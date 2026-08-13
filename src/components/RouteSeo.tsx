@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-import { getCanonicalUrl, normalizeSeoPath, seoByPath } from "../app/seo";
+import { getCanonicalUrl, getSocialImageUrl, normalizeSeoPath, seoByPath, socialImage } from "../app/seo";
 
 const MANAGED_JSON_LD_ID = "worklazy-route-jsonld";
 
@@ -15,6 +15,7 @@ export function RouteSeo() {
       ? { ...seoByPath["/tools/word-compare"], title: "Word 문서 비교 결과 | Worklazy Tools", noIndex: true }
       : seoByPath[path] ?? seoByPath["/"];
     const canonical = getCanonicalUrl(isTemporaryResult ? "/tools/word-compare" : path);
+    const image = getSocialImageUrl();
 
     document.title = seo.title;
     setMeta("name", "description", seo.description);
@@ -25,9 +26,17 @@ export function RouteSeo() {
     setMeta("property", "og:title", seo.title);
     setMeta("property", "og:description", seo.description);
     setMeta("property", "og:url", canonical);
-    setMeta("name", "twitter:card", "summary");
+    setMeta("property", "og:image", image);
+    setMeta("property", "og:image:secure_url", image);
+    setMeta("property", "og:image:type", socialImage.type);
+    setMeta("property", "og:image:width", String(socialImage.width));
+    setMeta("property", "og:image:height", String(socialImage.height));
+    setMeta("property", "og:image:alt", socialImage.alt);
+    setMeta("name", "twitter:card", "summary_large_image");
     setMeta("name", "twitter:title", seo.title);
     setMeta("name", "twitter:description", seo.description);
+    setMeta("name", "twitter:image", image);
+    setMeta("name", "twitter:image:alt", socialImage.alt);
     setCanonical(canonical);
     setJsonLd(createStructuredData(isTemporaryResult ? "/tools/word-compare" : path, canonical));
   }, [location.pathname]);
@@ -75,6 +84,7 @@ function createStructuredData(path: string, canonical: string) {
     description: seo.description,
     url: canonical,
     inLanguage: "ko-KR",
+    image: getSocialImageUrl(),
   }];
 
   if (seo.application) {

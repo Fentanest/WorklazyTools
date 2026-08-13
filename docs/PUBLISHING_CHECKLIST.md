@@ -33,8 +33,9 @@ GitHub 프로젝트 Pages의 `/저장소/ads.txt`는 호스트의 루트 `/ads.t
 
 - 최종 도메인 속성 등록 및 소유권 확인
 - `https://실제-주소/sitemap.xml` 제출
-- 홈, Excel 병합, Word 비교, 개인정보처리방침 URL을 URL 검사 도구로 확인
+- 홈, Excel 병합, Word 비교, 신규 계산·보안 도구와 개인정보처리방침 URL을 URL 검사 도구로 확인
 - canonical이 최종 공개 주소를 가리키는지 확인
+- Open Graph 대표 이미지가 1200×630 PNG로 표시되고 `summary_large_image` 카드가 생성되는지 확인
 - 배포 후 404, 모바일 사용성, Core Web Vitals 확인
 
 ## 5. 게시 전 운영 정보 확인
@@ -42,6 +43,7 @@ GitHub 프로젝트 Pages의 `/저장소/ads.txt`는 호스트의 루트 `/ads.t
 - 문의 페이지의 GitHub 채널이 실제 문의를 받을 수 있는지 확인
 - 개인정보처리방침과 이용약관의 운영 주체·연락 방법을 필요에 따라 보강
 - 중요 기능 변경 시 시행일, FAQ, 지원 범위와 sitemap을 함께 갱신
-- 실제 브라우저에서 XLSX·XLS·XLSB·XLSM·CSV·암호화 파일·DOCX 테스트
+- 실제 브라우저에서 XLSX·XLS·XLSB·XLSM·CSV·암호화 파일·DOCX와 EXIF·QR·그림판 테스트
+- `npm run test:utilities`, `npm run test:new-tools`, `npm run test:browser`, `npm run test:static` 통과 확인
 
 AdSense 승인은 코드 설치만으로 보장되지 않습니다. 명확한 내비게이션, 실제 사용 가치가 있는 독창적인 설명, 정상 작동하는 페이지와 정책 준수가 함께 평가됩니다.

@@ -8,14 +8,22 @@ export interface SeoDefinition {
   };
 }
 
+export const socialImage = {
+  path: "social/worklazy-tools-share.png",
+  width: 1200,
+  height: 630,
+  type: "image/png",
+  alt: "Worklazy Tools - 파일 업로드 없이 브라우저에서 실행하는 업무 도구",
+} as const;
+
 export const seoByPath: Record<string, SeoDefinition> = {
   "/": {
     title: "무료 문서·PDF·비디오·이미지 업무 도구 | Worklazy Tools",
-    description: "설치와 로그인 없이 Excel·Word·HWP·PDF·비디오·이미지 작업을 실행하세요. 작업 파일은 서버에 업로드하지 않고 브라우저에서 처리합니다.",
+    description: "설치와 로그인 없이 문서·미디어 편집, 텍스트·데이터 변환, 일정·급여 계산과 보안 도구를 실행하세요. 입력은 브라우저에서 처리합니다.",
   },
   "/tools": {
     title: "무료 업무 파일 도구 모음 | Worklazy Tools",
-    description: "Excel 병합, Word·HWP 문서 비교, HWP 문서 편집, PDF 편집·변환·OCR, 비디오와 이미지 편집을 브라우저에서 실행하세요.",
+    description: "문서·미디어 편집부터 텍스트, 데이터, 일정, 급여, 보안, QR 도구까지 브라우저에서 무료로 실행하세요.",
   },
   "/tools/excel-merger": {
     title: "Excel 파일 병합 - XLSX·XLS·XLSB·XLSM·CSV 합치기",
@@ -74,7 +82,52 @@ export const seoByPath: Record<string, SeoDefinition> = {
   "/tools/image-studio": {
     title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
     description: "클립보드 이미지를 붙여넣고 자르기·필터·레이어 편집, 일괄 리사이즈·워터마크, 미리보기가 있는 이어붙이기·콜라주와 GIF 생성을 실행하세요.",
-    application: { name: "Image Studio", featureList: ["클립보드 이미지 붙여넣기", "이미지 레이어 편집", "필터와 자르기", "일괄 리사이즈", "워터마크", "이어붙이기 실시간 미리보기", "GIF 애니메이션"] },
+    application: { name: "Image Studio", featureList: ["클립보드 이미지 붙여넣기", "이미지 레이어 편집", "필터와 자르기", "일괄 리사이즈", "워터마크", "이어붙이기 실시간 미리보기", "GIF 애니메이션", "그림판·스케치북"] },
+  },
+  "/tools/text-tools": {
+    title: "텍스트 정돈·케이스 변환 - 공백·줄바꿈·중복 줄 제거",
+    description: "불필요한 공백과 줄바꿈, 중복 줄을 제거하고 Camel·Snake·Kebab·Title Case 변환과 로컬 한국어 문장 검사를 실행하세요.",
+    application: { name: "Text Tools", featureList: ["공백 정돈", "줄바꿈 합치기", "중복 줄 제거", "Camel Case", "Snake Case", "Kebab Case", "한국어 띄어쓰기 가이드"] },
+  },
+  "/tools/text-formatter": {
+    title: "JSON·SQL·XML 포맷터 - 들여쓰기·Minify·문법 검사",
+    description: "JSON, SQL, XML 텍스트의 문법 오류를 확인하고 읽기 좋은 들여쓰기 또는 한 줄 Minify 형식으로 정돈하세요.",
+    application: { name: "JSON SQL XML Formatter", featureList: ["JSON 포맷", "SQL 정렬", "XML 포맷", "Minify", "문법 오류 탐지"] },
+  },
+  "/tools/work-calculator": {
+    title: "영업일·연차 계산기 - 대한민국 공휴일·대체공휴일 반영",
+    description: "주말과 대한민국 법정·대체공휴일을 제외한 영업일과 입사일·회계연도 기준 예상 연차를 계산하세요.",
+    application: { name: "영업일 연차 계산기", featureList: ["대한민국 공휴일", "음력 공휴일", "대체공휴일", "직접 휴일 추가", "입사일 기준 연차", "회계연도 기준 연차"] },
+  },
+  "/tools/timezone-calculator": {
+    title: "세계지도 시차·글로벌 회의 시간 계산기 - 도시 시간 비교",
+    description: "세계지도에서 도시 핀을 선택하고 IANA 타임존과 서머타임을 반영한 현지 시각과 글로벌 회의 가능 시간을 비교하세요.",
+    application: { name: "World Time Planner", featureList: ["인터랙티브 세계지도", "44개 주요 도시 핀", "도시 검색", "IANA 타임존", "서머타임 자동 반영", "최대 6개 도시 비교", "30분 단위 회의 추천"] },
+  },
+  "/tools/payroll-calculator": {
+    title: "주휴수당·월 실수령액·퇴직금 간이 계산기",
+    description: "2026년 최신 사회보험 기준으로 주휴수당, 월급 실수령액과 법정 퇴직금을 서버 전송 없이 간이 계산하세요.",
+    application: { name: "급여 간이 계산기", featureList: ["주휴수당", "국민연금", "건강보험", "장기요양보험", "고용보험", "근로소득세 추정", "퇴직금"] },
+  },
+  "/tools/image-privacy": {
+    title: "사진 EXIF·GPS 개인정보 제거 - JPG·PNG 메타데이터 삭제",
+    description: "사진 속 GPS 위치, 촬영 기기와 촬영 시각을 확인하고 EXIF 메타데이터가 제거된 깨끗한 JPG·PNG 사본을 만드세요.",
+    application: { name: "Image Privacy", featureList: ["EXIF 확인", "GPS 위치 확인", "촬영 기기 확인", "촬영 시각 확인", "OffscreenCanvas 재인코딩", "메타데이터 제거"] },
+  },
+  "/tools/security-tools": {
+    title: "안전한 비밀번호 생성기·강도 측정기",
+    description: "crypto.getRandomValues 기반 무작위 비밀번호를 만들고 패턴·엔트로피·공격 예상 시간으로 비밀번호 강도를 확인하세요.",
+    application: { name: "Password Security", featureList: ["CSPRNG 비밀번호 생성", "8~64자 길이", "문자 종류 선택", "패턴 강도 분석", "엔트로피", "공격 시간 추정"] },
+  },
+  "/tools/qr-studio": {
+    title: "QR 코드 생성기·사진 QR 스캐너 - 로고 삽입",
+    description: "URL과 텍스트를 중앙 로고가 포함된 QR 코드 PNG로 만들고 업로드한 사진 속 QR 데이터를 브라우저에서 읽으세요.",
+    application: { name: "QR Studio", featureList: ["URL QR 생성", "텍스트 QR 생성", "중앙 로고", "색상 설정", "PNG 다운로드", "사진 QR 스캔"] },
+  },
+  "/tools/data-converter": {
+    title: "CSV·JSON·HTML Table 표 데이터 변환기",
+    description: "CSV, JSON 객체 배열과 HTML Table 데이터를 브라우저 Worker에서 서로 변환하고 파일로 저장하세요.",
+    application: { name: "Table Data Converter", featureList: ["CSV JSON 변환", "JSON CSV 변환", "HTML Table 변환", "CSV 파일 불러오기", "Worker 파싱", "파일 다운로드"] },
   },
   "/about": {
     title: "서비스 소개 | Worklazy Tools",
@@ -111,6 +164,10 @@ export function getSiteBaseUrl() {
 
 export function getCanonicalUrl(pathname: string) {
   return new URL(normalizeSeoPath(pathname).replace(/^\//, ""), getSiteBaseUrl()).href;
+}
+
+export function getSocialImageUrl() {
+  return new URL(socialImage.path, getSiteBaseUrl()).href;
 }
 
 function ensureTrailingSlash(value: string) {

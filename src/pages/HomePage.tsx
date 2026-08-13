@@ -10,10 +10,10 @@ export function HomePage() {
     <div className="page home-page page-enter">
       <section className="hero compact-home-hero">
         <div className="hero-content">
-          <div className="hero-kicker"><Sparkles size={16} /> 작지만 확실한 업무 자동화</div>
+          <div className="hero-kicker"><Sparkles size={16} /> 작지만 유용한 업무 도구</div>
           <h1>귀찮은 파일 작업은 <span>도구에게 맡기세요.</span></h1>
           <p>
-            문서부터 비디오와 이미지까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 골라 파일을 넣으면
+            문서와 미디어부터 텍스트·계산·보안 도구까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 고르면
             나머지는 브라우저 안에서 안전하게 처리됩니다.
           </p>
           <div className="hero-actions">

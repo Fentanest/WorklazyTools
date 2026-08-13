@@ -22,6 +22,13 @@ resolved dependency versions.
 | `exceljs` 4.4.0 | MIT | XLSX/CSV processing · <https://github.com/exceljs/exceljs> |
 | `fabric` 7.4.0 | MIT | Interactive canvas editing · <https://github.com/fabricjs/fabric.js> |
 | `gifenc` 1.0.3 | MIT | GIF encoding · <https://github.com/mattdesl/gifenc> |
+| `change-case` | MIT | Text case conversion |
+| `sql-formatter`, `fast-xml-parser` | MIT | SQL and XML formatting/validation |
+| `date-fns`, `luxon` | MIT | Calendar and IANA timezone calculations |
+| `exifreader` | MPL-2.0 | EXIF metadata inspection · <https://github.com/mattiasw/ExifReader> |
+| `@zxcvbn-ts/core` | MIT | Password strength estimation · <https://github.com/zxcvbn-ts/zxcvbn> |
+| `qrcode`, `jsqr` | MIT / Apache-2.0 | QR generation and decoding |
+| `papaparse` | MIT | CSV parsing and serialization |
 | `jszip` 3.10.1 | MIT option | ZIP creation · <https://github.com/Stuk/jszip> |
 | `lucide-react` | ISC | Icons · <https://github.com/lucide-icons/lucide> |
 | `officecrypto-tool` | MIT | Office encryption/decryption |
