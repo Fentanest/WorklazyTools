@@ -1,0 +1,53 @@
+Worklazy Tools Proprietary License
+
+Copyright (c) 2026 the copyright holder(s) of Worklazy Tools.
+All rights reserved.
+
+1. Scope
+
+This license applies only to source code, user-interface design, documentation,
+text, graphics, and other materials independently authored for Worklazy Tools
+(the "Worklazy Materials"). It does not apply to third-party software, fonts,
+assets, or other components, including modifications derived from them. Those
+components remain governed by their respective licenses and notices.
+
+2. Permitted use
+
+You may access and use the officially hosted Worklazy Tools service for lawful
+personal or business file-processing tasks. Incidental copies made by a web
+browser as technically necessary to load and use the hosted service are allowed.
+No other license to the Worklazy Materials is granted.
+
+3. Restrictions
+
+Without prior written permission from the copyright holder, you may not:
+
+- copy, reproduce, modify, translate, publish, distribute, sublicense, sell, or
+  otherwise make the Worklazy Materials available to another person;
+- mirror, re-host, deploy, or operate all or a substantial part of Worklazy
+  Tools as another website, application, extension, package, or service;
+- use the Worklazy Materials to create or operate a competing or substantially
+  substitutable service;
+- monetize a copy, derivative, mirror, or re-hosted version through advertising,
+  subscriptions, fees, paid access, sponsorship, or another commercial model;
+- remove or obscure copyright, license, attribution, or provenance notices; or
+- use the Worklazy Tools name, logo, domain, or other brand identifiers in a way
+  that suggests sponsorship, affiliation, or endorsement.
+
+4. Third-party materials
+
+Third-party materials are excluded from these restrictions to the extent their
+own licenses grant broader rights. See THIRD_PARTY_NOTICES.md and the license
+page included with the distributed site. Nothing in this license limits rights
+that must be granted under an applicable open-source license.
+
+5. No warranty
+
+THE WORKLAZY MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY
+LAW, THE COPYRIGHT HOLDER IS NOT LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM THEIR USE.
+
+For permissions beyond this license, contact the project owner through the
+contact channel published on the official Worklazy Tools website.

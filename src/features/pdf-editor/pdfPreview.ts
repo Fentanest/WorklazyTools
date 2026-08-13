@@ -1,0 +1,345 @@
+import JSZip from "jszip";
+import {
+  getDocument,
+  GlobalWorkerOptions,
+  PasswordException,
+  type PDFDocumentProxy,
+} from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+import type { PdfTextCell, PdfTextDocument, PdfTextLine, PdfTextPage, WorkerProgress } from "./types";
+
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+interface CachedPdfDocument {
+  loadingTask: ReturnType<typeof getDocument>;
+  promise: Promise<PDFDocumentProxy>;
+}
+
+const documentCache = new Map<File, CachedPdfDocument>();
+
+export async function getPdfDocument(file: File) {
+  const cached = documentCache.get(file);
+  if (cached) return cached.promise;
+  const buffer = await file.arrayBuffer();
+  const loadingTask = getDocument({
+    data: new Uint8Array(buffer),
+    password: "",
+    enableXfa: true,
+    useSystemFonts: true,
+    // PDF.js의 내부 OffscreenCanvas/ImageDecoder 경로는 일부 Chromium·GPU 조합에서
+    // 오류 없이 흰 캔버스를 돌려주는 경우가 있어 썸네일은 호환성 경로를 사용합니다.
+    isOffscreenCanvasSupported: false,
+    isImageDecoderSupported: false,
+  });
+  const promise = loadingTask.promise.catch((error) => {
+    documentCache.delete(file);
+    throw normalizePdfOpenError(error);
+  });
+  documentCache.set(file, { loadingTask, promise });
+  return promise;
+}
+
+export async function inspectPdf(file: File) {
+  const document = await getPdfDocument(file);
+  return { pageCount: document.numPages };
+}
+
+export async function releasePdf(file: File) {
+  const cached = documentCache.get(file);
+  documentCache.delete(file);
+  if (cached) {
+    try { await cached.loadingTask.destroy(); } catch { /* 이미 종료된 문서는 무시합니다. */ }
+  }
+}
+
+export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172) {
+  const pdfDocument = await getPdfDocument(file);
+  const page = await pdfDocument.getPage(pageIndex + 1);
+  const natural = page.getViewport({ scale: 1 });
+  const cssScale = targetWidth / natural.width;
+  const viewport = page.getViewport({ scale: cssScale });
+  const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.floor(viewport.width * outputScale));
+  const height = Math.max(1, Math.floor(viewport.height * outputScale));
+  const renderCanvas = document.createElement("canvas");
+  renderCanvas.width = width;
+  renderCanvas.height = height;
+  const renderContext = renderCanvas.getContext("2d", { alpha: false });
+  if (!renderContext) throw new Error("PDF 미리보기를 표시할 수 없습니다.");
+  await page.render({
+    canvas: renderCanvas,
+    canvasContext: renderContext,
+    viewport,
+    transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
+    background: "#ffffff",
+  }).promise;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = `${Math.floor(viewport.width)}px`;
+  canvas.style.height = `${Math.floor(viewport.height)}px`;
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error("PDF 미리보기를 화면에 복사할 수 없습니다.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(renderCanvas, 0, 0);
+  renderCanvas.width = 1;
+  renderCanvas.height = 1;
+  return { width: viewport.width, height: viewport.height };
+}
+
+export function parsePageRange(value: string, pageCount: number) {
+  if (!value.trim()) throw new Error("페이지 범위를 입력해 주세요.");
+  const result: number[] = [];
+  const seen = new Set<number>();
+  for (const rawPart of value.split(",")) {
+    const part = rawPart.trim();
+    if (!part) continue;
+    const rangeMatch = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    const singleMatch = part.match(/^\d+$/);
+    let numbers: number[];
+    if (rangeMatch) {
+      const start = Number(rangeMatch[1]);
+      const end = Number(rangeMatch[2]);
+      if (start > end) throw new Error(`페이지 범위 ${part}의 시작 번호가 끝 번호보다 큽니다.`);
+      numbers = Array.from({ length: end - start + 1 }, (_, index) => start + index);
+    } else if (singleMatch) numbers = [Number(part)];
+    else throw new Error(`페이지 범위 '${part}'의 형식을 확인해 주세요.`);
+    for (const pageNumber of numbers) {
+      if (pageNumber < 1 || pageNumber > pageCount) throw new Error(`페이지 번호는 1~${pageCount} 사이여야 합니다.`);
+      if (!seen.has(pageNumber)) {
+        seen.add(pageNumber);
+        result.push(pageNumber - 1);
+      }
+    }
+  }
+  if (!result.length) throw new Error("추출할 페이지가 없습니다.");
+  return result;
+}
+
+export async function pdfToImageArchive(
+  file: File,
+  format: "png" | "jpeg",
+  dpi: 96 | 144 | 216,
+  quality: number,
+  onProgress?: WorkerProgress,
+) {
+  const document = await getPdfDocument(file);
+  const zip = new JSZip();
+  const scale = dpi / 72;
+  const baseName = stripExtension(file.name);
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    onProgress?.(5 + ((pageNumber - 1) / document.numPages) * 78, `[${pageNumber}/${document.numPages}] 페이지를 ${format.toUpperCase()}로 렌더링하는 중…`);
+    const canvas = await renderPageForExport(document, pageNumber, scale);
+    const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality);
+    zip.file(`${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob);
+    canvas.width = 1;
+    canvas.height = 1;
+    await yieldToBrowser();
+  }
+  onProgress?.(88, "변환된 이미지를 ZIP 파일로 압축하는 중…");
+  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, (metadata) => {
+    onProgress?.(88 + metadata.percent * 0.1, `ZIP 압축 중… ${Math.round(metadata.percent)}%`);
+  });
+  return { blob, fileName: `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip` };
+}
+
+export type PdfOcrMode = "off" | "auto" | "all";
+
+export interface ExtractPdfTextResult {
+  document: PdfTextDocument;
+  ocrPdfBuffers: ArrayBuffer[];
+  ocrPageCount: number;
+}
+
+export async function extractPdfText(
+  file: File,
+  ocrMode: PdfOcrMode,
+  searchablePdf: boolean,
+  onProgress?: WorkerProgress,
+): Promise<ExtractPdfTextResult> {
+  const document = await getPdfDocument(file);
+  const pages: PdfTextPage[] = [];
+  onProgress?.(2, "PDF의 내장 텍스트와 좌표를 확인하는 중…");
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const page = await document.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pages.push(layoutPdfItems(pageNumber, (content.items as unknown[]).filter(isTextItem)));
+    onProgress?.(2 + (pageNumber / document.numPages) * 16, `[${pageNumber}/${document.numPages}] 내장 텍스트 분석 완료`);
+  }
+
+  const ocrTargets = searchablePdf || ocrMode === "all"
+    ? pages.map((_, index) => index)
+    : ocrMode === "auto"
+      ? pages.flatMap((page, index) => page.lines.reduce((sum, line) => sum + line.text.length, 0) < 8 ? [index] : [])
+      : [];
+  const ocrPdfBuffers: ArrayBuffer[] = [];
+
+  if (ocrTargets.length) {
+    const { createWorker } = await import("tesseract.js");
+    let activePage = 0;
+    onProgress?.(19, "한국어·영어 OCR 언어 모델을 준비하는 중… (최초 실행 시 다운로드)");
+    const ocrWorker = await createWorker(["kor", "eng"], undefined, {
+      logger: (message) => {
+        if (message.status === "recognizing text") {
+          const value = 22 + ((activePage + message.progress) / ocrTargets.length) * 68;
+          onProgress?.(value, `[${activePage + 1}/${ocrTargets.length}] OCR 인식 중… ${Math.round(message.progress * 100)}%`);
+        } else {
+          onProgress?.(19 + message.progress * 3, translateOcrStatus(message.status));
+        }
+      },
+    });
+    try {
+      for (activePage = 0; activePage < ocrTargets.length; activePage += 1) {
+        const pageIndex = ocrTargets[activePage];
+        onProgress?.(22 + (activePage / ocrTargets.length) * 68, `[${activePage + 1}/${ocrTargets.length}] ${pageIndex + 1}페이지 OCR용 이미지 생성 중…`);
+        const canvas = await renderPageForOcr(document, pageIndex + 1);
+        const recognized = await ocrWorker.recognize(
+          canvas,
+          searchablePdf ? { pdfTitle: file.name, pdfTextOnly: false } : {},
+          { text: true, blocks: true, pdf: searchablePdf },
+        );
+        pages[pageIndex] = layoutOcrPage(pageIndex + 1, recognized.data);
+        if (searchablePdf && recognized.data.pdf) {
+          const bytes = Uint8Array.from(recognized.data.pdf);
+          ocrPdfBuffers.push(bytes.buffer);
+        }
+        canvas.width = 1;
+        canvas.height = 1;
+        await yieldToBrowser();
+      }
+    } finally {
+      await ocrWorker.terminate();
+    }
+  }
+
+  const characterCount = pages.reduce((total, page) => total + page.lines.reduce((sum, line) => sum + line.text.length, 0), 0);
+  return {
+    document: { sourceName: file.name, pages, characterCount },
+    ocrPdfBuffers,
+    ocrPageCount: ocrTargets.length,
+  };
+}
+
+async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number) {
+  const page = await document.getPage(pageNumber);
+  const natural = page.getViewport({ scale: 1 });
+  const requestedScale = 2.4;
+  const pixelLimit = 12_000_000;
+  const limitedScale = Math.min(requestedScale, Math.sqrt(pixelLimit / (natural.width * natural.height)));
+  return renderPageForExport(document, pageNumber, limitedScale);
+}
+
+async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number) {
+  const page = await document.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+  const canvas = documentCanvas(viewport.width, viewport.height);
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error("PDF 페이지 이미지를 만들 수 없습니다.");
+  await page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" }).promise;
+  return canvas;
+}
+
+interface PdfJsTextItem {
+  str: string;
+  transform: unknown[];
+  width: number;
+  height: number;
+}
+
+function layoutPdfItems(pageNumber: number, items: PdfJsTextItem[]): PdfTextPage {
+  const sorted = items
+    .filter((item) => item.str.trim())
+    .map((item) => ({ text: item.str, x: item.transform[4] as number, y: item.transform[5] as number, width: item.width, height: Math.max(item.height, 8) }))
+    .sort((left, right) => Math.abs(right.y - left.y) > Math.max(left.height, right.height) * 0.42 ? right.y - left.y : left.x - right.x);
+  const groups: typeof sorted[] = [];
+  for (const item of sorted) {
+    const group = groups.find((candidate) => Math.abs(candidate[0].y - item.y) <= Math.max(candidate[0].height, item.height) * 0.45);
+    if (group) group.push(item);
+    else groups.push([item]);
+  }
+  groups.sort((left, right) => right[0].y - left[0].y);
+  const lines = groups.map((group) => buildLine(group.sort((left, right) => left.x - right.x)));
+  return { pageNumber, lines };
+}
+
+function buildLine(items: Array<{ text: string; x: number; width: number; height: number }>): PdfTextLine {
+  const cells: PdfTextCell[] = [];
+  let text = "";
+  let currentCell = "";
+  let previousEnd: number | undefined;
+  let previousHeight = 10;
+  let cellX = items[0]?.x ?? 0;
+  for (const item of items) {
+    const gap = previousEnd === undefined ? 0 : item.x - previousEnd;
+    const wordGap = gap > Math.max(1.5, previousHeight * 0.18);
+    const cellGap = gap > Math.max(18, previousHeight * 1.8);
+    if (cellGap && currentCell.trim()) {
+      cells.push({ text: currentCell.trim(), x: cellX });
+      currentCell = "";
+      cellX = item.x;
+    }
+    if (wordGap && text && !text.endsWith(" ")) text += " ";
+    if (wordGap && currentCell && !currentCell.endsWith(" ")) currentCell += " ";
+    text += item.text;
+    currentCell += item.text;
+    previousEnd = item.x + item.width;
+    previousHeight = item.height;
+  }
+  if (currentCell.trim()) cells.push({ text: currentCell.trim(), x: cellX });
+  return { text: text.trim(), cells };
+}
+
+function layoutOcrPage(pageNumber: number, data: {
+  text: string;
+  blocks: Array<{ paragraphs: Array<{ lines: Array<{ text: string; words: Array<{ text: string; bbox: { x0: number; x1: number } }> }> }> }> | null;
+}) {
+  const ocrLines = data.blocks?.flatMap((block) => block.paragraphs.flatMap((paragraph) => paragraph.lines)) ?? [];
+  const lines = ocrLines.length
+    ? ocrLines.map((line) => buildLine(line.words.map((word) => ({ text: word.text, x: word.bbox.x0, width: word.bbox.x1 - word.bbox.x0, height: 12 }))))
+    : data.text.split(/\r?\n/).map((text) => text.trim()).filter(Boolean).map((text) => ({ text, cells: [{ text, x: 0 }] }));
+  return { pageNumber, lines };
+}
+
+function isTextItem(item: unknown): item is PdfJsTextItem {
+  return typeof item === "object" && item !== null && "str" in item && typeof (item as { str: unknown }).str === "string";
+}
+
+function documentCanvas(width: number, height: number) {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.ceil(width));
+  canvas.height = Math.max(1, Math.ceil(height));
+  return canvas;
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("이미지 파일을 만들지 못했습니다.")), type, quality));
+}
+
+function yieldToBrowser() {
+  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function stripExtension(name: string) {
+  return name.replace(/\.[^.]+$/, "") || "pdf";
+}
+
+function translateOcrStatus(status: string) {
+  const labels: Record<string, string> = {
+    "loading tesseract core": "OCR WebAssembly 엔진 불러오는 중…",
+    "initializing tesseract": "OCR 엔진 초기화 중…",
+    "loading language traineddata": "한국어·영어 학습 모델 내려받는 중…",
+    "initializing api": "한국어·영어 인식기 준비 중…",
+  };
+  return labels[status] || `OCR 준비 중 · ${status}`;
+}
+
+function normalizePdfOpenError(error: unknown) {
+  if (error instanceof PasswordException || (error instanceof Error && error.name === "PasswordException")) {
+    return new Error("암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.");
+  }
+  if (error instanceof Error && /password|encrypted/i.test(error.message)) {
+    return new Error("암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.");
+  }
+  return error instanceof Error ? error : new Error("PDF 파일을 열지 못했습니다.");
+}

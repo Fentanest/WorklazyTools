@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <rect id="bg-square" x="0" y="0" width="512" height="512" rx="128" />
+    <linearGradient id="facet-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+    <linearGradient id="facet-2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+    <linearGradient id="facet-3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+    <linearGradient id="facet-4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#D946EF" />
+    </linearGradient>
+    <filter id="subtle-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+  <use href="#bg-square" fill="#09090D" />
+  <rect x="1" y="1" width="510" height="510" rx="127" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="2" />
+  <g filter="url(#subtle-shadow)">
+    <path d="M 112 160 L 168 160 L 208 352 L 152 352 Z" fill="url(#facet-1)" />
+    <path d="M 152 352 L 208 352 L 272 216 L 240 216 Z" fill="url(#facet-2)" opacity="0.9" />
+    <path d="M 240 216 L 272 216 L 336 352 L 280 352 Z" fill="url(#facet-3)" opacity="0.9" />
+    <path d="M 280 352 L 336 352 L 392 160 L 336 160 Z" fill="url(#facet-4)" />
+    <polygon points="256,180 268,200 256,220 244,200" fill="#38BDF8" />
+  </g>
+</svg>

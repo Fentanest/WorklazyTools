@@ -1,0 +1,13 @@
+{
+  "name": "Worklazy Tools",
+  "short_name": "Worklazy",
+  "description": "브라우저에서 실행하는 문서, PDF, 비디오와 이미지 업무 도구",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

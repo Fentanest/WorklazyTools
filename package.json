@@ -1,0 +1,53 @@
+{
+  "name": "worklazytools",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "vendor:rhwp": "node scripts/vendor-rhwp-studio.mjs",
+    "prebuild": "node scripts/validate-rhwp-vendor.mjs && node scripts/generate-third-party-licenses.mjs",
+    "build": "tsc -b && vite build && node scripts/generate-static-pages.mjs",
+    "preview": "vite preview",
+    "test:browser": "node tests/browser-smoke.mjs",
+    "test:new-tools": "node tests/new-tools-smoke.mjs",
+    "test:static": "node scripts/validate-static-output.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/ffmpeg": "0.12.15",
+    "@ffmpeg/util": "0.12.2",
+    "@rhwp/core": "0.8.4",
+    "@rhwp/editor": "0.8.4",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "exceljs": "^4.4.0",
+    "fabric": "7.4.0",
+    "gifenc": "1.0.3",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.468.0",
+    "officecrypto-tool": "^0.0.19",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.2.108",
+    "process": "^0.11.10",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1",
+    "readable-stream": "^3.6.2",
+    "sortablejs": "^1.15.7",
+    "stream-browserify": "^3.0.0",
+    "tesseract.js": "^7.0.0",
+    "vite-plugin-node-polyfills": "^0.28.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+    "@types/readable-stream": "^4.0.24",
+    "@types/sortablejs": "^1.15.9",
+    "@vitejs/plugin-react": "^4.3.4",
+    "puppeteer-core": "^25.6.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5"
+  }
+}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64">
+  <defs>
+    <linearGradient id="hf-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+    <linearGradient id="hf-2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(12, 14)">
+    <rect width="36" height="36" rx="9" fill="#111118" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1" />
+    <path d="M 6 10 L 10 10 L 14 26 L 10 26 Z" fill="url(#hf-1)" />
+    <path d="M 10 26 L 14 26 L 19 16 L 16 16 Z" fill="#06B6D4" opacity="0.85" />
+    <path d="M 16 16 L 19 16 L 24 26 L 20 26 Z" fill="#6366F1" opacity="0.85" />
+    <path d="M 20 26 L 24 26 L 28 10 L 24 10 Z" fill="url(#hf-2)" />
+    <polygon points="17.5,13 19,15 17.5,17 16,15" fill="#38BDF8" />
+  </g>
+  <text x="60" y="37" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" font-size="20" fill="#FFFFFF" letter-spacing="-0.6">Worklazy</text>
+  <text x="151" y="37" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="400" font-size="20" fill="#94A3B8" letter-spacing="-0.4">Tools</text>
+  <rect x="218" y="23" width="88" height="18" rx="9" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1" />
+  <text x="262" y="35" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="9" fill="#10B981" letter-spacing="0.2">CLIENT SIDE</text>
+</svg>
