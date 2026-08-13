@@ -40,7 +40,8 @@ for (const [packagePath, lockMetadata] of productionPackages) {
   }
   for (const fileName of noticeFiles) {
     const content = await fs.readFile(path.join(directory, fileName), "utf8").catch(() => "");
-    if (content.trim()) sections.push("", `--- ${fileName} ---`, content.trim());
+    const normalized = content.replaceAll("\r\n", "\n").split("\n").map((line) => line.trimEnd()).join("\n").trim();
+    if (normalized) sections.push("", `--- ${fileName} ---`, normalized);
   }
 }
 

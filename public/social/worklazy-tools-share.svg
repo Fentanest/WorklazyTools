@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="20" x2="1120" y2="610" gradientUnits="userSpaceOnUse"><stop stop-color="#fbfcff"/><stop offset=".55" stop-color="#f2f2f7"/><stop offset="1" stop-color="#e7f4ff"/></linearGradient>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#10b981"/><stop offset="1" stop-color="#06b6d4"/></linearGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#06b6d4"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
+    <linearGradient id="c" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#d946ef"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#007aff" stop-opacity=".2"/><stop offset="1" stop-color="#007aff" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%"><feDropShadow dy="20" stdDeviation="28" flood-color="#363648" flood-opacity=".14"/></filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/><circle cx="1070" cy="70" r="380" fill="url(#glow)"/><circle cx="70" cy="610" r="330" fill="#20b15a" fill-opacity=".08"/>
+  <g filter="url(#shadow)"><rect x="92" y="80" width="1016" height="470" rx="58" fill="#fff" fill-opacity=".84"/><rect x="93" y="81" width="1014" height="468" rx="57" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="2"/></g>
+  <g transform="translate(154 139)"><rect width="116" height="116" rx="31" fill="#0b0b11"/><path d="M24 34h13l12 48H36z" fill="url(#a)"/><path d="M36 82h13l15-32h-9z" fill="#06b6d4"/><path d="M55 50h9l16 32H67z" fill="url(#b)"/><path d="M67 82h13l12-48H79z" fill="url(#c)"/><path d="m58 38 5 7-5 7-5-7z" fill="#38bdf8"/></g>
+  <text x="154" y="326" fill="#18181b" font-family="Arial,Helvetica,sans-serif" font-size="70" font-weight="700" letter-spacing="-3">Worklazy Tools</text>
+  <text x="157" y="382" fill="#69696f" font-family="Arial,Helvetica,sans-serif" font-size="28">Documents, media and everyday work utilities</text>
+  <g transform="translate(154 430)"><rect width="250" height="52" rx="26" fill="#e8f8ef"/><circle cx="27" cy="26" r="8" fill="#20b15a"/><path d="m23 26 3 3 6-7" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><text x="48" y="34" fill="#168a46" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="700">No file uploads</text></g>
+  <g transform="translate(424 430)"><rect width="290" height="52" rx="26" fill="#e9f3ff"/><path d="M19 26h16M27 18v16" stroke="#007aff" stroke-width="3" stroke-linecap="round"/><text x="48" y="34" fill="#0066d6" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="700">Runs in your browser</text></g>
+  <text x="1025" y="484" text-anchor="end" fill="#8a8a91" font-family="Arial,Helvetica,sans-serif" font-size="20" font-weight="700">worklazy.net</text>
+</svg>

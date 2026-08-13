@@ -4,14 +4,16 @@ import path from "node:path";
 const outputDirectory = path.resolve("dist");
 const sourceHtml = await fs.readFile(path.join(outputDirectory, "index.html"), "utf8");
 const siteUrl = ensureTrailingSlash(process.env.VITE_SITE_URL || "https://worklazy.net/");
+const socialImage = new URL("social/worklazy-tools-share.png", siteUrl).href;
+const socialImageAlt = "Worklazy Tools - 파일 업로드 없이 브라우저에서 실행하는 업무 도구";
 
 const pages = [
   {
     route: "",
     title: "무료 문서·PDF·비디오·이미지 업무 도구 | Worklazy Tools",
-    description: "설치와 로그인 없이 Excel·Word·HWP·PDF·비디오·이미지 작업을 실행하세요. 작업 파일은 서버에 업로드하지 않고 브라우저에서 처리합니다.",
+    description: "설치와 로그인 없이 문서·미디어 편집, 텍스트·데이터 변환, 일정·급여 계산과 보안 도구를 실행하세요. 입력은 브라우저에서 처리합니다.",
     heading: "귀찮은 파일 작업은 브라우저 도구에게 맡기세요.",
-    intro: "Worklazy Tools는 Excel 병합, Word·HWP 비교, HWP 편집, PDF 편집·변환·OCR, 비디오와 이미지 편집을 설치 없이 실행하는 무료 업무 도구입니다.",
+    intro: "Worklazy Tools는 문서·미디어 편집, 텍스트·표 변환, 일정·급여 계산과 개인정보·보안 도구를 설치 없이 실행하는 무료 업무 도구입니다.",
     sections: [
       ["Excel 파일 병합", "여러 스프레드시트를 시트별, 세로, 가로 방식으로 합칩니다. 수식 유지, 암호화 입력과 출력 XLSX 암호를 지원합니다."],
       ["Word 문서 비교", "여러 DOCX 문서 쌍의 본문과 표를 동시에 비교하고 웹·Excel 보고서와 변경 추적 DOCX로 제공합니다."],
@@ -19,6 +21,8 @@ const pages = [
       ["HWP 문서 편집", "공식 rhwp Studio에서 HWP와 HWPX의 본문·서식·표·개체를 편집하고 다시 HWP·HWPX로 저장합니다."],
       ["HWP 문서 비교", "여러 HWP·HWPX 문서 쌍의 본문, 개요 번호, 표와 기타 문서 영역을 비교하고 웹·Excel 결과를 제공합니다."],
       ["비디오와 이미지", "비디오 구간을 GIF·숏폼·음원으로 만들고 이미지를 개별 또는 일괄 편집해 콜라주와 GIF로 저장합니다."],
+      ["텍스트와 데이터", "텍스트 정돈과 JSON·SQL·XML 포맷, CSV·JSON·HTML Table 변환을 로컬 Worker에서 실행합니다."],
+      ["일정·급여·보안", "영업일·연차·글로벌 시차·급여를 계산하고 사진 EXIF, 비밀번호와 QR 코드를 안전하게 처리합니다."],
       ["로컬 우선 처리", "작업 파일과 암호를 별도 서버에 업로드하지 않습니다. 진행 상황은 단계별 로그로 바로 확인할 수 있습니다."],
     ],
   },
@@ -28,7 +32,7 @@ const pages = [
     description: "Excel·Word·HWP·PDF·비디오·이미지 작업을 브라우저에서 바로 실행하는 무료 업무 도구 모음입니다.",
     heading: "무료 업무 파일 도구",
     intro: "반복되는 문서, PDF, 비디오와 이미지 작업을 브라우저에서 처리하세요. 로그인이나 프로그램 설치가 필요하지 않습니다.",
-    sections: [["제공 도구", "스프레드시트 병합, 여러 DOCX·HWP·HWPX 문서 쌍 비교, HWP 편집, PDF 편집·변환·OCR, 비디오 인코딩과 이미지 일괄 편집을 제공합니다."]],
+    sections: [["제공 도구", "문서·PDF·비디오·이미지 편집과 텍스트·표 데이터 변환, 영업일·시차·급여 계산, 사진 개인정보·비밀번호·QR 도구를 제공합니다."]],
   },
   {
     route: "tools/excel-merger",
@@ -172,7 +176,89 @@ const pages = [
       ["일괄 리사이즈와 워터마크", "업로드나 클립보드로 여러 이미지를 추가하고 크기, 출력 형식과 워터마크를 적용해 ZIP으로 내려받습니다."],
       ["이어붙이기와 콜라주", "이미지를 세로·가로 또는 격자로 배치하고 간격과 배경색에 따른 결과를 미리 확인합니다."],
       ["GIF 애니메이션", "업로드 순서를 프레임 순서로 사용하고 크기와 재생 간격을 지정해 GIF를 만듭니다."],
+      ["그림판·스케치북", "연필·붓·지우개로 자유롭게 그리고 선·도형·텍스트와 Undo·Redo를 사용해 PNG·JPG로 저장합니다."],
     ],
+  },
+  {
+    route: "tools/text-tools",
+    title: "텍스트 정돈·케이스 변환 - 공백·줄바꿈·중복 줄 제거",
+    description: "불필요한 공백과 줄바꿈, 중복 줄을 제거하고 Camel·Snake·Kebab·Title Case 변환과 로컬 한국어 문장 검사를 실행하세요.",
+    heading: "복잡한 텍스트를 빠르고 안전하게 정돈하세요.",
+    intro: "원문을 서버로 보내지 않고 공백·줄 구조를 정리하거나 개발용 케이스로 바꾸고 한국어 문장의 자주 틀리는 표현을 점검합니다.",
+    application: "Text Tools",
+    sections: [["텍스트 정돈", "줄 앞뒤 공백, 다중 공백, 불필요한 줄바꿈과 중복 줄을 선택적으로 제거합니다."], ["케이스 변환", "Camel, Snake, Kebab, Title Case 결과를 원문과 나란히 확인하고 복사합니다."], ["한국어 가이드", "200개 이상의 로컬 정규식 패턴으로 의심 표현을 찾고 문맥 확인이 필요한 교정 제안을 표시합니다."]],
+  },
+  {
+    route: "tools/text-formatter",
+    title: "JSON·SQL·XML 포맷터 - 들여쓰기·Minify·문법 검사",
+    description: "JSON, SQL, XML 텍스트의 문법 오류를 확인하고 읽기 좋은 들여쓰기 또는 한 줄 Minify 형식으로 정돈하세요.",
+    heading: "JSON·SQL·XML을 읽기 좋게 정리하세요.",
+    intro: "브라우저 Worker가 텍스트 문법을 분석하고 들여쓰기 또는 한 줄 형식으로 결과를 만듭니다.",
+    application: "JSON SQL XML Formatter",
+    sections: [["세 가지 형식", "JSON.parse, SQL Formatter와 XML Validator를 사용해 각 형식에 맞게 처리합니다."], ["문법 오류", "잘못된 JSON과 XML은 오류 위치와 메시지를 표시하며 원문을 임의로 복구하지 않습니다."], ["Minify", "문자열 내부 값을 유지하면서 구조에 불필요한 공백과 줄바꿈을 줄입니다."]],
+  },
+  {
+    route: "tools/work-calculator",
+    title: "영업일·연차 계산기 - 대한민국 공휴일·대체공휴일 반영",
+    description: "주말과 대한민국 법정·대체공휴일을 제외한 영업일과 입사일·회계연도 기준 예상 연차를 계산하세요.",
+    heading: "업무 일정과 예상 연차를 계산하세요.",
+    intro: "양력·음력 공휴일과 대체공휴일을 계산하고 회사 휴무일을 직접 추가할 수 있습니다.",
+    application: "영업일 연차 계산기",
+    sections: [["대한민국 영업일", "주말, 설·추석·부처님오신날과 법정·대체공휴일을 기간에서 제외합니다."], ["추가 휴일", "임시공휴일, 선거일과 회사 휴무일을 날짜로 직접 추가할 수 있습니다."], ["연차", "입사일 기준과 회계연도 기준을 나누어 개근을 가정한 예상 발생 일수를 표시합니다."]],
+  },
+  {
+    route: "tools/timezone-calculator",
+    title: "세계지도 시차·글로벌 회의 시간 계산기 - 도시 시간 비교",
+    description: "세계지도에서 도시 핀을 선택하고 IANA 타임존과 서머타임을 반영한 현지 시각과 글로벌 회의 가능 시간을 비교하세요.",
+    heading: "세계지도에서 글로벌 팀의 시간을 비교하세요.",
+    intro: "서울을 비롯한 44개 주요 도시를 지도 핀과 검색으로 선택하고 현지 시각과 모두가 업무 중인 구간을 확인합니다.",
+    application: "World Time Planner",
+    sections: [["로컬 세계지도", "Natural Earth 기반 세계지도와 도시 좌표를 정적 자산으로 제공하며 외부 지도 서버를 호출하지 않습니다."], ["정확한 시차", "IANA 타임존 데이터로 날짜별 일광절약시간제와 UTC 오프셋을 반영합니다."], ["도시 비교", "지도 핀 또는 검색으로 최대 6개 도시를 선택해 현지 시각과 날짜 차이를 비교합니다."], ["회의 시간", "모든 선택 도시가 현지 09시부터 18시 사이인 30분 단위 구간을 추천합니다."]],
+  },
+  {
+    route: "tools/payroll-calculator",
+    title: "주휴수당·월 실수령액·퇴직금 간이 계산기",
+    description: "2026년 최신 사회보험 기준으로 주휴수당, 월급 실수령액과 법정 퇴직금을 서버 전송 없이 간이 계산하세요.",
+    heading: "민감한 급여 정보를 내 브라우저에서 계산하세요.",
+    intro: "주 소정근로시간과 급여·재직 정보를 저장하거나 전송하지 않고 주휴수당, 실수령액과 퇴직금을 추정합니다.",
+    application: "급여 간이 계산기",
+    sections: [["주휴수당", "주 15시간 이상일 때 주 소정근로시간 비율과 약정 시급으로 유급 주휴 시간을 계산합니다."], ["월 실수령액", "국민연금·건강보험·장기요양·고용보험과 부양가족 기준 예상 세액을 공제합니다."], ["퇴직금", "재직일수, 최근 3개월 임금과 연간 상여·연차수당 반영액으로 평균임금과 법정 퇴직금을 계산합니다."], ["참고용 결과", "실제 신고 기준소득, 비과세 급여와 회사 원천징수 방식에 따라 급여명세서와 차이가 날 수 있습니다."]],
+  },
+  {
+    route: "tools/image-privacy",
+    title: "사진 EXIF·GPS 개인정보 제거 - JPG·PNG 메타데이터 삭제",
+    description: "사진 속 GPS 위치, 촬영 기기와 촬영 시각을 확인하고 EXIF 메타데이터가 제거된 깨끗한 JPG·PNG 사본을 만드세요.",
+    heading: "사진을 공유하기 전에 개인정보를 제거하세요.",
+    intro: "사진의 메타데이터를 확인하고 픽셀만 새 캔버스에 그려 GPS·기기·촬영 시각 태그가 없는 사본을 만듭니다.",
+    application: "Image Privacy",
+    sections: [["EXIF 확인", "GPS 좌표, 촬영 기기, 촬영 시각과 소프트웨어 정보를 브라우저에서 읽습니다."], ["재인코딩 제거", "원본 컨테이너를 복사하지 않고 OffscreenCanvas에 픽셀을 렌더링해 새 JPG 또는 PNG로 저장합니다."], ["로컬 처리", "원본과 결과는 전용 Worker와 브라우저 메모리 밖으로 전송되지 않습니다."]],
+  },
+  {
+    route: "tools/security-tools",
+    title: "안전한 비밀번호 생성기·강도 측정기",
+    description: "crypto.getRandomValues 기반 무작위 비밀번호를 만들고 패턴·엔트로피·공격 예상 시간으로 비밀번호 강도를 확인하세요.",
+    heading: "길고 고유한 비밀번호를 안전하게 만드세요.",
+    intro: "운영체제의 암호학적 난수를 사용하고 입력한 비밀번호를 네트워크로 보내지 않은 채 강도를 분석합니다.",
+    application: "Password Security",
+    sections: [["안전한 난수", "crypto.getRandomValues와 편향을 줄인 거절 샘플링으로 문자 위치를 선택합니다."], ["사용자 설정", "8~64자 길이와 대문자·소문자·숫자·특수문자 포함 여부를 설정합니다."], ["강도 분석", "문자열 패턴, 엔트로피와 예상 추측 횟수로 공격에 견디는 시간을 추정합니다."]],
+  },
+  {
+    route: "tools/qr-studio",
+    title: "QR 코드 생성기·사진 QR 스캐너 - 로고 삽입",
+    description: "URL과 텍스트를 중앙 로고가 포함된 QR 코드 PNG로 만들고 업로드한 사진 속 QR 데이터를 브라우저에서 읽으세요.",
+    heading: "QR 코드를 만들고 사진에서 읽으세요.",
+    intro: "텍스트·URL QR 코드를 원하는 크기와 색상으로 만들거나 업로드한 이미지의 QR 데이터를 분석합니다.",
+    application: "QR Studio",
+    sections: [["QR 생성", "높은 오류 복원 수준과 충분한 여백으로 QR 코드를 만들고 PNG로 저장합니다."], ["중앙 로고", "선택한 로고를 흰 여백과 함께 QR 중앙에 배치합니다."], ["사진 스캔", "Worker에서 이미지를 축소하고 명암 반전을 포함해 QR 데이터를 찾습니다."]],
+  },
+  {
+    route: "tools/data-converter",
+    title: "CSV·JSON·HTML Table 표 데이터 변환기",
+    description: "CSV, JSON 객체 배열과 HTML Table 데이터를 브라우저 Worker에서 서로 변환하고 파일로 저장하세요.",
+    heading: "표 데이터를 필요한 형식으로 바꾸세요.",
+    intro: "CSV·JSON·HTML Table을 서로 변환하고 결과를 복사하거나 파일로 저장합니다.",
+    application: "Table Data Converter",
+    sections: [["CSV", "첫 행을 열 이름으로 사용하고 따옴표·쉼표·셀 줄바꿈을 Papa Parse로 해석합니다."], ["JSON", "객체 배열의 모든 키를 열 이름으로 모아 표 형태로 정규화합니다."], ["HTML Table", "셀 텍스트를 안전하게 이스케이프해 thead와 tbody가 포함된 HTML 표를 만듭니다."], ["Worker 처리", "파싱과 직렬화는 별도 Worker에서 실행하고 완료 즉시 종료합니다."]],
   },
   {
     route: "about",
@@ -190,6 +276,7 @@ const pages = [
     intro: "시행일: 2026년 8월 13일. 작업 문서, 미디어, 입력 암호와 결과 파일은 Worklazy Tools 서버에 업로드하거나 저장하지 않습니다.",
     sections: [
       ["브라우저 로컬 처리", "Excel, Word, HWP, PDF, 비디오와 이미지 파일은 브라우저 안에서 읽고 처리합니다. 공식 rhwp 편집기는 미저장 복구를 위해 브라우저 IndexedDB에 로컬 초안을 저장할 수 있습니다."],
+      ["새 로컬 도구", "텍스트·급여·재직·비밀번호 입력은 서버나 브라우저 영구 저장소에 보관하지 않습니다. EXIF 제거, QR 스캔과 표 변환 Worker는 작업이 끝나면 종료합니다."],
       ["HWP 편집기 자체 포함", "공식 rhwp Studio의 버전·커밋·파일 해시를 고정해 Worklazy Tools 정적 배포물에 포함합니다. HWP 편집 과정에서 외부 rhwp 사이트나 외부 웹폰트를 호출하지 않으며 작업 파일은 HTTP 업로드 요청에 포함하지 않습니다."],
       ["일반 네트워크 정보", "사이트, Word 비교 실행 파일과 OCR 언어 모델을 불러오는 과정에서 IP 주소, 브라우저 종류와 요청 시각 같은 일반 접속 정보가 처리될 수 있습니다. 작업 파일 내용은 해당 요청에 포함하지 않습니다."],
       ["Google AdSense", "광고가 활성화된 페이지에서는 Google과 광고 파트너가 쿠키, 웹 비콘, IP 주소와 기타 식별자를 광고 제공과 측정에 사용할 수 있습니다. 이 처리는 문서 기능의 파일 처리와 구분됩니다."],
@@ -202,7 +289,7 @@ const pages = [
     description: "무료 브라우저 파일 도구의 이용 조건, 지원 범위와 사용자 책임을 안내합니다.",
     heading: "이용약관",
     intro: "시행일: 2026년 8월 13일. Worklazy Tools는 브라우저에서 문서와 미디어 작업을 수행하는 무료 도구입니다.",
-    sections: [["안전한 이용", "처리할 권한이 있는 파일만 사용하고 중요한 원본은 별도로 보관해야 합니다."], ["결과 확인", "브라우저에서 만든 결과와 Microsoft Office 및 PDF 뷰어 표시에 차이가 있을 수 있으므로 중요한 수식, 서식, 비교와 변환 결과를 직접 확인하세요."], ["서비스 변경", "브라우저와 서비스 제공 환경의 변경에 따라 기능이 수정되거나 일시 중단될 수 있습니다."]],
+    sections: [["안전한 이용", "처리할 권한이 있는 파일만 사용하고 중요한 원본은 별도로 보관해야 합니다."], ["결과 확인", "브라우저에서 만든 문서·미디어 결과와 텍스트·QR·표 변환 결과를 실제 사용 전에 직접 확인하세요."], ["계산기 결과", "영업일·연차·급여·퇴직금은 표시된 기준과 입력값에 따른 참고 결과이며 회사 규정, 근태, 비과세 급여와 실제 신고 기준에 따라 달라질 수 있습니다."], ["보안 도구", "비밀번호 강도와 공격 시간은 추정치이며 QR 스캔 결과의 URL 안전성을 보증하지 않습니다."], ["서비스 변경", "브라우저와 서비스 제공 환경의 변경에 따라 기능이 수정되거나 일시 중단될 수 있습니다."]],
   },
   {
     route: "contact",
@@ -254,6 +341,7 @@ function renderPage(template, page, canonical) {
     description: page.description,
     url: canonical,
     inLanguage: "ko-KR",
+    image: socialImage,
   }];
 
   if (page.application) {
@@ -277,7 +365,17 @@ function renderPage(template, page, canonical) {
     `<meta property="og:title" content="${escapeHtml(page.title)}" />`,
     `<meta property="og:description" content="${escapeHtml(page.description)}" />`,
     `<meta property="og:url" content="${escapeHtml(canonical)}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta property="og:image" content="${escapeHtml(socialImage)}" />`,
+    `<meta property="og:image:secure_url" content="${escapeHtml(socialImage)}" />`,
+    `<meta property="og:image:type" content="image/png" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta property="og:image:alt" content="${escapeHtml(socialImageAlt)}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeHtml(page.title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(page.description)}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(socialImage)}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(socialImageAlt)}" />`,
     `<script id="worklazy-route-jsonld" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
   ].join("\n    ");
 

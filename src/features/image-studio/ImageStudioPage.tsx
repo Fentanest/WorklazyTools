@@ -1,5 +1,5 @@
-import { ArrowDownToLine, ArrowUpToLine, CircleIcon, ClipboardPaste, Download, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, RotateCw, Sparkles, Square, Trash2, Type } from "lucide-react";
-import { Canvas, Circle, FabricImage, FabricText, Rect, filters, type FabricObject } from "fabric";
+import { ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Paintbrush, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
+import { Canvas, Circle, FabricImage, FabricText, Line, PencilBrush, Rect, filters, type FabricObject } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -10,7 +10,7 @@ import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { batchProcessImages, buildAnimatedGif, buildCollage, serializeWatermark } from "./imageWorkerClient";
 import type { CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
 
-type StudioTab = "single" | "batch" | "collage" | "gif";
+type StudioTab = "single" | "batch" | "collage" | "gif" | "paint";
 const RASTER_IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
 
 export function ImageStudioPage() {
@@ -27,7 +27,7 @@ export function ImageStudioPage() {
       </PageHeader>
       <nav className="studio-tabs" aria-label="이미지 기능">
         {([
-          ["single", "단일 편집", ImageIcon], ["batch", "일괄 편집", Images], ["collage", "이어붙이기·콜라주", LayoutGrid], ["gif", "GIF 만들기", Sparkles],
+          ["single", "단일 편집", ImageIcon], ["batch", "일괄 편집", Images], ["collage", "이어붙이기·콜라주", LayoutGrid], ["gif", "GIF 만들기", Sparkles], ["paint", "그림판", Paintbrush],
         ] as const).map(([value, label, Icon]) => <button type="button" className={tab === value ? "active" : ""} onClick={() => { setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></button>)}
       </nav>
 
@@ -35,6 +35,7 @@ export function ImageStudioPage() {
       {tab === "batch" && <BatchImagePanel progress={progress} controllerRef={activeController} />}
       {tab === "collage" && <CollagePanel progress={progress} controllerRef={activeController} />}
       {tab === "gif" && <GifPanel progress={progress} controllerRef={activeController} />}
+      {tab === "paint" && <PaintPanel />}
 
       <OperationProgress {...progress} accent="sky" title="이미지 처리 로그" />
       {progress.status === "running" && <div className="cancel-operation"><button className="secondary-button" type="button" onClick={() => activeController.current?.abort()}>작업 취소</button></div>}
@@ -44,6 +45,7 @@ export function ImageStudioPage() {
         description="원본 이미지와 편집 결과는 외부 작업 서버로 업로드하지 않습니다. 단일 편집은 화면 캔버스에서, 일괄 작업은 전용 Worker에서 처리합니다."
         blocks={[
           { title: "단일 이미지 편집", paragraphs: ["파일을 선택하거나 클립보드 이미지를 Ctrl/⌘+V로 붙여넣고 텍스트, 도형과 이모지를 각각 선택 가능한 레이어로 배치합니다. 밝기·대비·색조는 원본 이미지 레이어에 적용됩니다."] },
+          { title: "그림판", paragraphs: ["연필과 붓으로 자유롭게 그리고 선·도형·텍스트를 추가합니다. 전체 편집 상태는 Undo·Redo 기록으로 관리하며 PNG 또는 JPG로 저장할 수 있습니다."] },
           { title: "일괄 처리", paragraphs: ["여러 파일과 클립보드 이미지를 한 목록에 추가할 수 있습니다. 리사이즈와 워터마크는 OffscreenCanvas Worker에서 한 장씩 처리하고 결과를 ZIP으로 묶습니다."] },
           { title: "콜라주와 GIF", paragraphs: ["이어붙이기는 배치·간격·배경색을 바꿀 때 실제 출력 계산과 같은 방식의 축소 미리보기를 갱신합니다. GIF는 256색 제한 때문에 사진의 미세한 색 변화가 단순화될 수 있습니다."] },
         ]}
@@ -400,6 +402,105 @@ function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
   const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildAnimatedGif(files, { width, delay, qualityColors: colors }, "worklazy-애니메이션.gif", progress.update, controller.signal), "GIF 애니메이션 생성 완료");
   return <SectionCard title="GIF 애니메이션 만들기" description="업로드 순서가 프레임 순서가 됩니다."><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint="두 개 이상의 JPG·PNG·WebP 프레임" accent="sky" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><NumberField label="최대 가로 px" value={width} onChange={setWidth} /><NumberField label="프레임 간격 ms" value={delay} onChange={setDelay} /><label><span>색상 수</span><select value={colors} onChange={(event) => setColors(Number(event.target.value))}><option value={128}>128색 · 작게</option><option value={192}>192색 · 균형</option><option value={256}>256색 · 선명</option></select></label></div><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><Sparkles size={18} /> GIF 다운로드</PrimaryButton></div></SectionCard>;
 }
+
+type PaintMode = "select" | "pencil" | "brush" | "erase";
+
+function PaintPanel() {
+  const elementRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<Canvas | undefined>(undefined);
+  const modeRef = useRef<PaintMode>("select");
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef(-1);
+  const restoringRef = useRef(false);
+  const snapshotTimerRef = useRef<number | undefined>(undefined);
+  const [mode, setMode] = useState<PaintMode>("select");
+  const [color, setColor] = useState("#1d1d1f");
+  const [width, setWidth] = useState(7);
+  const [background, setBackground] = useState("#ffffff");
+  const [text, setText] = useState("텍스트");
+  const [format, setFormat] = useState<"png" | "jpeg">("png");
+  const [historyState, setHistoryState] = useState({ index: -1, length: 0 });
+
+  const pushSnapshot = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || restoringRef.current) return;
+    window.clearTimeout(snapshotTimerRef.current);
+    snapshotTimerRef.current = window.setTimeout(() => {
+      const snapshot = JSON.stringify(canvas.toJSON());
+      if (historyRef.current[historyIndexRef.current] === snapshot) return;
+      historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+      historyRef.current.push(snapshot);
+      if (historyRef.current.length > 60) historyRef.current.shift();
+      historyIndexRef.current = historyRef.current.length - 1;
+      setHistoryState({ index: historyIndexRef.current, length: historyRef.current.length });
+    }, 40);
+  }, []);
+
+  useEffect(() => {
+    if (!elementRef.current) return;
+    const canvas = new Canvas(elementRef.current, { width: 1000, height: 650, backgroundColor: "#ffffff", preserveObjectStacking: true, selection: true });
+    canvasRef.current = canvas;
+    const onPath = (event: { path: FabricObject }) => {
+      if (modeRef.current === "erase") event.path.set({ globalCompositeOperation: "destination-out", selectable: false, evented: false });
+      pushSnapshot();
+    };
+    canvas.on("path:created", onPath);
+    canvas.on("object:modified", pushSnapshot);
+    canvas.on("object:added", pushSnapshot);
+    canvas.on("object:removed", pushSnapshot);
+    pushSnapshot();
+    return () => { window.clearTimeout(snapshotTimerRef.current); canvas.dispose(); canvasRef.current = undefined; };
+  }, [pushSnapshot]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.isDrawingMode = mode !== "select";
+    canvas.selection = mode === "select";
+    canvas.forEachObject((object) => { if (object.globalCompositeOperation !== "destination-out") { object.selectable = mode === "select"; object.evented = mode === "select"; } });
+    if (mode !== "select") {
+      const brush = new PencilBrush(canvas);
+      brush.color = mode === "erase" ? "rgba(0,0,0,1)" : color;
+      brush.width = mode === "brush" ? Math.max(10, width * 2.2) : mode === "erase" ? Math.max(12, width * 2.5) : width;
+      canvas.freeDrawingBrush = brush;
+    }
+    canvas.discardActiveObject(); canvas.requestRenderAll();
+  }, [mode, color, width]);
+
+  useEffect(() => { const canvas = canvasRef.current; if (!canvas) return; canvas.backgroundColor = background; canvas.requestRenderAll(); pushSnapshot(); }, [background, pushSnapshot]);
+
+  const addObject = (object: FabricObject) => { const canvas = canvasRef.current; if (!canvas) return; setMode("select"); canvas.add(object); canvas.setActiveObject(object); canvas.requestRenderAll(); pushSnapshot(); };
+  const addShape = (kind: "line" | "rect" | "circle") => {
+    if (kind === "line") addObject(new Line([180, 180, 520, 340], { stroke: color, strokeWidth: width, strokeLineCap: "round" }));
+    if (kind === "rect") addObject(new Rect({ left: 210, top: 170, width: 300, height: 200, rx: 16, ry: 16, fill: "transparent", stroke: color, strokeWidth: width }));
+    if (kind === "circle") addObject(new Circle({ left: 230, top: 170, radius: 115, fill: "transparent", stroke: color, strokeWidth: width }));
+  };
+  const addText = () => addObject(new FabricText(text.trim() || "텍스트", { left: 180, top: 170, fill: color, fontSize: 52, fontFamily: "sans-serif", fontWeight: "600" }));
+  const deleteSelected = () => { const canvas = canvasRef.current; if (!canvas) return; const objects = canvas.getActiveObjects(); if (!objects.length) return; canvas.remove(...objects); canvas.discardActiveObject(); canvas.requestRenderAll(); pushSnapshot(); };
+  const clear = () => { const canvas = canvasRef.current; if (!canvas) return; canvas.getObjects().forEach((object) => canvas.remove(object)); canvas.discardActiveObject(); canvas.requestRenderAll(); pushSnapshot(); };
+  const restore = async (index: number) => { const canvas = canvasRef.current; const snapshot = historyRef.current[index]; if (!canvas || !snapshot) return; restoringRef.current = true; try { await canvas.loadFromJSON(JSON.parse(snapshot)); canvas.backgroundColor = background; canvas.requestRenderAll(); historyIndexRef.current = index; setHistoryState({ index, length: historyRef.current.length }); } finally { restoringRef.current = false; } };
+  const exportPaint = () => { const canvas = canvasRef.current; if (!canvas) return; canvas.renderAll(); let data: string; if (format === "jpeg") { const flattened = document.createElement("canvas"); flattened.width = canvas.getWidth(); flattened.height = canvas.getHeight(); const context = flattened.getContext("2d"); if (!context) return; context.fillStyle = background || "#ffffff"; context.fillRect(0, 0, flattened.width, flattened.height); context.drawImage(canvas.getElement(), 0, 0); data = flattened.toDataURL("image/jpeg", 0.94); flattened.width = 1; flattened.height = 1; } else data = canvas.toDataURL({ format: "png", quality: 1, multiplier: 1 }); const anchor = document.createElement("a"); anchor.href = data; anchor.download = `worklazy-그림판.${format === "jpeg" ? "jpg" : "png"}`; anchor.click(); };
+
+  return <SectionCard title="그림판·스케치북" description="도구를 고르고 캔버스에 자유롭게 그리거나 편집 가능한 도형과 텍스트를 추가하세요." className="paint-panel">
+    <div className="paint-toolbar">
+      <div className="paint-tool-buttons" aria-label="그리기 도구">
+        <ToolButton active={mode === "select"} label="선택" onClick={() => setMode("select")}><MousePointer2 /></ToolButton>
+        <ToolButton active={mode === "pencil"} label="연필" onClick={() => setMode("pencil")}><Pencil /></ToolButton>
+        <ToolButton active={mode === "brush"} label="붓" onClick={() => setMode("brush")}><Brush /></ToolButton>
+        <ToolButton active={mode === "erase"} label="지우개" onClick={() => setMode("erase")}><Eraser /></ToolButton>
+      </div>
+      <label className="paint-color"><span>색상</span><input type="color" value={color} onChange={(event) => setColor(event.target.value)} /></label>
+      <label className="paint-width"><span>굵기 {width}px</span><input type="range" min={1} max={40} value={width} onChange={(event) => setWidth(Number(event.target.value))} /></label>
+      <div className="paint-history-actions"><button type="button" disabled={historyState.index <= 0} aria-label="실행 취소" onClick={() => void restore(historyState.index - 1)}><Undo2 /></button><button type="button" disabled={historyState.index >= historyState.length - 1} aria-label="다시 실행" onClick={() => void restore(historyState.index + 1)}><Redo2 /></button><button type="button" aria-label="선택 개체 삭제" onClick={deleteSelected}><Trash2 /></button></div>
+    </div>
+    <div className="paint-object-bar"><button type="button" onClick={() => addShape("line")}><Minus /> 직선</button><button type="button" onClick={() => addShape("rect")}><Square /> 사각형</button><button type="button" onClick={() => addShape("circle")}><CircleIcon /> 원</button><div className="paint-text-add"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={addText}><Type /> 텍스트 추가</button></div><button type="button" className="danger-subtle" onClick={clear}><Trash2 /> 전체 지우기</button></div>
+    <div className="paint-stage"><canvas ref={elementRef} /></div>
+    <div className="paint-export"><label><span>배경색</span><input type="color" value={background} onChange={(event) => setBackground(event.target.value)} /></label><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }]} onChange={setFormat} label="그림판 출력 형식" /><PrimaryButton accent="sky" onClick={exportPaint}><Download size={18} /> 그림 다운로드</PrimaryButton></div>
+  </SectionCard>;
+}
+
+function ToolButton({ active, label, onClick, children }: { active: boolean; label: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" className={active ? "active" : ""} aria-pressed={active} onClick={onClick}>{children}<span>{label}</span></button>; }
 
 interface ProcessPanelProps { progress: ReturnType<typeof useOperationProgress>; controllerRef: React.MutableRefObject<AbortController | undefined>; }
 

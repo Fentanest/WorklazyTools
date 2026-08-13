@@ -13,6 +13,14 @@ const libraries = [
   { name: "PDF.js 6.2.108", license: "Apache-2.0", url: "https://github.com/mozilla/pdf.js", purpose: "PDF 페이지 해석과 화면 렌더링" },
   { name: "pdf-lib 1.17.1", license: "MIT", url: "https://github.com/Hopding/pdf-lib", purpose: "PDF 병합·추출·회전과 결과 생성" },
   { name: "Tesseract.js 7.0.0", license: "Apache-2.0", url: "https://github.com/naptha/tesseract.js", purpose: "브라우저 OCR" },
+  { name: "change-case", license: "MIT", url: "https://github.com/blakeembrey/change-case", purpose: "텍스트 케이스 변환" },
+  { name: "sql-formatter·fast-xml-parser", license: "MIT", url: "https://github.com/sql-formatter-org/sql-formatter", purpose: "SQL·XML 포맷과 문법 검사" },
+  { name: "date-fns·Luxon", license: "MIT", url: "https://github.com/date-fns/date-fns", purpose: "영업일·연차·IANA 타임존 계산" },
+  { name: "d3-geo·TopoJSON Client·World Atlas", license: "ISC / Natural Earth Public Domain", url: "https://github.com/d3/d3-geo", purpose: "세계지도 투영·TopoJSON 변환과 Natural Earth 국가 경계 렌더링" },
+  { name: "ExifReader", license: "MPL-2.0", url: "https://github.com/mattiasw/ExifReader", purpose: "사진 EXIF 메타데이터 읽기" },
+  { name: "zxcvbn-ts", license: "MIT", url: "https://github.com/zxcvbn-ts/zxcvbn", purpose: "비밀번호 패턴과 강도 분석" },
+  { name: "qrcode·jsQR", license: "MIT / Apache-2.0", url: "https://github.com/soldair/node-qrcode", purpose: "QR 코드 생성과 이미지 디코딩" },
+  { name: "Papa Parse", license: "MIT", url: "https://github.com/mholt/PapaParse", purpose: "CSV 파싱과 직렬화" },
   { name: "React·React Router", license: "MIT", url: "https://github.com/facebook/react", purpose: "사용자 인터페이스와 브라우저 라우팅" },
 ];
 
