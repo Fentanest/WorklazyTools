@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Paintbrush, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Paintbrush, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
 import { Canvas, Circle, FabricImage, FabricText, Line, PencilBrush, Rect, filters, type FabricObject } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 
@@ -31,6 +31,9 @@ export function ImageStudioPage() {
         ] as const).map(([value, label, Icon]) => <button type="button" className={tab === value ? "active" : ""} onClick={() => { setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></button>)}
       </nav>
 
+      <div className="inline-notice warning image-format-notice"><AlertTriangle size={16} /><span>HEIC·HEIF 입력은 현재 지원하지 않습니다. iPhone 사진은 JPG·PNG·WebP로 변환하거나 ‘높은 호환성’ 형식으로 촬영한 파일을 사용해 주세요.</span></div>
+      {(tab === "batch" || tab === "collage" || tab === "gif") && <div className="inline-notice warning image-worker-notice"><AlertTriangle size={16} /><span>이 탭은 OffscreenCanvas Worker를 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저가 필요합니다. 모바일에서 대형 이미지가 위험한 것은 아니지만 출력 캔버스를 약 16MP 이하로 맞추고 적은 파일부터 처리하면 메모리 중단 가능성을 줄일 수 있습니다.</span></div>}
+
       {tab === "single" && <SingleImageEditor />}
       {tab === "batch" && <BatchImagePanel progress={progress} controllerRef={activeController} />}
       {tab === "collage" && <CollagePanel progress={progress} controllerRef={activeController} />}
@@ -52,7 +55,7 @@ export function ImageStudioPage() {
         faq={[
           { question: "이미지가 서버로 전송되나요?", answer: "아니요. 이미지 바이트는 현재 브라우저 메모리와 전용 Worker 안에서만 처리합니다." },
           { question: "원본 파일이 바뀌나요?", answer: "아니요. 원본은 읽기만 하며 모든 결과는 새 파일로 내려받습니다." },
-          { question: "지원 형식은 무엇인가요?", answer: "브라우저가 해석할 수 있는 JPG, PNG, WebP 등을 입력으로 사용합니다. 출력은 PNG, JPG, WebP와 애니메이션 GIF를 지원합니다." },
+          { question: "지원 형식은 무엇인가요?", answer: "JPG, PNG, WebP를 입력으로 사용합니다. HEIC·HEIF는 현재 지원하지 않습니다. 출력은 PNG, JPG, WebP와 애니메이션 GIF를 지원합니다." },
           { question: "투명 배경을 유지할 수 있나요?", answer: "네. 단일 편집, 일괄 편집과 콜라주에서 투명 배경을 선택할 수 있습니다. PNG·WebP는 투명도를 유지하며 JPG로 저장하면 투명한 부분을 흰색으로 처리합니다." },
           { question: "대용량 이미지가 중단되는 이유는 무엇인가요?", answer: "브라우저와 기기에는 캔버스 최대 크기와 메모리 한도가 있습니다. 출력 크기나 파일 수를 줄이면 안정적으로 처리할 수 있습니다." },
         ]}
@@ -63,6 +66,7 @@ export function ImageStudioPage() {
 
 function SingleImageEditor() {
   const canvasElement = useRef<HTMLCanvasElement>(null);
+  const stageElement = useRef<HTMLDivElement>(null);
   const canvas = useRef<Canvas | undefined>(undefined);
   const baseImage = useRef<FabricImage | undefined>(undefined);
   const [file, setFile] = useState<File>();
@@ -77,6 +81,7 @@ function SingleImageEditor() {
   const [shapeFill, setShapeFill] = useState("#0a84ff");
   const [shapeStroke, setShapeStroke] = useState("#ffffff");
   const [shapeStrokeWidth, setShapeStrokeWidth] = useState(0);
+  const syncCanvasDisplay = useResponsiveFabricCanvas(canvas, stageElement);
 
   const syncSelectedShape = useCallback((object?: FabricObject) => {
     const shape = object instanceof Rect || object instanceof Circle ? object : undefined;
@@ -95,8 +100,9 @@ function SingleImageEditor() {
     instance.on("selection:created", syncSelection);
     instance.on("selection:updated", syncSelection);
     instance.on("selection:cleared", syncSelection);
+    window.requestAnimationFrame(syncCanvasDisplay);
     return () => { baseImage.current = undefined; instance.dispose(); canvas.current = undefined; };
-  }, [syncSelectedShape]);
+  }, [syncCanvasDisplay, syncSelectedShape]);
 
   useEffect(() => {
     const instance = canvas.current;
@@ -127,6 +133,7 @@ function SingleImageEditor() {
       instance.clear();
       instance.backgroundColor = transparentBackground ? "" : "#ffffff";
       instance.setDimensions({ width: 900, height: 600 });
+      window.requestAnimationFrame(syncCanvasDisplay);
       const scale = Math.min(860 / image.width, 560 / image.height);
       image.set({ left: 450, top: 300, originX: "center", originY: "center", scaleX: scale, scaleY: scale });
       instance.add(image);
@@ -189,6 +196,7 @@ function SingleImageEditor() {
     const width = 900;
     const height = Math.round(width / ratio);
     instance.setDimensions({ width, height });
+    window.requestAnimationFrame(syncCanvasDisplay);
     const scale = Math.max(width / image.width, height / image.height);
     image.set({ left: width / 2, top: height / 2, scaleX: scale, scaleY: scale });
     image.setCoords();
@@ -250,6 +258,7 @@ function SingleImageEditor() {
           <div className="image-background-options compact"><ToggleRow label="투명 배경" description="PNG·WebP 출력에 적용" checked={transparentBackground} onChange={setTransparentBackground} /></div>
         </aside>
         <div
+          ref={stageElement}
           className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}`}
           onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setStageDragging(true); } }}
           onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
@@ -407,6 +416,7 @@ type PaintMode = "select" | "pencil" | "brush" | "erase";
 
 function PaintPanel() {
   const elementRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | undefined>(undefined);
   const modeRef = useRef<PaintMode>("select");
   const historyRef = useRef<string[]>([]);
@@ -420,6 +430,7 @@ function PaintPanel() {
   const [text, setText] = useState("텍스트");
   const [format, setFormat] = useState<"png" | "jpeg">("png");
   const [historyState, setHistoryState] = useState({ index: -1, length: 0 });
+  const syncCanvasDisplay = useResponsiveFabricCanvas(canvasRef, stageRef);
 
   const pushSnapshot = useCallback(() => {
     const canvas = canvasRef.current;
@@ -449,8 +460,9 @@ function PaintPanel() {
     canvas.on("object:added", pushSnapshot);
     canvas.on("object:removed", pushSnapshot);
     pushSnapshot();
+    window.requestAnimationFrame(syncCanvasDisplay);
     return () => { window.clearTimeout(snapshotTimerRef.current); canvas.dispose(); canvasRef.current = undefined; };
-  }, [pushSnapshot]);
+  }, [pushSnapshot, syncCanvasDisplay]);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -495,12 +507,39 @@ function PaintPanel() {
       <div className="paint-history-actions"><button type="button" disabled={historyState.index <= 0} aria-label="실행 취소" onClick={() => void restore(historyState.index - 1)}><Undo2 /></button><button type="button" disabled={historyState.index >= historyState.length - 1} aria-label="다시 실행" onClick={() => void restore(historyState.index + 1)}><Redo2 /></button><button type="button" aria-label="선택 개체 삭제" onClick={deleteSelected}><Trash2 /></button></div>
     </div>
     <div className="paint-object-bar"><button type="button" onClick={() => addShape("line")}><Minus /> 직선</button><button type="button" onClick={() => addShape("rect")}><Square /> 사각형</button><button type="button" onClick={() => addShape("circle")}><CircleIcon /> 원</button><div className="paint-text-add"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={addText}><Type /> 텍스트 추가</button></div><button type="button" className="danger-subtle" onClick={clear}><Trash2 /> 전체 지우기</button></div>
-    <div className="paint-stage"><canvas ref={elementRef} /></div>
+    <div className="paint-stage" ref={stageRef}><canvas ref={elementRef} /></div>
     <div className="paint-export"><label><span>배경색</span><input type="color" value={background} onChange={(event) => setBackground(event.target.value)} /></label><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }]} onChange={setFormat} label="그림판 출력 형식" /><PrimaryButton accent="sky" onClick={exportPaint}><Download size={18} /> 그림 다운로드</PrimaryButton></div>
   </SectionCard>;
 }
 
 function ToolButton({ active, label, onClick, children }: { active: boolean; label: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" className={active ? "active" : ""} aria-pressed={active} onClick={onClick}>{children}<span>{label}</span></button>; }
+
+function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | undefined>, stageRef: React.RefObject<HTMLDivElement | null>) {
+  const sync = useCallback(() => {
+    const canvas = canvasRef.current;
+    const stage = stageRef.current;
+    if (!canvas || !stage) return;
+    const style = getComputedStyle(stage);
+    const availableWidth = Math.max(1, stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
+    const scale = Math.min(1, availableWidth / canvas.getWidth());
+    canvas.setDimensions({ width: `${Math.round(canvas.getWidth() * scale)}px`, height: `${Math.round(canvas.getHeight() * scale)}px` }, { cssOnly: true });
+    canvas.calcOffset();
+  }, [canvasRef, stageRef]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const observer = new ResizeObserver(sync);
+    observer.observe(stage);
+    window.addEventListener("orientationchange", sync);
+    window.requestAnimationFrame(sync);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("orientationchange", sync);
+    };
+  }, [stageRef, sync]);
+  return sync;
+}
 
 interface ProcessPanelProps { progress: ReturnType<typeof useOperationProgress>; controllerRef: React.MutableRefObject<AbortController | undefined>; }
 

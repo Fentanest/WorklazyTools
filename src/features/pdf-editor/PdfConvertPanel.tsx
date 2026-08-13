@@ -5,7 +5,7 @@ import { OperationProgress } from "../../components/OperationProgress";
 import { FileDropZone, FileList, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { PdfThumbnail } from "./PdfThumbnail";
-import { extractPdfText, inspectPdf, releasePdf, type PdfOcrMode } from "./pdfPreview";
+import { extractPdfText, inspectPdf, parsePageRange, releasePdf, type PdfOcrMode } from "./pdfPreview";
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
 import { combineOcrPdfPages, textDocumentToOffice } from "./pdfWorkerClient";
 import type { PdfPageItem } from "./types";
@@ -18,6 +18,7 @@ export function PdfConvertPanel() {
   const [format, setFormat] = useState<OutputFormat>("docx");
   const [ocrMode, setOcrMode] = useState<PdfOcrMode>("auto");
   const [outputName, setOutputName] = useState("Worklazy-PDF-변환");
+  const [pageRange, setPageRange] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const operation = useOperationProgress();
@@ -36,6 +37,7 @@ export function PdfConvertPanel() {
       const inspected = await inspectPdf(next);
       setFile(next);
       setPageCount(inspected.pageCount);
+      setPageRange("");
       setOutputName(`${next.name.replace(/\.pdf$/i, "")}-변환`);
       operation.succeed(`${inspected.pageCount}개 페이지를 변환할 수 있습니다.`);
     } catch (reason) {
@@ -50,11 +52,13 @@ export function PdfConvertPanel() {
     setError("");
     download.clearResult();
     const searchable = format === "searchable-pdf";
-    operation.start(searchable ? "모든 페이지의 검색 가능한 텍스트 생성을 시작합니다." : "PDF의 텍스트와 배치 좌표를 분석하는 중…");
+    operation.start(searchable ? "검색 가능한 텍스트 생성을 준비합니다." : "PDF의 텍스트와 배치 좌표를 분석하는 중…");
     try {
-      const extracted = await extractPdfText(file, searchable ? "all" : ocrMode, searchable, operation.update);
+      const selectedPageIndexes = pageRange.trim() ? parsePageRange(pageRange, pageCount) : undefined;
+      const selectedPageCount = selectedPageIndexes?.length || pageCount;
+      const extracted = await extractPdfText(file, searchable ? "all" : ocrMode, searchable, operation.update, selectedPageIndexes);
       if (searchable) {
-        if (extracted.ocrPdfBuffers.length !== pageCount) throw new Error("일부 페이지의 검색 가능한 PDF 데이터를 만들지 못했습니다.");
+        if (extracted.ocrPdfBuffers.length !== selectedPageCount) throw new Error("일부 페이지의 검색 가능한 PDF 데이터를 만들지 못했습니다.");
         operation.update(91, "OCR 텍스트 레이어가 포함된 페이지를 결합하는 중…");
         const output = await combineOcrPdfPages(extracted.ocrPdfBuffers, normalizeOutputName(outputName, "Worklazy-검색-PDF"), (value, message) => operation.update(91 + value * 0.08, message));
         download.makeResult(output);
@@ -86,8 +90,8 @@ export function PdfConvertPanel() {
           </SectionCard>
           {file && (
             <SectionCard step={2} title="변환 범위 확인" description="내장 텍스트를 먼저 사용하고, 필요할 때만 페이지 이미지를 OCR합니다." className="accent-context-violet pdf-page-section">
-              <div className="pdf-ocr-notice"><Wifi size={16} /><div><strong>OCR 최초 실행에는 인터넷 연결이 필요합니다.</strong><span>한국어·영어 학습 모델을 내려받고 브라우저 캐시에 보관합니다. 선택한 PDF 내용은 언어 모델 서버로 전송하지 않습니다.</span></div></div>
-              {pageCount >= 50 && <div className="pdf-large-warning"><ScanText size={16} /><span>{pageCount}페이지 문서입니다. 전체 OCR은 오래 걸리고 기기 메모리를 많이 사용할 수 있으므로 다른 탭을 닫고 진행해 주세요.</span></div>}
+              <div className="pdf-ocr-notice"><Wifi size={16} /><div><strong>오프라인에서 사이트를 처음 열면 OCR을 시작할 수 없습니다.</strong><span>OCR 실행 파일과 한국어·영어 모델은 Worklazy Tools 배포 파일에서만 불러오며 외부 CDN이나 OCR 서버를 사용하지 않습니다. 선택한 PDF 내용은 브라우저 밖으로 전송되지 않습니다.</span></div></div>
+              {pageCount >= ((window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 760) ? 15 : 50) && <div className="pdf-large-warning"><ScanText size={16} /><span>{pageCount}페이지 문서입니다. 대형 문서도 처리할 수 있지만 모바일에서는 아래 ‘처리 페이지’에 필요한 범위만 입력하면 더 빠르고 안정적입니다.</span></div>}
               <div className="pdf-page-grid compact">{previewItems.map((item, index) => <PdfThumbnail key={item.id} item={item} file={file} outputIndex={index} draggable={false} />)}</div>
             </SectionCard>
           )}
@@ -110,6 +114,7 @@ export function PdfConvertPanel() {
               <div><dt>언어</dt><dd>한국어 + 영어</dd></div>
               <div><dt>처리 위치</dt><dd>이 브라우저</dd></div>
             </dl>
+            <label className="pdf-output-field"><span>처리 페이지</span><input value={pageRange} onChange={(event) => setPageRange(event.target.value)} placeholder={`전체 · 예: 1-5, 8 (최대 ${pageCount})`} /><small>{pageRange.trim() ? "지정" : "전체"}</small></label>
             <label className="pdf-output-field"><span>출력 파일명</span><input value={outputName} onChange={(event) => setOutputName(event.target.value)} /><small>.{extension}</small></label>
             <PrimaryButton accent="violet" disabled={!file || loading || operation.status === "running"} loading={operation.status === "running"} onClick={convert}><ScanText size={18} /> {format === "searchable-pdf" ? "OCR PDF 만들기" : `${format.toUpperCase()}로 변환`}</PrimaryButton>
             <p className="prototype-note">PDF는 원래 문단·표 구조가 없을 수 있어 DOCX·XLSX 배치는 좌표로 추정됩니다.</p>

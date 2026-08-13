@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -35,7 +36,7 @@ import type {
   VideoTask,
   VideoWorkerInput,
 } from "./types";
-import { runVideoTask } from "./videoWorkerClient";
+import { probeVideoMetadata, runVideoTask } from "./videoWorkerClient";
 
 type VideoGroupId = 1 | 2 | 3 | 4 | 5 | 6;
 type GroupOutputMode = "individual" | "concat";
@@ -50,6 +51,9 @@ interface VideoItem {
   start: number;
   end: number;
   group: VideoGroupId;
+  metadataSource?: "browser" | "ffmpeg";
+  metadataError?: string;
+  probing?: boolean;
 }
 
 interface GroupSettings {
@@ -68,6 +72,7 @@ const GROUP_IDS: VideoGroupId[] = [1, 2, 3, 4, 5, 6];
 const MAX_SAFE_BROWSER_OUTPUT_BYTES = 1.5 * 1024 * 1024 * 1024;
 
 export function VideoStudioPage() {
+  const mobileDevice = useMemo(isLikelyMobileDevice, []);
   const [items, setItems] = useState<VideoItem[]>([]);
   const [activeId, setActiveId] = useState<string>();
   const [groupSettings, setGroupSettings] = useState<Record<VideoGroupId, GroupSettings>>(createGroupSettings);
@@ -77,13 +82,13 @@ export function VideoStudioPage() {
   const [allGroupsOneFile, setAllGroupsOneFile] = useState(false);
   const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>("mp4");
   const [codec, setCodec] = useState<VideoCodec>("h264");
-  const [resolution, setResolution] = useState<VideoResolution>("source");
+  const [resolution, setResolution] = useState<VideoResolution>(() => isLikelyMobileDevice() ? "1080" : "source");
   const [aspect, setAspect] = useState<VideoAspect>("source");
   const [crf, setCrf] = useState(23);
   const [bitrate, setBitrate] = useState<VideoBitrate>("copy");
   const [audioBitrate, setAudioBitrate] = useState<VideoAudioBitrate>("192k");
   const [gifFps, setGifFps] = useState<10 | 12 | 15 | 20>(12);
-  const [gifWidth, setGifWidth] = useState<480 | 720 | 1080>(720);
+  const [gifWidth, setGifWidth] = useState<480 | 720 | 1080>(() => isLikelyMobileDevice() ? 480 : 720);
   const [lastResult, setLastResult] = useState("");
   const progress = useOperationProgress();
   const players = useRef<Record<string, HTMLVideoElement | null>>({});
@@ -91,6 +96,7 @@ export function VideoStudioPage() {
   const itemsRef = useRef<VideoItem[]>([]);
   const syncing = useRef(false);
   const activeController = useRef<AbortController | undefined>(undefined);
+  const probeControllers = useRef(new Map<string, AbortController>());
 
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => {
@@ -103,6 +109,8 @@ export function VideoStudioPage() {
   useEffect(() => () => {
     itemsRef.current.forEach((item) => URL.revokeObjectURL(item.url));
     activeController.current?.abort();
+    probeControllers.current.forEach((controller) => controller.abort());
+    probeControllers.current.clear();
   }, []);
 
   const files = useMemo(() => items.map((item) => item.file), [items]);
@@ -134,7 +142,13 @@ export function VideoStudioPage() {
       end: 0,
       group: 1 as VideoGroupId,
     });
-    items.forEach((item) => { if (!next.includes(item)) URL.revokeObjectURL(item.url); });
+    items.forEach((item) => {
+      if (!next.includes(item)) {
+        probeControllers.current.get(item.id)?.abort();
+        probeControllers.current.delete(item.id);
+        URL.revokeObjectURL(item.url);
+      }
+    });
     setItems(next);
     setActiveId((current) => next.some((item) => item.id === current) ? current : next[0]?.id);
     const largeFiles = unique.filter((file) => file.size > MAX_SAFE_BROWSER_OUTPUT_BYTES);
@@ -149,6 +163,8 @@ export function VideoStudioPage() {
   const removeItem = (itemId: string) => {
     const target = items.find((item) => item.id === itemId);
     if (target) URL.revokeObjectURL(target.url);
+    probeControllers.current.get(itemId)?.abort();
+    probeControllers.current.delete(itemId);
     const next = items.filter((item) => item.id !== itemId);
     setItems(next);
     if (activeId === itemId) setActiveId(next[0]?.id);
@@ -157,6 +173,24 @@ export function VideoStudioPage() {
 
   const updateItem = (itemId: string, patch: Partial<VideoItem>) => {
     setItems((current) => current.map((item) => item.id === itemId ? { ...item, ...patch } : item));
+  };
+
+  const probeItem = async (itemId: string) => {
+    const item = itemsRef.current.find((candidate) => candidate.id === itemId);
+    if (!item || item.duration > 0 || probeControllers.current.has(itemId)) return;
+    const controller = new AbortController();
+    probeControllers.current.set(itemId, controller);
+    updateItem(itemId, { probing: true, metadataError: undefined });
+    try {
+      const metadata = await probeVideoMetadata(item.file, controller.signal);
+      updateItem(itemId, { ...metadata, end: metadata.duration, metadataSource: "ffmpeg", probing: false });
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        updateItem(itemId, { probing: false, metadataError: error instanceof Error ? error.message : "영상 정보를 확인하지 못했습니다." });
+      }
+    } finally {
+      if (probeControllers.current.get(itemId) === controller) probeControllers.current.delete(itemId);
+    }
   };
 
   const updateGroup = (group: VideoGroupId, patch: Partial<GroupSettings>) => {
@@ -275,12 +309,13 @@ export function VideoStudioPage() {
         .find(({ estimate }) => estimate > MAX_SAFE_BROWSER_OUTPUT_BYTES);
       if (oversized) {
         progress.start("패스스루 결과 크기를 확인하는 중…");
-        progress.fail(`${oversized.job.name}의 예상 결과가 약 ${formatBytes(oversized.estimate)}입니다. 원본은 열 수 있지만 이 크기의 결과를 브라우저 메모리에서 다운로드 파일로 옮기기는 안전하지 않습니다. 출력 구간을 줄이거나 CRF 자동 인코딩을 선택해 주세요.`);
+        progress.fail(`${oversized.job.name}의 예상 결과가 약 ${formatBytes(oversized.estimate)}입니다. 대형 원본 자체가 위험한 것은 아니지만, 현재 브라우저 출력 방식은 1.5GB를 넘는 단일 결과를 만들 수 없습니다. 출력 구간을 줄이거나 CRF 자동 인코딩을 선택해 주세요.`);
         return;
       }
     }
     const totalSize = items.reduce((sum, item) => sum + item.file.size, 0);
-    if (totalSize > 500 * 1024 * 1024 && !window.confirm("대용량 원본은 전체 메모리 복사 없이 연결하지만, 긴 영상의 변환·GIF 생성은 매우 오래 걸리거나 중간 결과 메모리가 부족할 수 있습니다. 계속할까요?")) return;
+    const cautionBytes = mobileDevice ? 250 * 1024 * 1024 : 500 * 1024 * 1024;
+    if (totalSize > cautionBytes && !window.confirm(`대형 파일 처리 주의: 선택한 원본이 ${formatBytes(totalSize)}입니다. 원본은 전체 메모리 복사 없이 연결하지만, 이 기기에서는 변환 시간이 길어지거나 메모리가 부족할 수 있습니다. 계속할까요?`)) return;
     await executeTask((controller) => {
       const jobs: VideoOutputJob[] = jobEntries.map((job) => ({
         name: job.name,
@@ -331,6 +366,8 @@ export function VideoStudioPage() {
 
       <SectionCard step={1} title="비디오 선택" description="최대 6개 영상을 추가할 수 있습니다. 업로드 후 그룹 박스 안에서 순서와 출력 방식을 정합니다.">
         <FileDropZone files={files} onFiles={handleFiles} accept="video/*,.mkv,.avi" multiple hint="MP4·MOV·WebM·MKV·AVI · 최대 6개" accent="pink" />
+        <div className="inline-notice warning"><AlertTriangle size={16} /><span>MKV·AVI는 브라우저와 내부 코덱에 따라 완벽한 호환을 보장하지 않습니다. 미리보기가 안 되면 FFmpeg가 재생 시간과 크기를 대신 확인해 숫자로 구간을 지정하고 변환을 시작할 수 있지만, 분석도 실패하면 MP4·MOV·WebM으로 바꿔 주세요.</span></div>
+        {mobileDevice && <div className="inline-notice"><Gauge size={16} /><span>모바일 권장값으로 1080p와 GIF 480px를 기본 선택했습니다. 여러 영상이나 합계 250MB 이상의 대형 파일도 처리할 수 있지만, 한 번에 한 파일씩 짧은 구간부터 작업하면 더 안정적입니다.</span></div>}
       </SectionCard>
 
       {items.length > 0 && (
@@ -395,8 +432,11 @@ export function VideoStudioPage() {
                             preload="metadata"
                             onLoadedMetadata={(event) => {
                               const duration = event.currentTarget.duration;
-                              updateItem(item.id, { duration, width: event.currentTarget.videoWidth, height: event.currentTarget.videoHeight, end: item.end || duration });
+                              probeControllers.current.get(item.id)?.abort();
+                              probeControllers.current.delete(item.id);
+                              updateItem(item.id, { duration, width: event.currentTarget.videoWidth, height: event.currentTarget.videoHeight, end: item.end || duration, metadataSource: "browser", probing: false, metadataError: undefined });
                             }}
+                            onError={() => void probeItem(item.id)}
                             onPlay={() => void synchronizePlayers(item.id, "play")}
                             onPause={() => void synchronizePlayers(item.id, "pause")}
                             onSeeked={() => void synchronizePlayers(item.id, "seek")}
@@ -407,8 +447,10 @@ export function VideoStudioPage() {
                               }
                             }}
                           />
+                          {item.metadataSource === "ffmpeg" && <div className="video-preview-fallback"><Film size={22} /><strong>브라우저 미리보기 없음</strong><span>영상 정보는 확인했습니다. 아래 숫자 입력으로 구간을 지정하세요.</span></div>}
+                          {item.probing && <div className="video-preview-fallback"><Gauge size={22} /><strong>영상 정보 확인 중</strong><span>FFmpeg 호환 경로를 준비하고 있습니다.</span></div>}
                           <div className="video-card-footer">
-                            <span><strong>{groupIndex + 1}. {item.file.name}</strong><small>{formatBytes(item.file.size)} · {item.duration ? formatTime(item.duration) : "재생 정보 확인 중…"}</small></span>
+                            <span><strong>{groupIndex + 1}. {item.file.name}</strong><small>{formatBytes(item.file.size)} · {item.duration ? `${formatTime(item.duration)}${item.metadataSource === "ffmpeg" ? " · 변환용 정보 확인됨" : ""}` : item.metadataError || "재생 정보 확인 중…"}</small></span>
                             <span className="video-card-actions">
                               <button type="button" disabled={item.group === 1} aria-label={`${item.file.name} 왼쪽 그룹으로 이동`} onClick={(event) => { event.stopPropagation(); moveToAdjacentGroup(item, -1); }}><ChevronLeft size={14} /></button>
                               <label className="video-group-select"><span className="visually-hidden">{item.file.name} 그룹</span><select value={item.group} aria-label={`${item.file.name} 그룹 이동`} onClick={(event) => event.stopPropagation()} onChange={(event) => moveItem(item.id, Number(event.target.value) as VideoGroupId)}>{GROUP_IDS.map((id) => <option value={id} key={id}>그룹 {id}</option>)}</select></label>
@@ -511,6 +553,7 @@ export function VideoStudioPage() {
           { title: "패스스루와 정확도", paragraphs: ["패스스루는 원본 영상·음원 스트림을 그대로 복사해 빠르고 화질 손실이 없습니다. 키프레임 때문에 시작점이 조금 앞설 수 있으며, 서로 다른 코덱이나 해상도의 영상은 인코딩 없이 이어붙일 수 없습니다."] },
           { title: "동기 재생과 분할 전체화면", paragraphs: ["그룹 안의 영상을 함께 재생하고 공통 탐색 바로 위치를 맞출 수 있습니다. 분할 전체화면에서는 최대 6개 영상을 한 화면에서 비교하며 선택한 영상 하나의 소리만 듣습니다."] },
           { title: "대용량 원본과 결과 한도", paragraphs: ["원본 영상은 통째로 복사하지 않고 브라우저의 읽기 전용 파일 연결로 FFmpeg에 전달합니다. 다만 인코딩 중간 데이터와 완성된 결과는 브라우저 메모리를 사용하므로, 긴 4K 영상은 필요한 구간을 먼저 줄이는 것이 좋습니다. 패스스루 예상 결과가 안전 한도를 넘으면 작업 전에 안내합니다."] },
+          { title: "입력 형식 호환성", paragraphs: ["MP4·MOV·WebM은 일반적인 최신 브라우저에서 미리보기를 제공합니다. MKV·AVI 미리보기가 실패하면 FFmpeg가 재생 시간과 화면 크기를 대신 확인해 숫자 구간 입력과 변환을 열어 주지만, 내부 코덱까지 모든 조합의 완벽한 호환은 보장하지 않습니다."] },
         ]}
         faq={[
           { question: "영상이 서버로 전송되나요?", answer: "아니요. 선택한 파일은 브라우저가 제공하는 로컬 파일 참조를 통해 FFmpeg Worker에서만 읽습니다. 영상 데이터와 결과는 서버로 전송하지 않습니다." },
@@ -518,6 +561,7 @@ export function VideoStudioPage() {
           { question: "GIF와 음원 추출은 어디서 선택하나요?", answer: "출력 형식에서 GIF, MP3 또는 AAC를 고르면 필요한 설정만 자동으로 표시됩니다." },
           { question: "이어붙이면서 패스스루할 수 있나요?", answer: "코덱, 해상도와 스트림 구성이 호환되는 영상은 가능합니다. 호환되지 않으면 자동으로 품질을 바꾸지 않고 인코딩이 필요하다고 안내합니다." },
           { question: "왜 첫 실행이 오래 걸리나요?", answer: "FFmpeg 실행 코어를 처음 불러오고 WebAssembly 메모리를 준비하기 때문입니다. 브라우저 캐시에 저장되면 이후 다운로드는 빨라질 수 있습니다." },
+          { question: "MKV·AVI도 항상 변환되나요?", answer: "아니요. 브라우저 미리보기가 안 되면 FFmpeg 메타데이터 분석으로 변환을 시도할 수 있지만, 분석 엔진이 해당 내부 코덱을 읽지 못하는 조합까지 보장하지는 않습니다." },
         ]}
       />
     </div>
@@ -611,6 +655,7 @@ function createGroupValues<T>(value: T) {
 
 function createId() { return globalThis.crypto?.randomUUID?.() || `video-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 function fileKey(file: File) { return `${file.name}:${file.size}:${file.lastModified}`; }
+function isLikelyMobileDevice() { return typeof window !== "undefined" && (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 760); }
 
 function toUserFacingVideoError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);

@@ -2,6 +2,7 @@ import { AlertTriangle, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ResultCard, formatBytes } from "../../components/ui";
+import { FileShareButton } from "../../components/FileShareButton";
 import type { PdfWorkerResult } from "./types";
 
 export interface DownloadResult {
@@ -39,6 +40,7 @@ export function PdfDownloadCard({ result, title = "결과 파일이 준비됐어
       <a className="result-download accent-violet" href={result.url} download={result.fileName}>
         <Download size={16} /> {result.fileName}<small>{formatBytes(result.size)}</small>
       </a>
+      <FileShareButton url={result.url} fileName={result.fileName} />
       {!!result.warnings.length && <div className="result-warnings">{result.warnings.map((warning) => <p key={warning}><AlertTriangle size={13} /> {warning}</p>)}</div>}
     </ResultCard>
   );

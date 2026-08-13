@@ -1,7 +1,11 @@
 import type { BatchImageOptions, CollageOptions, GifOptions, ImageWorkerInput, ImageWorkerProgress, ImageWorkerResult } from "./types";
 
 async function serializeFiles(files: File[]): Promise<ImageWorkerInput[]> {
-  return Promise.all(files.map(async (file) => ({ name: file.name, mimeType: file.type, buffer: await file.arrayBuffer() })));
+  const inputs: ImageWorkerInput[] = [];
+  for (const file of files) {
+    inputs.push({ name: file.name, mimeType: file.type, buffer: await file.arrayBuffer() });
+  }
+  return inputs;
 }
 
 async function runImageWorker(message: object, transfers: ArrayBuffer[], onProgress?: ImageWorkerProgress, signal?: AbortSignal) {
@@ -61,4 +65,3 @@ export async function serializeWatermark(file?: File) {
   if (!file) return undefined;
   return { name: file.name, mimeType: file.type, buffer: await file.arrayBuffer() } satisfies ImageWorkerInput;
 }
-

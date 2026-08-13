@@ -61,8 +61,8 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/pdf-editor/convert": {
     title: "PDF를 DOCX·XLSX·TXT로 변환·한국어 OCR",
-    description: "PDF 내장 텍스트와 브라우저 한국어·영어 OCR로 DOCX, XLSX, TXT와 검색 가능한 PDF를 만드세요.",
-    application: { name: "PDF 문서 변환·OCR", featureList: ["PDF DOCX 변환", "PDF XLSX 변환", "PDF TXT 변환", "한국어·영어 OCR", "검색 가능한 PDF"] },
+    description: "원하는 PDF 페이지를 골라 자체 호스팅 한국어·영어 OCR로 DOCX, XLSX, TXT와 검색 가능한 PDF를 만드세요.",
+    application: { name: "PDF 문서 변환·OCR", featureList: ["처리 페이지 범위 선택", "PDF DOCX 변환", "PDF XLSX 변환", "PDF TXT 변환", "로컬 한국어·영어 OCR", "검색 가능한 PDF"] },
   },
   "/tools/hwp-editor": {
     title: "HWP·HWPX 문서 편집기 - 무료 온라인 HWP 편집",
@@ -76,8 +76,8 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/video-studio": {
     title: "온라인 비디오 편집·그룹별 이어붙이기 - GIF·MP3·AAC 변환",
-    description: "최대 6개 영상을 6개 그룹으로 나누고 구간·순서·동기 재생·분할 전체화면을 확인한 뒤 개별 저장하거나 이어붙이세요.",
-    application: { name: "Video Studio", featureList: ["최대 6개 영상·6개 그룹", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "인코딩 없는 패스스루", "원본 비율 유지·해상도 일괄 변경", "GIF·MP3·AAC 변환"] },
+    description: "최대 6개 영상을 그룹별로 자르고 이어붙이세요. MKV·AVI 미리보기 실패 시 FFmpeg 메타데이터 대체 분석도 지원합니다.",
+    application: { name: "Video Studio", featureList: ["최대 6개 영상·6개 그룹", "MKV·AVI 메타데이터 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "인코딩 없는 패스스루", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
   },
   "/tools/image-studio": {
     title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
@@ -111,7 +111,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/image-privacy": {
     title: "사진 EXIF·GPS 개인정보 제거 - JPG·PNG 메타데이터 삭제",
-    description: "사진 속 GPS 위치, 촬영 기기와 촬영 시각을 확인하고 EXIF 메타데이터가 제거된 깨끗한 JPG·PNG 사본을 만드세요.",
+    description: "JPG·PNG의 GPS 위치, 촬영 기기와 촬영 시각을 확인하고 EXIF가 제거된 사본을 만드세요. HEIC는 지원하지 않습니다.",
     application: { name: "Image Privacy", featureList: ["EXIF 확인", "GPS 위치 확인", "촬영 기기 확인", "촬영 시각 확인", "OffscreenCanvas 재인코딩", "메타데이터 제거"] },
   },
   "/tools/security-tools": {
@@ -120,9 +120,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "Password Security", featureList: ["CSPRNG 비밀번호 생성", "8~64자 길이", "문자 종류 선택", "패턴 강도 분석", "엔트로피", "공격 시간 추정"] },
   },
   "/tools/qr-studio": {
-    title: "QR 코드 생성기·사진 QR 스캐너 - 로고 삽입",
-    description: "URL과 텍스트를 중앙 로고가 포함된 QR 코드 PNG로 만들고 업로드한 사진 속 QR 데이터를 브라우저에서 읽으세요.",
-    application: { name: "QR Studio", featureList: ["URL QR 생성", "텍스트 QR 생성", "중앙 로고", "색상 설정", "PNG 다운로드", "사진 QR 스캔"] },
+    title: "QR 코드 생성기·실시간 카메라 스캐너 - 로고 삽입",
+    description: "URL과 텍스트를 로고 포함 QR로 만들고 휴대폰 카메라 또는 업로드한 사진 속 QR 데이터를 브라우저에서 읽으세요.",
+    application: { name: "QR Studio", featureList: ["URL QR 생성", "텍스트 QR 생성", "중앙 로고", "실시간 카메라 스캔", "사진 QR 스캔", "모바일 공유·저장"] },
   },
   "/tools/data-converter": {
     title: "CSV·JSON·HTML Table 표 데이터 변환기",

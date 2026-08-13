@@ -63,6 +63,10 @@ try {
 
   await page.goto(`${baseUrl}/tools/qr-studio`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => { const canvas = document.querySelector(".qr-preview canvas"); return canvas instanceof HTMLCanvasElement && canvas.width >= 600; });
+  await page.click(".mode-switch button:nth-child(2)");
+  await page.waitForSelector(".qr-camera-stage video[playsinline]");
+  const cameraCopy = await page.$eval(".qr-scan-layout", (element) => element.textContent);
+  if (!cameraCopy?.includes("카메라로 스캔")) throw new Error("Live QR camera scanner is missing.");
 
   await page.goto(`${baseUrl}/tools/data-converter`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "data-converter");
@@ -71,6 +75,8 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".utility-editor-grid textarea")[1]?.value.includes('"alpha"'));
 
   await page.goto(`${baseUrl}/tools/image-privacy`, { waitUntil: "networkidle0" });
+  const privacyCompatibility = await page.$eval(".image-privacy-page .inline-notice", (element) => element.textContent);
+  if (!privacyCompatibility.includes("HEIC") || !privacyCompatibility.includes("iOS 16.3")) throw new Error("Image privacy mobile compatibility notice is incomplete.");
   await page.evaluate(async () => {
     const canvas = document.createElement("canvas"); canvas.width = 48; canvas.height = 32;
     const context = canvas.getContext("2d"); context.fillStyle = "#159bd7"; context.fillRect(0, 0, 48, 32);
@@ -90,10 +96,17 @@ try {
   await page.mouse.move(bounds.x + 80, bounds.y + 80); await page.mouse.down(); await page.mouse.move(bounds.x + 220, bounds.y + 150, { steps: 8 }); await page.mouse.up();
   await page.waitForFunction(() => !document.querySelector('.paint-history-actions button[aria-label="실행 취소"]')?.disabled);
 
+  await page.goto(`${baseUrl}/tools/video-studio`, { waitUntil: "networkidle0" });
+  const videoCompatibility = await page.$eval(".video-studio-page .inline-notice.warning", (element) => element.textContent);
+  if (!videoCompatibility.includes("MKV") || !videoCompatibility.includes("AVI") || !videoCompatibility.includes("FFmpeg")) throw new Error("Video compatibility fallback notice is incomplete.");
+
+  await page.goto(`${baseUrl}/tools/pdf-editor/convert`, { waitUntil: "networkidle0" });
+  await page.waitForSelector('input[placeholder*="1-5, 8"]');
+
   const social = await page.evaluate(() => ({ card: document.querySelector('meta[name="twitter:card"]')?.content, image: document.querySelector('meta[property="og:image"]')?.content }));
   if (social.card !== "summary_large_image" || !social.image?.endsWith("/social/worklazy-tools-share.png")) throw new Error(`Social metadata is incomplete: ${JSON.stringify(social)}`);
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
-  console.log("Utility tool smoke tests passed: home copy, 4-column grid, paired editors, world map, text, formatter, workday, payroll, security, QR, data, EXIF and paint.");
+  console.log("Utility tool smoke tests passed: home copy, 4-column grid, paired editors, world map, text, formatter, workday, payroll, security, live QR, data, EXIF, paint, video compatibility and PDF page range.");
 } finally { await browser.close(); }
 
 async function clickButton(page, text) { const clicked = await page.evaluate((label) => { const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label)); if (!button) return false; button.click(); return true; }, text); if (!clicked) throw new Error(`Button not found: ${text}`); }

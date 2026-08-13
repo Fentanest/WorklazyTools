@@ -24,12 +24,15 @@ export async function compareWordFilePairs(
   onProgress?: (progress: number, message: string) => void,
 ) {
   const worker = new Worker(new URL("./word.worker.ts", import.meta.url), { type: "module" });
-  const payloads = await Promise.all(pairs.map(async ({ beforeFile, afterFile }) => ({
-    beforeName: beforeFile.name,
-    afterName: afterFile.name,
-    beforeBuffer: await beforeFile.arrayBuffer(),
-    afterBuffer: await afterFile.arrayBuffer(),
-  })));
+  const payloads: Array<{ beforeName: string; afterName: string; beforeBuffer: ArrayBuffer; afterBuffer: ArrayBuffer }> = [];
+  for (const { beforeFile, afterFile } of pairs) {
+    payloads.push({
+      beforeName: beforeFile.name,
+      afterName: afterFile.name,
+      beforeBuffer: await beforeFile.arrayBuffer(),
+      afterBuffer: await afterFile.arrayBuffer(),
+    });
+  }
   const transfer = payloads.flatMap((pair) => [pair.beforeBuffer, pair.afterBuffer]);
 
   return new Promise<WordWorkerPairResult[]>((resolve, reject) => {

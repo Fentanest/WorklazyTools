@@ -54,11 +54,11 @@ function runSpecificWorker<T>(worker: Worker, message: object, transfer: Transfe
 }
 
 async function serializeFiles(files: Array<{ id: string; file: File }>) {
-  return Promise.all(files.map(async ({ id, file }): Promise<PdfWorkerInput> => ({
-    id,
-    name: file.name,
-    buffer: await file.arrayBuffer(),
-  })));
+  const inputs: PdfWorkerInput[] = [];
+  for (const { id, file } of files) {
+    inputs.push({ id, name: file.name, buffer: await file.arrayBuffer() });
+  }
+  return inputs;
 }
 
 export async function mergePdfPages(

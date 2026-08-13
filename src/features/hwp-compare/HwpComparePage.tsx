@@ -16,6 +16,7 @@ import { type DragEvent as ReactDragEvent, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
+import { FileShareButton } from "../../components/FileShareButton";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
 import { ToolGuide } from "../../components/ToolGuide";
@@ -192,6 +193,7 @@ export function HwpComparePage() {
                 <div className="pair-result-actions">
                   {session.webOutput && <Link className="secondary-button" to={`/tools/hwp-compare/results/${item.pairNumber}`}><TextSearch size={15} /> 웹 비교 보기</Link>}
                   {item.reportUrl && <a className="result-download hwp-download" href={item.reportUrl} download={item.reportFileName}><Download size={15} /> Excel 보고서</a>}
+                  {item.reportUrl && <FileShareButton url={item.reportUrl} fileName={item.reportFileName || "worklazy-HWP-비교보고서.xlsx"} />}
                 </div>
               </article>
             ))}

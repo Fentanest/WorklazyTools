@@ -62,12 +62,10 @@ function runWorker<T>(
 }
 
 export async function inspectExcelFiles(files: Array<{ id: string; file: File; password?: string }>) {
-  const payloads: ExcelInputPayload[] = await Promise.all(files.map(async ({ id, file, password }) => ({
-    id,
-    name: file.name,
-    buffer: await file.arrayBuffer(),
-    password,
-  })));
+  const payloads: ExcelInputPayload[] = [];
+  for (const { id, file, password } of files) {
+    payloads.push({ id, name: file.name, buffer: await file.arrayBuffer(), password });
+  }
   return runWorker<ExcelInspectionResult[]>(
     { type: "inspect", files: payloads },
     payloads.map((file) => file.buffer),
@@ -79,13 +77,10 @@ export async function mergeExcelFiles(
   options: ExcelMergeOptions,
   onProgress?: WorkerProgress,
 ) {
-  const payloads: ExcelInputPayload[] = await Promise.all(files.map(async ({ id, file, password, selectedSheetNames }) => ({
-    id,
-    name: file.name,
-    buffer: await file.arrayBuffer(),
-    password,
-    selectedSheetNames,
-  })));
+  const payloads: ExcelInputPayload[] = [];
+  for (const { id, file, password, selectedSheetNames } of files) {
+    payloads.push({ id, name: file.name, buffer: await file.arrayBuffer(), password, selectedSheetNames });
+  }
 
   return runWorker<ExcelMergeResult>(
     { type: "merge", files: payloads, options },

@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
+import { FileShareButton } from "../../components/FileShareButton";
 import { OperationProgress } from "../../components/OperationProgress";
 import { ToolGuide } from "../../components/ToolGuide";
 import {
@@ -505,7 +506,7 @@ export function ExcelMergerPage() {
           title="Excel 파일을 만들었습니다."
           message={`${result.fileCount}개 파일의 ${result.sheetCount}개 시트를 ${result.outputSheetCount}개 시트로 정리했습니다.${result.encrypted ? " 출력 파일 암호도 적용했습니다." : ""}`}
         >
-          <a className="result-download" href={result.url} download={result.fileName}><Download size={17} /> {result.fileName}<small>{formatBytes(result.size)}</small></a>
+          <div className="result-file-actions"><a className="result-download" href={result.url} download={result.fileName}><Download size={17} /> {result.fileName}<small>{formatBytes(result.size)}</small></a><FileShareButton url={result.url} fileName={result.fileName} mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" /></div>
           {result.warnings.length > 0 && (
             <div className="result-warnings">{result.warnings.map((warning) => <p key={warning}><Info size={13} /> {warning}</p>)}</div>
           )}

@@ -17,6 +17,10 @@ interface CachedPdfDocument {
 }
 
 const documentCache = new Map<File, CachedPdfDocument>();
+const TESSERACT_BASE_URL = new URL(
+  "vendor/tesseract/7.0.0/",
+  new URL(import.meta.env.BASE_URL, window.location.origin),
+).href;
 
 export async function getPdfDocument(file: File) {
   const cached = documentCache.get(file);
@@ -157,15 +161,21 @@ export async function extractPdfText(
   ocrMode: PdfOcrMode,
   searchablePdf: boolean,
   onProgress?: WorkerProgress,
+  selectedPageIndexes?: number[],
 ): Promise<ExtractPdfTextResult> {
   const document = await getPdfDocument(file);
   const pages: PdfTextPage[] = [];
+  const sourcePageIndexes = selectedPageIndexes?.length
+    ? [...new Set(selectedPageIndexes)].filter((index) => index >= 0 && index < document.numPages)
+    : Array.from({ length: document.numPages }, (_, index) => index);
+  if (!sourcePageIndexes.length) throw new Error("처리할 PDF 페이지가 없습니다.");
   onProgress?.(2, "PDF의 내장 텍스트와 좌표를 확인하는 중…");
-  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+  for (let index = 0; index < sourcePageIndexes.length; index += 1) {
+    const pageNumber = sourcePageIndexes[index] + 1;
     const page = await document.getPage(pageNumber);
     const content = await page.getTextContent();
     pages.push(layoutPdfItems(pageNumber, (content.items as unknown[]).filter(isTextItem)));
-    onProgress?.(2 + (pageNumber / document.numPages) * 16, `[${pageNumber}/${document.numPages}] 내장 텍스트 분석 완료`);
+    onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, `[${index + 1}/${sourcePageIndexes.length}] ${pageNumber}페이지 내장 텍스트 분석 완료`);
   }
 
   const ocrTargets = searchablePdf || ocrMode === "all"
@@ -178,8 +188,11 @@ export async function extractPdfText(
   if (ocrTargets.length) {
     const { createWorker } = await import("tesseract.js");
     let activePage = 0;
-    onProgress?.(19, "한국어·영어 OCR 언어 모델을 준비하는 중… (최초 실행 시 다운로드)");
+    onProgress?.(19, "사이트에 포함된 한국어·영어 OCR 모델을 준비하는 중…");
     const ocrWorker = await createWorker(["kor", "eng"], undefined, {
+      workerPath: `${TESSERACT_BASE_URL}worker.min.js`,
+      corePath: `${TESSERACT_BASE_URL}core/`,
+      langPath: `${TESSERACT_BASE_URL}lang/`,
       logger: (message) => {
         if (message.status === "recognizing text") {
           const value = 22 + ((activePage + message.progress) / ocrTargets.length) * 68;
@@ -192,14 +205,15 @@ export async function extractPdfText(
     try {
       for (activePage = 0; activePage < ocrTargets.length; activePage += 1) {
         const pageIndex = ocrTargets[activePage];
-        onProgress?.(22 + (activePage / ocrTargets.length) * 68, `[${activePage + 1}/${ocrTargets.length}] ${pageIndex + 1}페이지 OCR용 이미지 생성 중…`);
-        const canvas = await renderPageForOcr(document, pageIndex + 1);
+        const sourcePageNumber = sourcePageIndexes[pageIndex] + 1;
+        onProgress?.(22 + (activePage / ocrTargets.length) * 68, `[${activePage + 1}/${ocrTargets.length}] ${sourcePageNumber}페이지 OCR용 이미지 생성 중…`);
+        const canvas = await renderPageForOcr(document, sourcePageNumber);
         const recognized = await ocrWorker.recognize(
           canvas,
           searchablePdf ? { pdfTitle: file.name, pdfTextOnly: false } : {},
           { text: true, blocks: true, pdf: searchablePdf },
         );
-        pages[pageIndex] = layoutOcrPage(pageIndex + 1, recognized.data);
+        pages[pageIndex] = layoutOcrPage(sourcePageNumber, recognized.data);
         if (searchablePdf && recognized.data.pdf) {
           const bytes = Uint8Array.from(recognized.data.pdf);
           ocrPdfBuffers.push(bytes.buffer);
@@ -224,8 +238,9 @@ export async function extractPdfText(
 async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number) {
   const page = await document.getPage(pageNumber);
   const natural = page.getViewport({ scale: 1 });
-  const requestedScale = 2.4;
-  const pixelLimit = 12_000_000;
+  const mobileDevice = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 760;
+  const requestedScale = mobileDevice ? 1.8 : 2.4;
+  const pixelLimit = mobileDevice ? 8_000_000 : 12_000_000;
   const limitedScale = Math.min(requestedScale, Math.sqrt(pixelLimit / (natural.width * natural.height)));
   return renderPageForExport(document, pageNumber, limitedScale);
 }

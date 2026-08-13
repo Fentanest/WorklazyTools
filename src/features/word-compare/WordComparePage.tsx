@@ -244,7 +244,7 @@ export function WordComparePage() {
         </SectionCard>
       </div>
 
-      <div className="comparison-prepare-note"><Info size={16} /><span><strong>처음 비교할 때 준비 시간이 조금 필요합니다.</strong><small>한 번 준비한 뒤 선택한 모든 문서 쌍을 순서대로 비교합니다.</small></span></div>
+      <div className="comparison-prepare-note"><Info size={16} /><span><strong>오프라인에서 사이트를 처음 열면 비교를 시작할 수 없습니다.</strong><small>비교 실행 환경은 Worklazy Tools 배포 파일에서만 불러오며 외부 CDN을 사용하지 않습니다. 실행 환경을 불러온 뒤 선택한 파일은 브라우저 안에서만 처리합니다.</small></span></div>
 
       <div className="tool-action-bar">
         <div><TextSearch size={20} /><span><strong>{ready ? `${beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.` : pairingError ? "양쪽 파일 개수를 맞춰 주세요." : !hasOutput ? "결과 형식을 하나 이상 선택해 주세요." : "수정 전·후 문서를 선택해 주세요."}</strong><small>비교 중에도 화면을 계속 사용할 수 있습니다.</small></span></div>
@@ -286,6 +286,7 @@ export function WordComparePage() {
         description="여러 문서를 순서대로 짝지어 비교하고, 각 문서 쌍의 결과를 따로 확인할 수 있습니다."
         blocks={[
           { title: "문서 쌍 만들기", paragraphs: ["수정 전과 수정 후 영역에 같은 개수의 DOCX를 넣으세요. 각 목록의 1번끼리, 2번끼리 순서대로 비교합니다. 드래그로 순서를 바꾸거나 좌우 화살표로 파일을 반대 목록에 옮길 수 있습니다."] },
+          { title: "최초 실행과 인터넷 연결", paragraphs: ["오프라인에서 사이트를 처음 열면 브라우저용 문서 비교 실행 환경을 받을 수 없어 비교를 시작할 수 없습니다. 실행 환경은 Worklazy Tools와 같은 GitHub Pages 배포 경로에서 제공되며 외부 CDN을 사용하지 않습니다. DOCX 파일과 비교 결과는 외부 작업 서버로 전송하지 않습니다."] },
           { title: "비교하는 범위", paragraphs: ["본문 문단을 기본으로 비교하며, 선택에 따라 표 셀과 머리말·꼬리말, 메모, 각주·미주의 텍스트도 각각 구분해 분석합니다."] },
           { title: "다중 동시 비교", paragraphs: ["여러 문서 쌍을 한 번에 비교하고, 웹에서는 각 문서 쌍의 독립된 상세 화면을 확인할 수 있습니다. Excel 보고서에서는 일반 변경과 표 변경을 나누고, 각 표를 별도 시트에서 수정 전·후 격자로 비교합니다."] },
           { title: "Word 변경 추적 파일", paragraphs: ["수정 후 문서를 바탕으로 삽입·삭제와 지원되는 서식 변경 revision이 포함된 DOCX를 만듭니다. 기존 작성자 기록은 유지하며, 문서 간 자동 번호 정의도 함께 보완합니다."] },

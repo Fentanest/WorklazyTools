@@ -1,5 +1,42 @@
 import type { VideoWorkerProgress, VideoWorkerRequest, VideoWorkerResult } from "./types";
 
+export interface VideoProbeResult {
+  duration: number;
+  width: number;
+  height: number;
+}
+
+export function probeVideoMetadata(file: File, signal?: AbortSignal) {
+  const worker = new Worker(new URL("./video-probe.worker.ts", import.meta.url), { type: "module" });
+  return new Promise<VideoProbeResult>((resolve, reject) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return false;
+      settled = true;
+      signal?.removeEventListener("abort", abort);
+      worker.terminate();
+      return true;
+    };
+    const abort = () => {
+      if (!finish()) return;
+      reject(new DOMException("영상 정보 확인을 취소했습니다.", "AbortError"));
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) return abort();
+    worker.onmessage = (event: MessageEvent) => {
+      if (event.data.type === "progress") return;
+      if (!finish()) return;
+      if (event.data.type === "result") resolve(event.data.result as VideoProbeResult);
+      else reject(new Error(event.data.error || "영상 정보를 확인하지 못했습니다."));
+    };
+    worker.onerror = (event) => {
+      if (!finish()) return;
+      reject(new Error(event.message || "영상 정보 확인을 시작하지 못했습니다."));
+    };
+    worker.postMessage({ file });
+  });
+}
+
 export function runVideoTask(request: VideoWorkerRequest, onProgress?: VideoWorkerProgress, signal?: AbortSignal) {
   const worker = new Worker(new URL("./video.worker.ts", import.meta.url), { type: "module" });
   return new Promise<VideoWorkerResult>((resolve, reject) => {

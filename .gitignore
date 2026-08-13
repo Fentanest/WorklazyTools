@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 .DS_Store
 coverage/
+public/vendor/pyodide/
+public/vendor/tesseract/
 /compareexample/
 /comparesample/
 __pycache__/

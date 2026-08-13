@@ -5,7 +5,10 @@ import trackedDocxScript from "./tracked_docx.py?raw";
 import type { WordCompareResult } from "../excel-merger/types";
 
 const PYODIDE_VERSION = "0.29.4";
-const PYODIDE_BASE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+const PYODIDE_BASE_URL = new URL(
+  `vendor/pyodide/${PYODIDE_VERSION}/`,
+  new URL(import.meta.env.BASE_URL, self.location.origin),
+).href;
 const PYODIDE_MODULE_URL = `${PYODIDE_BASE_URL}pyodide.mjs`;
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -94,7 +97,7 @@ worker.onmessage = async (event: MessageEvent) => {
     const detail = /zip|document\.xml|BadZipFile/i.test(rawMessage)
       ? "DOCX 파일 구조를 읽지 못했습니다. 손상되었거나 실제 DOCX 형식이 아닌지 확인해 주세요."
       : /fetch|network|import/i.test(rawMessage)
-        ? "문서 비교 기능을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요."
+        ? "문서 비교 실행 환경을 불러오지 못했습니다. 사이트를 온라인에서 다시 연 뒤 재시도해 주세요."
         : rawMessage;
     const message = activePair ? `${activePair}번 문서 쌍: ${detail}` : detail;
     worker.postMessage({ type: "error", error: { message } });

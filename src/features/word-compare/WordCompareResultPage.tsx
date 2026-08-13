@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { type ReactNode, useMemo, useState } from "react";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
+import { FileShareButton } from "../../components/FileShareButton";
 import { PageHeader, SegmentedControl } from "../../components/ui";
 import type {
   WordCompareResult,
@@ -94,7 +95,9 @@ export function DocumentCompareResultPage({
         description={`${pair.result.beforeName}과 ${pair.result.afterName}의 변경 내용입니다.`}
       >
         {pair.reportUrl && <a className="secondary-button" href={pair.reportUrl} download={pair.reportFileName}><Download size={15} /> Excel 보고서</a>}
+        {pair.reportUrl && <FileShareButton url={pair.reportUrl} fileName={pair.reportFileName || "worklazy-비교보고서.xlsx"} />}
         {pair.trackedUrl && trackedLabel && <a className="secondary-button" href={pair.trackedUrl} download={pair.trackedFileName}><Download size={15} /> {trackedLabel}</a>}
+        {pair.trackedUrl && trackedLabel && <FileShareButton url={pair.trackedUrl} fileName={pair.trackedFileName || "worklazy-변경추적.docx"} />}
       </PageHeader>
       <PrivacyBanner compact />
 
