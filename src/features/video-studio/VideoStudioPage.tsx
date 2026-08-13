@@ -461,6 +461,7 @@ export function VideoStudioPage() {
             <label><span>출력 형식</span><select value={outputFormat} onChange={(event) => changeOutputFormat(event.target.value as VideoOutputFormat)}><option value="mp4">MP4 영상</option><option value="mkv">MKV 영상</option><option value="webm">WebM 영상</option><option value="gif">GIF 움짤</option><option value="mp3">MP3 음원</option><option value="aac">AAC 음원</option></select></label>
             <div className="video-output-count"><ListVideo size={18} /><span><strong>{outputCount}개 결과 파일</strong><small>{outputCount > 1 ? "ZIP으로 한 번에 내려받습니다." : "완료 후 바로 내려받습니다."}</small></span></div>
           </div>
+          <div className="video-output-limit"><Gauge size={17} /><span><strong>브라우저 출력 권장: 파일당 1GB 이하</strong><small>현재 안전 한도는 결과 파일 1개당 1.5GB입니다. 원본 파일 크기와는 별도로 계산합니다.</small></span></div>
 
           {isVideoOutput && (
             <EncodingSettings

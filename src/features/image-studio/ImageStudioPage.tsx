@@ -1,11 +1,11 @@
-import { ArrowDownToLine, ArrowUpToLine, CircleIcon, ClipboardPaste, Download, FlipHorizontal2, ImageIcon, Images, LayoutGrid, RotateCw, Shapes, Sparkles, Trash2, Type } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, CircleIcon, ClipboardPaste, Download, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, RotateCw, Sparkles, Square, Trash2, Type } from "lucide-react";
 import { Canvas, Circle, FabricImage, FabricText, Rect, filters, type FabricObject } from "fabric";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, FileList, PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
+import { FileDropZone, FileList, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { batchProcessImages, buildAnimatedGif, buildCollage, serializeWatermark } from "./imageWorkerClient";
 import type { CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
@@ -51,7 +51,7 @@ export function ImageStudioPage() {
           { question: "이미지가 서버로 전송되나요?", answer: "아니요. 이미지 바이트는 현재 브라우저 메모리와 전용 Worker 안에서만 처리합니다." },
           { question: "원본 파일이 바뀌나요?", answer: "아니요. 원본은 읽기만 하며 모든 결과는 새 파일로 내려받습니다." },
           { question: "지원 형식은 무엇인가요?", answer: "브라우저가 해석할 수 있는 JPG, PNG, WebP 등을 입력으로 사용합니다. 출력은 PNG, JPG, WebP와 애니메이션 GIF를 지원합니다." },
-          { question: "투명 배경을 유지할 수 있나요?", answer: "현재 단일 편집기는 흰색 캔버스를 사용합니다. 일괄 편집과 콜라주는 선택한 배경색으로 채우며 JPG는 투명 배경을 지원하지 않습니다." },
+          { question: "투명 배경을 유지할 수 있나요?", answer: "네. 단일 편집, 일괄 편집과 콜라주에서 투명 배경을 선택할 수 있습니다. PNG·WebP는 투명도를 유지하며 JPG로 저장하면 투명한 부분을 흰색으로 처리합니다." },
           { question: "대용량 이미지가 중단되는 이유는 무엇인가요?", answer: "브라우저와 기기에는 캔버스 최대 크기와 메모리 한도가 있습니다. 출력 크기나 파일 수를 줄이면 안정적으로 처리할 수 있습니다." },
         ]}
       />
@@ -69,6 +69,8 @@ function SingleImageEditor() {
   const [contrast, setContrast] = useState(0);
   const [hue, setHue] = useState(0);
   const [format, setFormat] = useState<ImageOutputFormat>("png");
+  const [transparentBackground, setTransparentBackground] = useState(false);
+  const [stageDragging, setStageDragging] = useState(false);
   const [shapeSelected, setShapeSelected] = useState(false);
   const [shapeFill, setShapeFill] = useState("#0a84ff");
   const [shapeStroke, setShapeStroke] = useState("#ffffff");
@@ -95,6 +97,13 @@ function SingleImageEditor() {
   }, [syncSelectedShape]);
 
   useEffect(() => {
+    const instance = canvas.current;
+    if (!instance) return;
+    instance.backgroundColor = transparentBackground ? "" : "#ffffff";
+    instance.requestRenderAll();
+  }, [transparentBackground]);
+
+  useEffect(() => {
     const image = baseImage.current;
     if (!image) return;
     image.filters = [
@@ -114,7 +123,7 @@ function SingleImageEditor() {
       const image = await FabricImage.fromURL(url);
       const instance = canvas.current;
       instance.clear();
-      instance.backgroundColor = "#ffffff";
+      instance.backgroundColor = transparentBackground ? "" : "#ffffff";
       instance.setDimensions({ width: 900, height: 600 });
       const scale = Math.min(860 / image.width, 560 / image.height);
       image.set({ left: 450, top: 300, originX: "center", originY: "center", scaleX: scale, scaleY: scale });
@@ -130,6 +139,14 @@ function SingleImageEditor() {
   };
 
   useClipboardImages((images) => void loadFile(images.at(-1)));
+
+  const dropOnPreview = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setStageDragging(false);
+    const dropped = filterRasterImages(Array.from(event.dataTransfer.files));
+    if (dropped.length) void loadFile(dropped.at(-1));
+  };
 
   const mutateActive = (action: (object: FabricObject) => void) => {
     const instance = canvas.current;
@@ -205,7 +222,11 @@ function SingleImageEditor() {
   const exportImage = () => {
     const instance = canvas.current;
     if (!instance) return;
+    const originalBackground = instance.backgroundColor;
+    if (format === "jpeg") instance.backgroundColor = "#ffffff";
     const dataUrl = instance.toDataURL({ format, quality: 0.92, multiplier: 1 });
+    instance.backgroundColor = originalBackground;
+    instance.requestRenderAll();
     const anchor = document.createElement("a");
     anchor.href = dataUrl;
     anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-편집.${format === "jpeg" ? "jpg" : format}`;
@@ -219,15 +240,22 @@ function SingleImageEditor() {
       <div className="image-editor-layout">
         <aside className="image-editor-controls">
           <div className="editor-tool-group"><strong>자르기</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button></div></div>
-          <div className="editor-tool-group"><strong>선택 레이어</strong><div className="icon-tool-row"><button title="회전" type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title="좌우 반전" type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title="맨 앞으로" type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title="맨 뒤로" type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title="삭제 (Delete)" type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
+          <div className="editor-tool-group"><strong>선택 레이어</strong><div className="icon-tool-row"><button title="오른쪽으로 90도 회전" aria-label="오른쪽으로 90도 회전" type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title="좌우 반전" aria-label="좌우 반전" type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title="상하 반전" aria-label="상하 반전" type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title="맨 앞으로" aria-label="맨 앞으로" type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title="맨 뒤로" aria-label="맨 뒤로" type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title="삭제 (Delete)" aria-label="삭제 (Delete)" type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
           <div className="editor-tool-group"><strong>필터</strong><label>밝기 <b>{brightness}</b><input type="range" min={-80} max={80} value={brightness} onChange={(event) => setBrightness(Number(event.target.value))} /></label><label>대비 <b>{contrast}</b><input type="range" min={-80} max={80} value={contrast} onChange={(event) => setContrast(Number(event.target.value))} /></label><label>색조 <b>{hue}°</b><input type="range" min={-180} max={180} value={hue} onChange={(event) => setHue(Number(event.target.value))} /></label></div>
           <div className="editor-tool-group"><strong>텍스트·스티커</strong><div className="inline-input-action"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={() => addText()}><Type size={16} /></button></div><div className="button-grid sticker-grid">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" key={emoji} onClick={() => addText(emoji)}>{emoji}</button>)}</div></div>
-          <div className="editor-tool-group"><strong>도형</strong><div className="icon-tool-row"><button type="button" onClick={() => addShape("rect")}><Shapes size={18} /></button><button type="button" onClick={() => addShape("circle")}><CircleIcon size={18} /></button></div></div>
+          <div className="editor-tool-group"><strong>도형</strong><div className="icon-tool-row"><button title="사각형 추가" aria-label="사각형 추가" type="button" onClick={() => addShape("rect")}><Square size={18} /></button><button title="원 추가" aria-label="원 추가" type="button" onClick={() => addShape("circle")}><CircleIcon size={18} /></button></div></div>
           <div className={`editor-tool-group shape-style-controls${shapeSelected ? "" : " is-disabled"}`}><strong>선택 도형 스타일</strong><label><span>채움</span><input aria-label="도형 채움색" type="color" value={shapeFill} disabled={!shapeSelected} onChange={(event) => { setShapeFill(event.target.value); setSelectedShapeStyle("fill", event.target.value); }} /></label><label><span>테두리</span><input aria-label="도형 테두리색" type="color" value={shapeStroke} disabled={!shapeSelected} onChange={(event) => { setShapeStroke(event.target.value); setSelectedShapeStyle("stroke", event.target.value); }} /></label><label><span>테두리 두께 <b>{shapeStrokeWidth}px</b></span><input aria-label="도형 테두리 두께" type="range" min={0} max={30} step={1} value={shapeStrokeWidth} disabled={!shapeSelected} onChange={(event) => { const value = Number(event.target.value); setShapeStrokeWidth(value); setSelectedShapeStyle("strokeWidth", value); }} /></label>{!shapeSelected && <small>캔버스에서 사각형이나 원을 선택하세요.</small>}</div>
+          <div className="image-background-options compact"><ToggleRow label="투명 배경" description="PNG·WebP 출력에 적용" checked={transparentBackground} onChange={setTransparentBackground} /></div>
         </aside>
-        <div className="fabric-stage"><canvas ref={canvasElement} /></div>
+        <div
+          className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}`}
+          onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setStageDragging(true); } }}
+          onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
+          onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setStageDragging(false); }}
+          onDrop={dropOnPreview}
+        ><canvas ref={canvasElement} />{stageDragging && <span className="image-preview-drop-hint">여기에 놓아 편집 이미지 열기</span>}</div>
       </div>
-      <div className="export-row"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label="이미지 출력 형식" /><PrimaryButton accent="sky" disabled={!file} onClick={exportImage}><Download size={18} /> 이미지 다운로드</PrimaryButton></div>
+      <div className="export-row"><div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label="이미지 출력 형식" /><small>투명 배경은 PNG·WebP에서 유지됩니다. JPG로 저장하면 투명한 부분을 흰색으로 처리합니다.</small></div><PrimaryButton accent="sky" disabled={!file} onClick={exportImage}><Download size={18} /> 이미지 다운로드</PrimaryButton></div>
     </SectionCard>
   );
 }
@@ -239,6 +267,7 @@ function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) {
   const [height, setHeight] = useState(1200);
   const [format, setFormat] = useState<ImageOutputFormat>("jpeg");
   const [quality, setQuality] = useState(0.9);
+  const [transparentBackground, setTransparentBackground] = useState(false);
   const [watermarkText, setWatermarkText] = useState("");
   const [watermarkFile, setWatermarkFile] = useState<File>();
   const [watermarkPosition, setWatermarkPosition] = useState<WatermarkPosition>("bottom-right");
@@ -252,7 +281,7 @@ function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) {
     progress.start("이미지 파일을 준비하는 중…");
     try {
       const watermarkImage = await serializeWatermark(watermarkFile);
-      const result = await batchProcessImages(files, { mode, width, height, format, quality, background: "#ffffff", watermarkText, watermarkPosition, watermarkOpacity, watermarkImage }, "worklazy-일괄이미지.zip", progress.update, controller.signal);
+      const result = await batchProcessImages(files, { mode, width, height, format, quality, background: transparentBackground ? "transparent" : "#ffffff", watermarkText, watermarkPosition, watermarkOpacity, watermarkImage }, "worklazy-일괄이미지.zip", progress.update, controller.signal);
       downloadWorkerResult(result);
       progress.succeed(`${files.length}개 이미지 일괄 처리 완료`);
     } catch (error) { progress.fail(normalizePanelError(error)); }
@@ -262,6 +291,7 @@ function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) {
   return <SectionCard title="이미지 일괄 편집" description="같은 크기와 워터마크 설정을 여러 이미지에 적용하고 ZIP으로 받습니다.">
     <FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint="여러 JPG·PNG·WebP · Ctrl/⌘+V 가능" accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" />
     <div className="image-settings-grid"><label><span>리사이즈 방식</span><select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="fit-width">가로폭 맞춤</option><option value="contain">지정 크기 안에 맞춤</option><option value="cover">지정 크기 채우기</option><option value="original">원본 크기</option></select></label><NumberField label="가로 px" value={width} onChange={setWidth} /><NumberField label="세로 px" value={height} onChange={setHeight} disabled={mode === "fit-width" || mode === "original"} /><FormatField value={format} onChange={setFormat} /><RangeField label="품질" value={quality} min={0.4} max={1} step={0.05} onChange={setQuality} /></div>
+    <TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} />
     <div className="watermark-settings"><label><span>워터마크 텍스트</span><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} placeholder="비워두면 적용하지 않음" /></label><label><span>워터마크 이미지</span><input type="file" accept={RASTER_IMAGE_ACCEPT} onChange={(event) => setWatermarkFile(filterRasterImages(Array.from(event.target.files || []))[0])} /></label><label><span>위치</span><select value={watermarkPosition} onChange={(event) => setWatermarkPosition(event.target.value as WatermarkPosition)}><option value="top-left">왼쪽 위</option><option value="top-right">오른쪽 위</option><option value="center">가운데</option><option value="bottom-left">왼쪽 아래</option><option value="bottom-right">오른쪽 아래</option></select></label><RangeField label="불투명도" value={watermarkOpacity} min={0.1} max={1} step={0.05} onChange={setWatermarkOpacity} /></div>
     <div className="section-actions"><PrimaryButton accent="sky" disabled={!files.length} loading={progress.status === "running"} onClick={() => void execute()}><Download size={18} /> ZIP으로 일괄 다운로드</PrimaryButton></div>
   </SectionCard>;
@@ -274,15 +304,18 @@ function CollagePanel({ progress, controllerRef }: ProcessPanelProps) {
   const [width, setWidth] = useState(1600);
   const [gap, setGap] = useState(16);
   const [background, setBackground] = useState("#ffffff");
+  const [transparentBackground, setTransparentBackground] = useState(false);
   const [format, setFormat] = useState<ImageOutputFormat>("png");
   useClipboardImages((images) => setFiles((current) => [...current, ...images]));
-  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildCollage(files, { layout, columns, width, gap, background, format, quality: 0.92 }, "worklazy-콜라주", progress.update, controller.signal), "콜라주 생성 완료");
-  return <SectionCard title="이어붙이기·콜라주" description="설정한 간격만 이미지 사이에 적용합니다. 격자는 칸을 빈틈없이 채우며 가장자리가 일부 잘릴 수 있습니다."><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint="두 개 이상의 이미지 · Ctrl/⌘+V 가능" accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><label><span>배치</span><select value={layout} onChange={(event) => setLayout(event.target.value as CollageOptions["layout"])}><option value="vertical">세로 이어붙이기</option><option value="horizontal">가로 이어붙이기</option><option value="grid">격자 콜라주</option></select></label><NumberField label="열 개수" value={columns} onChange={setColumns} disabled={layout !== "grid"} /><NumberField label="전체 가로 px" value={width} onChange={setWidth} /><NumberField label="간격 px" value={gap} min={0} onChange={setGap} /><label><span>배경색</span><input type="color" value={background} onChange={(event) => setBackground(event.target.value)} /></label><FormatField value={format} onChange={setFormat} /></div><CollagePreview files={files} options={{ layout, columns, width, gap, background, format, quality: 0.92 }} /><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><LayoutGrid size={18} /> 콜라주 다운로드</PrimaryButton></div></SectionCard>;
+  const outputBackground = transparentBackground ? "transparent" : background;
+  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildCollage(files, { layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }, "worklazy-콜라주", progress.update, controller.signal), "콜라주 생성 완료");
+  return <SectionCard title="이어붙이기·콜라주" description="설정한 간격만 이미지 사이에 적용합니다. 격자는 칸을 빈틈없이 채우며 가장자리가 일부 잘릴 수 있습니다."><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint="두 개 이상의 이미지 · Ctrl/⌘+V 가능" accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><label><span>배치</span><select value={layout} onChange={(event) => setLayout(event.target.value as CollageOptions["layout"])}><option value="vertical">세로 이어붙이기</option><option value="horizontal">가로 이어붙이기</option><option value="grid">격자 콜라주</option></select></label><NumberField label="열 개수" value={columns} onChange={setColumns} disabled={layout !== "grid"} /><NumberField label="전체 가로 px" value={width} onChange={setWidth} /><NumberField label="간격 px" value={gap} min={0} onChange={setGap} /><label><span>배경색</span><input type="color" value={background} disabled={transparentBackground} onChange={(event) => setBackground(event.target.value)} /></label><FormatField value={format} onChange={setFormat} /></div><TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} /><CollagePreview files={files} options={{ layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }} onFiles={(incoming) => setFiles((current) => [...current, ...incoming])} /><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><LayoutGrid size={18} /> 콜라주 다운로드</PrimaryButton></div></SectionCard>;
 }
 
-function CollagePreview({ files, options }: { files: File[]; options: CollageOptions }) {
+function CollagePreview({ files, options, onFiles }: { files: File[]; options: CollageOptions; onFiles: (files: File[]) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [summary, setSummary] = useState("이미지를 추가하면 결과 배치를 미리 볼 수 있습니다.");
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -316,8 +349,12 @@ function CollagePreview({ files, options }: { files: File[]; options: CollageOpt
         context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = "high";
-        context.fillStyle = options.background;
-        context.fillRect(0, 0, displayWidth, displayHeight);
+        context.clearRect(0, 0, displayWidth, displayHeight);
+        const previewBackground = options.format === "jpeg" ? "#ffffff" : options.background;
+        if (previewBackground !== "transparent") {
+          context.fillStyle = previewBackground;
+          context.fillRect(0, 0, displayWidth, displayHeight);
+        }
         bitmaps.forEach((bitmap, index) => {
           const cell = layout.cells[index];
           const draw = options.layout === "grid" ? drawCoveredPreview : drawContainedPreview;
@@ -335,14 +372,21 @@ function CollagePreview({ files, options }: { files: File[]; options: CollageOpt
       disposed = true;
       window.clearTimeout(timer);
     };
-  }, [files, options.background, options.columns, options.gap, options.layout, options.width]);
+  }, [files, options.background, options.columns, options.format, options.gap, options.layout, options.width]);
 
   return (
     <div className="collage-preview-panel">
       <div className="collage-preview-heading"><span><LayoutGrid size={17} /><strong>결과 미리보기</strong></span><small>{summary}</small></div>
-      <div className={`collage-preview-stage${files.length ? " has-preview" : ""}`}>
+      <div
+        className={`collage-preview-stage image-preview-drop${files.length ? " has-preview" : ""}${dragging ? " is-file-dragging" : ""}`}
+        onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
+        onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragging(true); } }}
+        onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDragging(false); }}
+        onDrop={(event) => { event.preventDefault(); setDragging(false); const dropped = filterRasterImages(Array.from(event.dataTransfer.files)); if (dropped.length) onFiles(dropped); }}
+      >
         {!files.length && <span><ImageIcon size={24} />이미지를 추가해 주세요.</span>}
         <canvas ref={canvasRef} aria-label="이어붙이기 결과 미리보기" />
+        {dragging && <span className="image-preview-drop-hint">여기에 놓아 이미지 추가</span>}
       </div>
     </div>
   );
@@ -369,6 +413,10 @@ async function runPanelTask(controllerRef: ProcessPanelProps["controllerRef"], p
 function NumberField({ label, value, onChange, disabled = false, min = 1 }: { label: string; value: number; onChange: (value: number) => void; disabled?: boolean; min?: number }) { return <label><span>{label}</span><input type="number" min={min} value={value} disabled={disabled} onChange={(event) => onChange(Math.max(min, Number(event.target.value)))} /></label>; }
 function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) { return <label><span>{label} <b>{Math.round(value * 100)}%</b></span><input type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))} /></label>; }
 function FormatField({ value, onChange }: { value: ImageOutputFormat; onChange: (value: ImageOutputFormat) => void }) { return <label><span>출력 형식</span><select value={value} onChange={(event) => onChange(event.target.value as ImageOutputFormat)}><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select></label>; }
+
+function TransparencyControl({ checked, onChange, format }: { checked: boolean; onChange: (value: boolean) => void; format: ImageOutputFormat }) {
+  return <div className="image-background-options"><ToggleRow label="투명 배경" description="빈 공간과 이미지 사이 간격을 투명하게 저장" checked={checked} onChange={onChange} /><p>{format === "jpeg" ? "JPG는 투명도를 지원하지 않아 투명한 부분을 흰색으로 처리합니다." : "PNG·WebP 출력에서 투명 배경을 유지합니다."}</p></div>;
+}
 
 function ClipboardHint({ mode }: { mode: "replace" | "append" }) {
   return <div className="clipboard-image-hint"><ClipboardPaste size={15} /><span>화면을 캡처하거나 이미지를 복사한 뒤 <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>V</kbd>를 누르면 {mode === "replace" ? "편집 이미지로 바로 열립니다." : "현재 목록 뒤에 추가됩니다."}</span></div>;

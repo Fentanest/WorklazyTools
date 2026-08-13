@@ -99,8 +99,30 @@ async function testHwpEditor(page, hwpPath) {
 
 async function testImageStudio(page, imagePaths) {
   await page.goto(`${baseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
-  await pasteCanvasImages(page, ["#159bd7"]);
+  await page.waitForSelector(".fabric-stage");
+  await dropCanvasImages(page, ".fabric-stage", ["#159bd7"]);
   await page.waitForSelector(".fabric-stage .canvas-container");
+  await page.waitForFunction(() => document.querySelector(".image-studio-page .drop-zone strong")?.textContent?.includes("1개 파일 선택됨"));
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".fabric-stage .lower-canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return false;
+    const pixel = canvas.getContext("2d")?.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data;
+    return pixel && pixel[2] > 150;
+  });
+  const editorControls = await page.evaluate(() => ({
+    hasRectangleLabel: Boolean(document.querySelector('button[aria-label="사각형 추가"]')),
+    hasVerticalFlip: Boolean(document.querySelector('button[aria-label="상하 반전"]')),
+    jpgNotice: document.querySelector(".image-format-control small")?.textContent || "",
+  }));
+  if (!editorControls.hasRectangleLabel || !editorControls.hasVerticalFlip || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
+    throw new Error(`Single editor controls are incomplete: ${JSON.stringify(editorControls)}`);
+  }
+  await page.click('.image-background-options.compact button[role="switch"]');
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".fabric-stage .lower-canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return false;
+    return canvas.getContext("2d")?.getImageData(1, 1, 1, 1).data[3] === 0;
+  });
   await page.evaluate(() => {
     const group = Array.from(document.querySelectorAll(".editor-tool-group")).find((item) => item.querySelector("strong")?.textContent === "도형");
     group?.querySelector("button")?.click();
@@ -162,6 +184,21 @@ async function testImageStudio(page, imagePaths) {
     return Array.from(context.getImageData(Math.floor(canvas.width * 0.55), Math.floor(canvas.height * 0.5), 1, 1).data);
   });
   if (gridPixel[0] < 200 || gridPixel[1] > 140 || gridPixel[2] > 170) throw new Error(`Grid still contains implicit image padding: ${gridPixel.join(",")}`);
+  await page.evaluate(() => {
+    const gap = Array.from(document.querySelectorAll(".image-settings-grid label")).find((label) => label.querySelector("span")?.textContent === "간격 px")?.querySelector("input");
+    if (!(gap instanceof HTMLInputElement)) throw new Error("Collage gap control is unavailable");
+    gap.value = "12";
+    gap.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.click('.image-background-options button[role="switch"]');
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".collage-preview-stage canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return false;
+    const alpha = canvas.getContext("2d")?.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data[3];
+    return alpha === 0;
+  });
+  await dropCanvasImages(page, ".collage-preview-stage", ["#34c759"]);
+  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 3);
 }
 
 async function pasteCanvasImages(page, colors) {
@@ -185,6 +222,29 @@ async function pasteCanvasImages(page, colors) {
   }, colors);
 }
 
+async function dropCanvasImages(page, selector, colors) {
+  await page.evaluate(async (targetSelector, values) => {
+    const transfer = new DataTransfer();
+    for (let index = 0; index < values.length; index += 1) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 96 + index * 24;
+      canvas.height = 72 + index * 36;
+      const context = canvas.getContext("2d");
+      context.fillStyle = values[index];
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      transfer.items.add(new File([blob], `preview-drop-${index + 1}.png`, { type: "image/png" }));
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+    const target = document.querySelector(targetSelector);
+    if (!(target instanceof HTMLElement)) throw new Error(`Drop target is unavailable: ${targetSelector}`);
+    target.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  }, selector, colors);
+}
+
 async function testVideoStudio(page, videoPaths, largeVideoPath) {
   await page.goto(`${baseUrl}/tools/video-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".video-studio-page input[type=file]");
@@ -198,6 +258,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath) {
   });
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(...videoPaths);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2 && document.querySelectorAll(".video-sync-group").length === 1);
+  const outputLimit = await page.$eval(".video-output-limit", (element) => element.textContent || "");
+  if (!outputLimit.includes("1GB 이하") || !outputLimit.includes("1.5GB")) throw new Error(`Video output limit is not explicit: ${outputLimit}`);
   const readState = await page.evaluate(() => window.__videoFileReadState);
   if (readState.arrayBufferReads !== 0) {
     throw new Error(`Video selection copied a source into one contiguous ArrayBuffer: ${JSON.stringify(readState)}`);

@@ -236,5 +236,6 @@ export function ResultCard({ title, message, accent = "blue", children }: {
 export function formatBytes(bytes: number) {
   if (!bytes) return "0 KB";
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

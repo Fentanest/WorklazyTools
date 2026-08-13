@@ -49,8 +49,7 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
         validateCanvasSize(size.width, size.height);
         const canvas = new OffscreenCanvas(size.width, size.height);
         const context = getContext(canvas);
-        context.fillStyle = options.background;
-        context.fillRect(0, 0, size.width, size.height);
+        fillOutputBackground(context, size.width, size.height, options.background, options.format);
         context.drawImage(bitmap, size.sourceX, size.sourceY, size.sourceWidth, size.sourceHeight, size.destX, size.destY, size.destWidth, size.destHeight);
         drawWatermark(context, size.width, size.height, options, watermark);
         const blob = await canvas.convertToBlob({ type: formatMime(options.format), quality: options.quality });
@@ -82,8 +81,7 @@ async function createCollage(inputs: ImageWorkerInput[], options: CollageOptions
     validateCanvasSize(layout.width, layout.height);
     const canvas = new OffscreenCanvas(layout.width, layout.height);
     const context = getContext(canvas);
-    context.fillStyle = options.background;
-    context.fillRect(0, 0, layout.width, layout.height);
+    fillOutputBackground(context, layout.width, layout.height, options.background, options.format);
     for (let index = 0; index < bitmaps.length; index += 1) {
       const bitmap = bitmaps[index];
       const cell = layout.cells[index];
@@ -247,6 +245,20 @@ function getContext(canvas: OffscreenCanvas, readFrequently = false) {
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   return context;
+}
+
+function fillOutputBackground(
+  context: OffscreenCanvasRenderingContext2D,
+  width: number,
+  height: number,
+  background: string,
+  format: ImageOutputFormat,
+) {
+  context.clearRect(0, 0, width, height);
+  const color = format === "jpeg" ? "#ffffff" : background;
+  if (color === "transparent") return;
+  context.fillStyle = color;
+  context.fillRect(0, 0, width, height);
 }
 
 function ensureCanvasSupport() {
