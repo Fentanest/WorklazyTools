@@ -21,7 +21,7 @@ export type VideoTask =
 
 export interface VideoWorkerInput {
   fileName: string;
-  buffer: ArrayBuffer;
+  file: File;
   duration: number;
   width: number;
   height: number;

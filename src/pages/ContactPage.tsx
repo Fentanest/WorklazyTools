@@ -2,7 +2,7 @@ import { Bug, ExternalLink, Lightbulb, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "../components/ui";
 
-const GITHUB_PROFILE = "https://github.com/Fentanest";
+const GITHUB_ISSUES = "https://github.com/Fentanest/WorklazyTools/issues";
 
 export function ContactPage() {
   return (
@@ -15,7 +15,7 @@ export function ContactPage() {
           <p className="eyebrow">GITHUB</p>
           <h2>오류와 개선 의견을 알려주세요.</h2>
           <p>재현 순서, 사용한 브라우저, 파일 형식과 화면에 표시된 오류 문구를 함께 적으면 확인에 도움이 됩니다.</p>
-          <a className="secondary-button" href={GITHUB_PROFILE} target="_blank" rel="noreferrer">GitHub 프로필에서 문의 <ExternalLink size={15} /></a>
+          <a className="secondary-button" href={GITHUB_ISSUES} target="_blank" rel="noreferrer">GitHub Issues에 문의·건의 <ExternalLink size={15} /></a>
         </div>
       </section>
 

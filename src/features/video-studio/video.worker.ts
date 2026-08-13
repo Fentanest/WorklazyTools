@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import classWorkerURL from "@ffmpeg/ffmpeg/worker?worker&url";
 import coreURL from "@ffmpeg/core?url";
 import wasmURL from "@ffmpeg/core/wasm?url";
@@ -19,6 +19,7 @@ const worker = self as unknown as DedicatedWorkerGlobalScope;
 worker.onmessage = async (event: MessageEvent<VideoWorkerRequest>) => {
   const ffmpeg = new FFmpeg();
   const temporaryFiles = new Set<string>();
+  const mountedDirectories = new Set<string>();
   let progressStage = { start: 28, end: 90, duration: 1, label: "처리 중" };
   let lastProgress = -1;
   let lastProgressAt = 0;
@@ -49,7 +50,7 @@ worker.onmessage = async (event: MessageEvent<VideoWorkerRequest>) => {
       const job = request.jobs[jobIndex];
       const jobStart = 23 + (jobIndex / request.jobs.length) * 67;
       const jobEnd = 23 + ((jobIndex + 1) / request.jobs.length) * 67;
-      const result = await processJob(ffmpeg, job, request.task, jobIndex, temporaryFiles, (ratioStart, ratioEnd, duration, label) => {
+      const result = await processJob(ffmpeg, job, request.task, jobIndex, temporaryFiles, mountedDirectories, (ratioStart, ratioEnd, duration, label) => {
         progressStage = {
           start: jobStart + (jobEnd - jobStart) * ratioStart,
           end: jobStart + (jobEnd - jobStart) * ratioEnd,
@@ -69,6 +70,10 @@ worker.onmessage = async (event: MessageEvent<VideoWorkerRequest>) => {
     worker.postMessage({ type: "error", error: normalizeError(error) });
   } finally {
     for (const name of temporaryFiles) await ffmpeg.deleteFile(name).catch(() => undefined);
+    for (const directory of mountedDirectories) {
+      await ffmpeg.unmount(directory).catch(() => undefined);
+      await ffmpeg.deleteDir(directory).catch(() => undefined);
+    }
     ffmpeg.terminate();
     worker.close();
   }
@@ -80,15 +85,20 @@ async function processJob(
   task: VideoTask,
   jobIndex: number,
   temporaryFiles: Set<string>,
+  mountedDirectories: Set<string>,
   setStage: (start: number, end: number, duration: number, label: string) => void,
 ) {
   const inputNames: string[] = [];
   for (let inputIndex = 0; inputIndex < job.inputs.length; inputIndex += 1) {
     const input = job.inputs[inputIndex];
-    const inputName = `job-${jobIndex}-input-${inputIndex}.${sanitizeExtension(getExtension(input.fileName) || "mp4")}`;
+    const sourceName = `input.${sanitizeExtension(getExtension(input.fileName) || "mp4")}`;
+    const mountPoint = `/worklazy-input-${jobIndex}-${inputIndex}`;
+    const inputName = `${mountPoint}/${sourceName}`;
+    await ffmpeg.createDir(mountPoint);
+    const mounted = await ffmpeg.mount(FFFSType.WORKERFS, { blobs: [{ name: sourceName, data: input.file }] }, mountPoint);
+    if (!mounted) throw new Error("이 브라우저의 영상 처리 엔진에서 대용량 파일 연결 기능을 사용할 수 없습니다.");
+    mountedDirectories.add(mountPoint);
     inputNames.push(inputName);
-    temporaryFiles.add(inputName);
-    await ffmpeg.writeFile(inputName, new Uint8Array(input.buffer));
   }
 
   if (job.mode === "individual") {
@@ -264,7 +274,7 @@ function validateRequest(request: VideoWorkerRequest) {
 }
 
 function validateInput(input: VideoWorkerInput) {
-  if (!input.buffer.byteLength) throw new Error("비디오 파일이 비어 있습니다.");
+  if (!(input.file instanceof File) || !input.file.size) throw new Error("비디오 파일이 비어 있거나 브라우저의 파일 접근 권한이 해제되었습니다.");
   if (!Number.isFinite(input.duration) || input.duration <= 0) throw new Error("비디오 재생 시간을 확인하지 못했습니다.");
   if (!Number.isFinite(input.width) || !Number.isFinite(input.height) || input.width <= 0 || input.height <= 0) throw new Error("비디오 화면 크기를 확인하지 못했습니다.");
   if (!Number.isFinite(input.start) || !Number.isFinite(input.end) || input.start < 0 || input.end <= input.start || input.end > input.duration + 0.25) {

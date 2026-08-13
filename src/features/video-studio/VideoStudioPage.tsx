@@ -43,7 +43,6 @@ type GroupOutputMode = "individual" | "concat";
 interface VideoItem {
   id: string;
   file: File;
-  buffer: ArrayBuffer;
   url: string;
   duration: number;
   width: number;
@@ -66,6 +65,7 @@ interface VideoJobEntry {
 }
 
 const GROUP_IDS: VideoGroupId[] = [1, 2, 3, 4, 5, 6];
+const MAX_SAFE_BROWSER_OUTPUT_BYTES = 1.5 * 1024 * 1024 * 1024;
 
 export function VideoStudioPage() {
   const [items, setItems] = useState<VideoItem[]>([]);
@@ -119,38 +119,14 @@ export function VideoStudioPage() {
     ? (items.length ? 1 : 0)
     : usedGroups.reduce((count, entry) => count + (groupSettings[entry.group].outputMode === "concat" ? 1 : entry.items.length), 0);
 
-  const handleFiles = async (nextFiles: File[]) => {
+  const handleFiles = (nextFiles: File[]) => {
     const supported = nextFiles.filter((file) => file.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(file.name));
     const unique = supported.filter((file, index) => supported.findIndex((candidate) => fileKey(candidate) === fileKey(file)) === index).slice(0, 6);
     const existing = new Map(items.map((item) => [fileKey(item.file), item]));
-    const hasNewFiles = unique.some((file) => !existing.has(fileKey(file)));
-    if (hasNewFiles) progress.start("선택한 영상을 브라우저 메모리에 안전하게 복사하는 중…");
-    const prepared: Array<VideoItem | { file: File; buffer: ArrayBuffer }> = [];
-    try {
-      for (let index = 0; index < unique.length; index += 1) {
-        const file = unique[index];
-        const current = existing.get(fileKey(file));
-        if (current) {
-          prepared.push(current);
-          continue;
-        }
-        const start = 4 + (index / unique.length) * 90;
-        const span = 90 / unique.length;
-        const buffer = await readVideoFile(file, (loaded, total, attempt) => {
-          const ratio = total > 0 ? loaded / total : 0;
-          progress.update(start + ratio * span, `[${index + 1}/${unique.length}] ${file.name} 읽는 중${attempt > 1 ? ` · 재시도 ${attempt}` : ""}… ${formatBytes(loaded)} / ${formatBytes(total)}`);
-        });
-        prepared.push({ file, buffer });
-      }
-    } catch (error) {
-      progress.fail(toUserFacingVideoError(error));
-      return;
-    }
-    const next = prepared.map((entry) => "id" in entry ? entry : {
+    const next = unique.map((file) => existing.get(fileKey(file)) || {
       id: createId(),
-      file: entry.file,
-      buffer: entry.buffer,
-      url: URL.createObjectURL(new Blob([entry.buffer], { type: entry.file.type || "video/mp4" })),
+      file,
+      url: URL.createObjectURL(file),
       duration: 0,
       width: 0,
       height: 0,
@@ -161,7 +137,12 @@ export function VideoStudioPage() {
     items.forEach((item) => { if (!next.includes(item)) URL.revokeObjectURL(item.url); });
     setItems(next);
     setActiveId((current) => next.some((item) => item.id === current) ? current : next[0]?.id);
-    setLastResult(nextFiles.length > 6 ? "최대 6개까지만 추가할 수 있어 앞의 6개 영상을 유지했습니다." : "");
+    const largeFiles = unique.filter((file) => file.size > MAX_SAFE_BROWSER_OUTPUT_BYTES);
+    setLastResult(nextFiles.length > 6
+      ? "최대 6개까지만 추가할 수 있어 앞의 6개 영상을 유지했습니다."
+      : largeFiles.length
+        ? `${largeFiles.map((file) => `${file.name} (${formatBytes(file.size)})`).join(", ")}은 원본을 메모리에 통째로 복사하지 않고 연결했습니다. 패스스루 결과가 너무 크면 출력 전에 구간 축소 안내가 표시됩니다.`
+        : "");
     progress.reset();
   };
 
@@ -286,16 +267,26 @@ export function VideoStudioPage() {
 
   const outputAction = async () => {
     if (!ready || !validateSegments(items) || passthroughConflict) return;
-    const totalSize = items.reduce((sum, item) => sum + item.file.size, 0);
-    if (totalSize > 500 * 1024 * 1024 && !window.confirm("선택한 영상의 합계가 500MB를 넘습니다. 브라우저 메모리 부족으로 중단될 수 있는데 계속할까요?")) return;
     const task = createTask({ outputFormat, codec, resolution, aspect, crf, bitrate, audioBitrate, gifFps, gifWidth });
     const jobEntries = createJobEntries(items, usedGroups, groupSettings, allGroupsOneFile);
-    await executeTask(async (controller) => {
-      const jobs: VideoOutputJob[] = await Promise.all(jobEntries.map(async (job) => ({
+    if (task.kind === "encode" && task.bitrate === "copy") {
+      const oversized = jobEntries
+        .map((job) => ({ job, estimate: estimatePassthroughBytes(job) }))
+        .find(({ estimate }) => estimate > MAX_SAFE_BROWSER_OUTPUT_BYTES);
+      if (oversized) {
+        progress.start("패스스루 결과 크기를 확인하는 중…");
+        progress.fail(`${oversized.job.name}의 예상 결과가 약 ${formatBytes(oversized.estimate)}입니다. 원본은 열 수 있지만 이 크기의 결과를 브라우저 메모리에서 다운로드 파일로 옮기기는 안전하지 않습니다. 출력 구간을 줄이거나 CRF 자동 인코딩을 선택해 주세요.`);
+        return;
+      }
+    }
+    const totalSize = items.reduce((sum, item) => sum + item.file.size, 0);
+    if (totalSize > 500 * 1024 * 1024 && !window.confirm("대용량 원본은 전체 메모리 복사 없이 연결하지만, 긴 영상의 변환·GIF 생성은 매우 오래 걸리거나 중간 결과 메모리가 부족할 수 있습니다. 계속할까요?")) return;
+    await executeTask((controller) => {
+      const jobs: VideoOutputJob[] = jobEntries.map((job) => ({
         name: job.name,
         mode: job.mode,
-        inputs: await Promise.all(job.items.map(toWorkerInput)),
-      })));
+        inputs: job.items.map(toWorkerInput),
+      }));
       return runVideoTask({ mode: "batch", jobs, task }, progress.update, controller.signal);
     });
   };
@@ -303,7 +294,7 @@ export function VideoStudioPage() {
   const executeTask = async (task: (controller: AbortController) => ReturnType<typeof runVideoTask>) => {
     const controller = new AbortController();
     activeController.current = controller;
-    progress.start("그룹별 영상 파일을 브라우저 메모리로 읽는 중…");
+    progress.start("원본 영상을 메모리 복사 없이 처리 엔진에 연결하는 중…");
     setLastResult("");
     try {
       const result = await task(controller);
@@ -518,10 +509,10 @@ export function VideoStudioPage() {
           { title: "그룹과 출력 방식", paragraphs: ["최대 6개 그룹에서 영상 순서를 드래그로 정합니다. 각 그룹은 영상을 각각 출력하거나 선택 구간만 순서대로 이어붙일 수 있습니다. 결과가 여러 개면 ZIP으로 묶습니다."] },
           { title: "패스스루와 정확도", paragraphs: ["패스스루는 원본 영상·음원 스트림을 그대로 복사해 빠르고 화질 손실이 없습니다. 키프레임 때문에 시작점이 조금 앞설 수 있으며, 서로 다른 코덱이나 해상도의 영상은 인코딩 없이 이어붙일 수 없습니다."] },
           { title: "동기 재생과 분할 전체화면", paragraphs: ["그룹 안의 영상을 함께 재생하고 공통 탐색 바로 위치를 맞출 수 있습니다. 분할 전체화면에서는 최대 6개 영상을 한 화면에서 비교하며 선택한 영상 하나의 소리만 듣습니다."] },
-          { title: "성능과 메모리", paragraphs: ["입력과 중간 결과는 브라우저 메모리에 보관합니다. 여러 개의 긴 4K 영상은 메모리 부족으로 중단될 수 있으므로 필요한 구간을 먼저 줄이고 데스크톱 브라우저를 사용하는 것이 좋습니다."] },
+          { title: "대용량 원본과 결과 한도", paragraphs: ["원본 영상은 통째로 복사하지 않고 브라우저의 읽기 전용 파일 연결로 FFmpeg에 전달합니다. 다만 인코딩 중간 데이터와 완성된 결과는 브라우저 메모리를 사용하므로, 긴 4K 영상은 필요한 구간을 먼저 줄이는 것이 좋습니다. 패스스루 예상 결과가 안전 한도를 넘으면 작업 전에 안내합니다."] },
         ]}
         faq={[
-          { question: "영상이 서버로 전송되나요?", answer: "아니요. 선택한 파일은 브라우저 메모리와 FFmpeg Worker의 임시 파일 시스템에서만 사용합니다." },
+          { question: "영상이 서버로 전송되나요?", answer: "아니요. 선택한 파일은 브라우저가 제공하는 로컬 파일 참조를 통해 FFmpeg Worker에서만 읽습니다. 영상 데이터와 결과는 서버로 전송하지 않습니다." },
           { question: "그룹별 출력은 어떻게 내려받나요?", answer: "결과가 하나면 해당 형식으로, 둘 이상이면 모든 결과가 든 ZIP으로 내려받습니다." },
           { question: "GIF와 음원 추출은 어디서 선택하나요?", answer: "출력 형식에서 GIF, MP3 또는 AAC를 고르면 필요한 설정만 자동으로 표시됩니다." },
           { question: "이어붙이면서 패스스루할 수 있나요?", answer: "코덱, 해상도와 스트림 구성이 호환되는 영상은 가능합니다. 호환되지 않으면 자동으로 품질을 바꾸지 않고 인코딩이 필요하다고 안내합니다." },
@@ -588,8 +579,15 @@ function createJobEntries(
   return entries;
 }
 
-async function toWorkerInput(item: VideoItem): Promise<VideoWorkerInput> {
-  return { fileName: item.file.name, buffer: item.buffer.slice(0), duration: item.duration, width: item.width, height: item.height, start: item.start, end: item.end };
+function toWorkerInput(item: VideoItem): VideoWorkerInput {
+  return { fileName: item.file.name, file: item.file, duration: item.duration, width: item.width, height: item.height, start: item.start, end: item.end };
+}
+
+function estimatePassthroughBytes(job: VideoJobEntry) {
+  return job.items.reduce((sum, item) => {
+    const selectedRatio = item.duration > 0 ? Math.min(1, Math.max(0, (item.end - item.start) / item.duration)) : 1;
+    return sum + item.file.size * selectedRatio;
+  }, 0);
 }
 
 function hasIncompatibleConcatDimensions(
@@ -613,82 +611,11 @@ function createGroupValues<T>(value: T) {
 function createId() { return globalThis.crypto?.randomUUID?.() || `video-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 function fileKey(file: File) { return `${file.name}:${file.size}:${file.lastModified}`; }
 
-class VideoFileReadError extends Error {
-  constructor(public readonly file: File, public readonly original: unknown) {
-    super(original instanceof Error ? original.message : String(original));
-    this.name = "VideoFileReadError";
-  }
-}
-
-async function readVideoFile(file: File, onProgress: (loaded: number, total: number, attempt: number) => void) {
-  if (!file.size) throw new VideoFileReadError(file, new Error("파일 크기가 0바이트입니다."));
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      return await readBlobWithFileReader(file, (loaded, total) => onProgress(loaded, total || file.size, attempt));
-    } catch (error) {
-      lastError = error;
-      if (!isFileReadAccessError(error) || attempt === 2) break;
-      await new Promise((resolve) => window.setTimeout(resolve, 240));
-    }
-  }
-
-  // Chromium may fail one FileReader path for cloud-backed or temporarily
-  // locked files while the Blob stream path remains available.
-  try {
-    return await readBlobStream(file, (loaded) => onProgress(loaded, file.size, 3));
-  } catch (error) {
-    throw new VideoFileReadError(file, error || lastError);
-  }
-}
-
-function readBlobWithFileReader(blob: Blob, onProgress: (loaded: number, total: number) => void) {
-  return new Promise<ArrayBuffer>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("progress", (event) => onProgress(event.loaded, event.lengthComputable ? event.total : blob.size));
-    reader.addEventListener("load", () => {
-      if (reader.result instanceof ArrayBuffer) resolve(reader.result);
-      else reject(new Error("영상 파일을 바이너리 데이터로 변환하지 못했습니다."));
-    }, { once: true });
-    reader.addEventListener("error", () => reject(reader.error || new DOMException("영상 파일 읽기에 실패했습니다.", "NotReadableError")), { once: true });
-    reader.addEventListener("abort", () => reject(new DOMException("영상 파일 읽기가 취소되었습니다.", "AbortError")), { once: true });
-    reader.readAsArrayBuffer(blob);
-  });
-}
-
-async function readBlobStream(blob: Blob, onProgress: (loaded: number) => void) {
-  if (typeof blob.stream !== "function") return new Response(blob).arrayBuffer();
-  const output = new Uint8Array(blob.size);
-  const reader = blob.stream().getReader();
-  let offset = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (offset + value.byteLength > output.byteLength) throw new Error("영상 파일 크기가 읽는 도중 변경되었습니다.");
-      output.set(value, offset);
-      offset += value.byteLength;
-      onProgress(offset);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  if (offset !== output.byteLength) throw new Error(`영상 파일을 끝까지 읽지 못했습니다 (${formatBytes(offset)} / ${formatBytes(blob.size)}).`);
-  return output.buffer;
-}
-
-function isFileReadAccessError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return (error instanceof DOMException && (error.name === "NotReadableError" || error.name === "SecurityError"))
-    || /requested file could not be read|permission problems|concurrent lock|not readable/i.test(message);
-}
-
 function toUserFacingVideoError(error: unknown) {
-  if (error instanceof VideoFileReadError) {
-    const detail = error.original instanceof DOMException ? error.original.name : error.original instanceof Error ? error.original.name : "ReadError";
-    return `${error.file.name} (${formatBytes(error.file.size)})을 브라우저 메모리로 복사하지 못했습니다. 다른 앱에서 파일을 사용 중이면 닫고, OneDrive·Google Drive·네트워크·외장 저장소의 파일이면 로컬 폴더에 완전히 내려받은 사본을 선택해 주세요. 오류 종류: ${detail}`;
-  }
   const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof RangeError || /array buffer allocation failed|invalid typed array length|out of memory/i.test(message)) {
+    return "완성된 영상 또는 인코딩 중간 데이터가 브라우저 메모리 한도를 넘었습니다. 출력 구간·해상도를 줄이거나 패스스루를 사용해 주세요.";
+  }
   if ((error instanceof DOMException && error.name === "NotReadableError") || /requested file could not be read|permission problems/i.test(message)) {
     return "선택한 영상 파일을 읽을 수 없습니다. 파일이 이동·교체되었거나 브라우저의 접근 권한이 해제되었을 수 있습니다. 원본 파일을 다시 선택해 주세요.";
   }

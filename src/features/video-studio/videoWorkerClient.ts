@@ -40,7 +40,9 @@ export function runVideoTask(request: VideoWorkerRequest, onProgress?: VideoWork
       if (!finish()) return;
       reject(new Error(event.message || "비디오 작업을 시작하지 못했습니다."));
     };
-    const transfers = request.jobs.flatMap((job) => job.inputs.map((input) => input.buffer));
-    worker.postMessage(request, transfers);
+    // File/Blob is structured-cloned as a browser-backed handle. Do not turn it
+    // into an ArrayBuffer here: multi-GB sources would require one contiguous
+    // JavaScript allocation before FFmpeg even starts.
+    worker.postMessage(request);
   });
 }

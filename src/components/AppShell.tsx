@@ -4,6 +4,7 @@ import {
   Home,
   LockKeyhole,
   Menu,
+  MessageSquarePlus,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -18,6 +19,7 @@ const primaryNavigation = [
   { to: "/tools", label: "모든 도구", icon: Grid2X2, end: true },
   { to: "/about", label: "정보", icon: CircleHelp, end: true },
 ];
+const GITHUB_ISSUES_URL = "https://github.com/Fentanest/WorklazyTools/issues";
 
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -65,6 +67,10 @@ export function AppShell() {
             <span>파일·암호 전송 없이<br />브라우저에서 처리</span>
           </div>
           <NavItem {...primaryNavigation[2]} />
+          <a className="sidebar-link" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
+            <span className="nav-icon accent-blue"><MessageSquarePlus size={18} /></span>
+            <span>문의·건의</span>
+          </a>
         </div>
       </aside>
 
@@ -143,6 +149,10 @@ export function AppShell() {
                   </NavLink>
                 );
               })}
+              <a className="sheet-tool-item" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
+                <span className="tool-icon small accent-blue"><MessageSquarePlus size={22} /></span>
+                <span><strong>문의·건의</strong><small>GitHub Issues에 오류와 기능 제안 남기기</small></span>
+              </a>
             </div>
           </section>
         </div>

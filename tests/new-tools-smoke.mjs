@@ -34,7 +34,7 @@ try {
       await testImageStudio(page, fixtures.images);
     }
     console.log("[3/3] Video studio");
-    await testVideoStudio(page, fixtures.videos);
+    await testVideoStudio(page, fixtures.videos, fixtures.largeVideo);
 
     if (pageErrors.length) throw new Error(`Browser errors:\n${pageErrors.join("\n")}`);
   } finally {
@@ -185,43 +185,23 @@ async function pasteCanvasImages(page, colors) {
   }, colors);
 }
 
-async function testVideoStudio(page, videoPaths) {
+async function testVideoStudio(page, videoPaths, largeVideoPath) {
   await page.goto(`${baseUrl}/tools/video-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".video-studio-page input[type=file]");
   await page.evaluate(() => {
     const nativeRead = FileReader.prototype.readAsArrayBuffer;
-    window.__videoFileReadState = { active: 0, maxActive: 0, firstFailureInjected: false, clearedDuringRead: false };
-    FileReader.prototype.readAsArrayBuffer = function resilientReadTest(blob) {
-      const state = window.__videoFileReadState;
-      if (!state.firstFailureInjected) {
-        state.firstFailureInjected = true;
-        throw new DOMException("The requested file could not be read because of a temporary concurrent lock.", "NotReadableError");
-      }
-      state.active += 1;
-      state.maxActive = Math.max(state.maxActive, state.active);
-      let settled = false;
-      const finishRead = () => {
-        if (settled) return;
-        settled = true;
-        state.active -= 1;
-      };
-      this.addEventListener("load", finishRead, { once: true });
-      this.addEventListener("error", finishRead, { once: true });
-      this.addEventListener("abort", finishRead, { once: true });
-      window.setTimeout(() => {
-        const input = document.querySelector(".video-studio-page input[type=file]");
-        if (!(input instanceof HTMLInputElement) || !input.files?.length) state.clearedDuringRead = true;
-        nativeRead.call(this, blob);
-      }, 60);
+    window.__videoFileReadState = { arrayBufferReads: 0 };
+    FileReader.prototype.readAsArrayBuffer = function trackUnexpectedVideoCopy(blob) {
+      window.__videoFileReadState.arrayBufferReads += 1;
+      return nativeRead.call(this, blob);
     };
   });
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(...videoPaths);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2 && document.querySelectorAll(".video-sync-group").length === 1);
   const readState = await page.evaluate(() => window.__videoFileReadState);
-  if (!readState.firstFailureInjected || readState.clearedDuringRead) {
-    throw new Error(`Video files were not retried and read sequentially before clearing the input: ${JSON.stringify(readState)}`);
+  if (readState.arrayBufferReads !== 0) {
+    throw new Error(`Video selection copied a source into one contiguous ArrayBuffer: ${JSON.stringify(readState)}`);
   }
-  await Promise.all(videoPaths.map((videoPath) => fs.unlink(videoPath)));
   await page.evaluate(() => {
     const player = document.querySelector(".multi-video-grid video");
     if (!(player instanceof HTMLVideoElement)) throw new Error("Video player is unavailable");
@@ -263,6 +243,11 @@ async function testVideoStudio(page, videoPaths) {
   if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Video concat error"));
   const groupedResult = await page.$eval(".inline-success", (element) => element.textContent || "");
   if (!groupedResult.includes("worklazy-비디오-결과-2개.zip")) throw new Error(`Grouped concat did not create a ZIP: ${groupedResult}`);
+
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(largeVideoPath);
+  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("메모리에 통째로 복사하지 않고 연결했습니다"));
+  const largeReadState = await page.evaluate(() => window.__videoFileReadState);
+  if (largeReadState.arrayBufferReads !== 0) throw new Error(`A 3824MB source triggered a contiguous ArrayBuffer read: ${JSON.stringify(largeReadState)}`);
 }
 
 async function waitForTerminalStatus(page) {
@@ -302,6 +287,7 @@ async function createFixtures(directory) {
 
   const video = path.join(directory, "sample.mp4");
   const videoTwo = path.join(directory, "sample-two.mp4");
+  const largeVideo = path.join(directory, "2026_0618_070732_001396F.MP4");
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi", "-i", "color=c=0x159bd7:s=320x180:d=1.5",
@@ -314,5 +300,11 @@ async function createFixtures(directory) {
     "-f", "lavfi", "-i", "sine=frequency=660:duration=1",
     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", videoTwo,
   ]);
-  return { blankHwp, images: [imageOne, imageTwo], videos: [video, videoTwo] };
+  const largeHandle = await fs.open(largeVideo, "w");
+  try {
+    await largeHandle.truncate(3824 * 1024 * 1024);
+  } finally {
+    await largeHandle.close();
+  }
+  return { blankHwp, images: [imageOne, imageTwo], videos: [video, videoTwo], largeVideo };
 }
