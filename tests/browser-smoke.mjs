@@ -351,13 +351,13 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
   const edgeTrimState = await page.$eval('button[aria-label="끝의 빈 행·열 정리"]', (button) => button.getAttribute("aria-checked"));
   if (edgeTrimState !== "true") throw new Error("The existing trailing-edge trim setting was not preserved.");
 
-  await clickSetting(page, "연속 빈 행 정리 (SheetTrim)");
-  await clickSetting(page, "연속 빈 열 정리 (SheetTrim)");
+  await clickSetting(page, "중간의 연속 빈 행 삭제");
+  await clickSetting(page, "중간의 연속 빈 열 삭제");
   const thresholdInput = await page.$('.sheet-trim-threshold input[type="number"]');
   await replaceInputValue(page, thresholdInput, "3");
   await page.click(".summary-card .primary-button");
   await waitForResult(page);
-  await assertProgressLog(page, "Excel SheetTrim");
+  await assertProgressLog(page, "연속 빈 행·열 정리");
 
   const resultPath = path.join(tempDir, "sheet-trim-result.xlsx");
   await saveBlobLink(page, ".result-download", resultPath);

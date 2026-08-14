@@ -271,7 +271,7 @@ export function QrStudioPage() {
               </div>
             )}
           </div>
-          <div className="inline-notice warning qr-compatibility-notice"><AlertTriangle size={16} /><span>카메라·사진 분석은 OffscreenCanvas를 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저를 사용해 주세요.</span></div>
+          <div className="inline-notice warning qr-compatibility-notice"><AlertTriangle size={16} /><span>카메라·사진 분석은 브라우저의 고급 이미지 처리 기능(OffscreenCanvas)을 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저를 사용해 주세요.</span></div>
         </>
       )}
 
@@ -281,8 +281,8 @@ export function QrStudioPage() {
         description="생성 내용, 카메라 프레임과 스캔 이미지는 외부 서버에 전송되지 않습니다."
         blocks={[
           { title: "중앙 로고", paragraphs: ["높은 오류 복원 수준을 사용하고 로고 뒤에 흰 여백을 넣습니다. 로고가 너무 복잡하면 일부 카메라에서 인식률이 떨어질 수 있습니다."] },
-          { title: "실시간 카메라", paragraphs: ["HTTPS에서 사용자 허용을 받은 뒤 후면 카메라를 우선 사용합니다. 프레임을 브라우저 내부 Worker에서 반복 분석하며 QR을 찾으면 즉시 카메라 트랙과 Worker를 종료합니다."] },
-          { title: "사진 스캔", paragraphs: ["큰 이미지는 Worker에서 최대 2200px로 축소한 뒤 명암 반전을 포함해 분석합니다."] },
+          { title: "실시간 카메라", paragraphs: ["보안 연결(HTTPS)에서 사용자 허용을 받은 뒤 후면 카메라를 우선 사용합니다. 카메라 화면은 브라우저의 별도 작업 공간에서 반복 확인하며 QR을 찾으면 즉시 카메라와 분석 작업을 종료합니다."] },
+          { title: "사진 스캔", paragraphs: ["큰 이미지는 브라우저 안에서 최대 2200px로 축소한 뒤 밝고 어두운 색을 뒤집는 방식까지 시도해 QR을 찾습니다."] },
         ]}
         faq={[
           { question: "QR URL의 안전성도 검사하나요?", answer: "아니요. QR 데이터를 표시할 뿐 연결된 사이트의 안전성을 보증하지 않습니다." },

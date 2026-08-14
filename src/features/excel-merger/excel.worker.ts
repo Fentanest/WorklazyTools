@@ -221,7 +221,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
   if (options.sheetTrimRows || options.sheetTrimColumns) {
     progress(86, `${plans.length}개 시트 복사 완료 · 연속 빈 행·열을 검사합니다.`);
     const trimStats = performSheetTrim(output, options);
-    progress(89, `SheetTrim 완료 · 빈 행 ${trimStats.rows}개, 빈 열 ${trimStats.columns}개를 정리했습니다.`);
+    progress(89, `연속 빈 행·열 정리 완료 · 빈 행 ${trimStats.rows}개, 빈 열 ${trimStats.columns}개를 정리했습니다.`);
   } else {
     progress(86, `${plans.length}개 시트 복사 완료`);
   }

@@ -420,7 +420,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     video: Array.from(document.querySelectorAll('.encoding-grid label:nth-child(4) option')).map((option) => option.textContent),
     audioModes: Array.from(document.querySelectorAll('.video-audio-settings .segmented-control button')).map((button) => button.textContent),
   }));
-  if (!encodingOptions.video.some((label) => label?.includes("직접입력")) || encodingOptions.audioModes.join("|") !== "원본 유지|오디오 제거|재인코딩") {
+  if (!encodingOptions.video.some((label) => label?.includes("직접입력")) || encodingOptions.audioModes.join("|") !== "원본 음성 복사|음성 제거|호환 형식 변환") {
     throw new Error(`Video/audio encoding controls are incomplete: ${JSON.stringify(encodingOptions)}`);
   }
   await page.evaluate(() => {
@@ -599,7 +599,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (largePassThroughState.outputs !== 2
     || largePassThroughState.transfer.startContainsFile
     || largePassThroughState.transfer.inputFileSizes.length !== 2
-    || !largePassThroughState.logs.some((message) => message.includes("Worker 준비 완료"))
+    || !largePassThroughState.logs.some((message) => message.includes("처리 공간 준비 완료"))
     || !largePassThroughState.logs.some((message) => message.includes("원본 파일 연결 중"))) {
     throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
   }

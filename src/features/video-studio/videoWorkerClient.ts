@@ -102,7 +102,7 @@ export function runVideoTask(
         if (started || settled) return;
         started = true;
         if (startupTimer !== undefined) window.clearTimeout(startupTimer);
-        onProgress?.(1, "비디오 전용 Worker 준비 완료 · 작업 목록을 전달하는 중…");
+        onProgress?.(1, "비디오 처리 공간 준비 완료 · 작업 목록을 전달하는 중…");
         window.setTimeout(() => {
           if (settled) return;
           try {
@@ -144,7 +144,7 @@ export function runVideoTask(
     };
     startupTimer = window.setTimeout(() => {
       if (!finish()) return;
-      reject(new Error("비디오 전용 Worker가 30초 안에 시작되지 않았습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."));
+      reject(new Error("비디오 처리 공간이 30초 안에 시작되지 않았습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."));
     }, 30_000);
   });
 }

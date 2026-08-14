@@ -1,4 +1,4 @@
-import { ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import type { ToolDefinition } from "../app/toolRegistry";
@@ -28,7 +28,6 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
           return <span key={item.label}><HighlightIcon size={14} /> {item.label}</span>;
         })}
       </div>
-      <div className="local-badge"><CheckCircle2 size={14} /> 브라우저에서 안전하게 처리</div>
     </Link>
   );
 }

@@ -458,13 +458,13 @@ export function AudioStudioPage() {
         <PrivacyBanner compact />
       </PageHeader>
 
-      <SectionCard step={1} title="오디오 파일 선택" description="한 번에 한 파일을 편집합니다. 새 파일을 선택하면 이전 파형·Undo 기록·오디오 클립보드를 정리합니다.">
-        <FileDropZone files={files} onFiles={handleFiles} accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hint="MP3·WAV·M4A·AAC·OGG · 브라우저 지원 코덱" accent="violet" />
-        <div className="inline-notice"><AlertTriangle size={16} /><span>M4A·AAC·OGG는 브라우저와 내부 코덱에 따라 열리지 않을 수 있습니다. 긴 무압축 오디오는 PCM 편집 데이터와 Undo 기록 때문에 메모리를 많이 사용하므로 필요한 길이의 파일부터 작업하세요.</span></div>
+      <SectionCard step={1} title="오디오 파일 선택" description="한 번에 한 파일을 편집합니다. 새 파일을 선택하면 이전 파형·실행 취소 기록·오디오 클립보드를 정리합니다.">
+        <FileDropZone files={files} onFiles={handleFiles} accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hint="브라우저에서 재생할 수 있는 MP3·WAV·M4A·AAC·OGG" accent="violet" />
+        <div className="inline-notice"><AlertTriangle size={16} /><span>M4A·AAC·OGG는 기기와 브라우저가 파일 안의 음성 압축 방식을 지원해야 열 수 있습니다. 긴 파일은 편집을 위해 압축을 푼 음성 데이터와 실행 취소 기록을 함께 보관하므로 메모리를 많이 사용할 수 있습니다.</span></div>
         {document && (
           <div className="audio-file-summary">
             <FileAudio2 size={21} />
-            <span><strong>{document.sourceName}</strong><small>{formatAudioTime(document.duration)} · {document.channels.length}채널 · {document.sampleRate.toLocaleString()}Hz · 편집 PCM {formatBytes(pcmSize)}</small></span>
+            <span><strong>{document.sourceName}</strong><small>{formatAudioTime(document.duration)} · {document.channels.length}채널 · {document.sampleRate.toLocaleString()}Hz · 편집 메모리 {formatBytes(pcmSize)}</small></span>
           </div>
         )}
       </SectionCard>
@@ -525,19 +525,19 @@ export function AudioStudioPage() {
 
       <ToolGuide
         title="오디오 파형 편집 안내"
-        description="선택한 오디오와 편집 샘플은 외부 서버로 전송하지 않고 현재 브라우저의 Web Audio API와 작업별 Worker에서만 처리합니다."
+        description="선택한 오디오와 편집 데이터는 외부 서버로 전송하지 않고 현재 브라우저 안에서만 처리합니다."
         blocks={[
           { title: "파형 구간 선택", paragraphs: ["파형을 드래그하면 보라색 선택 영역이 생깁니다. 영역 전체를 옮기거나 양쪽 손잡이를 조절하고, 시작·종료 초 입력으로 1ms 단위 값을 지정할 수 있습니다."] },
           { title: "샘플 단위 편집", paragraphs: ["음소거는 선택 샘플을 0으로 바꾸고, 잘라내기와 삭제는 뒤 샘플을 앞으로 당깁니다. 붙여넣기는 현재 빨간 재생 커서 위치에 메모리 클립을 삽입합니다."] },
           { title: "키보드 단축키", paragraphs: ["입력 칸 밖에서는 Space로 재생·일시정지하고, Ctrl+Z 또는 macOS의 Cmd+Z로 실행 취소합니다. Ctrl+Shift+Z·Cmd+Shift+Z·Ctrl+Y·Cmd+Y는 다시 실행입니다."] },
-          { title: "Undo와 메모리", paragraphs: ["편집 상태는 PCM 채널별 Float32Array로 보관합니다. Undo 기록은 파일 크기에 맞춰 최대 12단계, 약 256MB 예산 안에서 자동 제한하며 새 파일을 열면 모두 해제합니다."] },
-          { title: "WAV와 MP3", paragraphs: ["WAV는 16-bit PCM으로 빠르게 생성합니다. MP3는 Worklazy Tools에 함께 배포한 FFmpeg WebAssembly를 Worker에서 실행하며 인코딩 후 즉시 종료합니다."] },
-          { title: "브라우저 코덱 지원", paragraphs: ["MP3와 WAV는 일반적인 최신 브라우저에서 열 수 있습니다. M4A·AAC·OGG는 운영체제와 브라우저가 내부 코덱을 해석할 수 있을 때 편집할 수 있습니다."] },
+          { title: "실행 취소와 메모리", paragraphs: ["편집을 위해 압축을 푼 음성 샘플(PCM)을 채널별로 보관합니다. 실행 취소 기록은 파일 크기에 맞춰 최대 12단계, 약 256MB 한도 안에서 자동 제한하며 새 파일을 열면 모두 해제합니다."] },
+          { title: "WAV와 MP3", paragraphs: ["WAV는 호환성이 높은 16비트 비압축 음성으로 빠르게 만듭니다. MP3는 사이트에 포함된 브라우저용 FFmpeg 변환기를 별도 작업 공간에서 실행하고 완료 즉시 종료합니다."] },
+          { title: "브라우저의 파일 지원", paragraphs: ["MP3와 WAV는 일반적인 최신 브라우저에서 열 수 있습니다. M4A·AAC·OGG는 운영체제와 브라우저가 파일 안의 음성 압축 방식을 지원할 때 편집할 수 있습니다."] },
         ]}
         faq={[
-          { question: "오디오가 서버로 업로드되나요?", answer: "아니요. 파일 디코딩, PCM 편집, 파형 미리보기와 결과 인코딩은 현재 브라우저에서만 실행됩니다." },
+          { question: "오디오가 서버로 업로드되나요?", answer: "아니요. 파일 열기, 샘플 편집, 파형 미리보기와 결과 변환은 현재 브라우저에서만 실행됩니다." },
           { question: "붙여넣기는 어디에 들어가나요?", answer: "파형을 클릭하거나 재생해 이동한 빨간 재생 커서의 현재 시각에 삽입됩니다. 선택 영역의 시작점이 아니라 재생 커서가 기준입니다." },
-          { question: "왜 긴 파일은 메모리를 많이 사용하나요?", answer: "압축 오디오도 편집할 때는 채널별 비압축 PCM 샘플로 풀어야 하고, 파형 재생용 WAV와 Undo 상태도 브라우저 메모리를 사용하기 때문입니다." },
+          { question: "왜 긴 파일은 메모리를 많이 사용하나요?", answer: "압축된 음성도 편집할 때는 채널별 비압축 샘플로 풀어야 하고, 파형 재생용 데이터와 실행 취소 상태도 함께 보관하기 때문입니다." },
           { question: "MP3가 오프라인에서 바로 만들어지나요?", answer: "이전에 인코더가 캐시되었다면 가능할 수 있습니다. 처음 방문한 완전한 오프라인 상태에서는 실행 파일을 받을 수 없으므로 WAV를 사용해 주세요." },
           { question: "편집 결과가 원본을 덮어쓰나요?", answer: "아니요. 원본 파일은 수정하지 않으며 WAV 또는 MP3 새 파일로 내려받습니다." },
         ]}
@@ -601,7 +601,7 @@ function formatTimelineLabel(seconds: number) {
 
 function toAudioError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/decodeAudioData|Unable to decode|EncodingError/i.test(message)) return "이 브라우저가 오디오 형식 또는 내부 코덱을 해석하지 못했습니다. MP3나 WAV 파일로 변환한 뒤 다시 시도해 주세요.";
+  if (/decodeAudioData|Unable to decode|EncodingError/i.test(message)) return "이 브라우저가 오디오 파일 안의 음성 압축 방식을 해석하지 못했습니다. MP3나 WAV 파일로 변환한 뒤 다시 시도해 주세요.";
   if (/memory|allocation|out of bounds|Array buffer/i.test(message)) return "브라우저 메모리가 부족합니다. 더 짧거나 채널 수가 적은 오디오로 다시 시도해 주세요.";
   return message || "오디오 작업에 실패했습니다.";
 }

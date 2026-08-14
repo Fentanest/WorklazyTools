@@ -32,7 +32,7 @@ export function ImageStudioPage() {
       </nav>
 
       <div className="inline-notice warning image-format-notice"><AlertTriangle size={16} /><span>HEIC·HEIF 입력은 현재 지원하지 않습니다. iPhone 사진은 JPG·PNG·WebP로 변환하거나 ‘높은 호환성’ 형식으로 촬영한 파일을 사용해 주세요.</span></div>
-      {(tab === "batch" || tab === "collage" || tab === "gif") && <div className="inline-notice warning image-worker-notice"><AlertTriangle size={16} /><span>이 탭은 OffscreenCanvas Worker를 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저가 필요합니다. 모바일에서 대형 이미지가 위험한 것은 아니지만 출력 캔버스를 약 16MP 이하로 맞추고 적은 파일부터 처리하면 메모리 중단 가능성을 줄일 수 있습니다.</span></div>}
+      {(tab === "batch" || tab === "collage" || tab === "gif") && <div className="inline-notice warning image-worker-notice"><AlertTriangle size={16} /><span>이 탭은 브라우저의 고급 이미지 처리 기능(OffscreenCanvas)을 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저가 필요합니다. 모바일에서 대형 이미지가 위험한 것은 아니지만 완성 이미지 크기를 약 1,600만 화소 이하로 맞추고 적은 파일부터 처리하면 메모리 부족으로 멈출 가능성을 줄일 수 있습니다.</span></div>}
 
       {tab === "editor" && <ImageEditor />}
       {tab === "batch" && <BatchImagePanel progress={progress} controllerRef={activeController} />}
@@ -44,14 +44,14 @@ export function ImageStudioPage() {
 
       <ToolGuide
         title="브라우저 이미지 편집 안내"
-        description="원본 이미지와 편집 결과는 외부 작업 서버로 업로드하지 않습니다. 이미지 편집은 화면 캔버스에서, 일괄 작업은 전용 Worker에서 처리합니다."
+        description="원본 이미지와 편집 결과는 외부 작업 서버로 업로드하지 않습니다. 한 장 편집은 화면에서, 일괄 작업은 브라우저의 별도 작업 공간에서 처리합니다."
         blocks={[
           { title: "통합 이미지 편집", paragraphs: ["사진을 열거나 빈 캔버스에서 시작해 자르기·밝기·대비·색조, 연필·붓·지우개, 텍스트·도형·이모지를 한 작업 기록 안에서 사용합니다. 원본 사진은 기본 잠금되어 실수로 이동하지 않습니다."] },
-          { title: "일괄 처리", paragraphs: ["여러 파일과 클립보드 이미지를 한 목록에 추가할 수 있습니다. 리사이즈와 워터마크는 OffscreenCanvas Worker에서 한 장씩 처리하고 결과를 ZIP으로 묶습니다."] },
+          { title: "일괄 처리", paragraphs: ["여러 파일과 클립보드 이미지를 한 목록에 추가할 수 있습니다. 크기 변경과 워터마크는 브라우저의 별도 작업 공간에서 한 장씩 처리하고 결과를 ZIP 파일로 묶습니다."] },
           { title: "콜라주와 GIF", paragraphs: ["이어붙이기는 배치·간격·배경색을 바꿀 때 실제 출력 계산과 같은 방식의 축소 미리보기를 갱신합니다. GIF는 256색 제한 때문에 사진의 미세한 색 변화가 단순화될 수 있습니다."] },
         ]}
         faq={[
-          { question: "이미지가 서버로 전송되나요?", answer: "아니요. 이미지 바이트는 현재 브라우저 메모리와 전용 Worker 안에서만 처리합니다." },
+          { question: "이미지가 서버로 전송되나요?", answer: "아니요. 이미지 파일은 현재 브라우저 메모리와 별도 작업 공간 안에서만 처리합니다." },
           { question: "원본 파일이 바뀌나요?", answer: "아니요. 원본은 읽기만 하며 모든 결과는 새 파일로 내려받습니다." },
           { question: "지원 형식은 무엇인가요?", answer: "JPG, PNG, WebP를 입력으로 사용합니다. HEIC·HEIF는 현재 지원하지 않습니다. 출력은 PNG, JPG, WebP와 애니메이션 GIF를 지원합니다." },
           { question: "투명 배경을 유지할 수 있나요?", answer: "네. 이미지 편집, 일괄 편집과 콜라주에서 투명 배경을 선택할 수 있습니다. PNG·WebP는 투명도를 유지하며 JPG로 저장하면 투명한 부분을 흰색으로 처리합니다." },

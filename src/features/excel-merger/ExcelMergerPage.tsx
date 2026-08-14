@@ -392,19 +392,19 @@ export function ExcelMergerPage() {
                 onChange={(checked) => { setTrimEmptyEdges(checked); clearResult(); }}
               />
               <ToggleRow
-                label="연속 빈 행 정리 (SheetTrim)"
+                label="중간의 연속 빈 행 삭제"
                 description="시트 중간을 포함해 기준 개수 이상 연속된 빈 행을 삭제합니다."
                 checked={sheetTrimRows}
                 onChange={(checked) => { setSheetTrimRows(checked); clearResult(); }}
               />
               <ToggleRow
-                label="연속 빈 열 정리 (SheetTrim)"
+                label="중간의 연속 빈 열 삭제"
                 description="시트 중간을 포함해 기준 개수 이상 연속된 빈 열을 삭제합니다."
                 checked={sheetTrimColumns}
                 onChange={(checked) => { setSheetTrimColumns(checked); clearResult(); }}
               />
               <label className="settings-row select-row sheet-trim-threshold">
-                <span><strong>SheetTrim 삭제 기준</strong><small>연속된 빈 행·열이 이 개수 이상일 때 해당 묶음 전체를 삭제합니다.</small></span>
+                <span><strong>삭제할 최소 연속 개수</strong><small>빈 행·열이 이 개수 이상 연속될 때 해당 묶음 전체를 삭제합니다.</small></span>
                 <span className="number-input-with-unit">
                   <input
                     type="number"
@@ -418,7 +418,7 @@ export function ExcelMergerPage() {
                       if (Number.isFinite(next)) setSheetTrimThreshold(Math.max(1, Math.floor(next)));
                       clearResult();
                     }}
-                    aria-label="SheetTrim 최소 연속 빈 행 또는 열 개수"
+                    aria-label="삭제할 최소 연속 빈 행 또는 열 개수"
                   />
                   <small>개 이상</small>
                 </span>
@@ -475,7 +475,7 @@ export function ExcelMergerPage() {
               <div><dt>암호화 입력</dt><dd>{encryptedCount}개</dd></div>
               <div><dt>병합 방식</dt><dd>{mergeModeLabel}</dd></div>
               <div><dt>셀 출력</dt><dd>{formulaLabel}</dd></div>
-              <div><dt>SheetTrim</dt><dd>{sheetTrimRows || sheetTrimColumns ? `${sheetTrimRows ? "행" : ""}${sheetTrimRows && sheetTrimColumns ? "·" : ""}${sheetTrimColumns ? "열" : ""} ${sheetTrimThreshold}개 이상` : "사용 안 함"}</dd></div>
+              <div><dt>중간 빈 영역</dt><dd>{sheetTrimRows || sheetTrimColumns ? `${sheetTrimRows ? "행" : ""}${sheetTrimRows && sheetTrimColumns ? "·" : ""}${sheetTrimColumns ? "열" : ""} ${sheetTrimThreshold}개 이상` : "사용 안 함"}</dd></div>
               <div><dt>결과 형식</dt><dd>암호{protectOutput ? " 적용" : " 없음"} XLSX</dd></div>
             </dl>
             <PrimaryButton accent="green" disabled={!ready} loading={loading} onClick={() => void runMerge()}>
@@ -538,7 +538,7 @@ export function ExcelMergerPage() {
           },
           {
             title: "빈 영역 정리 방식",
-            paragraphs: ["끝의 빈 행·열 정리는 각 입력 시트의 마지막 내용 뒤쪽 여백만 복사에서 제외합니다. SheetTrim은 병합이 끝난 결과 시트에서 중간을 포함해 지정한 개수 이상 연속된 빈 행 또는 빈 열 묶음을 삭제합니다."],
+            paragraphs: ["끝의 빈 행·열 정리는 각 입력 시트의 마지막 내용 뒤쪽 여백만 복사에서 제외합니다. 중간의 연속 빈 행·열 삭제는 병합이 끝난 결과 시트 전체를 살펴 지정한 개수 이상 이어진 빈 영역을 삭제합니다."],
             items: ["행과 열을 서로 독립적으로 선택", "공백 문자만 들어 있는 셀도 빈 셀로 판단", "기준보다 짧은 빈 행·열 묶음은 그대로 유지"],
           },
           {
@@ -550,7 +550,7 @@ export function ExcelMergerPage() {
           { question: "CSV 파일의 수식과 서식도 유지되나요?", answer: "CSV는 셀 값만 담는 텍스트 형식이므로 수식, 서식, 여러 시트를 저장하지 않습니다. 병합 결과는 이런 기능을 담을 수 있는 XLSX로 생성합니다." },
           { question: "XLSB와 XLSM도 병합할 수 있나요?", answer: "입력할 수 있지만 값과 기본 시트 구조를 읽어 XLSX로 변환합니다. 수식과 서식 보존은 XLSX 입력에서만 지원하며 XLSM의 매크로는 결과에 포함되지 않습니다." },
           { question: "여러 파일에서 같은 순번의 시트만 고를 수 있나요?", answer: "순번 선택에서 2처럼 입력하면 각 파일의 2번째 시트만 포함합니다. -3, 3-, 1,3,5, 2-4 같은 범위도 사용할 수 있습니다." },
-          { question: "끝 여백 정리와 SheetTrim은 무엇이 다른가요?", answer: "끝 여백 정리는 데이터 뒤쪽의 빈 범위를 복사하지 않습니다. SheetTrim은 결과 시트 전체를 검사해 중간에 있는 빈 행·열도 지정한 연속 개수 이상이면 묶음 전체를 삭제합니다." },
+          { question: "끝 여백 정리와 중간 빈 영역 삭제는 무엇이 다른가요?", answer: "끝 여백 정리는 데이터 뒤쪽의 빈 범위를 복사하지 않습니다. 중간 빈 영역 삭제는 결과 시트 전체를 검사해 중간에 있는 빈 행·열도 지정한 연속 개수 이상이면 묶음 전체를 삭제합니다." },
           { question: "암호가 걸린 Excel 파일도 합칠 수 있나요?", answer: "지원되는 Office 암호화 방식이면 파일별 암호를 입력해 브라우저에서 해제할 수 있습니다. 손상된 파일이나 일부 오래된 암호화 방식은 열지 못할 수 있습니다." },
           { question: "출력 파일 암호를 잊으면 복구할 수 있나요?", answer: "복구할 수 없습니다. 암호는 서버에 저장하지 않고 작업 후 메모리에서도 제거하므로 안전한 곳에 따로 기록해 주세요." },
         ]}

@@ -67,7 +67,7 @@ export function TimezoneCalculatorPage() {
 
   return (
     <div className="page tool-page page-enter utility-page timezone-page">
-      <PageHeader eyebrow="WORLD TIME" title="시차·글로벌 회의 시간" description="세계지도에서 도시를 선택하고 IANA 타임존과 일광절약시간제를 반영한 현지 시각과 중복 근무시간을 비교하세요." />
+      <PageHeader eyebrow="WORLD TIME" title="시차·글로벌 회의 시간" description="세계지도에서 도시를 선택하고 국제 표준 도시 시간대(IANA)와 서머타임을 반영한 현지 시각을 비교하세요." />
 
       <SectionCard title="기준 시간" description="기준 도시의 날짜와 시각을 다른 도시의 현지 시간으로 변환합니다.">
         <div className="utility-form-grid timezone-base-form">
@@ -83,7 +83,7 @@ export function TimezoneCalculatorPage() {
         <div className="city-picker-header">
           <label className="city-search-field">
             <Search size={17} />
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="도시·국가·IANA 타임존 검색" aria-label="비교할 도시 검색" />
+            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="도시·국가·시간대 이름 검색" aria-label="비교할 도시 검색" />
             {query && <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기"><X size={15} /></button>}
           </label>
           <strong>{selectedIds.length}<span> / {SELECTION_LIMIT} 선택</span></strong>
@@ -133,12 +133,12 @@ export function TimezoneCalculatorPage() {
         description="지도와 도시 좌표는 사이트에 포함되어 있으며 선택 정보는 브라우저 밖으로 전송되지 않습니다."
         blocks={[
           { title: "지도와 도시 선택", paragraphs: ["핀 또는 도시 검색을 이용해 최대 6개 도시를 선택할 수 있습니다. 확대 후에는 지도를 드래그해 밀집된 지역의 핀을 확인하세요."] },
-          { title: "서머타임", paragraphs: ["뉴욕·런던·시드니 등은 전환일이 서로 다릅니다. 선택한 날짜의 IANA 타임존 규칙을 적용해 UTC 오프셋을 계산합니다."] },
+          { title: "서머타임", paragraphs: ["뉴욕·런던·시드니 등은 전환일이 서로 다릅니다. 선택한 날짜의 국제 표준 도시 시간대(IANA) 규칙으로 UTC와의 시차를 계산합니다."] },
           { title: "회의 추천", paragraphs: ["30분 단위로 모든 선택 도시가 현지 09:00~18:00인 구간만 표시합니다."] },
         ]}
         faq={[
           { question: "지도 사용 중 외부 지도 서버에 접속하나요?", answer: "아니요. Natural Earth 기반 세계지도와 도시 좌표를 정적 자산으로 함께 배포합니다." },
-          { question: "지도 아무 곳이나 눌러 시간대를 찾을 수 있나요?", answer: "현재는 정확한 IANA 타임존이 등록된 주요 도시 핀과 검색 결과만 선택할 수 있습니다." },
+          { question: "지도 아무 곳이나 눌러 시간대를 찾을 수 있나요?", answer: "아니요. 현재는 공식 시간대 정보가 등록된 주요 도시 핀과 검색 결과만 선택할 수 있습니다." },
           { question: "공휴일도 반영되나요?", answer: "이 도구는 시차와 현지 업무시간만 비교하며 국가별 공휴일은 반영하지 않습니다." },
         ]}
       />

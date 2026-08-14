@@ -21,8 +21,9 @@ try {
     filters: document.querySelectorAll(".tool-category-filter button").length,
     sections: document.querySelectorAll(".tool-category-section").length,
     headings: Array.from(document.querySelectorAll(".tool-category-heading h2"), (element) => element.textContent),
+    repeatedLocalBadges: document.querySelectorAll(".local-badge").length,
   }));
-  if (categoryOverview.filters !== 6 || categoryOverview.sections !== 5 || !categoryOverview.headings.includes("이미지·영상·오디오")) {
+  if (categoryOverview.filters !== 6 || categoryOverview.sections !== 5 || categoryOverview.repeatedLocalBadges !== 0 || !categoryOverview.headings.includes("이미지·영상·오디오")) {
     throw new Error(`Tool categories are incomplete: ${JSON.stringify(categoryOverview)}`);
   }
   await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
@@ -53,8 +54,8 @@ try {
   await page.type(".utility-editor-grid textarea", "할수  있습니다\n할수  있습니다");
   await page.click(".utility-action-grid button:nth-child(2)");
   await page.waitForFunction(() => document.querySelectorAll(".utility-editor-grid textarea")[1]?.value.includes("할수 있습니다"));
-  await clickButton(page, "로컬 문장 검사");
-  await page.waitForFunction(() => document.querySelector(".utility-summary")?.textContent?.includes("로컬 패턴"));
+  await clickButton(page, "브라우저 내장 규칙 검사");
+  await page.waitForFunction(() => document.querySelector(".utility-summary")?.textContent?.includes("내장 규칙"));
 
   await page.goto(`${baseUrl}/tools/text-formatter`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "text-formatter");
@@ -92,6 +93,10 @@ try {
   await page.waitForFunction(() => document.querySelector(".password-output input")?.value.length === 20);
   await page.click(".primary-button");
   await page.waitForSelector(".strength-meter");
+  const passwordStrengthCopy = await page.$eval(".security-page", (element) => element.textContent || "");
+  if (!passwordStrengthCopy.includes("예상 해독 시간") || !passwordStrengthCopy.includes("초당 100억 회") || passwordStrengthCopy.includes("오프라인 고속 공격") || passwordStrengthCopy.includes("centuries")) {
+    throw new Error(`Password strength explanation is unclear: ${passwordStrengthCopy}`);
+  }
 
   await page.goto(`${baseUrl}/tools/qr-studio`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => { const canvas = document.querySelector(".qr-preview canvas"); return canvas instanceof HTMLCanvasElement && canvas.width >= 600; });

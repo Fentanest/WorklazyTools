@@ -30,7 +30,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
     description: "여러 XLSX, XLS, XLSB, XLSM, CSV 파일을 하나의 XLSX로 병합하세요. XLSX 수식·서식 보존과 암호 입출력을 지원하며 파일은 브라우저에서 처리됩니다.",
     application: {
       name: "Excel Merger",
-      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "연속 빈 행·열 SheetTrim", "XLSX 수식·서식 보존", "암호화 파일 입출력"],
+      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 수식·서식 보존", "암호화 파일 입출력"],
     },
   },
   "/tools/word-compare": {
@@ -76,13 +76,13 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/video-studio": {
     title: "온라인 비디오 편집·그룹별 이어붙이기 - GIF·MP3·AAC 변환",
-    description: "영상 수 제한 없이 여러 번 추가하고 최대 10개 그룹에서 자르거나 이어붙이세요. 오디오 원본 유지·제거·재인코딩과 직접 비트레이트·샘플레이트 설정을 지원합니다.",
-    application: { name: "Video Studio", featureList: ["영상 수 제한 없는 연속 추가", "최대 10개 그룹", "지원 브라우저 멀티스레드 인코딩", "영상별 예상 시간", "MKV·AVI 메타데이터 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "완성 결과 즉시 개별 다운로드", "전체 개별 다운로드와 폴더 저장", "선택형 ZIP 묶기", "인코딩 없는 영상 패스스루", "첫 번째 오디오 트랙 원본 유지·제거·재인코딩", "영상·오디오 비트레이트 직접입력", "오디오 샘플레이트 선택·직접입력", "음원 결과를 오디오 스튜디오로 메모리 전달", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
+    description: "영상 수 제한 없이 여러 번 추가하고 최대 10개 그룹에서 자르거나 이어붙이세요. 원본 음성 복사·제거·호환 형식 변환과 화질·음질 설정을 지원합니다.",
+    application: { name: "Video Studio", featureList: ["영상 수 제한 없는 연속 추가", "최대 10개 그룹", "지원 브라우저 다중 코어 변환", "영상별 예상 시간", "MKV·AVI 파일 정보 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "완성 결과 즉시 개별 다운로드", "전체 개별 다운로드와 폴더 저장", "선택형 ZIP 묶기", "다시 압축하지 않는 영상 복사", "첫 번째 음성 복사·제거·호환 형식 변환", "영상·음성 비트레이트 직접입력", "음성 샘플레이트 선택·직접입력", "음원 결과를 오디오 스튜디오로 메모리 전달", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
   },
   "/tools/audio-studio": {
     title: "온라인 오디오 파형 편집기 - MP3·WAV 자르기·음소거",
     description: "오디오 파형에서 구간을 선택해 음소거·잘라내기·복사·붙여넣기하고 WAV 또는 MP3로 저장하세요. 파일은 브라우저에서만 처리됩니다.",
-    application: { name: "Audio Waveform Studio", featureList: ["고해상도 오디오 파형", "드래그 구간 선택", "구간 음소거", "잘라내기·복사·붙여넣기", "구간 삭제", "Undo·Redo", "파형 줌", "선택 구간 반복", "WAV 내보내기", "MP3 내보내기", "Web Worker PCM 편집"] },
+    application: { name: "Audio Waveform Studio", featureList: ["고해상도 오디오 파형", "드래그 구간 선택", "구간 음소거", "잘라내기·복사·붙여넣기", "구간 삭제", "실행 취소·다시 실행", "파형 확대·축소", "선택 구간 반복", "WAV 내보내기", "MP3 내보내기", "브라우저 내 음성 샘플 편집"] },
   },
   "/tools/image-studio": {
     title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
@@ -95,9 +95,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "Text Tools", featureList: ["공백 정돈", "줄바꿈 합치기", "중복 줄 제거", "Camel Case", "Snake Case", "Kebab Case", "한국어 띄어쓰기 가이드"] },
   },
   "/tools/text-formatter": {
-    title: "JSON·SQL·XML 포맷터 - 들여쓰기·Minify·문법 검사",
-    description: "JSON, SQL, XML 텍스트의 문법 오류를 확인하고 읽기 좋은 들여쓰기 또는 한 줄 Minify 형식으로 정돈하세요.",
-    application: { name: "JSON SQL XML Formatter", featureList: ["JSON 포맷", "SQL 정렬", "XML 포맷", "Minify", "문법 오류 탐지"] },
+    title: "JSON·SQL·XML 포맷터 - 들여쓰기·한 줄 축소·문법 검사",
+    description: "JSON, SQL, XML 텍스트의 문법 오류를 확인하고 읽기 좋은 들여쓰기 또는 한 줄 형식으로 정돈하세요.",
+    application: { name: "JSON SQL XML Formatter", featureList: ["JSON 포맷", "SQL 정렬", "XML 포맷", "한 줄 축소", "문법 오류 탐지"] },
   },
   "/tools/work-calculator": {
     title: "영업일·연차 계산기 - 대한민국 공휴일·대체공휴일 반영",
@@ -106,8 +106,8 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/timezone-calculator": {
     title: "세계지도 시차·글로벌 회의 시간 계산기 - 도시 시간 비교",
-    description: "세계지도에서 도시 핀을 선택하고 IANA 타임존과 서머타임을 반영한 현지 시각과 글로벌 회의 가능 시간을 비교하세요.",
-    application: { name: "World Time Planner", featureList: ["인터랙티브 세계지도", "44개 주요 도시 핀", "도시 검색", "IANA 타임존", "서머타임 자동 반영", "최대 6개 도시 비교", "30분 단위 회의 추천"] },
+    description: "세계지도에서 도시 핀을 선택하고 국제 표준 도시 시간대(IANA)와 서머타임을 반영한 현지 시각과 회의 가능 시간을 비교하세요.",
+    application: { name: "World Time Planner", featureList: ["인터랙티브 세계지도", "44개 주요 도시 핀", "도시 검색", "국제 표준 도시 시간대(IANA)", "서머타임 자동 반영", "최대 6개 도시 비교", "30분 단위 회의 추천"] },
   },
   "/tools/payroll-calculator": {
     title: "주휴수당·월 실수령액·퇴직금 간이 계산기",
@@ -115,14 +115,14 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "급여 간이 계산기", featureList: ["주휴수당", "국민연금", "건강보험", "장기요양보험", "고용보험", "근로소득세 추정", "퇴직금"] },
   },
   "/tools/image-privacy": {
-    title: "사진 EXIF·GPS 개인정보 제거 - JPG·PNG 메타데이터 삭제",
-    description: "JPG·PNG의 GPS 위치, 촬영 기기와 촬영 시각을 확인하고 EXIF가 제거된 사본을 만드세요. HEIC는 지원하지 않습니다.",
-    application: { name: "Image Privacy", featureList: ["EXIF 확인", "GPS 위치 확인", "촬영 기기 확인", "촬영 시각 확인", "OffscreenCanvas 재인코딩", "메타데이터 제거"] },
+    title: "사진 속 숨은 정보(EXIF)·GPS 제거 - JPG·PNG 개인정보 삭제",
+    description: "JPG·PNG 파일에 숨은 GPS 위치, 촬영 기기와 촬영 시각 정보(EXIF)를 확인하고 제거된 사본을 만드세요. HEIC는 지원하지 않습니다.",
+    application: { name: "Image Privacy", featureList: ["숨은 촬영 정보(EXIF) 확인", "GPS 위치 확인", "촬영 기기 확인", "촬영 시각 확인", "사진 내용만 새 파일로 저장", "부가 정보 제거"] },
   },
   "/tools/security-tools": {
     title: "안전한 비밀번호 생성기·강도 측정기",
-    description: "crypto.getRandomValues 기반 무작위 비밀번호를 만들고 패턴·엔트로피·공격 예상 시간으로 비밀번호 강도를 확인하세요.",
-    application: { name: "Password Generator", featureList: ["CSPRNG 비밀번호 생성", "8~64자 길이", "문자 종류 선택", "패턴 강도 분석", "엔트로피", "공격 시간 추정"] },
+    description: "운영체제의 보안 난수로 무작위 비밀번호를 만들고 패턴·추측 난이도·예상 해독 시간으로 강도를 확인하세요.",
+    application: { name: "Password Generator", featureList: ["보안 난수 비밀번호 생성", "8~64자 길이", "문자 종류 선택", "패턴 강도 분석", "추측 난이도", "초당 100억 회 기준 예상 해독 시간"] },
   },
   "/tools/qr-studio": {
     title: "QR 코드 생성기·실시간 카메라 스캐너 - 로고 삽입",
@@ -130,9 +130,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "QR Studio", featureList: ["URL QR 생성", "텍스트 QR 생성", "중앙 로고", "실시간 카메라 스캔", "사진 QR 스캔", "모바일 공유·저장"] },
   },
   "/tools/data-converter": {
-    title: "CSV·JSON·HTML Table 표 데이터 변환기",
-    description: "CSV, JSON 객체 배열과 HTML Table 데이터를 브라우저 Worker에서 서로 변환하고 파일로 저장하세요.",
-    application: { name: "Table Data Converter", featureList: ["CSV JSON 변환", "JSON CSV 변환", "HTML Table 변환", "CSV 파일 불러오기", "Worker 파싱", "파일 다운로드"] },
+    title: "CSV·JSON·HTML 표 데이터 변환기",
+    description: "CSV, JSON 객체 배열과 HTML 표(table) 데이터를 브라우저에서 서로 변환하고 파일로 저장하세요.",
+    application: { name: "Table Data Converter", featureList: ["CSV JSON 변환", "JSON CSV 변환", "HTML 표 변환", "CSV 파일 불러오기", "브라우저 내 파싱", "파일 다운로드"] },
   },
   "/about": {
     title: "서비스 소개 | Worklazy Tools",
