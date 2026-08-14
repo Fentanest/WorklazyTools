@@ -7,15 +7,15 @@ const GITHUB_ISSUES = "https://github.com/Fentanest/WorklazyTools/issues";
 export function ContactPage() {
   return (
     <div className="page standard-page page-enter content-page">
-      <PageHeader eyebrow="CONTACT" title="문의하기" description="오류 제보와 기능 제안은 공개 개발자 채널에서 확인합니다." />
+      <PageHeader eyebrow="CONTACT" title="문의·건의·버그 제보" description="버그·오류 제보와 기능 제안은 공개 개발자 채널에서 확인합니다." />
 
       <section className="contact-card">
         <div className="contact-icon"><Bug size={27} /></div>
         <div>
           <p className="eyebrow">GITHUB</p>
-          <h2>오류와 개선 의견을 알려주세요.</h2>
+          <h2>버그와 개선 의견을 알려주세요.</h2>
           <p>재현 순서, 사용한 브라우저, 파일 형식과 화면에 표시된 오류 문구를 함께 적으면 확인에 도움이 됩니다.</p>
-          <a className="secondary-button" href={GITHUB_ISSUES} target="_blank" rel="noreferrer">GitHub Issues에 문의·건의 <ExternalLink size={15} /></a>
+          <a className="secondary-button" href={GITHUB_ISSUES} target="_blank" rel="noreferrer">GitHub Issues에 문의·건의·버그 제보 <ExternalLink size={15} /></a>
         </div>
       </section>
 
@@ -33,7 +33,7 @@ export function ContactPage() {
       </div>
 
       <article className="prose-card">
-        <h2>오류 제보에 포함하면 좋은 내용</h2>
+        <h2>버그·오류 제보에 포함하면 좋은 내용</h2>
         <ol>
           <li>사용한 운영체제와 브라우저 이름·버전</li>
           <li>XLSX, XLS, XLSB, XLSM, CSV, DOCX, HWP, HWPX, PDF, 비디오 또는 이미지 중 문제가 발생한 파일 형식</li>

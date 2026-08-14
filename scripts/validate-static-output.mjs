@@ -68,6 +68,9 @@ const [pyodideModule, pyodideWasm, ocrWorker, ocrEnglish, ocrKorean, videoIsolat
 ]);
 const videoWorkerFiles = await fs.readdir("dist/tools/video-studio/workers");
 const assetFiles = await fs.readdir("dist/assets");
+const applicationJavaScript = (await Promise.all(
+  assetFiles.filter((name) => name.endsWith(".js")).map((name) => fs.readFile(path.join("dist/assets", name), "utf8")),
+)).join("\n");
 
 if (!ads.includes("pub-8940087269746960")) throw new Error("ads.txt publisher ID is missing.");
 if (cname.trim() !== "worklazy.net") throw new Error("CNAME does not point to worklazy.net.");
@@ -81,6 +84,7 @@ if (videoIsolationWorker.size < 1_000) throw new Error("Video isolation service 
 if (videoSingleCore.size < 30_000_000 || videoMultiCore.size < 30_000_000 || videoMultiWorker.size < 1_000) throw new Error("Document-scoped FFmpeg runtime is incomplete.");
 if (!videoWorkerFiles.some((name) => name.startsWith("video.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-probe.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-zip.worker-"))) throw new Error("Video workers were emitted outside their isolated document scope.");
 if (!assetFiles.some((name) => name.startsWith("audioProcessor.worker-"))) throw new Error("Audio processor worker is missing from the static build.");
+if (!applicationJavaScript.includes("G-CFSK50SX9R") || !applicationJavaScript.includes("1025dd835558ee0") || !applicationJavaScript.includes("wcs.pstatic.net/wcslog.js")) throw new Error("Google or Naver Analytics configuration is missing from the application bundle.");
 if (!robots.includes("Sitemap:")) throw new Error("robots.txt does not point to the sitemap.");
 if (!robots.includes("https://worklazy.net/sitemap.xml")) throw new Error("robots.txt does not use the custom root domain.");
 if (sitemap.includes("/worklazytools/")) throw new Error("sitemap.xml still contains the repository subpath.");

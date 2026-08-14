@@ -12,6 +12,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { tools } from "../app/toolRegistry";
 import { AdSenseLoader } from "./AdSenseLoader";
+import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { RouteSeo } from "./RouteSeo";
 
 const primaryNavigation = [
@@ -37,6 +38,7 @@ export function AppShell() {
     <div className="app-shell">
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} />
+      <AnalyticsLoader disabled={videoStudioActive || videoIsolationDocument} />
       {!videoStudioActive && !videoIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label="주요 내비게이션">
         <NavLink className="brand brand-image-link" to="/" aria-label="Worklazy Tools 홈">
@@ -56,7 +58,7 @@ export function AppShell() {
             {tools.map((tool) => {
               const Icon = tool.icon;
               return (
-                <NavLink className="sidebar-link" key={tool.id} to={tool.path}>
+                <NavLink className="sidebar-link" key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar")}>
                   <span className={`nav-icon accent-${tool.accent}`}><Icon size={18} /></span>
                   <span>{tool.shortTitle}</span>
                 </NavLink>
@@ -73,7 +75,7 @@ export function AppShell() {
           <NavItem {...primaryNavigation[2]} />
           <a className="sidebar-link" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
             <span className="nav-icon accent-blue"><MessageSquarePlus size={18} /></span>
-            <span>문의·건의</span>
+            <span>문의·건의·버그 제보</span>
           </a>
         </div>
       </aside>
@@ -147,7 +149,7 @@ export function AppShell() {
               {tools.map((tool) => {
                 const Icon = tool.icon;
                 return (
-                  <NavLink className="sheet-tool-item" to={tool.path} key={tool.id}>
+                  <NavLink className="sheet-tool-item" to={tool.path} key={tool.id} onClick={() => trackToolOpen(tool.id, "mobile_sheet")}>
                     <span className={`tool-icon small accent-${tool.accent}`}><Icon size={22} /></span>
                     <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
                   </NavLink>
@@ -155,7 +157,7 @@ export function AppShell() {
               })}
               <a className="sheet-tool-item" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
                 <span className="tool-icon small accent-blue"><MessageSquarePlus size={22} /></span>
-                <span><strong>문의·건의</strong><small>GitHub Issues에 오류와 기능 제안 남기기</small></span>
+                <span><strong>문의·건의·버그 제보</strong><small>GitHub Issues에 버그와 기능 제안 남기기</small></span>
               </a>
             </div>
           </section>

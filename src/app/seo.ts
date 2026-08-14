@@ -140,15 +140,15 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/privacy": {
     title: "개인정보처리방침 | Worklazy Tools",
-    description: "Worklazy Tools의 로컬 파일 처리, 외부 서비스, 광고와 쿠키에 관한 개인정보 처리 방침을 확인하세요.",
+    description: "Worklazy Tools의 로컬 파일 처리, Google·Naver 방문 분석, 광고와 쿠키에 관한 개인정보 처리 방침을 확인하세요.",
   },
   "/terms": {
     title: "이용약관 | Worklazy Tools",
     description: "Worklazy Tools의 무료 브라우저 도구 이용 조건, 지원 범위, 사용자 책임과 면책 사항을 안내합니다.",
   },
   "/contact": {
-    title: "문의하기 | Worklazy Tools",
-    description: "Worklazy Tools의 오류 제보, 기능 제안, 개인정보 관련 문의 방법을 안내합니다.",
+    title: "문의·건의·버그 제보 | Worklazy Tools",
+    description: "Worklazy Tools의 버그·오류 제보, 기능 제안, 개인정보 관련 문의 방법을 안내합니다.",
   },
   "/licenses": {
     title: "라이선스 및 제3자 고지 | Worklazy Tools",
