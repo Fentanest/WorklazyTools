@@ -1,11 +1,12 @@
 /// <reference lib="webworker" />
 
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
-import classWorkerURL from "@ffmpeg/ffmpeg/worker?worker&url";
-import coreURL from "@ffmpeg/core?url";
-import wasmURL from "@ffmpeg/core/wasm?url";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
+const runtimeBaseURL = new URL(`${import.meta.env.BASE_URL}tools/video-studio/runtime/`, worker.location.origin);
+const classWorkerURL = new URL("ffmpeg-worker.js", runtimeBaseURL).href;
+const coreURL = new URL("single/ffmpeg-core.js", runtimeBaseURL).href;
+const wasmURL = new URL("single/ffmpeg-core.wasm", runtimeBaseURL).href;
 
 worker.onmessage = async (event: MessageEvent<{ file: File }>) => {
   const ffmpeg = new FFmpeg();

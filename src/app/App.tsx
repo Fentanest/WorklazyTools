@@ -65,7 +65,7 @@ export function App() {
         <Route path="tools/qr-studio" element={<LazyToolRoute label="QR 도구"><QrStudioPage /></LazyToolRoute>} />
         <Route path="tools/data-converter" element={<LazyToolRoute label="표 데이터 변환기"><DataConverterPage /></LazyToolRoute>} />
         <Route path="hwp-editor" element={<Navigate to="/tools/hwp-editor" replace />} />
-        <Route path="video-studio" element={<Navigate to="/tools/video-studio" replace />} />
+        <Route path="video-studio" element={<Navigate to="/tools/video-studio/" replace />} />
         <Route path="image-studio" element={<Navigate to="/tools/image-studio" replace />} />
         <Route path="text-tools" element={<Navigate to="/tools/text-tools" replace />} />
         <Route path="text-formatter" element={<Navigate to="/tools/text-formatter" replace />} />

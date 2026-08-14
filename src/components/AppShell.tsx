@@ -24,6 +24,9 @@ const GITHUB_ISSUES_URL = "https://github.com/Fentanest/WorklazyTools/issues";
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const videoStudioActive = normalizedPath === "/tools/video-studio";
+  const videoIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-video-isolation"]'));
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -33,7 +36,8 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <RouteSeo />
-      <AdSenseLoader />
+      <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} />
+      {!videoStudioActive && !videoIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label="주요 내비게이션">
         <NavLink className="brand brand-image-link" to="/" aria-label="Worklazy Tools 홈">
           <img className="brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
@@ -159,6 +163,21 @@ export function AppShell() {
       )}
     </div>
   );
+}
+
+function VideoIsolationBoundary({ active, isolationDocument }: { active: boolean; isolationDocument: boolean }) {
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    if (active && !isolationDocument) {
+      const target = new URL(window.location.href);
+      target.pathname = `${import.meta.env.BASE_URL}tools/video-studio/`.replace(/\/{2,}/g, "/");
+      window.location.replace(target.href);
+      return;
+    }
+    if (!active && isolationDocument) window.location.replace(window.location.href);
+  }, [active, isolationDocument]);
+
+  return null;
 }
 
 interface NavItemProps {

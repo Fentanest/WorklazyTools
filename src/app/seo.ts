@@ -76,13 +76,13 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/video-studio": {
     title: "온라인 비디오 편집·그룹별 이어붙이기 - GIF·MP3·AAC 변환",
-    description: "최대 6개 영상을 그룹별로 자르고 이어붙이세요. MKV·AVI 미리보기 실패 시 FFmpeg 메타데이터 대체 분석도 지원합니다.",
-    application: { name: "Video Studio", featureList: ["최대 6개 영상·6개 그룹", "MKV·AVI 메타데이터 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "인코딩 없는 패스스루", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
+    description: "최대 6개 영상을 그룹별로 자르고 이어붙이세요. 지원 브라우저의 멀티스레드 FFmpeg 인코딩과 MKV·AVI 메타데이터 대체 분석을 제공합니다.",
+    application: { name: "Video Studio", featureList: ["최대 6개 영상·6개 그룹", "지원 브라우저 멀티스레드 인코딩", "영상별 예상 시간", "MKV·AVI 메타데이터 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "인코딩 없는 패스스루", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
   },
   "/tools/image-studio": {
     title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
-    description: "클립보드 이미지를 붙여넣고 자르기·필터·레이어 편집, 일괄 리사이즈·워터마크, 미리보기가 있는 이어붙이기·콜라주와 GIF 생성을 실행하세요.",
-    application: { name: "Image Studio", featureList: ["클립보드 이미지 붙여넣기", "이미지 레이어 편집", "필터와 자르기", "일괄 리사이즈", "워터마크", "이어붙이기 실시간 미리보기", "GIF 애니메이션", "그림판·스케치북"] },
+    description: "사진 편집과 그림판을 하나로 합쳐 자르기·필터·자유 그리기·레이어·Undo를 사용하고, 일괄 리사이즈·콜라주·GIF도 만드세요.",
+    application: { name: "Image Studio", featureList: ["사진·빈 캔버스 통합 편집", "연필·붓·지우개", "Undo·Redo", "필터와 자르기", "텍스트·도형 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
   },
   "/tools/text-tools": {
     title: "텍스트 정돈·케이스 변환 - 공백·줄바꿈·중복 줄 제거",

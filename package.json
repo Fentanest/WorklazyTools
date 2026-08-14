@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/vendor-browser-runtimes.mjs && vite",
     "vendor:rhwp": "node scripts/vendor-rhwp-studio.mjs",
     "prebuild": "node scripts/validate-rhwp-vendor.mjs && node scripts/vendor-browser-runtimes.mjs && node scripts/generate-third-party-licenses.mjs",
     "build": "tsc -b && vite build && node scripts/generate-static-pages.mjs",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/core-mt": "0.12.10",
     "@ffmpeg/ffmpeg": "0.12.15",
     "@ffmpeg/util": "0.12.2",
     "@rhwp/core": "0.8.4",
@@ -25,6 +26,7 @@
     "@zxcvbn-ts/core": "^4.2.0",
     "buffer": "^6.0.3",
     "change-case": "^5.4.4",
+    "coi-serviceworker": "0.1.7",
     "crypto-browserify": "^3.12.1",
     "d3-geo": "^3.1.1",
     "date-fns": "^4.4.0",

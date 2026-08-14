@@ -6,6 +6,7 @@ const sourceHtml = await fs.readFile(path.join(outputDirectory, "index.html"), "
 const siteUrl = ensureTrailingSlash(process.env.VITE_SITE_URL || "https://worklazy.net/");
 const socialImage = new URL("social/worklazy-tools-share.png", siteUrl).href;
 const socialImageAlt = "Worklazy Tools - 파일 업로드 없이 브라우저에서 실행하는 업무 도구";
+const videoIsolationRoute = "tools/video-studio";
 
 const pages = [
   {
@@ -152,7 +153,7 @@ const pages = [
   {
     route: "tools/video-studio",
     title: "온라인 비디오 편집·그룹별 이어붙이기 - GIF·MP3·AAC 변환",
-    description: "최대 6개 영상을 그룹별로 자르고 이어붙이세요. MKV·AVI 미리보기 실패 시 FFmpeg 메타데이터 대체 분석도 지원합니다.",
+    description: "최대 6개 영상을 그룹별로 자르고 이어붙이세요. 지원 브라우저의 멀티스레드 FFmpeg 인코딩과 MKV·AVI 메타데이터 대체 분석을 제공합니다.",
     heading: "영상 그룹마다 구간과 출력 방식을 한눈에 설정하세요.",
     intro: "별도 작업 프리셋 없이 영상을 그룹에 배치하고 각 영상의 구간과 순서를 정합니다. 출력 형식에서 MP4·MKV·WebM·GIF·MP3·AAC를 고르면 필요한 설정만 표시됩니다.",
     application: "Video Studio",
@@ -164,22 +165,23 @@ const pages = [
       ["원본 비율과 해상도", "원본 비율은 영상을 자르거나 늘리지 않고 유지합니다. 해상도 일괄 변경은 별도 옵션이며 적용 시 인코딩이 필요함을 명확히 안내합니다."],
       ["MKV·AVI 대체 분석", "브라우저 미리보기를 열 수 없는 영상은 FFmpeg가 재생 시간과 화면 크기를 직접 확인합니다. 확인에 성공하면 숫자로 구간을 지정해 변환을 시작할 수 있습니다."],
       ["모바일 권장 설정", "모바일에서는 1080p와 GIF 480px를 기본값으로 사용합니다. 대형 파일도 선택할 수 있으며 합계 250MB 이상일 때 처리 시간과 메모리 사용 주의를 먼저 안내합니다."],
-      ["로컬 단일 스레드 처리", "광고와 기존 문서 도구의 호환성을 유지하기 위해 교차 출처 격리가 필요 없는 단일 스레드 실행 코어를 사용합니다."],
+      ["전용 멀티스레드 실행", "이 비디오 경로만 교차 출처 격리된 최상위 문서로 실행하고 지원 브라우저에서는 여러 CPU 코어를 사용합니다. 주소와 도메인은 그대로이며 조건을 만족하지 않으면 단일 스레드 엔진으로 자동 전환합니다."],
+      ["단계별 예상 시간", "각 영상과 인코딩 단계가 시작될 때 속도를 새로 측정해 남은 시간을 계산하므로 이전 영상의 처리 시간이 다음 영상 예상치에 섞이지 않습니다."],
     ],
   },
   {
     route: "tools/image-studio",
     title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
-    description: "클립보드 이미지 붙여넣기, 레이어 편집, 일괄 리사이즈·워터마크, 미리보기가 있는 이어붙이기·콜라주와 GIF 생성을 실행하세요.",
+    description: "사진 편집과 그림판을 하나로 합쳐 자르기·필터·자유 그리기·레이어·Undo를 사용하고, 일괄 리사이즈·콜라주·GIF도 만드세요.",
     heading: "이미지를 꾸미고 한꺼번에 정리하세요.",
-    intro: "한 장의 이미지에는 텍스트와 도형을 올리고, 여러 이미지는 같은 설정으로 처리해 ZIP으로 저장합니다.",
+    intro: "사진을 열거나 빈 캔버스에서 시작해 보정과 자유 그리기를 한곳에서 사용하고, 여러 이미지는 같은 설정으로 처리해 ZIP으로 저장합니다.",
     application: "Image Studio",
     sections: [
-      ["단일 이미지 편집", "클립보드 이미지를 바로 붙여넣고 자르기, 회전, 반전, 필터와 텍스트·도형·이모지 레이어를 적용합니다."],
+      ["통합 이미지 편집", "사진을 열거나 빈 캔버스에서 시작해 자르기·회전·필터, 연필·붓·지우개와 텍스트·도형·이모지를 같은 Undo·Redo 기록으로 편집합니다."],
+      ["원본 사진 보호", "불러온 사진은 기본 잠금된 바탕 레이어로 두고 필요할 때만 잠금을 풀어 이동·확대·회전할 수 있습니다."],
       ["일괄 리사이즈와 워터마크", "업로드나 클립보드로 여러 이미지를 추가하고 크기, 출력 형식과 워터마크를 적용해 ZIP으로 내려받습니다."],
       ["이어붙이기와 콜라주", "이미지를 세로·가로 또는 격자로 배치하고 간격과 배경색에 따른 결과를 미리 확인합니다."],
       ["GIF 애니메이션", "업로드 순서를 프레임 순서로 사용하고 크기와 재생 간격을 지정해 GIF를 만듭니다."],
-      ["그림판·스케치북", "연필·붓·지우개로 자유롭게 그리고 선·도형·텍스트와 Undo·Redo를 사용해 PNG·JPG로 저장합니다."],
     ],
   },
   {
@@ -283,7 +285,7 @@ const pages = [
       ["HWP 편집기 자체 포함", "공식 rhwp Studio의 버전·커밋·파일 해시를 고정해 Worklazy Tools 정적 배포물에 포함합니다. HWP 편집 과정에서 외부 rhwp 사이트나 외부 웹폰트를 호출하지 않으며 작업 파일은 HTTP 업로드 요청에 포함하지 않습니다."],
       ["자체 호스팅 실행 파일", "Word 비교 실행 환경과 OCR 언어 모델은 Worklazy Tools와 같은 GitHub Pages 배포 경로에서 제공하며 외부 CDN이나 OCR 서버를 호출하지 않습니다. 작업 파일 내용은 사이트 자산 요청에 포함하지 않습니다."],
       ["일반 네트워크 정보", "GitHub Pages에서 사이트와 자체 호스팅 실행 파일을 불러오는 과정에는 IP 주소, 브라우저 종류와 요청 시각 같은 일반 접속 정보가 처리될 수 있습니다."],
-      ["Google AdSense", "광고가 활성화된 페이지에서는 Google과 광고 파트너가 쿠키, 웹 비콘, IP 주소와 기타 식별자를 광고 제공과 측정에 사용할 수 있습니다. 이 처리는 문서 기능의 파일 처리와 구분됩니다."],
+      ["Google AdSense", "광고가 활성화된 페이지에서는 Google과 광고 파트너가 쿠키, 웹 비콘, IP 주소와 기타 식별자를 광고 제공과 측정에 사용할 수 있습니다. 멀티스레드 실행을 위한 비디오 전용 문서에는 광고 스크립트를 불러오지 않습니다."],
       ["문의", "개인정보 문의 시 실제 업무 문서나 파일 암호를 첨부하지 마세요. 자세한 내용은 화면의 개인정보처리방침에서 확인할 수 있습니다."],
     ],
   },
@@ -312,7 +314,8 @@ const pages = [
     sections: [
       ["Worklazy Tools 자체 저작물", "직접 작성한 코드, UI와 문서는 All Rights Reserved입니다. 무단 복제·재배포·미러링·경쟁 서비스 제공과 복제본의 수익화를 허용하지 않습니다."],
       ["rhwp", "HWP·HWPX·HML 문서 해석과 편집에 @rhwp/core 및 @rhwp/editor 0.8.4(MIT)를 사용합니다."],
-      ["ffmpeg.wasm", "비디오·오디오 처리에 @ffmpeg/core 0.12.10(GPL-2.0-or-later)과 @ffmpeg/ffmpeg 0.12.15(MIT)를 사용합니다."],
+      ["ffmpeg.wasm", "비디오·오디오 처리에 @ffmpeg/core·@ffmpeg/core-mt 0.12.10(GPL-2.0-or-later)과 @ffmpeg/ffmpeg 0.12.15(MIT)를 사용합니다."],
+      ["coi-serviceworker", "GitHub Pages의 비디오 전용 경로를 교차 출처 격리하는 coi-serviceworker 0.1.7(MIT)을 사용합니다."],
       ["Fabric.js와 gifenc", "이미지 레이어 편집에 Fabric.js 7.4.0(MIT), GIF 생성에 gifenc 1.0.3(MIT)을 사용합니다."],
       ["제3자 원본 소스", "오픈소스에는 각 원 라이선스가 우선합니다. 공식 저장소 링크와 배포된 라이선스 전문 묶음은 화면에서 확인할 수 있습니다."],
     ],
@@ -326,6 +329,11 @@ for (const page of pages) {
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(path.join(directory, "index.html"), html);
 }
+
+await fs.copyFile(
+  path.resolve("node_modules/coi-serviceworker/coi-serviceworker.min.js"),
+  path.join(outputDirectory, videoIsolationRoute, "coi-serviceworker.js"),
+);
 
 const notFound = renderPage(sourceHtml, pages[0], siteUrl)
   .replace("index, follow, max-image-preview:large", "noindex, nofollow");
@@ -381,6 +389,11 @@ function renderPage(template, page, canonical) {
     `<meta name="twitter:image" content="${escapeHtml(socialImage)}" />`,
     `<meta name="twitter:image:alt" content="${escapeHtml(socialImageAlt)}" />`,
     `<script id="worklazy-route-jsonld" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
+    ...(page.route === videoIsolationRoute ? [
+      `<meta name="worklazy-video-isolation" content="document-scope" />`,
+      `<script>globalThis.coi={quiet:true,coepCredentialless:()=>false};</script>`,
+      `<script data-worklazy-video-isolation src="./coi-serviceworker.js"></script>`,
+    ] : []),
   ].join("\n    ");
 
   return template

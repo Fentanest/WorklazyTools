@@ -40,6 +40,8 @@ try {
   await page.goto(`${baseUrl}/tools/timezone-calculator`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.querySelectorAll(".world-map-pin").length === 44);
   await page.waitForFunction(() => document.querySelectorAll(".world-clock-grid article").length === 4);
+  const timezoneMetaFont = await page.$eval(".world-clock-grid article > small", (element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  if (timezoneMetaFont < 13) throw new Error(`Timezone comparison copy is too small: ${timezoneMetaFont}px`);
   await page.$eval('.world-map-pin[aria-label^="두바이"]', (element) => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   await page.waitForFunction(() => document.querySelectorAll(".world-clock-grid article").length === 5);
   await page.type('.city-search-field input', "시드니");
@@ -89,24 +91,40 @@ try {
   await page.waitForSelector(".clean-result");
 
   await page.goto(`${baseUrl}/tools/image-studio`, { waitUntil: "networkidle0" });
-  await page.click(".studio-tabs button:nth-child(5)");
-  await page.waitForSelector(".paint-stage .upper-canvas");
-  await page.click(".paint-tool-buttons button:nth-child(2)");
-  const bounds = await page.$eval(".paint-stage .upper-canvas", (element) => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height }; });
+  await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4);
+  await page.waitForSelector(".fabric-stage .upper-canvas");
+  await page.click(".editor-draw-tools button:nth-child(2)");
+  const bounds = await page.$eval(".fabric-stage .upper-canvas", (element) => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height }; });
   await page.mouse.move(bounds.x + 80, bounds.y + 80); await page.mouse.down(); await page.mouse.move(bounds.x + 220, bounds.y + 150, { steps: 8 }); await page.mouse.up();
-  await page.waitForFunction(() => !document.querySelector('.paint-history-actions button[aria-label="실행 취소"]')?.disabled);
+  await page.waitForFunction(() => !document.querySelector('.editor-history-actions button[aria-label="실행 취소"]')?.disabled);
 
-  await page.goto(`${baseUrl}/tools/video-studio`, { waitUntil: "networkidle0" });
+  await page.$eval('a[href="/tools/video-studio/"]', (link) => link.click());
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-engine-status");
+  const videoIsolation = await page.evaluate(() => ({
+    origin: location.origin,
+    path: location.pathname,
+    marker: Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')),
+    ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
+    controller: navigator.serviceWorker.controller?.scriptURL || "",
+    engine: document.querySelector(".video-engine-status")?.textContent || "",
+  }));
+  if (videoIsolation.origin !== new URL(baseUrl).origin || videoIsolation.path !== "/tools/video-studio/" || !videoIsolation.marker || videoIsolation.ads || !videoIsolation.controller.endsWith("/tools/video-studio/coi-serviceworker.js") || !videoIsolation.engine.includes("멀티스레드")) {
+    throw new Error(`Video document isolation is incomplete: ${JSON.stringify(videoIsolation)}`);
+  }
   const videoCompatibility = await page.$eval(".video-studio-page .inline-notice.warning", (element) => element.textContent);
   if (!videoCompatibility.includes("MKV") || !videoCompatibility.includes("AVI") || !videoCompatibility.includes("FFmpeg")) throw new Error("Video compatibility fallback notice is incomplete.");
 
+  await page.$eval('a[href="/tools/pdf-editor"]', (link) => link.click());
+  await page.waitForFunction(() => location.pathname === "/tools/pdf-editor" && !document.querySelector('meta[name="worklazy-video-isolation"]'));
+  await page.waitForSelector("script[data-worklazy-adsense]");
   await page.goto(`${baseUrl}/tools/pdf-editor/convert`, { waitUntil: "networkidle0" });
   await page.waitForSelector('input[placeholder*="1-5, 8"]');
 
   const social = await page.evaluate(() => ({ card: document.querySelector('meta[name="twitter:card"]')?.content, image: document.querySelector('meta[property="og:image"]')?.content }));
   if (social.card !== "summary_large_image" || !social.image?.endsWith("/social/worklazy-tools-share.png")) throw new Error(`Social metadata is incomplete: ${JSON.stringify(social)}`);
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
-  console.log("Utility tool smoke tests passed: home copy, 4-column grid, paired editors, world map, text, formatter, workday, payroll, security, live QR, data, EXIF, paint, video compatibility and PDF page range.");
+  console.log("Utility tool smoke tests passed: home copy, 4-column grid, paired editors, world map, text, formatter, workday, payroll, security, live QR, data, EXIF, unified image editor, video compatibility and PDF page range.");
 } finally { await browser.close(); }
 
 async function clickButton(page, text) { const clicked = await page.evaluate((label) => { const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label)); if (!button) return false; button.click(); return true; }, text); if (!clicked) throw new Error(`Button not found: ${text}`); }

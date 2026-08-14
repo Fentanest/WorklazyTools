@@ -1,9 +1,6 @@
 /// <reference lib="webworker" />
 
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
-import classWorkerURL from "@ffmpeg/ffmpeg/worker?worker&url";
-import coreURL from "@ffmpeg/core?url";
-import wasmURL from "@ffmpeg/core/wasm?url";
 import JSZip from "jszip";
 
 import type {
@@ -15,51 +12,89 @@ import type {
 } from "./types";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
+const runtimeBaseURL = new URL(`${import.meta.env.BASE_URL}tools/video-studio/runtime/`, worker.location.origin);
+const classWorkerURL = new URL("ffmpeg-worker.js", runtimeBaseURL).href;
+const singleCoreURL = new URL("single/ffmpeg-core.js", runtimeBaseURL).href;
+const singleWasmURL = new URL("single/ffmpeg-core.wasm", runtimeBaseURL).href;
+const multiCoreURL = new URL("multi/ffmpeg-core.js", runtimeBaseURL).href;
+const multiWasmURL = new URL("multi/ffmpeg-core.wasm", runtimeBaseURL).href;
+const multiWorkerURL = new URL("multi/ffmpeg-core.worker.js", runtimeBaseURL).href;
+
+interface ProgressStage {
+  start: number;
+  end: number;
+  duration: number;
+  label: string;
+  startedAt: number;
+  lastRatio: number;
+  lastSampleAt: number;
+  smoothedRate: number;
+  sampleCount: number;
+}
 
 worker.onmessage = async (event: MessageEvent<VideoWorkerRequest>) => {
-  const ffmpeg = new FFmpeg();
+  let ffmpeg = new FFmpeg();
   const temporaryFiles = new Set<string>();
   const mountedDirectories = new Set<string>();
-  let progressStage = { start: 28, end: 90, duration: 1, label: "처리 중" };
+  let progressStage = createProgressStage(28, 90, 1, "처리 중");
   let lastProgress = -1;
   let lastProgressAt = 0;
-  const startedAt = performance.now();
+
+  const reportFfmpegProgress = ({ progress: rawProgress, time }: { progress: number; time: number }) => {
+    const timeProgress = progressStage.duration > 0 && time > 0 ? time / 1_000_000 / progressStage.duration : 0;
+    const ratio = clamp(timeProgress > 0 ? timeProgress : rawProgress || 0, 0, 1);
+    const value = Math.round(progressStage.start + ratio * (progressStage.end - progressStage.start));
+    const now = performance.now();
+    if (value === lastProgress || (now - lastProgressAt < 250 && value < progressStage.end)) return;
+    lastProgress = value;
+    lastProgressAt = now;
+    const remaining = estimateStageRemaining(progressStage, ratio, now);
+    const eta = remaining === undefined ? (ratio >= 0.04 ? " · 남은 시간 계산 중" : "") : ` · 현재 단계 약 ${formatDuration(remaining)}`;
+    progress(value, `${progressStage.label}… ${Math.round(ratio * 100)}%${eta}`);
+  };
+  ffmpeg.on("progress", reportFfmpegProgress);
 
   try {
     const request = event.data;
     validateRequest(request);
-    ffmpeg.on("progress", ({ progress: rawProgress, time }) => {
-      const timeProgress = progressStage.duration > 0 ? time / 1_000_000 / progressStage.duration : 0;
-      const ratio = clamp(Math.max(rawProgress || 0, timeProgress), 0, 1);
-      const value = Math.round(progressStage.start + ratio * (progressStage.end - progressStage.start));
-      const now = performance.now();
-      if (value === lastProgress || (now - lastProgressAt < 250 && value < progressStage.end)) return;
-      lastProgress = value;
-      lastProgressAt = now;
-      const elapsed = now - startedAt;
-      const remaining = ratio > 0.02 ? Math.max(0, elapsed / ratio - elapsed) : 0;
-      progress(value, `${progressStage.label}… ${Math.round(ratio * 100)}%${remaining ? ` · 남은 시간 약 ${formatDuration(remaining / 1000)}` : ""}`);
-    });
-
     progress(3, "비디오 처리 엔진을 불러오는 중… (첫 실행은 시간이 걸릴 수 있어요)");
-    await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
-    progress(20, "그룹별 출력 작업을 준비하는 중…");
+    const multiThreadCandidate = worker.crossOriginIsolated && typeof SharedArrayBuffer !== "undefined" && worker.navigator.hardwareConcurrency > 1;
+    let multiThreaded = false;
+    if (multiThreadCandidate) {
+      try {
+        await ffmpeg.load({ coreURL: multiCoreURL, wasmURL: multiWasmURL, workerURL: multiWorkerURL, classWorkerURL });
+        multiThreaded = true;
+      } catch {
+        ffmpeg.terminate();
+        ffmpeg = new FFmpeg();
+        ffmpeg.on("progress", reportFfmpegProgress);
+        progress(7, "멀티스레드 엔진을 시작하지 못해 호환 모드로 전환하는 중…");
+        await ffmpeg.load({ coreURL: singleCoreURL, wasmURL: singleWasmURL, classWorkerURL });
+      }
+    } else {
+      await ffmpeg.load({ coreURL: singleCoreURL, wasmURL: singleWasmURL, classWorkerURL });
+    }
+    progress(20, `${multiThreaded ? "멀티스레드" : "단일 스레드 호환"} 엔진 준비 완료 · 그룹별 출력 작업을 준비하는 중…`);
 
     const outputs: Array<{ name: string; bytes: Uint8Array }> = [];
+    const jobDurations = request.jobs.map(jobDuration);
+    const totalJobDuration = jobDurations.reduce((sum, duration) => sum + duration, 0);
+    let completedJobDuration = 0;
     for (let jobIndex = 0; jobIndex < request.jobs.length; jobIndex += 1) {
       const job = request.jobs[jobIndex];
-      const jobStart = 23 + (jobIndex / request.jobs.length) * 67;
-      const jobEnd = 23 + ((jobIndex + 1) / request.jobs.length) * 67;
+      const jobStart = 23 + (completedJobDuration / totalJobDuration) * 67;
+      const jobEnd = 23 + ((completedJobDuration + jobDurations[jobIndex]) / totalJobDuration) * 67;
       const result = await processJob(ffmpeg, job, request.task, jobIndex, temporaryFiles, mountedDirectories, (ratioStart, ratioEnd, duration, label) => {
-        progressStage = {
-          start: jobStart + (jobEnd - jobStart) * ratioStart,
-          end: jobStart + (jobEnd - jobStart) * ratioEnd,
+        progressStage = createProgressStage(
+          jobStart + (jobEnd - jobStart) * ratioStart,
+          jobStart + (jobEnd - jobStart) * ratioEnd,
           duration,
           label,
-        };
+        );
         lastProgress = -1;
       });
       outputs.push(result);
+      completedJobDuration += jobDurations[jobIndex];
     }
 
     progress(92, outputs.length > 1 ? `${outputs.length}개 결과를 ZIP으로 묶는 중…` : "결과 파일을 브라우저로 옮기는 중…");
@@ -126,27 +161,30 @@ async function processConcatJob(
 ) {
   const segmentNames: string[] = [];
   const concatDimensions = task.kind === "encode" ? outputDimensions(job.inputs[0], task) : undefined;
-  const segmentWeight = 0.72 / job.inputs.length;
+  const totalDuration = jobDuration(job);
+  const segmentEnd = task.kind === "gif" ? 0.76 : 0.9;
+  const segmentBudget = segmentEnd - 0.04;
+  let completedDuration = 0;
   for (let inputIndex = 0; inputIndex < job.inputs.length; inputIndex += 1) {
     const input = job.inputs[inputIndex];
+    const inputDuration = Math.max(0.05, input.end - input.start);
     const segmentName = `job-${jobIndex}-segment-${inputIndex}.${segmentExtension(task)}`;
     segmentNames.push(segmentName);
     temporaryFiles.add(segmentName);
     setStage(
-      0.04 + inputIndex * segmentWeight,
-      0.04 + (inputIndex + 1) * segmentWeight,
-      input.end - input.start,
+      0.04 + (completedDuration / totalDuration) * segmentBudget,
+      0.04 + ((completedDuration + inputDuration) / totalDuration) * segmentBudget,
+      inputDuration,
       `[${job.name} · ${inputIndex + 1}/${job.inputs.length}] 선택 구간 준비 중`,
     );
     const exitCode = await ffmpeg.exec(createConcatSegmentArguments(input, inputNames[inputIndex], segmentName, task, concatDimensions));
     if (exitCode !== 0) throw new Error(`${job.name}의 ${inputIndex + 1}번째 영상 구간을 준비하지 못했습니다.`);
+    completedDuration += inputDuration;
   }
 
   const listName = `job-${jobIndex}-concat.txt`;
   temporaryFiles.add(listName);
   await ffmpeg.writeFile(listName, segmentNames.map((name) => `file '${name}'`).join("\n"));
-  const totalDuration = job.inputs.reduce((sum, input) => sum + input.end - input.start, 0);
-
   if (task.kind === "gif") {
     const joinedName = `job-${jobIndex}-joined.mp4`;
     temporaryFiles.add(joinedName);
@@ -164,7 +202,7 @@ async function processConcatJob(
 
   const outputName = createOutputName(job.name, task, true);
   temporaryFiles.add(outputName);
-  setStage(0.76, 0.96, totalDuration, `[${job.name}] 순서대로 이어붙이는 중`);
+  setStage(0.9, 0.96, totalDuration, `[${job.name}] 순서대로 이어붙이는 중`);
   const concatArgs = ["-f", "concat", "-safe", "0", "-i", listName, "-c", "copy"];
   if (task.kind === "encode" && task.container === "mp4") concatArgs.push("-movflags", "+faststart");
   concatArgs.push(outputName);
@@ -211,7 +249,7 @@ function createEncodeArguments(prefix: string[], task: Extract<VideoTask, { kind
   else args.push("-preset", "veryfast", "-crf", String(task.crf), "-b:v", task.bitrate || "0");
   if (task.codec === "hevc" && task.container === "mp4") args.push("-tag:v", "hvc1");
   args.push("-c:a", task.container === "webm" ? "libopus" : "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2");
-  if (task.container === "mp4") args.push("-movflags", "+faststart");
+  if (task.container === "mp4" && !normalizeForConcat) args.push("-movflags", "+faststart");
   args.push(outputName);
   return args;
 }
@@ -313,6 +351,46 @@ function createWarnings(request: VideoWorkerRequest) {
   if (request.task.kind === "encode" && request.task.bitrate === "copy") warnings.push("패스스루 자르기는 키프레임 경계에 따라 시작 시각이 조금 앞당겨질 수 있습니다.");
   if (request.task.kind === "encode" && request.task.codec === "hevc") warnings.push("HEVC는 기기와 플레이어에 따라 재생되지 않을 수 있습니다.");
   return warnings;
+}
+
+function createProgressStage(start: number, end: number, duration: number, label: string): ProgressStage {
+  const now = performance.now();
+  return {
+    start,
+    end,
+    duration: Math.max(0.05, duration),
+    label,
+    startedAt: now,
+    lastRatio: 0,
+    lastSampleAt: now,
+    smoothedRate: 0,
+    sampleCount: 0,
+  };
+}
+
+function estimateStageRemaining(stage: ProgressStage, ratio: number, now: number) {
+  if (ratio > stage.lastRatio) {
+    const elapsed = (now - stage.lastSampleAt) / 1000;
+    const advanced = ratio - stage.lastRatio;
+    if (elapsed >= 0.15 && advanced > 0) {
+      const rate = advanced / elapsed;
+      if (Number.isFinite(rate) && rate > 0) {
+        stage.smoothedRate = stage.smoothedRate > 0 ? stage.smoothedRate * 0.72 + rate * 0.28 : rate;
+        stage.sampleCount += 1;
+      }
+      stage.lastRatio = ratio;
+      stage.lastSampleAt = now;
+    }
+  }
+
+  const elapsed = (now - stage.startedAt) / 1000;
+  if (elapsed < 5 || ratio < 0.04 || ratio >= 1 || stage.sampleCount < 3 || stage.smoothedRate <= 0) return undefined;
+  const remaining = (1 - ratio) / stage.smoothedRate;
+  return Number.isFinite(remaining) && remaining >= 0 ? remaining : undefined;
+}
+
+function jobDuration(job: VideoOutputJob) {
+  return Math.max(0.05, job.inputs.reduce((sum, input) => sum + Math.max(0.05, input.end - input.start), 0));
 }
 
 function aspectDimensions(aspect: "9:16" | "1:1" | "16:9", resolution: "source" | "1080" | "720" | "480") {

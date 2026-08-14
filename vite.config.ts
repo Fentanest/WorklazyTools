@@ -19,5 +19,12 @@ export default defineConfig({
   plugins: [react(), browserNodePolyfills()],
   worker: {
     plugins: () => [browserNodePolyfills()],
+    rollupOptions: {
+      output: {
+        entryFileNames: (chunk) => chunk.facadeModuleId?.includes("/features/video-studio/")
+          ? "tools/video-studio/workers/[name]-[hash].js"
+          : "assets/[name]-[hash].js",
+      },
+    },
   },
 });

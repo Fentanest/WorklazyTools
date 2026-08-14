@@ -82,7 +82,7 @@ async function testHwpEditor(page, hwpPath) {
     const shell = document.querySelector(".rhwp-editor-shell")?.getBoundingClientRect();
     return focus && sidebar && shell ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, hasPageHeader: Boolean(document.querySelector(".hwp-tool-page .page-header")) } : null;
   });
-  if (!focusLayout || focusLayout.focus.left < focusLayout.sidebar.right || focusLayout.focus.right < 1435 || focusLayout.focus.top > 10 || focusLayout.focus.bottom < 895 || focusLayout.shellHeight < 795 || focusLayout.hasPageHeader) {
+  if (!focusLayout || focusLayout.focus.left < focusLayout.sidebar.right || focusLayout.focus.right < 1435 || focusLayout.focus.top > 10 || focusLayout.focus.bottom < 895 || focusLayout.shellHeight < focusLayout.focus.bottom - focusLayout.focus.top - 130 || focusLayout.hasPageHeader) {
     throw new Error(`HWP focus layout did not fill the area outside the sidebar: ${JSON.stringify(focusLayout)}`);
   }
   await page.waitForFunction(() => {
@@ -99,6 +99,7 @@ async function testHwpEditor(page, hwpPath) {
 
 async function testImageStudio(page, imagePaths) {
   await page.goto(`${baseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4 && document.querySelector(".studio-tabs button")?.textContent?.includes("이미지 편집"));
   await page.waitForSelector(".fabric-stage");
   await dropCanvasImages(page, ".fabric-stage", ["#159bd7"]);
   await page.waitForSelector(".fabric-stage .canvas-container");
@@ -115,7 +116,7 @@ async function testImageStudio(page, imagePaths) {
     jpgNotice: document.querySelector(".image-format-control small")?.textContent || "",
   }));
   if (!editorControls.hasRectangleLabel || !editorControls.hasVerticalFlip || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
-    throw new Error(`Single editor controls are incomplete: ${JSON.stringify(editorControls)}`);
+    throw new Error(`Unified editor controls are incomplete: ${JSON.stringify(editorControls)}`);
   }
   await page.click('.image-background-options.compact button[role="switch"]');
   await page.waitForFunction(() => {
@@ -123,10 +124,7 @@ async function testImageStudio(page, imagePaths) {
     if (!(canvas instanceof HTMLCanvasElement)) return false;
     return canvas.getContext("2d")?.getImageData(1, 1, 1, 1).data[3] === 0;
   });
-  await page.evaluate(() => {
-    const group = Array.from(document.querySelectorAll(".editor-tool-group")).find((item) => item.querySelector("strong")?.textContent === "도형");
-    group?.querySelector("button")?.click();
-  });
+  await page.click('button[aria-label="사각형 추가"]');
   await page.waitForFunction(() => !document.querySelector(".shape-style-controls")?.classList.contains("is-disabled"));
   await page.evaluate(() => {
     const controls = document.querySelector(".shape-style-controls");
@@ -246,8 +244,23 @@ async function dropCanvasImages(page, selector, colors) {
 }
 
 async function testVideoStudio(page, videoPaths, largeVideoPath) {
-  await page.goto(`${baseUrl}/tools/video-studio`, { waitUntil: "domcontentloaded" });
+  const videoAdRequests = [];
+  const captureVideoRequests = (request) => {
+    if (request.url().includes("pagead2.googlesyndication.com")) videoAdRequests.push(request.url());
+  };
+  page.on("request", captureVideoRequests);
+  await page.goto(`${baseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
   await page.waitForSelector(".video-studio-page input[type=file]");
+  page.off("request", captureVideoRequests);
+  const isolation = await page.evaluate(() => ({
+    marker: Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')),
+    ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
+    engine: document.querySelector(".video-engine-status")?.textContent || "",
+  }));
+  if (!isolation.marker || isolation.ads || !isolation.engine.includes("멀티스레드") || videoAdRequests.length) {
+    throw new Error(`Video isolation or ad exclusion failed: ${JSON.stringify({ isolation, videoAdRequests })}`);
+  }
   await page.evaluate(() => {
     const nativeRead = FileReader.prototype.readAsArrayBuffer;
     window.__videoFileReadState = { arrayBufferReads: 0 };

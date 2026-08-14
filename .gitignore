@@ -5,6 +5,7 @@ dist/
 coverage/
 public/vendor/pyodide/
 public/vendor/tesseract/
+public/tools/video-studio/runtime/
 /compareexample/
 /comparesample/
 __pycache__/

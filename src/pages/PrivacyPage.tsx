@@ -47,6 +47,7 @@ export function PrivacyPage() {
 
         <h2>7. Google AdSense와 쿠키</h2>
         <p>사이트 운영을 위해 Google AdSense 광고를 사용할 수 있습니다. 광고가 활성화된 페이지에서는 Google과 광고 파트너가 쿠키를 저장하거나 읽고, 웹 비콘·IP 주소·기타 식별자를 이용해 광고 제공, 측정, 부정 사용 방지에 필요한 정보를 처리할 수 있습니다. 이 광고 데이터 처리는 문서 병합·비교 기능의 파일 처리와 구분됩니다.</p>
+        <p>여러 CPU 코어를 사용하는 비디오 스튜디오 전용 실행 문서는 다른 페이지와 분리되어 있으며 Google AdSense 광고 스크립트를 불러오지 않습니다. 주소는 같은 worklazy.net 도메인의 <code>/tools/video-studio/</code> 경로로 유지됩니다.</p>
         <p><a href="https://policies.google.com/technologies/partner-sites?hl=ko" target="_blank" rel="noreferrer">Google이 파트너 사이트의 정보를 사용하는 방법 <ExternalLink size={13} /></a></p>
 
         <h2>8. 동의와 광고 개인정보 설정</h2>
