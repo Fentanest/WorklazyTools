@@ -10,6 +10,18 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
 
+  await page.goto(baseUrl, { waitUntil: "networkidle0" });
+  await page.evaluate(() => localStorage.removeItem("worklazy_lang"));
+  await page.reload({ waitUntil: "networkidle0" });
+  const landingLines = await page.evaluate(() => ({
+    title: Array.from(document.querySelectorAll(".language-landing-card h1 span"), (element) => element.textContent),
+    description: Array.from(document.querySelectorAll(".language-landing-description span"), (element) => element.textContent),
+  }));
+  if (landingLines.title.join("|") !== "Choose your language|언어를 선택하세요"
+    || landingLines.description.join("|") !== "Your choice is saved only in this browser.|선택한 언어는 이 브라우저에만 저장됩니다.") {
+    throw new Error(`Language landing copy is not split into bilingual lines: ${JSON.stringify(landingLines)}`);
+  }
+
   await page.goto(koBaseUrl, { waitUntil: "networkidle0" });
   const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);

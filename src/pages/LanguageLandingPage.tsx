@@ -23,8 +23,8 @@ export function LanguageLandingPage() {
         <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
         <span className="language-landing-icon"><Languages size={25} /></span>
         <p className="eyebrow">{t("landing.eyebrow")}</p>
-        <h1>{t("landing.title")}</h1>
-        <p>{t("landing.description")}</p>
+        <h1><span>{t("landing.titlePrimary")}</span><span lang="ko">{t("landing.titleSecondary")}</span></h1>
+        <p className="language-landing-description"><span>{t("landing.descriptionPrimary")}</span><span lang="ko">{t("landing.descriptionSecondary")}</span></p>
         <div className="language-landing-actions">
           <button type="button" className={recommended === "ko" ? "recommended" : ""} onClick={() => choose("ko")}>
             <strong>{t("landing.continueKo")}</strong>

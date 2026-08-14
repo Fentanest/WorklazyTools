@@ -15,10 +15,17 @@ export interface AudioClipboardData {
 
 export type AudioEditCommand = "MUTE" | "CUT" | "COPY" | "PASTE" | "DELETE" | "PREVIEW";
 export type AudioExportCommand = "EXPORT_WAV" | "EXPORT_MP3";
+export type AudioVoiceEffectCommand = "PREVIEW_VOICE_EFFECT" | "APPLY_VOICE_EFFECT";
+export type AudioVoiceEffectMode = "pitch" | "robot";
+
+export interface AudioVoiceEffectSettings {
+  mode: AudioVoiceEffectMode;
+  semitones: number;
+}
 
 export interface AudioProcessorRequest {
   language?: "ko" | "en";
-  command: AudioEditCommand | AudioExportCommand;
+  command: AudioEditCommand | AudioExportCommand | AudioVoiceEffectCommand;
   document: Pick<AudioDocumentData, "channels" | "sampleRate" | "length">;
   start?: number;
   end?: number;
@@ -26,6 +33,7 @@ export interface AudioProcessorRequest {
   clipboard?: AudioClipboardData;
   fileName?: string;
   bitrate?: 128 | 192 | 256 | 320;
+  voiceEffect?: AudioVoiceEffectSettings;
 }
 
 export interface AudioProcessorResult {

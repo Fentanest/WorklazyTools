@@ -294,6 +294,38 @@ async function testAudioStudio(page, audioPath) {
   const loopEnabled = await page.$eval('.audio-loop-control [role="switch"]', (button) => button.getAttribute("aria-checked"));
   if (loopEnabled !== "true") throw new Error("Audio selection loop toggle did not activate.");
 
+  const voicePresets = await page.$$eval(".audio-voice-presets button", (buttons) => buttons.map((button) => button.textContent?.trim()));
+  if (voicePresets.join("|") !== "낮은 톤|높은 톤|어린 목소리|로봇|직접 조절") throw new Error(`Voice-effect presets are incomplete: ${JSON.stringify(voicePresets)}`);
+  const durationBeforeEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
+  await page.click(".audio-voice-presets button:nth-child(2)");
+  await page.click(".audio-voice-effect-actions .secondary-button");
+  await waitForAudioSuccess(page, "미리 듣기 준비 완료", 120_000);
+  const effectPreview = await page.$eval(".audio-effect-preview audio", async (audio) => {
+    const context = new AudioContext();
+    try {
+      const decoded = await context.decodeAudioData(await (await fetch(audio.src)).arrayBuffer());
+      const samples = decoded.getChannelData(0);
+      let upwardCrossings = 0;
+      for (let index = 1; index < samples.length; index += 1) {
+        if (samples[index - 1] <= 0 && samples[index] > 0) upwardCrossings += 1;
+      }
+      return { src: audio.src, duration: decoded.duration, frequency: upwardCrossings / decoded.duration };
+    } finally {
+      await context.close();
+    }
+  });
+  if (!effectPreview.src.startsWith("blob:") || effectPreview.frequency < 620 || effectPreview.frequency > 700) {
+    throw new Error(`Pitch preview was not shifted by about four semitones: ${JSON.stringify(effectPreview)}`);
+  }
+  await page.click(".audio-voice-effect-actions .primary-button");
+  await waitForAudioSuccess(page, "음성 효과 적용 완료", 120_000);
+  const durationAfterEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
+  if (durationAfterEffect !== durationBeforeEffect) throw new Error(`Pitch effect changed the document duration: ${durationBeforeEffect} -> ${durationAfterEffect}`);
+  await page.click(".audio-voice-presets button:nth-child(4)");
+  await page.click(".audio-voice-effect-actions .secondary-button");
+  await waitForAudioSuccess(page, "미리 듣기 준비 완료");
+  if (!(await page.$eval(".audio-effect-preview audio", (audio) => audio.src.startsWith("blob:")))) throw new Error("Robot voice preview was not created.");
+
   await clickAudioAction(page, "복사");
   await page.waitForFunction(() => document.querySelector(".audio-clipboard-status.has-clip")?.textContent?.includes("오디오 클립보드"));
   await clickAudioAction(page, "구간 음소거");
@@ -363,8 +395,8 @@ async function clickAudioAction(page, label) {
   }, label);
 }
 
-async function waitForAudioSuccess(page, text) {
-  await page.waitForFunction((expected) => document.querySelector(".operation-progress.status-success")?.textContent?.includes(expected), { timeout: 60_000 }, text);
+async function waitForAudioSuccess(page, text, timeout = 60_000) {
+  await page.waitForFunction((expected) => document.querySelector(".operation-progress.status-success")?.textContent?.includes(expected), { timeout }, text);
 }
 
 async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths) {

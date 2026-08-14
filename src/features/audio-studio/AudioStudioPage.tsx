@@ -1,20 +1,24 @@
 import {
   AlertTriangle,
+  Bot,
   ClipboardCopy,
   ClipboardPaste,
   Copy,
   Download,
   FileAudio2,
+  Headphones,
   LoaderCircle,
   Pause,
   Play,
   Redo2,
   Repeat2,
   Scissors,
+  SlidersHorizontal,
   SkipBack,
   Trash2,
   Undo2,
   VolumeX,
+  WandSparkles,
   Waves,
   ZoomIn,
   ZoomOut,
@@ -32,9 +36,10 @@ import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl,
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { audioBufferToDocument, audioHistoryLimit, createAudioFileName, formatAudioTime } from "./audioHelpers";
 import { runAudioProcessor } from "./audioProcessorClient";
-import type { AudioClipboardData, AudioDocumentData, AudioEditCommand, AudioProcessorResult } from "./types";
+import type { AudioClipboardData, AudioDocumentData, AudioEditCommand, AudioProcessorResult, AudioVoiceEffectSettings } from "./types";
 
 type ExportFormat = "wav" | "mp3";
+type VoicePreset = "low" | "high" | "child" | "robot" | "custom";
 
 interface AudioSelection {
   start: number;
@@ -43,6 +48,7 @@ interface AudioSelection {
 
 const MIN_SELECTION_SECONDS = 0.01;
 const ZOOM_LEVELS = [12, 24, 48, 96, 180, 300] as const;
+const VOICE_PRESET_PITCH: Record<Exclude<VoicePreset, "robot" | "custom">, number> = { low: -4, high: 4, child: 7 };
 
 export function AudioStudioPage() {
   const { t, i18n } = useTranslation("features");
@@ -60,6 +66,9 @@ export function AudioStudioPage() {
   const [zoomIndex, setZoomIndex] = useState(1);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("wav");
   const [mp3Bitrate, setMp3Bitrate] = useState<128 | 192 | 256 | 320>(192);
+  const [voicePreset, setVoicePreset] = useState<VoicePreset>("low");
+  const [customPitch, setCustomPitch] = useState(0);
+  const [effectPreviewUrl, setEffectPreviewUrl] = useState("");
   const [lastResult, setLastResult] = useState("");
   const progress = useOperationProgress();
   const failProgress = progress.fail;
@@ -72,6 +81,8 @@ export function AudioStudioPage() {
   const selectionRef = useRef<AudioSelection | undefined>(undefined);
   const loopRef = useRef(false);
   const previewUrlRef = useRef("");
+  const effectPreviewUrlRef = useRef("");
+  const effectPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const decodeContextRef = useRef<AudioContext | undefined>(undefined);
   const activeControllerRef = useRef<AbortController | undefined>(undefined);
   const loadGenerationRef = useRef(0);
@@ -80,6 +91,15 @@ export function AudioStudioPage() {
   useEffect(() => { documentRef.current = document; }, [document]);
   useEffect(() => { selectionRef.current = selection; }, [selection]);
   useEffect(() => { loopRef.current = loop; }, [loop]);
+
+  const clearEffectPreview = useCallback(() => {
+    effectPreviewAudioRef.current?.pause();
+    effectPreviewAudioRef.current = null;
+    const previousUrl = effectPreviewUrlRef.current;
+    effectPreviewUrlRef.current = "";
+    setEffectPreviewUrl("");
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+  }, []);
 
   const commitSelection = useCallback((next: AudioSelection | undefined) => {
     selectionRef.current = next;
@@ -192,9 +212,14 @@ export function AudioStudioPage() {
     activeControllerRef.current?.abort();
     void decodeContextRef.current?.close().catch(() => undefined);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    if (effectPreviewUrlRef.current) URL.revokeObjectURL(effectPreviewUrlRef.current);
     documentRef.current = undefined;
     selectionRef.current = undefined;
   }, []);
+
+  useEffect(() => {
+    clearEffectPreview();
+  }, [clearEffectPreview, customPitch, selection?.end, selection?.start, voicePreset]);
 
   const replacePreview = (blob: Blob) => {
     const nextUrl = URL.createObjectURL(blob);
@@ -228,6 +253,7 @@ export function AudioStudioPage() {
     setUndoHistory([]);
     setRedoHistory([]);
     setLastResult("");
+    clearEffectPreview();
     commitSelection(undefined);
     regionsRef.current?.clearRegions();
     progress.start(t("audio.status.decoding", { name: file.name }));
@@ -372,6 +398,62 @@ export function AudioStudioPage() {
     }
   };
 
+  const voiceEffectSettings = (): AudioVoiceEffectSettings => voicePreset === "robot"
+    ? { mode: "robot", semitones: 0 }
+    : { mode: "pitch", semitones: voicePreset === "custom" ? customPitch : VOICE_PRESET_PITCH[voicePreset] };
+
+  const runVoiceEffect = async (previewOnly: boolean) => {
+    const currentDocument = documentRef.current;
+    const currentSelection = selectionRef.current;
+    if (!currentDocument) return;
+    if (!currentSelection || currentSelection.end - currentSelection.start < MIN_SELECTION_SECONDS) {
+      progress.start(t("audio.status.selecting"));
+      progress.fail(t("audio.status.selectRegion"));
+      return;
+    }
+    clearEffectPreview();
+    wavesurferRef.current?.pause();
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
+    progress.start(previewOnly ? t("audio.voice.status.previewing") : t("audio.voice.status.applying"));
+    setLastResult("");
+    try {
+      const result = await runAudioProcessor({
+        command: previewOnly ? "PREVIEW_VOICE_EFFECT" : "APPLY_VOICE_EFFECT",
+        document: currentDocument,
+        start: currentSelection.start,
+        end: currentSelection.end,
+        voiceEffect: voiceEffectSettings(),
+        language,
+      }, progress.update, controller.signal);
+      if (previewOnly) {
+        if (!result.previewBlob) throw new Error(t("audio.voice.status.previewMissing"));
+        const url = URL.createObjectURL(result.previewBlob);
+        effectPreviewUrlRef.current = url;
+        setEffectPreviewUrl(url);
+        progress.succeed(t("audio.voice.status.previewReady"));
+        setLastResult(t("audio.voice.status.previewLength", { duration: formatAudioTime(result.duration) }));
+        window.requestAnimationFrame(() => void effectPreviewAudioRef.current?.play().catch(() => undefined));
+        return;
+      }
+      if (!result.channels || !result.previewBlob) throw new Error(t("audio.status.missingResult"));
+      const nextDocument = resultDocument(currentDocument, result);
+      const limit = audioHistoryLimit(currentDocument);
+      setUndoHistory((history) => [...history, currentDocument].slice(-limit));
+      setRedoHistory([]);
+      documentRef.current = nextDocument;
+      setDocument(nextDocument);
+      commitSelection(clampSelection(currentSelection, nextDocument.duration));
+      replacePreview(result.previewBlob);
+      progress.succeed(t("audio.voice.status.applied"));
+      setLastResult(t("audio.voice.status.appliedResult", { duration: formatAudioTime(currentSelection.end - currentSelection.start), count: Math.min(undoHistory.length + 1, limit) }));
+    } catch (error) {
+      progress.fail(error instanceof DOMException && error.name === "AbortError" ? t("audio.status.cancelled") : toAudioError(error, t));
+    } finally {
+      if (activeControllerRef.current === controller) activeControllerRef.current = undefined;
+    }
+  };
+
   const exportAudio = async () => {
     const currentDocument = documentRef.current;
     if (!currentDocument) return;
@@ -433,6 +515,7 @@ export function AudioStudioPage() {
 
   const busy = progress.status === "running";
   const selectionDuration = selection ? Math.max(0, selection.end - selection.start) : 0;
+  const effectivePitch = voicePreset === "custom" ? customPitch : voicePreset === "robot" ? 0 : VOICE_PRESET_PITCH[voicePreset];
   const pcmSize = useMemo(() => document?.channels.reduce((sum, channel) => sum + channel.byteLength, 0) || 0, [document]);
 
   useEffect(() => {
@@ -508,6 +591,31 @@ export function AudioStudioPage() {
             <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("DELETE")}><Trash2 size={18} /><span>{t("audio.delete")}</span></button>
             <button type="button" aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || !undoHistory.length} onClick={() => void restoreHistory("undo")}><Undo2 size={18} /><span>{t("audio.undo")}</span><small>{undoHistory.length}</small></button>
             <button type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y" disabled={busy || !redoHistory.length} onClick={() => void restoreHistory("redo")}><Redo2 size={18} /><span>{t("audio.redo")}</span><small>{redoHistory.length}</small></button>
+          </div>
+
+          <div className="audio-voice-effect-panel">
+            <div className="audio-voice-effect-heading">
+              <span><WandSparkles size={19} /><span><strong>{t("audio.voice.title")}</strong><small>{t("audio.voice.description")}</small></span></span>
+              <b>{voicePreset === "robot" ? t("audio.voice.robotValue") : t("audio.voice.semitones", { count: effectivePitch })}</b>
+            </div>
+            <div className="audio-voice-presets" role="radiogroup" aria-label={t("audio.voice.presetsLabel")}>
+              {(["low", "high", "child", "robot", "custom"] as const).map((preset) => (
+                <button key={preset} type="button" role="radio" aria-checked={voicePreset === preset} className={voicePreset === preset ? "active" : ""} disabled={busy} onClick={() => setVoicePreset(preset)}>
+                  {preset === "robot" && <Bot size={17} />}{t(`audio.voice.presets.${preset}` as never)}
+                </button>
+              ))}
+            </div>
+            <label className={`audio-pitch-control${voicePreset === "robot" ? " is-disabled" : ""}`}>
+              <span><SlidersHorizontal size={17} /> {t("audio.voice.pitch")}</span>
+              <input type="range" min={-12} max={12} step={1} disabled={busy || voicePreset === "robot"} value={effectivePitch} onChange={(event) => { setVoicePreset("custom"); setCustomPitch(Number(event.target.value)); }} />
+              <output>{voicePreset === "robot" ? "—" : `${effectivePitch > 0 ? "+" : ""}${effectivePitch}`}</output>
+            </label>
+            <div className="inline-notice"><AlertTriangle size={16} /><span>{t("audio.voice.notice")}</span></div>
+            <div className="audio-voice-effect-actions">
+              <button type="button" className="secondary-button" disabled={busy || !selection} onClick={() => void runVoiceEffect(true)}><Headphones size={17} /> {t("audio.voice.preview")}</button>
+              <PrimaryButton accent="violet" disabled={busy || !selection} loading={busy} onClick={() => void runVoiceEffect(false)}><WandSparkles size={17} /> {t("audio.voice.apply")}</PrimaryButton>
+            </div>
+            {effectPreviewUrl && <div className="audio-effect-preview"><span>{t("audio.voice.previewPlayer")}</span><audio ref={effectPreviewAudioRef} src={effectPreviewUrl} controls preload="auto" /></div>}
           </div>
           <div className={`audio-clipboard-status${clipboard ? " has-clip" : ""}`}><ClipboardCopy size={17} /><span>{clipboard ? t("audio.clipboard", { duration: formatAudioTime(clipboard.duration), channels: clipboard.channels.length }) : t("audio.clipboardEmpty")}</span></div>
         </SectionCard>

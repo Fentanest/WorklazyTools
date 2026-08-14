@@ -149,7 +149,7 @@ function renderLanding(template) {
   const title = "Worklazy Tools — Choose Language · 언어 선택";
   const description = "Choose English or Korean for free browser-based work tools. 무료 브라우저 업무 도구의 언어를 선택하세요.";
   const head = `<link rel="canonical" href="${siteUrl}" /><link rel="alternate" hreflang="ko" href="${absolute("ko", "")}" /><link rel="alternate" hreflang="en" href="${absolute("en", "")}" /><link rel="alternate" hreflang="x-default" href="${absolute("en", "")}" />`;
-  return template.replace(/<html[^>]*>/, '<html lang="en">').replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${description}" />`).replace("</head>", `${head}</head>`).replace('<div id="root"></div>', '<div id="root"><main class="seo-static-fallback"><p class="eyebrow">WORKLAZY TOOLS</p><h1>Choose your language · 언어를 선택하세요</h1><p><a href="/en/">Continue in English</a> · <a href="/ko/">한국어로 계속</a></p></main></div>');
+  return template.replace(/<html[^>]*>/, '<html lang="en">').replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${description}" />`).replace("</head>", `${head}</head>`).replace('<div id="root"></div>', '<div id="root"><main class="seo-static-fallback"><p class="eyebrow">WORKLAZY TOOLS</p><h1>Choose your language<br><span lang="ko">언어를 선택하세요</span></h1><p><a href="/en/">Continue in English</a> · <a href="/ko/">한국어로 계속</a></p></main></div>');
 }
 
 function renderRedirect(template, target) {

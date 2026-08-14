@@ -2,7 +2,7 @@
 
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 
-import type { AudioClipboardData, AudioProcessorRequest, AudioProcessorResult } from "./types";
+import type { AudioClipboardData, AudioProcessorRequest, AudioProcessorResult, AudioVoiceEffectSettings } from "./types";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 const runtimeBaseURL = new URL(`${import.meta.env.BASE_URL}tools/video-studio/runtime/`, worker.location.origin);
@@ -59,6 +59,31 @@ async function processRequest(request: AudioProcessorRequest): Promise<AudioProc
     return { length: document.length, duration: document.length / document.sampleRate, previewBlob };
   }
 
+  if (command === "PREVIEW_VOICE_EFFECT" || command === "APPLY_VOICE_EFFECT") {
+    const [start, end] = selectionSamples(request);
+    if (!request.voiceEffect) throw new Error(local("음성 효과 설정을 확인해 주세요.", "Check the voice-effect settings."));
+    const selectedChannels = document.channels.map((channel) => channel.slice(start, end));
+    const effectedChannels = await createVoiceEffect(selectedChannels, document.sampleRate, request.voiceEffect);
+    if (command === "PREVIEW_VOICE_EFFECT") {
+      progress(86, local("선택 구간 미리 듣기를 만드는 중…", "Creating the selected-region preview…"));
+      return {
+        length: end - start,
+        duration: (end - start) / document.sampleRate,
+        previewBlob: new Blob([encodeWav(effectedChannels, document.sampleRate)], { type: "audio/wav" }),
+      };
+    }
+    progress(82, local("변조한 음성을 원래 구간에 자연스럽게 연결하는 중…", "Blending the transformed voice into the original region…"));
+    const channels = document.channels.map((channel, channelIndex) => replaceWithCrossfade(
+      channel,
+      effectedChannels[channelIndex] || effectedChannels[0],
+      start,
+      end,
+      document.sampleRate,
+    ));
+    const previewBlob = new Blob([encodeWav(channels, document.sampleRate)], { type: "audio/wav" });
+    return { channels, length: document.length, duration: document.length / document.sampleRate, previewBlob };
+  }
+
   const [start, end] = command === "PASTE" ? [0, 0] : selectionSamples(request);
   let channels: Float32Array[];
   let clipboard: AudioClipboardData | undefined;
@@ -91,6 +116,107 @@ async function processRequest(request: AudioProcessorRequest): Promise<AudioProc
   progress(62, local("편집 결과와 파형 미리보기를 만드는 중…", "Creating the edited result and waveform preview…"));
   const previewBlob = new Blob([encodeWav(channels, document.sampleRate)], { type: "audio/wav" });
   return { channels, clipboard, length, duration: length / document.sampleRate, previewBlob };
+}
+
+async function createVoiceEffect(channels: Float32Array[], sampleRate: number, effect: AudioVoiceEffectSettings) {
+  if (effect.mode === "robot") {
+    progress(35, local("로봇 음색을 합성하는 중…", "Synthesizing the robot voice…"));
+    return channels.map((channel) => applyRobotEffect(channel, sampleRate));
+  }
+  const semitones = Math.max(-12, Math.min(12, Number.isFinite(effect.semitones) ? effect.semitones : 0));
+  if (Math.abs(semitones) < 0.01) return channels.map((channel) => channel.slice());
+  return pitchShiftWithFfmpeg(channels, sampleRate, semitones);
+}
+
+async function pitchShiftWithFfmpeg(channels: Float32Array[], sampleRate: number, semitones: number) {
+  const ffmpeg = new FFmpeg();
+  const inputName = "worklazy-voice-input.wav";
+  const outputName = "worklazy-voice-output.f32le";
+  const ratio = 2 ** (semitones / 12);
+  const shiftedRate = Math.max(1, Math.round(sampleRate * ratio));
+  const tempo = 1 / ratio;
+  ffmpeg.on("progress", ({ progress: ratioValue }) => {
+    const normalized = Math.max(0, Math.min(1, Number.isFinite(ratioValue) ? ratioValue : 0));
+    progress(35 + Math.round(normalized * 42), `${local("피치를 변환하는 중…", "Shifting pitch…")} ${Math.round(normalized * 100)}%`);
+  });
+  try {
+    progress(18, local("자체 호스팅 음성 효과 엔진을 불러오는 중…", "Loading the self-hosted voice-effects engine…"));
+    await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
+    await ffmpeg.writeFile(inputName, encodeWav(channels, sampleRate));
+    const filter = `asetrate=${shiftedRate},aresample=${sampleRate},atempo=${tempo.toFixed(8)}`;
+    const exitCode = await ffmpeg.exec([
+      "-i", inputName,
+      "-af", filter,
+      "-ac", String(channels.length),
+      "-ar", String(sampleRate),
+      "-c:a", "pcm_f32le",
+      "-f", "f32le",
+      outputName,
+    ]);
+    if (exitCode !== 0) throw new Error(local("피치 변환 결과를 만들지 못했습니다.", "The pitch shifter did not produce a result."));
+    const data = await ffmpeg.readFile(outputName);
+    if (typeof data === "string") throw new Error(local("피치 변환 결과가 올바른 형식이 아닙니다.", "The pitch-shift result is not valid audio data."));
+    const decoded = decodeInterleavedFloat32(data, channels.length);
+    return decoded.map((channel) => fitChannelLength(channel, channels[0].length));
+  } finally {
+    await ffmpeg.deleteFile(inputName).catch(() => undefined);
+    await ffmpeg.deleteFile(outputName).catch(() => undefined);
+    ffmpeg.terminate();
+  }
+}
+
+function decodeInterleavedFloat32(bytes: Uint8Array, channelCount: number) {
+  const frameCount = Math.floor(bytes.byteLength / 4 / channelCount);
+  if (!frameCount) throw new Error(local("변환된 음성 샘플이 비어 있습니다.", "The transformed voice contains no audio samples."));
+  const channels = Array.from({ length: channelCount }, () => new Float32Array(frameCount));
+  const view = new DataView(bytes.buffer, bytes.byteOffset, frameCount * channelCount * 4);
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    for (let channel = 0; channel < channelCount; channel += 1) {
+      channels[channel][frame] = view.getFloat32((frame * channelCount + channel) * 4, true);
+    }
+  }
+  return channels;
+}
+
+function fitChannelLength(channel: Float32Array, targetLength: number) {
+  if (channel.length === targetLength) return channel;
+  const output = new Float32Array(targetLength);
+  if (channel.length === 1) {
+    output.fill(channel[0]);
+    return output;
+  }
+  const scale = (channel.length - 1) / Math.max(1, targetLength - 1);
+  for (let index = 0; index < targetLength; index += 1) {
+    const position = index * scale;
+    const left = Math.floor(position);
+    const right = Math.min(channel.length - 1, left + 1);
+    const fraction = position - left;
+    output[index] = channel[left] * (1 - fraction) + channel[right] * fraction;
+  }
+  return output;
+}
+
+function applyRobotEffect(channel: Float32Array, sampleRate: number) {
+  const output = new Float32Array(channel.length);
+  const carrierHz = 55;
+  for (let index = 0; index < channel.length; index += 1) {
+    const carrier = Math.sin(2 * Math.PI * carrierHz * index / sampleRate);
+    output[index] = Math.max(-1, Math.min(1, channel[index] * (0.18 + carrier * 0.82)));
+  }
+  return output;
+}
+
+function replaceWithCrossfade(source: Float32Array, effect: Float32Array, start: number, end: number, sampleRate: number) {
+  const output = source.slice();
+  const length = end - start;
+  const fadeLength = Math.min(Math.round(sampleRate * 0.01), Math.floor(length / 2));
+  for (let index = 0; index < length; index += 1) {
+    let wet = 1;
+    if (fadeLength > 0 && index < fadeLength) wet = index / fadeLength;
+    if (fadeLength > 0 && index >= length - fadeLength) wet = Math.min(wet, (length - 1 - index) / fadeLength);
+    output[start + index] = source[start + index] * (1 - Math.max(0, wet)) + (effect[index] || 0) * Math.max(0, wet);
+  }
+  return output;
 }
 
 async function encodeMp3(wav: Uint8Array, length: number, sampleRate: number, fileName: string, bitrate: number): Promise<AudioProcessorResult> {
@@ -208,11 +334,13 @@ function describeCommand(command: AudioProcessorRequest["command"]) {
     PASTE: "재생 커서 위치에 오디오를 붙여넣는 중…",
     DELETE: "선택 구간을 삭제하는 중…",
     PREVIEW: "파형 미리보기를 준비하는 중…",
+    PREVIEW_VOICE_EFFECT: "선택 구간 음성 효과를 미리 만드는 중…",
+    APPLY_VOICE_EFFECT: "선택 구간에 음성 효과를 적용하는 중…",
     EXPORT_WAV: "WAV 내보내기를 준비하는 중…",
     EXPORT_MP3: "MP3 내보내기를 준비하는 중…",
   } satisfies Record<AudioProcessorRequest["command"], string>)[command];
   const english = ({
-    MUTE: "Muting selected region…", CUT: "Cutting selected region…", COPY: "Copying selected region to memory…", PASTE: "Pasting audio at the playback cursor…", DELETE: "Deleting selected region…", PREVIEW: "Preparing waveform preview…", EXPORT_WAV: "Preparing WAV export…", EXPORT_MP3: "Preparing MP3 export…",
+    MUTE: "Muting selected region…", CUT: "Cutting selected region…", COPY: "Copying selected region to memory…", PASTE: "Pasting audio at the playback cursor…", DELETE: "Deleting selected region…", PREVIEW: "Preparing waveform preview…", PREVIEW_VOICE_EFFECT: "Preparing a voice-effect preview…", APPLY_VOICE_EFFECT: "Applying the voice effect to the selected region…", EXPORT_WAV: "Preparing WAV export…", EXPORT_MP3: "Preparing MP3 export…",
   } satisfies Record<AudioProcessorRequest["command"], string>)[command];
   return local(korean, english);
 }
