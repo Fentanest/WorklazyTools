@@ -1,5 +1,6 @@
 import {
   AlignLeft,
+  AudioWaveform,
   Braces,
   CalendarDays,
   Clock3,
@@ -24,13 +25,25 @@ import {
   Sheet,
   Sparkles,
   Table2,
+  Undo2,
   WalletCards,
 } from "lucide-react";
 
 export type ToolAccent = "green" | "blue" | "violet" | "orange" | "pink" | "sky";
+export type ToolCategoryId = "documents" | "media" | "text-data" | "work" | "security-share";
+
+export interface ToolCategoryDefinition {
+  id: ToolCategoryId;
+  label: string;
+  shortLabel: string;
+  description: string;
+  accent: ToolAccent;
+  icon: LucideIcon;
+}
 
 export interface ToolDefinition {
   id: string;
+  category: ToolCategoryId;
   path: string;
   title: string;
   shortTitle: string;
@@ -42,9 +55,18 @@ export interface ToolDefinition {
   status: "available" | "soon";
 }
 
+export const toolCategories: ToolCategoryDefinition[] = [
+  { id: "documents", label: "문서·스프레드시트", shortLabel: "문서", description: "문서를 편집·비교·병합하고 필요한 형식으로 변환합니다.", accent: "blue", icon: FileText },
+  { id: "media", label: "이미지·영상·오디오", shortLabel: "미디어", description: "이미지와 영상, 오디오를 브라우저에서 직접 편집합니다.", accent: "pink", icon: Images },
+  { id: "text-data", label: "텍스트·데이터", shortLabel: "텍스트·데이터", description: "텍스트와 코드, 표 데이터를 읽기 좋은 형태로 정리합니다.", accent: "violet", icon: Braces },
+  { id: "work", label: "일정·근무·급여", shortLabel: "업무 계산", description: "업무 일정과 근무일, 시차와 급여를 간편하게 계산합니다.", accent: "green", icon: CalendarDays },
+  { id: "security-share", label: "보안·공유", shortLabel: "보안·공유", description: "개인정보를 보호하고 안전한 비밀번호와 공유용 QR을 만듭니다.", accent: "orange", icon: LockKeyhole },
+];
+
 export const tools: ToolDefinition[] = [
   {
     id: "excel-merger",
+    category: "documents",
     path: "/tools/excel-merger",
     title: "Excel Merger",
     shortTitle: "Excel 병합",
@@ -62,6 +84,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "pdf-editor",
+    category: "documents",
     path: "/tools/pdf-editor",
     title: "PDF Tools",
     shortTitle: "PDF 도구",
@@ -79,6 +102,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "word-compare",
+    category: "documents",
     path: "/tools/word-compare",
     title: "Word Compare",
     shortTitle: "Word 비교",
@@ -96,6 +120,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "hwp-editor",
+    category: "documents",
     path: "/tools/hwp-editor",
     title: "HWP Editor",
     shortTitle: "HWP 편집",
@@ -113,6 +138,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "hwp-compare",
+    category: "documents",
     path: "/tools/hwp-compare",
     title: "HWP Compare",
     shortTitle: "HWP 비교",
@@ -130,23 +156,43 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "video-studio",
+    category: "media",
     path: "/tools/video-studio/",
     title: "Video Studio",
     shortTitle: "비디오 스튜디오",
-    description: "최대 6개 영상을 그룹별로 편집하고 지원 브라우저에서는 멀티스레드 FFmpeg로 더 빠르게 변환합니다.",
+    description: "영상 수 제한 없이 최대 10개 그룹으로 편집하고 영상·오디오 스트림을 원하는 방식으로 변환합니다.",
     eyebrow: "비디오 편집",
     accent: "pink",
     icon: Film,
     highlights: [
-      { icon: Film, label: "멀티스레드 인코딩" },
+      { icon: Film, label: "무제한 추가·10개 그룹" },
       { icon: Scissors, label: "패스스루 자르기" },
-      { icon: Files, label: "그룹별 개별·연결" },
-      { icon: Music2, label: "GIF·MP3·AAC" },
+      { icon: Files, label: "개별 저장·선택 ZIP" },
+      { icon: Music2, label: "오디오 트랙 제어" },
+    ],
+    status: "available",
+  },
+  {
+    id: "audio-studio",
+    category: "media",
+    path: "/tools/audio-studio",
+    title: "Audio Waveform Studio",
+    shortTitle: "오디오 편집기",
+    description: "오디오 파형에서 구간을 선택해 음소거·잘라내기·복사·붙여넣기하고 WAV·MP3로 저장합니다.",
+    eyebrow: "오디오 편집",
+    accent: "violet",
+    icon: AudioWaveform,
+    highlights: [
+      { icon: AudioWaveform, label: "고해상도 파형" },
+      { icon: Scissors, label: "구간 편집" },
+      { icon: Undo2, label: "Undo·Redo" },
+      { icon: Music2, label: "WAV·MP3" },
     ],
     status: "available",
   },
   {
     id: "image-studio",
+    category: "media",
     path: "/tools/image-studio",
     title: "Image Studio",
     shortTitle: "이미지 스튜디오",
@@ -164,6 +210,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "text-tools",
+    category: "text-data",
     path: "/tools/text-tools",
     title: "Text Tools",
     shortTitle: "텍스트 정돈",
@@ -181,6 +228,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "text-formatter",
+    category: "text-data",
     path: "/tools/text-formatter",
     title: "Code Formatter",
     shortTitle: "코드 포맷터",
@@ -198,6 +246,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "work-calculator",
+    category: "work",
     path: "/tools/work-calculator",
     title: "Workday Calculator",
     shortTitle: "영업일·연차",
@@ -215,6 +264,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "timezone-calculator",
+    category: "work",
     path: "/tools/timezone-calculator",
     title: "World Time Planner",
     shortTitle: "글로벌 시차",
@@ -232,6 +282,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "payroll-calculator",
+    category: "work",
     path: "/tools/payroll-calculator",
     title: "Payroll Calculator",
     shortTitle: "급여 계산",
@@ -249,6 +300,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "image-privacy",
+    category: "security-share",
     path: "/tools/image-privacy",
     title: "Image Privacy",
     shortTitle: "사진 정보 제거",
@@ -266,9 +318,10 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "security-tools",
+    category: "security-share",
     path: "/tools/security-tools",
-    title: "Password Security",
-    shortTitle: "비밀번호 보안",
+    title: "Password Generator",
+    shortTitle: "비밀번호 생성기",
     description: "암호학적 난수로 비밀번호를 만들고 패턴·엔트로피 기반 강도를 측정합니다.",
     eyebrow: "보안 도구",
     accent: "violet",
@@ -283,6 +336,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "qr-studio",
+    category: "security-share",
     path: "/tools/qr-studio",
     title: "QR Studio",
     shortTitle: "QR 스튜디오",
@@ -300,6 +354,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: "data-converter",
+    category: "text-data",
     path: "/tools/data-converter",
     title: "Table Converter",
     shortTitle: "표 데이터 변환",

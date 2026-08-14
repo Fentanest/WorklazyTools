@@ -2,7 +2,7 @@ import { AlertTriangle, Camera, CameraOff, Copy, Download, ImagePlus, QrCode, Sc
 import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
+import { PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
 
 type QrMode = "create" | "scan";
@@ -23,6 +23,7 @@ export function QrStudioPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const scanResultRef = useRef<HTMLDivElement>(null);
   const fileWorkerRef = useRef<Worker | undefined>(undefined);
   const cameraWorkerRef = useRef<Worker | undefined>(undefined);
   const cameraStreamRef = useRef<MediaStream | undefined>(undefined);
@@ -63,6 +64,12 @@ export function QrStudioPage() {
     });
   }, [text, size, dark, logo]);
 
+  useEffect(() => {
+    if (mode !== "scan" || (!scanned && !error) || !window.matchMedia("(max-width: 620px)").matches) return;
+    const frame = window.requestAnimationFrame(() => scanResultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, scanned, error]);
+
   const download = () => canvasRef.current?.toBlob((blob) => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
@@ -84,9 +91,7 @@ export function QrStudioPage() {
     });
   };
 
-  const scanFile = async () => {
-    const file = scanFiles[0];
-    if (!file) return;
+  const scanFile = async (file: File) => {
     stopCamera();
     fileWorkerRef.current?.terminate();
     setBusy(true);
@@ -224,26 +229,49 @@ export function QrStudioPage() {
       ) : (
         <>
           <div className="qr-scan-layout">
-            <SectionCard title="실시간 카메라 스캔" description="후면 카메라를 켜고 QR 코드를 사각형 안에 맞추세요.">
+            <SectionCard className="qr-camera-scan-card" title="QR 스캔" description="카메라를 켜거나 저장된 QR 사진을 바로 선택하세요.">
               <div className={`qr-camera-stage${cameraActive ? " active" : ""}`}>
                 <video ref={videoRef} autoPlay muted playsInline aria-label="QR 스캔 카메라 미리보기" />
                 {!cameraActive && <div className="qr-camera-placeholder"><Camera size={30} /><strong>카메라는 버튼을 누른 뒤에만 켜집니다.</strong><span>영상과 QR 데이터는 외부 서버로 전송되지 않습니다.</span></div>}
                 {cameraActive && <div className="qr-camera-guide" aria-hidden="true" />}
               </div>
               <canvas ref={captureCanvasRef} className="visually-hidden" aria-hidden="true" />
-              <div className="section-actions">
+              <div className="section-actions qr-scan-actions">
                 {cameraActive
                   ? <PrimaryButton accent="blue" onClick={stopCamera}><CameraOff size={18} /> 카메라 끄기</PrimaryButton>
                   : <PrimaryButton accent="blue" loading={cameraStarting} onClick={() => void startCamera()}><Camera size={18} /> 카메라로 스캔</PrimaryButton>}
+                <label className={`secondary-button qr-photo-picker${busy ? " disabled" : ""}`} aria-disabled={busy}>
+                  {busy ? <><ScanLine size={18} /> 사진 분석 중…</> : <><ImagePlus size={18} /> QR 사진 선택</>}
+                  <input
+                    className="visually-hidden"
+                    type="file"
+                    accept="image/*"
+                    disabled={busy}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (!file) return;
+                      setScanFiles([file]);
+                      void scanFile(file);
+                    }}
+                  />
+                </label>
               </div>
+              {scanFiles[0] && <p className="qr-selected-photo"><ImagePlus size={15} /><span>{scanFiles[0].name}</span><small>선택 즉시 분석</small></p>}
             </SectionCard>
-            <SectionCard title="QR 사진 선택" description="저장된 사진이나 카메라로 촬영한 사진을 선택하세요.">
-              <FileDropZone files={scanFiles} onFiles={(files) => setScanFiles(files.slice(-1))} accept="image/*" hint="QR 코드가 선명하게 보이는 이미지" accent="blue" />
-              <div className="section-actions"><PrimaryButton accent="blue" disabled={!scanFiles.length} loading={busy} onClick={() => void scanFile()}><ScanLine size={18} /> QR 데이터 읽기</PrimaryButton></div>
-            </SectionCard>
+            {(scanned || error) && (
+              <div className="qr-scan-result-slot" ref={scanResultRef} role="status" aria-live="polite">
+                <SectionCard title="스캔 결과">
+                  <div className={`scan-result${error ? " error" : ""}`}>
+                    <QrCode size={21} />
+                    <p>{error || scanned}</p>
+                    {scanned && <button type="button" aria-label="스캔 결과 복사" onClick={() => void navigator.clipboard.writeText(scanned)}><Copy size={17} /></button>}
+                  </div>
+                </SectionCard>
+              </div>
+            )}
           </div>
           <div className="inline-notice warning qr-compatibility-notice"><AlertTriangle size={16} /><span>카메라·사진 분석은 OffscreenCanvas를 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저를 사용해 주세요.</span></div>
-          {(scanned || error) && <SectionCard title="스캔 결과"><div className={`scan-result${error ? " error" : ""}`}><QrCode size={21} /><p>{error || scanned}</p>{scanned && <button type="button" onClick={() => void navigator.clipboard.writeText(scanned)}><Copy size={17} /></button>}</div></SectionCard>}
         </>
       )}
 

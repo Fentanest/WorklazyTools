@@ -5,7 +5,7 @@ const routes = [
   "", "tools", "tools/excel-merger", "tools/word-compare",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
-  "tools/hwp-editor", "tools/hwp-compare", "tools/video-studio", "tools/image-studio",
+  "tools/hwp-editor", "tools/hwp-compare", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
   "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/data-converter",
@@ -67,6 +67,7 @@ const [pyodideModule, pyodideWasm, ocrWorker, ocrEnglish, ocrKorean, videoIsolat
   fs.stat("dist/tools/video-studio/runtime/multi/ffmpeg-core.worker.js"),
 ]);
 const videoWorkerFiles = await fs.readdir("dist/tools/video-studio/workers");
+const assetFiles = await fs.readdir("dist/assets");
 
 if (!ads.includes("pub-8940087269746960")) throw new Error("ads.txt publisher ID is missing.");
 if (cname.trim() !== "worklazy.net") throw new Error("CNAME does not point to worklazy.net.");
@@ -78,7 +79,8 @@ if (pyodideModule.size < 10_000 || pyodideWasm.size < 5_000_000) throw new Error
 if (ocrWorker.size < 50_000 || ocrEnglish.size < 1_000_000 || ocrKorean.size < 1_000_000) throw new Error("Self-hosted Tesseract runtime or language data is incomplete.");
 if (videoIsolationWorker.size < 1_000) throw new Error("Video isolation service worker is missing or unexpectedly small.");
 if (videoSingleCore.size < 30_000_000 || videoMultiCore.size < 30_000_000 || videoMultiWorker.size < 1_000) throw new Error("Document-scoped FFmpeg runtime is incomplete.");
-if (!videoWorkerFiles.some((name) => name.startsWith("video.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-probe.worker-"))) throw new Error("Video workers were emitted outside their isolated document scope.");
+if (!videoWorkerFiles.some((name) => name.startsWith("video.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-probe.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-zip.worker-"))) throw new Error("Video workers were emitted outside their isolated document scope.");
+if (!assetFiles.some((name) => name.startsWith("audioProcessor.worker-"))) throw new Error("Audio processor worker is missing from the static build.");
 if (!robots.includes("Sitemap:")) throw new Error("robots.txt does not point to the sitemap.");
 if (!robots.includes("https://worklazy.net/sitemap.xml")) throw new Error("robots.txt does not use the custom root domain.");
 if (sitemap.includes("/worklazytools/")) throw new Error("sitemap.xml still contains the repository subpath.");

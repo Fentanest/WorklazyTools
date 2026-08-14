@@ -76,8 +76,13 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/video-studio": {
     title: "온라인 비디오 편집·그룹별 이어붙이기 - GIF·MP3·AAC 변환",
-    description: "최대 6개 영상을 그룹별로 자르고 이어붙이세요. 지원 브라우저의 멀티스레드 FFmpeg 인코딩과 MKV·AVI 메타데이터 대체 분석을 제공합니다.",
-    application: { name: "Video Studio", featureList: ["최대 6개 영상·6개 그룹", "지원 브라우저 멀티스레드 인코딩", "영상별 예상 시간", "MKV·AVI 메타데이터 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "인코딩 없는 패스스루", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
+    description: "영상 수 제한 없이 여러 번 추가하고 최대 10개 그룹에서 자르거나 이어붙이세요. 오디오 원본 유지·제거·재인코딩과 직접 비트레이트·샘플레이트 설정을 지원합니다.",
+    application: { name: "Video Studio", featureList: ["영상 수 제한 없는 연속 추가", "최대 10개 그룹", "지원 브라우저 멀티스레드 인코딩", "영상별 예상 시간", "MKV·AVI 메타데이터 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "완성 결과 즉시 개별 다운로드", "전체 개별 다운로드와 폴더 저장", "선택형 ZIP 묶기", "인코딩 없는 영상 패스스루", "첫 번째 오디오 트랙 원본 유지·제거·재인코딩", "영상·오디오 비트레이트 직접입력", "오디오 샘플레이트 선택·직접입력", "음원 결과를 오디오 스튜디오로 메모리 전달", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
+  },
+  "/tools/audio-studio": {
+    title: "온라인 오디오 파형 편집기 - MP3·WAV 자르기·음소거",
+    description: "오디오 파형에서 구간을 선택해 음소거·잘라내기·복사·붙여넣기하고 WAV 또는 MP3로 저장하세요. 파일은 브라우저에서만 처리됩니다.",
+    application: { name: "Audio Waveform Studio", featureList: ["고해상도 오디오 파형", "드래그 구간 선택", "구간 음소거", "잘라내기·복사·붙여넣기", "구간 삭제", "Undo·Redo", "파형 줌", "선택 구간 반복", "WAV 내보내기", "MP3 내보내기", "Web Worker PCM 편집"] },
   },
   "/tools/image-studio": {
     title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
@@ -117,7 +122,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   "/tools/security-tools": {
     title: "안전한 비밀번호 생성기·강도 측정기",
     description: "crypto.getRandomValues 기반 무작위 비밀번호를 만들고 패턴·엔트로피·공격 예상 시간으로 비밀번호 강도를 확인하세요.",
-    application: { name: "Password Security", featureList: ["CSPRNG 비밀번호 생성", "8~64자 길이", "문자 종류 선택", "패턴 강도 분석", "엔트로피", "공격 시간 추정"] },
+    application: { name: "Password Generator", featureList: ["CSPRNG 비밀번호 생성", "8~64자 길이", "문자 종류 선택", "패턴 강도 분석", "엔트로피", "공격 시간 추정"] },
   },
   "/tools/qr-studio": {
     title: "QR 코드 생성기·실시간 카메라 스캐너 - 로고 삽입",

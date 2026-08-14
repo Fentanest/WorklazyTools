@@ -247,7 +247,7 @@ export function PdfOrganizePanel() {
       <div className="workflow-grid pdf-workflow-grid">
         <div>
           <SectionCard step={1} title="PDF 추가" description="여러 PDF의 모든 페이지를 한 편집 화면에 불러옵니다." className="accent-context-violet">
-            <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} accent="violet" hint="PDF 여러 개를 선택하거나 끌어다 놓으세요." />
+            <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} accent="violet" hint="PDF를 한 번에 고르거나 여러 번 나눠 추가하세요." />
             <FileList files={sources.map((source) => source.file)} onRemove={removeSource} accent="violet" />
           </SectionCard>
 

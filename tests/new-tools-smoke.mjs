@@ -25,33 +25,53 @@ try {
     const pageErrors = [];
     page.on("pageerror", (error) => { pageErrors.push(error.message); console.error("[page error]", error.message); });
     page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("ERR_CONNECTION_REFUSED")) console.error("[browser]", message.text()); });
-    page.on("requestfailed", (request) => { if (!request.url().includes("googlesyndication.com")) console.error("[request failed]", request.url(), request.failure()?.errorText); });
+    page.on("requestfailed", (request) => {
+      if (request.url().includes("googlesyndication.com")) return;
+      if (request.url().startsWith("blob:") && request.failure()?.errorText === "net::ERR_ABORTED") return;
+      console.error("[request failed]", request.url(), request.failure()?.errorText);
+    });
 
-    if (process.env.TEST_ONLY_VIDEO !== "1") {
-      console.log("[1/3] HWP editor");
-      await testHwpEditor(page, fixtures.blankHwp);
-      console.log("[2/3] Image studio");
+    const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
+    const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
+    if (!onlyVideo && !onlyAudio) {
+      console.log("[1/4] HWP editor");
+      await testHwpEditor(page, fixtures.hwpFiles);
+      console.log("[2/4] Image studio");
       await testImageStudio(page, fixtures.images);
     }
-    console.log("[3/3] Video studio");
-    await testVideoStudio(page, fixtures.videos, fixtures.largeVideo);
+    if (!onlyVideo) {
+      console.log("[3/4] Audio studio");
+      await testAudioStudio(page, fixtures.audio);
+    }
+    if (!onlyAudio) {
+      console.log("[4/4] Video studio");
+      await testVideoStudio(page, fixtures.videos, fixtures.largeVideo, fixtures.largePassThroughVideos);
+    }
 
     if (pageErrors.length) throw new Error(`Browser errors:\n${pageErrors.join("\n")}`);
   } finally {
     await browser.close();
   }
-  console.log("New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, video group timelines and grouped output.");
+  console.log("New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, video group timelines and grouped output.");
 } finally {
   await fs.rm(tempDirectory, { recursive: true, force: true });
 }
 
-async function testHwpEditor(page, hwpPath) {
+async function testHwpEditor(page, hwpPaths) {
   await page.goto(`${baseUrl}/tools/hwp-compare`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".rhwp-version-notice");
   const compareVersion = await page.$eval(".rhwp-version-notice", (element) => element.textContent || "");
   if (!compareVersion.includes("rhwp 0.8.4") || !compareVersion.includes("@rhwp/core WebAssembly")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
+  let compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  await compareInputs[0].uploadFile(hwpPaths[0]);
+  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 1);
+  compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  await compareInputs[0].uploadFile(hwpPaths[1]);
+  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 2);
+  const hwpAddButton = await page.$eval(".hwp-compare-page .drop-zone .secondary-button", (button) => button.textContent || "");
+  if (!hwpAddButton.includes("더 추가")) throw new Error(`HWP comparison does not expose incremental file addition: ${hwpAddButton}`);
 
   const forbiddenRhwpRequests = [];
   const recordRhwpRequest = (request) => {
@@ -72,7 +92,7 @@ async function testHwpEditor(page, hwpPath) {
     throw new Error(`HWP editor is not using the isolated self-hosted runtime: ${JSON.stringify(runtime)}`);
   }
   await page.waitForSelector(".hwp-tool-page input[type=file]");
-  await (await page.$(".hwp-tool-page input[type=file]")).uploadFile(hwpPath);
+  await (await page.$(".hwp-tool-page input[type=file]")).uploadFile(hwpPaths[0]);
   await page.waitForSelector(".hwp-tool-page.hwp-editor-focus");
   const editorDescription = await page.$eval(".hwp-editor-section", (element) => element.textContent || "");
   if (!editorDescription.includes("1페이지")) throw new Error(`HWP page count is incorrect: ${editorDescription}`);
@@ -243,7 +263,106 @@ async function dropCanvasImages(page, selector, colors) {
   }, selector, colors);
 }
 
-async function testVideoStudio(page, videoPaths, largeVideoPath) {
+async function testAudioStudio(page, audioPath) {
+  await page.goto(`${baseUrl}/tools/audio-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".audio-studio-page input[type=file]");
+  await (await page.$(".audio-studio-page input[type=file]")).uploadFile(audioPath);
+  await page.waitForFunction(() => document.querySelector(".operation-progress.status-success")?.textContent?.includes("파형 준비 완료"), { timeout: 60_000 });
+  await page.waitForFunction(() => {
+    const host = document.querySelector(".audio-waveform");
+    return Boolean(host?.firstElementChild?.shadowRoot?.querySelector("canvas"));
+  });
+  const summary = await page.$eval(".audio-file-summary", (element) => element.textContent || "");
+  if (!summary.includes("2채널") || !summary.includes("48,000Hz")) throw new Error(`Audio metadata is incomplete: ${summary}`);
+  const initialEnd = await page.$eval('.audio-selection-panel label:last-child input', (input) => Number(input.value));
+  if (!(initialEnd > 0 && initialEnd < 2.5)) throw new Error(`Audio selection was not initialized: ${initialEnd}`);
+
+  const zoomBefore = await page.$eval(".audio-waveform-toolbar small", (element) => element.textContent || "");
+  await page.click('.audio-waveform-toolbar button[aria-label="파형 확대"]');
+  const zoomAfter = await page.$eval(".audio-waveform-toolbar small", (element) => element.textContent || "");
+  if (zoomBefore === zoomAfter) throw new Error("Audio waveform zoom did not change.");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.querySelector(".audio-play-button")?.getAttribute("aria-label") === "일시정지");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.querySelector(".audio-play-button")?.getAttribute("aria-label") === "재생");
+  await page.click('.audio-loop-control [role="switch"]');
+  const loopEnabled = await page.$eval('.audio-loop-control [role="switch"]', (button) => button.getAttribute("aria-checked"));
+  if (loopEnabled !== "true") throw new Error("Audio selection loop toggle did not activate.");
+
+  await clickAudioAction(page, "복사");
+  await page.waitForFunction(() => document.querySelector(".audio-clipboard-status.has-clip")?.textContent?.includes("오디오 클립보드"));
+  await clickAudioAction(page, "구간 음소거");
+  await waitForAudioSuccess(page, "음소거 중 완료");
+  const undoEnabled = await page.$eval(".audio-edit-toolbar button:nth-child(6)", (button) => !button.disabled);
+  if (!undoEnabled) throw new Error("Audio undo history was not created.");
+  await page.keyboard.down("Control");
+  await page.keyboard.press("z");
+  await page.keyboard.up("Control");
+  await waitForAudioSuccess(page, "실행 취소 완료");
+  await page.keyboard.down("Control");
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("z");
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("Control");
+  await waitForAudioSuccess(page, "다시 실행 완료");
+
+  const durationBeforeCut = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
+  await clickAudioAction(page, "잘라내기");
+  await waitForAudioSuccess(page, "잘라내는 중 완료");
+  const durationAfterCut = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
+  if (durationBeforeCut === durationAfterCut) throw new Error("Audio cut did not shorten the timeline.");
+  await clickAudioAction(page, "커서에 붙여넣기");
+  await waitForAudioSuccess(page, "붙여넣는 중 완료");
+  await clickAudioAction(page, "구간 삭제");
+  await waitForAudioSuccess(page, "삭제 중 완료");
+
+  await page.evaluate(() => {
+    window.__audioDownloads = [];
+    window.__audioOriginalAnchorClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function captureAudioDownload() {
+      if (this.download) {
+        window.__audioDownloads.push({ fileName: this.download, href: this.href });
+        return;
+      }
+      return window.__audioOriginalAnchorClick.call(this);
+    };
+  });
+  await page.evaluate(() => document.querySelector(".audio-studio-page .section-actions .primary-button")?.click());
+  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes(".wav"), { timeout: 60_000 });
+  await page.evaluate(() => document.querySelector('.audio-export-settings .segmented-control button:nth-child(2)')?.click());
+  await page.evaluate(() => document.querySelector(".audio-studio-page .section-actions .primary-button")?.click());
+  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes(".mp3"), { timeout: 120_000 });
+  const downloads = await page.evaluate(() => {
+    const captured = window.__audioDownloads;
+    HTMLAnchorElement.prototype.click = window.__audioOriginalAnchorClick;
+    return captured;
+  });
+  if (downloads.length !== 2 || !downloads.some((item) => item.fileName.endsWith(".wav")) || !downloads.some((item) => item.fileName.endsWith(".mp3")) || downloads.some((item) => !item.href.startsWith("blob:"))) {
+    throw new Error(`Audio exports are incomplete: ${JSON.stringify(downloads)}`);
+  }
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  const mobileLayout = await page.$eval(".audio-edit-toolbar", (element) => ({
+    columns: getComputedStyle(element).gridTemplateColumns.split(" ").length,
+    pageWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  if (mobileLayout.columns !== 2 || mobileLayout.pageWidth > mobileLayout.viewportWidth + 1) throw new Error(`Audio mobile layout overflows: ${JSON.stringify(mobileLayout)}`);
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+}
+
+async function clickAudioAction(page, label) {
+  await page.evaluate((text) => {
+    const button = Array.from(document.querySelectorAll(".audio-edit-toolbar button")).find((candidate) => candidate.textContent?.includes(text));
+    if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error(`Audio action is unavailable: ${text}`);
+    button.click();
+  }, label);
+}
+
+async function waitForAudioSuccess(page, text) {
+  await page.waitForFunction((expected) => document.querySelector(".operation-progress.status-success")?.textContent?.includes(expected), { timeout: 60_000 }, text);
+}
+
+async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths) {
   const videoAdRequests = [];
   const captureVideoRequests = (request) => {
     if (request.url().includes("pagead2.googlesyndication.com")) videoAdRequests.push(request.url());
@@ -269,8 +388,12 @@ async function testVideoStudio(page, videoPaths, largeVideoPath) {
       return nativeRead.call(this, blob);
     };
   });
-  await (await page.$(".video-studio-page input[type=file]")).uploadFile(...videoPaths);
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[0]);
+  await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 1);
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[1]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2 && document.querySelectorAll(".video-sync-group").length === 1);
+  const addButton = await page.$eval(".video-studio-page .drop-zone .secondary-button", (button) => button.textContent || "");
+  if (!addButton.includes("더 추가")) throw new Error(`Video studio does not expose incremental file addition: ${addButton}`);
   const outputLimit = await page.$eval(".video-output-limit", (element) => element.textContent || "");
   if (!outputLimit.includes("1GB 이하") || !outputLimit.includes("1.5GB")) throw new Error(`Video output limit is not explicit: ${outputLimit}`);
   const readState = await page.evaluate(() => window.__videoFileReadState);
@@ -293,10 +416,56 @@ async function testVideoStudio(page, videoPaths, largeVideoPath) {
   if (rangeState.handles !== 2 || !rangeState.start || rangeState.start === "0%" || !rangeState.end) throw new Error(`Combined range track was not updated: ${JSON.stringify(rangeState)}`);
   const passthroughOption = await page.$eval('.encoding-grid label:nth-child(4) select', (select) => ({ value: select.value, text: select.selectedOptions[0]?.textContent }));
   if (passthroughOption.value !== "copy" || !passthroughOption.text?.includes("패스스루")) throw new Error(`Pass-through trim was not selected: ${JSON.stringify(passthroughOption)}`);
+  const encodingOptions = await page.evaluate(() => ({
+    video: Array.from(document.querySelectorAll('.encoding-grid label:nth-child(4) option')).map((option) => option.textContent),
+    audioModes: Array.from(document.querySelectorAll('.video-audio-settings .segmented-control button')).map((button) => button.textContent),
+  }));
+  if (!encodingOptions.video.some((label) => label?.includes("직접입력")) || encodingOptions.audioModes.join("|") !== "원본 유지|오디오 제거|재인코딩") {
+    throw new Error(`Video/audio encoding controls are incomplete: ${JSON.stringify(encodingOptions)}`);
+  }
+  await page.evaluate(() => {
+    const output = document.querySelector(".video-output-format-grid select");
+    if (!(output instanceof HTMLSelectElement)) throw new Error("Output format selector is unavailable");
+    output.value = "webm";
+    output.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const webmWarning = await page.$eval(".webm-passthrough-warning", (element) => element.textContent || "");
+  if (!webmWarning.includes("일반적인 MP4") || !webmWarning.includes("H.264") || !webmWarning.includes("AAC") || !webmWarning.includes("Opus")) {
+    throw new Error(`WebM pass-through warning is incomplete: ${webmWarning}`);
+  }
+  await page.evaluate(() => {
+    const output = document.querySelector(".video-output-format-grid select");
+    output.value = "mp4";
+    output.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.evaluate(() => {
+    const select = document.querySelector('.encoding-grid label:nth-child(4) select');
+    if (!(select instanceof HTMLSelectElement)) throw new Error("Video bitrate selector is unavailable");
+    select.value = "custom";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForSelector('input[aria-label="영상 비트레이트 직접입력"]');
+  await page.$eval('input[aria-label="영상 비트레이트 직접입력"]', (input) => { input.value = "12.5"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+  const customVideoBitrate = await page.$eval('input[aria-label="영상 비트레이트 직접입력"]', (input) => input.value);
+  if (customVideoBitrate !== "12.5") throw new Error(`Custom video bitrate was not accepted: ${customVideoBitrate}`);
+  await page.evaluate(() => {
+    const select = document.querySelector('.encoding-grid label:nth-child(4) select');
+    select.value = "copy";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
   await page.waitForSelector(".operation-progress.status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Video error"));
+  const firstResultState = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({
+    text: element.textContent || "",
+    href: element.querySelector("a")?.getAttribute("href") || "",
+    download: element.querySelector("a")?.getAttribute("download") || "",
+  })));
+  if (firstResultState.length !== 2 || firstResultState.some((result) => !result.href.startsWith("blob:") || !result.download)) {
+    throw new Error(`Video outputs were not exposed as individual downloads: ${JSON.stringify(firstResultState)}`);
+  }
+  if (await page.$(".audio-handoff-button")) throw new Error("Audio studio handoff was shown for a video result.");
   const progressFontSizes = await page.evaluate(() => ({
     message: Number.parseFloat(getComputedStyle(document.querySelector(".operation-current-message")).fontSize),
     log: Number.parseFloat(getComputedStyle(document.querySelector(".operation-log li")).fontSize),
@@ -304,6 +473,75 @@ async function testVideoStudio(page, videoPaths, largeVideoPath) {
   if (progressFontSizes.message < 10 || progressFontSizes.log < 9) {
     throw new Error(`Progress and error guidance fonts are still too small: ${JSON.stringify(progressFontSizes)}`);
   }
+
+  await page.evaluate(() => {
+    const output = document.querySelector(".video-output-format-grid select");
+    if (!(output instanceof HTMLSelectElement)) throw new Error("Output format selector is unavailable");
+    output.value = "mp3";
+    output.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForSelector(".audio-encoding-fields");
+  await page.evaluate(() => {
+    const selects = document.querySelectorAll(".audio-encoding-fields select");
+    const bitrate = selects[0];
+    const sampleRate = selects[1];
+    if (!(bitrate instanceof HTMLSelectElement) || !(sampleRate instanceof HTMLSelectElement)) throw new Error("Audio encoding selects are unavailable");
+    bitrate.value = "custom";
+    bitrate.dispatchEvent(new Event("change", { bubbles: true }));
+    sampleRate.value = "custom";
+    sampleRate.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForSelector('input[aria-label="오디오 비트레이트 직접입력"]');
+  await page.$eval('input[aria-label="오디오 비트레이트 직접입력"]', (input) => { input.value = "160"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+  await page.$eval('input[aria-label="오디오 샘플레이트 직접입력"]', (input) => { input.value = "44100"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+  const customAudioState = await page.evaluate(() => ({
+    bitrate: document.querySelector('input[aria-label="오디오 비트레이트 직접입력"]')?.value,
+    sampleRate: document.querySelector('input[aria-label="오디오 샘플레이트 직접입력"]')?.value,
+    disabled: document.querySelector(".video-studio-page .section-actions .primary-button")?.disabled,
+  }));
+  if (customAudioState.bitrate !== "160" || customAudioState.sampleRate !== "44100" || customAudioState.disabled) throw new Error(`Custom audio settings were not accepted: ${JSON.stringify(customAudioState)}`);
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.waitForSelector(".operation-progress.status-running");
+  await waitForTerminalStatus(page);
+  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Audio extraction error"));
+  const audioResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({
+    fileName: element.querySelector("a")?.getAttribute("download") || "",
+    handoff: element.querySelector(".audio-handoff-button")?.textContent || "",
+  })));
+  if (audioResults.length !== 2 || audioResults.some((result) => !result.fileName.endsWith(".mp3") || !result.handoff.includes("오디오 스튜디오에서 계속 편집"))) {
+    throw new Error(`Audio results or handoff buttons are incomplete: ${JSON.stringify(audioResults)}`);
+  }
+
+  const existingPages = new Set(await page.browser().pages());
+  await page.click(".audio-handoff-button");
+  const audioPage = await waitForNewPage(page.browser(), existingPages);
+  audioPage.setDefaultTimeout(120_000);
+  await audioPage.waitForSelector(".audio-studio-page");
+  await audioPage.waitForFunction(() => document.querySelector(".operation-progress.status-success, .operation-progress.status-error"));
+  if (await audioPage.$(".operation-progress.status-error")) throw new Error(await audioPage.$eval(".operation-current-message", (element) => element.textContent || "Audio handoff error"));
+  const handoffState = await audioPage.evaluate(() => ({
+    summary: document.querySelector(".audio-file-summary")?.textContent || "",
+    search: location.search,
+  }));
+  if (!handoffState.summary.includes(audioResults[0].fileName) || handoffState.search.includes("handoff=")) throw new Error(`Audio handoff did not load and consume the result: ${JSON.stringify(handoffState)}`);
+  await audioPage.close();
+  await page.bringToFront();
+  await page.evaluate(() => {
+    const output = document.querySelector(".video-output-format-grid select");
+    if (!(output instanceof HTMLSelectElement)) throw new Error("Output format selector is unavailable");
+    output.value = "mp4";
+    output.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForSelector(".video-audio-settings");
+  await page.evaluate(() => {
+    const bitrate = document.querySelector('.encoding-grid label:nth-child(4) select');
+    const reencode = document.querySelector('.video-audio-settings .segmented-control button:nth-child(3)');
+    if (!(bitrate instanceof HTMLSelectElement) || !(reencode instanceof HTMLButtonElement)) throw new Error("Video audio re-encoding controls are unavailable");
+    bitrate.value = "copy";
+    bitrate.dispatchEvent(new Event("change", { bubbles: true }));
+    reencode.click();
+  });
+  await page.waitForSelector(".video-audio-settings .audio-encoding-fields");
   await page.evaluate(() => {
     const select = document.querySelectorAll(".video-group-select select")[1];
     if (!(select instanceof HTMLSelectElement)) throw new Error("Second video group selector is unavailable");
@@ -316,13 +554,83 @@ async function testVideoStudio(page, videoPaths, largeVideoPath) {
   await page.waitForSelector(".operation-progress.status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Video concat error"));
-  const groupedResult = await page.$eval(".inline-success", (element) => element.textContent || "");
-  if (!groupedResult.includes("worklazy-비디오-결과-2개.zip")) throw new Error(`Grouped concat did not create a ZIP: ${groupedResult}`);
+  const groupedResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => element.textContent || ""));
+  if (groupedResults.length !== 2) throw new Error(`Grouped concat did not expose two individual results: ${JSON.stringify(groupedResults)}`);
+  const resultActions = await page.$eval(".video-result-actions", (element) => element.textContent || "");
+  if (!resultActions.includes("전체 개별 다운로드") || !resultActions.includes("ZIP으로 묶기")) throw new Error(`Video result actions are incomplete: ${resultActions}`);
+  await page.evaluate(() => Array.from(document.querySelectorAll(".video-result-actions button")).find((button) => button.textContent?.includes("ZIP으로 묶기"))?.click());
+  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("worklazy-비디오-결과-2개.zip"), { timeout: 60_000 });
+
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(...videoPaths.slice(2));
+  await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 7);
+  const groupOptionCount = await page.$eval(".video-group-select select", (select) => select.options.length);
+  if (groupOptionCount !== 10) throw new Error(`Video group limit is not 10: ${groupOptionCount}`);
+  await page.evaluate(() => {
+    const select = document.querySelectorAll(".video-group-select select")[6];
+    if (!(select instanceof HTMLSelectElement)) throw new Error("Seventh video group selector is unavailable");
+    select.value = "10";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-group-title strong")).some((element) => element.textContent === "그룹 10"));
 
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largeVideoPath);
   await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("메모리에 통째로 복사하지 않고 연결했습니다"));
   const largeReadState = await page.evaluate(() => window.__videoFileReadState);
   if (largeReadState.arrayBufferReads !== 0) throw new Error(`A 3824MB source triggered a contiguous ArrayBuffer read: ${JSON.stringify(largeReadState)}`);
+
+  await page.goto(`${baseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-studio-page input[type=file]");
+  await installVideoTransferProbe(page);
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(largePassThroughPaths[0]);
+  await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 1);
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(largePassThroughPaths[1]);
+  await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2);
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.waitForSelector(".operation-progress.status-running");
+  await waitForTerminalStatus(page);
+  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Large pass-through error"));
+  const largePassThroughState = await page.evaluate(() => ({
+    outputs: document.querySelectorAll(".video-result-item").length,
+    transfer: window.__videoWorkerTransferState,
+    logs: Array.from(document.querySelectorAll(".operation-log li")).map((item) => item.textContent || ""),
+  }));
+  if (largePassThroughState.outputs !== 2
+    || largePassThroughState.transfer.startContainsFile
+    || largePassThroughState.transfer.inputFileSizes.length !== 2
+    || !largePassThroughState.logs.some((message) => message.includes("Worker 준비 완료"))
+    || !largePassThroughState.logs.some((message) => message.includes("원본 파일 연결 중"))) {
+    throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
+  }
+}
+
+async function installVideoTransferProbe(page) {
+  await page.evaluate(() => {
+    const nativePostMessage = Worker.prototype.postMessage;
+    window.__videoWorkerTransferState = { startContainsFile: false, inputFileSizes: [] };
+    const containsFile = (value, seen = new WeakSet()) => {
+      if (value instanceof File) return true;
+      if (!value || typeof value !== "object" || seen.has(value)) return false;
+      seen.add(value);
+      return Object.values(value).some((child) => containsFile(child, seen));
+    };
+    Worker.prototype.postMessage = function trackVideoWorkerTransfer(message) {
+      if (message?.type === "start") window.__videoWorkerTransferState.startContainsFile ||= containsFile(message.request);
+      if (message?.type === "input-file" && message.file instanceof File) window.__videoWorkerTransferState.inputFileSizes.push(message.file.size);
+      return Reflect.apply(nativePostMessage, this, arguments);
+    };
+  });
+}
+
+async function waitForNewPage(browser, existingPages) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const next = (await browser.pages()).find((candidate) => !existingPages.has(candidate));
+    if (next) return next;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("Audio studio handoff did not open a new tab.");
 }
 
 async function waitForTerminalStatus(page) {
@@ -347,8 +655,10 @@ async function createFixtures(directory) {
   await initRhwp({ module_or_path: wasm });
   const document = HwpDocument.createEmpty();
   const blankHwp = path.join(directory, "blank.hwp");
+  const blankHwpTwo = path.join(directory, "blank-two.hwp");
   try {
-    await fs.writeFile(blankHwp, document.exportHwp());
+    const bytes = document.exportHwp();
+    await Promise.all([fs.writeFile(blankHwp, bytes), fs.writeFile(blankHwpTwo, bytes)]);
   } finally {
     document.free();
   }
@@ -363,11 +673,19 @@ async function createFixtures(directory) {
   const video = path.join(directory, "sample.mp4");
   const videoTwo = path.join(directory, "sample-two.mp4");
   const largeVideo = path.join(directory, "2026_0618_070732_001396F.MP4");
+  const largePassThroughVideos = [path.join(directory, "large-pass-through-one.mp4"), path.join(directory, "large-pass-through-two.mp4")];
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi", "-i", "color=c=0x159bd7:s=320x180:d=1.5",
     "-f", "lavfi", "-i", "sine=frequency=440:duration=1.5",
     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", video,
+  ]);
+  const audio = path.join(directory, "sample-audio.wav");
+  await execFileAsync("ffmpeg", [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi", "-i", "sine=frequency=523:duration=2.4:sample_rate=48000",
+    "-filter_complex", "[0:a]asplit=2[left][right];[left][right]amerge=inputs=2[a]",
+    "-map", "[a]", "-c:a", "pcm_s16le", audio,
   ]);
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
@@ -375,11 +693,22 @@ async function createFixtures(directory) {
     "-f", "lavfi", "-i", "sine=frequency=660:duration=1",
     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", videoTwo,
   ]);
+  const videoCopies = Array.from({ length: 5 }, (_, index) => path.join(directory, `sample-${index + 3}.mp4`));
+  await Promise.all(videoCopies.map((target) => fs.copyFile(video, target)));
+  await Promise.all(largePassThroughVideos.map(async (target) => {
+    await fs.copyFile(video, target);
+    const handle = await fs.open(target, "r+");
+    try {
+      await handle.truncate(512 * 1024 * 1024);
+    } finally {
+      await handle.close();
+    }
+  }));
   const largeHandle = await fs.open(largeVideo, "w");
   try {
     await largeHandle.truncate(3824 * 1024 * 1024);
   } finally {
     await largeHandle.close();
   }
-  return { blankHwp, images: [imageOne, imageTwo], videos: [video, videoTwo], largeVideo };
+  return { hwpFiles: [blankHwp, blankHwpTwo], images: [imageOne, imageTwo], audio, videos: [video, videoTwo, ...videoCopies], largeVideo, largePassThroughVideos };
 }

@@ -229,8 +229,12 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   if (!acceptedFormats.includes(".xlsb") || !acceptedFormats.includes(".xlsm")) {
     throw new Error(`XLSB/XLSM were not exposed as accepted inputs: ${acceptedFormats}`);
   }
-  await dropFiles(page, ".drop-zone", [fixtures.xlsxOne, fixtures.csv, fixtures.xls, fixtures.xlsb, fixtures.xlsm, fixtures.encryptedXlsx]);
+  await dropFiles(page, ".drop-zone", [fixtures.xlsxOne, fixtures.csv, fixtures.xls]);
+  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 3);
+  await dropFiles(page, ".drop-zone", [fixtures.xlsb, fixtures.xlsm, fixtures.encryptedXlsx]);
   await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 6);
+  const excelAddButton = await page.$eval(".drop-zone .secondary-button", (button) => button.textContent || "");
+  if (!excelAddButton.includes("더 추가")) throw new Error(`Excel merger does not expose incremental file addition: ${excelAddButton}`);
   await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
 
   const protectedInput = await page.$('.input-password-row input[type="password"]');
@@ -403,6 +407,8 @@ async function testWordCompare(page, fixtures, tempDir) {
   await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 2
     && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 2
     && !document.querySelector(".pair-count-error"));
+  const wordAddButtons = await page.$$eval(".word-file-column .drop-zone .secondary-button", (buttons) => buttons.map((button) => button.textContent || ""));
+  if (wordAddButtons.length !== 2 || wordAddButtons.some((label) => !label.includes("더 추가"))) throw new Error(`Word comparison does not expose incremental file addition: ${wordAddButtons.join(", ")}`);
   const draggable = await page.$$eval(".sortable-word-files li", (items) => items.every((item) => item.draggable));
   if (!draggable) throw new Error("Word file order list is not draggable.");
   if (await page.$eval(".pairing-preview ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");

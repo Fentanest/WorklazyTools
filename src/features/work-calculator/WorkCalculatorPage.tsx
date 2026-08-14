@@ -2,7 +2,7 @@ import { CalendarCheck, CalendarDays, Calculator, Palmtree } from "lucide-react"
 import { useMemo, useState } from "react";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
+import { PageHeader, SectionCard, SegmentedControl } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
 import { calculateAnnualLeave, calculateBusinessDays } from "./workCalculator";
 

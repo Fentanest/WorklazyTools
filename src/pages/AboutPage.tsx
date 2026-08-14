@@ -5,7 +5,7 @@ import { PageHeader, SectionCard } from "../components/ui";
 export function AboutPage() {
   return (
     <div className="page standard-page page-enter">
-      <PageHeader eyebrow="ABOUT" title="안심하고 쓰는 작은 도구" description="문서부터 비디오와 이미지까지 복잡한 파일 작업을 쉽고 안전하게 처리하는 것을 가장 중요하게 생각합니다." />
+      <PageHeader eyebrow="ABOUT" title="안심하고 쓰는 작은 도구" description="문서부터 비디오·오디오·이미지까지 복잡한 파일 작업을 쉽고 안전하게 처리하는 것을 가장 중요하게 생각합니다." />
 
       <div className="about-grid">
         <section className="about-hero-card">

@@ -156,7 +156,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
         className={`drop-zone accent-${accent}${dragging ? " dragging" : ""}`}
         role="button"
         tabIndex={0}
-        aria-label={`${label || "파일"} 선택 또는 드롭`}
+        aria-label={`${label || "파일"} ${multiple && files.length ? "추가 선택" : "선택"} 또는 드롭`}
         onClick={(event) => {
           if ((event.target as Element).closest("button")) return;
           inputRef.current?.click();
@@ -177,8 +177,8 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
         onDrop={(event) => { void handleDrop(event); }}
       >
         <span className="drop-icon">{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
-        <div aria-live="polite"><strong>{files.length ? `${files.length}개 파일 선택됨` : "파일을 여기에 놓으세요"}</strong><span>{hint}</span></div>
-        <button className="secondary-button small" type="button" onClick={() => inputRef.current?.click()}>파일 선택</button>
+        <div aria-live="polite"><strong>{files.length ? `${files.length}개 파일 선택됨${multiple ? " · 계속 추가 가능" : ""}` : "파일을 여기에 놓으세요"}</strong><span>{hint}</span></div>
+        <button className="secondary-button small" type="button" onClick={() => inputRef.current?.click()}>{multiple && files.length ? "파일 더 추가" : "파일 선택"}</button>
         {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> 목록에 추가됨</em>}
       </div>
     </div>

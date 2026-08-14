@@ -73,7 +73,7 @@ function ImagesToPdf() {
       <div className="workflow-grid pdf-workflow-grid">
         <div>
           <SectionCard step={1} title="이미지 추가" description="JPG와 PNG를 여러 장 추가하고 원하는 순서로 정리하세요." className="accent-context-violet">
-            <FileDropZone accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple files={files} onFiles={addFiles} accent="violet" hint="JPG·PNG 여러 장을 선택하거나 끌어다 놓으세요." />
+            <FileDropZone accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple files={files} onFiles={addFiles} accent="violet" hint="JPG·PNG를 한 번에 고르거나 여러 번 나눠 추가하세요." />
           </SectionCard>
           {!!files.length && (
             <SectionCard step={2} title="페이지 순서" description="끌어서 PDF의 페이지 순서를 바꾸세요." className="accent-context-violet">

@@ -14,9 +14,39 @@ try {
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
 
   await page.goto(`${baseUrl}/tools`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .tool-card").length === 16);
+  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .tool-card").length === 17);
   const grid = await page.$eval(".all-tools-grid", (element) => ({ columns: getComputedStyle(element).gridTemplateColumns.split(" ").length, width: element.getBoundingClientRect().width }));
   if (grid.columns !== 4 || grid.width < 900) throw new Error(`Tool grid is not four columns: ${JSON.stringify(grid)}`);
+  const categoryOverview = await page.evaluate(() => ({
+    filters: document.querySelectorAll(".tool-category-filter button").length,
+    sections: document.querySelectorAll(".tool-category-section").length,
+    headings: Array.from(document.querySelectorAll(".tool-category-heading h2"), (element) => element.textContent),
+  }));
+  if (categoryOverview.filters !== 6 || categoryOverview.sections !== 5 || !categoryOverview.headings.includes("이미지·영상·오디오")) {
+    throw new Error(`Tool categories are incomplete: ${JSON.stringify(categoryOverview)}`);
+  }
+  await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
+  await page.waitForFunction(() => window.matchMedia("(prefers-color-scheme: dark)").matches && getComputedStyle(document.querySelector(".tool-category-filter button.selected")).color !== "rgb(255, 255, 255)");
+  const darkSelectedText = await page.$eval(".tool-category-filter button.selected", (element) => getComputedStyle(element).color);
+  if (darkSelectedText === "rgb(255, 255, 255)") throw new Error("Selected tool category still uses invisible white text in dark mode.");
+  await page.click('.tool-category-filter button[aria-label^="이미지·영상·오디오"]');
+  await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".tool-card").length === 3);
+  await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
+  await page.click(".tool-category-filter button:first-child");
+  await page.type('.tool-search input[aria-label="도구 검색"]', "비밀번호");
+  await page.waitForFunction(() => document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".tool-card").length === 1 && document.querySelector(".tool-category-heading h2")?.textContent === "보안·공유");
+  await page.setViewport({ width: 390, height: 844 });
+  await page.goto(`${baseUrl}/tools`, { waitUntil: "networkidle0" });
+  const mobileToolsLayout = await page.evaluate(() => ({
+    columns: getComputedStyle(document.querySelector(".all-tools-grid")).gridTemplateColumns.split(" ").length,
+    pageWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+    categoryScrollable: document.querySelector(".tool-category-filter").scrollWidth > document.querySelector(".tool-category-filter").clientWidth,
+  }));
+  if (mobileToolsLayout.columns !== 1 || mobileToolsLayout.pageWidth > mobileToolsLayout.viewportWidth + 1 || !mobileToolsLayout.categoryScrollable) {
+    throw new Error(`Mobile tool categories overflow incorrectly: ${JSON.stringify(mobileToolsLayout)}`);
+  }
+  await page.setViewport({ width: 1440, height: 1000 });
 
   await page.goto(`${baseUrl}/tools/text-tools`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "text-tools");
@@ -65,10 +95,30 @@ try {
 
   await page.goto(`${baseUrl}/tools/qr-studio`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => { const canvas = document.querySelector(".qr-preview canvas"); return canvas instanceof HTMLCanvasElement && canvas.width >= 600; });
+  const qrFixture = await page.$eval(".qr-preview canvas", (canvas) => canvas.toDataURL("image/png"));
   await page.click(".mode-switch button:nth-child(2)");
   await page.waitForSelector(".qr-camera-stage video[playsinline]");
   const cameraCopy = await page.$eval(".qr-scan-layout", (element) => element.textContent);
   if (!cameraCopy?.includes("카메라로 스캔")) throw new Error("Live QR camera scanner is missing.");
+  await page.setViewport({ width: 390, height: 844 });
+  await page.evaluate(async (dataUrl) => {
+    const blob = await (await fetch(dataUrl)).blob();
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([blob], "qr-fixture.png", { type: "image/png" }));
+    const input = document.querySelector('.qr-camera-scan-card .qr-photo-picker input[type="file"]');
+    Object.defineProperty(input, "files", { configurable: true, value: transfer.files });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, qrFixture);
+  await page.waitForFunction(() => document.querySelector(".qr-scan-result-slot .scan-result")?.textContent?.includes("worklazy.net"));
+  const mobileQrScanLayout = await page.evaluate(() => ({
+    resultTop: document.querySelector(".qr-scan-result-slot").getBoundingClientRect().top,
+    scannerBottom: document.querySelector(".qr-camera-scan-card").getBoundingClientRect().bottom,
+    photoPickerInsideScanner: Boolean(document.querySelector(".qr-camera-scan-card .qr-photo-picker")),
+  }));
+  if (!mobileQrScanLayout.photoPickerInsideScanner || mobileQrScanLayout.resultTop < mobileQrScanLayout.scannerBottom) {
+    throw new Error(`Mobile QR photo picker and result layout is incomplete: ${JSON.stringify(mobileQrScanLayout)}`);
+  }
+  await page.setViewport({ width: 1440, height: 1000 });
 
   await page.goto(`${baseUrl}/tools/data-converter`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "data-converter");
@@ -124,7 +174,7 @@ try {
   const social = await page.evaluate(() => ({ card: document.querySelector('meta[name="twitter:card"]')?.content, image: document.querySelector('meta[property="og:image"]')?.content }));
   if (social.card !== "summary_large_image" || !social.image?.endsWith("/social/worklazy-tools-share.png")) throw new Error(`Social metadata is incomplete: ${JSON.stringify(social)}`);
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
-  console.log("Utility tool smoke tests passed: home copy, 4-column grid, paired editors, world map, text, formatter, workday, payroll, security, live QR, data, EXIF, unified image editor, video compatibility and PDF page range.");
+  console.log("Utility tool smoke tests passed: home copy, categorized 4-column tools, paired editors, world map, text, formatter, workday, payroll, security, live QR, data, EXIF, unified image editor, video compatibility and PDF page range.");
 } finally { await browser.close(); }
 
 async function clickButton(page, text) { const clicked = await page.evaluate((label) => { const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label)); if (!button) return false; button.click(); return true; }, text); if (!clicked) throw new Error(`Button not found: ${text}`); }

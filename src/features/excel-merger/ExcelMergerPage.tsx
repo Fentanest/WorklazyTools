@@ -307,10 +307,10 @@ export function ExcelMergerPage() {
 
       <div className="workflow-grid">
         <div className="workflow-main">
-          <SectionCard step={1} title="파일 선택" description="XLSX, XLS, XLSB, XLSM, CSV 파일을 여러 개 선택할 수 있습니다.">
+          <SectionCard step={1} title="파일 선택" description="XLSX, XLS, XLSB, XLSM, CSV 파일을 한 번에 고르거나 여러 번 나눠 기존 목록 뒤에 추가할 수 있습니다.">
             <FileDropZone
               accept=".xlsx,.xls,.xlsb,.xlsm,.csv"
-              hint="XLSX, XLS, XLSB, XLSM, CSV · 출력은 XLSX"
+              hint="XLSX, XLS, XLSB, XLSM, CSV · 여러 번 추가 가능 · 출력은 XLSX"
               multiple
               files={visibleFiles}
               onFiles={handleFiles}

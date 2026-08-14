@@ -250,10 +250,10 @@ function HwpFileColumn({ files, side, sideLabel, passwords, onPassword, onFiles,
         if (dropped.length) onFiles([...files, ...dropped]);
       }}
     >
-      <FileDropZone label={`${sideLabel} · ${files.length}개`} accept=".hwp,.hwpx" hint={`원본 ${sideLabel === "수정 전" ? "HWP·HWPX" : "또는 변경된 HWP·HWPX"} · 여러 파일 선택 가능`} multiple files={files} onFiles={onFiles} accent="orange" />
+      <FileDropZone label={`${sideLabel} · ${files.length}개`} accept=".hwp,.hwpx" hint={`원본 ${sideLabel === "수정 전" ? "HWP·HWPX" : "또는 변경된 HWP·HWPX"} · 여러 번 나눠 추가 가능`} multiple files={files} onFiles={onFiles} accent="orange" />
       {!!files.length && (
         <ol className="sortable-word-files hwp-sortable-files" aria-label={`${sideLabel} 문서 순서`}>
-          {files.map((file, index) => <HwpFileRow key={fileKey(file)} file={file} index={index} count={files.length} side={side} sideLabel={sideLabel} password={passwords[fileKey(file)] ?? ""} onPassword={onPassword} onRemove={onRemove} onMove={onMove} onMoveAcross={onMoveAcross} />)}
+          {files.map((file, index) => <HwpFileRow key={fileKey(file)} file={file} index={index} count={files.length} side={side} password={passwords[fileKey(file)] ?? ""} onPassword={onPassword} onRemove={onRemove} onMove={onMove} onMoveAcross={onMoveAcross} />)}
         </ol>
       )}
       {receivingFiles && <div className="word-column-drop-hint">여기에 놓아 {sideLabel} 문서 추가</div>}
@@ -261,12 +261,11 @@ function HwpFileColumn({ files, side, sideLabel, passwords, onPassword, onFiles,
   );
 }
 
-function HwpFileRow({ file, index, count, side, sideLabel, password, onPassword, onRemove, onMove, onMoveAcross }: {
+function HwpFileRow({ file, index, count, side, password, onPassword, onRemove, onMove, onMoveAcross }: {
   file: File;
   index: number;
   count: number;
   side: "before" | "after";
-  sideLabel: string;
   password: string;
   onPassword: (file: File, password: string) => void;
   onRemove: (index: number) => void;

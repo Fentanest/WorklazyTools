@@ -186,7 +186,7 @@ export function WordComparePage() {
             <WordFileColumn
               files={beforeFiles}
               sideLabel="수정 전"
-              hint="원본 DOCX · 여러 파일 선택 가능"
+              hint="원본 DOCX · 여러 번 나눠 추가 가능"
               onFiles={(files) => updateDocxFiles(files, setBeforeFiles)}
               onRemove={(index) => removeFile("before", index)}
               onMove={(from, to) => moveFile("before", from, to)}
@@ -197,7 +197,7 @@ export function WordComparePage() {
             <WordFileColumn
               files={afterFiles}
               sideLabel="수정 후"
-              hint="변경된 DOCX · 여러 파일 선택 가능"
+              hint="변경된 DOCX · 여러 번 나눠 추가 가능"
               onFiles={(files) => updateDocxFiles(files, setAfterFiles)}
               onRemove={(index) => removeFile("after", index)}
               onMove={(from, to) => moveFile("after", from, to)}

@@ -21,6 +21,7 @@ const HwpEditorPage = lazy(() => import("../features/hwp-editor/HwpEditorPage").
 const HwpComparePage = lazy(() => import("../features/hwp-compare/HwpComparePage").then((module) => ({ default: module.HwpComparePage })));
 const HwpCompareResultPage = lazy(() => import("../features/hwp-compare/HwpCompareResultPage").then((module) => ({ default: module.HwpCompareResultPage })));
 const VideoStudioPage = lazy(() => import("../features/video-studio/VideoStudioPage").then((module) => ({ default: module.VideoStudioPage })));
+const AudioStudioPage = lazy(() => import("../features/audio-studio/AudioStudioPage").then((module) => ({ default: module.AudioStudioPage })));
 const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioPage").then((module) => ({ default: module.ImageStudioPage })));
 const TextToolsPage = lazy(() => import("../features/text-tools/TextToolsPage").then((module) => ({ default: module.TextToolsPage })));
 const TextFormatterPage = lazy(() => import("../features/text-formatter/TextFormatterPage").then((module) => ({ default: module.TextFormatterPage })));
@@ -54,6 +55,7 @@ export function App() {
         </Route>
         <Route path="tools/hwp-editor" element={<LazyToolRoute label="HWP 도구"><HwpEditorPage /></LazyToolRoute>} />
         <Route path="tools/video-studio" element={<LazyToolRoute label="비디오 도구"><VideoStudioPage /></LazyToolRoute>} />
+        <Route path="tools/audio-studio" element={<LazyToolRoute label="오디오 도구"><AudioStudioPage /></LazyToolRoute>} />
         <Route path="tools/image-studio" element={<LazyToolRoute label="이미지 도구"><ImageStudioPage /></LazyToolRoute>} />
         <Route path="tools/text-tools" element={<LazyToolRoute label="텍스트 도구"><TextToolsPage /></LazyToolRoute>} />
         <Route path="tools/text-formatter" element={<LazyToolRoute label="포맷터"><TextFormatterPage /></LazyToolRoute>} />
@@ -61,11 +63,12 @@ export function App() {
         <Route path="tools/timezone-calculator" element={<LazyToolRoute label="시차 계산기"><TimezoneCalculatorPage /></LazyToolRoute>} />
         <Route path="tools/payroll-calculator" element={<LazyToolRoute label="급여 계산기"><PayrollCalculatorPage /></LazyToolRoute>} />
         <Route path="tools/image-privacy" element={<LazyToolRoute label="사진 개인정보 도구"><ImagePrivacyPage /></LazyToolRoute>} />
-        <Route path="tools/security-tools" element={<LazyToolRoute label="보안 도구"><SecurityToolsPage /></LazyToolRoute>} />
+        <Route path="tools/security-tools" element={<LazyToolRoute label="비밀번호 생성기"><SecurityToolsPage /></LazyToolRoute>} />
         <Route path="tools/qr-studio" element={<LazyToolRoute label="QR 도구"><QrStudioPage /></LazyToolRoute>} />
         <Route path="tools/data-converter" element={<LazyToolRoute label="표 데이터 변환기"><DataConverterPage /></LazyToolRoute>} />
         <Route path="hwp-editor" element={<Navigate to="/tools/hwp-editor" replace />} />
         <Route path="video-studio" element={<Navigate to="/tools/video-studio/" replace />} />
+        <Route path="audio-studio" element={<Navigate to="/tools/audio-studio" replace />} />
         <Route path="image-studio" element={<Navigate to="/tools/image-studio" replace />} />
         <Route path="text-tools" element={<Navigate to="/tools/text-tools" replace />} />
         <Route path="text-formatter" element={<Navigate to="/tools/text-formatter" replace />} />

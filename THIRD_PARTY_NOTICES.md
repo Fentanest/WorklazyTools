@@ -15,7 +15,6 @@ resolved dependency versions.
 | --- | --- | --- |
 | `@ffmpeg/core` 0.12.10 | GPL-2.0-or-later | FFmpeg WebAssembly core · <https://github.com/ffmpegwasm/ffmpeg.wasm> |
 | `@ffmpeg/ffmpeg` 0.12.15 | MIT | FFmpeg browser API · <https://github.com/ffmpegwasm/ffmpeg.wasm> |
-| `@ffmpeg/util` 0.12.2 | MIT | FFmpeg browser utilities · <https://github.com/ffmpegwasm/ffmpeg.wasm> |
 | `@rhwp/core`, `@rhwp/editor` 0.8.4 | MIT | HWP/HWPX parsing and editing · <https://github.com/edwardkim/rhwp> |
 | `buffer` 6.0.3 | MIT | Browser binary compatibility |
 | `crypto-browserify` 3.12.1 | MIT | Browser cryptographic compatibility |
@@ -47,10 +46,12 @@ repeated in this summary.
 
 ## Runtime resources loaded on demand
 
-- Pyodide 0.29.4 is loaded from jsDelivr for Word comparison and is distributed
-  under MPL-2.0. Source: <https://github.com/pyodide/pyodide>
-- Tesseract OCR engine resources and Korean/English trained data may be loaded on
-  demand by Tesseract.js. Their respective upstream licenses continue to apply.
+- Pyodide 0.29.4 is copied into the Worklazy Tools GitHub Pages deployment and
+  loaded from the same origin for Word comparison. It is distributed under
+  MPL-2.0. Source: <https://github.com/pyodide/pyodide>
+- Tesseract OCR engine resources and Korean/English trained data are copied into
+  the same GitHub Pages deployment and loaded on demand by Tesseract.js. Their
+  respective upstream licenses continue to apply.
 - Google AdSense is an external service and is governed by Google's terms; it is
   not part of the Worklazy source-code license.
 

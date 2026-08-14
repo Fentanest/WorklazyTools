@@ -4,7 +4,6 @@ import initRhwp, { HwpDocument } from "@rhwp/core";
 import rhwpWasmUrl from "@rhwp/core/rhwp_bg.wasm?url";
 
 import type {
-  WordChangeKind,
   WordCompareResult,
   WordDiffItem,
   WordDiffSegment,
