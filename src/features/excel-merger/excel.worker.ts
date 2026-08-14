@@ -57,9 +57,15 @@ class ExcelWorkerError extends Error {
 }
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
+let currentLanguage: "ko" | "en" = "ko";
+
+function local(ko: string, en: string) {
+  return currentLanguage === "en" ? en : ko;
+}
 
 worker.onmessage = async (event: MessageEvent) => {
   try {
+    currentLanguage = event.data.language === "en" ? "en" : "ko";
     if (event.data.type === "inspect") {
       const result = await inspectFiles(event.data.files as ExcelInputPayload[]);
       worker.postMessage({ type: "result", result });
@@ -99,7 +105,7 @@ worker.onmessage = async (event: MessageEvent) => {
       return;
     }
 
-    throw new ExcelWorkerError("지원하지 않는 작업 요청입니다.", "UNSUPPORTED_REQUEST");
+    throw new ExcelWorkerError(local("지원하지 않는 작업 요청입니다.", "Unsupported operation request."), "UNSUPPORTED_REQUEST");
   } catch (error) {
     const normalized = normalizeError(error);
     worker.postMessage({ type: "error", error: normalized });
@@ -126,41 +132,41 @@ async function inspectFiles(files: ExcelInputPayload[]): Promise<ExcelInspection
         id: file.id,
         encrypted,
         sheetNames: [],
-        error: error instanceof Error ? error.message : "시트 목록을 읽지 못했습니다.",
+        error: error instanceof Error ? error.message : local("시트 목록을 읽지 못했습니다.", "Could not read the sheet list."),
       };
     }
   }));
 }
 
 async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions): Promise<ExcelMergeResult> {
-  if (!files.length) throw new ExcelWorkerError("병합할 파일이 없습니다.", "NO_FILES");
+  if (!files.length) throw new ExcelWorkerError(local("병합할 파일이 없습니다.", "There are no files to merge."), "NO_FILES");
 
   const warnings = new Set<string>();
   if (files.some((file) => ["xls", "xlsb", "xlsm"].includes(getExtension(file.name)))) {
-    warnings.add("XLS·XLSB·XLSM 입력은 값과 기본 시트 구조를 XLSX로 변환합니다. 수식과 서식은 XLSX 입력에서만 보존됩니다.");
+    warnings.add(local("XLS·XLSB·XLSM 입력은 값과 기본 시트 구조를 XLSX로 변환합니다. 수식과 서식은 XLSX 입력에서만 보존됩니다.", "XLS, XLSB and XLSM inputs are converted to XLSX with values and basic sheet structure. Formulas and formatting are preserved only for XLSX inputs."));
   }
   if (files.some((file) => getExtension(file.name) === "xlsm")) {
-    warnings.add("XLSM의 매크로는 XLSX 출력 파일에 보존되지 않습니다.");
+    warnings.add(local("XLSM의 매크로는 XLSX 출력 파일에 보존되지 않습니다.", "XLSM macros are not preserved in the XLSX output."));
   }
   const inputs: ParsedInput[] = [];
-  progress(2, `${files.length}개 입력 파일을 안전한 작업 공간으로 전달했습니다.`);
+  progress(2, local(`${files.length}개 입력 파일을 안전한 작업 공간으로 전달했습니다.`, `Moved ${files.length} input files into the processing workspace.`));
 
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
-    progress(5 + Math.round((index / files.length) * 35), `[${index + 1}/${files.length}] ${file.name} 읽는 중…`);
+    progress(5 + Math.round((index / files.length) * 35), local(`[${index + 1}/${files.length}] ${file.name} 읽는 중…`, `[${index + 1}/${files.length}] Reading ${file.name}…`));
     const parsed = await parseInput(file);
     const selectedSheetNames = file.selectedSheetNames ?? parsed.workbook.worksheets.map((sheet) => sheet.name);
     parsed.selectedWorksheets = selectedSheetNames
       .map((sheetName) => parsed.workbook.getWorksheet(sheetName))
       .filter((sheet): sheet is ExcelJS.Worksheet => Boolean(sheet));
     if (!parsed.selectedWorksheets.length) {
-      throw new ExcelWorkerError(`${file.name}에서 병합할 시트를 선택해 주세요.`, "NO_SHEETS", file.name);
+      throw new ExcelWorkerError(local(`${file.name}에서 병합할 시트를 선택해 주세요.`, `Select at least one sheet from ${file.name}.`), "NO_SHEETS", file.name);
     }
     inputs.push(parsed);
-    progress(5 + Math.round(((index + 1) / files.length) * 35), `[${index + 1}/${files.length}] ${file.name} · ${parsed.selectedWorksheets.length}개 시트 선택`);
+    progress(5 + Math.round(((index + 1) / files.length) * 35), local(`[${index + 1}/${files.length}] ${file.name} · ${parsed.selectedWorksheets.length}개 시트 선택`, `[${index + 1}/${files.length}] ${file.name} · ${parsed.selectedWorksheets.length} sheets selected`));
   }
 
-  progress(43, "입력 분석 완료 · 출력 시트 구성을 시작합니다.");
+  progress(43, local("입력 분석 완료 · 출력 시트 구성을 시작합니다.", "Input analysis complete · Building the output sheets."));
   const output = new ExcelJS.Workbook();
   output.creator = "Worklazy Tools";
   output.created = new Date();
@@ -193,7 +199,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
       });
     });
   } else {
-    const target = output.addWorksheet("병합 결과");
+    const target = output.addWorksheet(local("병합 결과", "Merged Result"));
     let rowOffset = 0;
     let columnOffset = 0;
 
@@ -210,33 +216,33 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
 
   const planLookup = new Map<string, SheetPlan>();
   plans.forEach((plan) => planLookup.set(planKey(plan.fileIndex, plan.source.name), plan));
-  progress(45, `${plans.length}개 시트의 복사 위치를 계산했습니다.`);
+  progress(45, local(`${plans.length}개 시트의 복사 위치를 계산했습니다.`, `Calculated output positions for ${plans.length} sheets.`));
 
   for (let index = 0; index < plans.length; index += 1) {
     const plan = plans[index];
-    progress(47 + Math.round((index / Math.max(1, plans.length)) * 37), `[${index + 1}/${plans.length}] ${plan.source.name} 셀·수식·서식 복사 중…`);
+    progress(47 + Math.round((index / Math.max(1, plans.length)) * 37), local(`[${index + 1}/${plans.length}] ${plan.source.name} 셀·수식·서식 복사 중…`, `[${index + 1}/${plans.length}] Copying cells, formulas and formatting from ${plan.source.name}…`));
     copyWorksheet(plan, planLookup, options, warnings);
   }
 
   if (options.sheetTrimRows || options.sheetTrimColumns) {
-    progress(86, `${plans.length}개 시트 복사 완료 · 연속 빈 행·열을 검사합니다.`);
+    progress(86, local(`${plans.length}개 시트 복사 완료 · 연속 빈 행·열을 검사합니다.`, `Copied ${plans.length} sheets · Checking consecutive empty rows and columns.`));
     const trimStats = performSheetTrim(output, options);
-    progress(89, `연속 빈 행·열 정리 완료 · 빈 행 ${trimStats.rows}개, 빈 열 ${trimStats.columns}개를 정리했습니다.`);
+    progress(89, local(`연속 빈 행·열 정리 완료 · 빈 행 ${trimStats.rows}개, 빈 열 ${trimStats.columns}개를 정리했습니다.`, `Empty-area cleanup complete · Removed ${trimStats.rows} rows and ${trimStats.columns} columns.`));
   } else {
-    progress(86, `${plans.length}개 시트 복사 완료`);
+    progress(86, local(`${plans.length}개 시트 복사 완료`, `Copied ${plans.length} sheets`));
   }
 
-  progress(90, "XLSX 구조를 저장합니다.");
+  progress(90, local("XLSX 구조를 저장합니다.", "Writing the XLSX structure."));
   const plainBuffer = toArrayBuffer(await output.xlsx.writeBuffer());
   let finalBuffer = plainBuffer;
 
   if (options.outputPassword) {
-    progress(93, "XLSX 저장 완료 · 출력 파일 암호화 중…");
+    progress(93, local("XLSX 저장 완료 · 출력 파일 암호화 중…", "XLSX written · Encrypting the output file…"));
     const encrypted = officeCrypto.encrypt(Buffer.from(plainBuffer), { password: options.outputPassword });
     finalBuffer = toArrayBuffer(encrypted);
   }
 
-  progress(100, "병합 파일 생성 완료");
+  progress(100, local("병합 파일 생성 완료", "Merged file created"));
   return {
     buffer: finalBuffer,
     fileCount: files.length,
@@ -254,16 +260,16 @@ async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
 
   if (encrypted) {
     if (!file.password) {
-      throw new ExcelWorkerError(`${file.name}의 비밀번호를 입력해 주세요.`, "PASSWORD_REQUIRED", file.name);
+      throw new ExcelWorkerError(local(`${file.name}의 비밀번호를 입력해 주세요.`, `Enter the password for ${file.name}.`), "PASSWORD_REQUIRED", file.name);
     }
     try {
       data = new Uint8Array(await officeCrypto.decrypt(Buffer.from(data), { password: file.password }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (/password|incorrect|verify/i.test(message)) {
-        throw new ExcelWorkerError(`${file.name}의 비밀번호가 올바르지 않습니다.`, "WRONG_PASSWORD", file.name);
+        throw new ExcelWorkerError(local(`${file.name}의 비밀번호가 올바르지 않습니다.`, `The password for ${file.name} is incorrect.`), "WRONG_PASSWORD", file.name);
       }
-      throw new ExcelWorkerError(`${file.name}의 암호 방식을 지원하지 않거나 파일을 해제하지 못했습니다.`, "DECRYPT_FAILED", file.name);
+      throw new ExcelWorkerError(local(`${file.name}의 암호 방식을 지원하지 않거나 파일을 해제하지 못했습니다.`, `The encryption method for ${file.name} is unsupported or the file could not be decrypted.`), "DECRYPT_FAILED", file.name);
     }
   }
 
@@ -280,12 +286,12 @@ async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     if (/password|encrypted|EncryptionInfo/i.test(detail)) {
-      throw new ExcelWorkerError(`${file.name}은 암호로 보호되어 있습니다. 비밀번호를 입력해 주세요.`, "PASSWORD_REQUIRED", file.name);
+      throw new ExcelWorkerError(local(`${file.name}은 암호로 보호되어 있습니다. 비밀번호를 입력해 주세요.`, `${file.name} is password-protected. Enter its password.`), "PASSWORD_REQUIRED", file.name);
     }
-    throw new ExcelWorkerError(`${file.name}을 읽지 못했습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다. (${detail})`, "READ_FAILED", file.name);
+    throw new ExcelWorkerError(local(`${file.name}을 읽지 못했습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다. (${detail})`, `Could not read ${file.name}. The file may be damaged or use an unsupported format. (${detail})`), "READ_FAILED", file.name);
   }
 
-  throw new ExcelWorkerError(`${extension || "알 수 없는"} 형식은 지원하지 않습니다.`, "UNSUPPORTED_FORMAT", file.name);
+  throw new ExcelWorkerError(local(`${extension || "알 수 없는"} 형식은 지원하지 않습니다.`, `${extension || "Unknown"} format is not supported.`), "UNSUPPORTED_FORMAT", file.name);
 }
 
 async function readCsv(fileName: string, data: Uint8Array) {
@@ -393,8 +399,8 @@ function copyWorksheet(
     );
   }
 
-  if (source.getImages().length) warnings.add("셀 위에 배치된 이미지는 현재 브라우저 병합 결과에서 제외됩니다.");
-  if (source.getTables().length) warnings.add("Excel 표 개체는 일반 셀과 서식으로 복사되며 표 기능 자체는 유지되지 않을 수 있습니다.");
+  if (source.getImages().length) warnings.add(local("셀 위에 배치된 이미지는 현재 브라우저 병합 결과에서 제외됩니다.", "Images placed over cells are excluded from the current browser-generated result."));
+  if (source.getTables().length) warnings.add(local("Excel 표 개체는 일반 셀과 서식으로 복사되며 표 기능 자체는 유지되지 않을 수 있습니다.", "Excel table objects are copied as regular cells and formatting; table behavior may not be retained."));
 }
 
 function copyCell(
@@ -648,42 +654,42 @@ function toArrayBuffer(value: Uint8Array | ArrayBuffer) {
 }
 
 async function buildWordReport(result: WordCompareResult, reportProgress = progress) {
-  reportProgress(10, "보고서 생성을 시작했습니다.");
-  reportProgress(20, "요약 시트를 구성하고 있습니다.");
+  reportProgress(10, local("보고서 생성을 시작했습니다.", "Starting report generation."));
+  reportProgress(20, local("요약 시트를 구성하고 있습니다.", "Building the summary sheet."));
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Worklazy Tools";
-  const summary = workbook.addWorksheet("요약");
+  const summary = workbook.addWorksheet(local("요약", "Summary"));
   summary.columns = [
-    { header: "항목", key: "label", width: 24 },
-    { header: "내용", key: "value", width: 54 },
+    { header: local("항목", "Item"), key: "label", width: 24 },
+    { header: local("내용", "Value"), key: "value", width: 54 },
   ];
   summary.addRows([
-    { label: "수정 전", value: result.beforeName },
-    { label: "수정 후", value: result.afterName },
-    { label: "추가", value: result.summary.added },
-    { label: "삭제", value: result.summary.deleted },
-    { label: "내용 변경", value: result.summary.changed },
-    { label: "서식 변경", value: result.summary.format },
+    { label: local("수정 전", "Before"), value: result.beforeName },
+    { label: local("수정 후", "After"), value: result.afterName },
+    { label: local("추가", "Added"), value: result.summary.added },
+    { label: local("삭제", "Deleted"), value: result.summary.deleted },
+    { label: local("내용 변경", "Content changed"), value: result.summary.changed },
+    { label: local("서식 변경", "Formatting changed"), value: result.summary.format },
   ]);
   styleHeader(summary.getRow(1), "D3D3D3", "FF1D1D1F");
   summary.getCell("B8").value = {
-    richText: [{ text: "파란색 취소선", font: { color: { argb: "FF0000FF" }, strike: true } }],
+    richText: [{ text: local("파란색 취소선", "Blue strikethrough"), font: { color: { argb: "FF0000FF" }, strike: true } }],
   };
-  summary.getCell("A8").value = "삭제 표시";
+  summary.getCell("A8").value = local("삭제 표시", "Deletion mark");
   summary.getCell("B9").value = {
-    richText: [{ text: "빨간색 굵게", font: { color: { argb: "FFFF0000" }, bold: true } }],
+    richText: [{ text: local("빨간색 굵게", "Bold red"), font: { color: { argb: "FFFF0000" }, bold: true } }],
   };
-  summary.getCell("A9").value = "삽입 표시";
+  summary.getCell("A9").value = local("삽입 표시", "Insertion mark");
 
   const generalChanges = result.changes.filter((change) => change.section !== "table");
-  const changes = workbook.addWorksheet("변경 내용");
-  reportProgress(40, `${generalChanges.length}개 일반 변경 내용을 보고서에 기록합니다.`);
+  const changes = workbook.addWorksheet(local("변경 내용", "Changes"));
+  reportProgress(40, local(`${generalChanges.length}개 일반 변경 내용을 보고서에 기록합니다.`, `Writing ${generalChanges.length} general changes to the report.`));
   changes.columns = [
-    { header: "구분", key: "section", width: 13 },
-    { header: "위치", key: "location", width: 24 },
-    { header: "수정 전", key: "before", width: 55 },
-    { header: "수정 후", key: "after", width: 55 },
-    { header: "변경 유형", key: "kind", width: 14 },
+    { header: local("구분", "Section"), key: "section", width: 13 },
+    { header: local("위치", "Location"), key: "location", width: 24 },
+    { header: local("수정 전", "Before"), key: "before", width: 55 },
+    { header: local("수정 후", "After"), key: "after", width: 55 },
+    { header: local("변경 유형", "Change type"), key: "kind", width: 14 },
   ];
   generalChanges.forEach((change) => {
     const row = changes.addRow({
@@ -708,17 +714,17 @@ async function buildWordReport(result: WordCompareResult, reportProgress = progr
       };
     });
     const kind = row.getCell(5).value;
-    if (kind === "추가") row.getCell(5).font = { color: { argb: "FFFF0000" }, bold: true };
-    if (kind === "삭제") row.getCell(5).font = { color: { argb: "FF0000FF" }, bold: true };
-    if (kind === "서식 변경") row.getCell(5).font = { color: { argb: "FF7C3AED" }, bold: true };
+    if (kind === local("추가", "Added")) row.getCell(5).font = { color: { argb: "FFFF0000" }, bold: true };
+    if (kind === local("삭제", "Deleted")) row.getCell(5).font = { color: { argb: "FF0000FF" }, bold: true };
+    if (kind === local("서식 변경", "Formatting changed")) row.getCell(5).font = { color: { argb: "FF7C3AED" }, bold: true };
   });
   changes.views = [{ state: "frozen", ySplit: 1 }];
   changes.autoFilter = "A1:E1";
 
-  reportProgress(62, `${result.tables?.length ?? 0}개 표의 전후 비교 시트를 구성합니다.`);
+  reportProgress(62, local(`${result.tables?.length ?? 0}개 표의 전후 비교 시트를 구성합니다.`, `Building before-and-after sheets for ${result.tables?.length ?? 0} tables.`));
   buildWordTableSheets(workbook, result);
 
-  reportProgress(85, "보고서 서식 적용 완료 · Excel 파일 저장 중…");
+  reportProgress(85, local("보고서 서식 적용 완료 · Excel 파일 저장 중…", "Report formatting complete · Saving the Excel file…"));
   return toArrayBuffer(await workbook.xlsx.writeBuffer());
 }
 
@@ -729,17 +735,17 @@ function buildWordTableSheets(workbook: ExcelJS.Workbook, result: WordCompareRes
     .map((change) => [change.afterLocation, change]));
 
   (result.tables ?? []).forEach((table) => {
-    const suffix = table.beforeIndex === null ? " (수정 후만)" : table.afterIndex === null ? " (수정 전만)" : "";
-    const sheet = workbook.addWorksheet(`표 ${table.index + 1}${suffix}`.slice(0, 31));
+    const suffix = table.beforeIndex === null ? local(" (수정 후만)", " (after only)") : table.afterIndex === null ? local(" (수정 전만)", " (before only)") : "";
+    const sheet = workbook.addWorksheet(local(`표 ${table.index + 1}${suffix}`, `Table ${table.index + 1}${suffix}`).slice(0, 31));
     const beforeWidth = Math.max(1, ...table.before.map((row) => row.length));
     const afterWidth = Math.max(1, ...table.after.map((row) => row.length));
     const afterStartColumn = beforeWidth + 2;
     const tableStartRow = 3;
 
-    styleWordTableHeader(sheet, 1, 1, beforeWidth, table.beforeIndex === null ? "수정 전 없음" : "수정 전");
-    styleWordTableHeader(sheet, 1, afterStartColumn, afterWidth, table.afterIndex === null ? "수정 후 없음" : "수정 후");
-    if (table.beforeIndex === null) sheet.getCell(2, afterStartColumn).value = "이 표는 수정 후 문서에만 있습니다.";
-    if (table.afterIndex === null) sheet.getCell(2, 1).value = "이 표는 수정 전 문서에만 있습니다.";
+    styleWordTableHeader(sheet, 1, 1, beforeWidth, table.beforeIndex === null ? local("수정 전 없음", "No before table") : local("수정 전", "Before"));
+    styleWordTableHeader(sheet, 1, afterStartColumn, afterWidth, table.afterIndex === null ? local("수정 후 없음", "No after table") : local("수정 후", "After"));
+    if (table.beforeIndex === null) sheet.getCell(2, afterStartColumn).value = local("이 표는 수정 후 문서에만 있습니다.", "This table exists only in the after document.");
+    if (table.afterIndex === null) sheet.getCell(2, 1).value = local("이 표는 수정 전 문서에만 있습니다.", "This table exists only in the before document.");
 
     table.before.forEach((row, rowIndex) => row.forEach((sourceCell, columnIndex) => {
       const kind = table.beforeKinds[rowIndex]?.[columnIndex] ?? "deleted";
@@ -820,22 +826,22 @@ function styleHeader(row: ExcelJS.Row, color: string, fontColor = "FFFFFFFF") {
 }
 
 function sectionLabel(section: string) {
-  if (section === "body") return "본문";
-  if (section === "table") return "표";
-  if (section === "headerFooter") return "머리말·꼬리말";
-  if (section === "comment") return "메모";
-  return "각주·미주";
+  if (section === "body") return local("본문", "Body");
+  if (section === "table") return local("표", "Table");
+  if (section === "headerFooter") return local("머리말·꼬리말", "Header/Footer");
+  if (section === "comment") return local("메모", "Comment");
+  return local("각주·미주", "Footnote/Endnote");
 }
 
 function changeKindLabel(kind: string) {
-  return kind === "added" ? "추가" : kind === "deleted" ? "삭제" : kind === "format" ? "서식 변경" : "내용 변경";
+  return kind === "added" ? local("추가", "Added") : kind === "deleted" ? local("삭제", "Deleted") : kind === "format" ? local("서식 변경", "Formatting changed") : local("내용 변경", "Content changed");
 }
 
 function normalizeError(error: unknown) {
   if (error instanceof ExcelWorkerError) {
     return { message: error.message, code: error.code, fileName: error.fileName };
   }
-  return { message: error instanceof Error ? error.message : "파일 처리 중 오류가 발생했습니다." };
+  return { message: error instanceof Error ? error.message : local("파일 처리 중 오류가 발생했습니다.", "An error occurred while processing the file.") };
 }
 
 export {};

@@ -7,6 +7,7 @@ import type {
 } from "./types";
 
 type WorkerProgress = (progress: number, message: string) => void;
+type AppLanguage = "ko" | "en";
 
 interface WorkerErrorPayload {
   message: string;
@@ -22,6 +23,7 @@ function runWorker<T>(
   message: object,
   transfer: Transferable[],
   onProgress?: WorkerProgress,
+  language: AppLanguage = "ko",
 ): Promise<T> {
   const worker = createExcelWorker();
 
@@ -36,7 +38,7 @@ function runWorker<T>(
       };
 
       if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ?? "처리 중…");
+        onProgress?.(data.progress ?? 0, data.message ?? (language === "en" ? "Processing…" : "처리 중…"));
         return;
       }
 
@@ -46,7 +48,7 @@ function runWorker<T>(
         return;
       }
 
-      const error = new Error(data.error?.message || "파일 처리 중 오류가 발생했습니다.") as Error & WorkerErrorPayload;
+      const error = new Error(data.error?.message || (language === "en" ? "An error occurred while processing the file." : "파일 처리 중 오류가 발생했습니다.")) as Error & WorkerErrorPayload;
       error.code = data.error?.code;
       error.fileName = data.error?.fileName;
       reject(error);
@@ -54,21 +56,23 @@ function runWorker<T>(
 
     worker.onerror = (event) => {
       worker.terminate();
-      reject(new Error(event.message || "파일 처리를 시작하지 못했습니다."));
+      reject(new Error(event.message || (language === "en" ? "Could not start file processing." : "파일 처리를 시작하지 못했습니다.")));
     };
 
     worker.postMessage(message, transfer);
   });
 }
 
-export async function inspectExcelFiles(files: Array<{ id: string; file: File; password?: string }>) {
+export async function inspectExcelFiles(files: Array<{ id: string; file: File; password?: string }>, language: AppLanguage = "ko") {
   const payloads: ExcelInputPayload[] = [];
   for (const { id, file, password } of files) {
     payloads.push({ id, name: file.name, buffer: await file.arrayBuffer(), password });
   }
   return runWorker<ExcelInspectionResult[]>(
-    { type: "inspect", files: payloads },
+    { type: "inspect", files: payloads, language },
     payloads.map((file) => file.buffer),
+    undefined,
+    language,
   );
 }
 
@@ -76,6 +80,7 @@ export async function mergeExcelFiles(
   files: Array<{ id: string; file: File; password?: string; selectedSheetNames: string[] }>,
   options: ExcelMergeOptions,
   onProgress?: WorkerProgress,
+  language: AppLanguage = "ko",
 ) {
   const payloads: ExcelInputPayload[] = [];
   for (const { id, file, password, selectedSheetNames } of files) {
@@ -83,16 +88,17 @@ export async function mergeExcelFiles(
   }
 
   return runWorker<ExcelMergeResult>(
-    { type: "merge", files: payloads, options },
+    { type: "merge", files: payloads, options, language },
     payloads.map((file) => file.buffer),
     onProgress,
+    language,
   );
 }
 
-export function createWordExcelReport(result: WordCompareResult, onProgress?: WorkerProgress) {
-  return runWorker<ArrayBuffer>({ type: "word-report", result }, [], onProgress);
+export function createWordExcelReport(result: WordCompareResult, onProgress?: WorkerProgress, language: AppLanguage = "ko") {
+  return runWorker<ArrayBuffer>({ type: "word-report", result, language }, [], onProgress, language);
 }
 
-export function createWordExcelReports(results: WordCompareResult[], onProgress?: WorkerProgress) {
-  return runWorker<ArrayBuffer[]>({ type: "word-reports", results }, [], onProgress);
+export function createWordExcelReports(results: WordCompareResult[], onProgress?: WorkerProgress, language: AppLanguage = "ko") {
+  return runWorker<ArrayBuffer[]>({ type: "word-reports", results, language }, [], onProgress, language);
 }

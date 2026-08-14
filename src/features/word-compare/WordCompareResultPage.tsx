@@ -14,6 +14,8 @@ import type {
   WordTableComparison,
 } from "../excel-merger/types";
 import { useWordCompareSession } from "./wordCompareSession";
+import { useLocalizedPath } from "../../i18n/routing";
+import { useAppLanguage } from "../../i18n/routing";
 
 type ResultTab = "document" | "headerFooter" | "note";
 
@@ -39,7 +41,8 @@ interface DocumentCompareResultPageProps {
 
 export function WordCompareResultPage() {
   const { results } = useWordCompareSession();
-  return <DocumentCompareResultPage results={results} basePath="/tools/word-compare" toolLabel="Word 비교" eyebrow="WORD COMPARE" accentClass="accent-context-blue" trackedLabel="Word 변경 추적" showCommentLegend />;
+  const language = useAppLanguage();
+  return <DocumentCompareResultPage results={results} basePath="/tools/word-compare" toolLabel={language === "en" ? "Word comparison" : "Word 비교"} eyebrow="WORD COMPARE" accentClass="accent-context-blue" trackedLabel={language === "en" ? "Tracked Word file" : "Word 변경 추적"} showCommentLegend />;
 }
 
 export function DocumentCompareResultPage({
@@ -52,6 +55,9 @@ export function DocumentCompareResultPage({
   showCommentLegend = false,
   footer,
 }: DocumentCompareResultPageProps) {
+  const language = useAppLanguage();
+  const L = (ko: string, en: string) => language === "en" ? en : ko;
+  const localizedBasePath = useLocalizedPath(basePath);
   const { pairNumber: pairNumberParam } = useParams();
   const pairNumber = Number(pairNumberParam);
   const pair = results.find((item) => item.pairNumber === pairNumber);
@@ -66,17 +72,17 @@ export function DocumentCompareResultPage({
     [areaPages, resultTab, showFullContent],
   );
 
-  if (!Number.isInteger(pairNumber) || pairNumber < 1) return <Navigate to={basePath} replace />;
+  if (!Number.isInteger(pairNumber) || pairNumber < 1) return <Navigate to={localizedBasePath} replace />;
 
   if (!pair) {
     return (
       <div className={`page tool-page page-enter ${accentClass}`}>
-        <PageHeader eyebrow={eyebrow} title="비교 결과를 다시 열 수 없어요." description="비교 결과는 현재 브라우저 탭에서만 유지됩니다." />
+        <PageHeader eyebrow={eyebrow} title={L("비교 결과를 다시 열 수 없어요.", "This comparison result is no longer available.")} description={L("비교 결과는 현재 브라우저 탭에서만 유지됩니다.", "Comparison results remain only in the current browser tab.")} />
         <section className="expired-result-card">
           <TextSearch size={27} />
-          <h2>문서를 다시 선택해 주세요.</h2>
-          <p>페이지를 새로고침했거나 탭을 다시 연 경우, 문서 보호를 위해 이전 비교 내용은 남아 있지 않습니다.</p>
-          <Link className="secondary-button" to={basePath}><ArrowLeft size={15} /> {toolLabel}로 돌아가기</Link>
+          <h2>{L("문서를 다시 선택해 주세요.", "Choose the documents again.")}</h2>
+          <p>{L("페이지를 새로고침했거나 탭을 다시 연 경우, 문서 보호를 위해 이전 비교 내용은 남아 있지 않습니다.", "After a reload or reopened tab, the previous comparison is discarded to protect your documents.")}</p>
+          <Link className="secondary-button" to={localizedBasePath}><ArrowLeft size={15} /> {L(`${toolLabel}로 돌아가기`, `Back to ${toolLabel}`)}</Link>
         </section>
       </div>
     );
@@ -88,16 +94,16 @@ export function DocumentCompareResultPage({
 
   return (
     <div className={`page tool-page page-enter ${accentClass}`}>
-      <div className="result-view-back"><Link to={basePath}><ArrowLeft size={16} /> 전체 비교 결과</Link></div>
+      <div className="result-view-back"><Link to={localizedBasePath}><ArrowLeft size={16} /> {L("전체 비교 결과", "All comparison results")}</Link></div>
       <PageHeader
         eyebrow={`PAIR ${pair.pairNumber} OF ${results.length}`}
-        title={`${pair.pairNumber}번 문서 비교`}
-        description={`${pair.result.beforeName}과 ${pair.result.afterName}의 변경 내용입니다.`}
+        title={L(`${pair.pairNumber}번 문서 비교`, `Document comparison ${pair.pairNumber}`)}
+        description={L(`${pair.result.beforeName}과 ${pair.result.afterName}의 변경 내용입니다.`, `Changes between ${pair.result.beforeName} and ${pair.result.afterName}.`)}
       >
-        {pair.reportUrl && <a className="secondary-button" href={pair.reportUrl} download={pair.reportFileName}><Download size={15} /> Excel 보고서</a>}
-        {pair.reportUrl && <FileShareButton url={pair.reportUrl} fileName={pair.reportFileName || "worklazy-비교보고서.xlsx"} />}
+        {pair.reportUrl && <a className="secondary-button" href={pair.reportUrl} download={pair.reportFileName}><Download size={15} /> {L("Excel 보고서", "Excel report")}</a>}
+        {pair.reportUrl && <FileShareButton url={pair.reportUrl} fileName={pair.reportFileName || (language === "en" ? "worklazy-comparison-report.xlsx" : "worklazy-비교보고서.xlsx")} />}
         {pair.trackedUrl && trackedLabel && <a className="secondary-button" href={pair.trackedUrl} download={pair.trackedFileName}><Download size={15} /> {trackedLabel}</a>}
-        {pair.trackedUrl && trackedLabel && <FileShareButton url={pair.trackedUrl} fileName={pair.trackedFileName || "worklazy-변경추적.docx"} />}
+        {pair.trackedUrl && trackedLabel && <FileShareButton url={pair.trackedUrl} fileName={pair.trackedFileName || (language === "en" ? "worklazy-tracked-changes.docx" : "worklazy-변경추적.docx")} />}
       </PageHeader>
       <PrivacyBanner compact />
 
@@ -105,18 +111,18 @@ export function DocumentCompareResultPage({
         <ComparisonSummary result={pair.result} />
         <div className="comparison-toolbar document-toolbar">
           <SegmentedControl
-            label="문서 영역"
+            label={L("문서 영역", "Document area")}
             value={resultTab}
             onChange={setResultTab}
             options={[
-              { value: "document", label: "문서 전체" },
-              { value: "headerFooter", label: "머리말·꼬리말" },
-              { value: "note", label: "각주·미주" },
+              { value: "document", label: L("문서 전체", "Entire document") },
+              { value: "headerFooter", label: L("머리말·꼬리말", "Headers & footers") },
+              { value: "note", label: L("각주·미주", "Footnotes & endnotes") },
             ]}
           />
           <div className="document-toolbar-status">
             {resultTab === "document" && <ContentToggle checked={showFullContent} onChange={setShowFullContent} />}
-            <small>{visiblePages.length}개 표시 · {changedPages}개 변경</small>
+            <small>{L(`${visiblePages.length}개 표시 · ${changedPages}개 변경`, `${visiblePages.length} shown · ${changedPages} changed`)}</small>
           </div>
         </div>
 
@@ -131,9 +137,9 @@ export function DocumentCompareResultPage({
         {pair.result.warnings.map((warning) => <div className="comparison-warning" key={warning}><Info size={14} /> {warning}</div>)}
       </section>
 
-      <nav className="pair-result-navigation" aria-label="다른 문서 쌍 비교 결과">
-        {previous ? <Link to={`${basePath}/results/${previous.pairNumber}`}><ArrowLeft size={15} /> {previous.pairNumber}번 비교</Link> : <span />}
-        {next && <Link to={`${basePath}/results/${next.pairNumber}`}>{next.pairNumber}번 비교 <ArrowRight size={15} /></Link>}
+      <nav className="pair-result-navigation" aria-label={L("다른 문서 쌍 비교 결과", "Other document-pair results")}>
+        {previous ? <Link to={`${localizedBasePath}/results/${previous.pairNumber}`}><ArrowLeft size={15} /> {L(`${previous.pairNumber}번 비교`, `Comparison ${previous.pairNumber}`)}</Link> : <span />}
+        {next && <Link to={`${localizedBasePath}/results/${next.pairNumber}`}>{L(`${next.pairNumber}번 비교`, `Comparison ${next.pairNumber}`)} <ArrowRight size={15} /></Link>}
       </nav>
       {footer}
     </div>
@@ -141,36 +147,39 @@ export function DocumentCompareResultPage({
 }
 
 function ComparisonSummary({ result }: { result: WordCompareResult }) {
+  const language = useAppLanguage();
   const items = [
-    { label: "추가", value: result.summary.added, className: "added" },
-    { label: "삭제", value: result.summary.deleted, className: "deleted" },
-    { label: "내용 변경", value: result.summary.changed, className: "changed" },
-    { label: "서식 변경", value: result.summary.format, className: "format" },
+    { label: language === "en" ? "Added" : "추가", value: result.summary.added, className: "added" },
+    { label: language === "en" ? "Deleted" : "삭제", value: result.summary.deleted, className: "deleted" },
+    { label: language === "en" ? "Content changed" : "내용 변경", value: result.summary.changed, className: "changed" },
+    { label: language === "en" ? "Formatting changed" : "서식 변경", value: result.summary.format, className: "format" },
   ];
   return <div className="comparison-summary">{items.map((item) => <div className={item.className} key={item.label}><strong>{item.value}</strong><span>{item.label}</span></div>)}</div>;
 }
 
 function DiffLegend({ showComments }: { showComments: boolean }) {
+  const language = useAppLanguage();
   return (
-    <div className="document-diff-legend" aria-label="변경 표시 안내">
-      <span><i className="legend-delete">삭제된 내용</i></span>
-      <span><i className="legend-add">추가된 내용</i></span>
-      <span><i className="legend-format">서식 변경</i></span>
-      {showComments && <span><i className="legend-comment">메모 변경</i></span>}
+    <div className="document-diff-legend" aria-label={language === "en" ? "Change legend" : "변경 표시 안내"}>
+      <span><i className="legend-delete">{language === "en" ? "Deleted content" : "삭제된 내용"}</i></span>
+      <span><i className="legend-add">{language === "en" ? "Added content" : "추가된 내용"}</i></span>
+      <span><i className="legend-format">{language === "en" ? "Formatting changed" : "서식 변경"}</i></span>
+      {showComments && <span><i className="legend-comment">{language === "en" ? "Comment changed" : "메모 변경"}</i></span>}
     </div>
   );
 }
 
 function ContentToggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  const language = useAppLanguage();
   return (
     <div className="document-content-toggle">
-      <strong>내용 전체</strong>
+      <strong>{language === "en" ? "Show all content" : "내용 전체"}</strong>
       <button
         className={`ios-switch${checked ? " checked" : ""}`}
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label="내용 전체"
+        aria-label={language === "en" ? "Show all content" : "내용 전체"}
         onClick={() => onChange(!checked)}
       ><span /></button>
     </div>
@@ -183,15 +192,16 @@ function DocumentPageComparison({ beforeName, afterName, items, tables }: {
   items: WordDocumentViewItem[];
   tables: WordTableComparison[];
 }) {
+  const language = useAppLanguage();
   if (!items.length) {
-    return <div className="empty-diff document-empty"><TextSearch size={22} /><strong>이 영역에는 비교할 내용이 없습니다.</strong></div>;
+    return <div className="empty-diff document-empty"><TextSearch size={22} /><strong>{language === "en" ? "There is no content to compare in this area." : "이 영역에는 비교할 내용이 없습니다."}</strong></div>;
   }
 
   return (
     <div className="document-page-scroll">
-      <div className="document-page-view" role="table" aria-label="수정 전후 문서 전체 비교">
-        <div className="document-page-column-heading before" role="columnheader"><span>수정 전</span><strong>{beforeName}</strong></div>
-        <div className="document-page-column-heading after" role="columnheader"><span>수정 후</span><strong>{afterName}</strong></div>
+      <div className="document-page-view" role="table" aria-label={language === "en" ? "Full before-and-after document comparison" : "수정 전후 문서 전체 비교"}>
+        <div className="document-page-column-heading before" role="columnheader"><span>{language === "en" ? "Before" : "수정 전"}</span><strong>{beforeName}</strong></div>
+        <div className="document-page-column-heading after" role="columnheader"><span>{language === "en" ? "After" : "수정 후"}</span><strong>{afterName}</strong></div>
         {items.map((item, index) => {
           const table = item.blockType === "table" && item.tableIndex !== undefined
             ? tables.find((candidate) => candidate.index === item.tableIndex)
@@ -213,6 +223,7 @@ function DocumentBlock({ item, side, table }: {
   side: "before" | "after";
   table?: WordTableComparison;
 }) {
+  const language = useAppLanguage();
   const location = side === "before" ? item.beforeLocation : item.afterLocation;
   const text = side === "before" ? item.before : item.after;
   if (table) {
@@ -220,8 +231,8 @@ function DocumentBlock({ item, side, table }: {
     return (
       <article className={`document-page-block ${side} table${tableMissing ? " missing" : ""}`} role="cell">
         <div className="document-block-meta">
-          <small>{location || (side === "before" ? "수정 전에는 없음" : "수정 후에는 없음")}</small>
-          {item.kind !== "unchanged" && <span>{changeKindLabel(item.kind)}</span>}
+          <small>{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
+          {item.kind !== "unchanged" && <span>{changeKindLabel(item.kind, language)}</span>}
         </div>
         <DocumentTable table={table} side={side} />
       </article>
@@ -234,11 +245,11 @@ function DocumentBlock({ item, side, table }: {
   return (
     <article className={`document-page-block ${side} ${item.section}${isMissing ? " missing" : ""}`} role="cell">
       <div className="document-block-meta">
-        <small>{location || (side === "before" ? "수정 전에는 없음" : "수정 후에는 없음")}</small>
-        {item.kind !== "unchanged" && <span>{changeKindLabel(item.kind)}</span>}
+        <small>{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
+        {item.kind !== "unchanged" && <span>{changeKindLabel(item.kind, language)}</span>}
       </div>
       {isMissing
-        ? <p className="document-missing-copy">{item.kind === "added" ? "추가된 항목" : "삭제된 항목"}</p>
+        ? <p className="document-missing-copy">{item.kind === "added" ? (language === "en" ? "Added item" : "추가된 항목") : (language === "en" ? "Deleted item" : "삭제된 항목")}</p>
         : <p className={item.kind === "format" ? "format-highlight" : ""}>
           {isChangedSide || item.kind === "added" || item.kind === "deleted"
             ? <SideDiffText segments={item.segments} side={side} fallback={text} />
@@ -250,12 +261,13 @@ function DocumentBlock({ item, side, table }: {
 }
 
 function DocumentTable({ table, side }: { table: WordTableComparison; side: "before" | "after" }) {
+  const language = useAppLanguage();
   const grid = side === "before" ? table.before : table.after;
   const kinds = side === "before" ? table.beforeKinds : table.afterKinds;
 
   return (
     <div className="word-table-wrap">
-      <table className="word-document-table" aria-label={`${side === "before" ? "수정 전" : "수정 후"} 표 ${table.index + 1}`}>
+      <table className="word-document-table" aria-label={language === "en" ? `${side === "before" ? "Before" : "After"} table ${table.index + 1}` : `${side === "before" ? "수정 전" : "수정 후"} 표 ${table.index + 1}`}>
         <tbody>
           {table.rowPairs.map((rowPair, alignedRowIndex) => {
             const rowIndex = side === "before" ? rowPair.beforeIndex : rowPair.afterIndex;
@@ -309,6 +321,7 @@ function DocumentTableCell({ cell, kind, side }: {
 }
 
 function InlineComments({ comments, side }: { comments: WordCommentViewItem[]; side: "before" | "after" }) {
+  const language = useAppLanguage();
   const visibleComments = comments.filter((comment) => side === "before" ? comment.before : comment.after);
   if (!visibleComments.length) return null;
 
@@ -320,7 +333,7 @@ function InlineComments({ comments, side }: { comments: WordCommentViewItem[]; s
         const text = side === "before" ? comment.before : comment.after;
         return (
           <aside className={`inline-comment-card ${comment.kind}`} key={`${commentId}-${index}`}>
-            <div><MessageSquare size={11} /><strong>메모{author ? ` · ${author}` : ""}</strong></div>
+            <div><MessageSquare size={11} /><strong>{language === "en" ? "Comment" : "메모"}{author ? ` · ${author}` : ""}</strong></div>
             <p><SideDiffText segments={comment.segments} side={side} fallback={text} /></p>
           </aside>
         );
@@ -343,6 +356,7 @@ function SideDiffText({ segments, side, fallback }: {
   })}</>;
 }
 
-function changeKindLabel(kind: WordDocumentViewItem["kind"]) {
+function changeKindLabel(kind: WordDocumentViewItem["kind"], language: "ko" | "en") {
+  if (language === "en") return kind === "added" ? "Added" : kind === "deleted" ? "Deleted" : kind === "format" ? "Formatting changed" : kind === "comment" ? "Comment changed" : kind === "changed" ? "Content changed" : "Unchanged";
   return kind === "added" ? "추가" : kind === "deleted" ? "삭제" : kind === "format" ? "서식 변경" : kind === "comment" ? "메모 변경" : kind === "changed" ? "내용 변경" : "변경 없음";
 }

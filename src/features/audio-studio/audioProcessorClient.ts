@@ -13,7 +13,7 @@ export function runAudioProcessor(request: AudioProcessorRequest, onProgress?: A
     };
     const abort = () => {
       if (!finish()) return;
-      reject(new DOMException("오디오 작업을 취소했습니다.", "AbortError"));
+      reject(new DOMException(request.language === "en" ? "The audio operation was cancelled." : "오디오 작업을 취소했습니다.", "AbortError"));
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) {
@@ -29,16 +29,16 @@ export function runAudioProcessor(request: AudioProcessorRequest, onProgress?: A
         error?: string;
       };
       if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ?? "오디오 처리 중…");
+        onProgress?.(data.progress ?? 0, data.message ?? (request.language === "en" ? "Processing audio…" : "오디오 처리 중…"));
         return;
       }
       if (!finish()) return;
       if (data.type === "result") resolve(data.result as AudioProcessorResult);
-      else reject(new Error(data.error || "오디오 처리에 실패했습니다."));
+      else reject(new Error(data.error || (request.language === "en" ? "Audio processing failed." : "오디오 처리에 실패했습니다.")));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
-      reject(new Error(event.message || "오디오 Worker를 시작하지 못했습니다."));
+      reject(new Error(event.message || (request.language === "en" ? "The audio worker could not start." : "오디오 Worker를 시작하지 못했습니다.")));
     };
     // 입력 Float32Array는 현재 편집 상태와 Undo 기록이 계속 참조하므로
     // 전송(분리)하지 않고 Worker에 구조 복제합니다. 결과 버퍼만 Worker가 전송합니다.

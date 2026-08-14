@@ -75,9 +75,12 @@ interface ControlLayout {
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 let initialization: Promise<unknown> | undefined;
+let currentLanguage: "ko" | "en" = "ko";
+const L = (ko: string, english: string) => currentLanguage === "en" ? english : ko;
 
-worker.onmessage = async (event: MessageEvent<{ pairs: PairPayload[]; options: HwpCompareOptions }>) => {
+worker.onmessage = async (event: MessageEvent<{ pairs: PairPayload[]; options: HwpCompareOptions; language?: "ko" | "en" }>) => {
   try {
+    currentLanguage = event.data.language === "en" ? "en" : "ko";
     await ensureRhwp();
     const { pairs, options } = event.data;
     const results: HwpWorkerPairResult[] = [];
@@ -85,13 +88,13 @@ worker.onmessage = async (event: MessageEvent<{ pairs: PairPayload[]; options: H
       const pair = pairs[index];
       const start = (index / Math.max(1, pairs.length)) * 100;
       const size = 100 / Math.max(1, pairs.length);
-      progress(start + size * 0.05, `[${index + 1}/${pairs.length}] ${pair.beforeName} 문서 구조를 읽는 중…`);
+      progress(start + size * 0.05, L(`[${index + 1}/${pairs.length}] ${pair.beforeName} 문서 구조를 읽는 중…`, `[${index + 1}/${pairs.length}] Reading the structure of ${pair.beforeName}…`));
       const before = parseDocument(pair.beforeName, pair.beforeBuffer, pair.beforePassword, options);
-      progress(start + size * 0.38, `[${index + 1}/${pairs.length}] ${pair.afterName} 문서 구조를 읽는 중…`);
+      progress(start + size * 0.38, L(`[${index + 1}/${pairs.length}] ${pair.afterName} 문서 구조를 읽는 중…`, `[${index + 1}/${pairs.length}] Reading the structure of ${pair.afterName}…`));
       const after = parseDocument(pair.afterName, pair.afterBuffer, pair.afterPassword, options);
-      progress(start + size * 0.72, `[${index + 1}/${pairs.length}] 문단과 표의 대응 관계를 분석하는 중…`);
+      progress(start + size * 0.72, L(`[${index + 1}/${pairs.length}] 문단과 표의 대응 관계를 분석하는 중…`, `[${index + 1}/${pairs.length}] Matching paragraphs and tables…`));
       results.push({ result: compareModels(pair.beforeName, pair.afterName, before, after, options) });
-      progress(start + size, `[${index + 1}/${pairs.length}] HWP 비교 완료`);
+      progress(start + size, L(`[${index + 1}/${pairs.length}] HWP 비교 완료`, `[${index + 1}/${pairs.length}] HWP comparison complete`));
       await yieldToWorker();
     }
     worker.postMessage({ type: "result", result: results });
@@ -141,7 +144,7 @@ function parseDocument(name: string, buffer: ArrayBuffer, password: string | und
             type: "paragraph",
             text: displayText,
             format: options.formatting ? bodyFormat(document, section, paragraph, text.length) : "",
-            location: `제${section + 1}구역 ${paragraph + 1}문단`,
+            location: L(`제${section + 1}구역 ${paragraph + 1}문단`, `Section ${section + 1}, paragraph ${paragraph + 1}`),
           });
         }
         for (const table of tablesByParagraph.get(key) ?? []) {
@@ -153,16 +156,16 @@ function parseDocument(name: string, buffer: ArrayBuffer, password: string | und
     const headerFooter = options.metadata ? readHeaderFooters(document, options.formatting) : [];
     const notes = options.metadata ? readNotes(document, options.formatting) : [];
     const warnings = [
-      "HWP/HWPX의 검토 메모와 변경 추적 기록은 현재 브라우저 분석 범위에 포함되지 않아 비교 대상에서 제외됩니다.",
+      L("HWP/HWPX의 검토 메모와 변경 추적 기록은 현재 브라우저 분석 범위에 포함되지 않아 비교 대상에서 제외됩니다.", "HWP/HWPX review comments and tracked changes are outside the current browser parser scope and are excluded from comparison."),
     ];
-    if (options.tables && tables.some((table) => table.grid.some((row) => row.some((cell) => cell.location.includes("병합"))))) {
-      warnings.push("병합 셀은 시작 셀의 내용으로 비교하며 병합 범위 자체의 세부 차이는 단순화될 수 있습니다.");
+    if (options.tables && tables.some((table) => table.grid.some((row) => row.some((cell) => /병합|merged/i.test(cell.location))))) {
+      warnings.push(L("병합 셀은 시작 셀의 내용으로 비교하며 병합 범위 자체의 세부 차이는 단순화될 수 있습니다.", "Merged cells are compared by their leading cell; detailed differences in the merged range may be simplified."));
     }
     return { blocks, headerFooter, notes, warnings };
   } catch (error) {
     const message = normalizeError(error);
     if (/비밀번호|password|encrypted|암호/i.test(message)) {
-      throw new Error(`${name}: 암호로 보호된 문서입니다. 파일 목록의 암호 입력란에 열기 암호를 입력해 주세요.`);
+      throw new Error(L(`${name}: 암호로 보호된 문서입니다. 파일 목록의 암호 입력란에 열기 암호를 입력해 주세요.`, `${name}: this document is password-protected. Enter its open password in the file list.`));
     }
     throw new Error(`${name}: ${message}`);
   } finally {
@@ -205,7 +208,7 @@ function readTable(document: HwpDocument, control: ControlLayout, index: number)
   const colCount = Math.max(1, control.colCount ?? dimensions.colCount ?? 1);
   const allCells = safeJson<Array<{ cellIdx: number; row: number; col: number; rowSpan?: number; colSpan?: number }>>(document.getTableCellBboxes(section, paragraph, controlIndex), []);
   const cells = allCells.length ? allCells : control.cells ?? [];
-  const grid: WordTableCell[][] = Array.from({ length: rowCount }, (_, row) => Array.from({ length: colCount }, (_, col) => emptyCell(`표 ${index + 1} ${row + 1}행 ${col + 1}열`)));
+  const grid: WordTableCell[][] = Array.from({ length: rowCount }, (_, row) => Array.from({ length: colCount }, (_, col) => emptyCell(L(`표 ${index + 1} ${row + 1}행 ${col + 1}열`, `Table ${index + 1}, row ${row + 1}, column ${col + 1}`))));
 
   for (const cell of cells) {
     const paragraphs: string[] = [];
@@ -221,7 +224,7 @@ function readTable(document: HwpDocument, control: ControlLayout, index: number)
     }
     try { formats.push(safeJson(document.getCellProperties(section, paragraph, controlIndex, cell.cellIdx), {})); } catch { /* 동일 */ }
     const merged = (cell.rowSpan ?? 1) > 1 || (cell.colSpan ?? 1) > 1;
-    const location = `표 ${index + 1} ${cell.row + 1}행 ${cell.col + 1}열${merged ? " (병합 셀)" : ""}`;
+    const location = L(`표 ${index + 1} ${cell.row + 1}행 ${cell.col + 1}열${merged ? " (병합 셀)" : ""}`, `Table ${index + 1}, row ${cell.row + 1}, column ${cell.col + 1}${merged ? " (merged cell)" : ""}`);
     if (!grid[cell.row]?.[cell.col]) continue;
     grid[cell.row][cell.col] = {
       text: paragraphs.filter(Boolean).join("\n"),
@@ -231,7 +234,7 @@ function readTable(document: HwpDocument, control: ControlLayout, index: number)
       comments: [],
     };
   }
-  return { section, paragraph, control: controlIndex, location: `표 ${index + 1}`, grid };
+  return { section, paragraph, control: controlIndex, location: L(`표 ${index + 1}`, `Table ${index + 1}`), grid };
 }
 
 function readHeaderFooters(document: HwpDocument, formatting: boolean) {
@@ -242,9 +245,9 @@ function readHeaderFooters(document: HwpDocument, formatting: boolean) {
     if (!info.exists) continue;
     const text = cleanText(info.text ?? "");
     if (!text) continue;
-    const kind = item.isHeader ? "머리말" : "꼬리말";
+    const kind = item.isHeader ? L("머리말", "Header") : L("꼬리말", "Footer");
     const format = formatting ? stableStringify({ applyTo: item.applyTo, paraCount: info.paraCount }) : "";
-    records.push({ text, format, location: `${item.sectionIdx + 1}구역 ${item.label || kind}` });
+    records.push({ text, format, location: L(`${item.sectionIdx + 1}구역 ${item.label || kind}`, `Section ${item.sectionIdx + 1}, ${item.label || kind}`) });
   }
   return records;
 }
@@ -265,7 +268,7 @@ function readNotes(document: HwpDocument, formatting: boolean) {
         seen.add(key);
         const text = (info.texts ?? []).map(cleanText).filter(Boolean).join("\n");
         if (text) {
-          const kind = control.ctrlId === "fn" ? "각주" : "미주";
+          const kind = control.ctrlId === "fn" ? L("각주", "Footnote") : L("미주", "Endnote");
           records.push({
             text,
             format: formatting ? stableStringify({ paraCount: info.paraCount }) : "",
@@ -428,7 +431,7 @@ function compareTable(before: HwpTable | undefined, after: HwpTable | undefined,
         changes.push({
           kind,
           section: "table",
-          location: afterCell?.location || beforeCell?.location || `표 ${index + 1}`,
+          location: afterCell?.location || beforeCell?.location || L(`표 ${index + 1}`, `Table ${index + 1}`),
           beforeLocation: beforeCell?.location ?? "",
           afterLocation: afterCell?.location ?? "",
           before: beforeCell?.text ?? "",
@@ -717,7 +720,7 @@ function rowText(row: WordTableCell[]) {
 
 function transpose(grid: WordTableCell[][]) {
   const width = Math.max(0, ...grid.map((row) => row.length));
-  return Array.from({ length: width }, (_, column) => grid.map((row, rowIndex) => row[column] ?? emptyCell(`빈 셀 ${rowIndex + 1}:${column + 1}`)));
+  return Array.from({ length: width }, (_, column) => grid.map((row, rowIndex) => row[column] ?? emptyCell(L(`빈 셀 ${rowIndex + 1}:${column + 1}`, `Empty cell ${rowIndex + 1}:${column + 1}`))));
 }
 
 function toAxisPair(pair: SequencePair): WordTableAxisPair {
@@ -742,7 +745,7 @@ function yieldToWorker() {
 }
 
 function normalizeError(error: unknown) {
-  return error instanceof Error ? error.message : String(error || "HWP 문서를 처리하지 못했습니다.");
+  return error instanceof Error ? error.message : String(error || L("HWP 문서를 처리하지 못했습니다.", "Unable to process the HWP document."));
 }
 
 export {};

@@ -8,12 +8,21 @@ export interface SeoDefinition {
   };
 }
 
-export const socialImage = {
-  path: "social/worklazy-tools-share.png",
+export const socialImages = {
+  ko: {
+  path: "social/worklazy-tools-share-ko.png",
   width: 1200,
   height: 630,
   type: "image/png",
-  alt: "Worklazy Tools - 파일 업로드 없이 브라우저에서 실행하는 업무 도구",
+  alt: koSeo.socialImageAlt,
+  },
+  en: {
+    path: "social/worklazy-tools-share.png",
+    width: 1200,
+    height: 630,
+    type: "image/png",
+    alt: enSeo.socialImageAlt,
+  },
 } as const;
 
 export const seoByPath: Record<string, SeoDefinition> = {
@@ -156,6 +165,42 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
 };
 
+const englishPageSeo: Record<string, SeoDefinition> = {
+  "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
+  "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
+  "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
+  "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
+  "/tools/pdf-editor/convert": { title: "Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", description: "Convert selected PDF pages to DOCX, XLSX, TXT or searchable PDF using self-hosted English and Korean OCR in your browser.", application: { name: "PDF Document Conversion and OCR", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },
+  "/about": { title: "About | Worklazy Tools", description: "Learn how Worklazy Tools processes documents and media in the browser and where each tool's compatibility boundaries apply." },
+  "/privacy": { title: "Privacy Policy | Worklazy Tools", description: "Read how local file processing, Google and Naver Analytics, advertising and cookies are handled by Worklazy Tools." },
+  "/terms": { title: "Terms of Use | Worklazy Tools", description: "Review the conditions, supported scope, user responsibilities and limitations for Worklazy Tools browser utilities." },
+  "/contact": { title: "Contact, Suggestions & Bug Reports | Worklazy Tools", description: "Report a bug, suggest a feature or contact Worklazy Tools about privacy without attaching sensitive work files." },
+  "/licenses": { title: "Licenses & Third-Party Notices | Worklazy Tools", description: "Review Worklazy Tools copyright terms and licenses for rhwp, ffmpeg.wasm and other open-source components." },
+};
+
+const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
+  "/tools/excel-merger": "excel-merger", "/tools/word-compare": "word-compare", "/tools/pdf-editor": "pdf-editor",
+  "/tools/hwp-editor": "hwp-editor", "/tools/hwp-compare": "hwp-compare", "/tools/video-studio": "video-studio",
+  "/tools/audio-studio": "audio-studio", "/tools/image-studio": "image-studio", "/tools/text-tools": "text-tools",
+  "/tools/text-formatter": "text-formatter", "/tools/work-calculator": "work-calculator", "/tools/timezone-calculator": "timezone-calculator",
+  "/tools/payroll-calculator": "payroll-calculator", "/tools/image-privacy": "image-privacy", "/tools/security-tools": "security-tools",
+  "/tools/qr-studio": "qr-studio", "/tools/data-converter": "data-converter",
+};
+
+export function getSeoDefinition(language: AppLanguage, pathname: string): SeoDefinition {
+  const path = normalizeSeoPath(stripLanguagePrefix(pathname));
+  if (language === "ko") return seoByPath[path] ?? seoByPath["/"];
+  if (englishPageSeo[path]) return englishPageSeo[path];
+  const slug = toolSlugByPath[path];
+  if (!slug) return englishPageSeo["/"];
+  const tool = enTools.items[slug];
+  return {
+    title: `${tool.title} — Free Browser Tool | Worklazy Tools`,
+    description: tool.description,
+    application: { name: tool.title, featureList: tool.highlights },
+  };
+}
+
 export function normalizeSeoPath(pathname: string) {
   if (pathname === "/") return pathname;
   return pathname.replace(/\/+$/, "") || "/";
@@ -167,14 +212,20 @@ export function getSiteBaseUrl() {
   return new URL(import.meta.env.BASE_URL, window.location.origin).href;
 }
 
-export function getCanonicalUrl(pathname: string) {
-  return new URL(normalizeSeoPath(pathname).replace(/^\//, ""), getSiteBaseUrl()).href;
+export function getCanonicalUrl(language: AppLanguage, pathname: string) {
+  const path = normalizeSeoPath(stripLanguagePrefix(pathname));
+  const localized = path === "/" ? `${language}/` : `${language}${path}/`;
+  return new URL(localized, getSiteBaseUrl()).href;
 }
 
-export function getSocialImageUrl() {
-  return new URL(socialImage.path, getSiteBaseUrl()).href;
+export function getSocialImageUrl(language: AppLanguage) {
+  return new URL(socialImages[language].path, getSiteBaseUrl()).href;
 }
 
 function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
 }
+import enTools from "../locales/en/tools.json";
+import enSeo from "../locales/en/seo.json";
+import koSeo from "../locales/ko/seo.json";
+import { stripLanguagePrefix, type AppLanguage } from "../i18n/languages";

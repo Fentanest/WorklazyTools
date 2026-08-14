@@ -16,12 +16,14 @@ import type {
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 
 type ImageWorkerRequest =
-  | { type: "batch"; inputs: ImageWorkerInput[]; options: BatchImageOptions; archiveName: string }
-  | { type: "collage"; inputs: ImageWorkerInput[]; options: CollageOptions; fileName: string }
-  | { type: "gif"; inputs: ImageWorkerInput[]; options: GifOptions; fileName: string };
+  | { type: "batch"; inputs: ImageWorkerInput[]; options: BatchImageOptions; archiveName: string; language?: string }
+  | { type: "collage"; inputs: ImageWorkerInput[]; options: CollageOptions; fileName: string; language?: string }
+  | { type: "gif"; inputs: ImageWorkerInput[]; options: GifOptions; fileName: string; language?: string };
+let currentLanguage: "ko" | "en" = "ko";
 
 worker.onmessage = async (event: MessageEvent<ImageWorkerRequest>) => {
   try {
+    currentLanguage = event.data.language === "en" ? "en" : "ko";
     ensureCanvasSupport();
     let result: ImageWorkerResult;
     if (event.data.type === "batch") result = await processBatch(event.data.inputs, event.data.options, event.data.archiveName);
@@ -36,7 +38,7 @@ worker.onmessage = async (event: MessageEvent<ImageWorkerRequest>) => {
 };
 
 async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptions, archiveName: string) {
-  if (!inputs.length) throw new Error("일괄 처리할 이미지가 없습니다.");
+  if (!inputs.length) throw new Error(local("일괄 처리할 이미지가 없습니다.", "There are no images to batch process."));
   const zip = new JSZip();
   let watermark: ImageBitmap | undefined;
   try {
@@ -59,12 +61,12 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
       } finally {
         bitmap.close();
       }
-      progress(6 + ((index + 1) / inputs.length) * 74, `[${index + 1}/${inputs.length}] ${input.name} 처리 완료`);
+      progress(6 + ((index + 1) / inputs.length) * 74, `[${index + 1}/${inputs.length}] ${input.name} ${local("처리 완료", "processed")}`);
     }
-    progress(82, `${inputs.length}개 결과를 ZIP으로 묶는 중…`);
+    progress(82, local(`${inputs.length}개 결과를 ZIP으로 묶는 중…`, `Bundling ${inputs.length} results into a ZIP…`));
     const bytes = await zip.generateAsync(
       { type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } },
-      (metadata) => progress(82 + metadata.percent * 0.17, `ZIP 압축 중… ${Math.round(metadata.percent)}%`),
+      (metadata) => progress(82 + metadata.percent * 0.17, `${local("ZIP 압축 중…", "Compressing ZIP…")} ${Math.round(metadata.percent)}%`),
     );
     return binaryResult(bytes, ensureExtension(archiveName, "zip"), "application/zip", []);
   } finally {
@@ -73,8 +75,8 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
 }
 
 async function createCollage(inputs: ImageWorkerInput[], options: CollageOptions, fileName: string) {
-  if (inputs.length < 2) throw new Error("이어붙일 이미지를 두 개 이상 선택해 주세요.");
-  progress(4, "이미지 크기를 확인하는 중…");
+  if (inputs.length < 2) throw new Error(local("이어붙일 이미지를 두 개 이상 선택해 주세요.", "Choose at least two images to join."));
+  progress(4, local("이미지 크기를 확인하는 중…", "Checking image dimensions…"));
   const bitmaps = await Promise.all(inputs.map(decodeImage));
   try {
     const layout = calculateCollageLayout(bitmaps, options);
@@ -87,14 +89,14 @@ async function createCollage(inputs: ImageWorkerInput[], options: CollageOptions
       const cell = layout.cells[index];
       if (options.layout === "grid") drawCovered(context, bitmap, cell.x, cell.y, cell.width, cell.height);
       else drawContained(context, bitmap, cell.x, cell.y, cell.width, cell.height);
-      progress(18 + ((index + 1) / bitmaps.length) * 68, `[${index + 1}/${bitmaps.length}] 이미지 배치 중…`);
+      progress(18 + ((index + 1) / bitmaps.length) * 68, `[${index + 1}/${bitmaps.length}] ${local("이미지 배치 중…", "Placing image…")}`);
     }
-    progress(91, "콜라주 이미지를 저장하는 중…");
+    progress(91, local("콜라주 이미지를 저장하는 중…", "Saving collage image…"));
     const blob = await canvas.convertToBlob({ type: formatMime(options.format), quality: options.quality });
     const result = binaryResult(await blob.arrayBuffer(), ensureExtension(fileName, formatExtension(options.format)), blob.type, []);
     canvas.width = 1;
     canvas.height = 1;
-    progress(100, "콜라주 생성 완료");
+    progress(100, local("콜라주 생성 완료", "Collage created"));
     return result;
   } finally {
     bitmaps.forEach((bitmap) => bitmap.close());
@@ -102,7 +104,7 @@ async function createCollage(inputs: ImageWorkerInput[], options: CollageOptions
 }
 
 async function createGif(inputs: ImageWorkerInput[], options: GifOptions, fileName: string) {
-  if (inputs.length < 2) throw new Error("GIF 프레임 이미지를 두 개 이상 선택해 주세요.");
+  if (inputs.length < 2) throw new Error(local("GIF 프레임 이미지를 두 개 이상 선택해 주세요.", "Choose at least two GIF frame images."));
   const bitmaps = await Promise.all(inputs.map(decodeImage));
   try {
     const maxWidth = Math.max(...bitmaps.map((bitmap) => bitmap.width));
@@ -121,14 +123,14 @@ async function createGif(inputs: ImageWorkerInput[], options: GifOptions, fileNa
       const palette = quantize(pixels, options.qualityColors, { format: "rgba4444", oneBitAlpha: 20 });
       const indexed = applyPalette(pixels, palette, "rgba4444");
       gif.writeFrame(indexed, width, height, { palette, delay: options.delay, repeat: 0, transparent: true });
-      progress(10 + ((index + 1) / bitmaps.length) * 80, `[${index + 1}/${bitmaps.length}] GIF 프레임 인코딩 중…`);
+      progress(10 + ((index + 1) / bitmaps.length) * 80, `[${index + 1}/${bitmaps.length}] ${local("GIF 프레임 인코딩 중…", "Encoding GIF frame…")}`);
     }
     gif.finish();
     const bytes = gif.bytes();
     canvas.width = 1;
     canvas.height = 1;
-    progress(100, "GIF 애니메이션 생성 완료");
-    return binaryResult(bytes, ensureExtension(fileName, "gif"), "image/gif", ["GIF는 최대 256색 팔레트를 사용하므로 사진의 색상 그라데이션이 단순화될 수 있습니다."]);
+    progress(100, local("GIF 애니메이션 생성 완료", "Animated GIF created"));
+    return binaryResult(bytes, ensureExtension(fileName, "gif"), "image/gif", [local("GIF는 최대 256색 팔레트를 사용하므로 사진의 색상 그라데이션이 단순화될 수 있습니다.", "GIF uses a palette of at most 256 colors, so photo gradients may be simplified.")]);
   } finally {
     bitmaps.forEach((bitmap) => bitmap.close());
   }
@@ -168,13 +170,13 @@ function calculateCollageLayout(bitmaps: ImageBitmap[], options: CollageOptions)
     return { width, height: y - gap, cells };
   }
   if (options.layout === "horizontal") {
-    if (outputWidth - gap * (bitmaps.length - 1) < bitmaps.length) throw new Error("전체 가로 크기에 비해 이미지 수와 간격이 너무 큽니다.");
+    if (outputWidth - gap * (bitmaps.length - 1) < bitmaps.length) throw new Error(local("전체 가로 크기에 비해 이미지 수와 간격이 너무 큽니다.", "There are too many images or too much gap for the total width."));
     const cellWidth = Math.max(1, Math.floor((outputWidth - gap * (bitmaps.length - 1)) / bitmaps.length));
     const height = Math.max(...bitmaps.map((bitmap) => Math.round(bitmap.height * cellWidth / bitmap.width)));
     return { width: outputWidth, height, cells: bitmaps.map((_, index) => ({ x: index * (cellWidth + gap), y: 0, width: cellWidth, height })) };
   }
   const columns = Math.max(1, Math.min(Math.round(options.columns), bitmaps.length));
-  if (outputWidth - gap * (columns - 1) < columns) throw new Error("전체 가로 크기에 비해 열 개수와 간격이 너무 큽니다.");
+  if (outputWidth - gap * (columns - 1) < columns) throw new Error(local("전체 가로 크기에 비해 열 개수와 간격이 너무 큽니다.", "There are too many columns or too much gap for the total width."));
   const rows = Math.ceil(bitmaps.length / columns);
   const cellWidth = Math.floor((outputWidth - gap * (columns - 1)) / columns);
   const cellHeight = Math.round(cellWidth * 0.75);
@@ -241,7 +243,7 @@ async function decodeImage(input: ImageWorkerInput) {
 
 function getContext(canvas: OffscreenCanvas, readFrequently = false) {
   const context = canvas.getContext("2d", { alpha: true, willReadFrequently: readFrequently });
-  if (!context) throw new Error("이미지 캔버스를 만들지 못했습니다.");
+  if (!context) throw new Error(local("이미지 캔버스를 만들지 못했습니다.", "The image canvas could not be created."));
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   return context;
@@ -262,12 +264,12 @@ function fillOutputBackground(
 }
 
 function ensureCanvasSupport() {
-  if (typeof OffscreenCanvas === "undefined" || typeof createImageBitmap === "undefined") throw new Error("이 브라우저는 백그라운드 이미지 처리를 지원하지 않습니다. 최신 Chrome, Edge 또는 Firefox를 사용해 주세요.");
+  if (typeof OffscreenCanvas === "undefined" || typeof createImageBitmap === "undefined") throw new Error(local("이 브라우저는 백그라운드 이미지 처리를 지원하지 않습니다. 최신 Chrome, Edge 또는 Firefox를 사용해 주세요.", "This browser does not support background image processing. Use a current Chrome, Edge or Firefox."));
 }
 
 function validateCanvasSize(width: number, height: number) {
-  if (width < 1 || height < 1) throw new Error("출력 이미지 크기가 올바르지 않습니다.");
-  if (width > 12_000 || height > 12_000 || width * height > 80_000_000) throw new Error("출력 이미지가 브라우저 한도를 넘습니다. 크기 또는 이미지 수를 줄여 주세요.");
+  if (width < 1 || height < 1) throw new Error(local("출력 이미지 크기가 올바르지 않습니다.", "The output image dimensions are invalid."));
+  if (width > 12_000 || height > 12_000 || width * height > 80_000_000) throw new Error(local("출력 이미지가 브라우저 한도를 넘습니다. 크기 또는 이미지 수를 줄여 주세요.", "The output image exceeds browser limits. Reduce its dimensions or the image count."));
 }
 
 function binaryResult(data: Uint8Array | ArrayBuffer, fileName: string, mimeType: string, warnings: string[]): ImageWorkerResult {
@@ -301,8 +303,12 @@ function ensureExtension(name: string, extension: string) {
 
 function normalizeError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/memory|allocation|canvas.*size|브라우저 한도/i.test(message)) return { message: "이미지 크기나 개수가 브라우저 메모리 한도를 넘었습니다. 출력 크기 또는 파일 수를 줄여 주세요.", code: "OUT_OF_MEMORY" };
+  if (/memory|allocation|canvas.*size|브라우저 한도|browser limits/i.test(message)) return { message: local("이미지 크기나 개수가 브라우저 메모리 한도를 넘었습니다. 출력 크기 또는 파일 수를 줄여 주세요.", "The image dimensions or count exceeded browser memory limits. Reduce output dimensions or file count."), code: "OUT_OF_MEMORY" };
   return { message, code: "IMAGE_PROCESSING_ERROR" };
+}
+
+function local(korean: string, english: string) {
+  return currentLanguage === "en" ? english : korean;
 }
 
 function clamp(value: number, min: number, max: number) {

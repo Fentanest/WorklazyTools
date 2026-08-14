@@ -1,15 +1,19 @@
 import { LayoutGrid, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import { toolCategories, tools, type ToolCategoryId } from "../app/toolRegistry";
+import { type ToolCategoryId } from "../app/toolRegistry";
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
 import { PageHeader } from "../components/ui";
+import { useToolCatalog } from "../i18n/useToolCatalog";
 
 type CategoryFilter = "all" | ToolCategoryId;
 
 export function ToolsPage() {
+  const { t } = useTranslation(["tools", "common"]);
+  const { toolCategories, tools } = useToolCatalog();
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedCategory = searchParams.get("category");
@@ -47,16 +51,16 @@ export function ToolsPage() {
 
   return (
     <div className="page standard-page page-enter tools-index-page">
-      <PageHeader eyebrow="ALL TOOLS" title="모든 도구" description="업무 목적에 맞는 카테고리를 고르거나 필요한 기능을 검색하세요." />
+      <PageHeader eyebrow={t("tools:index.eyebrow")} title={t("tools:index.title")} description={t("tools:index.description")} />
       <div className="tool-search">
         <Search size={19} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="도구 이름이나 기능 검색" aria-label="도구 검색" />
-        {normalizedQuery && <span className="tool-search-count">{visibleToolCount}개</span>}
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("tools:index.searchPlaceholder")} aria-label={t("tools:index.searchLabel")} />
+        {normalizedQuery && <span className="tool-search-count">{t("common:format.tools", { count: visibleToolCount })}</span>}
       </div>
 
-      <div className="tool-category-filter" aria-label="도구 카테고리">
+      <div className="tool-category-filter" aria-label={t("tools:index.categoryLabel")}>
         <button type="button" className={activeCategory === "all" ? "selected" : ""} aria-pressed={activeCategory === "all"} onClick={() => selectCategory("all")}>
-          <LayoutGrid size={17} /><span>전체</span><small>{tools.length}</small>
+          <LayoutGrid size={17} /><span>{t("tools:index.all")}</span><small>{tools.length}</small>
         </button>
         {toolCategories.map((category) => {
           const Icon = category.icon;
@@ -65,7 +69,7 @@ export function ToolsPage() {
             <button
               type="button"
               className={`accent-${category.accent}${activeCategory === category.id ? " selected" : ""}`}
-              aria-label={`${category.label} ${count}개 도구`}
+              aria-label={`${category.label} ${t("common:format.tools", { count })}`}
               aria-pressed={activeCategory === category.id}
               key={category.id}
               onClick={() => selectCategory(category.id)}
@@ -86,7 +90,7 @@ export function ToolsPage() {
               <header className="tool-category-heading">
                 <span className={`tool-category-icon accent-${category.accent}`}><Icon size={20} /></span>
                 <span><h2 id={`tool-category-${category.id}`}>{category.label}</h2><p>{category.description}</p></span>
-                <b>{categoryTools.length}개 도구</b>
+                <b>{t("common:format.tools", { count: categoryTools.length })}</b>
               </header>
               <div className="tool-grid all-tools-grid">
                 {categoryTools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
@@ -96,11 +100,11 @@ export function ToolsPage() {
         })}
       </div>
 
-      {!visibleToolCount && <div className="empty-search"><Search size={25} /><strong>일치하는 도구가 없어요.</strong><span>다른 검색어나 카테고리를 선택해 보세요.</span></div>}
+      {!visibleToolCount && <div className="empty-search"><Search size={25} /><strong>{t("tools:index.emptyTitle")}</strong><span>{t("tools:index.emptyDescription")}</span></div>}
     </div>
   );
 }
 
 function isToolCategory(value: string | null): value is ToolCategoryId {
-  return toolCategories.some((category) => category.id === value);
+  return ["documents", "media", "text-data", "work", "security-share"].includes(value ?? "");
 }

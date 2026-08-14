@@ -8,6 +8,7 @@ import {
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 import type { PdfTextCell, PdfTextDocument, PdfTextLine, PdfTextPage, WorkerProgress } from "./types";
+import type { AppLanguage } from "../../i18n/languages";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -22,7 +23,9 @@ const TESSERACT_BASE_URL = new URL(
   new URL(import.meta.env.BASE_URL, window.location.origin),
 ).href;
 
-export async function getPdfDocument(file: File) {
+const local = (language: AppLanguage, ko: string, en: string) => language === "ko" ? ko : en;
+
+export async function getPdfDocument(file: File, language: AppLanguage = "ko") {
   const cached = documentCache.get(file);
   if (cached) return cached.promise;
   const buffer = await file.arrayBuffer();
@@ -38,14 +41,14 @@ export async function getPdfDocument(file: File) {
   });
   const promise = loadingTask.promise.catch((error) => {
     documentCache.delete(file);
-    throw normalizePdfOpenError(error);
+    throw normalizePdfOpenError(error, language);
   });
   documentCache.set(file, { loadingTask, promise });
   return promise;
 }
 
-export async function inspectPdf(file: File) {
-  const document = await getPdfDocument(file);
+export async function inspectPdf(file: File, language: AppLanguage = "ko") {
+  const document = await getPdfDocument(file, language);
   return { pageCount: document.numPages };
 }
 
@@ -57,8 +60,8 @@ export async function releasePdf(file: File) {
   }
 }
 
-export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172) {
-  const pdfDocument = await getPdfDocument(file);
+export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172, language: AppLanguage = "ko") {
+  const pdfDocument = await getPdfDocument(file, language);
   const page = await pdfDocument.getPage(pageIndex + 1);
   const natural = page.getViewport({ scale: 1 });
   const cssScale = targetWidth / natural.width;
@@ -70,7 +73,7 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
   renderCanvas.width = width;
   renderCanvas.height = height;
   const renderContext = renderCanvas.getContext("2d", { alpha: false });
-  if (!renderContext) throw new Error("PDF 미리보기를 표시할 수 없습니다.");
+  if (!renderContext) throw new Error(local(language, "PDF 미리보기를 표시할 수 없습니다.", "Unable to render the PDF preview."));
   await page.render({
     canvas: renderCanvas,
     canvasContext: renderContext,
@@ -83,7 +86,7 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
   canvas.style.width = `${Math.floor(viewport.width)}px`;
   canvas.style.height = `${Math.floor(viewport.height)}px`;
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error("PDF 미리보기를 화면에 복사할 수 없습니다.");
+  if (!context) throw new Error(local(language, "PDF 미리보기를 화면에 복사할 수 없습니다.", "Unable to display the PDF preview."));
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
   context.drawImage(renderCanvas, 0, 0);
@@ -92,8 +95,8 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
   return { width: viewport.width, height: viewport.height };
 }
 
-export function parsePageRange(value: string, pageCount: number) {
-  if (!value.trim()) throw new Error("페이지 범위를 입력해 주세요.");
+export function parsePageRange(value: string, pageCount: number, language: AppLanguage = "ko") {
+  if (!value.trim()) throw new Error(local(language, "페이지 범위를 입력해 주세요.", "Enter a page range."));
   const result: number[] = [];
   const seen = new Set<number>();
   for (const rawPart of value.split(",")) {
@@ -105,19 +108,19 @@ export function parsePageRange(value: string, pageCount: number) {
     if (rangeMatch) {
       const start = Number(rangeMatch[1]);
       const end = Number(rangeMatch[2]);
-      if (start > end) throw new Error(`페이지 범위 ${part}의 시작 번호가 끝 번호보다 큽니다.`);
+      if (start > end) throw new Error(local(language, `페이지 범위 ${part}의 시작 번호가 끝 번호보다 큽니다.`, `The start of range ${part} is greater than its end.`));
       numbers = Array.from({ length: end - start + 1 }, (_, index) => start + index);
     } else if (singleMatch) numbers = [Number(part)];
-    else throw new Error(`페이지 범위 '${part}'의 형식을 확인해 주세요.`);
+    else throw new Error(local(language, `페이지 범위 '${part}'의 형식을 확인해 주세요.`, `Check the format of page range '${part}'.`));
     for (const pageNumber of numbers) {
-      if (pageNumber < 1 || pageNumber > pageCount) throw new Error(`페이지 번호는 1~${pageCount} 사이여야 합니다.`);
+      if (pageNumber < 1 || pageNumber > pageCount) throw new Error(local(language, `페이지 번호는 1~${pageCount} 사이여야 합니다.`, `Page numbers must be between 1 and ${pageCount}.`));
       if (!seen.has(pageNumber)) {
         seen.add(pageNumber);
         result.push(pageNumber - 1);
       }
     }
   }
-  if (!result.length) throw new Error("추출할 페이지가 없습니다.");
+  if (!result.length) throw new Error(local(language, "추출할 페이지가 없습니다.", "No pages were selected."));
   return result;
 }
 
@@ -127,23 +130,24 @@ export async function pdfToImageArchive(
   dpi: 96 | 144 | 216,
   quality: number,
   onProgress?: WorkerProgress,
+  language: AppLanguage = "ko",
 ) {
-  const document = await getPdfDocument(file);
+  const document = await getPdfDocument(file, language);
   const zip = new JSZip();
   const scale = dpi / 72;
   const baseName = stripExtension(file.name);
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-    onProgress?.(5 + ((pageNumber - 1) / document.numPages) * 78, `[${pageNumber}/${document.numPages}] 페이지를 ${format.toUpperCase()}로 렌더링하는 중…`);
-    const canvas = await renderPageForExport(document, pageNumber, scale);
-    const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality);
+    onProgress?.(5 + ((pageNumber - 1) / document.numPages) * 78, local(language, `[${pageNumber}/${document.numPages}] 페이지를 ${format.toUpperCase()}로 렌더링하는 중…`, `[${pageNumber}/${document.numPages}] Rendering page as ${format.toUpperCase()}…`));
+    const canvas = await renderPageForExport(document, pageNumber, scale, language);
+    const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality, language);
     zip.file(`${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob);
     canvas.width = 1;
     canvas.height = 1;
     await yieldToBrowser();
   }
-  onProgress?.(88, "변환된 이미지를 ZIP 파일로 압축하는 중…");
+  onProgress?.(88, local(language, "변환된 이미지를 ZIP 파일로 압축하는 중…", "Compressing converted images into a ZIP file…"));
   const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, (metadata) => {
-    onProgress?.(88 + metadata.percent * 0.1, `ZIP 압축 중… ${Math.round(metadata.percent)}%`);
+    onProgress?.(88 + metadata.percent * 0.1, local(language, `ZIP 압축 중… ${Math.round(metadata.percent)}%`, `Compressing ZIP… ${Math.round(metadata.percent)}%`));
   });
   return { blob, fileName: `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip` };
 }
@@ -162,20 +166,21 @@ export async function extractPdfText(
   searchablePdf: boolean,
   onProgress?: WorkerProgress,
   selectedPageIndexes?: number[],
+  language: AppLanguage = "ko",
 ): Promise<ExtractPdfTextResult> {
-  const document = await getPdfDocument(file);
+  const document = await getPdfDocument(file, language);
   const pages: PdfTextPage[] = [];
   const sourcePageIndexes = selectedPageIndexes?.length
     ? [...new Set(selectedPageIndexes)].filter((index) => index >= 0 && index < document.numPages)
     : Array.from({ length: document.numPages }, (_, index) => index);
-  if (!sourcePageIndexes.length) throw new Error("처리할 PDF 페이지가 없습니다.");
-  onProgress?.(2, "PDF의 내장 텍스트와 좌표를 확인하는 중…");
+  if (!sourcePageIndexes.length) throw new Error(local(language, "처리할 PDF 페이지가 없습니다.", "There are no PDF pages to process."));
+  onProgress?.(2, local(language, "PDF의 내장 텍스트와 좌표를 확인하는 중…", "Reading embedded PDF text and coordinates…"));
   for (let index = 0; index < sourcePageIndexes.length; index += 1) {
     const pageNumber = sourcePageIndexes[index] + 1;
     const page = await document.getPage(pageNumber);
     const content = await page.getTextContent();
     pages.push(layoutPdfItems(pageNumber, (content.items as unknown[]).filter(isTextItem)));
-    onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, `[${index + 1}/${sourcePageIndexes.length}] ${pageNumber}페이지 내장 텍스트 분석 완료`);
+    onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, local(language, `[${index + 1}/${sourcePageIndexes.length}] ${pageNumber}페이지 내장 텍스트 분석 완료`, `[${index + 1}/${sourcePageIndexes.length}] Embedded text analyzed for page ${pageNumber}`));
   }
 
   const ocrTargets = searchablePdf || ocrMode === "all"
@@ -188,7 +193,7 @@ export async function extractPdfText(
   if (ocrTargets.length) {
     const { createWorker } = await import("tesseract.js");
     let activePage = 0;
-    onProgress?.(19, "사이트에 포함된 한국어·영어 OCR 모델을 준비하는 중…");
+    onProgress?.(19, local(language, "사이트에 포함된 한국어·영어 OCR 모델을 준비하는 중…", "Preparing the bundled Korean and English OCR models…"));
     const ocrWorker = await createWorker(["kor", "eng"], undefined, {
       workerPath: `${TESSERACT_BASE_URL}worker.min.js`,
       corePath: `${TESSERACT_BASE_URL}core/`,
@@ -196,9 +201,9 @@ export async function extractPdfText(
       logger: (message) => {
         if (message.status === "recognizing text") {
           const value = 22 + ((activePage + message.progress) / ocrTargets.length) * 68;
-          onProgress?.(value, `[${activePage + 1}/${ocrTargets.length}] OCR 인식 중… ${Math.round(message.progress * 100)}%`);
+          onProgress?.(value, local(language, `[${activePage + 1}/${ocrTargets.length}] OCR 인식 중… ${Math.round(message.progress * 100)}%`, `[${activePage + 1}/${ocrTargets.length}] Recognizing text… ${Math.round(message.progress * 100)}%`));
         } else {
-          onProgress?.(19 + message.progress * 3, translateOcrStatus(message.status));
+          onProgress?.(19 + message.progress * 3, translateOcrStatus(message.status, language));
         }
       },
     });
@@ -206,8 +211,8 @@ export async function extractPdfText(
       for (activePage = 0; activePage < ocrTargets.length; activePage += 1) {
         const pageIndex = ocrTargets[activePage];
         const sourcePageNumber = sourcePageIndexes[pageIndex] + 1;
-        onProgress?.(22 + (activePage / ocrTargets.length) * 68, `[${activePage + 1}/${ocrTargets.length}] ${sourcePageNumber}페이지 OCR용 이미지 생성 중…`);
-        const canvas = await renderPageForOcr(document, sourcePageNumber);
+        onProgress?.(22 + (activePage / ocrTargets.length) * 68, local(language, `[${activePage + 1}/${ocrTargets.length}] ${sourcePageNumber}페이지 OCR용 이미지 생성 중…`, `[${activePage + 1}/${ocrTargets.length}] Rendering page ${sourcePageNumber} for OCR…`));
+        const canvas = await renderPageForOcr(document, sourcePageNumber, language);
         const recognized = await ocrWorker.recognize(
           canvas,
           searchablePdf ? { pdfTitle: file.name, pdfTextOnly: false } : {},
@@ -235,22 +240,22 @@ export async function extractPdfText(
   };
 }
 
-async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number) {
+async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number, language: AppLanguage) {
   const page = await document.getPage(pageNumber);
   const natural = page.getViewport({ scale: 1 });
   const mobileDevice = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 760;
   const requestedScale = mobileDevice ? 1.8 : 2.4;
   const pixelLimit = mobileDevice ? 8_000_000 : 12_000_000;
   const limitedScale = Math.min(requestedScale, Math.sqrt(pixelLimit / (natural.width * natural.height)));
-  return renderPageForExport(document, pageNumber, limitedScale);
+  return renderPageForExport(document, pageNumber, limitedScale, language);
 }
 
-async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number) {
+async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number, language: AppLanguage) {
   const page = await document.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
   const canvas = documentCanvas(viewport.width, viewport.height);
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error("PDF 페이지 이미지를 만들 수 없습니다.");
+  if (!context) throw new Error(local(language, "PDF 페이지 이미지를 만들 수 없습니다.", "Unable to render the PDF page image."));
   await page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" }).promise;
   return canvas;
 }
@@ -327,8 +332,8 @@ function documentCanvas(width: number, height: number) {
   return canvas;
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
-  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("이미지 파일을 만들지 못했습니다.")), type, quality));
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number | undefined, language: AppLanguage) {
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(local(language, "이미지 파일을 만들지 못했습니다.", "Unable to create the image file."))), type, quality));
 }
 
 function yieldToBrowser() {
@@ -339,22 +344,23 @@ function stripExtension(name: string) {
   return name.replace(/\.[^.]+$/, "") || "pdf";
 }
 
-function translateOcrStatus(status: string) {
-  const labels: Record<string, string> = {
-    "loading tesseract core": "OCR WebAssembly 엔진 불러오는 중…",
-    "initializing tesseract": "OCR 엔진 초기화 중…",
-    "loading language traineddata": "한국어·영어 학습 모델 내려받는 중…",
-    "initializing api": "한국어·영어 인식기 준비 중…",
+function translateOcrStatus(status: string, language: AppLanguage) {
+  const labels: Record<string, [string, string]> = {
+    "loading tesseract core": ["OCR WebAssembly 엔진 불러오는 중…", "Loading the OCR WebAssembly engine…"],
+    "initializing tesseract": ["OCR 엔진 초기화 중…", "Initializing the OCR engine…"],
+    "loading language traineddata": ["한국어·영어 학습 모델 내려받는 중…", "Loading Korean and English language models…"],
+    "initializing api": ["한국어·영어 인식기 준비 중…", "Preparing Korean and English recognition…"],
   };
-  return labels[status] || `OCR 준비 중 · ${status}`;
+  const label = labels[status];
+  return label ? local(language, label[0], label[1]) : local(language, `OCR 준비 중 · ${status}`, `Preparing OCR · ${status}`);
 }
 
-function normalizePdfOpenError(error: unknown) {
+function normalizePdfOpenError(error: unknown, language: AppLanguage) {
   if (error instanceof PasswordException || (error instanceof Error && error.name === "PasswordException")) {
-    return new Error("암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.");
+    return new Error(local(language, "암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.", "This PDF is password-protected. Try again with an unlocked copy."));
   }
   if (error instanceof Error && /password|encrypted/i.test(error.message)) {
-    return new Error("암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.");
+    return new Error(local(language, "암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.", "This PDF is password-protected. Try again with an unlocked copy."));
   }
-  return error instanceof Error ? error : new Error("PDF 파일을 열지 못했습니다.");
+  return error instanceof Error ? error : new Error(local(language, "PDF 파일을 열지 못했습니다.", "Unable to open the PDF file."));
 }

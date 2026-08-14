@@ -1,5 +1,7 @@
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Circle, LoaderCircle } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { OperationLogEntry, OperationStatus } from "../hooks/useOperationProgress";
 import type { ToolAccent } from "../app/toolRegistry";
@@ -10,7 +12,7 @@ export function OperationProgress({
   message,
   logs,
   accent,
-  title = "작업 진행 상황",
+  title,
 }: {
   status: OperationStatus;
   progress: number;
@@ -19,6 +21,8 @@ export function OperationProgress({
   accent: ToolAccent;
   title?: string;
 }) {
+  const { t } = useTranslation("common");
+  const displayTitle = title ?? t("progress.title");
   const [expanded, setExpanded] = useState(true);
   const logRef = useRef<HTMLOListElement>(null);
 
@@ -34,15 +38,15 @@ export function OperationProgress({
 
   if (status === "idle" || !logs.length) return null;
 
-  const stateLabel = status === "running" ? "처리 중" : status === "success" ? "완료" : "확인 필요";
+  const stateLabel = status === "running" ? t("progress.running") : status === "success" ? t("progress.success") : t("progress.needsAttention");
   const StateIcon = status === "running" ? LoaderCircle : status === "success" ? CheckCircle2 : AlertCircle;
 
   return (
-    <section className={`operation-progress accent-${accent} status-${status}`} aria-label={title}>
+    <section className={`operation-progress accent-${accent} status-${status}`} aria-label={displayTitle}>
       <div className="operation-progress-heading">
         <span className="operation-state-icon"><StateIcon className={status === "running" ? "spin" : ""} size={17} /></span>
         <div>
-          <small>{title}</small>
+          <small>{displayTitle}</small>
           <strong>{stateLabel}</strong>
         </div>
         <b>{progress}%</b>
@@ -61,7 +65,7 @@ export function OperationProgress({
       <p className="operation-current-message" aria-live="polite">{message}</p>
 
       <button className="operation-log-toggle" type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>
-        처리 로그 {logs.length}개
+        {t("progress.logs", { count: logs.length })}
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
 
@@ -74,7 +78,7 @@ export function OperationProgress({
               <li className={`log-${entry.status}${isCurrent ? " current" : ""}`} key={entry.id}>
                 <Icon className={isCurrent && status === "running" ? "spin" : ""} size={13} />
                 <span>{entry.message}</span>
-                <time>+{formatElapsed(entry.elapsedMs)}</time>
+                <time>+{formatElapsed(entry.elapsedMs, t)}</time>
               </li>
             );
           })}
@@ -84,10 +88,10 @@ export function OperationProgress({
   );
 }
 
-function formatElapsed(milliseconds: number) {
+function formatElapsed(milliseconds: number, t: TFunction<"common">) {
   if (milliseconds < 1_000) return `${Math.round(milliseconds)}ms`;
-  if (milliseconds < 60_000) return `${(milliseconds / 1_000).toFixed(1)}초`;
+  if (milliseconds < 60_000) return t("progress.seconds", { value: (milliseconds / 1_000).toFixed(1) });
   const minutes = Math.floor(milliseconds / 60_000);
   const seconds = Math.round((milliseconds % 60_000) / 1_000);
-  return `${minutes}분 ${seconds}초`;
+  return t("progress.minutesSeconds", { minutes, seconds });
 }

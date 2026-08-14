@@ -1,5 +1,6 @@
 import { Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface FileShareButtonProps {
   url: string;
@@ -9,6 +10,7 @@ interface FileShareButtonProps {
 }
 
 export function FileShareButton({ url, fileName, mimeType, className = "secondary-button" }: FileShareButtonProps) {
+  const { t } = useTranslation("common");
   const blobRef = useRef<Blob | undefined>(undefined);
   const [supported] = useState(() => typeof navigator !== "undefined" && typeof navigator.share === "function");
 
@@ -39,7 +41,7 @@ export function FileShareButton({ url, fileName, mimeType, className = "secondar
     });
   };
 
-  return <button type="button" className={className} onClick={share}><Share2 size={16} /> 공유·기기에 저장</button>;
+  return <button type="button" className={className} onClick={share}><Share2 size={16} /> {t("actions.share")}</button>;
 }
 
 function triggerDownload(url: string, fileName: string) {

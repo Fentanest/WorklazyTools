@@ -11,6 +11,7 @@ import puppeteer from "puppeteer-core";
 import * as XLSX from "xlsx";
 
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:5173";
+const koBaseUrl = `${baseUrl}/ko`;
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "worklazytools-test-"));
 
 try {
@@ -32,6 +33,10 @@ try {
     page.on("pageerror", (error) => pageErrors.push(error.message));
     page.on("request", (request) => {
       if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) {
+        const requestUrl = new URL(request.url());
+        const isConfiguredAnalyticsWrite = (requestUrl.hostname === "wcs.naver.com" && requestUrl.pathname === "/b")
+          || (requestUrl.hostname.endsWith("google-analytics.com") && requestUrl.pathname.endsWith("/collect"));
+        if (isConfiguredAnalyticsWrite) return;
         outboundWrites.push(`${request.method()} ${request.url()}`);
       }
     });
@@ -66,7 +71,7 @@ try {
 }
 
 async function testPdfTools(page, fixtures, tempDir) {
-  await page.goto(`${baseUrl}/tools/pdf-editor`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/pdf-editor`, { waitUntil: "networkidle0" });
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
@@ -154,7 +159,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const separatePdfNames = Object.keys(separateZip.files).filter((name) => name.endsWith(".pdf"));
   if (separatePdfNames.length !== 1) throw new Error(`Expected one selected page PDF, got ${separatePdfNames.length}.`);
 
-  await page.goto(`${baseUrl}/tools/pdf-editor/image-to-pdf`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/pdf-editor/image-to-pdf`, { waitUntil: "networkidle0" });
   await (await page.$('input[type="file"]')).uploadFile(fixtures.tinyPng);
   await page.waitForSelector(".pdf-image-card");
   await page.click(".summary-card .primary-button");
@@ -164,7 +169,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
-  await page.goto(`${baseUrl}/tools/pdf-editor/pdf-to-image`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/pdf-editor/pdf-to-image`, { waitUntil: "networkidle0" });
   await (await page.$('input[type="file"]')).uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
   await page.click(".summary-card .primary-button");
@@ -175,7 +180,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
 
-  await page.goto(`${baseUrl}/tools/pdf-editor/convert`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/pdf-editor/convert`, { waitUntil: "networkidle0" });
   const convertInput = await page.$('input[type="file"]');
   await convertInput.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
@@ -224,7 +229,7 @@ async function replaceInputValue(page, input, value) {
 }
 
 async function testEncryptedExcelMerge(page, fixtures, tempDir) {
-  await page.goto(`${baseUrl}/tools/excel-merger`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/excel-merger`, { waitUntil: "networkidle0" });
   const acceptedFormats = await page.$eval('input[type="file"]', (input) => input.accept);
   if (!acceptedFormats.includes(".xlsb") || !acceptedFormats.includes(".xlsm")) {
     throw new Error(`XLSB/XLSM were not exposed as accepted inputs: ${acceptedFormats}`);
@@ -252,7 +257,11 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   const outputPasswords = await page.$$(".output-password-form input");
   await outputPasswords[0].type("output-pass");
   await outputPasswords[1].type("output-pass");
-  await page.click(".summary-card .primary-button");
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".summary-card .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.$eval(".summary-card .primary-button", (button) => button.click());
   await waitForResult(page);
   await assertProgressLog(page, "Excel 병합");
 
@@ -279,7 +288,7 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
 }
 
 async function testFormulaTranslation(page, fixtures, tempDir) {
-  await page.goto(`${baseUrl}/tools/excel-merger?run=formula`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/excel-merger?run=formula`, { waitUntil: "networkidle0" });
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.xlsxOne, fixtures.xlsxTwo);
   await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 2);
@@ -301,7 +310,7 @@ async function testFormulaTranslation(page, fixtures, tempDir) {
 }
 
 async function testExcelSheetSelection(page, fixtures, tempDir) {
-  await page.goto(`${baseUrl}/tools/excel-merger?run=sheets`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/excel-merger?run=sheets`, { waitUntil: "networkidle0" });
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.sheetSelectionXlsx);
   await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 4);
@@ -344,7 +353,7 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
 }
 
 async function testExcelSheetTrim(page, fixtures, tempDir) {
-  await page.goto(`${baseUrl}/tools/excel-merger?run=sheet-trim`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/excel-merger?run=sheet-trim`, { waitUntil: "networkidle0" });
   await (await page.$('input[type="file"]')).uploadFile(fixtures.sheetTrimXlsx);
   await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 1);
 
@@ -381,7 +390,7 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
 }
 
 async function testWordCompare(page, fixtures, tempDir) {
-  await page.goto(`${baseUrl}/tools/word-compare`, { waitUntil: "networkidle0" });
+  await page.goto(`${koBaseUrl}/tools/word-compare`, { waitUntil: "networkidle0" });
   await dropFiles(page, ".drop-zone", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
   await dropFiles(page, ".drop-zone", [fixtures.afterDocx], 1);
   await page.waitForSelector(".pair-count-error");

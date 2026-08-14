@@ -19,6 +19,8 @@ worker.onmessage = async (event: MessageEvent) => {
   let compareFunction: { (...args: unknown[]): string; destroy?: () => void } | undefined;
   let trackedFunction: { (...args: unknown[]): number; destroy?: () => void } | undefined;
   let activePair = 0;
+  const en = event.data.language === "en";
+  const L = (ko: string, english: string) => en ? english : ko;
 
   try {
     const pairs = event.data.pairs as Array<{
@@ -27,14 +29,14 @@ worker.onmessage = async (event: MessageEvent) => {
       beforeBuffer: ArrayBuffer;
       afterBuffer: ArrayBuffer;
     }>;
-    if (!pairs.length) throw new Error("비교할 문서 쌍이 없습니다.");
+    if (!pairs.length) throw new Error(L("비교할 문서 쌍이 없습니다.", "There are no document pairs to compare."));
 
-    progress(3, `${pairs.length}개 문서 쌍을 안전한 작업 공간으로 전달했습니다.`);
-    progress(5, "문서 비교 기능을 준비하는 중… (첫 실행은 시간이 걸릴 수 있어요)");
+    progress(3, L(`${pairs.length}개 문서 쌍을 안전한 작업 공간으로 전달했습니다.`, `Moved ${pairs.length} document pairs into the processing workspace.`));
+    progress(5, L("문서 비교 기능을 준비하는 중… (첫 실행은 시간이 걸릴 수 있어요)", "Loading document comparison… The first run may take a while."));
     const pyodideModule = await import(/* @vite-ignore */ PYODIDE_MODULE_URL);
-    progress(18, "비교 기능을 불러왔습니다. 문서 분석 환경을 준비합니다.");
+    progress(18, L("비교 기능을 불러왔습니다. 문서 분석 환경을 준비합니다.", "Comparison loaded. Preparing document analysis."));
     const pyodide = await pyodideModule.loadPyodide({ indexURL: PYODIDE_BASE_URL });
-    progress(42, "문서 비교 준비를 완료했습니다.");
+    progress(42, L("문서 비교 준비를 완료했습니다.", "Document comparison is ready."));
 
     pyodide.runPython(compareScript);
     pyodide.runPython(trackedDocxScript);
@@ -50,7 +52,7 @@ worker.onmessage = async (event: MessageEvent) => {
       const pair = pairs[index];
       const startProgress = 45 + Math.round((index / pairs.length) * 50);
       const endProgress = 45 + Math.round(((index + 1) / pairs.length) * 50);
-      progress(startProgress, `[${activePair}/${pairs.length}] ${pair.beforeName} ↔ ${pair.afterName} 분석 중…`);
+      progress(startProgress, L(`[${activePair}/${pairs.length}] ${pair.beforeName} ↔ ${pair.afterName} 분석 중…`, `[${activePair}/${pairs.length}] Analyzing ${pair.beforeName} ↔ ${pair.afterName}…`));
       pyodide.FS.writeFile(beforePath, new Uint8Array(pair.beforeBuffer));
       pyodide.FS.writeFile(afterPath, new Uint8Array(pair.afterBuffer));
       const resultText = compare(
@@ -65,7 +67,7 @@ worker.onmessage = async (event: MessageEvent) => {
       const result = JSON.parse(resultText) as WordCompareResult;
       let trackedBuffer: ArrayBuffer | undefined;
       if (event.data.options.trackedDocument) {
-        progress(Math.min(endProgress - 1, startProgress + Math.round((endProgress - startProgress) * 0.7)), `[${activePair}/${pairs.length}] Word 변경 추적 파일 생성 중…`);
+        progress(Math.min(endProgress - 1, startProgress + Math.round((endProgress - startProgress) * 0.7)), L(`[${activePair}/${pairs.length}] Word 변경 추적 파일 생성 중…`, `[${activePair}/${pairs.length}] Creating tracked-changes Word file…`));
         generateTracked(
           beforePath,
           afterPath,
@@ -83,23 +85,23 @@ worker.onmessage = async (event: MessageEvent) => {
       results.push({ result, trackedBuffer });
       pyodide.FS.unlink(beforePath);
       pyodide.FS.unlink(afterPath);
-      progress(endProgress, `[${activePair}/${pairs.length}] 비교 결과 정리 완료`);
+      progress(endProgress, L(`[${activePair}/${pairs.length}] 비교 결과 정리 완료`, `[${activePair}/${pairs.length}] Comparison result ready`));
     }
 
     compare.destroy?.();
     generateTracked.destroy?.();
-    progress(100, `${pairs.length}개 문서 쌍 비교 완료`);
+    progress(100, L(`${pairs.length}개 문서 쌍 비교 완료`, `Compared ${pairs.length} document pairs`));
     worker.postMessage({ type: "result", result: results }, transfers);
   } catch (error) {
     compareFunction?.destroy?.();
     trackedFunction?.destroy?.();
     const rawMessage = error instanceof Error ? error.message : String(error);
     const detail = /zip|document\.xml|BadZipFile/i.test(rawMessage)
-      ? "DOCX 파일 구조를 읽지 못했습니다. 손상되었거나 실제 DOCX 형식이 아닌지 확인해 주세요."
+      ? L("DOCX 파일 구조를 읽지 못했습니다. 손상되었거나 실제 DOCX 형식이 아닌지 확인해 주세요.", "Could not read the DOCX structure. Check whether the file is damaged or is not actually a DOCX file.")
       : /fetch|network|import/i.test(rawMessage)
-        ? "문서 비교 실행 환경을 불러오지 못했습니다. 사이트를 온라인에서 다시 연 뒤 재시도해 주세요."
+        ? L("문서 비교 실행 환경을 불러오지 못했습니다. 사이트를 온라인에서 다시 연 뒤 재시도해 주세요.", "Could not load the comparison runtime. Reopen the site while online and try again.")
         : rawMessage;
-    const message = activePair ? `${activePair}번 문서 쌍: ${detail}` : detail;
+    const message = activePair ? L(`${activePair}번 문서 쌍: ${detail}`, `Document pair ${activePair}: ${detail}`) : detail;
     worker.postMessage({ type: "error", error: { message } });
   }
 };

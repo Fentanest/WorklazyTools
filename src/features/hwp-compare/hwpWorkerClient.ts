@@ -21,6 +21,7 @@ export async function compareHwpFilePairs(
   pairs: HwpFilePair[],
   options: HwpCompareOptions,
   onProgress?: (progress: number, message: string) => void,
+  language: "ko" | "en" = "ko",
 ) {
   const worker = new Worker(new URL("./hwp-compare.worker.ts", import.meta.url), { type: "module" });
   const payloads: Array<{
@@ -51,12 +52,12 @@ export async function compareHwpFilePairs(
       }
       worker.terminate();
       if (event.data.type === "result") resolve(event.data.result as HwpWorkerPairResult[]);
-      else reject(new Error(event.data.error?.message || "HWP 문서 비교 중 오류가 발생했습니다."));
+      else reject(new Error(event.data.error?.message || (language === "en" ? "An error occurred while comparing HWP documents." : "HWP 문서 비교 중 오류가 발생했습니다.")));
     };
     worker.onerror = (event) => {
       worker.terminate();
-      reject(new Error(event.message || "HWP 문서 비교를 시작하지 못했습니다."));
+      reject(new Error(event.message || (language === "en" ? "Could not start HWP comparison." : "HWP 문서 비교를 시작하지 못했습니다.")));
     };
-    worker.postMessage({ pairs: payloads, options }, transfer);
+    worker.postMessage({ pairs: payloads, options, language }, transfer);
   });
 }

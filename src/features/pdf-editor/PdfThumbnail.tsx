@@ -2,6 +2,7 @@ import { Check, ChevronLeft, ChevronRight, GripVertical, RotateCw, Trash2 } from
 import { useEffect, useRef, useState } from "react";
 
 import { renderPdfThumbnail } from "./pdfPreview";
+import { useAppLanguage } from "../../i18n/routing";
 import type { PdfPageItem } from "./types";
 
 export function PdfThumbnail({
@@ -27,6 +28,8 @@ export function PdfThumbnail({
   draggable?: boolean;
   selected?: boolean;
 }) {
+  const language = useAppLanguage();
+  const L = (ko: string, en: string) => language === "ko" ? ko : en;
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(false);
@@ -52,11 +55,11 @@ export function PdfThumbnail({
     let cancelled = false;
     setError("");
     setRendered(false);
-    renderPdfThumbnail(file, item.sourcePageIndex, canvasRef.current)
+    renderPdfThumbnail(file, item.sourcePageIndex, canvasRef.current, 172, language)
       .then((size) => { if (!cancelled) { setDimensions(size); setRendered(true); } })
-      .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "미리보기 실패"); });
+      .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : L("미리보기 실패", "Preview failed")); });
     return () => { cancelled = true; };
-  }, [file, item.sourcePageIndex, visible]);
+  }, [file, item.sourcePageIndex, visible, language]);
 
   const sideways = item.rotation === 90 || item.rotation === 270;
   const frameStyle = {
@@ -71,31 +74,31 @@ export function PdfThumbnail({
       data-rotation={item.rotation}
     >
       <div className="pdf-page-card-top">
-        {draggable && <button type="button" className="pdf-drag-handle" aria-label={`${outputIndex + 1}번 페이지 순서 변경`}><GripVertical size={16} /></button>}
+        {draggable && <button type="button" className="pdf-drag-handle" aria-label={L(`${outputIndex + 1}번 페이지 순서 변경`, `Reorder page ${outputIndex + 1}`)}><GripVertical size={16} /></button>}
         <strong>{outputIndex + 1}</strong>
-        <span>{item.rotation ? `${item.rotation}°` : "원본 방향"}</span>
-        {onSelect && <button type="button" className={`pdf-page-select${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} aria-label={`${outputIndex + 1}번 페이지 ${selected ? "선택 해제" : "선택"}`}><Check size={13} /></button>}
+        <span>{item.rotation ? `${item.rotation}°` : L("원본 방향", "Original")}</span>
+        {onSelect && <button type="button" className={`pdf-page-select${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} aria-label={L(`${outputIndex + 1}번 페이지 ${selected ? "선택 해제" : "선택"}`, `${selected ? "Deselect" : "Select"} page ${outputIndex + 1}`)}><Check size={13} /></button>}
       </div>
       <div className="pdf-thumbnail-frame" style={frameStyle}>
-        {!!groupNumbers.length && <span className="pdf-group-badges" aria-label={`포함된 범위 그룹 ${groupNumbers.join(", ")}`}>{groupNumbers.map((number) => <b key={number}>{number}</b>)}</span>}
-        {(!visible || visible && !rendered && !error) && <span className="pdf-thumbnail-placeholder">{visible ? "페이지 그리는 중…" : "미리보기 대기"}</span>}
+        {!!groupNumbers.length && <span className="pdf-group-badges" aria-label={L(`포함된 범위 그룹 ${groupNumbers.join(", ")}`, `Included range groups ${groupNumbers.join(", ")}`)}>{groupNumbers.map((number) => <b key={number}>{number}</b>)}</span>}
+        {(!visible || visible && !rendered && !error) && <span className="pdf-thumbnail-placeholder">{visible ? L("페이지 그리는 중…", "Rendering page…") : L("미리보기 대기", "Preview pending")}</span>}
         {error && <span className="pdf-thumbnail-error">{error}</span>}
         <canvas
           ref={canvasRef}
-          aria-label={`${item.sourceName} ${item.sourcePageIndex + 1}페이지 미리보기`}
+          aria-label={L(`${item.sourceName} ${item.sourcePageIndex + 1}페이지 미리보기`, `${item.sourceName} page ${item.sourcePageIndex + 1} preview`)}
           style={{ opacity: rendered ? 1 : 0, transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${sideways ? dimensions.width / dimensions.height : 1})` }}
         />
       </div>
       <div className="pdf-page-source" title={item.sourceName}>
         <strong>{item.sourceName}</strong>
-        <small>원본 {item.sourcePageIndex + 1}페이지</small>
+        <small>{L(`원본 ${item.sourcePageIndex + 1}페이지`, `Source page ${item.sourcePageIndex + 1}`)}</small>
       </div>
       {(onRotate || onRemove || onMove) && (
         <div className="pdf-page-actions">
-          {onMove && <button type="button" onClick={() => onMove(-1)} disabled={outputIndex === 0} aria-label="왼쪽으로 이동"><ChevronLeft size={15} /></button>}
-          {onRotate && <button type="button" onClick={onRotate} aria-label="오른쪽으로 90도 회전"><RotateCw size={15} /><span>회전</span></button>}
-          {onMove && <button type="button" onClick={() => onMove(1)} aria-label="오른쪽으로 이동"><ChevronRight size={15} /></button>}
-          {onRemove && <button type="button" className="danger" onClick={onRemove} aria-label="페이지 삭제"><Trash2 size={15} /></button>}
+          {onMove && <button type="button" onClick={() => onMove(-1)} disabled={outputIndex === 0} aria-label={L("왼쪽으로 이동", "Move left")}><ChevronLeft size={15} /></button>}
+          {onRotate && <button type="button" onClick={onRotate} aria-label={L("오른쪽으로 90도 회전", "Rotate 90 degrees clockwise")}><RotateCw size={15} /><span>{L("회전", "Rotate")}</span></button>}
+          {onMove && <button type="button" onClick={() => onMove(1)} aria-label={L("오른쪽으로 이동", "Move right")}><ChevronRight size={15} /></button>}
+          {onRemove && <button type="button" className="danger" onClick={onRemove} aria-label={L("페이지 삭제", "Delete page")}><Trash2 size={15} /></button>}
         </div>
       )}
     </article>

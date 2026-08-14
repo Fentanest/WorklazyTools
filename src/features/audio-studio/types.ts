@@ -17,6 +17,7 @@ export type AudioEditCommand = "MUTE" | "CUT" | "COPY" | "PASTE" | "DELETE" | "P
 export type AudioExportCommand = "EXPORT_WAV" | "EXPORT_MP3";
 
 export interface AudioProcessorRequest {
+  language?: "ko" | "en";
   command: AudioEditCommand | AudioExportCommand;
   document: Pick<AudioDocumentData, "channels" | "sampleRate" | "length">;
   start?: number;

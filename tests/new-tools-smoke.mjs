@@ -9,6 +9,7 @@ import puppeteer from "puppeteer-core";
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
+const koBaseUrl = `${baseUrl}/ko`;
 const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-new-tools-"));
 
 try {
@@ -23,11 +24,14 @@ try {
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
     page.setDefaultTimeout(300_000);
     const pageErrors = [];
+    const requestFailures = [];
     page.on("pageerror", (error) => { pageErrors.push(error.message); console.error("[page error]", error.message); });
     page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("ERR_CONNECTION_REFUSED")) console.error("[browser]", message.text()); });
     page.on("requestfailed", (request) => {
       if (request.url().includes("googlesyndication.com")) return;
       if (request.url().startsWith("blob:") && request.failure()?.errorText === "net::ERR_ABORTED") return;
+      if (new URL(request.url()).origin !== new URL(baseUrl).origin) return;
+      requestFailures.push(`${request.url()} ${request.failure()?.errorText || "unknown error"}`);
       console.error("[request failed]", request.url(), request.failure()?.errorText);
     });
 
@@ -49,6 +53,7 @@ try {
     }
 
     if (pageErrors.length) throw new Error(`Browser errors:\n${pageErrors.join("\n")}`);
+    if (requestFailures.length) throw new Error(`Same-origin request failures:\n${requestFailures.join("\n")}`);
   } finally {
     await browser.close();
   }
@@ -58,7 +63,7 @@ try {
 }
 
 async function testHwpEditor(page, hwpPaths) {
-  await page.goto(`${baseUrl}/tools/hwp-compare`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${koBaseUrl}/tools/hwp-compare`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".rhwp-version-notice");
   const compareVersion = await page.$eval(".rhwp-version-notice", (element) => element.textContent || "");
   if (!compareVersion.includes("rhwp 0.8.4") || !compareVersion.includes("@rhwp/core WebAssembly")) {
@@ -78,7 +83,7 @@ async function testHwpEditor(page, hwpPaths) {
     if (/edwardkim\.github\.io|cdn\.jsdelivr\.net/i.test(request.url())) forbiddenRhwpRequests.push(request.url());
   };
   page.on("request", recordRhwpRequest);
-  await page.goto(`${baseUrl}/tools/hwp-editor`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${koBaseUrl}/tools/hwp-editor`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".rhwp-editor-shell iframe");
   await page.waitForFunction(() => document.querySelector(".operation-progress.status-success")?.textContent?.includes("편집기를 사용할 수 있습니다"));
   const runtime = await page.$eval(".rhwp-editor-shell iframe", (iframe) => {
@@ -118,7 +123,7 @@ async function testHwpEditor(page, hwpPaths) {
 }
 
 async function testImageStudio(page, imagePaths) {
-  await page.goto(`${baseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4 && document.querySelector(".studio-tabs button")?.textContent?.includes("이미지 편집"));
   await page.waitForSelector(".fabric-stage");
   await dropCanvasImages(page, ".fabric-stage", ["#159bd7"]);
@@ -264,7 +269,7 @@ async function dropCanvasImages(page, selector, colors) {
 }
 
 async function testAudioStudio(page, audioPath) {
-  await page.goto(`${baseUrl}/tools/audio-studio`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${koBaseUrl}/tools/audio-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".audio-studio-page input[type=file]");
   await (await page.$(".audio-studio-page input[type=file]")).uploadFile(audioPath);
   await page.waitForFunction(() => document.querySelector(".operation-progress.status-success")?.textContent?.includes("파형 준비 완료"), { timeout: 60_000 });
@@ -368,7 +373,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     if (request.url().includes("pagead2.googlesyndication.com")) videoAdRequests.push(request.url());
   };
   page.on("request", captureVideoRequests);
-  await page.goto(`${baseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
   await page.waitForSelector(".video-studio-page input[type=file]");
   page.off("request", captureVideoRequests);
@@ -578,7 +583,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   const largeReadState = await page.evaluate(() => window.__videoFileReadState);
   if (largeReadState.arrayBufferReads !== 0) throw new Error(`A 3824MB source triggered a contiguous ArrayBuffer read: ${JSON.stringify(largeReadState)}`);
 
-  await page.goto(`${baseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
   await page.waitForSelector(".video-studio-page input[type=file]");
   await installVideoTransferProbe(page);

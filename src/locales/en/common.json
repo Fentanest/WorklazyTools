@@ -1,0 +1,88 @@
+{
+  "language": { "ko": "한국어", "en": "English", "switchLabel": "Choose language" },
+  "landing": {
+    "eyebrow": "WORKLAZY TOOLS",
+    "title": "Choose your language · 언어를 선택하세요",
+    "description": "Your choice is saved only in this browser. 선택한 언어는 이 브라우저에만 저장됩니다.",
+    "recommended": "Browser recommendation",
+    "continueKo": "한국어로 계속",
+    "continueEn": "Continue in English"
+  },
+  "navigation": {
+    "browse": "Explore",
+    "tools": "Tools",
+    "home": "Home",
+    "allTools": "All tools",
+    "about": "About",
+    "openMenu": "Open tools menu",
+    "shortcuts": "Shortcuts",
+    "chooseTask": "What would you like to do?",
+    "close": "Close",
+    "primaryLabel": "Primary navigation",
+    "mobileLabel": "Mobile navigation"
+  },
+  "footer": {
+    "service": "About the service",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "licenses": "Licenses & Notices",
+    "contact": "Contact",
+    "policyLabel": "Policies and contact",
+    "feedback": "Contact, ideas & bug reports",
+    "feedbackDescription": "Report bugs or suggest features on GitHub Issues"
+  },
+  "privacy": {
+    "mini": "Files and passwords stay\nin your browser",
+    "compact": "Files and passwords are processed only in this browser.",
+    "eyebrow": "PRIVATE BY DESIGN",
+    "title": "Your work files are never uploaded to our server.",
+    "description": "Selected files, passwords and results are processed only in your current browser. No account or external upload is required.",
+    "local": "Local processing",
+    "removed": "Cleared when the tab closes"
+  },
+  "home": {
+    "kicker": "Small, useful tools for work",
+    "titleBefore": "Let the tools handle",
+    "titleAccent": "the tedious file work.",
+    "description": "Handle documents, media, text, calculations and privacy tasks without installing software or signing in. Choose a tool and the work stays in your browser.",
+    "browse": "Explore tools",
+    "noUpload": "No work-file uploads",
+    "availableTitle": "Tools you can use now",
+    "howTitle": "How your files are handled",
+    "steps": {
+      "selectTitle": "1. Choose files", "selectDescription": "Choose the documents you want to work with in your browser's file picker.",
+      "processTitle": "2. Process locally", "processDescription": "See progress and logs while your files remain on your device.",
+      "saveTitle": "3. Save the result", "saveDescription": "Review the result created by your browser and download it to your device."
+    }
+  },
+  "files": {
+    "generic": "File", "selectOrDrop": "{{label}}: {{action}} or drop", "select": "select", "add": "add more",
+    "selected": "{{count}} files selected", "keepAdding": "you can keep adding files", "dropHere": "Drop files here",
+    "added": "Added to the list", "remove": "Remove {{name}}"
+  },
+  "actions": {
+    "selectFile": "Choose files",
+    "addFiles": "Add more files",
+    "remove": "Remove",
+    "download": "Download",
+    "save": "Save",
+    "copy": "Copy",
+    "copied": "Copied",
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "close": "Close",
+    "retry": "Try again",
+    "share": "Share or save to device",
+    "viewAll": "View all"
+  },
+  "status": {
+    "preparing": "Preparing…",
+    "processing": "Processing…",
+    "complete": "Complete",
+    "failed": "Failed",
+    "loadingTool": "Loading {{tool}}…"
+  },
+  "progress": { "title":"Progress", "running":"Processing", "success":"Complete", "needsAttention":"Needs attention", "logs":"{{count}} log entries", "seconds":"{{value}}s", "minutesSeconds":"{{minutes}}m {{seconds}}s" },
+  "guide": { "faq":"Frequently asked questions" },
+  "format": { "characters": "{{count}} characters", "files": "{{count}} files", "tools": "{{count}} tools" }
+}

@@ -1,6 +1,8 @@
 import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
+import type { TFunction } from "i18next";
 import { Canvas, Circle, FabricImage, FabricText, Line, PencilBrush, Rect, filters, type FabricObject } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -14,6 +16,7 @@ type StudioTab = "editor" | "batch" | "collage" | "gif";
 const RASTER_IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
 
 export function ImageStudioPage() {
+  const { t } = useTranslation("features");
   const [tab, setTab] = useState<StudioTab>("editor");
   const progress = useOperationProgress();
   const activeController = useRef<AbortController | undefined>(undefined);
@@ -22,41 +25,31 @@ export function ImageStudioPage() {
 
   return (
     <div className="page tool-page page-enter image-studio-page">
-      <PageHeader eyebrow="IMAGE STUDIO" title="이미지 스튜디오" description="한 장을 꾸미거나 여러 이미지를 일괄 편집하고 콜라주·GIF로 저장하세요.">
+      <PageHeader eyebrow="IMAGE STUDIO" title={t("image.title")} description={t("image.description")}>
         <PrivacyBanner compact />
       </PageHeader>
-      <nav className="studio-tabs" aria-label="이미지 기능">
+      <nav className="studio-tabs" aria-label={t("image.tabs.label")}>
         {([
-          ["editor", "이미지 편집", ImageIcon], ["batch", "일괄 편집", Images], ["collage", "이어붙이기·콜라주", LayoutGrid], ["gif", "GIF 만들기", Sparkles],
+          ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],
         ] as const).map(([value, label, Icon]) => <button type="button" className={tab === value ? "active" : ""} onClick={() => { setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></button>)}
       </nav>
 
-      <div className="inline-notice warning image-format-notice"><AlertTriangle size={16} /><span>HEIC·HEIF 입력은 현재 지원하지 않습니다. iPhone 사진은 JPG·PNG·WebP로 변환하거나 ‘높은 호환성’ 형식으로 촬영한 파일을 사용해 주세요.</span></div>
-      {(tab === "batch" || tab === "collage" || tab === "gif") && <div className="inline-notice warning image-worker-notice"><AlertTriangle size={16} /><span>이 탭은 브라우저의 고급 이미지 처리 기능(OffscreenCanvas)을 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저가 필요합니다. 모바일에서 대형 이미지가 위험한 것은 아니지만 완성 이미지 크기를 약 1,600만 화소 이하로 맞추고 적은 파일부터 처리하면 메모리 부족으로 멈출 가능성을 줄일 수 있습니다.</span></div>}
+      <div className="inline-notice warning image-format-notice"><AlertTriangle size={16} /><span>{t("image.heic")}</span></div>
+      {(tab === "batch" || tab === "collage" || tab === "gif") && <div className="inline-notice warning image-worker-notice"><AlertTriangle size={16} /><span>{t("image.offscreen")}</span></div>}
 
       {tab === "editor" && <ImageEditor />}
       {tab === "batch" && <BatchImagePanel progress={progress} controllerRef={activeController} />}
       {tab === "collage" && <CollagePanel progress={progress} controllerRef={activeController} />}
       {tab === "gif" && <GifPanel progress={progress} controllerRef={activeController} />}
 
-      <OperationProgress {...progress} accent="sky" title="이미지 처리 로그" />
-      {progress.status === "running" && <div className="cancel-operation"><button className="secondary-button" type="button" onClick={() => activeController.current?.abort()}>작업 취소</button></div>}
+      <OperationProgress {...progress} accent="sky" title={t("image.log")} />
+      {progress.status === "running" && <div className="cancel-operation"><button className="secondary-button" type="button" onClick={() => activeController.current?.abort()}>{t("image.cancel")}</button></div>}
 
       <ToolGuide
-        title="브라우저 이미지 편집 안내"
-        description="원본 이미지와 편집 결과는 외부 작업 서버로 업로드하지 않습니다. 한 장 편집은 화면에서, 일괄 작업은 브라우저의 별도 작업 공간에서 처리합니다."
-        blocks={[
-          { title: "통합 이미지 편집", paragraphs: ["사진을 열거나 빈 캔버스에서 시작해 자르기·밝기·대비·색조, 연필·붓·지우개, 텍스트·도형·이모지를 한 작업 기록 안에서 사용합니다. 원본 사진은 기본 잠금되어 실수로 이동하지 않습니다."] },
-          { title: "일괄 처리", paragraphs: ["여러 파일과 클립보드 이미지를 한 목록에 추가할 수 있습니다. 크기 변경과 워터마크는 브라우저의 별도 작업 공간에서 한 장씩 처리하고 결과를 ZIP 파일로 묶습니다."] },
-          { title: "콜라주와 GIF", paragraphs: ["이어붙이기는 배치·간격·배경색을 바꿀 때 실제 출력 계산과 같은 방식의 축소 미리보기를 갱신합니다. GIF는 256색 제한 때문에 사진의 미세한 색 변화가 단순화될 수 있습니다."] },
-        ]}
-        faq={[
-          { question: "이미지가 서버로 전송되나요?", answer: "아니요. 이미지 파일은 현재 브라우저 메모리와 별도 작업 공간 안에서만 처리합니다." },
-          { question: "원본 파일이 바뀌나요?", answer: "아니요. 원본은 읽기만 하며 모든 결과는 새 파일로 내려받습니다." },
-          { question: "지원 형식은 무엇인가요?", answer: "JPG, PNG, WebP를 입력으로 사용합니다. HEIC·HEIF는 현재 지원하지 않습니다. 출력은 PNG, JPG, WebP와 애니메이션 GIF를 지원합니다." },
-          { question: "투명 배경을 유지할 수 있나요?", answer: "네. 이미지 편집, 일괄 편집과 콜라주에서 투명 배경을 선택할 수 있습니다. PNG·WebP는 투명도를 유지하며 JPG로 저장하면 투명한 부분을 흰색으로 처리합니다." },
-          { question: "대용량 이미지가 중단되는 이유는 무엇인가요?", answer: "브라우저와 기기에는 캔버스 최대 크기와 메모리 한도가 있습니다. 출력 크기나 파일 수를 줄이면 안정적으로 처리할 수 있습니다." },
-        ]}
+        title={t("image.guide.title")}
+        description={t("image.guide.description")}
+        blocks={(t("image.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
+        faq={(t("image.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
     </div>
   );
@@ -77,6 +70,7 @@ interface EditorHistorySnapshot {
 }
 
 function ImageEditor() {
+  const { t } = useTranslation("features");
   const canvasElement = useRef<HTMLCanvasElement>(null);
   const stageElement = useRef<HTMLDivElement>(null);
   const canvas = useRef<Canvas | undefined>(undefined);
@@ -229,7 +223,7 @@ function ImageEditor() {
   const newBlankCanvas = () => {
     const instance = canvas.current;
     if (!instance) return;
-    if (instance.getObjects().length && !window.confirm("현재 편집 내용을 비우고 새 캔버스를 시작할까요?")) return;
+    if (instance.getObjects().length && !window.confirm(t("image.editor.confirm"))) return;
     restoringRef.current = true;
     instance.clear();
     instance.setDimensions({ width: 900, height: 600 });
@@ -443,35 +437,35 @@ function ImageEditor() {
     } else dataUrl = instance.toDataURL({ format, quality: 0.92, multiplier: 1 });
     const anchor = document.createElement("a");
     anchor.href = dataUrl;
-    anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-편집.${format === "jpeg" ? "jpg" : format}`;
+    anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${format === "jpeg" ? "jpg" : format}`;
     anchor.click();
   };
 
   return (
-    <SectionCard title="이미지 편집" description="사진을 보정하거나 빈 캔버스에 그리고, 모든 작업을 같은 Undo·Redo 기록에서 관리하세요.">
-      <FileDropZone files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint="JPG·PNG·WebP · Ctrl/⌘+V로 붙여넣기" accent="sky" />
+    <SectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
+      <FileDropZone files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
       <ClipboardHint mode="replace" />
-      <div className="editor-source-actions"><button type="button" className="secondary-button" onClick={newBlankCanvas}><ImageIcon size={16} /> 빈 캔버스로 새로 시작</button>{file && <span><strong>{file.name}</strong>을 바탕으로 편집 중</span>}</div>
+      <div className="editor-source-actions"><button type="button" className="secondary-button" onClick={newBlankCanvas}><ImageIcon size={16} /> {t("image.editor.blank")}</button>{file && <span>{t("image.editor.editing", { name: file.name })}</span>}</div>
       <div className="editor-toolbar">
-        <div className="editor-draw-tools" aria-label="이미지 편집 도구">
-          <ToolButton active={mode === "select"} label="선택" onClick={() => setMode("select")}><MousePointer2 /></ToolButton>
-          <ToolButton active={mode === "pencil"} label="연필" onClick={() => setMode("pencil")}><Pencil /></ToolButton>
-          <ToolButton active={mode === "brush"} label="붓" onClick={() => setMode("brush")}><Brush /></ToolButton>
-          <ToolButton active={mode === "erase"} label="지우개" onClick={() => setMode("erase")}><Eraser /></ToolButton>
+        <div className="editor-draw-tools" aria-label={t("image.editor.tools")}>
+          <ToolButton active={mode === "select"} label={t("image.editor.select")} onClick={() => setMode("select")}><MousePointer2 /></ToolButton>
+          <ToolButton active={mode === "pencil"} label={t("image.editor.pencil")} onClick={() => setMode("pencil")}><Pencil /></ToolButton>
+          <ToolButton active={mode === "brush"} label={t("image.editor.brush")} onClick={() => setMode("brush")}><Brush /></ToolButton>
+          <ToolButton active={mode === "erase"} label={t("image.editor.eraser")} onClick={() => setMode("erase")}><Eraser /></ToolButton>
         </div>
-        <label className="editor-draw-color"><span>그리기 색상</span><input type="color" value={drawColor} onChange={(event) => setDrawColor(event.target.value)} /></label>
-        <label className="editor-draw-width"><span>굵기 {drawWidth}px</span><input type="range" min={1} max={40} value={drawWidth} onChange={(event) => setDrawWidth(Number(event.target.value))} /></label>
-        <div className="editor-history-actions"><button type="button" disabled={historyState.index <= 0} aria-label="실행 취소" onClick={() => void restore(historyState.index - 1)}><Undo2 /></button><button type="button" disabled={historyState.index >= historyState.length - 1} aria-label="다시 실행" onClick={() => void restore(historyState.index + 1)}><Redo2 /></button><button type="button" aria-label="선택 개체 삭제" onClick={removeSelectedLayers}><Trash2 /></button></div>
+        <label className="editor-draw-color"><span>{t("image.editor.color")}</span><input type="color" value={drawColor} onChange={(event) => setDrawColor(event.target.value)} /></label>
+        <label className="editor-draw-width"><span>{t("image.editor.width", { count: drawWidth })}</span><input type="range" min={1} max={40} value={drawWidth} onChange={(event) => setDrawWidth(Number(event.target.value))} /></label>
+        <div className="editor-history-actions"><button type="button" disabled={historyState.index <= 0} aria-label={t("image.editor.undo")} onClick={() => void restore(historyState.index - 1)}><Undo2 /></button><button type="button" disabled={historyState.index >= historyState.length - 1} aria-label={t("image.editor.redo")} onClick={() => void restore(historyState.index + 1)}><Redo2 /></button><button type="button" aria-label={t("image.editor.deleteObject")} onClick={removeSelectedLayers}><Trash2 /></button></div>
       </div>
       <div className="image-editor-layout">
         <aside className="image-editor-controls">
-          <div className="editor-tool-group"><strong>캔버스 비율·자르기</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button></div></div>
-          <div className="editor-tool-group"><strong>선택 레이어</strong><div className="icon-tool-row"><button title="오른쪽으로 90도 회전" aria-label="오른쪽으로 90도 회전" type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title="좌우 반전" aria-label="좌우 반전" type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title="상하 반전" aria-label="상하 반전" type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title="맨 앞으로" aria-label="맨 앞으로" type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title="맨 뒤로" aria-label="맨 뒤로" type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title="삭제 (Delete)" aria-label="삭제 (Delete)" type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
-          <div className={`editor-tool-group${file ? "" : " is-disabled"}`}><strong>원본 사진 보정</strong><label>밝기 <b>{brightness}</b><input disabled={!file} type="range" min={-80} max={80} value={brightness} onChange={(event) => updateFilter("brightness", Number(event.target.value))} /></label><label>대비 <b>{contrast}</b><input disabled={!file} type="range" min={-80} max={80} value={contrast} onChange={(event) => updateFilter("contrast", Number(event.target.value))} /></label><label>색조 <b>{hue}°</b><input disabled={!file} type="range" min={-180} max={180} value={hue} onChange={(event) => updateFilter("hue", Number(event.target.value))} /></label>{file && <ToggleRow label="원본 사진 잠금" description="이동·회전 실수 방지" checked={baseLocked} onChange={updateBaseLock} />}</div>
-          <div className="editor-tool-group"><strong>텍스트·스티커</strong><div className="inline-input-action"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={() => addText()}><Type size={16} /></button></div><div className="button-grid sticker-grid">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" key={emoji} onClick={() => addText(emoji)}>{emoji}</button>)}</div></div>
-          <div className="editor-tool-group"><strong>선·도형</strong><div className="icon-tool-row"><button title="직선 추가" aria-label="직선 추가" type="button" onClick={() => addShape("line")}><Minus size={18} /></button><button title="사각형 추가" aria-label="사각형 추가" type="button" onClick={() => addShape("rect")}><Square size={18} /></button><button title="원 추가" aria-label="원 추가" type="button" onClick={() => addShape("circle")}><CircleIcon size={18} /></button></div></div>
-          <div className={`editor-tool-group shape-style-controls${shapeSelected ? "" : " is-disabled"}`}><strong>선택 도형 스타일</strong><label><span>채움</span><input aria-label="도형 채움색" type="color" value={shapeFill} disabled={!shapeSelected} onChange={(event) => { setShapeFill(event.target.value); setSelectedShapeStyle("fill", event.target.value); }} /></label><label><span>테두리</span><input aria-label="도형 테두리색" type="color" value={shapeStroke} disabled={!shapeSelected} onChange={(event) => { setShapeStroke(event.target.value); setSelectedShapeStyle("stroke", event.target.value); }} /></label><label><span>테두리 두께 <b>{shapeStrokeWidth}px</b></span><input aria-label="도형 테두리 두께" type="range" min={0} max={30} step={1} value={shapeStrokeWidth} disabled={!shapeSelected} onChange={(event) => { const value = Number(event.target.value); setShapeStrokeWidth(value); setSelectedShapeStyle("strokeWidth", value); }} /></label>{!shapeSelected && <small>캔버스에서 사각형이나 원을 선택하세요.</small>}</div>
-          <div className="editor-tool-group editor-background-control"><strong>배경·정리</strong><label><span>배경색</span><input type="color" value={background} disabled={transparentBackground} onChange={(event) => updateBackground(event.target.value, transparentBackground)} /></label><div className="image-background-options compact"><ToggleRow label="투명 배경" description="PNG·WebP 출력에 적용" checked={transparentBackground} onChange={(checked) => updateBackground(background, checked)} /></div><button type="button" className="secondary-button" onClick={clearAddedLayers}><Trash2 size={15} /> 추가 레이어 모두 지우기</button></div>
+          <div className="editor-tool-group"><strong>{t("image.editor.crop")}</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button></div></div>
+          <div className="editor-tool-group"><strong>{t("image.editor.layer")}</strong><div className="icon-tool-row"><button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title={t("image.editor.front")} aria-label={t("image.editor.front")} type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title={t("image.editor.back")} aria-label={t("image.editor.back")} type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title={t("image.editor.delete")} aria-label={t("image.editor.delete")} type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
+          <div className={`editor-tool-group${file ? "" : " is-disabled"}`}><strong>{t("image.editor.adjust")}</strong><label>{t("image.editor.brightness")} <b>{brightness}</b><input disabled={!file} type="range" min={-80} max={80} value={brightness} onChange={(event) => updateFilter("brightness", Number(event.target.value))} /></label><label>{t("image.editor.contrast")} <b>{contrast}</b><input disabled={!file} type="range" min={-80} max={80} value={contrast} onChange={(event) => updateFilter("contrast", Number(event.target.value))} /></label><label>{t("image.editor.hue")} <b>{hue}°</b><input disabled={!file} type="range" min={-180} max={180} value={hue} onChange={(event) => updateFilter("hue", Number(event.target.value))} /></label>{file && <ToggleRow label={t("image.editor.lock")} description={t("image.editor.lockHelp")} checked={baseLocked} onChange={updateBaseLock} />}</div>
+          <div className="editor-tool-group"><strong>{t("image.editor.text")}</strong><div className="inline-input-action"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={() => addText()}><Type size={16} /></button></div><div className="button-grid sticker-grid">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" key={emoji} onClick={() => addText(emoji)}>{emoji}</button>)}</div></div>
+          <div className="editor-tool-group"><strong>{t("image.editor.shapes")}</strong><div className="icon-tool-row"><button title={t("image.editor.line")} aria-label={t("image.editor.line")} type="button" onClick={() => addShape("line")}><Minus size={18} /></button><button title={t("image.editor.rect")} aria-label={t("image.editor.rect")} type="button" onClick={() => addShape("rect")}><Square size={18} /></button><button title={t("image.editor.circle")} aria-label={t("image.editor.circle")} type="button" onClick={() => addShape("circle")}><CircleIcon size={18} /></button></div></div>
+          <div className={`editor-tool-group shape-style-controls${shapeSelected ? "" : " is-disabled"}`}><strong>{t("image.editor.shapeStyle")}</strong><label><span>{t("image.editor.fill")}</span><input aria-label={t("image.editor.fillLabel")} type="color" value={shapeFill} disabled={!shapeSelected} onChange={(event) => { setShapeFill(event.target.value); setSelectedShapeStyle("fill", event.target.value); }} /></label><label><span>{t("image.editor.stroke")}</span><input aria-label={t("image.editor.strokeLabel")} type="color" value={shapeStroke} disabled={!shapeSelected} onChange={(event) => { setShapeStroke(event.target.value); setSelectedShapeStyle("stroke", event.target.value); }} /></label><label><span>{t("image.editor.strokeWidth", { count: shapeStrokeWidth })}</span><input aria-label={t("image.editor.strokeWidthLabel")} type="range" min={0} max={30} step={1} value={shapeStrokeWidth} disabled={!shapeSelected} onChange={(event) => { const value = Number(event.target.value); setShapeStrokeWidth(value); setSelectedShapeStyle("strokeWidth", value); }} /></label>{!shapeSelected && <small>{t("image.editor.selectShape")}</small>}</div>
+          <div className="editor-tool-group editor-background-control"><strong>{t("image.editor.backgroundGroup")}</strong><label><span>{t("image.editor.background")}</span><input type="color" value={background} disabled={transparentBackground} onChange={(event) => updateBackground(event.target.value, transparentBackground)} /></label><div className="image-background-options compact"><ToggleRow label={t("image.editor.transparent")} description={t("image.editor.transparentOutput")} checked={transparentBackground} onChange={(checked) => updateBackground(background, checked)} /></div><button type="button" className="secondary-button" onClick={clearAddedLayers}><Trash2 size={15} /> {t("image.editor.clearLayers")}</button></div>
         </aside>
         <div
           ref={stageElement}
@@ -480,9 +474,9 @@ function ImageEditor() {
           onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
           onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setStageDragging(false); }}
           onDrop={dropOnPreview}
-        ><canvas ref={canvasElement} />{stageDragging && <span className="image-preview-drop-hint">여기에 놓아 편집 이미지 열기</span>}</div>
+        ><canvas ref={canvasElement} />{stageDragging && <span className="image-preview-drop-hint">{t("image.editor.drop")}</span>}</div>
       </div>
-      <div className="export-row"><div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label="이미지 출력 형식" /><small>사진이 없어도 빈 캔버스 작업을 저장할 수 있습니다. 투명 배경은 PNG·WebP에서 유지되고 JPG는 흰색으로 저장됩니다.</small></div><PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> 이미지 다운로드</PrimaryButton></div>
+      <div className="export-row"><div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label={t("image.editor.format")} /><small>{t("image.editor.formatHelp")}</small></div><PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> {t("image.editor.download")}</PrimaryButton></div>
     </SectionCard>
   );
 }
@@ -496,6 +490,7 @@ function applyEditorInteractivity(instance: Canvas, image: FabricImage | undefin
 }
 
 function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) {
+  const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
   const [mode, setMode] = useState<"fit-width" | "contain" | "cover" | "original">("fit-width");
   const [width, setWidth] = useState(1600);
@@ -513,26 +508,27 @@ function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) {
   const execute = async () => {
     if (!files.length) return;
     const controller = new AbortController(); controllerRef.current = controller;
-    progress.start("이미지 파일을 준비하는 중…");
+    progress.start(t("image.batch.prepare"));
     try {
       const watermarkImage = await serializeWatermark(watermarkFile);
-      const result = await batchProcessImages(files, { mode, width, height, format, quality, background: transparentBackground ? "transparent" : "#ffffff", watermarkText, watermarkPosition, watermarkOpacity, watermarkImage }, "worklazy-일괄이미지.zip", progress.update, controller.signal);
+      const result = await batchProcessImages(files, { mode, width, height, format, quality, background: transparentBackground ? "transparent" : "#ffffff", watermarkText, watermarkPosition, watermarkOpacity, watermarkImage }, t("image.batch.archive"), progress.update, controller.signal, i18n.language === "en" ? "en" : "ko");
       downloadWorkerResult(result);
-      progress.succeed(`${files.length}개 이미지 일괄 처리 완료`);
-    } catch (error) { progress.fail(normalizePanelError(error)); }
+      progress.succeed(t("image.batch.done", { count: files.length }));
+    } catch (error) { progress.fail(normalizePanelError(error, t)); }
     finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
   };
 
-  return <SectionCard title="이미지 일괄 편집" description="같은 크기와 워터마크 설정을 여러 이미지에 적용하고 ZIP으로 받습니다.">
-    <FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint="JPG·PNG·WebP · 여러 번 추가·Ctrl/⌘+V 가능" accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" />
-    <div className="image-settings-grid"><label><span>리사이즈 방식</span><select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="fit-width">가로폭 맞춤</option><option value="contain">지정 크기 안에 맞춤</option><option value="cover">지정 크기 채우기</option><option value="original">원본 크기</option></select></label><NumberField label="가로 px" value={width} onChange={setWidth} /><NumberField label="세로 px" value={height} onChange={setHeight} disabled={mode === "fit-width" || mode === "original"} /><FormatField value={format} onChange={setFormat} /><RangeField label="품질" value={quality} min={0.4} max={1} step={0.05} onChange={setQuality} /></div>
+  return <SectionCard title={t("image.batch.title")} description={t("image.batch.description")}>
+    <FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.batch.hint")} accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" />
+    <div className="image-settings-grid"><label><span>{t("image.batch.resize")}</span><select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="fit-width">{t("image.batch.fitWidth")}</option><option value="contain">{t("image.batch.contain")}</option><option value="cover">{t("image.batch.cover")}</option><option value="original">{t("image.batch.original")}</option></select></label><NumberField label={t("image.batch.width")} value={width} onChange={setWidth} /><NumberField label={t("image.batch.height")} value={height} onChange={setHeight} disabled={mode === "fit-width" || mode === "original"} /><FormatField value={format} onChange={setFormat} /><RangeField label={t("image.batch.quality")} value={quality} min={0.4} max={1} step={0.05} onChange={setQuality} /></div>
     <TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} />
-    <div className="watermark-settings"><label><span>워터마크 텍스트</span><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} placeholder="비워두면 적용하지 않음" /></label><label><span>워터마크 이미지</span><input type="file" accept={RASTER_IMAGE_ACCEPT} onChange={(event) => setWatermarkFile(filterRasterImages(Array.from(event.target.files || []))[0])} /></label><label><span>위치</span><select value={watermarkPosition} onChange={(event) => setWatermarkPosition(event.target.value as WatermarkPosition)}><option value="top-left">왼쪽 위</option><option value="top-right">오른쪽 위</option><option value="center">가운데</option><option value="bottom-left">왼쪽 아래</option><option value="bottom-right">오른쪽 아래</option></select></label><RangeField label="불투명도" value={watermarkOpacity} min={0.1} max={1} step={0.05} onChange={setWatermarkOpacity} /></div>
-    <div className="section-actions"><PrimaryButton accent="sky" disabled={!files.length} loading={progress.status === "running"} onClick={() => void execute()}><Download size={18} /> ZIP으로 일괄 다운로드</PrimaryButton></div>
+    <div className="watermark-settings"><label><span>{t("image.batch.watermarkText")}</span><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} placeholder={t("image.batch.watermarkPlaceholder")} /></label><label><span>{t("image.batch.watermarkImage")}</span><input type="file" accept={RASTER_IMAGE_ACCEPT} onChange={(event) => setWatermarkFile(filterRasterImages(Array.from(event.target.files || []))[0])} /></label><label><span>{t("image.batch.position")}</span><select value={watermarkPosition} onChange={(event) => setWatermarkPosition(event.target.value as WatermarkPosition)}><option value="top-left">{t("image.batch.topLeft")}</option><option value="top-right">{t("image.batch.topRight")}</option><option value="center">{t("image.batch.center")}</option><option value="bottom-left">{t("image.batch.bottomLeft")}</option><option value="bottom-right">{t("image.batch.bottomRight")}</option></select></label><RangeField label={t("image.batch.opacity")} value={watermarkOpacity} min={0.1} max={1} step={0.05} onChange={setWatermarkOpacity} /></div>
+    <div className="section-actions"><PrimaryButton accent="sky" disabled={!files.length} loading={progress.status === "running"} onClick={() => void execute()}><Download size={18} /> {t("image.batch.download")}</PrimaryButton></div>
   </SectionCard>;
 }
 
 function CollagePanel({ progress, controllerRef }: ProcessPanelProps) {
+  const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
   const [layout, setLayout] = useState<CollageOptions["layout"]>("vertical");
   const [columns, setColumns] = useState(2);
@@ -543,13 +539,15 @@ function CollagePanel({ progress, controllerRef }: ProcessPanelProps) {
   const [format, setFormat] = useState<ImageOutputFormat>("png");
   useClipboardImages((images) => setFiles((current) => [...current, ...images]));
   const outputBackground = transparentBackground ? "transparent" : background;
-  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildCollage(files, { layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }, "worklazy-콜라주", progress.update, controller.signal), "콜라주 생성 완료");
-  return <SectionCard title="이어붙이기·콜라주" description="설정한 간격만 이미지 사이에 적용합니다. 격자는 칸을 빈틈없이 채우며 가장자리가 일부 잘릴 수 있습니다."><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint="두 개 이상의 이미지 · Ctrl/⌘+V 가능" accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><label><span>배치</span><select value={layout} onChange={(event) => setLayout(event.target.value as CollageOptions["layout"])}><option value="vertical">세로 이어붙이기</option><option value="horizontal">가로 이어붙이기</option><option value="grid">격자 콜라주</option></select></label><NumberField label="열 개수" value={columns} onChange={setColumns} disabled={layout !== "grid"} /><NumberField label="전체 가로 px" value={width} onChange={setWidth} /><NumberField label="간격 px" value={gap} min={0} onChange={setGap} /><label><span>배경색</span><input type="color" value={background} disabled={transparentBackground} onChange={(event) => setBackground(event.target.value)} /></label><FormatField value={format} onChange={setFormat} /></div><TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} /><CollagePreview files={files} options={{ layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }} onFiles={(incoming) => setFiles((current) => [...current, ...incoming])} /><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><LayoutGrid size={18} /> 콜라주 다운로드</PrimaryButton></div></SectionCard>;
+  const language = i18n.language === "en" ? "en" : "ko";
+  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildCollage(files, { layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }, t("image.collage.file"), progress.update, controller.signal, language), t("image.collage.done"), t);
+  return <SectionCard title={t("image.collage.title")} description={t("image.collage.description")}><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.collage.hint")} accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><label><span>{t("image.collage.layout")}</span><select value={layout} onChange={(event) => setLayout(event.target.value as CollageOptions["layout"])}><option value="vertical">{t("image.collage.vertical")}</option><option value="horizontal">{t("image.collage.horizontal")}</option><option value="grid">{t("image.collage.grid")}</option></select></label><NumberField label={t("image.collage.columns")} value={columns} onChange={setColumns} disabled={layout !== "grid"} /><NumberField label={t("image.collage.width")} value={width} onChange={setWidth} /><NumberField label={t("image.collage.gap")} value={gap} min={0} onChange={setGap} /><label><span>{t("image.collage.background")}</span><input type="color" value={background} disabled={transparentBackground} onChange={(event) => setBackground(event.target.value)} /></label><FormatField value={format} onChange={setFormat} /></div><TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} /><CollagePreview files={files} options={{ layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }} onFiles={(incoming) => setFiles((current) => [...current, ...incoming])} /><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><LayoutGrid size={18} /> {t("image.collage.download")}</PrimaryButton></div></SectionCard>;
 }
 
 function CollagePreview({ files, options, onFiles }: { files: File[]; options: CollageOptions; onFiles: (files: File[]) => void }) {
+  const { t, i18n } = useTranslation("features");
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [summary, setSummary] = useState("이미지를 추가하면 결과 배치를 미리 볼 수 있습니다.");
+  const [summary, setSummary] = useState(() => t("image.collage.emptySummary"));
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
@@ -562,7 +560,7 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
         canvas.height = 1;
         canvas.style.width = "0";
         canvas.style.height = "0";
-        setSummary("이미지를 추가하면 결과 배치를 미리 볼 수 있습니다.");
+        setSummary(t("image.collage.emptySummary"));
         return;
       }
 
@@ -570,7 +568,7 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
       try {
         for (const file of files) bitmaps.push(await createImageBitmap(file));
         if (disposed) return;
-        const layout = calculatePreviewLayout(bitmaps, options);
+        const layout = calculatePreviewLayout(bitmaps, options, t);
         const scale = calculatePreviewScale(layout.width, layout.height);
         const displayWidth = Math.max(1, Math.round(layout.width * scale));
         const displayHeight = Math.max(1, Math.round(layout.height * scale));
@@ -580,7 +578,7 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
         canvas.style.width = `${displayWidth}px`;
         canvas.style.height = `${displayHeight}px`;
         const context = canvas.getContext("2d");
-        if (!context) throw new Error("미리보기 캔버스를 만들 수 없습니다.");
+        if (!context) throw new Error(t("image.collage.canvasError"));
         context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = "high";
@@ -595,9 +593,9 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
           const draw = options.layout === "grid" ? drawCoveredPreview : drawContainedPreview;
           draw(context, bitmap, cell.x * scale, cell.y * scale, cell.width * scale, cell.height * scale);
         });
-        setSummary(`출력 예상 ${layout.width.toLocaleString()} × ${layout.height.toLocaleString()} px · ${files.length}개 이미지`);
+        setSummary(t("image.collage.summary", { width: layout.width.toLocaleString(i18n.language), height: layout.height.toLocaleString(i18n.language), count: files.length }));
       } catch (error) {
-        if (!disposed) setSummary(error instanceof Error ? error.message : "미리보기를 만들지 못했습니다.");
+        if (!disposed) setSummary(error instanceof Error ? error.message : t("image.collage.previewError"));
       } finally {
         bitmaps.forEach((bitmap) => bitmap.close());
       }
@@ -607,11 +605,11 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
       disposed = true;
       window.clearTimeout(timer);
     };
-  }, [files, options.background, options.columns, options.format, options.gap, options.layout, options.width]);
+  }, [files, i18n.language, options.background, options.columns, options.format, options.gap, options.layout, options.width, t]);
 
   return (
     <div className="collage-preview-panel">
-      <div className="collage-preview-heading"><span><LayoutGrid size={17} /><strong>결과 미리보기</strong></span><small>{summary}</small></div>
+      <div className="collage-preview-heading"><span><LayoutGrid size={17} /><strong>{t("image.collage.preview")}</strong></span><small>{summary}</small></div>
       <div
         className={`collage-preview-stage image-preview-drop${files.length ? " has-preview" : ""}${dragging ? " is-file-dragging" : ""}`}
         onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
@@ -619,21 +617,23 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
         onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDragging(false); }}
         onDrop={(event) => { event.preventDefault(); setDragging(false); const dropped = filterRasterImages(Array.from(event.dataTransfer.files)); if (dropped.length) onFiles(dropped); }}
       >
-        {!files.length && <span><ImageIcon size={24} />이미지를 추가해 주세요.</span>}
-        <canvas ref={canvasRef} aria-label="이어붙이기 결과 미리보기" />
-        {dragging && <span className="image-preview-drop-hint">여기에 놓아 이미지 추가</span>}
+        {!files.length && <span><ImageIcon size={24} />{t("image.collage.add")}</span>}
+        <canvas ref={canvasRef} aria-label={t("image.collage.previewLabel")} />
+        {dragging && <span className="image-preview-drop-hint">{t("image.collage.drop")}</span>}
       </div>
     </div>
   );
 }
 
 function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
+  const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
   const [width, setWidth] = useState(720);
   const [delay, setDelay] = useState(500);
   const [colors, setColors] = useState(192);
-  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildAnimatedGif(files, { width, delay, qualityColors: colors }, "worklazy-애니메이션.gif", progress.update, controller.signal), "GIF 애니메이션 생성 완료");
-  return <SectionCard title="GIF 애니메이션 만들기" description="업로드 순서가 프레임 순서가 됩니다."><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint="두 개 이상의 JPG·PNG·WebP 프레임" accent="sky" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><NumberField label="최대 가로 px" value={width} onChange={setWidth} /><NumberField label="프레임 간격 ms" value={delay} onChange={setDelay} /><label><span>색상 수</span><select value={colors} onChange={(event) => setColors(Number(event.target.value))}><option value={128}>128색 · 작게</option><option value={192}>192색 · 균형</option><option value={256}>256색 · 선명</option></select></label></div><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><Sparkles size={18} /> GIF 다운로드</PrimaryButton></div></SectionCard>;
+  const language = i18n.language === "en" ? "en" : "ko";
+  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildAnimatedGif(files, { width, delay, qualityColors: colors }, t("image.gif.file"), progress.update, controller.signal, language), t("image.gif.done"), t);
+  return <SectionCard title={t("image.gif.title")} description={t("image.gif.description")}><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.gif.hint")} accent="sky" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><NumberField label={t("image.gif.width")} value={width} onChange={setWidth} /><NumberField label={t("image.gif.delay")} value={delay} onChange={setDelay} /><label><span>{t("image.gif.colors")}</span><select value={colors} onChange={(event) => setColors(Number(event.target.value))}><option value={128}>{t("image.gif.small")}</option><option value={192}>{t("image.gif.balanced")}</option><option value={256}>{t("image.gif.sharp")}</option></select></label></div><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><Sparkles size={18} /> {t("image.gif.download")}</PrimaryButton></div></SectionCard>;
 }
 
 function ToolButton({ active, label, onClick, children }: { active: boolean; label: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" className={active ? "active" : ""} aria-pressed={active} onClick={onClick}>{children}<span>{label}</span></button>; }
@@ -667,23 +667,25 @@ function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | un
 
 interface ProcessPanelProps { progress: ReturnType<typeof useOperationProgress>; controllerRef: React.MutableRefObject<AbortController | undefined>; }
 
-async function runPanelTask(controllerRef: ProcessPanelProps["controllerRef"], progress: ProcessPanelProps["progress"], task: (controller: AbortController) => Promise<import("./types").ImageWorkerResult>, success: string) {
-  const controller = new AbortController(); controllerRef.current = controller; progress.start("이미지 파일을 준비하는 중…");
+async function runPanelTask(controllerRef: ProcessPanelProps["controllerRef"], progress: ProcessPanelProps["progress"], task: (controller: AbortController) => Promise<import("./types").ImageWorkerResult>, success: string, t: TFunction<"features">) {
+  const controller = new AbortController(); controllerRef.current = controller; progress.start(t("image.batch.prepare"));
   try { const result = await task(controller); downloadWorkerResult(result); progress.succeed(success); }
-  catch (error) { progress.fail(normalizePanelError(error)); }
+  catch (error) { progress.fail(normalizePanelError(error, t)); }
   finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
 }
 
 function NumberField({ label, value, onChange, disabled = false, min = 1 }: { label: string; value: number; onChange: (value: number) => void; disabled?: boolean; min?: number }) { return <label><span>{label}</span><input type="number" min={min} value={value} disabled={disabled} onChange={(event) => onChange(Math.max(min, Number(event.target.value)))} /></label>; }
 function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) { return <label><span>{label} <b>{Math.round(value * 100)}%</b></span><input type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))} /></label>; }
-function FormatField({ value, onChange }: { value: ImageOutputFormat; onChange: (value: ImageOutputFormat) => void }) { return <label><span>출력 형식</span><select value={value} onChange={(event) => onChange(event.target.value as ImageOutputFormat)}><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select></label>; }
+function FormatField({ value, onChange }: { value: ImageOutputFormat; onChange: (value: ImageOutputFormat) => void }) { const { t } = useTranslation("features"); return <label><span>{t("image.common.output")}</span><select value={value} onChange={(event) => onChange(event.target.value as ImageOutputFormat)}><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select></label>; }
 
 function TransparencyControl({ checked, onChange, format }: { checked: boolean; onChange: (value: boolean) => void; format: ImageOutputFormat }) {
-  return <div className="image-background-options"><ToggleRow label="투명 배경" description="빈 공간과 이미지 사이 간격을 투명하게 저장" checked={checked} onChange={onChange} /><p>{format === "jpeg" ? "JPG는 투명도를 지원하지 않아 투명한 부분을 흰색으로 처리합니다." : "PNG·WebP 출력에서 투명 배경을 유지합니다."}</p></div>;
+  const { t } = useTranslation("features");
+  return <div className="image-background-options"><ToggleRow label={t("image.common.transparent")} description={t("image.common.transparentHelp")} checked={checked} onChange={onChange} /><p>{format === "jpeg" ? t("image.common.jpeg") : t("image.common.alpha")}</p></div>;
 }
 
 function ClipboardHint({ mode }: { mode: "replace" | "append" }) {
-  return <div className="clipboard-image-hint"><ClipboardPaste size={15} /><span>화면을 캡처하거나 이미지를 복사한 뒤 <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>V</kbd>를 누르면 {mode === "replace" ? "편집 이미지로 바로 열립니다." : "현재 목록 뒤에 추가됩니다."}</span></div>;
+  const { t } = useTranslation("features");
+  return <div className="clipboard-image-hint"><ClipboardPaste size={15} /><span>{t("image.common.clipboard", { action: mode === "replace" ? t("image.common.replace") : t("image.common.append") })}</span></div>;
 }
 
 function useClipboardImages(onImages: (files: File[]) => void) {
@@ -706,10 +708,11 @@ function useClipboardImages(onImages: (files: File[]) => void) {
 
 function clipboardFile(source: File, index: number) {
   const extension = source.type === "image/jpeg" ? "jpg" : source.type === "image/webp" ? "webp" : "png";
-  return new File([source], `클립보드-${new Date().toISOString().replace(/[:.]/g, "-")}-${index + 1}.${extension}`, { type: source.type, lastModified: Date.now() });
+  const prefix = document.documentElement.lang === "en" ? "clipboard" : "클립보드";
+  return new File([source], `${prefix}-${new Date().toISOString().replace(/[:.]/g, "-")}-${index + 1}.${extension}`, { type: source.type, lastModified: Date.now() });
 }
 
-function calculatePreviewLayout(bitmaps: Array<{ width: number; height: number }>, options: CollageOptions) {
+function calculatePreviewLayout(bitmaps: Array<{ width: number; height: number }>, options: CollageOptions, t: TFunction<"features">) {
   const width = Math.max(1, Math.round(options.width));
   const gap = Math.max(0, Math.round(options.gap));
   if (options.layout === "vertical") {
@@ -719,13 +722,13 @@ function calculatePreviewLayout(bitmaps: Array<{ width: number; height: number }
     return { width, height: Math.max(1, y - gap), cells };
   }
   if (options.layout === "horizontal") {
-    if (width - gap * (bitmaps.length - 1) < bitmaps.length) throw new Error("전체 가로 크기에 비해 이미지 수와 간격이 너무 큽니다.");
+    if (width - gap * (bitmaps.length - 1) < bitmaps.length) throw new Error(t("image.collage.sizeError"));
     const cellWidth = Math.max(1, Math.floor((width - gap * (bitmaps.length - 1)) / bitmaps.length));
     const height = Math.max(...bitmaps.map((bitmap) => Math.max(1, Math.round(bitmap.height * cellWidth / bitmap.width))));
     return { width, height, cells: bitmaps.map((_, index) => ({ x: index * (cellWidth + gap), y: 0, width: cellWidth, height })) };
   }
   const columns = Math.max(1, Math.min(Math.round(options.columns), bitmaps.length));
-  if (width - gap * (columns - 1) < columns) throw new Error("전체 가로 크기에 비해 열 개수와 간격이 너무 큽니다.");
+  if (width - gap * (columns - 1) < columns) throw new Error(t("image.collage.columnError"));
   const rows = Math.ceil(bitmaps.length / columns);
   const cellWidth = Math.floor((width - gap * (columns - 1)) / columns);
   const cellHeight = Math.max(1, Math.round(cellWidth * 0.75));
@@ -765,5 +768,5 @@ function fabricColorToHex(value: FabricObject["fill"] | FabricObject["stroke"], 
 
 function stripExtension(name: string) { return name.replace(/\.[^.]+$/, ""); }
 function filterRasterImages(files: File[]) { return files.filter((file) => /^(image\/(?:jpeg|png|webp))$/i.test(file.type) || /\.(?:jpe?g|png|webp)$/i.test(file.name)); }
-function normalizePanelError(error: unknown) { return error instanceof DOMException && error.name === "AbortError" ? "이미지 작업을 취소했습니다." : error instanceof Error ? error.message : "이미지 처리에 실패했습니다."; }
+function normalizePanelError(error: unknown, t: TFunction<"features">) { return error instanceof DOMException && error.name === "AbortError" ? t("image.common.cancelled") : error instanceof Error ? error.message : t("image.common.failed"); }
 function downloadWorkerResult(result: import("./types").ImageWorkerResult) { const url = URL.createObjectURL(new Blob([result.buffer], { type: result.mimeType })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = result.fileName; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 0); }

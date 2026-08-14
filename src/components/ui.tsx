@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { ToolAccent } from "../app/toolRegistry";
 
@@ -114,6 +115,7 @@ interface FileDropZoneProps {
 }
 
 export function FileDropZone({ label, hint, accept, multiple = false, files, onFiles, accent = "blue" }: FileDropZoneProps) {
+  const { t } = useTranslation("common");
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -156,7 +158,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
         className={`drop-zone accent-${accent}${dragging ? " dragging" : ""}`}
         role="button"
         tabIndex={0}
-        aria-label={`${label || "파일"} ${multiple && files.length ? "추가 선택" : "선택"} 또는 드롭`}
+        aria-label={t("files.selectOrDrop", { label: label || t("files.generic"), action: multiple && files.length ? t("files.add") : t("files.select") })}
         onClick={(event) => {
           if ((event.target as Element).closest("button")) return;
           inputRef.current?.click();
@@ -177,9 +179,9 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
         onDrop={(event) => { void handleDrop(event); }}
       >
         <span className="drop-icon">{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
-        <div aria-live="polite"><strong>{files.length ? `${files.length}개 파일 선택됨${multiple ? " · 계속 추가 가능" : ""}` : "파일을 여기에 놓으세요"}</strong><span>{hint}</span></div>
-        <button className="secondary-button small" type="button" onClick={() => inputRef.current?.click()}>{multiple && files.length ? "파일 더 추가" : "파일 선택"}</button>
-        {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> 목록에 추가됨</em>}
+        <div aria-live="polite"><strong>{files.length ? `${t("files.selected", { count: files.length })}${multiple ? ` · ${t("files.keepAdding")}` : ""}` : t("files.dropHere")}</strong><span>{hint}</span></div>
+        <button className="secondary-button small" type="button" onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</button>
+        {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> {t("files.added")}</em>}
       </div>
     </div>
   );
@@ -190,6 +192,7 @@ export function FileList({ files, onRemove, accent = "blue" }: {
   onRemove: (index: number) => void;
   accent?: ToolAccent;
 }) {
+  const { t } = useTranslation("common");
   if (!files.length) return null;
   return (
     <div className="file-list">
@@ -197,7 +200,7 @@ export function FileList({ files, onRemove, accent = "blue" }: {
         <div className="file-row" key={`${file.name}-${file.lastModified}-${index}`}>
           <span className={`file-type accent-${accent}`}>{file.name.split(".").pop()?.slice(0, 4).toUpperCase()}</span>
           <span className="file-meta"><strong>{file.name}</strong><small>{formatBytes(file.size)}</small></span>
-          <button className="remove-button" type="button" onClick={() => onRemove(index)} aria-label={`${file.name} 제거`}><X size={17} /></button>
+          <button className="remove-button" type="button" onClick={() => onRemove(index)} aria-label={t("files.remove", { name: file.name })}><X size={17} /></button>
         </div>
       ))}
     </div>
@@ -225,10 +228,11 @@ export function ResultCard({ title, message, accent = "blue", children }: {
   accent?: ToolAccent;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation("common");
   return (
     <section className={`result-card accent-${accent}`} aria-live="polite">
       <span className="result-icon"><Check size={24} /></span>
-      <div><p className="eyebrow">작업 완료</p><h2>{title}</h2><p>{message}</p>{children}</div>
+      <div><p className="eyebrow">{t("status.complete")}</p><h2>{title}</h2><p>{message}</p>{children}</div>
     </section>
   );
 }

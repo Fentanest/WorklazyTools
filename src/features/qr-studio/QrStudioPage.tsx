@@ -1,6 +1,7 @@
 import { AlertTriangle, Camera, CameraOff, Copy, Download, ImagePlus, QrCode, ScanLine, Share2 } from "lucide-react";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
@@ -8,6 +9,7 @@ import { ToolGuide } from "../../components/ToolGuide";
 type QrMode = "create" | "scan";
 
 export function QrStudioPage() {
+  const { t, i18n } = useTranslation("features");
   const [mode, setMode] = useState<QrMode>("create");
   const [text, setText] = useState("https://worklazy.net/");
   const [size, setSize] = useState(640);
@@ -59,10 +61,10 @@ export function QrStudioPage() {
   }, [releaseCameraResources]);
 
   useEffect(() => {
-    void drawQr(canvasRef.current, text, size, dark, logo).catch((reason) => {
-      setError(reason instanceof Error ? reason.message : "QR 코드를 만들지 못했습니다.");
+    void drawQr(canvasRef.current, text, size, dark, logo, t("qr.errors.logo")).catch((reason) => {
+      setError(reason instanceof Error ? reason.message : t("qr.createError"));
     });
-  }, [text, size, dark, logo]);
+  }, [text, size, dark, logo, t]);
 
   useEffect(() => {
     if (mode !== "scan" || (!scanned && !error) || !window.matchMedia("(max-width: 620px)").matches) return;
@@ -86,7 +88,7 @@ export function QrStudioPage() {
     const blob = dataUrlToBlob(canvas.toDataURL("image/png"));
     const file = new File([blob], "worklazy-qr.png", { type: "image/png" });
     if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) return download();
-    void navigator.share({ title: "Worklazy QR 코드", files: [file] }).catch((reason) => {
+    void navigator.share({ title: t("qr.shareTitle"), files: [file] }).catch((reason) => {
       if (!(reason instanceof DOMException && reason.name === "AbortError")) download();
     });
   };
@@ -102,19 +104,19 @@ export function QrStudioPage() {
     worker.onmessage = (event) => {
       setBusy(false);
       if (event.data.type === "error") setError(event.data.message);
-      else if (!event.data.data) setError("사진에서 QR 코드를 찾지 못했습니다.");
+      else if (!event.data.data) setError(t("qr.notFound"));
       else setScanned(event.data.data);
       worker.terminate();
       if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
     };
     worker.onerror = (event) => {
       setBusy(false);
-      setError(event.message || "QR 사진을 분석하지 못했습니다.");
+      setError(event.message || t("qr.fileError"));
       worker.terminate();
       if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
     };
     const buffer = await file.arrayBuffer();
-    worker.postMessage({ buffer, type: file.type }, [buffer]);
+    worker.postMessage({ buffer, type: file.type, language: i18n.language }, [buffer]);
   };
 
   const startCamera = async () => {
@@ -125,7 +127,7 @@ export function QrStudioPage() {
     setScanned("");
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-        throw new Error("이 브라우저에서는 보안 연결(HTTPS) 카메라 접근을 지원하지 않습니다.");
+        throw new Error(t("qr.errors.secure"));
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
@@ -133,7 +135,7 @@ export function QrStudioPage() {
       });
       cameraStreamRef.current = stream;
       const video = videoRef.current;
-      if (!video) throw new Error("카메라 미리보기 화면을 준비하지 못했습니다.");
+      if (!video) throw new Error(t("qr.errors.preview"));
       video.srcObject = stream;
       await video.play();
 
@@ -160,14 +162,14 @@ export function QrStudioPage() {
           canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
           canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
           const context = canvas.getContext("2d", { alpha: false });
-          if (!context) throw new Error("카메라 프레임을 읽을 수 없습니다.");
+          if (!context) throw new Error(t("qr.errors.frame"));
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const blob = await canvasToBlob(canvas, "image/jpeg", 0.86);
+          const blob = await canvasToBlob(canvas, "image/jpeg", 0.86, t("qr.errors.image"));
           const buffer = await blob.arrayBuffer();
-          if (cameraWorkerRef.current === worker) worker.postMessage({ buffer, type: blob.type }, [buffer]);
+          if (cameraWorkerRef.current === worker) worker.postMessage({ buffer, type: blob.type, language: i18n.language }, [buffer]);
         } catch (reason) {
           captureInFlightRef.current = false;
-          setError(reason instanceof Error ? reason.message : "카메라 QR 스캔 중 오류가 발생했습니다.");
+          setError(reason instanceof Error ? reason.message : t("qr.errors.scan"));
           stopCamera();
         }
       };
@@ -175,7 +177,7 @@ export function QrStudioPage() {
       worker.onmessage = (event) => {
         captureInFlightRef.current = false;
         if (event.data.type === "error") {
-          setError(event.data.message || "카메라 프레임에서 QR 코드를 읽지 못했습니다.");
+          setError(event.data.message || t("qr.errors.frameQr"));
           stopCamera();
           return;
         }
@@ -188,7 +190,7 @@ export function QrStudioPage() {
         scheduleNext();
       };
       worker.onerror = (event) => {
-        setError(event.message || "카메라 QR 스캐너를 실행하지 못했습니다.");
+        setError(event.message || t("qr.errors.scanner"));
         stopCamera();
       };
       setCameraActive(true);
@@ -196,7 +198,9 @@ export function QrStudioPage() {
     } catch (reason) {
       releaseCameraResources();
       setCameraActive(false);
-      setError(cameraErrorMessage(reason));
+      setError(cameraErrorMessage(reason, {
+        start: t("qr.errors.start"), permission: t("qr.errors.permission"), notFound: t("qr.errors.notFound"), busy: t("qr.errors.busy"),
+      }));
     } finally {
       setCameraStarting(false);
     }
@@ -211,37 +215,37 @@ export function QrStudioPage() {
 
   return (
     <div className="page tool-page page-enter utility-page qr-page">
-      <PageHeader eyebrow="QR STUDIO" title="QR 코드 생성·스캔" description="텍스트와 URL을 로고가 포함된 QR 코드로 만들거나 카메라·사진 속 QR 데이터를 브라우저에서 읽으세요." />
-      <div className="mode-switch"><SegmentedControl value={mode} onChange={changeMode} label="QR 기능" options={[{ value: "create", label: "QR 생성" }, { value: "scan", label: "QR 스캔" }]} /></div>
+      <PageHeader eyebrow="QR STUDIO" title={t("qr.title")} description={t("qr.description")} />
+      <div className="mode-switch"><SegmentedControl value={mode} onChange={changeMode} label={t("qr.modeLabel")} options={[{ value: "create", label: t("qr.create") }, { value: "scan", label: t("qr.scan") }]} /></div>
 
       {mode === "create" ? (
         <div className="qr-layout">
-          <SectionCard title="내용과 스타일">
-            <label className="block-field"><span>URL 또는 텍스트</span><textarea value={text} onChange={(event) => setText(event.target.value)} /></label>
+          <SectionCard title={t("qr.contentStyle")}>
+            <label className="block-field"><span>{t("qr.content")}</span><textarea value={text} onChange={(event) => setText(event.target.value)} /></label>
             <div className="utility-form-grid">
-              <label><span>크기</span><select value={size} onChange={(event) => setSize(Number(event.target.value))}><option value={320}>320px</option><option value={640}>640px</option><option value={1024}>1024px</option></select></label>
-              <label><span>QR 색상</span><input type="color" value={dark} onChange={(event) => setDark(event.target.value)} /></label>
-              <label className="span-2 file-control"><span>중앙 로고(선택)</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogo(event.target.files?.[0])} /></label>
+              <label><span>{t("qr.size")}</span><select value={size} onChange={(event) => setSize(Number(event.target.value))}><option value={320}>320px</option><option value={640}>640px</option><option value={1024}>1024px</option></select></label>
+              <label><span>{t("qr.color")}</span><input type="color" value={dark} onChange={(event) => setDark(event.target.value)} /></label>
+              <label className="span-2 file-control"><span>{t("qr.logo")}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogo(event.target.files?.[0])} /></label>
             </div>
           </SectionCard>
-          <SectionCard title="미리보기"><div className="qr-preview"><canvas ref={canvasRef} /></div><div className="result-file-actions"><PrimaryButton accent="blue" disabled={!text} onClick={download}><Download size={18} /> PNG 다운로드</PrimaryButton>{typeof navigator.share === "function" && <button type="button" className="secondary-button" disabled={!text} onClick={shareQr}><Share2 size={17} /> 공유·기기에 저장</button>}</div></SectionCard>
+          <SectionCard title={t("qr.preview")}><div className="qr-preview"><canvas ref={canvasRef} /></div><div className="result-file-actions"><PrimaryButton accent="blue" disabled={!text} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <button type="button" className="secondary-button" disabled={!text} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</button>}</div></SectionCard>
         </div>
       ) : (
         <>
           <div className="qr-scan-layout">
-            <SectionCard className="qr-camera-scan-card" title="QR 스캔" description="카메라를 켜거나 저장된 QR 사진을 바로 선택하세요.">
+            <SectionCard className="qr-camera-scan-card" title={t("qr.scanTitle")} description={t("qr.scanHelp")}>
               <div className={`qr-camera-stage${cameraActive ? " active" : ""}`}>
-                <video ref={videoRef} autoPlay muted playsInline aria-label="QR 스캔 카메라 미리보기" />
-                {!cameraActive && <div className="qr-camera-placeholder"><Camera size={30} /><strong>카메라는 버튼을 누른 뒤에만 켜집니다.</strong><span>영상과 QR 데이터는 외부 서버로 전송되지 않습니다.</span></div>}
+                <video ref={videoRef} autoPlay muted playsInline aria-label={t("qr.cameraLabel")} />
+                {!cameraActive && <div className="qr-camera-placeholder"><Camera size={30} /><strong>{t("qr.cameraOffTitle")}</strong><span>{t("qr.cameraPrivate")}</span></div>}
                 {cameraActive && <div className="qr-camera-guide" aria-hidden="true" />}
               </div>
               <canvas ref={captureCanvasRef} className="visually-hidden" aria-hidden="true" />
               <div className="section-actions qr-scan-actions">
                 {cameraActive
-                  ? <PrimaryButton accent="blue" onClick={stopCamera}><CameraOff size={18} /> 카메라 끄기</PrimaryButton>
-                  : <PrimaryButton accent="blue" loading={cameraStarting} onClick={() => void startCamera()}><Camera size={18} /> 카메라로 스캔</PrimaryButton>}
+                  ? <PrimaryButton accent="blue" onClick={stopCamera}><CameraOff size={18} /> {t("qr.turnOff")}</PrimaryButton>
+                  : <PrimaryButton accent="blue" loading={cameraStarting} onClick={() => void startCamera()}><Camera size={18} /> {t("qr.cameraScan")}</PrimaryButton>}
                 <label className={`secondary-button qr-photo-picker${busy ? " disabled" : ""}`} aria-disabled={busy}>
-                  {busy ? <><ScanLine size={18} /> 사진 분석 중…</> : <><ImagePlus size={18} /> QR 사진 선택</>}
+                  {busy ? <><ScanLine size={18} /> {t("qr.analyzing")}</> : <><ImagePlus size={18} /> {t("qr.choosePhoto")}</>}
                   <input
                     className="visually-hidden"
                     type="file"
@@ -257,49 +261,42 @@ export function QrStudioPage() {
                   />
                 </label>
               </div>
-              {scanFiles[0] && <p className="qr-selected-photo"><ImagePlus size={15} /><span>{scanFiles[0].name}</span><small>선택 즉시 분석</small></p>}
+              {scanFiles[0] && <p className="qr-selected-photo"><ImagePlus size={15} /><span>{scanFiles[0].name}</span><small>{t("qr.instant")}</small></p>}
             </SectionCard>
             {(scanned || error) && (
               <div className="qr-scan-result-slot" ref={scanResultRef} role="status" aria-live="polite">
-                <SectionCard title="스캔 결과">
+                <SectionCard title={t("qr.scanResult")}>
                   <div className={`scan-result${error ? " error" : ""}`}>
                     <QrCode size={21} />
                     <p>{error || scanned}</p>
-                    {scanned && <button type="button" aria-label="스캔 결과 복사" onClick={() => void navigator.clipboard.writeText(scanned)}><Copy size={17} /></button>}
+                    {scanned && <button type="button" aria-label={t("qr.copyResult")} onClick={() => void navigator.clipboard.writeText(scanned)}><Copy size={17} /></button>}
                   </div>
                 </SectionCard>
               </div>
             )}
           </div>
-          <div className="inline-notice warning qr-compatibility-notice"><AlertTriangle size={16} /><span>카메라·사진 분석은 브라우저의 고급 이미지 처리 기능(OffscreenCanvas)을 사용하므로 iOS 16.3 이하에서는 사용할 수 없습니다. iOS 16.4 이상 또는 최신 Android 브라우저를 사용해 주세요.</span></div>
+          <div className="inline-notice warning qr-compatibility-notice"><AlertTriangle size={16} /><span>{t("qr.compatibility")}</span></div>
         </>
       )}
 
-      <div className="format-capabilities"><span><QrCode size={17} /> 오류 복원 H</span><span><ImagePlus size={17} /> 중앙 로고</span><span><Camera size={17} /> 실시간 카메라</span><span><ScanLine size={17} /> 로컬 사진 스캔</span></div>
+      <div className="format-capabilities"><span><QrCode size={17} /> {t("qr.capabilities.recovery")}</span><span><ImagePlus size={17} /> {t("qr.capabilities.logo")}</span><span><Camera size={17} /> {t("qr.capabilities.camera")}</span><span><ScanLine size={17} /> {t("qr.capabilities.photo")}</span></div>
       <ToolGuide
-        title="QR 코드 사용 안내"
-        description="생성 내용, 카메라 프레임과 스캔 이미지는 외부 서버에 전송되지 않습니다."
-        blocks={[
-          { title: "중앙 로고", paragraphs: ["높은 오류 복원 수준을 사용하고 로고 뒤에 흰 여백을 넣습니다. 로고가 너무 복잡하면 일부 카메라에서 인식률이 떨어질 수 있습니다."] },
-          { title: "실시간 카메라", paragraphs: ["보안 연결(HTTPS)에서 사용자 허용을 받은 뒤 후면 카메라를 우선 사용합니다. 카메라 화면은 브라우저의 별도 작업 공간에서 반복 확인하며 QR을 찾으면 즉시 카메라와 분석 작업을 종료합니다."] },
-          { title: "사진 스캔", paragraphs: ["큰 이미지는 브라우저 안에서 최대 2200px로 축소한 뒤 밝고 어두운 색을 뒤집는 방식까지 시도해 QR을 찾습니다."] },
-        ]}
-        faq={[
-          { question: "QR URL의 안전성도 검사하나요?", answer: "아니요. QR 데이터를 표시할 뿐 연결된 사이트의 안전성을 보증하지 않습니다." },
-          { question: "카메라 권한은 언제 사용하나요?", answer: "카메라로 스캔 버튼을 누른 경우에만 권한을 요청합니다. 스캔 완료, 카메라 끄기, 탭 전환 또는 페이지 종료 시 카메라 트랙을 즉시 중지합니다." },
-        ]}
+        title={t("qr.guide.title")}
+        description={t("qr.guide.description")}
+        blocks={(t("qr.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
+        faq={(t("qr.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
     </div>
   );
 }
 
-async function drawQr(canvas: HTMLCanvasElement | null, text: string, size: number, dark: string, logo?: File) {
+async function drawQr(canvas: HTMLCanvasElement | null, text: string, size: number, dark: string, logo: File | undefined, logoError: string) {
   if (!canvas || !text) return;
   await QRCode.toCanvas(canvas, text, { width: size, margin: 3, errorCorrectionLevel: "H", color: { dark, light: "#ffffff" } });
   if (!logo) return;
   const url = URL.createObjectURL(logo);
   try {
-    const image = await loadImage(url);
+    const image = await loadImage(url, logoError);
     const context = canvas.getContext("2d");
     if (!context) return;
     const box = size * 0.22;
@@ -313,19 +310,19 @@ async function drawQr(canvas: HTMLCanvasElement | null, text: string, size: numb
   } finally { URL.revokeObjectURL(url); }
 }
 
-function loadImage(url: string) {
+function loadImage(url: string, errorMessage: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("로고 이미지를 읽지 못했습니다."));
+    image.onerror = () => reject(new Error(errorMessage));
     image.src = url;
   });
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number, errorMessage: string) {
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => {
     if (blob) resolve(blob);
-    else reject(new Error("카메라 프레임을 이미지로 만들지 못했습니다."));
+    else reject(new Error(errorMessage));
   }, type, quality));
 }
 
@@ -338,10 +335,10 @@ function dataUrlToBlob(dataUrl: string) {
   return new Blob([bytes], { type: mimeType });
 }
 
-function cameraErrorMessage(reason: unknown) {
-  if (!(reason instanceof DOMException)) return reason instanceof Error ? reason.message : "카메라를 시작하지 못했습니다.";
-  if (reason.name === "NotAllowedError" || reason.name === "SecurityError") return "카메라 권한이 거부되었습니다. 브라우저 사이트 설정에서 카메라를 허용해 주세요.";
-  if (reason.name === "NotFoundError" || reason.name === "OverconstrainedError") return "사용할 수 있는 카메라를 찾지 못했습니다.";
-  if (reason.name === "NotReadableError" || reason.name === "AbortError") return "다른 앱이 카메라를 사용 중이거나 카메라를 열 수 없습니다.";
-  return reason.message || "카메라를 시작하지 못했습니다.";
+function cameraErrorMessage(reason: unknown, messages: { start: string; permission: string; notFound: string; busy: string }) {
+  if (!(reason instanceof DOMException)) return reason instanceof Error ? reason.message : messages.start;
+  if (reason.name === "NotAllowedError" || reason.name === "SecurityError") return messages.permission;
+  if (reason.name === "NotFoundError" || reason.name === "OverconstrainedError") return messages.notFound;
+  if (reason.name === "NotReadableError" || reason.name === "AbortError") return messages.busy;
+  return reason.message || messages.start;
 }

@@ -17,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { FileShareButton } from "../../components/FileShareButton";
@@ -59,6 +61,8 @@ const SUPPORTED_EXTENSIONS = new Set(["xlsx", "xls", "xlsb", "xlsm", "csv"]);
 let fileIdSequence = 0;
 
 export function ExcelMergerPage() {
+  const { t, i18n } = useTranslation("features");
+  const language = i18n.resolvedLanguage === "en" ? "en" : "ko";
   const [entries, setEntries] = useState<ExcelFileEntry[]>([]);
   const [mergeMode, setMergeMode] = useState<MergeMode>("sheets");
   const [onlyValues, setOnlyValues] = useState(false);
@@ -73,7 +77,7 @@ export function ExcelMergerPage() {
   const [outputPassword, setOutputPassword] = useState("");
   const [outputPasswordConfirm, setOutputPasswordConfirm] = useState("");
   const [showOutputPassword, setShowOutputPassword] = useState(false);
-  const [outputName, setOutputName] = useState("merged_result.xlsx");
+  const [outputName, setOutputName] = useState(() => t("excel.defaultName"));
   const [loading, setLoading] = useState(false);
   const operation = useOperationProgress();
   const [error, setError] = useState<string | null>(null);
@@ -103,8 +107,8 @@ export function ExcelMergerPage() {
     && !outputPasswordMissing
     && !outputPasswordMismatch;
 
-  const mergeModeLabel = mergeMode === "sheets" ? "시트별" : mergeMode === "vertical" ? "세로" : "가로";
-  const formulaLabel = onlyValues ? "값만 복사" : "수식 유지";
+  const mergeModeLabel = t(`excel.modes.${mergeMode}`);
+  const formulaLabel = t(onlyValues ? "excel.valuesOnly" : "excel.keepFormulas");
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
   const handleFiles = (nextFiles: File[]) => {
@@ -123,7 +127,7 @@ export function ExcelMergerPage() {
       accepted.push(file);
     });
 
-    if (rejected.length) setFileNotice(`지원하지 않는 파일을 제외했습니다: ${rejected.join(", ")}`);
+    if (rejected.length) setFileNotice(t("excel.unsupportedFiles", { files: rejected.join(", ") }));
     else setFileNotice(null);
     if (!accepted.length) return;
 
@@ -140,7 +144,7 @@ export function ExcelMergerPage() {
     clearResult();
     setError(null);
 
-    void inspectExcelFiles(additions.map(({ id, file }) => ({ id, file })))
+    void inspectExcelFiles(additions.map(({ id, file }) => ({ id, file })), language)
       .then((inspectionResults) => {
         const byId = new Map(inspectionResults.map((item) => [item.id, item]));
         setEntries((current) => current.map((entry) => {
@@ -188,7 +192,7 @@ export function ExcelMergerPage() {
     const entry = entries.find((item) => item.id === id);
     if (!entry || !password) return;
     setEntries((current) => current.map((item) => item.id === id ? { ...item, inspection: "checking", error: undefined } : item));
-    void inspectExcelFiles([{ id, file: entry.file, password }]).then(([inspectionResult]) => {
+    void inspectExcelFiles([{ id, file: entry.file, password }], language).then(([inspectionResult]) => {
       setEntries((current) => current.map((item) => item.id === id ? {
         ...item,
         inspection: inspectionResult.error ? "error" : "ready",
@@ -226,7 +230,7 @@ export function ExcelMergerPage() {
     if (!ready) return;
     clearResult();
     setLoading(true);
-    operation.start(`${entries.length}개 파일 병합을 준비하고 있습니다.`);
+    operation.start(t("excel.status.preparing", { count: entries.length }));
     setError(null);
 
     try {
@@ -254,9 +258,10 @@ export function ExcelMergerPage() {
         (nextProgress, message) => {
           operation.update(nextProgress, message);
         },
+        language,
       );
 
-      const fileName = normalizeOutputName(outputName);
+      const fileName = normalizeOutputName(outputName, t("excel.defaultName"));
       const blob = new Blob([merged.buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
@@ -276,7 +281,7 @@ export function ExcelMergerPage() {
       setEntries((current) => current.map((entry) => ({ ...entry, password: "" })));
       setOutputPassword("");
       setOutputPasswordConfirm("");
-      operation.succeed("출력 XLSX 파일 생성을 완료했습니다.");
+      operation.succeed(t("excel.status.complete"));
     } catch (mergeError) {
       const normalized = mergeError as Error & { code?: string; fileName?: string };
       setError(normalized.message);
@@ -300,23 +305,23 @@ export function ExcelMergerPage() {
 
   return (
     <div className="page tool-page page-enter accent-context-green">
-      <PageHeader eyebrow="SPREADSHEET TOOL" title="Excel Merger" description="여러 Excel 파일과 CSV를 브라우저 안에서 하나의 XLSX로 안전하게 합치세요.">
-        <div className="header-status ready"><span className="status-dot" /> 브라우저에서 바로 사용</div>
+      <PageHeader eyebrow="SPREADSHEET TOOL" title={t("excel.title")} description={t("excel.description")}>
+        <div className="header-status ready"><span className="status-dot" /> {t("excel.ready")}</div>
       </PageHeader>
       <PrivacyBanner compact />
 
       <div className="workflow-grid">
         <div className="workflow-main">
-          <SectionCard step={1} title="파일 선택" description="XLSX, XLS, XLSB, XLSM, CSV 파일을 한 번에 고르거나 여러 번 나눠 기존 목록 뒤에 추가할 수 있습니다.">
+          <SectionCard step={1} title={t("excel.steps.files.title")} description={t("excel.steps.files.description")}>
             <FileDropZone
               accept=".xlsx,.xls,.xlsb,.xlsm,.csv"
-              hint="XLSX, XLS, XLSB, XLSM, CSV · 여러 번 추가 가능 · 출력은 XLSX"
+              hint={t("excel.steps.files.hint")}
               multiple
               files={visibleFiles}
               onFiles={handleFiles}
               accent="green"
             />
-            <div className="inline-notice"><Info size={15} /><span>출력은 XLSX로 생성됩니다. 수식과 서식 보존은 XLSX 입력만 지원하며, XLSM 매크로는 보존되지 않습니다.</span></div>
+            <div className="inline-notice"><Info size={15} /><span>{t("excel.steps.files.notice")}</span></div>
             {fileNotice && <div className="inline-notice warning"><AlertCircle size={15} /><span>{fileNotice}</span></div>}
             <ExcelFileList
               entries={entries}
@@ -324,30 +329,31 @@ export function ExcelMergerPage() {
               onMove={moveFile}
               onPasswordChange={updateInputPassword}
               onPasswordInspect={inspectProtectedFile}
+              t={t}
             />
           </SectionCard>
 
-          <SectionCard step={2} title="포함할 시트" description="파일 안의 시트명을 확인하고 병합에 포함할 시트만 고르세요.">
+          <SectionCard step={2} title={t("excel.steps.sheets.title")} description={t("excel.steps.sheets.description")}>
             <SegmentedControl
-              label="시트 선택 방식"
+              label={t("excel.sheetSelection.label")}
               value={sheetSelectionMode}
               onChange={(value) => { setSheetSelectionMode(value); clearResult(); }}
               options={[
-                { value: "all", label: "모든 시트" },
-                { value: "positions", label: "순번 선택" },
-                { value: "custom", label: "직접 선택" },
+                { value: "all", label: t("excel.sheetSelection.all") },
+                { value: "positions", label: t("excel.sheetSelection.positions") },
+                { value: "custom", label: t("excel.sheetSelection.custom") },
               ]}
             />
             {sheetSelectionMode === "positions" && (
               <div className="sheet-position-input">
-                <label htmlFor="sheet-position-pattern">포함할 시트 순번</label>
+                <label htmlFor="sheet-position-pattern">{t("excel.sheetSelection.positionLabel")}</label>
                 <input
                   id="sheet-position-pattern"
                   value={sheetPositionPattern}
                   onChange={(event) => { setSheetPositionPattern(event.target.value); clearResult(); }}
-                  placeholder="예: 2 또는 1,3 또는 1-3"
+                  placeholder={t("excel.sheetSelection.placeholder")}
                 />
-                <small><b>2</b>는 2번째만 · <b>-3</b>은 3번까지 · <b>3-</b>은 3번부터 · <b>1,3,5</b>와 <b>2-4</b>도 사용할 수 있습니다.</small>
+                <small>{t("excel.sheetSelection.help")}</small>
               </div>
             )}
             <ExcelSheetSelector
@@ -356,55 +362,56 @@ export function ExcelMergerPage() {
               pattern={sheetPositionPattern}
               onToggle={toggleSheet}
               onSetAll={setAllSheetsForFile}
+              t={t}
             />
-            {entries.length > 0 && !inspecting && selectedSheetCount === 0 && <div className="inline-notice warning"><AlertCircle size={15} /><span>병합에 포함할 시트를 하나 이상 선택해 주세요.</span></div>}
+            {entries.length > 0 && !inspecting && selectedSheetCount === 0 && <div className="inline-notice warning"><AlertCircle size={15} /><span>{t("excel.sheetSelection.required")}</span></div>}
           </SectionCard>
 
-          <SectionCard step={3} title="병합 방식" description="선택한 시트를 파일 순서대로 처리합니다.">
+          <SectionCard step={3} title={t("excel.steps.mode.title")} description={t("excel.steps.mode.description")}>
             <SegmentedControl
-              label="병합 방식"
+              label={t("excel.steps.mode.label")}
               value={mergeMode}
               onChange={(value) => { setMergeMode(value); clearResult(); }}
               options={[
-                { value: "sheets", label: "시트별" },
-                { value: "vertical", label: "세로" },
-                { value: "horizontal", label: "가로" },
+                { value: "sheets", label: t("excel.modes.sheets") },
+                { value: "vertical", label: t("excel.modes.vertical") },
+                { value: "horizontal", label: t("excel.modes.horizontal") },
               ]}
             />
             <div className="mode-explainer">
               <Info size={17} />
-              <span>{mergeMode === "sheets" ? "각 시트를 결과 파일의 개별 시트로 모읍니다." : mergeMode === "vertical" ? "모든 시트의 데이터를 위아래로 이어 붙이고 수식 참조 행을 보정합니다." : "모든 시트의 데이터를 좌우로 이어 붙이고 수식 참조 열을 보정합니다."}</span>
+              <span>{t(`excel.modeHelp.${mergeMode}`)}</span>
             </div>
           </SectionCard>
 
-          <SectionCard step={4} title="출력 설정" description="결과는 호환성이 높은 XLSX 형식으로 생성됩니다.">
+          <SectionCard step={4} title={t("excel.steps.output.title")} description={t("excel.steps.output.description")}>
             <div className="settings-list">
               <ToggleRow
-                label="값만 복사"
-                description={onlyValues ? "수식의 현재 계산 결과만 저장합니다." : "꺼짐: 수식과 저장된 계산 결과를 함께 유지합니다."}
+                label={t("excel.output.valuesLabel")}
+                description={t(onlyValues ? "excel.output.valuesOn" : "excel.output.valuesOff")}
                 checked={onlyValues}
                 onChange={(checked) => { setOnlyValues(checked); clearResult(); }}
               />
               <ToggleRow
-                label="끝의 빈 행·열 정리"
-                description="내용 뒤에 남은 불필요한 빈 영역을 제외합니다."
+                label={t("excel.output.trimEdges")}
+                description={t("excel.output.trimEdgesHelp")}
                 checked={trimEmptyEdges}
                 onChange={(checked) => { setTrimEmptyEdges(checked); clearResult(); }}
               />
               <ToggleRow
-                label="중간의 연속 빈 행 삭제"
-                description="시트 중간을 포함해 기준 개수 이상 연속된 빈 행을 삭제합니다."
+                label={t("excel.output.trimRows")}
+                description={t("excel.output.trimRowsHelp")}
                 checked={sheetTrimRows}
                 onChange={(checked) => { setSheetTrimRows(checked); clearResult(); }}
               />
               <ToggleRow
-                label="중간의 연속 빈 열 삭제"
-                description="시트 중간을 포함해 기준 개수 이상 연속된 빈 열을 삭제합니다."
+                label={t("excel.output.trimColumns")}
+                description={t("excel.output.trimColumnsHelp")}
                 checked={sheetTrimColumns}
                 onChange={(checked) => { setSheetTrimColumns(checked); clearResult(); }}
               />
               <label className="settings-row select-row sheet-trim-threshold">
-                <span><strong>삭제할 최소 연속 개수</strong><small>빈 행·열이 이 개수 이상 연속될 때 해당 묶음 전체를 삭제합니다.</small></span>
+                <span><strong>{t("excel.output.trimThreshold")}</strong><small>{t("excel.output.trimThresholdHelp")}</small></span>
                 <span className="number-input-with-unit">
                   <input
                     type="number"
@@ -418,32 +425,32 @@ export function ExcelMergerPage() {
                       if (Number.isFinite(next)) setSheetTrimThreshold(Math.max(1, Math.floor(next)));
                       clearResult();
                     }}
-                    aria-label="삭제할 최소 연속 빈 행 또는 열 개수"
+                    aria-label={t("excel.output.trimThresholdAria")}
                   />
-                  <small>개 이상</small>
+                  <small>{t("excel.output.orMore")}</small>
                 </span>
               </label>
               <label className="settings-row select-row">
-                <span><strong>시트 이름 규칙</strong><small>시트별 병합에 적용됩니다.</small></span>
+                <span><strong>{t("excel.output.sheetNameRule")}</strong><small>{t("excel.output.sheetNameRuleHelp")}</small></span>
                 <select value={sheetNameRule} disabled={mergeMode !== "sheets"} onChange={(event) => setSheetNameRule(event.target.value as SheetNameRule)}>
-                  <option value="file-sheet">파일명 + 시트명</option>
-                  <option value="sheet-file">시트명 + 파일명</option>
-                  <option value="sheet">원본 시트명</option>
+                  <option value="file-sheet">{t("excel.output.fileSheet")}</option>
+                  <option value="sheet-file">{t("excel.output.sheetFile")}</option>
+                  <option value="sheet">{t("excel.output.originalSheet")}</option>
                 </select>
               </label>
             </div>
 
             <div className="output-name-field">
-              <label htmlFor="output-file-name">출력 파일명</label>
+              <label htmlFor="output-file-name">{t("excel.output.fileName")}</label>
               <div><FileSpreadsheet size={17} /><input id="output-file-name" value={outputName} onChange={(event) => setOutputName(event.target.value)} /></div>
             </div>
           </SectionCard>
 
-          <SectionCard step={5} title="출력 파일 보호" description="선택 사항 · 파일을 열 때 필요한 암호를 설정합니다.">
+          <SectionCard step={5} title={t("excel.steps.protect.title")} description={t("excel.steps.protect.description")}>
             <div className="settings-list">
               <ToggleRow
-                label="출력 파일에 암호 설정"
-                description="수식과 서식을 포함한 XLSX 전체를 암호화합니다."
+                label={t("excel.protect.label")}
+                description={t("excel.protect.help")}
                 checked={protectOutput}
                 onChange={(checked) => {
                   setProtectOutput(checked);
@@ -457,10 +464,10 @@ export function ExcelMergerPage() {
             </div>
             {protectOutput && (
               <div className="password-form output-password-form">
-                <PasswordField label="파일 암호" value={outputPassword} onChange={setOutputPassword} visible={showOutputPassword} onVisibilityChange={setShowOutputPassword} />
-                <PasswordField label="암호 확인" value={outputPasswordConfirm} onChange={setOutputPasswordConfirm} visible={showOutputPassword} />
-                {outputPasswordConfirm && outputPasswordMismatch && <p className="field-error">두 암호가 일치하지 않습니다.</p>}
-                <p className="field-help"><LockKeyhole size={13} /> 암호를 잊으면 복구할 수 없습니다. 암호는 작업 직후 메모리에서 지워집니다.</p>
+                <PasswordField label={t("excel.protect.password")} value={outputPassword} onChange={setOutputPassword} visible={showOutputPassword} onVisibilityChange={setShowOutputPassword} toggleLabel={t("excel.protect.toggle")} />
+                <PasswordField label={t("excel.protect.confirm")} value={outputPasswordConfirm} onChange={setOutputPasswordConfirm} visible={showOutputPassword} toggleLabel={t("excel.protect.toggle")} />
+                {outputPasswordConfirm && outputPasswordMismatch && <p className="field-error">{t("excel.protect.mismatch")}</p>}
+                <p className="field-help"><LockKeyhole size={13} /> {t("excel.protect.warning")}</p>
               </div>
             )}
           </SectionCard>
@@ -468,24 +475,24 @@ export function ExcelMergerPage() {
 
         <aside className="workflow-summary">
           <div className="summary-card">
-            <div className="summary-title"><SlidersHorizontal size={19} /><h2>병합 요약</h2></div>
+            <div className="summary-title"><SlidersHorizontal size={19} /><h2>{t("excel.summary.title")}</h2></div>
             <dl>
-              <div><dt>선택한 파일</dt><dd>{entries.length}개</dd></div>
-              <div><dt>포함할 시트</dt><dd>{selectedSheetCount}개</dd></div>
-              <div><dt>암호화 입력</dt><dd>{encryptedCount}개</dd></div>
-              <div><dt>병합 방식</dt><dd>{mergeModeLabel}</dd></div>
-              <div><dt>셀 출력</dt><dd>{formulaLabel}</dd></div>
-              <div><dt>중간 빈 영역</dt><dd>{sheetTrimRows || sheetTrimColumns ? `${sheetTrimRows ? "행" : ""}${sheetTrimRows && sheetTrimColumns ? "·" : ""}${sheetTrimColumns ? "열" : ""} ${sheetTrimThreshold}개 이상` : "사용 안 함"}</dd></div>
-              <div><dt>결과 형식</dt><dd>암호{protectOutput ? " 적용" : " 없음"} XLSX</dd></div>
+              <div><dt>{t("excel.summary.files")}</dt><dd>{t("excel.summary.count", { count: entries.length })}</dd></div>
+              <div><dt>{t("excel.summary.sheets")}</dt><dd>{t("excel.summary.count", { count: selectedSheetCount })}</dd></div>
+              <div><dt>{t("excel.summary.encryptedInputs")}</dt><dd>{t("excel.summary.count", { count: encryptedCount })}</dd></div>
+              <div><dt>{t("excel.summary.mode")}</dt><dd>{mergeModeLabel}</dd></div>
+              <div><dt>{t("excel.summary.cells")}</dt><dd>{formulaLabel}</dd></div>
+              <div><dt>{t("excel.summary.middleEmpty")}</dt><dd>{sheetTrimRows || sheetTrimColumns ? t("excel.summary.emptyEnabled", { axes: `${sheetTrimRows ? t("excel.summary.rows") : ""}${sheetTrimRows && sheetTrimColumns ? "·" : ""}${sheetTrimColumns ? t("excel.summary.columns") : ""}`, count: sheetTrimThreshold }) : t("excel.summary.disabled")}</dd></div>
+              <div><dt>{t("excel.summary.format")}</dt><dd>{t(protectOutput ? "excel.summary.protected" : "excel.summary.unprotected")}</dd></div>
             </dl>
             <PrimaryButton accent="green" disabled={!ready} loading={loading} onClick={() => void runMerge()}>
-              {loading ? `${operation.progress}% 처리 중` : "Excel 파일 병합"}
+              {loading ? t("excel.summary.processing", { progress: operation.progress }) : t("excel.summary.merge")}
             </PrimaryButton>
-            {!loading && inspecting && <p className="prototype-note">파일 보호 여부와 시트 목록을 확인하고 있습니다.</p>}
-            {!loading && inspectionFailed && <p className="prototype-note error-text">읽지 못한 파일의 암호 또는 형식을 확인해 주세요.</p>}
-            {!loading && missingInputPassword && <p className="prototype-note error-text">암호화된 입력 파일의 비밀번호가 필요합니다.</p>}
-            {!loading && entries.length > 0 && selectedSheetCount === 0 && <p className="prototype-note error-text">포함할 시트를 선택해 주세요.</p>}
-            {!loading && outputPasswordMissing && <p className="prototype-note error-text">출력 파일 암호를 입력해 주세요.</p>}
+            {!loading && inspecting && <p className="prototype-note">{t("excel.summary.inspecting")}</p>}
+            {!loading && inspectionFailed && <p className="prototype-note error-text">{t("excel.summary.inspectionFailed")}</p>}
+            {!loading && missingInputPassword && <p className="prototype-note error-text">{t("excel.summary.inputPassword")}</p>}
+            {!loading && entries.length > 0 && selectedSheetCount === 0 && <p className="prototype-note error-text">{t("excel.summary.selectSheet")}</p>}
+            {!loading && outputPasswordMissing && <p className="prototype-note error-text">{t("excel.summary.outputPassword")}</p>}
           </div>
           <OperationProgress
             status={operation.status}
@@ -493,18 +500,18 @@ export function ExcelMergerPage() {
             message={operation.message}
             logs={operation.logs}
             accent="green"
-            title="Excel 병합 진행 상황"
+            title={t("excel.progressTitle")}
           />
         </aside>
       </div>
 
-      {error && <div className="error-banner" role="alert"><AlertCircle size={19} /><div><strong>병합하지 못했습니다.</strong><span>{error}</span></div></div>}
+      {error && <div className="error-banner" role="alert"><AlertCircle size={19} /><div><strong>{t("excel.failed")}</strong><span>{error}</span></div></div>}
 
       {result && (
         <ResultCard
           accent="green"
-          title="Excel 파일을 만들었습니다."
-          message={`${result.fileCount}개 파일의 ${result.sheetCount}개 시트를 ${result.outputSheetCount}개 시트로 정리했습니다.${result.encrypted ? " 출력 파일 암호도 적용했습니다." : ""}`}
+          title={t("excel.result.title")}
+          message={t("excel.result.message", { fileCount: result.fileCount, sheetCount: result.sheetCount, outputCount: result.outputSheetCount, encrypted: result.encrypted ? t("excel.result.encrypted") : "" })}
         >
           <div className="result-file-actions"><a className="result-download" href={result.url} download={result.fileName}><Download size={17} /> {result.fileName}<small>{formatBytes(result.size)}</small></a><FileShareButton url={result.url} fileName={result.fileName} mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" /></div>
           {result.warnings.length > 0 && (
@@ -514,59 +521,24 @@ export function ExcelMergerPage() {
       )}
 
       <ToolGuide
-        title="Excel 병합 사용 안내"
-        description="파일 형식과 병합 방식의 차이를 확인하면 원하는 결과를 더 정확하게 만들 수 있습니다."
-        blocks={[
-          {
-            title: "지원하는 파일 형식",
-            paragraphs: ["XLSX, XLS, XLSB, XLSM, CSV 파일을 함께 선택할 수 있으며, 병합 결과는 항상 XLSX 파일로 만들어집니다."],
-            items: ["XLSX: 수식·일반 셀 서식 보존 지원", "XLS·XLSB·XLSM: 값과 기본 시트 구조를 XLSX로 변환", "CSV: 한 개의 표 형태 데이터로 처리", "XLSM 매크로는 출력 파일에 보존되지 않음"],
-          },
-          {
-            title: "포함할 시트 고르기",
-            paragraphs: ["파일을 추가하면 내부 시트명을 순서대로 읽습니다. 모든 시트, 공통 순번 규칙, 파일별 직접 선택 중 원하는 방식을 사용할 수 있습니다."],
-            items: ["2: 각 파일의 2번째 시트만", "-3: 각 파일의 1~3번째 시트", "3-: 각 파일의 3번째부터 마지막 시트", "1,3,5 또는 2-4: 여러 순번과 범위"],
-          },
-          {
-            title: "병합 방식 고르기",
-            paragraphs: ["시트별은 원본 시트를 각각 보관합니다. 세로는 행을 아래로 이어 붙이고, 가로는 열을 오른쪽으로 이어 붙입니다."],
-            items: ["구조가 다른 파일: 시트별 병합", "열 구성이 같은 월별 자료: 세로 병합", "행 구성이 같은 항목별 자료: 가로 병합"],
-          },
-          {
-            title: "수식·서식과 암호",
-            paragraphs: ["수식과 서식 보존은 XLSX 입력 파일에서만 지원합니다. 값만 복사를 끄면 XLSX의 수식과 저장된 계산 결과를 유지하고, 위치가 바뀌는 세로·가로 병합에서는 상대 참조를 보정합니다. 입력 암호와 출력 암호는 작업 중 브라우저 메모리에서만 사용합니다."],
-          },
-          {
-            title: "빈 영역 정리 방식",
-            paragraphs: ["끝의 빈 행·열 정리는 각 입력 시트의 마지막 내용 뒤쪽 여백만 복사에서 제외합니다. 중간의 연속 빈 행·열 삭제는 병합이 끝난 결과 시트 전체를 살펴 지정한 개수 이상 이어진 빈 영역을 삭제합니다."],
-            items: ["행과 열을 서로 독립적으로 선택", "공백 문자만 들어 있는 셀도 빈 셀로 판단", "기준보다 짧은 빈 행·열 묶음은 그대로 유지"],
-          },
-          {
-            title: "결과 확인이 필요한 항목",
-            paragraphs: ["출력은 XLSX만 지원하며 XLSM의 매크로는 보존되지 않습니다. 이미지, 외부 데이터 연결, 피벗과 일부 고급 표 개체도 제외되거나 단순화될 수 있으므로 중요한 결과는 Excel에서 직접 확인하세요."],
-          },
-        ]}
-        faq={[
-          { question: "CSV 파일의 수식과 서식도 유지되나요?", answer: "CSV는 셀 값만 담는 텍스트 형식이므로 수식, 서식, 여러 시트를 저장하지 않습니다. 병합 결과는 이런 기능을 담을 수 있는 XLSX로 생성합니다." },
-          { question: "XLSB와 XLSM도 병합할 수 있나요?", answer: "입력할 수 있지만 값과 기본 시트 구조를 읽어 XLSX로 변환합니다. 수식과 서식 보존은 XLSX 입력에서만 지원하며 XLSM의 매크로는 결과에 포함되지 않습니다." },
-          { question: "여러 파일에서 같은 순번의 시트만 고를 수 있나요?", answer: "순번 선택에서 2처럼 입력하면 각 파일의 2번째 시트만 포함합니다. -3, 3-, 1,3,5, 2-4 같은 범위도 사용할 수 있습니다." },
-          { question: "끝 여백 정리와 중간 빈 영역 삭제는 무엇이 다른가요?", answer: "끝 여백 정리는 데이터 뒤쪽의 빈 범위를 복사하지 않습니다. 중간 빈 영역 삭제는 결과 시트 전체를 검사해 중간에 있는 빈 행·열도 지정한 연속 개수 이상이면 묶음 전체를 삭제합니다." },
-          { question: "암호가 걸린 Excel 파일도 합칠 수 있나요?", answer: "지원되는 Office 암호화 방식이면 파일별 암호를 입력해 브라우저에서 해제할 수 있습니다. 손상된 파일이나 일부 오래된 암호화 방식은 열지 못할 수 있습니다." },
-          { question: "출력 파일 암호를 잊으면 복구할 수 있나요?", answer: "복구할 수 없습니다. 암호는 서버에 저장하지 않고 작업 후 메모리에서도 제거하므로 안전한 곳에 따로 기록해 주세요." },
-        ]}
+        title={t("excel.guide.title")}
+        description={t("excel.guide.description")}
+        blocks={t("excel.guide.blocks", { returnObjects: true }) as Array<{ title: string; paragraphs: string[]; items?: string[] }>}
+        faq={(t("excel.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map(({ q, a }) => ({ question: q, answer: a }))}
       />
     </div>
   );
 }
 
-function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll }: {
+function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll, t }: {
   entries: ExcelFileEntry[];
   mode: SheetSelectionMode;
   pattern: string;
   onToggle: (id: string, sheetName: string) => void;
   onSetAll: (id: string, selected: boolean) => void;
+  t: TFunction<"features">;
 }) {
-  if (!entries.length) return <div className="sheet-selector-empty">파일을 추가하면 내부 시트명이 여기에 표시됩니다.</div>;
+  if (!entries.length) return <div className="sheet-selector-empty">{t("excel.sheetList.empty")}</div>;
 
   return (
     <div className="excel-sheet-selector">
@@ -575,18 +547,18 @@ function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll }: {
         return (
           <section className="sheet-file-group" key={entry.id}>
             <div className="sheet-file-heading">
-              <span><strong>{entry.file.name}</strong><small>{entry.sheetNames.length ? `${selectedNames.size}/${entry.sheetNames.length}개 시트 포함` : "시트 확인 필요"}</small></span>
+              <span><strong>{entry.file.name}</strong><small>{entry.sheetNames.length ? t("excel.sheetList.included", { selected: selectedNames.size, total: entry.sheetNames.length }) : t("excel.sheetList.needsCheck")}</small></span>
               {mode === "custom" && entry.sheetNames.length > 0 && (
                 <span className="sheet-select-actions">
-                  <button type="button" onClick={() => onSetAll(entry.id, true)}>모두</button>
-                  <button type="button" onClick={() => onSetAll(entry.id, false)}>해제</button>
+                  <button type="button" onClick={() => onSetAll(entry.id, true)}>{t("excel.sheetList.all")}</button>
+                  <button type="button" onClick={() => onSetAll(entry.id, false)}>{t("excel.sheetList.clear")}</button>
                 </span>
               )}
             </div>
             {entry.inspection === "checking" ? (
-              <div className="sheet-loading"><LoaderCircle className="spin" size={14} /> 시트명 읽는 중…</div>
+              <div className="sheet-loading"><LoaderCircle className="spin" size={14} /> {t("excel.sheetList.loading")}</div>
             ) : entry.encrypted && !entry.sheetNames.length && !entry.error ? (
-              <div className="sheet-loading"><FileLock2 size={14} /> 파일 암호를 입력하면 시트명을 확인합니다.</div>
+              <div className="sheet-loading"><FileLock2 size={14} /> {t("excel.sheetList.password")}</div>
             ) : entry.error ? (
               <div className="sheet-loading error-text"><AlertCircle size={14} /> {entry.error}</div>
             ) : (
@@ -600,7 +572,7 @@ function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll }: {
                           <input type="checkbox" checked={selected} onChange={() => onToggle(entry.id, sheetName)} />
                           <b>{index + 1}</b><span>{sheetName}</span>
                         </label>
-                      ) : <><b>{index + 1}</b><span>{sheetName}</span>{selected && <small>포함</small>}</>}
+                      ) : <><b>{index + 1}</b><span>{sheetName}</span>{selected && <small>{t("excel.sheetList.include")}</small>}</>}
                     </li>
                   );
                 })}
@@ -613,12 +585,13 @@ function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll }: {
   );
 }
 
-function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPasswordInspect }: {
+function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPasswordInspect, t }: {
   entries: ExcelFileEntry[];
   onRemove: (id: string) => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onPasswordChange: (id: string, password: string) => void;
   onPasswordInspect: (id: string, password: string) => void;
+  t: TFunction<"features">;
 }) {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   if (!entries.length) return null;
@@ -639,23 +612,23 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
             <span className="file-meta"><strong>{entry.file.name}</strong><small>{formatBytes(entry.file.size)}</small></span>
             <span className={`file-security-status ${entry.inspection}`}>
               {entry.inspection === "checking"
-                ? <><LoaderCircle className="spin" size={14} /> 확인 중</>
+                ? <><LoaderCircle className="spin" size={14} /> {t("excel.fileList.checking")}</>
                 : entry.encrypted
-                  ? <><FileLock2 size={14} /> 암호화됨</>
+                  ? <><FileLock2 size={14} /> {t("excel.fileList.encrypted")}</>
                   : entry.inspection === "error"
-                    ? <><AlertCircle size={14} /> 확인 필요</>
-                    : <><CheckCircle2 size={14} /> 사용 가능</>}
+                    ? <><AlertCircle size={14} /> {t("excel.fileList.needsCheck")}</>
+                    : <><CheckCircle2 size={14} /> {t("excel.fileList.available")}</>}
             </span>
             <span className="file-order-actions">
-              <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0} aria-label={`${entry.file.name} 위로 이동`}><ArrowUp size={15} /></button>
-              <button type="button" onClick={() => onMove(index, 1)} disabled={index === entries.length - 1} aria-label={`${entry.file.name} 아래로 이동`}><ArrowDown size={15} /></button>
+              <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0} aria-label={t("excel.fileList.moveUp", { name: entry.file.name })}><ArrowUp size={15} /></button>
+              <button type="button" onClick={() => onMove(index, 1)} disabled={index === entries.length - 1} aria-label={t("excel.fileList.moveDown", { name: entry.file.name })}><ArrowDown size={15} /></button>
             </span>
-            <button className="remove-button" type="button" onClick={() => onRemove(entry.id)} aria-label={`${entry.file.name} 제거`}><X size={17} /></button>
+            <button className="remove-button" type="button" onClick={() => onRemove(entry.id)} aria-label={t("excel.fileList.remove", { name: entry.file.name })}><X size={17} /></button>
           </div>
           {entry.encrypted && (
             <div className="input-password-row">
               <LockKeyhole size={16} />
-              <label htmlFor={`password-${entry.id}`}>파일 암호</label>
+              <label htmlFor={`password-${entry.id}`}>{t("excel.protect.password")}</label>
               <div className="password-input compact">
                 <input
                   id={`password-${entry.id}`}
@@ -664,14 +637,14 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
                   onChange={(event) => onPasswordChange(entry.id, event.target.value)}
                   onBlur={(event) => onPasswordInspect(entry.id, event.target.value)}
                   onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-                  placeholder="암호 입력"
+                  placeholder={t("excel.fileList.passwordPlaceholder")}
                   autoComplete="off"
                 />
-                <button type="button" onClick={() => togglePassword(entry.id)} aria-label="암호 표시 전환">
+                <button type="button" onClick={() => togglePassword(entry.id)} aria-label={t("excel.protect.toggle")}>
                   {visiblePasswords.has(entry.id) ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              <small>입력 후 시트 목록 자동 확인</small>
+              <small>{t("excel.fileList.passwordHelp")}</small>
             </div>
           )}
           {entry.error && <p className="file-item-error"><AlertCircle size={13} /> {entry.error}</p>}
@@ -681,12 +654,13 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
   );
 }
 
-function PasswordField({ label, value, onChange, visible, onVisibilityChange }: {
+function PasswordField({ label, value, onChange, visible, onVisibilityChange, toggleLabel }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   visible: boolean;
   onVisibilityChange?: (visible: boolean) => void;
+  toggleLabel: string;
 }) {
   return (
     <label className="password-field">
@@ -694,7 +668,7 @@ function PasswordField({ label, value, onChange, visible, onVisibilityChange }: 
       <div className="password-input">
         {value ? <ShieldCheck size={17} /> : <LockOpen size={17} />}
         <input type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} autoComplete="new-password" />
-        {onVisibilityChange && <button type="button" onClick={() => onVisibilityChange(!visible)} aria-label="암호 표시 전환">{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button>}
+        {onVisibilityChange && <button type="button" onClick={() => onVisibilityChange(!visible)} aria-label={toggleLabel}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button>}
       </div>
     </label>
   );
@@ -748,7 +722,7 @@ function createFileId() {
   return `excel-file-${Date.now().toString(36)}-${fileIdSequence.toString(36)}`;
 }
 
-function normalizeOutputName(name: string) {
-  const sanitized = name.trim().replace(/[\\/:*?"<>|]/g, "_") || "merged_result.xlsx";
+function normalizeOutputName(name: string, fallback: string) {
+  const sanitized = name.trim().replace(/[\\/:*?"<>|]/g, "_") || fallback;
   return sanitized.toLowerCase().endsWith(".xlsx") ? sanitized : `${sanitized}.xlsx`;
 }

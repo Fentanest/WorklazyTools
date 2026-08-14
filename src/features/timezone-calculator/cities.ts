@@ -61,3 +61,25 @@ export const WORLD_CITIES: readonly WorldCity[] = [
 ] as const;
 
 export const CITY_BY_ID = new Map(WORLD_CITIES.map((city) => [city.id, city]));
+
+const ENGLISH_CITY_NAMES: Record<string, string> = {
+  seoul: "Seoul", tokyo: "Tokyo", beijing: "Beijing", "hong-kong": "Hong Kong", taipei: "Taipei", manila: "Manila", singapore: "Singapore", bangkok: "Bangkok", jakarta: "Jakarta", "new-delhi": "New Delhi", dubai: "Dubai", istanbul: "Istanbul",
+  london: "London", paris: "Paris", berlin: "Berlin", amsterdam: "Amsterdam", madrid: "Madrid", rome: "Rome", warsaw: "Warsaw", stockholm: "Stockholm", athens: "Athens", moscow: "Moscow",
+  "new-york": "New York", "los-angeles": "Los Angeles", chicago: "Chicago", toronto: "Toronto", vancouver: "Vancouver", "mexico-city": "Mexico City", bogota: "Bogotá", lima: "Lima", "sao-paulo": "São Paulo", "buenos-aires": "Buenos Aires", santiago: "Santiago",
+  sydney: "Sydney", melbourne: "Melbourne", perth: "Perth", auckland: "Auckland", honolulu: "Honolulu", cairo: "Cairo", casablanca: "Casablanca", lagos: "Lagos", nairobi: "Nairobi", johannesburg: "Johannesburg", "cape-town": "Cape Town",
+};
+
+const ENGLISH_COUNTRY_NAMES: Record<string, string> = {
+  seoul: "South Korea", tokyo: "Japan", beijing: "China", "hong-kong": "Hong Kong", taipei: "Taiwan", manila: "Philippines", singapore: "Singapore", bangkok: "Thailand", jakarta: "Indonesia", "new-delhi": "India", dubai: "United Arab Emirates", istanbul: "Türkiye",
+  london: "United Kingdom", paris: "France", berlin: "Germany", amsterdam: "Netherlands", madrid: "Spain", rome: "Italy", warsaw: "Poland", stockholm: "Sweden", athens: "Greece", moscow: "Russia",
+  "new-york": "United States", "los-angeles": "United States", chicago: "United States", toronto: "Canada", vancouver: "Canada", "mexico-city": "Mexico", bogota: "Colombia", lima: "Peru", "sao-paulo": "Brazil", "buenos-aires": "Argentina", santiago: "Chile",
+  sydney: "Australia", melbourne: "Australia", perth: "Australia", auckland: "New Zealand", honolulu: "United States", cairo: "Egypt", casablanca: "Morocco", lagos: "Nigeria", nairobi: "Kenya", johannesburg: "South Africa", "cape-town": "South Africa",
+};
+
+export function cityName(city: WorldCity, language: "ko" | "en") {
+  return language === "en" ? ENGLISH_CITY_NAMES[city.id] ?? city.city : city.city;
+}
+
+export function countryName(city: WorldCity, language: "ko" | "en") {
+  return language === "en" ? ENGLISH_COUNTRY_NAMES[city.id] ?? city.country : city.country;
+}

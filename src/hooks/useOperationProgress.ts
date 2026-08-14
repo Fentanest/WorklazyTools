@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export type OperationStatus = "idle" | "running" | "success" | "error";
 
@@ -11,6 +12,7 @@ export interface OperationLogEntry {
 }
 
 export function useOperationProgress() {
+  const { t } = useTranslation("common");
   const [status, setStatus] = useState<OperationStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("");
@@ -55,9 +57,9 @@ export function useOperationProgress() {
     append(nextProgress, nextMessage, "running");
   }, [append]);
 
-  const succeed = useCallback((successMessage = "작업을 완료했습니다.") => {
+  const succeed = useCallback((successMessage = t("status.complete")) => {
     append(100, successMessage, "success");
-  }, [append]);
+  }, [append, t]);
 
   const fail = useCallback((errorMessage: string) => {
     append(progressRef.current, errorMessage, "error");

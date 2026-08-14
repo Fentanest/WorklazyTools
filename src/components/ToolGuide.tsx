@@ -15,6 +15,7 @@ export function ToolGuide({ title, description, blocks, faq }: {
   blocks: GuideBlock[];
   faq: GuideFaq[];
 }) {
+  const { t } = useTranslation("common");
   return (
     <section className="tool-guide" aria-labelledby="tool-guide-title">
       <div className="content-heading">
@@ -30,7 +31,7 @@ export function ToolGuide({ title, description, blocks, faq }: {
         ))}
       </div>
       <div className="tool-faq">
-        <h2>자주 묻는 질문</h2>
+        <h2>{t("guide.faq")}</h2>
         {faq.map((item) => (
           <details key={item.question}>
             <summary>{item.question}</summary>
@@ -41,3 +42,4 @@ export function ToolGuide({ title, description, blocks, faq }: {
     </section>
   );
 }
+import { useTranslation } from "react-i18next";

@@ -1,5 +1,6 @@
 import { Braces, CodeXml, Copy, Database, Minimize2, WandSparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
@@ -8,6 +9,7 @@ import { ToolGuide } from "../../components/ToolGuide";
 type FormatKind = "json" | "sql" | "xml";
 
 export function TextFormatterPage() {
+  const { t, i18n } = useTranslation(["features", "common"]);
   const [kind, setKind] = useState<FormatKind>("json");
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
@@ -25,19 +27,19 @@ export function TextFormatterPage() {
       else setError(event.data.message);
       setBusy(false); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined;
     };
-    worker.onerror = (event) => { setBusy(false); setError(event.message || "포맷터를 실행하지 못했습니다."); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined; };
-    worker.postMessage({ kind, mode, text: input, indent });
+    worker.onerror = (event) => { setBusy(false); setError(event.message || t("features:formatter.workerError")); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined; };
+    worker.postMessage({ kind, mode, text: input, indent, language: i18n.language });
   };
 
   return <div className="page tool-page page-enter utility-page formatter-page">
-    <PageHeader eyebrow="FORMATTER" title="JSON·SQL·XML 포맷터" description="문법을 검사하고 읽기 좋은 들여쓰기 또는 한 줄 형식으로 정리하세요."><PrivacyBanner compact /></PageHeader>
-    <SectionCard title="형식과 출력 설정"><div className="formatter-toolbar"><SegmentedControl value={kind} onChange={(value) => { setKind(value); setError(""); }} label="텍스트 형식" options={[{ value: "json", label: "JSON" }, { value: "sql", label: "SQL" }, { value: "xml", label: "XML" }]} /><label><span>들여쓰기</span><select value={indent} onChange={(event) => setIndent(Number(event.target.value))}><option value={2}>2칸</option><option value={4}>4칸</option></select></label></div></SectionCard>
+    <PageHeader eyebrow="FORMATTER" title={t("features:formatter.title")} description={t("features:formatter.description")}><PrivacyBanner compact /></PageHeader>
+    <SectionCard title={t("features:formatter.settings")}><div className="formatter-toolbar"><SegmentedControl value={kind} onChange={(value) => { setKind(value); setError(""); }} label={t("features:formatter.formatLabel")} options={[{ value: "json", label: "JSON" }, { value: "sql", label: "SQL" }, { value: "xml", label: "XML" }]} /><label><span>{t("features:formatter.indent")}</span><select value={indent} onChange={(event) => setIndent(Number(event.target.value))}><option value={2}>{t("features:formatter.spaces", { count: 2 })}</option><option value={4}>{t("features:formatter.spaces", { count: 4 })}</option></select></label></div></SectionCard>
     <div className="utility-editor-grid">
-      <SectionCard title="입력" description={`${input.length.toLocaleString()}자`}><textarea className="utility-textarea code-textarea" spellCheck={false} value={input} onChange={(event) => setInput(event.target.value)} placeholder={kind === "json" ? '{"name":"Worklazy"}' : kind === "sql" ? "select * from tools where enabled = true" : '<tools><tool id="1" /></tools>'} /><div className="utility-inline-actions utility-inline-actions-spacer" aria-hidden="true" /></SectionCard>
-      <SectionCard title="결과" description={error ? "문법 오류" : `${output.length.toLocaleString()}자`}><textarea className={`utility-textarea code-textarea${error ? " has-error" : ""}`} readOnly value={error || output} placeholder="정돈 결과가 표시됩니다." /><div className="utility-inline-actions"><button type="button" className="secondary-button" disabled={!output || Boolean(error)} onClick={() => void navigator.clipboard.writeText(output)}><Copy size={16} /> 복사</button></div></SectionCard>
+      <SectionCard title={t("features:formatter.input")} description={t("common:format.characters", { count: input.length })}><textarea className="utility-textarea code-textarea" spellCheck={false} value={input} onChange={(event) => setInput(event.target.value)} placeholder={kind === "json" ? '{"name":"Worklazy"}' : kind === "sql" ? "select * from tools where enabled = true" : '<tools><tool id="1" /></tools>'} /><div className="utility-inline-actions utility-inline-actions-spacer" aria-hidden="true" /></SectionCard>
+      <SectionCard title={t("features:formatter.result")} description={error ? t("features:formatter.syntaxError") : t("common:format.characters", { count: output.length })}><textarea className={`utility-textarea code-textarea${error ? " has-error" : ""}`} readOnly value={error || output} placeholder={t("features:formatter.resultPlaceholder")} /><div className="utility-inline-actions"><button type="button" className="secondary-button" disabled={!output || Boolean(error)} onClick={() => void navigator.clipboard.writeText(output)}><Copy size={16} /> {t("common:actions.copy")}</button></div></SectionCard>
     </div>
-    <div className="formatter-actions"><PrimaryButton accent="violet" loading={busy} disabled={!input} onClick={() => execute("pretty")}><WandSparkles size={18} /> 들여쓰기 정돈</PrimaryButton><button className="secondary-button" type="button" disabled={!input || busy} onClick={() => execute("minify")}><Minimize2 size={17} /> 한 줄로 축소</button></div>
-    <div className="format-capabilities"><span><Braces size={17} /> JSON 문법 검사</span><span><Database size={17} /> SQL 문장 정렬</span><span><CodeXml size={17} /> XML 문법 검사</span></div>
-    <ToolGuide title="포맷터 사용 안내" description="입력한 글은 브라우저의 별도 작업 공간에서만 해석됩니다." blocks={[{ title: "오류 확인", paragraphs: ["JSON과 XML은 오류가 발견된 위치를 표시하고 SQL은 문장의 구성 요소를 기준으로 줄과 들여쓰기를 정돈합니다."] }, { title: "한 줄로 축소", paragraphs: ["따옴표 안의 글자와 공백은 유지하고, 데이터 구조를 표시하는 데 불필요한 공백과 줄바꿈만 줄입니다."] }]} faq={[{ question: "SQL을 실행하나요?", answer: "아니요. 데이터베이스 연결 없이 텍스트만 정리합니다." }, { question: "잘못된 JSON도 자동 복구하나요?", answer: "데이터가 달라지는 일을 막기 위해 임의 복구하지 않고 오류를 표시합니다." }]} />
+    <div className="formatter-actions"><PrimaryButton accent="violet" loading={busy} disabled={!input} onClick={() => execute("pretty")}><WandSparkles size={18} /> {t("features:formatter.pretty")}</PrimaryButton><button className="secondary-button" type="button" disabled={!input || busy} onClick={() => execute("minify")}><Minimize2 size={17} /> {t("features:formatter.minify")}</button></div>
+    <div className="format-capabilities"><span><Braces size={17} /> {t("features:formatter.jsonCheck")}</span><span><Database size={17} /> {t("features:formatter.sqlSort")}</span><span><CodeXml size={17} /> {t("features:formatter.xmlCheck")}</span></div>
+    <ToolGuide title={t("features:formatter.guide.title")} description={t("features:formatter.guide.description")} blocks={(t("features:formatter.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))} faq={(t("features:formatter.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))} />
   </div>;
 }

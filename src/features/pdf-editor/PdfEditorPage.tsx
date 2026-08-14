@@ -4,6 +4,8 @@ import { NavLink } from "react-router-dom";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
 import { PageHeader } from "../../components/ui";
+import { useAppLanguage } from "../../i18n/routing";
+import { localizedPath } from "../../i18n/languages";
 import { PdfConvertPanel } from "./PdfConvertPanel";
 import { PdfImagePanel } from "./PdfImagePanel";
 import { PdfOrganizePanel } from "./PdfOrganizePanel";
@@ -40,17 +42,26 @@ const navigation = [
 ] as const;
 
 export function PdfEditorPage({ mode }: { mode: PdfToolMode }) {
-  const definition = modeDefinitions[mode];
+  const language = useAppLanguage();
+  const L = (ko: string, en: string) => language === "ko" ? ko : en;
+  const englishDefinitions = {
+    organize: { eyebrow: "PDF PAGE EDITOR", title: "Edit, merge, and extract PDF pages", description: "Review pages visually, reorder, rotate, and select them, then export one PDF or several page ranges." },
+    "image-to-pdf": { eyebrow: "IMAGE TO PDF", title: "Convert images to PDF", description: "Arrange JPG and PNG images and create a PDF fitted to A4 or sized to each original image." },
+    "pdf-to-image": { eyebrow: "PDF TO IMAGE", title: "Convert PDF pages to images", description: "Render every PDF page as PNG or JPG and download them in a ZIP archive." },
+    convert: { eyebrow: "PDF OCR & CONVERT", title: "Convert PDF to DOCX, XLSX, or TXT", description: "Export embedded text and Korean/English OCR results as documents, spreadsheets, text, or a searchable PDF." },
+  } as const;
+  const definition = language === "ko" ? modeDefinitions[mode] : englishDefinitions[mode];
   return (
     <div className="page tool-page page-enter pdf-tool-page">
       <PageHeader eyebrow={definition.eyebrow} title={definition.title} description={definition.description}>
         <PrivacyBanner compact />
       </PageHeader>
 
-      <nav className="pdf-tool-navigation" aria-label="PDF 기능">
+      <nav className="pdf-tool-navigation" aria-label={L("PDF 기능", "PDF tools")}>
         {navigation.map((item) => {
           const Icon = item.icon;
-          return <NavLink key={item.mode} to={item.to} end={item.mode === "organize"} className={mode === item.mode ? "active" : ""}><Icon size={17} /><span>{item.label}</span></NavLink>;
+          const label = ({ organize: "Edit, merge & extract", "image-to-pdf": "Image → PDF", "pdf-to-image": "PDF → Image", convert: "Document & OCR" } as const)[item.mode];
+          return <NavLink key={item.mode} to={localizedPath(language, item.to)} end={item.mode === "organize"} className={mode === item.mode ? "active" : ""}><Icon size={17} /><span>{L(item.label, label)}</span></NavLink>;
         })}
       </nav>
 
@@ -64,7 +75,33 @@ export function PdfEditorPage({ mode }: { mode: PdfToolMode }) {
 }
 
 function PdfGuide({ mode }: { mode: PdfToolMode }) {
+  const language = useAppLanguage();
   const isConvert = mode === "convert";
+  if (language === "en") return (
+    <ToolGuide
+      title={isConvert ? "PDF text conversion and browser OCR" : "Using the browser PDF tools"}
+      description="Selected files stay in this browser's memory and are not uploaded to a processing server. Keep your originals and review every downloaded result."
+      blocks={isConvert ? [
+        { title: "Text PDFs and scanned PDFs", paragraphs: ["Text PDFs contain selectable characters, so extraction is fast and accurate. Scanned PDFs store each page like a photo and require OCR.", "Automatic OCR runs Korean and English recognition only on pages with little usable embedded text. A drawing or photo with no text may correctly produce an empty result."] },
+        { title: "DOCX and XLSX conversion limits", paragraphs: ["PDFs often preserve positions rather than the original paragraphs, tables, and cells. DOCX reconstructs lines as paragraphs, while XLSX estimates cells from spacing.", "Complex tables, columns, vertical text, footnotes, formulas, fonts, and formatting may not be reproduced exactly. Treat the output as an editable draft and compare it with the source."] },
+        { title: "OCR models and privacy", paragraphs: ["The OCR runtime and Korean/English models are served from the same GitHub Pages deployment. No external OCR server or CDN receives your document pages.", "OCR cannot start on a first offline visit or when its runtime is not cached. Reopen the site online after clearing storage, using private browsing, or running low on browser storage."] },
+        { title: "Large documents", paragraphs: ["OCR renders and recognizes pages one at a time, so it takes longer than embedded-text extraction. For 50+ pages, close heavy tabs and keep enough memory and power available.", "Mobile operating systems may close memory-intensive tabs, so long documents are generally more reliable on a desktop browser."] },
+      ] : [
+        { title: "Page-level editing", paragraphs: ["Drag previews to reorder pages, remove unwanted pages, and rotate them. The chosen rotation is written to the exported PDF.", "If a source page is already rotated, your rotation is added to its existing orientation so the exported page matches the preview."] },
+        { title: "Local processing and file lifetime", paragraphs: ["PDFs, images, and download links live in browser memory. Refreshing or closing the tab clears the current selection and any undownloaded result.", "The site, advertising, and OCR model assets may use ordinary network requests, but your work files are not sent to a conversion server."] },
+        { title: "Protected PDFs and signatures", paragraphs: ["Password-protected PDFs are not supported. Use a legitimately unlocked copy provided by the document owner.", "Merging, rotating, splitting, or rebuilding a PDF invalidates existing digital signatures. Forms, bookmarks, links, attachments, and advanced objects may not survive page copying."] },
+        { title: "Quality and performance", paragraphs: ["Reordering and extracting pages normally copies original PDF pages rather than rasterizing them. Image conversion and searchable OCR PDFs render pages at the selected resolution.", "More pages and higher resolution increase processing time, memory use, and output size. Previews render lazily at lower resolution to keep long documents responsive."] },
+      ]}
+      faq={[
+        { question: "Are files uploaded to a server?", answer: "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests." },
+        { question: "Can I process a password-protected PDF?", answer: "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy." },
+        { question: "Does it work on mobile?", answer: "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited." },
+        { question: "Does rotation reduce PDF quality?", answer: "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages." },
+        { question: "Can it perfectly restore Word or Excel structure?", answer: "Usually not. PDFs often lack the original paragraph and table structure, so the output is an editable reconstruction based on coordinates and spacing." },
+        { question: "Why is the first OCR run slower?", answer: "The browser must download the Korean/English recognition models and runtime. Later runs can start faster while those assets remain cached." },
+      ]}
+    />
+  );
   return (
     <ToolGuide
       title={isConvert ? "PDF 텍스트 변환과 브라우저 OCR 안내" : "브라우저 PDF 도구 이용 안내"}

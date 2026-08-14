@@ -22,6 +22,7 @@ export async function compareWordFilePairs(
   pairs: WordFilePair[],
   options: WordCompareOptions,
   onProgress?: (progress: number, message: string) => void,
+  language: "ko" | "en" = "ko",
 ) {
   const worker = new Worker(new URL("./word.worker.ts", import.meta.url), { type: "module" });
   const payloads: Array<{ beforeName: string; afterName: string; beforeBuffer: ArrayBuffer; afterBuffer: ArrayBuffer }> = [];
@@ -43,15 +44,16 @@ export async function compareWordFilePairs(
       }
       worker.terminate();
       if (event.data.type === "result") resolve(event.data.result as WordWorkerPairResult[]);
-      else reject(new Error(event.data.error?.message || "Word 문서 비교 중 오류가 발생했습니다."));
+      else reject(new Error(event.data.error?.message || (language === "en" ? "An error occurred while comparing Word documents." : "Word 문서 비교 중 오류가 발생했습니다.")));
     };
     worker.onerror = (event) => {
       worker.terminate();
-      reject(new Error(event.message || "Word 문서 비교를 시작하지 못했습니다."));
+      reject(new Error(event.message || (language === "en" ? "Could not start Word comparison." : "Word 문서 비교를 시작하지 못했습니다.")));
     };
     worker.postMessage({
       pairs: payloads,
       options,
+      language,
     }, transfer);
   });
 }

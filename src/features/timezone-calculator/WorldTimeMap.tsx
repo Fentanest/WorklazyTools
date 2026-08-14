@@ -3,11 +3,12 @@ import type { FeatureCollection } from "geojson";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import type { DateTime } from "luxon";
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { feature } from "topojson-client";
 import type { Topology } from "topojson-specification";
 import worldAtlas from "world-atlas/countries-110m.json";
 
-import type { WorldCity } from "./cities";
+import { cityName, countryName, type WorldCity } from "./cities";
 
 const MAP_WIDTH = 960;
 const MAP_HEIGHT = 500;
@@ -23,6 +24,7 @@ interface WorldTimeMapProps {
   instant: DateTime;
   selectionLimit: number;
   onToggle: (cityId: string) => void;
+  language: "ko" | "en";
 }
 
 interface PanPoint {
@@ -30,7 +32,8 @@ interface PanPoint {
   y: number;
 }
 
-export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selectionLimit, onToggle }: WorldTimeMapProps) {
+export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selectionLimit, onToggle, language }: WorldTimeMapProps) {
+  const { t } = useTranslation("features");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<PanPoint>({ x: 0, y: 0 });
   const dragRef = useRef<{ pointerId: number; x: number; y: number; pan: PanPoint } | undefined>(undefined);
@@ -80,15 +83,15 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   return (
     <div className="world-map-shell">
       <div className="world-map-toolbar">
-        <div className="world-map-legend" aria-label="지도 범례">
-          <span><i className="selected" /> 비교 도시</span>
-          <span><i className="base" /> 기준 도시</span>
+        <div className="world-map-legend" aria-label={t("timezone.map.legend")}>
+          <span><i className="selected" /> {t("timezone.map.selected")}</span>
+          <span><i className="base" /> {t("timezone.map.base")}</span>
         </div>
-        <div className="world-map-controls" aria-label="지도 확대 및 축소">
-          <button type="button" onClick={() => setZoomLevel(zoom - 0.5)} disabled={zoom <= MIN_ZOOM} aria-label="지도 축소"><Minus size={16} /></button>
-          <output aria-label="지도 확대 비율">{Math.round(zoom * 100)}%</output>
-          <button type="button" onClick={() => setZoomLevel(zoom + 0.5)} disabled={zoom >= MAX_ZOOM} aria-label="지도 확대"><Plus size={16} /></button>
-          <button type="button" onClick={resetView} disabled={zoom === 1 && pan.x === 0 && pan.y === 0} aria-label="지도 위치 초기화"><RotateCcw size={15} /></button>
+        <div className="world-map-controls" aria-label={t("timezone.map.controls")}>
+          <button type="button" onClick={() => setZoomLevel(zoom - 0.5)} disabled={zoom <= MIN_ZOOM} aria-label={t("timezone.map.zoomOut")}><Minus size={16} /></button>
+          <output aria-label={t("timezone.map.zoom")}>{Math.round(zoom * 100)}%</output>
+          <button type="button" onClick={() => setZoomLevel(zoom + 0.5)} disabled={zoom >= MAX_ZOOM} aria-label={t("timezone.map.zoomIn")}><Plus size={16} /></button>
+          <button type="button" onClick={resetView} disabled={zoom === 1 && pan.x === 0 && pan.y === 0} aria-label={t("timezone.map.reset")}><RotateCcw size={15} /></button>
         </div>
       </div>
 
@@ -96,7 +99,7 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
         <svg
           viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
           role="img"
-          aria-label={`세계지도. ${cities.length}개 도시 중 ${selectedIds.length}개 선택됨, 최대 ${selectionLimit}개`}
+          aria-label={t("timezone.map.aria", { total: cities.length, selected: selectedIds.length, limit: selectionLimit })}
           className={zoom > 1 ? "is-zoomed" : ""}
           onPointerDown={startDrag}
           onPointerMove={moveDrag}
@@ -118,7 +121,7 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
               const isSelected = selected.has(city.id);
               const isBase = city.id === baseCityId;
               const local = instant.setZone(city.zone);
-              const label = `${city.city}, ${city.country} · ${local.isValid ? local.toFormat("HH:mm") : "시간 확인 불가"}`;
+              const label = `${cityName(city, language)}, ${countryName(city, language)} · ${local.isValid ? local.toFormat("HH:mm") : t("timezone.map.unavailable")}`;
               return (
                 <g
                   className={`world-map-pin${isSelected ? " is-selected" : ""}${isBase ? " is-base" : ""}`}
@@ -126,7 +129,7 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
                   role="button"
                   tabIndex={0}
                   aria-pressed={isSelected}
-                  aria-label={`${label}${isBase ? " · 기준 도시" : ""}`}
+                  aria-label={`${label}${isBase ? ` · ${t("timezone.map.baseSuffix")}` : ""}`}
                   key={city.id}
                   onClick={(event) => { event.stopPropagation(); onToggle(city.id); }}
                   onKeyDown={(event: KeyboardEvent<SVGGElement>) => {
@@ -138,14 +141,14 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
                   <circle className="world-map-pin-hit" cy={-8} r={15} />
                   <path className="world-map-pin-shape" d="M0 2C-1.5-1-7-5.5-7-11a7 7 0 1 1 14 0C7-5.5 1.5-1 0 2Z" />
                   <circle className="world-map-pin-dot" cy={-11} r={2.4} />
-                  <text y={-22}>{city.city} {local.isValid ? local.toFormat("HH:mm") : "--:--"}</text>
+                  <text y={-22}>{cityName(city, language)} {local.isValid ? local.toFormat("HH:mm") : "--:--"}</text>
                 </g>
               );
             })}
           </g>
         </svg>
       </div>
-      <p className="world-map-help">핀을 선택해 시간을 비교하세요. 지도를 확대하면 드래그로 이동할 수 있습니다.</p>
+      <p className="world-map-help">{t("timezone.map.help")}</p>
     </div>
   );
 }

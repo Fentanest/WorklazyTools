@@ -42,7 +42,7 @@ export function AnalyticsLoader({ disabled = false }: { disabled?: boolean }) {
   return null;
 }
 
-export function trackToolOpen(toolId: string, menuSource: string) {
+export function trackToolOpen(toolId: string, menuSource: string, contentLanguage: "ko" | "en") {
   if (!import.meta.env.PROD || !initialized) return;
   const safeToolId = sanitizeEventValue(toolId);
   const safeMenuSource = sanitizeEventValue(menuSource);
@@ -50,8 +50,9 @@ export function trackToolOpen(toolId: string, menuSource: string) {
   sendGoogleEvent("tool_open", {
     tool_id: safeToolId,
     menu_source: safeMenuSource,
+    content_language: contentLanguage,
   });
-  sendNaverEvent("tool_open", `${safeMenuSource}:${safeToolId}`);
+  sendNaverEvent("tool_open", `${contentLanguage}:${safeMenuSource}:${safeToolId}`);
 }
 
 function initializeAnalytics() {

@@ -2,6 +2,7 @@ import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import type { ToolDefinition } from "../app/toolRegistry";
+import { useAppLanguage } from "../i18n/routing";
 import { trackToolOpen } from "./AnalyticsLoader";
 
 interface ToolCardProps {
@@ -11,12 +12,13 @@ interface ToolCardProps {
 
 export function ToolCard({ tool, featured = false }: ToolCardProps) {
   const Icon = tool.icon;
+  const language = useAppLanguage();
 
   return (
     <Link
       className={`tool-card accent-${tool.accent}${featured ? " featured" : ""}`}
       to={tool.path}
-      onClick={() => trackToolOpen(tool.id, featured ? "home_card" : "tools_card")}
+      onClick={() => trackToolOpen(tool.id, featured ? "home_card" : "tools_card", language)}
     >
       <div className="tool-card-top">
         <span className={`tool-icon accent-${tool.accent}`}><Icon size={29} /></span>

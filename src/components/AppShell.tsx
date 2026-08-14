@@ -8,24 +8,31 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
-import { tools } from "../app/toolRegistry";
+import { localizedPath, stripLanguagePrefix } from "../i18n/languages";
+import { useAppLanguage } from "../i18n/routing";
+import { useToolCatalog } from "../i18n/useToolCatalog";
 import { AdSenseLoader } from "./AdSenseLoader";
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 import { RouteSeo } from "./RouteSeo";
 
 const primaryNavigation = [
-  { to: "/", label: "홈", icon: Home, end: true },
-  { to: "/tools", label: "모든 도구", icon: Grid2X2, end: true },
-  { to: "/about", label: "정보", icon: CircleHelp, end: true },
+  { to: "/", labelKey: "navigation.home", icon: Home, end: true },
+  { to: "/tools", labelKey: "navigation.allTools", icon: Grid2X2, end: true },
+  { to: "/about", labelKey: "navigation.about", icon: CircleHelp, end: true },
 ];
 const GITHUB_ISSUES_URL = "https://github.com/Fentanest/WorklazyTools/issues";
 
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { t } = useTranslation("common");
+  const language = useAppLanguage();
+  const { tools } = useToolCatalog();
   const location = useLocation();
-  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
   const videoStudioActive = normalizedPath === "/tools/video-studio";
   const videoIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-video-isolation"]'));
 
@@ -37,28 +44,28 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <RouteSeo />
-      <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} />
+      <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} language={language} />
       <AnalyticsLoader disabled={videoStudioActive || videoIsolationDocument} />
       {!videoStudioActive && !videoIsolationDocument && <AdSenseLoader />}
-      <aside className="sidebar glass-panel" aria-label="주요 내비게이션">
-        <NavLink className="brand brand-image-link" to="/" aria-label="Worklazy Tools 홈">
+      <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
+        <NavLink className="brand brand-image-link" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
           <img className="brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
         </NavLink>
 
         <nav className="sidebar-nav">
           <div className="nav-group">
-            <p className="nav-caption">둘러보기</p>
+            <p className="nav-caption">{t("navigation.browse")}</p>
             {primaryNavigation.slice(0, 2).map((item) => (
-              <NavItem key={item.to} {...item} />
+              <NavItem key={item.to} {...item} language={language} label={t(item.labelKey as never)} />
             ))}
           </div>
 
           <div className="nav-group">
-            <p className="nav-caption">도구</p>
+            <p className="nav-caption">{t("navigation.tools")}</p>
             {tools.map((tool) => {
               const Icon = tool.icon;
               return (
-                <NavLink className="sidebar-link" key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar")}>
+                <NavLink className="sidebar-link" key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar", language)}>
                   <span className={`nav-icon accent-${tool.accent}`}><Icon size={18} /></span>
                   <span>{tool.shortTitle}</span>
                 </NavLink>
@@ -70,57 +77,60 @@ export function AppShell() {
         <div className="sidebar-footer">
           <div className="local-processing-mini">
             <LockKeyhole size={16} />
-            <span>파일·암호 전송 없이<br />브라우저에서 처리</span>
+            <span>{t("privacy.mini").split("\n").map((line, index) => <span key={line}>{index > 0 && <br />}{line}</span>)}</span>
           </div>
-          <NavItem {...primaryNavigation[2]} />
+          <NavItem {...primaryNavigation[2]} language={language} label={t(primaryNavigation[2].labelKey as never)} />
           <a className="sidebar-link" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
             <span className="nav-icon accent-blue"><MessageSquarePlus size={18} /></span>
-            <span>문의·건의·버그 제보</span>
+            <span>{t("footer.feedback")}</span>
           </a>
         </div>
       </aside>
 
       <header className="mobile-header glass-bar">
-        <NavLink className="mobile-brand" to="/">
+        <NavLink className="mobile-brand" to={localizedPath(language, "/")}>
           <img className="mobile-brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
         </NavLink>
         <button
           className="icon-button"
           type="button"
-          aria-label="도구 메뉴 열기"
+          aria-label={t("navigation.openMenu")}
           aria-expanded={mobileMenuOpen}
           onClick={() => setMobileMenuOpen(true)}
         >
           <Menu size={21} />
         </button>
+        <LanguageSwitcher compact />
       </header>
+
+      <div className="desktop-language-switcher"><LanguageSwitcher /></div>
 
       <main className="main-content" id="main-content">
         <Outlet />
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
-          <nav aria-label="정책 및 문의">
-            <NavLink to="/about">서비스 소개</NavLink>
-            <NavLink to="/privacy">개인정보처리방침</NavLink>
-            <NavLink to="/terms">이용약관</NavLink>
-            <NavLink to="/licenses">라이선스·제3자 고지</NavLink>
-            <NavLink to="/contact">문의</NavLink>
+          <nav aria-label={t("footer.policyLabel")}>
+            <NavLink to={localizedPath(language, "/about")}>{t("footer.service")}</NavLink>
+            <NavLink to={localizedPath(language, "/privacy")}>{t("footer.privacy")}</NavLink>
+            <NavLink to={localizedPath(language, "/terms")}>{t("footer.terms")}</NavLink>
+            <NavLink to={localizedPath(language, "/licenses")}>{t("footer.licenses")}</NavLink>
+            <NavLink to={localizedPath(language, "/contact")}>{t("footer.contact")}</NavLink>
           </nav>
         </footer>
       </main>
 
-      <nav className="bottom-tabs glass-bar" aria-label="모바일 내비게이션">
+      <nav className="bottom-tabs glass-bar" aria-label={t("navigation.mobileLabel")}>
         {primaryNavigation.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={localizedPath(language, item.to)}
               end={item.end}
               className={({ isActive }) => `bottom-tab${isActive ? " active" : ""}`}
             >
               <Icon size={21} strokeWidth={2.1} />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey as never)}</span>
             </NavLink>
           );
         })}
@@ -132,16 +142,16 @@ export function AppShell() {
             className="mobile-sheet"
             role="dialog"
             aria-modal="true"
-            aria-label="도구 바로가기"
+            aria-label={t("navigation.shortcuts")}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="sheet-grabber" />
             <div className="sheet-header">
               <div>
-                <p className="eyebrow">바로가기</p>
-                <h2>어떤 작업을 할까요?</h2>
+                <p className="eyebrow">{t("navigation.shortcuts")}</p>
+                <h2>{t("navigation.chooseTask")}</h2>
               </div>
-              <button className="icon-button subtle" type="button" onClick={() => setMobileMenuOpen(false)} aria-label="닫기">
+              <button className="icon-button subtle" type="button" onClick={() => setMobileMenuOpen(false)} aria-label={t("navigation.close")}>
                 <X size={20} />
               </button>
             </div>
@@ -149,7 +159,7 @@ export function AppShell() {
               {tools.map((tool) => {
                 const Icon = tool.icon;
                 return (
-                  <NavLink className="sheet-tool-item" to={tool.path} key={tool.id} onClick={() => trackToolOpen(tool.id, "mobile_sheet")}>
+                  <NavLink className="sheet-tool-item" to={tool.path} key={tool.id} onClick={() => trackToolOpen(tool.id, "mobile_sheet", language)}>
                     <span className={`tool-icon small accent-${tool.accent}`}><Icon size={22} /></span>
                     <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
                   </NavLink>
@@ -157,7 +167,7 @@ export function AppShell() {
               })}
               <a className="sheet-tool-item" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
                 <span className="tool-icon small accent-blue"><MessageSquarePlus size={22} /></span>
-                <span><strong>문의·건의·버그 제보</strong><small>GitHub Issues에 버그와 기능 제안 남기기</small></span>
+                <span><strong>{t("footer.feedback")}</strong><small>{t("footer.feedbackDescription")}</small></span>
               </a>
             </div>
           </section>
@@ -167,12 +177,12 @@ export function AppShell() {
   );
 }
 
-function VideoIsolationBoundary({ active, isolationDocument }: { active: boolean; isolationDocument: boolean }) {
+function VideoIsolationBoundary({ active, isolationDocument, language }: { active: boolean; isolationDocument: boolean; language: "ko" | "en" }) {
   useEffect(() => {
     if (!import.meta.env.PROD) return;
     if (active && !isolationDocument) {
       const target = new URL(window.location.href);
-      target.pathname = `${import.meta.env.BASE_URL}tools/video-studio/`.replace(/\/{2,}/g, "/");
+      target.pathname = localizedPath(language, "/tools/video-studio/");
       window.location.replace(target.href);
       return;
     }
@@ -185,13 +195,15 @@ function VideoIsolationBoundary({ active, isolationDocument }: { active: boolean
 interface NavItemProps {
   to: string;
   label: string;
+  labelKey?: string;
   icon: typeof Home;
   end: boolean;
+  language: "ko" | "en";
 }
 
-function NavItem({ to, label, icon: Icon, end }: NavItemProps) {
+function NavItem({ to, label, icon: Icon, end, language }: NavItemProps) {
   return (
-    <NavLink className="sidebar-link" to={to} end={end}>
+    <NavLink className="sidebar-link" to={localizedPath(language, to)} end={end}>
       <span className="nav-icon"><Icon size={18} /></span>
       <span>{label}</span>
     </NavLink>

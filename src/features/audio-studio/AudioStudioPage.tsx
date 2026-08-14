@@ -20,6 +20,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.esm.js";
 import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
@@ -44,6 +45,8 @@ const MIN_SELECTION_SECONDS = 0.01;
 const ZOOM_LEVELS = [12, 24, 48, 96, 180, 300] as const;
 
 export function AudioStudioPage() {
+  const { t, i18n } = useTranslation("features");
+  const language = i18n.language === "en" ? "en" : "ko";
   const [files, setFiles] = useState<File[]>([]);
   const [document, setDocument] = useState<AudioDocumentData>();
   const [selection, setSelection] = useState<AudioSelection>();
@@ -157,7 +160,7 @@ export function AudioStudioPage() {
       void wavesurfer.play();
     });
     const unsubscribeError = wavesurfer.on("error", (error) => {
-      failProgress(`파형 재생 데이터를 열지 못했습니다: ${error.message}`);
+      failProgress(t("audio.status.waveOpen", { error: error.message }));
     });
     return () => {
       disableDragSelection();
@@ -174,15 +177,15 @@ export function AudioStudioPage() {
       wavesurferRef.current = undefined;
       wavesurfer.destroy();
     };
-  }, [commitSelection, documentReady, failProgress, showSelectionRegion]);
+  }, [commitSelection, documentReady, failProgress, showSelectionRegion, t]);
 
   useEffect(() => {
     const wavesurfer = wavesurferRef.current;
     if (!wavesurfer || !previewUrl) return;
     void wavesurfer.load(previewUrl).catch((error) => {
-      failProgress(`파형을 표시하지 못했습니다: ${error instanceof Error ? error.message : String(error)}`);
+      failProgress(t("audio.status.waveDisplay", { error: error instanceof Error ? error.message : String(error) }));
     });
-  }, [failProgress, previewUrl]);
+  }, [failProgress, previewUrl, t]);
 
   useEffect(() => () => {
     loadGenerationRef.current += 1;
@@ -205,8 +208,8 @@ export function AudioStudioPage() {
     const file = nextFiles.at(-1);
     if (!file) return;
     if (!isSupportedAudio(file)) {
-      progress.start("오디오 형식을 확인하는 중…");
-      progress.fail("MP3, WAV, M4A, AAC 또는 OGG 파일을 선택해 주세요.");
+      progress.start(t("audio.status.checking"));
+      progress.fail(t("audio.status.unsupported"));
       return;
     }
     const generation = ++loadGenerationRef.current;
@@ -227,26 +230,26 @@ export function AudioStudioPage() {
     setLastResult("");
     commitSelection(undefined);
     regionsRef.current?.clearRegions();
-    progress.start(`${file.name} 오디오 샘플을 해석하는 중…`);
+    progress.start(t("audio.status.decoding", { name: file.name }));
     try {
       const sourceBytes = await file.arrayBuffer();
-      progress.update(22, "Web Audio API로 채널과 샘플레이트를 해석하는 중…");
+      progress.update(22, t("audio.status.webAudio"));
       const decoded = await context.decodeAudioData(sourceBytes);
       if (generation !== loadGenerationRef.current) return;
       const nextDocument = audioBufferToDocument(decoded, file.name);
       const controller = new AbortController();
       activeControllerRef.current = controller;
-      const preview = await runAudioProcessor({ command: "PREVIEW", document: nextDocument }, (value, message) => progress.update(30 + value * 0.65, message), controller.signal);
+      const preview = await runAudioProcessor({ command: "PREVIEW", document: nextDocument, language }, (value, message) => progress.update(30 + value * 0.65, message), controller.signal);
       if (generation !== loadGenerationRef.current || !preview.previewBlob) return;
       documentRef.current = nextDocument;
       setDocument(nextDocument);
       const initialSelection = defaultSelection(nextDocument.duration);
       commitSelection(initialSelection);
       replacePreview(preview.previewBlob);
-      progress.succeed(`${file.name} 파형 준비 완료`);
-      setLastResult(`${formatAudioTime(nextDocument.duration)} · ${nextDocument.channels.length}채널 · ${nextDocument.sampleRate.toLocaleString()}Hz`);
+      progress.succeed(t("audio.status.ready", { name: file.name }));
+      setLastResult(`${formatAudioTime(nextDocument.duration)} · ${t("audio.channels", { count: nextDocument.channels.length })} · ${nextDocument.sampleRate.toLocaleString(i18n.language)}Hz`);
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) progress.fail(toAudioError(error));
+      if (!(error instanceof DOMException && error.name === "AbortError")) progress.fail(toAudioError(error, t));
     } finally {
       if (decodeContextRef.current === context) decodeContextRef.current = undefined;
       await context.close().catch(() => undefined);
@@ -290,18 +293,18 @@ export function AudioStudioPage() {
     const currentSelection = selectionRef.current;
     if (!currentDocument) return;
     if (command !== "PASTE" && (!currentSelection || currentSelection.end - currentSelection.start < MIN_SELECTION_SECONDS)) {
-      progress.start("편집 구간을 확인하는 중…");
-      progress.fail("파형에서 편집할 구간을 드래그해 선택해 주세요.");
+      progress.start(t("audio.status.selecting"));
+      progress.fail(t("audio.status.selectRegion"));
       return;
     }
     if (command === "PASTE" && !clipboard) {
-      progress.start("오디오 클립보드를 확인하는 중…");
-      progress.fail("먼저 선택 구간을 복사하거나 잘라내 주세요.");
+      progress.start(t("audio.status.checkingClipboard"));
+      progress.fail(t("audio.status.copyFirst"));
       return;
     }
     const controller = new AbortController();
     activeControllerRef.current = controller;
-    progress.start(editLabel(command));
+    progress.start(editLabel(command, t));
     setLastResult("");
     try {
       const result = await runAudioProcessor({
@@ -311,13 +314,14 @@ export function AudioStudioPage() {
         end: currentSelection?.end,
         cursor: wavesurferRef.current?.getCurrentTime() || 0,
         clipboard,
+        language,
       }, progress.update, controller.signal);
       if (command === "COPY") {
         if (result.clipboard) setClipboard(result.clipboard);
-        progress.succeed(`선택한 ${formatAudioTime(result.clipboard?.duration || 0)} 구간을 복사했습니다.`);
+        progress.succeed(t("audio.status.copied", { duration: formatAudioTime(result.clipboard?.duration || 0) }));
         return;
       }
-      if (!result.channels || !result.previewBlob) throw new Error("편집 결과 샘플을 받지 못했습니다.");
+      if (!result.channels || !result.previewBlob) throw new Error(t("audio.status.missingResult"));
       const nextDocument = resultDocument(currentDocument, result);
       const limit = audioHistoryLimit(currentDocument);
       setUndoHistory((history) => [...history, currentDocument].slice(-limit));
@@ -328,10 +332,10 @@ export function AudioStudioPage() {
       const nextSelection = selectionAfterEdit(command, currentSelection, clipboard, nextDocument.duration, wavesurferRef.current?.getCurrentTime() || 0);
       commitSelection(nextSelection);
       replacePreview(result.previewBlob);
-      progress.succeed(`${editLabel(command).replace("…", "")} 완료`);
-      setLastResult(`편집 후 길이 ${formatAudioTime(nextDocument.duration)} · 실행 취소 기록 ${Math.min(undoHistory.length + 1, limit)}개`);
+      progress.succeed(t("audio.status.done", { action: editLabel(command, t).replace("…", "") }));
+      setLastResult(t("audio.status.edited", { duration: formatAudioTime(nextDocument.duration), count: Math.min(undoHistory.length + 1, limit) }));
     } catch (error) {
-      progress.fail(error instanceof DOMException && error.name === "AbortError" ? "오디오 작업을 취소했습니다." : toAudioError(error));
+      progress.fail(error instanceof DOMException && error.name === "AbortError" ? t("audio.status.cancelled") : toAudioError(error, t));
     } finally {
       if (activeControllerRef.current === controller) activeControllerRef.current = undefined;
     }
@@ -344,10 +348,10 @@ export function AudioStudioPage() {
     if (!currentDocument || !target) return;
     const controller = new AbortController();
     activeControllerRef.current = controller;
-    progress.start(direction === "undo" ? "이전 편집 상태를 복원하는 중…" : "다음 편집 상태를 복원하는 중…");
+    progress.start(direction === "undo" ? t("audio.status.restoringUndo") : t("audio.status.restoringRedo"));
     try {
-      const result = await runAudioProcessor({ command: "PREVIEW", document: target }, progress.update, controller.signal);
-      if (!result.previewBlob) throw new Error("복원할 파형 미리보기를 만들지 못했습니다.");
+      const result = await runAudioProcessor({ command: "PREVIEW", document: target, language }, progress.update, controller.signal);
+      if (!result.previewBlob) throw new Error(t("audio.status.previewRestore"));
       if (direction === "undo") {
         setUndoHistory((history) => history.slice(0, -1));
         setRedoHistory((history) => [...history, currentDocument].slice(-audioHistoryLimit(currentDocument)));
@@ -359,10 +363,10 @@ export function AudioStudioPage() {
       setDocument(target);
       commitSelection(defaultSelection(target.duration));
       replacePreview(result.previewBlob);
-      progress.succeed(direction === "undo" ? "실행 취소 완료" : "다시 실행 완료");
-      setLastResult(`${direction === "undo" ? "이전" : "다음"} 상태 · ${formatAudioTime(target.duration)}`);
+      progress.succeed(direction === "undo" ? t("audio.status.undoDone") : t("audio.status.redoDone"));
+      setLastResult(t("audio.status.state", { direction: direction === "undo" ? t("audio.status.previous") : t("audio.status.next"), duration: formatAudioTime(target.duration) }));
     } catch (error) {
-      progress.fail(toAudioError(error));
+      progress.fail(toAudioError(error, t));
     } finally {
       if (activeControllerRef.current === controller) activeControllerRef.current = undefined;
     }
@@ -374,8 +378,8 @@ export function AudioStudioPage() {
     const controller = new AbortController();
     activeControllerRef.current = controller;
     const extension = exportFormat;
-    const fileName = createAudioFileName(currentDocument.sourceName, extension);
-    progress.start(`${extension.toUpperCase()} 내보내기를 준비하는 중…`);
+    const fileName = createAudioFileName(currentDocument.sourceName, extension, language);
+    progress.start(t("audio.status.exportPrepare", { format: extension.toUpperCase() }));
     setLastResult("");
     try {
       const result = await runAudioProcessor({
@@ -383,13 +387,14 @@ export function AudioStudioPage() {
         document: currentDocument,
         fileName,
         bitrate: mp3Bitrate,
+        language,
       }, progress.update, controller.signal);
-      if (!result.output) throw new Error("오디오 결과 파일을 받지 못했습니다.");
+      if (!result.output) throw new Error(t("audio.status.missingFile"));
       downloadAudio(result.output.buffer, result.output.mimeType, result.output.fileName);
-      progress.succeed(`${result.output.fileName} 생성 완료`);
-      setLastResult(`${result.output.fileName}을 내려받았습니다.`);
+      progress.succeed(t("audio.status.created", { name: result.output.fileName }));
+      setLastResult(t("audio.status.downloaded", { name: result.output.fileName }));
     } catch (error) {
-      progress.fail(error instanceof DOMException && error.name === "AbortError" ? "오디오 내보내기를 취소했습니다." : toAudioError(error));
+      progress.fail(error instanceof DOMException && error.name === "AbortError" ? t("audio.status.exportCancelled") : toAudioError(error, t));
     } finally {
       if (activeControllerRef.current === controller) activeControllerRef.current = undefined;
     }
@@ -454,28 +459,28 @@ export function AudioStudioPage() {
 
   return (
     <div className="page tool-page page-enter audio-studio-page">
-      <PageHeader eyebrow="AUDIO WAVEFORM STUDIO" title="오디오 파형 편집기" description="파형에서 구간을 선택해 음소거·잘라내기·복사·붙여넣기하고 WAV 또는 MP3로 저장하세요.">
+      <PageHeader eyebrow="AUDIO WAVEFORM STUDIO" title={t("audio.title")} description={t("audio.description")}>
         <PrivacyBanner compact />
       </PageHeader>
 
-      <SectionCard step={1} title="오디오 파일 선택" description="한 번에 한 파일을 편집합니다. 새 파일을 선택하면 이전 파형·실행 취소 기록·오디오 클립보드를 정리합니다.">
-        <FileDropZone files={files} onFiles={handleFiles} accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hint="브라우저에서 재생할 수 있는 MP3·WAV·M4A·AAC·OGG" accent="violet" />
-        <div className="inline-notice"><AlertTriangle size={16} /><span>M4A·AAC·OGG는 기기와 브라우저가 파일 안의 음성 압축 방식을 지원해야 열 수 있습니다. 긴 파일은 편집을 위해 압축을 푼 음성 데이터와 실행 취소 기록을 함께 보관하므로 메모리를 많이 사용할 수 있습니다.</span></div>
+      <SectionCard step={1} title={t("audio.select")} description={t("audio.selectHelp")}>
+        <FileDropZone files={files} onFiles={handleFiles} accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hint={t("audio.hint")} accent="violet" />
+        <div className="inline-notice"><AlertTriangle size={16} /><span>{t("audio.compatibility")}</span></div>
         {document && (
           <div className="audio-file-summary">
             <FileAudio2 size={21} />
-            <span><strong>{document.sourceName}</strong><small>{formatAudioTime(document.duration)} · {document.channels.length}채널 · {document.sampleRate.toLocaleString()}Hz · 편집 메모리 {formatBytes(pcmSize)}</small></span>
+            <span><strong>{document.sourceName}</strong><small>{formatAudioTime(document.duration)} · {t("audio.channels", { count: document.channels.length })} · {document.sampleRate.toLocaleString(i18n.language)}Hz · {t("audio.memory", { size: formatBytes(pcmSize) })}</small></span>
           </div>
         )}
       </SectionCard>
 
       {document && (
-        <SectionCard step={2} title="파형 선택과 편집" description="파형의 빈 영역을 드래그해 한 구간을 만들고, 양쪽 손잡이로 시작과 끝을 정밀하게 조절하세요.">
+        <SectionCard step={2} title={t("audio.waveTitle")} description={t("audio.waveHelp")}>
           <div className="audio-waveform-toolbar">
-            <span><Waves size={18} /><strong>고해상도 파형</strong><small>{ZOOM_LEVELS[zoomIndex]} px/초</small></span>
+            <span><Waves size={18} /><strong>{t("audio.highResolution")}</strong><small>{t("audio.pxSecond", { count: ZOOM_LEVELS[zoomIndex] })}</small></span>
             <div>
-              <button type="button" aria-label="파형 축소" disabled={zoomIndex === 0} onClick={() => updateZoom(-1)}><ZoomOut size={18} /></button>
-              <button type="button" aria-label="파형 확대" disabled={zoomIndex === ZOOM_LEVELS.length - 1} onClick={() => updateZoom(1)}><ZoomIn size={18} /></button>
+              <button type="button" aria-label={t("audio.zoomOut")} disabled={zoomIndex === 0} onClick={() => updateZoom(-1)}><ZoomOut size={18} /></button>
+              <button type="button" aria-label={t("audio.zoomIn")} disabled={zoomIndex === ZOOM_LEVELS.length - 1} onClick={() => updateZoom(1)}><ZoomIn size={18} /></button>
             </div>
           </div>
           <div className="audio-waveform-shell">
@@ -483,64 +488,51 @@ export function AudioStudioPage() {
           </div>
 
           <div className="audio-selection-panel">
-            <label><span>선택 시작 (초)</span><input type="number" min={0} max={selection?.end || document.duration} step="0.001" value={(selection?.start || 0).toFixed(3)} onChange={(event) => updateSelectionNumber("start", Number(event.target.value))} /></label>
-            <div><small>선택 길이</small><strong>{formatAudioTime(selectionDuration)}</strong></div>
-            <label><span>선택 종료 (초)</span><input type="number" min={selection?.start || 0} max={document.duration} step="0.001" value={(selection?.end || 0).toFixed(3)} onChange={(event) => updateSelectionNumber("end", Number(event.target.value))} /></label>
+            <label><span>{t("audio.start")}</span><input type="number" min={0} max={selection?.end || document.duration} step="0.001" value={(selection?.start || 0).toFixed(3)} onChange={(event) => updateSelectionNumber("start", Number(event.target.value))} /></label>
+            <div><small>{t("audio.duration")}</small><strong>{formatAudioTime(selectionDuration)}</strong></div>
+            <label><span>{t("audio.end")}</span><input type="number" min={selection?.start || 0} max={document.duration} step="0.001" value={(selection?.end || 0).toFixed(3)} onChange={(event) => updateSelectionNumber("end", Number(event.target.value))} /></label>
           </div>
 
           <div className="audio-transport">
-            <button type="button" aria-label="처음으로 이동" onClick={() => wavesurferRef.current?.setTime(0)}><SkipBack size={20} /></button>
-            <button type="button" className="audio-play-button" aria-label={isPlaying ? "일시정지" : "재생"} aria-keyshortcuts="Space" onClick={() => void togglePlayback()}>{isPlaying ? <Pause size={22} /> : <Play size={22} />}</button>
+            <button type="button" aria-label={t("audio.rewind")} onClick={() => wavesurferRef.current?.setTime(0)}><SkipBack size={20} /></button>
+            <button type="button" className="audio-play-button" aria-label={isPlaying ? t("audio.pause") : t("audio.play")} aria-keyshortcuts="Space" onClick={() => void togglePlayback()}>{isPlaying ? <Pause size={22} /> : <Play size={22} />}</button>
             <div className="audio-timecode"><strong>{formatAudioTime(currentTime)}</strong><span>/</span><small>{formatAudioTime(document.duration)}</small></div>
-            <div className="audio-loop-control"><Repeat2 size={17} /><ToggleRow label="선택 구간 반복" checked={loop} onChange={setLoop} /></div>
+            <div className="audio-loop-control"><Repeat2 size={17} /><ToggleRow label={t("audio.loop")} checked={loop} onChange={setLoop} /></div>
           </div>
 
-          <div className="audio-edit-toolbar" aria-label="오디오 편집 도구">
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("MUTE")}><VolumeX size={18} /><span>구간 음소거</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("CUT")}><Scissors size={18} /><span>잘라내기</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("COPY")}><Copy size={18} /><span>복사</span></button>
-            <button type="button" disabled={busy || !clipboard} onClick={() => void applyEdit("PASTE")}><ClipboardPaste size={18} /><span>커서에 붙여넣기</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("DELETE")}><Trash2 size={18} /><span>구간 삭제</span></button>
-            <button type="button" aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || !undoHistory.length} onClick={() => void restoreHistory("undo")}><Undo2 size={18} /><span>실행 취소</span><small>{undoHistory.length}</small></button>
-            <button type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y" disabled={busy || !redoHistory.length} onClick={() => void restoreHistory("redo")}><Redo2 size={18} /><span>다시 실행</span><small>{redoHistory.length}</small></button>
+          <div className="audio-edit-toolbar" aria-label={t("audio.toolbar")}>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("MUTE")}><VolumeX size={18} /><span>{t("audio.mute")}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("CUT")}><Scissors size={18} /><span>{t("audio.cut")}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("COPY")}><Copy size={18} /><span>{t("audio.copy")}</span></button>
+            <button type="button" disabled={busy || !clipboard} onClick={() => void applyEdit("PASTE")}><ClipboardPaste size={18} /><span>{t("audio.paste")}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("DELETE")}><Trash2 size={18} /><span>{t("audio.delete")}</span></button>
+            <button type="button" aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || !undoHistory.length} onClick={() => void restoreHistory("undo")}><Undo2 size={18} /><span>{t("audio.undo")}</span><small>{undoHistory.length}</small></button>
+            <button type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y" disabled={busy || !redoHistory.length} onClick={() => void restoreHistory("redo")}><Redo2 size={18} /><span>{t("audio.redo")}</span><small>{redoHistory.length}</small></button>
           </div>
-          <div className={`audio-clipboard-status${clipboard ? " has-clip" : ""}`}><ClipboardCopy size={17} /><span>{clipboard ? `오디오 클립보드: ${formatAudioTime(clipboard.duration)} · ${clipboard.channels.length}채널` : "복사하거나 잘라낸 구간은 이 페이지의 메모리에만 보관됩니다."}</span></div>
+          <div className={`audio-clipboard-status${clipboard ? " has-clip" : ""}`}><ClipboardCopy size={17} /><span>{clipboard ? t("audio.clipboard", { duration: formatAudioTime(clipboard.duration), channels: clipboard.channels.length }) : t("audio.clipboardEmpty")}</span></div>
         </SectionCard>
       )}
 
       {document && (
-        <SectionCard step={3} title="오디오 내보내기" description="WAV는 편집 샘플을 바로 저장하고, MP3는 자체 호스팅 FFmpeg 인코더를 필요할 때만 불러옵니다.">
+        <SectionCard step={3} title={t("audio.exportTitle")} description={t("audio.exportHelp")}>
           <div className="audio-export-settings">
-            <SegmentedControl value={exportFormat} options={[{ value: "wav", label: "WAV · 무손실" }, { value: "mp3", label: "MP3 · 작은 용량" }]} onChange={setExportFormat} label="오디오 출력 형식" />
-            {exportFormat === "mp3" && <label><span>MP3 비트레이트</span><select value={mp3Bitrate} onChange={(event) => setMp3Bitrate(Number(event.target.value) as 128 | 192 | 256 | 320)}><option value={128}>128 kbps</option><option value={192}>192 kbps · 권장</option><option value={256}>256 kbps</option><option value={320}>320 kbps</option></select></label>}
+            <SegmentedControl value={exportFormat} options={[{ value: "wav", label: t("audio.wav") }, { value: "mp3", label: t("audio.mp3") }]} onChange={setExportFormat} label={t("audio.format")} />
+            {exportFormat === "mp3" && <label><span>{t("audio.bitrate")}</span><select value={mp3Bitrate} onChange={(event) => setMp3Bitrate(Number(event.target.value) as 128 | 192 | 256 | 320)}><option value={128}>128 kbps</option><option value={192}>192 kbps · {t("audio.recommended")}</option><option value={256}>256 kbps</option><option value={320}>320 kbps</option></select></label>}
           </div>
-          {exportFormat === "mp3" && <div className="inline-notice warning"><AlertTriangle size={16} /><span>MP3를 처음 만들 때 같은 사이트의 FFmpeg 실행 파일을 내려받습니다. 실행 파일이 브라우저 캐시에 없는 완전한 오프라인 상태에서는 MP3 내보내기를 시작할 수 없으며, WAV 내보내기는 별도 인코더 없이 동작합니다.</span></div>}
-          <div className="section-actions"><PrimaryButton accent="violet" disabled={busy} loading={busy} onClick={() => void exportAudio()}><Download size={18} /> {exportFormat.toUpperCase()}로 내보내기</PrimaryButton></div>
+          {exportFormat === "mp3" && <div className="inline-notice warning"><AlertTriangle size={16} /><span>{t("audio.offline")}</span></div>}
+          <div className="section-actions"><PrimaryButton accent="violet" disabled={busy} loading={busy} onClick={() => void exportAudio()}><Download size={18} /> {t("audio.export", { format: exportFormat.toUpperCase() })}</PrimaryButton></div>
         </SectionCard>
       )}
 
-      <OperationProgress {...progress} accent="violet" title="오디오 처리 로그" />
-      {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { activeControllerRef.current?.abort(); void decodeContextRef.current?.close().catch(() => undefined); }}><LoaderCircle size={16} /> 작업 취소</button></div>}
+      <OperationProgress {...progress} accent="violet" title={t("audio.log")} />
+      {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { activeControllerRef.current?.abort(); void decodeContextRef.current?.close().catch(() => undefined); }}><LoaderCircle size={16} /> {t("audio.cancel")}</button></div>}
       {lastResult && <div className="inline-success"><FileAudio2 size={18} /><span>{lastResult}</span></div>}
 
       <ToolGuide
-        title="오디오 파형 편집 안내"
-        description="선택한 오디오와 편집 데이터는 외부 서버로 전송하지 않고 현재 브라우저 안에서만 처리합니다."
-        blocks={[
-          { title: "파형 구간 선택", paragraphs: ["파형을 드래그하면 보라색 선택 영역이 생깁니다. 영역 전체를 옮기거나 양쪽 손잡이를 조절하고, 시작·종료 초 입력으로 1ms 단위 값을 지정할 수 있습니다."] },
-          { title: "샘플 단위 편집", paragraphs: ["음소거는 선택 샘플을 0으로 바꾸고, 잘라내기와 삭제는 뒤 샘플을 앞으로 당깁니다. 붙여넣기는 현재 빨간 재생 커서 위치에 메모리 클립을 삽입합니다."] },
-          { title: "키보드 단축키", paragraphs: ["입력 칸 밖에서는 Space로 재생·일시정지하고, Ctrl+Z 또는 macOS의 Cmd+Z로 실행 취소합니다. Ctrl+Shift+Z·Cmd+Shift+Z·Ctrl+Y·Cmd+Y는 다시 실행입니다."] },
-          { title: "실행 취소와 메모리", paragraphs: ["편집을 위해 압축을 푼 음성 샘플(PCM)을 채널별로 보관합니다. 실행 취소 기록은 파일 크기에 맞춰 최대 12단계, 약 256MB 한도 안에서 자동 제한하며 새 파일을 열면 모두 해제합니다."] },
-          { title: "WAV와 MP3", paragraphs: ["WAV는 호환성이 높은 16비트 비압축 음성으로 빠르게 만듭니다. MP3는 사이트에 포함된 브라우저용 FFmpeg 변환기를 별도 작업 공간에서 실행하고 완료 즉시 종료합니다."] },
-          { title: "브라우저의 파일 지원", paragraphs: ["MP3와 WAV는 일반적인 최신 브라우저에서 열 수 있습니다. M4A·AAC·OGG는 운영체제와 브라우저가 파일 안의 음성 압축 방식을 지원할 때 편집할 수 있습니다."] },
-        ]}
-        faq={[
-          { question: "오디오가 서버로 업로드되나요?", answer: "아니요. 파일 열기, 샘플 편집, 파형 미리보기와 결과 변환은 현재 브라우저에서만 실행됩니다." },
-          { question: "붙여넣기는 어디에 들어가나요?", answer: "파형을 클릭하거나 재생해 이동한 빨간 재생 커서의 현재 시각에 삽입됩니다. 선택 영역의 시작점이 아니라 재생 커서가 기준입니다." },
-          { question: "왜 긴 파일은 메모리를 많이 사용하나요?", answer: "압축된 음성도 편집할 때는 채널별 비압축 샘플로 풀어야 하고, 파형 재생용 데이터와 실행 취소 상태도 함께 보관하기 때문입니다." },
-          { question: "MP3가 오프라인에서 바로 만들어지나요?", answer: "이전에 인코더가 캐시되었다면 가능할 수 있습니다. 처음 방문한 완전한 오프라인 상태에서는 실행 파일을 받을 수 없으므로 WAV를 사용해 주세요." },
-          { question: "편집 결과가 원본을 덮어쓰나요?", answer: "아니요. 원본 파일은 수정하지 않으며 WAV 또는 MP3 새 파일로 내려받습니다." },
-        ]}
+        title={t("audio.guide.title")}
+        description={t("audio.guide.description")}
+        blocks={(t("audio.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
+        faq={(t("audio.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
     </div>
   );
@@ -563,7 +555,7 @@ function clampSelection(selection: AudioSelection | undefined, duration: number)
 }
 
 function resultDocument(current: AudioDocumentData, result: AudioProcessorResult): AudioDocumentData {
-  if (!result.channels) throw new Error("편집된 오디오 채널이 없습니다.");
+  if (!result.channels) throw new Error("Edited audio channels are missing.");
   return { ...current, channels: result.channels, length: result.length, duration: result.duration };
 }
 
@@ -580,8 +572,8 @@ function selectionAfterEdit(
   return clampSelection({ start, end: Math.min(duration, start + 1) }, duration);
 }
 
-function editLabel(command: AudioEditCommand) {
-  return ({ MUTE: "선택 구간 음소거 중…", CUT: "선택 구간 잘라내는 중…", COPY: "선택 구간 복사 중…", PASTE: "재생 커서에 붙여넣는 중…", DELETE: "선택 구간 삭제 중…", PREVIEW: "파형 미리보기 생성 중…" } satisfies Record<AudioEditCommand, string>)[command];
+function editLabel(command: AudioEditCommand, t: (key: never) => string) {
+  return t(`audio.edit.${command}` as never);
 }
 
 function isSupportedAudio(file: File) {
@@ -599,11 +591,11 @@ function formatTimelineLabel(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
 }
 
-function toAudioError(error: unknown) {
+function toAudioError(error: unknown, t: (key: never) => string) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/decodeAudioData|Unable to decode|EncodingError/i.test(message)) return "이 브라우저가 오디오 파일 안의 음성 압축 방식을 해석하지 못했습니다. MP3나 WAV 파일로 변환한 뒤 다시 시도해 주세요.";
-  if (/memory|allocation|out of bounds|Array buffer/i.test(message)) return "브라우저 메모리가 부족합니다. 더 짧거나 채널 수가 적은 오디오로 다시 시도해 주세요.";
-  return message || "오디오 작업에 실패했습니다.";
+  if (/decodeAudioData|Unable to decode|EncodingError/i.test(message)) return t("audio.errors.decode" as never);
+  if (/memory|allocation|out of bounds|Array buffer/i.test(message)) return t("audio.errors.memory" as never);
+  return message || t("audio.errors.generic" as never);
 }
 
 function downloadAudio(buffer: ArrayBuffer, mimeType: string, fileName: string) {

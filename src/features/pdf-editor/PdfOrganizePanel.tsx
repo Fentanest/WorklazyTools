@@ -5,6 +5,8 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { OperationProgress } from "../../components/OperationProgress";
 import { FileDropZone, FileList, PrimaryButton, SectionCard } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
+import { useAppLanguage } from "../../i18n/routing";
+import type { AppLanguage } from "../../i18n/languages";
 import { PdfThumbnail } from "./PdfThumbnail";
 import { inspectPdf, parsePageRange, releasePdf } from "./pdfPreview";
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
@@ -25,14 +27,16 @@ interface EvaluatedRangeRow extends RangeRow {
 }
 
 export function PdfOrganizePanel() {
+  const language = useAppLanguage();
+  const L = (ko: string, en: string) => language === "ko" ? ko : en;
   const [sources, setSources] = useState<PdfSourceFile[]>([]);
   const [pages, setPages] = useState<PdfPageItem[]>([]);
   const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(new Set());
   const [selectionRange, setSelectionRange] = useState("");
   const [selectionError, setSelectionError] = useState("");
   const [outputMode, setOutputMode] = useState<OutputMode>("merged");
-  const [rangeRows, setRangeRows] = useState<RangeRow[]>(() => [createRangeRow(1)]);
-  const [outputName, setOutputName] = useState("Worklazy-PDF-편집");
+  const [rangeRows, setRangeRows] = useState<RangeRow[]>(() => [createRangeRow(1, language)]);
+  const [outputName, setOutputName] = useState(language === "ko" ? "Worklazy-PDF-편집" : "Worklazy-PDF-edited");
   const [error, setError] = useState("");
   const [inspecting, setInspecting] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -75,7 +79,7 @@ export function PdfOrganizePanel() {
     return () => sortable.destroy();
   }, [pages.length]);
 
-  const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length), [rangeRows, pages.length]);
+  const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
   const groupMembership = useMemo(() => {
     const membership = new Map<string, number[]>();
     evaluatedRanges.forEach((row, groupIndex) => {
@@ -98,15 +102,15 @@ export function PdfOrganizePanel() {
     setError("");
     setInspecting(true);
     download.clearResult();
-    operation.start(`${incoming.length}개 PDF의 페이지를 확인하는 중…`);
+    operation.start(L(`${incoming.length}개 PDF의 페이지를 확인하는 중…`, `Checking pages in ${incoming.length} PDFs…`));
     const addedSources: PdfSourceFile[] = [];
     const addedPages: PdfPageItem[] = [];
     try {
       for (let index = 0; index < incoming.length; index += 1) {
         const file = incoming[index];
-        if (!file.name.toLowerCase().endsWith(".pdf")) throw new Error(`${file.name}: PDF 파일만 추가할 수 있습니다.`);
-        operation.update(8 + (index / incoming.length) * 82, `[${index + 1}/${incoming.length}] ${file.name} 페이지 확인 중…`);
-        const inspected = await inspectPdf(file);
+        if (!file.name.toLowerCase().endsWith(".pdf")) throw new Error(L(`${file.name}: PDF 파일만 추가할 수 있습니다.`, `${file.name}: only PDF files can be added.`));
+        operation.update(8 + (index / incoming.length) * 82, L(`[${index + 1}/${incoming.length}] ${file.name} 페이지 확인 중…`, `[${index + 1}/${incoming.length}] Checking pages in ${file.name}…`));
+        const inspected = await inspectPdf(file, language);
         const sourceId = createLocalId("pdf");
         addedSources.push({ id: sourceId, file, pageCount: inspected.pageCount });
         for (let pageIndex = 0; pageIndex < inspected.pageCount; pageIndex += 1) {
@@ -116,10 +120,10 @@ export function PdfOrganizePanel() {
       setSources((current) => [...current, ...addedSources]);
       setPages((current) => [...current, ...addedPages]);
       setSelectedPageIds((current) => new Set([...current, ...addedPages.map((page) => page.id)]));
-      operation.succeed(`${addedPages.length}개 페이지를 편집 화면에 추가하고 모두 선택했습니다.`);
+      operation.succeed(L(`${addedPages.length}개 페이지를 편집 화면에 추가하고 모두 선택했습니다.`, `Added and selected all ${addedPages.length} pages.`));
     } catch (reason) {
       addedSources.forEach((source) => { void releasePdf(source.file); });
-      const message = reason instanceof Error ? reason.message : "PDF 파일을 읽지 못했습니다.";
+      const message = reason instanceof Error ? reason.message : L("PDF 파일을 읽지 못했습니다.", "Unable to read the PDF files.");
       setError(message);
       operation.fail(message);
     } finally {
@@ -141,34 +145,34 @@ export function PdfOrganizePanel() {
   const exportPdf = async () => {
     setError("");
     download.clearResult();
-    operation.start("선택 페이지, 편집 순서와 회전값을 확인하는 중…");
+    operation.start(L("선택 페이지, 편집 순서와 회전값을 확인하는 중…", "Checking selected pages, order, and rotations…"));
     try {
       const sourceFiles = sources.map((source) => ({ id: source.id, file: source.file }));
-      const archiveName = normalizeOutputName(outputName, "Worklazy-PDF-편집");
+      const archiveName = normalizeOutputName(outputName, L("Worklazy-PDF-편집", "Worklazy-PDF-edited"));
       if (outputMode === "merged") {
-        if (!selectedPages.length) throw new Error("하나의 PDF로 저장할 페이지를 선택해 주세요.");
-        const output = await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, operation.update);
+        if (!selectedPages.length) throw new Error(L("하나의 PDF로 저장할 페이지를 선택해 주세요.", "Select pages to save in one PDF."));
+        const output = await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, operation.update, language);
         download.makeResult(output);
-        operation.succeed(`${selectedPages.length}개 선택 페이지를 하나의 PDF로 생성했습니다.`);
+        operation.succeed(L(`${selectedPages.length}개 선택 페이지를 하나의 PDF로 생성했습니다.`, `Created one PDF from ${selectedPages.length} selected pages.`));
         return;
       }
 
       let groups: Array<{ fileName: string; pages: ReturnType<typeof toPagePlan>[] }>;
       if (outputMode === "ranges") {
-        if (!rangesValid) throw new Error("여러 범위의 파일명과 페이지 범위를 확인해 주세요.");
+        if (!rangesValid) throw new Error(L("여러 범위의 파일명과 페이지 범위를 확인해 주세요.", "Check the file names and page ranges."));
         groups = evaluatedRanges.map((row) => ({ fileName: row.name, pages: row.indexes.map((index) => toPagePlan(pages[index])) }));
       } else {
-        if (!selectedPages.length) throw new Error("페이지별 PDF로 저장할 페이지를 선택해 주세요.");
+        if (!selectedPages.length) throw new Error(L("페이지별 PDF로 저장할 페이지를 선택해 주세요.", "Select pages to save as separate PDFs."));
         groups = selectedPages.map((page) => {
           const position = pages.findIndex((candidate) => candidate.id === page.id) + 1;
           return { fileName: `${archiveName}-${String(position).padStart(3, "0")}`, pages: [toPagePlan(page)] };
         });
       }
-      const output = await exportPdfGroups(sourceFiles, groups, archiveName, operation.update);
+      const output = await exportPdfGroups(sourceFiles, groups, archiveName, operation.update, language);
       download.makeResult(output);
-      operation.succeed(`${groups.length}개 PDF를 만들어 ZIP으로 묶었습니다.`);
+      operation.succeed(L(`${groups.length}개 PDF를 만들어 ZIP으로 묶었습니다.`, `Created ${groups.length} PDFs and packed them into a ZIP.`));
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : "PDF를 생성하지 못했습니다.";
+      const message = reason instanceof Error ? reason.message : L("PDF를 생성하지 못했습니다.", "Unable to create the PDF output.");
       setError(message);
       operation.fail(message);
     }
@@ -177,13 +181,13 @@ export function PdfOrganizePanel() {
   const applySelectionRange = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     try {
-      const indexes = parsePageRange(selectionRange, pages.length);
+      const indexes = parsePageRange(selectionRange, pages.length, language);
       setSelectedPageIds(new Set(indexes.map((index) => pages[index].id)));
       setSelectionError("");
       setError("");
       download.clearResult();
     } catch (reason) {
-      setSelectionError(reason instanceof Error ? reason.message : "선택할 페이지 범위를 확인해 주세요.");
+      setSelectionError(reason instanceof Error ? reason.message : L("선택할 페이지 범위를 확인해 주세요.", "Check the page range to select."));
     }
   };
 
@@ -216,7 +220,7 @@ export function PdfOrganizePanel() {
       const selectedRange = compactPageRange(selectedIndexes);
       setRangeRows((current) => current.some((row) => row.range.trim())
         ? current
-        : [{ ...(current[0] ?? createRangeRow(1)), range: selectedRange }]);
+        : [{ ...(current[0] ?? createRangeRow(1, language)), range: selectedRange }]);
     }
     setOutputMode(mode);
     setSelectionError("");
@@ -246,42 +250,42 @@ export function PdfOrganizePanel() {
     <>
       <div className="workflow-grid pdf-workflow-grid">
         <div>
-          <SectionCard step={1} title="PDF 추가" description="여러 PDF의 모든 페이지를 한 편집 화면에 불러옵니다." className="accent-context-violet">
-            <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} accent="violet" hint="PDF를 한 번에 고르거나 여러 번 나눠 추가하세요." />
+          <SectionCard step={1} title={L("PDF 추가", "Add PDFs")} description={L("여러 PDF의 모든 페이지를 한 편집 화면에 불러옵니다.", "Load every page from multiple PDFs into one editor.")} className="accent-context-violet">
+            <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} accent="violet" hint={L("PDF를 한 번에 고르거나 여러 번 나눠 추가하세요.", "Choose multiple PDFs at once or add more later.")} />
             <FileList files={sources.map((source) => source.file)} onRemove={removeSource} accent="violet" />
           </SectionCard>
 
           {!!pages.length && (
-            <SectionCard step={2} title="페이지 편집·선택" description={outputMode === "ranges" ? "결과별 범위를 지정하고, 페이지를 끌어서 이동하거나 회전·삭제하세요." : "현재 순서를 기준으로 출력할 페이지를 고르고, 끌어서 이동하거나 회전·삭제하세요."} className="accent-context-violet pdf-page-section">
-              <div className="pdf-editor-note"><Info size={15} /><span>{outputMode === "ranges" ? "번호 배지는 페이지가 포함된 결과 범위를 뜻합니다. 휴지통은 모든 결과에서 해당 페이지를 제거하며, 회전값은 실제 출력 PDF에도 기록됩니다." : "선택 해제는 현재 출력에서만 제외합니다. 휴지통은 편집 목록에서 페이지를 완전히 제거하며, 회전값은 실제 출력 PDF에도 기록됩니다."}</span></div>
+            <SectionCard step={2} title={L("페이지 편집·선택", "Edit and select pages")} description={outputMode === "ranges" ? L("결과별 범위를 지정하고, 페이지를 끌어서 이동하거나 회전·삭제하세요.", "Define each output range, then drag, rotate, or delete pages.") : L("현재 순서를 기준으로 출력할 페이지를 고르고, 끌어서 이동하거나 회전·삭제하세요.", "Choose output pages in the current order, then drag, rotate, or delete them.")} className="accent-context-violet pdf-page-section">
+              <div className="pdf-editor-note"><Info size={15} /><span>{outputMode === "ranges" ? L("번호 배지는 페이지가 포함된 결과 범위를 뜻합니다. 휴지통은 모든 결과에서 해당 페이지를 제거하며, 회전값은 실제 출력 PDF에도 기록됩니다.", "Number badges show which output ranges include a page. Deleting removes it from every result, and rotations are written to the exported PDFs.") : L("선택 해제는 현재 출력에서만 제외합니다. 휴지통은 편집 목록에서 페이지를 완전히 제거하며, 회전값은 실제 출력 PDF에도 기록됩니다.", "Deselecting excludes a page from this output. Deleting removes it from the editor, and rotations are written to the exported PDF.")}</span></div>
               {outputMode === "ranges" ? (
                 <div ref={multiRangePanelRef} className="pdf-multi-range-panel">
                   <div className="pdf-multi-range-heading">
-                    <div><strong>출력 범위 설정</strong><span>각 행이 하나의 PDF가 되며, 같은 페이지를 여러 결과에 넣을 수 있습니다.</span></div>
-                    <button type="button" className="secondary-button" onClick={() => setRangeRows((current) => [...current, createRangeRow(current.length + 1)])}><Plus size={15} /> 범위 추가</button>
+                    <div><strong>{L("출력 범위 설정", "Output ranges")}</strong><span>{L("각 행이 하나의 PDF가 되며, 같은 페이지를 여러 결과에 넣을 수 있습니다.", "Each row creates one PDF, and a page may appear in multiple results.")}</span></div>
+                    <button type="button" className="secondary-button" onClick={() => setRangeRows((current) => [...current, createRangeRow(current.length + 1, language)])}><Plus size={15} /> {L("범위 추가", "Add range")}</button>
                   </div>
                   <div className="pdf-range-groups">
                     {evaluatedRanges.map((row, index) => <div className={`pdf-range-group${row.error ? " invalid" : ""}`} key={row.id}>
                       <b>{index + 1}</b>
-                      <label><span>결과 파일명</span><input value={row.name} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`분할-${String(index + 1).padStart(2, "0")}`} /><small>.pdf</small></label>
-                      <label><span>현재 순서의 페이지 범위</span><input value={row.range} onChange={(event) => updateRangeRow(row.id, "range", event.target.value)} placeholder="예: 1-3, 5" /></label>
-                      <button type="button" onClick={() => setRangeRows((current) => current.filter((candidate) => candidate.id !== row.id))} disabled={rangeRows.length === 1} aria-label={`${index + 1}번 범위 삭제`}><Trash2 size={16} /></button>
+                      <label><span>{L("결과 파일명", "Output file name")}</span><input value={row.name} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`${L("분할", "split")}-${String(index + 1).padStart(2, "0")}`} /><small>.pdf</small></label>
+                      <label><span>{L("현재 순서의 페이지 범위", "Page range in current order")}</span><input value={row.range} onChange={(event) => updateRangeRow(row.id, "range", event.target.value)} placeholder={L("예: 1-3, 5", "e.g. 1-3, 5")} /></label>
+                      <button type="button" onClick={() => setRangeRows((current) => current.filter((candidate) => candidate.id !== row.id))} disabled={rangeRows.length === 1} aria-label={L(`${index + 1}번 범위 삭제`, `Delete range ${index + 1}`)}><Trash2 size={16} /></button>
                       {row.error && <em>{row.error}</em>}
                     </div>)}
                   </div>
-                  <p className="pdf-range-help">페이지 번호는 아래 편집 화면의 현재 순서를 따릅니다. 예를 들어 <code>5, 1-3</code>은 5, 1, 2, 3 순서의 PDF를 만듭니다.</p>
+                  <p className="pdf-range-help">{L("페이지 번호는 아래 편집 화면의 현재 순서를 따릅니다. 예를 들어", "Page numbers follow the current editor order. For example,")} <code>5, 1-3</code>{L("은 5, 1, 2, 3 순서의 PDF를 만듭니다.", " creates a PDF ordered 5, 1, 2, 3.")}</p>
                 </div>
               ) : (
                 <div className="pdf-selection-toolbar">
                   <div>
-                    <button type="button" onClick={selectAllPages}>전체 선택</button>
-                    <button type="button" onClick={clearPageSelection}>선택 해제</button>
-                    <strong>{selectedPages.length}/{pages.length} 선택</strong>
+                    <button type="button" onClick={selectAllPages}>{L("전체 선택", "Select all")}</button>
+                    <button type="button" onClick={clearPageSelection}>{L("선택 해제", "Clear selection")}</button>
+                    <strong>{selectedPages.length}/{pages.length} {L("선택", "selected")}</strong>
                   </div>
                   <form className="pdf-selection-range-form" onSubmit={applySelectionRange} noValidate>
-                    <label htmlFor="pdf-selection-range" className="visually-hidden">선택할 페이지 범위</label>
-                    <input id="pdf-selection-range" value={selectionRange} onChange={(event) => { setSelectionRange(event.target.value); setSelectionError(""); }} placeholder="예: 1-3, 5" aria-invalid={!!selectionError} aria-describedby={selectionError ? "pdf-selection-range-error" : undefined} />
-                    <button type="submit">범위로 선택</button>
+                    <label htmlFor="pdf-selection-range" className="visually-hidden">{L("선택할 페이지 범위", "Page range to select")}</label>
+                    <input id="pdf-selection-range" value={selectionRange} onChange={(event) => { setSelectionRange(event.target.value); setSelectionError(""); }} placeholder={L("예: 1-3, 5", "e.g. 1-3, 5")} aria-invalid={!!selectionError} aria-describedby={selectionError ? "pdf-selection-range-error" : undefined} />
+                    <button type="submit">{L("범위로 선택", "Select range")}</button>
                     {selectionError && <em id="pdf-selection-range-error" role="alert">{selectionError}</em>}
                   </form>
                 </div>
@@ -299,23 +303,23 @@ export function PdfOrganizePanel() {
 
         <aside className="workflow-summary">
           <section className="summary-card">
-            <div className="summary-title"><Layers3 size={18} /><h2>편집·출력 요약</h2></div>
-            <div className="pdf-output-mode-list" role="radiogroup" aria-label="PDF 출력 방식">
-              <button type="button" role="radio" aria-checked={outputMode === "merged"} className={outputMode === "merged" ? "selected" : ""} onClick={() => setMode("merged")}><FileCheck2 size={16} /><span><strong>하나의 PDF</strong><small>선택 페이지를 현재 순서로 저장</small></span></button>
-              <button type="button" role="radio" aria-checked={outputMode === "ranges"} className={outputMode === "ranges" ? "selected" : ""} onClick={() => setMode("ranges")}><FileArchive size={16} /><span><strong>여러 범위별 PDF</strong><small>입력 행마다 PDF를 만들어 ZIP 저장</small></span></button>
-              <button type="button" role="radio" aria-checked={outputMode === "separate"} className={outputMode === "separate" ? "selected" : ""} onClick={() => setMode("separate")}><Layers3 size={16} /><span><strong>페이지별 PDF</strong><small>선택 페이지를 각각 나눠 ZIP 저장</small></span></button>
+            <div className="summary-title"><Layers3 size={18} /><h2>{L("편집·출력 요약", "Edit & output summary")}</h2></div>
+            <div className="pdf-output-mode-list" role="radiogroup" aria-label={L("PDF 출력 방식", "PDF output mode")}>
+              <button type="button" role="radio" aria-checked={outputMode === "merged"} className={outputMode === "merged" ? "selected" : ""} onClick={() => setMode("merged")}><FileCheck2 size={16} /><span><strong>{L("하나의 PDF", "One PDF")}</strong><small>{L("선택 페이지를 현재 순서로 저장", "Save selected pages in current order")}</small></span></button>
+              <button type="button" role="radio" aria-checked={outputMode === "ranges"} className={outputMode === "ranges" ? "selected" : ""} onClick={() => setMode("ranges")}><FileArchive size={16} /><span><strong>{L("여러 범위별 PDF", "One PDF per range")}</strong><small>{L("입력 행마다 PDF를 만들어 ZIP 저장", "Create each row as a PDF in a ZIP")}</small></span></button>
+              <button type="button" role="radio" aria-checked={outputMode === "separate"} className={outputMode === "separate" ? "selected" : ""} onClick={() => setMode("separate")}><Layers3 size={16} /><span><strong>{L("페이지별 PDF", "One PDF per page")}</strong><small>{L("선택 페이지를 각각 나눠 ZIP 저장", "Split selected pages into a ZIP")}</small></span></button>
             </div>
             <dl>
-              <div><dt>원본 파일</dt><dd>{sources.length}개</dd></div>
-              <div><dt>{outputMode === "ranges" ? "범위 포함 페이지" : "선택 페이지"}</dt><dd>{outputMode === "ranges" ? rangePageCount : selectedPages.length}개</dd></div>
-              <div><dt>결과 PDF</dt><dd>{resultFileCount}개</dd></div>
-              <div><dt>회전한 페이지</dt><dd>{pages.filter((page) => page.rotation).length}개</dd></div>
+              <div><dt>{L("원본 파일", "Source files")}</dt><dd>{sources.length}</dd></div>
+              <div><dt>{outputMode === "ranges" ? L("범위 포함 페이지", "Pages in ranges") : L("선택 페이지", "Selected pages")}</dt><dd>{outputMode === "ranges" ? rangePageCount : selectedPages.length}</dd></div>
+              <div><dt>{L("결과 PDF", "Output PDFs")}</dt><dd>{resultFileCount}</dd></div>
+              <div><dt>{L("회전한 페이지", "Rotated pages")}</dt><dd>{pages.filter((page) => page.rotation).length}</dd></div>
             </dl>
-            <label className="pdf-output-field"><span>{outputMode === "merged" ? "출력 파일명" : "ZIP 파일명"}</span><input value={outputName} onChange={(event) => setOutputName(event.target.value)} /><small>.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
-            <PrimaryButton accent="violet" disabled={!pages.length || !resultFileCount || inspecting || operation.status === "running"} loading={operation.status === "running"} onClick={exportPdf}>{outputMode === "merged" ? <FileCheck2 size={18} /> : <FileArchive size={18} />} {outputMode === "merged" ? "새 PDF 만들기" : "PDF ZIP 만들기"}</PrimaryButton>
-            <p className="prototype-note">암호로 보호된 PDF는 보호를 해제한 사본이 필요합니다.</p>
+            <label className="pdf-output-field"><span>{outputMode === "merged" ? L("출력 파일명", "Output file name") : L("ZIP 파일명", "ZIP file name")}</span><input value={outputName} onChange={(event) => setOutputName(event.target.value)} /><small>.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
+            <PrimaryButton accent="violet" disabled={!pages.length || !resultFileCount || inspecting || operation.status === "running"} loading={operation.status === "running"} onClick={exportPdf}>{outputMode === "merged" ? <FileCheck2 size={18} /> : <FileArchive size={18} />} {outputMode === "merged" ? L("새 PDF 만들기", "Create PDF") : L("PDF ZIP 만들기", "Create PDF ZIP")}</PrimaryButton>
+            <p className="prototype-note">{L("암호로 보호된 PDF는 보호를 해제한 사본이 필요합니다.", "Password-protected PDFs require an unlocked copy.")}</p>
           </section>
-          <OperationProgress {...operation} accent="violet" title="PDF 편집·추출 로그" />
+          <OperationProgress {...operation} accent="violet" title={L("PDF 편집·추출 로그", "PDF edit & extract log")} />
         </aside>
       </div>
       <PdfError message={error} />
@@ -324,20 +328,21 @@ export function PdfOrganizePanel() {
   );
 }
 
-function createRangeRow(index: number): RangeRow {
-  return { id: createLocalId("pdf-range"), name: `분할-${String(index).padStart(2, "0")}`, range: "" };
+function createRangeRow(index: number, language: AppLanguage): RangeRow {
+  return { id: createLocalId("pdf-range"), name: `${language === "ko" ? "분할" : "split"}-${String(index).padStart(2, "0")}`, range: "" };
 }
 
-function evaluateRangeRows(rows: RangeRow[], pageCount: number): EvaluatedRangeRow[] {
+function evaluateRangeRows(rows: RangeRow[], pageCount: number, language: AppLanguage): EvaluatedRangeRow[] {
+  const L = (ko: string, en: string) => language === "ko" ? ko : en;
   const normalizedNames = rows.map((row) => normalizeOutputName(row.name, "").replace(/\.pdf$/i, "").toLocaleLowerCase());
   return rows.map((row, index) => {
     let indexes: number[] = [];
     let error = "";
-    if (!row.name.trim()) error = "결과 파일명을 입력해 주세요.";
-    else if (normalizedNames.filter((name) => name === normalizedNames[index]).length > 1) error = "다른 범위와 파일명이 중복됩니다.";
+    if (!row.name.trim()) error = L("결과 파일명을 입력해 주세요.", "Enter an output file name.");
+    else if (normalizedNames.filter((name) => name === normalizedNames[index]).length > 1) error = L("다른 범위와 파일명이 중복됩니다.", "This file name duplicates another range.");
     else {
-      try { indexes = parsePageRange(row.range, pageCount); }
-      catch (reason) { error = reason instanceof Error ? reason.message : "페이지 범위를 확인해 주세요."; }
+      try { indexes = parsePageRange(row.range, pageCount, language); }
+      catch (reason) { error = reason instanceof Error ? reason.message : L("페이지 범위를 확인해 주세요.", "Check the page range."); }
     }
     return { ...row, indexes, error };
   });

@@ -9,10 +9,12 @@ interface VideoZipInput {
   blob: Blob;
 }
 
-worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[] }>) => {
+worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; language?: "ko" | "en" }>) => {
+  const language = event.data.language === "en" ? "en" : "ko";
+  const L = (ko: string, en: string) => language === "ko" ? ko : en;
   try {
     const files = event.data.files;
-    if (!files.length) throw new Error("ZIP으로 묶을 결과 파일이 없습니다.");
+    if (!files.length) throw new Error(L("ZIP으로 묶을 결과 파일이 없습니다.", "There are no result files to add to a ZIP."));
     const zip = new JSZip();
     const usedNames = new Set<string>();
 
@@ -22,7 +24,7 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[] }>) => {
       worker.postMessage({
         type: "progress",
         progress: Math.round(((index + 1) / files.length) * 35),
-        message: `${index + 1}/${files.length} 결과를 ZIP에 추가하는 중…`,
+        message: L(`${index + 1}/${files.length} 결과를 ZIP에 추가하는 중…`, `${index + 1}/${files.length} Adding result to ZIP…`),
       });
     }
 
@@ -31,7 +33,7 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[] }>) => {
       (metadata) => worker.postMessage({
         type: "progress",
         progress: 35 + Math.round(metadata.percent * 0.65),
-        message: `ZIP 파일 만드는 중… ${Math.round(metadata.percent)}%`,
+        message: L(`ZIP 파일 만드는 중… ${Math.round(metadata.percent)}%`, `Creating ZIP file… ${Math.round(metadata.percent)}%`),
       }),
     );
     const buffer = archive.buffer as ArrayBuffer;
@@ -39,7 +41,7 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[] }>) => {
       type: "result",
       result: {
         buffer,
-        fileName: `worklazy-비디오-결과-${files.length}개.zip`,
+        fileName: language === "ko" ? `worklazy-비디오-결과-${files.length}개.zip` : `worklazy-video-results-${files.length}.zip`,
         mimeType: "application/zip",
       },
     }, [buffer]);

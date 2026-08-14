@@ -1,70 +1,23 @@
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { PageHeader } from "../components/ui";
 
+interface TermsSection { title: string; paragraphs: string[]; items?: string[] }
+
 export function TermsPage() {
+  const { t } = useTranslation("pages");
+  const sections = t("terms.sections", { returnObjects: true }) as TermsSection[];
   return (
     <div className="page standard-page page-enter content-page">
-      <PageHeader eyebrow="TERMS" title="이용약관" description="브라우저 파일 도구의 지원 범위와 안전한 이용 조건을 안내합니다." />
-
+      <PageHeader eyebrow="TERMS" title={t("terms.title")} description={t("terms.description")} />
       <article className="prose-card">
-        <p className="policy-date">시행일: 2026년 8월 14일</p>
-
-        <h2>1. 서비스의 목적</h2>
-        <p>Worklazy Tools는 문서·PDF·비디오·오디오·이미지 편집과 텍스트·표 데이터 변환, 근무일·시차·급여 계산, 사진 개인정보·비밀번호·QR 도구 등 반복적인 업무를 브라우저에서 수행할 수 있도록 제공하는 무료 도구입니다. 별도 계정이나 설치 프로그램 없이 사용할 수 있습니다.</p>
-
-        <h2>2. 이용 조건</h2>
-        <p>사용자는 본인이 처리할 권한이 있는 파일만 사용해야 하며, 관련 법령과 제3자의 권리를 침해해서는 안 됩니다. 서비스의 정상 운영을 방해하거나 악성 파일을 배포하는 용도로 사용할 수 없습니다.</p>
-
-        <h2>3. 지식재산권과 금지되는 이용</h2>
-        <p>공식 Worklazy Tools 사이트를 정상적으로 이용하는 것은 허용되지만, Worklazy가 직접 작성한 코드, UI 디자인, 문서와 고유 시각 자료에 대한 소유권이나 재사용 권리가 이전되는 것은 아닙니다. 저작권자의 사전 서면 허가 없이 다음 행위를 할 수 없습니다.</p>
-        <ul>
-          <li>서비스의 전부 또는 실질적인 일부를 복제·수정·배포·판매·재라이선스하는 행위</li>
-          <li>동일하거나 실질적으로 대체 가능한 웹사이트·앱·확장 프로그램으로 미러링하거나 재호스팅하는 행위</li>
-          <li>복제본이나 파생 서비스에 광고, 구독, 이용료, 후원 또는 유료 API를 붙여 수익화하는 행위</li>
-          <li>저작권·라이선스·출처 표시를 제거하거나 가리는 행위</li>
-          <li>Worklazy Tools의 명칭, 로고, 도메인 또는 시각적 식별 요소를 공식 서비스·제휴·후원으로 오인하게 사용하는 행위</li>
-        </ul>
-        <p>오픈소스 라이브러리와 제3자 자료는 이 제한의 대상이 아니며 각 원 라이선스가 우선합니다. 상세 범위는 라이선스 및 제3자 고지 페이지에서 확인할 수 있습니다.</p>
-
-        <h2>4. 결과 확인과 백업</h2>
-        <p>브라우저에서 만든 결과는 원본 프로그램, 미디어 플레이어 또는 이미지 편집기의 결과와 차이가 있을 수 있습니다. 중요한 업무에 사용하기 전 원본을 별도로 보관하고 생성된 결과를 적절한 프로그램에서 직접 확인해야 합니다.</p>
-        <ul>
-          <li>Excel 이미지, 매크로, 외부 연결과 일부 고급 개체는 보존되지 않을 수 있습니다.</li>
-          <li>Word 자동 번호, 필드, 도형과 복잡한 병합 표의 변경 추적은 Microsoft Word 자체 비교 결과와 다를 수 있습니다.</li>
-          <li>암호화 방식이나 손상된 파일 구조에 따라 입력 파일을 열지 못할 수 있습니다.</li>
-          <li>Word 자동 번호, 계산 필드와 복잡한 레이아웃은 화면 표시와 다르게 비교될 수 있습니다.</li>
-          <li>PDF의 문단·표 구조가 원본에 남아 있지 않으면 DOCX·XLSX 변환의 읽기 순서와 셀 배치는 좌표로 추정됩니다.</li>
-          <li>OCR 결과에는 오인식과 누락이 있을 수 있으며, 검색 가능한 PDF는 페이지를 이미지로 다시 구성합니다.</li>
-          <li>PDF를 병합·분할·회전하거나 다시 구성하면 기존 디지털 서명은 유효하지 않으며 양식, 책갈피와 일부 고급 개체가 보존되지 않을 수 있습니다.</li>
-          <li>설정한 출력 파일 암호를 잊으면 서비스에서 복구할 수 없습니다.</li>
-          <li>HWP 편집과 비교 기능은 공식 rhwp가 현재 공개한 기능 범위로 제한되며, 설치된 글꼴과 문서 개체에 따라 한글 프로그램의 페이지 배치·비교·저장 결과와 다를 수 있습니다.</li>
-          <li>비디오 변환은 입력 영상의 압축 방식(코덱), 브라우저 메모리와 기기 성능의 영향을 받습니다. MKV·AVI는 완벽한 호환을 보장하지 않으며 HEVC와 MKV 결과는 일부 기기에서 재생되지 않을 수 있습니다. 원본 음성 복사는 파일 안의 첫 번째 음성을 자동 변환 없이 옮기므로 출력 파일 형식과 맞지 않으면 실패할 수 있습니다.</li>
-          <li>오디오 편집은 브라우저가 입력 파일의 음성 압축 방식을 해석할 수 있어야 합니다. M4A·AAC·OGG 지원은 기기마다 다를 수 있으며, 긴 다채널 파일과 실행 취소 기록은 브라우저 메모리를 많이 사용합니다. 중요한 결과는 별도 플레이어에서 확인해야 합니다.</li>
-          <li>이미지 입력은 JPG·PNG·WebP를 지원하고 HEIC·HEIF는 지원하지 않습니다. 브라우저의 고급 이미지 처리 기능(OffscreenCanvas)을 사용하는 일괄 처리·GIF·사진 숨은 정보 제거·QR 사진 분석은 iOS 16.3 이하에서 사용할 수 없습니다.</li>
-          <li>한국어 문장 검사는 로컬 정규식 기반 가이드이며 전문 맞춤법 검사나 교정을 대체하지 않습니다.</li>
-          <li>영업일 계산에서 임시공휴일·선거일·회사 휴무일은 직접 추가해야 하며, 연차 결과는 개근과 출근율 요건 충족을 가정합니다.</li>
-          <li>급여·주휴수당·퇴직금 결과는 표시된 기준일의 간이 예상치입니다. 실제 보험 신고 기준, 비과세 급여, 근태, 통상임금과 회사의 원천징수 방식에 따라 달라집니다.</li>
-          <li>비밀번호 강도와 예상 해독 시간은 문자열 패턴과 초당 100억 회 대입 가정에 따른 비교값이며 계정 유출 여부나 서비스의 보안 수준을 보증하지 않습니다.</li>
-          <li>QR 스캔 결과의 URL과 내용은 안전성이 검증된 것이 아니므로 열기 전에 사용자가 직접 확인해야 합니다.</li>
-        </ul>
-
-        <h2>5. 서비스 변경과 중단</h2>
-        <p>브라우저나 서비스 제공 환경의 변경 또는 유지보수로 기능이 수정되거나 일시 중단될 수 있습니다. 중요한 변경은 서비스 화면이나 문서에 반영합니다.</p>
-
-        <h2>6. 보증과 책임의 제한</h2>
-        <p>서비스는 현재 상태로 제공됩니다. 고의 또는 중대한 과실이 없는 한, 파일 손상, 결과의 누락, 호환성 문제나 사용자의 검증 없이 결과를 사용해 발생한 간접 손해에 대해 책임을 지지 않습니다. 관련 법령이 달리 정하는 경우에는 그 규정을 따릅니다.</p>
-
-        <h2>7. 방문 분석, 광고와 외부 서비스</h2>
-        <p>서비스에는 개선을 위한 방문 분석, 운영을 위한 광고 또는 외부 사이트 링크가 포함될 수 있습니다. 방문 분석·광고와 외부 서비스의 콘텐츠 및 개인정보 처리는 개인정보처리방침과 각 제공자의 정책을 따릅니다.</p>
-
-        <h2>8. 약관 변경</h2>
-        <p>기능이나 운영 조건이 바뀌면 약관을 수정하고 상단 시행일을 갱신합니다. 변경 후 서비스를 계속 이용하면 변경된 조건에 동의한 것으로 봅니다. 다만 법령상 별도 동의가 필요한 사항은 해당 절차를 따릅니다.</p>
+        <p className="policy-date">{t("terms.date")}</p>
+        {sections.map((section) => <section key={section.title}><h2>{section.title}</h2>{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}{section.items && <ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}</section>)}
       </article>
-
       <div className="content-callouts">
-        <div><CheckCircle2 size={20} /><span><strong>원본 보관</strong><small>작업 전 별도 백업 권장</small></span></div>
-        <div><AlertTriangle size={20} /><span><strong>결과 검증</strong><small>중요 파일은 Office에서 확인</small></span></div>
+        <div><CheckCircle2 size={20} /><span><strong>{t("terms.backupTitle")}</strong><small>{t("terms.backupText")}</small></span></div>
+        <div><AlertTriangle size={20} /><span><strong>{t("terms.verifyTitle")}</strong><small>{t("terms.verifyText")}</small></span></div>
       </div>
     </div>
   );

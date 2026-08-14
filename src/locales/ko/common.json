@@ -1,0 +1,88 @@
+{
+  "language": { "ko": "한국어", "en": "English", "switchLabel": "언어 선택" },
+  "landing": {
+    "eyebrow": "WORKLAZY TOOLS",
+    "title": "Choose your language · 언어를 선택하세요",
+    "description": "Your choice is saved only in this browser. 선택한 언어는 이 브라우저에만 저장됩니다.",
+    "recommended": "브라우저 권장",
+    "continueKo": "한국어로 계속",
+    "continueEn": "Continue in English"
+  },
+  "navigation": {
+    "browse": "둘러보기",
+    "tools": "도구",
+    "home": "홈",
+    "allTools": "모든 도구",
+    "about": "정보",
+    "openMenu": "도구 메뉴 열기",
+    "shortcuts": "바로가기",
+    "chooseTask": "어떤 작업을 할까요?",
+    "close": "닫기",
+    "primaryLabel": "주요 내비게이션",
+    "mobileLabel": "모바일 내비게이션"
+  },
+  "footer": {
+    "service": "서비스 소개",
+    "privacy": "개인정보처리방침",
+    "terms": "이용약관",
+    "licenses": "라이선스·제3자 고지",
+    "contact": "문의",
+    "policyLabel": "정책 및 문의",
+    "feedback": "문의·건의·버그 제보",
+    "feedbackDescription": "GitHub Issues에 버그와 기능 제안 남기기"
+  },
+  "privacy": {
+    "mini": "파일·암호 전송 없이\n브라우저에서 처리",
+    "compact": "파일과 암호는 이 브라우저 안에서만 처리됩니다.",
+    "eyebrow": "PRIVATE BY DESIGN",
+    "title": "작업 파일을 서버에 업로드하지 않아요.",
+    "description": "선택한 파일, 입력한 암호와 작업 결과는 사용 중인 브라우저 안에서만 처리됩니다. 로그인이나 외부 업로드 없이 안심하고 사용하실 수 있습니다.",
+    "local": "로컬 처리",
+    "removed": "탭 종료 시 삭제"
+  },
+  "home": {
+    "kicker": "작지만 유용한 업무 도구",
+    "titleBefore": "귀찮은 파일 작업은",
+    "titleAccent": "도구에게 맡기세요.",
+    "description": "문서와 미디어부터 텍스트·계산·보안 도구까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 고르면 나머지는 브라우저 안에서 안전하게 처리됩니다.",
+    "browse": "도구 둘러보기",
+    "noUpload": "작업 파일 업로드 없음",
+    "availableTitle": "지금 바로 사용할 도구",
+    "howTitle": "파일은 이렇게 처리됩니다",
+    "steps": {
+      "selectTitle": "1. 파일 선택", "selectDescription": "브라우저의 파일 선택 창에서 작업할 문서를 고릅니다.",
+      "processTitle": "2. 안전하게 처리", "processDescription": "작업 파일을 외부로 보내지 않고 진행률과 처리 로그를 보여줍니다.",
+      "saveTitle": "3. 결과 저장", "saveDescription": "브라우저가 만든 결과를 확인하고 내 기기로 내려받습니다."
+    }
+  },
+  "files": {
+    "generic": "파일", "selectOrDrop": "{{label}} {{action}} 또는 드롭", "select": "선택", "add": "추가 선택",
+    "selected": "{{count}}개 파일 선택됨", "keepAdding": "계속 추가 가능", "dropHere": "파일을 여기에 놓으세요",
+    "added": "목록에 추가됨", "remove": "{{name}} 제거"
+  },
+  "actions": {
+    "selectFile": "파일 선택",
+    "addFiles": "파일 더 추가",
+    "remove": "제거",
+    "download": "다운로드",
+    "save": "저장",
+    "copy": "복사",
+    "copied": "복사됨",
+    "reset": "초기화",
+    "cancel": "취소",
+    "close": "닫기",
+    "retry": "다시 시도",
+    "share": "공유·기기에 저장",
+    "viewAll": "전체 보기"
+  },
+  "status": {
+    "preparing": "준비하는 중…",
+    "processing": "처리 중…",
+    "complete": "완료",
+    "failed": "실패",
+    "loadingTool": "{{tool}} 준비 중…"
+  },
+  "progress": { "title":"작업 진행 상황", "running":"처리 중", "success":"완료", "needsAttention":"확인 필요", "logs":"처리 로그 {{count}}개", "seconds":"{{value}}초", "minutesSeconds":"{{minutes}}분 {{seconds}}초" },
+  "guide": { "faq":"자주 묻는 질문" },
+  "format": { "characters": "{{count}}자", "files": "{{count}}개 파일", "tools": "{{count}}개 도구" }
+}

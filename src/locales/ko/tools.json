@@ -1,0 +1,32 @@
+{
+  "index": {
+    "eyebrow": "ALL TOOLS", "title": "모든 도구", "description": "업무 목적에 맞는 카테고리를 고르거나 필요한 기능을 검색하세요.",
+    "searchPlaceholder": "도구 이름이나 기능 검색", "searchLabel": "도구 검색", "categoryLabel": "도구 카테고리", "all": "전체", "emptyTitle": "일치하는 도구가 없어요.", "emptyDescription": "다른 검색어나 카테고리를 선택해 보세요."
+  },
+  "categories": {
+    "documents": { "label": "문서·스프레드시트", "shortLabel": "문서", "description": "문서를 편집·비교·병합하고 필요한 형식으로 변환합니다." },
+    "media": { "label": "이미지·영상·오디오", "shortLabel": "미디어", "description": "이미지와 영상, 오디오를 브라우저에서 직접 편집합니다." },
+    "text-data": { "label": "텍스트·데이터", "shortLabel": "텍스트·데이터", "description": "텍스트와 코드, 표 데이터를 읽기 좋은 형태로 정리합니다." },
+    "work": { "label": "일정·근무·급여", "shortLabel": "업무 계산", "description": "업무 일정과 근무일, 시차와 급여를 간편하게 계산합니다." },
+    "security-share": { "label": "보안·공유", "shortLabel": "보안·공유", "description": "개인정보를 보호하고 안전한 비밀번호와 공유용 QR을 만듭니다." }
+  },
+  "items": {
+    "excel-merger": { "title": "Excel Merger", "shortTitle": "Excel 병합", "description": "여러 Excel 파일과 CSV를 원하는 방식으로 하나의 파일에 정리합니다.", "eyebrow": "스프레드시트", "highlights": ["시트별 병합", "세로 병합", "가로 병합", "빈 영역·암호"] },
+    "pdf-editor": { "title": "PDF Tools", "shortTitle": "PDF 도구", "description": "PDF 페이지를 편집·병합·범위별 추출하고 이미지·DOCX·XLSX·TXT로 변환하거나 브라우저 OCR을 실행합니다.", "eyebrow": "PDF 편집·변환", "highlights": ["편집·범위 추출", "이미지 변환", "DOCX·TXT", "XLSX·OCR"] },
+    "word-compare": { "title": "Word Compare", "shortTitle": "Word 비교", "description": "수정 전후 Word 문서의 본문·표·서식 변경을 비교하고 웹·Excel·변경 추적 DOCX로 확인합니다.", "eyebrow": "문서 비교", "highlights": ["문단·문장 Diff", "표 변경 확인", "Excel 보고서", "다중 동시 비교"] },
+    "hwp-editor": { "title": "HWP Editor", "shortTitle": "HWP 편집", "description": "HWP·HWPX 문서를 공식 rhwp Studio에서 편집하고 다시 HWP·HWPX로 저장합니다.", "eyebrow": "한글 문서", "highlights": ["HWP·HWPX·HML", "전체 문서 편집", "서식·표·개체", "암호 문서"] },
+    "hwp-compare": { "title": "HWP Compare", "shortTitle": "HWP 비교", "description": "수정 전후 HWP·HWPX 문서의 본문·표·개요 번호 변경을 웹과 Excel에서 확인합니다.", "eyebrow": "한글 문서 비교", "highlights": ["문단·문장 Diff", "표 구조 비교", "Excel 보고서", "다중 동시 비교"] },
+    "video-studio": { "title": "Video Studio", "shortTitle": "비디오 스튜디오", "description": "영상 수 제한 없이 최대 10개 그룹으로 편집하고 영상·오디오 스트림을 원하는 방식으로 변환합니다.", "eyebrow": "비디오 편집", "highlights": ["무제한 추가·10개 그룹", "무손실 빠른 자르기", "개별 저장·선택 ZIP", "영상 속 음성 제어"] },
+    "audio-studio": { "title": "Audio Waveform Studio", "shortTitle": "오디오 편집기", "description": "오디오 파형에서 구간을 선택해 음소거·잘라내기·복사·붙여넣기하고 WAV·MP3로 저장합니다.", "eyebrow": "오디오 편집", "highlights": ["고해상도 파형", "구간 편집", "Undo·Redo", "WAV·MP3"] },
+    "image-studio": { "title": "Image Studio", "shortTitle": "이미지 스튜디오", "description": "사진 보정과 자유 그리기를 한 편집기에서 사용하고 여러 파일은 일괄 편집·콜라주·GIF로 만듭니다.", "eyebrow": "이미지 편집", "highlights": ["사진·그리기 통합", "일괄 리사이즈", "콜라주", "GIF 애니메이션"] },
+    "text-tools": { "title": "Text Tools", "shortTitle": "텍스트 정돈", "description": "공백·줄바꿈을 정리하고 케이스 변환과 로컬 한국어 문장 검사를 실행합니다.", "eyebrow": "텍스트 생산성", "highlights": ["공백·줄 정돈", "중복 줄 제거", "Case 변환", "한국어 가이드"] },
+    "text-formatter": { "title": "Code Formatter", "shortTitle": "코드 포맷터", "description": "JSON·SQL·XML 문법을 검사하고 들여쓰기 또는 한 줄 형식으로 정돈합니다.", "eyebrow": "개발·데이터", "highlights": ["JSON", "SQL", "XML", "오류 탐지"] },
+    "work-calculator": { "title": "Workday Calculator", "shortTitle": "영업일·연차", "description": "대한민국 공휴일을 제외한 영업일과 입사일·회계연도 기준 연차를 계산합니다.", "eyebrow": "근무 일정", "highlights": ["영업일", "대체공휴일", "입사일 기준", "회계연도 기준"] },
+    "timezone-calculator": { "title": "World Time Planner", "shortTitle": "글로벌 시차", "description": "세계지도에서 도시를 선택해 현지 시각과 모두가 근무 중인 글로벌 회의 시간대를 찾습니다.", "eyebrow": "글로벌 협업", "highlights": ["세계지도 도시 핀", "서머타임", "근무시간 중첩", "44개 주요 도시"] },
+    "payroll-calculator": { "title": "Payroll Calculator", "shortTitle": "급여 계산", "description": "주휴수당·월 실수령액·퇴직금을 최신 기준으로 브라우저에서 간이 계산합니다.", "eyebrow": "급여·노무", "highlights": ["주휴수당", "실수령액", "4대 보험", "퇴직금"] },
+    "image-privacy": { "title": "Image Privacy", "shortTitle": "사진 정보 제거", "description": "JPG·PNG에 숨은 GPS·촬영 기기·시각 정보(EXIF)를 확인하고 제거합니다.", "eyebrow": "사진 개인정보", "highlights": ["숨은 정보 확인", "GPS 제거", "JPG·PNG", "브라우저 처리"] },
+    "security-tools": { "title": "Password Generator", "shortTitle": "비밀번호 생성기", "description": "운영체제의 보안 난수로 비밀번호를 만들고 패턴 기반 추측 난이도를 확인합니다.", "eyebrow": "보안 도구", "highlights": ["보안 난수 생성", "강도 분석", "해독 시간 추정", "최대 64자"] },
+    "qr-studio": { "title": "QR Studio", "shortTitle": "QR 스튜디오", "description": "URL·텍스트 QR 코드를 만들고 휴대폰 카메라나 사진에서 QR 데이터를 읽습니다.", "eyebrow": "QR 생성·스캔", "highlights": ["QR 생성", "중앙 로고", "카메라·사진 스캔", "PNG 저장"] },
+    "data-converter": { "title": "Table Converter", "shortTitle": "표 데이터 변환", "description": "CSV·JSON·HTML 표 데이터를 서로 변환하고 파일 또는 클립보드로 내보냅니다.", "eyebrow": "표 데이터", "highlights": ["CSV", "JSON", "HTML 표", "브라우저 변환"] }
+  }
+}
