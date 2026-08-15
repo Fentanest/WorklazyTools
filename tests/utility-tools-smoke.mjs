@@ -25,6 +25,14 @@ try {
   await page.goto(koBaseUrl, { waitUntil: "networkidle0" });
   const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
+  const homeFeedback = await page.$eval(".hero-feedback", (element) => ({
+    text: element.textContent || "",
+    href: element.querySelector("a")?.href || "",
+    target: element.querySelector("a")?.target || "",
+  }));
+  if (!homeFeedback.text.includes("기능 개선 제안이나 버그 문의") || !homeFeedback.href.endsWith("/Fentanest/WorklazyTools/issues") || homeFeedback.target !== "_blank") {
+    throw new Error(`Home GitHub Issues guidance is incomplete: ${JSON.stringify(homeFeedback)}`);
+  }
 
   await page.goto(`${koBaseUrl}/tools`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .tool-card").length === 17);

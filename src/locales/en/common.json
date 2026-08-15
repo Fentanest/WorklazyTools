@@ -49,6 +49,10 @@
     "description": "Handle documents, media, text, calculations and privacy tasks without installing software or signing in. Choose a tool and the work stays in your browser.",
     "browse": "Explore tools",
     "noUpload": "No work-file uploads",
+    "feedback": {
+      "description": "For feature suggestions or bug reports, please use GitHub Issues.",
+      "action": "Open GitHub Issues"
+    },
     "availableTitle": "Tools you can use now",
     "howTitle": "How your files are handled",
     "steps": {

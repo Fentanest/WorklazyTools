@@ -49,6 +49,10 @@
     "description": "문서와 미디어부터 텍스트·계산·보안 도구까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 고르면 나머지는 브라우저 안에서 안전하게 처리됩니다.",
     "browse": "도구 둘러보기",
     "noUpload": "작업 파일 업로드 없음",
+    "feedback": {
+      "description": "기능 개선 제안이나 버그 문의는 GitHub Issues를 이용해 주세요.",
+      "action": "GitHub Issues 열기"
+    },
     "availableTitle": "지금 바로 사용할 도구",
     "howTitle": "파일은 이렇게 처리됩니다",
     "steps": {

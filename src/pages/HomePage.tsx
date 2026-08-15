@@ -1,4 +1,4 @@
-import { ArrowRight, Download, FileUp, LockKeyhole, ScanSearch, Sparkles } from "lucide-react";
+import { ArrowRight, Download, ExternalLink, FileUp, LockKeyhole, MessageSquarePlus, ScanSearch, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +7,8 @@ import { ToolCard } from "../components/ToolCard";
 import { localizedPath } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
 import { useToolCatalog } from "../i18n/useToolCatalog";
+
+const GITHUB_ISSUES_URL = "https://github.com/Fentanest/WorklazyTools/issues";
 
 export function HomePage() {
   const { t } = useTranslation("common");
@@ -22,6 +24,11 @@ export function HomePage() {
           <div className="hero-actions">
             <Link className="primary-link" to={localizedPath(language, "/tools")}>{t("home.browse")} <ArrowRight size={18} /></Link>
             <div className="hero-trust"><LockKeyhole size={16} /> {t("home.noUpload")}</div>
+          </div>
+          <div className="hero-feedback">
+            <MessageSquarePlus size={17} />
+            <span>{t("home.feedback.description")}</span>
+            <a href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">{t("home.feedback.action")} <ExternalLink size={14} /></a>
           </div>
         </div>
       </section>
