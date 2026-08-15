@@ -40,6 +40,7 @@ import type {
   VideoOutputFormat,
   VideoOutputJob,
   VideoResolution,
+  VideoRotation,
   VideoTask,
   VideoWorkerInput,
   VideoWorkerOutput,
@@ -65,6 +66,7 @@ interface VideoItem {
   metadataSource?: "browser" | "ffmpeg";
   metadataError?: string;
   probing?: boolean;
+  frameRate?: number;
 }
 
 interface GroupSettings {
@@ -114,13 +116,14 @@ export function VideoStudioPage() {
   const [groupSettings, setGroupSettings] = useState<Record<VideoGroupId, GroupSettings>>(createGroupSettings);
   const [draggedId, setDraggedId] = useState<string>();
   const [fullscreenGroup, setFullscreenGroup] = useState<VideoGroupId>();
-  const [groupPlayheads, setGroupPlayheads] = useState<Record<VideoGroupId, number>>(() => createGroupValues(0));
   const [allGroupsOneFile, setAllGroupsOneFile] = useState(false);
   const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>("mp4");
   const [codec, setCodec] = useState<VideoCodec>("h264");
   const [resolution, setResolution] = useState<VideoResolution>(() => isLikelyMobileDevice() ? "1080" : "source");
   const [aspect, setAspect] = useState<VideoAspect>("source");
   const [crf, setCrf] = useState(23);
+  const [rotation, setRotation] = useState<VideoRotation>(0);
+  const [flipHorizontal, setFlipHorizontal] = useState(false);
   const [bitrate, setBitrate] = useState<VideoBitrate>("copy");
   const [customVideoBitrate, setCustomVideoBitrate] = useState("4.5");
   const [audioMode, setAudioMode] = useState<VideoAudioMode>("copy");
@@ -134,10 +137,13 @@ export function VideoStudioPage() {
   const [videoOutputs, setVideoOutputs] = useState<DownloadableVideoOutput[]>([]);
   const progress = useOperationProgress();
   const players = useRef<Record<string, HTMLVideoElement | null>>({});
+  const groupPlayheadInputs = useRef<Partial<Record<VideoGroupId, HTMLInputElement | null>>>({});
+  const groupPlayheadLabels = useRef<Partial<Record<VideoGroupId, HTMLElement | null>>>({});
   const groupContainers = useRef<Partial<Record<VideoGroupId, HTMLElement | null>>>({});
   const itemsRef = useRef<VideoItem[]>([]);
   const videoOutputsRef = useRef<DownloadableVideoOutput[]>([]);
   const syncing = useRef(false);
+  const expectedSeeks = useRef(new Map<string, number>());
   const activeController = useRef<AbortController | undefined>(undefined);
   const probeControllers = useRef(new Map<string, AbortController>());
   const audioHandoffChannels = useRef(new Set<BroadcastChannel>());
@@ -171,13 +177,14 @@ export function VideoStudioPage() {
     .filter((entry) => entry.items.length), [items]);
   const ready = items.length > 0 && items.every((item) => item.duration > 0 && item.end > item.start);
   const isVideoOutput = outputFormat === "mp4" || outputFormat === "mkv" || outputFormat === "webm";
-  const passthroughTransformConflict = isVideoOutput && bitrate === "copy" && (resolution !== "source" || aspect !== "source");
+  const passthroughTransformConflict = isVideoOutput && bitrate === "copy" && (resolution !== "source" || aspect !== "source" || rotation !== 0 || flipHorizontal);
   const passthroughConcatConflict = isVideoOutput && bitrate === "copy" && hasIncompatibleConcatDimensions(items, usedGroups, groupSettings, allGroupsOneFile);
   const passthroughConflict = passthroughTransformConflict || passthroughConcatConflict;
   const videoBitrateInvalid = isVideoOutput && bitrate === "custom" && !isNumberInRange(customVideoBitrate, 0.1, 200);
   const audioEncodingEnabled = (isVideoOutput && audioMode === "encode") || outputFormat === "mp3" || outputFormat === "aac";
   const audioBitrateInvalid = audioEncodingEnabled && audioBitrate === "custom" && !isIntegerInRange(customAudioBitrate, 32, 512);
-  const audioSampleRateInvalid = audioEncodingEnabled && audioSampleRate === "custom" && !isIntegerInRange(customAudioSampleRate, 8_000, 192_000);
+  const audioSampleRateMaximum = outputFormat === "aac" || (isVideoOutput && outputFormat !== "webm") ? 96_000 : 48_000;
+  const audioSampleRateInvalid = audioEncodingEnabled && audioSampleRate === "custom" && !isIntegerInRange(customAudioSampleRate, 8_000, audioSampleRateMaximum);
   const outputSettingsInvalid = videoBitrateInvalid || audioBitrateInvalid || audioSampleRateInvalid;
   const outputCount = allGroupsOneFile
     ? (items.length ? 1 : 0)
@@ -207,13 +214,14 @@ export function VideoStudioPage() {
     });
     setItems(next);
     setActiveId((current) => next.some((item) => item.id === current) ? current : next[0]?.id);
-    const largeFiles = unique.filter((file) => file.size > MAX_SAFE_BROWSER_OUTPUT_BYTES);
+    const incomingFiles = unique.filter((file) => !existing.has(fileKey(file)));
+    const largeFiles = incomingFiles.filter((file) => file.size > MAX_SAFE_BROWSER_OUTPUT_BYTES);
     const rejected = nextFiles.filter((file) => !supported.includes(file));
-    setLastResult(rejected.length
-      ? L(`지원하지 않는 파일을 제외했습니다: ${rejected.map((file) => file.name).join(", ")}`, `Unsupported files were skipped: ${rejected.map((file) => file.name).join(", ")}`)
-      : largeFiles.length
-        ? L(`${largeFiles.map((file) => `${file.name} (${formatBytes(file.size)})`).join(", ")}은 원본을 메모리에 통째로 복사하지 않고 연결했습니다. 원본 그대로 복사(패스스루)한 결과가 너무 크면 출력 전에 구간 축소 안내가 표시됩니다.`, `${largeFiles.map((file) => `${file.name} (${formatBytes(file.size)})`).join(", ")} were attached without copying the entire source into memory. If a passthrough result is too large, you will be asked to shorten the range before export.`)
-        : "");
+    const notices = [
+      rejected.length ? L(`지원하지 않는 파일을 제외했습니다: ${rejected.map((file) => file.name).join(", ")}`, `Unsupported files were skipped: ${rejected.map((file) => file.name).join(", ")}`) : "",
+      largeFiles.length ? L(`${largeFiles.map((file) => `${file.name} (${formatBytes(file.size)})`).join(", ")}은 원본을 메모리에 통째로 복사하지 않고 연결했습니다. 원본 그대로 복사(패스스루)한 결과가 너무 크면 출력 전에 구간 축소 안내가 표시됩니다.`, `${largeFiles.map((file) => `${file.name} (${formatBytes(file.size)})`).join(", ")} were attached without copying the entire source into memory. If a passthrough result is too large, you will be asked to shorten the range before export.`) : "",
+    ].filter(Boolean);
+    setLastResult(notices.join(" "));
     progress.reset();
   };
 
@@ -234,7 +242,7 @@ export function VideoStudioPage() {
 
   const probeItem = async (itemId: string) => {
     const item = itemsRef.current.find((candidate) => candidate.id === itemId);
-    if (!item || item.duration > 0 || probeControllers.current.has(itemId)) return;
+    if (!item || (Number.isFinite(item.duration) && item.duration > 0) || probeControllers.current.has(itemId)) return;
     const controller = new AbortController();
     probeControllers.current.set(itemId, controller);
     updateItem(itemId, { probing: true, metadataError: undefined });
@@ -296,7 +304,11 @@ export function VideoStudioPage() {
       await Promise.all(itemsRef.current.map(async (item) => {
         const player = players.current[item.id];
         if (!player || item.id === sourceId || item.group !== sourceItem.group) return;
-        player.currentTime = Math.min(source.currentTime, Number.isFinite(player.duration) ? player.duration : source.currentTime);
+        const targetTime = Math.min(source.currentTime, Number.isFinite(player.duration) ? player.duration : source.currentTime);
+        if (Math.abs(player.currentTime - targetTime) >= 0.05) {
+          expectedSeeks.current.set(item.id, targetTime);
+          player.currentTime = targetTime;
+        }
         if (action === "play") await player.play().catch(() => undefined);
         if (action === "pause") player.pause();
       }));
@@ -305,10 +317,21 @@ export function VideoStudioPage() {
     }
   };
 
+  const handlePlayerSeeked = (item: VideoItem) => {
+    const player = players.current[item.id];
+    const expected = expectedSeeks.current.get(item.id);
+    if (player && expected !== undefined && Math.abs(player.currentTime - expected) < 0.05) {
+      expectedSeeks.current.delete(item.id);
+      return;
+    }
+    expectedSeeks.current.delete(item.id);
+    void synchronizePlayers(item.id, "seek");
+  };
+
   const seekItem = (item: VideoItem, value: number) => {
     const player = players.current[item.id];
     if (player) player.currentTime = value;
-    setGroupPlayheads((current) => ({ ...current, [item.group]: value }));
+    updateGroupPlayhead(item.group, value, groupPlayheadInputs, groupPlayheadLabels);
     void synchronizePlayers(item.id, "seek");
   };
 
@@ -335,10 +358,14 @@ export function VideoStudioPage() {
   };
 
   const seekGroup = (group: VideoGroupId, value: number) => {
-    setGroupPlayheads((current) => ({ ...current, [group]: value }));
+    updateGroupPlayhead(group, value, groupPlayheadInputs, groupPlayheadLabels);
     itemsRef.current.filter((item) => item.group === group).forEach((item) => {
       const player = players.current[item.id];
-      if (player) player.currentTime = Math.min(value, item.duration);
+      if (player) {
+        const target = Math.min(value, item.duration);
+        expectedSeeks.current.set(item.id, target);
+        player.currentTime = target;
+      }
     });
   };
 
@@ -475,7 +502,7 @@ export function VideoStudioPage() {
     if (!ready || !validateSegments(items) || passthroughConflict) return;
     if (outputSettingsInvalid) {
       progress.start(L("직접입력 값을 확인하는 중…", "Checking custom values…"));
-      progress.fail(L("영상 비트레이트는 0.1~200 Mbps, 오디오 비트레이트는 32~512 kbps, 샘플레이트는 8,000~192,000 Hz 범위로 입력해 주세요.", "Enter video bitrate from 0.1–200 Mbps, audio bitrate from 32–512 kbps, and sample rate from 8,000–192,000 Hz."));
+      progress.fail(L(`영상 비트레이트는 0.1~200 Mbps, 오디오 비트레이트는 32~512 kbps, 샘플레이트는 8,000~${audioSampleRateMaximum.toLocaleString()} Hz 범위로 입력해 주세요.`, `Enter video bitrate from 0.1–200 Mbps, audio bitrate from 32–512 kbps, and sample rate from 8,000–${audioSampleRateMaximum.toLocaleString()} Hz.`));
       return;
     }
     const task = createTask({
@@ -484,6 +511,8 @@ export function VideoStudioPage() {
       resolution,
       aspect,
       crf,
+      rotation,
+      flipHorizontal,
       bitrate,
       customVideoBitrate,
       audioMode,
@@ -603,8 +632,8 @@ export function VideoStudioPage() {
                     <div className="video-group-master-controls">
                       <button type="button" aria-label={L(`그룹 ${group} 함께 재생`, `Play group ${group} together`)} onClick={() => void playGroup(group)}><Play size={15} /></button>
                       <button type="button" aria-label={L(`그룹 ${group} 함께 정지`, `Pause group ${group} together`)} onClick={() => pauseGroup(group)}><Pause size={15} /></button>
-                      <input type="range" min={0} max={groupDuration} step="0.01" value={Math.min(groupPlayheads[group], groupDuration)} aria-label={L(`그룹 ${group} 공통 재생 위치`, `Group ${group} playhead`)} onChange={(event) => seekGroup(group, Number(event.target.value))} />
-                      <b>{formatTime(groupPlayheads[group])}</b>
+                      <input ref={(element) => { groupPlayheadInputs.current[group] = element; }} type="range" min={0} max={groupDuration} step="0.01" defaultValue={0} aria-label={L(`그룹 ${group} 공통 재생 위치`, `Group ${group} playhead`)} onChange={(event) => seekGroup(group, Number(event.target.value))} />
+                      <b ref={(element) => { groupPlayheadLabels.current[group] = element; }}>{formatTime(0)}</b>
                       <label><Volume2 size={14} /><span>{L("소리", "Audio")}</span><select value={audioItemId} onChange={(event) => updateGroup(group, { audioItemId: event.target.value })}>{groupItems.map((item, index) => <option value={item.id} key={item.id}>{index + 1}. {item.file.name}</option>)}</select></label>
                     </div>
                   )}
@@ -635,6 +664,10 @@ export function VideoStudioPage() {
                             preload="metadata"
                             onLoadedMetadata={(event) => {
                               const duration = event.currentTarget.duration;
+                              if (!Number.isFinite(duration) || duration <= 0) {
+                                void probeItem(item.id);
+                                return;
+                              }
                               probeControllers.current.get(item.id)?.abort();
                               probeControllers.current.delete(item.id);
                               updateItem(item.id, { duration, width: event.currentTarget.videoWidth, height: event.currentTarget.videoHeight, end: item.end || duration, metadataSource: "browser", probing: false, metadataError: undefined });
@@ -642,11 +675,25 @@ export function VideoStudioPage() {
                             onError={() => void probeItem(item.id)}
                             onPlay={() => void synchronizePlayers(item.id, "play")}
                             onPause={() => void synchronizePlayers(item.id, "pause")}
-                            onSeeked={() => void synchronizePlayers(item.id, "seek")}
+                            onSeeked={() => handlePlayerSeeked(item)}
                             onTimeUpdate={(event) => {
+                              if (event.currentTarget.currentTime >= item.end - 0.01 && !event.currentTarget.paused) {
+                                event.currentTarget.pause();
+                                event.currentTarget.currentTime = item.end;
+                              }
                               if (audioItemId === item.id) {
                                 const currentTime = event.currentTarget.currentTime;
-                                setGroupPlayheads((current) => ({ ...current, [group]: currentTime }));
+                                updateGroupPlayhead(group, currentTime, groupPlayheadInputs, groupPlayheadLabels);
+                                if (settings.sync) {
+                                  groupItems.forEach((target) => {
+                                    if (target.id === item.id) return;
+                                    const player = players.current[target.id];
+                                    if (!player || Math.abs(player.currentTime - currentTime) <= 0.15) return;
+                                    const expected = Math.min(currentTime, target.duration);
+                                    expectedSeeks.current.set(target.id, expected);
+                                    player.currentTime = expected;
+                                  });
+                                }
                               }
                             }}
                           />
@@ -680,14 +727,16 @@ export function VideoStudioPage() {
                           <input aria-label={L(`${item.file.name} 종료 지점`, `${item.file.name} end time`)} type="range" min={0} max={item.duration} step="0.01" value={item.end} onChange={(event) => { const value = Math.max(Number(event.target.value), item.start + 0.05); updateItem(item.id, { end: value }); seekItem(item, value); }} />
                         </div>
                         <div className="video-range-values">
-                          <label><span>{L("시작", "Start")}</span><input type="number" min={0} max={item.end} step="0.1" value={item.start.toFixed(1)} onChange={(event) => updateItem(item.id, { start: Math.max(0, Math.min(Number(event.target.value), item.end - 0.05)) })} /></label>
+                          <label><span>{L("시작", "Start")}</span><TrimNumberInput value={item.start} min={0} max={item.end - 0.05} onCommit={(value) => updateItem(item.id, { start: value })} /></label>
                           <small>{L("선택 구간", "Selection")} {formatTime(item.end - item.start)}</small>
-                          <label><span>{L("종료", "End")}</span><input type="number" min={item.start} max={item.duration} step="0.1" value={item.end.toFixed(1)} onChange={(event) => updateItem(item.id, { end: Math.min(item.duration, Math.max(Number(event.target.value), item.start + 0.05)) })} /></label>
+                          <label><span>{L("종료", "End")}</span><TrimNumberInput value={item.end} min={item.start + 0.05} max={item.duration} onCommit={(value) => updateItem(item.id, { end: value })} /></label>
                         </div>
                         <div className="trim-play-buttons">
                           <button type="button" className="secondary-button small" onClick={() => setBoundaryFromPlayer(item, "start")}><Timer size={14} /> {L("현재 위치→시작", "Current → start")}</button>
                           <button type="button" className="secondary-button small" onClick={() => setBoundaryFromPlayer(item, "end")}><Timer size={14} /> {L("현재 위치→종료", "Current → end")}</button>
                           <button type="button" className="secondary-button small" onClick={() => { const player = players.current[item.id]; if (player) { player.currentTime = item.start; void player.play(); } }}><Play size={14} /> {L("구간 재생", "Play range")}</button>
+                          <button type="button" className="secondary-button small" onClick={() => seekItem(item, Math.max(0, (players.current[item.id]?.currentTime ?? item.start) - 0.1))}>−0.1s</button>
+                          <button type="button" className="secondary-button small" onClick={() => seekItem(item, Math.min(item.duration, (players.current[item.id]?.currentTime ?? item.start) + 0.1))}>+0.1s</button>
                           {groupItems.length > 1 && <button type="button" className="secondary-button small" onClick={() => applyRangeToGroup(item)}>{L("이 구간을 그룹 전체에 적용", "Apply range to entire group")}</button>}
                         </div>
                       </div>
@@ -715,12 +764,16 @@ export function VideoStudioPage() {
               resolution={resolution}
               aspect={aspect}
               crf={crf}
+              rotation={rotation}
+              flipHorizontal={flipHorizontal}
               bitrate={bitrate}
               customBitrate={customVideoBitrate}
               onCodec={setCodec}
               onResolution={setResolution}
               onAspect={setAspect}
               onCrf={setCrf}
+              onRotation={setRotation}
+              onFlipHorizontal={setFlipHorizontal}
               onBitrate={setBitrate}
               onCustomBitrate={setCustomVideoBitrate}
               language={language}
@@ -730,6 +783,7 @@ export function VideoStudioPage() {
           {outputFormat === "gif" && <div className="quick-tool-settings"><label><span>{L("GIF 초당 프레임", "GIF frame rate")}</span><select value={gifFps} onChange={(event) => setGifFps(Number(event.target.value) as 10 | 12 | 15 | 20)}><option value={10}>10 fps · {L("작은 용량", "smaller")}</option><option value={12}>12 fps · {L("권장", "recommended")}</option><option value={15}>15 fps</option><option value={20}>20 fps · {L("부드럽게", "smoother")}</option></select></label><label><span>{L("최대 가로 크기", "Maximum width")}</span><select value={gifWidth} onChange={(event) => setGifWidth(Number(event.target.value) as 480 | 720 | 1080)}><option value={480}>480px</option><option value={720}>720px · {L("권장", "recommended")}</option><option value={1080}>1080px</option></select></label></div>}
           {isVideoOutput && (
             <AudioTrackSettings
+              container={outputFormat}
               mode={audioMode}
               bitrate={audioBitrate}
               customBitrate={customAudioBitrate}
@@ -745,6 +799,7 @@ export function VideoStudioPage() {
           )}
           {(outputFormat === "mp3" || outputFormat === "aac") && (
             <AudioEncodingFields
+              codec={outputFormat === "mp3" ? "mp3" : "aac"}
               bitrate={audioBitrate}
               customBitrate={customAudioBitrate}
               sampleRate={audioSampleRate}
@@ -774,6 +829,7 @@ export function VideoStudioPage() {
               : usedGroups.map(({ group, items: groupItems }) => <p key={group}><strong>{L("그룹", "Group")} {group}</strong><span>{groupSettings[group].outputMode === "concat" ? L(`${groupItems.length}개 영상을 순서대로 이어붙이기`, `Concatenate ${groupItems.length} videos in order`) : L(`${groupItems.length}개 영상을 각각 출력`, `Export ${groupItems.length} videos individually`)}</span><b>{groupSettings[group].outputMode === "concat" ? 1 : groupItems.length}</b></p>)}
           </div>
           <div className="section-actions"><PrimaryButton accent="pink" disabled={!ready || passthroughConflict || outputSettingsInvalid} loading={progress.status === "running"} onClick={() => void outputAction()}><Download size={18} /> {L(`설정대로 ${outputCount}개 결과 만들기`, `Create ${outputCount} results`)}</PrimaryButton></div>
+          {!ready && <div className="inline-warning error"><AlertTriangle size={17} /><span>{L(`재생 정보를 확인하지 못한 파일이 있어 출력을 시작할 수 없습니다: ${items.filter((item) => !(item.duration > 0 && item.end > item.start)).map((item) => item.file.name).join(", ")}`, `Export is blocked because metadata is unavailable for: ${items.filter((item) => !(item.duration > 0 && item.end > item.start)).map((item) => item.file.name).join(", ")}`)}</span></div>}
         </SectionCard>
       )}
 
@@ -855,37 +911,57 @@ export function VideoStudioPage() {
   );
 }
 
-function EncodingSettings({ container, codec, resolution, aspect, crf, bitrate, customBitrate, onCodec, onResolution, onAspect, onCrf, onBitrate, onCustomBitrate, language }: {
+function TrimNumberInput({ value, min, max, onCommit }: { value: number; min: number; max: number; onCommit: (value: number) => void }) {
+  const [draft, setDraft] = useState(() => value.toFixed(2));
+  useEffect(() => setDraft(value.toFixed(2)), [value]);
+  const commit = () => {
+    const parsed = Number(draft);
+    const next = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : value;
+    setDraft(next.toFixed(2));
+    onCommit(next);
+  };
+  return <input type="number" min={min} max={max} step="0.01" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") { setDraft(value.toFixed(2)); event.currentTarget.blur(); } }} />;
+}
+
+function EncodingSettings({ container, codec, resolution, aspect, crf, rotation, flipHorizontal, bitrate, customBitrate, onCodec, onResolution, onAspect, onCrf, onRotation, onFlipHorizontal, onBitrate, onCustomBitrate, language }: {
   container: "mp4" | "mkv" | "webm";
   codec: VideoCodec;
   resolution: VideoResolution;
   aspect: VideoAspect;
   crf: number;
+  rotation: VideoRotation;
+  flipHorizontal: boolean;
   bitrate: VideoBitrate;
   customBitrate: string;
   onCodec: (value: VideoCodec) => void;
   onResolution: (value: VideoResolution) => void;
   onAspect: (value: VideoAspect) => void;
   onCrf: (value: number) => void;
+  onRotation: (value: VideoRotation) => void;
+  onFlipHorizontal: (value: boolean) => void;
   onBitrate: (value: VideoBitrate) => void;
   onCustomBitrate: (value: string) => void;
   language: AppLanguage;
 }) {
   const L = (ko: string, en: string) => language === "ko" ? ko : en;
   const passthrough = bitrate === "copy";
+  const crfMode = bitrate === "0" || codec === "vp9";
   return (
     <div className="encoding-grid">
       <label><span>{L("영상 압축 방식(코덱)", "Video codec")}</span><select value={codec} disabled={passthrough} onChange={(event) => onCodec(event.target.value as VideoCodec)}><option value="h264" disabled={container === "webm"}>H.264</option><option value="hevc" disabled={container === "webm"}>HEVC · {L("지원 시", "when supported")}</option><option value="vp9">VP9</option></select></label>
       <label><span>{L("해상도 일괄 변경", "Resize all videos")}</span><select value={resolution} disabled={passthrough} onChange={(event) => onResolution(event.target.value as VideoResolution)}><option value="source">{L("변경 안 함", "Keep source")}</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option></select></label>
       <label><span>{L("화면 비율", "Aspect ratio")}</span><select value={aspect} disabled={passthrough} onChange={(event) => onAspect(event.target.value as VideoAspect)}><option value="source">{L("원본 비율 유지", "Keep source ratio")}</option><option value="9:16">9:16 {L("세로", "portrait")}</option><option value="1:1">1:1 {L("정사각형", "square")}</option><option value="16:9">16:9 {L("가로", "landscape")}</option></select></label>
-      <label><span>{L("영상 처리 방식·용량 기준", "Video processing & size target")}</span><select value={bitrate} onChange={(event) => onBitrate(event.target.value as VideoBitrate)}><option value="copy">{L("원본 그대로 복사(패스스루)", "Copy source (passthrough)")}</option><option value="0">{L("화질 기준 자동 용량 조절(CRF)", "Quality-based size (CRF)")}</option><option value="2M">2 Mbps</option><option value="5M">5 Mbps</option><option value="8M">8 Mbps</option><option value="custom">{L("직접입력", "Custom")}</option></select></label>
+      <label><span>{L("회전", "Rotation")}</span><select value={rotation} disabled={passthrough} onChange={(event) => onRotation(Number(event.target.value) as VideoRotation)}><option value={0}>{L("회전 안 함", "No rotation")}</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option></select></label>
+      <ToggleRow label={L("좌우 반전", "Flip horizontally")} checked={flipHorizontal} onChange={onFlipHorizontal} disabled={passthrough} />
+      <label className="video-bitrate-control"><span>{L("영상 처리 방식·용량 기준", "Video processing & size target")}</span><select value={bitrate} onChange={(event) => onBitrate(event.target.value as VideoBitrate)}><option value="copy">{L("원본 그대로 복사(패스스루)", "Copy source (passthrough)")}</option><option value="0">{L("화질 기준 자동 용량 조절(CRF)", "Quality-based size (CRF)")}</option><option value="2M">2 Mbps</option><option value="5M">5 Mbps</option><option value="8M">8 Mbps</option><option value="custom">{L("직접입력", "Custom")}</option></select></label>
       {bitrate === "custom" && <label className={`custom-encoding-input${isNumberInRange(customBitrate, 0.1, 200) ? "" : " invalid"}`}><span>{L("영상 비트레이트 직접입력", "Custom video bitrate")}</span><span className="unit-input"><input aria-label={L("영상 비트레이트 직접입력", "Custom video bitrate")} type="number" min={0.1} max={200} step={0.1} inputMode="decimal" value={customBitrate} onChange={(event) => onCustomBitrate(event.target.value)} /><b>Mbps</b></span><small>0.1~200 Mbps</small></label>}
-      <label className="crf-control"><span>{L("화질 기준(CRF)", "Quality (CRF)")} <b>{crf}</b></span><input type="range" min={18} max={32} value={crf} disabled={passthrough} onChange={(event) => onCrf(Number(event.target.value))} /><small>{L("값이 낮을수록 더 선명하고 파일이 커집니다.", "Lower values are sharper and produce larger files.")}</small></label>
+      <label className="crf-control"><span>{L("화질 기준(CRF)", "Quality (CRF)")} <b>{crf}</b></span><input type="range" min={18} max={32} value={crf} disabled={!crfMode} onChange={(event) => onCrf(Number(event.target.value))} /><small>{crfMode ? L("값이 낮을수록 더 선명하고 파일이 커집니다.", "Lower values are sharper and produce larger files.") : L("지정 비트레이트 모드에서는 CRF 대신 목표 비트레이트를 사용합니다.", "Target-bitrate mode uses the selected bitrate instead of CRF.")}</small></label>
     </div>
   );
 }
 
 function AudioTrackSettings(props: {
+  container: "mp4" | "mkv" | "webm";
   mode: VideoAudioMode;
   bitrate: VideoAudioBitrate;
   customBitrate: string;
@@ -912,12 +988,12 @@ function AudioTrackSettings(props: {
         onChange={props.onMode}
         label={L("영상 속 음성 처리 방식", "Video audio mode")}
       />
-      {props.mode === "encode" && <AudioEncodingFields {...props} />}
+      {props.mode === "encode" && <AudioEncodingFields {...props} codec={props.container === "webm" ? "opus" : "aac"} />}
     </div>
   );
 }
 
-function AudioEncodingFields({ bitrate, customBitrate, sampleRate, customSampleRate, onBitrate, onCustomBitrate, onSampleRate, onCustomSampleRate, language }: {
+function AudioEncodingFields({ bitrate, customBitrate, sampleRate, customSampleRate, onBitrate, onCustomBitrate, onSampleRate, onCustomSampleRate, codec, language }: {
   bitrate: VideoAudioBitrate;
   customBitrate: string;
   sampleRate: VideoAudioSampleRate;
@@ -926,15 +1002,17 @@ function AudioEncodingFields({ bitrate, customBitrate, sampleRate, customSampleR
   onCustomBitrate: (value: string) => void;
   onSampleRate: (value: VideoAudioSampleRate) => void;
   onCustomSampleRate: (value: string) => void;
+  codec: "aac" | "mp3" | "opus";
   language: AppLanguage;
 }) {
   const L = (ko: string, en: string) => language === "ko" ? ko : en;
+  const maximumSampleRate = codec === "aac" ? 96_000 : 48_000;
   return (
     <div className="quick-tool-settings audio-encoding-fields">
       <label><span>{L("음질·용량(비트레이트)", "Audio quality & size (bitrate)")}</span><select value={bitrate} onChange={(event) => onBitrate(event.target.value as VideoAudioBitrate)}><option value="128k">128 kbps</option><option value="192k">192 kbps · {L("권장", "recommended")}</option><option value="256k">256 kbps</option><option value="320k">320 kbps</option><option value="custom">{L("직접입력", "Custom")}</option></select></label>
       {bitrate === "custom" && <label className={isIntegerInRange(customBitrate, 32, 512) ? "" : "invalid"}><span>{L("오디오 비트레이트 직접입력", "Custom audio bitrate")}</span><span className="unit-input"><input aria-label={L("오디오 비트레이트 직접입력", "Custom audio bitrate")} type="number" min={32} max={512} step={1} inputMode="numeric" value={customBitrate} onChange={(event) => onCustomBitrate(event.target.value)} /><b>kbps</b></span><small>32~512 kbps</small></label>}
-      <label><span>{L("초당 음성 표본 수(샘플레이트)", "Audio sample rate")}</span><select value={sampleRate} onChange={(event) => onSampleRate(event.target.value as VideoAudioSampleRate)}><option value="source">{L("원본 유지", "Keep source")}</option><option value="44100">44,100 Hz</option><option value="48000">48,000 Hz · {L("권장", "recommended")}</option><option value="custom">{L("직접입력", "Custom")}</option></select></label>
-      {sampleRate === "custom" && <label className={isIntegerInRange(customSampleRate, 8_000, 192_000) ? "" : "invalid"}><span>{L("샘플레이트 직접입력", "Custom sample rate")}</span><span className="unit-input"><input aria-label={L("오디오 샘플레이트 직접입력", "Custom sample rate")} type="number" min={8000} max={192000} step={100} inputMode="numeric" value={customSampleRate} onChange={(event) => onCustomSampleRate(event.target.value)} /><b>Hz</b></span><small>8,000~192,000 Hz</small></label>}
+      <label><span>{L("초당 음성 표본 수(샘플레이트)", "Audio sample rate")}</span><select value={sampleRate} onChange={(event) => onSampleRate(event.target.value as VideoAudioSampleRate)}><option value="source">{L("원본 유지", "Keep source")}</option>{codec !== "opus" && <option value="44100">44,100 Hz</option>}<option value="48000">48,000 Hz · {L("권장", "recommended")}</option><option value="custom">{L("직접입력", "Custom")}</option></select></label>
+      {sampleRate === "custom" && <label className={isIntegerInRange(customSampleRate, 8_000, maximumSampleRate) ? "" : "invalid"}><span>{L("샘플레이트 직접입력", "Custom sample rate")}</span><span className="unit-input"><input aria-label={L("오디오 샘플레이트 직접입력", "Custom sample rate")} type="number" min={8000} max={maximumSampleRate} step={100} inputMode="numeric" value={customSampleRate} onChange={(event) => onCustomSampleRate(event.target.value)} /><b>Hz</b></span><small>8,000~{maximumSampleRate.toLocaleString()} Hz{codec === "opus" ? L(" · Opus는 지원값으로 자동 보정", " · snapped to an Opus-supported rate") : ""}</small></label>}
     </div>
   );
 }
@@ -945,6 +1023,8 @@ function createTask(settings: {
   resolution: VideoResolution;
   aspect: VideoAspect;
   crf: number;
+  rotation: VideoRotation;
+  flipHorizontal: boolean;
   bitrate: VideoBitrate;
   customVideoBitrate: string;
   audioMode: VideoAudioMode;
@@ -975,6 +1055,8 @@ function createTask(settings: {
     audioMode: settings.audioMode,
     audioBitrate: resolvedAudioBitrate,
     audioSampleRate: resolvedSampleRate,
+    rotation: settings.rotation,
+    flipHorizontal: settings.flipHorizontal,
   };
 }
 
@@ -994,7 +1076,7 @@ function createJobEntries(
 }
 
 function toWorkerInput(item: VideoItem): VideoWorkerInput {
-  return { fileName: item.file.name, file: item.file, duration: item.duration, width: item.width, height: item.height, start: item.start, end: item.end };
+  return { fileName: item.file.name, file: item.file, fileSize: item.file.size, duration: item.duration, width: item.width, height: item.height, start: item.start, end: item.end };
 }
 
 function estimatePassthroughBytes(job: VideoJobEntry) {
@@ -1018,8 +1100,16 @@ function createGroupSettings() {
   return Object.fromEntries(GROUP_IDS.map((group) => [group, { sync: false, outputMode: "individual" as GroupOutputMode }])) as Record<VideoGroupId, GroupSettings>;
 }
 
-function createGroupValues<T>(value: T) {
-  return Object.fromEntries(GROUP_IDS.map((group) => [group, value])) as Record<VideoGroupId, T>;
+function updateGroupPlayhead(
+  group: VideoGroupId,
+  value: number,
+  inputs: { current: Partial<Record<VideoGroupId, HTMLInputElement | null>> },
+  labels: { current: Partial<Record<VideoGroupId, HTMLElement | null>> },
+) {
+  const input = inputs.current[group];
+  if (input) input.value = String(Math.min(Number(input.max) || value, value));
+  const label = labels.current[group];
+  if (label) label.textContent = formatTime(value);
 }
 
 function createId() { return globalThis.crypto?.randomUUID?.() || `video-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -1057,7 +1147,7 @@ function formatTime(seconds: number) {
 function downloadBuffer(buffer: ArrayBuffer, mimeType: string, fileName: string) {
   const url = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
   triggerDownloadUrl(url, fileName);
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.setTimeout(() => URL.revokeObjectURL(url), 15_000);
 }
 
 function triggerDownloadUrl(url: string, fileName: string) {

@@ -10,24 +10,26 @@ const coreURL = new URL("single/ffmpeg-core.js", runtimeBaseURL).href;
 const wasmURL = new URL("single/ffmpeg-core.wasm", runtimeBaseURL).href;
 const classWorkerURL = new URL("ffmpeg-worker.js", runtimeBaseURL).href;
 let currentLanguage: "ko" | "en" = "ko";
+let currentRequestId = "";
+let sharedFfmpeg: FFmpeg | undefined;
+let ffmpegLoadPromise: Promise<FFmpeg> | undefined;
 
-worker.onmessage = async (event: MessageEvent<AudioProcessorRequest>) => {
+worker.onmessage = async (event: MessageEvent<AudioProcessorRequest & { requestId?: string }>) => {
   try {
     const request = event.data;
+    currentRequestId = request.requestId || "";
     currentLanguage = request.language === "en" ? "en" : "ko";
     validateDocument(request);
-    progress(5, describeCommand(request.command));
+    progressKey(5, commandProgressKey(request.command));
     const result = await processRequest(request);
     const transfer: Transferable[] = [];
     result.channels?.forEach((channel) => transfer.push(channel.buffer));
     result.clipboard?.channels.forEach((channel) => transfer.push(channel.buffer));
     if (result.output) transfer.push(result.output.buffer);
     progress(100, local("오디오 작업 완료", "Audio operation complete"));
-    worker.postMessage({ type: "result", result }, transfer);
+    worker.postMessage({ type: "result", requestId: currentRequestId, result }, transfer);
   } catch (error) {
-    worker.postMessage({ type: "error", error: normalizeError(error) });
-  } finally {
-    worker.close();
+    worker.postMessage({ type: "error", requestId: currentRequestId, error: normalizeError(error) });
   }
 };
 
@@ -41,16 +43,19 @@ async function processRequest(request: AudioProcessorRequest): Promise<AudioProc
 
   if (command === "EXPORT_WAV" || command === "EXPORT_MP3") {
     progress(18, command === "EXPORT_WAV" ? local("WAV 데이터를 인코딩하는 중…", "Encoding WAV data…") : local("MP3 인코딩 입력을 준비하는 중…", "Preparing MP3 encoding input…"));
-    const wav = encodeWav(document.channels, document.sampleRate);
+    const exportChannels = request.exportSelection
+      ? (() => { const [start, end] = selectionSamples(request); return document.channels.map((channel) => channel.slice(start, end)); })()
+      : document.channels;
+    const exportLength = exportChannels[0]?.length || 0;
+    const wav = encodeWav(exportChannels, document.sampleRate);
     if (command === "EXPORT_WAV") {
-      const buffer = exactBuffer(wav);
       return {
-        length: document.length,
-        duration: document.length / document.sampleRate,
-        output: { buffer, fileName: request.fileName || "worklazy-audio.wav", mimeType: "audio/wav" },
+        length: exportLength,
+        duration: exportLength / document.sampleRate,
+        output: { buffer: wav.buffer, fileName: request.fileName || "worklazy-audio.wav", mimeType: "audio/wav" },
       };
     }
-    return encodeMp3(wav, document.length, document.sampleRate, request.fileName || "worklazy-audio.mp3", request.bitrate || 192);
+    return encodeMp3(wav, exportLength, document.sampleRate, request.fileName || "worklazy-audio.mp3", request.bitrate || 192, exportChannels.length);
   }
 
   if (command === "PREVIEW") {
@@ -99,7 +104,7 @@ async function processRequest(request: AudioProcessorRequest): Promise<AudioProc
   } else if (command === "CUT") {
     clipboard = createClipboard(document.channels, document.sampleRate, start, end);
     channels = document.channels.map((channel) => removeSamples(channel, start, end));
-  } else {
+  } else if (command === "PASTE") {
     if (!request.clipboard?.channels.length || request.clipboard.sampleRate !== document.sampleRate) {
       throw new Error(local("붙여넣을 오디오 클립이 없거나 샘플레이트가 다릅니다.", "The audio clipboard is empty or its sample rate differs."));
     }
@@ -109,6 +114,20 @@ async function processRequest(request: AudioProcessorRequest): Promise<AudioProc
       request.clipboard?.channels[channelIndex] || request.clipboard?.channels[0],
       cursor,
     ));
+  } else if (command === "TRIM") {
+    channels = document.channels.map((channel) => channel.slice(start, end));
+  } else if (command === "FADE_IN" || command === "FADE_OUT") {
+    channels = document.channels.map((channel) => applyGainRamp(channel, start, end, command === "FADE_IN"));
+  } else if (command === "GAIN") {
+    const gain = Number.isFinite(request.gain) ? Math.max(0, Math.min(4, request.gain || 0)) : 1;
+    channels = document.channels.map((channel) => applyGain(channel, start, end, gain));
+  } else if (command === "NORMALIZE") {
+    let peak = 0;
+    document.channels.forEach((channel) => { for (let index = start; index < end; index += 1) peak = Math.max(peak, Math.abs(channel[index] || 0)); });
+    const gain = peak > 0 ? Math.min(16, 0.98 / peak) : 1;
+    channels = document.channels.map((channel) => applyGain(channel, start, end, gain));
+  } else {
+    throw new Error(local("지원하지 않는 오디오 편집 명령입니다.", "Unsupported audio edit command."));
   }
 
   const length = channels[0]?.length || 0;
@@ -129,23 +148,17 @@ async function createVoiceEffect(channels: Float32Array[], sampleRate: number, e
 }
 
 async function pitchShiftWithFfmpeg(channels: Float32Array[], sampleRate: number, semitones: number) {
-  const ffmpeg = new FFmpeg();
-  const inputName = "worklazy-voice-input.wav";
+  const ffmpeg = await getFfmpeg();
+  const inputName = "worklazy-voice-input.f32le";
   const outputName = "worklazy-voice-output.f32le";
   const ratio = 2 ** (semitones / 12);
   const shiftedRate = Math.max(1, Math.round(sampleRate * ratio));
   const tempo = 1 / ratio;
-  ffmpeg.on("progress", ({ progress: ratioValue }) => {
-    const normalized = Math.max(0, Math.min(1, Number.isFinite(ratioValue) ? ratioValue : 0));
-    progress(35 + Math.round(normalized * 42), `${local("피치를 변환하는 중…", "Shifting pitch…")} ${Math.round(normalized * 100)}%`);
-  });
   try {
-    progress(18, local("자체 호스팅 음성 효과 엔진을 불러오는 중…", "Loading the self-hosted voice-effects engine…"));
-    await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
-    await ffmpeg.writeFile(inputName, encodeWav(channels, sampleRate));
+    await ffmpeg.writeFile(inputName, interleaveFloat32(channels));
     const filter = `asetrate=${shiftedRate},aresample=${sampleRate},atempo=${tempo.toFixed(8)}`;
     const exitCode = await ffmpeg.exec([
-      "-i", inputName,
+      "-f", "f32le", "-ar", String(sampleRate), "-ac", String(channels.length), "-i", inputName,
       "-af", filter,
       "-ac", String(channels.length),
       "-ar", String(sampleRate),
@@ -161,7 +174,6 @@ async function pitchShiftWithFfmpeg(channels: Float32Array[], sampleRate: number
   } finally {
     await ffmpeg.deleteFile(inputName).catch(() => undefined);
     await ffmpeg.deleteFile(outputName).catch(() => undefined);
-    ffmpeg.terminate();
   }
 }
 
@@ -219,20 +231,14 @@ function replaceWithCrossfade(source: Float32Array, effect: Float32Array, start:
   return output;
 }
 
-async function encodeMp3(wav: Uint8Array, length: number, sampleRate: number, fileName: string, bitrate: number): Promise<AudioProcessorResult> {
-  const ffmpeg = new FFmpeg();
+async function encodeMp3(wav: Uint8Array, length: number, sampleRate: number, fileName: string, bitrate: number, channelCount: number): Promise<AudioProcessorResult> {
+  const ffmpeg = await getFfmpeg();
   const inputName = "worklazy-audio-input.wav";
   const outputName = "worklazy-audio-output.mp3";
-  ffmpeg.on("progress", ({ progress: ratio }) => {
-    const normalized = Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
-    progress(35 + Math.round(normalized * 55), `${local("MP3로 인코딩하는 중…", "Encoding MP3…")} ${Math.round(normalized * 100)}%`);
-  });
   try {
-    progress(24, local("자체 호스팅 MP3 인코더를 불러오는 중…", "Loading the self-hosted MP3 encoder…"));
-    await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
     await ffmpeg.writeFile(inputName, wav);
     progress(35, local("MP3로 인코딩하는 중…", "Encoding MP3…"));
-    const exitCode = await ffmpeg.exec(["-i", inputName, "-vn", "-c:a", "libmp3lame", "-b:a", `${bitrate}k`, outputName]);
+    const exitCode = await ffmpeg.exec(["-i", inputName, "-vn", "-ac", String(Math.min(2, channelCount)), "-c:a", "libmp3lame", "-b:a", `${bitrate}k`, outputName]);
     if (exitCode !== 0) throw new Error(local("MP3 인코더가 결과를 만들지 못했습니다.", "The MP3 encoder did not produce a result."));
     const data = await ffmpeg.readFile(outputName);
     if (typeof data === "string") throw new Error(local("MP3 결과가 올바른 바이너리 형식이 아닙니다.", "The MP3 result is not valid binary data."));
@@ -245,8 +251,28 @@ async function encodeMp3(wav: Uint8Array, length: number, sampleRate: number, fi
   } finally {
     await ffmpeg.deleteFile(inputName).catch(() => undefined);
     await ffmpeg.deleteFile(outputName).catch(() => undefined);
-    ffmpeg.terminate();
   }
+}
+
+function getFfmpeg() {
+  if (sharedFfmpeg) return Promise.resolve(sharedFfmpeg);
+  if (!ffmpegLoadPromise) {
+    progress(18, local("자체 호스팅 오디오 엔진을 불러오는 중…", "Loading the self-hosted audio engine…"));
+    const ffmpeg = new FFmpeg();
+    ffmpeg.on("progress", ({ progress: ratio }) => {
+      const normalized = Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
+      progress(35 + Math.round(normalized * 45), `${local("오디오를 변환하는 중…", "Converting audio…")} ${Math.round(normalized * 100)}%`);
+    });
+    ffmpegLoadPromise = ffmpeg.load({ coreURL, wasmURL, classWorkerURL }).then(() => {
+      sharedFfmpeg = ffmpeg;
+      return ffmpeg;
+    }).catch((error) => {
+      ffmpeg.terminate();
+      ffmpegLoadPromise = undefined;
+      throw error;
+    });
+  }
+  return ffmpegLoadPromise;
 }
 
 function selectionSamples(request: AudioProcessorRequest) {
@@ -281,11 +307,36 @@ function insertSamples(channel: Float32Array, clip: Float32Array | undefined, cu
   return output;
 }
 
+function applyGain(channel: Float32Array, start: number, end: number, gain: number) {
+  const output = channel.slice();
+  for (let index = start; index < end; index += 1) output[index] = Math.max(-1, Math.min(1, output[index] * gain));
+  return output;
+}
+
+function applyGainRamp(channel: Float32Array, start: number, end: number, fadeIn: boolean) {
+  const output = channel.slice();
+  const denominator = Math.max(1, end - start - 1);
+  for (let index = start; index < end; index += 1) {
+    const ratio = (index - start) / denominator;
+    output[index] *= fadeIn ? ratio : 1 - ratio;
+  }
+  return output;
+}
+
+function interleaveFloat32(channels: Float32Array[]) {
+  const frameCount = channels[0]?.length || 0;
+  const interleaved = new Float32Array(frameCount * channels.length);
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    for (let channel = 0; channel < channels.length; channel += 1) interleaved[frame * channels.length + channel] = channels[channel][frame] || 0;
+  }
+  return new Uint8Array(interleaved.buffer);
+}
+
 function encodeWav(channels: Float32Array[], sampleRate: number) {
   const channelCount = channels.length;
   const sampleCount = channels[0]?.length || 0;
   const dataBytes = sampleCount * channelCount * 2;
-  if (dataBytes > 0xfffffff0) throw new Error(local("WAV 4GB 형식 한도를 넘습니다. 오디오 길이를 줄여 주세요.", "The audio exceeds the 4GB WAV format limit. Shorten it first."));
+  if (dataBytes > 0xffffffff - 44) throw new Error(local("WAV 4GB 형식 한도를 넘습니다. 오디오 길이를 줄여 주세요.", "The audio exceeds the 4GB WAV format limit. Shorten it first."));
   const buffer = new ArrayBuffer(44 + dataBytes);
   const view = new DataView(buffer);
   writeAscii(view, 0, "RIFF");
@@ -326,27 +377,19 @@ function validateDocument(request: AudioProcessorRequest) {
   if (document.channels.some((channel) => !(channel instanceof Float32Array) || channel.length !== document.length)) throw new Error(local("오디오 채널 길이가 서로 다릅니다.", "Audio channel lengths do not match."));
 }
 
-function describeCommand(command: AudioProcessorRequest["command"]) {
-  const korean = ({
-    MUTE: "선택 구간을 음소거하는 중…",
-    CUT: "선택 구간을 잘라내는 중…",
-    COPY: "선택 구간을 메모리 클립보드에 복사하는 중…",
-    PASTE: "재생 커서 위치에 오디오를 붙여넣는 중…",
-    DELETE: "선택 구간을 삭제하는 중…",
-    PREVIEW: "파형 미리보기를 준비하는 중…",
-    PREVIEW_VOICE_EFFECT: "선택 구간 음성 효과를 미리 만드는 중…",
-    APPLY_VOICE_EFFECT: "선택 구간에 음성 효과를 적용하는 중…",
-    EXPORT_WAV: "WAV 내보내기를 준비하는 중…",
-    EXPORT_MP3: "MP3 내보내기를 준비하는 중…",
-  } satisfies Record<AudioProcessorRequest["command"], string>)[command];
-  const english = ({
-    MUTE: "Muting selected region…", CUT: "Cutting selected region…", COPY: "Copying selected region to memory…", PASTE: "Pasting audio at the playback cursor…", DELETE: "Deleting selected region…", PREVIEW: "Preparing waveform preview…", PREVIEW_VOICE_EFFECT: "Preparing a voice-effect preview…", APPLY_VOICE_EFFECT: "Applying the voice effect to the selected region…", EXPORT_WAV: "Preparing WAV export…", EXPORT_MP3: "Preparing MP3 export…",
-  } satisfies Record<AudioProcessorRequest["command"], string>)[command];
-  return local(korean, english);
+function commandProgressKey(command: AudioProcessorRequest["command"]) {
+  if (command === "PREVIEW_VOICE_EFFECT") return "audio.voice.status.previewing";
+  if (command === "APPLY_VOICE_EFFECT") return "audio.voice.status.applying";
+  if (command === "EXPORT_WAV" || command === "EXPORT_MP3") return "audio.status.exportPrepare";
+  return `audio.edit.${command}`;
 }
 
 function progress(value: number, message: string) {
-  worker.postMessage({ type: "progress", progress: Math.round(value), message });
+  worker.postMessage({ type: "progress", requestId: currentRequestId, progress: Math.round(value), message });
+}
+
+function progressKey(value: number, messageKey: string) {
+  worker.postMessage({ type: "progress", requestId: currentRequestId, progress: Math.round(value), messageKey });
 }
 
 function normalizeError(error: unknown) {

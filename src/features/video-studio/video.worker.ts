@@ -6,6 +6,7 @@ import type {
   VideoTask,
   VideoWorkerInput,
 } from "./types";
+import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate } from "./videoEncoding";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 const runtimeLanguage = worker.location.pathname.match(new RegExp(`^${import.meta.env.BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(ko|en)(?:/|$)`))?.[1];
@@ -229,7 +230,11 @@ async function processConcatJob(
   setStage: (start: number, end: number, duration: number, label: string) => void,
 ) {
   const segmentNames: string[] = [];
-  const concatDimensions = task.kind === "encode" ? outputDimensions(job.inputs[0], task) : undefined;
+  const concatDimensions = task.kind === "encode"
+    ? outputDimensions(job.inputs[0], task)
+    : task.kind === "gif"
+      ? gifDimensions(job.inputs[0], task.width)
+      : undefined;
   const totalDuration = jobDuration(job);
   const segmentEnd = task.kind === "gif" ? 0.76 : 0.9;
   const segmentBudget = segmentEnd - 0.04;
@@ -263,7 +268,7 @@ async function processConcatJob(
     const outputName = createOutputName(job.name, task, true);
     temporaryFiles.add(outputName);
     setStage(0.84, 0.96, totalDuration, L(`[${job.name}] GIF 생성 중`, `[${job.name}] creating GIF`));
-    const filter = gifFilter(task);
+    const filter = gifFilter(task, concatDimensions);
     const gifCode = await ffmpeg.exec(["-i", joinedName, "-filter_complex", filter, "-loop", "0", outputName]);
     if (gifCode !== 0) throw new Error(L(`${job.name} GIF를 생성하지 못했습니다.`, `Unable to create the ${job.name} GIF.`));
     return { name: outputName, bytes: await readBytes(ffmpeg, outputName) };
@@ -293,11 +298,11 @@ function createSingleArguments(input: VideoWorkerInputDescriptor, inputName: str
     const args = [...prefix, "-map", "0:v:0", "-c:v", "copy"];
     appendVideoAudioArguments(args, task);
     args.push("-avoid_negative_ts", "make_zero");
-    if (task.container === "mp4") args.push("-movflags", "+faststart");
+    if (task.container === "mp4" && input.fileSize < 512 * 1024 * 1024) args.push("-movflags", "+faststart");
     args.push(outputName);
     return args;
   }
-  return createEncodeArguments(prefix, task, outputName, false);
+  return createEncodeArguments(prefix, task, outputName, false, outputDimensions(input, task), input.fileSize);
 }
 
 function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask, concatDimensions?: readonly [number, number]) {
@@ -306,8 +311,8 @@ function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputNa
     return createAudioOnlyArguments(prefix, task, outputName);
   }
   if (task.kind === "gif") {
-    const height = even(Math.round(task.width * 9 / 16));
-    const filter = `fps=${task.fps},scale=${task.width}:${height}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${task.width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+    const [width, height] = concatDimensions || gifDimensions(input, task.width);
+    const filter = `fps=${task.fps},scale=${width}:${height}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
     return [...prefix, "-an", "-vf", filter, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", outputName];
   }
   if (task.bitrate === "copy") {
@@ -319,29 +324,28 @@ function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputNa
   return createEncodeArguments(prefix, task, outputName, true, concatDimensions);
 }
 
-function createEncodeArguments(prefix: string[], task: Extract<VideoTask, { kind: "encode" }>, outputName: string, normalizeForConcat: boolean, concatDimensions?: readonly [number, number]) {
+function createEncodeArguments(prefix: string[], task: Extract<VideoTask, { kind: "encode" }>, outputName: string, normalizeForConcat: boolean, concatDimensions?: readonly [number, number], inputFileSize = 0) {
   const args = [...prefix, "-map", "0:v:0"];
   const filter = createVideoFilter(task, normalizeForConcat, concatDimensions);
   if (filter) args.push("-vf", filter);
   args.push("-c:v", codecName(task.codec));
-  if (task.codec === "vp9") args.push("-b:v", task.bitrate || "0", "-crf", String(task.crf), "-row-mt", "1");
-  else args.push("-preset", "veryfast", "-crf", String(task.crf), "-b:v", task.bitrate || "0");
+  appendVideoRateControl(args, task.codec, task.bitrate, task.crf);
   args.push("-threads", String(encodingThreadCount()));
   if (task.codec === "hevc" && task.container === "mp4") args.push("-tag:v", "hvc1");
-  appendVideoAudioArguments(args, task);
-  if (task.container === "mp4" && !normalizeForConcat) args.push("-movflags", "+faststart");
+  appendVideoAudioArguments(args, task, normalizeForConcat);
+  if (task.container === "mp4" && !normalizeForConcat && inputFileSize < 512 * 1024 * 1024) args.push("-movflags", "+faststart");
   args.push(outputName);
   return args;
 }
 
 function createAudioOnlyArguments(prefix: string[], task: Extract<VideoTask, { kind: "audio" }>, outputName: string) {
   const args = [...prefix, "-map", "0:a:0", "-vn", "-c:a", task.format === "mp3" ? "libmp3lame" : "aac", "-b:a", task.bitrate];
-  appendSampleRate(args, task.sampleRate);
+  appendSampleRate(args, task.sampleRate, task.format === "mp3" ? "mp3" : "aac");
   args.push(outputName);
   return args;
 }
 
-function appendVideoAudioArguments(args: string[], task: Extract<VideoTask, { kind: "encode" }>) {
+function appendVideoAudioArguments(args: string[], task: Extract<VideoTask, { kind: "encode" }>, normalizeForConcat = false) {
   if (task.audioMode === "remove") {
     args.push("-an");
     return;
@@ -351,33 +355,39 @@ function appendVideoAudioArguments(args: string[], task: Extract<VideoTask, { ki
     args.push("-c:a", "copy");
     return;
   }
-  args.push("-c:a", task.container === "webm" ? "libopus" : "aac", "-b:a", task.audioBitrate);
-  appendSampleRate(args, task.audioSampleRate);
+  const audioCodec = task.container === "webm" ? "opus" : "aac";
+  args.push("-c:a", audioCodec === "opus" ? "libopus" : "aac", "-b:a", task.audioBitrate);
+  appendSampleRate(args, task.audioSampleRate, audioCodec);
+  if (normalizeForConcat) args.push("-ar", "48000", "-ac", "2");
 }
 
-function appendSampleRate(args: string[], sampleRate: "source" | number) {
-  if (sampleRate !== "source") args.push("-ar", String(sampleRate));
+function appendSampleRate(args: string[], sampleRate: "source" | number, codec: "aac" | "mp3" | "opus") {
+  const resolved = resolveAudioSampleRate(sampleRate, codec);
+  if (resolved !== "source") args.push("-ar", String(resolved));
 }
 
 function createVideoFilter(task: Extract<VideoTask, { kind: "encode" }>, normalizeForConcat: boolean, concatDimensions?: readonly [number, number]) {
   if (task.aspect !== "source") {
-    const [width, height] = aspectDimensions(task.aspect, task.resolution);
-    return `crop=min(iw\,ih*${width}/${height}):min(ih\,iw*${height}/${width}),scale=${width}:${height}:flags=lanczos,setsar=1${normalizeForConcat ? ",fps=30" : ""}`;
+    const [width, height] = concatDimensions || aspectDimensions(task.aspect, task.resolution);
+    return appendTransformFilters(`crop=min(iw\,ih*${width}/${height}):min(ih\,iw*${height}/${width}),scale=${width}:${height}:flags=lanczos,setsar=1`, task);
   }
   if (normalizeForConcat) {
     const [width, height] = concatDimensions || landscapeDimensions(task.resolution);
-    return `scale=${width}:${height}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30`;
+    return appendTransformFilters(`scale=${width}:${height}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`, task);
   }
-  if (task.resolution !== "source") return `scale=-2:${task.resolution}:flags=lanczos`;
-  return "";
+  const resize = task.resolution !== "source"
+    ? `scale=w='if(lte(iw\,ih)\,min(iw\,${task.resolution})\,-2)':h='if(gt(iw\,ih)\,min(ih\,${task.resolution})\,-2)':flags=lanczos`
+    : "";
+  return appendTransformFilters(resize, task);
 }
 
 function trimPrefix(input: VideoWorkerInputDescriptor, inputName: string) {
   return ["-ss", input.start.toFixed(3), "-i", inputName, "-t", Math.max(0.05, input.end - input.start).toFixed(3)];
 }
 
-function gifFilter(task: Extract<VideoTask, { kind: "gif" }>) {
-  return `fps=${task.fps},scale=min(${task.width}\,iw):-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=192[p];[s1][p]paletteuse=dither=sierra2_4a`;
+function gifFilter(task: Extract<VideoTask, { kind: "gif" }>, dimensions?: readonly [number, number]) {
+  const scale = dimensions ? `scale=${dimensions[0]}:${dimensions[1]}:flags=lanczos` : `scale=min(${task.width}\,iw):-2:flags=lanczos`;
+  return `fps=${task.fps},${scale},split[s0][s1];[s0]palettegen=max_colors=192[p];[s1][p]paletteuse=dither=sierra2_4a`;
 }
 
 function validateRequest(request: VideoWorkerStartRequest) {
@@ -389,18 +399,18 @@ function validateRequest(request: VideoWorkerStartRequest) {
   }
   if (request.task.kind === "encode") {
     if (request.task.container === "webm" && request.task.codec !== "vp9" && request.task.bitrate !== "copy") throw new Error(L("WebM은 VP9 코덱으로 출력해 주세요.", "Export WebM with the VP9 codec."));
-    if (request.task.bitrate === "copy" && (request.task.resolution !== "source" || request.task.aspect !== "source")) {
+    if (request.task.bitrate === "copy" && (request.task.resolution !== "source" || request.task.aspect !== "source" || request.task.rotation !== 0 || request.task.flipHorizontal)) {
       throw new Error(L("패스스루는 해상도와 화면 비율을 원본으로 유지할 때만 사용할 수 있습니다.", "Passthrough requires source resolution and aspect ratio."));
     }
     validateVideoBitrate(request.task.bitrate);
     if (request.task.audioMode === "encode") {
       validateAudioBitrate(request.task.audioBitrate);
-      validateSampleRate(request.task.audioSampleRate);
+      validateSampleRate(request.task.audioSampleRate, request.task.container === "webm" ? "opus" : "aac");
     }
   }
   if (request.task.kind === "audio") {
     validateAudioBitrate(request.task.bitrate);
-    validateSampleRate(request.task.sampleRate);
+    validateSampleRate(request.task.sampleRate, request.task.format === "mp3" ? "mp3" : "aac");
   }
 }
 
@@ -419,10 +429,11 @@ function validateAudioBitrate(value: string) {
   }
 }
 
-function validateSampleRate(value: "source" | number) {
+function validateSampleRate(value: "source" | number, codec: "aac" | "mp3" | "opus") {
   if (value === "source") return;
-  if (!Number.isInteger(value) || value < 8_000 || value > 192_000) {
-    throw new Error(L("오디오 샘플레이트는 8,000~192,000 Hz 범위로 입력해 주세요.", "Enter an audio sample rate between 8,000 and 192,000 Hz."));
+  const maximum = codec === "aac" ? 96_000 : 48_000;
+  if (!Number.isInteger(value) || value < 8_000 || value > maximum) {
+    throw new Error(L(`선택한 오디오 코덱의 샘플레이트는 8,000~${maximum.toLocaleString()} Hz 범위로 입력해 주세요.`, `Enter a sample rate between 8,000 and ${maximum.toLocaleString()} Hz for the selected audio codec.`));
   }
 }
 
@@ -445,7 +456,7 @@ function requestInputFile(fileId: string, fileName: string) {
 async function readBytes(ffmpeg: FFmpeg, outputName: string) {
   const data = await ffmpeg.readFile(outputName);
   if (typeof data === "string") throw new Error(L("결과 파일이 올바른 바이너리 형식이 아닙니다.", "The output file is not valid binary data."));
-  return data.slice();
+  return data;
 }
 
 function createOutputName(name: string, task: VideoTask, concat: boolean) {
@@ -538,10 +549,21 @@ function landscapeDimensions(resolution: "source" | "1080" | "720" | "480") {
 }
 
 function outputDimensions(input: VideoWorkerInputDescriptor, task: Extract<VideoTask, { kind: "encode" }>) {
-  if (task.aspect !== "source") return aspectDimensions(task.aspect, task.resolution);
-  if (task.resolution === "source") return [even(input.width), even(input.height)] as const;
-  const height = Number(task.resolution);
-  return [even(height * input.width / input.height), even(height)] as const;
+  return outputDimensionsForSource(input.width, input.height, task.aspect, task.resolution);
+}
+
+function gifDimensions(input: VideoWorkerInputDescriptor, maximumWidth: number) {
+  const width = even(Math.min(maximumWidth, input.width));
+  return [width, even(width * input.height / input.width)] as const;
+}
+
+function appendTransformFilters(base: string, task: Extract<VideoTask, { kind: "encode" }>) {
+  const filters = base ? [base] : [];
+  if (task.rotation === 90) filters.push("transpose=1");
+  if (task.rotation === 180) filters.push("hflip", "vflip");
+  if (task.rotation === 270) filters.push("transpose=2");
+  if (task.flipHorizontal) filters.push("hflip");
+  return filters.join(",");
 }
 
 function codecName(codec: "h264" | "hevc" | "vp9") {
@@ -574,7 +596,6 @@ function getMimeType(name: string) {
   if (name.endsWith(".mkv")) return "video/x-matroska";
   return "video/mp4";
 }
-function even(value: number) { return Math.max(2, Math.round(value / 2) * 2); }
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
 function formatDuration(seconds: number) {
   if (seconds < 60) return L(`${Math.max(1, Math.round(seconds))}초`, `${Math.max(1, Math.round(seconds))} sec`);

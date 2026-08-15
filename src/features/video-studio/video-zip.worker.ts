@@ -20,7 +20,7 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; language
 
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index];
-      zip.file(uniqueFileName(file.fileName, usedNames), await file.blob.arrayBuffer());
+      zip.file(uniqueFileName(file.fileName, usedNames), file.blob);
       worker.postMessage({
         type: "progress",
         progress: Math.round(((index + 1) / files.length) * 35),

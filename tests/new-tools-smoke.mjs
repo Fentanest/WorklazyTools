@@ -378,7 +378,10 @@ async function testAudioStudio(page, audioPath) {
   await page.waitForFunction(() => document.querySelector(".audio-clipboard-status.has-clip")?.textContent?.includes("오디오 클립보드"));
   await clickAudioAction(page, "구간 음소거");
   await waitForAudioSuccess(page, "음소거 중 완료");
-  const undoEnabled = await page.$eval(".audio-edit-toolbar button:nth-child(6)", (button) => !button.disabled);
+  const undoEnabled = await page.$$eval(".audio-edit-toolbar button", (buttons) => {
+    const undo = buttons.find((button) => button.textContent?.includes("실행 취소"));
+    return undo instanceof HTMLButtonElement && !undo.disabled;
+  });
   if (!undoEnabled) throw new Error("Audio undo history was not created.");
   await page.keyboard.down("Control");
   await page.keyboard.press("z");
@@ -499,10 +502,10 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     end: element.style.getPropertyValue("--range-end"),
   }));
   if (rangeState.handles !== 2 || !rangeState.start || rangeState.start === "0%" || !rangeState.end) throw new Error(`Combined range track was not updated: ${JSON.stringify(rangeState)}`);
-  const passthroughOption = await page.$eval('.encoding-grid label:nth-child(4) select', (select) => ({ value: select.value, text: select.selectedOptions[0]?.textContent }));
+  const passthroughOption = await page.$eval('.video-bitrate-control select', (select) => ({ value: select.value, text: select.selectedOptions[0]?.textContent }));
   if (passthroughOption.value !== "copy" || !passthroughOption.text?.includes("패스스루")) throw new Error(`Pass-through trim was not selected: ${JSON.stringify(passthroughOption)}`);
   const encodingOptions = await page.evaluate(() => ({
-    video: Array.from(document.querySelectorAll('.encoding-grid label:nth-child(4) option')).map((option) => option.textContent),
+    video: Array.from(document.querySelectorAll('.video-bitrate-control option')).map((option) => option.textContent),
     audioModes: Array.from(document.querySelectorAll('.video-audio-settings .segmented-control button')).map((button) => button.textContent),
   }));
   if (!encodingOptions.video.some((label) => label?.includes("직접입력")) || encodingOptions.audioModes.join("|") !== "원본 음성 복사|음성 제거|호환 형식 변환") {
@@ -524,7 +527,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     output.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await page.evaluate(() => {
-    const select = document.querySelector('.encoding-grid label:nth-child(4) select');
+    const select = document.querySelector('.video-bitrate-control select');
     if (!(select instanceof HTMLSelectElement)) throw new Error("Video bitrate selector is unavailable");
     select.value = "custom";
     select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -534,7 +537,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   const customVideoBitrate = await page.$eval('input[aria-label="영상 비트레이트 직접입력"]', (input) => input.value);
   if (customVideoBitrate !== "12.5") throw new Error(`Custom video bitrate was not accepted: ${customVideoBitrate}`);
   await page.evaluate(() => {
-    const select = document.querySelector('.encoding-grid label:nth-child(4) select');
+    const select = document.querySelector('.video-bitrate-control select');
     select.value = "copy";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
@@ -619,7 +622,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   });
   await page.waitForSelector(".video-audio-settings");
   await page.evaluate(() => {
-    const bitrate = document.querySelector('.encoding-grid label:nth-child(4) select');
+    const bitrate = document.querySelector('.video-bitrate-control select');
     const reencode = document.querySelector('.video-audio-settings .segmented-control button:nth-child(3)');
     if (!(bitrate instanceof HTMLSelectElement) || !(reencode instanceof HTMLButtonElement)) throw new Error("Video audio re-encoding controls are unavailable");
     bitrate.value = "copy";

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.esm.js";
 import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
@@ -34,8 +35,8 @@ import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
 import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
-import { audioBufferToDocument, audioHistoryLimit, createAudioFileName, formatAudioTime } from "./audioHelpers";
-import { runAudioProcessor } from "./audioProcessorClient";
+import { audioBufferToDocument, audioHistoryLimit, createAudioFileName, formatAudioTime, sniffAudioSampleRate } from "./audioHelpers";
+import { runAudioProcessor, terminateAudioProcessorSession } from "./audioProcessorClient";
 import type { AudioClipboardData, AudioDocumentData, AudioEditCommand, AudioProcessorResult, AudioVoiceEffectSettings } from "./types";
 
 type ExportFormat = "wav" | "mp3";
@@ -66,6 +67,8 @@ export function AudioStudioPage() {
   const [zoomIndex, setZoomIndex] = useState(1);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("wav");
   const [mp3Bitrate, setMp3Bitrate] = useState<128 | 192 | 256 | 320>(192);
+  const [gain, setGain] = useState(1);
+  const [exportSelection, setExportSelection] = useState(false);
   const [voicePreset, setVoicePreset] = useState<VoicePreset>("low");
   const [customPitch, setCustomPitch] = useState(0);
   const [effectPreviewUrl, setEffectPreviewUrl] = useState("");
@@ -87,6 +90,9 @@ export function AudioStudioPage() {
   const activeControllerRef = useRef<AbortController | undefined>(undefined);
   const loadGenerationRef = useRef(0);
   const handleFilesRef = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
+  const restoreHistoryRef = useRef<(direction: "undo" | "redo") => Promise<void>>(async () => undefined);
+  const togglePlaybackRef = useRef<() => Promise<void>>(async () => undefined);
+  const applyEditRef = useRef<(command: AudioEditCommand) => Promise<void>>(async () => undefined);
 
   useEffect(() => { documentRef.current = document; }, [document]);
   useEffect(() => { selectionRef.current = selection; }, [selection]);
@@ -180,6 +186,7 @@ export function AudioStudioPage() {
       void wavesurfer.play();
     });
     const unsubscribeError = wavesurfer.on("error", (error) => {
+      if (isExpectedMediaAbort(error)) return;
       failProgress(t("audio.status.waveOpen", { error: error.message }));
     });
     return () => {
@@ -203,6 +210,7 @@ export function AudioStudioPage() {
     const wavesurfer = wavesurferRef.current;
     if (!wavesurfer || !previewUrl) return;
     void wavesurfer.load(previewUrl).catch((error) => {
+      if (isExpectedMediaAbort(error)) return;
       failProgress(t("audio.status.waveDisplay", { error: error instanceof Error ? error.message : String(error) }));
     });
   }, [failProgress, previewUrl, t]);
@@ -210,6 +218,7 @@ export function AudioStudioPage() {
   useEffect(() => () => {
     loadGenerationRef.current += 1;
     activeControllerRef.current?.abort();
+    terminateAudioProcessorSession();
     void decodeContextRef.current?.close().catch(() => undefined);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     if (effectPreviewUrlRef.current) URL.revokeObjectURL(effectPreviewUrlRef.current);
@@ -244,8 +253,8 @@ export function AudioStudioPage() {
     previewUrlRef.current = "";
     setPreviewUrl("");
     wavesurferRef.current?.empty();
-    const context = new AudioContext();
-    decodeContextRef.current = context;
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
     setFiles([file]);
     setDocument(undefined);
     documentRef.current = undefined;
@@ -257,16 +266,20 @@ export function AudioStudioPage() {
     commitSelection(undefined);
     regionsRef.current?.clearRegions();
     progress.start(t("audio.status.decoding", { name: file.name }));
+    let context: AudioContext | undefined;
     try {
       const sourceBytes = await file.arrayBuffer();
+      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
+      const sourceSampleRate = sniffAudioSampleRate(sourceBytes, file.name);
+      context = new AudioContext(sourceSampleRate ? { sampleRate: sourceSampleRate } : undefined);
+      decodeContextRef.current = context;
       progress.update(22, t("audio.status.webAudio"));
       const decoded = await context.decodeAudioData(sourceBytes);
-      if (generation !== loadGenerationRef.current) return;
+      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
       const nextDocument = audioBufferToDocument(decoded, file.name);
-      const controller = new AbortController();
-      activeControllerRef.current = controller;
       const preview = await runAudioProcessor({ command: "PREVIEW", document: nextDocument, language }, (value, message) => progress.update(30 + value * 0.65, message), controller.signal);
-      if (generation !== loadGenerationRef.current || !preview.previewBlob) return;
+      if (generation !== loadGenerationRef.current) return;
+      if (!preview.previewBlob) throw new Error(t("audio.status.previewRestore"));
       documentRef.current = nextDocument;
       setDocument(nextDocument);
       const initialSelection = defaultSelection(nextDocument.duration);
@@ -275,11 +288,11 @@ export function AudioStudioPage() {
       progress.succeed(t("audio.status.ready", { name: file.name }));
       setLastResult(`${formatAudioTime(nextDocument.duration)} · ${t("audio.channels", { count: nextDocument.channels.length })} · ${nextDocument.sampleRate.toLocaleString(i18n.language)}Hz`);
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) progress.fail(toAudioError(error, t));
+      if (generation === loadGenerationRef.current) progress.fail(error instanceof DOMException && error.name === "AbortError" ? t("audio.status.cancelled") : toAudioError(error, t));
     } finally {
       if (decodeContextRef.current === context) decodeContextRef.current = undefined;
-      await context.close().catch(() => undefined);
-      if (activeControllerRef.current?.signal.aborted || generation === loadGenerationRef.current) activeControllerRef.current = undefined;
+      await context?.close().catch(() => undefined);
+      if (activeControllerRef.current === controller) activeControllerRef.current = undefined;
     }
   };
   handleFilesRef.current = handleFiles;
@@ -330,6 +343,8 @@ export function AudioStudioPage() {
     }
     const controller = new AbortController();
     activeControllerRef.current = controller;
+    const editCursor = wavesurferRef.current?.getCurrentTime() || 0;
+    if (command === "PASTE") wavesurferRef.current?.pause();
     progress.start(editLabel(command, t));
     setLastResult("");
     try {
@@ -338,8 +353,9 @@ export function AudioStudioPage() {
         document: currentDocument,
         start: currentSelection?.start,
         end: currentSelection?.end,
-        cursor: wavesurferRef.current?.getCurrentTime() || 0,
+        cursor: editCursor,
         clipboard,
+        gain,
         language,
       }, progress.update, controller.signal);
       if (command === "COPY") {
@@ -350,12 +366,12 @@ export function AudioStudioPage() {
       if (!result.channels || !result.previewBlob) throw new Error(t("audio.status.missingResult"));
       const nextDocument = resultDocument(currentDocument, result);
       const limit = audioHistoryLimit(currentDocument);
-      setUndoHistory((history) => [...history, currentDocument].slice(-limit));
+      setUndoHistory((history) => [...history, { ...currentDocument, selection: currentSelection }].slice(-limit));
       setRedoHistory([]);
       if (result.clipboard) setClipboard(result.clipboard);
       documentRef.current = nextDocument;
       setDocument(nextDocument);
-      const nextSelection = selectionAfterEdit(command, currentSelection, clipboard, nextDocument.duration, wavesurferRef.current?.getCurrentTime() || 0);
+      const nextSelection = selectionAfterEdit(command, currentSelection, clipboard, nextDocument.duration, editCursor);
       commitSelection(nextSelection);
       replacePreview(result.previewBlob);
       progress.succeed(t("audio.status.done", { action: editLabel(command, t).replace("…", "") }));
@@ -387,7 +403,7 @@ export function AudioStudioPage() {
       }
       documentRef.current = target;
       setDocument(target);
-      commitSelection(defaultSelection(target.duration));
+      commitSelection(clampSelection(target.selection, target.duration) || defaultSelection(target.duration));
       replacePreview(result.previewBlob);
       progress.succeed(direction === "undo" ? t("audio.status.undoDone") : t("audio.status.redoDone"));
       setLastResult(t("audio.status.state", { direction: direction === "undo" ? t("audio.status.previous") : t("audio.status.next"), duration: formatAudioTime(target.duration) }));
@@ -469,6 +485,9 @@ export function AudioStudioPage() {
         document: currentDocument,
         fileName,
         bitrate: mp3Bitrate,
+        start: selectionRef.current?.start,
+        end: selectionRef.current?.end,
+        exportSelection,
         language,
       }, progress.update, controller.signal);
       if (!result.output) throw new Error(t("audio.status.missingFile"));
@@ -513,6 +532,10 @@ export function AudioStudioPage() {
     showSelectionRegion(next);
   };
 
+  restoreHistoryRef.current = restoreHistory;
+  togglePlaybackRef.current = togglePlayback;
+  applyEditRef.current = applyEdit;
+
   const busy = progress.status === "running";
   const selectionDuration = selection ? Math.max(0, selection.end - selection.start) : 0;
   const effectivePitch = voicePreset === "custom" ? customPitch : voicePreset === "robot" ? 0 : VOICE_PRESET_PITCH[voicePreset];
@@ -524,21 +547,29 @@ export function AudioStudioPage() {
       if (event.code === "Space" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
         if (!documentRef.current || event.repeat) return;
         event.preventDefault();
-        void togglePlayback();
+        void togglePlaybackRef.current();
+        return;
+      }
+      if (event.key === "Delete" && !busy && selectionRef.current) {
+        event.preventDefault();
+        void applyEditRef.current("DELETE");
         return;
       }
       if (!(event.ctrlKey || event.metaKey) || event.altKey || busy) return;
       const key = event.key.toLowerCase();
+      if (key === "c" && selectionRef.current) { event.preventDefault(); void applyEditRef.current("COPY"); return; }
+      if (key === "x" && selectionRef.current) { event.preventDefault(); void applyEditRef.current("CUT"); return; }
+      if (key === "v" && clipboard) { event.preventDefault(); void applyEditRef.current("PASTE"); return; }
       const direction = key === "y" || (key === "z" && event.shiftKey) ? "redo" : key === "z" ? "undo" : undefined;
       if (!direction) return;
       const available = direction === "undo" ? undoHistory.length > 0 : redoHistory.length > 0;
       if (!available) return;
       event.preventDefault();
-      void restoreHistory(direction);
+      void restoreHistoryRef.current(direction);
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [busy, redoHistory.length, restoreHistory, togglePlayback, undoHistory.length]);
+  }, [busy, clipboard, redoHistory.length, undoHistory.length]);
 
   return (
     <div className="page tool-page page-enter audio-studio-page">
@@ -571,9 +602,9 @@ export function AudioStudioPage() {
           </div>
 
           <div className="audio-selection-panel">
-            <label><span>{t("audio.start")}</span><input type="number" min={0} max={selection?.end || document.duration} step="0.001" value={(selection?.start || 0).toFixed(3)} onChange={(event) => updateSelectionNumber("start", Number(event.target.value))} /></label>
+            <label><span>{t("audio.start")}</span><AudioSelectionInput value={selection?.start || 0} min={0} max={(selection?.end || document.duration) - MIN_SELECTION_SECONDS} onCommit={(value) => updateSelectionNumber("start", value)} /></label>
             <div><small>{t("audio.duration")}</small><strong>{formatAudioTime(selectionDuration)}</strong></div>
-            <label><span>{t("audio.end")}</span><input type="number" min={selection?.start || 0} max={document.duration} step="0.001" value={(selection?.end || 0).toFixed(3)} onChange={(event) => updateSelectionNumber("end", Number(event.target.value))} /></label>
+            <label><span>{t("audio.end")}</span><AudioSelectionInput value={selection?.end || 0} min={(selection?.start || 0) + MIN_SELECTION_SECONDS} max={document.duration} onCommit={(value) => updateSelectionNumber("end", value)} /></label>
           </div>
 
           <div className="audio-transport">
@@ -589,9 +620,14 @@ export function AudioStudioPage() {
             <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("COPY")}><Copy size={18} /><span>{t("audio.copy")}</span></button>
             <button type="button" disabled={busy || !clipboard} onClick={() => void applyEdit("PASTE")}><ClipboardPaste size={18} /><span>{t("audio.paste")}</span></button>
             <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("DELETE")}><Trash2 size={18} /><span>{t("audio.delete")}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_IN")}><Waves size={18} /><span>{language === "ko" ? "페이드 인" : "Fade in"}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_OUT")}><Waves size={18} /><span>{language === "ko" ? "페이드 아웃" : "Fade out"}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("NORMALIZE")}><SlidersHorizontal size={18} /><span>{language === "ko" ? "피크 정규화" : "Normalize peak"}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("TRIM")}><Scissors size={18} /><span>{language === "ko" ? "선택만 남기기" : "Trim to selection"}</span></button>
             <button type="button" aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || !undoHistory.length} onClick={() => void restoreHistory("undo")}><Undo2 size={18} /><span>{t("audio.undo")}</span><small>{undoHistory.length}</small></button>
             <button type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y" disabled={busy || !redoHistory.length} onClick={() => void restoreHistory("redo")}><Redo2 size={18} /><span>{t("audio.redo")}</span><small>{redoHistory.length}</small></button>
           </div>
+          <div className="audio-gain-control"><label><span>{language === "ko" ? "선택 구간 음량" : "Selection gain"}</span><input type="range" min={0} max={2} step={0.05} value={gain} onChange={(event) => setGain(Number(event.target.value))} /><b>{gain.toFixed(2)}×</b></label><button type="button" className="secondary-button" disabled={busy || !selection} onClick={() => void applyEdit("GAIN")}>{language === "ko" ? "음량 적용" : "Apply gain"}</button></div>
 
           <div className="audio-voice-effect-panel">
             <div className="audio-voice-effect-heading">
@@ -601,7 +637,7 @@ export function AudioStudioPage() {
             <div className="audio-voice-presets" role="radiogroup" aria-label={t("audio.voice.presetsLabel")}>
               {(["low", "high", "child", "robot", "custom"] as const).map((preset) => (
                 <button key={preset} type="button" role="radio" aria-checked={voicePreset === preset} className={voicePreset === preset ? "active" : ""} disabled={busy} onClick={() => setVoicePreset(preset)}>
-                  {preset === "robot" && <Bot size={17} />}{t(`audio.voice.presets.${preset}` as never)}
+                  {preset === "robot" && <Bot size={17} />}{t(`audio.voice.presets.${preset}`)}
                 </button>
               ))}
             </div>
@@ -627,13 +663,14 @@ export function AudioStudioPage() {
             <SegmentedControl value={exportFormat} options={[{ value: "wav", label: t("audio.wav") }, { value: "mp3", label: t("audio.mp3") }]} onChange={setExportFormat} label={t("audio.format")} />
             {exportFormat === "mp3" && <label><span>{t("audio.bitrate")}</span><select value={mp3Bitrate} onChange={(event) => setMp3Bitrate(Number(event.target.value) as 128 | 192 | 256 | 320)}><option value={128}>128 kbps</option><option value={192}>192 kbps · {t("audio.recommended")}</option><option value={256}>256 kbps</option><option value={320}>320 kbps</option></select></label>}
           </div>
+          <ToggleRow label={language === "ko" ? "선택 구간만 내보내기" : "Export selection only"} description={selection ? formatAudioTime(selectionDuration) : undefined} checked={exportSelection} onChange={setExportSelection} disabled={!selection} />
           {exportFormat === "mp3" && <div className="inline-notice warning"><AlertTriangle size={16} /><span>{t("audio.offline")}</span></div>}
           <div className="section-actions"><PrimaryButton accent="violet" disabled={busy} loading={busy} onClick={() => void exportAudio()}><Download size={18} /> {t("audio.export", { format: exportFormat.toUpperCase() })}</PrimaryButton></div>
         </SectionCard>
       )}
 
       <OperationProgress {...progress} accent="violet" title={t("audio.log")} />
-      {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { activeControllerRef.current?.abort(); void decodeContextRef.current?.close().catch(() => undefined); }}><LoaderCircle size={16} /> {t("audio.cancel")}</button></div>}
+      {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { loadGenerationRef.current += 1; activeControllerRef.current?.abort(); void decodeContextRef.current?.close().catch(() => undefined); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</button></div>}
       {lastResult && <div className="inline-success"><FileAudio2 size={18} /><span>{lastResult}</span></div>}
 
       <ToolGuide
@@ -648,6 +685,18 @@ export function AudioStudioPage() {
 
 function regionSelection(region: Region): AudioSelection {
   return { start: region.start, end: region.end };
+}
+
+function AudioSelectionInput({ value, min, max, onCommit }: { value: number; min: number; max: number; onCommit: (value: number) => void }) {
+  const [draft, setDraft] = useState(() => value.toFixed(3));
+  useEffect(() => setDraft(value.toFixed(3)), [value]);
+  const commit = () => {
+    const parsed = Number(draft);
+    const next = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : value;
+    setDraft(next.toFixed(3));
+    onCommit(next);
+  };
+  return <input type="number" min={min} max={max} step="0.001" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") { setDraft(value.toFixed(3)); event.currentTarget.blur(); } }} />;
 }
 
 function defaultSelection(duration: number): AudioSelection | undefined {
@@ -674,14 +723,19 @@ function selectionAfterEdit(
   duration: number,
   cursor: number,
 ) {
-  if (command === "MUTE") return clampSelection(selection, duration);
+  if (["MUTE", "FADE_IN", "FADE_OUT", "GAIN", "NORMALIZE"].includes(command)) return clampSelection(selection, duration);
+  if (command === "TRIM") return duration >= MIN_SELECTION_SECONDS ? { start: 0, end: duration } : undefined;
   if (command === "PASTE") return clampSelection({ start: cursor, end: cursor + (clipboard?.duration || 0) }, duration);
   const start = Math.min(selection?.start || 0, Math.max(0, duration - MIN_SELECTION_SECONDS));
   return clampSelection({ start, end: Math.min(duration, start + 1) }, duration);
 }
 
-function editLabel(command: AudioEditCommand, t: (key: never) => string) {
-  return t(`audio.edit.${command}` as never);
+function editLabel(command: AudioEditCommand, t: TFunction<"features">) {
+  const keys = {
+    MUTE: "audio.edit.MUTE", CUT: "audio.edit.CUT", COPY: "audio.edit.COPY", PASTE: "audio.edit.PASTE", DELETE: "audio.edit.DELETE", PREVIEW: "audio.edit.PREVIEW",
+    FADE_IN: "audio.edit.FADE_IN", FADE_OUT: "audio.edit.FADE_OUT", GAIN: "audio.edit.GAIN", NORMALIZE: "audio.edit.NORMALIZE", TRIM: "audio.edit.TRIM",
+  } as const satisfies Record<AudioEditCommand, string>;
+  return t(keys[command]);
 }
 
 function isSupportedAudio(file: File) {
@@ -690,6 +744,10 @@ function isSupportedAudio(file: File) {
 
 function isEditableKeyboardTarget(target: EventTarget | null) {
   return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true'], [role='textbox']"));
+}
+
+function isExpectedMediaAbort(error: unknown) {
+  return (error instanceof DOMException && error.name === "AbortError") || /(?:user aborted|request was aborted)/i.test(error instanceof Error ? error.message : String(error));
 }
 
 function formatTimelineLabel(seconds: number) {

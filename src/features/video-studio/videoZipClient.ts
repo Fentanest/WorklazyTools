@@ -1,6 +1,7 @@
 import type { VideoWorkerProgress } from "./types";
 import type { AppLanguage } from "../../i18n/languages";
 import videoZipWorkerUrl from "./video-zip.worker.ts?worker&url";
+import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
 
 export interface VideoZipSource {
   fileName: string;
@@ -13,17 +14,9 @@ export interface VideoZipResult {
   mimeType: string;
 }
 
-function localizedWorkerUrl(source: URL) {
-  const language = window.location.pathname.match(/^\/(ko|en)(?:\/|$)/)?.[1];
-  if (language && source.pathname.includes("/tools/video-studio/workers/") && !source.pathname.includes(`/${language}/tools/video-studio/workers/`)) {
-    source.pathname = source.pathname.replace("/tools/video-studio/workers/", `/${language}/tools/video-studio/workers/`);
-  }
-  return source;
-}
-
 export function createVideoZip(files: VideoZipSource[], onProgress?: VideoWorkerProgress, signal?: AbortSignal, language: AppLanguage = "ko") {
   const L = (ko: string, en: string) => language === "ko" ? ko : en;
-  const worker = new Worker(localizedWorkerUrl(new URL(videoZipWorkerUrl, window.location.origin)), { type: "module" });
+  const worker = new Worker(localizedVideoWorkerUrl(videoZipWorkerUrl), { type: "module" });
   return new Promise<VideoZipResult>((resolve, reject) => {
     let settled = false;
     const finish = () => {

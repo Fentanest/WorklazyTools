@@ -2,6 +2,7 @@ import type { VideoWorkerOutput, VideoWorkerOutputHandler, VideoWorkerProgress, 
 import type { AppLanguage } from "../../i18n/languages";
 import videoProbeWorkerUrl from "./video-probe.worker.ts?worker&url";
 import videoProcessorWorkerUrl from "./video.worker.ts?worker&url";
+import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
 
 type VideoWorkerInputDescriptor = Omit<VideoWorkerRequest["jobs"][number]["inputs"][number], "file"> & { fileId: string };
 interface VideoWorkerStartRequest {
@@ -15,19 +16,13 @@ export interface VideoProbeResult {
   duration: number;
   width: number;
   height: number;
-}
-
-function localizedWorkerUrl(source: URL) {
-  const language = window.location.pathname.match(/^\/(ko|en)(?:\/|$)/)?.[1];
-  if (language && source.pathname.includes("/tools/video-studio/workers/") && !source.pathname.includes(`/${language}/tools/video-studio/workers/`)) {
-    source.pathname = source.pathname.replace("/tools/video-studio/workers/", `/${language}/tools/video-studio/workers/`);
-  }
-  return source;
+  rotation?: number;
+  frameRate?: number;
 }
 
 export function probeVideoMetadata(file: File, signal?: AbortSignal, language: AppLanguage = "ko") {
   const L = (ko: string, en: string) => language === "ko" ? ko : en;
-  const worker = new Worker(localizedWorkerUrl(new URL(videoProbeWorkerUrl, window.location.origin)), { type: "module" });
+  const worker = new Worker(localizedVideoWorkerUrl(videoProbeWorkerUrl), { type: "module" });
   return new Promise<VideoProbeResult>((resolve, reject) => {
     let settled = false;
     const finish = () => {
@@ -65,7 +60,7 @@ export function runVideoTask(
   language: AppLanguage = "ko",
 ) {
   const L = (ko: string, en: string) => language === "ko" ? ko : en;
-  const worker = new Worker(localizedWorkerUrl(new URL(videoProcessorWorkerUrl, window.location.origin)), { type: "module" });
+  const worker = new Worker(localizedVideoWorkerUrl(videoProcessorWorkerUrl), { type: "module" });
   const inputFiles = new Map<string, File>();
   const startRequest: VideoWorkerStartRequest = {
     mode: request.mode,

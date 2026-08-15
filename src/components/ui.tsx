@@ -70,11 +70,12 @@ export function SegmentedControl<T extends string>({ value, options, onChange, l
   );
 }
 
-export function ToggleRow({ label, description, checked, onChange }: {
+export function ToggleRow({ label, description, checked, onChange, disabled = false }: {
   label: string;
   description?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="settings-row">
@@ -85,6 +86,7 @@ export function ToggleRow({ label, description, checked, onChange }: {
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
       ><span /></button>
     </div>

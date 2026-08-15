@@ -43,14 +43,19 @@ function parseMetadata(lines: string[], language: "ko" | "en") {
   const L = (ko: string, en: string) => language === "ko" ? ko : en;
   const log = lines.join("\n");
   const durationMatch = log.match(/Duration:\s*(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)/i);
-  const videoLine = lines.find((line) => /Video:/i.test(line));
+  const videoLine = lines.find((line) => /Video:/i.test(line) && !/(?:attached pic|cover art)/i.test(line));
   const sizeMatch = videoLine?.match(/(?:^|[^\d])(\d{2,5})x(\d{2,5})(?:[^\d]|$)/);
   if (!durationMatch || !sizeMatch) throw new Error(L("이 영상의 재생 시간과 화면 크기를 확인하지 못했습니다. MP4·MOV·WebM으로 변환한 뒤 다시 시도해 주세요.", "Unable to read this video's duration and dimensions. Convert it to MP4, MOV, or WebM and try again."));
   const duration = Number(durationMatch[1]) * 3600 + Number(durationMatch[2]) * 60 + Number(durationMatch[3]);
-  const width = Number(sizeMatch[1]);
-  const height = Number(sizeMatch[2]);
+  let width = Number(sizeMatch[1]);
+  let height = Number(sizeMatch[2]);
+  const rotationMatch = log.match(/rotation of\s*(-?\d+(?:\.\d+)?)\s*degrees/i) || log.match(/rotate\s*:\s*(-?\d+(?:\.\d+)?)/i);
+  const rotation = rotationMatch ? ((Math.round(Number(rotationMatch[1]) / 90) * 90) % 360 + 360) % 360 : 0;
+  if (rotation === 90 || rotation === 270) [width, height] = [height, width];
   if (!Number.isFinite(duration) || duration <= 0 || !width || !height) throw new Error(L("영상 정보가 올바르지 않습니다.", "The video metadata is invalid."));
-  return { duration, width, height };
+  const frameRateMatch = videoLine?.match(/(\d+(?:\.\d+)?)\s*fps/i) || videoLine?.match(/(\d+(?:\.\d+)?)\s*tbr/i);
+  const frameRate = frameRateMatch ? Number(frameRateMatch[1]) : 0;
+  return { duration, width, height, rotation, frameRate: Number.isFinite(frameRate) ? frameRate : 0 };
 }
 
 export {};

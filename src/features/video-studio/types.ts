@@ -8,6 +8,7 @@ export type VideoAudioMode = "copy" | "remove" | "encode";
 export type VideoAudioBitrate = "128k" | "192k" | "256k" | "320k" | "custom";
 export type VideoAudioSampleRate = "source" | "44100" | "48000" | "custom";
 export type ResolvedAudioSampleRate = "source" | number;
+export type VideoRotation = 0 | 90 | 180 | 270;
 
 export type VideoTask =
   | { kind: "gif"; fps: number; width: 480 | 720 | 1080 }
@@ -28,11 +29,14 @@ export type VideoTask =
       audioMode: VideoAudioMode;
       audioBitrate: string;
       audioSampleRate: ResolvedAudioSampleRate;
+      rotation: VideoRotation;
+      flipHorizontal: boolean;
     };
 
 export interface VideoWorkerInput {
   fileName: string;
   file: File;
+  fileSize: number;
   duration: number;
   width: number;
   height: number;
