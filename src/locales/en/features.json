@@ -49,7 +49,7 @@
     "contentStyle":"Content and style", "content":"URL or text", "size":"Size", "color":"QR color", "logo":"Center logo (optional)", "preview":"Preview", "download":"Download PNG", "share":"Share or save to device",
     "scanTitle":"Scan QR", "scanHelp":"Turn on the camera or choose a saved QR photo.", "cameraLabel":"QR scanning camera preview", "cameraOffTitle":"The camera turns on only after you press the button.", "cameraPrivate":"Video frames and QR data are not sent to an external server.", "turnOff":"Turn off camera", "cameraScan":"Scan with camera", "analyzing":"Analyzing photo…", "choosePhoto":"Choose QR photo", "instant":"Analyzed immediately", "scanResult":"Scan result", "copyResult":"Copy scan result", "copied":"Copied", "copyFailed":"Copy failed", "openLink":"Open link", "compatibility":"Camera and photo analysis require OffscreenCanvas and are unavailable on iOS 16.3 and earlier. Use iOS 16.4+ or a current Android browser.",
     "capabilities":{"recovery":"Error correction H","logo":"Center logo","camera":"Live camera","photo":"Local photo scan"},
-    "errors":{"secure":"This browser does not support camera access over a secure HTTPS connection.","preview":"The camera preview could not be prepared.","frame":"The camera frame could not be read.","scan":"An error occurred while scanning the camera frame.","frameQr":"The QR code could not be read from the camera frame.","scanner":"The camera QR scanner could not start.","start":"The camera could not start.","permission":"Camera permission was denied. Allow camera access in your browser's site settings.","notFound":"No usable camera was found.","busy":"Another app may be using the camera, or the camera could not be opened.","logo":"The logo image could not be read.","image":"The camera frame could not be converted to an image."},
+    "errors":{"secure":"This browser does not support camera access over a secure HTTPS connection.","preview":"The camera preview could not be prepared.","frame":"The camera frame could not be read.","scan":"An error occurred while scanning the camera frame.","frameQr":"The QR code could not be read from the camera frame.","scanner":"The camera QR scanner could not start.","start":"The camera could not start.","permission":"Camera permission was denied. Allow camera access in your browser's site settings.","notFound":"No usable camera was found.","busy":"Another app may be using the camera, or the camera could not be opened.","logo":"The logo image could not be read.","image":"The camera frame could not be converted to an image.","scanCanvas":"The QR scanning canvas could not be created.","read":"The QR code could not be read.","tooLong":"This content is too long for a high-reliability QR code. Shorten the text or URL and try again."},
     "guide":{"title":"QR code guide","description":"Generated content, camera frames and scanned images are not sent to an external server.","blocks":[{"title":"Center logo","text":"The code uses high error correction and puts white padding behind the logo. A complex logo may reduce recognition in some cameras."},{"title":"Live camera","text":"After permission is granted on HTTPS, the rear camera is preferred. The camera and analysis worker stop immediately after a QR code is found."},{"title":"Photo scanning","text":"Large images are reduced to at most 2200px in the browser, and inverted light/dark colors are also tested."}],"faq":[{"q":"Does this check whether a QR URL is safe?","a":"No. It displays the QR data but cannot guarantee that a linked site is safe."},{"q":"When is camera permission used?","a":"Permission is requested only after you press Scan with camera. Camera tracks stop on success, when turned off, when the tab changes or when you leave the page."}]}
   },
   "timezone": {
@@ -76,22 +76,832 @@
     "guide":{"title":"Excel merge guide","description":"Understanding input formats and merge layouts helps produce the expected result.","blocks":[{"title":"Supported file formats","paragraphs":["You can combine XLSX, XLS, XLSB, XLSM and CSV files. The result is always XLSX."],"items":["XLSX: formulas and common cell formatting can be preserved","XLS, XLSB and XLSM: values and basic sheet structure are converted","CSV: handled as one table of values","XLSM macros are not retained"]},{"title":"Choosing sheets","paragraphs":["After adding files, choose all sheets, a shared position rule, or a custom selection for each file."],"items":["2: second sheet from every file","-3: sheets one through three","3-: third through last sheet","1,3,5 or 2-4: multiple positions and ranges"]},{"title":"Choosing a merge layout","paragraphs":["Separate sheets keeps each source sheet. Vertical appends rows; horizontal appends columns."],"items":["Different structures: separate sheets","Same columns, such as monthly records: vertical","Same rows, such as category records: horizontal"]},{"title":"Formulas, formatting and passwords","paragraphs":["Formula and formatting preservation applies to XLSX inputs. With values-only disabled, stored results and formulas are retained and relative references are adjusted when rows or columns move. Passwords remain only in browser memory during the task."]},{"title":"Trimming empty areas","paragraphs":["Ending trim excludes unused space after content. Consecutive-empty removal scans the completed output and removes middle groups that meet the threshold."],"items":["Rows and columns can be selected independently","Whitespace-only cells count as empty","Groups shorter than the threshold remain"]},{"title":"Items to verify","paragraphs":["XLSM macros, images, external connections, pivots and some advanced objects can be omitted or simplified. Review important output in Excel."]}],"faq":[{"q":"Are CSV formulas and styles preserved?","a":"No. CSV stores plain values only. The combined result uses XLSX so it can hold richer spreadsheet features."},{"q":"Can XLSB and XLSM files be merged?","a":"Yes, but values and basic sheets are converted to XLSX. Formula and formatting preservation is limited to XLSX inputs, and macros are excluded."},{"q":"Can I select the same sheet position from every file?","a":"Yes. Enter 2 for every second sheet. Rules such as -3, 3-, 1,3,5 and 2-4 also work."},{"q":"What is the difference between ending trim and middle-empty removal?","a":"Ending trim skips blank space after data. Middle-empty removal also scans inside the output for consecutive empty row or column groups."},{"q":"Can encrypted Excel files be merged?","a":"Supported Office encryption can be unlocked locally with the password. Damaged files and some older encryption methods may not open."},{"q":"Can a forgotten output password be recovered?","a":"No. It is never stored on a server and is cleared from memory after processing, so keep it somewhere safe."}]}
   },
   "audio": {
-    "title":"Audio Waveform Editor", "description":"Select waveform regions to edit or transform pitch and tone, then export WAV or MP3.", "select":"Choose an audio file", "selectHelp":"Edit one file at a time. Choosing a new file clears the previous waveform, history and audio clipboard.", "hint":"MP3, WAV, M4A, AAC or OGG that your browser can play", "compatibility":"M4A, AAC and OGG open only when the device and browser support the audio codec inside the file. Long files can use substantial memory because decoded samples and undo history are retained.", "channels":"{{count}} channels", "memory":"Editing memory {{size}}",
+    "title":"Audio Waveform Editor", "description":"Select waveform regions to edit or transform pitch and tone, then export WAV or MP3.", "select":"Choose an audio file", "selectHelp":"Edit one file at a time. Choosing a new file clears the previous waveform, history and audio clipboard.", "hint":"MP3, WAV, M4A, AAC or OGG that your browser can play", "compatibility":"M4A, AAC and OGG open only when the device and browser support the audio codec inside the file. Long files can use substantial memory because decoded samples and undo history are retained.", "channels":"{{count}} channels", "memory":"Editing memory {{size}}", "fileSuffix":"edited",
     "waveTitle":"Select and edit the waveform", "waveHelp":"Drag an empty part of the waveform to create one region, then use its handles to adjust the start and end precisely.", "highResolution":"Detailed waveform", "pxSecond":"{{count}} px/sec", "zoomOut":"Zoom waveform out", "zoomIn":"Zoom waveform in", "start":"Selection start (seconds)", "duration":"Selection length", "end":"Selection end (seconds)", "rewind":"Go to beginning", "pause":"Pause", "play":"Play", "loop":"Loop selection", "toolbar":"Audio editing tools", "mute":"Mute region", "cut":"Cut", "copy":"Copy", "paste":"Paste at cursor", "delete":"Delete region", "undo":"Undo", "redo":"Redo", "clipboard":"Audio clipboard: {{duration}} · {{channels}} channels", "clipboardEmpty":"Copied or cut audio is kept only in this page's memory.", "selectionGain":"Selection gain", "selectionOnly":"Export selection only",
     "voice":{"title":"Selected-region voice effects","description":"Change only the selected pitch or tone while keeping its original duration.","presetsLabel":"Voice-effect presets","presets":{"low":"Lower tone","high":"Higher tone","child":"Childlike voice","robot":"Robot","custom":"Custom pitch"},"robotValue":"Robot modulation","semitones":"{{count}} semitones","pitch":"Pitch (-12 to +12 semitones)","notice":"Lower and higher tone presets do not identify or change a person's gender. Pitch shifting loads the same-site FFmpeg engine the first time and takes longer for larger selections.","preview":"Preview selection","apply":"Apply to selection","previewPlayer":"Effect preview","status":{"previewing":"Preparing a voice-effect preview for the selected region…","applying":"Applying the voice effect to the selected region…","previewMissing":"The voice-effect preview could not be created.","previewReady":"Selected-region preview ready","previewLength":"Effect preview {{duration}}","applied":"Voice effect applied to the selected region","appliedResult":"Transformed {{duration}} · {{count}} undo states"}},
     "exportTitle":"Export audio", "exportHelp":"WAV saves the edited samples directly. MP3 loads the self-hosted FFmpeg encoder only when needed.", "wav":"WAV · lossless", "mp3":"MP3 · smaller file", "format":"Audio output format", "bitrate":"MP3 bitrate", "recommended":"recommended", "offline":"The first MP3 export downloads the FFmpeg runtime from this site. MP3 cannot start completely offline unless it is cached; WAV works without that encoder.", "export":"Export as {{format}}", "log":"Audio processing log", "cancel":"Cancel operation",
     "status":{"waveOpen":"Could not open waveform playback data: {{error}}","waveDisplay":"Could not display waveform: {{error}}","checking":"Checking audio format…","unsupported":"Choose an MP3, WAV, M4A, AAC or OGG file.","decoding":"Decoding audio samples from {{name}}…","webAudio":"Reading channels and sample rate with Web Audio API…","ready":"Waveform ready for {{name}}","selecting":"Checking the edit selection…","selectRegion":"Drag across the waveform to select a region first.","checkingClipboard":"Checking the audio clipboard…","copyFirst":"Copy or cut a region first.","copied":"Copied the selected {{duration}} region.","missingResult":"No edited audio samples were returned.","done":"{{action}} complete","edited":"Edited length {{duration}} · {{count}} undo states","cancelled":"The audio operation was cancelled.","restoringUndo":"Restoring the previous edit state…","restoringRedo":"Restoring the next edit state…","previewRestore":"A waveform preview could not be created for this history state.","undoDone":"Undo complete","redoDone":"Redo complete","previous":"Previous","next":"Next","state":"{{direction}} state · {{duration}}","exportPrepare":"Preparing {{format}} export…","missingFile":"No audio result file was returned.","created":"Created {{name}}","downloaded":"Downloaded {{name}}.","exportCancelled":"Audio export was cancelled."},
     "edit":{"MUTE":"Muting selected region…","CUT":"Cutting selected region…","COPY":"Copying selected region…","PASTE":"Pasting at playback cursor…","DELETE":"Deleting selected region…","FADE_IN":"Fade in","FADE_OUT":"Fade out","GAIN":"Apply gain","NORMALIZE":"Normalize peak","TRIM":"Trim to selection","PREVIEW":"Creating waveform preview…"},
     "errors":{"decode":"This browser could not decode the audio codec in the file. Convert it to MP3 or WAV and try again.","memory":"The browser ran out of memory. Try a shorter audio file or fewer channels.","generic":"The audio operation failed."},
+    "client":{"busy":"Another audio operation is still running.","cancelled":"The audio operation was cancelled.","processing":"Processing audio…","failed":"Audio processing failed.","workerStart":"The audio worker could not start."},
+    "worker":{"done":"Audio operation complete","encodeWav":"Encoding WAV data…","prepareMp3":"Preparing MP3 encoding input…","previewWav":"Creating WAV for waveform playback…","voiceSettings":"Check the voice-effect settings.","voicePreview":"Creating the selected-region preview…","voiceBlend":"Blending the transformed voice into the original region…","clipboardMismatch":"The audio clipboard is empty or its sample rate differs.","unsupportedCommand":"Unsupported audio edit command.","deleteAll":"You cannot delete the entire audio document. Leave at least one sample.","editPreview":"Creating the edited result and waveform preview…","robot":"Synthesizing the robot voice…","pitchFailed":"The pitch shifter did not produce a result.","pitchBinary":"The pitch-shift result is not valid audio data.","emptyVoice":"The transformed voice contains no audio samples.","encodeMp3":"Encoding MP3…","mp3Failed":"The MP3 encoder did not produce a result.","mp3Binary":"The MP3 result is not valid binary data.","loadingEngine":"Loading the self-hosted audio engine…","converting":"Converting audio… {{percent}}%","selectRegion":"Drag across the waveform to select a region first.","missingPasteChannels":"There is no channel data to paste.","wavLimit":"The audio exceeds the 4GB WAV format limit. Shorten it first.","noSamples":"There are no audio samples to process.","channelMismatch":"Audio channel lengths do not match.","memory":"The browser ran out of memory. Try a shorter audio file or region.","codec":"{{error}} The browser may not support this audio codec.","generic":"An error occurred while processing audio."},
     "guide":{"title":"Audio waveform editing guide","description":"Selected audio and edit data remain in the current browser and are not sent to an external server.","blocks":[{"title":"Selecting a waveform region","text":"Drag the waveform to create a purple selection. Move it, resize its handles, or enter start and end values with 1ms precision."},{"title":"Sample-level editing","text":"Mute sets selected samples to zero; Cut and Delete pull later samples forward. Paste inserts the memory clip at the red playback cursor."},{"title":"Selected-region voice effects","text":"Lower, higher and childlike presets shift pitch while preserving duration; Robot applies fast amplitude modulation. Preview only the selected region before applying it, and a short crossfade softens each boundary."},{"title":"Keyboard shortcuts","text":"Outside input fields, Space toggles playback. Ctrl+Z or Cmd+Z undoes; Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y redo."},{"title":"Undo and memory","text":"Decoded PCM samples are retained per channel. History is limited automatically to at most 12 states and roughly 256MB, and is cleared with a new file."},{"title":"WAV and MP3","text":"WAV creates a compatible 16-bit uncompressed file quickly. MP3 and pitch effects reuse the bundled browser FFmpeg worker during the page session, then terminate it when a new file replaces the current one or the page closes."},{"title":"Browser file support","text":"Modern browsers normally open MP3 and WAV. M4A, AAC and OGG depend on operating-system and browser codec support."}],"faq":[{"q":"Is audio uploaded to a server?","a":"No. Opening, sample editing, preview and conversion all run in the current browser."},{"q":"Do lower and higher tone presets change gender?","a":"No. They do not identify or transform a person's gender; they only alter the selected region's pitch and tone."},{"q":"Where does Paste insert audio?","a":"At the current red playback cursor after you click or play through the waveform."},{"q":"Why do long files use so much memory?","a":"Compressed audio must be decoded to uncompressed per-channel samples, while preview data and undo states are also retained."},{"q":"Can MP3 export work offline?","a":"It may work if the encoder was cached before. On a first visit with no connection, use WAV instead."},{"q":"Does export overwrite the original?","a":"No. The original remains unchanged and a new WAV or MP3 is downloaded."}]}
   },
   "image": {
     "title":"Image Studio", "description":"Decorate one image, batch-edit several files, or export a collage or animated GIF.", "tabs":{"label":"Image features","editor":"Image editor","batch":"Batch edit","collage":"Join & collage","gif":"Make GIF"}, "heic":"HEIC and HEIF input is not supported. Convert iPhone photos to JPG, PNG or WebP, or capture them with the Most Compatible setting.", "offscreen":"This tab requires OffscreenCanvas and is unavailable on iOS 16.3 and earlier. Use iOS 16.4+ or a current Android browser. Large images are not dangerous, but keeping the final output under about 16 megapixels and starting with fewer files reduces memory-related stops.", "log":"Image processing log", "cancel":"Cancel operation",
-    "editor":{"confirm":"Clear the current edit and start a new canvas?","suffix":"edited","title":"Image editor","description":"Retouch a photo or draw on a blank canvas while keeping every action in one Undo/Redo history.","hint":"JPG, PNG or WebP · paste with Ctrl/⌘+V","blank":"Start with a blank canvas","editing":"Editing from {{name}}","tools":"Image editing tools","select":"Select","pencil":"Pencil","brush":"Brush","eraser":"Eraser","color":"Drawing color","width":"Width {{count}}px","undo":"Undo","redo":"Redo","duplicate":"Duplicate selected layer","deleteObject":"Delete selected object","crop":"Canvas ratio & crop","layer":"Selected layer","rotate":"Rotate 90° right","flipH":"Flip horizontally","flipV":"Flip vertically","front":"Bring to front","back":"Send to back","delete":"Delete","adjust":"Original photo adjustments","brightness":"Brightness","contrast":"Contrast","hue":"Hue","lock":"Lock original photo","lockHelp":"Prevent accidental move or rotation","text":"Text & stickers","shapes":"Lines & shapes","line":"Add line","rect":"Add rectangle","circle":"Add circle","shapeStyle":"Selected shape style","fill":"Fill","fillLabel":"Shape fill color","stroke":"Border","strokeLabel":"Shape border color","strokeWidth":"Border width {{count}}px","strokeWidthLabel":"Shape border width","selectShape":"Select a rectangle or circle on the canvas.","backgroundGroup":"Background & cleanup","background":"Background color","transparent":"Transparent background","transparentOutput":"Applies to PNG and WebP","clearLayers":"Clear all added layers","drop":"Drop here to open an image","format":"Image output format","formatHelp":"You can save a blank-canvas drawing. PNG and WebP keep transparency; JPG saves transparent areas as white.","download":"Download image"},
+    "editor":{"confirm":"Clear the current edit and start a new canvas?","suffix":"edited","title":"Image editor","description":"Retouch a photo or draw on a blank canvas while keeping every action in one Undo/Redo history.","hint":"JPG, PNG or WebP · paste with Ctrl/⌘+V","blank":"Start with a blank canvas","editing":"Editing from {{name}}","tools":"Image editing tools","select":"Select","pencil":"Pencil","brush":"Brush","eraser":"Eraser","cropDrag":"Free crop","color":"Drawing color","width":"Width {{count}}px","undo":"Undo","redo":"Redo","duplicate":"Duplicate selected layer","deleteObject":"Delete selected object","crop":"Canvas ratio & crop","cropHint":"Choose Free crop, then drag the area you want to keep on the canvas.","cropSelection":"Selection {{width}} × {{height}}px","cropApply":"Crop to selection","cropCancel":"Cancel","layer":"Selected layer","rotate":"Rotate 90° right","flipH":"Flip horizontally","flipV":"Flip vertically","front":"Bring to front","back":"Send to back","delete":"Delete","adjust":"Original photo adjustments","brightness":"Brightness","contrast":"Contrast","hue":"Hue","lock":"Lock original photo","lockHelp":"Prevent accidental move or rotation","text":"Text & stickers","shapes":"Lines & shapes","line":"Add line","rect":"Add rectangle","circle":"Add circle","shapeStyle":"Selected shape style","fill":"Fill","fillLabel":"Shape fill color","stroke":"Border","strokeLabel":"Shape border color","strokeWidth":"Border width {{count}}px","strokeWidthLabel":"Shape border width","selectShape":"Select a rectangle or circle on the canvas.","backgroundGroup":"Background & cleanup","background":"Background color","transparent":"Transparent background","transparentOutput":"Applies to PNG and WebP","clearLayers":"Clear all added layers","drop":"Drop here to open an image","format":"Image output format","formatHelp":"You can save a blank-canvas drawing. PNG and WebP keep transparency; JPG saves transparent areas as white.","download":"Download image"},
     "batch":{"prepare":"Preparing image files…","archive":"worklazy-batch-images.zip","done":"Batch processed {{count}} images","title":"Batch image editing","description":"Apply the same size and watermark settings to several images and download a ZIP.","hint":"JPG, PNG or WebP · add repeatedly or paste with Ctrl/⌘+V","resize":"Resize mode","fitWidth":"Fit width","contain":"Fit inside dimensions","cover":"Fill dimensions","original":"Original size","width":"Width px","height":"Height px","quality":"Quality","watermarkText":"Watermark text","watermarkPlaceholder":"Leave blank to disable","watermarkImage":"Watermark image","position":"Position","topLeft":"Top left","topRight":"Top right","center":"Center","bottomLeft":"Bottom left","bottomRight":"Bottom right","opacity":"Opacity","download":"Batch download ZIP"},
     "collage":{"file":"worklazy-collage","done":"Collage created","title":"Join & collage","description":"The selected gap is applied only between images. Grid cells are filled and may crop edges.","hint":"Two or more images · paste with Ctrl/⌘+V","layout":"Layout","vertical":"Join vertically","horizontal":"Join horizontally","grid":"Grid collage","columns":"Columns","width":"Total width px","gap":"Gap px","background":"Background color","download":"Download collage","emptySummary":"Add images to preview the output layout.","canvasError":"The preview canvas could not be created.","summary":"Estimated output {{width}} × {{height}} px · {{count}} images","previewError":"The preview could not be created.","preview":"Output preview","add":"Add images.","previewLabel":"Joined-image output preview","drop":"Drop here to add images","sizeError":"There are too many images or too much gap for the total width.","columnError":"There are too many columns or too much gap for the total width."},
     "gif":{"file":"worklazy-animation.gif","done":"Animated GIF created","title":"Create animated GIF","description":"Reorder frames and adjust how long each one is displayed.","hint":"Two or more JPG, PNG or WebP frames","width":"Maximum width px","delay":"All frame delays ms","colors":"Color count","small":"128 colors · smaller","balanced":"192 colors · balanced","sharp":"256 colors · sharper","download":"Download GIF","create":"Create GIF","frameDelay":"Delay ms","moveUp":"Move frame up","moveDown":"Move frame down","remove":"Remove frame","previewAlt":"Generated GIF preview"},
     "common":{"output":"Output format","transparent":"Transparent background","transparentHelp":"Keep empty areas and gaps transparent","jpeg":"JPG does not support transparency, so transparent areas become white.","alpha":"PNG and WebP keep the transparent background.","clipboard":"After copying an image or screenshot, press Ctrl/⌘ + V to {{action}}","replace":"open it for editing.","append":"append it to the current list.","clipboardPrefix":"clipboard","cancelled":"The image operation was cancelled.","failed":"Image processing failed."},
     "guide":{"title":"Browser image-editing guide","description":"Original images and edited results are not uploaded to an external processing server.","blocks":[{"title":"Unified image editor","text":"Open a photo or blank canvas and use adjustments, drawing, text and shapes in one history."},{"title":"Batch processing","text":"Add files or clipboard images, resize and watermark them, then bundle the results in a ZIP."},{"title":"Collages and GIF","text":"A scaled preview uses the same layout calculation as export. GIF's 256-color limit may simplify subtle gradients."}],"faq":[{"q":"Are images sent to a server?","a":"No. They are processed only in the current browser."},{"q":"Does this modify my originals?","a":"No. Every result is downloaded as a new file."},{"q":"Which formats are supported?","a":"Input supports JPG, PNG and WebP, not HEIC or HEIF. Output supports PNG, JPG, WebP and GIF."},{"q":"Can I keep transparency?","a":"PNG and WebP keep transparency; JPG turns it white."},{"q":"Why can large images stop?","a":"Browsers and devices have canvas and memory limits. Reduce output dimensions or file count."}]}
+  },
+  "video": {
+    "messages": {
+      "videoZip": {
+        "thereAreNoResultFilesToAddTo": "There are no result files to add to a ZIP.",
+        "addingResultToZip": "{{p0}}/{{p1}} Adding result to ZIP…",
+        "creatingZipFile": "Creating ZIP file… {{p0}}%",
+        "worklazyVideoResultsZip": "worklazy-video-results-{{p0}}.zip"
+      },
+      "videoProbe": {
+        "unableToReadTheVideoFile": "Unable to read the video file.",
+        "browserPreviewIsUnavailableInspectingVideoMetadataDirectly": "Browser preview is unavailable; inspecting video metadata directly…",
+        "unableToAttachTheVideoFileToThe": "Unable to attach the video file to the analysis engine.",
+        "unableToReadThisVideoSDurationAnd": "Unable to read this video's duration and dimensions. Convert it to MP4, MOV, or WebM and try again.",
+        "theVideoMetadataIsInvalid": "The video metadata is invalid."
+      },
+      "VideoGroupSection": {
+        "thisBrowserDoesNotSupportSplitFullscreen": "This browser does not support split fullscreen.",
+        "unableToEnterFullscreenCheckTheBrowserS": "Unable to enter fullscreen. Check the browser's fullscreen permission.",
+        "group": "Group",
+        "videosExportedInCardOrder": "{{p0}} videos · exported in card order",
+        "individual": "Individual",
+        "concatenate": "Concatenate",
+        "groupOutputMode": "Group {{p0}} output mode",
+        "syncPlayback": "Sync playback",
+        "splitFullscreen": "Split fullscreen",
+        "playGroupTogether": "Play group {{p0}} together",
+        "pauseGroupTogether": "Pause group {{p0}} together",
+        "groupPlayhead": "Group {{p0}} playhead",
+        "audio": "Audio",
+        "dragToReorderOrChangeGroup": "Drag to reorder or change group",
+        "noBrowserPreview": "No browser preview",
+        "metadataIsAvailableUseTheNumericFieldsBelow": "Metadata is available. Use the numeric fields below to set the range.",
+        "readingVideoMetadata": "Reading video metadata",
+        "preparingTheFfmpegCompatibilityPath": "Preparing the FFmpeg compatibility path.",
+        "metadataReadyForConversion": " · metadata ready for conversion",
+        "readingPlaybackMetadata": "Reading playback metadata…",
+        "moveToThePreviousGroup": "Move {{p0}} to the previous group",
+        "group2": "group",
+        "moveToAGroup": "Move {{p0}} to a group",
+        "moveToTheNextGroup": "Move {{p0}} to the next group",
+        "remove": "Remove {{p0}}",
+        "groupTrimRanges": "Group {{p0}} trim ranges",
+        "eachVideoCanUseADifferentRange": "Each video can use a different range."
+      },
+      "VideoTrimLane": {
+        "message1Frame": "1 frame",
+        "readingPlaybackMetadataFor": "Reading playback metadata for {{p0}}…",
+        "startTime": "{{p0}} start time",
+        "endTime": "{{p0}} end time",
+        "start": "Start",
+        "moveStartEarlier": "Move start {{p0}} earlier",
+        "moveStartLater": "Move start {{p0}} later",
+        "selection": "Selection",
+        "end": "End",
+        "moveEndEarlier": "Move end {{p0}} earlier",
+        "moveEndLater": "Move end {{p0}} later",
+        "fineTrimAltStartAltShiftEnd": "Fine trim {{p0}}: Alt+←/→ start · Alt+Shift+←/→ end",
+        "fineTrimEditor": "Fine trim editor for {{p0}}",
+        "currentStart": "Current → start",
+        "currentEnd": "Current → end",
+        "playRange": "Play range",
+        "applyRangeToEntireGroup": "Apply range to entire group"
+      },
+      "videoZipClient": {
+        "zipCreationWasCanceled": "ZIP creation was canceled.",
+        "creatingZipFile": "Creating ZIP file…",
+        "unableToCreateTheZipFile": "Unable to create the ZIP file.",
+        "unableToStartTheZipWorker": "Unable to start the ZIP worker."
+      },
+      "video": {
+        "theSourceVideoIsEmptyOrBrowserFile": "The source video is empty or browser file access permission has been revoked.",
+        "aVideoJobIsAlreadyRunning": "A video job is already running.",
+        "processing": "Processing",
+        "estimatingTimeRemaining": " · estimating time remaining",
+        "aboutForThisStage": " · about {{p0}} for this stage",
+        "loadingTheVideoEngineTheFirstRunMay": "Loading the video engine… (the first run may take a while)",
+        "multiThreadStartupFailedSwitchingToCompatibilityMode": "Multi-thread startup failed; switching to compatibility mode…",
+        "engineReadyPreparingGroupOutputs": "{{p0}} engine ready · preparing group outputs…",
+        "preparing": "{{p0}}… preparing",
+        "resultReadyCheckingTheNextJob": "{{p0}}/{{p1}} result ready · checking the next job…",
+        "resultsCreated": "{{p0}} results created",
+        "sourceFileAttachmentWasCanceledBecauseTheVideo": "Source file attachment was canceled because the video job ended.",
+        "attachingSourceFile": "[{{p0}}] {{p1}}/{{p2}} attaching source file",
+        "thisBrowserSVideoEngineCannotAttachLarge": "This browser's video engine cannot attach large files.",
+        "preparingSelectedRange": "[{{p0}} · {{p1}}/{{p2}}] preparing selected range",
+        "videoIn": "video {{p1}} in {{p0}}",
+        "concatenatingVideosInOrder": "[{{p0}}] concatenating videos in order",
+        "unableToConcatenateGifSegmentsFor": "Unable to concatenate GIF segments for {{p0}}.",
+        "creatingGif": "[{{p0}}] creating GIF",
+        "unableToCreateTheGif": "Unable to create the {{p0}} GIF.",
+        "concatenatingInOrder": "[{{p0}}] concatenating in order",
+        "containsIncompatibleCodecsDimensionsOrAudioStreamsAnd": "{{p0}} contains incompatible codecs, dimensions, or audio streams and cannot concatenate via passthrough. Choose CRF/target-bitrate video encoding and convert or remove audio.",
+        "unableToCombineTheSelectedRangesForInto": "Unable to combine the selected ranges for {{p0}} into the final file.",
+        "thereAreNoVideoGroupsToExport": "There are no video groups to export.",
+        "isEmpty": "{{p0}} is empty.",
+        "anIndividualOutputJobMustContainExactlyOne": "An individual output job must contain exactly one video.",
+        "exportWebmWithTheVp9Codec": "Export WebM with the VP9 codec.",
+        "passthroughRequiresSourceResolutionAndAspectRatio": "Passthrough requires source resolution and aspect ratio.",
+        "enterAVideoBitrateBetween01And": "Enter a video bitrate between 0.1 and 200 Mbps.",
+        "enterAnAudioBitrateBetween32And512": "Enter an audio bitrate between 32 and 512 kbps.",
+        "enterASampleRateBetween8000And": "Enter a sample rate between 8,000 and {{p0}} Hz for the selected audio codec.",
+        "theVideoFileReferenceIsInvalid": "The video file reference is invalid.",
+        "unableToDetermineVideoDuration": "Unable to determine video duration.",
+        "unableToDetermineVideoDimensions": "Unable to determine video dimensions.",
+        "checkTheStartAndEndTimes": "Check the start and end times.",
+        "theOutputFileIsNotValidBinaryData": "The output file is not valid binary data.",
+        "concatenated": "concatenated",
+        "passthrough": "passthrough",
+        "converted": "converted",
+        "animation": "animation",
+        "audio": "audio",
+        "gifConversion": "GIF conversion",
+        "audioExtraction": "{{p0}} audio extraction",
+        "passthroughWithoutReEncoding": "passthrough without re-encoding",
+        "encoding": "{{p0}} encoding",
+        "theFirstAudioTrackInCannotBeCopied": "The first audio track in {{p0}} cannot be copied directly into the selected container. Convert or remove the audio track.",
+        "unableToExtractTheFirstAudioTrackFrom": "Unable to extract the first audio track from {{p0}} as {{p1}}.",
+        "unableToProcessUsing": "Unable to process {{p0}} using {{p1}}.",
+        "processedOutputJobsAccordingToGroupSettings": "Processed {{p0}} output jobs according to group settings.",
+        "passthroughTrimmingMayStartSlightlyEarlierAtA": "Passthrough trimming may start slightly earlier at a keyframe boundary.",
+        "theFirstAudioTrackWasPreservedWithoutRe": "The first audio track was preserved without re-encoding.",
+        "theAudioTrackWasRemovedFromTheOutput": "The audio track was removed from the output video.",
+        "hevcMayNotPlayOnEveryDeviceOr": "HEVC may not play on every device or player.",
+        "theBrowserRanOutOfMemoryTryA": "The browser ran out of memory. Try a shorter range or fewer files.",
+        "theBrowserEncodingEngineDoesNotSupportThe": "The browser encoding engine does not support the selected codec. Choose H.264 or VP9.",
+        "theInputFormatOrCodecMayNotBe": "{{p0}} The input format or codec may not be supported by this browser engine.",
+        "sec": "{{p0}} sec",
+        "minSec": "{{p0}} min {{p1}} sec",
+        "engineMultiThreaded": "multi-threaded",
+        "engineSingleThreaded": "single-thread compatibility"
+      },
+      "videoWorkerClient": {
+        "videoMetadataInspectionWasCanceled": "Video metadata inspection was canceled.",
+        "unableToReadVideoMetadata": "Unable to read video metadata.",
+        "unableToStartVideoMetadataInspection": "Unable to start video metadata inspection.",
+        "videoProcessingWasCanceled": "Video processing was canceled.",
+        "videoWorkspaceReadySendingTheJobList": "Video workspace ready · sending the job list…",
+        "unableToSendTheVideoJobListTo": "Unable to send the video job list to the worker.",
+        "theBrowserFileReferenceForIsUnavailableSelect": "The browser file reference for {{p0}} is unavailable. Select the file again.",
+        "unableToSendTheFileReferenceToThe": "Unable to send the {{p0}} file reference to the worker.",
+        "processingVideo": "Processing video…",
+        "anErrorOccurredWhileProcessingTheVideo": "An error occurred while processing the video.",
+        "unableToStartVideoProcessing": "Unable to start video processing.",
+        "theVideoWorkspaceDidNotStartWithin30": "The video workspace did not start within 30 seconds. Refresh the page and try again.",
+        "originalVideo": "source video"
+      },
+      "VideoStudioPage": {
+        "unsupportedFilesWereSkipped": "Unsupported files were skipped: {{p0}}",
+        "wereAttachedWithoutCopyingTheEntireSourceInto": "{{p0}} were attached without copying the entire source into memory. If a passthrough result is too large, you will be asked to shorten the range before export.",
+        "unableToReadVideoMetadata": "Unable to read video metadata.",
+        "isReadyDownloadItFromTheResultsBelow": "{{p0}} is ready. Download it from the results below.",
+        "requestedIndividualDownloadsAllowMultipleDownloadsIfYour": "Requested {{p0}} individual downloads. Allow multiple downloads if your browser asks.",
+        "savingResultsToTheSelectedFolder": "Saving results to the selected folder…",
+        "saving": "{{p0}}/{{p1}} Saving {{p2}}…",
+        "savedResultsToTheSelectedFolder": "Saved {{p0}} results to the selected folder.",
+        "unableToSaveResultsToTheSelectedFolder": "Unable to save results to the selected folder.",
+        "creatingAZipFromTheSelectedResults": "Creating a ZIP from the selected results…",
+        "created": "{{p0}} created",
+        "createdAndDownloaded": "Created and downloaded {{p0}}.",
+        "zipCreationWasCanceled": "ZIP creation was canceled.",
+        "thisBrowserCannotTransferFilesBetweenToolsIn": "This browser cannot transfer files between tools in memory. Download the file and open it manually in Audio Studio.",
+        "sentToAudioStudioInANewTab": "Sent {{p0}} to Audio Studio in a new tab.",
+        "theNewTabWasBlockedAllowPopUps": "The new tab was blocked. Allow pop-ups and try again.",
+        "theAudioStudioConnectionTimedOutDownloadThe": "The Audio Studio connection timed out. Download the result and open it manually.",
+        "checkingCustomValues": "Checking custom values…",
+        "enterVideoBitrateFrom01200Mbps": "Enter video bitrate from 0.1–200 Mbps, audio bitrate from 32–512 kbps, and sample rate from 8,000–{{p0}} Hz.",
+        "checkingEstimatedPassthroughOutputSize": "Checking estimated passthrough output size…",
+        "isEstimatedAtAboutLargeSourceFilesAre": "{{p0}} is estimated at about {{p1}}. Large source files are not inherently unsafe, but this browser output path cannot create a single result over 1.5 GB. Shorten the range or select CRF encoding.",
+        "largeFileNoticeTheSelectedSourcesTotalThey": "Large-file notice: the selected sources total {{p0}}. They are attached without copying the entire files into memory, but conversion may take longer or run out of memory on this device. Continue?",
+        "attachingSourceVideosToTheProcessingEngineWithout": "Attaching source videos to the processing engine without copying them into memory…",
+        "allResultsAreReady": "All {{p0}} results are ready.{{p1}}",
+        "resultsCreated": "{{p0}} results created",
+        "videoProcessingWasCanceled": "Video processing was canceled.",
+        "resultsCompletedAndCanBeDownloadedIndividuallyBelow": "{{p0}} results completed and can be downloaded individually below.",
+        "checkingTrimRanges": "Checking trim ranges…",
+        "theEndTimeMustBeAfterTheStart": "{{p0}}: the end time must be after the start time.",
+        "videoStudio": "Video Studio",
+        "keepAddingVideosWithoutAFileCountLimit": "Keep adding videos without a file-count limit, organize them into up to 10 groups, and export individually or concatenate in order.",
+        "multiThreadEncodingReady": "Multi-thread encoding ready",
+        "singleThreadCompatibilityMode": "Single-thread compatibility mode",
+        "aDedicatedVideoRuntimeUsesMultipleCpuCores": "A dedicated video runtime uses multiple CPU cores and does not load advertising scripts.",
+        "thisBrowserCannotMeetTheMultiThreadRequirements": "This browser cannot meet the multi-thread requirements, so it uses the compatible engine. Features are the same, but encoding may take longer.",
+        "chooseVideos": "Choose videos",
+        "addFilesInMultipleRoundsWithNoFile": "Add files in multiple rounds with no file-count limit, then set order and output mode in up to 10 groups.",
+        "mp4MovWebmMkvAviAddMoreAt": "MP4 · MOV · WebM · MKV · AVI · add more at any time",
+        "mkvAndAviCompatibilityDependsOnTheirInternal": "MKV and AVI compatibility depends on their internal codecs and is not guaranteed. If preview fails, browser FFmpeg will try to read duration and dimensions for numeric trimming; if probing also fails, convert the source to MP4, MOV, or WebM first.",
+        "mobileDefaultsAre1080pAnd480PxGif": "Mobile defaults are 1080p and 480 px GIF. Large totals above 250 MB are supported, but processing one short clip at a time is more reliable.",
+        "groupPreviewsAndTrimRanges": "Group previews and trim ranges",
+        "dragVideosToReorderThemWithinAGroup": "Drag videos to reorder them within a group or move them to another group.",
+        "outputSettings": "Output settings",
+        "theOutputFormatAutomaticallyDeterminesWhetherToCreate": "The output format automatically determines whether to create a GIF, extract audio, or export video.",
+        "outputFormat": "Output format",
+        "video": "video",
+        "animation": "animation",
+        "audio": "audio",
+        "outputFiles": "{{p0}} output files",
+        "completedFilesAppearInTheIndividualDownloadList": "Completed files appear in the individual download list immediately.",
+        "browserRecommendationUnder1GbPerOutput": "Browser recommendation: under 1 GB per output",
+        "theCurrentSafetyLimitIs15Gb": "The current safety limit is 1.5 GB per result, calculated separately from source file size.",
+        "gifFrameRate": "GIF frame rate",
+        "smaller": "smaller",
+        "recommended": "recommended",
+        "smoother": "smoother",
+        "maximumWidth": "Maximum width",
+        "concatenateAllGroupsIntoOneFile": "Concatenate all groups into one file",
+        "connectGroupsByGroupNumberAndCardOrder": "Connect groups by group number and card order, overriding each group's output mode for this export only.",
+        "passthroughAvoidsReEncodingSoItIsFast": "Passthrough avoids re-encoding, so it is fast and lossless. Trim starts may snap to a nearby keyframe, and videos with different codec settings may not concatenate.",
+        "typicalMp4VideoAndAudioCannotBeCopied": "Typical MP4 video and audio cannot be copied directly into WebM.",
+        "reEncodeH264VideoUsingCrfOr": "Re-encode H.264 video using CRF or a target bitrate, and convert audio to Opus or remove it. Direct copy works only when the source already uses VP8, VP9, or AV1 video with Opus or Vorbis audio.",
+        "onlyTheFirstAudioTrackIsCopiedWithout": "Only the first audio track is copied without re-encoding. If the output container does not support it, the tool reports an error instead of silently changing quality.",
+        "audioWillBeRemovedFromTheOutputVideo": "Audio will be removed from the output video.",
+        "changingAspectRatioOrResolutionRequiresReEncoding": "Changing aspect ratio or resolution requires re-encoding. Restore both to source settings or choose CRF/target-bitrate encoding.",
+        "videosWithDifferentDimensionsOrAspectRatiosCannot": "Videos with different dimensions or aspect ratios cannot be concatenated via passthrough. Choose CRF or a target bitrate to fit each source into the first video's frame while preserving its aspect ratio.",
+        "createsGifsFromEachGroupSSelectedRanges": "Creates GIFs from each group's selected ranges in the configured order and output mode.",
+        "extractsOnlyAudioFromEachGroupSSelected": "Extracts only audio from each group's selected ranges, excluding video.",
+        "allGroups": "All groups",
+        "concatenateByGroupNumberAndCardOrder": "Concatenate by group number and card order",
+        "group": "Group",
+        "concatenateVideosInOrder": "Concatenate {{p0}} videos in order",
+        "exportVideosIndividually": "Export {{p0}} videos individually",
+        "createResults": "Create {{p0}} results",
+        "exportIsBlockedBecauseMetadataIsUnavailableFor": "Export is blocked because metadata is unavailable for: {{p0}}",
+        "videoProcessingLog": "Video processing log",
+        "cancel": "Cancel",
+        "completedResults": "{{p0}} completed results",
+        "eachFileAppearsAsSoonAsItFinishes": "Each file appears as soon as it finishes. Download only what you need, download all individually, or create a ZIP when required.",
+        "result": "result",
+        "download": "Download",
+        "continueInAudioStudio": "Continue in Audio Studio",
+        "downloadAllIndividually": "Download all individually",
+        "saveToFolder": "Save to folder",
+        "createZip": "Create ZIP",
+        "clearResults": "Clear results",
+        "browserVideoProcessingGuide": "Browser video processing guide",
+        "videoFilesAreProcessedInAnIsolatedWorkspace": "Video files are processed in an isolated workspace on this page and are not uploaded to a conversion server.",
+        "videoCodec": "Video codec",
+        "whenSupported": "when supported",
+        "resizeAllVideos": "Resize all videos",
+        "keepSource": "Keep source",
+        "aspectRatio": "Aspect ratio",
+        "keepSourceRatio": "Keep source ratio",
+        "portrait": "portrait",
+        "square": "square",
+        "landscape": "landscape",
+        "rotation": "Rotation",
+        "noRotation": "No rotation",
+        "flipHorizontally": "Flip horizontally",
+        "videoProcessingSizeTarget": "Video processing & size target",
+        "copySourcePassthrough": "Copy source (passthrough)",
+        "qualityBasedSizeCrf": "Quality-based size (CRF)",
+        "custom": "Custom",
+        "customVideoBitrate": "Custom video bitrate",
+        "qualityCrf": "Quality (CRF)",
+        "lowerValuesAreSharperAndProduceLargerFiles": "Lower values are sharper and produce larger files.",
+        "targetBitrateModeUsesTheSelectedBitrateInstead": "Target-bitrate mode uses the selected bitrate instead of CRF.",
+        "videoAudio": "Video audio",
+        "onlyTheFirstAudioTrackIsProcessed": "Only the first audio track is processed.",
+        "copyAudio": "Copy audio",
+        "removeAudio": "Remove audio",
+        "convertAudio": "Convert audio",
+        "videoAudioMode": "Video audio mode",
+        "audioQualitySizeBitrate": "Audio quality & size (bitrate)",
+        "customAudioBitrate": "Custom audio bitrate",
+        "audioSampleRate": "Audio sample rate",
+        "keepSource2": "Keep source",
+        "customSampleRate": "Custom sample rate",
+        "customSampleRate2": "Custom sample rate",
+        "snappedToAnOpusSupportedRate": " · snapped to an Opus-supported rate",
+        "allGroups2": "all-groups",
+        "group2": "group",
+        "theCompletedVideoOrIntermediateDataExceededThe": "The completed video or intermediate data exceeded the browser memory limit. Shorten the range, reduce resolution, or use passthrough.",
+        "theSelectedVideoCannotBeReadItMay": "The selected video cannot be read. It may have moved, changed, or lost browser permission. Select the source file again.",
+        "videoProcessingFailed": "Video processing failed."
+      }
+    },
+    "page": {
+      "guide": {
+        "blocks": [
+          {
+            "title": "Adding files and group outputs",
+            "paragraphs": [
+              "Open the file picker or drop files repeatedly to append videos. Arrange them in up to 10 groups; each group can export individually or concatenate selected ranges. Results appear as they finish, and ZIP creation is optional. MP3 and AAC results can be sent directly to Audio Studio in a new tab."
+            ]
+          },
+          {
+            "title": "Passthrough and trim accuracy",
+            "paragraphs": [
+              "Passthrough is fast and lossless because it avoids re-encoding. The first audio track can be copied, removed, or converted. Incompatible source audio reports an error rather than changing quality silently. Trim starts may move to a nearby keyframe, and videos with different codecs or dimensions cannot be concatenated without re-encoding."
+            ]
+          },
+          {
+            "title": "Bitrate and sample rate",
+            "paragraphs": [
+              "Bitrate is data stored per second; higher values generally increase quality and file size. Sample rate is how often audio is sampled per second. Choose a preset or enter a custom value."
+            ]
+          },
+          {
+            "title": "Synchronized playback and split fullscreen",
+            "paragraphs": [
+              "Play videos in a group together and move them with one playhead. Split fullscreen lets you compare the group on one screen while listening to one selected video."
+            ]
+          },
+          {
+            "title": "Large sources and output limits",
+            "paragraphs": [
+              "Source videos are attached to the engine through read-only browser file references rather than copied in full. Intermediate data and final results still use memory, so trim long 4K sources first. Oversized passthrough estimates are reported before processing."
+            ]
+          },
+          {
+            "title": "Input compatibility",
+            "paragraphs": [
+              "MP4, MOV, and WebM usually preview in current browsers. If MKV or AVI preview fails, the conversion engine tries to read duration and dimensions for numeric trimming, but not every internal codec is guaranteed."
+            ]
+          },
+          {
+            "title": "Using multiple CPU cores",
+            "paragraphs": [
+              "Supported browsers reopen only the video tool in a secure isolated runtime that can use multiple CPU cores. The address and domain stay the same, and other tools and ad execution are unaffected. A functionally equivalent single-core path is used when requirements are not met."
+            ]
+          }
+        ],
+        "faq": [
+          {
+            "question": "Are videos sent to a server?",
+            "answer": "No. Selected files are read only by the in-browser conversion engine; video data and results are not sent to a server."
+          },
+          {
+            "question": "How do I download group outputs?",
+            "answer": "Each completed file gets its own download button. You can also download all individually, save to a folder in supported browsers, or create an optional ZIP."
+          },
+          {
+            "question": "Where do I select GIF or audio extraction?",
+            "answer": "Choose GIF, MP3, or AAC as the output format. Only the relevant settings appear, and MP3/AAC results can continue in Audio Studio."
+          },
+          {
+            "question": "Can I keep or remove video audio?",
+            "answer": "Yes. Copy, remove, or convert the first audio track. Selecting among multiple audio tracks is not currently supported."
+          },
+          {
+            "question": "Can videos concatenate without re-encoding?",
+            "answer": "Yes when video/audio codecs and dimensions are compatible. Otherwise the tool asks you to re-encode instead of silently changing quality."
+          },
+          {
+            "question": "Why is the first run slow?",
+            "answer": "The browser must load the bundled video conversion runtime and allocate memory. Later starts may be faster while assets remain cached."
+          },
+          {
+            "question": "Is remaining time for the whole job?",
+            "answer": "It is recalculated from the recent speed of the current video and encoding stage. A new input or final concat stage starts a fresh estimate."
+          },
+          {
+            "question": "Do MKV and AVI always work?",
+            "answer": "No. The engine can often probe files that browsers cannot preview, but unsupported internal codec combinations are not guaranteed."
+          }
+        ]
+      },
+      "downloadGuidanceLabel": "Download all individually",
+      "downloadGuidance": " may prompt your browser to allow multiple downloads. ZIP barely reduces video size and keeps both results and the archive in memory, so use it only when you need one bundle."
+    }
+  },
+  "pdf": {
+    "messages": {
+      "pdfOffice": {
+        "unsupportedDocumentConversionOperation": "Unsupported document conversion operation.",
+        "anErrorOccurredWhileConvertingTheDocument": "An error occurred while converting the document.",
+        "pdfsOftenOmitParagraphAndTableStructureSo": "PDFs often omit paragraph and table structure, so reading order and cell boundaries are estimated from coordinates.",
+        "complexTablesColumnsFootnotesShapesAndOriginalFormatting": "Complex tables, columns, footnotes, shapes, and original formatting may not be reproduced exactly.",
+        "page": "[Page {{p0}}]",
+        "creatingOneWorksheetPerPage": "Creating one worksheet per page…",
+        "page2": "Page {{p0}}",
+        "worksheetCreated": "[{{p0}}/{{p1}}] Worksheet created",
+        "buildingTheWordDocumentStructure": "Building the Word document structure…",
+        "normal": "Normal",
+        "pageHeading": "Page Heading",
+        "noRecognizedText": "(No recognized text)",
+        "paragraphsCreated": "[{{p0}}/{{p1}}] Paragraphs created"
+      },
+      "PdfImagePanel": {
+        "onlyJpgAndPngImagesAreSupported": "{{p0}}: only JPG and PNG images are supported.",
+        "preparingImagesAsPdfPages": "Preparing {{p0}} images as PDF pages…",
+        "worklazyImagePdf": "Worklazy-image-PDF",
+        "createdAPdfInTheSelectedImageOrder": "Created a PDF in the selected image order.",
+        "unableToConvertTheImagesToPdf": "Unable to convert the images to PDF.",
+        "addImages": "Add images",
+        "addJpgAndPngImagesAndArrangeThem": "Add JPG and PNG images and arrange them in any order.",
+        "chooseJpgPngImagesAtOnceOrAdd": "Choose JPG/PNG images at once or add more later.",
+        "pageOrder": "Page order",
+        "dragImagesToChangeThePdfPageOrder": "Drag images to change the PDF page order.",
+        "pdfSettings": "PDF settings",
+        "pageSize": "Page size",
+        "imagePdfPageSize": "Image PDF page size",
+        "fitA4": "Fit A4",
+        "imageSize": "Image size",
+        "images": "Images",
+        "orientation": "Orientation",
+        "automaticA4": "Automatic A4",
+        "cropping": "Cropping",
+        "none": "None",
+        "outputFileName": "Output file name",
+        "createPdf": "Create PDF",
+        "imageConversionLog": "Image conversion log",
+        "checkingPagesIn": "Checking pages in {{p0}}…",
+        "loadedPages": "Loaded {{p0}} pages.",
+        "unableToReadThePdf": "Unable to read the PDF.",
+        "startingPdfPageImageConversion": "Starting PDF page image conversion.",
+        "morePagesAndHigherResolutionIncreaseConversionTime": "More pages and higher resolution increase conversion time and memory use.",
+        "createdAZipContainingPageImages": "Created a ZIP containing {{p0}} page images.",
+        "unableToConvertThePdfToImages": "Unable to convert the PDF to images.",
+        "chooseAPdf": "Choose a PDF",
+        "convertEveryPageToAHighResolutionPng": "Convert every page to a high-resolution PNG or JPG image.",
+        "chooseOnePdfToConvertToImages": "Choose one PDF to convert to images.",
+        "pagePreview": "Page preview",
+        "everyPageIsConvertedWithTheSameFormat": "Every page is converted with the same format and resolution.",
+        "imageSettings": "Image settings",
+        "fileFormat": "File format",
+        "outputImageFormat": "Output image format",
+        "resolution": "Resolution",
+        "higherIsSharperButSlower": "Higher is sharper but slower.",
+        "screen96Dpi": "Screen · 96 DPI",
+        "sharp144Dpi": "Sharp · 144 DPI",
+        "highResolution216Dpi": "High resolution · 216 DPI",
+        "pagesToConvert": "Pages to convert",
+        "allEG13710": "All · e.g. 1-3, 7, 10-",
+        "custom": "Custom",
+        "all": "All",
+        "pages": "Pages",
+        "output": "Output",
+        "createImageZip": "Create image ZIP",
+        "pdfImageConversionLog": "PDF image conversion log",
+        "reorderImage": "Reorder image {{p0}}",
+        "remove": "Remove {{p0}}"
+      },
+      "PdfConvertPanel": {
+        "checkingPagesAndSecuritySettingsIn": "Checking pages and security settings in {{p0}}…",
+        "converted": "converted",
+        "pagesAreReadyToConvert": "{{p0}} pages are ready to convert.",
+        "unableToReadThePdf": "Unable to read the PDF.",
+        "preparingSearchableText": "Preparing searchable text…",
+        "analyzingPdfTextAndLayoutCoordinates": "Analyzing PDF text and layout coordinates…",
+        "searchablePdfDataCouldNotBeCreatedFor": "Searchable PDF data could not be created for some pages.",
+        "combiningPagesWithOcrTextLayers": "Combining pages with OCR text layers…",
+        "worklazySearchablePdf": "Worklazy-searchable-PDF",
+        "noTextWasExtractedEnableAutomaticOcrFor": "No text was extracted. Enable automatic OCR for scanned pages and try again.",
+        "buildingAStructureFromCharacters": "Building a {{p1}} structure from {{p0}} characters…",
+        "worklazyPdfConversion": "Worklazy-PDF-conversion",
+        "pagesUsedKoreanAndEnglishOcrResults": "{{p0}} pages used Korean and English OCR results.",
+        "createdASearchablePdfWithSelectableText": "Created a searchable PDF with selectable text.",
+        "createdTheFile": "Created the {{p0}} file.",
+        "unableToCompleteThePdfConversion": "Unable to complete the PDF conversion.",
+        "chooseAPdf": "Choose a PDF",
+        "convertTextOrScannedPdfsToDocxXlsx": "Convert text or scanned PDFs to DOCX, XLSX, TXT, or a searchable PDF.",
+        "chooseOnePdfToExtractTextFromOr": "Choose one PDF to extract text from or process with OCR.",
+        "reviewTheConversionRange": "Review the conversion range",
+        "embeddedTextIsUsedFirstPageImagesAre": "Embedded text is used first; page images are OCRed only when needed.",
+        "ocrCannotStartDuringAFirstOfflineVisit": "OCR cannot start during a first offline visit.",
+        "theOcrRuntimeAndKoreanEnglishModelsLoad": "The OCR runtime and Korean/English models load only from the Worklazy Tools deployment, with no external CDN or OCR server. Your PDF content does not leave the browser.",
+        "thisDocumentHasPagesLargeDocumentsAreSupported": "This document has {{p0}} pages. Large documents are supported, but on mobile it is faster and more reliable to enter only the required range below.",
+        "conversionSettings": "Conversion settings",
+        "pdfConversionFormat": "PDF conversion format",
+        "paragraphs": "Paragraphs",
+        "estimatedCells": "Estimated cells",
+        "textOnly": "Text only",
+        "searchablePdf": "Searchable PDF",
+        "ocrLayer": "OCR layer",
+        "scannedPageOcr": "Scanned-page OCR",
+        "ocrScope": "OCR scope",
+        "auto": "Auto",
+        "off": "Off",
+        "all": "All",
+        "aSearchablePdfAppliesKoreanAndEnglishOcr": "A searchable PDF applies Korean and English OCR to every page and rebuilds each page image.",
+        "pages": "Pages",
+        "languages": "Languages",
+        "koreanEnglish": "Korean + English",
+        "processing": "Processing",
+        "thisBrowser": "This browser",
+        "pagesToProcess": "Pages to process",
+        "allEG158Max": "All · e.g. 1-5, 8 (max {{p0}})",
+        "custom": "Custom",
+        "outputFileName": "Output file name",
+        "createOcrPdf": "Create OCR PDF",
+        "convertTo": "Convert to {{p0}}",
+        "pdfsMayNotContainOriginalParagraphOrTable": "PDFs may not contain original paragraph or table structure, so DOCX and XLSX layout is estimated from coordinates.",
+        "pdfConversionOcrLog": "PDF conversion & OCR log",
+        "yourSearchablePdfIsReady": "Your searchable PDF is ready.",
+        "yourConvertedFileIsReady": "Your converted file is ready."
+      },
+      "pdfWorkerClient": {
+        "processing": "Processing…",
+        "anErrorOccurredWhileProcessingThePdf": "An error occurred while processing the PDF.",
+        "unableToStartThePdfOperation": "Unable to start the PDF operation.",
+        "theSourceImageCouldNotBeDecoded": "The source image could not be decoded.",
+        "theImageDimensionsCouldNotBeDetermined": "The image dimensions could not be determined.",
+        "unableToCorrectTheImageOrientation": "Unable to correct the image orientation.",
+        "unableToPrepareTheImageForPdfConversion": "Unable to prepare the image for PDF conversion.",
+        "unableToReadTheImageFile": "Unable to read the image file."
+      },
+      "PdfEditorPage": {
+        "pdfTools": "PDF tools"
+      },
+      "pdf": {
+        "unsupportedPdfOperation": "Unsupported PDF operation.",
+        "thereAreNoPagesToExport": "There are no pages to export.",
+        "readingSourcePdfs": "Reading source PDFs…",
+        "ready": "[{{p0}}/{{p1}}] {{p2}} ready",
+        "theSourcePageCouldNotBeFound": "The source page could not be found.",
+        "placingPage": "[{{p0}}/{{p1}}] Placing page…",
+        "writingPageOrderAndRotationsToThePdf": "Writing page order and rotations to the PDF…",
+        "editingAPdfInvalidatesItsDigitalSignatures": "Editing a PDF invalidates its digital signatures.",
+        "formsBookmarksAttachmentsAndSomeAdvancedPdfObjects": "Forms, bookmarks, attachments, and some advanced PDF objects may not survive page copying.",
+        "thereAreNoPdfGroupsToExport": "There are no PDF groups to export.",
+        "aPdfGroupContainsNoPages": "A PDF group contains no pages.",
+        "buildingPage": "[{{p0}}/{{p1}}] {{p2}} · building page {{p3}}/{{p4}}…",
+        "splitPdf": "split-PDF",
+        "packingPdfsIntoAZip": "Packing {{p0}} PDFs into a ZIP…",
+        "compressingZip": "Compressing ZIP… {{p0}}%",
+        "thereAreNoImagesToConvert": "There are no images to convert.",
+        "thisIsNotAJpgOrPngImage": "{{p0}}: this is not a JPG or PNG image.",
+        "theImageIsDamagedOrUnreadable": "{{p0}}: the image is damaged or unreadable.",
+        "placed": "[{{p0}}/{{p1}}] {{p2}} placed",
+        "imageBasedCompressionRedrawsPagesSoSearchableText": "Image-based compression redraws pages, so searchable text, links, forms, and digital signatures are not preserved.",
+        "thereAreNoSearchablePdfPages": "There are no searchable PDF pages.",
+        "combiningOcrPage": "[{{p0}}/{{p1}}] Combining OCR page…",
+        "searchablePdfsRebuildEveryPageAsAnImage": "Searchable PDFs rebuild every page as an image, so original vectors, links, forms, and digital signatures are not preserved.",
+        "recognizedTextMayDifferFromTheSourceDepending": "Recognized text may differ from the source depending on OCR accuracy.",
+        "passwordProtectedPdfsCannotBeEditedTryAgain": "Password-protected PDFs cannot be edited. Try again with an unlocked copy.",
+        "unableToReadThePdfItMayBe": "Unable to read the PDF. It may be damaged or unsupported.",
+        "anUnknownErrorOccurredWhileProcessingThePdf": "An unknown error occurred while processing the PDF."
+      },
+      "PdfOrganizePanel": {
+        "checkingPagesInPdfs": "Checking pages in {{p0}} PDFs…",
+        "onlyPdfFilesCanBeAdded": "{{p0}}: only PDF files can be added.",
+        "checkingPagesIn": "[{{p0}}/{{p1}}] Checking pages in {{p2}}…",
+        "addedAndSelectedAllPages": "Added and selected all {{p0}} pages.",
+        "unableToReadThePdfFiles": "Unable to read the PDF files.",
+        "checkingSelectedPagesOrderAndRotations": "Checking selected pages, order, and rotations…",
+        "worklazyPdfEdited": "Worklazy-PDF-edited",
+        "selectPagesToSaveInOnePdf": "Select pages to save in one PDF.",
+        "theSourcePageCouldNotBeFound": "The source page could not be found.",
+        "renderingCompressedPage": "[{{p0}}/{{p1}}] Rendering compressed page…",
+        "createdOnePdfFromSelectedPages": "Created one PDF from {{p0}} selected pages.",
+        "checkTheFileNamesAndPageRanges": "Check the file names and page ranges.",
+        "selectPagesToSaveAsSeparatePdfs": "Select pages to save as separate PDFs.",
+        "createdPdfsAndPackedThemIntoAZip": "Created {{p0}} PDFs and packed them into a ZIP.",
+        "unableToCreateThePdfOutput": "Unable to create the PDF output.",
+        "checkThePageRangeToSelect": "Check the page range to select.",
+        "addPdfs": "Add PDFs",
+        "loadEveryPageFromMultiplePdfsIntoOne": "Load every page from multiple PDFs into one editor.",
+        "chooseMultiplePdfsAtOnceOrAddMore": "Choose multiple PDFs at once or add more later.",
+        "editAndSelectPages": "Edit and select pages",
+        "defineEachOutputRangeThenDragRotateOr": "Define each output range, then drag, rotate, or delete pages.",
+        "chooseOutputPagesInTheCurrentOrderThen": "Choose output pages in the current order, then drag, rotate, or delete them.",
+        "numberBadgesShowWhichOutputRangesIncludeA": "Number badges show which output ranges include a page. Deleting removes it from every result, and rotations are written to the exported PDFs.",
+        "deselectingExcludesAPageFromThisOutputDeleting": "Deselecting excludes a page from this output. Deleting removes it from the editor, and rotations are written to the exported PDF.",
+        "outputRanges": "Output ranges",
+        "eachRowCreatesOnePdfAndAPage": "Each row creates one PDF, and a page may appear in multiple results.",
+        "addRange": "Add range",
+        "outputFileName": "Output file name",
+        "split": "split",
+        "pageRangeInCurrentOrder": "Page range in current order",
+        "eG135": "e.g. 1-3, 5",
+        "deleteRange": "Delete range {{p0}}",
+        "pageNumbersFollowTheCurrentEditorOrderFor": "Page numbers follow the current editor order. For example,",
+        "createsAPdfOrdered5123": " creates a PDF ordered 5, 1, 2, 3.",
+        "selectAll": "Select all",
+        "clearSelection": "Clear selection",
+        "selected": "selected",
+        "pageRangeToSelect": "Page range to select",
+        "selectRange": "Select range",
+        "editOutputSummary": "Edit & output summary",
+        "pdfOutputMode": "PDF output mode",
+        "onePdf": "One PDF",
+        "saveSelectedPagesInCurrentOrder": "Save selected pages in current order",
+        "onePdfPerRange": "One PDF per range",
+        "createEachRowAsAPdfInA": "Create each row as a PDF in a ZIP",
+        "onePdfPerPage": "One PDF per page",
+        "splitSelectedPagesIntoAZip": "Split selected pages into a ZIP",
+        "sourceFiles": "Source files",
+        "pagesInRanges": "Pages in ranges",
+        "selectedPages": "Selected pages",
+        "outputPdfs": "Output PDFs",
+        "rotatedPages": "Rotated pages",
+        "outputFileName2": "Output file name",
+        "zipFileName": "ZIP file name",
+        "watermarkTextOptional": "Watermark text (optional)",
+        "eGInternalReview": "e.g. INTERNAL REVIEW",
+        "addPageNumbers": "Add page numbers",
+        "numberEachOutputPdfFrom1AtThe": "Number each output PDF from 1 at the bottom center.",
+        "imageBasedCompression": "Image-based compression",
+        "redrawPagesAs144DpiJpegToReduce": "Redraw pages as 144 dpi JPEG to reduce size. Text search, links, and forms are removed.",
+        "availableOnlyWhenCreatingOnePdf": "Available only when creating one PDF.",
+        "createPdf": "Create PDF",
+        "createPdfZip": "Create PDF ZIP",
+        "passwordProtectedPdfsRequireAnUnlockedCopy": "Password-protected PDFs require an unlocked copy.",
+        "pdfEditExtractLog": "PDF edit & extract log",
+        "enterAnOutputFileName": "Enter an output file name.",
+        "thisFileNameDuplicatesAnotherRange": "This file name duplicates another range.",
+        "checkThePageRange": "Check the page range."
+      },
+      "PdfThumbnail": {
+        "previewFailed": "Preview failed",
+        "largePreviewFailed": "Large preview failed",
+        "reorderPage": "Reorder page {{p0}}",
+        "original": "Original",
+        "page": "{{p1}} page {{p0}}",
+        "includedRangeGroups": "Included range groups {{p0}}",
+        "renderingPage": "Rendering page…",
+        "previewPending": "Preview pending",
+        "pagePreview": "{{p0}} page {{p1}} preview",
+        "sourcePage": "Source page {{p0}}",
+        "moveLeft": "Move left",
+        "rotate90DegreesClockwise": "Rotate 90 degrees clockwise",
+        "rotate": "Rotate",
+        "moveRight": "Move right",
+        "deletePage": "Delete page",
+        "largePdfPagePreview": "Large PDF page preview",
+        "close": "Close",
+        "select": "select",
+        "deselect": "deselect"
+      },
+      "pdfUi": {
+        "yourFileIsReady": "Your file is ready.",
+        "thisFileWasCreatedInYourBrowserDownload": "This file was created in your browser. Download it and review the result.",
+        "unableToContinue": "Unable to continue."
+      },
+      "pdfPreview": {
+        "encryptedOrPermissionRestrictedPdfsCannotBeEdited": "Encrypted or permission-restricted PDFs cannot be edited. Try again with an unlocked copy.",
+        "unableToRenderThePdfPreview": "Unable to render the PDF preview.",
+        "unableToDisplayThePdfPreview": "Unable to display the PDF preview.",
+        "enterAPageRange": "Enter a page range.",
+        "checkTheFormatOfPageRange": "Check the format of page range '{{p0}}'.",
+        "pageNumbersMustBeBetween1And": "Page numbers must be between 1 and {{p0}}.",
+        "noPagesWereSelected": "No pages were selected.",
+        "renderingPageAs": "[{{p0}}/{{p1}}] Rendering page {{p2}} as {{p3}}…",
+        "compressingConvertedImagesIntoAZipFile": "Compressing converted images into a ZIP file…",
+        "compressingZip": "Compressing ZIP… {{p0}}%",
+        "unableToCreateTheCompressedPdfPageImage": "Unable to create the compressed PDF page image.",
+        "thereAreNoPdfPagesToProcess": "There are no PDF pages to process.",
+        "readingEmbeddedPdfTextAndCoordinates": "Reading embedded PDF text and coordinates…",
+        "embeddedTextAnalyzedForPage": "[{{p0}}/{{p1}}] Embedded text analyzed for page {{p2}}",
+        "preparingTheBundledKoreanAndEnglishOcrModels": "Preparing the bundled Korean and English OCR models…",
+        "recognizingText": "[{{p0}}/{{p1}}] Recognizing text… {{p2}}%",
+        "renderingPageForOcr": "[{{p0}}/{{p1}}] Rendering page {{p2}} for OCR…",
+        "unableToRenderThePdfPageImage": "Unable to render the PDF page image.",
+        "unableToCreateTheImageFile": "Unable to create the image file.",
+        "preparingOcr": "Preparing OCR · {{p0}}",
+        "thisPdfIsPasswordProtectedTryAgainWith": "This PDF is password-protected. Try again with an unlocked copy.",
+        "unableToOpenThePdfFile": "Unable to open the PDF file."
+      }
+    },
+    "page": {
+      "modes": {
+        "organize": {
+          "eyebrow": "PDF PAGE EDITOR",
+          "title": "Edit, merge, and extract PDF pages",
+          "description": "Review pages visually, reorder, rotate, and select them, then export one PDF or several page ranges."
+        },
+        "image-to-pdf": {
+          "eyebrow": "IMAGE TO PDF",
+          "title": "Convert images to PDF",
+          "description": "Arrange JPG and PNG images and create a PDF fitted to A4 or sized to each original image."
+        },
+        "pdf-to-image": {
+          "eyebrow": "PDF TO IMAGE",
+          "title": "Convert PDF pages to images",
+          "description": "Render every PDF page as PNG or JPG and download them in a ZIP archive."
+        },
+        "convert": {
+          "eyebrow": "PDF OCR & CONVERT",
+          "title": "Convert PDF to DOCX, XLSX, or TXT",
+          "description": "Export embedded text and Korean/English OCR results as documents, spreadsheets, text, or a searchable PDF."
+        }
+      },
+      "navigation": {
+        "organize": "Edit, merge & extract",
+        "image-to-pdf": "Image → PDF",
+        "pdf-to-image": "PDF → Image",
+        "convert": "Document & OCR"
+      },
+      "guides": {
+        "standard": {
+          "title": "Using the browser PDF tools",
+          "description": "Selected files stay in this browser's memory and are not uploaded to a processing server. Keep your originals and review every downloaded result.",
+          "blocks": [
+            {
+              "title": "Page-level editing",
+              "paragraphs": [
+                "Drag previews to reorder pages, remove unwanted pages, and rotate them. The chosen rotation is written to the exported PDF.",
+                "If a source page is already rotated, your rotation is added to its existing orientation so the exported page matches the preview."
+              ]
+            },
+            {
+              "title": "Local processing and file lifetime",
+              "paragraphs": [
+                "PDFs, images, and download links live in browser memory. Refreshing or closing the tab clears the current selection and any undownloaded result.",
+                "The site, advertising, and OCR model assets may use ordinary network requests, but your work files are not sent to a conversion server."
+              ]
+            },
+            {
+              "title": "Protected PDFs and signatures",
+              "paragraphs": [
+                "Password-protected PDFs are not supported. Use a legitimately unlocked copy provided by the document owner.",
+                "Merging, rotating, splitting, or rebuilding a PDF invalidates existing digital signatures. Forms, bookmarks, links, attachments, and advanced objects may not survive page copying."
+              ]
+            },
+            {
+              "title": "Quality and performance",
+              "paragraphs": [
+                "Reordering and extracting pages normally copies original PDF pages rather than rasterizing them. Image conversion and searchable OCR PDFs render pages at the selected resolution.",
+                "More pages and higher resolution increase processing time, memory use, and output size. Previews render lazily at lower resolution to keep long documents responsive."
+              ]
+            }
+          ],
+          "faq": [
+            {
+              "question": "Are files uploaded to a server?",
+              "answer": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests."
+            },
+            {
+              "question": "Can I process a password-protected PDF?",
+              "answer": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy."
+            },
+            {
+              "question": "Does it work on mobile?",
+              "answer": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited."
+            },
+            {
+              "question": "Does rotation reduce PDF quality?",
+              "answer": "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages."
+            },
+            {
+              "question": "Can it perfectly restore Word or Excel structure?",
+              "answer": "Usually not. PDFs often lack the original paragraph and table structure, so the output is an editable reconstruction based on coordinates and spacing."
+            },
+            {
+              "question": "Why is the first OCR run slower?",
+              "answer": "The browser must download the Korean/English recognition models and runtime. Later runs can start faster while those assets remain cached."
+            }
+          ]
+        },
+        "convert": {
+          "title": "PDF text conversion and browser OCR",
+          "description": "Selected files stay in this browser's memory and are not uploaded to a processing server. Keep your originals and review every downloaded result.",
+          "blocks": [
+            {
+              "title": "Text PDFs and scanned PDFs",
+              "paragraphs": [
+                "Text PDFs contain selectable characters, so extraction is fast and accurate. Scanned PDFs store each page like a photo and require OCR.",
+                "Automatic OCR runs Korean and English recognition only on pages with little usable embedded text. A drawing or photo with no text may correctly produce an empty result."
+              ]
+            },
+            {
+              "title": "DOCX and XLSX conversion limits",
+              "paragraphs": [
+                "PDFs often preserve positions rather than the original paragraphs, tables, and cells. DOCX reconstructs lines as paragraphs, while XLSX estimates cells from spacing.",
+                "Complex tables, columns, vertical text, footnotes, formulas, fonts, and formatting may not be reproduced exactly. Treat the output as an editable draft and compare it with the source."
+              ]
+            },
+            {
+              "title": "OCR models and privacy",
+              "paragraphs": [
+                "The OCR runtime and Korean/English models are served from the same GitHub Pages deployment. No external OCR server or CDN receives your document pages.",
+                "OCR cannot start on a first offline visit or when its runtime is not cached. Reopen the site online after clearing storage, using private browsing, or running low on browser storage."
+              ]
+            },
+            {
+              "title": "Large documents",
+              "paragraphs": [
+                "OCR renders and recognizes pages one at a time, so it takes longer than embedded-text extraction. For 50+ pages, close heavy tabs and keep enough memory and power available.",
+                "Mobile operating systems may close memory-intensive tabs, so long documents are generally more reliable on a desktop browser."
+              ]
+            }
+          ],
+          "faq": [
+            {
+              "question": "Are files uploaded to a server?",
+              "answer": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests."
+            },
+            {
+              "question": "Can I process a password-protected PDF?",
+              "answer": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy."
+            },
+            {
+              "question": "Does it work on mobile?",
+              "answer": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited."
+            },
+            {
+              "question": "Does rotation reduce PDF quality?",
+              "answer": "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages."
+            },
+            {
+              "question": "Can it perfectly restore Word or Excel structure?",
+              "answer": "Usually not. PDFs often lack the original paragraph and table structure, so the output is an editable reconstruction based on coordinates and spacing."
+            },
+            {
+              "question": "Why is the first OCR run slower?",
+              "answer": "The browser must download the Korean/English recognition models and runtime. Later runs can start faster while those assets remain cached."
+            }
+          ]
+        }
+      }
+    },
+    "ocrStatus": {
+      "loadingCore": "Loading the OCR WebAssembly engine…",
+      "initializing": "Initializing the OCR engine…",
+      "loadingLanguage": "Loading Korean and English language models…",
+      "initializingApi": "Preparing Korean and English recognition…"
+    }
   }
 }

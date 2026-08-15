@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { renderPdfThumbnail } from "./pdfPreview";
 import { useAppLanguage } from "../../i18n/routing";
 import type { PdfPageItem } from "./types";
+import { featureMessage } from "../../i18n/featureMessages";
 
 export function PdfThumbnail({
   item,
@@ -31,8 +32,7 @@ export function PdfThumbnail({
   selected?: boolean;
 }) {
   const language = useAppLanguage();
-  const L = (ko: string, en: string) => language === "ko" ? ko : en;
-  const hostRef = useRef<HTMLDivElement>(null);
+    const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 172, height: 224 });
@@ -58,7 +58,7 @@ export function PdfThumbnail({
     setRendered(false);
     renderPdfThumbnail(file, item.sourcePageIndex, canvasRef.current, 172, language, controller.signal)
       .then((size) => { if (!controller.signal.aborted) { setDimensions(size); setRendered(true); } })
-      .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : L("미리보기 실패", "Preview failed")); });
+      .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfThumbnail.previewFailed")); });
     return () => { controller.abort(); if (canvasRef.current) { canvasRef.current.width = 1; canvasRef.current.height = 1; } };
   }, [file, item.sourcePageIndex, visible, language]);
 
@@ -66,7 +66,7 @@ export function PdfThumbnail({
     if (!expanded || !largeCanvasRef.current) return;
     const controller = new AbortController();
     void renderPdfThumbnail(file, item.sourcePageIndex, largeCanvasRef.current, Math.min(960, window.innerWidth - 48), language, controller.signal).catch((reason) => {
-      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : L("확대 미리보기 실패", "Large preview failed"));
+      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfThumbnail.largePreviewFailed"));
     });
     return () => controller.abort();
   }, [expanded, file, item.sourcePageIndex, language]);
@@ -84,35 +84,35 @@ export function PdfThumbnail({
       data-rotation={item.rotation}
     >
       <div className="pdf-page-card-top">
-        {draggable && <button type="button" className="pdf-drag-handle" aria-label={L(`${outputIndex + 1}번 페이지 순서 변경`, `Reorder page ${outputIndex + 1}`)}><GripVertical size={16} /></button>}
+        {draggable && <button type="button" className="pdf-drag-handle" aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.reorderPage", { p0: outputIndex + 1 })}><GripVertical size={16} /></button>}
         <strong>{outputIndex + 1}</strong>
-        <span>{item.rotation ? `${item.rotation}°` : L("원본 방향", "Original")}</span>
-        {onSelect && <button type="button" className={`pdf-page-select${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} aria-label={L(`${outputIndex + 1}번 페이지 ${selected ? "선택 해제" : "선택"}`, `${selected ? "Deselect" : "Select"} page ${outputIndex + 1}`)}><Check size={13} /></button>}
+        <span>{item.rotation ? `${item.rotation}°` : featureMessage(language, "pdf.messages.PdfThumbnail.original")}</span>
+        {onSelect && <button type="button" className={`pdf-page-select${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.page", { p0: outputIndex + 1, p1: featureMessage(language, selected ? "pdf.messages.PdfThumbnail.deselect" : "pdf.messages.PdfThumbnail.select") })}><Check size={13} /></button>}
       </div>
       <div className="pdf-thumbnail-frame" style={frameStyle} onClick={() => setExpanded(true)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setExpanded(true); } }}>
-        {!!groupNumbers.length && <span className="pdf-group-badges" aria-label={L(`포함된 범위 그룹 ${groupNumbers.join(", ")}`, `Included range groups ${groupNumbers.join(", ")}`)}>{groupNumbers.map((number) => <b key={number}>{number}</b>)}</span>}
-        {(!visible || visible && !rendered && !error) && <span className="pdf-thumbnail-placeholder">{visible ? L("페이지 그리는 중…", "Rendering page…") : L("미리보기 대기", "Preview pending")}</span>}
+        {!!groupNumbers.length && <span className="pdf-group-badges" aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.includedRangeGroups", { p0: groupNumbers.join(", ") })}>{groupNumbers.map((number) => <b key={number}>{number}</b>)}</span>}
+        {(!visible || visible && !rendered && !error) && <span className="pdf-thumbnail-placeholder">{visible ? featureMessage(language, "pdf.messages.PdfThumbnail.renderingPage") : featureMessage(language, "pdf.messages.PdfThumbnail.previewPending")}</span>}
         {error && <span className="pdf-thumbnail-error">{error}</span>}
         <canvas
           ref={canvasRef}
-          aria-label={L(`${item.sourceName} ${item.sourcePageIndex + 1}페이지 미리보기`, `${item.sourceName} page ${item.sourcePageIndex + 1} preview`)}
+          aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.pagePreview", { p0: item.sourceName, p1: item.sourcePageIndex + 1 })}
           style={{ opacity: rendered ? 1 : 0, transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${sideways ? dimensions.width / dimensions.height : 1})` }}
         />
         {rendered && <Maximize2 className="pdf-thumbnail-expand" size={15} aria-hidden="true" />}
       </div>
       <div className="pdf-page-source" title={item.sourceName}>
         <strong>{item.sourceName}</strong>
-        <small>{L(`원본 ${item.sourcePageIndex + 1}페이지`, `Source page ${item.sourcePageIndex + 1}`)}</small>
+        <small>{featureMessage(language, "pdf.messages.PdfThumbnail.sourcePage", { p0: item.sourcePageIndex + 1 })}</small>
       </div>
       {(onRotate || onRemove || onMove) && (
         <div className="pdf-page-actions">
-          {onMove && <button type="button" onClick={() => onMove(-1)} disabled={outputIndex === 0} aria-label={L("왼쪽으로 이동", "Move left")}><ChevronLeft size={15} /></button>}
-          {onRotate && <button type="button" onClick={onRotate} aria-label={L("오른쪽으로 90도 회전", "Rotate 90 degrees clockwise")}><RotateCw size={15} /><span>{L("회전", "Rotate")}</span></button>}
-          {onMove && <button type="button" onClick={() => onMove(1)} disabled={totalItems !== undefined && outputIndex === totalItems - 1} aria-label={L("오른쪽으로 이동", "Move right")}><ChevronRight size={15} /></button>}
-          {onRemove && <button type="button" className="danger" onClick={onRemove} aria-label={L("페이지 삭제", "Delete page")}><Trash2 size={15} /></button>}
+          {onMove && <button type="button" onClick={() => onMove(-1)} disabled={outputIndex === 0} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.moveLeft")}><ChevronLeft size={15} /></button>}
+          {onRotate && <button type="button" onClick={onRotate} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.rotate90DegreesClockwise")}><RotateCw size={15} /><span>{featureMessage(language, "pdf.messages.PdfThumbnail.rotate")}</span></button>}
+          {onMove && <button type="button" onClick={() => onMove(1)} disabled={totalItems !== undefined && outputIndex === totalItems - 1} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.moveRight")}><ChevronRight size={15} /></button>}
+          {onRemove && <button type="button" className="danger" onClick={onRemove} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.deletePage")}><Trash2 size={15} /></button>}
         </div>
       )}
-      {expanded && <div className="pdf-lightbox" role="dialog" aria-modal="true" aria-label={L("PDF 페이지 확대 미리보기", "Large PDF page preview")} onClick={() => setExpanded(false)}><div onClick={(event) => event.stopPropagation()}><button type="button" className="pdf-lightbox-close" onClick={() => setExpanded(false)} aria-label={L("닫기", "Close")}><X size={19} /></button><canvas ref={largeCanvasRef} /></div></div>}
+      {expanded && <div className="pdf-lightbox" role="dialog" aria-modal="true" aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.largePdfPagePreview")} onClick={() => setExpanded(false)}><div onClick={(event) => event.stopPropagation()}><button type="button" className="pdf-lightbox-close" onClick={() => setExpanded(false)} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.close")}><X size={19} /></button><canvas ref={largeCanvasRef} /></div></div>}
     </article>
   );
 }

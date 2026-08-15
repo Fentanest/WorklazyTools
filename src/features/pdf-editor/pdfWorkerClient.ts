@@ -7,6 +7,7 @@ import type {
   WorkerProgress,
 } from "./types";
 import type { AppLanguage } from "../../i18n/languages";
+import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessages";
 
 interface WorkerErrorPayload {
   message: string;
@@ -26,8 +27,7 @@ function runWorker<T>(message: object, transfer: Transferable[], onProgress?: Wo
 }
 
 function runSpecificWorker<T>(worker: Worker, message: object, transfer: Transferable[], onProgress?: WorkerProgress, language: AppLanguage = "ko") {
-  const L = (ko: string, en: string) => language === "ko" ? ko : en;
-  return new Promise<T>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
     worker.onmessage = (event: MessageEvent) => {
       const data = event.data as {
         type: "progress" | "result" | "error";
@@ -37,23 +37,28 @@ function runSpecificWorker<T>(worker: Worker, message: object, transfer: Transfe
         error?: WorkerErrorPayload;
       };
       if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ?? L("처리 중…", "Processing…"));
+        onProgress?.(data.progress ?? 0, data.message ? resolveFeatureMessage(language, data.message) : featureMessage(language, "pdf.messages.pdfWorkerClient.processing"));
         return;
       }
       worker.terminate();
-      if (data.type === "result") resolve(data.result as T);
+      if (data.type === "result") resolve(localizeWorkerResult(data.result as T, language));
       else {
-        const error = new Error(data.error?.message || L("PDF 처리 중 오류가 발생했습니다.", "An error occurred while processing the PDF.")) as Error & { code?: string };
+        const error = new Error(data.error?.message ? resolveFeatureMessage(language, data.error.message) : featureMessage(language, "pdf.messages.pdfWorkerClient.anErrorOccurredWhileProcessingThePdf")) as Error & { code?: string };
         error.code = data.error?.code;
         reject(error);
       }
     };
     worker.onerror = (event) => {
       worker.terminate();
-      reject(new Error(event.message || L("PDF 작업을 시작하지 못했습니다.", "Unable to start the PDF operation.")));
+      reject(new Error(event.message || featureMessage(language, "pdf.messages.pdfWorkerClient.unableToStartThePdfOperation")));
     };
     worker.postMessage(message, transfer);
   });
+}
+
+function localizeWorkerResult<T>(result: T, language: AppLanguage): T {
+  if (!result || typeof result !== "object" || !("warnings" in result) || !Array.isArray(result.warnings)) return result;
+  return { ...result, warnings: result.warnings.map((warning) => typeof warning === "string" ? resolveFeatureMessage(language, warning) : warning) };
 }
 
 async function serializeFiles(files: Array<{ id: string; file: File }>) {
@@ -97,7 +102,7 @@ export async function exportPdfGroups(
   const workerOptions = await serializeOutputOptions(options);
   const transfer = [...inputs.map((input) => input.buffer), ...(workerOptions.watermarkImage ? [workerOptions.watermarkImage] : [])];
   return runWorker<PdfWorkerResult>(
-    { type: "export-groups", inputs, groups, archiveName, options: workerOptions },
+    { type: "export-groups", inputs, groups, archiveName, splitPdfFallback: featureMessage(language, "pdf.messages.pdf.splitPdf"), options: workerOptions },
     transfer,
     onProgress,
     language,
@@ -153,8 +158,7 @@ export async function imagesToPdf(
 }
 
 async function normalizeImageOrientation(file: File, language: AppLanguage) {
-  const L = (ko: string, en: string) => language === "ko" ? ko : en;
-  let bitmap: ImageBitmap | undefined;
+    let bitmap: ImageBitmap | undefined;
   let image: HTMLImageElement | undefined;
   let objectUrl = "";
   try {
@@ -167,24 +171,24 @@ async function normalizeImageOrientation(file: File, language: AppLanguage) {
       await image.decode();
     }
     const source = bitmap ?? image;
-    if (!source) throw new Error(L("원본 이미지를 읽지 못했습니다.", "The source image could not be decoded."));
+    if (!source) throw new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.theSourceImageCouldNotBeDecoded"));
     const width = bitmap?.width ?? image?.naturalWidth ?? 0;
     const height = bitmap?.height ?? image?.naturalHeight ?? 0;
-    if (!width || !height) throw new Error(L("이미지 크기를 확인할 수 없습니다.", "The image dimensions could not be determined."));
+    if (!width || !height) throw new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.theImageDimensionsCouldNotBeDetermined"));
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d", { alpha: file.type === "image/png" });
-    if (!context) throw new Error(L("이미지 방향을 보정할 수 없습니다.", "Unable to correct the image orientation."));
+    if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.unableToCorrectTheImageOrientation"));
     context.drawImage(source, 0, 0);
     const mimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
-    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error(L("이미지를 PDF용으로 준비하지 못했습니다.", "Unable to prepare the image for PDF conversion."))), mimeType, 0.96));
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.unableToPrepareTheImageForPdfConversion"))), mimeType, 0.96));
     canvas.width = 1;
     canvas.height = 1;
     const extension = mimeType === "image/png" ? "png" : "jpg";
     return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.${extension}`, { type: mimeType, lastModified: file.lastModified });
   } catch (error) {
-    throw error instanceof Error ? error : new Error(L("이미지 파일을 읽지 못했습니다.", "Unable to read the image file."));
+    throw error instanceof Error ? error : new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.unableToReadTheImageFile"));
   } finally {
     bitmap?.close();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -200,7 +204,20 @@ export function textDocumentToOffice(
 ) {
   return runSpecificWorker<PdfWorkerResult>(
     createPdfOfficeWorker(),
-    { type: "text-to-office", document, format, fileName, language },
+    {
+      type: "text-to-office",
+      document,
+      format,
+      fileName,
+      language,
+      copy: {
+        textPageTitles: document.pages.map((page) => featureMessage(language, "pdf.messages.pdfOffice.page", { p0: page.pageNumber })),
+        pageTitles: document.pages.map((page) => featureMessage(language, "pdf.messages.pdfOffice.page2", { p0: page.pageNumber })),
+        normalStyle: featureMessage(language, "pdf.messages.pdfOffice.normal"),
+        pageHeadingStyle: featureMessage(language, "pdf.messages.pdfOffice.pageHeading"),
+        noRecognizedText: featureMessage(language, "pdf.messages.pdfOffice.noRecognizedText"),
+      },
+    },
     [],
     onProgress,
     language,

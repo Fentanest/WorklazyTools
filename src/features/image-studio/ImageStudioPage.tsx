@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Crop, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
 import { Canvas, Circle, FabricImage, IText, Line, PencilBrush, Rect, filters, type FabricObject } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -54,7 +54,14 @@ export function ImageStudioPage() {
   );
 }
 
-type EditorMode = "select" | "pencil" | "brush" | "erase";
+type EditorMode = "select" | "pencil" | "brush" | "erase" | "crop";
+
+interface CropSelection {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 interface EditorHistorySnapshot {
   canvas: object;
@@ -76,6 +83,8 @@ function ImageEditor() {
   const baseImage = useRef<FabricImage | undefined>(undefined);
   const sourceUrl = useRef<string | undefined>(undefined);
   const outputMultiplier = useRef(1);
+  const cropOverlay = useRef<Rect | undefined>(undefined);
+  const cropOrigin = useRef<{ x: number; y: number } | undefined>(undefined);
   const modeRef = useRef<EditorMode>("select");
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
@@ -100,6 +109,7 @@ function ImageEditor() {
   const [shapeStroke, setShapeStroke] = useState("#ffffff");
   const [shapeStrokeWidth, setShapeStrokeWidth] = useState(0);
   const [editorError, setEditorError] = useState("");
+  const [cropSelection, setCropSelection] = useState<CropSelection>();
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
   const syncCanvasDisplay = useResponsiveFabricCanvas(canvas, stageElement);
@@ -140,6 +150,18 @@ function ImageEditor() {
     setShapeStrokeWidth(Math.max(0, Math.round(shape.strokeWidth || 0)));
   }, []);
 
+  const clearCropSelection = useCallback(() => {
+    const instance = canvas.current;
+    const overlay = cropOverlay.current;
+    cropOrigin.current = undefined;
+    setCropSelection(undefined);
+    if (instance && overlay) {
+      instance.remove(overlay);
+      instance.requestRenderAll();
+    }
+    cropOverlay.current = undefined;
+  }, []);
+
   useEffect(() => {
     if (!canvasElement.current) return;
     const instance = new Canvas(canvasElement.current, { width: 900, height: 600, backgroundColor: "#ffffff", preserveObjectStacking: true });
@@ -154,8 +176,38 @@ function ImageEditor() {
     instance.on("selection:cleared", syncSelection);
     instance.on("path:created", onPath);
     instance.on("object:modified", () => pushSnapshot());
-    instance.on("object:added", () => pushSnapshot());
-    instance.on("object:removed", () => pushSnapshot());
+    instance.on("object:added", (event) => { if (event.target !== cropOverlay.current) pushSnapshot(); });
+    instance.on("object:removed", (event) => { if (event.target !== cropOverlay.current) pushSnapshot(); });
+    instance.on("mouse:down", (event) => {
+      if (modeRef.current !== "crop") return;
+      const point = event.scenePoint;
+      const x = Math.max(0, Math.min(instance.getWidth(), point.x));
+      const y = Math.max(0, Math.min(instance.getHeight(), point.y));
+      clearCropSelection();
+      cropOrigin.current = { x, y };
+      const overlay = new Rect({ left: x, top: y, width: 1, height: 1, fill: "rgba(10,132,255,.14)", stroke: "#0a84ff", strokeWidth: 2, strokeDashArray: [9, 6], strokeUniform: true, selectable: false, evented: false, excludeFromExport: true });
+      cropOverlay.current = overlay;
+      instance.add(overlay);
+      instance.requestRenderAll();
+    });
+    instance.on("mouse:move", (event) => {
+      const origin = cropOrigin.current;
+      const overlay = cropOverlay.current;
+      if (modeRef.current !== "crop" || !origin || !overlay) return;
+      const x = Math.max(0, Math.min(instance.getWidth(), event.scenePoint.x));
+      const y = Math.max(0, Math.min(instance.getHeight(), event.scenePoint.y));
+      overlay.set({ left: Math.min(origin.x, x), top: Math.min(origin.y, y), width: Math.abs(x - origin.x), height: Math.abs(y - origin.y) });
+      overlay.setCoords();
+      instance.requestRenderAll();
+    });
+    instance.on("mouse:up", () => {
+      const overlay = cropOverlay.current;
+      cropOrigin.current = undefined;
+      if (!overlay) return;
+      const selection = { left: overlay.left || 0, top: overlay.top || 0, width: overlay.width || 0, height: overlay.height || 0 };
+      if (selection.width < 10 || selection.height < 10) clearCropSelection();
+      else setCropSelection(selection);
+    });
     pushSnapshot(true, true);
     window.requestAnimationFrame(syncCanvasDisplay);
     return () => {
@@ -166,13 +218,13 @@ function ImageEditor() {
       instance.dispose();
       canvas.current = undefined;
     };
-  }, [pushSnapshot, syncCanvasDisplay, syncSelectedShape]);
+  }, [clearCropSelection, pushSnapshot, syncCanvasDisplay, syncSelectedShape]);
 
   useEffect(() => {
     const instance = canvas.current;
     if (!instance) return;
     modeRef.current = mode;
-    instance.isDrawingMode = mode !== "select";
+    instance.isDrawingMode = mode === "pencil" || mode === "brush" || mode === "erase";
     instance.selection = mode === "select";
     applyEditorInteractivity(instance, baseImage.current, mode, baseLocked);
     if (mode !== "select") {
@@ -184,6 +236,10 @@ function ImageEditor() {
     instance.discardActiveObject();
     instance.requestRenderAll();
   }, [baseLocked, drawColor, drawWidth, mode]);
+
+  useEffect(() => {
+    if (mode !== "crop") clearCropSelection();
+  }, [clearCropSelection, mode]);
 
   const loadFile = async (next?: File) => {
     if (!next || !canvas.current) return;
@@ -283,16 +339,53 @@ function ImageEditor() {
     return true;
   }, [pushSnapshot, syncSelectedShape]);
 
+  const applyCropSelection = useCallback(() => {
+    const instance = canvas.current;
+    const selection = cropSelection;
+    const overlay = cropOverlay.current;
+    if (!instance || !selection || selection.width < 10 || selection.height < 10) return;
+    restoringRef.current = true;
+    if (overlay) instance.remove(overlay);
+    cropOverlay.current = undefined;
+    cropOrigin.current = undefined;
+    instance.getObjects().forEach((object) => {
+      object.set({ left: (object.left || 0) - selection.left, top: (object.top || 0) - selection.top });
+      object.setCoords();
+    });
+    instance.setDimensions({ width: Math.max(1, Math.round(selection.width)), height: Math.max(1, Math.round(selection.height)) });
+    instance.discardActiveObject();
+    setCropSelection(undefined);
+    setMode("select");
+    modeRef.current = "select";
+    applyEditorInteractivity(instance, baseImage.current, "select", baseLocked);
+    instance.requestRenderAll();
+    syncSelectedShape();
+    restoringRef.current = false;
+    pushSnapshot(true);
+    window.requestAnimationFrame(syncCanvasDisplay);
+  }, [baseLocked, cropSelection, pushSnapshot, syncCanvasDisplay, syncSelectedShape]);
+
   useEffect(() => {
-    const handleDelete = (event: KeyboardEvent) => {
+    const handleEditorShortcut = (event: KeyboardEvent) => {
+      if (modeRef.current === "crop" && event.key === "Escape") {
+        event.preventDefault();
+        clearCropSelection();
+        setMode("select");
+        return;
+      }
+      if (modeRef.current === "crop" && event.key === "Enter" && cropOverlay.current) {
+        event.preventDefault();
+        applyCropSelection();
+        return;
+      }
       if (event.key !== "Delete" && event.key !== "Backspace") return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
       if (removeSelectedLayers()) event.preventDefault();
     };
-    document.addEventListener("keydown", handleDelete);
-    return () => document.removeEventListener("keydown", handleDelete);
-  }, [removeSelectedLayers]);
+    document.addEventListener("keydown", handleEditorShortcut);
+    return () => document.removeEventListener("keydown", handleEditorShortcut);
+  }, [applyCropSelection, clearCropSelection, removeSelectedLayers]);
 
   const cropTo = (ratio: number) => {
     const instance = canvas.current;
@@ -302,6 +395,9 @@ function ImageEditor() {
     const height = Math.round(width / ratio);
     const previousWidth = instance.getWidth();
     const previousHeight = instance.getHeight();
+    clearCropSelection();
+    setMode("select");
+    modeRef.current = "select";
     instance.setDimensions({ width, height });
     window.requestAnimationFrame(syncCanvasDisplay);
     if (image) {
@@ -482,6 +578,7 @@ function ImageEditor() {
           <ToolButton active={mode === "pencil"} label={t("image.editor.pencil")} onClick={() => setMode("pencil")}><Pencil /></ToolButton>
           <ToolButton active={mode === "brush"} label={t("image.editor.brush")} onClick={() => setMode("brush")}><Brush /></ToolButton>
           <ToolButton active={mode === "erase"} label={t("image.editor.eraser")} onClick={() => setMode("erase")}><Eraser /></ToolButton>
+          <ToolButton active={mode === "crop"} label={t("image.editor.cropDrag")} onClick={() => setMode("crop")}><Crop /></ToolButton>
         </div>
         <label className="editor-draw-color"><span>{t("image.editor.color")}</span><input type="color" value={drawColor} onChange={(event) => setDrawColor(event.target.value)} /></label>
         <label className="editor-draw-width"><span>{t("image.editor.width", { count: drawWidth })}</span><input type="range" min={1} max={40} value={drawWidth} onChange={(event) => setDrawWidth(Number(event.target.value))} /></label>
@@ -489,7 +586,7 @@ function ImageEditor() {
       </div>
       <div className="image-editor-layout">
         <aside className="image-editor-controls">
-          <div className="editor-tool-group"><strong>{t("image.editor.crop")}</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(3 / 4)}>3:4</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button><button type="button" onClick={() => cropTo(9 / 16)}>9:16</button></div></div>
+          <div className="editor-tool-group"><strong>{t("image.editor.crop")}</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(3 / 4)}>3:4</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button><button type="button" onClick={() => cropTo(9 / 16)}>9:16</button></div><p className="image-crop-hint">{t("image.editor.cropHint")}</p>{cropSelection && <div className="image-crop-selection-status"><span>{t("image.editor.cropSelection", { width: Math.round(cropSelection.width), height: Math.round(cropSelection.height) })}</span><div><button type="button" className="secondary-button" onClick={() => { clearCropSelection(); setMode("select"); }}>{t("image.editor.cropCancel")}</button><button type="button" className="primary-button" onClick={applyCropSelection}>{t("image.editor.cropApply")}</button></div></div>}</div>
           <div className="editor-tool-group"><strong>{t("image.editor.layer")}</strong><div className="icon-tool-row"><button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title={t("image.editor.front")} aria-label={t("image.editor.front")} type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title={t("image.editor.back")} aria-label={t("image.editor.back")} type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title={t("image.editor.duplicate")} aria-label={t("image.editor.duplicate")} type="button" onClick={() => void duplicateSelectedLayer()}><ClipboardPaste size={18} /></button><button title={t("image.editor.delete")} aria-label={t("image.editor.delete")} type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
           <div className={`editor-tool-group${file ? "" : " is-disabled"}`}><strong>{t("image.editor.adjust")}</strong><label>{t("image.editor.brightness")} <b>{brightness}</b><input disabled={!file} type="range" min={-80} max={80} value={brightness} onChange={(event) => updateFilter("brightness", Number(event.target.value))} /></label><label>{t("image.editor.contrast")} <b>{contrast}</b><input disabled={!file} type="range" min={-80} max={80} value={contrast} onChange={(event) => updateFilter("contrast", Number(event.target.value))} /></label><label>{t("image.editor.hue")} <b>{hue}°</b><input disabled={!file} type="range" min={-180} max={180} value={hue} onChange={(event) => updateFilter("hue", Number(event.target.value))} /></label>{file && <ToggleRow label={t("image.editor.lock")} description={t("image.editor.lockHelp")} checked={baseLocked} onChange={updateBaseLock} />}</div>
           <div className="editor-tool-group"><strong>{t("image.editor.text")}</strong><div className="inline-input-action"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={() => addText()}><Type size={16} /></button></div><div className="button-grid sticker-grid">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" key={emoji} onClick={() => addText(emoji)}>{emoji}</button>)}</div></div>
@@ -499,7 +596,7 @@ function ImageEditor() {
         </aside>
         <div
           ref={stageElement}
-          className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}`}
+          className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}${mode === "crop" ? " is-crop-mode" : ""}`}
           onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setStageDragging(true); } }}
           onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
           onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setStageDragging(false); }}

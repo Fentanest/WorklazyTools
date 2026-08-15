@@ -222,6 +222,35 @@ async function testImageStudio(page, imagePaths) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const deletedCanvas = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
   if (!styledCanvas || styledCanvas === deletedCanvas) throw new Error("Delete did not remove the selected Fabric layer");
+  const portraitPresets = await page.$$eval(".image-editor-controls .button-grid button", (buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean));
+  if (!portraitPresets.includes("3:4") || !portraitPresets.includes("9:16")) throw new Error("Portrait crop presets are unavailable");
+  await page.$$eval(".editor-draw-tools button", (buttons) => {
+    const crop = buttons.find((button) => button.textContent?.includes("범위 자르기"));
+    if (!(crop instanceof HTMLButtonElement)) throw new Error("Free crop tool is unavailable");
+    crop.click();
+  });
+  await page.waitForSelector(".fabric-stage.is-crop-mode");
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".fabric-stage .upper-canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return false;
+    const bounds = canvas.getBoundingClientRect();
+    return bounds.top >= 0 && bounds.bottom <= innerHeight;
+  });
+  const cropCanvas = await page.$(".fabric-stage .upper-canvas");
+  const cropBox = await cropCanvas?.boundingBox();
+  if (!cropBox) throw new Error("Free crop canvas is unavailable");
+  await page.mouse.move(cropBox.x + cropBox.width * 0.15, cropBox.y + cropBox.height * 0.15);
+  await page.mouse.down();
+  await page.mouse.move(cropBox.x + cropBox.width * 0.8, cropBox.y + cropBox.height * 0.8, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForSelector(".image-crop-selection-status");
+  await page.click(".image-crop-selection-status .primary-button");
+  await page.waitForFunction(() => !document.querySelector(".image-crop-selection-status"));
+  const croppedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  if (croppedSize.width >= 850 || croppedSize.height >= 570 || croppedSize.width < 450 || croppedSize.height < 280) {
+    throw new Error(`Free crop did not resize the canvas as selected: ${JSON.stringify(croppedSize)}`);
+  }
   await page.click(".studio-tabs button:nth-child(2)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
   await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 2);
@@ -502,6 +531,36 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.evaluate(() => document.querySelector(".video-trim-lane .trim-play-buttons button:nth-child(1)")?.click());
   const startValue = await page.$eval('.video-trim-lane label:first-of-type input[type="number"]', (input) => Number(input.value));
   if (startValue <= 0) throw new Error("The current player position was not applied as the start time.");
+  const initialFineTrim = await page.evaluate(() => {
+    const lane = document.querySelector(".video-trim-lane");
+    return {
+      start: Number(lane?.querySelector('[data-trim-boundary="start"] input[type="number"]')?.value),
+      end: Number(lane?.querySelector('[data-trim-boundary="end"] input[type="number"]')?.value),
+      steppers: lane?.querySelectorAll(".video-boundary-stepper button").length || 0,
+      stepLabel: lane?.querySelector('.video-boundary-stepper button')?.getAttribute("aria-label") || "",
+    };
+  });
+  await page.focus('.video-trim-lane');
+  await page.keyboard.down("Alt");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.up("Alt");
+  await page.waitForFunction((start) => Number(document.querySelector('.video-trim-lane [data-trim-boundary="start"] input[type="number"]')?.value) > start, {}, initialFineTrim.start);
+  await page.keyboard.down("Alt");
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("Alt");
+  await page.waitForFunction((end) => Number(document.querySelector('.video-trim-lane [data-trim-boundary="end"] input[type="number"]')?.value) < end, {}, initialFineTrim.end);
+  const adjustedFineTrim = await page.evaluate(() => ({
+    start: Number(document.querySelector('.video-trim-lane [data-trim-boundary="start"] input[type="number"]')?.value),
+    end: Number(document.querySelector('.video-trim-lane [data-trim-boundary="end"] input[type="number"]')?.value),
+  }));
+  const startDelta = adjustedFineTrim.start - initialFineTrim.start;
+  const endDelta = initialFineTrim.end - adjustedFineTrim.end;
+  if (initialFineTrim.steppers !== 4 || !/1프레임|0\.1/.test(initialFineTrim.stepLabel)
+    || startDelta <= 0 || startDelta > 0.11 || endDelta <= 0 || endDelta > 0.11) {
+    throw new Error(`Video fine-trim buttons or keyboard shortcuts failed: ${JSON.stringify({ initialFineTrim, adjustedFineTrim })}`);
+  }
   const rangeState = await page.$eval(".video-range-control", (element) => ({
     handles: element.querySelectorAll('input[type="range"]').length,
     start: element.style.getPropertyValue("--range-start"),

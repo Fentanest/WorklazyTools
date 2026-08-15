@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import JSZip from "jszip";
+import { workerMessage as featureMessage } from "../../i18n/workerMessages";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -9,12 +10,11 @@ interface VideoZipInput {
   blob: Blob;
 }
 
-worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; language?: "ko" | "en" }>) => {
+worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; archiveName: string; language?: "ko" | "en" }>) => {
   const language = event.data.language === "en" ? "en" : "ko";
-  const L = (ko: string, en: string) => language === "ko" ? ko : en;
   try {
     const files = event.data.files;
-    if (!files.length) throw new Error(L("ZIP으로 묶을 결과 파일이 없습니다.", "There are no result files to add to a ZIP."));
+    if (!files.length) throw new Error(featureMessage(language, "video.messages.videoZip.thereAreNoResultFilesToAddTo"));
     const zip = new JSZip();
     const usedNames = new Set<string>();
 
@@ -24,7 +24,7 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; language
       worker.postMessage({
         type: "progress",
         progress: Math.round(((index + 1) / files.length) * 35),
-        message: L(`${index + 1}/${files.length} 결과를 ZIP에 추가하는 중…`, `${index + 1}/${files.length} Adding result to ZIP…`),
+        message: featureMessage(language, "video.messages.videoZip.addingResultToZip", { p0: index + 1, p1: files.length }),
       });
     }
 
@@ -33,7 +33,7 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; language
       (metadata) => worker.postMessage({
         type: "progress",
         progress: 35 + Math.round(metadata.percent * 0.65),
-        message: L(`ZIP 파일 만드는 중… ${Math.round(metadata.percent)}%`, `Creating ZIP file… ${Math.round(metadata.percent)}%`),
+        message: featureMessage(language, "video.messages.videoZip.creatingZipFile", { p0: Math.round(metadata.percent) }),
       }),
     );
     const buffer = archive.buffer as ArrayBuffer;
@@ -41,7 +41,7 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; language
       type: "result",
       result: {
         buffer,
-        fileName: language === "ko" ? `worklazy-비디오-결과-${files.length}개.zip` : `worklazy-video-results-${files.length}.zip`,
+        fileName: event.data.archiveName,
         mimeType: "application/zip",
       },
     }, [buffer]);

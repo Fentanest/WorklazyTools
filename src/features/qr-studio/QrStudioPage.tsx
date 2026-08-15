@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
+import { resolveFeatureMessage } from "../../i18n/featureMessages";
 
 type QrMode = "create" | "scan";
 
@@ -77,7 +78,7 @@ export function QrStudioPage() {
       if (generation !== qrGenerationRef.current) return;
       clearCanvas(canvasRef.current);
       setQrReady(false);
-      setError(qrGenerationError(reason, i18n.language === "en"));
+      setError(qrGenerationError(reason, t("qr.errors.tooLong"), t("qr.createError")));
     });
   }, [mode, text, size, dark, logo, i18n.language, t]);
 
@@ -120,7 +121,7 @@ export function QrStudioPage() {
       fileWorkerRef.current = worker;
       worker.onmessage = (event) => {
         setBusy(false);
-        if (event.data.type === "error") setError(event.data.message);
+        if (event.data.type === "error") setError(resolveFeatureMessage(i18n.language === "en" ? "en" : "ko", event.data.message));
         else if (!event.data.data) setError(t("qr.notFound"));
         else { setError(""); setScanned(event.data.data); }
         worker.terminate();
@@ -132,7 +133,7 @@ export function QrStudioPage() {
         worker.terminate();
         if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
       };
-      worker.postMessage({ buffer, type: file.type, language: i18n.language }, [buffer]);
+      worker.postMessage({ buffer, type: file.type }, [buffer]);
     } catch (reason) {
       setBusy(false);
       setError(reason instanceof Error ? reason.message : t("qr.fileError"));
@@ -187,7 +188,7 @@ export function QrStudioPage() {
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const blob = await canvasToBlob(canvas, "image/jpeg", 0.86, t("qr.errors.image"));
           const buffer = await blob.arrayBuffer();
-          if (cameraWorkerRef.current === worker) worker.postMessage({ buffer, type: blob.type, language: i18n.language }, [buffer]);
+          if (cameraWorkerRef.current === worker) worker.postMessage({ buffer, type: blob.type }, [buffer]);
         } catch (reason) {
           captureInFlightRef.current = false;
           setError(reason instanceof Error ? reason.message : t("qr.errors.scan"));
@@ -198,7 +199,7 @@ export function QrStudioPage() {
       worker.onmessage = (event) => {
         captureInFlightRef.current = false;
         if (event.data.type === "error") {
-          setError(event.data.message || t("qr.errors.frameQr"));
+          setError(event.data.message ? resolveFeatureMessage(i18n.language === "en" ? "en" : "ko", event.data.message) : t("qr.errors.frameQr"));
           stopCamera();
           return;
         }
@@ -340,12 +341,10 @@ function clearCanvas(canvas: HTMLCanvasElement | null) {
   canvas.getContext("2d")?.clearRect(0, 0, 1, 1);
 }
 
-function qrGenerationError(reason: unknown, english: boolean) {
+function qrGenerationError(reason: unknown, tooLong: string, fallback: string) {
   const message = reason instanceof Error ? reason.message : String(reason);
-  if (/too big|amount of data|code length|overflow/i.test(message)) return english
-    ? "This content is too long for a high-reliability QR code. Shorten the text or URL and try again."
-    : "고신뢰도 QR 코드에 담기에는 내용이 너무 깁니다. 텍스트나 URL을 줄여 다시 시도해 주세요.";
-  return message || (english ? "The QR code could not be created." : "QR 코드를 만들지 못했습니다.");
+  if (/too big|amount of data|code length|overflow/i.test(message)) return tooLong;
+  return message || fallback;
 }
 
 function safeHttpUrl(value: string) {

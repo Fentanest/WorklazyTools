@@ -2,6 +2,7 @@ import type { VideoWorkerProgress } from "./types";
 import type { AppLanguage } from "../../i18n/languages";
 import videoZipWorkerUrl from "./video-zip.worker.ts?worker&url";
 import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
+import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessages";
 
 export interface VideoZipSource {
   fileName: string;
@@ -15,8 +16,7 @@ export interface VideoZipResult {
 }
 
 export function createVideoZip(files: VideoZipSource[], onProgress?: VideoWorkerProgress, signal?: AbortSignal, language: AppLanguage = "ko") {
-  const L = (ko: string, en: string) => language === "ko" ? ko : en;
-  const worker = new Worker(localizedVideoWorkerUrl(videoZipWorkerUrl), { type: "module" });
+    const worker = new Worker(localizedVideoWorkerUrl(videoZipWorkerUrl), { type: "module" });
   return new Promise<VideoZipResult>((resolve, reject) => {
     let settled = false;
     const finish = () => {
@@ -28,7 +28,7 @@ export function createVideoZip(files: VideoZipSource[], onProgress?: VideoWorker
     };
     const abort = () => {
       if (!finish()) return;
-      reject(new DOMException(L("ZIP 만들기를 취소했습니다.", "ZIP creation was canceled."), "AbortError"));
+      reject(new DOMException(featureMessage(language, "video.messages.videoZipClient.zipCreationWasCanceled"), "AbortError"));
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) {
@@ -44,17 +44,17 @@ export function createVideoZip(files: VideoZipSource[], onProgress?: VideoWorker
         error?: string;
       };
       if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ?? L("ZIP 파일 만드는 중…", "Creating ZIP file…"));
+        onProgress?.(data.progress ?? 0, data.message ? resolveFeatureMessage(language, data.message) : featureMessage(language, "video.messages.videoZipClient.creatingZipFile"));
         return;
       }
       if (!finish()) return;
       if (data.type === "result") resolve(data.result as VideoZipResult);
-      else reject(new Error(data.error || L("ZIP 파일을 만들지 못했습니다.", "Unable to create the ZIP file.")));
+      else reject(new Error(data.error ? resolveFeatureMessage(language, data.error) : featureMessage(language, "video.messages.videoZipClient.unableToCreateTheZipFile")));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
-      reject(new Error(event.message || L("ZIP Worker를 시작하지 못했습니다.", "Unable to start the ZIP worker.")));
+      reject(new Error(event.message || featureMessage(language, "video.messages.videoZipClient.unableToStartTheZipWorker")));
     };
-    worker.postMessage({ files, language });
+    worker.postMessage({ files, language, archiveName: featureMessage(language, "video.messages.videoZip.worklazyVideoResultsZip", { p0: files.length }) });
   });
 }

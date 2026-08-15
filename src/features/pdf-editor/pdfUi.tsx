@@ -5,6 +5,7 @@ import { ResultCard, formatBytes } from "../../components/ui";
 import { FileShareButton } from "../../components/FileShareButton";
 import { useAppLanguage } from "../../i18n/routing";
 import type { PdfWorkerResult } from "./types";
+import { featureMessage } from "../../i18n/featureMessages";
 
 export interface DownloadResult {
   url: string;
@@ -39,7 +40,7 @@ export function useDownloadResult() {
 export function PdfDownloadCard({ result, title }: { result: DownloadResult; title?: string }) {
   const language = useAppLanguage();
   return (
-    <ResultCard accent="violet" title={title ?? (language === "ko" ? "결과 파일이 준비됐어요." : "Your file is ready.")} message={language === "ko" ? "브라우저에서 생성한 파일입니다. 다운로드 후 결과를 확인해 주세요." : "This file was created in your browser. Download it and review the result."}>
+    <ResultCard accent="violet" title={title ?? (featureMessage(language, "pdf.messages.pdfUi.yourFileIsReady"))} message={featureMessage(language, "pdf.messages.pdfUi.thisFileWasCreatedInYourBrowserDownload")}>
       <a className="result-download accent-violet" href={result.url} download={result.fileName}>
         <Download size={16} /> {result.fileName}<small>{formatBytes(result.size)}</small>
       </a>
@@ -52,7 +53,7 @@ export function PdfDownloadCard({ result, title }: { result: DownloadResult; tit
 export function PdfError({ message }: { message: string }) {
   const language = useAppLanguage();
   if (!message) return null;
-  return <div className="error-banner" role="alert"><AlertTriangle size={19} /><div><strong>{language === "ko" ? "작업을 계속할 수 없습니다." : "Unable to continue."}</strong><span>{message}</span></div></div>;
+  return <div className="error-banner" role="alert"><AlertTriangle size={19} /><div><strong>{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span>{message}</span></div></div>;
 }
 
 export function normalizeOutputName(value: string, fallback: string) {

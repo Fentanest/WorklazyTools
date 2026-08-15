@@ -9,6 +9,33 @@ export type VideoAudioBitrate = "128k" | "192k" | "256k" | "320k" | "custom";
 export type VideoAudioSampleRate = "source" | "44100" | "48000" | "custom";
 export type ResolvedAudioSampleRate = "source" | number;
 export type VideoRotation = 0 | 90 | 180 | 270;
+export type VideoGroupId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type GroupOutputMode = "individual" | "concat";
+
+export interface VideoItem {
+  id: string;
+  file: File;
+  url: string;
+  duration: number;
+  width: number;
+  height: number;
+  start: number;
+  end: number;
+  group: VideoGroupId;
+  metadataSource?: "browser" | "ffmpeg";
+  metadataError?: string;
+  probing?: boolean;
+  frameRate?: number;
+}
+
+export interface VideoGroupSettings {
+  sync: boolean;
+  outputMode: GroupOutputMode;
+  audioItemId?: string;
+}
+
+export const VIDEO_GROUP_IDS: VideoGroupId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export const MAX_VIDEO_GROUP = VIDEO_GROUP_IDS[VIDEO_GROUP_IDS.length - 1];
 
 export type VideoTask =
   | { kind: "gif"; fps: number; width: 480 | 720 | 1080 }

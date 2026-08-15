@@ -9,6 +9,7 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 import type { PdfTextCell, PdfTextDocument, PdfTextLine, PdfTextPage, WorkerProgress } from "./types";
 import type { AppLanguage } from "../../i18n/languages";
+import { featureMessage } from "../../i18n/featureMessages";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -23,7 +24,6 @@ const TESSERACT_BASE_URL = new URL(
   new URL(import.meta.env.BASE_URL, window.location.origin),
 ).href;
 
-const local = (language: AppLanguage, ko: string, en: string) => language === "ko" ? ko : en;
 
 export async function getPdfDocument(file: File, language: AppLanguage = "ko") {
   const cached = documentCache.get(file);
@@ -52,7 +52,7 @@ export async function inspectPdf(file: File, language: AppLanguage = "ko", optio
   const permissions = await document.getPermissions();
   if (permissions !== null && options.requirePdfLibCompatibility) {
     await releasePdf(file);
-    throw new Error(local(language, "암호화되거나 권한이 제한된 PDF는 편집할 수 없습니다. 보호가 해제된 사본으로 다시 시도해 주세요.", "Encrypted or permission-restricted PDFs cannot be edited. Try again with an unlocked copy."));
+    throw new Error(featureMessage(language, "pdf.messages.pdfPreview.encryptedOrPermissionRestrictedPdfsCannotBeEdited"));
   }
   return { pageCount: document.numPages, permissionRestricted: permissions !== null };
 }
@@ -78,7 +78,7 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
   renderCanvas.width = width;
   renderCanvas.height = height;
   const renderContext = renderCanvas.getContext("2d", { alpha: false });
-  if (!renderContext) throw new Error(local(language, "PDF 미리보기를 표시할 수 없습니다.", "Unable to render the PDF preview."));
+  if (!renderContext) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToRenderThePdfPreview"));
   const renderTask = page.render({
     canvas: renderCanvas,
     canvasContext: renderContext,
@@ -99,7 +99,7 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
   canvas.style.width = `${Math.floor(viewport.width)}px`;
   canvas.style.height = `${Math.floor(viewport.height)}px`;
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error(local(language, "PDF 미리보기를 화면에 복사할 수 없습니다.", "Unable to display the PDF preview."));
+  if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToDisplayThePdfPreview"));
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
   context.drawImage(renderCanvas, 0, 0);
@@ -109,7 +109,7 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
 }
 
 export function parsePageRange(value: string, pageCount: number, language: AppLanguage = "ko") {
-  if (!value.trim()) throw new Error(local(language, "페이지 범위를 입력해 주세요.", "Enter a page range."));
+  if (!value.trim()) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.enterAPageRange"));
   const result: number[] = [];
   const seen = new Set<number>();
   for (const rawPart of value.split(",")) {
@@ -119,22 +119,22 @@ export function parsePageRange(value: string, pageCount: number, language: AppLa
     const singleMatch = part.match(/^\d+$/);
     let numbers: number[];
     if (rangeMatch) {
-      if (!rangeMatch[1] && !rangeMatch[2]) throw new Error(local(language, `페이지 범위 '${part}'의 형식을 확인해 주세요.`, `Check the format of page range '${part}'.`));
+      if (!rangeMatch[1] && !rangeMatch[2]) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.checkTheFormatOfPageRange", { p0: part }));
       const start = rangeMatch[1] ? Number(rangeMatch[1]) : 1;
       const end = rangeMatch[2] ? Number(rangeMatch[2]) : pageCount;
       const direction = start <= end ? 1 : -1;
       numbers = Array.from({ length: Math.abs(end - start) + 1 }, (_, index) => start + index * direction);
     } else if (singleMatch) numbers = [Number(part)];
-    else throw new Error(local(language, `페이지 범위 '${part}'의 형식을 확인해 주세요.`, `Check the format of page range '${part}'.`));
+    else throw new Error(featureMessage(language, "pdf.messages.pdfPreview.checkTheFormatOfPageRange", { p0: part }));
     for (const pageNumber of numbers) {
-      if (pageNumber < 1 || pageNumber > pageCount) throw new Error(local(language, `페이지 번호는 1~${pageCount} 사이여야 합니다.`, `Page numbers must be between 1 and ${pageCount}.`));
+      if (pageNumber < 1 || pageNumber > pageCount) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.pageNumbersMustBeBetween1And", { p0: pageCount }));
       if (!seen.has(pageNumber)) {
         seen.add(pageNumber);
         result.push(pageNumber - 1);
       }
     }
   }
-  if (!result.length) throw new Error(local(language, "추출할 페이지가 없습니다.", "No pages were selected."));
+  if (!result.length) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.noPagesWereSelected"));
   return result;
 }
 
@@ -154,7 +154,7 @@ export async function pdfToImageArchive(
   const pageNumbers = selectedPageIndexes?.length ? selectedPageIndexes.map((index) => index + 1) : Array.from({ length: document.numPages }, (_, index) => index + 1);
   for (let index = 0; index < pageNumbers.length; index += 1) {
     const pageNumber = pageNumbers[index];
-    onProgress?.(5 + (index / pageNumbers.length) * 78, local(language, `[${index + 1}/${pageNumbers.length}] ${pageNumber}페이지를 ${format.toUpperCase()}로 렌더링하는 중…`, `[${index + 1}/${pageNumbers.length}] Rendering page ${pageNumber} as ${format.toUpperCase()}…`));
+    onProgress?.(5 + (index / pageNumbers.length) * 78, featureMessage(language, "pdf.messages.pdfPreview.renderingPageAs", { p0: index + 1, p1: pageNumbers.length, p2: pageNumber, p3: format.toUpperCase() }));
     const canvas = await renderPageForExport(document, pageNumber, scale, language);
     const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality, language);
     zip.file(`${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob);
@@ -162,9 +162,9 @@ export async function pdfToImageArchive(
     canvas.height = 1;
     await yieldToBrowser();
   }
-  onProgress?.(88, local(language, "변환된 이미지를 ZIP 파일로 압축하는 중…", "Compressing converted images into a ZIP file…"));
+  onProgress?.(88, featureMessage(language, "pdf.messages.pdfPreview.compressingConvertedImagesIntoAZipFile"));
   const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, (metadata) => {
-    onProgress?.(88 + metadata.percent * 0.1, local(language, `ZIP 압축 중… ${Math.round(metadata.percent)}%`, `Compressing ZIP… ${Math.round(metadata.percent)}%`));
+    onProgress?.(88 + metadata.percent * 0.1, featureMessage(language, "pdf.messages.pdfPreview.compressingZip", { p0: Math.round(metadata.percent) }));
   });
   return { blob, fileName: `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip` };
 }
@@ -177,7 +177,7 @@ export async function renderPdfPageAsJpeg(file: File, pageIndex: number, additio
   canvas.width = Math.max(1, Math.ceil(viewport.width));
   canvas.height = Math.max(1, Math.ceil(viewport.height));
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error(local(language, "PDF 페이지 압축 화면을 만들 수 없습니다.", "Unable to create the compressed PDF page image."));
+  if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToCreateTheCompressedPdfPageImage"));
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvas, canvasContext: context, viewport }).promise;
@@ -207,14 +207,14 @@ export async function extractPdfText(
   const sourcePageIndexes = selectedPageIndexes?.length
     ? [...new Set(selectedPageIndexes)].filter((index) => index >= 0 && index < document.numPages)
     : Array.from({ length: document.numPages }, (_, index) => index);
-  if (!sourcePageIndexes.length) throw new Error(local(language, "처리할 PDF 페이지가 없습니다.", "There are no PDF pages to process."));
-  onProgress?.(2, local(language, "PDF의 내장 텍스트와 좌표를 확인하는 중…", "Reading embedded PDF text and coordinates…"));
+  if (!sourcePageIndexes.length) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.thereAreNoPdfPagesToProcess"));
+  onProgress?.(2, featureMessage(language, "pdf.messages.pdfPreview.readingEmbeddedPdfTextAndCoordinates"));
   for (let index = 0; index < sourcePageIndexes.length; index += 1) {
     const pageNumber = sourcePageIndexes[index] + 1;
     const page = await document.getPage(pageNumber);
     const content = await page.getTextContent();
     pages.push(layoutPdfItems(pageNumber, (content.items as unknown[]).filter(isTextItem)));
-    onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, local(language, `[${index + 1}/${sourcePageIndexes.length}] ${pageNumber}페이지 내장 텍스트 분석 완료`, `[${index + 1}/${sourcePageIndexes.length}] Embedded text analyzed for page ${pageNumber}`));
+    onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, featureMessage(language, "pdf.messages.pdfPreview.embeddedTextAnalyzedForPage", { p0: index + 1, p1: sourcePageIndexes.length, p2: pageNumber }));
   }
 
   const ocrTargets = searchablePdf || ocrMode === "all"
@@ -227,7 +227,7 @@ export async function extractPdfText(
   if (ocrTargets.length) {
     const { createWorker } = await import("tesseract.js");
     let activePage = 0;
-    onProgress?.(19, local(language, "사이트에 포함된 한국어·영어 OCR 모델을 준비하는 중…", "Preparing the bundled Korean and English OCR models…"));
+    onProgress?.(19, featureMessage(language, "pdf.messages.pdfPreview.preparingTheBundledKoreanAndEnglishOcrModels"));
     const ocrWorker = await createWorker(["kor", "eng"], undefined, {
       workerPath: `${TESSERACT_BASE_URL}worker.min.js`,
       corePath: `${TESSERACT_BASE_URL}core/`,
@@ -235,7 +235,7 @@ export async function extractPdfText(
       logger: (message) => {
         if (message.status === "recognizing text") {
           const value = 22 + ((activePage + message.progress) / ocrTargets.length) * 68;
-          onProgress?.(value, local(language, `[${activePage + 1}/${ocrTargets.length}] OCR 인식 중… ${Math.round(message.progress * 100)}%`, `[${activePage + 1}/${ocrTargets.length}] Recognizing text… ${Math.round(message.progress * 100)}%`));
+          onProgress?.(value, featureMessage(language, "pdf.messages.pdfPreview.recognizingText", { p0: activePage + 1, p1: ocrTargets.length, p2: Math.round(message.progress * 100) }));
         } else {
           onProgress?.(19 + message.progress * 3, translateOcrStatus(message.status, language));
         }
@@ -245,7 +245,7 @@ export async function extractPdfText(
       for (activePage = 0; activePage < ocrTargets.length; activePage += 1) {
         const pageIndex = ocrTargets[activePage];
         const sourcePageNumber = sourcePageIndexes[pageIndex] + 1;
-        onProgress?.(22 + (activePage / ocrTargets.length) * 68, local(language, `[${activePage + 1}/${ocrTargets.length}] ${sourcePageNumber}페이지 OCR용 이미지 생성 중…`, `[${activePage + 1}/${ocrTargets.length}] Rendering page ${sourcePageNumber} for OCR…`));
+        onProgress?.(22 + (activePage / ocrTargets.length) * 68, featureMessage(language, "pdf.messages.pdfPreview.renderingPageForOcr", { p0: activePage + 1, p1: ocrTargets.length, p2: sourcePageNumber }));
         const canvas = await renderPageForOcr(document, sourcePageNumber, language);
         const recognized = await ocrWorker.recognize(
           canvas,
@@ -289,7 +289,7 @@ async function renderPageForExport(document: PDFDocumentProxy, pageNumber: numbe
   const viewport = page.getViewport({ scale });
   const canvas = documentCanvas(viewport.width, viewport.height);
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error(local(language, "PDF 페이지 이미지를 만들 수 없습니다.", "Unable to render the PDF page image."));
+  if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToRenderThePdfPageImage"));
   await page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" }).promise;
   return canvas;
 }
@@ -367,7 +367,7 @@ function documentCanvas(width: number, height: number) {
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number | undefined, language: AppLanguage) {
-  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(local(language, "이미지 파일을 만들지 못했습니다.", "Unable to create the image file."))), type, quality));
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToCreateTheImageFile"))), type, quality));
 }
 
 function yieldToBrowser() {
@@ -379,22 +379,22 @@ function stripExtension(name: string) {
 }
 
 function translateOcrStatus(status: string, language: AppLanguage) {
-  const labels: Record<string, [string, string]> = {
-    "loading tesseract core": ["OCR WebAssembly 엔진 불러오는 중…", "Loading the OCR WebAssembly engine…"],
-    "initializing tesseract": ["OCR 엔진 초기화 중…", "Initializing the OCR engine…"],
-    "loading language traineddata": ["한국어·영어 학습 모델 내려받는 중…", "Loading Korean and English language models…"],
-    "initializing api": ["한국어·영어 인식기 준비 중…", "Preparing Korean and English recognition…"],
+  const labels: Record<string, string> = {
+    "loading tesseract core": "pdf.ocrStatus.loadingCore",
+    "initializing tesseract": "pdf.ocrStatus.initializing",
+    "loading language traineddata": "pdf.ocrStatus.loadingLanguage",
+    "initializing api": "pdf.ocrStatus.initializingApi",
   };
   const label = labels[status];
-  return label ? local(language, label[0], label[1]) : local(language, `OCR 준비 중 · ${status}`, `Preparing OCR · ${status}`);
+  return label ? featureMessage(language, label) : featureMessage(language, "pdf.messages.pdfPreview.preparingOcr", { p0: status });
 }
 
 function normalizePdfOpenError(error: unknown, language: AppLanguage) {
   if (error instanceof PasswordException || (error instanceof Error && error.name === "PasswordException")) {
-    return new Error(local(language, "암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.", "This PDF is password-protected. Try again with an unlocked copy."));
+    return new Error(featureMessage(language, "pdf.messages.pdfPreview.thisPdfIsPasswordProtectedTryAgainWith"));
   }
   if (error instanceof Error && /password|encrypted/i.test(error.message)) {
-    return new Error(local(language, "암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.", "This PDF is password-protected. Try again with an unlocked copy."));
+    return new Error(featureMessage(language, "pdf.messages.pdfPreview.thisPdfIsPasswordProtectedTryAgainWith"));
   }
-  return error instanceof Error ? error : new Error(local(language, "PDF 파일을 열지 못했습니다.", "Unable to open the PDF file."));
+  return error instanceof Error ? error : new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToOpenThePdfFile"));
 }

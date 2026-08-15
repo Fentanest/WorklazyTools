@@ -20,9 +20,9 @@ export function formatAudioTime(seconds: number) {
   return `${pad(hours, 2)}:${pad(minutes, 2)}:${pad(wholeSeconds, 2)}.${pad(milliseconds, 3)}`;
 }
 
-export function createAudioFileName(sourceName: string, extension: "wav" | "mp3", language: "ko" | "en" = "ko") {
+export function createAudioFileName(sourceName: string, extension: "wav" | "mp3", suffix: string) {
   const base = sourceName.replace(/\.[^.]+$/, "").trim().replace(/[\\/:*?"<>|]+/g, "-") || "worklazy-audio";
-  return `${base}-${language === "en" ? "edited" : "편집"}.${extension}`;
+  return `${base}-${suffix}.${extension}`;
 }
 
 export function audioHistoryLimit(document: AudioDocumentData) {

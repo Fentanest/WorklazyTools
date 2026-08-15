@@ -31,10 +31,11 @@ import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
 import { FileDropZone, PageHeader, SectionCard, ToggleRow, formatBytes } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
-import { audioBufferToDocument, audioHistoryLimit, createAudioFileName, formatAudioTime, sniffAudioSampleRate } from "./audioHelpers";
+import { audioHistoryLimit, createAudioFileName, formatAudioTime } from "./audioHelpers";
 import { AudioExportPanel, VoiceEffectPanel, type AudioExportFormat, type VoicePreset } from "./AudioStudioPanels";
 import { runAudioProcessor, terminateAudioProcessorSession } from "./audioProcessorClient";
 import type { AudioClipboardData, AudioDocumentData, AudioEditCommand, AudioProcessorResult, AudioVoiceEffectSettings } from "./types";
+import { useAudioDocument } from "./useAudioDocument";
 
 interface AudioSelection {
   start: number;
@@ -49,7 +50,7 @@ export function AudioStudioPage() {
   const { t, i18n } = useTranslation("features");
   const language = i18n.language === "en" ? "en" : "ko";
   const [files, setFiles] = useState<File[]>([]);
-  const [document, setDocument] = useState<AudioDocumentData>();
+  const { document, documentRef, replaceDocument, prepareDecode, decodeFile, isCurrentDecode, cancelDecode } = useAudioDocument();
   const [selection, setSelection] = useState<AudioSelection>();
   const [clipboard, setClipboard] = useState<AudioClipboardData>();
   const [undoHistory, setUndoHistory] = useState<AudioDocumentData[]>([]);
@@ -76,21 +77,17 @@ export function AudioStudioPage() {
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | undefined>(undefined);
   const regionsRef = useRef<RegionsPlugin | undefined>(undefined);
-  const documentRef = useRef<AudioDocumentData | undefined>(undefined);
   const selectionRef = useRef<AudioSelection | undefined>(undefined);
   const loopRef = useRef(false);
   const previewUrlRef = useRef("");
   const effectPreviewUrlRef = useRef("");
   const effectPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
-  const decodeContextRef = useRef<AudioContext | undefined>(undefined);
   const activeControllerRef = useRef<AbortController | undefined>(undefined);
-  const loadGenerationRef = useRef(0);
   const handleFilesRef = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
   const restoreHistoryRef = useRef<(direction: "undo" | "redo") => Promise<void>>(async () => undefined);
   const togglePlaybackRef = useRef<() => Promise<void>>(async () => undefined);
   const applyEditRef = useRef<(command: AudioEditCommand) => Promise<void>>(async () => undefined);
 
-  useEffect(() => { documentRef.current = document; }, [document]);
   useEffect(() => { selectionRef.current = selection; }, [selection]);
   useEffect(() => { loopRef.current = loop; }, [loop]);
 
@@ -212,15 +209,13 @@ export function AudioStudioPage() {
   }, [failProgress, previewUrl, t]);
 
   useEffect(() => () => {
-    loadGenerationRef.current += 1;
     activeControllerRef.current?.abort();
     terminateAudioProcessorSession();
-    void decodeContextRef.current?.close().catch(() => undefined);
+    cancelDecode();
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     if (effectPreviewUrlRef.current) URL.revokeObjectURL(effectPreviewUrlRef.current);
-    documentRef.current = undefined;
     selectionRef.current = undefined;
-  }, []);
+  }, [cancelDecode]);
 
   useEffect(() => {
     clearEffectPreview();
@@ -242,9 +237,9 @@ export function AudioStudioPage() {
       progress.fail(t("audio.status.unsupported"));
       return;
     }
-    const generation = ++loadGenerationRef.current;
     activeControllerRef.current?.abort();
-    await decodeContextRef.current?.close().catch(() => undefined);
+    terminateAudioProcessorSession();
+    const generation = await prepareDecode();
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     previewUrlRef.current = "";
     setPreviewUrl("");
@@ -252,8 +247,6 @@ export function AudioStudioPage() {
     const controller = new AbortController();
     activeControllerRef.current = controller;
     setFiles([file]);
-    setDocument(undefined);
-    documentRef.current = undefined;
     setClipboard(undefined);
     setUndoHistory([]);
     setRedoHistory([]);
@@ -262,32 +255,21 @@ export function AudioStudioPage() {
     commitSelection(undefined);
     regionsRef.current?.clearRegions();
     progress.start(t("audio.status.decoding", { name: file.name }));
-    let context: AudioContext | undefined;
     try {
-      const sourceBytes = await file.arrayBuffer();
-      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
-      const sourceSampleRate = sniffAudioSampleRate(sourceBytes, file.name);
-      context = new AudioContext(sourceSampleRate ? { sampleRate: sourceSampleRate } : undefined);
-      decodeContextRef.current = context;
-      progress.update(22, t("audio.status.webAudio"));
-      const decoded = await context.decodeAudioData(sourceBytes);
-      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
-      const nextDocument = audioBufferToDocument(decoded, file.name);
+      const nextDocument = await decodeFile(file, generation, controller.signal, () => progress.update(22, t("audio.status.webAudio")));
+      if (!nextDocument) return;
       const preview = await runAudioProcessor({ command: "PREVIEW", document: nextDocument, language }, (value, message) => progress.update(30 + value * 0.65, message), controller.signal);
-      if (generation !== loadGenerationRef.current) return;
+      if (!isCurrentDecode(generation)) return;
       if (!preview.previewBlob) throw new Error(t("audio.status.previewRestore"));
-      documentRef.current = nextDocument;
-      setDocument(nextDocument);
+      replaceDocument(nextDocument);
       const initialSelection = defaultSelection(nextDocument.duration);
       commitSelection(initialSelection);
       replacePreview(preview.previewBlob);
       progress.succeed(t("audio.status.ready", { name: file.name }));
       setLastResult(`${formatAudioTime(nextDocument.duration)} · ${t("audio.channels", { count: nextDocument.channels.length })} · ${nextDocument.sampleRate.toLocaleString(i18n.language)}Hz`);
     } catch (error) {
-      if (generation === loadGenerationRef.current) progress.fail(error instanceof DOMException && error.name === "AbortError" ? t("audio.status.cancelled") : toAudioError(error, t));
+      if (isCurrentDecode(generation)) progress.fail(error instanceof DOMException && error.name === "AbortError" ? t("audio.status.cancelled") : toAudioError(error, t));
     } finally {
-      if (decodeContextRef.current === context) decodeContextRef.current = undefined;
-      await context?.close().catch(() => undefined);
       if (activeControllerRef.current === controller) activeControllerRef.current = undefined;
     }
   };
@@ -365,8 +347,7 @@ export function AudioStudioPage() {
       setUndoHistory((history) => [...history, { ...currentDocument, selection: currentSelection }].slice(-limit));
       setRedoHistory([]);
       if (result.clipboard) setClipboard(result.clipboard);
-      documentRef.current = nextDocument;
-      setDocument(nextDocument);
+      replaceDocument(nextDocument);
       const nextSelection = selectionAfterEdit(command, currentSelection, clipboard, nextDocument.duration, editCursor);
       commitSelection(nextSelection);
       replacePreview(result.previewBlob);
@@ -397,8 +378,7 @@ export function AudioStudioPage() {
         setRedoHistory((history) => history.slice(0, -1));
         setUndoHistory((history) => [...history, currentDocument].slice(-audioHistoryLimit(currentDocument)));
       }
-      documentRef.current = target;
-      setDocument(target);
+      replaceDocument(target);
       commitSelection(clampSelection(target.selection, target.duration) || defaultSelection(target.duration));
       replacePreview(result.previewBlob);
       progress.succeed(direction === "undo" ? t("audio.status.undoDone") : t("audio.status.redoDone"));
@@ -456,8 +436,7 @@ export function AudioStudioPage() {
       const limit = audioHistoryLimit(currentDocument);
       setUndoHistory((history) => [...history, currentDocument].slice(-limit));
       setRedoHistory([]);
-      documentRef.current = nextDocument;
-      setDocument(nextDocument);
+      replaceDocument(nextDocument);
       commitSelection(clampSelection(currentSelection, nextDocument.duration));
       replacePreview(result.previewBlob);
       progress.succeed(t("audio.voice.status.applied"));
@@ -478,7 +457,7 @@ export function AudioStudioPage() {
     const controller = new AbortController();
     activeControllerRef.current = controller;
     const extension = exportFormat;
-    const fileName = createAudioFileName(currentDocument.sourceName, extension, language);
+    const fileName = createAudioFileName(currentDocument.sourceName, extension, t("audio.fileSuffix"));
     progress.start(t("audio.status.exportPrepare", { format: extension.toUpperCase() }));
     setLastResult("");
     try {
@@ -650,7 +629,7 @@ export function AudioStudioPage() {
       {document && <AudioExportPanel format={exportFormat} bitrate={mp3Bitrate} busy={busy} selectionDuration={selection ? selectionDuration : undefined} exportSelection={exportSelection} onFormat={setExportFormat} onBitrate={setMp3Bitrate} onExportSelection={setExportSelection} onExport={() => void exportAudio()} />}
 
       <OperationProgress {...progress} accent="violet" title={t("audio.log")} />
-      {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { loadGenerationRef.current += 1; activeControllerRef.current?.abort(); void decodeContextRef.current?.close().catch(() => undefined); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</button></div>}
+      {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { cancelDecode(); activeControllerRef.current?.abort(); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</button></div>}
       {lastResult && <div className="inline-success"><FileAudio2 size={18} /><span>{lastResult}</span></div>}
 
       <ToolGuide
