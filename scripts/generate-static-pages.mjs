@@ -73,7 +73,7 @@ function makePage(language, route) {
     route,
     title: definition.title,
     description: definition.description,
-    heading: definition.title.split(" | ")[0].split(" — ")[0],
+    heading: definition.title.split(/\s(?:\||—|-)\s/)[0],
     application: definition.application?.name ?? null,
     highlights: definition.application?.featureList ?? [],
   };
@@ -124,7 +124,7 @@ function renderRedirect(template, target) {
 function renderNotFound(template) {
   return template
     .replace(/<title>[\s\S]*?<\/title>/, "<title>Page not found | Worklazy Tools</title>")
-    .replace("</head>", '<meta name="robots" content="noindex, nofollow" /></head>');
+    .replace(/<meta\s+name="robots"\s+content="[^"]*"\s*\/>/, '<meta name="robots" content="noindex, nofollow" />');
 }
 
 function staticBody(page) {

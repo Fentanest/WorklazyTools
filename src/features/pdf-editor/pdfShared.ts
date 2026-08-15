@@ -24,3 +24,17 @@ export function ensurePdfExtension(name: string, extension: string) {
 export function sanitizePdfFileName(name: string, fallback: string) {
   return name.trim().replace(/[\\/:*?"<>|]+/g, "-") || fallback;
 }
+
+export async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number, mapper: (item: T, index: number) => Promise<R>) {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(items.length, Math.max(1, Math.floor(concurrency)));
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }));
+  return results;
+}

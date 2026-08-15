@@ -1,12 +1,9 @@
 import {
   AlertTriangle,
-  Bot,
   ClipboardCopy,
   ClipboardPaste,
   Copy,
-  Download,
   FileAudio2,
-  Headphones,
   LoaderCircle,
   Pause,
   Play,
@@ -18,7 +15,6 @@ import {
   Trash2,
   Undo2,
   VolumeX,
-  WandSparkles,
   Waves,
   ZoomIn,
   ZoomOut,
@@ -33,14 +29,12 @@ import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
+import { FileDropZone, PageHeader, SectionCard, ToggleRow, formatBytes } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { audioBufferToDocument, audioHistoryLimit, createAudioFileName, formatAudioTime, sniffAudioSampleRate } from "./audioHelpers";
+import { AudioExportPanel, VoiceEffectPanel, type AudioExportFormat, type VoicePreset } from "./AudioStudioPanels";
 import { runAudioProcessor, terminateAudioProcessorSession } from "./audioProcessorClient";
 import type { AudioClipboardData, AudioDocumentData, AudioEditCommand, AudioProcessorResult, AudioVoiceEffectSettings } from "./types";
-
-type ExportFormat = "wav" | "mp3";
-type VoicePreset = "low" | "high" | "child" | "robot" | "custom";
 
 interface AudioSelection {
   start: number;
@@ -65,7 +59,7 @@ export function AudioStudioPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [loop, setLoop] = useState(false);
   const [zoomIndex, setZoomIndex] = useState(1);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("wav");
+  const [exportFormat, setExportFormat] = useState<AudioExportFormat>("wav");
   const [mp3Bitrate, setMp3Bitrate] = useState<128 | 192 | 256 | 320>(192);
   const [gain, setGain] = useState(1);
   const [exportSelection, setExportSelection] = useState(false);
@@ -478,6 +472,9 @@ export function AudioStudioPage() {
   const exportAudio = async () => {
     const currentDocument = documentRef.current;
     if (!currentDocument) return;
+    const currentSelection = selectionRef.current;
+    const shouldExportSelection = exportSelection && Boolean(currentSelection);
+    if (exportSelection && !currentSelection) setExportSelection(false);
     const controller = new AbortController();
     activeControllerRef.current = controller;
     const extension = exportFormat;
@@ -490,9 +487,9 @@ export function AudioStudioPage() {
         document: currentDocument,
         fileName,
         bitrate: mp3Bitrate,
-        start: selectionRef.current?.start,
-        end: selectionRef.current?.end,
-        exportSelection,
+        start: currentSelection?.start,
+        end: currentSelection?.end,
+        exportSelection: shouldExportSelection,
         language,
       }, progress.update, controller.signal);
       if (!result.output) throw new Error(t("audio.status.missingFile"));
@@ -625,54 +622,32 @@ export function AudioStudioPage() {
             <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("COPY")}><Copy size={18} /><span>{t("audio.copy")}</span></button>
             <button type="button" disabled={busy || !clipboard} onClick={() => void applyEdit("PASTE")}><ClipboardPaste size={18} /><span>{t("audio.paste")}</span></button>
             <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("DELETE")}><Trash2 size={18} /><span>{t("audio.delete")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_IN")}><Waves size={18} /><span>{language === "ko" ? "페이드 인" : "Fade in"}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_OUT")}><Waves size={18} /><span>{language === "ko" ? "페이드 아웃" : "Fade out"}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("NORMALIZE")}><SlidersHorizontal size={18} /><span>{language === "ko" ? "피크 정규화" : "Normalize peak"}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("TRIM")}><Scissors size={18} /><span>{language === "ko" ? "선택만 남기기" : "Trim to selection"}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_IN")}><Waves size={18} /><span>{t("audio.edit.FADE_IN")}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_OUT")}><Waves size={18} /><span>{t("audio.edit.FADE_OUT")}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("NORMALIZE")}><SlidersHorizontal size={18} /><span>{t("audio.edit.NORMALIZE")}</span></button>
+            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("TRIM")}><Scissors size={18} /><span>{t("audio.edit.TRIM")}</span></button>
             <button type="button" aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || !undoHistory.length} onClick={() => void restoreHistory("undo")}><Undo2 size={18} /><span>{t("audio.undo")}</span><small>{undoHistory.length}</small></button>
             <button type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y" disabled={busy || !redoHistory.length} onClick={() => void restoreHistory("redo")}><Redo2 size={18} /><span>{t("audio.redo")}</span><small>{redoHistory.length}</small></button>
           </div>
-          <div className="audio-gain-control"><label><span>{language === "ko" ? "선택 구간 음량" : "Selection gain"}</span><input type="range" min={0} max={2} step={0.05} value={gain} onChange={(event) => setGain(Number(event.target.value))} /><b>{gain.toFixed(2)}×</b></label><button type="button" className="secondary-button" disabled={busy || !selection} onClick={() => void applyEdit("GAIN")}>{language === "ko" ? "음량 적용" : "Apply gain"}</button></div>
+          <div className="audio-gain-control"><label><span>{t("audio.selectionGain")}</span><input type="range" min={0} max={2} step={0.05} value={gain} onChange={(event) => setGain(Number(event.target.value))} /><b>{gain.toFixed(2)}×</b></label><button type="button" className="secondary-button" disabled={busy || !selection} onClick={() => void applyEdit("GAIN")}>{t("audio.edit.GAIN")}</button></div>
 
-          <div className="audio-voice-effect-panel">
-            <div className="audio-voice-effect-heading">
-              <span><WandSparkles size={19} /><span><strong>{t("audio.voice.title")}</strong><small>{t("audio.voice.description")}</small></span></span>
-              <b>{voicePreset === "robot" ? t("audio.voice.robotValue") : t("audio.voice.semitones", { count: effectivePitch })}</b>
-            </div>
-            <div className="audio-voice-presets" role="radiogroup" aria-label={t("audio.voice.presetsLabel")}>
-              {(["low", "high", "child", "robot", "custom"] as const).map((preset) => (
-                <button key={preset} type="button" role="radio" aria-checked={voicePreset === preset} className={voicePreset === preset ? "active" : ""} disabled={busy} onClick={() => { voicePresetRef.current = preset; setVoicePreset(preset); }}>
-                  {preset === "robot" && <Bot size={17} />}{t(`audio.voice.presets.${preset}`)}
-                </button>
-              ))}
-            </div>
-            <label className={`audio-pitch-control${voicePreset === "robot" ? " is-disabled" : ""}`}>
-              <span><SlidersHorizontal size={17} /> {t("audio.voice.pitch")}</span>
-              <input type="range" min={-12} max={12} step={1} disabled={busy || voicePreset === "robot"} value={effectivePitch} onChange={(event) => { const value = Number(event.target.value); voicePresetRef.current = "custom"; customPitchRef.current = value; setVoicePreset("custom"); setCustomPitch(value); }} />
-              <output>{voicePreset === "robot" ? "—" : `${effectivePitch > 0 ? "+" : ""}${effectivePitch}`}</output>
-            </label>
-            <div className="inline-notice"><AlertTriangle size={16} /><span>{t("audio.voice.notice")}</span></div>
-            <div className="audio-voice-effect-actions">
-              <button type="button" className="secondary-button" disabled={busy || !selection} onClick={() => void runVoiceEffect(true)}><Headphones size={17} /> {t("audio.voice.preview")}</button>
-              <PrimaryButton accent="violet" disabled={busy || !selection} loading={busy} onClick={() => void runVoiceEffect(false)}><WandSparkles size={17} /> {t("audio.voice.apply")}</PrimaryButton>
-            </div>
-            {effectPreviewUrl && <div className="audio-effect-preview"><span>{t("audio.voice.previewPlayer")}</span><audio ref={effectPreviewAudioRef} src={effectPreviewUrl} controls preload="auto" /></div>}
-          </div>
+          <VoiceEffectPanel
+            busy={busy}
+            selectionAvailable={Boolean(selection)}
+            voicePreset={voicePreset}
+            effectivePitch={effectivePitch}
+            onPreset={(preset) => { voicePresetRef.current = preset; setVoicePreset(preset); }}
+            onPitch={(value) => { voicePresetRef.current = "custom"; customPitchRef.current = value; setVoicePreset("custom"); setCustomPitch(value); }}
+            onPreview={() => void runVoiceEffect(true)}
+            onApply={() => void runVoiceEffect(false)}
+            previewUrl={effectPreviewUrl}
+            audioRef={effectPreviewAudioRef}
+          />
           <div className={`audio-clipboard-status${clipboard ? " has-clip" : ""}`}><ClipboardCopy size={17} /><span>{clipboard ? t("audio.clipboard", { duration: formatAudioTime(clipboard.duration), channels: clipboard.channels.length }) : t("audio.clipboardEmpty")}</span></div>
         </SectionCard>
       )}
 
-      {document && (
-        <SectionCard step={3} title={t("audio.exportTitle")} description={t("audio.exportHelp")}>
-          <div className="audio-export-settings">
-            <SegmentedControl value={exportFormat} options={[{ value: "wav", label: t("audio.wav") }, { value: "mp3", label: t("audio.mp3") }]} onChange={setExportFormat} label={t("audio.format")} />
-            {exportFormat === "mp3" && <label><span>{t("audio.bitrate")}</span><select value={mp3Bitrate} onChange={(event) => setMp3Bitrate(Number(event.target.value) as 128 | 192 | 256 | 320)}><option value={128}>128 kbps</option><option value={192}>192 kbps · {t("audio.recommended")}</option><option value={256}>256 kbps</option><option value={320}>320 kbps</option></select></label>}
-          </div>
-          <ToggleRow label={language === "ko" ? "선택 구간만 내보내기" : "Export selection only"} description={selection ? formatAudioTime(selectionDuration) : undefined} checked={exportSelection} onChange={setExportSelection} disabled={!selection} />
-          {exportFormat === "mp3" && <div className="inline-notice warning"><AlertTriangle size={16} /><span>{t("audio.offline")}</span></div>}
-          <div className="section-actions"><PrimaryButton accent="violet" disabled={busy} loading={busy} onClick={() => void exportAudio()}><Download size={18} /> {t("audio.export", { format: exportFormat.toUpperCase() })}</PrimaryButton></div>
-        </SectionCard>
-      )}
+      {document && <AudioExportPanel format={exportFormat} bitrate={mp3Bitrate} busy={busy} selectionDuration={selection ? selectionDuration : undefined} exportSelection={exportSelection} onFormat={setExportFormat} onBitrate={setMp3Bitrate} onExportSelection={setExportSelection} onExport={() => void exportAudio()} />}
 
       <OperationProgress {...progress} accent="violet" title={t("audio.log")} />
       {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { loadGenerationRef.current += 1; activeControllerRef.current?.abort(); void decodeContextRef.current?.close().catch(() => undefined); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</button></div>}

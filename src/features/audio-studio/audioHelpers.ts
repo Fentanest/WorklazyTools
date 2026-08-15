@@ -40,7 +40,7 @@ export function sniffAudioSampleRate(bytes: ArrayBuffer, fileName = "") {
     while (offset + 8 <= view.byteLength) {
       const id = ascii(view, offset, 4);
       const length = view.getUint32(offset + 4, true);
-      if (id === "fmt " && length >= 16 && offset + 12 <= view.byteLength) return validSampleRate(view.getUint32(offset + 12, true));
+      if (id === "fmt " && length >= 16 && offset + 16 <= view.byteLength) return validSampleRate(view.getUint32(offset + 12, true));
       offset += 8 + length + (length % 2);
     }
   }

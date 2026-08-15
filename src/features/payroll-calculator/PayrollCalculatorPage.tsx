@@ -5,13 +5,10 @@ import { useTranslation } from "react-i18next";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { PageHeader, SectionCard, SegmentedControl } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
+import { localIsoDate } from "../../utils/date";
 import { calculateNetPay, calculateSeverance, calculateWeeklyAllowance, PAYROLL_STANDARD } from "./payroll";
 
 type PayrollMode = "weekly" | "net" | "severance";
-function localIsoDate(date = new Date()) {
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
-}
 export function PayrollCalculatorPage() {
   const { t, i18n } = useTranslation("features");
   const won = new Intl.NumberFormat(i18n.language === "en" ? "en-US" : "ko-KR", { style: "currency", currency: "KRW", maximumFractionDigits: 0 });

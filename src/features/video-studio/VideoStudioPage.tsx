@@ -17,13 +17,12 @@ import {
   Play,
   Scissors,
   Sparkles,
-  Timer,
   Trash2,
   Volume2,
   Waves,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -47,13 +46,14 @@ import type {
 } from "./types";
 import { probeVideoMetadata, runVideoTask } from "./videoWorkerClient";
 import { createVideoZip } from "./videoZipClient";
+import { VideoTrimLane } from "./VideoTrimLane";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import type { AppLanguage } from "../../i18n/languages";
 
 type VideoGroupId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 type GroupOutputMode = "individual" | "concat";
 
-interface VideoItem {
+export interface VideoItem {
   id: string;
   file: File;
   url: string;
@@ -715,32 +715,23 @@ export function VideoStudioPage() {
 
                   <div className="group-trim-editor">
                     <div className="group-trim-heading"><span><Scissors size={17} /><strong>{L(`그룹 ${group} 구간 설정`, `Group ${group} trim ranges`)}</strong></span><small>{L("각 영상에 서로 다른 구간을 지정할 수 있습니다.", "Each video can use a different range.")}</small></div>
-                    {groupItems.map((item, groupIndex) => item.duration > 0 ? (
-                      <div className={`video-trim-lane${activeId === item.id ? " active" : ""}`} key={item.id} onClick={() => setActiveId(item.id)}>
-                        <div className="video-trim-lane-title"><strong>{groupIndex + 1}. {item.file.name}</strong><b>{formatTime(item.start)} — {formatTime(item.end)}</b></div>
-                        <div
-                          className="video-range-control"
-                          style={{ "--range-start": `${item.start / item.duration * 100}%`, "--range-end": `${item.end / item.duration * 100}%` } as CSSProperties}
-                        >
-                          <span className="video-range-selection" />
-                          <input aria-label={L(`${item.file.name} 시작 지점`, `${item.file.name} start time`)} type="range" min={0} max={item.duration} step="0.01" value={item.start} onChange={(event) => { const value = Math.min(Number(event.target.value), item.end - 0.05); updateItem(item.id, { start: value }); seekItem(item, value); }} />
-                          <input aria-label={L(`${item.file.name} 종료 지점`, `${item.file.name} end time`)} type="range" min={0} max={item.duration} step="0.01" value={item.end} onChange={(event) => { const value = Math.max(Number(event.target.value), item.start + 0.05); updateItem(item.id, { end: value }); seekItem(item, value); }} />
-                        </div>
-                        <div className="video-range-values">
-                          <label><span>{L("시작", "Start")}</span><TrimNumberInput value={item.start} min={0} max={item.end - 0.05} onCommit={(value) => updateItem(item.id, { start: value })} /></label>
-                          <small>{L("선택 구간", "Selection")} {formatTime(item.end - item.start)}</small>
-                          <label><span>{L("종료", "End")}</span><TrimNumberInput value={item.end} min={item.start + 0.05} max={item.duration} onCommit={(value) => updateItem(item.id, { end: value })} /></label>
-                        </div>
-                        <div className="trim-play-buttons">
-                          <button type="button" className="secondary-button small" onClick={() => setBoundaryFromPlayer(item, "start")}><Timer size={14} /> {L("현재 위치→시작", "Current → start")}</button>
-                          <button type="button" className="secondary-button small" onClick={() => setBoundaryFromPlayer(item, "end")}><Timer size={14} /> {L("현재 위치→종료", "Current → end")}</button>
-                          <button type="button" className="secondary-button small" onClick={() => { const player = players.current[item.id]; if (player) { player.currentTime = item.start; void player.play(); } }}><Play size={14} /> {L("구간 재생", "Play range")}</button>
-                          <button type="button" className="secondary-button small" onClick={() => seekItem(item, Math.max(0, (players.current[item.id]?.currentTime ?? item.start) - 0.1))}>−0.1s</button>
-                          <button type="button" className="secondary-button small" onClick={() => seekItem(item, Math.min(item.duration, (players.current[item.id]?.currentTime ?? item.start) + 0.1))}>+0.1s</button>
-                          {groupItems.length > 1 && <button type="button" className="secondary-button small" onClick={() => applyRangeToGroup(item)}>{L("이 구간을 그룹 전체에 적용", "Apply range to entire group")}</button>}
-                        </div>
-                      </div>
-                    ) : <div className="video-trim-loading" key={item.id}>{L(`${item.file.name} 재생 정보를 확인하는 중…`, `Reading playback metadata for ${item.file.name}…`)}</div>)}
+                    {groupItems.map((item, groupIndex) => (
+                      <VideoTrimLane
+                        key={item.id}
+                        item={item}
+                        index={groupIndex}
+                        active={activeId === item.id}
+                        groupSize={groupItems.length}
+                        language={language}
+                        onActivate={() => setActiveId(item.id)}
+                        onStart={(value, seek) => { updateItem(item.id, { start: value }); if (seek) seekItem(item, value); }}
+                        onEnd={(value, seek) => { updateItem(item.id, { end: value }); if (seek) seekItem(item, value); }}
+                        onBoundary={(boundary) => setBoundaryFromPlayer(item, boundary)}
+                        onPlay={() => { const player = players.current[item.id]; if (player) { player.currentTime = item.start; void player.play(); } }}
+                        onNudge={(delta) => seekItem(item, Math.min(item.duration, Math.max(0, (players.current[item.id]?.currentTime ?? item.start) + delta)))}
+                        onApplyGroup={() => applyRangeToGroup(item)}
+                      />
+                    ))}
                   </div>
                 </section>
               );
@@ -909,18 +900,6 @@ export function VideoStudioPage() {
       />
     </div>
   );
-}
-
-function TrimNumberInput({ value, min, max, onCommit }: { value: number; min: number; max: number; onCommit: (value: number) => void }) {
-  const [draft, setDraft] = useState(() => value.toFixed(2));
-  useEffect(() => setDraft(value.toFixed(2)), [value]);
-  const commit = () => {
-    const parsed = Number(draft);
-    const next = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : value;
-    setDraft(next.toFixed(2));
-    onCommit(next);
-  };
-  return <input type="number" min={min} max={max} step="0.01" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") { setDraft(value.toFixed(2)); event.currentTarget.blur(); } }} />;
 }
 
 function EncodingSettings({ container, codec, resolution, aspect, crf, rotation, flipHorizontal, bitrate, customBitrate, onCodec, onResolution, onAspect, onCrf, onRotation, onFlipHorizontal, onBitrate, onCustomBitrate, language }: {

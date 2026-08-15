@@ -52,7 +52,7 @@ export function PdfEditorPage({ mode }: { mode: PdfToolMode }) {
   } as const;
   const definition = language === "ko" ? modeDefinitions[mode] : englishDefinitions[mode];
   return (
-    <div className="page tool-page page-enter pdf-tool-page">
+    <div className="page tool-page page-enter pdf-tool-page" data-pdf-mode={mode}>
       <PageHeader eyebrow={definition.eyebrow} title={definition.title} description={definition.description}>
         <PrivacyBanner compact />
       </PageHeader>

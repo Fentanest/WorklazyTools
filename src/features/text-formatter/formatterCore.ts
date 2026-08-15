@@ -27,3 +27,35 @@ export function formatXml(text: string, mode: "pretty" | "minify", indent: numbe
   });
   return builder.build(parser.parse(text));
 }
+
+export function collapseSql(value: string, backslashEscapes: boolean) {
+  let output = "";
+  let quote = "";
+  let pendingSpace = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (quote) {
+      output += char;
+      if (char === quote && value[index + 1] === quote) { output += value[++index]; continue; }
+      if (char === quote && (!backslashEscapes || value[index - 1] !== "\\")) quote = "";
+      continue;
+    }
+    if ((char === "-" && value[index + 1] === "-") || char === "#") {
+      const start = char === "#" ? index + 1 : index + 2;
+      const end = value.indexOf("\n", start);
+      const comment = value.slice(start, end < 0 ? value.length : end).trim().replaceAll("*/", "* /");
+      if (pendingSpace && output) output += " ";
+      output += `/* ${comment} */`;
+      pendingSpace = true;
+      index = end < 0 ? value.length : end;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") { if (pendingSpace && output) output += " "; pendingSpace = false; quote = char; output += char; continue; }
+    if (/\s/.test(char)) { pendingSpace = true; continue; }
+    const wouldCreateLineComment = output.endsWith("-") && char === "-";
+    if (pendingSpace && output && (wouldCreateLineComment || (!/[,(]/.test(char) && !/[.(]$/.test(output)))) output += " ";
+    pendingSpace = false;
+    output += char;
+  }
+  return output.trim();
+}

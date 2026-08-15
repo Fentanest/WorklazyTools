@@ -68,7 +68,7 @@ export function QrStudioPage() {
     setQrReady(false);
     setError("");
     clearCanvas(canvasRef.current);
-    if (!text) return;
+    if (mode !== "create" || !text) return;
     void drawQr(canvasRef.current, text, size, dark, logo, t("qr.errors.logo")).then(() => {
       if (generation !== qrGenerationRef.current) return;
       setError("");
@@ -79,7 +79,7 @@ export function QrStudioPage() {
       setQrReady(false);
       setError(qrGenerationError(reason, i18n.language === "en"));
     });
-  }, [text, size, dark, logo, i18n.language, t]);
+  }, [mode, text, size, dark, logo, i18n.language, t]);
 
   useEffect(() => {
     if (mode !== "scan" || (!scanned && !error) || !window.matchMedia("(max-width: 620px)").matches) return;
@@ -274,10 +274,10 @@ export function QrStudioPage() {
                     disabled={busy}
                     onChange={(event) => {
                       const file = event.currentTarget.files?.[0];
-                      event.currentTarget.value = "";
                       if (!file) return;
+                      const input = event.currentTarget;
                       setScanFiles([file]);
-                      void scanFile(file);
+                      void scanFile(file).finally(() => { input.value = ""; });
                     }}
                   />
                 </label>
@@ -290,8 +290,8 @@ export function QrStudioPage() {
                   <div className={`scan-result${error ? " error" : ""}`}>
                     <QrCode size={21} />
                     <p>{error || scanned}</p>
-                    {scanned && <button type="button" aria-label={t("qr.copyResult")} onClick={() => void navigator.clipboard.writeText(scanned).then(() => setCopyFeedback(i18n.language === "en" ? "Copied" : "복사됨")).catch(() => setCopyFeedback(i18n.language === "en" ? "Copy failed" : "복사 실패"))}><Copy size={17} /></button>}
-                    {scanned && safeHttpUrl(scanned) && <a className="secondary-button" href={safeHttpUrl(scanned)} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} /> {i18n.language === "en" ? "Open link" : "링크 열기"}</a>}
+                    {scanned && <button type="button" aria-label={t("qr.copyResult")} onClick={() => void navigator.clipboard.writeText(scanned).then(() => setCopyFeedback(t("qr.copied"))).catch(() => setCopyFeedback(t("qr.copyFailed")))}><Copy size={17} /></button>}
+                    {scanned && safeHttpUrl(scanned) && <a className="secondary-button" href={safeHttpUrl(scanned)} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} /> {t("qr.openLink")}</a>}
                   </div>
                   {copyFeedback && <small role="status">{copyFeedback}</small>}
                 </SectionCard>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { calculateAnnualLeave, calculateBusinessDays, getKoreanHolidays } from "../../src/features/work-calculator/workCalculator.ts";
-import { calculateSeverance, calculateWeeklyAllowance, estimateMonthlyIncomeTax } from "../../src/features/payroll-calculator/payroll.ts";
+import { calculateNetPay, calculateSeverance, calculateWeeklyAllowance, estimateMonthlyIncomeTax } from "../../src/features/payroll-calculator/payroll.ts";
 import { generatePassword } from "../../src/features/security-tools/securityPassword.ts";
 
 test("Korean holidays use the Dangi calendar and emit one substitute for one overlap", () => {
@@ -16,6 +16,8 @@ test("Korean holidays use the Dangi calendar and emit one substitute for one ove
   assert.ok(holidays2026.some((holiday) => holiday.date === "2026-06-03"));
   const holidays2027 = getKoreanHolidays(2027);
   assert.ok(holidays2027.some((holiday) => holiday.date === "2027-02-07"));
+  assert.ok(getKoreanHolidays(2028).some((holiday) => holiday.date === "2028-01-27" && holiday.name === "설날"));
+  assert.ok(getKoreanHolidays(2030).some((holiday) => holiday.date === "2030-02-03" && holiday.name === "설날"));
 });
 
 test("first-year leave requires completed months rather than calendar month boundaries", () => {
@@ -44,6 +46,20 @@ test("payroll formulas preserve statutory thresholds and tax credit structure", 
   });
   assert.equal(severance.eligible, false);
   assert.equal(severance.severance, 0);
+});
+
+test("monthly payroll keeps exact official-rate mapping outputs", () => {
+  assert.equal(estimateMonthlyIncomeTax(3_000_000, 1, 0), 55_333.333333333336);
+  assert.deepEqual(calculateNetPay(3_000_000, 1, 0), {
+    pension: 142_500,
+    health: 107_850,
+    longTermCare: 14_170,
+    employment: 26_990,
+    incomeTax: 55_330,
+    localTax: 5_530,
+    deductions: 352_370,
+    net: 2_647_630,
+  });
 });
 
 test("password generation includes every selected character group", () => {

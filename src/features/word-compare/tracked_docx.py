@@ -1116,6 +1116,45 @@ def _revisionize_styles(before_data, after_data, writer):
     return _serialize_xml(after_root)
 
 
+SETTINGS_CHILD_ORDER = (
+    "writeProtection", "view", "zoom", "removePersonalInformation", "removeDateAndTime",
+    "doNotDisplayPageBoundaries", "displayBackgroundShape", "printPostScriptOverText",
+    "printFractionalCharacterWidth", "printFormsData", "embedTrueTypeFonts", "embedSystemFonts",
+    "saveSubsetFonts", "saveFormsData", "mirrorMargins", "alignBordersAndEdges",
+    "bordersDoNotSurroundHeader", "bordersDoNotSurroundFooter", "gutterAtTop",
+    "hideSpellingErrors", "hideGrammaticalErrors", "activeWritingStyle", "proofState",
+    "formsDesign", "attachedTemplate", "linkStyles", "stylePaneFormatFilter", "stylePaneSortMethod",
+    "documentType", "mailMerge", "revisionView", "trackRevisions", "trackChanges",
+    "doNotTrackMoves", "doNotTrackFormatting", "documentProtection", "autoFormatOverride",
+    "styleLockTheme", "styleLockQFSet", "defaultTabStop", "autoHyphenation",
+    "consecutiveHyphenLimit", "hyphenationZone", "doNotHyphenateCaps", "showEnvelope",
+    "summaryLength", "clickAndTypeStyle", "defaultTableStyle", "evenAndOddHeaders",
+    "bookFoldRevPrinting", "bookFoldPrinting", "bookFoldPrintingSheets",
+    "drawingGridHorizontalSpacing", "drawingGridVerticalSpacing", "displayHorizontalDrawingGridEvery",
+    "displayVerticalDrawingGridEvery", "doNotUseMarginsForDrawingGridOrigin",
+    "drawingGridHorizontalOrigin", "drawingGridVerticalOrigin", "doNotShadeFormData",
+    "noPunctuationKerning", "characterSpacingControl", "printTwoOnOne", "strictFirstAndLastChars",
+    "noLineBreaksAfter", "noLineBreaksBefore", "savePreviewPicture", "doNotValidateAgainstSchema",
+    "saveInvalidXml", "ignoreMixedContent", "alwaysShowPlaceholderText", "doNotDemarcateInvalidXml",
+    "saveXmlDataOnly", "useXSLTWhenSaving", "saveThroughXslt", "showXMLTags",
+    "alwaysMergeEmptyNamespace", "updateFields", "hdrShapeDefaults", "footnotePr", "endnotePr",
+    "compat", "docVars", "rsids", "mathPr", "uiCompat97To2003", "attachedSchema",
+    "themeFontLang", "clrSchemeMapping", "doNotIncludeSubdocsInStats", "doNotAutoCompressPictures",
+    "forceUpgrade", "captions", "readModeInkLockDown", "smartTagType", "schemaLibrary",
+    "shapeDefaults", "doNotEmbedSmartTags", "decimalSymbol", "listSeparator",
+)
+
+
+def _settings_insert_index(root, child_name):
+    order = {name: index for index, name in enumerate(SETTINGS_CHILD_ORDER)}
+    target_order = order[child_name]
+    for index, child in enumerate(root):
+        local_name = child.tag.rsplit("}", 1)[-1]
+        if order.get(local_name, -1) > target_order:
+            return index
+    return len(root)
+
+
 def _enable_revision_display(settings_data):
     root = _parse_xml(settings_data)
     revision_view = root.find(W + "revisionView")
@@ -1126,12 +1165,7 @@ def _enable_revision_display(settings_data):
             W + "insDel": "true",
             W + "formatting": "true",
         })
-        track_revisions = root.find(W + "trackRevisions")
-        if track_revisions is not None:
-            root.insert(list(root).index(track_revisions), revision_view)
-        else:
-            later = next((item for item in root if item.tag in (W + "doNotTrackMoves", W + "doNotTrackFormatting", W + "documentProtection")), None)
-            root.insert(list(root).index(later) if later is not None else len(root), revision_view)
+        root.insert(_settings_insert_index(root, "revisionView"), revision_view)
     return _serialize_xml(root)
 
 

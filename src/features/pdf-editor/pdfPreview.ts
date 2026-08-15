@@ -47,14 +47,14 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko") {
   return promise;
 }
 
-export async function inspectPdf(file: File, language: AppLanguage = "ko") {
+export async function inspectPdf(file: File, language: AppLanguage = "ko", options: { requirePdfLibCompatibility?: boolean } = {}) {
   const document = await getPdfDocument(file, language);
   const permissions = await document.getPermissions();
-  if (permissions !== null) {
+  if (permissions !== null && options.requirePdfLibCompatibility) {
     await releasePdf(file);
     throw new Error(local(language, "암호화되거나 권한이 제한된 PDF는 편집할 수 없습니다. 보호가 해제된 사본으로 다시 시도해 주세요.", "Encrypted or permission-restricted PDFs cannot be edited. Try again with an unlocked copy."));
   }
-  return { pageCount: document.numPages };
+  return { pageCount: document.numPages, permissionRestricted: permissions !== null };
 }
 
 export async function releasePdf(file: File) {

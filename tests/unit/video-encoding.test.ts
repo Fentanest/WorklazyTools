@@ -29,4 +29,6 @@ test("audio sample rates respect encoder constraints", () => {
   assert.equal(resolveAudioSampleRate(44_100, "opus"), 48_000);
   assert.equal(resolveAudioSampleRate(96_000, "mp3"), 48_000);
   assert.equal(resolveAudioSampleRate(44_100, "aac"), 44_100);
+  assert.equal(resolveAudioSampleRate(45_000, "aac"), 44_100);
+  assert.equal(resolveAudioSampleRate(70_000, "aac"), 64_000);
 });

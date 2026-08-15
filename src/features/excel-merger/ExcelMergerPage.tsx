@@ -36,7 +36,7 @@ import {
 } from "../../components/ui";
 import { inspectExcelFiles, mergeExcelFiles } from "./excelWorkerClient";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
-import type { ExcelMergeResult, MergeMode, SheetNameRule, SheetSelectionMode } from "./types";
+import type { ExcelInspectionResult, ExcelMergeResult, MergeMode, SheetNameRule, SheetSelectionMode } from "./types";
 
 type InspectionState = "checking" | "ready" | "error";
 
@@ -154,14 +154,7 @@ export function ExcelMergerPage() {
         setEntries((current) => current.map((entry) => {
           const inspectionResult = byId.get(entry.id);
           if (!inspectionResult) return entry;
-          return {
-            ...entry,
-            inspection: inspectionResult.error ? "error" : "ready",
-            encrypted: inspectionResult.encrypted,
-            sheetNames: inspectionResult.sheetNames,
-            selectedSheetNames: inspectionResult.sheetNames,
-            error: inspectionResult.error,
-          };
+          return applyInspectionResult(entry, inspectionResult);
         }));
       })
       .catch((inspectionError: Error) => {
@@ -197,14 +190,7 @@ export function ExcelMergerPage() {
     if (!entry || !password) return;
     setEntries((current) => current.map((item) => item.id === id ? { ...item, inspection: "checking", error: undefined } : item));
     void inspectExcelFiles([{ id, file: entry.file, password }], language).then(([inspectionResult]) => {
-      setEntries((current) => current.map((item) => item.id === id ? {
-        ...item,
-        inspection: inspectionResult.error ? "error" : "ready",
-        encrypted: inspectionResult.encrypted,
-        sheetNames: inspectionResult.sheetNames,
-        selectedSheetNames: item.sheetNames.length ? inspectionResult.sheetNames.filter((name) => item.selectedSheetNames.includes(name)) : inspectionResult.sheetNames,
-        error: inspectionResult.error,
-      } : item));
+      setEntries((current) => current.map((item) => item.id === id ? applyInspectionResult(item, inspectionResult, true) : item));
     }).catch((inspectionError: Error) => {
       setEntries((current) => current.map((item) => item.id === id
         ? { ...item, inspection: "error", error: inspectionError.message }
@@ -509,7 +495,7 @@ export function ExcelMergerPage() {
             {loading && <button type="button" className="secondary-button" onClick={() => mergeControllerRef.current?.abort()}>{t("excel.summary.cancel")}</button>}
             {!loading && inspecting && <p className="prototype-note">{t("excel.summary.inspecting")}</p>}
             {!loading && inspectionFailed && <p className="prototype-note error-text">{t("excel.summary.inspectionFailed")}</p>}
-            {!loading && missingInputPassword && <p className="prototype-note error-text">{t("excel.summary.inputPassword")}</p>}
+            {!loading && !result && missingInputPassword && <p className="prototype-note error-text">{t("excel.summary.inputPassword")}</p>}
             {!loading && entries.length > 0 && selectedSheetCount === 0 && <p className="prototype-note error-text">{t("excel.summary.selectSheet")}</p>}
             {!loading && !result && outputPasswordMissing && <p className="prototype-note error-text">{t("excel.summary.outputPassword")}</p>}
           </div>
@@ -547,6 +533,19 @@ export function ExcelMergerPage() {
       />
     </div>
   );
+}
+
+function applyInspectionResult(entry: ExcelFileEntry, result: ExcelInspectionResult, preserveSelection = false): ExcelFileEntry {
+  return {
+    ...entry,
+    inspection: result.error ? "error" : "ready",
+    encrypted: result.encrypted,
+    sheetNames: result.sheetNames,
+    selectedSheetNames: preserveSelection && entry.sheetNames.length
+      ? result.sheetNames.filter((name) => entry.selectedSheetNames.includes(name))
+      : result.sheetNames,
+    error: result.error,
+  };
 }
 
 function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll, t }: {

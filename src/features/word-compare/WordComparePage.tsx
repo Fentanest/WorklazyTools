@@ -27,6 +27,7 @@ import {
 } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { createWordExcelReports } from "../excel-merger/excelWorkerClient";
+import { DocumentPairingPreview } from "../document-compare/DocumentPairingPreview";
 import { deduplicateDocumentFiles as deduplicateFiles, documentFileKey as fileKey, reorderDocumentFiles as reorder, stripDocumentExtension as stripExtension } from "../document-compare/filePairs";
 import { useWordCompareSession } from "./wordCompareSession";
 import { compareWordFilePairs } from "./wordWorkerClient";
@@ -219,7 +220,7 @@ export function WordComparePage() {
         </div>
 
         {pairingError && <div className="pair-count-error" role="alert"><AlertCircle size={17} /><span><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small>{pairingError}</small></span></div>}
-        {!pairingError && beforeFiles.length > 0 && <PairingPreview beforeFiles={beforeFiles} afterFiles={afterFiles} language={language} />}
+        {!pairingError && beforeFiles.length > 0 && <DocumentPairingPreview beforeFiles={beforeFiles} afterFiles={afterFiles} language={language} />}
       </SectionCard>
 
       <div className="word-options-grid">
@@ -435,17 +436,6 @@ function SortableWordFileList({ files, sideLabel, onRemove, onMove, onMoveAcross
         </li>
       ))}
     </ol>
-  );
-}
-
-function PairingPreview({ beforeFiles, afterFiles, language }: { beforeFiles: File[]; afterFiles: File[]; language: "ko" | "en" }) {
-  return (
-    <div className="pairing-preview">
-      <div className="pairing-preview-title"><strong>{language === "en" ? `${beforeFiles.length} comparison pairs` : `${beforeFiles.length}개 비교 쌍`}</strong><small>{language === "en" ? "Paired in list order." : "목록 순서대로 연결됩니다."}</small></div>
-      <ol>
-        {beforeFiles.map((file, index) => <li key={fileKey(file)}><b>{index + 1}</b><span>{file.name}</span><i>↔</i><span>{afterFiles[index].name}</span></li>)}
-      </ol>
-    </div>
   );
 }
 

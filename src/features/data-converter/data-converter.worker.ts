@@ -2,6 +2,8 @@
 
 import Papa from "papaparse";
 
+import { parseCsvStream } from "./dataConverterCore";
+
 type Kind = "csv" | "json" | "html";
 interface TableData { headers: string[]; rows: string[][]; warnings?: string[] }
 
@@ -32,34 +34,6 @@ function parseTable(kind: Kind, text: string, korean: boolean): TableData | Prom
   const rows = Array.from(text.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi), (match) => Array.from(match[1].matchAll(/<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/gi), (cell) => decodeEntities(cell[1].replace(/<br\s*\/?\s*>/gi, "\n").replace(/<[^>]+>/g, "").trim())));
   if (!rows.length) throw new Error(korean ? "HTML에서 table 행을 찾지 못했습니다." : "No table rows were found in the HTML.");
   return { headers: rows[0], rows: rows.slice(1) };
-}
-
-function parseCsvStream(text: string, korean: boolean) {
-  return new Promise<TableData>((resolve, reject) => {
-    const records: Record<string, string>[] = [];
-    const warnings: string[] = [];
-    let headers: string[] = [];
-    Papa.parse<Record<string, string>>(text, {
-      header: true,
-      skipEmptyLines: "greedy",
-      chunkSize: 256 * 1024,
-      transformHeader: (header, index) => header.trim() || `${korean ? "열" : "Column "}${index + 1}`,
-      chunk: (results: Papa.ParseResult<Record<string, string>>, parser: Papa.Parser) => {
-        const fatal = results.errors.find((error) => error.type !== "FieldMismatch");
-        const mismatchCount = results.errors.filter((error) => error.type === "FieldMismatch").length;
-        if (mismatchCount) warnings.push(korean ? `${mismatchCount}개 행의 열 개수가 헤더와 달라 빈 값을 보완하거나 남는 값을 제외했습니다.` : `${mismatchCount} rows had a different column count; missing values were filled and extras were omitted.`);
-        if (fatal) {
-          parser.abort();
-          reject(new Error(`${fatal.row !== undefined ? `${korean ? `${fatal.row + 1}행` : `Row ${fatal.row + 1}`}: ` : ""}${fatal.message}`));
-          return;
-        }
-        headers = results.meta.fields ?? headers;
-        records.push(...results.data);
-      },
-      complete: () => resolve({ headers, rows: records.map((row) => headers.map((header) => row[header] ?? "")), warnings }),
-      error: (error: Error) => reject(error),
-    });
-  });
 }
 
 function serializeTable(kind: Kind, headers: string[], rows: string[][]) {

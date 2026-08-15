@@ -1,5 +1,5 @@
 import { AlertTriangle, Download } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ResultCard, formatBytes } from "../../components/ui";
 import { FileShareButton } from "../../components/FileShareButton";
@@ -15,24 +15,25 @@ export interface DownloadResult {
 
 export function useDownloadResult() {
   const [result, setResult] = useState<DownloadResult | null>(null);
+  const resultRef = useRef<DownloadResult | null>(null);
   useEffect(() => () => {
-    if (result) URL.revokeObjectURL(result.url);
-  }, [result]);
+    if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
+  }, []);
 
-  const makeResult = (output: PdfWorkerResult) => {
-    if (result) URL.revokeObjectURL(result.url);
+  const replaceResult = useCallback((next: DownloadResult | null) => {
+    if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
+    resultRef.current = next;
+    setResult(next);
+  }, []);
+  const makeResult = useCallback((output: PdfWorkerResult) => {
     const blob = new Blob([output.buffer], { type: output.mimeType });
-    setResult({ url: URL.createObjectURL(blob), fileName: output.fileName, size: blob.size, warnings: output.warnings });
-  };
-  const makeBlobResult = (blob: Blob, fileName: string, warnings: string[] = []) => {
-    if (result) URL.revokeObjectURL(result.url);
-    setResult({ url: URL.createObjectURL(blob), fileName, size: blob.size, warnings });
-  };
-  const clearResult = () => {
-    if (result) URL.revokeObjectURL(result.url);
-    setResult(null);
-  };
-  return { result, makeResult, makeBlobResult, clearResult };
+    replaceResult({ url: URL.createObjectURL(blob), fileName: output.fileName, size: blob.size, warnings: output.warnings });
+  }, [replaceResult]);
+  const makeBlobResult = useCallback((blob: Blob, fileName: string, warnings: string[] = []) => {
+    replaceResult({ url: URL.createObjectURL(blob), fileName, size: blob.size, warnings });
+  }, [replaceResult]);
+  const clearResult = useCallback(() => replaceResult(null), [replaceResult]);
+  return useMemo(() => ({ result, makeResult, makeBlobResult, clearResult }), [clearResult, makeBlobResult, makeResult, result]);
 }
 
 export function PdfDownloadCard({ result, title }: { result: DownloadResult; title?: string }) {

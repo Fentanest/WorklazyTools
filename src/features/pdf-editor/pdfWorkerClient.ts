@@ -139,7 +139,7 @@ export async function imagesToPdf(
 ) {
   const inputs: PdfWorkerInput[] = [];
   for (let index = 0; index < files.length; index += 1) {
-    const normalized = await normalizeImageOrientation(files[index], language);
+    const normalized = options.imagesAlreadyNormalized ? files[index] : await normalizeImageOrientation(files[index], language);
     inputs.push({ id: `image-${index}`, name: normalized.name, mimeType: normalized.type, buffer: await normalized.arrayBuffer() });
   }
   const workerOptions = await serializeOutputOptions(options);

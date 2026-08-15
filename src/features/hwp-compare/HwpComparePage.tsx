@@ -23,6 +23,7 @@ import { ToolGuide } from "../../components/ToolGuide";
 import { FileDropZone, formatBytes, PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { createWordExcelReports } from "../excel-merger/excelWorkerClient";
+import { DocumentPairingPreview } from "../document-compare/DocumentPairingPreview";
 import { deduplicateDocumentFiles as deduplicateFiles, reorderDocumentFiles as reorder, stripDocumentExtension as stripExtension } from "../document-compare/filePairs";
 import { fileKey, useHwpCompareSession } from "./hwpCompareSession";
 import { compareHwpFilePairs } from "./hwpWorkerClient";
@@ -166,7 +167,7 @@ export function HwpComparePage() {
           />
         </div>
         {pairingError && <div className="pair-count-error" role="alert"><AlertCircle size={17} /><span><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small>{pairingError}</small></span></div>}
-        {!pairingError && session.beforeFiles.length > 0 && <PairingPreview beforeFiles={session.beforeFiles} afterFiles={session.afterFiles} language={language} />}
+        {!pairingError && session.beforeFiles.length > 0 && <DocumentPairingPreview beforeFiles={session.beforeFiles} afterFiles={session.afterFiles} language={language} />}
       </SectionCard>
 
       <div className="word-options-grid">
@@ -319,10 +320,6 @@ function HwpFileRow({ file, index, count, side, password, onPassword, onRemove, 
       <label className="hwp-file-password"><LockKeyhole size={13} /><input type="password" value={password} autoComplete="off" aria-label={language === "en" ? `Opening password for ${file.name}` : `${file.name} 열기 암호`} placeholder={language === "en" ? "Encrypted documents only" : "암호 문서만 입력"} onChange={(event) => onPassword(file, event.target.value)} /></label>
     </li>
   );
-}
-
-function PairingPreview({ beforeFiles, afterFiles, language }: { beforeFiles: File[]; afterFiles: File[]; language: "ko" | "en" }) {
-  return <div className="pairing-preview"><div className="pairing-preview-title"><strong>{language === "en" ? `${beforeFiles.length} comparison pairs` : `${beforeFiles.length}개 비교 쌍`}</strong><small>{language === "en" ? "Paired in list order." : "목록 순서대로 연결됩니다."}</small></div><ol>{beforeFiles.map((file, index) => <li key={fileKey(file)}><b>{index + 1}</b><span>{file.name}</span><i>↔</i><span>{afterFiles[index].name}</span></li>)}</ol></div>;
 }
 
 function isHwpFile(file: File) {

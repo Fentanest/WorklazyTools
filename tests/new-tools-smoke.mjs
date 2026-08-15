@@ -208,10 +208,13 @@ async function testImageStudio(page, imagePaths) {
       }
     }
     const samples = [[150, 150], [250, 200], [300, 240]].map(([x, y]) => Array.from(context.getImageData(x, y, 1, 1).data));
-    return { width: canvas.width, height: canvas.height, greenWidth: maxX >= minX ? maxX - minX + 1 : 0, samples };
+    return { width: canvas.width, height: canvas.height, greenWidth: maxX >= minX ? maxX - minX + 1 : 0, samples, source: window.__imageStudioTestSource };
   });
-  if (jpegGreenBounds.width !== 900 || jpegGreenBounds.height !== 600 || jpegGreenBounds.greenWidth < 180 || jpegGreenBounds.greenWidth > 280) {
-    throw new Error(`DPR2 JPEG export is cropped or scaled incorrectly: ${JSON.stringify(jpegGreenBounds)}`);
+  if (jpegGreenBounds.source?.width !== 1800 || jpegGreenBounds.source?.height !== 1200
+    || jpegGreenBounds.width < 1900 || jpegGreenBounds.width > 1950
+    || jpegGreenBounds.height < 1270 || jpegGreenBounds.height > 1300
+    || jpegGreenBounds.greenWidth < 430 || jpegGreenBounds.greenWidth > 510) {
+    throw new Error(`High-resolution JPEG export is cropped, blurred, or scaled incorrectly: ${JSON.stringify(jpegGreenBounds)}`);
   }
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
   await page.keyboard.press("Delete");
@@ -298,12 +301,13 @@ async function dropCanvasImages(page, selector, colors) {
     const transfer = new DataTransfer();
     for (let index = 0; index < values.length; index += 1) {
       const canvas = document.createElement("canvas");
-      canvas.width = 96 + index * 24;
-      canvas.height = 72 + index * 36;
+      canvas.width = targetSelector === ".fabric-stage" ? 1800 : 96 + index * 24;
+      canvas.height = targetSelector === ".fabric-stage" ? 1200 : 72 + index * 36;
       const context = canvas.getContext("2d");
       context.fillStyle = values[index];
       context.fillRect(0, 0, canvas.width, canvas.height);
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (targetSelector === ".fabric-stage") window.__imageStudioTestSource = { width: canvas.width, height: canvas.height, size: blob.size };
       transfer.items.add(new File([blob], `preview-drop-${index + 1}.png`, { type: "image/png" }));
       canvas.width = 1;
       canvas.height = 1;

@@ -41,7 +41,10 @@ export function AnalyticsLoader({ disabled = false }: { disabled?: boolean }) {
 
   useEffect(() => {
     updateGoogleConsent(consent);
-    if (!import.meta.env.PROD || disabled || consent !== "granted") return;
+    if (!import.meta.env.PROD || disabled || consent !== "granted") {
+      resetPageViewState();
+      return;
+    }
     initializeAnalytics();
   }, [consent, disabled]);
 
@@ -166,4 +169,10 @@ function sendNaverEvent(category: string, action: string) {
 
 function sanitizeEventValue(value: string) {
   return value.replace(/[^a-z0-9_-]/gi, "_").slice(0, 60);
+}
+
+function resetPageViewState() {
+  lastGooglePath = "";
+  lastNaverPath = "";
+  pendingNaverPageView = false;
 }

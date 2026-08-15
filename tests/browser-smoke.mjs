@@ -164,8 +164,8 @@ async function testPdfTools(page, fixtures, tempDir) {
   const separatePdfNames = Object.keys(separateZip.files).filter((name) => name.endsWith(".pdf"));
   if (separatePdfNames.length !== 1) throw new Error(`Expected one selected page PDF, got ${separatePdfNames.length}.`);
 
-  await navigatePdfTab(page, 2, "/tools/pdf-editor/image-to-pdf");
-  await (await page.$('input[type="file"]')).uploadFile(fixtures.tinyPng);
+  await navigatePdfTab(page, 2, "/tools/pdf-editor/image-to-pdf", "image-to-pdf", "image/jpeg");
+  await (await page.$('input[type="file"][accept*="image/jpeg"]')).uploadFile(fixtures.tinyPng);
   await page.waitForSelector(".pdf-image-card");
   await clickPrimaryAction(page);
   await waitForResult(page);
@@ -174,7 +174,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
-  await navigatePdfTab(page, 3, "/tools/pdf-editor/pdf-to-image");
+  await navigatePdfTab(page, 3, "/tools/pdf-editor/pdf-to-image", "pdf-to-image", "application/pdf");
   await (await page.$('input[type="file"]')).uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
   await clickPrimaryAction(page);
@@ -185,7 +185,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
 
-  await navigatePdfTab(page, 4, "/tools/pdf-editor/convert");
+  await navigatePdfTab(page, 4, "/tools/pdf-editor/convert", "convert", "application/pdf");
   const convertInput = await page.$('input[type="file"]');
   await convertInput.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
@@ -247,10 +247,16 @@ async function navigateTo(page, url) {
   }
 }
 
-async function navigatePdfTab(page, index, pathname) {
+async function navigatePdfTab(page, index, pathname, mode, acceptedType) {
   await page.$eval(`.pdf-tool-navigation a:nth-child(${index})`, (link) => link.click());
-  await page.waitForFunction((expectedPath) => location.pathname.endsWith(expectedPath)
-    && Boolean(document.querySelector(".pdf-tool-page input[type='file']")), {}, pathname);
+  await page.waitForFunction((expectedPath, expectedMode, expectedType) => {
+    const panel = document.querySelector(`.pdf-tool-page[data-pdf-mode="${expectedMode}"]`);
+    const input = document.querySelector(".pdf-tool-page input[type='file']");
+    return location.pathname.endsWith(expectedPath)
+      && panel instanceof HTMLElement
+      && input instanceof HTMLInputElement
+      && input.accept.includes(expectedType);
+  }, {}, pathname, mode, acceptedType);
 }
 
 async function testEncryptedExcelMerge(page, fixtures, tempDir) {
@@ -564,7 +570,10 @@ async function testWordCompare(page, fixtures, tempDir) {
   if (!await page.$(".document-page-row .inline-comment-card")) throw new Error("A changed paragraph's comment was hidden by the change filter.");
   if (!filteredKinds.some((className) => className.includes("table-block"))) throw new Error("The changed table was hidden by the change filter.");
   const backHref = await page.$eval(".result-view-back a", (link) => link.getAttribute("href"));
-  await page.click(".result-view-back a");
+  await page.$eval(".result-view-back a", (link) => {
+    if (!(link instanceof HTMLAnchorElement)) throw new Error("Word result back link was not found.");
+    link.click();
+  });
   try {
     await page.waitForFunction(() => location.pathname.replace(/\/$/, "").endsWith("/tools/word-compare")
       && document.querySelectorAll(".word-pair-result-card").length === 2, { timeout: 15_000 });
@@ -815,7 +824,7 @@ async function createDocx(paragraph, tableValue, headerValue, commentValue, bold
   zip.file("word/footer1.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${bold ? footerParagraph : `<w:sdt><w:sdtContent>${footerParagraph}</w:sdtContent></w:sdt>`}</w:ftr>`);
   zip.file("word/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="${bold ? "160" : "80"}"/></w:pPr><w:rPr>${bold ? "<w:b/>" : "<w:i/>"}</w:rPr></w:style></w:styles>`);
   zip.file("word/comments.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:comment w:id="0" w:author="검토자"><w:p><w:r><w:t>${commentValue}</w:t></w:r></w:p></w:comment></w:comments>`);
-  zip.file("word/settings.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>`);
+  zip.file("word/settings.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:defaultTabStop w:val="720"/><w:compat/><w:rsids/></w:settings>`);
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
@@ -850,6 +859,13 @@ async function assertTrackedDocument(trackedPath, beforePath, afterPath, require
   if (!trackedDocument.includes('w:author="Worklazy Tools"')) throw new Error("Tracked changes have no revision author.");
   if (!settings.includes("<w:revisionView")) {
     throw new Error("Tracked-change display settings were not written.");
+  }
+  const revisionViewIndex = settings.indexOf("<w:revisionView");
+  for (const laterSetting of ["<w:defaultTabStop", "<w:compat", "<w:rsids"]) {
+    const laterIndex = settings.indexOf(laterSetting);
+    if (laterIndex >= 0 && revisionViewIndex > laterIndex) {
+      throw new Error(`Tracked-change display settings violate CT_Settings order before ${laterSetting}.`);
+    }
   }
   if (settings.includes("<w:trackRevisions")) {
     throw new Error("The generated document unexpectedly enables tracking for the user's future edits.");

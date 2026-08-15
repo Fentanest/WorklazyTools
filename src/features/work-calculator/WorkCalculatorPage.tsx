@@ -5,12 +5,8 @@ import { useTranslation } from "react-i18next";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { PageHeader, SectionCard, SegmentedControl } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
+import { localIsoDate } from "../../utils/date";
 import { calculateAnnualLeave, calculateBusinessDays } from "./workCalculator";
-
-function localIsoDate(date = new Date()) {
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
-}
 
 export function WorkCalculatorPage() {
   const { t, i18n } = useTranslation("features");

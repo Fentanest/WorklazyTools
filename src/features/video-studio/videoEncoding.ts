@@ -17,7 +17,7 @@ export function resolveAudioSampleRate(sampleRate: "source" | number, codec: "aa
   if (sampleRate === "source") return sampleRate;
   if (codec === "opus") return nearest(sampleRate, [8_000, 12_000, 16_000, 24_000, 48_000]);
   if (codec === "mp3") return Math.min(48_000, sampleRate);
-  return sampleRate;
+  return nearest(sampleRate, [8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000, 64_000, 88_200, 96_000]);
 }
 
 export function outputDimensionsForSource(

@@ -64,7 +64,7 @@ function coordinateText(value: number | undefined) {
 }
 
 function countMetadataTags(tags: ExpandedTags) {
-  return [tags.exif, tags.gps, tags.xmp, tags.iptc].reduce((count, group) => count + (group ? Object.keys(group).filter((key) => key !== "_raw").length + ("_raw" in group ? 1 : 0) : 0), 0);
+  return [tags.exif, tags.gps, tags.xmp, tags.iptc].reduce((count, group) => count + (group ? Object.keys(group).filter((key) => key !== "_raw").length : 0), 0);
 }
 
 function sanitizeName(name: string) { return name.trim().replace(/[\\/:*?"<>|]+/g, "-") || "image"; }

@@ -30,6 +30,7 @@ export interface PdfPagePlan {
 export interface PdfOutputOptions {
   watermarkText?: string;
   pageNumbers?: boolean;
+  imagesAlreadyNormalized?: boolean;
 }
 
 export interface PdfTextCell {

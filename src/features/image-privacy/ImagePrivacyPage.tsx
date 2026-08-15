@@ -27,7 +27,7 @@ export function ImagePrivacyPage() {
       worker.postMessage({ files: inputs, language: i18n.language }, inputs.map((input) => input.buffer));
     } catch (reason) {
       setBusy(false);
-      setError(reason instanceof Error ? reason.message : t("imagePrivacy.readError", { defaultValue: "사진 파일을 읽지 못했습니다." }));
+      setError(reason instanceof Error ? reason.message : t("imagePrivacy.readError"));
     }
   };
   return <div className="page tool-page page-enter utility-page image-privacy-page">

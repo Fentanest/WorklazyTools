@@ -1,5 +1,4 @@
 import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
-import type { TFunction } from "i18next";
 import { Canvas, Circle, FabricImage, IText, Line, PencilBrush, Rect, filters, type FabricObject } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,14 +6,13 @@ import { useTranslation } from "react-i18next";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, FileList, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
+import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
-import { batchProcessImages, buildAnimatedGif, buildCollage, serializeWatermark } from "./imageWorkerClient";
-import { calculateCollageLayout, CollageLayoutError } from "./collageLayout";
-import type { CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
+import { BatchImagePanel, CollagePanel, GifPanel } from "./ImageProcessingPanels";
+import { ClipboardHint, RASTER_IMAGE_ACCEPT, filterRasterImages, useClipboardImages } from "./imageStudioShared";
+import type { ImageOutputFormat } from "./types";
 
 type StudioTab = "editor" | "batch" | "collage" | "gif";
-const RASTER_IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
 
 export function ImageStudioPage() {
   const { t } = useTranslation("features");
@@ -452,16 +450,18 @@ function ImageEditor() {
     const multiplier = outputMultiplier.current;
     let dataUrl: string;
     if (format === "jpeg") {
+      const rendered = instance.toCanvasElement(multiplier);
       const flattened = document.createElement("canvas");
-      flattened.width = Math.round(instance.getWidth() * multiplier);
-      flattened.height = Math.round(instance.getHeight() * multiplier);
+      flattened.width = rendered.width;
+      flattened.height = rendered.height;
       const context = flattened.getContext("2d");
       if (!context) return;
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, flattened.width, flattened.height);
-      context.drawImage(instance.getElement(), 0, 0, flattened.width, flattened.height);
+      context.drawImage(rendered, 0, 0);
       dataUrl = flattened.toDataURL("image/jpeg", 0.92);
       flattened.width = 1; flattened.height = 1;
+      rendered.width = 1; rendered.height = 1;
     } else dataUrl = instance.toDataURL({ format, quality: 0.92, multiplier });
     const actualFormat = dataUrl.startsWith("data:image/png") ? "png" : dataUrl.startsWith("data:image/webp") ? "webp" : "jpeg";
     const anchor = document.createElement("a");
@@ -490,7 +490,7 @@ function ImageEditor() {
       <div className="image-editor-layout">
         <aside className="image-editor-controls">
           <div className="editor-tool-group"><strong>{t("image.editor.crop")}</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(3 / 4)}>3:4</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button><button type="button" onClick={() => cropTo(9 / 16)}>9:16</button></div></div>
-          <div className="editor-tool-group"><strong>{t("image.editor.layer")}</strong><div className="icon-tool-row"><button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title={t("image.editor.front")} aria-label={t("image.editor.front")} type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title={t("image.editor.back")} aria-label={t("image.editor.back")} type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title={t("image.editor.duplicate", { defaultValue: "선택 레이어 복제" })} aria-label={t("image.editor.duplicate", { defaultValue: "선택 레이어 복제" })} type="button" onClick={() => void duplicateSelectedLayer()}><ClipboardPaste size={18} /></button><button title={t("image.editor.delete")} aria-label={t("image.editor.delete")} type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
+          <div className="editor-tool-group"><strong>{t("image.editor.layer")}</strong><div className="icon-tool-row"><button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title={t("image.editor.front")} aria-label={t("image.editor.front")} type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title={t("image.editor.back")} aria-label={t("image.editor.back")} type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title={t("image.editor.duplicate")} aria-label={t("image.editor.duplicate")} type="button" onClick={() => void duplicateSelectedLayer()}><ClipboardPaste size={18} /></button><button title={t("image.editor.delete")} aria-label={t("image.editor.delete")} type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
           <div className={`editor-tool-group${file ? "" : " is-disabled"}`}><strong>{t("image.editor.adjust")}</strong><label>{t("image.editor.brightness")} <b>{brightness}</b><input disabled={!file} type="range" min={-80} max={80} value={brightness} onChange={(event) => updateFilter("brightness", Number(event.target.value))} /></label><label>{t("image.editor.contrast")} <b>{contrast}</b><input disabled={!file} type="range" min={-80} max={80} value={contrast} onChange={(event) => updateFilter("contrast", Number(event.target.value))} /></label><label>{t("image.editor.hue")} <b>{hue}°</b><input disabled={!file} type="range" min={-180} max={180} value={hue} onChange={(event) => updateFilter("hue", Number(event.target.value))} /></label>{file && <ToggleRow label={t("image.editor.lock")} description={t("image.editor.lockHelp")} checked={baseLocked} onChange={updateBaseLock} />}</div>
           <div className="editor-tool-group"><strong>{t("image.editor.text")}</strong><div className="inline-input-action"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={() => addText()}><Type size={16} /></button></div><div className="button-grid sticker-grid">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" key={emoji} onClick={() => addText(emoji)}>{emoji}</button>)}</div></div>
           <div className="editor-tool-group"><strong>{t("image.editor.shapes")}</strong><div className="icon-tool-row"><button title={t("image.editor.line")} aria-label={t("image.editor.line")} type="button" onClick={() => addShape("line")}><Minus size={18} /></button><button title={t("image.editor.rect")} aria-label={t("image.editor.rect")} type="button" onClick={() => addShape("rect")}><Square size={18} /></button><button title={t("image.editor.circle")} aria-label={t("image.editor.circle")} type="button" onClick={() => addShape("circle")}><CircleIcon size={18} /></button></div></div>
@@ -517,193 +517,6 @@ function applyEditorInteractivity(instance: Canvas, image: FabricImage | undefin
     const interactive = mode === "select" && !eraserPath && (object !== image || !baseLocked);
     object.set({ selectable: interactive, evented: interactive });
   });
-}
-
-function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) {
-  const { t, i18n } = useTranslation("features");
-  const [files, setFiles] = useState<File[]>([]);
-  const [mode, setMode] = useState<"fit-width" | "contain" | "cover" | "original">("fit-width");
-  const [width, setWidth] = useState(1600);
-  const [height, setHeight] = useState(1200);
-  const [format, setFormat] = useState<ImageOutputFormat>("jpeg");
-  const [quality, setQuality] = useState(0.9);
-  const [transparentBackground, setTransparentBackground] = useState(false);
-  const [watermarkText, setWatermarkText] = useState("");
-  const [watermarkFile, setWatermarkFile] = useState<File>();
-  const [watermarkPosition, setWatermarkPosition] = useState<WatermarkPosition>("bottom-right");
-  const [watermarkOpacity, setWatermarkOpacity] = useState(0.7);
-
-  useClipboardImages((images) => setFiles((current) => [...current, ...images]));
-
-  const execute = async () => {
-    if (!files.length) return;
-    const controller = new AbortController(); controllerRef.current = controller;
-    progress.start(t("image.batch.prepare"));
-    try {
-      const watermarkImage = await serializeWatermark(watermarkFile);
-      const result = await batchProcessImages(files, { mode, width, height, format, quality, background: transparentBackground ? "transparent" : "#ffffff", watermarkText, watermarkPosition, watermarkOpacity, watermarkImage }, t("image.batch.archive"), progress.update, controller.signal, i18n.language === "en" ? "en" : "ko");
-      downloadWorkerResult(result);
-      progress.succeed(t("image.batch.done", { count: files.length }));
-    } catch (error) { progress.fail(normalizePanelError(error, t)); }
-    finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
-  };
-
-  return <SectionCard title={t("image.batch.title")} description={t("image.batch.description")}>
-    <FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.batch.hint")} accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" />
-    <div className="image-settings-grid"><label><span>{t("image.batch.resize")}</span><select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="fit-width">{t("image.batch.fitWidth")}</option><option value="contain">{t("image.batch.contain")}</option><option value="cover">{t("image.batch.cover")}</option><option value="original">{t("image.batch.original")}</option></select></label><NumberField label={t("image.batch.width")} value={width} onChange={setWidth} /><NumberField label={t("image.batch.height")} value={height} onChange={setHeight} disabled={mode === "fit-width" || mode === "original"} /><FormatField value={format} onChange={setFormat} /><RangeField label={t("image.batch.quality")} value={quality} min={0.4} max={1} step={0.05} onChange={setQuality} /></div>
-    <TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} />
-    <div className="watermark-settings"><label><span>{t("image.batch.watermarkText")}</span><input value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} placeholder={t("image.batch.watermarkPlaceholder")} /></label><label><span>{t("image.batch.watermarkImage")}</span><input type="file" accept={RASTER_IMAGE_ACCEPT} onChange={(event) => setWatermarkFile(filterRasterImages(Array.from(event.target.files || []))[0])} /></label><label><span>{t("image.batch.position")}</span><select value={watermarkPosition} onChange={(event) => setWatermarkPosition(event.target.value as WatermarkPosition)}><option value="top-left">{t("image.batch.topLeft")}</option><option value="top-right">{t("image.batch.topRight")}</option><option value="center">{t("image.batch.center")}</option><option value="bottom-left">{t("image.batch.bottomLeft")}</option><option value="bottom-right">{t("image.batch.bottomRight")}</option></select></label><RangeField label={t("image.batch.opacity")} value={watermarkOpacity} min={0.1} max={1} step={0.05} onChange={setWatermarkOpacity} /></div>
-    <div className="section-actions"><PrimaryButton accent="sky" disabled={!files.length} loading={progress.status === "running"} onClick={() => void execute()}><Download size={18} /> {t("image.batch.download")}</PrimaryButton></div>
-  </SectionCard>;
-}
-
-function CollagePanel({ progress, controllerRef }: ProcessPanelProps) {
-  const { t, i18n } = useTranslation("features");
-  const [files, setFiles] = useState<File[]>([]);
-  const [layout, setLayout] = useState<CollageOptions["layout"]>("vertical");
-  const [columns, setColumns] = useState(2);
-  const [width, setWidth] = useState(1600);
-  const [gap, setGap] = useState(16);
-  const [background, setBackground] = useState("#ffffff");
-  const [transparentBackground, setTransparentBackground] = useState(false);
-  const [format, setFormat] = useState<ImageOutputFormat>("png");
-  useClipboardImages((images) => setFiles((current) => [...current, ...images]));
-  const outputBackground = transparentBackground ? "transparent" : background;
-  const language = i18n.language === "en" ? "en" : "ko";
-  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildCollage(files, { layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }, t("image.collage.file"), progress.update, controller.signal, language), t("image.collage.done"), t);
-  return <SectionCard title={t("image.collage.title")} description={t("image.collage.description")}><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.collage.hint")} accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><label><span>{t("image.collage.layout")}</span><select value={layout} onChange={(event) => setLayout(event.target.value as CollageOptions["layout"])}><option value="vertical">{t("image.collage.vertical")}</option><option value="horizontal">{t("image.collage.horizontal")}</option><option value="grid">{t("image.collage.grid")}</option></select></label><NumberField label={t("image.collage.columns")} value={columns} onChange={setColumns} disabled={layout !== "grid"} /><NumberField label={t("image.collage.width")} value={width} onChange={setWidth} /><NumberField label={t("image.collage.gap")} value={gap} min={0} onChange={setGap} /><label><span>{t("image.collage.background")}</span><input type="color" value={background} disabled={transparentBackground} onChange={(event) => setBackground(event.target.value)} /></label><FormatField value={format} onChange={setFormat} /></div><TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} /><CollagePreview files={files} options={{ layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }} onFiles={(incoming) => setFiles((current) => [...current, ...incoming])} /><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><LayoutGrid size={18} /> {t("image.collage.download")}</PrimaryButton></div></SectionCard>;
-}
-
-function CollagePreview({ files, options, onFiles }: { files: File[]; options: CollageOptions; onFiles: (files: File[]) => void }) {
-  const { t, i18n } = useTranslation("features");
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [summary, setSummary] = useState(() => t("image.collage.emptySummary"));
-  const [dragging, setDragging] = useState(false);
-
-  useEffect(() => {
-    let disposed = false;
-    const timer = window.setTimeout(async () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      if (!files.length) {
-        canvas.width = 1;
-        canvas.height = 1;
-        canvas.style.width = "0";
-        canvas.style.height = "0";
-        setSummary(t("image.collage.emptySummary"));
-        return;
-      }
-
-      const bitmaps: ImageBitmap[] = [];
-      try {
-        for (const file of files) bitmaps.push(await createImageBitmap(file));
-        if (disposed) return;
-        const layout = calculateCollageLayout(bitmaps, options);
-        const scale = calculatePreviewScale(layout.width, layout.height);
-        const displayWidth = Math.max(1, Math.round(layout.width * scale));
-        const displayHeight = Math.max(1, Math.round(layout.height * scale));
-        const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-        canvas.width = Math.max(1, Math.round(displayWidth * pixelRatio));
-        canvas.height = Math.max(1, Math.round(displayHeight * pixelRatio));
-        canvas.style.width = `${displayWidth}px`;
-        canvas.style.height = `${displayHeight}px`;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error(t("image.collage.canvasError"));
-        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = "high";
-        context.clearRect(0, 0, displayWidth, displayHeight);
-        const previewBackground = options.format === "jpeg" ? "#ffffff" : options.background;
-        if (previewBackground !== "transparent") {
-          context.fillStyle = previewBackground;
-          context.fillRect(0, 0, displayWidth, displayHeight);
-        }
-        bitmaps.forEach((bitmap, index) => {
-          const cell = layout.cells[index];
-          const draw = options.layout === "grid" ? drawCoveredPreview : drawContainedPreview;
-          draw(context, bitmap, cell.x * scale, cell.y * scale, cell.width * scale, cell.height * scale);
-        });
-        setSummary(t("image.collage.summary", { width: layout.width.toLocaleString(i18n.language), height: layout.height.toLocaleString(i18n.language), count: files.length }));
-      } catch (error) {
-        if (!disposed) setSummary(error instanceof Error ? error.message : t("image.collage.previewError"));
-      } finally {
-        bitmaps.forEach((bitmap) => bitmap.close());
-      }
-    }, 120);
-
-    return () => {
-      disposed = true;
-      window.clearTimeout(timer);
-    };
-  }, [files, i18n.language, options.background, options.columns, options.format, options.gap, options.layout, options.width, t]);
-
-  return (
-    <div className="collage-preview-panel">
-      <div className="collage-preview-heading"><span><LayoutGrid size={17} /><strong>{t("image.collage.preview")}</strong></span><small>{summary}</small></div>
-      <div
-        className={`collage-preview-stage image-preview-drop${files.length ? " has-preview" : ""}${dragging ? " is-file-dragging" : ""}`}
-        onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
-        onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragging(true); } }}
-        onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDragging(false); }}
-        onDrop={(event) => { event.preventDefault(); setDragging(false); const dropped = filterRasterImages(Array.from(event.dataTransfer.files)); if (dropped.length) onFiles(dropped); }}
-      >
-        {!files.length && <span><ImageIcon size={24} />{t("image.collage.add")}</span>}
-        <canvas ref={canvasRef} aria-label={t("image.collage.previewLabel")} />
-        {dragging && <span className="image-preview-drop-hint">{t("image.collage.drop")}</span>}
-      </div>
-    </div>
-  );
-}
-
-function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
-  const { t, i18n } = useTranslation("features");
-  const [files, setFiles] = useState<File[]>([]);
-  const [delays, setDelays] = useState<number[]>([]);
-  const [width, setWidth] = useState(720);
-  const [delay, setDelay] = useState(500);
-  const [colors, setColors] = useState(192);
-  const [preview, setPreview] = useState<{ url: string; fileName: string }>();
-  const language = i18n.language === "en" ? "en" : "ko";
-  const replaceFiles = useCallback((next: File[]) => {
-    const filtered = filterRasterImages(next);
-    setFiles(filtered);
-    setDelays((current) => filtered.map((_, index) => Math.max(20, current[index] ?? delay)));
-  }, [delay]);
-  const appendFiles = useCallback((incoming: File[]) => {
-    const filtered = filterRasterImages(incoming);
-    if (!filtered.length) return;
-    setFiles((current) => [...current, ...filtered]);
-    setDelays((current) => [...current, ...filtered.map(() => Math.max(20, delay))]);
-  }, [delay]);
-  useClipboardImages(appendFiles);
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
-  const moveFrame = (from: number, to: number) => {
-    if (to < 0 || to >= files.length) return;
-    setFiles((current) => moveItem(current, from, to));
-    setDelays((current) => moveItem(current, from, to));
-  };
-  const removeFrame = (index: number) => {
-    setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    setDelays((current) => current.filter((_, itemIndex) => itemIndex !== index));
-  };
-  const execute = async () => {
-    const controller = new AbortController(); controllerRef.current = controller; progress.start(t("image.batch.prepare"));
-    try {
-      const result = await buildAnimatedGif(files, { width, delay: Math.max(20, delay), delays: delays.map((value) => Math.max(20, value)), qualityColors: colors }, t("image.gif.file"), progress.update, controller.signal, language);
-      if (preview) URL.revokeObjectURL(preview.url);
-      setPreview({ url: URL.createObjectURL(new Blob([result.buffer], { type: result.mimeType })), fileName: result.fileName });
-      progress.succeed(t("image.gif.done"));
-    } catch (error) { progress.fail(normalizePanelError(error, t)); }
-    finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
-  };
-  return <SectionCard title={t("image.gif.title")} description={t("image.gif.description")}>
-    <FileDropZone files={files} onFiles={replaceFiles} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.gif.hint")} accent="sky" />
-    <ClipboardHint mode="append" />
-    {!!files.length && <div className="gif-frame-list">{files.map((file, index) => <div className="gif-frame-row" key={`${file.name}-${file.lastModified}-${index}`}><span><b>{index + 1}</b>{file.name}</span><label>{t("image.gif.frameDelay")}<input type="number" min={20} step={10} value={delays[index] ?? delay} onChange={(event) => setDelays((current) => current.map((value, itemIndex) => itemIndex === index ? Math.max(20, Number(event.target.value) || 20) : value))} /></label><button type="button" disabled={index === 0} aria-label={t("image.gif.moveUp")} onClick={() => moveFrame(index, index - 1)}><ArrowUpToLine size={16} /></button><button type="button" disabled={index === files.length - 1} aria-label={t("image.gif.moveDown")} onClick={() => moveFrame(index, index + 1)}><ArrowDownToLine size={16} /></button><button type="button" aria-label={t("image.gif.remove")} onClick={() => removeFrame(index)}><Trash2 size={16} /></button></div>)}</div>}
-    <div className="image-settings-grid"><NumberField label={t("image.gif.width")} value={width} onChange={setWidth} /><NumberField label={t("image.gif.delay")} value={delay} min={20} onChange={(value) => { setDelay(value); setDelays(files.map(() => value)); }} /><label><span>{t("image.gif.colors")}</span><select value={colors} onChange={(event) => setColors(Number(event.target.value))}><option value={128}>{t("image.gif.small")}</option><option value={192}>{t("image.gif.balanced")}</option><option value={256}>{t("image.gif.sharp")}</option></select></label></div>
-    {preview && <div className="gif-result-preview"><img src={preview.url} alt={t("image.gif.previewAlt")} /><a className="result-download blue-download" href={preview.url} download={preview.fileName}><Download size={17} /> {t("image.gif.download")}</a></div>}
-    <div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><Sparkles size={18} /> {t("image.gif.create")}</PrimaryButton></div>
-  </SectionCard>;
 }
 
 function ToolButton({ active, label, onClick, children }: { active: boolean; label: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" className={active ? "active" : ""} aria-pressed={active} onClick={onClick}>{children}<span>{label}</span></button>; }
@@ -735,77 +548,6 @@ function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | un
   return sync;
 }
 
-interface ProcessPanelProps { progress: ReturnType<typeof useOperationProgress>; controllerRef: React.MutableRefObject<AbortController | undefined>; }
-
-async function runPanelTask(controllerRef: ProcessPanelProps["controllerRef"], progress: ProcessPanelProps["progress"], task: (controller: AbortController) => Promise<import("./types").ImageWorkerResult>, success: string, t: TFunction<"features">) {
-  const controller = new AbortController(); controllerRef.current = controller; progress.start(t("image.batch.prepare"));
-  try { const result = await task(controller); downloadWorkerResult(result); progress.succeed(success); }
-  catch (error) { progress.fail(normalizePanelError(error, t)); }
-  finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
-}
-
-function NumberField({ label, value, onChange, disabled = false, min = 1 }: { label: string; value: number; onChange: (value: number) => void; disabled?: boolean; min?: number }) { return <label><span>{label}</span><input type="number" min={min} value={value} disabled={disabled} onChange={(event) => onChange(Math.max(min, Number(event.target.value)))} /></label>; }
-function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) { return <label><span>{label} <b>{Math.round(value * 100)}%</b></span><input type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))} /></label>; }
-function FormatField({ value, onChange }: { value: ImageOutputFormat; onChange: (value: ImageOutputFormat) => void }) { const { t } = useTranslation("features"); return <label><span>{t("image.common.output")}</span><select value={value} onChange={(event) => onChange(event.target.value as ImageOutputFormat)}><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select></label>; }
-
-function TransparencyControl({ checked, onChange, format }: { checked: boolean; onChange: (value: boolean) => void; format: ImageOutputFormat }) {
-  const { t } = useTranslation("features");
-  return <div className="image-background-options"><ToggleRow label={t("image.common.transparent")} description={t("image.common.transparentHelp")} checked={checked} onChange={onChange} /><p>{format === "jpeg" ? t("image.common.jpeg") : t("image.common.alpha")}</p></div>;
-}
-
-function ClipboardHint({ mode }: { mode: "replace" | "append" }) {
-  const { t } = useTranslation("features");
-  return <div className="clipboard-image-hint"><ClipboardPaste size={15} /><span>{t("image.common.clipboard", { action: mode === "replace" ? t("image.common.replace") : t("image.common.append") })}</span></div>;
-}
-
-function useClipboardImages(onImages: (files: File[]) => void) {
-  const { t } = useTranslation("features");
-  const callbackRef = useRef(onImages);
-  useEffect(() => { callbackRef.current = onImages; }, [onImages]);
-  useEffect(() => {
-    const handlePaste = (event: ClipboardEvent) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true'], [role='textbox']")) return;
-      const pasted = Array.from(event.clipboardData?.items || [])
-        .filter((item) => item.kind === "file" && /^(?:image\/(?:png|jpeg|webp))$/i.test(item.type))
-        .map((item, index) => item.getAsFile() ? clipboardFile(item.getAsFile() as File, index, t("image.common.clipboardPrefix")) : undefined)
-        .filter((file): file is File => Boolean(file));
-      if (!pasted.length) return;
-      event.preventDefault();
-      callbackRef.current(pasted);
-    };
-    document.addEventListener("paste", handlePaste);
-    return () => document.removeEventListener("paste", handlePaste);
-  }, [t]);
-}
-
-function clipboardFile(source: File, index: number, prefix: string) {
-  const extension = source.type === "image/jpeg" ? "jpg" : source.type === "image/webp" ? "webp" : "png";
-  return new File([source], `${prefix}-${new Date().toISOString().replace(/[:.]/g, "-")}-${index + 1}.${extension}`, { type: source.type, lastModified: Date.now() });
-}
-
-function calculatePreviewScale(width: number, height: number) {
-  const widthScale = Math.min(1, 820 / width);
-  const heightScale = Math.min(1, 5_000 / height);
-  const pixelScale = Math.min(1, Math.sqrt(6_000_000 / Math.max(1, width * height)));
-  return Math.max(0.01, Math.min(widthScale, heightScale, pixelScale));
-}
-
-function drawContainedPreview(context: CanvasRenderingContext2D, bitmap: ImageBitmap, x: number, y: number, width: number, height: number) {
-  const scale = Math.min(width / bitmap.width, height / bitmap.height);
-  const drawnWidth = bitmap.width * scale;
-  const drawnHeight = bitmap.height * scale;
-  context.drawImage(bitmap, x + (width - drawnWidth) / 2, y + (height - drawnHeight) / 2, drawnWidth, drawnHeight);
-}
-
-function drawCoveredPreview(context: CanvasRenderingContext2D, bitmap: ImageBitmap, x: number, y: number, width: number, height: number) {
-  const targetRatio = width / height;
-  const sourceRatio = bitmap.width / bitmap.height;
-  const sourceWidth = sourceRatio > targetRatio ? bitmap.height * targetRatio : bitmap.width;
-  const sourceHeight = sourceRatio > targetRatio ? bitmap.height : bitmap.width / targetRatio;
-  context.drawImage(bitmap, (bitmap.width - sourceWidth) / 2, (bitmap.height - sourceHeight) / 2, sourceWidth, sourceHeight, x, y, width, height);
-}
-
 function fabricColorToHex(value: FabricObject["fill"] | FabricObject["stroke"], fallback: string) {
   if (typeof value !== "string") return fallback;
   if (/^#[\da-f]{6}$/i.test(value)) return value.toLowerCase();
@@ -816,14 +558,3 @@ function fabricColorToHex(value: FabricObject["fill"] | FabricObject["stroke"], 
 }
 
 function stripExtension(name: string) { return name.replace(/\.[^.]+$/, ""); }
-function filterRasterImages(files: File[]) { return files.filter((file) => /^(image\/(?:jpeg|png|webp))$/i.test(file.type) || /\.(?:jpe?g|png|webp)$/i.test(file.name)); }
-function normalizePanelError(error: unknown, t: TFunction<"features">) {
-  if (error instanceof DOMException && error.name === "AbortError") return t("image.common.cancelled");
-  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
-  if (code === "COLLAGE_SIZE") return t("image.collage.sizeError");
-  if (code === "COLLAGE_COLUMNS") return t("image.collage.columnError");
-  if (error instanceof CollageLayoutError) return error.code === "COLLAGE_SIZE" ? t("image.collage.sizeError") : t("image.collage.columnError");
-  return error instanceof Error && error.message ? error.message : t("image.common.failed");
-}
-function downloadWorkerResult(result: import("./types").ImageWorkerResult) { const url = URL.createObjectURL(new Blob([result.buffer], { type: result.mimeType })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = result.fileName; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 15_000); }
-function moveItem<T>(items: T[], from: number, to: number) { const next = [...items]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next; }

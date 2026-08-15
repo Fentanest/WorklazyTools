@@ -12,7 +12,7 @@ import { inspectPdf, parsePageRange, releasePdf, renderPdfPageAsJpeg } from "./p
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
 import { exportPdfGroups, imagesToPdf, mergePdfPages } from "./pdfWorkerClient";
 import { createLocalId, normalizeRotation, type PdfPageItem, type PdfSourceFile } from "./types";
-import { movePdfItem as moveItem } from "./pdfShared";
+import { mapWithConcurrency, movePdfItem as moveItem } from "./pdfShared";
 
 type OutputMode = "merged" | "ranges" | "separate";
 
@@ -83,7 +83,7 @@ export function PdfOrganizePanel() {
       },
     });
     return () => sortable.destroy();
-  }, [download, locked, pages.length]);
+  }, [download.clearResult, locked, pages.length]);
 
   const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
   const groupMembership = useMemo(() => {
@@ -116,7 +116,7 @@ export function PdfOrganizePanel() {
         const file = incoming[index];
         if (!file.name.toLowerCase().endsWith(".pdf")) throw new Error(L(`${file.name}: PDF 파일만 추가할 수 있습니다.`, `${file.name}: only PDF files can be added.`));
         operation.update(8 + (index / incoming.length) * 82, L(`[${index + 1}/${incoming.length}] ${file.name} 페이지 확인 중…`, `[${index + 1}/${incoming.length}] Checking pages in ${file.name}…`));
-        const inspected = await inspectPdf(file, language);
+        const inspected = await inspectPdf(file, language, { requirePdfLibCompatibility: true });
         const sourceId = createLocalId("pdf");
         addedSources.push({ id: sourceId, file, pageCount: inspected.pageCount });
         for (let pageIndex = 0; pageIndex < inspected.pageCount; pageIndex += 1) {
@@ -159,12 +159,12 @@ export function PdfOrganizePanel() {
       if (outputMode === "merged") {
         if (!selectedPages.length) throw new Error(L("하나의 PDF로 저장할 페이지를 선택해 주세요.", "Select pages to save in one PDF."));
         const output = imageCompression
-          ? await imagesToPdf(await Promise.all(selectedPages.map(async (page, index) => {
+          ? await imagesToPdf(await mapWithConcurrency(selectedPages, 4, async (page, index) => {
             const source = sources.find((candidate) => candidate.id === page.sourceId);
             if (!source) throw new Error(L("페이지 원본을 찾지 못했습니다.", "The source page could not be found."));
             operation.update(5 + (index / selectedPages.length) * 55, L(`[${index + 1}/${selectedPages.length}] 압축용 페이지를 렌더링하는 중…`, `[${index + 1}/${selectedPages.length}] Rendering compressed page…`));
             return renderPdfPageAsJpeg(source.file, page.sourcePageIndex, page.rotation, language);
-          })), "image", archiveName, operation.update, language, { watermarkText, pageNumbers })
+          }), "image", archiveName, operation.update, language, { watermarkText, pageNumbers, imagesAlreadyNormalized: true })
           : await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, operation.update, language, { watermarkText, pageNumbers });
         download.makeResult(output);
         operation.succeed(L(`${selectedPages.length}개 선택 페이지를 하나의 PDF로 생성했습니다.`, `Created one PDF from ${selectedPages.length} selected pages.`));
