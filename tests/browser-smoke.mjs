@@ -30,7 +30,10 @@ try {
     });
     const pageErrors = [];
     const outboundWrites = [];
-    page.on("pageerror", (error) => pageErrors.push(error.message));
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+      console.error("[page error]", error.message);
+    });
     page.on("request", (request) => {
       if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) {
         const requestUrl = new URL(request.url());
@@ -71,7 +74,7 @@ try {
 }
 
 async function testPdfTools(page, fixtures, tempDir) {
-  await page.goto(`${koBaseUrl}/tools/pdf-editor`, { waitUntil: "networkidle0" });
+  await navigateTo(page, `${koBaseUrl}/tools/pdf-editor/`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
@@ -86,7 +89,7 @@ async function testPdfTools(page, fixtures, tempDir) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
   }
   await page.waitForFunction(() => !document.querySelector(".summary-card .primary-button")?.disabled);
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   await assertProgressLog(page, "PDF 페이지 편집");
   const rotatedPath = path.join(tempDir, "rotated.pdf");
@@ -114,19 +117,20 @@ async function testPdfTools(page, fixtures, tempDir) {
   await replaceInputValue(page, selectionRangeInput, "2");
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => document.querySelector('.pdf-page-card:first-child .pdf-page-select')?.getAttribute("aria-pressed") === "false" && document.querySelector('.pdf-page-card:nth-child(2) .pdf-page-select')?.getAttribute("aria-pressed") === "true");
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const extractedPath = path.join(tempDir, "extracted.pdf");
   await saveBlobLink(page, ".result-download", extractedPath);
   const extracted = await PDFDocument.load(await fs.readFile(extractedPath));
   if (extracted.getPageCount() !== 1 || Math.round(extracted.getPage(0).getWidth()) !== 600) throw new Error("PDF page-range extraction selected the wrong page.");
 
-  await page.click('.pdf-output-mode-list button:nth-child(2)');
+  await page.$eval('.pdf-output-mode-list button:nth-child(2)', (button) => button.click());
+  await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(2)')?.getAttribute("aria-checked") === "true");
   await page.waitForSelector(".pdf-multi-range-panel");
   if (await page.$(".pdf-selection-range-form") || await page.$(".pdf-page-select")) throw new Error("Single-output selection controls remained visible in multi-range mode.");
   let groupRows = await page.$$(".pdf-range-group");
   if (groupRows.length !== 1) throw new Error(`Expected one seeded PDF range row, got ${groupRows.length}.`);
-  await page.click(".pdf-multi-range-heading .secondary-button");
+  await page.$eval(".pdf-multi-range-heading .secondary-button", (button) => button.click());
   groupRows = await page.$$(".pdf-range-group");
   if (groupRows.length !== 2) throw new Error(`Expected a second PDF range row after adding one, got ${groupRows.length}.`);
   const groupInputs = await page.$$(".pdf-range-group input");
@@ -135,7 +139,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const firstGroups = await page.$$eval(".pdf-page-card:first-child .pdf-group-badges b", (badges) => badges.map((badge) => badge.textContent));
   const secondGroups = await page.$$eval(".pdf-page-card:nth-child(2) .pdf-group-badges b", (badges) => badges.map((badge) => badge.textContent));
   if (firstGroups.join(",") !== "1,2" || secondGroups.join(",") !== "2") throw new Error(`PDF range badges are incorrect: first=${firstGroups}, second=${secondGroups}`);
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const rangeZipPath = path.join(tempDir, "range-pdfs.zip");
   await saveBlobLink(page, ".result-download", rangeZipPath);
@@ -147,11 +151,12 @@ async function testPdfTools(page, fixtures, tempDir) {
     throw new Error("Range PDF did not preserve the entered page order and rotations.");
   }
   await replaceInputValue(page, groupInputs[2], "분할-01");
-  if (!await page.$(".pdf-range-group.invalid")) throw new Error("Duplicate range PDF names were not marked invalid.");
+  await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group.invalid").length === 2);
   if (!await page.$eval(".summary-card .primary-button", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
 
-  await page.click('.pdf-output-mode-list button:nth-child(3)');
-  await page.click(".summary-card .primary-button");
+  await page.$eval('.pdf-output-mode-list button:nth-child(3)', (button) => button.click());
+  await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(3)')?.getAttribute("aria-checked") === "true");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const separateZipPath = path.join(tempDir, "separate-pages.zip");
   await saveBlobLink(page, ".result-download", separateZipPath);
@@ -159,20 +164,20 @@ async function testPdfTools(page, fixtures, tempDir) {
   const separatePdfNames = Object.keys(separateZip.files).filter((name) => name.endsWith(".pdf"));
   if (separatePdfNames.length !== 1) throw new Error(`Expected one selected page PDF, got ${separatePdfNames.length}.`);
 
-  await page.goto(`${koBaseUrl}/tools/pdf-editor/image-to-pdf`, { waitUntil: "networkidle0" });
+  await navigatePdfTab(page, 2, "/tools/pdf-editor/image-to-pdf");
   await (await page.$('input[type="file"]')).uploadFile(fixtures.tinyPng);
   await page.waitForSelector(".pdf-image-card");
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const imagePdfPath = path.join(tempDir, "image.pdf");
   await saveBlobLink(page, ".result-download", imagePdfPath);
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
-  await page.goto(`${koBaseUrl}/tools/pdf-editor/pdf-to-image`, { waitUntil: "networkidle0" });
+  await navigatePdfTab(page, 3, "/tools/pdf-editor/pdf-to-image");
   await (await page.$('input[type="file"]')).uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const imageZipPath = path.join(tempDir, "pdf-images.zip");
   await saveBlobLink(page, ".result-download", imageZipPath);
@@ -180,13 +185,13 @@ async function testPdfTools(page, fixtures, tempDir) {
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
 
-  await page.goto(`${koBaseUrl}/tools/pdf-editor/convert`, { waitUntil: "networkidle0" });
+  await navigatePdfTab(page, 4, "/tools/pdf-editor/convert");
   const convertInput = await page.$('input[type="file"]');
   await convertInput.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
   const noOcrButton = await findButtonByText(page, ".pdf-summary-control .segmented-control button", "사용 안 함");
   await noOcrButton.click();
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const docxPath = path.join(tempDir, "pdf-converted.docx");
   await saveBlobLink(page, ".result-download", docxPath);
@@ -199,7 +204,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const xlsxButton = await page.$('.pdf-format-grid button:nth-child(2)');
   if (!xlsxButton) throw new Error("PDF XLSX format button was not found.");
   await xlsxButton.click();
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const xlsxPath = path.join(tempDir, "pdf-converted.xlsx");
   await saveBlobLink(page, ".result-download", xlsxPath);
@@ -212,7 +217,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const txtButton = await page.$('.pdf-format-grid button:nth-child(3)');
   if (!txtButton) throw new Error("PDF TXT format button was not found.");
   await txtButton.click();
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const txtPath = path.join(tempDir, "pdf-converted.txt");
   await saveBlobLink(page, ".result-download", txtPath);
@@ -221,15 +226,35 @@ async function testPdfTools(page, fixtures, tempDir) {
 }
 
 async function replaceInputValue(page, input, value) {
-  await input.click();
-  await page.keyboard.down("Control");
-  await page.keyboard.press("A");
-  await page.keyboard.up("Control");
+  await input.evaluate((element) => {
+    element.focus();
+    element.select();
+  });
   await input.type(value);
 }
 
+async function navigateTo(page, url) {
+  if (page.url() !== "about:blank") await page.goto("about:blank", { waitUntil: "domcontentloaded" });
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.waitForFunction(() => Boolean(document.querySelector("#root .app-shell input[type='file']")), { timeout: 3_000 });
+      return;
+    } catch (error) {
+      if (attempt === 2) throw error;
+      await page.reload({ waitUntil: "domcontentloaded" });
+    }
+  }
+}
+
+async function navigatePdfTab(page, index, pathname) {
+  await page.$eval(`.pdf-tool-navigation a:nth-child(${index})`, (link) => link.click());
+  await page.waitForFunction((expectedPath) => location.pathname.endsWith(expectedPath)
+    && Boolean(document.querySelector(".pdf-tool-page input[type='file']")), {}, pathname);
+}
+
 async function testEncryptedExcelMerge(page, fixtures, tempDir) {
-  await page.goto(`${koBaseUrl}/tools/excel-merger`, { waitUntil: "networkidle0" });
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/`);
   const acceptedFormats = await page.$eval('input[type="file"]', (input) => input.accept);
   if (!acceptedFormats.includes(".xlsb") || !acceptedFormats.includes(".xlsm")) {
     throw new Error(`XLSB/XLSM were not exposed as accepted inputs: ${acceptedFormats}`);
@@ -288,14 +313,14 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
 }
 
 async function testFormulaTranslation(page, fixtures, tempDir) {
-  await page.goto(`${koBaseUrl}/tools/excel-merger?run=formula`, { waitUntil: "networkidle0" });
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=formula`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.xlsxOne, fixtures.xlsxTwo);
   await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 2);
   await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
   const verticalButton = await findButtonByText(page, ".segmented-control button", "세로");
   await verticalButton.click();
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   await assertProgressLog(page, "Excel 세로 병합");
 
@@ -310,7 +335,7 @@ async function testFormulaTranslation(page, fixtures, tempDir) {
 }
 
 async function testExcelSheetSelection(page, fixtures, tempDir) {
-  await page.goto(`${koBaseUrl}/tools/excel-merger?run=sheets`, { waitUntil: "networkidle0" });
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheets`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.sheetSelectionXlsx);
   await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 4);
@@ -341,7 +366,7 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   await patternInput.type("-2");
   if (await page.$$(".sheet-name-list li.selected").then((items) => items.length) !== 2) throw new Error("Up-to-N sheet selection failed.");
 
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   const resultPath = path.join(tempDir, "selected-sheets-result.xlsx");
   await saveBlobLink(page, ".result-download", resultPath);
@@ -353,7 +378,7 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
 }
 
 async function testExcelSheetTrim(page, fixtures, tempDir) {
-  await page.goto(`${koBaseUrl}/tools/excel-merger?run=sheet-trim`, { waitUntil: "networkidle0" });
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheet-trim`);
   await (await page.$('input[type="file"]')).uploadFile(fixtures.sheetTrimXlsx);
   await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 1);
 
@@ -364,7 +389,7 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
   await clickSetting(page, "중간의 연속 빈 열 삭제");
   const thresholdInput = await page.$('.sheet-trim-threshold input[type="number"]');
   await replaceInputValue(page, thresholdInput, "3");
-  await page.click(".summary-card .primary-button");
+  await clickPrimaryAction(page);
   await waitForResult(page);
   await assertProgressLog(page, "연속 빈 행·열 정리");
 
@@ -390,7 +415,7 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
 }
 
 async function testWordCompare(page, fixtures, tempDir) {
-  await page.goto(`${koBaseUrl}/tools/word-compare`, { waitUntil: "networkidle0" });
+  await navigateTo(page, `${koBaseUrl}/tools/word-compare/`);
   await dropFiles(page, ".drop-zone", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
   await dropFiles(page, ".drop-zone", [fixtures.afterDocx], 1);
   await page.waitForSelector(".pair-count-error");
@@ -574,9 +599,25 @@ async function testWordCompare(page, fixtures, tempDir) {
 }
 
 async function waitForResult(page, timeout = 180_000) {
-  await page.waitForFunction(() => document.querySelector(".result-download") || document.querySelector(".error-banner"), { timeout });
+  await page.waitForFunction(() => !document.querySelector(".operation-progress.status-running")
+    && (document.querySelector(".result-download") || document.querySelector(".error-banner")), { timeout });
   const error = await page.$(".error-banner");
   if (error) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Unknown UI error"));
+}
+
+async function clickPrimaryAction(page) {
+  const previousHref = await page.$eval(".result-download", (link) => link.href).catch(() => "");
+  await page.$eval(".summary-card .primary-button", (button) => {
+    if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error("The primary action is unavailable.");
+    button.click();
+  });
+  await page.waitForFunction((href) => {
+    const result = document.querySelector(".result-download");
+    return Boolean(document.querySelector(".operation-progress.status-running")
+      || document.querySelector(".error-banner")
+      || !result
+      || result.href !== href);
+  }, {}, previousHref);
 }
 
 async function assertProgressLog(page, label) {
@@ -807,8 +848,11 @@ async function assertTrackedDocument(trackedPath, beforePath, afterPath, require
     if (!trackedDocument.includes(marker)) throw new Error(`Tracked DOCX is missing ${marker}. ${trackedDocument.slice(0, 1800)}`);
   }
   if (!trackedDocument.includes('w:author="Worklazy Tools"')) throw new Error("Tracked changes have no revision author.");
-  if (!settings.includes("<w:trackRevisions") || !settings.includes("<w:revisionView")) {
+  if (!settings.includes("<w:revisionView")) {
     throw new Error("Tracked-change display settings were not written.");
+  }
+  if (settings.includes("<w:trackRevisions")) {
+    throw new Error("The generated document unexpectedly enables tracking for the user's future edits.");
   }
   const definedNumberIds = new Set(Array.from(trackedNumbering.matchAll(/<w:num\b[^>]*w:numId="(\d+)"/g), (match) => match[1]));
   const referencedNumberIds = Array.from(trackedDocument.matchAll(/<w:numId\b[^>]*w:val="(\d+)"/g), (match) => match[1]);

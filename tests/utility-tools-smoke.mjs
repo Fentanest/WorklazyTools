@@ -23,6 +23,9 @@ try {
   }
 
   await page.goto(koBaseUrl, { waitUntil: "networkidle0" });
+  await page.waitForSelector(".privacy-consent");
+  await page.click(".privacy-consent .primary-button");
+  await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent") === "granted");
   const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
   const homeFeedback = await page.$eval(".hero-feedback", (element) => ({

@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, Download, Info, MessageSquare, TextSearch } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { FileShareButton } from "../../components/FileShareButton";
@@ -193,12 +193,22 @@ function DocumentPageComparison({ beforeName, afterName, items, tables }: {
   tables: WordTableComparison[];
 }) {
   const language = useAppLanguage();
+  const changedIndexes = useMemo(() => items.flatMap((item, index) => item.kind === "unchanged" ? [] : [index]), [items]);
+  const [currentChange, setCurrentChange] = useState(-1);
+  useEffect(() => setCurrentChange(-1), [items]);
+  const goToChange = (direction: -1 | 1) => {
+    if (!changedIndexes.length) return;
+    const nextPosition = currentChange < 0 ? (direction > 0 ? 0 : changedIndexes.length - 1) : Math.max(0, Math.min(changedIndexes.length - 1, currentChange + direction));
+    setCurrentChange(nextPosition);
+    document.getElementById(`comparison-change-${changedIndexes[nextPosition]}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   if (!items.length) {
     return <div className="empty-diff document-empty"><TextSearch size={22} /><strong>{language === "en" ? "There is no content to compare in this area." : "이 영역에는 비교할 내용이 없습니다."}</strong></div>;
   }
 
   return (
     <div className="document-page-scroll">
+      {!!changedIndexes.length && <nav className="change-jump-navigation" aria-label={language === "en" ? "Navigate changes" : "변경 내용 이동"}><button type="button" onClick={() => goToChange(-1)} disabled={currentChange === 0}><ArrowLeft size={14} /> {language === "en" ? "Previous change" : "이전 변경"}</button><span>{currentChange < 0 ? `– / ${changedIndexes.length}` : `${currentChange + 1} / ${changedIndexes.length}`}</span><button type="button" onClick={() => goToChange(1)} disabled={currentChange === changedIndexes.length - 1}>{language === "en" ? "Next change" : "다음 변경"} <ArrowRight size={14} /></button></nav>}
       <div className="document-page-view" role="table" aria-label={language === "en" ? "Full before-and-after document comparison" : "수정 전후 문서 전체 비교"}>
         <div className="document-page-column-heading before" role="columnheader"><span>{language === "en" ? "Before" : "수정 전"}</span><strong>{beforeName}</strong></div>
         <div className="document-page-column-heading after" role="columnheader"><span>{language === "en" ? "After" : "수정 후"}</span><strong>{afterName}</strong></div>
@@ -207,7 +217,7 @@ function DocumentPageComparison({ beforeName, afterName, items, tables }: {
             ? tables.find((candidate) => candidate.index === item.tableIndex)
             : undefined;
           return (
-          <div className={`document-page-row ${item.kind}${table ? " table-block" : ""}`} role="row" key={`${item.section}-${item.beforeLocation}-${item.afterLocation}-${index}`}>
+          <div id={item.kind === "unchanged" ? undefined : `comparison-change-${index}`} className={`document-page-row ${item.kind}${table ? " table-block" : ""}`} role="row" key={`${item.section}-${item.beforeLocation}-${item.afterLocation}-${index}`}>
             <DocumentBlock item={item} side="before" table={table} />
             <DocumentBlock item={item} side="after" table={table} />
           </div>

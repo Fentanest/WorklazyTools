@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Download, Eraser, FlipHorizontal2, FlipVertical2, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
 import type { TFunction } from "i18next";
-import { Canvas, Circle, FabricImage, FabricText, Line, PencilBrush, Rect, filters, type FabricObject } from "fabric";
+import { Canvas, Circle, FabricImage, IText, Line, PencilBrush, Rect, filters, type FabricObject } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,6 +10,7 @@ import { ToolGuide } from "../../components/ToolGuide";
 import { FileDropZone, FileList, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { batchProcessImages, buildAnimatedGif, buildCollage, serializeWatermark } from "./imageWorkerClient";
+import { calculateCollageLayout, CollageLayoutError } from "./collageLayout";
 import type { CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
 
 type StudioTab = "editor" | "batch" | "collage" | "gif";
@@ -31,7 +32,7 @@ export function ImageStudioPage() {
       <nav className="studio-tabs" aria-label={t("image.tabs.label")}>
         {([
           ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],
-        ] as const).map(([value, label, Icon]) => <button type="button" className={tab === value ? "active" : ""} onClick={() => { setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></button>)}
+        ] as const).map(([value, label, Icon]) => <button type="button" className={tab === value ? "active" : ""} onClick={() => { activeController.current?.abort(); activeController.current = undefined; setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></button>)}
       </nav>
 
       <div className="inline-notice warning image-format-notice"><AlertTriangle size={16} /><span>{t("image.heic")}</span></div>
@@ -76,6 +77,7 @@ function ImageEditor() {
   const canvas = useRef<Canvas | undefined>(undefined);
   const baseImage = useRef<FabricImage | undefined>(undefined);
   const sourceUrl = useRef<string | undefined>(undefined);
+  const outputMultiplier = useRef(1);
   const modeRef = useRef<EditorMode>("select");
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
@@ -99,6 +101,7 @@ function ImageEditor() {
   const [shapeFill, setShapeFill] = useState("#0a84ff");
   const [shapeStroke, setShapeStroke] = useState("#ffffff");
   const [shapeStrokeWidth, setShapeStrokeWidth] = useState(0);
+  const [editorError, setEditorError] = useState("");
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
   const syncCanvasDisplay = useResponsiveFabricCanvas(canvas, stageElement);
@@ -131,7 +134,7 @@ function ImageEditor() {
   }, []);
 
   const syncSelectedShape = useCallback((object?: FabricObject) => {
-    const shape = object instanceof Rect || object instanceof Circle ? object : undefined;
+    const shape = object instanceof Rect || object instanceof Circle || object instanceof Line || object instanceof IText ? object : undefined;
     setShapeSelected(Boolean(shape));
     if (!shape) return;
     setShapeFill(fabricColorToHex(shape.fill, "#0a84ff"));
@@ -194,7 +197,8 @@ function ImageEditor() {
       instance.clear();
       instance.backgroundColor = transparentBackground ? "" : background;
       instance.setDimensions({ width: 900, height: 600 });
-      const scale = Math.min(860 / image.width, 560 / image.height);
+      const scale = Math.min(1, 860 / image.width, 560 / image.height);
+      outputMultiplier.current = Math.max(1, 1 / scale);
       image.set({ left: 450, top: 300, originX: "center", originY: "center", scaleX: scale, scaleY: scale, selectable: false, evented: false });
       baseImage.current = image;
       instance.add(image);
@@ -202,6 +206,7 @@ function ImageEditor() {
       if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
       sourceUrl.current = url;
       setFile(next);
+      setEditorError("");
       setBaseLocked(true);
       setBrightness(0); setContrast(0); setHue(0);
       editorSettings.current = { ...editorSettings.current, brightness: 0, contrast: 0, hue: 0, baseLocked: true };
@@ -216,7 +221,7 @@ function ImageEditor() {
     } catch (error) {
       restoringRef.current = false;
       URL.revokeObjectURL(url);
-      throw error;
+      setEditorError(error instanceof Error ? error.message : t("image.common.failed"));
     }
   };
 
@@ -232,6 +237,8 @@ function ImageEditor() {
     if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
     sourceUrl.current = undefined;
     setFile(undefined);
+    outputMultiplier.current = 1;
+    setEditorError("");
     setBrightness(0); setContrast(0); setHue(0); setBaseLocked(true); setMode("select");
     modeRef.current = "select";
     editorSettings.current = { ...editorSettings.current, brightness: 0, contrast: 0, hue: 0, baseLocked: true };
@@ -242,7 +249,10 @@ function ImageEditor() {
     window.requestAnimationFrame(syncCanvasDisplay);
   };
 
-  useClipboardImages((images) => void loadFile(images.at(-1)));
+  useClipboardImages((images) => {
+    if (canvas.current?.getObjects().length && !window.confirm(t("image.editor.confirm"))) return;
+    void loadFile(images.at(-1));
+  });
 
   const dropOnPreview = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -292,6 +302,8 @@ function ImageEditor() {
     if (!instance) return;
     const width = 900;
     const height = Math.round(width / ratio);
+    const previousWidth = instance.getWidth();
+    const previousHeight = instance.getHeight();
     instance.setDimensions({ width, height });
     window.requestAnimationFrame(syncCanvasDisplay);
     if (image) {
@@ -299,6 +311,10 @@ function ImageEditor() {
       image.set({ left: width / 2, top: height / 2, scaleX: scale, scaleY: scale });
       image.setCoords();
     }
+    instance.getObjects().filter((object) => object !== image).forEach((object) => {
+      object.set({ left: (object.left || 0) * width / previousWidth, top: (object.top || 0) * height / previousHeight });
+      object.setCoords();
+    });
     instance.requestRenderAll();
     pushSnapshot();
   };
@@ -318,7 +334,7 @@ function ImageEditor() {
 
   const addText = (value = text) => {
     if (!value.trim()) return;
-    addObject(new FabricText(value, { left: 90, top: 90, fontFamily: "sans-serif", fontSize: 48, fontWeight: "700", fill: drawColor, stroke: "rgba(255,255,255,.55)", strokeWidth: 1 }));
+    addObject(new IText(value, { left: 90, top: 90, fontFamily: "sans-serif", fontSize: 48, fontWeight: "700", fill: drawColor, stroke: "rgba(255,255,255,.55)", strokeWidth: 1 }));
   };
 
   const addShape = (kind: "line" | "rect" | "circle") => {
@@ -330,7 +346,17 @@ function ImageEditor() {
   const setSelectedShapeStyle = (property: "fill" | "stroke" | "strokeWidth", value: string | number) => {
     mutateActive((object) => {
       if (object instanceof Rect || object instanceof Circle) object.set(property, value);
+      if (object instanceof IText && property === "fill") object.set("fill", value);
+      if (object instanceof Line && property !== "fill") object.set(property, value);
     });
+  };
+
+  const duplicateSelectedLayer = async () => {
+    const active = canvas.current?.getActiveObject();
+    if (!active || active === baseImage.current) return;
+    const clone = await active.clone();
+    clone.set({ left: (active.left || 0) + 24, top: (active.top || 0) + 24 });
+    addObject(clone);
   };
 
   const updateFilter = (kind: "brightness" | "contrast" | "hue", value: number) => {
@@ -414,6 +440,7 @@ function ImageEditor() {
       syncSelectedShape();
       window.requestAnimationFrame(syncCanvasDisplay);
     } finally {
+      window.clearTimeout(snapshotTimerRef.current);
       restoringRef.current = false;
     }
   };
@@ -422,11 +449,12 @@ function ImageEditor() {
     const instance = canvas.current;
     if (!instance) return;
     instance.renderAll();
+    const multiplier = outputMultiplier.current;
     let dataUrl: string;
     if (format === "jpeg") {
       const flattened = document.createElement("canvas");
-      flattened.width = instance.getWidth();
-      flattened.height = instance.getHeight();
+      flattened.width = Math.round(instance.getWidth() * multiplier);
+      flattened.height = Math.round(instance.getHeight() * multiplier);
       const context = flattened.getContext("2d");
       if (!context) return;
       context.fillStyle = "#ffffff";
@@ -434,16 +462,18 @@ function ImageEditor() {
       context.drawImage(instance.getElement(), 0, 0, flattened.width, flattened.height);
       dataUrl = flattened.toDataURL("image/jpeg", 0.92);
       flattened.width = 1; flattened.height = 1;
-    } else dataUrl = instance.toDataURL({ format, quality: 0.92, multiplier: 1 });
+    } else dataUrl = instance.toDataURL({ format, quality: 0.92, multiplier });
+    const actualFormat = dataUrl.startsWith("data:image/png") ? "png" : dataUrl.startsWith("data:image/webp") ? "webp" : "jpeg";
     const anchor = document.createElement("a");
     anchor.href = dataUrl;
-    anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${format === "jpeg" ? "jpg" : format}`;
+    anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${actualFormat === "jpeg" ? "jpg" : actualFormat}`;
     anchor.click();
   };
 
   return (
     <SectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
       <FileDropZone files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
+      {editorError && <p className="utility-error" role="alert">{editorError}</p>}
       <ClipboardHint mode="replace" />
       <div className="editor-source-actions"><button type="button" className="secondary-button" onClick={newBlankCanvas}><ImageIcon size={16} /> {t("image.editor.blank")}</button>{file && <span>{t("image.editor.editing", { name: file.name })}</span>}</div>
       <div className="editor-toolbar">
@@ -459,8 +489,8 @@ function ImageEditor() {
       </div>
       <div className="image-editor-layout">
         <aside className="image-editor-controls">
-          <div className="editor-tool-group"><strong>{t("image.editor.crop")}</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button></div></div>
-          <div className="editor-tool-group"><strong>{t("image.editor.layer")}</strong><div className="icon-tool-row"><button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title={t("image.editor.front")} aria-label={t("image.editor.front")} type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title={t("image.editor.back")} aria-label={t("image.editor.back")} type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title={t("image.editor.delete")} aria-label={t("image.editor.delete")} type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
+          <div className="editor-tool-group"><strong>{t("image.editor.crop")}</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(3 / 4)}>3:4</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button><button type="button" onClick={() => cropTo(9 / 16)}>9:16</button></div></div>
+          <div className="editor-tool-group"><strong>{t("image.editor.layer")}</strong><div className="icon-tool-row"><button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title={t("image.editor.front")} aria-label={t("image.editor.front")} type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title={t("image.editor.back")} aria-label={t("image.editor.back")} type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title={t("image.editor.duplicate", { defaultValue: "선택 레이어 복제" })} aria-label={t("image.editor.duplicate", { defaultValue: "선택 레이어 복제" })} type="button" onClick={() => void duplicateSelectedLayer()}><ClipboardPaste size={18} /></button><button title={t("image.editor.delete")} aria-label={t("image.editor.delete")} type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
           <div className={`editor-tool-group${file ? "" : " is-disabled"}`}><strong>{t("image.editor.adjust")}</strong><label>{t("image.editor.brightness")} <b>{brightness}</b><input disabled={!file} type="range" min={-80} max={80} value={brightness} onChange={(event) => updateFilter("brightness", Number(event.target.value))} /></label><label>{t("image.editor.contrast")} <b>{contrast}</b><input disabled={!file} type="range" min={-80} max={80} value={contrast} onChange={(event) => updateFilter("contrast", Number(event.target.value))} /></label><label>{t("image.editor.hue")} <b>{hue}°</b><input disabled={!file} type="range" min={-180} max={180} value={hue} onChange={(event) => updateFilter("hue", Number(event.target.value))} /></label>{file && <ToggleRow label={t("image.editor.lock")} description={t("image.editor.lockHelp")} checked={baseLocked} onChange={updateBaseLock} />}</div>
           <div className="editor-tool-group"><strong>{t("image.editor.text")}</strong><div className="inline-input-action"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={() => addText()}><Type size={16} /></button></div><div className="button-grid sticker-grid">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" key={emoji} onClick={() => addText(emoji)}>{emoji}</button>)}</div></div>
           <div className="editor-tool-group"><strong>{t("image.editor.shapes")}</strong><div className="icon-tool-row"><button title={t("image.editor.line")} aria-label={t("image.editor.line")} type="button" onClick={() => addShape("line")}><Minus size={18} /></button><button title={t("image.editor.rect")} aria-label={t("image.editor.rect")} type="button" onClick={() => addShape("rect")}><Square size={18} /></button><button title={t("image.editor.circle")} aria-label={t("image.editor.circle")} type="button" onClick={() => addShape("circle")}><CircleIcon size={18} /></button></div></div>
@@ -568,7 +598,7 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
       try {
         for (const file of files) bitmaps.push(await createImageBitmap(file));
         if (disposed) return;
-        const layout = calculatePreviewLayout(bitmaps, options, t);
+        const layout = calculateCollageLayout(bitmaps, options);
         const scale = calculatePreviewScale(layout.width, layout.height);
         const displayWidth = Math.max(1, Math.round(layout.width * scale));
         const displayHeight = Math.max(1, Math.round(layout.height * scale));
@@ -628,12 +658,52 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
 function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
   const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
+  const [delays, setDelays] = useState<number[]>([]);
   const [width, setWidth] = useState(720);
   const [delay, setDelay] = useState(500);
   const [colors, setColors] = useState(192);
+  const [preview, setPreview] = useState<{ url: string; fileName: string }>();
   const language = i18n.language === "en" ? "en" : "ko";
-  const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildAnimatedGif(files, { width, delay, qualityColors: colors }, t("image.gif.file"), progress.update, controller.signal, language), t("image.gif.done"), t);
-  return <SectionCard title={t("image.gif.title")} description={t("image.gif.description")}><FileDropZone files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.gif.hint")} accent="sky" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" /><div className="image-settings-grid"><NumberField label={t("image.gif.width")} value={width} onChange={setWidth} /><NumberField label={t("image.gif.delay")} value={delay} onChange={setDelay} /><label><span>{t("image.gif.colors")}</span><select value={colors} onChange={(event) => setColors(Number(event.target.value))}><option value={128}>{t("image.gif.small")}</option><option value={192}>{t("image.gif.balanced")}</option><option value={256}>{t("image.gif.sharp")}</option></select></label></div><div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><Sparkles size={18} /> {t("image.gif.download")}</PrimaryButton></div></SectionCard>;
+  const replaceFiles = useCallback((next: File[]) => {
+    const filtered = filterRasterImages(next);
+    setFiles(filtered);
+    setDelays((current) => filtered.map((_, index) => Math.max(20, current[index] ?? delay)));
+  }, [delay]);
+  const appendFiles = useCallback((incoming: File[]) => {
+    const filtered = filterRasterImages(incoming);
+    if (!filtered.length) return;
+    setFiles((current) => [...current, ...filtered]);
+    setDelays((current) => [...current, ...filtered.map(() => Math.max(20, delay))]);
+  }, [delay]);
+  useClipboardImages(appendFiles);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
+  const moveFrame = (from: number, to: number) => {
+    if (to < 0 || to >= files.length) return;
+    setFiles((current) => moveItem(current, from, to));
+    setDelays((current) => moveItem(current, from, to));
+  };
+  const removeFrame = (index: number) => {
+    setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setDelays((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+  const execute = async () => {
+    const controller = new AbortController(); controllerRef.current = controller; progress.start(t("image.batch.prepare"));
+    try {
+      const result = await buildAnimatedGif(files, { width, delay: Math.max(20, delay), delays: delays.map((value) => Math.max(20, value)), qualityColors: colors }, t("image.gif.file"), progress.update, controller.signal, language);
+      if (preview) URL.revokeObjectURL(preview.url);
+      setPreview({ url: URL.createObjectURL(new Blob([result.buffer], { type: result.mimeType })), fileName: result.fileName });
+      progress.succeed(t("image.gif.done"));
+    } catch (error) { progress.fail(normalizePanelError(error, t)); }
+    finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
+  };
+  return <SectionCard title={t("image.gif.title")} description={t("image.gif.description")}>
+    <FileDropZone files={files} onFiles={replaceFiles} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.gif.hint")} accent="sky" />
+    <ClipboardHint mode="append" />
+    {!!files.length && <div className="gif-frame-list">{files.map((file, index) => <div className="gif-frame-row" key={`${file.name}-${file.lastModified}-${index}`}><span><b>{index + 1}</b>{file.name}</span><label>{t("image.gif.frameDelay")}<input type="number" min={20} step={10} value={delays[index] ?? delay} onChange={(event) => setDelays((current) => current.map((value, itemIndex) => itemIndex === index ? Math.max(20, Number(event.target.value) || 20) : value))} /></label><button type="button" disabled={index === 0} aria-label={t("image.gif.moveUp")} onClick={() => moveFrame(index, index - 1)}><ArrowUpToLine size={16} /></button><button type="button" disabled={index === files.length - 1} aria-label={t("image.gif.moveDown")} onClick={() => moveFrame(index, index + 1)}><ArrowDownToLine size={16} /></button><button type="button" aria-label={t("image.gif.remove")} onClick={() => removeFrame(index)}><Trash2 size={16} /></button></div>)}</div>}
+    <div className="image-settings-grid"><NumberField label={t("image.gif.width")} value={width} onChange={setWidth} /><NumberField label={t("image.gif.delay")} value={delay} min={20} onChange={(value) => { setDelay(value); setDelays(files.map(() => value)); }} /><label><span>{t("image.gif.colors")}</span><select value={colors} onChange={(event) => setColors(Number(event.target.value))}><option value={128}>{t("image.gif.small")}</option><option value={192}>{t("image.gif.balanced")}</option><option value={256}>{t("image.gif.sharp")}</option></select></label></div>
+    {preview && <div className="gif-result-preview"><img src={preview.url} alt={t("image.gif.previewAlt")} /><a className="result-download blue-download" href={preview.url} download={preview.fileName}><Download size={17} /> {t("image.gif.download")}</a></div>}
+    <div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><Sparkles size={18} /> {t("image.gif.create")}</PrimaryButton></div>
+  </SectionCard>;
 }
 
 function ToolButton({ active, label, onClick, children }: { active: boolean; label: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" className={active ? "active" : ""} aria-pressed={active} onClick={onClick}>{children}<span>{label}</span></button>; }
@@ -689,13 +759,16 @@ function ClipboardHint({ mode }: { mode: "replace" | "append" }) {
 }
 
 function useClipboardImages(onImages: (files: File[]) => void) {
+  const { t } = useTranslation("features");
   const callbackRef = useRef(onImages);
   useEffect(() => { callbackRef.current = onImages; }, [onImages]);
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true'], [role='textbox']")) return;
       const pasted = Array.from(event.clipboardData?.items || [])
         .filter((item) => item.kind === "file" && /^(?:image\/(?:png|jpeg|webp))$/i.test(item.type))
-        .map((item, index) => item.getAsFile() ? clipboardFile(item.getAsFile() as File, index) : undefined)
+        .map((item, index) => item.getAsFile() ? clipboardFile(item.getAsFile() as File, index, t("image.common.clipboardPrefix")) : undefined)
         .filter((file): file is File => Boolean(file));
       if (!pasted.length) return;
       event.preventDefault();
@@ -703,36 +776,12 @@ function useClipboardImages(onImages: (files: File[]) => void) {
     };
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, []);
+  }, [t]);
 }
 
-function clipboardFile(source: File, index: number) {
+function clipboardFile(source: File, index: number, prefix: string) {
   const extension = source.type === "image/jpeg" ? "jpg" : source.type === "image/webp" ? "webp" : "png";
-  const prefix = document.documentElement.lang === "en" ? "clipboard" : "클립보드";
   return new File([source], `${prefix}-${new Date().toISOString().replace(/[:.]/g, "-")}-${index + 1}.${extension}`, { type: source.type, lastModified: Date.now() });
-}
-
-function calculatePreviewLayout(bitmaps: Array<{ width: number; height: number }>, options: CollageOptions, t: TFunction<"features">) {
-  const width = Math.max(1, Math.round(options.width));
-  const gap = Math.max(0, Math.round(options.gap));
-  if (options.layout === "vertical") {
-    const heights = bitmaps.map((bitmap) => Math.max(1, Math.round(bitmap.height * width / bitmap.width)));
-    let y = 0;
-    const cells = heights.map((height) => { const cell = { x: 0, y, width, height }; y += height + gap; return cell; });
-    return { width, height: Math.max(1, y - gap), cells };
-  }
-  if (options.layout === "horizontal") {
-    if (width - gap * (bitmaps.length - 1) < bitmaps.length) throw new Error(t("image.collage.sizeError"));
-    const cellWidth = Math.max(1, Math.floor((width - gap * (bitmaps.length - 1)) / bitmaps.length));
-    const height = Math.max(...bitmaps.map((bitmap) => Math.max(1, Math.round(bitmap.height * cellWidth / bitmap.width))));
-    return { width, height, cells: bitmaps.map((_, index) => ({ x: index * (cellWidth + gap), y: 0, width: cellWidth, height })) };
-  }
-  const columns = Math.max(1, Math.min(Math.round(options.columns), bitmaps.length));
-  if (width - gap * (columns - 1) < columns) throw new Error(t("image.collage.columnError"));
-  const rows = Math.ceil(bitmaps.length / columns);
-  const cellWidth = Math.floor((width - gap * (columns - 1)) / columns);
-  const cellHeight = Math.max(1, Math.round(cellWidth * 0.75));
-  return { width, height: rows * cellHeight + (rows - 1) * gap, cells: bitmaps.map((_, index) => ({ x: (index % columns) * (cellWidth + gap), y: Math.floor(index / columns) * (cellHeight + gap), width: cellWidth, height: cellHeight })) };
 }
 
 function calculatePreviewScale(width: number, height: number) {
@@ -768,5 +817,13 @@ function fabricColorToHex(value: FabricObject["fill"] | FabricObject["stroke"], 
 
 function stripExtension(name: string) { return name.replace(/\.[^.]+$/, ""); }
 function filterRasterImages(files: File[]) { return files.filter((file) => /^(image\/(?:jpeg|png|webp))$/i.test(file.type) || /\.(?:jpe?g|png|webp)$/i.test(file.name)); }
-function normalizePanelError(error: unknown, t: TFunction<"features">) { return error instanceof DOMException && error.name === "AbortError" ? t("image.common.cancelled") : error instanceof Error ? error.message : t("image.common.failed"); }
-function downloadWorkerResult(result: import("./types").ImageWorkerResult) { const url = URL.createObjectURL(new Blob([result.buffer], { type: result.mimeType })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = result.fileName; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 0); }
+function normalizePanelError(error: unknown, t: TFunction<"features">) {
+  if (error instanceof DOMException && error.name === "AbortError") return t("image.common.cancelled");
+  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  if (code === "COLLAGE_SIZE") return t("image.collage.sizeError");
+  if (code === "COLLAGE_COLUMNS") return t("image.collage.columnError");
+  if (error instanceof CollageLayoutError) return error.code === "COLLAGE_SIZE" ? t("image.collage.sizeError") : t("image.collage.columnError");
+  return error instanceof Error && error.message ? error.message : t("image.common.failed");
+}
+function downloadWorkerResult(result: import("./types").ImageWorkerResult) { const url = URL.createObjectURL(new Blob([result.buffer], { type: result.mimeType })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = result.fileName; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 15_000); }
+function moveItem<T>(items: T[], from: number, to: number) { const next = [...items]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next; }

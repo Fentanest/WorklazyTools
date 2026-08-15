@@ -8,6 +8,11 @@ import xml.etree.ElementTree as ET
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 TOKEN_PATTERN = re.compile(r"\s+|[\w]+|[^\w\s]", re.UNICODE)
+LANGUAGE = "ko"
+
+
+def _l(korean, english):
+    return english if LANGUAGE == "en" else korean
 
 
 def _word_attribute(element, name, default=None):
@@ -313,7 +318,7 @@ def _parse_document(data, include_tables, include_metadata):
             for child in _iter_story_blocks(body):
                 if child.tag == W + "p":
                     paragraph_index += 1
-                    record = _paragraph_record(child, "body", f"본문 {paragraph_index}번째 문단", numbering)
+                    record = _paragraph_record(child, "body", _l(f"본문 {paragraph_index}번째 문단", f"Body paragraph {paragraph_index}"), numbering)
                     comment_ids = _paragraph_comment_ids(child)
                     record["comments"] = [comments[item] for item in comment_ids if item in comments]
                     for comment_id in comment_ids:
@@ -341,7 +346,7 @@ def _parse_document(data, include_tables, include_metadata):
                                         comment_ids.append(comment_id)
                             record = {
                                 "section": "table",
-                                "location": f"표 {table_index} · {row_index}행 {cell_index}열",
+                                "location": _l(f"표 {table_index} · {row_index}행 {cell_index}열", f"Table {table_index} · row {row_index}, column {cell_index}"),
                                 "text": text,
                                 "displayText": display_text,
                                 "listLabel": list_labels,
@@ -375,14 +380,14 @@ def _parse_document(data, include_tables, include_metadata):
                 story_numbering = numbering.fresh()
                 metadata_root = ET.fromstring(archive.read(path))
                 file_name = path.split("/")[-1]
-                area = "머리말" if file_name.startswith("header") else "꼬리말"
+                area = _l("머리말", "Header") if file_name.startswith("header") else _l("꼬리말", "Footer")
                 area_number = re.search(r"\d+", file_name)
                 label = f"{area} {area_number.group(0)}" if area_number else area
                 for index, paragraph in enumerate(metadata_root.iter(W + "p"), 1):
                     record = _paragraph_record(
                         paragraph,
                         "headerFooter",
-                        f"{label} · {index}번째 문단",
+                        _l(f"{label} · {index}번째 문단", f"{label} · paragraph {index}"),
                         story_numbering,
                     )
                     if record["text"] or record["format"]:
@@ -390,17 +395,17 @@ def _parse_document(data, include_tables, include_metadata):
 
             for comment_id, comment in comments.items():
                 author_label = f" · {comment['author']}" if comment["author"] else ""
-                anchor_location = comment_locations.get(comment_id, "연결 위치를 찾지 못한 문단")
+                anchor_location = comment_locations.get(comment_id, _l("연결 위치를 찾지 못한 문단", "Paragraph with unknown anchor"))
                 records["comment"].append({
                     "section": "comment",
-                    "location": f"{anchor_location} · 메모 {comment_id}{author_label}",
+                    "location": _l(f"{anchor_location} · 메모 {comment_id}{author_label}", f"{anchor_location} · comment {comment_id}{author_label}"),
                     "text": comment["text"],
                     "format": comment["format"],
                 })
 
             for path, note_name, element_name in (
-                ("word/footnotes.xml", "각주", "footnote"),
-                ("word/endnotes.xml", "미주", "endnote"),
+                ("word/footnotes.xml", _l("각주", "Footnote"), "footnote"),
+                ("word/endnotes.xml", _l("미주", "Endnote"), "endnote"),
             ):
                 if path not in archive.namelist():
                     continue
@@ -417,7 +422,7 @@ def _parse_document(data, include_tables, include_metadata):
                         record = _paragraph_record(
                             paragraph,
                             "note",
-                            f"{note_name} {note_id} · {paragraph_index}번째 문단",
+                            _l(f"{note_name} {note_id} · {paragraph_index}번째 문단", f"{note_name} {note_id} · paragraph {paragraph_index}"),
                             story_numbering,
                         )
                         if record["text"] or record["format"]:
@@ -501,7 +506,7 @@ def _looks_like_paragraph_split(single_value, first_value, second_value):
     # Both child paragraphs must own a meaningful, non-overlapping part of the
     # source. This avoids folding an unrelated paragraph into an exact match.
     non_overlapping = prefix < len(single) - minimum_suffix // 2 and suffix < len(single) - minimum_prefix // 2
-    return prefix >= minimum_prefix and suffix >= minimum_suffix and covered >= 0.58 and non_overlapping
+    return prefix >= minimum_prefix and suffix >= minimum_suffix and covered >= PARAGRAPH_SPLIT_COVERAGE and non_overlapping
 
 
 def _combine_records(records):
@@ -527,68 +532,25 @@ def _combine_records(records):
 
 
 def _align_changed_items(before, after, text_of, compatible):
-    before_count = len(before)
-    after_count = len(after)
-    gap_cost = 0.58
-    costs = [[0.0] * (after_count + 1) for _ in range(before_count + 1)]
-    choices = [[""] * (after_count + 1) for _ in range(before_count + 1)]
-    for before_index in range(1, before_count + 1):
-        costs[before_index][0] = before_index * gap_cost
-        choices[before_index][0] = "delete"
-    for after_index in range(1, after_count + 1):
-        costs[0][after_index] = after_index * gap_cost
-        choices[0][after_index] = "insert"
+    def similarity(old, new):
+        if not compatible(old, new):
+            return -1.0
+        return difflib.SequenceMatcher(
+            None,
+            _normalize_split_text(text_of(old)),
+            _normalize_split_text(text_of(new)),
+            autojunk=False,
+        ).ratio()
 
-    for before_index in range(1, before_count + 1):
-        for after_index in range(1, after_count + 1):
-            old = before[before_index - 1]
-            new = after[after_index - 1]
-            similarity = difflib.SequenceMatcher(
-                None,
-                _normalize_split_text(text_of(old)),
-                _normalize_split_text(text_of(new)),
-                autojunk=False,
-            ).ratio() if compatible(old, new) else -1.0
-            match_cost = 1.0 - similarity if similarity >= 0 else gap_cost * 2 + 0.1
-            candidates = (
-                (costs[before_index - 1][after_index - 1] + match_cost, "match"),
-                (costs[before_index - 1][after_index] + gap_cost, "delete"),
-                (costs[before_index][after_index - 1] + gap_cost, "insert"),
-            )
-            costs[before_index][after_index], choices[before_index][after_index] = min(
-                candidates,
-                key=lambda item: (item[0], 0 if item[1] == "match" else 1),
-            )
-
-    groups = []
-    before_index = before_count
-    after_index = after_count
-    while before_index > 0 or after_index > 0:
-        choice = choices[before_index][after_index]
-        if choice == "match":
-            old = before[before_index - 1]
-            new = after[after_index - 1]
-            similarity = difflib.SequenceMatcher(
-                None,
-                _normalize_split_text(text_of(old)),
-                _normalize_split_text(text_of(new)),
-                autojunk=False,
-            ).ratio() if compatible(old, new) else 0.0
-            if similarity >= 0.24:
-                groups.append(([old], [new]))
-            else:
-                groups.append(([], [new]))
-                groups.append(([old], []))
-            before_index -= 1
-            after_index -= 1
-        elif choice == "delete":
-            groups.append(([before[before_index - 1]], []))
-            before_index -= 1
-        else:
-            groups.append(([], [after[after_index - 1]]))
-            after_index -= 1
-    groups.reverse()
-    return groups
+    return [
+        (
+            [before[before_index]] if before_index is not None else [],
+            [after[after_index]] if after_index is not None else [],
+        )
+        for before_index, after_index in align_dynamic_indices(
+            before, after, similarity, ALIGNMENT_GAP_COST, ALIGNMENT_MATCH_THRESHOLD
+        )
+    ]
 
 
 def _initial_record_groups(before, after, before_keys, after_keys, text_of=_display_text, compatible=lambda old, new: True):
@@ -712,10 +674,45 @@ def _view_record_key(record, include_formatting):
 
 def _align_comments(before, after):
     pairs = []
-    pair_count = min(len(before), len(after))
-    for index in range(pair_count):
-        old = before[index]
-        new = after[index]
+    unmatched_after = set(range(len(after)))
+    matched = []
+    for old in before:
+        old_id = old.get("id", "")
+        match_index = next((index for index in unmatched_after if old_id and after[index].get("id", "") == old_id), None)
+        if match_index is None and unmatched_after:
+            scored = []
+            for index in unmatched_after:
+                new = after[index]
+                score = difflib.SequenceMatcher(None, old.get("text", ""), new.get("text", ""), autojunk=False).ratio()
+                if old.get("author", "") and old.get("author", "") == new.get("author", ""):
+                    score += 0.2
+                scored.append((score, index))
+            score, candidate = max(scored)
+            match_index = candidate if score >= 0.45 else None
+        if match_index is None:
+            matched.append((old, None))
+        else:
+            unmatched_after.remove(match_index)
+            matched.append((old, after[match_index]))
+    matched.extend((None, after[index]) for index in sorted(unmatched_after))
+
+    for old, new in matched:
+        if old is None:
+            pairs.append({
+                "kind": "added", "beforeId": "", "afterId": new.get("id", ""),
+                "beforeAuthor": "", "afterAuthor": new.get("author", ""),
+                "before": "", "after": new.get("text", ""),
+                "segments": _segments("", new.get("text", "")),
+            })
+            continue
+        if new is None:
+            pairs.append({
+                "kind": "deleted", "beforeId": old.get("id", ""), "afterId": "",
+                "beforeAuthor": old.get("author", ""), "afterAuthor": "",
+                "before": old.get("text", ""), "after": "",
+                "segments": _segments(old.get("text", ""), ""),
+            })
+            continue
         unchanged = old.get("author", "") == new.get("author", "") and old.get("text", "") == new.get("text", "")
         pairs.append({
             "kind": "unchanged" if unchanged else "changed",
@@ -726,28 +723,6 @@ def _align_comments(before, after):
             "before": old.get("text", ""),
             "after": new.get("text", ""),
             "segments": _segments(old.get("text", ""), new.get("text", "")),
-        })
-    for old in before[pair_count:]:
-        pairs.append({
-            "kind": "deleted",
-            "beforeId": old.get("id", ""),
-            "afterId": "",
-            "beforeAuthor": old.get("author", ""),
-            "afterAuthor": "",
-            "before": old.get("text", ""),
-            "after": "",
-            "segments": _segments(old.get("text", ""), ""),
-        })
-    for new in after[pair_count:]:
-        pairs.append({
-            "kind": "added",
-            "beforeId": "",
-            "afterId": new.get("id", ""),
-            "beforeAuthor": "",
-            "afterAuthor": new.get("author", ""),
-            "before": "",
-            "after": new.get("text", ""),
-            "segments": _segments("", new.get("text", "")),
         })
     return pairs
 
@@ -999,8 +974,8 @@ def _document_table_view(table_result):
         "section": "table",
         "blockType": "table",
         "tableIndex": table_result["index"],
-        "beforeLocation": f"표 {before_index + 1}" if before_index is not None else "",
-        "afterLocation": f"표 {after_index + 1}" if after_index is not None else "",
+        "beforeLocation": _l(f"표 {before_index + 1}", f"Table {before_index + 1}") if before_index is not None else "",
+        "afterLocation": _l(f"표 {after_index + 1}", f"Table {after_index + 1}") if after_index is not None else "",
         "before": "",
         "after": "",
         "segments": [],
@@ -1071,9 +1046,13 @@ def _align_document_blocks(before_blocks, after_blocks, table_results, include_f
             continue
 
         if len(before_group) == 1 and len(after_group) == 1 and before_group[0]["type"] == after_group[0]["type"] == "table":
-            table = before_tables.get(before_group[0]["tableIndex"]) or after_tables.get(after_group[0]["tableIndex"])
-            if table:
-                result.append(_document_table_view(table))
+            before_table = before_tables.get(before_group[0]["tableIndex"])
+            after_table = after_tables.get(after_group[0]["tableIndex"])
+            if before_table and after_table and before_table["index"] != after_table["index"]:
+                result.append(_document_table_view(before_table))
+                result.append(_document_table_view(after_table))
+            elif before_table or after_table:
+                result.append(_document_table_view(before_table or after_table))
             continue
 
         for block in before_group:
@@ -1088,7 +1067,9 @@ def _align_document_blocks(before_blocks, after_blocks, table_results, include_f
     return result
 
 
-def compare_documents(before_bytes, after_bytes, before_name, after_name, include_formatting, include_tables, include_metadata):
+def compare_documents(before_bytes, after_bytes, before_name, after_name, include_formatting, include_tables, include_metadata, language="ko"):
+    global LANGUAGE
+    LANGUAGE = "en" if language == "en" else "ko"
     before_bytes = bytes(before_bytes)
     after_bytes = bytes(after_bytes)
     before_records = _parse_document(before_bytes, include_tables, include_metadata)
@@ -1125,10 +1106,10 @@ def compare_documents(before_bytes, after_bytes, before_name, after_name, includ
     for change in all_changes:
         summary[change["kind"]] += 1
 
-    warnings = ["필드 계산 결과, 도형과 일부 고급 레이아웃은 Microsoft Word의 표시와 차이가 날 수 있습니다."]
+    warnings = [_l("필드 계산 결과, 도형과 일부 고급 레이아웃은 Microsoft Word의 표시와 차이가 날 수 있습니다.", "Calculated fields, shapes, and some advanced layouts may differ from Microsoft Word's display.")]
     unresolved_numbering = before_records.get("warnings", 0) + after_records.get("warnings", 0)
     if unresolved_numbering:
-        warnings.append(f"정의를 찾지 못한 자동 번호 {unresolved_numbering}개는 번호 없이 표시했습니다.")
+        warnings.append(_l(f"정의를 찾지 못한 자동 번호 {unresolved_numbering}개는 번호 없이 표시했습니다.", f"Displayed {unresolved_numbering} automatic numbers without labels because their definitions were unavailable."))
 
     result = {
         "beforeName": before_name,

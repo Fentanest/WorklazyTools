@@ -1,17 +1,19 @@
 /// <reference lib="webworker" />
 
 import JSZip from "jszip";
-import { degrees, PDFDocument } from "pdf-lib";
+import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 import type {
   PdfPagePlan,
   PdfWorkerInput,
   PdfWorkerResult,
 } from "./types";
+import { ensurePdfExtension as ensureExtension, normalizePdfRotation as normalizeRotation, pdfBinaryResult as binaryResult, sanitizePdfFileName as sanitizeFileName } from "./pdfShared";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 let currentLanguage: "ko" | "en" = "ko";
 const L = (ko: string, en: string) => currentLanguage === "ko" ? ko : en;
+interface PdfDecorationOptions { watermarkImage?: ArrayBuffer; pageNumbers?: boolean }
 
 worker.onmessage = async (event: MessageEvent) => {
   try {
@@ -38,6 +40,7 @@ async function mergePages(data: {
   inputs: PdfWorkerInput[];
   pages: PdfPagePlan[];
   fileName: string;
+  options?: PdfDecorationOptions;
 }): Promise<PdfWorkerResult> {
   if (!data.pages.length) throw new PdfWorkerError(L("내보낼 페이지가 없습니다.", "There are no pages to export."), "NO_PAGES");
   progress(4, L("원본 PDF를 읽는 중…", "Reading source PDFs…"));
@@ -47,8 +50,8 @@ async function mergePages(data: {
     sources.set(input.id, await loadPdf(input.buffer));
     progress(8 + ((index + 1) / data.inputs.length) * 22, L(`[${index + 1}/${data.inputs.length}] ${input.name} 준비 완료`, `[${index + 1}/${data.inputs.length}] ${input.name} ready`));
   }
-
   const output = await PDFDocument.create();
+  copyDocumentMetadata(data.pages[0] ? sources.get(data.pages[0].sourceId) : undefined, output);
   for (let index = 0; index < data.pages.length; index += 1) {
     const plan = data.pages[index];
     const source = sources.get(plan.sourceId);
@@ -59,6 +62,7 @@ async function mergePages(data: {
     output.addPage(copied);
     progress(30 + ((index + 1) / data.pages.length) * 58, L(`[${index + 1}/${data.pages.length}] 페이지 배치 중…`, `[${index + 1}/${data.pages.length}] Placing page…`));
   }
+  await decoratePdf(output, data.options);
   progress(92, L("회전값과 페이지 순서를 PDF에 기록하는 중…", "Writing page order and rotations to the PDF…"));
   const bytes = await output.save({ useObjectStreams: true });
   return pdfResult(bytes, ensureExtension(data.fileName, "pdf"), [
@@ -71,6 +75,7 @@ async function exportGroups(data: {
   inputs: PdfWorkerInput[];
   groups: Array<{ fileName: string; pages: PdfPagePlan[] }>;
   archiveName: string;
+  options?: PdfDecorationOptions;
 }): Promise<PdfWorkerResult> {
   if (!data.groups.length) throw new PdfWorkerError(L("내보낼 PDF 그룹이 없습니다.", "There are no PDF groups to export."), "NO_GROUPS");
   if (data.groups.some((group) => !group.pages.length)) throw new PdfWorkerError(L("페이지가 없는 PDF 그룹이 있습니다.", "A PDF group contains no pages."), "EMPTY_GROUP");
@@ -83,7 +88,8 @@ async function exportGroups(data: {
       const groupProgress = (groupIndex + (pageIndex + 1) / group.pages.length) / data.groups.length;
       progress(23 + groupProgress * 62, L(`[${groupIndex + 1}/${data.groups.length}] ${group.fileName} · ${pageIndex + 1}/${group.pages.length}페이지 구성 중…`, `[${groupIndex + 1}/${data.groups.length}] ${group.fileName} · building page ${pageIndex + 1}/${group.pages.length}…`));
     });
-    archive.file(ensureExtension(sanitizeFileName(group.fileName), "pdf"), await output.save({ useObjectStreams: true }));
+    await decoratePdf(output, data.options);
+    archive.file(ensureExtension(sanitizeFileName(group.fileName, L("분할-PDF", "split-PDF")), "pdf"), await output.save({ useObjectStreams: true }));
   }
   progress(88, L(`${data.groups.length}개 PDF를 ZIP으로 묶는 중…`, `Packing ${data.groups.length} PDFs into a ZIP…`));
   const bytes = await archive.generateAsync(
@@ -94,6 +100,33 @@ async function exportGroups(data: {
     L("디지털 서명은 PDF를 수정하면 유효하지 않게 됩니다.", "Editing a PDF invalidates its digital signatures."),
     L("양식, 책갈피, 첨부 파일과 일부 고급 PDF 개체는 페이지 복사 과정에서 보존되지 않을 수 있습니다.", "Forms, bookmarks, attachments, and some advanced PDF objects may not survive page copying."),
   ]);
+}
+
+async function decoratePdf(document: PDFDocument, options?: PdfDecorationOptions) {
+  if (!options?.pageNumbers && !options?.watermarkImage) return;
+  const font = options.pageNumbers ? await document.embedFont(StandardFonts.Helvetica) : undefined;
+  const watermark = options.watermarkImage ? await document.embedPng(options.watermarkImage) : undefined;
+  const pages = document.getPages();
+  pages.forEach((page, index) => {
+    const { width, height } = page.getSize();
+    if (watermark) {
+      const targetWidth = Math.min(width * 0.72, watermark.width * 0.55);
+      const targetHeight = targetWidth * watermark.height / watermark.width;
+      page.drawImage(watermark, {
+        x: (width - targetWidth) / 2,
+        y: (height - targetHeight) / 2,
+        width: targetWidth,
+        height: targetHeight,
+        rotate: degrees(-32),
+        opacity: 0.2,
+      });
+    }
+    if (font) {
+      const label = `${index + 1} / ${pages.length}`;
+      const size = 9;
+      page.drawText(label, { x: (width - font.widthOfTextAtSize(label, size)) / 2, y: 12, size, font, color: rgb(0.35, 0.35, 0.38), opacity: 0.9 });
+    }
+  });
 }
 
 async function loadSources(inputs: PdfWorkerInput[], progressStart: number, progressSize: number) {
@@ -112,6 +145,7 @@ async function createPlannedPdf(
   onPage?: (pageIndex: number) => void,
 ) {
   const output = await PDFDocument.create();
+  copyDocumentMetadata(pages[0] ? sources.get(pages[0].sourceId) : undefined, output);
   for (let index = 0; index < pages.length; index += 1) {
     const plan = pages[index];
     const source = sources.get(plan.sourceId);
@@ -128,15 +162,17 @@ async function buildImagePdf(data: {
   inputs: PdfWorkerInput[];
   pageMode: "a4" | "image";
   fileName: string;
+  options?: PdfDecorationOptions;
 }): Promise<PdfWorkerResult> {
   if (!data.inputs.length) throw new PdfWorkerError(L("변환할 이미지가 없습니다.", "There are no images to convert."), "NO_IMAGES");
   const output = await PDFDocument.create();
   for (let index = 0; index < data.inputs.length; index += 1) {
     const input = data.inputs[index];
-    const extension = getExtension(input.name);
-    const image = extension === "png"
-      ? await output.embedPng(input.buffer)
-      : await output.embedJpg(input.buffer);
+    const imageType = detectImageType(input.buffer);
+    if (!imageType) throw new PdfWorkerError(L(`${input.name}: JPG 또는 PNG 이미지가 아닙니다.`, `${input.name}: this is not a JPG or PNG image.`), "UNSUPPORTED_IMAGE");
+    let image;
+    try { image = imageType === "png" ? await output.embedPng(input.buffer) : await output.embedJpg(input.buffer); }
+    catch { throw new PdfWorkerError(L(`${input.name}: 이미지가 손상되었거나 읽을 수 없습니다.`, `${input.name}: the image is damaged or unreadable.`), "INVALID_IMAGE"); }
     const originalWidth = image.width * 0.75;
     const originalHeight = image.height * 0.75;
     let pageWidth = originalWidth;
@@ -160,7 +196,10 @@ async function buildImagePdf(data: {
     page.drawImage(image, { x, y, width, height });
     progress(8 + ((index + 1) / data.inputs.length) * 82, L(`[${index + 1}/${data.inputs.length}] ${input.name} 배치 완료`, `[${index + 1}/${data.inputs.length}] ${input.name} placed`));
   }
-  return pdfResult(await output.save(), ensureExtension(data.fileName, "pdf"), []);
+  await decoratePdf(output, data.options);
+  return pdfResult(await output.save({ useObjectStreams: true }), ensureExtension(data.fileName, "pdf"), [
+    L("이미지 기반 압축은 페이지를 다시 그리므로 검색 가능한 텍스트, 링크, 양식과 디지털 서명이 보존되지 않습니다.", "Image-based compression redraws pages, so searchable text, links, forms, and digital signatures are not preserved."),
+  ]);
 }
 
 async function combineOcrPdfs(data: { buffers: ArrayBuffer[]; fileName: string }): Promise<PdfWorkerResult> {
@@ -192,32 +231,29 @@ function pdfResult(bytes: Uint8Array, fileName: string, warnings: string[]) {
   return binaryResult(bytes, fileName, "application/pdf", warnings);
 }
 
-function binaryResult(bytes: Uint8Array | ArrayBuffer, fileName: string, mimeType: string, warnings: string[]): PdfWorkerResult {
-  const buffer = bytes instanceof ArrayBuffer
-    ? bytes
-    : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  return { buffer, fileName, mimeType, warnings };
+function detectImageType(buffer: ArrayBuffer): "png" | "jpeg" | undefined {
+  const bytes = new Uint8Array(buffer, 0, Math.min(buffer.byteLength, 12));
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) return "png";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpeg";
+  return undefined;
 }
 
-function getExtension(name: string) {
-  return name.split(".").pop()?.toLowerCase() || "";
-}
-
-function stripExtension(name: string) {
-  return name.replace(/\.[^.]+$/, "");
-}
-
-function ensureExtension(name: string, extension: string) {
-  const base = stripExtension(name.trim()) || "worklazy-result";
-  return `${base}.${extension}`;
-}
-
-function sanitizeFileName(name: string) {
-  return name.trim().replace(/[\\/:*?"<>|]+/g, "-") || L("분할-PDF", "split-PDF");
-}
-
-function normalizeRotation(value: number) {
-  return ((value % 360) + 360) % 360;
+function copyDocumentMetadata(source: PDFDocument | undefined, output: PDFDocument) {
+  if (!source) return;
+  const values = [
+    [source.getTitle(), (value: string) => output.setTitle(value)],
+    [source.getAuthor(), (value: string) => output.setAuthor(value)],
+    [source.getSubject(), (value: string) => output.setSubject(value)],
+    [source.getCreator(), (value: string) => output.setCreator(value)],
+    [source.getProducer(), (value: string) => output.setProducer(value)],
+  ] as const;
+  values.forEach(([value, setter]) => { if (value) setter(value); });
+  const keywords = source.getKeywords();
+  if (keywords) output.setKeywords(keywords.split(/[,;]\s*/).filter(Boolean));
+  const created = source.getCreationDate();
+  const modified = source.getModificationDate();
+  if (created) output.setCreationDate(created);
+  if (modified) output.setModificationDate(modified);
 }
 
 class PdfWorkerError extends Error {

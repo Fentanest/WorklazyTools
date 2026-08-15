@@ -1,3 +1,8 @@
+import enTools from "../locales/en/tools.json" with { type: "json" };
+import enSeo from "../locales/en/seo.json" with { type: "json" };
+import koSeo from "../locales/ko/seo.json" with { type: "json" };
+import { stripLanguagePrefix, type AppLanguage } from "../i18n/languages.ts";
+
 export interface SeoDefinition {
   title: string;
   description: string;
@@ -225,7 +230,3 @@ export function getSocialImageUrl(language: AppLanguage) {
 function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
 }
-import enTools from "../locales/en/tools.json";
-import enSeo from "../locales/en/seo.json";
-import koSeo from "../locales/ko/seo.json";
-import { stripLanguagePrefix, type AppLanguage } from "../i18n/languages";

@@ -1,4 +1,5 @@
 import { Check, Clock3, Globe2, LocateFixed, Moon, Search, Sun, X } from "lucide-react";
+import type { TFunction } from "i18next";
 import { DateTime } from "luxon";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +24,7 @@ export function TimezoneCalculatorPage() {
   const [notice, setNotice] = useState("");
   const baseCity = CITY_BY_ID.get(baseCityId) ?? WORLD_CITIES[0];
   const base = DateTime.fromISO(`${date}T${time}`, { zone: baseCity.zone }).setLocale(language);
+  const daylightSavingAdjusted = base.isValid && base.toFormat("yyyy-MM-dd HH:mm") !== `${date} ${time}`;
   const selectedCities = selectedIds.flatMap((id) => {
     const city = CITY_BY_ID.get(id);
     return city ? [city] : [];
@@ -80,6 +82,7 @@ export function TimezoneCalculatorPage() {
         </div>
         <div className="timezone-current-action"><button type="button" className="secondary-button" onClick={useCurrentTime}><LocateFixed size={16} /> {t("timezone.current")}</button></div>
         {!base.isValid && <p className="utility-error">{t("timezone.invalid")}</p>}
+        {daylightSavingAdjusted && <p className="timezone-selection-notice" role="status">{t("timezone.adjusted", { time: base.toFormat("HH:mm") })}</p>}
       </SectionCard>
 
       <SectionCard title={t("timezone.selectTitle")} description={t("timezone.selectHelp", { total: WORLD_CITIES.length, limit: SELECTION_LIMIT })}>
@@ -151,7 +154,10 @@ function findMeetingSlots(date: string, baseCity: WorldCity, cities: WorldCity[]
   if (cities.length < 2) return [];
   const start = DateTime.fromISO(`${date}T00:00`, { zone: baseCity.zone }).setLocale(language);
   if (!start.isValid) return [];
-  return Array.from({ length: 48 }, (_, index) => start.plus({ minutes: index * 30 }))
+  const end = start.plus({ days: 1 });
+  const points: DateTime[] = [];
+  for (let point = start; point < end; point = point.plus({ minutes: 30 })) points.push(point);
+  return points
     .filter((point) => cities.every((city) => {
       const local = point.setZone(city.zone);
       const hour = local.hour + local.minute / 60;
@@ -164,19 +170,19 @@ function findMeetingSlots(date: string, baseCity: WorldCity, cities: WorldCity[]
     }));
 }
 
-function formatDayShift(base: DateTime, local: DateTime, t: (key: never, options?: Record<string, unknown>) => string) {
+function formatDayShift(base: DateTime, local: DateTime, t: TFunction<"features">) {
   const baseDay = Date.UTC(base.year, base.month - 1, base.day);
   const localDay = Date.UTC(local.year, local.month - 1, local.day);
   const difference = Math.round((localDay - baseDay) / 86_400_000);
-  if (difference === 0) return t("timezone.day.same" as never);
-  if (difference === 1) return t("timezone.day.next" as never);
-  if (difference === -1) return t("timezone.day.previous" as never);
-  return difference > 0 ? t("timezone.day.after" as never, { count: difference }) : t("timezone.day.before" as never, { count: Math.abs(difference) });
+  if (difference === 0) return t("timezone.day.same");
+  if (difference === 1) return t("timezone.day.next");
+  if (difference === -1) return t("timezone.day.previous");
+  return difference > 0 ? t("timezone.day.after", { count: difference }) : t("timezone.day.before", { count: Math.abs(difference) });
 }
 
-function formatTimeDifference(base: DateTime, local: DateTime, t: (key: never, options?: Record<string, unknown>) => string) {
+function formatTimeDifference(base: DateTime, local: DateTime, t: TFunction<"features">) {
   const hours = (local.offset - base.offset) / 60;
-  if (hours === 0) return t("timezone.difference.same" as never);
+  if (hours === 0) return t("timezone.difference.same");
   const amount = Number.isInteger(hours) ? Math.abs(hours).toString() : Math.abs(hours).toFixed(1);
-  return t(hours > 0 ? "timezone.difference.ahead" as never : "timezone.difference.behind" as never, { hours: amount });
+  return t(hours > 0 ? "timezone.difference.ahead" : "timezone.difference.behind", { hours: amount });
 }

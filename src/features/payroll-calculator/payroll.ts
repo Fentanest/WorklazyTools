@@ -28,18 +28,18 @@ export function calculateNetPay(monthlySalary: number, dependents: number, child
   return { pension, health, longTermCare, employment, incomeTax, localTax, deductions, net: Math.max(0, monthlySalary - deductions) };
 }
 
-function estimateMonthlyIncomeTax(monthly: number, dependents: number, children: number) {
+export function estimateMonthlyIncomeTax(monthly: number, dependents: number, children: number) {
   const gross = monthly * 12;
-  const earnedDeduction = gross <= 5_000_000 ? gross * 0.7 : gross <= 15_000_000 ? 3_500_000 + (gross - 5_000_000) * 0.4 : gross <= 45_000_000 ? 7_500_000 + (gross - 15_000_000) * 0.15 : gross <= 100_000_000 ? 12_000_000 + (gross - 45_000_000) * 0.05 : 14_750_000 + (gross - 100_000_000) * 0.02;
+  const earnedDeduction = Math.min(20_000_000, gross <= 5_000_000 ? gross * 0.7 : gross <= 15_000_000 ? 3_500_000 + (gross - 5_000_000) * 0.4 : gross <= 45_000_000 ? 7_500_000 + (gross - 15_000_000) * 0.15 : gross <= 100_000_000 ? 12_000_000 + (gross - 45_000_000) * 0.05 : 14_750_000 + (gross - 100_000_000) * 0.02);
   const personal = dependents * 1_500_000;
   const pensionDeduction = Math.min(PAYROLL_STANDARD.pensionMaxBase, Math.max(PAYROLL_STANDARD.pensionMinBase, monthly)) * PAYROLL_STANDARD.pensionEmployeeRate * 12;
   const simplifiedSpecial = dependents === 1 ? 3_100_000 + gross * 0.04 : dependents === 2 ? 3_600_000 + gross * 0.04 : 5_000_000 + gross * 0.07;
   const base = Math.max(0, gross - earnedDeduction - personal - pensionDeduction - simplifiedSpecial);
   const calculated = progressiveTax(base);
-  const creditRate = calculated <= 1_300_000 ? 0.55 : 0.3;
+  const calculatedCredit = calculated <= 1_300_000 ? calculated * 0.55 : 715_000 + (calculated - 1_300_000) * 0.3;
   const creditCap = gross <= 33_000_000 ? 740_000 : gross <= 70_000_000 ? Math.max(660_000, 740_000 - (gross - 33_000_000) * 0.008) : Math.max(500_000, 660_000 - (gross - 70_000_000) * 0.005);
   const childCredit = children <= 0 ? 0 : children === 1 ? 250_000 : children === 2 ? 550_000 : 550_000 + (children - 2) * 400_000;
-  return Math.max(0, calculated - Math.min(calculated * creditRate, creditCap) - childCredit) / 12;
+  return Math.max(0, calculated - Math.min(calculatedCredit, creditCap) - childCredit) / 12;
 }
 
 function progressiveTax(base: number) {

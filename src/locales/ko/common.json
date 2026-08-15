@@ -29,9 +29,16 @@
     "terms": "이용약관",
     "licenses": "라이선스·제3자 고지",
     "contact": "문의",
+    "consentSettings": "분석·광고 설정",
     "policyLabel": "정책 및 문의",
     "feedback": "문의·건의·버그 제보",
     "feedbackDescription": "GitHub Issues에 버그와 기능 제안 남기기"
+  },
+  "consent": {
+    "title": "방문 분석과 광고 사용 설정",
+    "description": "동의하면 Google·Naver 방문 분석과 광고 스크립트를 불러옵니다. 작업 파일과 도구 입력값은 분석 서비스로 보내지 않습니다.",
+    "reject": "필수 기능만 사용",
+    "accept": "동의하고 계속"
   },
   "privacy": {
     "mini": "파일·암호 전송 없이\n브라우저에서 처리",

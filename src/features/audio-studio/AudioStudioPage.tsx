@@ -71,6 +71,8 @@ export function AudioStudioPage() {
   const [exportSelection, setExportSelection] = useState(false);
   const [voicePreset, setVoicePreset] = useState<VoicePreset>("low");
   const [customPitch, setCustomPitch] = useState(0);
+  const voicePresetRef = useRef<VoicePreset>("low");
+  const customPitchRef = useRef(0);
   const [effectPreviewUrl, setEffectPreviewUrl] = useState("");
   const [lastResult, setLastResult] = useState("");
   const progress = useOperationProgress();
@@ -414,9 +416,12 @@ export function AudioStudioPage() {
     }
   };
 
-  const voiceEffectSettings = (): AudioVoiceEffectSettings => voicePreset === "robot"
-    ? { mode: "robot", semitones: 0 }
-    : { mode: "pitch", semitones: voicePreset === "custom" ? customPitch : VOICE_PRESET_PITCH[voicePreset] };
+  const voiceEffectSettings = (): AudioVoiceEffectSettings => {
+    const preset = voicePresetRef.current;
+    return preset === "robot"
+      ? { mode: "robot", semitones: 0 }
+      : { mode: "pitch", semitones: preset === "custom" ? customPitchRef.current : VOICE_PRESET_PITCH[preset] };
+  };
 
   const runVoiceEffect = async (previewOnly: boolean) => {
     const currentDocument = documentRef.current;
@@ -636,14 +641,14 @@ export function AudioStudioPage() {
             </div>
             <div className="audio-voice-presets" role="radiogroup" aria-label={t("audio.voice.presetsLabel")}>
               {(["low", "high", "child", "robot", "custom"] as const).map((preset) => (
-                <button key={preset} type="button" role="radio" aria-checked={voicePreset === preset} className={voicePreset === preset ? "active" : ""} disabled={busy} onClick={() => setVoicePreset(preset)}>
+                <button key={preset} type="button" role="radio" aria-checked={voicePreset === preset} className={voicePreset === preset ? "active" : ""} disabled={busy} onClick={() => { voicePresetRef.current = preset; setVoicePreset(preset); }}>
                   {preset === "robot" && <Bot size={17} />}{t(`audio.voice.presets.${preset}`)}
                 </button>
               ))}
             </div>
             <label className={`audio-pitch-control${voicePreset === "robot" ? " is-disabled" : ""}`}>
               <span><SlidersHorizontal size={17} /> {t("audio.voice.pitch")}</span>
-              <input type="range" min={-12} max={12} step={1} disabled={busy || voicePreset === "robot"} value={effectivePitch} onChange={(event) => { setVoicePreset("custom"); setCustomPitch(Number(event.target.value)); }} />
+              <input type="range" min={-12} max={12} step={1} disabled={busy || voicePreset === "robot"} value={effectivePitch} onChange={(event) => { const value = Number(event.target.value); voicePresetRef.current = "custom"; customPitchRef.current = value; setVoicePreset("custom"); setCustomPitch(value); }} />
               <output>{voicePreset === "robot" ? "—" : `${effectivePitch > 0 ? "+" : ""}${effectivePitch}`}</output>
             </label>
             <div className="inline-notice"><AlertTriangle size={16} /><span>{t("audio.voice.notice")}</span></div>
@@ -757,11 +762,11 @@ function formatTimelineLabel(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
 }
 
-function toAudioError(error: unknown, t: (key: never) => string) {
+function toAudioError(error: unknown, t: TFunction<"features">) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/decodeAudioData|Unable to decode|EncodingError/i.test(message)) return t("audio.errors.decode" as never);
-  if (/memory|allocation|out of bounds|Array buffer/i.test(message)) return t("audio.errors.memory" as never);
-  return message || t("audio.errors.generic" as never);
+  if (/decodeAudioData|Unable to decode|EncodingError/i.test(message)) return t("audio.errors.decode");
+  if (/memory|allocation|out of bounds|Array buffer/i.test(message)) return t("audio.errors.memory");
+  return message || t("audio.errors.generic");
 }
 
 function downloadAudio(buffer: ArrayBuffer, mimeType: string, fileName: string) {

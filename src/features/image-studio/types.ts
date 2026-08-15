@@ -40,8 +40,18 @@ export interface CollageOptions {
 export interface GifOptions {
   width: number;
   delay: number;
+  delays?: number[];
   qualityColors: number;
 }
 
 export type ImageWorkerProgress = (progress: number, message: string) => void;
 
+export type ImageWorkerRequest =
+  | { type: "batch"; inputs: ImageWorkerInput[]; options: BatchImageOptions; archiveName: string; language?: string }
+  | { type: "collage"; inputs: ImageWorkerInput[]; options: CollageOptions; fileName: string; language?: string }
+  | { type: "gif"; inputs: ImageWorkerInput[]; options: GifOptions; fileName: string; language?: string };
+
+export type ImageWorkerResponse =
+  | { type: "progress"; progress: number; message: string }
+  | { type: "result"; result: ImageWorkerResult }
+  | { type: "error"; error: { code: string; message?: string } };

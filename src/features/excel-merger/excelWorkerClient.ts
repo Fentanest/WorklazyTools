@@ -24,10 +24,16 @@ function runWorker<T>(
   transfer: Transferable[],
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
+  signal?: AbortSignal,
 ): Promise<T> {
   const worker = createExcelWorker();
 
   return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); worker.terminate(); return true; };
+    const abort = () => { if (finish()) reject(new DOMException(language === "en" ? "The spreadsheet merge was cancelled." : "스프레드시트 병합을 취소했습니다.", "AbortError")); };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) { abort(); return; }
     worker.onmessage = (event: MessageEvent) => {
       const data = event.data as {
         type: "progress" | "result" | "error";
@@ -42,7 +48,7 @@ function runWorker<T>(
         return;
       }
 
-      worker.terminate();
+      if (!finish()) return;
       if (data.type === "result") {
         resolve(data.result as T);
         return;
@@ -55,7 +61,7 @@ function runWorker<T>(
     };
 
     worker.onerror = (event) => {
-      worker.terminate();
+      if (!finish()) return;
       reject(new Error(event.message || (language === "en" ? "Could not start file processing." : "파일 처리를 시작하지 못했습니다.")));
     };
 
@@ -63,10 +69,10 @@ function runWorker<T>(
   });
 }
 
-export async function inspectExcelFiles(files: Array<{ id: string; file: File; password?: string }>, language: AppLanguage = "ko") {
+export async function inspectExcelFiles(files: Array<{ id: string; file: File; password?: string; csvEncoding?: ExcelInputPayload["csvEncoding"] }>, language: AppLanguage = "ko") {
   const payloads: ExcelInputPayload[] = [];
-  for (const { id, file, password } of files) {
-    payloads.push({ id, name: file.name, buffer: await file.arrayBuffer(), password });
+  for (const { id, file, password, csvEncoding } of files) {
+    payloads.push({ id, name: file.name, buffer: await file.arrayBuffer(), password, csvEncoding });
   }
   return runWorker<ExcelInspectionResult[]>(
     { type: "inspect", files: payloads, language },
@@ -77,14 +83,16 @@ export async function inspectExcelFiles(files: Array<{ id: string; file: File; p
 }
 
 export async function mergeExcelFiles(
-  files: Array<{ id: string; file: File; password?: string; selectedSheetNames: string[] }>,
+  files: Array<{ id: string; file: File; password?: string; selectedSheetNames: string[]; csvEncoding?: ExcelInputPayload["csvEncoding"] }>,
   options: ExcelMergeOptions,
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
+  signal?: AbortSignal,
 ) {
   const payloads: ExcelInputPayload[] = [];
-  for (const { id, file, password, selectedSheetNames } of files) {
-    payloads.push({ id, name: file.name, buffer: await file.arrayBuffer(), password, selectedSheetNames });
+  for (const { id, file, password, selectedSheetNames, csvEncoding } of files) {
+    if (signal?.aborted) throw new DOMException(language === "en" ? "The spreadsheet merge was cancelled." : "스프레드시트 병합을 취소했습니다.", "AbortError");
+    payloads.push({ id, name: file.name, buffer: await file.arrayBuffer(), password, selectedSheetNames, csvEncoding });
   }
 
   return runWorker<ExcelMergeResult>(
@@ -92,6 +100,7 @@ export async function mergeExcelFiles(
     payloads.map((file) => file.buffer),
     onProgress,
     language,
+    signal,
   );
 }
 
@@ -99,6 +108,6 @@ export function createWordExcelReport(result: WordCompareResult, onProgress?: Wo
   return runWorker<ArrayBuffer>({ type: "word-report", result, language }, [], onProgress, language);
 }
 
-export function createWordExcelReports(results: WordCompareResult[], onProgress?: WorkerProgress, language: AppLanguage = "ko") {
-  return runWorker<ArrayBuffer[]>({ type: "word-reports", results, language }, [], onProgress, language);
+export function createWordExcelReports(results: WordCompareResult[], onProgress?: WorkerProgress, language: AppLanguage = "ko", signal?: AbortSignal) {
+  return runWorker<ArrayBuffer[]>({ type: "word-reports", results, language }, [], onProgress, language, signal);
 }

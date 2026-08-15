@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 export interface GuideBlock {
   title: string;
   paragraphs?: string[];
@@ -42,4 +44,3 @@ export function ToolGuide({ title, description, blocks, faq }: {
     </section>
   );
 }
-import { useTranslation } from "react-i18next";

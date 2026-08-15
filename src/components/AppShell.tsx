@@ -7,7 +7,7 @@ import {
   MessageSquarePlus,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
@@ -17,17 +17,19 @@ import { useToolCatalog } from "../i18n/useToolCatalog";
 import { AdSenseLoader } from "./AdSenseLoader";
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
+import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
+import { GITHUB_ISSUES_URL } from "../constants/links";
 
 const primaryNavigation = [
   { to: "/", labelKey: "navigation.home", icon: Home, end: true },
   { to: "/tools", labelKey: "navigation.allTools", icon: Grid2X2, end: true },
   { to: "/about", labelKey: "navigation.about", icon: CircleHelp, end: true },
 ];
-const GITHUB_ISSUES_URL = "https://github.com/Fentanest/WorklazyTools/issues";
-
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileSheetRef = useRef<HTMLElement>(null);
   const { t } = useTranslation("common");
   const language = useAppLanguage();
   const { tools } = useToolCatalog();
@@ -40,6 +42,25 @@ export function AppShell() {
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const sheet = mobileSheetRef.current;
+    const focusable = () => Array.from(sheet?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []);
+    focusable()[0]?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setMobileMenuOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0]; const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => { document.removeEventListener("keydown", handleKeyDown); previousFocus?.focus(); };
+  }, [mobileMenuOpen]);
 
   return (
     <div className="app-shell">
@@ -115,9 +136,11 @@ export function AppShell() {
             <NavLink to={localizedPath(language, "/terms")}>{t("footer.terms")}</NavLink>
             <NavLink to={localizedPath(language, "/licenses")}>{t("footer.licenses")}</NavLink>
             <NavLink to={localizedPath(language, "/contact")}>{t("footer.contact")}</NavLink>
+            <button type="button" className="footer-link-button" onClick={resetPrivacyConsent}>{t("footer.consentSettings")}</button>
           </nav>
         </footer>
       </main>
+      <PrivacyConsentBanner />
 
       <nav className="bottom-tabs glass-bar" aria-label={t("navigation.mobileLabel")}>
         {primaryNavigation.map((item) => {
@@ -139,6 +162,7 @@ export function AppShell() {
       {mobileMenuOpen && (
         <div className="sheet-backdrop" role="presentation" onMouseDown={() => setMobileMenuOpen(false)}>
           <section
+            ref={mobileSheetRef}
             className="mobile-sheet"
             role="dialog"
             aria-modal="true"
@@ -187,7 +211,7 @@ function VideoIsolationBoundary({ active, isolationDocument, language }: { activ
       return;
     }
     if (!active && isolationDocument) window.location.replace(window.location.href);
-  }, [active, isolationDocument]);
+  }, [active, isolationDocument, language]);
 
   return null;
 }

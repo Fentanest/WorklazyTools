@@ -5,14 +5,11 @@ const outputDirectory = path.resolve("dist");
 const sourceHtml = await fs.readFile(path.join(outputDirectory, "index.html"), "utf8");
 const siteUrl = ensureTrailingSlash(process.env.VITE_SITE_URL || "https://worklazy.net/");
 const languages = ["ko", "en"];
-const tools = {
-  ko: JSON.parse(await fs.readFile("src/locales/ko/tools.json", "utf8")),
-  en: JSON.parse(await fs.readFile("src/locales/en/tools.json", "utf8")),
-};
 const seoCopy = {
   ko: JSON.parse(await fs.readFile("src/locales/ko/seo.json", "utf8")),
   en: JSON.parse(await fs.readFile("src/locales/en/seo.json", "utf8")),
 };
+const { getSeoDefinition } = await import("../src/app/seo.ts");
 
 const toolRoutes = [
   "excel-merger", "word-compare", "pdf-editor", "hwp-editor", "hwp-compare", "video-studio", "audio-studio",
@@ -23,40 +20,6 @@ const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-ed
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
 const localizedRoutes = ["", "tools", ...toolRoutes.map((slug) => `tools/${slug}`), ...pdfRoutes.map((slug) => `tools/${slug}`), ...pageRoutes];
 const videoRoute = "tools/video-studio";
-
-const pageSeo = {
-  ko: {
-    "": ["무료 문서·PDF·비디오·이미지 업무 도구 | Worklazy Tools", "설치와 로그인 없이 문서·미디어 편집, 텍스트·데이터 변환, 일정·급여 계산과 보안 도구를 실행하세요."],
-    tools: ["무료 업무 파일 도구 모음 | Worklazy Tools", "문서·미디어 편집부터 텍스트, 데이터, 일정, 급여, 보안, QR 도구까지 브라우저에서 무료로 실행하세요."],
-    about: ["서비스 소개 | Worklazy Tools", "Worklazy Tools의 브라우저 로컬 처리 방식과 지원 범위를 안내합니다."],
-    privacy: ["개인정보처리방침 | Worklazy Tools", "로컬 파일 처리, 방문 분석, 광고와 쿠키에 관한 개인정보처리방침입니다."],
-    terms: ["이용약관 | Worklazy Tools", "무료 브라우저 업무 도구의 이용 조건, 지원 범위와 사용자 책임을 안내합니다."],
-    contact: ["문의·건의·버그 제보 | Worklazy Tools", "버그 제보, 기능 제안과 개인정보 문의 방법을 안내합니다."],
-    licenses: ["라이선스 및 제3자 고지 | Worklazy Tools", "Worklazy Tools와 주요 오픈소스 구성요소의 라이선스를 안내합니다."],
-  },
-  en: {
-    "": ["Free Browser Tools for Documents, Media & Work | Worklazy Tools", "Edit documents and media, convert text and data, plan work and use privacy tools without installing software."],
-    tools: ["All Free Browser Tools | Worklazy Tools", "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing."],
-    about: ["About | Worklazy Tools", "Learn how Worklazy Tools processes files in your browser and explains compatibility boundaries."],
-    privacy: ["Privacy Policy | Worklazy Tools", "Read how local file processing, analytics, advertising and cookies are handled."],
-    terms: ["Terms of Use | Worklazy Tools", "Review the conditions, supported scope and user responsibilities for these browser tools."],
-    contact: ["Contact, Suggestions & Bug Reports | Worklazy Tools", "Report a bug, suggest a feature or ask a privacy question."],
-    licenses: ["Licenses & Third-Party Notices | Worklazy Tools", "Review Worklazy Tools copyright terms and third-party open-source licenses."],
-  },
-};
-
-const pdfSeo = {
-  ko: {
-    "pdf-editor/image-to-pdf": ["JPG·PNG 이미지를 PDF로 변환 | Worklazy Tools", "여러 JPG·PNG 이미지를 정렬해 하나의 PDF로 변환하세요."],
-    "pdf-editor/pdf-to-image": ["PDF를 PNG·JPG 이미지로 변환 | Worklazy Tools", "PDF 페이지를 PNG 또는 JPG로 변환해 ZIP으로 내려받으세요."],
-    "pdf-editor/convert": ["PDF를 DOCX·XLSX·TXT로 변환·한국어 OCR | Worklazy Tools", "PDF를 문서·표·텍스트 또는 검색 가능한 PDF로 브라우저에서 변환하세요."],
-  },
-  en: {
-    "pdf-editor/image-to-pdf": ["Convert JPG & PNG Images to PDF | Worklazy Tools", "Reorder JPG and PNG images and combine them into one browser-generated PDF."],
-    "pdf-editor/pdf-to-image": ["Convert PDF Pages to PNG or JPG | Worklazy Tools", "Render PDF pages as PNG or JPG images and download them together as a ZIP."],
-    "pdf-editor/convert": ["Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", "Convert PDF pages to documents, spreadsheets, text or searchable PDF with local OCR."],
-  },
-};
 
 const generated = [];
 for (const language of languages) {
@@ -73,6 +36,7 @@ for (const language of languages) {
 }
 
 await fs.writeFile(path.join(outputDirectory, "index.html"), renderLanding(sourceHtml));
+await fs.writeFile(path.join(outputDirectory, "404.html"), renderNotFound(sourceHtml));
 
 for (const route of localizedRoutes.filter(Boolean)) {
   const target = absolute("ko", route);
@@ -102,17 +66,17 @@ await fs.writeFile(path.join(outputDirectory, "robots.txt"), `User-agent: *\nAll
 console.log(`Generated ${generated.length} localized crawlable pages for ${siteUrl}`);
 
 function makePage(language, route) {
-  const root = pageSeo[language][route];
-  if (root) return { language, route, title: root[0], description: root[1], heading: root[0].split(" | ")[0], application: null };
-  const pdfSubpath = route.replace(/^tools\//, "");
-  if (pdfSeo[language][pdfSubpath]) {
-    const [title, description] = pdfSeo[language][pdfSubpath];
-    return { language, route, title, description, heading: title.split(" | ")[0], application: "PDF Tools" };
-  }
-  const slug = route.replace(/^tools\//, "");
-  const item = tools[language].items[slug];
-  const title = `${item.title} | Worklazy Tools`;
-  return { language, route, title, description: item.description, heading: item.title, application: item.title, highlights: item.highlights };
+  const pathname = route ? `/${route}` : "/";
+  const definition = getSeoDefinition(language, pathname);
+  return {
+    language,
+    route,
+    title: definition.title,
+    description: definition.description,
+    heading: definition.title.split(" | ")[0].split(" — ")[0],
+    application: definition.application?.name ?? null,
+    highlights: definition.application?.featureList ?? [],
+  };
 }
 
 function renderPage(template, page, canonical) {
@@ -123,7 +87,7 @@ function renderPage(template, page, canonical) {
   const locale = page.language === "ko" ? "ko_KR" : "en_US";
   const inLanguage = page.language === "ko" ? "ko-KR" : "en-US";
   const structuredData = [{ "@context": "https://schema.org", "@type": page.route ? "WebPage" : "WebSite", name: page.title, description: page.description, url: canonical, inLanguage, image }];
-  if (page.application) structuredData.push({ "@context": "https://schema.org", "@type": "WebApplication", name: page.application, description: page.description, url: canonical, applicationCategory: "BusinessApplication", operatingSystem: "Any", featureList: page.highlights ?? [], offers: { "@type": "Offer", price: "0", priceCurrency: "USD" } });
+  if (page.application) structuredData.push({ "@context": "https://schema.org", "@type": "WebApplication", name: page.application, description: page.description, url: canonical, applicationCategory: "BusinessApplication", operatingSystem: "Any", featureList: page.highlights ?? [], offers: { "@type": "Offer", price: "0", priceCurrency: "KRW" } });
   const head = [
     `<link rel="canonical" href="${escapeHtml(canonical)}" />`,
     `<link rel="alternate" hreflang="ko" href="${escapeHtml(alternateKo)}" />`,
@@ -155,6 +119,12 @@ function renderLanding(template) {
 function renderRedirect(template, target) {
   const scriptTarget = JSON.stringify(target);
   return template.replace(/<title>[\s\S]*?<\/title>/, "<title>Redirecting | Worklazy Tools</title>").replace("</head>", `<link rel="canonical" href="${escapeHtml(target)}" /><meta name="robots" content="noindex, follow" /><meta http-equiv="refresh" content="0;url=${escapeHtml(target)}" /><script>location.replace(${scriptTarget}+location.search+location.hash);</script></head>`).replace('<div id="root"></div>', `<div id="root"><p><a href="${escapeHtml(target)}">Continue</a></p></div>`);
+}
+
+function renderNotFound(template) {
+  return template
+    .replace(/<title>[\s\S]*?<\/title>/, "<title>Page not found | Worklazy Tools</title>")
+    .replace("</head>", '<meta name="robots" content="noindex, nofollow" /></head>');
 }
 
 function staticBody(page) {

@@ -39,7 +39,7 @@ export function ToolsPage() {
         return searchText.includes(normalizedQuery);
       }),
     }))
-    .filter((group) => group.tools.length > 0), [activeCategory, normalizedQuery]);
+    .filter((group) => group.tools.length > 0), [activeCategory, normalizedQuery, toolCategories, tools]);
 
   const visibleToolCount = groupedTools.reduce((count, group) => count + group.tools.length, 0);
   const selectCategory = (category: CategoryFilter) => {

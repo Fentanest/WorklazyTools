@@ -345,7 +345,8 @@ async function testAudioStudio(page, audioPath) {
   const voicePresets = await page.$$eval(".audio-voice-presets button", (buttons) => buttons.map((button) => button.textContent?.trim()));
   if (voicePresets.join("|") !== "낮은 톤|높은 톤|어린 목소리|로봇|직접 조절") throw new Error(`Voice-effect presets are incomplete: ${JSON.stringify(voicePresets)}`);
   const durationBeforeEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
-  await page.click(".audio-voice-presets button:nth-child(2)");
+  await page.$eval(".audio-voice-presets button:nth-child(2)", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".audio-voice-presets button:nth-child(2)")?.getAttribute("aria-checked") === "true");
   await page.click(".audio-voice-effect-actions .secondary-button");
   await waitForAudioSuccess(page, "미리 듣기 준비 완료", 120_000);
   const effectPreview = await page.$eval(".audio-effect-preview audio", async (audio) => {
@@ -369,7 +370,8 @@ async function testAudioStudio(page, audioPath) {
   await waitForAudioSuccess(page, "음성 효과 적용 완료", 120_000);
   const durationAfterEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
   if (durationAfterEffect !== durationBeforeEffect) throw new Error(`Pitch effect changed the document duration: ${durationBeforeEffect} -> ${durationAfterEffect}`);
-  await page.click(".audio-voice-presets button:nth-child(4)");
+  await page.$eval(".audio-voice-presets button:nth-child(4)", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".audio-voice-presets button:nth-child(4)")?.getAttribute("aria-checked") === "true");
   await page.click(".audio-voice-effect-actions .secondary-button");
   await waitForAudioSuccess(page, "미리 듣기 준비 완료");
   if (!(await page.$eval(".audio-effect-preview audio", (audio) => audio.src.startsWith("blob:")))) throw new Error("Robot voice preview was not created.");

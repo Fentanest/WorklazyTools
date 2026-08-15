@@ -49,6 +49,11 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko") {
 
 export async function inspectPdf(file: File, language: AppLanguage = "ko") {
   const document = await getPdfDocument(file, language);
+  const permissions = await document.getPermissions();
+  if (permissions !== null) {
+    await releasePdf(file);
+    throw new Error(local(language, "암호화되거나 권한이 제한된 PDF는 편집할 수 없습니다. 보호가 해제된 사본으로 다시 시도해 주세요.", "Encrypted or permission-restricted PDFs cannot be edited. Try again with an unlocked copy."));
+  }
   return { pageCount: document.numPages };
 }
 
@@ -60,7 +65,7 @@ export async function releasePdf(file: File) {
   }
 }
 
-export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172, language: AppLanguage = "ko") {
+export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172, language: AppLanguage = "ko", signal?: AbortSignal) {
   const pdfDocument = await getPdfDocument(file, language);
   const page = await pdfDocument.getPage(pageIndex + 1);
   const natural = page.getViewport({ scale: 1 });
@@ -74,13 +79,21 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
   renderCanvas.height = height;
   const renderContext = renderCanvas.getContext("2d", { alpha: false });
   if (!renderContext) throw new Error(local(language, "PDF 미리보기를 표시할 수 없습니다.", "Unable to render the PDF preview."));
-  await page.render({
+  const renderTask = page.render({
     canvas: renderCanvas,
     canvasContext: renderContext,
     viewport,
     transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
     background: "#ffffff",
-  }).promise;
+  });
+  const abort = () => renderTask.cancel();
+  signal?.addEventListener("abort", abort, { once: true });
+  try { await renderTask.promise; }
+  catch (error) {
+    if (signal?.aborted || (error instanceof Error && error.name === "RenderingCancelledException")) throw new DOMException("Thumbnail rendering cancelled", "AbortError");
+    throw error;
+  } finally { signal?.removeEventListener("abort", abort); }
+  if (signal?.aborted) throw new DOMException("Thumbnail rendering cancelled", "AbortError");
   canvas.width = width;
   canvas.height = height;
   canvas.style.width = `${Math.floor(viewport.width)}px`;
@@ -102,14 +115,15 @@ export function parsePageRange(value: string, pageCount: number, language: AppLa
   for (const rawPart of value.split(",")) {
     const part = rawPart.trim();
     if (!part) continue;
-    const rangeMatch = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    const rangeMatch = part.match(/^(\d*)\s*-\s*(\d*)$/);
     const singleMatch = part.match(/^\d+$/);
     let numbers: number[];
     if (rangeMatch) {
-      const start = Number(rangeMatch[1]);
-      const end = Number(rangeMatch[2]);
-      if (start > end) throw new Error(local(language, `페이지 범위 ${part}의 시작 번호가 끝 번호보다 큽니다.`, `The start of range ${part} is greater than its end.`));
-      numbers = Array.from({ length: end - start + 1 }, (_, index) => start + index);
+      if (!rangeMatch[1] && !rangeMatch[2]) throw new Error(local(language, `페이지 범위 '${part}'의 형식을 확인해 주세요.`, `Check the format of page range '${part}'.`));
+      const start = rangeMatch[1] ? Number(rangeMatch[1]) : 1;
+      const end = rangeMatch[2] ? Number(rangeMatch[2]) : pageCount;
+      const direction = start <= end ? 1 : -1;
+      numbers = Array.from({ length: Math.abs(end - start) + 1 }, (_, index) => start + index * direction);
     } else if (singleMatch) numbers = [Number(part)];
     else throw new Error(local(language, `페이지 범위 '${part}'의 형식을 확인해 주세요.`, `Check the format of page range '${part}'.`));
     for (const pageNumber of numbers) {
@@ -131,13 +145,16 @@ export async function pdfToImageArchive(
   quality: number,
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
+  selectedPageIndexes?: number[],
 ) {
   const document = await getPdfDocument(file, language);
   const zip = new JSZip();
   const scale = dpi / 72;
   const baseName = stripExtension(file.name);
-  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-    onProgress?.(5 + ((pageNumber - 1) / document.numPages) * 78, local(language, `[${pageNumber}/${document.numPages}] 페이지를 ${format.toUpperCase()}로 렌더링하는 중…`, `[${pageNumber}/${document.numPages}] Rendering page as ${format.toUpperCase()}…`));
+  const pageNumbers = selectedPageIndexes?.length ? selectedPageIndexes.map((index) => index + 1) : Array.from({ length: document.numPages }, (_, index) => index + 1);
+  for (let index = 0; index < pageNumbers.length; index += 1) {
+    const pageNumber = pageNumbers[index];
+    onProgress?.(5 + (index / pageNumbers.length) * 78, local(language, `[${index + 1}/${pageNumbers.length}] ${pageNumber}페이지를 ${format.toUpperCase()}로 렌더링하는 중…`, `[${index + 1}/${pageNumbers.length}] Rendering page ${pageNumber} as ${format.toUpperCase()}…`));
     const canvas = await renderPageForExport(document, pageNumber, scale, language);
     const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality, language);
     zip.file(`${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob);
@@ -150,6 +167,23 @@ export async function pdfToImageArchive(
     onProgress?.(88 + metadata.percent * 0.1, local(language, `ZIP 압축 중… ${Math.round(metadata.percent)}%`, `Compressing ZIP… ${Math.round(metadata.percent)}%`));
   });
   return { blob, fileName: `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip` };
+}
+
+export async function renderPdfPageAsJpeg(file: File, pageIndex: number, additionalRotation: number, language: AppLanguage = "ko") {
+  const pdfDocument = await getPdfDocument(file, language);
+  const page = await pdfDocument.getPage(pageIndex + 1);
+  const viewport = page.getViewport({ scale: 1.5, rotation: (page.rotate + additionalRotation) % 360 });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.ceil(viewport.width));
+  canvas.height = Math.max(1, Math.ceil(viewport.height));
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error(local(language, "PDF 페이지 압축 화면을 만들 수 없습니다.", "Unable to create the compressed PDF page image."));
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvas, canvasContext: context, viewport }).promise;
+  const blob = await canvasToBlob(canvas, "image/jpeg", 0.78, language);
+  canvas.width = 1; canvas.height = 1;
+  return new File([blob], `page-${String(pageIndex + 1).padStart(4, "0")}.jpg`, { type: "image/jpeg" });
 }
 
 export type PdfOcrMode = "off" | "auto" | "all";
@@ -337,7 +371,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number |
 }
 
 function yieldToBrowser() {
-  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  return new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 }
 
 function stripExtension(name: string) {

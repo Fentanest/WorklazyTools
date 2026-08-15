@@ -95,7 +95,7 @@ export function PdfConvertPanel() {
             <SectionCard step={2} title={L("변환 범위 확인", "Review the conversion range")} description={L("내장 텍스트를 먼저 사용하고, 필요할 때만 페이지 이미지를 OCR합니다.", "Embedded text is used first; page images are OCRed only when needed.")} className="accent-context-violet pdf-page-section">
               <div className="pdf-ocr-notice"><Wifi size={16} /><div><strong>{L("오프라인에서 사이트를 처음 열면 OCR을 시작할 수 없습니다.", "OCR cannot start during a first offline visit.")}</strong><span>{L("OCR 실행 파일과 한국어·영어 모델은 Worklazy Tools 배포 파일에서만 불러오며 외부 CDN이나 OCR 서버를 사용하지 않습니다. 선택한 PDF 내용은 브라우저 밖으로 전송되지 않습니다.", "The OCR runtime and Korean/English models load only from the Worklazy Tools deployment, with no external CDN or OCR server. Your PDF content does not leave the browser.")}</span></div></div>
               {pageCount >= ((window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 760) ? 15 : 50) && <div className="pdf-large-warning"><ScanText size={16} /><span>{L(`${pageCount}페이지 문서입니다. 대형 문서도 처리할 수 있지만 모바일에서는 아래 ‘처리 페이지’에 필요한 범위만 입력하면 더 빠르고 안정적입니다.`, `This document has ${pageCount} pages. Large documents are supported, but on mobile it is faster and more reliable to enter only the required range below.`)}</span></div>}
-              <div className="pdf-page-grid compact">{previewItems.map((item, index) => <PdfThumbnail key={item.id} item={item} file={file} outputIndex={index} draggable={false} />)}</div>
+              <div className="pdf-page-grid compact">{previewItems.map((item, index) => <PdfThumbnail key={`${file.name}-${file.size}-${file.lastModified}-${item.id}`} item={item} file={file} outputIndex={index} totalItems={previewItems.length} draggable={false} />)}</div>
             </SectionCard>
           )}
         </div>

@@ -23,10 +23,12 @@ export async function compareWordFilePairs(
   options: WordCompareOptions,
   onProgress?: (progress: number, message: string) => void,
   language: "ko" | "en" = "ko",
+  signal?: AbortSignal,
 ) {
   const worker = new Worker(new URL("./word.worker.ts", import.meta.url), { type: "module" });
   const payloads: Array<{ beforeName: string; afterName: string; beforeBuffer: ArrayBuffer; afterBuffer: ArrayBuffer }> = [];
   for (const { beforeFile, afterFile } of pairs) {
+    if (signal?.aborted) throw new DOMException(language === "en" ? "Word comparison was cancelled." : "Word 문서 비교를 취소했습니다.", "AbortError");
     payloads.push({
       beforeName: beforeFile.name,
       afterName: afterFile.name,
@@ -37,17 +39,22 @@ export async function compareWordFilePairs(
   const transfer = payloads.flatMap((pair) => [pair.beforeBuffer, pair.afterBuffer]);
 
   return new Promise<WordWorkerPairResult[]>((resolve, reject) => {
+    let settled = false;
+    const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); worker.terminate(); return true; };
+    const abort = () => { if (finish()) reject(new DOMException(language === "en" ? "Word comparison was cancelled." : "Word 문서 비교를 취소했습니다.", "AbortError")); };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) { abort(); return; }
     worker.onmessage = (event: MessageEvent) => {
       if (event.data.type === "progress") {
         onProgress?.(event.data.progress, event.data.message);
         return;
       }
-      worker.terminate();
+      if (!finish()) return;
       if (event.data.type === "result") resolve(event.data.result as WordWorkerPairResult[]);
       else reject(new Error(event.data.error?.message || (language === "en" ? "An error occurred while comparing Word documents." : "Word 문서 비교 중 오류가 발생했습니다.")));
     };
     worker.onerror = (event) => {
-      worker.terminate();
+      if (!finish()) return;
       reject(new Error(event.message || (language === "en" ? "Could not start Word comparison." : "Word 문서 비교를 시작하지 못했습니다.")));
     };
     worker.postMessage({

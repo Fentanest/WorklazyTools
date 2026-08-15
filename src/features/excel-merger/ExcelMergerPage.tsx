@@ -16,7 +16,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 
@@ -70,6 +70,8 @@ export function ExcelMergerPage() {
   const [sheetTrimRows, setSheetTrimRows] = useState(false);
   const [sheetTrimColumns, setSheetTrimColumns] = useState(false);
   const [sheetTrimThreshold, setSheetTrimThreshold] = useState(3);
+  const [skipHeaderRows, setSkipHeaderRows] = useState(0);
+  const [csvEncoding, setCsvEncoding] = useState<"auto" | "utf-8" | "euc-kr">("auto");
   const [sheetNameRule, setSheetNameRule] = useState<SheetNameRule>("file-sheet");
   const [sheetSelectionMode, setSheetSelectionMode] = useState<SheetSelectionMode>("all");
   const [sheetPositionPattern, setSheetPositionPattern] = useState("1");
@@ -83,8 +85,10 @@ export function ExcelMergerPage() {
   const [error, setError] = useState<string | null>(null);
   const [fileNotice, setFileNotice] = useState<string | null>(null);
   const [result, setResult] = useState<DownloadResult | null>(null);
+  const mergeControllerRef = useRef<AbortController | undefined>(undefined);
 
   useEffect(() => () => {
+    mergeControllerRef.current?.abort();
     if (result?.url) URL.revokeObjectURL(result.url);
   }, [result?.url]);
 
@@ -144,7 +148,7 @@ export function ExcelMergerPage() {
     clearResult();
     setError(null);
 
-    void inspectExcelFiles(additions.map(({ id, file }) => ({ id, file })), language)
+    void inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {
         const byId = new Map(inspectionResults.map((item) => [item.id, item]));
         setEntries((current) => current.map((entry) => {
@@ -198,7 +202,7 @@ export function ExcelMergerPage() {
         inspection: inspectionResult.error ? "error" : "ready",
         encrypted: inspectionResult.encrypted,
         sheetNames: inspectionResult.sheetNames,
-        selectedSheetNames: inspectionResult.sheetNames,
+        selectedSheetNames: item.sheetNames.length ? inspectionResult.sheetNames.filter((name) => item.selectedSheetNames.includes(name)) : inspectionResult.sheetNames,
         error: inspectionResult.error,
       } : item));
     }).catch((inspectionError: Error) => {
@@ -230,6 +234,8 @@ export function ExcelMergerPage() {
     if (!ready) return;
     clearResult();
     setLoading(true);
+    const controller = new AbortController();
+    mergeControllerRef.current = controller;
     operation.start(t("excel.status.preparing", { count: entries.length }));
     setError(null);
 
@@ -244,6 +250,7 @@ export function ExcelMergerPage() {
           file: entry.file,
           password: entry.password || undefined,
           selectedSheetNames,
+          csvEncoding,
         })),
         {
           mergeMode,
@@ -252,6 +259,7 @@ export function ExcelMergerPage() {
           sheetTrimRows,
           sheetTrimColumns,
           sheetTrimThreshold,
+          skipHeaderRows: mergeMode === "vertical" ? skipHeaderRows : 0,
           sheetNameRule,
           outputPassword: protectOutput ? outputPassword : undefined,
         },
@@ -259,6 +267,7 @@ export function ExcelMergerPage() {
           operation.update(nextProgress, message);
         },
         language,
+        controller.signal,
       );
 
       const fileName = normalizeOutputName(outputName, t("excel.defaultName"));
@@ -293,6 +302,7 @@ export function ExcelMergerPage() {
       }
     } finally {
       setLoading(false);
+      if (mergeControllerRef.current === controller) mergeControllerRef.current = undefined;
     }
   };
 
@@ -431,6 +441,14 @@ export function ExcelMergerPage() {
                 </span>
               </label>
               <label className="settings-row select-row">
+                <span><strong>{t("excel.output.skipHeaders")}</strong><small>{t("excel.output.skipHeadersHelp")}</small></span>
+                <span className="number-input-with-unit"><input type="number" min={0} step={1} inputMode="numeric" value={skipHeaderRows} disabled={mergeMode !== "vertical"} onChange={(event) => { setSkipHeaderRows(Math.max(0, Math.floor(Number(event.target.value) || 0))); clearResult(); }} /><small>{t("excel.output.rows")}</small></span>
+              </label>
+              <label className="settings-row select-row">
+                <span><strong>{t("excel.output.csvEncoding")}</strong><small>{t("excel.output.csvEncodingHelp")}</small></span>
+                <select value={csvEncoding} onChange={(event) => { setCsvEncoding(event.target.value as "auto" | "utf-8" | "euc-kr"); clearResult(); }}><option value="auto">{t("excel.output.csvAuto")}</option><option value="utf-8">UTF-8</option><option value="euc-kr">CP949 / EUC-KR</option></select>
+              </label>
+              <label className="settings-row select-row">
                 <span><strong>{t("excel.output.sheetNameRule")}</strong><small>{t("excel.output.sheetNameRuleHelp")}</small></span>
                 <select value={sheetNameRule} disabled={mergeMode !== "sheets"} onChange={(event) => setSheetNameRule(event.target.value as SheetNameRule)}>
                   <option value="file-sheet">{t("excel.output.fileSheet")}</option>
@@ -488,11 +506,12 @@ export function ExcelMergerPage() {
             <PrimaryButton accent="green" disabled={!ready} loading={loading} onClick={() => void runMerge()}>
               {loading ? t("excel.summary.processing", { progress: operation.progress }) : t("excel.summary.merge")}
             </PrimaryButton>
+            {loading && <button type="button" className="secondary-button" onClick={() => mergeControllerRef.current?.abort()}>{t("excel.summary.cancel")}</button>}
             {!loading && inspecting && <p className="prototype-note">{t("excel.summary.inspecting")}</p>}
             {!loading && inspectionFailed && <p className="prototype-note error-text">{t("excel.summary.inspectionFailed")}</p>}
             {!loading && missingInputPassword && <p className="prototype-note error-text">{t("excel.summary.inputPassword")}</p>}
             {!loading && entries.length > 0 && selectedSheetCount === 0 && <p className="prototype-note error-text">{t("excel.summary.selectSheet")}</p>}
-            {!loading && outputPasswordMissing && <p className="prototype-note error-text">{t("excel.summary.outputPassword")}</p>}
+            {!loading && !result && outputPasswordMissing && <p className="prototype-note error-text">{t("excel.summary.outputPassword")}</p>}
           </div>
           <OperationProgress
             status={operation.status}
@@ -698,7 +717,7 @@ function parseSheetPositions(value: string, sheetCount: number) {
     }
     const until = token.match(/^-(\d+)$/);
     if (until) {
-      for (let index = 1; index <= Number(until[1]); index += 1) add(index);
+      for (let index = 1; index <= Math.min(sheetCount, Number(until[1])); index += 1) add(index);
       return;
     }
     const from = token.match(/^(\d+)-$/);
@@ -708,8 +727,8 @@ function parseSheetPositions(value: string, sheetCount: number) {
     }
     const range = token.match(/^(\d+)-(\d+)$/);
     if (range) {
-      const start = Number(range[1]);
-      const end = Number(range[2]);
+      const start = Math.max(1, Math.min(sheetCount, Number(range[1])));
+      const end = Math.max(1, Math.min(sheetCount, Number(range[2])));
       const direction = start <= end ? 1 : -1;
       for (let index = start; direction > 0 ? index <= end : index >= end; index += direction) add(index);
     }

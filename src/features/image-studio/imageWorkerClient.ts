@@ -1,4 +1,4 @@
-import type { BatchImageOptions, CollageOptions, GifOptions, ImageWorkerInput, ImageWorkerProgress, ImageWorkerResult } from "./types";
+import type { BatchImageOptions, CollageOptions, GifOptions, ImageWorkerInput, ImageWorkerProgress, ImageWorkerRequest, ImageWorkerResponse, ImageWorkerResult } from "./types";
 
 async function serializeFiles(files: File[]): Promise<ImageWorkerInput[]> {
   const inputs: ImageWorkerInput[] = [];
@@ -8,7 +8,7 @@ async function serializeFiles(files: File[]): Promise<ImageWorkerInput[]> {
   return inputs;
 }
 
-async function runImageWorker(message: object, transfers: ArrayBuffer[], onProgress?: ImageWorkerProgress, signal?: AbortSignal, language: "ko" | "en" = "ko") {
+async function runImageWorker(message: ImageWorkerRequest, transfers: ArrayBuffer[], onProgress?: ImageWorkerProgress, signal?: AbortSignal, language: "ko" | "en" = "ko") {
   const worker = new Worker(new URL("./image.worker.ts", import.meta.url), { type: "module" });
   return new Promise<ImageWorkerResult>((resolve, reject) => {
     let settled = false;
@@ -25,14 +25,14 @@ async function runImageWorker(message: object, transfers: ArrayBuffer[], onProgr
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) return abort();
-    worker.onmessage = (event: MessageEvent) => {
-      const data = event.data as { type: "progress" | "result" | "error"; progress?: number; message?: string; result?: ImageWorkerResult; error?: { message?: string; code?: string } };
+    worker.onmessage = (event: MessageEvent<ImageWorkerResponse>) => {
+      const data = event.data;
       if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ?? (language === "en" ? "Processing images…" : "이미지 처리 중…"));
+        onProgress?.(data.progress, data.message || (language === "en" ? "Processing images…" : "이미지 처리 중…"));
         return;
       }
       if (!finish()) return;
-      if (data.type === "result") resolve(data.result as ImageWorkerResult);
+      if (data.type === "result") resolve(data.result);
       else reject(Object.assign(new Error(data.error?.message || (language === "en" ? "Image processing failed." : "이미지 처리에 실패했습니다.")), { code: data.error?.code }));
     };
     worker.onerror = (event) => {

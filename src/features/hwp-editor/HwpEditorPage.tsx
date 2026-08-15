@@ -231,7 +231,7 @@ function downloadBlob(blob: Blob, fileName: string) {
   anchor.href = url;
   anchor.download = fileName;
   anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.setTimeout(() => URL.revokeObjectURL(url), 15_000);
 }
 
 function normalizeEditorError(error: unknown) {

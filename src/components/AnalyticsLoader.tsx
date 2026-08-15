@@ -1,5 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+
+import { CONSENT_EVENT, getPrivacyConsent, initializeGoogleConsentMode, updateGoogleConsent, type PrivacyConsent } from "./privacyConsent";
 
 const GOOGLE_ANALYTICS_ID = "G-CFSK50SX9R";
 const NAVER_ANALYTICS_ID = "1025dd835558ee0";
@@ -21,29 +23,43 @@ declare global {
 let initialized = false;
 let naverReady = false;
 let lastNaverPath = "";
+let lastGooglePath = "";
 let pendingNaverPageView = false;
 const pendingNaverEvents: Array<[string, string]> = [];
 
 export function AnalyticsLoader({ disabled = false }: { disabled?: boolean }) {
   const location = useLocation();
+  const [consent, setConsent] = useState<PrivacyConsent>(() => getPrivacyConsent());
 
   useEffect(() => {
-    if (!import.meta.env.PROD || disabled) return;
+    initializeGoogleConsentMode();
+    updateGoogleConsent(consent);
+    const handleConsent = (event: Event) => setConsent((event as CustomEvent<PrivacyConsent>).detail);
+    window.addEventListener(CONSENT_EVENT, handleConsent);
+    return () => window.removeEventListener(CONSENT_EVENT, handleConsent);
+  }, []);
+
+  useEffect(() => {
+    updateGoogleConsent(consent);
+    if (!import.meta.env.PROD || disabled || consent !== "granted") return;
     initializeAnalytics();
-  }, [disabled]);
+  }, [consent, disabled]);
 
   useEffect(() => {
-    if (!import.meta.env.PROD || disabled) return;
+    if (!import.meta.env.PROD || disabled || consent !== "granted") return;
     const path = `${location.pathname}${location.search}`;
-    const timer = window.setTimeout(() => requestNaverPageView(path), 0);
+    const timer = window.setTimeout(() => {
+      requestGooglePageView(path);
+      requestNaverPageView(path);
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [disabled, location.pathname, location.search]);
+  }, [consent, disabled, location.pathname, location.search]);
 
   return null;
 }
 
 export function trackToolOpen(toolId: string, menuSource: string, contentLanguage: "ko" | "en") {
-  if (!import.meta.env.PROD || !initialized) return;
+  if (!import.meta.env.PROD || !initialized || getPrivacyConsent() !== "granted") return;
   const safeToolId = sanitizeEventValue(toolId);
   const safeMenuSource = sanitizeEventValue(menuSource);
 
@@ -72,6 +88,7 @@ function initializeGoogleAnalytics() {
   window.gtag("config", GOOGLE_ANALYTICS_ID, {
     allow_google_signals: false,
     allow_ad_personalization_signals: false,
+    send_page_view: false,
   });
 
   if (document.querySelector("script[data-worklazy-google-analytics]")) return;
@@ -80,6 +97,16 @@ function initializeGoogleAnalytics() {
   script.dataset.worklazyGoogleAnalytics = "true";
   script.src = GOOGLE_TAG_URL;
   document.head.appendChild(script);
+}
+
+function requestGooglePageView(path: string) {
+  if (path === lastGooglePath || !initialized) return;
+  lastGooglePath = path;
+  window.gtag?.("event", "page_view", {
+    page_location: window.location.href,
+    page_path: path,
+    page_title: document.title,
+  });
 }
 
 function initializeNaverAnalytics() {

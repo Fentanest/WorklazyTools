@@ -4,11 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
+import { GITHUB_ISSUES_URL } from "../constants/links";
 import { localizedPath } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
 import { useToolCatalog } from "../i18n/useToolCatalog";
-
-const GITHUB_ISSUES_URL = "https://github.com/Fentanest/WorklazyTools/issues";
 
 export function HomePage() {
   const { t } = useTranslation("common");

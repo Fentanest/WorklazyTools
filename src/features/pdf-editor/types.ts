@@ -17,6 +17,7 @@ export interface PdfPageItem {
 export interface PdfWorkerInput {
   id: string;
   name: string;
+  mimeType?: string;
   buffer: ArrayBuffer;
 }
 
@@ -24,6 +25,11 @@ export interface PdfPagePlan {
   sourceId: string;
   pageIndex: number;
   rotation: number;
+}
+
+export interface PdfOutputOptions {
+  watermarkText?: string;
+  pageNumbers?: boolean;
 }
 
 export interface PdfTextCell {
@@ -63,5 +69,6 @@ export function createLocalId(prefix: string) {
 }
 
 export function normalizeRotation(value: number): 0 | 90 | 180 | 270 {
-  return (((value % 360) + 360) % 360) as 0 | 90 | 180 | 270;
+  return normalizePdfRotation(value);
 }
+import { normalizePdfRotation } from "./pdfShared";

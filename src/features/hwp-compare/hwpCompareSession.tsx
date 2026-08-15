@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 
 import type { WordCompareResult } from "../excel-merger/types";
+import { documentFileKey } from "../document-compare/filePairs";
 
 export interface HwpPairResult {
   pairNumber: number;
@@ -55,7 +56,7 @@ export function HwpCompareSessionProvider() {
     afterFiles,
     setAfterFiles,
     passwords,
-    setPassword: (file, password) => setPasswords((current) => ({ ...current, [fileKey(file)]: password })),
+    setPassword: (file, password) => setPasswords((current) => ({ ...current, [documentFileKey(file)]: password })),
     webOutput,
     setWebOutput,
     excelOutput,
@@ -80,6 +81,4 @@ export function useHwpCompareSession() {
   return context;
 }
 
-export function fileKey(file: File) {
-  return `${file.name}:${file.size}:${file.lastModified}`;
-}
+export { documentFileKey as fileKey } from "../document-compare/filePairs";

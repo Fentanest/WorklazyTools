@@ -1,4 +1,4 @@
-import { AlertTriangle, Camera, CameraOff, Copy, Download, ImagePlus, QrCode, ScanLine, Share2 } from "lucide-react";
+import { AlertTriangle, Camera, CameraOff, Copy, Download, ExternalLink, ImagePlus, QrCode, ScanLine, Share2 } from "lucide-react";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +21,8 @@ export function QrStudioPage() {
   const [busy, setBusy] = useState(false);
   const [cameraStarting, setCameraStarting] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [qrReady, setQrReady] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState("");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -32,6 +34,7 @@ export function QrStudioPage() {
   const cameraTimerRef = useRef<number | undefined>(undefined);
   const captureInFlightRef = useRef(false);
   const captureFrameRef = useRef<(() => void) | undefined>(undefined);
+  const qrGenerationRef = useRef(0);
 
   const releaseCameraResources = useCallback(() => {
     window.clearTimeout(cameraTimerRef.current);
@@ -61,10 +64,22 @@ export function QrStudioPage() {
   }, [releaseCameraResources]);
 
   useEffect(() => {
-    void drawQr(canvasRef.current, text, size, dark, logo, t("qr.errors.logo")).catch((reason) => {
-      setError(reason instanceof Error ? reason.message : t("qr.createError"));
+    const generation = ++qrGenerationRef.current;
+    setQrReady(false);
+    setError("");
+    clearCanvas(canvasRef.current);
+    if (!text) return;
+    void drawQr(canvasRef.current, text, size, dark, logo, t("qr.errors.logo")).then(() => {
+      if (generation !== qrGenerationRef.current) return;
+      setError("");
+      setQrReady(true);
+    }).catch((reason) => {
+      if (generation !== qrGenerationRef.current) return;
+      clearCanvas(canvasRef.current);
+      setQrReady(false);
+      setError(qrGenerationError(reason, i18n.language === "en"));
     });
-  }, [text, size, dark, logo, t]);
+  }, [text, size, dark, logo, i18n.language, t]);
 
   useEffect(() => {
     if (mode !== "scan" || (!scanned && !error) || !window.matchMedia("(max-width: 620px)").matches) return;
@@ -72,19 +87,19 @@ export function QrStudioPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [mode, scanned, error]);
 
-  const download = () => canvasRef.current?.toBlob((blob) => {
+  const download = () => qrReady && canvasRef.current?.toBlob((blob) => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = "worklazy-qr.png";
     anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    window.setTimeout(() => URL.revokeObjectURL(url), 15_000);
   }, "image/png");
 
   const shareQr = () => {
     const canvas = canvasRef.current;
-    if (!canvas || typeof navigator.share !== "function") return download();
+    if (!qrReady || !canvas || typeof navigator.share !== "function") return download();
     const blob = dataUrlToBlob(canvas.toDataURL("image/png"));
     const file = new File([blob], "worklazy-qr.png", { type: "image/png" });
     if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) return download();
@@ -97,26 +112,31 @@ export function QrStudioPage() {
     stopCamera();
     fileWorkerRef.current?.terminate();
     setBusy(true);
-    setError("");
-    setScanned("");
-    const worker = new Worker(new URL("./qr-scan.worker.ts", import.meta.url), { type: "module" });
-    fileWorkerRef.current = worker;
-    worker.onmessage = (event) => {
+    try {
+      const buffer = await file.arrayBuffer();
+      setError("");
+      setScanned("");
+      const worker = new Worker(new URL("./qr-scan.worker.ts", import.meta.url), { type: "module" });
+      fileWorkerRef.current = worker;
+      worker.onmessage = (event) => {
+        setBusy(false);
+        if (event.data.type === "error") setError(event.data.message);
+        else if (!event.data.data) setError(t("qr.notFound"));
+        else { setError(""); setScanned(event.data.data); }
+        worker.terminate();
+        if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
+      };
+      worker.onerror = (event) => {
+        setBusy(false);
+        setError(event.message || t("qr.fileError"));
+        worker.terminate();
+        if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
+      };
+      worker.postMessage({ buffer, type: file.type, language: i18n.language }, [buffer]);
+    } catch (reason) {
       setBusy(false);
-      if (event.data.type === "error") setError(event.data.message);
-      else if (!event.data.data) setError(t("qr.notFound"));
-      else setScanned(event.data.data);
-      worker.terminate();
-      if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
-    };
-    worker.onerror = (event) => {
-      setBusy(false);
-      setError(event.message || t("qr.fileError"));
-      worker.terminate();
-      if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
-    };
-    const buffer = await file.arrayBuffer();
-    worker.postMessage({ buffer, type: file.type, language: i18n.language }, [buffer]);
+      setError(reason instanceof Error ? reason.message : t("qr.fileError"));
+    }
   };
 
   const startCamera = async () => {
@@ -125,6 +145,7 @@ export function QrStudioPage() {
     setCameraActive(false);
     setError("");
     setScanned("");
+    setCopyFeedback("");
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
         throw new Error(t("qr.errors.secure"));
@@ -228,7 +249,7 @@ export function QrStudioPage() {
               <label className="span-2 file-control"><span>{t("qr.logo")}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogo(event.target.files?.[0])} /></label>
             </div>
           </SectionCard>
-          <SectionCard title={t("qr.preview")}><div className="qr-preview"><canvas ref={canvasRef} /></div><div className="result-file-actions"><PrimaryButton accent="blue" disabled={!text} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <button type="button" className="secondary-button" disabled={!text} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</button>}</div></SectionCard>
+          <SectionCard title={t("qr.preview")}><div className="qr-preview"><canvas ref={canvasRef} /></div>{error && <p className="utility-error" role="alert">{error}</p>}<div className="result-file-actions"><PrimaryButton accent="blue" disabled={!qrReady} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <button type="button" className="secondary-button" disabled={!qrReady} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</button>}</div></SectionCard>
         </div>
       ) : (
         <>
@@ -269,8 +290,10 @@ export function QrStudioPage() {
                   <div className={`scan-result${error ? " error" : ""}`}>
                     <QrCode size={21} />
                     <p>{error || scanned}</p>
-                    {scanned && <button type="button" aria-label={t("qr.copyResult")} onClick={() => void navigator.clipboard.writeText(scanned)}><Copy size={17} /></button>}
+                    {scanned && <button type="button" aria-label={t("qr.copyResult")} onClick={() => void navigator.clipboard.writeText(scanned).then(() => setCopyFeedback(i18n.language === "en" ? "Copied" : "복사됨")).catch(() => setCopyFeedback(i18n.language === "en" ? "Copy failed" : "복사 실패"))}><Copy size={17} /></button>}
+                    {scanned && safeHttpUrl(scanned) && <a className="secondary-button" href={safeHttpUrl(scanned)} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} /> {i18n.language === "en" ? "Open link" : "링크 열기"}</a>}
                   </div>
+                  {copyFeedback && <small role="status">{copyFeedback}</small>}
                 </SectionCard>
               </div>
             )}
@@ -308,6 +331,30 @@ async function drawQr(canvas: HTMLCanvasElement | null, text: string, size: numb
     context.fill();
     context.drawImage(image, x, y, box, box);
   } finally { URL.revokeObjectURL(url); }
+}
+
+function clearCanvas(canvas: HTMLCanvasElement | null) {
+  if (!canvas) return;
+  canvas.width = 1;
+  canvas.height = 1;
+  canvas.getContext("2d")?.clearRect(0, 0, 1, 1);
+}
+
+function qrGenerationError(reason: unknown, english: boolean) {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  if (/too big|amount of data|code length|overflow/i.test(message)) return english
+    ? "This content is too long for a high-reliability QR code. Shorten the text or URL and try again."
+    : "고신뢰도 QR 코드에 담기에는 내용이 너무 깁니다. 텍스트나 URL을 줄여 다시 시도해 주세요.";
+  return message || (english ? "The QR code could not be created." : "QR 코드를 만들지 못했습니다.");
+}
+
+function safeHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function loadImage(url: string, errorMessage: string) {

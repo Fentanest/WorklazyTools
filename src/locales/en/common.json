@@ -29,9 +29,16 @@
     "terms": "Terms of Use",
     "licenses": "Licenses & Notices",
     "contact": "Contact",
+    "consentSettings": "Analytics & ad settings",
     "policyLabel": "Policies and contact",
     "feedback": "Contact, ideas & bug reports",
     "feedbackDescription": "Report bugs or suggest features on GitHub Issues"
+  },
+  "consent": {
+    "title": "Analytics and advertising preferences",
+    "description": "With your consent, Google and Naver analytics and advertising scripts are loaded. Work files and tool inputs are never sent to analytics services.",
+    "reject": "Use essential features only",
+    "accept": "Accept and continue"
   },
   "privacy": {
     "mini": "Files and passwords stay\nin your browser",

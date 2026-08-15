@@ -3,15 +3,16 @@ import Sortable from "sortablejs";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
-import { FileDropZone, FileList, PrimaryButton, SectionCard } from "../../components/ui";
+import { FileDropZone, FileList, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage } from "../../i18n/routing";
 import type { AppLanguage } from "../../i18n/languages";
 import { PdfThumbnail } from "./PdfThumbnail";
-import { inspectPdf, parsePageRange, releasePdf } from "./pdfPreview";
+import { inspectPdf, parsePageRange, releasePdf, renderPdfPageAsJpeg } from "./pdfPreview";
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
-import { exportPdfGroups, mergePdfPages } from "./pdfWorkerClient";
+import { exportPdfGroups, imagesToPdf, mergePdfPages } from "./pdfWorkerClient";
 import { createLocalId, normalizeRotation, type PdfPageItem, type PdfSourceFile } from "./types";
+import { movePdfItem as moveItem } from "./pdfShared";
 
 type OutputMode = "merged" | "ranges" | "separate";
 
@@ -37,6 +38,9 @@ export function PdfOrganizePanel() {
   const [outputMode, setOutputMode] = useState<OutputMode>("merged");
   const [rangeRows, setRangeRows] = useState<RangeRow[]>(() => [createRangeRow(1, language)]);
   const [outputName, setOutputName] = useState(language === "ko" ? "Worklazy-PDF-편집" : "Worklazy-PDF-edited");
+  const [watermarkText, setWatermarkText] = useState("");
+  const [pageNumbers, setPageNumbers] = useState(false);
+  const [imageCompression, setImageCompression] = useState(false);
   const [error, setError] = useState("");
   const [inspecting, setInspecting] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -44,6 +48,7 @@ export function PdfOrganizePanel() {
   const sourcesRef = useRef<PdfSourceFile[]>([]);
   const operation = useOperationProgress();
   const download = useDownloadResult();
+  const locked = inspecting || operation.status === "running";
 
   useEffect(() => { sourcesRef.current = sources; }, [sources]);
   useEffect(() => () => { sourcesRef.current.forEach((source) => { void releasePdf(source.file); }); }, []);
@@ -62,7 +67,7 @@ export function PdfOrganizePanel() {
 
   useEffect(() => {
     const grid = gridRef.current;
-    if (!grid) return;
+    if (!grid || locked) return;
     const sortable = Sortable.create(grid, {
       animation: 170,
       handle: ".pdf-drag-handle",
@@ -72,12 +77,13 @@ export function PdfOrganizePanel() {
       fallbackTolerance: 4,
       onEnd: ({ oldIndex, newIndex }) => {
         if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return;
+        restoreSortableDom(grid, oldIndex, newIndex);
         setPages((current) => moveItem(current, oldIndex, newIndex));
         download.clearResult();
       },
     });
     return () => sortable.destroy();
-  }, [pages.length]);
+  }, [download, locked, pages.length]);
 
   const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
   const groupMembership = useMemo(() => {
@@ -132,6 +138,7 @@ export function PdfOrganizePanel() {
   };
 
   const removeSource = (index: number) => {
+    if (locked) return;
     const source = sources[index];
     if (!source) return;
     const removedIds = new Set(pages.filter((page) => page.sourceId === source.id).map((page) => page.id));
@@ -151,7 +158,14 @@ export function PdfOrganizePanel() {
       const archiveName = normalizeOutputName(outputName, L("Worklazy-PDF-편집", "Worklazy-PDF-edited"));
       if (outputMode === "merged") {
         if (!selectedPages.length) throw new Error(L("하나의 PDF로 저장할 페이지를 선택해 주세요.", "Select pages to save in one PDF."));
-        const output = await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, operation.update, language);
+        const output = imageCompression
+          ? await imagesToPdf(await Promise.all(selectedPages.map(async (page, index) => {
+            const source = sources.find((candidate) => candidate.id === page.sourceId);
+            if (!source) throw new Error(L("페이지 원본을 찾지 못했습니다.", "The source page could not be found."));
+            operation.update(5 + (index / selectedPages.length) * 55, L(`[${index + 1}/${selectedPages.length}] 압축용 페이지를 렌더링하는 중…`, `[${index + 1}/${selectedPages.length}] Rendering compressed page…`));
+            return renderPdfPageAsJpeg(source.file, page.sourcePageIndex, page.rotation, language);
+          })), "image", archiveName, operation.update, language, { watermarkText, pageNumbers })
+          : await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, operation.update, language, { watermarkText, pageNumbers });
         download.makeResult(output);
         operation.succeed(L(`${selectedPages.length}개 선택 페이지를 하나의 PDF로 생성했습니다.`, `Created one PDF from ${selectedPages.length} selected pages.`));
         return;
@@ -168,7 +182,7 @@ export function PdfOrganizePanel() {
           return { fileName: `${archiveName}-${String(position).padStart(3, "0")}`, pages: [toPagePlan(page)] };
         });
       }
-      const output = await exportPdfGroups(sourceFiles, groups, archiveName, operation.update, language);
+      const output = await exportPdfGroups(sourceFiles, groups, archiveName, operation.update, language, { watermarkText, pageNumbers });
       download.makeResult(output);
       operation.succeed(L(`${groups.length}개 PDF를 만들어 ZIP으로 묶었습니다.`, `Created ${groups.length} PDFs and packed them into a ZIP.`));
     } catch (reason) {
@@ -180,6 +194,7 @@ export function PdfOrganizePanel() {
 
   const applySelectionRange = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
+    if (locked) return;
     try {
       const indexes = parsePageRange(selectionRange, pages.length, language);
       setSelectedPageIds(new Set(indexes.map((index) => pages[index].id)));
@@ -197,17 +212,20 @@ export function PdfOrganizePanel() {
   };
 
   const removePage = (id: string) => {
+    if (locked) return;
     setPages((current) => current.filter((page) => page.id !== id));
     setSelectedPageIds((current) => { const next = new Set(current); next.delete(id); return next; });
     download.clearResult();
   };
 
   const rotatePage = (id: string) => {
+    if (locked) return;
     setPages((current) => current.map((page) => page.id === id ? { ...page, rotation: normalizeRotation(page.rotation + 90) } : page));
     download.clearResult();
   };
 
   const movePage = (index: number, direction: -1 | 1) => {
+    if (locked) return;
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= pages.length) return;
     setPages((current) => moveItem(current, index, nextIndex));
@@ -251,7 +269,7 @@ export function PdfOrganizePanel() {
       <div className="workflow-grid pdf-workflow-grid">
         <div>
           <SectionCard step={1} title={L("PDF 추가", "Add PDFs")} description={L("여러 PDF의 모든 페이지를 한 편집 화면에 불러옵니다.", "Load every page from multiple PDFs into one editor.")} className="accent-context-violet">
-            <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} accent="violet" hint={L("PDF를 한 번에 고르거나 여러 번 나눠 추가하세요.", "Choose multiple PDFs at once or add more later.")} />
+            <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} disabled={locked} accent="violet" hint={L("PDF를 한 번에 고르거나 여러 번 나눠 추가하세요.", "Choose multiple PDFs at once or add more later.")} />
             <FileList files={sources.map((source) => source.file)} onRemove={removeSource} accent="violet" />
           </SectionCard>
 
@@ -294,7 +312,7 @@ export function PdfOrganizePanel() {
                 {pages.map((page, index) => {
                   const source = sources.find((candidate) => candidate.id === page.sourceId);
                   if (!source) return null;
-                  return <PdfThumbnail key={page.id} item={page} file={source.file} outputIndex={index} selected={outputMode !== "ranges" && selectedPageIds.has(page.id)} groupNumbers={outputMode === "ranges" ? groupMembership.get(page.id) : []} onSelect={outputMode === "ranges" ? undefined : () => togglePageSelection(page.id)} onRotate={() => rotatePage(page.id)} onRemove={() => removePage(page.id)} onMove={(direction) => movePage(index, direction)} />;
+                  return <PdfThumbnail key={page.id} item={page} file={source.file} outputIndex={index} totalItems={pages.length} selected={outputMode !== "ranges" && selectedPageIds.has(page.id)} groupNumbers={outputMode === "ranges" ? groupMembership.get(page.id) : []} draggable={!locked} onSelect={locked || outputMode === "ranges" ? undefined : () => togglePageSelection(page.id)} onRotate={locked ? undefined : () => rotatePage(page.id)} onRemove={locked ? undefined : () => removePage(page.id)} onMove={locked ? undefined : (direction) => movePage(index, direction)} />;
                 })}
               </div>
             </SectionCard>
@@ -316,6 +334,9 @@ export function PdfOrganizePanel() {
               <div><dt>{L("회전한 페이지", "Rotated pages")}</dt><dd>{pages.filter((page) => page.rotation).length}</dd></div>
             </dl>
             <label className="pdf-output-field"><span>{outputMode === "merged" ? L("출력 파일명", "Output file name") : L("ZIP 파일명", "ZIP file name")}</span><input value={outputName} onChange={(event) => setOutputName(event.target.value)} /><small>.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
+            <label className="pdf-output-field"><span>{L("워터마크 문구 (선택)", "Watermark text (optional)")}</span><input value={watermarkText} maxLength={120} onChange={(event) => setWatermarkText(event.target.value)} placeholder={L("예: 사내 검토용", "e.g. INTERNAL REVIEW")} /></label>
+            <ToggleRow label={L("페이지 번호 넣기", "Add page numbers")} description={L("각 결과 PDF의 아래쪽 가운데에 1부터 표시합니다.", "Number each output PDF from 1 at the bottom center.")} checked={pageNumbers} onChange={setPageNumbers} />
+            <ToggleRow label={L("이미지 기반 압축", "Image-based compression")} description={outputMode === "merged" ? L("페이지를 144dpi JPEG로 다시 그려 용량을 줄입니다. 텍스트 검색·링크·양식은 사라집니다.", "Redraw pages as 144 dpi JPEG to reduce size. Text search, links, and forms are removed.") : L("하나의 PDF 출력에서만 사용할 수 있습니다.", "Available only when creating one PDF.")} checked={imageCompression && outputMode === "merged"} onChange={setImageCompression} disabled={outputMode !== "merged"} />
             <PrimaryButton accent="violet" disabled={!pages.length || !resultFileCount || inspecting || operation.status === "running"} loading={operation.status === "running"} onClick={exportPdf}>{outputMode === "merged" ? <FileCheck2 size={18} /> : <FileArchive size={18} />} {outputMode === "merged" ? L("새 PDF 만들기", "Create PDF") : L("PDF ZIP 만들기", "Create PDF ZIP")}</PrimaryButton>
             <p className="prototype-note">{L("암호로 보호된 PDF는 보호를 해제한 사본이 필요합니다.", "Password-protected PDFs require an unlocked copy.")}</p>
           </section>
@@ -378,9 +399,9 @@ function toggleSetItem(current: Set<string>, id: string) {
   return next;
 }
 
-function moveItem<T>(items: T[], from: number, to: number) {
-  const next = [...items];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  return next;
+function restoreSortableDom(container: HTMLElement, oldIndex: number, newIndex: number) {
+  const moved = container.children.item(newIndex);
+  if (!moved) return;
+  container.removeChild(moved);
+  container.insertBefore(moved, container.children.item(oldIndex));
 }

@@ -54,7 +54,7 @@ export function SegmentedControl<T extends string>({ value, options, onChange, l
   label: string;
 }) {
   return (
-    <div className="segmented-control" aria-label={label}>
+    <div className="segmented-control" role="group" aria-label={label}>
       {options.map((option) => (
         <button
           type="button"
@@ -114,16 +114,17 @@ interface FileDropZoneProps {
   files: File[];
   onFiles: (files: File[]) => void | Promise<void>;
   accent?: ToolAccent;
+  disabled?: boolean;
 }
 
-export function FileDropZone({ label, hint, accept, multiple = false, files, onFiles, accent = "blue" }: FileDropZoneProps) {
+export function FileDropZone({ label, hint, accept, multiple = false, files, onFiles, accent = "blue", disabled = false }: FileDropZoneProps) {
   const { t } = useTranslation("common");
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const appendFiles = async (incoming: FileList | null) => {
-    if (!incoming) return;
+    if (!incoming || disabled) return;
     const next = Array.from(incoming);
     await onFiles(multiple ? [...files, ...next] : next.slice(0, 1));
   };
@@ -155,34 +156,35 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   return (
     <div className="drop-zone-wrap">
       {label && <label className="field-label" htmlFor={id}>{label}</label>}
-      <input ref={inputRef} id={id} className="visually-hidden" type="file" accept={accept} multiple={multiple} onChange={handleChange} />
+      <input ref={inputRef} id={id} className="visually-hidden" type="file" accept={accept} multiple={multiple} disabled={disabled} onChange={handleChange} />
       <div
-        className={`drop-zone accent-${accent}${dragging ? " dragging" : ""}`}
+        className={`drop-zone accent-${accent}${dragging ? " dragging" : ""}${disabled ? " disabled" : ""}`}
         role="button"
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
         aria-label={t("files.selectOrDrop", { label: label || t("files.generic"), action: multiple && files.length ? t("files.add") : t("files.select") })}
         onClick={(event) => {
-          if ((event.target as Element).closest("button")) return;
+          if (disabled || (event.target as Element).closest("button")) return;
           inputRef.current?.click();
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
+          if (!disabled && (event.key === "Enter" || event.key === " ")) {
             event.preventDefault();
             inputRef.current?.click();
           }
         }}
-        onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+        onDragEnter={(event) => { event.preventDefault(); if (!disabled) setDragging(true); }}
         onDragOver={(event) => {
           event.preventDefault();
-          event.dataTransfer.dropEffect = "copy";
-          setDragging(true);
+          event.dataTransfer.dropEffect = disabled ? "none" : "copy";
+          if (!disabled) setDragging(true);
         }}
         onDragLeave={handleDragLeave}
         onDrop={(event) => { void handleDrop(event); }}
       >
         <span className="drop-icon">{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
         <div aria-live="polite"><strong>{files.length ? `${t("files.selected", { count: files.length })}${multiple ? ` · ${t("files.keepAdding")}` : ""}` : t("files.dropHere")}</strong><span>{hint}</span></div>
-        <button className="secondary-button small" type="button" onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</button>
+        <button className="secondary-button small" type="button" disabled={disabled} onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</button>
         {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> {t("files.added")}</em>}
       </div>
     </div>

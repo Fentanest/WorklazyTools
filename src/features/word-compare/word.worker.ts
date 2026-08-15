@@ -1,10 +1,12 @@
 /// <reference lib="webworker" />
 
+import alignmentScript from "./alignment.py?raw";
 import compareScript from "./compare.py?raw";
 import trackedDocxScript from "./tracked_docx.py?raw";
+import pyodidePackage from "pyodide/package.json";
 import type { WordCompareResult } from "../excel-merger/types";
 
-const PYODIDE_VERSION = "0.29.4";
+const PYODIDE_VERSION = pyodidePackage.version;
 const PYODIDE_BASE_URL = new URL(
   `vendor/pyodide/${PYODIDE_VERSION}/`,
   new URL(import.meta.env.BASE_URL, self.location.origin),
@@ -30,6 +32,8 @@ worker.onmessage = async (event: MessageEvent) => {
       afterBuffer: ArrayBuffer;
     }>;
     if (!pairs.length) throw new Error(L("비교할 문서 쌍이 없습니다.", "There are no document pairs to compare."));
+    const encryptedPair = pairs.find((pair) => isCompoundOfficeFile(pair.beforeBuffer) || isCompoundOfficeFile(pair.afterBuffer));
+    if (encryptedPair) throw new Error(L("암호화된 DOCX는 현재 브라우저 비교에서 열 수 없습니다. Word에서 암호를 해제한 사본으로 다시 시도해 주세요.", "Encrypted DOCX files cannot be opened by this browser comparison. Remove the password in Word and try an unlocked copy."));
 
     progress(3, L(`${pairs.length}개 문서 쌍을 안전한 작업 공간으로 전달했습니다.`, `Moved ${pairs.length} document pairs into the processing workspace.`));
     progress(5, L("문서 비교 기능을 준비하는 중… (첫 실행은 시간이 걸릴 수 있어요)", "Loading document comparison… The first run may take a while."));
@@ -38,6 +42,7 @@ worker.onmessage = async (event: MessageEvent) => {
     const pyodide = await pyodideModule.loadPyodide({ indexURL: PYODIDE_BASE_URL });
     progress(42, L("문서 비교 준비를 완료했습니다.", "Document comparison is ready."));
 
+    pyodide.runPython(alignmentScript);
     pyodide.runPython(compareScript);
     pyodide.runPython(trackedDocxScript);
     const compare = pyodide.globals.get("compare_documents") as { (...args: unknown[]): string; destroy?: () => void };
@@ -63,6 +68,7 @@ worker.onmessage = async (event: MessageEvent) => {
         event.data.options.formatting,
         event.data.options.tables,
         event.data.options.metadata,
+        en ? "en" : "ko",
       );
       const result = JSON.parse(resultText) as WordCompareResult;
       let trackedBuffer: ArrayBuffer | undefined;
@@ -108,6 +114,11 @@ worker.onmessage = async (event: MessageEvent) => {
 
 function progress(value: number, message: string) {
   worker.postMessage({ type: "progress", progress: value, message });
+}
+
+function isCompoundOfficeFile(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer, 0, Math.min(8, buffer.byteLength));
+  return bytes.length === 8 && bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0 && bytes[4] === 0xa1 && bytes[5] === 0xb1 && bytes[6] === 0x1a && bytes[7] === 0xe1;
 }
 
 export {};

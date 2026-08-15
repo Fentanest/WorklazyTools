@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
+
 const routes = [
   "", "tools", "tools/excel-merger", "tools/word-compare",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
@@ -47,10 +49,11 @@ for (const route of routes) {
 }
 }
 
-const [ads, robots, sitemap] = await Promise.all([
+const [ads, robots, sitemap, notFound] = await Promise.all([
   fs.readFile("dist/ads.txt", "utf8"),
   fs.readFile("dist/robots.txt", "utf8"),
   fs.readFile("dist/sitemap.xml", "utf8"),
+  fs.readFile("dist/404.html", "utf8"),
 ]);
 
 const [cname, worklazyLicense, thirdPartyLicenses, favicon, logo, socialImage, koreanSocialImage] = await Promise.all([
@@ -63,8 +66,8 @@ const [cname, worklazyLicense, thirdPartyLicenses, favicon, logo, socialImage, k
   fs.readFile("dist/social/worklazy-tools-share-ko.png"),
 ]);
 const [pyodideModule, pyodideWasm, ocrWorker, ocrEnglish, ocrKorean, videoIsolationWorker, videoSingleCore, videoMultiCore, videoMultiWorker] = await Promise.all([
-  fs.stat("dist/vendor/pyodide/0.29.4/pyodide.mjs"),
-  fs.stat("dist/vendor/pyodide/0.29.4/pyodide.asm.wasm"),
+  fs.stat(`dist/vendor/pyodide/${pyodideVersion}/pyodide.mjs`),
+  fs.stat(`dist/vendor/pyodide/${pyodideVersion}/pyodide.asm.wasm`),
   fs.stat("dist/vendor/tesseract/7.0.0/worker.min.js"),
   fs.stat("dist/vendor/tesseract/7.0.0/lang/eng.traineddata.gz"),
   fs.stat("dist/vendor/tesseract/7.0.0/lang/kor.traineddata.gz"),
@@ -114,6 +117,7 @@ if (!videoWorkerFiles.some((name) => name.startsWith("video.worker-")) || !video
 if (!assetFiles.some((name) => name.startsWith("audioProcessor.worker-"))) throw new Error("Audio processor worker is missing from the static build.");
 if (!applicationJavaScript.includes("G-CFSK50SX9R") || !applicationJavaScript.includes("1025dd835558ee0") || !applicationJavaScript.includes("wcs.pstatic.net/wcslog.js")) throw new Error("Google or Naver Analytics configuration is missing from the application bundle.");
 if (!robots.includes("Sitemap:")) throw new Error("robots.txt does not point to the sitemap.");
+if (!notFound.includes('name="robots" content="noindex, nofollow"') || !notFound.includes('id="root"')) throw new Error("GitHub Pages SPA 404 fallback is missing or indexable.");
 if (!robots.includes("https://worklazy.net/sitemap.xml")) throw new Error("robots.txt does not use the custom root domain.");
 if (sitemap.includes("/worklazytools/")) throw new Error("sitemap.xml still contains the repository subpath.");
 for (const route of routes) {

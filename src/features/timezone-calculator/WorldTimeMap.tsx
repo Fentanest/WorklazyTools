@@ -83,11 +83,11 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   return (
     <div className="world-map-shell">
       <div className="world-map-toolbar">
-        <div className="world-map-legend" aria-label={t("timezone.map.legend")}>
+        <div className="world-map-legend" role="group" aria-label={t("timezone.map.legend")}>
           <span><i className="selected" /> {t("timezone.map.selected")}</span>
           <span><i className="base" /> {t("timezone.map.base")}</span>
         </div>
-        <div className="world-map-controls" aria-label={t("timezone.map.controls")}>
+        <div className="world-map-controls" role="group" aria-label={t("timezone.map.controls")}>
           <button type="button" onClick={() => setZoomLevel(zoom - 0.5)} disabled={zoom <= MIN_ZOOM} aria-label={t("timezone.map.zoomOut")}><Minus size={16} /></button>
           <output aria-label={t("timezone.map.zoom")}>{Math.round(zoom * 100)}%</output>
           <button type="button" onClick={() => setZoomLevel(zoom + 0.5)} disabled={zoom >= MAX_ZOOM} aria-label={t("timezone.map.zoomIn")}><Plus size={16} /></button>

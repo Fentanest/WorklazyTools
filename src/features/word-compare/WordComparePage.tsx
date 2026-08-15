@@ -11,7 +11,7 @@ import {
   TextSearch,
   X,
 } from "lucide-react";
-import { type DragEvent as ReactDragEvent, useState } from "react";
+import { type DragEvent as ReactDragEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -27,6 +27,7 @@ import {
 } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { createWordExcelReports } from "../excel-merger/excelWorkerClient";
+import { deduplicateDocumentFiles as deduplicateFiles, documentFileKey as fileKey, reorderDocumentFiles as reorder, stripDocumentExtension as stripExtension } from "../document-compare/filePairs";
 import { useWordCompareSession } from "./wordCompareSession";
 import { compareWordFilePairs } from "./wordWorkerClient";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
@@ -61,6 +62,8 @@ export function WordComparePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const operation = useOperationProgress();
+  const comparisonControllerRef = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => comparisonControllerRef.current?.abort(), []);
 
   const hasFiles = beforeFiles.length > 0 || afterFiles.length > 0;
   const hasOutput = webOutput || excelOutput || trackedOutput;
@@ -125,6 +128,8 @@ export function WordComparePage() {
     clearResults();
     setError(null);
     setLoading(true);
+    const controller = new AbortController();
+    comparisonControllerRef.current = controller;
     operation.start(L(`${beforeFiles.length}개 문서 쌍의 비교를 준비하고 있습니다.`, `Preparing ${beforeFiles.length} document pairs.`));
 
     try {
@@ -141,6 +146,7 @@ export function WordComparePage() {
           operation.update(excelOutput ? Math.round(nextProgress * 0.8) : nextProgress, message);
         },
         language,
+        controller.signal,
       );
       const comparisonResults = workerResults.map((item) => item.result);
 
@@ -149,7 +155,7 @@ export function WordComparePage() {
         operation.update(80, L(`${comparisonResults.length}개 Excel 보고서를 준비합니다.`, `Preparing ${comparisonResults.length} Excel reports.`));
         reportBuffers = await createWordExcelReports(comparisonResults, (nextProgress, message) => {
           operation.update(80 + Math.round(nextProgress * 0.2), message);
-        }, language);
+        }, language, controller.signal);
       }
 
       replaceResults(comparisonResults.map((result, index) => {
@@ -175,6 +181,7 @@ export function WordComparePage() {
       operation.fail(message);
     } finally {
       setLoading(false);
+      if (comparisonControllerRef.current === controller) comparisonControllerRef.current = undefined;
     }
   };
 
@@ -254,6 +261,7 @@ export function WordComparePage() {
       <div className="tool-action-bar">
         <div><TextSearch size={20} /><span><strong>{ready ? L(`${beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.`, `${beforeFiles.length} document pairs are ready.`) : pairingError ? L("양쪽 파일 개수를 맞춰 주세요.", "Use the same number of files on both sides.") : !hasOutput ? L("결과 형식을 하나 이상 선택해 주세요.", "Select at least one output format.") : L("수정 전·후 문서를 선택해 주세요.", "Choose before and after documents.")}</strong><small>{L("비교 중에도 화면을 계속 사용할 수 있습니다.", "You can continue using the page during comparison.")}</small></span></div>
         <PrimaryButton accent="blue" disabled={!ready || Boolean(pairingError)} loading={loading} onClick={() => void runComparison()}>{loading ? L(`${operation.progress}% 비교 중`, `Comparing ${operation.progress}%`) : beforeFiles.length ? L(`${beforeFiles.length}개 문서 쌍 비교`, `Compare ${beforeFiles.length} document pairs`) : L("문서 쌍 비교", "Compare document pairs")}</PrimaryButton>
+        {loading && <button type="button" className="secondary-button" onClick={() => comparisonControllerRef.current?.abort()}>{L("비교 취소", "Cancel comparison")}</button>}
       </div>
 
       <OperationProgress status={operation.status} progress={operation.progress} message={operation.message} logs={operation.logs} accent="blue" title={L("Word 비교 진행 상황", "Word comparison progress")} />
@@ -441,28 +449,6 @@ function PairingPreview({ beforeFiles, afterFiles, language }: { beforeFiles: Fi
   );
 }
 
-function reorder<T>(items: T[], from: number, to: number) {
-  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return items;
-  const next = [...items];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  return next;
-}
-
-function deduplicateFiles(files: File[]) {
-  const seen = new Set<string>();
-  return files.filter((file) => {
-    const key = fileKey(file);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function fileKey(file: File) {
-  return `${file.name}:${file.size}:${file.lastModified}`;
-}
-
 function createReportFileName(pairNumber: number, beforeName: string, afterName: string, language: "ko" | "en") {
   const base = `${pairNumber}_${stripExtension(beforeName)}_vs_${stripExtension(afterName)}`.replace(/[\\/:*?"<>|]/g, "_");
   return `${base.slice(0, 120)}_${language === "en" ? "comparison-report" : "비교보고서"}.xlsx`;
@@ -471,8 +457,4 @@ function createReportFileName(pairNumber: number, beforeName: string, afterName:
 function createTrackedFileName(pairNumber: number, beforeName: string, afterName: string, language: "ko" | "en") {
   const base = `${pairNumber}_${stripExtension(beforeName)}_vs_${stripExtension(afterName)}`.replace(/[\\/:*?"<>|]/g, "_");
   return `${base.slice(0, 120)}_${language === "en" ? "tracked-changes" : "변경추적"}.docx`;
-}
-
-function stripExtension(fileName: string) {
-  return fileName.replace(/\.[^.]+$/, "");
 }

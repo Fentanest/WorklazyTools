@@ -10,7 +10,12 @@ await copyVideoRuntime();
 
 async function copyPyodide() {
   const source = path.join(projectRoot, "node_modules", "pyodide");
-  const destination = path.join(publicVendorRoot, "pyodide", "0.29.4");
+  const packageMetadata = JSON.parse(await fs.readFile(path.join(source, "package.json"), "utf8"));
+  const declaredVersion = JSON.parse(await fs.readFile(path.join(projectRoot, "package.json"), "utf8")).dependencies?.pyodide;
+  if (!packageMetadata.version || packageMetadata.version !== declaredVersion) {
+    throw new Error(`Pyodide version mismatch: package.json=${declaredVersion ?? "missing"}, installed=${packageMetadata.version ?? "missing"}`);
+  }
+  const destination = path.join(publicVendorRoot, "pyodide", packageMetadata.version);
   await fs.rm(destination, { recursive: true, force: true });
   await fs.mkdir(destination, { recursive: true });
   await Promise.all([

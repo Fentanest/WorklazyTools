@@ -254,17 +254,30 @@ function readHeaderFooters(document: HwpDocument, formatting: boolean) {
 
 function readNotes(document: HwpDocument, formatting: boolean) {
   const records: HwpParagraph[] = [];
-  const controls = safeJson<Array<{ ctrlId?: string; list?: number; para?: number; controlIndex?: number }>>(document.getControls(), []);
+  const controls = safeJson<Array<{
+    ctrlId?: string;
+    list?: number;
+    para?: number;
+    controlIndex?: number;
+    section?: number;
+    sectionIdx?: number;
+    secIdx?: number;
+  }>>(document.getControls(), []);
   const seen = new Set<string>();
   for (const control of controls) {
     if ((control.ctrlId !== "fn" && control.ctrlId !== "en") || control.para === undefined || control.controlIndex === undefined) continue;
-    for (let section = 0; section < document.getSectionCount(); section += 1) {
+    const declaredSection = control.sectionIdx ?? control.secIdx ?? control.section;
+    const sections = declaredSection === undefined
+      ? Array.from({ length: document.getSectionCount() }, (_, section) => section)
+      : [declaredSection];
+    for (const section of sections) {
+      if (section < 0 || section >= document.getSectionCount()) continue;
       if (control.para >= document.getParagraphCount(section)) continue;
       try {
         const info = safeJson<{ ok?: boolean; number?: number; texts?: string[]; paraCount?: number }>(document.getFootnoteInfo(section, control.para, control.controlIndex), {});
         if (!info.ok) continue;
-        const key = `${section}:${control.para}:${control.controlIndex}:${control.ctrlId}`;
-        if (seen.has(key)) break;
+        const key = `${section}:${control.list ?? ""}:${control.para}:${control.controlIndex}:${control.ctrlId}:${info.number ?? ""}`;
+        if (seen.has(key)) continue;
         seen.add(key);
         const text = (info.texts ?? []).map(cleanText).filter(Boolean).join("\n");
         if (text) {
@@ -324,10 +337,10 @@ function compareModels(beforeName: string, afterName: string, before: HwpModel, 
   const headerFooter = compareRecordList(before.headerFooter, after.headerFooter, "headerFooter", changes, options.formatting);
   const note = compareRecordList(before.notes, after.notes, "note", changes, options.formatting);
   const summary = { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0 };
-  for (const view of [...documentViews, ...headerFooter, ...note]) {
-    if (view.kind === "unchanged" || view.kind === "comment") summary.unchanged += 1;
-    else summary[view.kind] += 1;
-  }
+  for (const change of changes) summary[change.kind] += 1;
+  summary.unchanged = [...documentViews, ...headerFooter, ...note]
+    .filter((view) => view.kind === "unchanged" || view.kind === "comment")
+    .length;
 
   return {
     beforeName,

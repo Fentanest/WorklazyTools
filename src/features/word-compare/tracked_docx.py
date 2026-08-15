@@ -311,48 +311,7 @@ def _block_similarity(before, after):
 
 
 def _align_elements_dynamic(before, after, similarity, gap_cost):
-    before_count = len(before)
-    after_count = len(after)
-    costs = [[0.0] * (after_count + 1) for _ in range(before_count + 1)]
-    choices = [[""] * (after_count + 1) for _ in range(before_count + 1)]
-    for before_index in range(1, before_count + 1):
-        costs[before_index][0] = before_index * gap_cost
-        choices[before_index][0] = "delete"
-    for after_index in range(1, after_count + 1):
-        costs[0][after_index] = after_index * gap_cost
-        choices[0][after_index] = "insert"
-
-    for before_index in range(1, before_count + 1):
-        for after_index in range(1, after_count + 1):
-            score = similarity(before[before_index - 1], after[after_index - 1])
-            match_cost = 1.0 - score if score >= 0 else gap_cost * 2 + 0.1
-            candidates = (
-                (costs[before_index - 1][after_index - 1] + match_cost, "match"),
-                (costs[before_index - 1][after_index] + gap_cost, "delete"),
-                (costs[before_index][after_index - 1] + gap_cost, "insert"),
-            )
-            costs[before_index][after_index], choices[before_index][after_index] = min(
-                candidates,
-                key=lambda item: (item[0], 0 if item[1] == "match" else 1),
-            )
-
-    pairs = []
-    before_index = before_count
-    after_index = after_count
-    while before_index > 0 or after_index > 0:
-        choice = choices[before_index][after_index]
-        if choice == "match":
-            pairs.append((before_index - 1, after_index - 1))
-            before_index -= 1
-            after_index -= 1
-        elif choice == "delete":
-            pairs.append((before_index - 1, None))
-            before_index -= 1
-        else:
-            pairs.append((None, after_index - 1))
-            after_index -= 1
-    pairs.reverse()
-    return pairs
+    return align_dynamic_indices(before, after, similarity, gap_cost)
 
 
 def _alignment_key(element, similarity):
@@ -380,7 +339,7 @@ def _alignment_key(element, similarity):
     return repr(element)
 
 
-def _align_elements(before, after, similarity=_block_similarity, gap_cost=0.58):
+def _align_elements(before, after, similarity=_block_similarity, gap_cost=ALIGNMENT_GAP_COST):
     """Anchor identical content first, then compare only the changed spans.
 
     A single global fuzzy alignment can drift around repeated blank paragraphs or
@@ -448,7 +407,7 @@ def _tracked_looks_like_paragraph_split(single_element, first_element, second_el
     minimum_suffix = min(24, max(8, round(min(len(single), len(second)) * 0.12)))
     covered = min(len(single), prefix + suffix) / len(single)
     non_overlapping = prefix < len(single) - minimum_suffix // 2 and suffix < len(single) - minimum_prefix // 2
-    return prefix >= minimum_prefix and suffix >= minimum_suffix and covered >= 0.58 and non_overlapping
+    return prefix >= minimum_prefix and suffix >= minimum_suffix and covered >= PARAGRAPH_SPLIT_COVERAGE and non_overlapping
 
 
 def _tracked_group_paragraph_alignment(pairs, before, after):
@@ -578,12 +537,7 @@ def _append_text_nodes(run, text, deleted=False):
             if chunk[:1].isspace() or chunk[-1:].isspace():
                 node.set(XML_SPACE, "preserve")
         character = match.group(0)
-        if deleted:
-            node = ET.SubElement(run, text_tag)
-            node.text = character
-            node.set(XML_SPACE, "preserve")
-        else:
-            ET.SubElement(run, W + ("tab" if character == "\t" else "br"))
+        ET.SubElement(run, W + ("tab" if character == "\t" else "br"))
         cursor = match.end()
     if cursor < len(text) or not text:
         node = ET.SubElement(run, text_tag)
@@ -626,11 +580,7 @@ def _mark_paragraph_end(paragraph, kind, writer):
     if run_properties is None:
         run_properties = ET.SubElement(paragraph_properties, W + "rPr")
     marker = ET.Element(W + kind, writer.attributes())
-    change = run_properties.find(W + "rPrChange")
-    if change is None:
-        run_properties.append(marker)
-    else:
-        run_properties.insert(list(run_properties).index(change), marker)
+    run_properties.insert(0, marker)
 
 
 def _plain_paragraph_from_tokens(source, tokens):
@@ -942,6 +892,7 @@ def _table_revision(before, after, include_formatting, writer):
         if after_row_index is None:
             row = _accepted_copy(before_rows[before_row_index])
             _mark_row(row, "del", writer)
+            _revisionize_deleted_row(row, writer)
             revised_rows.append(row)
             continue
 
@@ -980,7 +931,17 @@ def _whole_table_revision(source, kind, writer):
     table = copy.deepcopy(source) if kind == "ins" else _accepted_copy(source)
     for row in table.findall(W + "tr"):
         _mark_row(row, kind, writer)
+        if kind == "del":
+            _revisionize_deleted_row(row, writer)
     return table
+
+
+def _revisionize_deleted_row(row, writer):
+    for cell in row.findall(W + "tc"):
+        for index, child in enumerate(list(cell)):
+            if child.tag == W + "p":
+                cell.remove(child)
+                cell.insert(index, _whole_paragraph_revision(child, "del", writer))
 
 
 def _whole_content_control_revision(source, kind, writer, include_formatting, include_tables):
@@ -1157,17 +1118,20 @@ def _revisionize_styles(before_data, after_data, writer):
 
 def _enable_revision_display(settings_data):
     root = _parse_xml(settings_data)
-    track_revisions = root.find(W + "trackRevisions")
-    if track_revisions is None:
-        root.insert(0, ET.Element(W + "trackRevisions", {W + "val": "true"}))
     revision_view = root.find(W + "revisionView")
     if revision_view is None:
-        root.insert(1, ET.Element(W + "revisionView", {
+        revision_view = ET.Element(W + "revisionView", {
             W + "markup": "true",
             W + "comments": "true",
             W + "insDel": "true",
             W + "formatting": "true",
-        }))
+        })
+        track_revisions = root.find(W + "trackRevisions")
+        if track_revisions is not None:
+            root.insert(list(root).index(track_revisions), revision_view)
+        else:
+            later = next((item for item in root if item.tag in (W + "doNotTrackMoves", W + "doNotTrackFormatting", W + "documentProtection")), None)
+            root.insert(list(root).index(later) if later is not None else len(root), revision_view)
     return _serialize_xml(root)
 
 
@@ -1201,12 +1165,29 @@ def _next_revision_id(*archives):
     return maximum + 1
 
 
-def _merge_numbering(before_data, after_data):
+def _merge_numbering(before_data, after_data, referenced_number_ids):
     before_root = _parse_xml(before_data)
+    referenced_number_ids = {str(value) for value in referenced_number_ids if str(value) != "0"}
+    referenced_numbers = [
+        number for number in before_root.findall(W + "num")
+        if number.get(W + "numId") in referenced_number_ids
+    ]
+    referenced_abstract_ids = {
+        abstract_id.get(W + "val")
+        for number in referenced_numbers
+        for abstract_id in [number.find(W + "abstractNumId")]
+        if abstract_id is not None and abstract_id.get(W + "val") is not None
+    }
     if after_data is None:
+        for abstract in list(before_root.findall(W + "abstractNum")):
+            if abstract.get(W + "abstractNumId") not in referenced_abstract_ids:
+                before_root.remove(abstract)
+        for number in list(before_root.findall(W + "num")):
+            if number.get(W + "numId") not in referenced_number_ids:
+                before_root.remove(number)
         mapping = {
             number.get(W + "numId"): number.get(W + "numId")
-            for number in before_root.findall(W + "num")
+            for number in referenced_numbers
             if number.get(W + "numId") not in (None, "0")
         }
         return _serialize_xml(before_root), mapping
@@ -1220,7 +1201,7 @@ def _merge_numbering(before_data, after_data):
     copied_abstracts = []
     for abstract in before_root.findall(W + "abstractNum"):
         old_id = abstract.get(W + "abstractNumId")
-        if old_id is None:
+        if old_id is None or old_id not in referenced_abstract_ids:
             continue
         new_id = str(next_abstract_id)
         next_abstract_id += 1
@@ -1235,7 +1216,7 @@ def _merge_numbering(before_data, after_data):
     ) + 1
     number_mapping = {}
     copied_numbers = []
-    for number in before_root.findall(W + "num"):
+    for number in referenced_numbers:
         old_id = number.get(W + "numId")
         if old_id in (None, "0"):
             continue
@@ -1266,6 +1247,20 @@ def _merge_numbering(before_data, after_data):
     for offset, copied in enumerate(copied_numbers):
         after_root.insert(number_insert_index + offset, copied)
     return _serialize_xml(after_root), number_mapping
+
+
+def _referenced_number_ids(archive, names):
+    referenced = set()
+    for name in names:
+        try:
+            root = _parse_xml(archive.read(name))
+        except (KeyError, ET.ParseError):
+            continue
+        for number_id in root.iter(W + "numId"):
+            value = number_id.get(W + "val")
+            if value not in (None, "0"):
+                referenced.add(value)
+    return referenced
 
 
 def _remap_numbering_references(data, number_mapping):
@@ -1325,9 +1320,21 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         additions = {}
         number_mapping = {}
         if "word/numbering.xml" in before_names:
+            reference_parts = ["word/document.xml"]
+            if include_metadata:
+                reference_parts.extend(
+                    name for name in before_names
+                    if re.fullmatch(r"word/(header|footer)\d+\.xml", name) and name in after_names
+                )
+                reference_parts.extend(
+                    name for name in ("word/footnotes.xml", "word/endnotes.xml")
+                    if name in before_names and name in after_names
+                )
+            referenced_number_ids = _referenced_number_ids(before_archive, reference_parts)
             merged_numbering, number_mapping = _merge_numbering(
                 before_archive.read("word/numbering.xml"),
                 after_archive.read("word/numbering.xml") if "word/numbering.xml" in after_names else None,
+                referenced_number_ids,
             )
             if "word/numbering.xml" in after_names:
                 replacements["word/numbering.xml"] = merged_numbering

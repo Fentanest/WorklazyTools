@@ -2,6 +2,7 @@
 
 import { applyPalette, GIFEncoder, quantize } from "gifenc";
 import JSZip from "jszip";
+import { calculateCollageLayout, CollageLayoutError } from "./collageLayout";
 
 import type {
   BatchImageOptions,
@@ -9,16 +10,13 @@ import type {
   GifOptions,
   ImageOutputFormat,
   ImageWorkerInput,
+  ImageWorkerRequest,
   ImageWorkerResult,
   WatermarkPosition,
 } from "./types";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 
-type ImageWorkerRequest =
-  | { type: "batch"; inputs: ImageWorkerInput[]; options: BatchImageOptions; archiveName: string; language?: string }
-  | { type: "collage"; inputs: ImageWorkerInput[]; options: CollageOptions; fileName: string; language?: string }
-  | { type: "gif"; inputs: ImageWorkerInput[]; options: GifOptions; fileName: string; language?: string };
 let currentLanguage: "ko" | "en" = "ko";
 
 worker.onmessage = async (event: MessageEvent<ImageWorkerRequest>) => {
@@ -55,7 +53,8 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
         context.drawImage(bitmap, size.sourceX, size.sourceY, size.sourceWidth, size.sourceHeight, size.destX, size.destY, size.destWidth, size.destHeight);
         drawWatermark(context, size.width, size.height, options, watermark);
         const blob = await canvas.convertToBlob({ type: formatMime(options.format), quality: options.quality });
-        zip.file(`${String(index + 1).padStart(2, "0")}-${sanitizeName(stripExtension(input.name))}.${formatExtension(options.format)}`, await blob.arrayBuffer());
+        const actualFormat = formatFromMime(blob.type, options.format);
+        zip.file(`${String(index + 1).padStart(2, "0")}-${sanitizeName(stripExtension(input.name))}.${formatExtension(actualFormat)}`, blob);
         canvas.width = 1;
         canvas.height = 1;
       } finally {
@@ -93,7 +92,8 @@ async function createCollage(inputs: ImageWorkerInput[], options: CollageOptions
     }
     progress(91, local("콜라주 이미지를 저장하는 중…", "Saving collage image…"));
     const blob = await canvas.convertToBlob({ type: formatMime(options.format), quality: options.quality });
-    const result = binaryResult(await blob.arrayBuffer(), ensureExtension(fileName, formatExtension(options.format)), blob.type, []);
+    const actualFormat = formatFromMime(blob.type, options.format);
+    const result = binaryResult(await blob.arrayBuffer(), ensureExtension(fileName, formatExtension(actualFormat)), blob.type, actualFormat === options.format ? [] : [local("이 브라우저가 요청한 이미지 형식을 인코딩하지 못해 PNG로 저장했습니다.", "This browser could not encode the requested image format, so the result was saved as PNG.")]);
     canvas.width = 1;
     canvas.height = 1;
     progress(100, local("콜라주 생성 완료", "Collage created"));
@@ -120,9 +120,11 @@ async function createGif(inputs: ImageWorkerInput[], options: GifOptions, fileNa
       context.clearRect(0, 0, width, height);
       drawContained(context, bitmaps[index], 0, 0, width, height);
       const pixels = context.getImageData(0, 0, width, height).data;
+      const hasTransparency = hasTransparentPixel(pixels);
       const palette = quantize(pixels, options.qualityColors, { format: "rgba4444", oneBitAlpha: 20 });
       const indexed = applyPalette(pixels, palette, "rgba4444");
-      gif.writeFrame(indexed, width, height, { palette, delay: options.delay, repeat: 0, transparent: true });
+      const transparentIndex = hasTransparency ? palette.findIndex((color) => color[3] === 0) : -1;
+      gif.writeFrame(indexed, width, height, { palette, delay: Math.max(20, options.delays?.[index] ?? options.delay), repeat: 0, transparent: hasTransparency && transparentIndex >= 0, transparentIndex: transparentIndex >= 0 ? transparentIndex : 0 });
       progress(10 + ((index + 1) / bitmaps.length) * 80, `[${index + 1}/${bitmaps.length}] ${local("GIF 프레임 인코딩 중…", "Encoding GIF frame…")}`);
     }
     gif.finish();
@@ -159,30 +161,6 @@ function drawPlan(sourceWidth: number, sourceHeight: number, width: number, heig
   return { width, height, sourceX: (sourceWidth - cropWidth) / 2, sourceY: (sourceHeight - cropHeight) / 2, sourceWidth: cropWidth, sourceHeight: cropHeight, destX: 0, destY: 0, destWidth: width, destHeight: height };
 }
 
-function calculateCollageLayout(bitmaps: ImageBitmap[], options: CollageOptions) {
-  const gap = Math.max(0, Math.round(options.gap));
-  const outputWidth = Math.max(1, Math.round(options.width));
-  if (options.layout === "vertical") {
-    const width = outputWidth;
-    const heights = bitmaps.map((bitmap) => Math.round(bitmap.height * width / bitmap.width));
-    let y = 0;
-    const cells = heights.map((height) => { const cell = { x: 0, y, width, height }; y += height + gap; return cell; });
-    return { width, height: y - gap, cells };
-  }
-  if (options.layout === "horizontal") {
-    if (outputWidth - gap * (bitmaps.length - 1) < bitmaps.length) throw new Error(local("전체 가로 크기에 비해 이미지 수와 간격이 너무 큽니다.", "There are too many images or too much gap for the total width."));
-    const cellWidth = Math.max(1, Math.floor((outputWidth - gap * (bitmaps.length - 1)) / bitmaps.length));
-    const height = Math.max(...bitmaps.map((bitmap) => Math.round(bitmap.height * cellWidth / bitmap.width)));
-    return { width: outputWidth, height, cells: bitmaps.map((_, index) => ({ x: index * (cellWidth + gap), y: 0, width: cellWidth, height })) };
-  }
-  const columns = Math.max(1, Math.min(Math.round(options.columns), bitmaps.length));
-  if (outputWidth - gap * (columns - 1) < columns) throw new Error(local("전체 가로 크기에 비해 열 개수와 간격이 너무 큽니다.", "There are too many columns or too much gap for the total width."));
-  const rows = Math.ceil(bitmaps.length / columns);
-  const cellWidth = Math.floor((outputWidth - gap * (columns - 1)) / columns);
-  const cellHeight = Math.round(cellWidth * 0.75);
-  return { width: outputWidth, height: rows * cellHeight + (rows - 1) * gap, cells: bitmaps.map((_, index) => ({ x: (index % columns) * (cellWidth + gap), y: Math.floor(index / columns) * (cellHeight + gap), width: cellWidth, height: cellHeight })) };
-}
-
 function drawContained(context: OffscreenCanvasRenderingContext2D, bitmap: ImageBitmap, x: number, y: number, width: number, height: number) {
   const scale = Math.min(width / bitmap.width, height / bitmap.height);
   const drawnWidth = bitmap.width * scale;
@@ -207,7 +185,8 @@ function drawWatermark(context: OffscreenCanvasRenderingContext2D, width: number
     const targetHeight = watermark.height * targetWidth / watermark.width;
     const point = positionPoint(options.watermarkPosition, width, height, targetWidth, targetHeight, margin);
     context.drawImage(watermark, point.x, point.y, targetWidth, targetHeight);
-  } else if (options.watermarkText.trim()) {
+  }
+  if (options.watermarkText.trim()) {
     const fontSize = Math.max(14, Math.round(Math.min(width, height) * 0.045));
     context.font = `700 ${fontSize}px sans-serif`;
     context.fillStyle = "#ffffff";
@@ -289,6 +268,18 @@ function formatExtension(format: ImageOutputFormat) {
   return format === "jpeg" ? "jpg" : format;
 }
 
+function formatFromMime(mimeType: string, requested: ImageOutputFormat): ImageOutputFormat {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/jpeg") return "jpeg";
+  if (mimeType === "image/webp") return "webp";
+  return requested;
+}
+
+function hasTransparentPixel(pixels: Uint8ClampedArray) {
+  for (let index = 3; index < pixels.length; index += 4) if (pixels[index] < 255) return true;
+  return false;
+}
+
 function stripExtension(name: string) {
   return name.replace(/\.[^.]+$/, "");
 }
@@ -302,6 +293,7 @@ function ensureExtension(name: string, extension: string) {
 }
 
 function normalizeError(error: unknown) {
+  if (error instanceof CollageLayoutError) return { code: error.code };
   const message = error instanceof Error ? error.message : String(error);
   if (/memory|allocation|canvas.*size|브라우저 한도|browser limits/i.test(message)) return { message: local("이미지 크기나 개수가 브라우저 메모리 한도를 넘었습니다. 출력 크기 또는 파일 수를 줄여 주세요.", "The image dimensions or count exceeded browser memory limits. Reduce output dimensions or file count."), code: "OUT_OF_MEMORY" };
   return { message, code: "IMAGE_PROCESSING_ERROR" };

@@ -8,6 +8,7 @@ export interface ExcelInputPayload {
   buffer: ArrayBuffer;
   password?: string;
   selectedSheetNames?: string[];
+  csvEncoding?: "auto" | "utf-8" | "euc-kr";
 }
 
 export interface ExcelMergeOptions {
@@ -17,6 +18,7 @@ export interface ExcelMergeOptions {
   sheetTrimRows: boolean;
   sheetTrimColumns: boolean;
   sheetTrimThreshold: number;
+  skipHeaderRows: number;
   sheetNameRule: SheetNameRule;
   outputPassword?: string;
 }

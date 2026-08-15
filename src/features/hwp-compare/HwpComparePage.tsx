@@ -12,7 +12,7 @@ import {
   TextSearch,
   X,
 } from "lucide-react";
-import { type DragEvent as ReactDragEvent, useState } from "react";
+import { type DragEvent as ReactDragEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -23,6 +23,7 @@ import { ToolGuide } from "../../components/ToolGuide";
 import { FileDropZone, formatBytes, PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { createWordExcelReports } from "../excel-merger/excelWorkerClient";
+import { deduplicateDocumentFiles as deduplicateFiles, reorderDocumentFiles as reorder, stripDocumentExtension as stripExtension } from "../document-compare/filePairs";
 import { fileKey, useHwpCompareSession } from "./hwpCompareSession";
 import { compareHwpFilePairs } from "./hwpWorkerClient";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
@@ -35,6 +36,8 @@ export function HwpComparePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const operation = useOperationProgress();
+  const comparisonControllerRef = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => comparisonControllerRef.current?.abort(), []);
   const hasFiles = session.beforeFiles.length > 0 || session.afterFiles.length > 0;
   const countMismatch = hasFiles && session.beforeFiles.length !== session.afterFiles.length;
   const hasOutput = session.webOutput || session.excelOutput;
@@ -88,6 +91,8 @@ export function HwpComparePage() {
     session.clearResults();
     setError(null);
     setLoading(true);
+    const controller = new AbortController();
+    comparisonControllerRef.current = controller;
     operation.start(L(`${session.beforeFiles.length}개 HWP 문서 쌍의 비교를 준비하고 있습니다.`, `Preparing ${session.beforeFiles.length} HWP document pairs.`));
     try {
       const workerResults = await compareHwpFilePairs(
@@ -100,12 +105,13 @@ export function HwpComparePage() {
         { formatting: session.formatting, tables: session.tables, metadata: session.metadata },
         (nextProgress, message) => operation.update(session.excelOutput ? Math.round(nextProgress * 0.8) : nextProgress, message),
         language,
+        controller.signal,
       );
       const comparisonResults = workerResults.map((item) => item.result);
       let reports: ArrayBuffer[] = [];
       if (session.excelOutput) {
         operation.update(80, L(`${comparisonResults.length}개 Excel 보고서를 준비합니다.`, `Preparing ${comparisonResults.length} Excel reports.`));
-        reports = await createWordExcelReports(comparisonResults, (nextProgress, message) => operation.update(80 + Math.round(nextProgress * 0.2), message), language);
+        reports = await createWordExcelReports(comparisonResults, (nextProgress, message) => operation.update(80 + Math.round(nextProgress * 0.2), message), language, controller.signal);
       }
       session.replaceResults(comparisonResults.map((result, index) => {
         const report = reports[index];
@@ -123,6 +129,7 @@ export function HwpComparePage() {
       operation.fail(message);
     } finally {
       setLoading(false);
+      if (comparisonControllerRef.current === controller) comparisonControllerRef.current = undefined;
     }
   };
 
@@ -183,6 +190,7 @@ export function HwpComparePage() {
       <div className="tool-action-bar">
         <div><TextSearch size={20} /><span><strong>{ready ? L(`${session.beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.`, `${session.beforeFiles.length} document pairs are ready.`) : pairingError ? L("양쪽 파일 개수를 맞춰 주세요.", "Use the same number of files on both sides.") : !hasOutput ? L("결과 형식을 하나 이상 선택해 주세요.", "Select at least one output format.") : L("수정 전·후 문서를 선택해 주세요.", "Choose before and after documents.")}</strong><small>{L("파일과 입력한 암호는 현재 브라우저 메모리에서만 사용됩니다.", "Files and passwords are used only in current browser memory.")}</small></span></div>
         <PrimaryButton accent="orange" disabled={!ready || Boolean(pairingError)} loading={loading} onClick={() => void runComparison()}>{loading ? L(`${operation.progress}% 비교 중`, `Comparing ${operation.progress}%`) : session.beforeFiles.length ? L(`${session.beforeFiles.length}개 문서 쌍 비교`, `Compare ${session.beforeFiles.length} document pairs`) : L("문서 쌍 비교", "Compare document pairs")}</PrimaryButton>
+        {loading && <button type="button" className="secondary-button" onClick={() => comparisonControllerRef.current?.abort()}>{L("비교 취소", "Cancel comparison")}</button>}
       </div>
       <OperationProgress status={operation.status} progress={operation.progress} message={operation.message} logs={operation.logs} accent="orange" title={L("HWP 비교 진행 상황", "HWP comparison progress")} />
       {error && !pairingError && <div className="error-banner" role="alert"><AlertCircle size={19} /><div><strong>{L("비교하지 못했습니다.", "Comparison failed.")}</strong><span>{error}</span></div></div>}
@@ -294,9 +302,9 @@ function HwpFileRow({ file, index, count, side, password, onPassword, onRemove, 
     <li
       className={dragging ? "dragging" : ""}
       draggable
-      onDragStart={(event) => { setDragging(true); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-hwp-index", String(index)); }}
-      onDragOver={(event) => { if (event.dataTransfer.types.includes("application/x-hwp-index")) event.preventDefault(); }}
-      onDrop={(event) => { if (!event.dataTransfer.types.includes("application/x-hwp-index")) return; event.preventDefault(); const from = Number(event.dataTransfer.getData("application/x-hwp-index")); if (Number.isInteger(from)) onMove(from, index); setDragging(false); }}
+      onDragStart={(event) => { setDragging(true); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData(`application/x-hwp-index-${side}`, String(index)); }}
+      onDragOver={(event) => { if (event.dataTransfer.types.includes(`application/x-hwp-index-${side}`)) event.preventDefault(); }}
+      onDrop={(event) => { const mime = `application/x-hwp-index-${side}`; if (!event.dataTransfer.types.includes(mime)) return; event.preventDefault(); const from = Number(event.dataTransfer.getData(mime)); if (Number.isInteger(from)) onMove(from, index); setDragging(false); }}
       onDragEnd={() => setDragging(false)}
     >
       <span className="drag-handle" title={language === "en" ? "Drag to reorder" : "드래그해서 순서 변경"}><GripVertical size={16} /></span>
@@ -321,24 +329,7 @@ function isHwpFile(file: File) {
   return /\.(hwp|hwpx)$/i.test(file.name);
 }
 
-function reorder<T>(items: T[], from: number, to: number) {
-  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return items;
-  const next = [...items];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  return next;
-}
-
-function deduplicateFiles(files: File[]) {
-  const seen = new Set<string>();
-  return files.filter((file) => { const key = fileKey(file); if (seen.has(key)) return false; seen.add(key); return true; });
-}
-
 function createReportFileName(pairNumber: number, beforeName: string, afterName: string, language: "ko" | "en") {
   const base = `${pairNumber}_${stripExtension(beforeName)}_vs_${stripExtension(afterName)}`.replace(/[\\/:*?"<>|]/g, "_");
   return `${base.slice(0, 120)}_${language === "en" ? "HWP-comparison-report" : "HWP-비교보고서"}.xlsx`;
-}
-
-function stripExtension(fileName: string) {
-  return fileName.replace(/\.[^.]+$/, "");
 }

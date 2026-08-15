@@ -6,6 +6,7 @@ import JSZip from "jszip";
 import process from "process";
 
 import type { PdfTextDocument, PdfWorkerResult } from "./types";
+import { ensurePdfExtension as ensureExtension, pdfBinaryResult as binaryResult } from "./pdfShared";
 
 Object.assign(globalThis, { Buffer, process });
 
@@ -47,8 +48,14 @@ async function buildOfficeFile(data: {
     workbook.creator = "Worklazy Tools";
     data.document.pages.forEach((page, pageIndex) => {
       const sheet = workbook.addWorksheet(uniqueSheetName(workbook, L(`페이지 ${page.pageNumber}`, `Page ${page.pageNumber}`)));
-      page.lines.forEach((line) => sheet.addRow(line.cells.length ? line.cells.map((cell) => cell.text) : [line.text]));
-      const maxColumns = Math.max(1, ...page.lines.map((line) => line.cells.length));
+      const columnPositions = clusterColumnPositions(page.lines.flatMap((line) => line.cells.map((cell) => cell.x)));
+      page.lines.forEach((line) => {
+        if (!line.cells.length || !columnPositions.length) { sheet.addRow([line.text]); return; }
+        const values = Array<string>(columnPositions.length).fill("");
+        line.cells.forEach((cell) => { values[nearestColumn(columnPositions, cell.x)] = cell.text; });
+        sheet.addRow(values);
+      });
+      const maxColumns = Math.max(1, columnPositions.length);
       for (let column = 1; column <= maxColumns; column += 1) sheet.getColumn(column).width = 24;
       progress(15 + ((pageIndex + 1) / data.document.pages.length) * 72, L(`[${pageIndex + 1}/${data.document.pages.length}] 워크시트 작성 완료`, `[${pageIndex + 1}/${data.document.pages.length}] Worksheet created`));
     });
@@ -88,18 +95,25 @@ function uniqueSheetName(workbook: ExcelJS.Workbook, requested: string) {
   return name;
 }
 
-function binaryResult(bytes: Uint8Array | ArrayBuffer, fileName: string, mimeType: string, warnings: string[]): PdfWorkerResult {
-  const buffer = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  return { buffer, fileName, mimeType, warnings };
-}
-
-function ensureExtension(name: string, extension: string) {
-  const base = name.trim().replace(/\.[^.]+$/, "") || "worklazy-result";
-  return `${base}.${extension}`;
-}
-
 function escapeXml(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+
+function clusterColumnPositions(values: number[]) {
+  const sorted = values.filter(Number.isFinite).sort((left, right) => left - right);
+  const clusters: number[][] = [];
+  sorted.forEach((value) => {
+    const cluster = clusters.find((candidate) => Math.abs(candidate.reduce((sum, item) => sum + item, 0) / candidate.length - value) <= 18);
+    if (cluster) cluster.push(value);
+    else clusters.push([value]);
+  });
+  return clusters.map((cluster) => cluster.reduce((sum, value) => sum + value, 0) / cluster.length).sort((left, right) => left - right);
+}
+
+function nearestColumn(columns: number[], value: number) {
+  let nearest = 0;
+  for (let index = 1; index < columns.length; index += 1) if (Math.abs(columns[index] - value) < Math.abs(columns[nearest] - value)) nearest = index;
+  return nearest;
 }
 
 export {};
