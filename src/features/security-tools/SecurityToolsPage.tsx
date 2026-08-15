@@ -1,14 +1,12 @@
 import { Copy, KeyRound, RefreshCw, Shield, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ZxcvbnFactory } from "@zxcvbn-ts/core";
 
 import { PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
+import { strengthChecker } from "./securityStrength";
 
 const SETS = { upper: "ABCDEFGHJKLMNPQRSTUVWXYZ", lower: "abcdefghijkmnopqrstuvwxyz", number: "23456789", symbol: "!@#$%^&*()-_=+[]{}?" };
-const strengthChecker = new ZxcvbnFactory();
-
 export function SecurityToolsPage() {
   const { t } = useTranslation("features");
   const [length, setLength] = useState(20); const [upper, setUpper] = useState(true); const [lower, setLower] = useState(true); const [number, setNumber] = useState(true); const [symbol, setSymbol] = useState(true);

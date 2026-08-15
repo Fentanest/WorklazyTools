@@ -431,7 +431,7 @@ function ImageEditor() {
       if (!context) return;
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, flattened.width, flattened.height);
-      context.drawImage(instance.getElement(), 0, 0);
+      context.drawImage(instance.getElement(), 0, 0, flattened.width, flattened.height);
       dataUrl = flattened.toDataURL("image/jpeg", 0.92);
       flattened.width = 1; flattened.height = 1;
     } else dataUrl = instance.toDataURL({ format, quality: 0.92, multiplier: 1 });

@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 
-import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";
 import { format as formatSql } from "sql-formatter";
+
+import { formatXml } from "./formatterCore";
 
 type FormatKind = "json" | "sql" | "xml";
 
@@ -16,11 +17,7 @@ self.onmessage = (event: MessageEvent<{ kind: FormatKind; mode: "pretty" | "mini
       result = mode === "pretty" ? formatted : collapseSql(formatted);
     }
     if (kind === "xml") {
-      const validation = XMLValidator.validate(text, { allowBooleanAttributes: true });
-      if (validation !== true) throw new Error(korean ? `XML ${validation.err.line}행 ${validation.err.col}열: ${validation.err.msg}` : `XML line ${validation.err.line}, column ${validation.err.col}: ${validation.err.msg}`);
-      const parser = new XMLParser({ ignoreAttributes: false, preserveOrder: true, commentPropName: "#comment" });
-      const builder = new XMLBuilder({ ignoreAttributes: false, preserveOrder: true, format: mode === "pretty", indentBy: " ".repeat(indent), suppressEmptyNode: false, commentPropName: "#comment" });
-      result = builder.build(parser.parse(text));
+      result = formatXml(text, mode, indent, korean);
     }
     self.postMessage({ type: "result", result });
   } catch (error) {

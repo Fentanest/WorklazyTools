@@ -7,6 +7,7 @@ import process from "process";
 import { Readable } from "readable-stream";
 import * as XLSX from "xlsx";
 
+import { preserveCsvValue } from "./csvImport";
 import type {
   ExcelInputPayload,
   ExcelInspectionResult,
@@ -299,7 +300,10 @@ async function readCsv(fileName: string, data: Uint8Array) {
   const stream = new Readable({ read() {} });
   stream.push(Buffer.from(data));
   stream.push(null);
-  await workbook.csv.read(stream, { sheetName: stripExtension(fileName) || "CSV" });
+  await workbook.csv.read(stream, {
+    sheetName: stripExtension(fileName) || "CSV",
+    map: preserveCsvValue,
+  });
   return workbook;
 }
 

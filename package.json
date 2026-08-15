@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build && node scripts/generate-static-pages.mjs",
     "preview": "vite preview",
     "test:browser": "node tests/browser-smoke.mjs",
+    "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
@@ -23,6 +24,8 @@
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/kor": "1.0.0",
     "@zxcvbn-ts/core": "^4.2.0",
+    "@zxcvbn-ts/language-common": "^3.0.4",
+    "@zxcvbn-ts/language-en": "^3.0.2",
     "buffer": "^6.0.3",
     "change-case": "^5.4.4",
     "coi-serviceworker": "0.1.7",

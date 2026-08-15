@@ -41,7 +41,9 @@ try {
       console.log("[1/4] HWP editor");
       await testHwpEditor(page, fixtures.hwpFiles);
       console.log("[2/4] Image studio");
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
       await testImageStudio(page, fixtures.images);
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
     }
     if (!onlyVideo) {
       console.log("[3/4] Audio studio");
@@ -165,6 +167,52 @@ async function testImageStudio(page, imagePaths) {
   });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const styledCanvas = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  await page.evaluate(() => {
+    window.__worklazyExportDataUrl = "";
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function captureImageExport() {
+      if (this.href.startsWith("data:image/jpeg")) {
+        window.__worklazyExportDataUrl = this.href;
+        return;
+      }
+      return originalClick.call(this);
+    };
+  });
+  await page.$$eval(".image-format-control button", (buttons) => {
+    const jpg = buttons.find((button) => button.textContent?.trim() === "JPG");
+    if (!(jpg instanceof HTMLButtonElement)) throw new Error("JPG export option is unavailable");
+    jpg.click();
+  });
+  await page.click(".export-row .primary-button");
+  const jpegGreenBounds = await page.evaluate(async () => {
+    const dataUrl = window.__worklazyExportDataUrl;
+    if (!dataUrl) throw new Error("JPEG export was not captured");
+    const image = new Image();
+    image.src = dataUrl;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let minX = canvas.width;
+    let maxX = -1;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const offset = (y * canvas.width + x) * 4;
+        if (pixels[offset] < 18 && pixels[offset + 1] > 110 && pixels[offset + 1] < 150 && pixels[offset + 2] > 238) {
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+        }
+      }
+    }
+    const samples = [[150, 150], [250, 200], [300, 240]].map(([x, y]) => Array.from(context.getImageData(x, y, 1, 1).data));
+    return { width: canvas.width, height: canvas.height, greenWidth: maxX >= minX ? maxX - minX + 1 : 0, samples };
+  });
+  if (jpegGreenBounds.width !== 900 || jpegGreenBounds.height !== 600 || jpegGreenBounds.greenWidth < 180 || jpegGreenBounds.greenWidth > 280) {
+    throw new Error(`DPR2 JPEG export is cropped or scaled incorrectly: ${JSON.stringify(jpegGreenBounds)}`);
+  }
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
   await page.keyboard.press("Delete");
   await page.waitForFunction(() => document.querySelector(".shape-style-controls")?.classList.contains("is-disabled"));
