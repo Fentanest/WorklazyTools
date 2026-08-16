@@ -23,7 +23,7 @@ export function getPrivacyConsent(): PrivacyConsent {
 
 export function initializeGoogleConsentMode() {
   window.dataLayer ??= [];
-  window.gtag ??= function gtag(...args: unknown[]) { window.dataLayer?.push(args); };
+  window.gtag ??= function gtag() { window.dataLayer?.push(arguments); };
   if (googleDefaultApplied) return;
   googleDefaultApplied = true;
   window.gtag("consent", "default", {

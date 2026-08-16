@@ -594,8 +594,7 @@ function normalizeError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   if (/memory|allocation|out of bounds/i.test(message)) return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserRanOutOfMemoryTryA"), code: "OUT_OF_MEMORY" };
   if (/libx265|encoder.*not found|unknown encoder/i.test(message)) return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserEncodingEngineDoesNotSupportThe"), code: "CODEC_UNAVAILABLE" };
-  const localized = featureMessage(currentLanguage, "video.messages.video.theInputFormatOrCodecMayNotBe", { p0: message });
-  return { message: localized, code: "VIDEO_PROCESSING_ERROR" };
+  return { message: featureMessage(currentLanguage, "video.messages.video.theInputFormatOrCodecMayNotBe"), code: "VIDEO_PROCESSING_ERROR" };
 }
 
 function getExtension(name: string) { return name.split(".").pop()?.toLowerCase() || ""; }

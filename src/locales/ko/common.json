@@ -88,6 +88,13 @@
     "share": "공유·기기에 저장",
     "viewAll": "전체 보기"
   },
+  "install": {
+    "action": "웹앱 설치",
+    "title": "홈 화면에 추가",
+    "description": "Worklazy Tools를 앱처럼 바로 열기",
+    "browserInstructions": "브라우저 메뉴에서 '홈 화면에 추가' 또는 '앱 설치'를 선택해 주세요.",
+    "iosInstructions": "Safari의 공유 버튼을 누른 뒤 '홈 화면에 추가'를 선택해 주세요."
+  },
   "status": {
     "preparing": "준비하는 중…",
     "processing": "처리 중…",

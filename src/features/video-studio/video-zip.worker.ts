@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import JSZip from "jszip";
-import { workerMessage as featureMessage } from "../../i18n/workerMessages";
+import { FEATURE_MESSAGE_TOKEN_PREFIX, workerMessage as featureMessage } from "../../i18n/workerMessages";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -46,7 +46,13 @@ worker.onmessage = async (event: MessageEvent<{ files: VideoZipInput[]; archiveN
       },
     }, [buffer]);
   } catch (error) {
-    worker.postMessage({ type: "error", error: error instanceof Error ? error.message : String(error) });
+    const message = error instanceof Error ? error.message : "";
+    worker.postMessage({
+      type: "error",
+      error: message.startsWith(FEATURE_MESSAGE_TOKEN_PREFIX)
+        ? message
+        : featureMessage(language, "video.messages.videoZipClient.unableToCreateTheZipFile"),
+    });
   } finally {
     worker.close();
   }

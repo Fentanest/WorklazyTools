@@ -4,6 +4,8 @@ import videoProbeWorkerUrl from "./video-probe.worker.ts?worker&url";
 import videoProcessorWorkerUrl from "./video.worker.ts?worker&url";
 import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
 import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessages";
+import { FEATURE_MESSAGE_TOKEN_PREFIX } from "../../i18n/workerMessages";
+import { UserFacingVideoError } from "./videoErrors";
 
 type VideoWorkerInputDescriptor = Omit<VideoWorkerRequest["jobs"][number]["inputs"][number], "file"> & { fileId: string };
 interface VideoWorkerStartRequest {
@@ -30,7 +32,7 @@ export function probeVideoMetadata(file: File, signal?: AbortSignal, language: A
     let settled = false;
     const timeout = window.setTimeout(() => {
       if (!finish()) return;
-      reject(new Error(featureMessage(language, "video.messages.videoWorkerClient.videoMetadataInspectionTimedOut")));
+      reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.videoMetadataInspectionTimedOut")));
     }, VIDEO_PROBE_TIMEOUT_MS);
     const finish = () => {
       if (settled) return false;
@@ -50,11 +52,11 @@ export function probeVideoMetadata(file: File, signal?: AbortSignal, language: A
       if (event.data.type === "progress") return;
       if (!finish()) return;
       if (event.data.type === "result") resolve(event.data.result as VideoProbeResult);
-      else reject(new Error(event.data.error ? resolveFeatureMessage(language, event.data.error) : featureMessage(language, "video.messages.videoWorkerClient.unableToReadVideoMetadata")));
+      else reject(new UserFacingVideoError(resolveSafeWorkerMessage(event.data.error, language, "video.messages.videoWorkerClient.unableToReadVideoMetadata")));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
-      reject(new Error(event.message || featureMessage(language, "video.messages.videoWorkerClient.unableToStartVideoMetadataInspection")));
+      reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStartVideoMetadataInspection")));
     };
     worker.postMessage({ file, language });
   });
@@ -133,7 +135,7 @@ export function runVideoTask(
           try {
             worker.postMessage({ type: "start", request: startRequest });
           } catch (error) {
-            if (finish()) reject(error instanceof Error ? error : new Error(featureMessage(language, "video.messages.videoWorkerClient.unableToSendTheVideoJobListTo")));
+            if (finish()) reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToSendTheVideoJobListTo")));
           }
         }, 0);
         return;
@@ -141,18 +143,18 @@ export function runVideoTask(
       if (data.type === "request-input-file") {
         const file = data.fileId ? inputFiles.get(data.fileId) : undefined;
         if (!file) {
-          if (finish()) reject(new Error(featureMessage(language, "video.messages.videoWorkerClient.theBrowserFileReferenceForIsUnavailableSelect", { p0: data.fileName || featureMessage(language, "video.messages.videoWorkerClient.originalVideo") })));
+          if (finish()) reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.theBrowserFileReferenceForIsUnavailableSelect", { p0: data.fileName || featureMessage(language, "video.messages.videoWorkerClient.originalVideo") })));
           return;
         }
         try {
           worker.postMessage({ type: "input-file", fileId: data.fileId, file });
         } catch (error) {
-          if (finish()) reject(error instanceof Error ? error : new Error(featureMessage(language, "video.messages.videoWorkerClient.unableToSendTheFileReferenceToThe", { p0: file.name })));
+          if (finish()) reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToSendTheFileReferenceToThe", { p0: file.name })));
         }
         return;
       }
       if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ? resolveFeatureMessage(language, data.message) : featureMessage(language, "video.messages.videoWorkerClient.processingVideo"));
+        onProgress?.(data.progress ?? 0, resolveSafeWorkerMessage(data.message, language, "video.messages.videoWorkerClient.processingVideo"));
         return;
       }
       if (data.type === "output") {
@@ -163,15 +165,21 @@ export function runVideoTask(
       if (data.type === "result") {
         const result = data.result as VideoWorkerResult;
         resolve({ ...result, warnings: result.warnings.map((warning) => resolveFeatureMessage(language, warning)) });
-      } else reject(Object.assign(new Error(data.error?.message ? resolveFeatureMessage(language, data.error.message) : featureMessage(language, "video.messages.videoWorkerClient.anErrorOccurredWhileProcessingTheVideo")), { code: data.error?.code }));
+      } else reject(new UserFacingVideoError(resolveSafeWorkerMessage(data.error?.message, language, "video.messages.videoWorkerClient.anErrorOccurredWhileProcessingTheVideo"), data.error?.code));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
-      reject(new Error(event.message || featureMessage(language, "video.messages.videoWorkerClient.unableToStartVideoProcessing")));
+      reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStartVideoProcessing")));
     };
     startupTimer = window.setTimeout(() => {
       if (!finish()) return;
-      reject(new Error(featureMessage(language, "video.messages.videoWorkerClient.theVideoWorkspaceDidNotStartWithin30")));
+      reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.theVideoWorkspaceDidNotStartWithin30")));
     }, 30_000);
   });
+}
+
+function resolveSafeWorkerMessage(message: string | undefined, language: AppLanguage, fallbackKey: string) {
+  return message?.startsWith(FEATURE_MESSAGE_TOKEN_PREFIX)
+    ? resolveFeatureMessage(language, message)
+    : featureMessage(language, fallbackKey);
 }

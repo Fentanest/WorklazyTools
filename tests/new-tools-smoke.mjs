@@ -607,6 +607,10 @@ async function waitForAudioSuccess(page, text, timeout = 60_000) {
 }
 
 async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths) {
+  if (new URL(page.url()).origin !== new URL(baseUrl).origin) {
+    await page.goto(`${koBaseUrl}/`, { waitUntil: "domcontentloaded" });
+  }
+  await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
   const videoAdRequests = [];
   const captureVideoRequests = (request) => {
     if (request.url().includes("pagead2.googlesyndication.com")) videoAdRequests.push(request.url());
@@ -619,9 +623,13 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   const isolation = await page.evaluate(() => ({
     marker: Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')),
     ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
+    googleAnalytics: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
+    naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
+    googlePageViewQueued: (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"),
     engine: document.querySelector(".video-engine-status")?.textContent || "",
   }));
-  if (!isolation.marker || isolation.ads || !isolation.engine.includes("멀티스레드") || videoAdRequests.length) {
+  if (!isolation.marker || isolation.ads || !isolation.googleAnalytics || !isolation.naverAnalytics || !isolation.googlePageViewQueued
+    || !isolation.engine.includes("멀티스레드") || isolation.engine.includes("광고") || isolation.engine.includes("실행 문서") || videoAdRequests.length) {
     throw new Error(`Video isolation or ad exclusion failed: ${JSON.stringify({ isolation, videoAdRequests })}`);
   }
   await page.evaluate(() => {
@@ -905,10 +913,58 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (largePassThroughState.outputs !== 2
     || largePassThroughState.transfer.startContainsFile
     || largePassThroughState.transfer.inputFileSizes.length !== 2
-    || !largePassThroughState.logs.some((message) => message.includes("처리 공간 준비 완료"))
-    || !largePassThroughState.logs.some((message) => message.includes("원본 파일 연결 중"))) {
+    || !largePassThroughState.logs.some((message) => message.includes("영상 처리 준비 완료"))
+    || !largePassThroughState.logs.some((message) => message.includes("영상 불러오는 중"))) {
     throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
   }
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-studio-page input[type=file]");
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[0]);
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  const mobilePassthroughDefaults = await page.evaluate(() => {
+    const selects = document.querySelectorAll(".encoding-grid select");
+    return {
+      bitrate: document.querySelector(".video-bitrate-control select")?.value,
+      resolution: selects[1]?.value,
+      aspect: selects[2]?.value,
+      rotation: selects[3]?.value,
+      actionDisabled: document.querySelector(".video-studio-page .section-actions .primary-button")?.disabled,
+      notice: Array.from(document.querySelectorAll(".video-studio-page .inline-notice"), (element) => element.textContent || "").find((text) => text.includes("모바일")) || "",
+    };
+  });
+  if (mobilePassthroughDefaults.bitrate !== "copy" || mobilePassthroughDefaults.resolution !== "source" || mobilePassthroughDefaults.aspect !== "source"
+    || mobilePassthroughDefaults.rotation !== "0" || mobilePassthroughDefaults.actionDisabled
+    || !mobilePassthroughDefaults.notice.includes("패스스루") || !mobilePassthroughDefaults.notice.includes("원본 해상도") || !mobilePassthroughDefaults.notice.includes("회전 없음")
+    || !mobilePassthroughDefaults.notice.includes("GIF") || mobilePassthroughDefaults.notice.includes("1080p")) {
+    throw new Error(`Mobile pass-through defaults are invalid: ${JSON.stringify(mobilePassthroughDefaults)}`);
+  }
+  await page.evaluate(() => {
+    const selects = document.querySelectorAll(".encoding-grid select");
+    const bitrate = document.querySelector(".video-bitrate-control select");
+    if (!(bitrate instanceof HTMLSelectElement) || !(selects[1] instanceof HTMLSelectElement) || !(selects[2] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement)) throw new Error("Mobile encoding controls are unavailable");
+    bitrate.value = "0";
+    bitrate.dispatchEvent(new Event("change", { bubbles: true }));
+    selects[1].value = "1080";
+    selects[1].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[2].value = "9:16";
+    selects[2].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[3].value = "90";
+    selects[3].dispatchEvent(new Event("change", { bubbles: true }));
+    bitrate.value = "copy";
+    bitrate.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForFunction(() => {
+    const selects = document.querySelectorAll(".encoding-grid select");
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return selects[1]?.value === "source" && selects[2]?.value === "source" && selects[3]?.value === "0" && button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
 }
 
 async function installVideoTransferProbe(page) {

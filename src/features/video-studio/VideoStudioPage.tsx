@@ -44,6 +44,7 @@ import { createVideoZip } from "./videoZipClient";
 import { VIDEO_GROUP_IDS } from "./types";
 import { VideoGroupSection } from "./VideoGroupSection";
 import { hasUsableVideoRange, shouldProbeVideoMetadata } from "./videoMetadata";
+import { isUserFacingVideoError } from "./videoErrors";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
@@ -100,7 +101,7 @@ export function VideoStudioPage() {
   const [allGroupsOneFile, setAllGroupsOneFile] = useState(false);
   const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>("mp4");
   const [codec, setCodec] = useState<VideoCodec>("h264");
-  const [resolution, setResolution] = useState<VideoResolution>(() => isLikelyMobileDevice() ? "1080" : "source");
+  const [resolution, setResolution] = useState<VideoResolution>("source");
   const [aspect, setAspect] = useState<VideoAspect>("source");
   const [crf, setCrf] = useState(23);
   const [rotation, setRotation] = useState<VideoRotation>(0);
@@ -251,7 +252,7 @@ export function VideoStudioPage() {
           frameRateProbeStatus: "failed",
           metadataError: candidate.duration > 0
             ? undefined
-            : error instanceof Error ? error.message : featureMessage(language, "video.messages.VideoStudioPage.unableToReadVideoMetadata"),
+            : isUserFacingVideoError(error) ? error.message : featureMessage(language, "video.messages.VideoStudioPage.unableToReadVideoMetadata"),
         } : candidate));
       }
     } finally {
@@ -333,7 +334,7 @@ export function VideoStudioPage() {
       setLastResult(featureMessage(language, "video.messages.VideoStudioPage.savedResultsToTheSelectedFolder", { p0: videoOutputsRef.current.length }));
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      progress.fail(error instanceof Error ? error.message : featureMessage(language, "video.messages.VideoStudioPage.unableToSaveResultsToTheSelectedFolder"));
+      progress.fail(featureMessage(language, "video.messages.VideoStudioPage.unableToSaveResultsToTheSelectedFolder"));
     }
   };
 
@@ -487,6 +488,15 @@ export function VideoStudioPage() {
     progress.reset();
   };
 
+  const changeVideoBitrate = (value: VideoBitrate) => {
+    setBitrate(value);
+    if (value !== "copy") return;
+    setResolution("source");
+    setAspect("source");
+    setRotation(0);
+    setFlipHorizontal(false);
+  };
+
   return (
     <div className="page tool-page page-enter video-studio-page">
       <PageHeader eyebrow="VIDEO STUDIO" title={featureMessage(language, "video.messages.VideoStudioPage.videoStudio")} description={featureMessage(language, "video.messages.VideoStudioPage.keepAddingVideosWithoutAFileCountLimit")}>
@@ -560,7 +570,7 @@ export function VideoStudioPage() {
               onCrf={setCrf}
               onRotation={setRotation}
               onFlipHorizontal={setFlipHorizontal}
-              onBitrate={setBitrate}
+              onBitrate={changeVideoBitrate}
               onCustomBitrate={setCustomVideoBitrate}
               language={language}
             />
@@ -854,6 +864,7 @@ function isAudioOutput(output: DownloadableVideoOutput) {
 function audioHandoffChannelName(id: string) { return `worklazy-audio-handoff-${id}`; }
 
 function toUserFacingVideoError(error: unknown, language: AppLanguage) {
+  if (isUserFacingVideoError(error)) return error.message;
   const message = error instanceof Error ? error.message : String(error);
   if (error instanceof RangeError || /array buffer allocation failed|invalid typed array length|out of memory/i.test(message)) {
     return featureMessage(language, "video.messages.VideoStudioPage.theCompletedVideoOrIntermediateDataExceededThe");
@@ -861,7 +872,7 @@ function toUserFacingVideoError(error: unknown, language: AppLanguage) {
   if ((error instanceof DOMException && error.name === "NotReadableError") || /requested file could not be read|permission problems/i.test(message)) {
     return featureMessage(language, "video.messages.VideoStudioPage.theSelectedVideoCannotBeReadItMay");
   }
-  return message || (featureMessage(language, "video.messages.VideoStudioPage.videoProcessingFailed"));
+  return featureMessage(language, "video.messages.VideoStudioPage.videoProcessingFailed");
 }
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return "00:00.0";
