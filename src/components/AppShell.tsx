@@ -16,6 +16,7 @@ import { useAppLanguage } from "../i18n/routing";
 import { useToolCatalog } from "../i18n/useToolCatalog";
 import { AdSenseLoader } from "./AdSenseLoader";
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
+import { AppInstallControl } from "./AppInstallControl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
 import { resetPrivacyConsent } from "./privacyConsent";
@@ -66,7 +67,7 @@ export function AppShell() {
     <div className="app-shell">
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} language={language} />
-      <AnalyticsLoader disabled={videoStudioActive || videoIsolationDocument} />
+      <AnalyticsLoader disabled={videoStudioActive && !videoIsolationDocument} />
       {!videoStudioActive && !videoIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand brand-image-link" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
@@ -112,16 +113,19 @@ export function AppShell() {
         <NavLink className="mobile-brand" to={localizedPath(language, "/")}>
           <img className="mobile-brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
         </NavLink>
-        <button
-          className="icon-button"
-          type="button"
-          aria-label={t("navigation.openMenu")}
-          aria-expanded={mobileMenuOpen}
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <Menu size={21} />
-        </button>
-        <LanguageSwitcher compact />
+        <div className="mobile-header-actions">
+          <AppInstallControl />
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={t("navigation.openMenu")}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <Menu size={21} />
+          </button>
+          <LanguageSwitcher compact />
+        </div>
       </header>
 
       <div className="desktop-language-switcher"><LanguageSwitcher /></div>

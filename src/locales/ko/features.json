@@ -119,7 +119,7 @@
       "videoProbe": {
         "unableToReadTheVideoFile": "영상 파일을 읽을 수 없습니다.",
         "browserPreviewIsUnavailableInspectingVideoMetadataDirectly": "브라우저 미리보기를 열 수 없어 영상 정보를 직접 확인하는 중…",
-        "unableToAttachTheVideoFileToThe": "영상 파일을 분석 엔진에 연결하지 못했습니다.",
+        "unableToAttachTheVideoFileToThe": "영상 파일 정보를 확인하지 못했습니다.",
         "unableToReadThisVideoSDurationAnd": "이 영상의 재생 시간과 화면 크기를 확인하지 못했습니다. MP4·MOV·WebM으로 변환한 뒤 다시 시도해 주세요.",
         "theVideoMetadataIsInvalid": "영상 정보가 올바르지 않습니다."
       },
@@ -141,7 +141,7 @@
         "noBrowserPreview": "브라우저 미리보기 없음",
         "metadataIsAvailableUseTheNumericFieldsBelow": "영상 정보는 확인했습니다. 아래 숫자 입력으로 구간을 지정하세요.",
         "readingVideoMetadata": "영상 정보 확인 중",
-        "preparingTheFfmpegCompatibilityPath": "FFmpeg 호환 경로를 준비하고 있습니다.",
+        "preparingTheFfmpegCompatibilityPath": "영상 정보를 확인할 준비를 하고 있습니다.",
         "metadataReadyForConversion": " · 변환용 정보 확인됨",
         "readingPlaybackMetadata": "재생 정보 확인 중…",
         "checkingFrameRateWithoutBlockingExport": "FPS 확인 중 · 출력은 바로 시작할 수 있습니다.",
@@ -177,7 +177,7 @@
         "zipCreationWasCanceled": "ZIP 만들기를 취소했습니다.",
         "creatingZipFile": "ZIP 파일 만드는 중…",
         "unableToCreateTheZipFile": "ZIP 파일을 만들지 못했습니다.",
-        "unableToStartTheZipWorker": "ZIP Worker를 시작하지 못했습니다."
+        "unableToStartTheZipWorker": "ZIP 만들기 기능을 시작하지 못했습니다."
       },
       "video": {
         "theSourceVideoIsEmptyOrBrowserFile": "원본 영상 파일이 비어 있거나 브라우저의 파일 접근 권한이 해제되었습니다.",
@@ -187,15 +187,15 @@
         "aboutForThisStage": " · 현재 단계 약 {{p0}}",
         "progressWithEta": "{{p0}}… {{p1}}%{{p2}}",
         "jobTask": "[{{p0}}] {{p1}}",
-        "loadingTheVideoEngineTheFirstRunMay": "비디오 처리 엔진을 불러오는 중… (첫 실행은 시간이 걸릴 수 있어요)",
-        "multiThreadStartupFailedSwitchingToCompatibilityMode": "멀티스레드 엔진을 시작하지 못해 호환 모드로 전환하는 중…",
-        "engineReadyPreparingGroupOutputs": "{{p0}} 엔진 준비 완료 · 그룹별 출력 작업을 준비하는 중…",
+        "loadingTheVideoEngineTheFirstRunMay": "영상 처리 기능을 준비하는 중… (처음에는 시간이 조금 걸릴 수 있어요)",
+        "multiThreadStartupFailedSwitchingToCompatibilityMode": "멀티스레드 처리를 사용할 수 없어 호환 모드로 전환하는 중…",
+        "engineReadyPreparingGroupOutputs": "{{p0}} 처리 준비 완료 · 그룹별 결과를 준비하는 중…",
         "preparing": "{{p0}}… 준비 중",
         "resultReadyCheckingTheNextJob": "{{p0}}/{{p1}} 결과 준비 완료 · 다음 작업을 확인하는 중…",
         "resultsCreated": "{{p0}}개 결과 생성 완료",
-        "sourceFileAttachmentWasCanceledBecauseTheVideo": "비디오 작업이 종료되어 원본 파일 연결을 취소했습니다.",
-        "attachingSourceFile": "[{{p0}}] {{p1}}/{{p2}} 원본 파일 연결 중",
-        "thisBrowserSVideoEngineCannotAttachLarge": "이 브라우저의 영상 처리 엔진에서 대용량 파일 연결 기능을 사용할 수 없습니다.",
+        "sourceFileAttachmentWasCanceledBecauseTheVideo": "비디오 작업이 종료되어 영상 불러오기를 취소했습니다.",
+        "attachingSourceFile": "[{{p0}}] {{p1}}/{{p2}} 영상 불러오는 중",
+        "thisBrowserSVideoEngineCannotAttachLarge": "이 브라우저에서는 선택한 대용량 영상을 처리할 수 없습니다.",
         "preparingSelectedRange": "[{{p0}} · {{p1}}/{{p2}}] 선택 구간 준비 중",
         "videoIn": "{{p0}}의 {{p1}}번째 영상",
         "concatenatingVideosInOrder": "[{{p0}}] 영상 순서대로 연결 중",
@@ -213,11 +213,11 @@
         "enterAVideoBitrateBetween01And": "영상 비트레이트는 0.1~200 Mbps 범위로 입력해 주세요.",
         "enterAnAudioBitrateBetween32And512": "오디오 비트레이트는 32~512 kbps 범위로 입력해 주세요.",
         "enterASampleRateBetween8000And": "선택한 오디오 코덱의 샘플레이트는 8,000~{{p0}} Hz 범위로 입력해 주세요.",
-        "theVideoFileReferenceIsInvalid": "비디오 파일 참조 정보가 올바르지 않습니다.",
+        "theVideoFileReferenceIsInvalid": "선택한 영상 정보가 올바르지 않습니다. 파일을 다시 선택해 주세요.",
         "unableToDetermineVideoDuration": "비디오 재생 시간을 확인하지 못했습니다.",
         "unableToDetermineVideoDimensions": "비디오 화면 크기를 확인하지 못했습니다.",
         "checkTheStartAndEndTimes": "시작 시간과 종료 시간을 다시 확인해 주세요.",
-        "theOutputFileIsNotValidBinaryData": "결과 파일이 올바른 바이너리 형식이 아닙니다.",
+        "theOutputFileIsNotValidBinaryData": "결과 파일을 완성하지 못했습니다. 설정을 확인한 뒤 다시 시도해 주세요.",
         "concatenated": "이어붙임",
         "passthrough": "패스스루",
         "converted": "변환",
@@ -227,7 +227,7 @@
         "audioExtraction": "{{p0}} 음원 추출",
         "passthroughWithoutReEncoding": "재인코딩 없는 패스스루",
         "encoding": "{{p0}} 인코딩",
-        "theFirstAudioTrackInCannotBeCopied": "{{p0}}의 첫 번째 오디오 트랙을 선택한 컨테이너에 원본 그대로 넣을 수 없습니다. 오디오 재인코딩 또는 오디오 트랙 제거를 선택해 주세요.",
+        "theFirstAudioTrackInCannotBeCopied": "{{p0}}의 첫 번째 음성을 선택한 출력 형식에 원본 그대로 넣을 수 없습니다. 호환 형식 변환 또는 음성 제거를 선택해 주세요.",
         "unableToExtractTheFirstAudioTrackFrom": "{{p0}}에서 첫 번째 오디오 트랙을 {{p1}}로 추출하지 못했습니다.",
         "unableToProcessUsing": "{{p0}} 파일을 {{p1}} 방식으로 처리하지 못했습니다.",
         "processedOutputJobsAccordingToGroupSettings": "그룹 설정에 따라 {{p0}}개 출력 작업을 처리했습니다.",
@@ -236,8 +236,8 @@
         "theAudioTrackWasRemovedFromTheOutput": "출력 영상에서 오디오 트랙을 제거했습니다.",
         "hevcMayNotPlayOnEveryDeviceOr": "HEVC는 기기와 플레이어에 따라 재생되지 않을 수 있습니다.",
         "theBrowserRanOutOfMemoryTryA": "브라우저 메모리가 부족합니다. 더 짧은 구간이나 작은 파일 수로 다시 시도해 주세요.",
-        "theBrowserEncodingEngineDoesNotSupportThe": "현재 브라우저용 인코딩 엔진에서 선택한 코덱을 지원하지 않습니다. H.264 또는 VP9을 선택해 주세요.",
-        "theInputFormatOrCodecMayNotBe": "{{p0}} 입력 형식이나 코덱이 현재 브라우저 엔진에서 지원되지 않을 수 있습니다.",
+        "theBrowserEncodingEngineDoesNotSupportThe": "이 브라우저에서는 선택한 코덱을 사용할 수 없습니다. H.264 또는 VP9을 선택해 주세요.",
+        "theInputFormatOrCodecMayNotBe": "선택한 영상 형식이나 압축 방식을 처리하지 못했습니다. 다른 출력 설정을 고르거나 MP4·MOV·WebM으로 바꾼 뒤 다시 시도해 주세요.",
         "sec": "{{p0}}초",
         "minSec": "{{p0}}분 {{p1}}초",
         "engineMultiThreaded": "멀티스레드",
@@ -249,14 +249,14 @@
         "unableToStartVideoMetadataInspection": "영상 정보 확인을 시작하지 못했습니다.",
         "videoMetadataInspectionTimedOut": "영상 정보 확인이 60초 안에 끝나지 않아 중단했습니다.",
         "videoProcessingWasCanceled": "비디오 작업이 취소되었습니다.",
-        "videoWorkspaceReadySendingTheJobList": "비디오 처리 공간 준비 완료 · 작업 목록을 전달하는 중…",
-        "unableToSendTheVideoJobListTo": "비디오 작업 목록을 Worker에 전달하지 못했습니다.",
-        "theBrowserFileReferenceForIsUnavailableSelect": "{{p0}}의 브라우저 파일 참조를 찾지 못했습니다. 파일을 다시 선택해 주세요.",
-        "unableToSendTheFileReferenceToThe": "{{p0}} 파일 참조를 Worker에 전달하지 못했습니다.",
+        "videoWorkspaceReadySendingTheJobList": "영상 처리 준비 완료 · 작업 목록을 확인하는 중…",
+        "unableToSendTheVideoJobListTo": "비디오 작업을 시작하지 못했습니다.",
+        "theBrowserFileReferenceForIsUnavailableSelect": "{{p0}}을 다시 불러올 수 없습니다. 파일을 다시 선택해 주세요.",
+        "unableToSendTheFileReferenceToThe": "{{p0}}을 처리하지 못했습니다. 파일을 다시 선택해 주세요.",
         "processingVideo": "비디오 처리 중…",
         "anErrorOccurredWhileProcessingTheVideo": "비디오 처리 중 오류가 발생했습니다.",
         "unableToStartVideoProcessing": "비디오 작업을 시작하지 못했습니다.",
-        "theVideoWorkspaceDidNotStartWithin30": "비디오 처리 공간이 30초 안에 시작되지 않았습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.",
+        "theVideoWorkspaceDidNotStartWithin30": "영상 처리를 30초 안에 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.",
         "originalVideo": "원본 영상"
       },
       "VideoStudioPage": {
@@ -282,7 +282,7 @@
         "checkingEstimatedPassthroughOutputSize": "원본 그대로 복사할 결과 크기를 확인하는 중…",
         "isEstimatedAtAboutLargeSourceFilesAre": "{{p0}}의 예상 결과가 약 {{p1}}입니다. 대형 원본 자체가 위험한 것은 아니지만, 현재 브라우저 출력 방식은 1.5GB를 넘는 단일 결과를 만들 수 없습니다. 출력 구간을 줄이거나 화질 기준 자동 용량 조절(CRF)을 선택해 주세요.",
         "largeFileNoticeTheSelectedSourcesTotalThey": "대형 파일 처리 주의: 선택한 원본이 {{p0}}입니다. 원본은 전체 메모리 복사 없이 연결하지만, 이 기기에서는 변환 시간이 길어지거나 메모리가 부족할 수 있습니다. 계속할까요?",
-        "attachingSourceVideosToTheProcessingEngineWithout": "원본 영상을 메모리 복사 없이 처리 엔진에 연결하는 중…",
+        "attachingSourceVideosToTheProcessingEngineWithout": "원본 영상을 불러오는 중…",
         "allResultsAreReady": "{{p0}}개 결과가 모두 준비되었습니다.{{p1}}",
         "resultsCreated": "{{p0}}개 결과 생성 완료",
         "videoProcessingWasCanceled": "비디오 작업을 취소했습니다.",
@@ -293,13 +293,13 @@
         "keepAddingVideosWithoutAFileCountLimit": "영상 수 제한 없이 계속 추가하고 최대 10개 그룹으로 나눠, 그룹마다 개별 저장하거나 순서대로 이어붙이세요.",
         "multiThreadEncodingReady": "멀티스레드 인코딩 준비됨",
         "singleThreadCompatibilityMode": "단일 스레드 호환 모드",
-        "aDedicatedVideoRuntimeUsesMultipleCpuCores": "비디오 전용 실행 문서에서 여러 CPU 코어를 사용합니다. 이 문서에는 광고 스크립트를 불러오지 않습니다.",
-        "thisBrowserCannotMeetTheMultiThreadRequirements": "현재 브라우저에서 멀티스레드 실행 조건을 사용할 수 없어 호환 엔진으로 처리합니다. 기능은 같지만 인코딩 시간이 더 길 수 있습니다.",
+        "aDedicatedVideoRuntimeUsesMultipleCpuCores": "여러 CPU 코어를 사용해 영상을 더 빠르게 처리할 수 있습니다.",
+        "thisBrowserCannotMeetTheMultiThreadRequirements": "현재 브라우저에서는 단일 스레드 호환 모드로 처리합니다. 기능은 같지만 인코딩 시간이 더 길 수 있습니다.",
         "chooseVideos": "비디오 선택",
         "addFilesInMultipleRoundsWithNoFile": "파일 개수 제한 없이 여러 번 이어서 추가할 수 있습니다. 추가 후 최대 10개 그룹에서 순서와 출력 방식을 정합니다.",
         "mp4MovWebmMkvAviAddMoreAt": "MP4·MOV·WebM·MKV·AVI · 여러 번 나눠 추가 가능",
-        "mkvAndAviCompatibilityDependsOnTheirInternal": "MKV·AVI는 파일 안의 영상 압축 방식에 따라 완벽한 호환을 보장하지 않습니다. 미리보기가 안 되면 브라우저용 FFmpeg 변환기가 재생 시간과 크기를 대신 확인해 숫자로 구간을 지정할 수 있지만, 분석도 실패하면 MP4·MOV·WebM으로 바꿔 주세요.",
-        "mobileDefaultsAre1080pAnd480PxGif": "모바일 권장값으로 1080p와 GIF 480px를 기본 선택했습니다. 여러 영상이나 합계 250MB 이상의 대형 파일도 처리할 수 있지만, 한 번에 한 파일씩 짧은 구간부터 작업하면 더 안정적입니다.",
+        "mkvAndAviCompatibilityDependsOnTheirInternal": "MKV·AVI는 파일 안의 영상 압축 방식에 따라 완벽한 호환을 보장하지 않습니다. 미리보기가 안 되면 재생 시간과 크기를 별도로 확인해 숫자로 구간을 지정할 수 있지만, 파일 정보도 확인할 수 없다면 MP4·MOV·WebM으로 바꿔 주세요.",
+        "mobileDefaultsAre1080pAnd480PxGif": "모바일에서는 패스스루, 원본 해상도·비율, 회전 없음을 기본값으로 사용합니다. GIF 가로 크기는 480px가 기본입니다. 여러 영상이나 합계 250MB 이상의 대형 파일도 처리할 수 있지만, 한 번에 한 파일씩 짧은 구간부터 작업하면 더 안정적입니다.",
         "groupPreviewsAndTrimRanges": "그룹별 미리보기와 구간 설정",
         "dragVideosToReorderThemWithinAGroup": "영상을 끌어서 같은 그룹 안의 순서를 바꾸거나 다른 그룹으로 옮길 수 있습니다.",
         "outputSettings": "출력 설정",
@@ -335,7 +335,7 @@
         "exportVideosIndividually": "{{p0}}개 영상을 각각 출력",
         "createResults": "설정대로 {{p0}}개 결과 만들기",
         "exportIsBlockedBecauseMetadataIsUnavailableFor": "재생 정보를 확인하지 못한 파일이 있어 출력을 시작할 수 없습니다: {{p0}}",
-        "videoProcessingLog": "비디오 처리 로그",
+        "videoProcessingLog": "영상 처리 진행 상황",
         "cancel": "작업 취소",
         "completedResults": "완성된 결과 {{p0}}개",
         "eachFileAppearsAsSoonAsItFinishes": "파일 하나가 끝날 때마다 즉시 추가됩니다. 필요한 파일만 받거나 전체를 개별 파일로 받고, 필요할 때만 ZIP을 만들 수 있습니다.",
@@ -347,7 +347,7 @@
         "createZip": "ZIP으로 묶기",
         "clearResults": "결과 지우기",
         "browserVideoProcessingGuide": "브라우저 비디오 처리 안내",
-        "videoFilesAreProcessedInAnIsolatedWorkspace": "영상 파일은 외부 변환 서버에 업로드하지 않고 이 페이지의 별도 작업 공간에서 처리합니다.",
+        "videoFilesAreProcessedInAnIsolatedWorkspace": "영상 파일은 외부 변환 서버에 업로드하지 않고 이 브라우저에서 처리합니다.",
         "videoCodec": "영상 압축 방식(코덱)",
         "whenSupported": "지원 시",
         "resizeAllVideos": "해상도 일괄 변경",
@@ -418,26 +418,26 @@
           {
             "title": "대용량 원본과 결과 한도",
             "paragraphs": [
-              "원본 영상은 통째로 복사하지 않고 브라우저의 읽기 전용 파일 연결로 변환 엔진에 전달합니다. 다만 변환 중간 데이터와 완성된 결과는 브라우저 메모리를 사용하므로, 긴 4K 영상은 필요한 구간을 먼저 줄이는 것이 좋습니다. 원본 그대로 복사한 예상 결과가 안전 한도를 넘으면 작업 전에 안내합니다."
+              "대용량 원본은 한 번에 메모리로 복사하지 않습니다. 다만 변환 중간 데이터와 완성된 결과는 브라우저 메모리를 사용하므로, 긴 4K 영상은 필요한 구간을 먼저 줄이는 것이 좋습니다. 원본 그대로 복사한 예상 결과가 안전 한도를 넘으면 작업 전에 안내합니다."
             ]
           },
           {
             "title": "입력 형식 호환성",
             "paragraphs": [
-              "MP4·MOV·WebM은 일반적인 최신 브라우저에서 미리보기를 제공합니다. MKV·AVI 미리보기가 실패하면 브라우저용 변환 엔진이 재생 시간과 화면 크기를 대신 확인해 숫자 구간 입력을 열어 주지만, 파일 안의 모든 영상 압축 방식까지 완벽하게 지원하지는 않습니다."
+              "MP4·MOV·WebM은 일반적인 최신 브라우저에서 미리보기를 제공합니다. MKV·AVI 미리보기가 실패하면 재생 시간과 화면 크기를 별도로 확인해 숫자로 구간을 지정할 수 있지만, 파일 안의 모든 영상 압축 방식까지 완벽하게 지원하지는 않습니다."
             ]
           },
           {
             "title": "여러 CPU 코어 사용",
             "paragraphs": [
-              "지원 브라우저에서는 비디오 도구만 별도의 안전한 실행 환경으로 다시 열어 여러 CPU 코어를 사용합니다. 주소와 도메인은 그대로 유지되며 다른 도구와 광고 실행 환경에는 영향을 주지 않습니다. 조건을 만족하지 않으면 기능이 같은 단일 코어 방식으로 자동 전환합니다."
+              "지원되는 브라우저에서는 여러 CPU 코어로 영상을 처리합니다. 지원되지 않으면 같은 기능의 단일 스레드 호환 모드로 자동 전환합니다."
             ]
           }
         ],
         "faq": [
           {
             "question": "영상이 서버로 전송되나요?",
-            "answer": "아니요. 선택한 파일은 브라우저 안의 변환 엔진에서만 읽으며 영상 데이터와 결과를 서버로 전송하지 않습니다."
+            "answer": "아니요. 선택한 파일과 결과는 이 브라우저에서만 처리하며 서버로 전송하지 않습니다."
           },
           {
             "question": "그룹별 출력은 어떻게 내려받나요?",
@@ -457,7 +457,7 @@
           },
           {
             "question": "왜 첫 실행이 오래 걸리나요?",
-            "answer": "사이트에 포함된 브라우저용 영상 변환 실행 파일을 처음 불러오고 메모리를 준비하기 때문입니다. 브라우저 캐시에 저장되면 다음 작업의 준비 시간은 짧아질 수 있습니다."
+            "answer": "처음 사용할 때 영상 처리 기능을 준비하기 때문입니다. 한 번 준비된 뒤에는 다음 작업이 더 빨리 시작될 수 있습니다."
           },
           {
             "question": "남은 시간은 전체 작업 기준인가요?",
@@ -465,7 +465,7 @@
           },
           {
             "question": "MKV·AVI도 항상 변환되나요?",
-            "answer": "아니요. 브라우저 미리보기가 안 되면 변환 엔진이 재생 시간과 크기 같은 파일 정보를 대신 분석하지만, 파일 안의 영상 압축 방식을 읽지 못하는 조합까지 보장하지는 않습니다."
+            "answer": "아니요. 브라우저 미리보기가 안 되면 재생 시간과 크기 같은 파일 정보를 별도로 확인하지만, 읽을 수 없는 영상 압축 방식까지 보장하지는 않습니다."
           }
         ]
       },

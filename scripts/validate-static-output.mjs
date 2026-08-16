@@ -34,6 +34,8 @@ for (const route of routes) {
     'type="application/ld+json"',
     'class="seo-static-fallback"',
     'name="google-adsense-account"',
+    'rel="manifest"',
+    'rel="apple-touch-icon"',
   ];
   for (const marker of required) {
     if (!html.includes(marker)) throw new Error(`${filePath} is missing ${marker}`);
@@ -56,12 +58,17 @@ const [ads, robots, sitemap, notFound] = await Promise.all([
   fs.readFile("dist/404.html", "utf8"),
 ]);
 
-const [cname, worklazyLicense, thirdPartyLicenses, favicon, logo, socialImage, koreanSocialImage] = await Promise.all([
+const [cname, worklazyLicense, thirdPartyLicenses, favicon, logo, manifestText, serviceWorker, installIcon180, installIcon192, installIcon512, socialImage, koreanSocialImage] = await Promise.all([
   fs.readFile("dist/CNAME", "utf8"),
   fs.readFile("dist/legal/worklazy-license.txt", "utf8"),
   fs.readFile("dist/legal/third-party-licenses.txt", "utf8"),
   fs.readFile("dist/icon.svg", "utf8"),
   fs.readFile("dist/logo.svg", "utf8"),
+  fs.readFile("dist/site.webmanifest", "utf8"),
+  fs.readFile("dist/service-worker.js", "utf8"),
+  fs.stat("dist/icon-180.png"),
+  fs.stat("dist/icon-192.png"),
+  fs.stat("dist/icon-512.png"),
   fs.readFile("dist/social/worklazy-tools-share.png"),
   fs.readFile("dist/social/worklazy-tools-share-ko.png"),
 ]);
@@ -108,10 +115,22 @@ if (cname.trim() !== "worklazy.net") throw new Error("CNAME does not point to wo
 if (!worklazyLicense.includes("All rights reserved")) throw new Error("Worklazy proprietary license is missing.");
 if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker") || !thirdPartyLicenses.includes("@rhwp/core")) throw new Error("Third-party license bundle is incomplete.");
 if (!favicon.includes("facet-4") || !logo.includes("Worklazy")) throw new Error("Worklazy favicon or logo is missing from the build.");
+const manifest = JSON.parse(manifestText);
+if (manifest.display !== "standalone" || manifest.scope !== "./" || manifest.start_url !== "./"
+  || !manifest.icons?.some((icon) => icon.sizes === "192x192") || !manifest.icons?.some((icon) => icon.sizes === "512x512")) {
+  throw new Error("The installable web app manifest is incomplete.");
+}
+if (!serviceWorker.includes('addEventListener("install"') || !serviceWorker.includes('addEventListener("fetch"') || !serviceWorker.includes('"credentialless"')
+  || !serviceWorker.includes('Cross-Origin-Embedder-Policy') || !serviceWorker.includes('Cross-Origin-Opener-Policy')
+  || !serviceWorker.includes('Cross-Origin-Resource-Policy')
+  || installIcon180.size < 5_000 || installIcon192.size < 5_000 || installIcon512.size < 10_000) {
+  throw new Error("The mobile web app service worker or install icons are incomplete.");
+}
 if (socialImage.length < 10_000 || koreanSocialImage.length < 10_000) throw new Error("A localized social preview image is missing or unexpectedly small.");
 if (pyodideModule.size < 10_000 || pyodideWasm.size < 5_000_000) throw new Error("Self-hosted Pyodide runtime is incomplete.");
 if (ocrWorker.size < 50_000 || ocrEnglish.size < 1_000_000 || ocrKorean.size < 1_000_000) throw new Error("Self-hosted Tesseract runtime or language data is incomplete.");
 if (videoIsolationWorker.size < 1_000) throw new Error("Video isolation service worker is missing or unexpectedly small.");
+if (!(await fs.readFile("dist/tools/video-studio/coi-serviceworker.js", "utf8")).includes("let coepCredentialless=!0;")) throw new Error("Video isolation service worker does not allow credentialless analytics requests.");
 if (videoSingleCore.size < 30_000_000 || videoMultiCore.size < 30_000_000 || videoMultiWorker.size < 1_000) throw new Error("Document-scoped FFmpeg runtime is incomplete.");
 if (!videoWorkerFiles.some((name) => name.startsWith("video.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-probe.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-zip.worker-"))) throw new Error("Video workers were emitted outside their isolated document scope.");
 if (!assetFiles.some((name) => name.startsWith("audioProcessor.worker-"))) throw new Error("Audio processor worker is missing from the static build.");
@@ -125,5 +144,23 @@ for (const route of routes) {
   if (route && route !== "tools/hwp-editor" && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
 }
 if (!sitemap.includes('xmlns:xhtml=') || !sitemap.includes('hreflang="x-default"')) throw new Error("sitemap.xml is missing multilingual alternate links.");
+
+const [koreanFeatures, englishFeatures] = await Promise.all([
+  fs.readFile("src/locales/ko/features.json", "utf8"),
+  fs.readFile("src/locales/en/features.json", "utf8"),
+]);
+for (const forbidden of ["광고 스크립트를 불러오지", "광고 실행 환경", "FFmpeg 호환 경로", "ZIP Worker", "does not load advertising scripts", "ad execution", "FFmpeg compatibility path", "ZIP worker"]) {
+  if (koreanFeatures.includes(forbidden) || englishFeatures.includes(forbidden)) throw new Error(`User-facing feature copy exposes implementation state: ${forbidden}`);
+}
+const [koreanPages, englishPages] = await Promise.all([
+  fs.readFile("src/locales/ko/pages.json", "utf8"),
+  fs.readFile("src/locales/en/pages.json", "utf8"),
+]);
+if (!koreanPages.includes("비디오 스튜디오는 AdSense 스크립트를 불러오지 않지만")
+  || !englishPages.includes("Video Studio does not load AdSense scripts, but with consent")
+  || koreanPages.includes("Analytics와 AdSense 스크립트를 불러오지 않습니다")
+  || englishPages.includes("does not load Analytics or AdSense scripts")) {
+  throw new Error("The privacy policy does not describe Video Studio analytics and ad exclusion accurately.");
+}
 
 console.log(`Static output validation passed: localized pages, hreflang metadata, self-hosted browser runtimes, ads.txt, robots.txt and sitemap.xml.`);

@@ -26,6 +26,15 @@ try {
   await page.waitForSelector(".privacy-consent");
   await page.click(".privacy-consent .primary-button");
   await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent") === "granted");
+  await page.waitForFunction(() => (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"));
+  const analyticsBootstrap = await page.evaluate(() => ({
+    google: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
+    naver: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
+    malformedCommands: (window.dataLayer || []).filter((item) => Array.isArray(item) && typeof item[0] === "string").length,
+  }));
+  if (!analyticsBootstrap.google || !analyticsBootstrap.naver || analyticsBootstrap.malformedCommands) {
+    throw new Error(`Analytics bootstrap is incomplete or uses malformed gtag commands: ${JSON.stringify(analyticsBootstrap)}`);
+  }
   const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
   const homeFeedback = await page.$eval(".hero-feedback", (element) => ({
@@ -72,6 +81,33 @@ try {
   if (mobileToolsLayout.columns !== 1 || mobileToolsLayout.pageWidth > mobileToolsLayout.viewportWidth + 1 || !mobileToolsLayout.categoryScrollable) {
     throw new Error(`Mobile tool categories overflow incorrectly: ${JSON.stringify(mobileToolsLayout)}`);
   }
+  await page.waitForSelector(".app-install-button");
+  await page.evaluate(() => {
+    window.__installPromptCalls = 0;
+    window.__installChoiceResolved = false;
+    const event = new Event("beforeinstallprompt", { cancelable: true });
+    Object.defineProperties(event, {
+      prompt: { value: async () => { window.__installPromptCalls += 1; } },
+      userChoice: { value: Promise.resolve({ outcome: "dismissed", platform: "web" }).then((choice) => {
+        window.__installChoiceResolved = true;
+        return choice;
+      }) },
+    });
+    window.dispatchEvent(event);
+  });
+  await page.click(".app-install-button");
+  await page.waitForFunction(() => window.__installPromptCalls === 1 && window.__installChoiceResolved);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.click(".app-install-button");
+  await page.waitForSelector(".install-sheet");
+  const installFallback = await page.$eval(".install-sheet", (element) => element.textContent || "");
+  if (!installFallback.includes("홈 화면에 추가") || !installFallback.includes("브라우저 메뉴")) throw new Error(`Mobile install fallback is incomplete: ${installFallback}`);
+  await page.click(".install-sheet .secondary-button");
+  const pwaRegistration = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.getRegistration(new URL("/", location.origin));
+    return registration?.active?.scriptURL || registration?.installing?.scriptURL || registration?.waiting?.scriptURL || "";
+  });
+  if (!pwaRegistration.endsWith("/service-worker.js")) throw new Error(`PWA service worker is not registered: ${pwaRegistration}`);
   await page.setViewport({ width: 1440, height: 1000 });
 
   await page.goto(`${koBaseUrl}/tools/text-tools`, { waitUntil: "networkidle0" });
@@ -178,22 +214,35 @@ try {
   await page.mouse.move(bounds.x + 80, bounds.y + 80); await page.mouse.down(); await page.mouse.move(bounds.x + 220, bounds.y + 150, { steps: 8 }); await page.mouse.up();
   await page.waitForFunction(() => !document.querySelector('.editor-history-actions button[aria-label="실행 취소"]')?.disabled);
 
+  const googleVideoVisit = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.hostname.endsWith("google-analytics.com") && url.pathname.endsWith("/collect") && url.searchParams.get("en") === "page_view";
+  }, { timeout: 60_000 });
+  const naverVideoVisit = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.hostname === "wcs.naver.com" && url.pathname === "/b";
+  }, { timeout: 60_000 });
   await page.$eval('a[href^="/ko/tools/video-studio"]', (link) => link.click());
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await Promise.all([googleVideoVisit, naverVideoVisit]);
   await page.waitForSelector(".video-engine-status");
   const videoIsolation = await page.evaluate(() => ({
     origin: location.origin,
     path: location.pathname,
     marker: Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')),
     ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
+    googleAnalytics: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
+    naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
     controller: navigator.serviceWorker.controller?.scriptURL || "",
     engine: document.querySelector(".video-engine-status")?.textContent || "",
   }));
-  if (videoIsolation.origin !== new URL(baseUrl).origin || videoIsolation.path !== "/ko/tools/video-studio/" || !videoIsolation.marker || videoIsolation.ads || !videoIsolation.controller.endsWith("/ko/tools/video-studio/coi-serviceworker.js") || !videoIsolation.engine.includes("멀티스레드")) {
+  const validVideoController = videoIsolation.controller.endsWith("/service-worker.js") || videoIsolation.controller.endsWith("/ko/tools/video-studio/coi-serviceworker.js");
+  if (videoIsolation.origin !== new URL(baseUrl).origin || videoIsolation.path !== "/ko/tools/video-studio/" || !videoIsolation.marker || videoIsolation.ads
+    || !videoIsolation.googleAnalytics || !videoIsolation.naverAnalytics || !validVideoController || !videoIsolation.engine.includes("멀티스레드")) {
     throw new Error(`Video document isolation is incomplete: ${JSON.stringify(videoIsolation)}`);
   }
   const videoCompatibility = await page.$eval(".video-studio-page .inline-notice.warning", (element) => element.textContent);
-  if (!videoCompatibility.includes("MKV") || !videoCompatibility.includes("AVI") || !videoCompatibility.includes("FFmpeg")) throw new Error("Video compatibility fallback notice is incomplete.");
+  if (!videoCompatibility.includes("MKV") || !videoCompatibility.includes("AVI") || !videoCompatibility.includes("재생 시간") || videoCompatibility.includes("FFmpeg")) throw new Error("Video compatibility fallback notice is incomplete or exposes implementation details.");
 
   await page.$eval('a[href^="/ko/tools/pdf-editor"]', (link) => link.click());
   await page.waitForFunction(() => location.pathname === "/ko/tools/pdf-editor" && !document.querySelector('meta[name="worklazy-video-isolation"]'));

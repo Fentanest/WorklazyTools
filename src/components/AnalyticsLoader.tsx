@@ -83,8 +83,8 @@ function initializeAnalytics() {
 
 function initializeGoogleAnalytics() {
   window.dataLayer ??= [];
-  window.gtag ??= function gtag(...args: unknown[]) {
-    window.dataLayer?.push(args);
+  window.gtag ??= function gtag() {
+    window.dataLayer?.push(arguments);
   };
 
   window.gtag("js", new Date());
@@ -129,6 +129,7 @@ function initializeNaverAnalytics() {
 
   const script = document.createElement("script");
   script.async = true;
+  script.crossOrigin = "anonymous";
   script.dataset.worklazyNaverAnalytics = "true";
   script.src = NAVER_TAG_URL;
   script.addEventListener("load", markNaverReady, { once: true });

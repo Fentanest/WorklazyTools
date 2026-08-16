@@ -46,6 +46,9 @@ for (const route of localizedRoutes.filter(Boolean)) {
 }
 
 const coiSource = path.resolve("node_modules/coi-serviceworker/coi-serviceworker.min.js");
+const coiSourceText = await fs.readFile(coiSource, "utf8");
+const credentiallessCoiSource = coiSourceText.replace("let coepCredentialless=!1;", "let coepCredentialless=!0;");
+if (credentiallessCoiSource === coiSourceText) throw new Error("Unable to configure the video isolation service worker for credentialless subresources.");
 for (const language of languages) {
   for (const assetDirectory of ["workers", "runtime"]) {
     const source = path.join(outputDirectory, videoRoute, assetDirectory);
@@ -58,7 +61,7 @@ for (const language of [...languages, "legacy"]) {
     ? path.join(outputDirectory, videoRoute, "coi-serviceworker.js")
     : path.join(outputDirectory, language, videoRoute, "coi-serviceworker.js");
   await fs.mkdir(path.dirname(target), { recursive: true });
-  await fs.copyFile(coiSource, target);
+  await fs.writeFile(target, credentiallessCoiSource);
 }
 
 await fs.writeFile(path.join(outputDirectory, "sitemap.xml"), createSitemap(generated));
@@ -104,7 +107,7 @@ function renderPage(template, page, canonical) {
     `<meta name="twitter:card" content="summary_large_image" />`, `<meta name="twitter:title" content="${escapeHtml(page.title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(page.description)}" />`, `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
     `<script id="worklazy-route-jsonld" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
-    ...(page.route === videoRoute ? [`<meta name="worklazy-video-isolation" content="document-scope" />`, `<script>globalThis.coi={quiet:true,coepCredentialless:()=>false};</script>`, `<script data-worklazy-video-isolation src="./coi-serviceworker.js"></script>`] : []),
+    ...(page.route === videoRoute ? [`<meta name="worklazy-video-isolation" content="document-scope" />`, `<script>globalThis.coi={quiet:true,coepCredentialless:()=>true};</script>`, `<script data-worklazy-video-isolation src="./coi-serviceworker.js"></script>`] : []),
   ].join("\n    ");
   return template.replace(/<html[^>]*>/, `<html lang="${page.language}">`).replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(page.title)}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${escapeHtml(page.description)}" />`).replace("</head>", `    ${head}\n  </head>`).replace('<div id="root"></div>', `<div id="root">${staticBody(page)}</div>`);
 }

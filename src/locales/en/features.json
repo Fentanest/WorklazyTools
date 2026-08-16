@@ -118,10 +118,10 @@
       },
       "videoProbe": {
         "unableToReadTheVideoFile": "Unable to read the video file.",
-        "browserPreviewIsUnavailableInspectingVideoMetadataDirectly": "Browser preview is unavailable; inspecting video metadata directly…",
-        "unableToAttachTheVideoFileToThe": "Unable to attach the video file to the analysis engine.",
+        "browserPreviewIsUnavailableInspectingVideoMetadataDirectly": "Browser preview is unavailable; reading video details directly…",
+        "unableToAttachTheVideoFileToThe": "Unable to read the video file details.",
         "unableToReadThisVideoSDurationAnd": "Unable to read this video's duration and dimensions. Convert it to MP4, MOV, or WebM and try again.",
-        "theVideoMetadataIsInvalid": "The video metadata is invalid."
+        "theVideoMetadataIsInvalid": "The video details are invalid."
       },
       "VideoGroupSection": {
         "thisBrowserDoesNotSupportSplitFullscreen": "This browser does not support split fullscreen.",
@@ -139,11 +139,11 @@
         "audio": "Audio",
         "dragToReorderOrChangeGroup": "Drag to reorder or change group",
         "noBrowserPreview": "No browser preview",
-        "metadataIsAvailableUseTheNumericFieldsBelow": "Metadata is available. Use the numeric fields below to set the range.",
-        "readingVideoMetadata": "Reading video metadata",
-        "preparingTheFfmpegCompatibilityPath": "Preparing the FFmpeg compatibility path.",
-        "metadataReadyForConversion": " · metadata ready for conversion",
-        "readingPlaybackMetadata": "Reading playback metadata…",
+        "metadataIsAvailableUseTheNumericFieldsBelow": "Video details are available. Use the numeric fields below to set the range.",
+        "readingVideoMetadata": "Reading video details",
+        "preparingTheFfmpegCompatibilityPath": "Preparing to read the video details.",
+        "metadataReadyForConversion": " · video details ready",
+        "readingPlaybackMetadata": "Reading playback details…",
         "checkingFrameRateWithoutBlockingExport": "Checking FPS · export can start immediately.",
         "frameRateUnavailableUsingTenthsOfASecond": "FPS was unavailable, so trim controls use 0.1-second steps. Export is unaffected.",
         "moveToThePreviousGroup": "Move {{p0}} to the previous group",
@@ -156,7 +156,7 @@
       },
       "VideoTrimLane": {
         "message1Frame": "1 frame",
-        "readingPlaybackMetadataFor": "Reading playback metadata for {{p0}}…",
+        "readingPlaybackMetadataFor": "Reading playback details for {{p0}}…",
         "startTime": "{{p0}} start time",
         "endTime": "{{p0}} end time",
         "start": "Start",
@@ -177,7 +177,7 @@
         "zipCreationWasCanceled": "ZIP creation was canceled.",
         "creatingZipFile": "Creating ZIP file…",
         "unableToCreateTheZipFile": "Unable to create the ZIP file.",
-        "unableToStartTheZipWorker": "Unable to start the ZIP worker."
+        "unableToStartTheZipWorker": "Unable to start ZIP creation."
       },
       "video": {
         "theSourceVideoIsEmptyOrBrowserFile": "The source video is empty or browser file access permission has been revoked.",
@@ -187,15 +187,15 @@
         "aboutForThisStage": " · about {{p0}} for this stage",
         "progressWithEta": "{{p0}}… {{p1}}%{{p2}}",
         "jobTask": "[{{p0}}] {{p1}}",
-        "loadingTheVideoEngineTheFirstRunMay": "Loading the video engine… (the first run may take a while)",
-        "multiThreadStartupFailedSwitchingToCompatibilityMode": "Multi-thread startup failed; switching to compatibility mode…",
-        "engineReadyPreparingGroupOutputs": "{{p0}} engine ready · preparing group outputs…",
+        "loadingTheVideoEngineTheFirstRunMay": "Preparing video processing… (the first time may take a little longer)",
+        "multiThreadStartupFailedSwitchingToCompatibilityMode": "Multi-thread processing is unavailable; switching to compatibility mode…",
+        "engineReadyPreparingGroupOutputs": "{{p0}} processing ready · preparing group results…",
         "preparing": "{{p0}}… preparing",
         "resultReadyCheckingTheNextJob": "{{p0}}/{{p1}} result ready · checking the next job…",
         "resultsCreated": "{{p0}} results created",
-        "sourceFileAttachmentWasCanceledBecauseTheVideo": "Source file attachment was canceled because the video job ended.",
-        "attachingSourceFile": "[{{p0}}] {{p1}}/{{p2}} attaching source file",
-        "thisBrowserSVideoEngineCannotAttachLarge": "This browser's video engine cannot attach large files.",
+        "sourceFileAttachmentWasCanceledBecauseTheVideo": "Loading the video was canceled because the job ended.",
+        "attachingSourceFile": "[{{p0}}] {{p1}}/{{p2}} loading video",
+        "thisBrowserSVideoEngineCannotAttachLarge": "This browser cannot process the selected large video.",
         "preparingSelectedRange": "[{{p0}} · {{p1}}/{{p2}}] preparing selected range",
         "videoIn": "video {{p1}} in {{p0}}",
         "concatenatingVideosInOrder": "[{{p0}}] concatenating videos in order",
@@ -213,11 +213,11 @@
         "enterAVideoBitrateBetween01And": "Enter a video bitrate between 0.1 and 200 Mbps.",
         "enterAnAudioBitrateBetween32And512": "Enter an audio bitrate between 32 and 512 kbps.",
         "enterASampleRateBetween8000And": "Enter a sample rate between 8,000 and {{p0}} Hz for the selected audio codec.",
-        "theVideoFileReferenceIsInvalid": "The video file reference is invalid.",
+        "theVideoFileReferenceIsInvalid": "The selected video information is invalid. Select the file again.",
         "unableToDetermineVideoDuration": "Unable to determine video duration.",
         "unableToDetermineVideoDimensions": "Unable to determine video dimensions.",
         "checkTheStartAndEndTimes": "Check the start and end times.",
-        "theOutputFileIsNotValidBinaryData": "The output file is not valid binary data.",
+        "theOutputFileIsNotValidBinaryData": "The result could not be completed. Check the settings and try again.",
         "concatenated": "concatenated",
         "passthrough": "passthrough",
         "converted": "converted",
@@ -227,7 +227,7 @@
         "audioExtraction": "{{p0}} audio extraction",
         "passthroughWithoutReEncoding": "passthrough without re-encoding",
         "encoding": "{{p0}} encoding",
-        "theFirstAudioTrackInCannotBeCopied": "The first audio track in {{p0}} cannot be copied directly into the selected container. Convert or remove the audio track.",
+        "theFirstAudioTrackInCannotBeCopied": "The first audio track in {{p0}} cannot be copied directly into the selected output format. Convert or remove audio.",
         "unableToExtractTheFirstAudioTrackFrom": "Unable to extract the first audio track from {{p0}} as {{p1}}.",
         "unableToProcessUsing": "Unable to process {{p0}} using {{p1}}.",
         "processedOutputJobsAccordingToGroupSettings": "Processed {{p0}} output jobs according to group settings.",
@@ -236,33 +236,33 @@
         "theAudioTrackWasRemovedFromTheOutput": "The audio track was removed from the output video.",
         "hevcMayNotPlayOnEveryDeviceOr": "HEVC may not play on every device or player.",
         "theBrowserRanOutOfMemoryTryA": "The browser ran out of memory. Try a shorter range or fewer files.",
-        "theBrowserEncodingEngineDoesNotSupportThe": "The browser encoding engine does not support the selected codec. Choose H.264 or VP9.",
-        "theInputFormatOrCodecMayNotBe": "{{p0}} The input format or codec may not be supported by this browser engine.",
+        "theBrowserEncodingEngineDoesNotSupportThe": "This browser cannot use the selected codec. Choose H.264 or VP9.",
+        "theInputFormatOrCodecMayNotBe": "The selected video format or compression could not be processed. Choose different output settings or convert the source to MP4, MOV, or WebM and try again.",
         "sec": "{{p0}} sec",
         "minSec": "{{p0}} min {{p1}} sec",
         "engineMultiThreaded": "multi-threaded",
         "engineSingleThreaded": "single-thread compatibility"
       },
       "videoWorkerClient": {
-        "videoMetadataInspectionWasCanceled": "Video metadata inspection was canceled.",
-        "unableToReadVideoMetadata": "Unable to read video metadata.",
-        "unableToStartVideoMetadataInspection": "Unable to start video metadata inspection.",
-        "videoMetadataInspectionTimedOut": "Video metadata inspection did not finish within 60 seconds and was stopped.",
+        "videoMetadataInspectionWasCanceled": "Reading video details was canceled.",
+        "unableToReadVideoMetadata": "Unable to read video details.",
+        "unableToStartVideoMetadataInspection": "Unable to start reading video details.",
+        "videoMetadataInspectionTimedOut": "Video details could not be read within 60 seconds, so the attempt was stopped.",
         "videoProcessingWasCanceled": "Video processing was canceled.",
-        "videoWorkspaceReadySendingTheJobList": "Video workspace ready · sending the job list…",
-        "unableToSendTheVideoJobListTo": "Unable to send the video job list to the worker.",
-        "theBrowserFileReferenceForIsUnavailableSelect": "The browser file reference for {{p0}} is unavailable. Select the file again.",
-        "unableToSendTheFileReferenceToThe": "Unable to send the {{p0}} file reference to the worker.",
+        "videoWorkspaceReadySendingTheJobList": "Video processing ready · checking the job list…",
+        "unableToSendTheVideoJobListTo": "Unable to start video processing.",
+        "theBrowserFileReferenceForIsUnavailableSelect": "{{p0}} could not be loaded again. Select the file again.",
+        "unableToSendTheFileReferenceToThe": "Unable to process {{p0}}. Select the file again.",
         "processingVideo": "Processing video…",
         "anErrorOccurredWhileProcessingTheVideo": "An error occurred while processing the video.",
         "unableToStartVideoProcessing": "Unable to start video processing.",
-        "theVideoWorkspaceDidNotStartWithin30": "The video workspace did not start within 30 seconds. Refresh the page and try again.",
+        "theVideoWorkspaceDidNotStartWithin30": "Video processing did not start within 30 seconds. Refresh the page and try again.",
         "originalVideo": "source video"
       },
       "VideoStudioPage": {
         "unsupportedFilesWereSkipped": "Unsupported files were skipped: {{p0}}",
         "wereAttachedWithoutCopyingTheEntireSourceInto": "{{p0}} were attached without copying the entire source into memory. If a passthrough result is too large, you will be asked to shorten the range before export.",
-        "unableToReadVideoMetadata": "Unable to read video metadata.",
+        "unableToReadVideoMetadata": "Unable to read video details.",
         "isReadyDownloadItFromTheResultsBelow": "{{p0}} is ready. Download it from the results below.",
         "requestedIndividualDownloadsAllowMultipleDownloadsIfYour": "Requested {{p0}} individual downloads. Allow multiple downloads if your browser asks.",
         "savingResultsToTheSelectedFolder": "Saving results to the selected folder…",
@@ -282,7 +282,7 @@
         "checkingEstimatedPassthroughOutputSize": "Checking estimated passthrough output size…",
         "isEstimatedAtAboutLargeSourceFilesAre": "{{p0}} is estimated at about {{p1}}. Large source files are not inherently unsafe, but this browser output path cannot create a single result over 1.5 GB. Shorten the range or select CRF encoding.",
         "largeFileNoticeTheSelectedSourcesTotalThey": "Large-file notice: the selected sources total {{p0}}. They are attached without copying the entire files into memory, but conversion may take longer or run out of memory on this device. Continue?",
-        "attachingSourceVideosToTheProcessingEngineWithout": "Attaching source videos to the processing engine without copying them into memory…",
+        "attachingSourceVideosToTheProcessingEngineWithout": "Loading source videos…",
         "allResultsAreReady": "All {{p0}} results are ready.{{p1}}",
         "resultsCreated": "{{p0}} results created",
         "videoProcessingWasCanceled": "Video processing was canceled.",
@@ -293,13 +293,13 @@
         "keepAddingVideosWithoutAFileCountLimit": "Keep adding videos without a file-count limit, organize them into up to 10 groups, and export individually or concatenate in order.",
         "multiThreadEncodingReady": "Multi-thread encoding ready",
         "singleThreadCompatibilityMode": "Single-thread compatibility mode",
-        "aDedicatedVideoRuntimeUsesMultipleCpuCores": "A dedicated video runtime uses multiple CPU cores and does not load advertising scripts.",
-        "thisBrowserCannotMeetTheMultiThreadRequirements": "This browser cannot meet the multi-thread requirements, so it uses the compatible engine. Features are the same, but encoding may take longer.",
+        "aDedicatedVideoRuntimeUsesMultipleCpuCores": "Multiple CPU cores can process your videos faster.",
+        "thisBrowserCannotMeetTheMultiThreadRequirements": "This browser is using single-thread compatibility mode. Features are the same, but encoding may take longer.",
         "chooseVideos": "Choose videos",
         "addFilesInMultipleRoundsWithNoFile": "Add files in multiple rounds with no file-count limit, then set order and output mode in up to 10 groups.",
         "mp4MovWebmMkvAviAddMoreAt": "MP4 · MOV · WebM · MKV · AVI · add more at any time",
-        "mkvAndAviCompatibilityDependsOnTheirInternal": "MKV and AVI compatibility depends on their internal codecs and is not guaranteed. If preview fails, browser FFmpeg will try to read duration and dimensions for numeric trimming; if probing also fails, convert the source to MP4, MOV, or WebM first.",
-        "mobileDefaultsAre1080pAnd480PxGif": "Mobile defaults are 1080p and 480 px GIF. Large totals above 250 MB are supported, but processing one short clip at a time is more reliable.",
+        "mkvAndAviCompatibilityDependsOnTheirInternal": "MKV and AVI compatibility depends on their internal compression and is not guaranteed. If preview fails, the tool will separately read duration and dimensions for numeric trimming; if it cannot read those details, convert the source to MP4, MOV, or WebM first.",
+        "mobileDefaultsAre1080pAnd480PxGif": "On mobile, passthrough, source resolution and aspect ratio, and no rotation are the defaults. GIF width defaults to 480 px. Large totals above 250 MB are supported, but processing one short clip at a time is more reliable.",
         "groupPreviewsAndTrimRanges": "Group previews and trim ranges",
         "dragVideosToReorderThemWithinAGroup": "Drag videos to reorder them within a group or move them to another group.",
         "outputSettings": "Output settings",
@@ -322,7 +322,7 @@
         "passthroughAvoidsReEncodingSoItIsFast": "Passthrough avoids re-encoding, so it is fast and lossless. Trim starts may snap to a nearby keyframe, and videos with different codec settings may not concatenate.",
         "typicalMp4VideoAndAudioCannotBeCopied": "Typical MP4 video and audio cannot be copied directly into WebM.",
         "reEncodeH264VideoUsingCrfOr": "Re-encode H.264 video using CRF or a target bitrate, and convert audio to Opus or remove it. Direct copy works only when the source already uses VP8, VP9, or AV1 video with Opus or Vorbis audio.",
-        "onlyTheFirstAudioTrackIsCopiedWithout": "Only the first audio track is copied without re-encoding. If the output container does not support it, the tool reports an error instead of silently changing quality.",
+        "onlyTheFirstAudioTrackIsCopiedWithout": "Only the first audio track is copied without re-encoding. If the selected result format does not support it, the tool reports an error instead of silently changing quality.",
         "audioWillBeRemovedFromTheOutputVideo": "Audio will be removed from the output video.",
         "changingAspectRatioOrResolutionRequiresReEncoding": "Changing aspect ratio or resolution requires re-encoding. Restore both to source settings or choose CRF/target-bitrate encoding.",
         "videosWithDifferentDimensionsOrAspectRatiosCannot": "Videos with different dimensions or aspect ratios cannot be concatenated via passthrough. Choose CRF or a target bitrate to fit each source into the first video's frame while preserving its aspect ratio.",
@@ -334,8 +334,8 @@
         "concatenateVideosInOrder": "Concatenate {{p0}} videos in order",
         "exportVideosIndividually": "Export {{p0}} videos individually",
         "createResults": "Create {{p0}} results",
-        "exportIsBlockedBecauseMetadataIsUnavailableFor": "Export is blocked because metadata is unavailable for: {{p0}}",
-        "videoProcessingLog": "Video processing log",
+        "exportIsBlockedBecauseMetadataIsUnavailableFor": "Video details could not be read, so export cannot start: {{p0}}",
+        "videoProcessingLog": "Video processing progress",
         "cancel": "Cancel",
         "completedResults": "{{p0}} completed results",
         "eachFileAppearsAsSoonAsItFinishes": "Each file appears as soon as it finishes. Download only what you need, download all individually, or create a ZIP when required.",
@@ -347,7 +347,7 @@
         "createZip": "Create ZIP",
         "clearResults": "Clear results",
         "browserVideoProcessingGuide": "Browser video processing guide",
-        "videoFilesAreProcessedInAnIsolatedWorkspace": "Video files are processed in an isolated workspace on this page and are not uploaded to a conversion server.",
+        "videoFilesAreProcessedInAnIsolatedWorkspace": "Video files are processed in this browser and are not uploaded to a conversion server.",
         "videoCodec": "Video codec",
         "whenSupported": "when supported",
         "resizeAllVideos": "Resize all videos",
@@ -418,26 +418,26 @@
           {
             "title": "Large sources and output limits",
             "paragraphs": [
-              "Source videos are attached to the engine through read-only browser file references rather than copied in full. Intermediate data and final results still use memory, so trim long 4K sources first. Oversized passthrough estimates are reported before processing."
+              "Large source videos are not copied into memory all at once. Intermediate data and final results still use browser memory, so trim long 4K sources first. Oversized passthrough estimates are reported before processing."
             ]
           },
           {
             "title": "Input compatibility",
             "paragraphs": [
-              "MP4, MOV, and WebM usually preview in current browsers. If MKV or AVI preview fails, the conversion engine tries to read duration and dimensions for numeric trimming, but not every internal codec is guaranteed."
+              "MP4, MOV, and WebM usually preview in current browsers. If MKV or AVI preview fails, the tool separately reads duration and dimensions for numeric trimming, but not every internal compression format is guaranteed."
             ]
           },
           {
             "title": "Using multiple CPU cores",
             "paragraphs": [
-              "Supported browsers reopen only the video tool in a secure isolated runtime that can use multiple CPU cores. The address and domain stay the same, and other tools and ad execution are unaffected. A functionally equivalent single-core path is used when requirements are not met."
+              "Supported browsers process videos with multiple CPU cores. When this is unavailable, the tool automatically uses a functionally equivalent single-thread compatibility mode."
             ]
           }
         ],
         "faq": [
           {
             "question": "Are videos sent to a server?",
-            "answer": "No. Selected files are read only by the in-browser conversion engine; video data and results are not sent to a server."
+            "answer": "No. Selected files and results are processed only in this browser and are not sent to a server."
           },
           {
             "question": "How do I download group outputs?",
@@ -457,7 +457,7 @@
           },
           {
             "question": "Why is the first run slow?",
-            "answer": "The browser must load the bundled video conversion runtime and allocate memory. Later starts may be faster while assets remain cached."
+            "answer": "The video processing feature must be prepared the first time you use it. Later jobs may start faster once it is ready."
           },
           {
             "question": "Is remaining time for the whole job?",
@@ -465,7 +465,7 @@
           },
           {
             "question": "Do MKV and AVI always work?",
-            "answer": "No. The engine can often probe files that browsers cannot preview, but unsupported internal codec combinations are not guaranteed."
+            "answer": "No. When a browser cannot preview a file, the tool can often read its duration and dimensions separately, but unsupported compression combinations are not guaranteed."
           }
         ]
       },

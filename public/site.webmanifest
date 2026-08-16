@@ -3,11 +3,15 @@
   "short_name": "Worklazy",
   "description": "브라우저에서 실행하는 문서, PDF, 비디오와 이미지 업무 도구",
   "lang": "ko-KR",
+  "id": "./",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f2f2f7",
   "theme_color": "#f2f2f7",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

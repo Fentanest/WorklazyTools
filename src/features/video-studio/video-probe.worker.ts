@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
-import { workerMessage as featureMessage } from "../../i18n/workerMessages";
+import { FEATURE_MESSAGE_TOKEN_PREFIX, workerMessage as featureMessage } from "../../i18n/workerMessages";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 const runtimeLanguage = worker.location.pathname.match(new RegExp(`^${import.meta.env.BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(ko|en)(?:/|$)`))?.[1];
@@ -30,7 +30,13 @@ worker.onmessage = async (event: MessageEvent<{ file: File; language?: "ko" | "e
     const metadata = parseMetadata(lines, language);
     worker.postMessage({ type: "result", result: metadata });
   } catch (error) {
-    worker.postMessage({ type: "error", error: error instanceof Error ? error.message : String(error) });
+    const message = error instanceof Error ? error.message : "";
+    worker.postMessage({
+      type: "error",
+      error: message.startsWith(FEATURE_MESSAGE_TOKEN_PREFIX)
+        ? message
+        : featureMessage(language, "video.messages.videoWorkerClient.unableToReadVideoMetadata"),
+    });
   } finally {
     await ffmpeg.unmount(mountPoint).catch(() => undefined);
     await ffmpeg.deleteDir(mountPoint).catch(() => undefined);

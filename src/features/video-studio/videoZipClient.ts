@@ -3,6 +3,8 @@ import type { AppLanguage } from "../../i18n/languages";
 import videoZipWorkerUrl from "./video-zip.worker.ts?worker&url";
 import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
 import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessages";
+import { FEATURE_MESSAGE_TOKEN_PREFIX } from "../../i18n/workerMessages";
+import { UserFacingVideoError } from "./videoErrors";
 
 export interface VideoZipSource {
   fileName: string;
@@ -44,16 +46,16 @@ export function createVideoZip(files: VideoZipSource[], onProgress?: VideoWorker
         error?: string;
       };
       if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ? resolveFeatureMessage(language, data.message) : featureMessage(language, "video.messages.videoZipClient.creatingZipFile"));
+        onProgress?.(data.progress ?? 0, data.message?.startsWith(FEATURE_MESSAGE_TOKEN_PREFIX) ? resolveFeatureMessage(language, data.message) : featureMessage(language, "video.messages.videoZipClient.creatingZipFile"));
         return;
       }
       if (!finish()) return;
       if (data.type === "result") resolve(data.result as VideoZipResult);
-      else reject(new Error(data.error ? resolveFeatureMessage(language, data.error) : featureMessage(language, "video.messages.videoZipClient.unableToCreateTheZipFile")));
+      else reject(new UserFacingVideoError(data.error?.startsWith(FEATURE_MESSAGE_TOKEN_PREFIX) ? resolveFeatureMessage(language, data.error) : featureMessage(language, "video.messages.videoZipClient.unableToCreateTheZipFile")));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
-      reject(new Error(event.message || featureMessage(language, "video.messages.videoZipClient.unableToStartTheZipWorker")));
+      reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoZipClient.unableToStartTheZipWorker")));
     };
     worker.postMessage({ files, language, archiveName: featureMessage(language, "video.messages.videoZip.worklazyVideoResultsZip", { p0: files.length }) });
   });

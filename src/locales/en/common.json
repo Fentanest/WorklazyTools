@@ -88,6 +88,13 @@
     "share": "Share or save to device",
     "viewAll": "View all"
   },
+  "install": {
+    "action": "Install web app",
+    "title": "Add to Home Screen",
+    "description": "Open Worklazy Tools like an app",
+    "browserInstructions": "Open your browser menu and choose 'Add to Home screen' or 'Install app'.",
+    "iosInstructions": "Tap the Share button in Safari, then choose 'Add to Home Screen'."
+  },
   "status": {
     "preparing": "Preparing…",
     "processing": "Processing…",
