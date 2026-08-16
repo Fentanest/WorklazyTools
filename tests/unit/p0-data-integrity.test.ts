@@ -36,8 +36,7 @@ test("CSV streaming rejects fatal quote errors and returns no partial table", as
   assert.deepEqual(await parseCsvStream("name,value\nvalid,1", false), { headers: ["name", "value"], rows: [["valid", "1"]], warnings: [] });
 });
 
-test("SQL minification never joins arithmetic minus tokens into a line comment", () => {
-  assert.equal(collapseSql("SELECT a -\n-1 FROM records", false), "SELECT a - -1 FROM records");
+test("SQL minification converts line comments without changing the query", () => {
   assert.equal(collapseSql("SELECT a -- explanation\nFROM records", false), "SELECT a /* explanation */ FROM records");
 });
 

@@ -1,34 +1,28 @@
 import {
   AlertCircle,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
   Download,
   FileText,
-  GripVertical,
   Info,
   TextSearch,
-  X,
 } from "lucide-react";
-import { type DragEvent as ReactDragEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
 import {
-  FileDropZone,
-  formatBytes,
   PageHeader,
   PrimaryButton,
   SectionCard,
   ToggleRow,
 } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
-import { createWordExcelReports } from "../excel-merger/excelWorkerClient";
+import { DocumentFileColumn } from "../document-compare/DocumentFileColumn";
 import { DocumentPairingPreview } from "../document-compare/DocumentPairingPreview";
-import { deduplicateDocumentFiles as deduplicateFiles, documentFileKey as fileKey, reorderDocumentFiles as reorder, stripDocumentExtension as stripExtension } from "../document-compare/filePairs";
+import { createComparisonExcelReports, createComparisonReportArtifact } from "../document-compare/comparisonResults";
+import { stripDocumentExtension as stripExtension } from "../document-compare/filePairs";
+import { useDocumentPairFiles } from "../document-compare/useDocumentPairFiles";
 import { useWordCompareSession } from "./wordCompareSession";
 import { compareWordFilePairs } from "./wordWorkerClient";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
@@ -79,44 +73,18 @@ export function WordComparePage() {
     setError(null);
     operation.reset();
   };
+  const pairFiles = useDocumentPairFiles({
+    beforeFiles,
+    afterFiles,
+    setBeforeFiles,
+    setAfterFiles,
+    accepts: (file) => file.name.toLowerCase().endsWith(".docx"),
+    onReset: resetOutput,
+  });
 
-  const updateDocxFiles = (files: File[], setter: typeof setBeforeFiles) => {
-    const rejected = files.filter((file) => !file.name.toLowerCase().endsWith(".docx"));
-    const accepted = deduplicateFiles(files.filter((file) => file.name.toLowerCase().endsWith(".docx")));
-    setter(accepted);
-    clearResults();
-    operation.reset();
+  const updateDocxFiles = (files: File[], side: "before" | "after") => {
+    const rejected = pairFiles.updateFiles(files, side);
     setError(rejected.length ? L(`DOCX가 아닌 파일을 제외했습니다: ${rejected.map((file) => file.name).join(", ")}`, `Non-DOCX files were excluded: ${rejected.map((file) => file.name).join(", ")}`) : null);
-  };
-
-  const removeFile = (side: "before" | "after", index: number) => {
-    const setter = side === "before" ? setBeforeFiles : setAfterFiles;
-    setter((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    resetOutput();
-  };
-
-  const moveFile = (side: "before" | "after", from: number, to: number) => {
-    const setter = side === "before" ? setBeforeFiles : setAfterFiles;
-    setter((current) => reorder(current, from, to));
-    resetOutput();
-  };
-
-  const moveFileAcross = (side: "before" | "after", index: number) => {
-    const sourceFiles = side === "before" ? beforeFiles : afterFiles;
-    const targetFiles = side === "before" ? afterFiles : beforeFiles;
-    const sourceSetter = side === "before" ? setBeforeFiles : setAfterFiles;
-    const targetSetter = side === "before" ? setAfterFiles : setBeforeFiles;
-    const file = sourceFiles[index];
-    if (!file) return;
-
-    sourceSetter(sourceFiles.filter((_, itemIndex) => itemIndex !== index));
-    const targetIndex = Math.min(index, targetFiles.length);
-    targetSetter([
-      ...targetFiles.slice(0, targetIndex),
-      file,
-      ...targetFiles.slice(targetIndex),
-    ]);
-    resetOutput();
   };
 
   const runComparison = async () => {
@@ -154,7 +122,7 @@ export function WordComparePage() {
       let reportBuffers: ArrayBuffer[] = [];
       if (excelOutput) {
         operation.update(80, L(`${comparisonResults.length}개 Excel 보고서를 준비합니다.`, `Preparing ${comparisonResults.length} Excel reports.`));
-        reportBuffers = await createWordExcelReports(comparisonResults, (nextProgress, message) => {
+        reportBuffers = await createComparisonExcelReports(comparisonResults, (nextProgress, message) => {
           operation.update(80 + Math.round(nextProgress * 0.2), message);
         }, language, controller.signal);
       }
@@ -165,10 +133,7 @@ export function WordComparePage() {
         return {
           pairNumber: index + 1,
           result,
-          reportUrl: reportBuffer ? URL.createObjectURL(new Blob([reportBuffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          })) : undefined,
-          reportFileName: reportBuffer ? createReportFileName(index + 1, result.beforeName, result.afterName, language) : undefined,
+          ...createComparisonReportArtifact(reportBuffer, index + 1, result.beforeName, result.afterName, language),
           trackedUrl: trackedBuffer ? URL.createObjectURL(new Blob([trackedBuffer], {
             type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
           })) : undefined,
@@ -196,25 +161,31 @@ export function WordComparePage() {
       <SectionCard step={1} title={L("비교할 문서", "Documents to compare")} description={L("드래그로 순서를 맞추거나 화살표로 문서를 반대쪽 목록에 옮기세요.", "Drag to align the order, or use the arrows to move a document to the other list.")}>
         <div className="compare-file-grid">
           <div>
-            <WordFileColumn
+            <DocumentFileColumn
               files={beforeFiles}
+              side="before"
               sideLabel={L("수정 전", "Before")}
               hint={L("원본 DOCX · 여러 번 나눠 추가 가능", "Original DOCX · add more at any time")}
-              onFiles={(files) => updateDocxFiles(files, setBeforeFiles)}
-              onRemove={(index) => removeFile("before", index)}
-              onMove={(from, to) => moveFile("before", from, to)}
-              onMoveAcross={(index) => moveFileAcross("before", index)}
+              accept=".docx"
+              accent="blue"
+              onFiles={(files) => updateDocxFiles(files, "before")}
+              onRemove={(index) => pairFiles.removeFile("before", index)}
+              onMove={(from, to) => pairFiles.moveFile("before", from, to)}
+              onMoveAcross={(index) => pairFiles.moveAcross("before", index)}
             />
           </div>
           <div>
-            <WordFileColumn
+            <DocumentFileColumn
               files={afterFiles}
+              side="after"
               sideLabel={L("수정 후", "After")}
               hint={L("변경된 DOCX · 여러 번 나눠 추가 가능", "Revised DOCX · add more at any time")}
-              onFiles={(files) => updateDocxFiles(files, setAfterFiles)}
-              onRemove={(index) => removeFile("after", index)}
-              onMove={(from, to) => moveFile("after", from, to)}
-              onMoveAcross={(index) => moveFileAcross("after", index)}
+              accept=".docx"
+              accent="blue"
+              onFiles={(files) => updateDocxFiles(files, "after")}
+              onRemove={(index) => pairFiles.removeFile("after", index)}
+              onMove={(from, to) => pairFiles.moveFile("after", from, to)}
+              onMoveAcross={(index) => pairFiles.moveAcross("after", index)}
             />
           </div>
         </div>
@@ -325,123 +296,6 @@ export function WordComparePage() {
       />
     </div>
   );
-}
-
-function WordFileColumn({ files, sideLabel, hint, onFiles, onRemove, onMove, onMoveAcross }: {
-  files: File[];
-  sideLabel: string;
-  hint: string;
-  onFiles: (files: File[]) => void;
-  onRemove: (index: number) => void;
-  onMove: (from: number, to: number) => void;
-  onMoveAcross: (index: number) => void;
-}) {
-  const language = useAppLanguage();
-  const [receivingFiles, setReceivingFiles] = useState(false);
-
-  const isExternalFileDrag = (event: ReactDragEvent<HTMLDivElement>) => Array.from(event.dataTransfer.types).includes("Files");
-
-  return (
-    <div
-      className={`word-file-column${receivingFiles ? " receiving-files" : ""}`}
-      onDragEnter={(event) => {
-        if (!isExternalFileDrag(event)) return;
-        event.preventDefault();
-        setReceivingFiles(true);
-      }}
-      onDragOver={(event) => {
-        if (!isExternalFileDrag(event)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
-      }}
-      onDragLeave={(event) => {
-        const nextTarget = event.relatedTarget;
-        if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
-        setReceivingFiles(false);
-      }}
-      onDrop={(event) => {
-        if (!isExternalFileDrag(event)) return;
-        event.preventDefault();
-        setReceivingFiles(false);
-        if ((event.target as Element).closest(".drop-zone")) return;
-        const droppedFiles = Array.from(event.dataTransfer.files);
-        if (droppedFiles.length) onFiles([...files, ...droppedFiles]);
-      }}
-    >
-      <FileDropZone
-        label={language === "en" ? `${sideLabel} · ${files.length} files` : `${sideLabel} · ${files.length}개`}
-        accept=".docx"
-        hint={hint}
-        multiple
-        files={files}
-        onFiles={onFiles}
-        accent="blue"
-      />
-      <SortableWordFileList files={files} sideLabel={sideLabel} onRemove={onRemove} onMove={onMove} onMoveAcross={onMoveAcross} />
-      {receivingFiles && <div className="word-column-drop-hint">{language === "en" ? `Drop to add ${sideLabel.toLowerCase()} documents` : `여기에 놓아 ${sideLabel} 문서 추가`}</div>}
-    </div>
-  );
-}
-
-function SortableWordFileList({ files, sideLabel, onRemove, onMove, onMoveAcross }: {
-  files: File[];
-  sideLabel: string;
-  onRemove: (index: number) => void;
-  onMove: (from: number, to: number) => void;
-  onMoveAcross: (index: number) => void;
-}) {
-  const language = useAppLanguage();
-  const isBefore = sideLabel === "수정 전" || sideLabel === "Before";
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
-  if (!files.length) return null;
-
-  return (
-    <ol className="sortable-word-files" aria-label={language === "en" ? `${sideLabel} document order` : `${sideLabel} 문서 순서`}>
-      {files.map((file, index) => (
-        <li
-          className={`${draggedIndex === index ? "dragging" : ""}${overIndex === index ? " drag-over" : ""}`}
-          key={fileKey(file)}
-          draggable
-          onDragStart={(event) => {
-            setDraggedIndex(index);
-            event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("text/plain", String(index));
-          }}
-          onDragEnter={() => setOverIndex(index)}
-          onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
-          onDrop={(event) => {
-            event.preventDefault();
-            if (draggedIndex !== null && draggedIndex !== index) onMove(draggedIndex, index);
-            setDraggedIndex(null);
-            setOverIndex(null);
-          }}
-          onDragEnd={() => { setDraggedIndex(null); setOverIndex(null); }}
-        >
-          <span className="drag-handle" title={language === "en" ? "Drag to reorder" : "드래그해서 순서 변경"}><GripVertical size={16} /></span>
-          <b>{index + 1}</b>
-          <span className="sortable-file-copy"><strong>{file.name}</strong><small>{formatBytes(file.size)}</small></span>
-          <span className="sortable-file-actions">
-            <button
-              className="move-across-button"
-              type="button"
-              onClick={() => onMoveAcross(index)}
-              aria-label={language === "en" ? `Move ${file.name} to the ${isBefore ? "After" : "Before"} list` : `${file.name} ${isBefore ? "수정 후" : "수정 전"} 목록으로 이동`}
-              title={language === "en" ? `Move to ${isBefore ? "After" : "Before"}` : `${isBefore ? "수정 후" : "수정 전"}로 이동`}
-            >{isBefore ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}</button>
-            <button type="button" disabled={index === 0} onClick={() => onMove(index, index - 1)} aria-label={language === "en" ? `Move ${file.name} up` : `${file.name} 위로 이동`}><ArrowUp size={14} /></button>
-            <button type="button" disabled={index === files.length - 1} onClick={() => onMove(index, index + 1)} aria-label={language === "en" ? `Move ${file.name} down` : `${file.name} 아래로 이동`}><ArrowDown size={14} /></button>
-            <button type="button" onClick={() => onRemove(index)} aria-label={language === "en" ? `Remove ${file.name}` : `${file.name} 제거`}><X size={15} /></button>
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function createReportFileName(pairNumber: number, beforeName: string, afterName: string, language: "ko" | "en") {
-  const base = `${pairNumber}_${stripExtension(beforeName)}_vs_${stripExtension(afterName)}`.replace(/[\\/:*?"<>|]/g, "_");
-  return `${base.slice(0, 120)}_${language === "en" ? "comparison-report" : "비교보고서"}.xlsx`;
 }
 
 function createTrackedFileName(pairNumber: number, beforeName: string, afterName: string, language: "ko" | "en") {

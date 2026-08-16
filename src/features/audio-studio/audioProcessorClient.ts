@@ -4,6 +4,7 @@ import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessage
 const AUDIO_PROGRESS_KEYS = {
   "audio.edit.MUTE": "audio.edit.MUTE", "audio.edit.CUT": "audio.edit.CUT", "audio.edit.COPY": "audio.edit.COPY", "audio.edit.PASTE": "audio.edit.PASTE", "audio.edit.DELETE": "audio.edit.DELETE", "audio.edit.PREVIEW": "audio.edit.PREVIEW",
   "audio.edit.FADE_IN": "audio.edit.FADE_IN", "audio.edit.FADE_OUT": "audio.edit.FADE_OUT", "audio.edit.GAIN": "audio.edit.GAIN", "audio.edit.NORMALIZE": "audio.edit.NORMALIZE", "audio.edit.TRIM": "audio.edit.TRIM",
+  "audio.progress.FADE_IN": "audio.progress.FADE_IN", "audio.progress.FADE_OUT": "audio.progress.FADE_OUT", "audio.progress.GAIN": "audio.progress.GAIN", "audio.progress.NORMALIZE": "audio.progress.NORMALIZE", "audio.progress.TRIM": "audio.progress.TRIM",
   "audio.voice.status.previewing": "audio.voice.status.previewing", "audio.voice.status.applying": "audio.voice.status.applying", "audio.status.exportPrepare": "audio.status.exportPrepare",
 } as const;
 

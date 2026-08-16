@@ -6,7 +6,7 @@ import type {
   VideoTask,
   VideoWorkerInput,
 } from "./types";
-import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate } from "./videoEncoding";
+import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate } from "./videoEncoding";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
@@ -96,7 +96,11 @@ async function processRequest(request: VideoWorkerStartRequest) {
     lastProgressAt = now;
     const remaining = estimateStageRemaining(progressStage, ratio, now);
     const eta = remaining === undefined ? (ratio >= 0.04 ? featureMessage(currentLanguage, "video.messages.video.estimatingTimeRemaining") : "") : featureMessage(currentLanguage, "video.messages.video.aboutForThisStage", { p0: formatDuration(remaining) });
-    progress(value, `${progressStage.label}… ${Math.round(ratio * 100)}%${eta}`);
+    progress(value, featureMessage(currentLanguage, "video.messages.video.progressWithEta", {
+      p0: progressStage.label,
+      p1: Math.round(ratio * 100),
+      p2: eta,
+    }));
   };
   ffmpeg.on("progress", reportFfmpegProgress);
 
@@ -202,7 +206,7 @@ async function processJob(
       const input = job.inputs[0];
       const outputName = createOutputName(job.name || input.fileName, task, false);
       temporaryFiles.add(outputName);
-      setStage(0.08, 0.92, input.end - input.start, `[${job.name}] ${describeTask(task)}`);
+      setStage(0.08, 0.92, input.end - input.start, featureMessage(currentLanguage, "video.messages.video.jobTask", { p0: job.name, p1: describeTask(task) }));
       const exitCode = await ffmpeg.exec(createSingleArguments(input, inputNames[0], outputName, task));
       if (exitCode !== 0) throw new Error(processingFailureMessage(job.name, task));
       const bytes = await readBytes(ffmpeg, outputName);
@@ -239,6 +243,9 @@ async function processConcatJob(
     : task.kind === "gif"
       ? gifDimensions(job.inputs[0], task.width)
       : undefined;
+  const concatFrameRate = task.kind === "encode" && task.bitrate !== "copy"
+    ? resolveConcatFrameRate(job.inputs.map((input) => input.frameRate))
+    : undefined;
   const totalDuration = jobDuration(job);
   const segmentEnd = task.kind === "gif" ? 0.76 : 0.9;
   const segmentBudget = segmentEnd - 0.04;
@@ -255,7 +262,7 @@ async function processConcatJob(
       inputDuration,
       featureMessage(currentLanguage, "video.messages.video.preparingSelectedRange", { p0: job.name, p1: inputIndex + 1, p2: job.inputs.length }),
     );
-    const exitCode = await ffmpeg.exec(createConcatSegmentArguments(input, inputNames[inputIndex], segmentName, task, concatDimensions));
+    const exitCode = await ffmpeg.exec(createConcatSegmentArguments(input, inputNames[inputIndex], segmentName, task, concatDimensions, concatFrameRate));
     if (exitCode !== 0) throw new Error(processingFailureMessage(featureMessage(currentLanguage, "video.messages.video.videoIn", { p0: job.name, p1: inputIndex + 1 }), task));
     completedDuration += inputDuration;
   }
@@ -309,7 +316,7 @@ function createSingleArguments(input: VideoWorkerInputDescriptor, inputName: str
   return createEncodeArguments(prefix, task, outputName, false, outputDimensions(input, task), input.fileSize);
 }
 
-function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask, concatDimensions?: readonly [number, number]) {
+function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask, concatDimensions?: readonly [number, number], concatFrameRate?: number) {
   const prefix = trimPrefix(input, inputName);
   if (task.kind === "audio") {
     return createAudioOnlyArguments(prefix, task, outputName);
@@ -325,12 +332,12 @@ function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputNa
     args.push("-avoid_negative_ts", "make_zero", outputName);
     return args;
   }
-  return createEncodeArguments(prefix, task, outputName, true, concatDimensions);
+  return createEncodeArguments(prefix, task, outputName, true, concatDimensions, 0, concatFrameRate);
 }
 
-function createEncodeArguments(prefix: string[], task: Extract<VideoTask, { kind: "encode" }>, outputName: string, normalizeForConcat: boolean, concatDimensions?: readonly [number, number], inputFileSize = 0) {
+function createEncodeArguments(prefix: string[], task: Extract<VideoTask, { kind: "encode" }>, outputName: string, normalizeForConcat: boolean, concatDimensions?: readonly [number, number], inputFileSize = 0, concatFrameRate?: number) {
   const args = [...prefix, "-map", "0:v:0"];
-  const filter = createVideoFilter(task, normalizeForConcat, concatDimensions);
+  const filter = createVideoFilter(task, normalizeForConcat, concatDimensions, concatFrameRate);
   if (filter) args.push("-vf", filter);
   args.push("-c:v", codecName(task.codec));
   appendVideoRateControl(args, task.codec, task.bitrate, task.crf);
@@ -370,14 +377,15 @@ function appendSampleRate(args: string[], sampleRate: "source" | number, codec: 
   if (resolved !== "source") args.push("-ar", String(resolved));
 }
 
-function createVideoFilter(task: Extract<VideoTask, { kind: "encode" }>, normalizeForConcat: boolean, concatDimensions?: readonly [number, number]) {
+function createVideoFilter(task: Extract<VideoTask, { kind: "encode" }>, normalizeForConcat: boolean, concatDimensions?: readonly [number, number], concatFrameRate?: number) {
+  const frameRateFilter = normalizeForConcat && concatFrameRate ? `fps=${concatFrameRate},` : "";
   if (task.aspect !== "source") {
     const [width, height] = concatDimensions || aspectDimensions(task.aspect, task.resolution);
-    return appendTransformFilters(`crop=min(iw\,ih*${width}/${height}):min(ih\,iw*${height}/${width}),scale=${width}:${height}:flags=lanczos,setsar=1`, task);
+    return appendTransformFilters(`${frameRateFilter}crop=min(iw\,ih*${width}/${height}):min(ih\,iw*${height}/${width}),scale=${width}:${height}:flags=lanczos,setsar=1`, task);
   }
   if (normalizeForConcat) {
     const [width, height] = concatDimensions || landscapeDimensions(task.resolution);
-    return appendTransformFilters(`scale=${width}:${height}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`, task);
+    return appendTransformFilters(`${frameRateFilter}scale=${width}:${height}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`, task);
   }
   const resize = task.resolution !== "source"
     ? `scale=w='if(lte(iw\,ih)\,min(iw\,${task.resolution})\,-2)':h='if(gt(iw\,ih)\,min(ih\,${task.resolution})\,-2)':flags=lanczos`

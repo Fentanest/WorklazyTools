@@ -68,8 +68,3 @@ export function createLocalId(prefix: string) {
   if (typeof randomUuid === "function") return `${prefix}-${randomUuid.call(globalThis.crypto)}`;
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
-
-export function normalizeRotation(value: number): 0 | 90 | 180 | 270 {
-  return normalizePdfRotation(value);
-}
-import { normalizePdfRotation } from "./pdfShared";

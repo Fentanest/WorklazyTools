@@ -6,6 +6,7 @@ import { featureMessage } from "../../i18n/featureMessages";
 import type { AppLanguage } from "../../i18n/languages";
 import { MAX_VIDEO_GROUP, VIDEO_GROUP_IDS, type VideoGroupId, type VideoGroupSettings, type VideoItem } from "./types";
 import { VideoTrimLane } from "./VideoTrimLane";
+import { areVideoGroupRenderInputsEqual } from "./videoMemo";
 
 interface VideoGroupSectionProps {
   group: VideoGroupId;
@@ -19,7 +20,7 @@ interface VideoGroupSectionProps {
   onUpdateSettings: (group: VideoGroupId, patch: Partial<VideoGroupSettings>) => void;
   onMoveItem: (itemId: string, group: VideoGroupId, targetId?: string) => void;
   onRemoveItem: (itemId: string) => void;
-  onProbeItem: (itemId: string) => void;
+  onProbeItem: (itemId: string, preserveTiming?: boolean) => void;
   onApplyRange: (source: VideoItem) => void;
   onNotice: (message: string) => void;
 }
@@ -184,6 +185,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
                     return;
                   }
                   onUpdateItem(item.id, { duration, width: event.currentTarget.videoWidth, height: event.currentTarget.videoHeight, end: item.end || duration, metadataSource: "browser", probing: false, metadataError: undefined });
+                  if (!(item.frameRate && item.frameRate > 0)) onProbeItem(item.id, true);
                 }}
                 onError={() => onProbeItem(item.id)}
                 onPlay={() => void synchronizePlayers(item.id, "play")}
@@ -218,9 +220,9 @@ export const VideoGroupSection = memo(function VideoGroupSection({
                 }}
               />
               {item.metadataSource === "ffmpeg" && <div className="video-preview-fallback"><Film size={22} /><strong>{featureMessage(language, "video.messages.VideoGroupSection.noBrowserPreview")}</strong><span>{featureMessage(language, "video.messages.VideoGroupSection.metadataIsAvailableUseTheNumericFieldsBelow")}</span></div>}
-              {item.probing && <div className="video-preview-fallback"><Gauge size={22} /><strong>{featureMessage(language, "video.messages.VideoGroupSection.readingVideoMetadata")}</strong><span>{featureMessage(language, "video.messages.VideoGroupSection.preparingTheFfmpegCompatibilityPath")}</span></div>}
+              {item.probing && item.metadataSource !== "browser" && <div className="video-preview-fallback"><Gauge size={22} /><strong>{featureMessage(language, "video.messages.VideoGroupSection.readingVideoMetadata")}</strong><span>{featureMessage(language, "video.messages.VideoGroupSection.preparingTheFfmpegCompatibilityPath")}</span></div>}
               <div className="video-card-footer">
-                <span><strong>{groupIndex + 1}. {item.file.name}</strong><small>{formatBytes(item.file.size)} · {item.duration ? `${formatTime(item.duration)}${item.metadataSource === "ffmpeg" ? featureMessage(language, "video.messages.VideoGroupSection.metadataReadyForConversion") : ""}` : item.metadataError || featureMessage(language, "video.messages.VideoGroupSection.readingPlaybackMetadata")}</small></span>
+                <span><strong>{groupIndex + 1}. {item.file.name}</strong><small>{formatBytes(item.file.size)} · {item.duration ? `${formatTime(item.duration)}${item.metadataSource === "ffmpeg" ? featureMessage(language, "video.messages.VideoGroupSection.metadataReadyForConversion") : ""}` : item.metadataError || featureMessage(language, "video.messages.VideoGroupSection.readingPlaybackMetadata")}</small>{item.metadataSource === "browser" && item.frameRateProbeStatus === "running" && <small>{featureMessage(language, "video.messages.VideoGroupSection.checkingFrameRateWithoutBlockingExport")}</small>}{item.metadataSource === "browser" && (item.frameRateProbeStatus === "done" || item.frameRateProbeStatus === "failed") && !(item.frameRate && item.frameRate > 0) && <small>{featureMessage(language, "video.messages.VideoGroupSection.frameRateUnavailableUsingTenthsOfASecond")}</small>}</span>
                 <span className="video-card-actions">
                   <button type="button" disabled={item.group === 1} aria-label={featureMessage(language, "video.messages.VideoGroupSection.moveToThePreviousGroup", { p0: item.file.name })} onClick={(event) => { event.stopPropagation(); onMoveItem(item.id, Math.max(1, item.group - 1) as VideoGroupId); }}><ChevronLeft size={14} /></button>
                   <label className="video-group-select"><span className="visually-hidden">{item.file.name} {featureMessage(language, "video.messages.VideoGroupSection.group2")}</span><select value={item.group} aria-label={featureMessage(language, "video.messages.VideoGroupSection.moveToAGroup", { p0: item.file.name })} onClick={(event) => event.stopPropagation()} onChange={(event) => onMoveItem(item.id, Number(event.target.value) as VideoGroupId)}>{VIDEO_GROUP_IDS.map((id) => <option value={id} key={id}>{featureMessage(language, "video.messages.VideoGroupSection.group")} {id}</option>)}</select></label>
@@ -260,17 +262,12 @@ export const VideoGroupSection = memo(function VideoGroupSection({
       </div>
     </section>
   );
-}, (previous, next) => {
-  if (previous.group !== next.group || previous.settings !== next.settings || previous.language !== next.language || previous.players !== next.players) return false;
-  if (previous.items.length !== next.items.length || previous.items.some((item, index) => item !== next.items[index])) return false;
-  const previousActiveInGroup = previous.items.some((item) => item.id === previous.activeId);
-  const nextActiveInGroup = next.items.some((item) => item.id === next.activeId);
-  return (!previousActiveInGroup && !nextActiveInGroup) || previous.activeId === next.activeId;
-});
+}, areVideoGroupRenderInputsEqual);
 
 function formatTime(seconds: number) {
-  if (!Number.isFinite(seconds)) return "00:00.0";
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${remaining.toFixed(1).padStart(4, "0")}`;
+  const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const rest = safe % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${rest.toFixed(2).padStart(5, "0")}`;
 }

@@ -11,8 +11,8 @@ import { PdfThumbnail } from "./PdfThumbnail";
 import { inspectPdf, parsePageRange, releasePdf, renderPdfPageAsJpeg } from "./pdfPreview";
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
 import { exportPdfGroups, imagesToPdf, mergePdfPages } from "./pdfWorkerClient";
-import { createLocalId, normalizeRotation, type PdfPageItem, type PdfSourceFile } from "./types";
-import { mapWithConcurrency, movePdfItem as moveItem } from "./pdfShared";
+import { createLocalId, type PdfPageItem, type PdfSourceFile } from "./types";
+import { mapWithConcurrency, movePdfItem as moveItem, normalizePdfRotation as normalizeRotation } from "./pdfShared";
 import { featureMessage } from "../../i18n/featureMessages";
 
 type OutputMode = "merged" | "ranges" | "separate";

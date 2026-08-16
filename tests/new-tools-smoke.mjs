@@ -37,19 +37,22 @@ try {
 
     const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
     const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
+    const onlyImage = process.env.TEST_ONLY_IMAGE === "1";
     if (!onlyVideo && !onlyAudio) {
-      console.log("[1/4] HWP editor");
-      await testHwpEditor(page, fixtures.hwpFiles);
+      if (!onlyImage) {
+        console.log("[1/4] HWP editor");
+        await testHwpEditor(page, fixtures.hwpFiles);
+      }
       console.log("[2/4] Image studio");
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
       await testImageStudio(page, fixtures.images);
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
     }
-    if (!onlyVideo) {
+    if (!onlyVideo && !onlyImage) {
       console.log("[3/4] Audio studio");
       await testAudioStudio(page, fixtures.audio);
     }
-    if (!onlyAudio) {
+    if (!onlyAudio && !onlyImage) {
       console.log("[4/4] Video studio");
       await testVideoStudio(page, fixtures.videos, fixtures.largeVideo, fixtures.largePassThroughVideos);
     }
@@ -216,12 +219,113 @@ async function testImageStudio(page, imagePaths) {
     || jpegGreenBounds.greenWidth < 430 || jpegGreenBounds.greenWidth > 510) {
     throw new Error(`High-resolution JPEG export is cropped, blurred, or scaled incorrectly: ${JSON.stringify(jpegGreenBounds)}`);
   }
+  console.log("  image: high-resolution export verified");
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
   await page.keyboard.press("Delete");
   await page.waitForFunction(() => document.querySelector(".shape-style-controls")?.classList.contains("is-disabled"));
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const deletedCanvas = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
   if (!styledCanvas || styledCanvas === deletedCanvas) throw new Error("Delete did not remove the selected Fabric layer");
+  await page.click('button[aria-label="사각형 추가"]');
+  await page.evaluate(() => {
+    const fill = document.querySelector('.shape-style-controls input[aria-label="도형 채움색"]');
+    if (!(fill instanceof HTMLInputElement)) throw new Error("Shape fill control is unavailable for the region-effect test");
+    fill.value = "#ff375f";
+    fill.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  const beforeRegionEffect = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  const disabledNativeCanvasBlur = await page.evaluate(() => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, "CanvasRenderingContext2D");
+    if (!descriptor?.configurable) return false;
+    window.__canvasContextConstructorDescriptor = descriptor;
+    Object.defineProperty(window, "CanvasRenderingContext2D", { configurable: true, writable: true, value: undefined });
+    return true;
+  });
+  await page.click('button[aria-label="영역 효과"]');
+  await page.$$eval(".region-effect-options button", (buttons) => {
+    const blur = buttons.find((button) => button.textContent?.trim() === "블러");
+    if (!(blur instanceof HTMLButtonElement)) throw new Error("Blur region effect is unavailable");
+    blur.click();
+  });
+  await page.$eval('input[aria-label="효과 강도"]', (input) => {
+    input.value = "10";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.waitForFunction(() => document.querySelector('input[aria-label="효과 강도"]')?.value === "10");
+  await page.waitForSelector(".fabric-stage.is-effect-mode");
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  const effectCanvas = await page.$(".fabric-stage .upper-canvas");
+  const effectBox = await effectCanvas?.boundingBox();
+  if (!effectBox) throw new Error("Region-effect canvas is unavailable");
+  await page.mouse.move(effectBox.x + effectBox.width * 0.02, effectBox.y + effectBox.height * 0.02);
+  await page.mouse.down();
+  await page.mouse.move(effectBox.x + effectBox.width * 0.42, effectBox.y + effectBox.height * 0.36, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForSelector(".region-effect-selection");
+  await page.click(".region-effect-selection .primary-button");
+  await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode") && !document.querySelector(".region-effect-selection"));
+  if (disabledNativeCanvasBlur) {
+    await page.evaluate(() => Object.defineProperty(window, "CanvasRenderingContext2D", window.__canvasContextConstructorDescriptor));
+  }
+  const afterRegionEffect = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  console.log("  image: legacy canvas blur fallback verified");
+  if (beforeRegionEffect === afterRegionEffect) throw new Error("Blur did not change the selected image region");
+  const blurredEdgeAlpha = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.getContext("2d").getImageData(Math.floor(canvas.width * 0.04), Math.floor(canvas.height * 0.04), 1, 1).data[3]);
+  if (blurredEdgeAlpha < 250) throw new Error(`Blur introduced transparency at the source-image edge: ${blurredEdgeAlpha}`);
+  await page.click('.editor-history-actions button[aria-label="실행 취소"]');
+  await page.waitForFunction((effected) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() !== effected, {}, afterRegionEffect);
+  const undoneRegionEffect = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  await page.click('.editor-history-actions button[aria-label="다시 실행"]');
+  await page.waitForFunction((undone) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() !== undone, {}, undoneRegionEffect);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(() => {
+    const clearLayers = Array.from(document.querySelectorAll(".image-editor-controls button")).find((button) => button.textContent?.includes("추가 레이어 모두 지우기"));
+    if (!(clearLayers instanceof HTMLButtonElement)) throw new Error("Clear-added-layers control is unavailable");
+    clearLayers.click();
+  });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.$eval(".fabric-stage .lower-canvas", (canvas) => {
+    window.__protectedEffectBeforeLayerMove = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+  });
+  await page.click('button[aria-label="원본 사진 잠금"]');
+  const baseCanvas = await page.$(".fabric-stage .upper-canvas");
+  const baseBox = await baseCanvas?.boundingBox();
+  if (!baseBox) throw new Error("Image base canvas is unavailable for the layer-order test");
+  await page.mouse.click(baseBox.x + baseBox.width * 0.8, baseBox.y + baseBox.height * 0.8);
+  await page.click('button[aria-label="맨 앞으로"]');
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const protectedEffectDifference = await page.$eval(".fabric-stage .lower-canvas", (canvas) => {
+    const before = window.__protectedEffectBeforeLayerMove;
+    const after = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+    let changedPixels = 0;
+    let totalDelta = 0;
+    for (let index = 0; index < after.length; index += 4) {
+      const delta = Math.abs(after[index] - before[index]) + Math.abs(after[index + 1] - before[index + 1]) + Math.abs(after[index + 2] - before[index + 2]) + Math.abs(after[index + 3] - before[index + 3]);
+      if (delta > 8) changedPixels += 1;
+      totalDelta += delta;
+    }
+    return { changedRatio: changedPixels / (after.length / 4), meanChannelDelta: totalDelta / after.length };
+  });
+  if (protectedEffectDifference.changedRatio > 0.02 || protectedEffectDifference.meanChannelDelta > 3) throw new Error(`Bringing the base image forward exposed pixels concealed by a region effect: ${JSON.stringify(protectedEffectDifference)}`);
+  console.log("  image: protected effect layer order verified");
+  await page.click('button[aria-label="영역 효과"]');
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  const overlayCanvas = await page.$(".fabric-stage .upper-canvas");
+  const overlayBox = await overlayCanvas?.boundingBox();
+  if (!overlayBox) throw new Error("Region overlay export canvas is unavailable");
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.18, overlayBox.y + overlayBox.height * 0.18);
+  await page.mouse.down();
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.34, overlayBox.y + overlayBox.height * 0.32, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForSelector(".region-effect-selection");
+  await page.click(".export-row .primary-button");
+  const exportWithSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
+  await page.click(".region-effect-selection .secondary-button");
+  await page.click(".export-row .primary-button");
+  const exportWithoutSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
+  if (!exportWithSelection || exportWithSelection !== exportWithoutSelection) throw new Error("The region-selection overlay contaminated the raster export");
+  console.log("  image: region overlay export verified");
   const portraitPresets = await page.$$eval(".image-editor-controls .button-grid button", (buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean));
   if (!portraitPresets.includes("3:4") || !portraitPresets.includes("9:16")) throw new Error("Portrait crop presets are unavailable");
   await page.$$eval(".editor-draw-tools button", (buttons) => {
@@ -302,6 +406,23 @@ async function testImageStudio(page, imagePaths) {
   });
   await dropCanvasImages(page, ".collage-preview-stage", ["#34c759"]);
   await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 3);
+  await page.click(".studio-tabs button:nth-child(4)");
+  await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
+  await page.waitForFunction(() => document.querySelectorAll(".gif-frame-row").length === 2 && document.querySelectorAll(".gif-frame-drag-handle").length === 2);
+  const initialFrameOrder = await page.$$eval(".gif-frame-row", (rows) => rows.map((row) => row.textContent || ""));
+  const firstHandle = await page.$(".gif-frame-row:first-child .gif-frame-drag-handle");
+  const secondRow = await page.$(".gif-frame-row:nth-child(2)");
+  const firstHandleBox = await firstHandle?.boundingBox();
+  const secondRowBox = await secondRow?.boundingBox();
+  if (!firstHandleBox || !secondRowBox) throw new Error("GIF frame drag handles are unavailable");
+  await page.mouse.move(firstHandleBox.x + firstHandleBox.width / 2, firstHandleBox.y + firstHandleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(secondRowBox.x + secondRowBox.width / 2, secondRowBox.y + secondRowBox.height * 0.8, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForFunction((before) => {
+    const current = Array.from(document.querySelectorAll(".gif-frame-row"), (row) => row.textContent || "");
+    return JSON.stringify(current) !== JSON.stringify(before);
+  }, {}, initialFrameOrder);
 }
 
 async function pasteCanvasImages(page, colors) {
@@ -511,10 +632,28 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
       return nativeRead.call(this, blob);
     };
   });
+  await page.setRequestInterception(true);
+  const delayVideoProbe = (request) => {
+    if (request.url().includes("video-probe.worker")) setTimeout(() => request.continue(), 2_000);
+    else void request.continue();
+  };
+  page.on("request", delayVideoProbe);
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[0]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 1);
+  await page.waitForFunction(() => document.querySelector(".video-card-footer")?.textContent?.includes("FPS 확인 중"));
+  const exportDuringFpsProbe = await page.$eval(".video-studio-page .section-actions .primary-button", (button) => ({ disabled: button.disabled, text: button.textContent || "" }));
+  if (exportDuringFpsProbe.disabled) throw new Error(`Supplemental FPS probing still blocks export: ${JSON.stringify(exportDuringFpsProbe)}`);
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('.video-boundary-stepper button')).every((button) => button.getAttribute("aria-label")?.includes("1프레임")));
+  page.off("request", delayVideoProbe);
+  await page.setRequestInterception(false);
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[1]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2 && document.querySelectorAll(".video-sync-group").length === 1);
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('.video-boundary-stepper button')).every((button) => button.getAttribute("aria-label")?.includes("1프레임")));
+  const previewState = await page.evaluate(() => ({
+    fallbackCount: document.querySelectorAll(".multi-video-grid .video-preview-fallback").length,
+    playableCount: Array.from(document.querySelectorAll(".multi-video-grid video")).filter((video) => video.readyState >= 1).length,
+  }));
+  if (previewState.fallbackCount || previewState.playableCount !== 2) throw new Error(`Browser video previews were covered after FFmpeg metadata probing: ${JSON.stringify(previewState)}`);
   const addButton = await page.$eval(".video-studio-page .drop-zone .secondary-button", (button) => button.textContent || "");
   if (!addButton.includes("더 추가")) throw new Error(`Video studio does not expose incremental file addition: ${addButton}`);
   const outputLimit = await page.$eval(".video-output-limit", (element) => element.textContent || "");
@@ -561,6 +700,12 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     || startDelta <= 0 || startDelta > 0.11 || endDelta <= 0 || endDelta > 0.11) {
     throw new Error(`Video fine-trim buttons or keyboard shortcuts failed: ${JSON.stringify({ initialFineTrim, adjustedFineTrim })}`);
   }
+  await page.focus('.video-trim-lane [data-trim-boundary="start"] input[type="number"]');
+  await page.keyboard.down("Alt");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.up("Alt");
+  await page.focus('.video-trim-lane [data-trim-boundary="end"] input[type="number"]');
+  await page.waitForFunction((start) => Number(document.querySelector('.video-trim-lane [data-trim-boundary="start"] input[type="number"]')?.value) < start, {}, adjustedFineTrim.start);
   const rangeState = await page.$eval(".video-range-control", (element) => ({
     handles: element.querySelectorAll('input[type="range"]').length,
     start: element.style.getPropertyValue("--range-start"),
@@ -657,6 +802,10 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForSelector(".operation-progress.status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Audio extraction error"));
+  const rawVideoMessages = await page.$$eval(".video-studio-page *", (elements) => elements
+    .filter((element) => element.children.length === 0 && element.textContent?.includes("__worklazy_i18n__:"))
+    .map((element) => element.textContent).slice(0, 5));
+  if (rawVideoMessages.length) throw new Error(`A raw i18n worker token was exposed in video progress UI: ${JSON.stringify(rawVideoMessages)}`);
   const audioResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({
     fileName: element.querySelector("a")?.getAttribute("download") || "",
     handoff: element.querySelector(".audio-handoff-button")?.textContent || "",
@@ -739,6 +888,10 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 1);
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largePassThroughPaths[1]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2);
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
   page.once("dialog", (dialog) => void dialog.accept());
   await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
   await page.waitForSelector(".operation-progress.status-running");
@@ -842,7 +995,7 @@ async function createFixtures(directory) {
   ]);
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
-    "-f", "lavfi", "-i", "color=c=0xff375f:s=240x320:d=1",
+    "-f", "lavfi", "-i", "color=c=0xff375f:s=240x320:r=60:d=1",
     "-f", "lavfi", "-i", "sine=frequency=660:duration=1",
     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", videoTwo,
   ]);

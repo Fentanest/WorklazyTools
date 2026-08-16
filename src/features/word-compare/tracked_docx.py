@@ -1124,7 +1124,7 @@ SETTINGS_CHILD_ORDER = (
     "bordersDoNotSurroundHeader", "bordersDoNotSurroundFooter", "gutterAtTop",
     "hideSpellingErrors", "hideGrammaticalErrors", "activeWritingStyle", "proofState",
     "formsDesign", "attachedTemplate", "linkStyles", "stylePaneFormatFilter", "stylePaneSortMethod",
-    "documentType", "mailMerge", "revisionView", "trackRevisions", "trackChanges",
+    "documentType", "mailMerge", "revisionView", "trackRevisions",
     "doNotTrackMoves", "doNotTrackFormatting", "documentProtection", "autoFormatOverride",
     "styleLockTheme", "styleLockQFSet", "defaultTabStop", "autoHyphenation",
     "consecutiveHyphenLimit", "hyphenationZone", "doNotHyphenateCaps", "showEnvelope",

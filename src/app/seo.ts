@@ -100,8 +100,8 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/image-studio": {
     title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
-    description: "사진 편집과 그림판을 하나로 합쳐 자르기·필터·자유 그리기·레이어·Undo를 사용하고, 일괄 리사이즈·콜라주·GIF도 만드세요.",
-    application: { name: "Image Studio", featureList: ["사진·빈 캔버스 통합 편집", "연필·붓·지우개", "Undo·Redo", "필터와 자르기", "텍스트·도형 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
+    description: "사진 편집과 그림판을 하나로 합쳐 선택 영역 모자이크·블러, 자르기·필터·자유 그리기·Undo를 사용하고 콜라주·GIF도 만드세요.",
+    application: { name: "Image Studio", featureList: ["사진·빈 캔버스 통합 편집", "선택 영역 모자이크·블러", "블러 강도 조절", "연필·붓·지우개", "Undo·Redo", "필터와 자르기", "텍스트·도형 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
   },
   "/tools/text-tools": {
     title: "텍스트 정돈·케이스 변환 - 공백·줄바꿈·중복 줄 제거",

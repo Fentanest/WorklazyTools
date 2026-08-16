@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { appendVideoRateControl, outputDimensionsForSource, resolveAudioSampleRate } from "../../src/features/video-studio/videoEncoding.ts";
+import { appendVideoRateControl, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate } from "../../src/features/video-studio/videoEncoding.ts";
 
 test("H.264 target bitrate does not also enable CRF", () => {
   const args: string[] = [];
@@ -31,4 +31,10 @@ test("audio sample rates respect encoder constraints", () => {
   assert.equal(resolveAudioSampleRate(44_100, "aac"), 44_100);
   assert.equal(resolveAudioSampleRate(45_000, "aac"), 44_100);
   assert.equal(resolveAudioSampleRate(70_000, "aac"), 64_000);
+});
+
+test("concatenated videos use the highest trustworthy rate or a shared compatibility fallback", () => {
+  assert.equal(resolveConcatFrameRate([24, 29.97, 60]), 60);
+  assert.equal(resolveConcatFrameRate([undefined, 0, Number.NaN]), 30);
+  assert.equal(resolveConcatFrameRate([30, 1_000]), 30);
 });

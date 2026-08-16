@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { Outlet } from "react-router-dom";
 
 import type { WordCompareResult } from "../excel-merger/types";
 import { documentFileKey } from "../document-compare/filePairs";
+import { useComparisonResults } from "../document-compare/useComparisonResults";
 
 export interface HwpPairResult {
   pairNumber: number;
@@ -44,11 +45,7 @@ export function HwpCompareSessionProvider() {
   const [formatting, setFormatting] = useState(true);
   const [tables, setTables] = useState(true);
   const [metadata, setMetadata] = useState(true);
-  const [results, setResults] = useState<HwpPairResult[]>([]);
-
-  useEffect(() => () => {
-    results.forEach((item) => { if (item.reportUrl) URL.revokeObjectURL(item.reportUrl); });
-  }, [results]);
+  const { results, replaceResults, clearResults } = useComparisonResults<HwpPairResult>();
 
   const value: HwpCompareSessionValue = {
     beforeFiles,
@@ -68,8 +65,8 @@ export function HwpCompareSessionProvider() {
     metadata,
     setMetadata,
     results,
-    replaceResults: setResults,
-    clearResults: () => setResults([]),
+    replaceResults,
+    clearResults,
   };
 
   return <HwpCompareSessionContext.Provider value={value}><Outlet /></HwpCompareSessionContext.Provider>;

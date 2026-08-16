@@ -43,6 +43,7 @@ import { probeVideoMetadata, runVideoTask } from "./videoWorkerClient";
 import { createVideoZip } from "./videoZipClient";
 import { VIDEO_GROUP_IDS } from "./types";
 import { VideoGroupSection } from "./VideoGroupSection";
+import { hasUsableVideoRange, shouldProbeVideoMetadata } from "./videoMetadata";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
@@ -121,6 +122,7 @@ export function VideoStudioPage() {
   const videoOutputsRef = useRef<DownloadableVideoOutput[]>([]);
   const activeController = useRef<AbortController | undefined>(undefined);
   const probeControllers = useRef(new Map<string, AbortController>());
+  const probeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const audioHandoffChannels = useRef(new Set<BroadcastChannel>());
 
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -143,7 +145,8 @@ export function VideoStudioPage() {
   const usedGroups = useMemo(() => GROUP_IDS
     .map((group) => ({ group, items: items.filter((item) => item.group === group) }))
     .filter((entry) => entry.items.length), [items]);
-  const ready = items.length > 0 && items.every((item) => item.duration > 0 && item.end > item.start);
+  const metadataBlockedItems = items.filter((item) => !hasUsableVideoRange(item));
+  const ready = items.length > 0 && metadataBlockedItems.length === 0;
   const isVideoOutput = outputFormat === "mp4" || outputFormat === "mkv" || outputFormat === "webm";
   const passthroughTransformConflict = isVideoOutput && bitrate === "copy" && (resolution !== "source" || aspect !== "source" || rotation !== 0 || flipHorizontal);
   const passthroughConcatConflict = isVideoOutput && bitrate === "copy" && hasIncompatibleConcatDimensions(items, usedGroups, groupSettings, allGroupsOneFile);
@@ -204,25 +207,52 @@ export function VideoStudioPage() {
   }, []);
 
   const updateItem = useCallback((itemId: string, patch: Partial<VideoItem>) => {
-    if (patch.metadataSource === "browser") {
-      probeControllers.current.get(itemId)?.abort();
-      probeControllers.current.delete(itemId);
-    }
     setItems((current) => current.map((item) => item.id === itemId ? { ...item, ...patch } : item));
   }, []);
 
-  const probeItem = useCallback(async (itemId: string) => {
+  const probeItem = useCallback(async (itemId: string, preserveTiming = false) => {
     const item = itemsRef.current.find((candidate) => candidate.id === itemId);
-    if (!item || (Number.isFinite(item.duration) && item.duration > 0) || probeControllers.current.has(itemId)) return;
+    if (!item || !shouldProbeVideoMetadata(item) || probeControllers.current.has(itemId)) return;
     const controller = new AbortController();
     probeControllers.current.set(itemId, controller);
-    updateItem(itemId, { probing: true, metadataError: undefined });
+    updateItem(itemId, {
+      probing: preserveTiming ? false : true,
+      frameRateProbeStatus: "running",
+      metadataError: undefined,
+    });
     try {
-      const metadata = await probeVideoMetadata(item.file, controller.signal, language);
-      updateItem(itemId, { ...metadata, end: metadata.duration, metadataSource: "ffmpeg", probing: false });
+      const queuedProbe = probeQueueRef.current.then(() => probeVideoMetadata(item.file, controller.signal, language));
+      probeQueueRef.current = queuedProbe.then(() => undefined, () => undefined);
+      const metadata = await queuedProbe;
+      setItems((current) => current.map((candidate) => {
+        if (candidate.id !== itemId) return candidate;
+        const keepBrowserMetadata = candidate.metadataSource === "browser" && candidate.duration > 0;
+        const duration = keepBrowserMetadata ? candidate.duration : metadata.duration;
+        return {
+          ...candidate,
+          ...metadata,
+          duration,
+          width: keepBrowserMetadata ? candidate.width : metadata.width,
+          height: keepBrowserMetadata ? candidate.height : metadata.height,
+          end: (preserveTiming || keepBrowserMetadata) && candidate.end > candidate.start
+            ? Math.min(candidate.end, duration)
+            : duration,
+          metadataSource: keepBrowserMetadata ? "browser" : "ffmpeg",
+          probing: false,
+          frameRateProbeStatus: "done",
+          metadataError: undefined,
+        };
+      }));
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
-        updateItem(itemId, { probing: false, metadataError: error instanceof Error ? error.message : featureMessage(language, "video.messages.VideoStudioPage.unableToReadVideoMetadata") });
+        setItems((current) => current.map((candidate) => candidate.id === itemId ? {
+          ...candidate,
+          probing: false,
+          frameRateProbeStatus: "failed",
+          metadataError: candidate.duration > 0
+            ? undefined
+            : error instanceof Error ? error.message : featureMessage(language, "video.messages.VideoStudioPage.unableToReadVideoMetadata"),
+        } : candidate));
       }
     } finally {
       if (probeControllers.current.get(itemId) === controller) probeControllers.current.delete(itemId);
@@ -585,7 +615,7 @@ export function VideoStudioPage() {
               : usedGroups.map(({ group, items: groupItems }) => <p key={group}><strong>{featureMessage(language, "video.messages.VideoStudioPage.group")} {group}</strong><span>{groupSettings[group].outputMode === "concat" ? featureMessage(language, "video.messages.VideoStudioPage.concatenateVideosInOrder", { p0: groupItems.length }) : featureMessage(language, "video.messages.VideoStudioPage.exportVideosIndividually", { p0: groupItems.length })}</span><b>{groupSettings[group].outputMode === "concat" ? 1 : groupItems.length}</b></p>)}
           </div>
           <div className="section-actions"><PrimaryButton accent="pink" disabled={!ready || passthroughConflict || outputSettingsInvalid} loading={progress.status === "running"} onClick={() => void outputAction()}><Download size={18} /> {featureMessage(language, "video.messages.VideoStudioPage.createResults", { p0: outputCount })}</PrimaryButton></div>
-          {!ready && <div className="inline-warning error"><AlertTriangle size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.exportIsBlockedBecauseMetadataIsUnavailableFor", { p0: items.filter((item) => !(item.duration > 0 && item.end > item.start)).map((item) => item.file.name).join(", ") })}</span></div>}
+          {!ready && <div className="inline-warning error"><AlertTriangle size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.exportIsBlockedBecauseMetadataIsUnavailableFor", { p0: metadataBlockedItems.map((item) => item.file.name).join(", ") })}</span></div>}
         </SectionCard>
       )}
 
@@ -783,7 +813,7 @@ function createJobEntries(
 }
 
 function toWorkerInput(item: VideoItem): VideoWorkerInput {
-  return { fileName: item.file.name, file: item.file, fileSize: item.file.size, duration: item.duration, width: item.width, height: item.height, start: item.start, end: item.end };
+  return { fileName: item.file.name, file: item.file, fileSize: item.file.size, duration: item.duration, width: item.width, height: item.height, frameRate: item.frameRate, start: item.start, end: item.end };
 }
 
 function estimatePassthroughBytes(job: VideoJobEntry) {

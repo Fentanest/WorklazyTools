@@ -380,6 +380,7 @@ function commandProgressKey(command: AudioProcessorRequest["command"]) {
   if (command === "PREVIEW_VOICE_EFFECT") return "audio.voice.status.previewing";
   if (command === "APPLY_VOICE_EFFECT") return "audio.voice.status.applying";
   if (command === "EXPORT_WAV" || command === "EXPORT_MP3") return "audio.status.exportPrepare";
+  if (["FADE_IN", "FADE_OUT", "GAIN", "NORMALIZE", "TRIM"].includes(command)) return `audio.progress.${command}`;
   return `audio.edit.${command}`;
 }
 

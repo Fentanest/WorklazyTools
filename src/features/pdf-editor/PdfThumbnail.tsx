@@ -32,7 +32,7 @@ export function PdfThumbnail({
   selected?: boolean;
 }) {
   const language = useAppLanguage();
-    const hostRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 172, height: 224 });

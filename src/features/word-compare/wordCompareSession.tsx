@@ -1,7 +1,8 @@
-import { createContext, type Dispatch, type SetStateAction, useContext, useEffect, useState } from "react";
+import { createContext, type Dispatch, type SetStateAction, useContext, useState } from "react";
 import { Outlet } from "react-router-dom";
 
 import type { WordCompareResult } from "../excel-merger/types";
+import { useComparisonResults } from "../document-compare/useComparisonResults";
 
 export interface WordPairResult {
   pairNumber: number;
@@ -48,14 +49,7 @@ export function WordCompareSessionProvider() {
   const [formatting, setFormatting] = useState(true);
   const [tables, setTables] = useState(true);
   const [metadata, setMetadata] = useState(true);
-  const [results, setResults] = useState<WordPairResult[]>([]);
-
-  useEffect(() => () => {
-    results.forEach((item) => {
-      if (item.reportUrl) URL.revokeObjectURL(item.reportUrl);
-      if (item.trackedUrl) URL.revokeObjectURL(item.trackedUrl);
-    });
-  }, [results]);
+  const { results, replaceResults, clearResults } = useComparisonResults<WordPairResult>();
 
   const value: WordCompareSessionValue = {
     beforeFiles,
@@ -77,8 +71,8 @@ export function WordCompareSessionProvider() {
     metadata,
     setMetadata,
     results,
-    replaceResults: setResults,
-    clearResults: () => setResults([]),
+    replaceResults,
+    clearResults,
   };
 
   return <WordCompareSessionContext.Provider value={value}><Outlet /></WordCompareSessionContext.Provider>;

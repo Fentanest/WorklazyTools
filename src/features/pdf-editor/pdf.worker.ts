@@ -44,24 +44,10 @@ async function mergePages(data: {
 }): Promise<PdfWorkerResult> {
   if (!data.pages.length) throw new PdfWorkerError(featureMessage(currentLanguage, "pdf.messages.pdf.thereAreNoPagesToExport"), "NO_PAGES");
   progress(4, featureMessage(currentLanguage, "pdf.messages.pdf.readingSourcePdfs"));
-  const sources = new Map<string, PDFDocument>();
-  for (let index = 0; index < data.inputs.length; index += 1) {
-    const input = data.inputs[index];
-    sources.set(input.id, await loadPdf(input.buffer));
-    progress(8 + ((index + 1) / data.inputs.length) * 22, featureMessage(currentLanguage, "pdf.messages.pdf.ready", { p0: index + 1, p1: data.inputs.length, p2: input.name }));
-  }
-  const output = await PDFDocument.create();
-  copyDocumentMetadata(data.pages[0] ? sources.get(data.pages[0].sourceId) : undefined, output);
-  for (let index = 0; index < data.pages.length; index += 1) {
-    const plan = data.pages[index];
-    const source = sources.get(plan.sourceId);
-    if (!source) throw new PdfWorkerError(featureMessage(currentLanguage, "pdf.messages.pdf.theSourcePageCouldNotBeFound"), "SOURCE_NOT_FOUND");
-    const [copied] = await output.copyPages(source, [plan.pageIndex]);
-    const originalRotation = copied.getRotation().angle;
-    copied.setRotation(degrees(normalizeRotation(originalRotation + plan.rotation)));
-    output.addPage(copied);
+  const sources = await loadSources(data.inputs, 8, 22);
+  const output = await createPlannedPdf(sources, data.pages, (index) => {
     progress(30 + ((index + 1) / data.pages.length) * 58, featureMessage(currentLanguage, "pdf.messages.pdf.placingPage", { p0: index + 1, p1: data.pages.length }));
-  }
+  });
   await decoratePdf(output, data.options);
   progress(92, featureMessage(currentLanguage, "pdf.messages.pdf.writingPageOrderAndRotationsToThePdf"));
   const bytes = await output.save({ useObjectStreams: true });

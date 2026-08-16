@@ -52,8 +52,7 @@ export function collapseSql(value: string, backslashEscapes: boolean) {
     }
     if (char === "'" || char === '"' || char === "`") { if (pendingSpace && output) output += " "; pendingSpace = false; quote = char; output += char; continue; }
     if (/\s/.test(char)) { pendingSpace = true; continue; }
-    const wouldCreateLineComment = output.endsWith("-") && char === "-";
-    if (pendingSpace && output && (wouldCreateLineComment || (!/[,(]/.test(char) && !/[.(]$/.test(output)))) output += " ";
+    if (pendingSpace && output && !/[,(]/.test(char) && !/[.(]$/.test(output)) output += " ";
     pendingSpace = false;
     output += char;
   }

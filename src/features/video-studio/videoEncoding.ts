@@ -20,6 +20,12 @@ export function resolveAudioSampleRate(sampleRate: "source" | number, codec: "aa
   return nearest(sampleRate, [8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000, 64_000, 88_200, 96_000]);
 }
 
+export function resolveConcatFrameRate(frameRates: readonly (number | undefined)[], fallback = 30) {
+  const validRates = frameRates.filter((value): value is number => Number.isFinite(value) && (value ?? 0) > 0 && (value ?? 0) <= 240);
+  // Re-encoded segments are joined with stream copy, so an unknown-rate batch still needs one shared compatibility rate.
+  return validRates.length ? Math.max(...validRates) : fallback;
+}
+
 export function outputDimensionsForSource(
   width: number,
   height: number,

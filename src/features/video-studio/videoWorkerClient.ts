@@ -22,13 +22,20 @@ export interface VideoProbeResult {
   frameRate?: number;
 }
 
+const VIDEO_PROBE_TIMEOUT_MS = 60_000;
+
 export function probeVideoMetadata(file: File, signal?: AbortSignal, language: AppLanguage = "ko") {
-    const worker = new Worker(localizedVideoWorkerUrl(videoProbeWorkerUrl), { type: "module" });
+  const worker = new Worker(localizedVideoWorkerUrl(videoProbeWorkerUrl), { type: "module" });
   return new Promise<VideoProbeResult>((resolve, reject) => {
     let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (!finish()) return;
+      reject(new Error(featureMessage(language, "video.messages.videoWorkerClient.videoMetadataInspectionTimedOut")));
+    }, VIDEO_PROBE_TIMEOUT_MS);
     const finish = () => {
       if (settled) return false;
       settled = true;
+      window.clearTimeout(timeout);
       signal?.removeEventListener("abort", abort);
       worker.terminate();
       return true;

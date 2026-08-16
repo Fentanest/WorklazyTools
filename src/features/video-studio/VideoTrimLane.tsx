@@ -1,9 +1,10 @@
 import { ChevronLeft, ChevronRight, Play, Timer } from "lucide-react";
-import { memo, useEffect, useState, type CSSProperties } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { featureMessage } from "../../i18n/featureMessages";
 import type { AppLanguage } from "../../i18n/languages";
 import type { VideoItem } from "./types";
+import { areVideoTrimRenderInputsEqual } from "./videoMemo";
 
 export const VideoTrimLane = memo(function VideoTrimLane({ item, index, active, groupSize, language, onActivate, onStart, onEnd, onBoundary, onPlay, onNudge, onApplyGroup }: {
   item: VideoItem;
@@ -62,23 +63,19 @@ export const VideoTrimLane = memo(function VideoTrimLane({ item, index, active, 
       </div>
     </div>
   );
-}, (previous, next) => previous.item === next.item
-  && previous.index === next.index
-  && previous.active === next.active
-  && previous.groupSize === next.groupSize
-  && previous.synchronizationKey === next.synchronizationKey
-  && previous.language === next.language);
+}, areVideoTrimRenderInputsEqual);
 
 function TrimNumberInput({ value, min, max, onCommit }: { value: number; min: number; max: number; onCommit: (value: number) => void }) {
   const [draft, setDraft] = useState(value.toFixed(2));
-  useEffect(() => setDraft(value.toFixed(2)), [value]);
+  const shortcutPendingRef = useRef(false);
+  useEffect(() => { setDraft(value.toFixed(2)); }, [value]);
   const commit = () => {
     const parsed = Number(draft);
     const next = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : value;
     setDraft(next.toFixed(2));
     onCommit(next);
   };
-  return <input type="number" min={min} max={max} step="0.01" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") { setDraft(value.toFixed(2)); event.currentTarget.blur(); } }} />;
+  return <input type="number" min={min} max={max} step="0.01" value={draft} onChange={(event) => { shortcutPendingRef.current = false; setDraft(event.target.value); }} onBlur={() => { if (shortcutPendingRef.current) { shortcutPendingRef.current = false; return; } commit(); }} onKeyDown={(event) => { if (event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) shortcutPendingRef.current = true; if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") { setDraft(value.toFixed(2)); event.currentTarget.blur(); } }} />;
 }
 
 function formatTime(seconds: number) {

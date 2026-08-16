@@ -1,18 +1,12 @@
 import {
   AlertCircle,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
   Download,
   FileText,
-  GripVertical,
   Info,
   LockKeyhole,
   TextSearch,
-  X,
 } from "lucide-react";
-import { type DragEvent as ReactDragEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -20,11 +14,12 @@ import { FileShareButton } from "../../components/FileShareButton";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, formatBytes, PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
+import { PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
-import { createWordExcelReports } from "../excel-merger/excelWorkerClient";
+import { DocumentFileColumn } from "../document-compare/DocumentFileColumn";
 import { DocumentPairingPreview } from "../document-compare/DocumentPairingPreview";
-import { deduplicateDocumentFiles as deduplicateFiles, reorderDocumentFiles as reorder, stripDocumentExtension as stripExtension } from "../document-compare/filePairs";
+import { createComparisonExcelReports, createComparisonReportArtifact } from "../document-compare/comparisonResults";
+import { useDocumentPairFiles } from "../document-compare/useDocumentPairFiles";
 import { fileKey, useHwpCompareSession } from "./hwpCompareSession";
 import { compareHwpFilePairs } from "./hwpWorkerClient";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
@@ -52,38 +47,18 @@ export function HwpComparePage() {
     setError(null);
     operation.reset();
   };
+  const pairFiles = useDocumentPairFiles({
+    beforeFiles: session.beforeFiles,
+    afterFiles: session.afterFiles,
+    setBeforeFiles: session.setBeforeFiles,
+    setAfterFiles: session.setAfterFiles,
+    accepts: isHwpFile,
+    onReset: resetOutput,
+  });
 
   const updateFiles = (files: File[], side: "before" | "after") => {
-    const rejected = files.filter((file) => !isHwpFile(file));
-    const accepted = deduplicateFiles(files.filter(isHwpFile));
-    (side === "before" ? session.setBeforeFiles : session.setAfterFiles)(accepted);
-    resetOutput();
+    const rejected = pairFiles.updateFiles(files, side);
     if (rejected.length) setError(L(`HWP·HWPX가 아닌 파일을 제외했습니다: ${rejected.map((file) => file.name).join(", ")}`, `Non-HWP/HWPX files were excluded: ${rejected.map((file) => file.name).join(", ")}`));
-  };
-
-  const removeFile = (side: "before" | "after", index: number) => {
-    const setter = side === "before" ? session.setBeforeFiles : session.setAfterFiles;
-    setter((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    resetOutput();
-  };
-
-  const moveFile = (side: "before" | "after", from: number, to: number) => {
-    const setter = side === "before" ? session.setBeforeFiles : session.setAfterFiles;
-    setter((current) => reorder(current, from, to));
-    resetOutput();
-  };
-
-  const moveAcross = (side: "before" | "after", index: number) => {
-    const source = side === "before" ? session.beforeFiles : session.afterFiles;
-    const target = side === "before" ? session.afterFiles : session.beforeFiles;
-    const setSource = side === "before" ? session.setBeforeFiles : session.setAfterFiles;
-    const setTarget = side === "before" ? session.setAfterFiles : session.setBeforeFiles;
-    const file = source[index];
-    if (!file) return;
-    setSource(source.filter((_, itemIndex) => itemIndex !== index));
-    const targetIndex = Math.min(index, target.length);
-    setTarget([...target.slice(0, targetIndex), file, ...target.slice(targetIndex)]);
-    resetOutput();
   };
 
   const runComparison = async () => {
@@ -112,15 +87,14 @@ export function HwpComparePage() {
       let reports: ArrayBuffer[] = [];
       if (session.excelOutput) {
         operation.update(80, L(`${comparisonResults.length}개 Excel 보고서를 준비합니다.`, `Preparing ${comparisonResults.length} Excel reports.`));
-        reports = await createWordExcelReports(comparisonResults, (nextProgress, message) => operation.update(80 + Math.round(nextProgress * 0.2), message), language, controller.signal);
+        reports = await createComparisonExcelReports(comparisonResults, (nextProgress, message) => operation.update(80 + Math.round(nextProgress * 0.2), message), language, controller.signal);
       }
       session.replaceResults(comparisonResults.map((result, index) => {
         const report = reports[index];
         return {
           pairNumber: index + 1,
           result,
-          reportUrl: report ? URL.createObjectURL(new Blob([report], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })) : undefined,
-          reportFileName: report ? createReportFileName(index + 1, result.beforeName, result.afterName, language) : undefined,
+          ...createComparisonReportArtifact(report, index + 1, result.beforeName, result.afterName, language, "HWP"),
         };
       }));
       operation.succeed(L(`${comparisonResults.length}개 HWP 문서 쌍의 결과를 모두 만들었습니다.`, `Created results for all ${comparisonResults.length} HWP document pairs.`));
@@ -143,27 +117,33 @@ export function HwpComparePage() {
 
       <SectionCard step={1} title={L("비교할 문서", "Documents to compare")} description={L("목록의 같은 번호끼리 비교합니다. 드래그로 순서를 맞추거나 좌우 화살표로 문서를 옮기세요.", "Files are paired by list position. Drag to reorder or use the side arrows to move documents.")}>
         <div className="compare-file-grid">
-          <HwpFileColumn
+          <DocumentFileColumn
             files={session.beforeFiles}
             side="before"
             sideLabel={L("수정 전", "Before")}
-            passwords={session.passwords}
-            onPassword={(file, password) => { session.setPassword(file, password); resetOutput(); }}
+            hint={L("원본 HWP·HWPX · 여러 번 나눠 추가 가능", "Original HWP or HWPX · add more at any time")}
+            accept=".hwp,.hwpx"
+            accent="orange"
+            listClassName="hwp-sortable-files"
             onFiles={(files) => updateFiles(files, "before")}
-            onRemove={(index) => removeFile("before", index)}
-            onMove={(from, to) => moveFile("before", from, to)}
-            onMoveAcross={(index) => moveAcross("before", index)}
+            onRemove={(index) => pairFiles.removeFile("before", index)}
+            onMove={(from, to) => pairFiles.moveFile("before", from, to)}
+            onMoveAcross={(index) => pairFiles.moveAcross("before", index)}
+            renderAccessory={(file) => <label className="hwp-file-password"><LockKeyhole size={13} /><input type="password" value={session.passwords[fileKey(file)] ?? ""} autoComplete="off" aria-label={language === "en" ? `Opening password for ${file.name}` : `${file.name} 열기 암호`} placeholder={language === "en" ? "Encrypted documents only" : "암호 문서만 입력"} onChange={(event) => { session.setPassword(file, event.target.value); resetOutput(); }} /></label>}
           />
-          <HwpFileColumn
+          <DocumentFileColumn
             files={session.afterFiles}
             side="after"
             sideLabel={L("수정 후", "After")}
-            passwords={session.passwords}
-            onPassword={(file, password) => { session.setPassword(file, password); resetOutput(); }}
+            hint={L("변경된 HWP·HWPX · 여러 번 나눠 추가 가능", "Revised HWP or HWPX · add more at any time")}
+            accept=".hwp,.hwpx"
+            accent="orange"
+            listClassName="hwp-sortable-files"
             onFiles={(files) => updateFiles(files, "after")}
-            onRemove={(index) => removeFile("after", index)}
-            onMove={(from, to) => moveFile("after", from, to)}
-            onMoveAcross={(index) => moveAcross("after", index)}
+            onRemove={(index) => pairFiles.removeFile("after", index)}
+            onMove={(from, to) => pairFiles.moveFile("after", from, to)}
+            onMoveAcross={(index) => pairFiles.moveAcross("after", index)}
+            renderAccessory={(file) => <label className="hwp-file-password"><LockKeyhole size={13} /><input type="password" value={session.passwords[fileKey(file)] ?? ""} autoComplete="off" aria-label={language === "en" ? `Opening password for ${file.name}` : `${file.name} 열기 암호`} placeholder={language === "en" ? "Encrypted documents only" : "암호 문서만 입력"} onChange={(event) => { session.setPassword(file, event.target.value); resetOutput(); }} /></label>}
           />
         </div>
         {pairingError && <div className="pair-count-error" role="alert"><AlertCircle size={17} /><span><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small>{pairingError}</small></span></div>}
@@ -246,87 +226,6 @@ export function HwpComparePage() {
   );
 }
 
-function HwpFileColumn({ files, side, sideLabel, passwords, onPassword, onFiles, onRemove, onMove, onMoveAcross }: {
-  files: File[];
-  side: "before" | "after";
-  sideLabel: string;
-  passwords: Record<string, string>;
-  onPassword: (file: File, password: string) => void;
-  onFiles: (files: File[]) => void;
-  onRemove: (index: number) => void;
-  onMove: (from: number, to: number) => void;
-  onMoveAcross: (index: number) => void;
-}) {
-  const language = useAppLanguage();
-  const [receivingFiles, setReceivingFiles] = useState(false);
-  const isExternalFileDrag = (event: ReactDragEvent<HTMLDivElement>) => Array.from(event.dataTransfer.types).includes("Files");
-  return (
-    <div
-      className={`word-file-column${receivingFiles ? " receiving-files" : ""}`}
-      onDragEnter={(event) => { if (isExternalFileDrag(event)) { event.preventDefault(); setReceivingFiles(true); } }}
-      onDragOver={(event) => { if (isExternalFileDrag(event)) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }}
-      onDragLeave={(event) => { const next = event.relatedTarget; if (!(next instanceof Node && event.currentTarget.contains(next))) setReceivingFiles(false); }}
-      onDrop={(event) => {
-        if (!isExternalFileDrag(event)) return;
-        event.preventDefault();
-        setReceivingFiles(false);
-        if ((event.target as Element).closest(".drop-zone")) return;
-        const dropped = Array.from(event.dataTransfer.files);
-        if (dropped.length) onFiles([...files, ...dropped]);
-      }}
-    >
-      <FileDropZone label={language === "en" ? `${sideLabel} · ${files.length} files` : `${sideLabel} · ${files.length}개`} accept=".hwp,.hwpx" hint={language === "en" ? `${side === "before" ? "Original" : "Revised"} HWP or HWPX · add more at any time` : `원본 ${side === "before" ? "HWP·HWPX" : "또는 변경된 HWP·HWPX"} · 여러 번 나눠 추가 가능`} multiple files={files} onFiles={onFiles} accent="orange" />
-      {!!files.length && (
-        <ol className="sortable-word-files hwp-sortable-files" aria-label={language === "en" ? `${sideLabel} document order` : `${sideLabel} 문서 순서`}>
-          {files.map((file, index) => <HwpFileRow key={fileKey(file)} file={file} index={index} count={files.length} side={side} password={passwords[fileKey(file)] ?? ""} onPassword={onPassword} onRemove={onRemove} onMove={onMove} onMoveAcross={onMoveAcross} />)}
-        </ol>
-      )}
-      {receivingFiles && <div className="word-column-drop-hint">{language === "en" ? `Drop to add ${sideLabel.toLowerCase()} documents` : `여기에 놓아 ${sideLabel} 문서 추가`}</div>}
-    </div>
-  );
-}
-
-function HwpFileRow({ file, index, count, side, password, onPassword, onRemove, onMove, onMoveAcross }: {
-  file: File;
-  index: number;
-  count: number;
-  side: "before" | "after";
-  password: string;
-  onPassword: (file: File, password: string) => void;
-  onRemove: (index: number) => void;
-  onMove: (from: number, to: number) => void;
-  onMoveAcross: (index: number) => void;
-}) {
-  const language = useAppLanguage();
-  const [dragging, setDragging] = useState(false);
-  return (
-    <li
-      className={dragging ? "dragging" : ""}
-      draggable
-      onDragStart={(event) => { setDragging(true); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData(`application/x-hwp-index-${side}`, String(index)); }}
-      onDragOver={(event) => { if (event.dataTransfer.types.includes(`application/x-hwp-index-${side}`)) event.preventDefault(); }}
-      onDrop={(event) => { const mime = `application/x-hwp-index-${side}`; if (!event.dataTransfer.types.includes(mime)) return; event.preventDefault(); const from = Number(event.dataTransfer.getData(mime)); if (Number.isInteger(from)) onMove(from, index); setDragging(false); }}
-      onDragEnd={() => setDragging(false)}
-    >
-      <span className="drag-handle" title={language === "en" ? "Drag to reorder" : "드래그해서 순서 변경"}><GripVertical size={16} /></span>
-      <b>{index + 1}</b>
-      <span className="sortable-file-copy"><strong>{file.name}</strong><small>{formatBytes(file.size)}</small></span>
-      <span className="sortable-file-actions">
-        <button className="move-across-button" type="button" onClick={() => onMoveAcross(index)} aria-label={language === "en" ? `Move ${file.name} to the other list` : `${file.name} 반대 목록으로 이동`}>{side === "before" ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}</button>
-        <button type="button" disabled={index === 0} onClick={() => onMove(index, index - 1)} aria-label={language === "en" ? `Move ${file.name} up` : `${file.name} 위로 이동`}><ArrowUp size={14} /></button>
-        <button type="button" disabled={index === count - 1} onClick={() => onMove(index, index + 1)} aria-label={language === "en" ? `Move ${file.name} down` : `${file.name} 아래로 이동`}><ArrowDown size={14} /></button>
-        <button type="button" onClick={() => onRemove(index)} aria-label={language === "en" ? `Remove ${file.name}` : `${file.name} 제거`}><X size={15} /></button>
-      </span>
-      <label className="hwp-file-password"><LockKeyhole size={13} /><input type="password" value={password} autoComplete="off" aria-label={language === "en" ? `Opening password for ${file.name}` : `${file.name} 열기 암호`} placeholder={language === "en" ? "Encrypted documents only" : "암호 문서만 입력"} onChange={(event) => onPassword(file, event.target.value)} /></label>
-    </li>
-  );
-}
-
 function isHwpFile(file: File) {
   return /\.(hwp|hwpx)$/i.test(file.name);
-}
-
-function createReportFileName(pairNumber: number, beforeName: string, afterName: string, language: "ko" | "en") {
-  const base = `${pairNumber}_${stripExtension(beforeName)}_vs_${stripExtension(afterName)}`.replace(/[\\/:*?"<>|]/g, "_");
-  return `${base.slice(0, 120)}_${language === "en" ? "HWP-comparison-report" : "HWP-비교보고서"}.xlsx`;
 }

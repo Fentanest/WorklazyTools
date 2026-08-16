@@ -11,6 +11,7 @@ export type ResolvedAudioSampleRate = "source" | number;
 export type VideoRotation = 0 | 90 | 180 | 270;
 export type VideoGroupId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 export type GroupOutputMode = "individual" | "concat";
+export type VideoFrameRateProbeStatus = "running" | "done" | "failed";
 
 export interface VideoItem {
   id: string;
@@ -26,6 +27,7 @@ export interface VideoItem {
   metadataError?: string;
   probing?: boolean;
   frameRate?: number;
+  frameRateProbeStatus?: VideoFrameRateProbeStatus;
 }
 
 export interface VideoGroupSettings {
@@ -67,6 +69,7 @@ export interface VideoWorkerInput {
   duration: number;
   width: number;
   height: number;
+  frameRate?: number;
   start: number;
   end: number;
 }

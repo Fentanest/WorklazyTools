@@ -7,7 +7,7 @@ import process from "process";
 import * as XLSX from "xlsx";
 
 import { readCsvWorkbook } from "./csvImport";
-import { hasIncomingSheetReference } from "./sheetReferences";
+import { buildIncomingSheetReferenceIndex, hasIncomingSheetReference, type IncomingSheetReferenceIndex } from "./sheetReferences";
 import { buildWordReport } from "./wordReport";
 import type {
   ExcelInputPayload,
@@ -26,6 +26,7 @@ interface ParsedInput {
   fileName: string;
   workbook: ExcelJS.Workbook;
   selectedWorksheets?: ExcelJS.Worksheet[];
+  incomingSheetReferences?: IncomingSheetReferenceIndex;
 }
 
 interface SheetBounds {
@@ -162,6 +163,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
     parsed.selectedWorksheets = selectedSheetNames
       .map((sheetName) => parsed.workbook.getWorksheet(sheetName))
       .filter((sheet): sheet is ExcelJS.Worksheet => Boolean(sheet));
+    if (options.trimEmptyEdges) parsed.incomingSheetReferences = buildIncomingSheetReferenceIndex(parsed.workbook);
     if (!parsed.selectedWorksheets.length) {
       throw new ExcelWorkerError(local(`${file.name}에서 병합할 시트를 선택해 주세요.`, `Select at least one sheet from ${file.name}.`), "NO_SHEETS", file.name);
     }
@@ -184,7 +186,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
     inputs.forEach((input, fileIndex) => {
       (input.selectedWorksheets ?? []).forEach((source) => {
         inputSheetCount += 1;
-        const referencedByAnotherSheet = options.trimEmptyEdges && hasIncomingSheetReference(input.workbook, source);
+        const referencedByAnotherSheet = options.trimEmptyEdges && hasIncomingSheetReference(input.workbook, source, input.incomingSheetReferences);
         if (referencedByAnotherSheet) warnings.add(local(`'${source.name}' 시트는 다른 시트 수식에서 참조하므로 끝의 빈 영역 정리를 건너뛰었습니다.`, `Skipped ending-empty-area trim in '${source.name}' because another sheet formula references it.`));
         const targetName = createSheetName(input.fileName, source.name, options.sheetNameRule, usedNames);
         const target = output.addWorksheet(targetName, {
@@ -515,6 +517,7 @@ function getSheetBounds(sheet: ExcelJS.Worksheet, trim: boolean): SheetBounds {
 function performSheetTrim(workbook: ExcelJS.Workbook, options: ExcelMergeOptions, warnings: Set<string>): SheetTrimStats {
   const threshold = Math.max(1, Math.floor(Number(options.sheetTrimThreshold) || 1));
   const stats: SheetTrimStats = { rows: 0, columns: 0 };
+  const incomingSheetReferences = buildIncomingSheetReferenceIndex(workbook);
 
   workbook.worksheets.forEach((worksheet) => {
     let hasFormula = false;
@@ -524,8 +527,11 @@ function performSheetTrim(workbook: ExcelJS.Workbook, options: ExcelMergeOptions
       if (!isSheetTrimValueEmpty(cell.value)) { nonEmptyRows.add(rowNumber); nonEmptyColumns.add(columnNumber); }
       if (cell.type === ExcelJS.ValueType.Formula) hasFormula = true;
     }));
-    if (hasFormula || (worksheet.model.merges?.length ?? 0) > 0) {
-      warnings.add(local(`'${worksheet.name}' 시트에는 수식 또는 병합 셀이 있어 중간 빈 행·열 정리를 건너뛰었습니다.`, `Skipped middle empty-row/column cleanup in '${worksheet.name}' because it contains formulas or merged cells.`));
+    const referencedByAnotherSheet = hasIncomingSheetReference(workbook, worksheet, incomingSheetReferences);
+    if (hasFormula || (worksheet.model.merges?.length ?? 0) > 0 || referencedByAnotherSheet) {
+      warnings.add(referencedByAnotherSheet
+        ? local(`'${worksheet.name}' 시트는 다른 시트 수식에서 참조하므로 중간 빈 행·열 정리를 건너뛰었습니다.`, `Skipped middle empty-row/column cleanup in '${worksheet.name}' because another sheet formula references it.`)
+        : local(`'${worksheet.name}' 시트에는 수식 또는 병합 셀이 있어 중간 빈 행·열 정리를 건너뛰었습니다.`, `Skipped middle empty-row/column cleanup in '${worksheet.name}' because it contains formulas or merged cells.`));
       return;
     }
     if (options.sheetTrimRows) {

@@ -386,7 +386,7 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
 async function testExcelSheetTrim(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheet-trim`);
   await (await page.$('input[type="file"]')).uploadFile(fixtures.sheetTrimXlsx);
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 1);
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 3);
 
   const edgeTrimState = await page.$eval('button[aria-label="끝의 빈 행·열 정리"]', (button) => button.getAttribute("aria-checked"));
   if (edgeTrimState !== "true") throw new Error("The existing trailing-edge trim setting was not preserved.");
@@ -418,6 +418,14 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
   }
   const logText = await page.$eval(".operation-log", (element) => element.textContent || "");
   if (!logText.includes("빈 행 3개, 빈 열 3개")) throw new Error(`SheetTrim counts were not logged: ${logText}`);
+  const referencedSheet = workbook.worksheets.find((candidate) => candidate.name.includes("참조 대상"));
+  const summarySheet = workbook.worksheets.find((candidate) => candidate.name.includes("참조 요약"));
+  const summaryFormula = String(summarySheet?.getCell("A1").formula || "");
+  if (referencedSheet?.getCell("A5").text !== "참조 유지" || !summaryFormula.replaceAll("'", "").includes(`${referencedSheet?.name}!A5`)) {
+    throw new Error(`Middle-row trimming shifted a cell referenced by another worksheet: ${JSON.stringify({ sheets: workbook.worksheets.map((candidate) => candidate.name), referencedA5: referencedSheet?.getCell("A5").text, summaryFormula })}`);
+  }
+  const warningText = await page.$eval(".result-warnings", (element) => element.textContent || "");
+  if (!warningText.includes("다른 시트 수식에서 참조")) throw new Error(`Incoming sheet-reference protection was not reported: ${warningText}`);
 }
 
 async function testWordCompare(page, fixtures, tempDir) {
@@ -451,6 +459,22 @@ async function testWordCompare(page, fixtures, tempDir) {
   if (wordAddButtons.length !== 2 || wordAddButtons.some((label) => !label.includes("더 추가"))) throw new Error(`Word comparison does not expose incremental file addition: ${wordAddButtons.join(", ")}`);
   const draggable = await page.$$eval(".sortable-word-files li", (items) => items.every((item) => item.draggable));
   if (!draggable) throw new Error("Word file order list is not draggable.");
+  const crossColumnDrag = await page.evaluate(async () => {
+    const source = document.querySelectorAll(".sortable-word-files")[0]?.querySelector("li");
+    const target = document.querySelectorAll(".sortable-word-files")[1]?.querySelector("li");
+    if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) throw new Error("Word drag fixtures are unavailable");
+    const transfer = new DataTransfer();
+    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const state = { dropEffect: transfer.dropEffect, highlighted: target.classList.contains("drag-over") };
+    source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    return state;
+  });
+  if (crossColumnDrag.dropEffect !== "none" || crossColumnDrag.highlighted) throw new Error(`Cross-column reorder still appears available: ${JSON.stringify(crossColumnDrag)}`);
+  const moveTooltip = await page.$eval('.move-across-button', (button) => ({ label: button.getAttribute("aria-label"), title: button.getAttribute("title") }));
+  if (!moveTooltip.title || moveTooltip.title !== moveTooltip.label) throw new Error(`Move-across tooltip is missing: ${JSON.stringify(moveTooltip)}`);
   if (await page.$eval(".pairing-preview ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");
 
   await page.click(".tool-action-bar .primary-button");
@@ -589,9 +613,22 @@ async function testWordCompare(page, fixtures, tempDir) {
   }
   if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 2) throw new Error("Pair results were lost after returning from detail view.");
   await page.click(".word-pair-result-card:nth-child(2) .secondary-button");
-  await page.waitForFunction(() => location.pathname.endsWith("/tools/word-compare/results/2")
-    && document.querySelector("h1")?.textContent?.includes("2번 문서 비교")
-    && document.querySelectorAll(".document-page-row").length > 0);
+  try {
+    await page.waitForFunction(() => location.pathname.endsWith("/tools/word-compare/results/2")
+      && document.querySelector("h1")?.textContent?.includes("2번 문서 비교")
+      && document.querySelectorAll(".document-page-row").length > 0, { timeout: 15_000 });
+  } catch (error) {
+    const state = await page.evaluate(() => ({
+      href: location.href,
+      pathname: location.pathname,
+      title: document.querySelector("h1")?.textContent || "",
+      rows: document.querySelectorAll(".document-page-row").length,
+      cards: document.querySelectorAll(".word-pair-result-card").length,
+      buttons: Array.from(document.querySelectorAll(".word-pair-result-card .secondary-button"), (button) => ({ text: button.textContent || "", disabled: button.disabled })),
+      body: document.body.innerText.slice(0, 1_000),
+    }));
+    throw new Error(`Second Word result navigation failed: ${JSON.stringify(state)}\n${error.message || error}`);
+  }
   const splitParagraph = await page.evaluate(() => {
     const row = Array.from(document.querySelectorAll(".document-page-row")).find((item) => item.textContent?.includes("제5항의 지급이 완료되면"));
     if (!row) return null;
@@ -764,6 +801,11 @@ async function createFixtures(directory) {
   sheetTrimSheet.getCell("A8").value = "마지막 행";
   sheetTrimSheet.getCell("D8").value = "D 유지";
   sheetTrimSheet.getCell("H8").value = "H 이동";
+  const referencedSheet = sheetTrimBook.addWorksheet("참조 대상");
+  referencedSheet.getCell("A1").value = "첫 행";
+  referencedSheet.getCell("A5").value = "참조 유지";
+  const referenceSummary = sheetTrimBook.addWorksheet("참조 요약");
+  referenceSummary.getCell("A1").value = { formula: "'참조 대상'!A5", result: "참조 유지" };
   await sheetTrimBook.xlsx.writeFile(sheetTrimXlsx);
   await fs.writeFile(beforeDocx, await createDocx("업무 파일을 빠르게 처리합니다.", [
     ["항목", "금액", "비고"],

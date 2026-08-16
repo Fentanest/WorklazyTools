@@ -1,4 +1,5 @@
-import { ArrowDownToLine, ArrowUpToLine, Download, ImageIcon, LayoutGrid, Sparkles, Trash2 } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, Download, GripVertical, ImageIcon, LayoutGrid, Sparkles, Trash2 } from "lucide-react";
+import Sortable from "sortablejs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -167,6 +168,7 @@ export function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
   const [delay, setDelay] = useState(500);
   const [colors, setColors] = useState(192);
   const [preview, setPreview] = useState<{ url: string; fileName: string }>();
+  const frameListRef = useRef<HTMLDivElement>(null);
   const language = i18n.language === "en" ? "en" : "ko";
   const replaceFiles = useCallback((next: File[]) => {
     const filtered = filterRasterImages(next);
@@ -181,6 +183,27 @@ export function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
   }, [delay]);
   useClipboardImages(appendFiles);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
+  useEffect(() => {
+    const list = frameListRef.current;
+    if (!list) return;
+    const sortable = Sortable.create(list, {
+      animation: 170,
+      handle: ".gif-frame-drag-handle",
+      draggable: ".gif-frame-row",
+      forceFallback: true,
+      fallbackOnBody: true,
+      delay: 120,
+      delayOnTouchOnly: true,
+      fallbackTolerance: 4,
+      onEnd: ({ oldIndex, newIndex }) => {
+        if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return;
+        restoreSortableDom(list, oldIndex, newIndex);
+        setFiles((current) => moveItem(current, oldIndex, newIndex));
+        setDelays((current) => moveItem(current, oldIndex, newIndex));
+      },
+    });
+    return () => sortable.destroy();
+  }, [files.length]);
   const moveFrame = (from: number, to: number) => {
     if (to < 0 || to >= files.length) return;
     setFiles((current) => moveItem(current, from, to));
@@ -203,9 +226,16 @@ export function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
   return <SectionCard title={t("image.gif.title")} description={t("image.gif.description")}>
     <FileDropZone files={files} onFiles={replaceFiles} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.gif.hint")} accent="sky" />
     <ClipboardHint mode="append" />
-    {!!files.length && <div className="gif-frame-list">{files.map((file, index) => <div className="gif-frame-row" key={`${file.name}-${file.lastModified}-${index}`}><span><b>{index + 1}</b>{file.name}</span><label>{t("image.gif.frameDelay")}<input type="number" min={20} step={10} value={delays[index] ?? delay} onChange={(event) => setDelays((current) => current.map((value, itemIndex) => itemIndex === index ? Math.max(20, Number(event.target.value) || 20) : value))} /></label><button type="button" disabled={index === 0} aria-label={t("image.gif.moveUp")} onClick={() => moveFrame(index, index - 1)}><ArrowUpToLine size={16} /></button><button type="button" disabled={index === files.length - 1} aria-label={t("image.gif.moveDown")} onClick={() => moveFrame(index, index + 1)}><ArrowDownToLine size={16} /></button><button type="button" aria-label={t("image.gif.remove")} onClick={() => removeFrame(index)}><Trash2 size={16} /></button></div>)}</div>}
+    {!!files.length && <div ref={frameListRef} className="gif-frame-list">{files.map((file, index) => <div className="gif-frame-row" key={`${file.name}-${file.lastModified}-${index}`}><span><button type="button" className="gif-frame-drag-handle" aria-label={t("image.gif.drag")}><GripVertical size={16} /></button><b>{index + 1}</b>{file.name}</span><label>{t("image.gif.frameDelay")}<input type="number" min={20} step={10} value={delays[index] ?? delay} onChange={(event) => setDelays((current) => current.map((value, itemIndex) => itemIndex === index ? Math.max(20, Number(event.target.value) || 20) : value))} /></label><button type="button" disabled={index === 0} aria-label={t("image.gif.moveUp")} onClick={() => moveFrame(index, index - 1)}><ArrowUpToLine size={16} /></button><button type="button" disabled={index === files.length - 1} aria-label={t("image.gif.moveDown")} onClick={() => moveFrame(index, index + 1)}><ArrowDownToLine size={16} /></button><button type="button" aria-label={t("image.gif.remove")} onClick={() => removeFrame(index)}><Trash2 size={16} /></button></div>)}</div>}
     <div className="image-settings-grid"><NumberField label={t("image.gif.width")} value={width} onChange={setWidth} /><NumberField label={t("image.gif.delay")} value={delay} min={20} onChange={(value) => { setDelay(value); setDelays(files.map(() => value)); }} /><label><span>{t("image.gif.colors")}</span><select value={colors} onChange={(event) => setColors(Number(event.target.value))}><option value={128}>{t("image.gif.small")}</option><option value={192}>{t("image.gif.balanced")}</option><option value={256}>{t("image.gif.sharp")}</option></select></label></div>
     {preview && <div className="gif-result-preview"><img src={preview.url} alt={t("image.gif.previewAlt")} /><a className="result-download blue-download" href={preview.url} download={preview.fileName}><Download size={17} /> {t("image.gif.download")}</a></div>}
     <div className="section-actions"><PrimaryButton accent="sky" disabled={files.length < 2} loading={progress.status === "running"} onClick={() => void execute()}><Sparkles size={18} /> {t("image.gif.create")}</PrimaryButton></div>
   </SectionCard>;
+}
+
+function restoreSortableDom(container: HTMLElement, oldIndex: number, newIndex: number) {
+  const moved = container.children[newIndex];
+  if (!moved) return;
+  if (oldIndex < newIndex) container.insertBefore(moved, container.children[oldIndex] ?? null);
+  else container.insertBefore(moved, container.children[oldIndex + 1] ?? null);
 }
