@@ -235,7 +235,7 @@
         "theFirstAudioTrackWasPreservedWithoutRe": "첫 번째 오디오 트랙을 재인코딩 없이 원본 그대로 유지했습니다.",
         "theAudioTrackWasRemovedFromTheOutput": "출력 영상에서 오디오 트랙을 제거했습니다.",
         "hevcMayNotPlayOnEveryDeviceOr": "HEVC는 기기와 플레이어에 따라 재생되지 않을 수 있습니다.",
-        "theBrowserRanOutOfMemoryTryA": "브라우저 메모리가 부족합니다. 더 짧은 구간이나 작은 파일 수로 다시 시도해 주세요.",
+        "theBrowserRanOutOfMemoryTryA": "영상을 처리할 메모리가 부족합니다. 출력 해상도를 1080p·720p로 낮추거나 한 번에 처리할 영상 수를 줄인 뒤 다시 시도해 주세요.",
         "theBrowserEncodingEngineDoesNotSupportThe": "이 브라우저에서는 선택한 코덱을 사용할 수 없습니다. H.264 또는 VP9을 선택해 주세요.",
         "theInputFormatOrCodecMayNotBe": "선택한 영상 형식이나 압축 방식을 처리하지 못했습니다. 다른 출력 설정을 고르거나 MP4·MOV·WebM으로 바꾼 뒤 다시 시도해 주세요.",
         "sec": "{{p0}}초",

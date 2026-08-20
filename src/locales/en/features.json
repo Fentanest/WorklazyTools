@@ -235,7 +235,7 @@
         "theFirstAudioTrackWasPreservedWithoutRe": "The first audio track was preserved without re-encoding.",
         "theAudioTrackWasRemovedFromTheOutput": "The audio track was removed from the output video.",
         "hevcMayNotPlayOnEveryDeviceOr": "HEVC may not play on every device or player.",
-        "theBrowserRanOutOfMemoryTryA": "The browser ran out of memory. Try a shorter range or fewer files.",
+        "theBrowserRanOutOfMemoryTryA": "There is not enough memory to process the video. Lower the output resolution to 1080p or 720p, or process fewer videos at a time, then try again.",
         "theBrowserEncodingEngineDoesNotSupportThe": "This browser cannot use the selected codec. Choose H.264 or VP9.",
         "theInputFormatOrCodecMayNotBe": "The selected video format or compression could not be processed. Choose different output settings or convert the source to MP4, MOV, or WebM and try again.",
         "sec": "{{p0}} sec",

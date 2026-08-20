@@ -7,6 +7,7 @@ import type {
   VideoWorkerInput,
 } from "./types";
 import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate } from "./videoEncoding";
+import { classifyVideoProcessingFailure } from "./videoErrors";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
@@ -85,6 +86,7 @@ async function processRequest(request: VideoWorkerStartRequest) {
   let progressStage = createProgressStage(28, 90, 1, featureMessage(currentLanguage, "video.messages.video.processing"));
   let lastProgress = -1;
   let lastProgressAt = 0;
+  const ffmpegDiagnostics: string[] = [];
 
   const reportFfmpegProgress = ({ progress: rawProgress, time }: { progress: number; time: number }) => {
     const timeProgress = progressStage.duration > 0 && time > 0 ? time / 1_000_000 / progressStage.duration : 0;
@@ -102,7 +104,13 @@ async function processRequest(request: VideoWorkerStartRequest) {
       p2: eta,
     }));
   };
+  const collectFfmpegDiagnostic = ({ message }: { message: string }) => {
+    if (!message) return;
+    ffmpegDiagnostics.push(message);
+    if (ffmpegDiagnostics.length > 80) ffmpegDiagnostics.splice(0, ffmpegDiagnostics.length - 80);
+  };
   ffmpeg.on("progress", reportFfmpegProgress);
+  ffmpeg.on("log", collectFfmpegDiagnostic);
 
   try {
     validateRequest(request);
@@ -117,6 +125,7 @@ async function processRequest(request: VideoWorkerStartRequest) {
         ffmpeg.terminate();
         ffmpeg = new FFmpeg();
         ffmpeg.on("progress", reportFfmpegProgress);
+        ffmpeg.on("log", collectFfmpegDiagnostic);
         progress(7, featureMessage(currentLanguage, "video.messages.video.multiThreadStartupFailedSwitchingToCompatibilityMode"));
         await ffmpeg.load({ coreURL: singleCoreURL, wasmURL: singleWasmURL, classWorkerURL });
       }
@@ -158,7 +167,7 @@ async function processRequest(request: VideoWorkerStartRequest) {
     progress(100, featureMessage(currentLanguage, "video.messages.video.resultsCreated", { p0: result.outputCount }));
     worker.postMessage({ type: "result", result });
   } catch (error) {
-    worker.postMessage({ type: "error", error: normalizeError(error) });
+    worker.postMessage({ type: "error", error: normalizeError(error, ffmpegDiagnostics) });
   } finally {
     pendingInputFiles.forEach(({ reject }) => reject(new Error(featureMessage(currentLanguage, "video.messages.video.sourceFileAttachmentWasCanceledBecauseTheVideo"))));
     pendingInputFiles.clear();
@@ -590,10 +599,10 @@ function progress(value: number, message: string) {
   worker.postMessage({ type: "progress", progress: Math.round(value), message });
 }
 
-function normalizeError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/memory|allocation|out of bounds/i.test(message)) return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserRanOutOfMemoryTryA"), code: "OUT_OF_MEMORY" };
-  if (/libx265|encoder.*not found|unknown encoder/i.test(message)) return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserEncodingEngineDoesNotSupportThe"), code: "CODEC_UNAVAILABLE" };
+function normalizeError(error: unknown, diagnosticMessages: readonly string[] = []) {
+  const code = classifyVideoProcessingFailure(error, diagnosticMessages);
+  if (code === "OUT_OF_MEMORY") return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserRanOutOfMemoryTryA"), code };
+  if (code === "CODEC_UNAVAILABLE") return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserEncodingEngineDoesNotSupportThe"), code };
   return { message: featureMessage(currentLanguage, "video.messages.video.theInputFormatOrCodecMayNotBe"), code: "VIDEO_PROCESSING_ERROR" };
 }
 
