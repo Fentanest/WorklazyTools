@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Expand, Film, Gauge, GripVertical, Link2, Pause, Play, Scissors, Volume2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, Film, Gauge, GripVertical, Link2, Minimize2, Pause, Play, Scissors, Timer, Volume2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState, type DragEvent, type MutableRefObject } from "react";
 
 import { SegmentedControl, formatBytes } from "../../components/ui";
@@ -49,6 +49,8 @@ export const VideoGroupSection = memo(function VideoGroupSection({
   const [draggedId, setDraggedId] = useState<string>();
   const [fullscreen, setFullscreen] = useState(false);
   const audioItemId = settings.audioItemId && items.some((item) => item.id === settings.audioItemId) ? settings.audioItemId : items[0].id;
+  const activeItemIndex = Math.max(0, items.findIndex((item) => item.id === activeId));
+  const activeItem = items[activeItemIndex];
   const groupDuration = Math.max(...items.map((item) => item.duration || 0), 0.01);
   const synchronizationKey = `${settings.sync}:${items.map((item) => `${item.id}:${item.duration}`).join("|")}`;
 
@@ -98,19 +100,47 @@ export const VideoGroupSection = memo(function VideoGroupSection({
     });
   }, [items, players, updatePlayhead]);
 
-  const openFullscreen = useCallback(async () => {
+  const toggleFullscreen = useCallback(async () => {
     const element = containerRef.current;
+    if (document.fullscreenElement === element) {
+      try {
+        await document.exitFullscreen();
+        setFullscreen(false);
+      } catch {
+        onNotice(featureMessage(language, "video.messages.VideoGroupSection.unableToExitFullscreen"));
+      }
+      return;
+    }
     if (!element?.requestFullscreen) {
       onNotice(featureMessage(language, "video.messages.VideoGroupSection.thisBrowserDoesNotSupportSplitFullscreen"));
       return;
     }
     try {
+      if (!items.some((item) => item.id === activeId)) onActivate(items[0].id);
       await element.requestFullscreen();
       setFullscreen(true);
     } catch {
       onNotice(featureMessage(language, "video.messages.VideoGroupSection.unableToEnterFullscreenCheckTheBrowserS"));
     }
-  }, [language, onNotice]);
+  }, [activeId, items, language, onActivate, onNotice]);
+
+  const setCurrentAsBoundary = useCallback((item: VideoItem, boundary: "start" | "end") => {
+    const current = players.current[item.id]?.currentTime ?? 0;
+    if (boundary === "start") onUpdateItem(item.id, { start: Math.max(0, Math.min(current, item.end - 0.05)) });
+    else onUpdateItem(item.id, { end: Math.min(item.duration, Math.max(current, item.start + 0.05)) });
+  }, [onUpdateItem, players]);
+
+  const playItemRange = useCallback((item: VideoItem) => {
+    const player = players.current[item.id];
+    if (!player) return;
+    player.currentTime = item.start;
+    void player.play();
+  }, [players]);
+
+  const nudgeItem = useCallback((item: VideoItem, delta: number) => {
+    const current = players.current[item.id]?.currentTime ?? item.start;
+    seekItem(item, Math.min(item.duration, Math.max(0, current + delta)));
+  }, [players, seekItem]);
 
   useEffect(() => {
     const onFullscreenChange = () => setFullscreen(document.fullscreenElement === containerRef.current);
@@ -140,7 +170,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
         </div>
         <div className="video-group-actions">
           <label className="compact-sync-toggle"><input type="checkbox" checked={settings.sync} disabled={items.length < 2} onChange={(event) => onUpdateSettings(group, { sync: event.target.checked })} /><span>{featureMessage(language, "video.messages.VideoGroupSection.syncPlayback")}</span></label>
-          {items.length > 1 && <button type="button" className="secondary-button small" onClick={() => void openFullscreen()}><Expand size={15} /> {featureMessage(language, "video.messages.VideoGroupSection.splitFullscreen")}</button>}
+          {items.length > 1 && <button type="button" className="secondary-button small" onClick={() => void toggleFullscreen()}>{fullscreen ? <Minimize2 size={15} /> : <Expand size={15} />} {featureMessage(language, fullscreen ? "video.messages.VideoGroupSection.closeSplitFullscreen" : "video.messages.VideoGroupSection.splitFullscreen")}</button>}
         </div>
       </header>
 
@@ -235,6 +265,27 @@ export const VideoGroupSection = memo(function VideoGroupSection({
         })}
       </div>
 
+      {items.length > 1 && (
+        <div
+          className="video-fullscreen-trim-toolbar"
+          role="group"
+          aria-label={featureMessage(language, "video.messages.VideoGroupSection.fullscreenRangeControls", { p0: activeItem.file.name })}
+        >
+          <div className="video-fullscreen-trim-selection">
+            <span><Scissors size={15} /><small>{featureMessage(language, "video.messages.VideoGroupSection.selectedVideo")} {activeItemIndex + 1}</small><strong title={activeItem.file.name}>{activeItem.file.name}</strong></span>
+            <b>{formatTime(activeItem.start)} — {formatTime(activeItem.end)}</b>
+          </div>
+          <div className="video-fullscreen-trim-actions">
+            <button type="button" disabled={!(activeItem.duration > 0)} onClick={() => setCurrentAsBoundary(activeItem, "start")}><Timer size={14} /> {featureMessage(language, "video.messages.VideoTrimLane.currentStart")}</button>
+            <button type="button" disabled={!(activeItem.duration > 0)} onClick={() => setCurrentAsBoundary(activeItem, "end")}><Timer size={14} /> {featureMessage(language, "video.messages.VideoTrimLane.currentEnd")}</button>
+            <button type="button" disabled={!(activeItem.duration > 0)} onClick={() => playItemRange(activeItem)}><Play size={14} /> {featureMessage(language, "video.messages.VideoTrimLane.playRange")}</button>
+            <button type="button" disabled={!(activeItem.duration > 0)} onClick={() => nudgeItem(activeItem, -0.1)}>−0.1s</button>
+            <button type="button" disabled={!(activeItem.duration > 0)} onClick={() => nudgeItem(activeItem, 0.1)}>+0.1s</button>
+            <button type="button" className="apply-group-range" disabled={!(activeItem.duration > 0)} onClick={() => onApplyRange(activeItem)}>{featureMessage(language, "video.messages.VideoTrimLane.applyRangeToEntireGroup")}</button>
+          </div>
+        </div>
+      )}
+
       <div className="group-trim-editor">
         <div className="group-trim-heading"><span><Scissors size={17} /><strong>{featureMessage(language, "video.messages.VideoGroupSection.groupTrimRanges", { p0: group })}</strong></span><small>{featureMessage(language, "video.messages.VideoGroupSection.eachVideoCanUseADifferentRange")}</small></div>
         {items.map((item, groupIndex) => (
@@ -249,13 +300,9 @@ export const VideoGroupSection = memo(function VideoGroupSection({
             onActivate={() => onActivate(item.id)}
             onStart={(value, seek) => { onUpdateItem(item.id, { start: value }); if (seek) seekItem(item, value); }}
             onEnd={(value, seek) => { onUpdateItem(item.id, { end: value }); if (seek) seekItem(item, value); }}
-            onBoundary={(boundary) => {
-              const current = players.current[item.id]?.currentTime ?? 0;
-              if (boundary === "start") onUpdateItem(item.id, { start: Math.max(0, Math.min(current, item.end - 0.05)) });
-              else onUpdateItem(item.id, { end: Math.min(item.duration, Math.max(current, item.start + 0.05)) });
-            }}
-            onPlay={() => { const player = players.current[item.id]; if (player) { player.currentTime = item.start; void player.play(); } }}
-            onNudge={(delta) => seekItem(item, Math.min(item.duration, Math.max(0, (players.current[item.id]?.currentTime ?? item.start) + delta)))}
+            onBoundary={(boundary) => setCurrentAsBoundary(item, boundary)}
+            onPlay={() => playItemRange(item)}
+            onNudge={(delta) => nudgeItem(item, delta)}
             onApplyGroup={() => onApplyRange(item)}
           />
         ))}
