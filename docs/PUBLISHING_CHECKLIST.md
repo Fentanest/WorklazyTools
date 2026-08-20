@@ -35,8 +35,10 @@ GitHub 프로젝트 Pages의 `/저장소/ads.txt`는 호스트의 루트 `/ads.t
 - `https://실제-주소/sitemap.xml` 제출
 - 홈, Excel 병합, Word 비교, 신규 계산·보안 도구와 개인정보처리방침 URL을 URL 검사 도구로 확인
 - canonical이 최종 공개 주소를 가리키는지 확인
-- Open Graph 대표 이미지가 1200×630 PNG로 표시되고 `summary_large_image` 카드가 생성되는지 확인
+- 각 도구의 한국어·영어 Open Graph 이미지가 `public/social/tools/`의 1200×630 PNG로 표시되고 `summary_large_image` 카드가 생성되는지 확인
 - 배포 후 404, 모바일 사용성, Core Web Vitals 확인
+
+도구 이름이나 핵심 기능 문구를 바꾸면 `scripts/generate-social-images.mjs`의 같은 항목도 갱신하고 `npm run social:generate`를 실행합니다. 생성에는 Chrome 또는 Chromium이 필요하며 자동 탐색되지 않으면 `WORKLAZY_CHROME_PATH`에 실행 파일 경로를 지정합니다. 공유 이미지는 메타데이터에서만 참조하므로 일반 페이지 콘텐츠에서 미리 불러오지 않습니다.
 
 ## 5. 게시 전 운영 정보 확인
 

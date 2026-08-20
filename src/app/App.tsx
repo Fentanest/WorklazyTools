@@ -68,10 +68,10 @@ export function App() {
           <Route path="tools/work-calculator" element={<LazyToolRoute label="Workday Calculator"><WorkCalculatorPage /></LazyToolRoute>} />
           <Route path="tools/timezone-calculator" element={<LazyToolRoute label="World Time Planner"><TimezoneCalculatorPage /></LazyToolRoute>} />
           <Route path="tools/payroll-calculator" element={<LazyToolRoute label="Payroll Calculator"><PayrollCalculatorPage /></LazyToolRoute>} />
-          <Route path="tools/image-privacy" element={<LazyToolRoute label="Image Privacy"><ImagePrivacyPage /></LazyToolRoute>} />
+          <Route path="tools/image-privacy" element={<LazyToolRoute label="Photo Metadata Remover"><ImagePrivacyPage /></LazyToolRoute>} />
           <Route path="tools/security-tools" element={<LazyToolRoute label="Password Generator"><SecurityToolsPage /></LazyToolRoute>} />
           <Route path="tools/qr-studio" element={<LazyToolRoute label="QR Studio"><QrStudioPage /></LazyToolRoute>} />
-          <Route path="tools/data-converter" element={<LazyToolRoute label="Table Converter"><DataConverterPage /></LazyToolRoute>} />
+          <Route path="tools/data-converter" element={<LazyToolRoute label="Table Data Converter"><DataConverterPage /></LazyToolRoute>} />
           <Route path="hwp-editor" element={<LocalizedNavigate to="/tools/hwp-editor" />} />
           <Route path="video-studio" element={<LocalizedNavigate to="/tools/video-studio/" />} />
           <Route path="audio-studio" element={<LocalizedNavigate to="/tools/audio-studio" />} />

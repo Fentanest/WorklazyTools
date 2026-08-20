@@ -13,6 +13,15 @@ const routes = [
   "tools/security-tools", "tools/qr-studio", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
 ];
+const socialSlugByRoute = {
+  "tools/excel-merger": "excel-merger", "tools/word-compare": "word-compare", "tools/pdf-editor": "pdf-tools",
+  "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
+  "tools/hwp-editor": "hwp-editor", "tools/hwp-compare": "hwp-compare", "tools/video-studio": "video-studio",
+  "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-tools": "text-tools",
+  "tools/text-formatter": "code-formatter", "tools/work-calculator": "workday-calculator", "tools/timezone-calculator": "world-time-planner",
+  "tools/payroll-calculator": "payroll-calculator", "tools/image-privacy": "photo-metadata-remover", "tools/security-tools": "password-generator",
+  "tools/qr-studio": "qr-studio", "tools/data-converter": "table-data-converter",
+};
 
 for (const language of ["ko", "en"]) {
 for (const route of routes) {
@@ -39,6 +48,13 @@ for (const route of routes) {
   ];
   for (const marker of required) {
     if (!html.includes(marker)) throw new Error(`${filePath} is missing ${marker}`);
+  }
+  const socialSlug = socialSlugByRoute[route];
+  if (socialSlug) {
+    const socialPath = `social/tools/${socialSlug}-${language}.png`;
+    if (!html.includes(`https://worklazy.net/${socialPath}`)) throw new Error(`${filePath} does not use its localized tool social image.`);
+    const image = await fs.stat(path.join("dist", socialPath));
+    if (image.size < 10_000) throw new Error(`${socialPath} is missing or unexpectedly small.`);
   }
   if (route === "tools/video-studio") {
     if (!html.includes('name="worklazy-video-isolation"') || !html.includes('data-worklazy-video-isolation') || !html.includes('./coi-serviceworker.js')) {
@@ -149,8 +165,12 @@ const [koreanFeatures, englishFeatures] = await Promise.all([
   fs.readFile("src/locales/ko/features.json", "utf8"),
   fs.readFile("src/locales/en/features.json", "utf8"),
 ]);
-for (const forbidden of ["광고 스크립트를 불러오지", "광고 실행 환경", "FFmpeg 호환 경로", "ZIP Worker", "does not load advertising scripts", "ad execution", "FFmpeg compatibility path", "ZIP worker"]) {
+for (const forbidden of ["광고 스크립트를 불러오지", "광고 실행 환경", "FFmpeg", "오디오 Worker", "브라우저 실행 구성요소", "OCR WebAssembly", "ZIP Worker", "does not load advertising scripts", "ad execution", "analysis worker", "audio worker", "OCR runtime", "separate worker", "ZIP worker"]) {
   if (koreanFeatures.includes(forbidden) || englishFeatures.includes(forbidden)) throw new Error(`User-facing feature copy exposes implementation state: ${forbidden}`);
+}
+if (!koreanFeatures.includes("JPG·PNG·WebP를 지원하며 HEIC·HEIF는 지원하지 않습니다")
+  || !englishFeatures.includes("JPG, PNG and WebP are supported; HEIC and HEIF are not")) {
+  throw new Error("Photo metadata FAQ does not match the supported JPG, PNG and WebP inputs.");
 }
 const [koreanPages, englishPages] = await Promise.all([
   fs.readFile("src/locales/ko/pages.json", "utf8"),

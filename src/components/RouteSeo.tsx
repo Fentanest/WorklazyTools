@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-import { getCanonicalUrl, getSeoDefinition, getSocialImageUrl, normalizeSeoPath, socialImages } from "../app/seo";
+import { getCanonicalUrl, getSeoDefinition, getSocialImageDefinition, getSocialImageUrl, normalizeSeoPath } from "../app/seo";
 import { languageFromPath, stripLanguagePrefix } from "../i18n/languages";
 
 const MANAGED_JSON_LD_ID = "worklazy-route-jsonld";
@@ -20,8 +20,8 @@ export function RouteSeo() {
       : getSeoDefinition(language, routePath);
     const canonicalPath = isTemporaryResult ? baseResultPath : routePath;
     const canonical = getCanonicalUrl(language, canonicalPath);
-    const imageDefinition = socialImages[language];
-    const image = getSocialImageUrl(language);
+    const imageDefinition = getSocialImageDefinition(language, canonicalPath);
+    const image = getSocialImageUrl(language, canonicalPath);
 
     document.title = seo.title;
     setMeta("name", "description", seo.description);
@@ -107,7 +107,7 @@ function createStructuredData(language: "ko" | "en", path: string, canonical: st
     description: seo.description,
     url: canonical,
     inLanguage: language === "ko" ? "ko-KR" : "en-US",
-    image: getSocialImageUrl(language),
+    image: getSocialImageUrl(language, path),
   }];
 
   if (seo.application) {

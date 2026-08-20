@@ -13,13 +13,21 @@ export interface SeoDefinition {
   };
 }
 
+export interface SocialImageDefinition {
+  path: string;
+  width: 1200;
+  height: 630;
+  type: "image/png";
+  alt: string;
+}
+
 export const socialImages = {
   ko: {
-  path: "social/worklazy-tools-share-ko.png",
-  width: 1200,
-  height: 630,
-  type: "image/png",
-  alt: koSeo.socialImageAlt,
+    path: "social/worklazy-tools-share-ko.png",
+    width: 1200,
+    height: 630,
+    type: "image/png",
+    alt: koSeo.socialImageAlt,
   },
   en: {
     path: "social/worklazy-tools-share.png",
@@ -29,6 +37,29 @@ export const socialImages = {
     alt: enSeo.socialImageAlt,
   },
 } as const;
+
+const socialImageSlugByPath: Record<string, string> = {
+  "/tools/excel-merger": "excel-merger",
+  "/tools/word-compare": "word-compare",
+  "/tools/pdf-editor": "pdf-tools",
+  "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
+  "/tools/pdf-editor/pdf-to-image": "pdf-to-image",
+  "/tools/pdf-editor/convert": "pdf-convert",
+  "/tools/hwp-editor": "hwp-editor",
+  "/tools/hwp-compare": "hwp-compare",
+  "/tools/video-studio": "video-studio",
+  "/tools/audio-studio": "audio-studio",
+  "/tools/image-studio": "image-studio",
+  "/tools/text-tools": "text-tools",
+  "/tools/text-formatter": "code-formatter",
+  "/tools/work-calculator": "workday-calculator",
+  "/tools/timezone-calculator": "world-time-planner",
+  "/tools/payroll-calculator": "payroll-calculator",
+  "/tools/image-privacy": "photo-metadata-remover",
+  "/tools/security-tools": "password-generator",
+  "/tools/qr-studio": "qr-studio",
+  "/tools/data-converter": "table-data-converter",
+};
 
 export const seoByPath: Record<string, SeoDefinition> = {
   "/": {
@@ -56,11 +87,11 @@ export const seoByPath: Record<string, SeoDefinition> = {
     },
   },
   "/tools/pdf-editor": {
-    title: "PDF 편집·병합·분할·페이지 추출 - 무료 온라인 PDF 도구",
-    description: "PDF 페이지를 미리 보며 순서 변경·회전·선택하고 하나의 PDF, 여러 범위별 PDF 또는 페이지별 PDF로 저장하세요.",
+    title: "PDF 도구 | 페이지 편집·병합·변환·OCR",
+    description: "PDF 페이지를 편집·병합·추출하고 JPG·PNG 이미지와 PDF를 서로 변환하거나 한국어·영어 OCR로 DOCX·XLSX·TXT를 만드세요.",
     application: {
-      name: "PDF 페이지 편집·병합·추출",
-      featureList: ["PDF 다중 병합", "페이지 순서 변경", "90도 회전", "선택 페이지 추출", "여러 범위별 PDF 분할", "페이지별 PDF 분할"],
+      name: "PDF Tools",
+      featureList: ["PDF 페이지 편집·병합·추출", "페이지 순서 변경·회전", "이미지를 PDF로 변환", "PDF를 PNG·JPG로 변환", "PDF DOCX·XLSX·TXT 변환", "한국어·영어 OCR"],
     },
   },
   "/tools/pdf-editor/image-to-pdf": {
@@ -89,17 +120,17 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "HWP Compare", featureList: ["HWP 문단·문장 텍스트 Diff", "추가·삭제 내용 하이라이트", "HWP·HWPX 본문 비교", "개요 번호·서식 비교", "스마트 표 행·열 비교", "머리말·꼬리말·각주·미주", "Excel 비교 보고서", "다중 동시 비교"] },
   },
   "/tools/video-studio": {
-    title: "온라인 비디오 편집·그룹별 이어붙이기 - GIF·MP3·AAC 변환",
-    description: "영상 수 제한 없이 여러 번 추가하고 최대 10개 그룹에서 자르거나 이어붙이세요. 원본 음성 복사·제거·호환 형식 변환과 화질·음질 설정을 지원합니다.",
-    application: { name: "Video Studio", featureList: ["영상 수 제한 없는 연속 추가", "최대 10개 그룹", "지원 브라우저 다중 코어 변환", "영상별 예상 시간", "MKV·AVI 파일 정보 대체 분석", "그룹별 동기 재생과 분할 전체화면", "드래그 순서 변경", "그룹별 개별 출력·이어붙이기", "완성 결과 즉시 개별 다운로드", "전체 개별 다운로드와 폴더 저장", "선택형 ZIP 묶기", "다시 압축하지 않는 영상 복사", "첫 번째 음성 복사·제거·호환 형식 변환", "영상·음성 비트레이트 직접입력", "음성 샘플레이트 선택·직접입력", "음원 결과를 오디오 스튜디오로 메모리 전달", "모바일 권장 설정", "GIF·MP3·AAC 변환"] },
+    title: "비디오 스튜디오 | 영상 자르기·이어붙이기·음원 추출",
+    description: "영상 수 제한 없이 최대 10개 그룹에서 영상을 자르거나 이어붙이세요. 빠른 무손실 저장, 영상 속 음성 제어와 GIF·MP3·AAC 출력을 지원합니다.",
+    application: { name: "Video Studio", featureList: ["영상 수 제한 없는 추가·10개 그룹", "빠른 무손실 자르기", "그룹별 개별 출력·이어붙이기", "동기 재생·분할 전체화면", "개별·폴더·ZIP 저장", "영상 속 음성 복사·제거·변환", "화질·음질 설정", "GIF·MP3·AAC 출력"] },
   },
   "/tools/audio-studio": {
-    title: "온라인 오디오 파형·음성 변조 편집기 - MP3·WAV 피치 조절",
-    description: "오디오 파형에서 구간을 선택해 자르거나 낮은 톤·높은 톤·어린 목소리·로봇 효과와 피치 조절을 적용하고 WAV 또는 MP3로 저장하세요.",
-    application: { name: "Audio Waveform Studio", featureList: ["고해상도 오디오 파형", "드래그 구간 선택", "구간 음소거", "잘라내기·복사·붙여넣기", "낮은 톤·높은 톤 프리셋", "어린 목소리·로봇 효과", "-12~+12반음 피치 조절", "선택 구간 효과 미리 듣기", "구간 삭제", "실행 취소·다시 실행", "파형 확대·축소", "선택 구간 반복", "WAV 내보내기", "MP3 내보내기", "브라우저 내 음성 샘플 편집"] },
+    title: "오디오 스튜디오 | 파형 편집·구간 자르기·피치 조절",
+    description: "오디오 파형에서 구간을 자르고 음소거·복사·붙여넣기하거나 피치와 음색 효과를 적용한 뒤 WAV 또는 MP3로 저장하세요.",
+    application: { name: "Audio Studio", featureList: ["고해상도 오디오 파형", "구간 자르기·음소거", "복사·붙여넣기", "피치·음색 효과", "선택 구간 미리 듣기", "실행 취소·다시 실행", "WAV·MP3 저장"] },
   },
   "/tools/image-studio": {
-    title: "온라인 이미지 편집 - 일괄 리사이즈·워터마크·콜라주·GIF",
+    title: "이미지 스튜디오 | 사진 편집·모자이크·콜라주·GIF",
     description: "사진 편집과 그림판을 하나로 합쳐 선택 영역 모자이크·블러, 자르기·필터·자유 그리기·Undo를 사용하고 콜라주·GIF도 만드세요.",
     application: { name: "Image Studio", featureList: ["사진·빈 캔버스 통합 편집", "선택 영역 모자이크·블러", "블러 강도 조절", "연필·붓·지우개", "Undo·Redo", "필터와 자르기", "텍스트·도형 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
   },
@@ -129,9 +160,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "급여 간이 계산기", featureList: ["주휴수당", "국민연금", "건강보험", "장기요양보험", "고용보험", "근로소득세 추정", "퇴직금"] },
   },
   "/tools/image-privacy": {
-    title: "사진 속 숨은 정보(EXIF)·GPS 제거 - JPG·PNG 개인정보 삭제",
-    description: "JPG·PNG 파일에 숨은 GPS 위치, 촬영 기기와 촬영 시각 정보(EXIF)를 확인하고 제거된 사본을 만드세요. HEIC는 지원하지 않습니다.",
-    application: { name: "Image Privacy", featureList: ["숨은 촬영 정보(EXIF) 확인", "GPS 위치 확인", "촬영 기기 확인", "촬영 시각 확인", "사진 내용만 새 파일로 저장", "부가 정보 제거"] },
+    title: "사진 메타데이터 제거 | EXIF·GPS 확인 및 삭제",
+    description: "JPG·PNG·WebP 사진에 숨은 GPS 위치, 촬영 기기와 촬영 시각 정보(EXIF)를 확인하고 메타데이터가 제거된 새 사본을 만드세요.",
+    application: { name: "Photo Metadata Remover", featureList: ["JPG·PNG·WebP 지원", "숨은 촬영 정보(EXIF) 확인", "GPS 위치 확인", "촬영 기기·시각 확인", "사진 내용만 새 파일로 저장", "메타데이터 제거"] },
   },
   "/tools/security-tools": {
     title: "안전한 비밀번호 생성기·강도 측정기",
@@ -139,12 +170,12 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "Password Generator", featureList: ["보안 난수 비밀번호 생성", "8~64자 길이", "문자 종류 선택", "패턴 강도 분석", "추측 난이도", "초당 100억 회 기준 예상 해독 시간"] },
   },
   "/tools/qr-studio": {
-    title: "QR 코드 생성기·실시간 카메라 스캐너 - 로고 삽입",
+    title: "QR 스튜디오 | QR 코드 만들기·카메라 스캔",
     description: "URL과 텍스트를 로고 포함 QR로 만들고 휴대폰 카메라 또는 업로드한 사진 속 QR 데이터를 브라우저에서 읽으세요.",
     application: { name: "QR Studio", featureList: ["URL QR 생성", "텍스트 QR 생성", "중앙 로고", "실시간 카메라 스캔", "사진 QR 스캔", "모바일 공유·저장"] },
   },
   "/tools/data-converter": {
-    title: "CSV·JSON·HTML 표 데이터 변환기",
+    title: "표 데이터 변환기 | CSV·JSON·HTML 상호 변환",
     description: "CSV, JSON 객체 배열과 HTML 표(table) 데이터를 브라우저에서 서로 변환하고 파일로 저장하세요.",
     application: { name: "Table Data Converter", featureList: ["CSV JSON 변환", "JSON CSV 변환", "HTML 표 변환", "CSV 파일 불러오기", "브라우저 내 파싱", "파일 다운로드"] },
   },
@@ -168,6 +199,26 @@ export const seoByPath: Record<string, SeoDefinition> = {
     title: "라이선스 및 제3자 고지 | Worklazy Tools",
     description: "Worklazy Tools 자체 저작물의 이용 조건과 rhwp, ffmpeg.wasm 등 주요 오픈소스 구성요소의 라이선스를 안내합니다.",
   },
+};
+
+const englishToolTitles: Record<keyof typeof enTools.items, string> = {
+  "excel-merger": "Excel Merger | Combine Excel & CSV Files",
+  "pdf-editor": "PDF Tools | Edit, Merge, Convert & OCR PDFs",
+  "word-compare": "Word Compare | Compare DOCX Text, Tables & Formatting",
+  "hwp-editor": "HWP Editor | Edit HWP & HWPX Documents",
+  "hwp-compare": "HWP Compare | Compare HWP Text, Tables & Numbering",
+  "video-studio": "Video Studio | Trim, Join & Extract Audio",
+  "audio-studio": "Audio Studio | Waveform Editing, Trimming & Pitch",
+  "image-studio": "Image Studio | Edit Photos, Mosaic, Collage & GIF",
+  "text-tools": "Text Cleanup | Whitespace, Lines & Case Conversion",
+  "text-formatter": "Code Formatter | Format & Validate JSON, SQL & XML",
+  "work-calculator": "Korean Workday Calculator | Business Days & Leave",
+  "timezone-calculator": "World Time Planner | Time Zones & Meeting Hours",
+  "payroll-calculator": "Korean Payroll Calculator | Take-Home & Severance Pay",
+  "image-privacy": "Photo Metadata Remover | Inspect & Remove EXIF and GPS",
+  "security-tools": "Password Generator | Create & Check Strong Passwords",
+  "qr-studio": "QR Studio | Create & Scan QR Codes",
+  "data-converter": "Table Data Converter | Convert CSV, JSON & HTML",
 };
 
 const englishPageSeo: Record<string, SeoDefinition> = {
@@ -200,7 +251,7 @@ export function getSeoDefinition(language: AppLanguage, pathname: string): SeoDe
   if (!slug) return englishPageSeo["/"];
   const tool = enTools.items[slug];
   return {
-    title: `${tool.title} — Free Browser Tool | Worklazy Tools`,
+    title: englishToolTitles[slug],
     description: tool.description,
     application: { name: tool.title, featureList: tool.highlights },
   };
@@ -223,8 +274,21 @@ export function getCanonicalUrl(language: AppLanguage, pathname: string) {
   return new URL(localized, getSiteBaseUrl()).href;
 }
 
-export function getSocialImageUrl(language: AppLanguage) {
-  return new URL(socialImages[language].path, getSiteBaseUrl()).href;
+export function getSocialImageDefinition(language: AppLanguage, pathname = "/"): SocialImageDefinition {
+  const path = normalizeSeoPath(stripLanguagePrefix(pathname));
+  const slug = socialImageSlugByPath[path];
+  if (!slug) return socialImages[language];
+  return {
+    path: `social/tools/${slug}-${language}.png`,
+    width: 1200,
+    height: 630,
+    type: "image/png",
+    alt: getSeoDefinition(language, path).title,
+  };
+}
+
+export function getSocialImageUrl(language: AppLanguage, pathname = "/") {
+  return new URL(getSocialImageDefinition(language, pathname).path, getSiteBaseUrl()).href;
 }
 
 function ensureTrailingSlash(value: string) {

@@ -251,7 +251,7 @@ try {
   await page.waitForSelector('input[placeholder*="1-5, 8"]');
 
   const social = await page.evaluate(() => ({ card: document.querySelector('meta[name="twitter:card"]')?.content, image: document.querySelector('meta[property="og:image"]')?.content }));
-  if (social.card !== "summary_large_image" || !social.image?.endsWith("/social/worklazy-tools-share-ko.png")) throw new Error(`Social metadata is incomplete: ${JSON.stringify(social)}`);
+  if (social.card !== "summary_large_image" || !social.image?.endsWith("/social/tools/pdf-convert-ko.png")) throw new Error(`Tool-specific social metadata is incomplete: ${JSON.stringify(social)}`);
 
   const englishRoutes = ["/en/", "/en/tools/", "/en/tools/excel-merger", "/en/tools/word-compare", "/en/tools/hwp-compare", "/en/tools/pdf-editor", "/en/tools/pdf-editor/convert", "/en/tools/audio-studio", "/en/tools/image-studio", "/en/tools/text-tools", "/en/tools/text-formatter", "/en/tools/work-calculator", "/en/tools/timezone-calculator", "/en/tools/payroll-calculator", "/en/tools/image-privacy", "/en/tools/security-tools", "/en/tools/qr-studio", "/en/tools/data-converter", "/en/privacy", "/en/terms"];
   for (const route of englishRoutes) {

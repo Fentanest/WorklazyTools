@@ -5,11 +5,7 @@ const outputDirectory = path.resolve("dist");
 const sourceHtml = await fs.readFile(path.join(outputDirectory, "index.html"), "utf8");
 const siteUrl = ensureTrailingSlash(process.env.VITE_SITE_URL || "https://worklazy.net/");
 const languages = ["ko", "en"];
-const seoCopy = {
-  ko: JSON.parse(await fs.readFile("src/locales/ko/seo.json", "utf8")),
-  en: JSON.parse(await fs.readFile("src/locales/en/seo.json", "utf8")),
-};
-const { getSeoDefinition } = await import("../src/app/seo.ts");
+const { getSeoDefinition, getSocialImageDefinition } = await import("../src/app/seo.ts");
 
 const toolRoutes = [
   "excel-merger", "word-compare", "pdf-editor", "hwp-editor", "hwp-compare", "video-studio", "audio-studio",
@@ -71,6 +67,7 @@ console.log(`Generated ${generated.length} localized crawlable pages for ${siteU
 function makePage(language, route) {
   const pathname = route ? `/${route}` : "/";
   const definition = getSeoDefinition(language, pathname);
+  const socialImage = getSocialImageDefinition(language, pathname);
   return {
     language,
     route,
@@ -79,14 +76,14 @@ function makePage(language, route) {
     heading: definition.title.split(/\s(?:\||—|-)\s/)[0],
     application: definition.application?.name ?? null,
     highlights: definition.application?.featureList ?? [],
+    socialImage,
   };
 }
 
 function renderPage(template, page, canonical) {
   const alternateKo = absolute("ko", page.route);
   const alternateEn = absolute("en", page.route === "tools/hwp-editor" ? "tools" : page.route);
-  const imagePath = page.language === "ko" ? "social/worklazy-tools-share-ko.png" : "social/worklazy-tools-share.png";
-  const image = new URL(imagePath, siteUrl).href;
+  const image = new URL(page.socialImage.path, siteUrl).href;
   const locale = page.language === "ko" ? "ko_KR" : "en_US";
   const inLanguage = page.language === "ko" ? "ko-KR" : "en-US";
   const structuredData = [{ "@context": "https://schema.org", "@type": page.route ? "WebPage" : "WebSite", name: page.title, description: page.description, url: canonical, inLanguage, image }];
@@ -103,9 +100,10 @@ function renderPage(template, page, canonical) {
     `<meta property="og:url" content="${escapeHtml(canonical)}" />`, `<meta property="og:image" content="${escapeHtml(image)}" />`,
     `<meta property="og:image:secure_url" content="${escapeHtml(image)}" />`, `<meta property="og:image:type" content="image/png" />`,
     `<meta property="og:image:width" content="1200" />`, `<meta property="og:image:height" content="630" />`,
-    `<meta property="og:image:alt" content="${escapeHtml(seoCopy[page.language].socialImageAlt)}" />`,
+    `<meta property="og:image:alt" content="${escapeHtml(page.socialImage.alt)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`, `<meta name="twitter:title" content="${escapeHtml(page.title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(page.description)}" />`, `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(page.socialImage.alt)}" />`,
     `<script id="worklazy-route-jsonld" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
     ...(page.route === videoRoute ? [`<meta name="worklazy-video-isolation" content="document-scope" />`, `<script>globalThis.coi={quiet:true,coepCredentialless:()=>true};</script>`, `<script data-worklazy-video-isolation src="./coi-serviceworker.js"></script>`] : []),
   ].join("\n    ");
