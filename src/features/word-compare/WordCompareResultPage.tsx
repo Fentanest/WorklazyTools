@@ -153,6 +153,7 @@ function ComparisonSummary({ result }: { result: WordCompareResult }) {
     { label: language === "en" ? "Deleted" : "삭제", value: result.summary.deleted, className: "deleted" },
     { label: language === "en" ? "Content changed" : "내용 변경", value: result.summary.changed, className: "changed" },
     { label: language === "en" ? "Formatting changed" : "서식 변경", value: result.summary.format, className: "format" },
+    ...(result.summary.moved ? [{ label: language === "en" ? "Moved" : "이동", value: result.summary.moved, className: "moved" }] : []),
   ];
   return <div className="comparison-summary">{items.map((item) => <div className={item.className} key={item.label}><strong>{item.value}</strong><span>{item.label}</span></div>)}</div>;
 }
@@ -242,7 +243,7 @@ function DocumentBlock({ item, side, table }: {
       <article className={`document-page-block ${side} table${tableMissing ? " missing" : ""}`} role="cell">
         <div className="document-block-meta">
           <small>{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
-          {item.kind !== "unchanged" && <span>{changeKindLabel(item.kind, language)}</span>}
+          {(item.kind !== "unchanged" || item.moved) && <span>{changeKindLabel(item.kind, language)}{item.moved && item.kind !== "moved" ? ` · ${language === "en" ? "Moved" : "이동"}` : ""}</span>}
         </div>
         <DocumentTable table={table} side={side} />
       </article>
@@ -256,7 +257,7 @@ function DocumentBlock({ item, side, table }: {
     <article className={`document-page-block ${side} ${item.section}${isMissing ? " missing" : ""}`} role="cell">
       <div className="document-block-meta">
         <small>{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
-        {item.kind !== "unchanged" && <span>{changeKindLabel(item.kind, language)}</span>}
+        {(item.kind !== "unchanged" || item.moved) && <span>{changeKindLabel(item.kind, language)}{item.moved && item.kind !== "moved" ? ` · ${language === "en" ? "Moved" : "이동"}` : ""}</span>}
       </div>
       {isMissing
         ? <p className="document-missing-copy">{item.kind === "added" ? (language === "en" ? "Added item" : "추가된 항목") : (language === "en" ? "Deleted item" : "삭제된 항목")}</p>
@@ -357,7 +358,8 @@ function SideDiffText({ segments, side, fallback }: {
   side: "before" | "after";
   fallback: string;
 }) {
-  const visible = segments.filter((segment) => segment.type === "equal" || segment.type === (side === "before" ? "deleted" : "added"));
+  const changeType = side === "before" ? "deleted" : "added";
+  const visible = mergeSideSegments(segments.filter((segment) => segment.type === "equal" || segment.type === changeType), changeType);
   if (!visible.length) return <>{fallback}</>;
   return <>{visible.map((segment, index) => {
     if (segment.type === "deleted") return <span className="page-diff-delete" key={`${segment.type}-${index}`}>{segment.text}</span>;
@@ -366,7 +368,24 @@ function SideDiffText({ segments, side, fallback }: {
   })}</>;
 }
 
+function mergeSideSegments(segments: WordDiffSegment[], changeType: "added" | "deleted") {
+  const merged: WordDiffSegment[] = [];
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    const next = segments[index + 1];
+    const previous = merged.at(-1);
+    if (segment.type === "equal" && /^\s+$/u.test(segment.text) && previous?.type === changeType && next?.type === changeType) {
+      previous.text += segment.text + next.text;
+      index += 1;
+      continue;
+    }
+    if (previous?.type === segment.type) previous.text += segment.text;
+    else merged.push({ ...segment });
+  }
+  return merged;
+}
+
 function changeKindLabel(kind: WordDocumentViewItem["kind"], language: "ko" | "en") {
-  if (language === "en") return kind === "added" ? "Added" : kind === "deleted" ? "Deleted" : kind === "format" ? "Formatting changed" : kind === "comment" ? "Comment changed" : kind === "changed" ? "Content changed" : "Unchanged";
-  return kind === "added" ? "추가" : kind === "deleted" ? "삭제" : kind === "format" ? "서식 변경" : kind === "comment" ? "메모 변경" : kind === "changed" ? "내용 변경" : "변경 없음";
+  if (language === "en") return kind === "added" ? "Added" : kind === "deleted" ? "Deleted" : kind === "format" ? "Formatting changed" : kind === "comment" ? "Comment changed" : kind === "changed" ? "Content changed" : kind === "moved" ? "Moved" : "Unchanged";
+  return kind === "added" ? "추가" : kind === "deleted" ? "삭제" : kind === "format" ? "서식 변경" : kind === "comment" ? "메모 변경" : kind === "changed" ? "내용 변경" : kind === "moved" ? "이동" : "변경 없음";
 }

@@ -11,6 +11,8 @@
     "build": "tsc -b && vite build && node --experimental-strip-types scripts/generate-static-pages.mjs",
     "preview": "vite preview",
     "test:browser": "node tests/browser-smoke.mjs",
+    "test:office": "node tests/office-editor-smoke.mjs",
+    "test:xls-preserve": "node tests/xls-preserve-smoke.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
@@ -43,6 +45,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "luxon": "^3.7.2",
+    "legacy-word-doc-reader": "github:Alpaq92/JSDoc#821695a884e0c0bb8592a635d9524bb3e116cd67",
     "officecrypto-tool": "^0.0.19",
     "papaparse": "^5.5.4",
     "pdf-lib": "^1.17.1",
@@ -62,7 +65,8 @@
     "vite-plugin-node-polyfills": "^0.28.0",
     "wavesurfer.js": "^7.12.11",
     "world-atlas": "^2.0.2",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zetajs": "1.2.0"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.1",

@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { useLocation } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { FileShareButton } from "../../components/FileShareButton";
@@ -36,6 +37,10 @@ import {
 } from "../../components/ui";
 import { inspectExcelFiles, mergeExcelFiles } from "./excelWorkerClient";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
+import { stripLanguagePrefix } from "../../i18n/languages";
+import { useLocalizedPath } from "../../i18n/routing";
+import { prepareOfficeAssets } from "../office-editor/officeAssetLoader";
+import { launchOfficeRuntime, type OfficeRuntime } from "../office-editor/officeRuntime";
 import type { ExcelInspectionResult, ExcelMergeResult, MergeMode, SheetNameRule, SheetSelectionMode } from "./types";
 
 type InspectionState = "checking" | "ready" | "error";
@@ -43,6 +48,8 @@ type InspectionState = "checking" | "ready" | "error";
 interface ExcelFileEntry {
   id: string;
   file: File;
+  processingFile?: File;
+  preservedLegacy?: boolean;
   inspection: InspectionState;
   encrypted: boolean;
   password: string;
@@ -63,6 +70,10 @@ let fileIdSequence = 0;
 export function ExcelMergerPage() {
   const { t, i18n } = useTranslation("features");
   const language = i18n.resolvedLanguage === "en" ? "en" : "ko";
+  const location = useLocation();
+  const preserveLegacyXls = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") === "/tools/excel-merger/xls-preserve";
+  const standardPath = useLocalizedPath("/tools/excel-merger/");
+  const preservePath = useLocalizedPath("/tools/excel-merger/xls-preserve/");
   const [entries, setEntries] = useState<ExcelFileEntry[]>([]);
   const [mergeMode, setMergeMode] = useState<MergeMode>("sheets");
   const [onlyValues, setOnlyValues] = useState(false);
@@ -81,14 +92,20 @@ export function ExcelMergerPage() {
   const [showOutputPassword, setShowOutputPassword] = useState(false);
   const [outputName, setOutputName] = useState(() => t("excel.defaultName"));
   const [loading, setLoading] = useState(false);
+  const [precisionPreparing, setPrecisionPreparing] = useState(false);
   const operation = useOperationProgress();
   const [error, setError] = useState<string | null>(null);
   const [fileNotice, setFileNotice] = useState<string | null>(null);
   const [result, setResult] = useState<DownloadResult | null>(null);
   const mergeControllerRef = useRef<AbortController | undefined>(undefined);
+  const precisionControllerRef = useRef<AbortController | undefined>(undefined);
+  const converterCanvasRef = useRef<HTMLCanvasElement>(null);
+  const officeRuntimeRef = useRef<OfficeRuntime | undefined>(undefined);
+  const assetUiRef = useRef({ fileNumber: 0, percent: -1 });
 
   useEffect(() => () => {
     mergeControllerRef.current?.abort();
+    precisionControllerRef.current?.abort();
     if (result?.url) URL.revokeObjectURL(result.url);
   }, [result?.url]);
 
@@ -104,6 +121,7 @@ export function ExcelMergerPage() {
   })), [entries, sheetSelectionMode, sheetPositionPattern]);
   const selectedSheetCount = selectedSheetsByFile.reduce((total, item) => total + item.names.length, 0);
   const ready = entries.length > 0
+    && !precisionPreparing
     && !inspecting
     && !inspectionFailed
     && !missingInputPassword
@@ -116,6 +134,7 @@ export function ExcelMergerPage() {
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
   const handleFiles = (nextFiles: File[]) => {
+    if (precisionPreparing) return;
     const accepted: File[] = [];
     const rejected: string[] = [];
     const existingKeys = new Set(entries.map((entry) => fileKey(entry.file)));
@@ -148,6 +167,14 @@ export function ExcelMergerPage() {
     clearResult();
     setError(null);
 
+    const legacyAdditions = preserveLegacyXls
+      ? additions.filter((entry) => getExtension(entry.file.name) === "xls")
+      : [];
+    if (legacyAdditions.length) {
+      void prepareLegacyInputs(additions, legacyAdditions);
+      return;
+    }
+
     void inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {
         const byId = new Map(inspectionResults.map((item) => [item.id, item]));
@@ -164,8 +191,90 @@ export function ExcelMergerPage() {
       });
   };
 
+  const prepareLegacyInputs = async (additions: ExcelFileEntry[], legacyAdditions: ExcelFileEntry[]) => {
+    const controller = new AbortController();
+    precisionControllerRef.current = controller;
+    setPrecisionPreparing(true);
+    assetUiRef.current = { fileNumber: 0, percent: -1 };
+    operation.start(t("excel.xlsPreserve.status.checking"));
+    try {
+      if (!crossOriginIsolated || typeof SharedArrayBuffer === "undefined" || !converterCanvasRef.current) {
+        throw new Error("isolation-required");
+      }
+      let runtime = officeRuntimeRef.current;
+      if (!runtime) {
+        const assetBaseUrl = await prepareOfficeAssets(({ loaded, total, fileNumber, fileCount, cached }) => {
+          const percent = Math.max(2, Math.min(74, Math.round((loaded / Math.max(1, total)) * 74)));
+          if (assetUiRef.current.fileNumber === fileNumber && assetUiRef.current.percent === percent) return;
+          const message = cached
+            ? t("excel.xlsPreserve.status.cached", { fileNumber, fileCount })
+            : t("excel.xlsPreserve.status.downloading", { loaded: formatBytes(loaded), total: formatBytes(total), fileNumber, fileCount });
+          if (assetUiRef.current.fileNumber === fileNumber) operation.updateCurrent(percent, message);
+          else operation.update(percent, message);
+          assetUiRef.current = { fileNumber, percent };
+        }, controller.signal);
+        operation.update(78, t("excel.xlsPreserve.status.preparing"));
+        runtime = await launchOfficeRuntime(converterCanvasRef.current, assetBaseUrl);
+        officeRuntimeRef.current = runtime;
+      } else {
+        operation.update(78, t("excel.xlsPreserve.status.reusing"));
+      }
+
+      const convertedById = new Map<string, File>();
+      for (let index = 0; index < legacyAdditions.length; index += 1) {
+        if (controller.signal.aborted) throw controller.signal.reason ?? new DOMException("Cancelled", "AbortError");
+        const entry = legacyAdditions[index];
+        const progress = 80 + Math.round((index / Math.max(1, legacyAdditions.length)) * 14);
+        operation.update(progress, t("excel.xlsPreserve.status.converting", { current: index + 1, total: legacyAdditions.length, name: entry.file.name }));
+        const converted = await runtime.convertLegacySpreadsheet(entry.file);
+        convertedById.set(entry.id, new File([converted.bytes], converted.fileName, {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          lastModified: entry.file.lastModified,
+        }));
+      }
+      if (controller.signal.aborted) throw controller.signal.reason ?? new DOMException("Cancelled", "AbortError");
+      const prepared = additions.map((entry) => {
+        const processingFile = convertedById.get(entry.id);
+        return processingFile ? { ...entry, processingFile, preservedLegacy: true } : entry;
+      });
+      setEntries((current) => current.map((entry) => prepared.find((item) => item.id === entry.id) ?? entry));
+      operation.update(96, t("excel.xlsPreserve.status.inspecting"));
+      const inspectionResults = await inspectExcelFiles(prepared.map((entry) => ({
+        id: entry.id,
+        file: entry.processingFile ?? entry.file,
+        displayName: entry.file.name,
+        preservedLegacy: entry.preservedLegacy,
+        csvEncoding,
+      })), language);
+      const byId = new Map(inspectionResults.map((item) => [item.id, item]));
+      setEntries((current) => current.map((entry) => {
+        const inspectionResult = byId.get(entry.id);
+        if (!inspectionResult) return entry;
+        return applyInspectionResult(entry, inspectionResult);
+      }));
+      operation.succeed(t("excel.xlsPreserve.status.ready", { count: legacyAdditions.length }));
+    } catch (reason) {
+      const message = xlsPreserveError(reason, language);
+      setEntries((current) => current.map((entry) => additions.some((item) => item.id === entry.id)
+        ? { ...entry, inspection: "error", error: message }
+        : entry));
+      setError(message);
+      operation.fail(message);
+    } finally {
+      setPrecisionPreparing(false);
+      if (precisionControllerRef.current === controller) precisionControllerRef.current = undefined;
+    }
+  };
+
+  const changePreserveMode = (enabled: boolean) => {
+    if (enabled === preserveLegacyXls || precisionPreparing || loading) return;
+    if (entries.length > 0 && !window.confirm(t("excel.xlsPreserve.switchConfirm"))) return;
+    window.location.assign(enabled ? preservePath : standardPath);
+  };
+
   const removeFile = (id: string) => {
     setEntries((current) => current.filter((entry) => entry.id !== id));
+    setError(null);
     clearResult();
   };
 
@@ -189,7 +298,13 @@ export function ExcelMergerPage() {
     const entry = entries.find((item) => item.id === id);
     if (!entry || !password) return;
     setEntries((current) => current.map((item) => item.id === id ? { ...item, inspection: "checking", error: undefined } : item));
-    void inspectExcelFiles([{ id, file: entry.file, password }], language).then(([inspectionResult]) => {
+    void inspectExcelFiles([{
+      id,
+      file: entry.processingFile ?? entry.file,
+      displayName: entry.file.name,
+      preservedLegacy: entry.preservedLegacy,
+      password,
+    }], language).then(([inspectionResult]) => {
       setEntries((current) => current.map((item) => item.id === id ? applyInspectionResult(item, inspectionResult, true) : item));
     }).catch((inspectionError: Error) => {
       setEntries((current) => current.map((item) => item.id === id
@@ -233,7 +348,9 @@ export function ExcelMergerPage() {
       const merged = await mergeExcelFiles(
         mergeEntries.map(({ entry, selectedSheetNames }) => ({
           id: entry.id,
-          file: entry.file,
+          file: entry.processingFile ?? entry.file,
+          displayName: entry.file.name,
+          preservedLegacy: entry.preservedLegacy,
           password: entry.password || undefined,
           selectedSheetNames,
           csvEncoding,
@@ -317,7 +434,7 @@ export function ExcelMergerPage() {
               onFiles={handleFiles}
               accent="green"
             />
-            <div className="inline-notice"><Info size={15} /><span>{t("excel.steps.files.notice")}</span></div>
+            <div className="inline-notice"><Info size={15} /><span>{t(preserveLegacyXls ? "excel.steps.files.preserveNotice" : "excel.steps.files.notice")}</span></div>
             {fileNotice && <div className="inline-notice warning"><AlertCircle size={15} /><span>{fileNotice}</span></div>}
             <ExcelFileList
               entries={entries}
@@ -381,67 +498,97 @@ export function ExcelMergerPage() {
           </SectionCard>
 
           <SectionCard step={4} title={t("excel.steps.output.title")} description={t("excel.steps.output.description")}>
-            <div className="settings-list">
-              <ToggleRow
-                label={t("excel.output.valuesLabel")}
-                description={t(onlyValues ? "excel.output.valuesOn" : "excel.output.valuesOff")}
-                checked={onlyValues}
-                onChange={(checked) => { setOnlyValues(checked); clearResult(); }}
-              />
-              <ToggleRow
-                label={t("excel.output.trimEdges")}
-                description={t("excel.output.trimEdgesHelp")}
-                checked={trimEmptyEdges}
-                onChange={(checked) => { setTrimEmptyEdges(checked); clearResult(); }}
-              />
-              <ToggleRow
-                label={t("excel.output.trimRows")}
-                description={t("excel.output.trimRowsHelp")}
-                checked={sheetTrimRows}
-                onChange={(checked) => { setSheetTrimRows(checked); clearResult(); }}
-              />
-              <ToggleRow
-                label={t("excel.output.trimColumns")}
-                description={t("excel.output.trimColumnsHelp")}
-                checked={sheetTrimColumns}
-                onChange={(checked) => { setSheetTrimColumns(checked); clearResult(); }}
-              />
-              <label className="settings-row select-row sheet-trim-threshold">
-                <span><strong>{t("excel.output.trimThreshold")}</strong><small>{t("excel.output.trimThresholdHelp")}</small></span>
-                <span className="number-input-with-unit">
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    inputMode="numeric"
-                    value={sheetTrimThreshold}
-                    disabled={!sheetTrimRows && !sheetTrimColumns}
-                    onChange={(event) => {
-                      const next = Number(event.target.value);
-                      if (Number.isFinite(next)) setSheetTrimThreshold(Math.max(1, Math.floor(next)));
-                      clearResult();
-                    }}
-                    aria-label={t("excel.output.trimThresholdAria")}
+            <div className="settings-categories">
+              <section className="settings-category">
+                <h3>{t("excel.output.categories.cellContent")}</h3>
+                <div className="settings-list">
+                  <ToggleRow
+                    label={t("excel.output.valuesLabel")}
+                    description={t(onlyValues ? "excel.output.valuesOn" : "excel.output.valuesOff")}
+                    checked={onlyValues}
+                    onChange={(checked) => { setOnlyValues(checked); clearResult(); }}
                   />
-                  <small>{t("excel.output.orMore")}</small>
-                </span>
-              </label>
-              <label className="settings-row select-row">
-                <span><strong>{t("excel.output.skipHeaders")}</strong><small>{t("excel.output.skipHeadersHelp")}</small></span>
-                <span className="number-input-with-unit"><input type="number" min={0} step={1} inputMode="numeric" value={skipHeaderRows} disabled={mergeMode !== "vertical"} onChange={(event) => { setSkipHeaderRows(Math.max(0, Math.floor(Number(event.target.value) || 0))); clearResult(); }} /><small>{t("excel.output.rows")}</small></span>
-              </label>
-              <label className="settings-row select-row">
-                <span><strong>{t("excel.output.csvEncoding")}</strong><small>{t("excel.output.csvEncodingHelp")}</small></span>
-                <select value={csvEncoding} onChange={(event) => { setCsvEncoding(event.target.value as "auto" | "utf-8" | "euc-kr"); clearResult(); }}><option value="auto">{t("excel.output.csvAuto")}</option><option value="utf-8">UTF-8</option><option value="euc-kr">CP949 / EUC-KR</option></select>
-              </label>
-              <label className="settings-row select-row">
-                <span><strong>{t("excel.output.sheetNameRule")}</strong><small>{t("excel.output.sheetNameRuleHelp")}</small></span>
-                <select value={sheetNameRule} disabled={mergeMode !== "sheets"} onChange={(event) => setSheetNameRule(event.target.value as SheetNameRule)}>
-                  <option value="file-sheet">{t("excel.output.fileSheet")}</option>
-                  <option value="sheet-file">{t("excel.output.sheetFile")}</option>
-                  <option value="sheet">{t("excel.output.originalSheet")}</option>
-                </select>
-              </label>
+                  <label className="settings-row select-row">
+                    <span><strong>{t("excel.output.csvEncoding")}</strong><small>{t("excel.output.csvEncodingHelp")}</small></span>
+                    <select value={csvEncoding} onChange={(event) => { setCsvEncoding(event.target.value as "auto" | "utf-8" | "euc-kr"); clearResult(); }}><option value="auto">{t("excel.output.csvAuto")}</option><option value="utf-8">UTF-8</option><option value="euc-kr">CP949 / EUC-KR</option></select>
+                  </label>
+                </div>
+              </section>
+
+              <section className="settings-category">
+                <h3>{t("excel.output.categories.xlsInput")}</h3>
+                <div className="settings-list">
+                  <ToggleRow
+                    label={t("excel.xlsPreserve.label")}
+                    description={t(preserveLegacyXls ? "excel.xlsPreserve.onHelp" : "excel.xlsPreserve.offHelp")}
+                    checked={preserveLegacyXls}
+                    onChange={changePreserveMode}
+                    disabled={precisionPreparing || loading}
+                  />
+                </div>
+              </section>
+
+              <section className="settings-category">
+                <h3>{t("excel.output.categories.emptyAreas")}</h3>
+                <div className="settings-list">
+                  <ToggleRow
+                    label={t("excel.output.trimEdges")}
+                    description={t("excel.output.trimEdgesHelp")}
+                    checked={trimEmptyEdges}
+                    onChange={(checked) => { setTrimEmptyEdges(checked); clearResult(); }}
+                  />
+                  <ToggleRow
+                    label={t("excel.output.trimRows")}
+                    description={t("excel.output.trimRowsHelp")}
+                    checked={sheetTrimRows}
+                    onChange={(checked) => { setSheetTrimRows(checked); clearResult(); }}
+                  />
+                  <ToggleRow
+                    label={t("excel.output.trimColumns")}
+                    description={t("excel.output.trimColumnsHelp")}
+                    checked={sheetTrimColumns}
+                    onChange={(checked) => { setSheetTrimColumns(checked); clearResult(); }}
+                  />
+                  <label className="settings-row select-row sheet-trim-threshold">
+                    <span><strong>{t("excel.output.trimThreshold")}</strong><small>{t("excel.output.trimThresholdHelp")}</small></span>
+                    <span className="number-input-with-unit">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        value={sheetTrimThreshold}
+                        disabled={!sheetTrimRows && !sheetTrimColumns}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          if (Number.isFinite(next)) setSheetTrimThreshold(Math.max(1, Math.floor(next)));
+                          clearResult();
+                        }}
+                        aria-label={t("excel.output.trimThresholdAria")}
+                      />
+                      <small>{t("excel.output.orMore")}</small>
+                    </span>
+                  </label>
+                </div>
+              </section>
+
+              <section className="settings-category">
+                <h3>{t("excel.output.categories.mergeDetails")}</h3>
+                <div className="settings-list">
+                  <label className="settings-row select-row">
+                    <span><strong>{t("excel.output.skipHeaders")}</strong><small>{t("excel.output.skipHeadersHelp")}</small></span>
+                    <span className="number-input-with-unit"><input type="number" min={0} step={1} inputMode="numeric" value={skipHeaderRows} disabled={mergeMode !== "vertical"} onChange={(event) => { setSkipHeaderRows(Math.max(0, Math.floor(Number(event.target.value) || 0))); clearResult(); }} /><small>{t("excel.output.rows")}</small></span>
+                  </label>
+                  <label className="settings-row select-row">
+                    <span><strong>{t("excel.output.sheetNameRule")}</strong><small>{t("excel.output.sheetNameRuleHelp")}</small></span>
+                    <select value={sheetNameRule} disabled={mergeMode !== "sheets"} onChange={(event) => setSheetNameRule(event.target.value as SheetNameRule)}>
+                      <option value="file-sheet">{t("excel.output.fileSheet")}</option>
+                      <option value="sheet-file">{t("excel.output.sheetFile")}</option>
+                      <option value="sheet">{t("excel.output.originalSheet")}</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
             </div>
 
             <div className="output-name-field">
@@ -493,6 +640,7 @@ export function ExcelMergerPage() {
               {loading ? t("excel.summary.processing", { progress: operation.progress }) : t("excel.summary.merge")}
             </PrimaryButton>
             {loading && <button type="button" className="secondary-button" onClick={() => mergeControllerRef.current?.abort()}>{t("excel.summary.cancel")}</button>}
+            {precisionPreparing && <button type="button" className="secondary-button" onClick={() => precisionControllerRef.current?.abort()}>{t("excel.xlsPreserve.cancel")}</button>}
             {!loading && inspecting && <p className="prototype-note">{t("excel.summary.inspecting")}</p>}
             {!loading && inspectionFailed && <p className="prototype-note error-text">{t("excel.summary.inspectionFailed")}</p>}
             {!loading && !result && missingInputPassword && <p className="prototype-note error-text">{t("excel.summary.inputPassword")}</p>}
@@ -531,6 +679,7 @@ export function ExcelMergerPage() {
         blocks={t("excel.guide.blocks", { returnObjects: true }) as Array<{ title: string; paragraphs: string[]; items?: string[] }>}
         faq={(t("excel.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map(({ q, a }) => ({ question: q, answer: a }))}
       />
+      {preserveLegacyXls && <canvas ref={converterCanvasRef} id="qtcanvas" className="excel-converter-canvas" aria-hidden="true" />}
     </div>
   );
 }
@@ -694,6 +843,40 @@ function PasswordField({ label, value, onChange, visible, onVisibilityChange, to
 
 function fileKey(file: File) {
   return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function getExtension(fileName: string) {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function xlsPreserveError(reason: unknown, language: "ko" | "en") {
+  if (reason instanceof DOMException && reason.name === "AbortError") {
+    return language === "en" ? "XLS preparation was cancelled." : "XLS 보존 준비를 취소했습니다.";
+  }
+  const code = reason instanceof Error ? reason.message : "";
+  if (code === "isolation-required") {
+    return language === "en"
+      ? "This browser session cannot prepare XLS preservation. Reload this page in a current Chrome or Edge browser."
+      : "현재 브라우저 환경에서 XLS 보존을 준비할 수 없습니다. 최신 Chrome 또는 Edge에서 이 페이지를 다시 열어 주세요.";
+  }
+  if (code === "cache-unavailable") {
+    return language === "en"
+      ? "Browser storage is unavailable. Allow site storage and try again."
+      : "브라우저 저장 공간을 사용할 수 없습니다. 사이트 저장을 허용한 뒤 다시 시도해 주세요.";
+  }
+  if (code === "asset-download-failed") {
+    return language === "en"
+      ? "The files needed for XLS preservation could not be downloaded. Check your connection and available storage, then try again."
+      : "XLS 보존에 필요한 파일을 내려받지 못했습니다. 인터넷 연결과 저장 공간을 확인한 뒤 다시 시도해 주세요.";
+  }
+  if (code === "office-operation-timeout") {
+    return language === "en"
+      ? "XLS conversion took longer than expected. Keep this tab open and try again."
+      : "XLS 변환 시간이 예상보다 길어 중단했습니다. 이 탭을 유지한 채 다시 시도해 주세요.";
+  }
+  return language === "en"
+    ? "The XLS file could not be prepared. Check that it is not damaged or password-protected, then try again."
+    : "XLS 파일을 준비하지 못했습니다. 파일이 손상되지 않았는지, 암호로 보호되지 않았는지 확인한 뒤 다시 시도해 주세요.";
 }
 
 function resolveSelectedSheetNames(entry: ExcelFileEntry, mode: SheetSelectionMode, pattern: string) {

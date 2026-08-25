@@ -429,7 +429,7 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
 }
 
 async function testWordCompare(page, fixtures, tempDir) {
-  await navigateTo(page, `${koBaseUrl}/tools/word-compare/`);
+  await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
   await dropFiles(page, ".drop-zone", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
   await dropFiles(page, ".drop-zone", [fixtures.afterDocx], 1);
   await page.waitForSelector(".pair-count-error");
@@ -479,7 +479,7 @@ async function testWordCompare(page, fixtures, tempDir) {
 
   await page.click(".tool-action-bar .primary-button");
   await waitForResult(page, 240_000);
-  await assertProgressLog(page, "Word 비교");
+  await assertProgressLog(page, "문서 비교");
   const resultCards = await page.$$(".word-pair-result-card");
   if (resultCards.length !== 2) throw new Error(`Expected 2 Word pair results, got ${resultCards.length}.`);
   if (await page.$$(".word-pair-result-card .blue-download").then((items) => items.length) !== 2) {
@@ -542,7 +542,7 @@ async function testWordCompare(page, fixtures, tempDir) {
   await assertTrackedDocument(secondTrackedPath, fixtures.beforeDocxTwo, fixtures.afterDocxTwo, false);
 
   await page.click(".word-pair-result-card .secondary-button");
-  await page.waitForFunction(() => location.pathname.endsWith("/tools/word-compare/results/1")
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1")
     && document.querySelector("h1")?.textContent?.includes("1번 문서 비교"));
   const detailHeading = await page.$eval("h1", (element) => element.textContent || "");
   if (!detailHeading.includes("1번 문서 비교")) throw new Error(`Pair result view did not open: ${detailHeading}`);
@@ -599,7 +599,7 @@ async function testWordCompare(page, fixtures, tempDir) {
     link.click();
   });
   try {
-    await page.waitForFunction(() => location.pathname.replace(/\/$/, "").endsWith("/tools/word-compare")
+    await page.waitForFunction(() => location.pathname.replace(/\/$/, "").endsWith("/tools/document-compare")
       && document.querySelectorAll(".word-pair-result-card").length === 2, { timeout: 15_000 });
   } catch (error) {
     const state = await page.evaluate(() => ({
@@ -614,7 +614,7 @@ async function testWordCompare(page, fixtures, tempDir) {
   if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 2) throw new Error("Pair results were lost after returning from detail view.");
   await page.click(".word-pair-result-card:nth-child(2) .secondary-button");
   try {
-    await page.waitForFunction(() => location.pathname.endsWith("/tools/word-compare/results/2")
+    await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2")
       && document.querySelector("h1")?.textContent?.includes("2번 문서 비교")
       && document.querySelectorAll(".document-page-row").length > 0, { timeout: 15_000 });
   } catch (error) {

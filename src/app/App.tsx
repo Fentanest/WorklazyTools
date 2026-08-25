@@ -4,10 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { AppShell } from "../components/AppShell";
 import { ExcelMergerPage } from "../features/excel-merger/ExcelMergerPage";
-import { WordComparePage } from "../features/word-compare/WordComparePage";
-import { WordCompareResultPage } from "../features/word-compare/WordCompareResultPage";
-import { WordCompareSessionProvider } from "../features/word-compare/wordCompareSession";
-import { HwpCompareSessionProvider } from "../features/hwp-compare/hwpCompareSession";
+import { DocumentCompareSessionProvider } from "../features/document-compare/documentCompareSession";
 import { AboutPage } from "../pages/AboutPage";
 import { ContactPage } from "../pages/ContactPage";
 import { HomePage } from "../pages/HomePage";
@@ -22,8 +19,8 @@ import { isAppLanguage } from "../i18n/languages";
 
 const PdfEditorPage = lazy(() => import("../features/pdf-editor/PdfEditorPage").then((module) => ({ default: module.PdfEditorPage })));
 const HwpEditorPage = lazy(() => import("../features/hwp-editor/HwpEditorPage").then((module) => ({ default: module.HwpEditorPage })));
-const HwpComparePage = lazy(() => import("../features/hwp-compare/HwpComparePage").then((module) => ({ default: module.HwpComparePage })));
-const HwpCompareResultPage = lazy(() => import("../features/hwp-compare/HwpCompareResultPage").then((module) => ({ default: module.HwpCompareResultPage })));
+const DocumentComparePage = lazy(() => import("../features/document-compare/DocumentComparePage").then((module) => ({ default: module.DocumentComparePage })));
+const DocumentCompareResultPage = lazy(() => import("../features/document-compare/DocumentCompareResultPage").then((module) => ({ default: module.DocumentCompareResultPage })));
 const VideoStudioPage = lazy(() => import("../features/video-studio/VideoStudioPage").then((module) => ({ default: module.VideoStudioPage })));
 const AudioStudioPage = lazy(() => import("../features/audio-studio/AudioStudioPage").then((module) => ({ default: module.AudioStudioPage })));
 const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioPage").then((module) => ({ default: module.ImageStudioPage })));
@@ -36,6 +33,8 @@ const ImagePrivacyPage = lazy(() => import("../features/image-privacy/ImagePriva
 const SecurityToolsPage = lazy(() => import("../features/security-tools/SecurityToolsPage").then((module) => ({ default: module.SecurityToolsPage })));
 const QrStudioPage = lazy(() => import("../features/qr-studio/QrStudioPage").then((module) => ({ default: module.QrStudioPage })));
 const DataConverterPage = lazy(() => import("../features/data-converter/DataConverterPage").then((module) => ({ default: module.DataConverterPage })));
+const OfficeEditorPage = lazy(() => import("../features/office-editor/OfficeEditorPage").then((module) => ({ default: module.OfficeEditorPage })));
+const OfficeEditorAppPage = lazy(() => import("../features/office-editor/OfficeEditorAppPage").then((module) => ({ default: module.OfficeEditorAppPage })));
 
 export function App() {
   return (
@@ -46,20 +45,21 @@ export function App() {
           <Route index element={<HomePage />} />
           <Route path="tools" element={<ToolsPage />} />
           <Route path="tools/excel-merger" element={<ExcelMergerPage />} />
+          <Route path="tools/excel-merger/xls-preserve" element={<ExcelMergerPage />} />
           <Route path="tools/pdf-editor" element={<PdfRoute mode="organize" />} />
           <Route path="tools/pdf-editor/split" element={<LocalizedNavigate to="/tools/pdf-editor" />} />
           <Route path="tools/pdf-editor/image-to-pdf" element={<PdfRoute mode="image-to-pdf" />} />
           <Route path="tools/pdf-editor/pdf-to-image" element={<PdfRoute mode="pdf-to-image" />} />
           <Route path="tools/pdf-editor/convert" element={<PdfRoute mode="convert" />} />
-          <Route path="tools/word-compare" element={<WordCompareSessionProvider />}>
-            <Route index element={<WordComparePage />} />
-            <Route path="results/:pairNumber" element={<WordCompareResultPage />} />
+          <Route path="tools/document-compare" element={<DocumentCompareSessionProvider />}>
+            <Route index element={<LazyToolRoute label="Document compare"><DocumentComparePage /></LazyToolRoute>} />
+            <Route path="results/:pairNumber" element={<LazyToolRoute label="Document comparison results"><DocumentCompareResultPage /></LazyToolRoute>} />
           </Route>
-          <Route path="tools/hwp-compare" element={<HwpCompareSessionProvider />}>
-            <Route index element={<LazyToolRoute label="HWP compare"><HwpComparePage /></LazyToolRoute>} />
-            <Route path="results/:pairNumber" element={<LazyToolRoute label="HWP comparison results"><HwpCompareResultPage /></LazyToolRoute>} />
-          </Route>
+          <Route path="tools/word-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
+          <Route path="tools/hwp-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
           <Route path="tools/hwp-editor" element={<KoreanOnlyRoute><LazyToolRoute label="HWP editor"><HwpEditorPage /></LazyToolRoute></KoreanOnlyRoute>} />
+          <Route path="tools/office-editor" element={<LazyToolRoute label="Office editor"><OfficeEditorPage /></LazyToolRoute>} />
+          <Route path="tools/office-editor/app" element={<LazyToolRoute label="Office editor workspace"><OfficeEditorAppPage /></LazyToolRoute>} />
           <Route path="tools/video-studio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage /></LazyToolRoute>} />
           <Route path="tools/audio-studio" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage /></LazyToolRoute>} />
           <Route path="tools/image-studio" element={<LazyToolRoute label="Image Studio"><ImageStudioPage /></LazyToolRoute>} />

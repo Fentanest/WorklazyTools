@@ -57,6 +57,20 @@ export function useOperationProgress() {
     append(nextProgress, nextMessage, "running");
   }, [append]);
 
+  const updateCurrent = useCallback((nextProgress: number, nextMessage: string) => {
+    const normalizedProgress = Math.max(0, Math.min(100, Math.round(nextProgress)));
+    const elapsedMs = startedAt.current ? performance.now() - startedAt.current : 0;
+    progressRef.current = normalizedProgress;
+    setProgress(normalizedProgress);
+    setMessage(nextMessage);
+    setStatus("running");
+    setLogs((current) => {
+      const last = current.at(-1);
+      if (!last) return [{ id: nextId.current++, message: nextMessage, progress: normalizedProgress, elapsedMs, status: "running" }];
+      return [...current.slice(0, -1), { ...last, message: nextMessage, progress: normalizedProgress, elapsedMs, status: "running" }];
+    });
+  }, []);
+
   const succeed = useCallback((successMessage = t("status.complete")) => {
     append(100, successMessage, "success");
   }, [append, t]);
@@ -74,5 +88,5 @@ export function useOperationProgress() {
     setLogs([]);
   }, []);
 
-  return { status, progress, message, logs, start, update, succeed, fail, reset };
+  return { status, progress, message, logs, start, update, updateCurrent, succeed, fail, reset };
 }

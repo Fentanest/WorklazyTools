@@ -228,7 +228,7 @@ export function WordComparePage() {
         </SectionCard>
       </div>
 
-      <div className="comparison-prepare-note"><Info size={16} /><span><strong>{L("오프라인에서 사이트를 처음 열면 비교를 시작할 수 없습니다.", "Comparison cannot start on a first visit while offline.")}</strong><small>{L("비교 실행 환경은 Worklazy Tools 배포 파일에서만 불러오며 외부 CDN을 사용하지 않습니다. 실행 환경을 불러온 뒤 선택한 파일은 브라우저 안에서만 처리합니다.", "The comparison runtime is loaded only from this Worklazy Tools deployment, not an external CDN. Your selected files are then processed only in the browser.")}</small></span></div>
+      <div className="comparison-prepare-note"><Info size={16} /><span><strong>{L("오프라인에서 사이트를 처음 열면 비교를 시작할 수 없습니다.", "Comparison cannot start on a first visit while offline.")}</strong><small>{L("필요한 비교 파일을 이 사이트에서 준비한 뒤 선택한 문서는 브라우저 안에서만 처리합니다.", "After the required comparison files are prepared from this site, selected documents are processed only in your browser.")}</small></span></div>
 
       <div className="tool-action-bar">
         <div><TextSearch size={20} /><span><strong>{ready ? L(`${beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.`, `${beforeFiles.length} document pairs are ready.`) : pairingError ? L("양쪽 파일 개수를 맞춰 주세요.", "Use the same number of files on both sides.") : !hasOutput ? L("결과 형식을 하나 이상 선택해 주세요.", "Select at least one output format.") : L("수정 전·후 문서를 선택해 주세요.", "Choose before and after documents.")}</strong><small>{L("비교 중에도 화면을 계속 사용할 수 있습니다.", "You can continue using the page during comparison.")}</small></span></div>
@@ -271,7 +271,7 @@ export function WordComparePage() {
         description={L("여러 문서를 순서대로 짝지어 비교하고, 각 문서 쌍의 결과를 따로 확인할 수 있습니다.", "Pair documents by list order and review each pair separately.")}
         blocks={language === "en" ? [
           { title: "Creating document pairs", paragraphs: ["Add the same number of DOCX files to Before and After. Files are paired by list position; drag to reorder or use the side arrows to move a file."] },
-          { title: "First run and connectivity", paragraphs: ["The self-hosted browser runtime must be downloaded on the first run. Documents and results are never sent to a comparison server."] },
+          { title: "First run and connectivity", paragraphs: ["The required comparison files must be downloaded on the first run. Documents and results are never sent to a comparison server."] },
           { title: "Comparison scope", paragraphs: ["Body paragraphs are compared by default. Tables, formatting, headers, footers, comments, footnotes and endnotes can be included."] },
           { title: "Web, Excel and tracked Word output", paragraphs: ["Each pair can have an independent web view, an Excel report, and a DOCX with supported tracked insertions, deletions and formatting changes."] },
           { title: "Items to verify", paragraphs: ["Automatic numbering, fields, text in shapes and complex layouts may differ from Microsoft Word. Verify important results in the original documents."] },

@@ -122,6 +122,7 @@ function progress(value: number, message: string) {
 
 async function inspectFiles(files: ExcelInputPayload[]): Promise<ExcelInspectionResult[]> {
   return Promise.all(files.map(async (file) => {
+    const displayName = file.displayName ?? file.name;
     const encrypted = isEncryptedFile(file.name, new Uint8Array(file.buffer));
     if (encrypted && !file.password) return { id: file.id, encrypted: true, sheetNames: [] };
     try {
@@ -136,7 +137,7 @@ async function inspectFiles(files: ExcelInputPayload[]): Promise<ExcelInspection
         id: file.id,
         encrypted,
         sheetNames: [],
-        error: error instanceof Error ? error.message : local("시트 목록을 읽지 못했습니다.", "Could not read the sheet list."),
+        error: error instanceof Error ? error.message : local(`${displayName}의 시트 목록을 읽지 못했습니다.`, `Could not read the sheet list from ${displayName}.`),
       };
     }
   }));
@@ -146,7 +147,10 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
   if (!files.length) throw new ExcelWorkerError(local("병합할 파일이 없습니다.", "There are no files to merge."), "NO_FILES");
 
   const warnings = new Set<string>();
-  if (files.some((file) => ["xls", "xlsb", "xlsm"].includes(getExtension(file.name)))) {
+  if (files.some((file) => file.preservedLegacy)) {
+    warnings.add(local("XLS 입력을 호환 XLSX 구조로 먼저 변환해 수식과 일반 셀 서식을 보존했습니다. 차트·외부 연결·일부 고급 개체는 결과에서 확인해 주세요.", "Legacy XLS input was first converted to a compatible XLSX structure to preserve formulas and common cell formatting. Verify charts, external links and advanced objects in the result."));
+  }
+  if (files.some((file) => !file.preservedLegacy && ["xls", "xlsb", "xlsm"].includes(getExtension(file.name)))) {
     warnings.add(local("XLS·XLSB·XLSM 입력은 값과 기본 시트 구조를 XLSX로 변환합니다. 수식과 서식은 XLSX 입력에서만 보존됩니다.", "XLS, XLSB and XLSM inputs are converted to XLSX with values and basic sheet structure. Formulas and formatting are preserved only for XLSX inputs."));
   }
   if (files.some((file) => getExtension(file.name) === "xlsm")) {
@@ -157,7 +161,8 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
 
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
-    progress(5 + Math.round((index / files.length) * 35), local(`[${index + 1}/${files.length}] ${file.name} 읽는 중…`, `[${index + 1}/${files.length}] Reading ${file.name}…`));
+    const displayName = file.displayName ?? file.name;
+    progress(5 + Math.round((index / files.length) * 35), local(`[${index + 1}/${files.length}] ${displayName} 읽는 중…`, `[${index + 1}/${files.length}] Reading ${displayName}…`));
     const parsed = await parseInput(file);
     const selectedSheetNames = file.selectedSheetNames ?? parsed.workbook.worksheets.map((sheet) => sheet.name);
     parsed.selectedWorksheets = selectedSheetNames
@@ -165,10 +170,10 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
       .filter((sheet): sheet is ExcelJS.Worksheet => Boolean(sheet));
     if (options.trimEmptyEdges) parsed.incomingSheetReferences = buildIncomingSheetReferenceIndex(parsed.workbook);
     if (!parsed.selectedWorksheets.length) {
-      throw new ExcelWorkerError(local(`${file.name}에서 병합할 시트를 선택해 주세요.`, `Select at least one sheet from ${file.name}.`), "NO_SHEETS", file.name);
+      throw new ExcelWorkerError(local(`${displayName}에서 병합할 시트를 선택해 주세요.`, `Select at least one sheet from ${displayName}.`), "NO_SHEETS", displayName);
     }
     inputs.push(parsed);
-    progress(5 + Math.round(((index + 1) / files.length) * 35), local(`[${index + 1}/${files.length}] ${file.name} · ${parsed.selectedWorksheets.length}개 시트 선택`, `[${index + 1}/${files.length}] ${file.name} · ${parsed.selectedWorksheets.length} sheets selected`));
+    progress(5 + Math.round(((index + 1) / files.length) * 35), local(`[${index + 1}/${files.length}] ${displayName} · ${parsed.selectedWorksheets.length}개 시트 선택`, `[${index + 1}/${files.length}] ${displayName} · ${parsed.selectedWorksheets.length} sheets selected`));
   }
 
   progress(43, local("입력 분석 완료 · 출력 시트 구성을 시작합니다.", "Input analysis complete · Building the output sheets."));
@@ -265,43 +270,44 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
 
 async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
   const extension = getExtension(file.name);
+  const displayName = file.displayName ?? file.name;
   let data = new Uint8Array(file.buffer);
   const encrypted = isEncryptedFile(file.name, data);
 
   if (encrypted) {
     if (!file.password) {
-      throw new ExcelWorkerError(local(`${file.name}의 비밀번호를 입력해 주세요.`, `Enter the password for ${file.name}.`), "PASSWORD_REQUIRED", file.name);
+      throw new ExcelWorkerError(local(`${displayName}의 비밀번호를 입력해 주세요.`, `Enter the password for ${displayName}.`), "PASSWORD_REQUIRED", displayName);
     }
     try {
       data = new Uint8Array(await officeCrypto.decrypt(Buffer.from(data), { password: file.password }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (/password|incorrect|verify/i.test(message)) {
-        throw new ExcelWorkerError(local(`${file.name}의 비밀번호가 올바르지 않습니다.`, `The password for ${file.name} is incorrect.`), "WRONG_PASSWORD", file.name);
+        throw new ExcelWorkerError(local(`${displayName}의 비밀번호가 올바르지 않습니다.`, `The password for ${displayName} is incorrect.`), "WRONG_PASSWORD", displayName);
       }
-      throw new ExcelWorkerError(local(`${file.name}의 암호 방식을 지원하지 않거나 파일을 해제하지 못했습니다.`, `The encryption method for ${file.name} is unsupported or the file could not be decrypted.`), "DECRYPT_FAILED", file.name);
+      throw new ExcelWorkerError(local(`${displayName}의 암호 방식을 지원하지 않거나 파일을 해제하지 못했습니다.`, `The encryption method for ${displayName} is unsupported or the file could not be decrypted.`), "DECRYPT_FAILED", displayName);
     }
   }
 
   try {
-    if (extension === "csv") return { fileName: file.name, workbook: await readCsv(file.name, data, file.csvEncoding) };
+    if (extension === "csv") return { fileName: displayName, workbook: await readCsv(displayName, data, file.csvEncoding) };
     if (["xls", "xlsb", "xlsm"].includes(extension)) {
-      return { fileName: file.name, workbook: readConvertedWorkbook(data) };
+      return { fileName: displayName, workbook: readConvertedWorkbook(data) };
     }
     if (extension === "xlsx") {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(Buffer.from(data));
-      return { fileName: file.name, workbook };
+      return { fileName: displayName, workbook };
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     if (/password|encrypted|EncryptionInfo/i.test(detail)) {
-      throw new ExcelWorkerError(local(`${file.name}은 암호로 보호되어 있습니다. 비밀번호를 입력해 주세요.`, `${file.name} is password-protected. Enter its password.`), "PASSWORD_REQUIRED", file.name);
+      throw new ExcelWorkerError(local(`${displayName}은 암호로 보호되어 있습니다. 비밀번호를 입력해 주세요.`, `${displayName} is password-protected. Enter its password.`), "PASSWORD_REQUIRED", displayName);
     }
-    throw new ExcelWorkerError(local(`${file.name}을 읽지 못했습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다. (${detail})`, `Could not read ${file.name}. The file may be damaged or use an unsupported format. (${detail})`), "READ_FAILED", file.name);
+    throw new ExcelWorkerError(local(`${displayName}을 읽지 못했습니다. 파일 형식과 손상 여부를 확인해 주세요.`, `Could not read ${displayName}. Check the file format and whether the file is damaged.`), "READ_FAILED", displayName);
   }
 
-  throw new ExcelWorkerError(local(`${extension || "알 수 없는"} 형식은 지원하지 않습니다.`, `${extension || "Unknown"} format is not supported.`), "UNSUPPORTED_FORMAT", file.name);
+  throw new ExcelWorkerError(local(`${extension || "알 수 없는"} 형식은 지원하지 않습니다.`, `${extension || "Unknown"} format is not supported.`), "UNSUPPORTED_FORMAT", displayName);
 }
 
 async function readCsv(fileName: string, data: Uint8Array, encoding: ExcelInputPayload["csvEncoding"] = "auto") {

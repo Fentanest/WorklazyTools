@@ -1,22 +1,23 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
 
 const routes = [
-  "", "tools", "tools/excel-merger", "tools/word-compare",
+  "", "tools", "tools/excel-merger", "tools/document-compare",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
-  "tools/hwp-editor", "tools/hwp-compare", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
+  "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
   "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
 ];
 const socialSlugByRoute = {
-  "tools/excel-merger": "excel-merger", "tools/word-compare": "word-compare", "tools/pdf-editor": "pdf-tools",
+  "tools/excel-merger": "excel-merger", "tools/document-compare": "document-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
-  "tools/hwp-editor": "hwp-editor", "tools/hwp-compare": "hwp-compare", "tools/video-studio": "video-studio",
+  "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",
   "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-tools": "text-tools",
   "tools/text-formatter": "code-formatter", "tools/work-calculator": "workday-calculator", "tools/timezone-calculator": "world-time-planner",
   "tools/payroll-calculator": "payroll-calculator", "tools/image-privacy": "photo-metadata-remover", "tools/security-tools": "password-generator",
@@ -63,8 +64,44 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
+  if (["tools/excel-merger", "tools/document-compare", "tools/office-editor"].includes(route)) {
+    const expectedQuestion = route === "tools/excel-merger"
+      ? language === "ko" ? "XLS 수식과 서식도 보존할 수 있나요?" : "Can XLS formulas and formatting be preserved?"
+      : route === "tools/document-compare"
+        ? language === "ko" ? "DOC와 DOCX를 서로 비교할 수 있나요?" : "Can I compare DOC with DOCX?"
+        : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";
+    if (!html.includes('"@type":"FAQPage"') || !html.includes(expectedQuestion)) {
+      throw new Error(`${filePath} is missing its localized static FAQ and FAQPage metadata.`);
+    }
+  }
   if (html.includes("#/")) throw new Error(`${filePath} still contains a hash route.`);
 }
+}
+
+for (const language of ["ko", "en"]) {
+  const filePath = path.join("dist", language, "tools", "office-editor", "app", "index.html");
+  const html = await fs.readFile(filePath, "utf8");
+  if (!html.includes('name="robots" content="noindex, nofollow"')
+    || !html.includes('name="worklazy-office-isolation"')
+    || !html.includes('data-worklazy-office-isolation')
+    || !html.includes('./coi-serviceworker.js')
+    || !html.includes(`/${language}/tools/office-editor/`)
+    || html.includes("pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) {
+    throw new Error(`${filePath} does not keep the office workspace noindex, isolated, canonicalized to its guide, and free of ad code.`);
+  }
+}
+
+for (const language of ["ko", "en"]) {
+  const filePath = path.join("dist", language, "tools", "excel-merger", "xls-preserve", "index.html");
+  const html = await fs.readFile(filePath, "utf8");
+  if (!html.includes('name="robots" content="noindex, nofollow"')
+    || !html.includes('name="worklazy-excel-preserve-isolation"')
+    || !html.includes('data-worklazy-excel-preserve-isolation')
+    || !html.includes('./coi-serviceworker.js')
+    || !html.includes(`/${language}/tools/excel-merger/`)
+    || html.includes("pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) {
+    throw new Error(`${filePath} does not keep the XLS preservation workspace noindex, isolated, canonicalized to Excel Merger, and free of ad code.`);
+  }
 }
 
 const [ads, robots, sitemap, notFound] = await Promise.all([
@@ -99,6 +136,30 @@ const [pyodideModule, pyodideWasm, ocrWorker, ocrEnglish, ocrKorean, videoIsolat
   fs.stat("dist/tools/video-studio/runtime/multi/ffmpeg-core.wasm"),
   fs.stat("dist/tools/video-studio/runtime/multi/ffmpeg-core.worker.js"),
 ]);
+const officeAssets = [
+  ["soffice.js", 858124, "5143e5354f470b87f86ba272bcfef857bd13e6f07b59666e48a7ccb89643cd77"],
+  ["soffice.wasm", 161667499, "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4"],
+  ["soffice.data", 99520604, "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c"],
+  ["soffice.data.js.metadata", 215180, "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3"],
+];
+for (const [name, expectedSize, expectedHash] of officeAssets) {
+  const filePath = path.join("dist", "vendor", "zetaoffice", "2026-08-26", name);
+  const bytes = await fs.readFile(filePath);
+  if (bytes.length !== expectedSize || createHash("sha256").update(bytes).digest("hex") !== expectedHash) {
+    throw new Error(`Pinned office asset verification failed in static output: ${name}`);
+  }
+}
+const officeThread = await fs.stat(path.join("dist", "vendor", "zetaoffice", "2026-08-26", "office_thread.js"));
+if (officeThread.size !== 2636) throw new Error("The pinned office command bridge is missing or does not match the current bundle.");
+for (const language of ["ko", "en"]) {
+  for (const isolatedRoute of [["tools", "office-editor", "app"], ["tools", "excel-merger", "xls-preserve"]]) {
+    const officeIsolationPath = path.join("dist", language, ...isolatedRoute, "coi-serviceworker.js");
+    const [officeIsolationWorker, officeIsolationText] = await Promise.all([fs.stat(officeIsolationPath), fs.readFile(officeIsolationPath, "utf8")]);
+    if (officeIsolationWorker.size < 1_000 || !officeIsolationText.includes("caches.match(request)") || !officeIsolationText.includes("vendor\\/zetaoffice")) {
+      throw new Error(`${language}/${isolatedRoute.join("/")} is missing its document-scoped preparation and asset-cache behavior.`);
+    }
+  }
+}
 const videoWorkerFiles = await fs.readdir("dist/tools/video-studio/workers");
 for (const language of ["ko", "en"]) {
   const localizedVideoRoot = path.join("dist", language, "tools", "video-studio");
@@ -129,7 +190,8 @@ const applicationJavaScript = (await Promise.all(
 if (!ads.includes("pub-8940087269746960")) throw new Error("ads.txt publisher ID is missing.");
 if (cname.trim() !== "worklazy.net") throw new Error("CNAME does not point to worklazy.net.");
 if (!worklazyLicense.includes("All rights reserved")) throw new Error("Worklazy proprietary license is missing.");
-if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker") || !thirdPartyLicenses.includes("@rhwp/core")) throw new Error("Third-party license bundle is incomplete.");
+if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker") || !thirdPartyLicenses.includes("@rhwp/core")
+  || !thirdPartyLicenses.includes("ZetaOffice / LibreOffice") || !thirdPartyLicenses.includes("zetajs") || !thirdPartyLicenses.includes("JSDoc legacy Word reader")) throw new Error("Third-party license bundle is incomplete.");
 if (!favicon.includes("facet-4") || !logo.includes("Worklazy")) throw new Error("Worklazy favicon or logo is missing from the build.");
 const manifest = JSON.parse(manifestText);
 if (manifest.display !== "standalone" || manifest.scope !== "./" || manifest.start_url !== "./"
@@ -138,7 +200,7 @@ if (manifest.display !== "standalone" || manifest.scope !== "./" || manifest.sta
 }
 if (!serviceWorker.includes('addEventListener("install"') || !serviceWorker.includes('addEventListener("fetch"') || !serviceWorker.includes('"credentialless"')
   || !serviceWorker.includes('Cross-Origin-Embedder-Policy') || !serviceWorker.includes('Cross-Origin-Opener-Policy')
-  || !serviceWorker.includes('Cross-Origin-Resource-Policy')
+  || !serviceWorker.includes('Cross-Origin-Resource-Policy') || !serviceWorker.includes('vendor\\/zetaoffice')
   || installIcon180.size < 5_000 || installIcon192.size < 5_000 || installIcon512.size < 10_000) {
   throw new Error("The mobile web app service worker or install icons are incomplete.");
 }
@@ -155,6 +217,7 @@ if (!robots.includes("Sitemap:")) throw new Error("robots.txt does not point to 
 if (!notFound.includes('name="robots" content="noindex, nofollow"') || !notFound.includes('id="root"')) throw new Error("GitHub Pages SPA 404 fallback is missing or indexable.");
 if (!robots.includes("https://worklazy.net/sitemap.xml")) throw new Error("robots.txt does not use the custom root domain.");
 if (sitemap.includes("/worklazytools/")) throw new Error("sitemap.xml still contains the repository subpath.");
+if (sitemap.includes("/tools/office-editor/app/") || sitemap.includes("/tools/excel-merger/xls-preserve/") || sitemap.includes("/tools/word-compare/") || sitemap.includes("/tools/hwp-compare/")) throw new Error("sitemap.xml contains a workspace or retired comparison route.");
 for (const route of routes) {
   if (route && !sitemap.includes(`/ko/${route}/`)) throw new Error(`sitemap.xml is missing ko/${route}.`);
   if (route && route !== "tools/hwp-editor" && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
@@ -176,11 +239,11 @@ const [koreanPages, englishPages] = await Promise.all([
   fs.readFile("src/locales/ko/pages.json", "utf8"),
   fs.readFile("src/locales/en/pages.json", "utf8"),
 ]);
-if (!koreanPages.includes("비디오 스튜디오는 AdSense 스크립트를 불러오지 않지만")
-  || !englishPages.includes("Video Studio does not load AdSense scripts, but with consent")
-  || koreanPages.includes("Analytics와 AdSense 스크립트를 불러오지 않습니다")
-  || englishPages.includes("does not load Analytics or AdSense scripts")) {
-  throw new Error("The privacy policy does not describe Video Studio analytics and ad exclusion accurately.");
+if (!koreanPages.includes("비디오 스튜디오, 오피스 편집 작업 화면과 XLS 수식·서식 보존 화면은 AdSense 스크립트를 불러오지 않으며")
+  || !koreanPages.includes("오피스 편집 작업 화면과 XLS 수식·서식 보존 화면은 방문 분석도 불러오지 않습니다")
+  || !englishPages.includes("Video Studio, the office editing workspace and the XLS formula-and-formatting preservation screen do not load AdSense")
+  || !englishPages.includes("office editing workspace and XLS preservation screen also do not load visit analytics")) {
+  throw new Error("The privacy policy does not describe the isolated workspace analytics and ad exclusions accurately.");
 }
 
 console.log(`Static output validation passed: localized pages, hreflang metadata, self-hosted browser runtimes, ads.txt, robots.txt and sitemap.xml.`);

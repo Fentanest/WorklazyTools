@@ -6,9 +6,12 @@ import { useAppLanguage } from "../i18n/routing";
 
 const libraries = [
   { name: "rhwp / @rhwp/core·@rhwp/editor 0.8.4", license: "MIT", url: "https://github.com/edwardkim/rhwp", purpose: "HWP·HWPX·HML 문서 해석, 편집기 UI와 파일 저장" },
+  { name: "ZetaOffice / LibreOffice browser build snapshot 2026-08-25", license: "MPL-2.0", url: "https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2", purpose: "Writer·Calc·Impress 브라우저 편집 화면" },
+  { name: "ZetaJS 1.2.0", license: "MIT", url: "https://github.com/allotropia/zetajs", purpose: "LibreOffice UNO JavaScript 연결" },
+  { name: "JSDoc legacy Word reader snapshot 821695a", license: "0BSD", url: "https://github.com/Alpaq92/JSDoc", purpose: "Word 97–2003 DOC 문서 해석" },
   { name: "ffmpeg.wasm / @ffmpeg/core·@ffmpeg/core-mt 0.12.10", license: "GPL-2.0-or-later", url: "https://github.com/ffmpegwasm/ffmpeg.wasm", purpose: "브라우저 단일·멀티스레드 비디오 및 오디오 인코딩" },
   { name: "@ffmpeg/ffmpeg 0.12.15", license: "MIT", url: "https://github.com/ffmpegwasm/ffmpeg.wasm", purpose: "FFmpeg WebAssembly Worker API" },
-  { name: "coi-serviceworker 0.1.7", license: "MIT", url: "https://github.com/gzuidhof/coi-serviceworker", purpose: "GitHub Pages 비디오 전용 경로의 교차 출처 격리" },
+  { name: "coi-serviceworker 0.1.7", license: "MIT", url: "https://github.com/gzuidhof/coi-serviceworker", purpose: "GitHub Pages 비디오·오피스 작업 화면의 교차 출처 격리" },
   { name: "Fabric.js 7.4.0", license: "MIT", url: "https://github.com/fabricjs/fabric.js", purpose: "대화형 이미지 레이어 편집" },
   { name: "gifenc 1.0.3", license: "MIT", url: "https://github.com/mattdesl/gifenc", purpose: "이미지 프레임 GIF 인코딩" },
   { name: "ExcelJS 4.4.0", license: "MIT", url: "https://github.com/exceljs/exceljs", purpose: "XLSX·CSV 읽기와 쓰기" },

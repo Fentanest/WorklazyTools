@@ -6,6 +6,8 @@ coverage/
 public/vendor/pyodide/
 public/vendor/tesseract/
 public/tools/video-studio/runtime/
+public/vendor/zetaoffice/
+.cache/zetaoffice/
 /compareexample/
 /comparesample/
 __pycache__/

@@ -1121,3 +1121,83 @@ def compare_documents(before_bytes, after_bytes, before_name, after_name, includ
         "warnings": warnings,
     }
     return json.dumps(result, ensure_ascii=False)
+
+
+def extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
+    """Return only the format-specific extraction model.
+
+    Paragraph matching and result generation live in the shared TypeScript
+    comparison engine so Word and HWP/HWPX use exactly the same rules.
+    """
+    global LANGUAGE
+    LANGUAGE = "en" if language == "en" else "ko"
+    records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
+
+    def comments_of(record):
+        return [
+            {
+                "id": comment.get("id", ""),
+                "author": comment.get("author", ""),
+                "text": comment.get("text", ""),
+            }
+            for comment in record.get("comments", [])
+        ]
+
+    def record_of(record):
+        return {
+            "text": _display_text(record),
+            "format": record.get("format", ""),
+            "location": record.get("location", ""),
+            "comments": comments_of(record),
+        }
+
+    tables = []
+    for table_index, table in enumerate(records["tables"]):
+        tables.append({
+            "location": _l(f"표 {table_index + 1}", f"Table {table_index + 1}"),
+            "sourceIndex": table_index,
+            "grid": [[_cell_payload(cell) for cell in row] for row in table],
+        })
+
+    blocks = []
+    for block in records["documentBlocks"]:
+        if block["type"] == "paragraph":
+            record = record_of(block["record"])
+            blocks.append({
+                "type": "paragraph",
+                **record,
+            })
+            continue
+        table_index = block["tableIndex"]
+        table = tables[table_index]
+        blocks.append({
+            "type": "table",
+            "text": " | ".join(
+                "\u241f".join(cell.get("text", "") for cell in row)
+                for row in table["grid"]
+                if any(cell.get("text", "") for cell in row)
+            ),
+            "format": "",
+            "location": table["location"],
+            "table": table,
+        })
+
+    warnings = [_l(
+        "필드 계산 결과, 도형과 일부 고급 레이아웃은 Microsoft Word의 표시와 차이가 날 수 있습니다.",
+        "Calculated fields, shapes, and some advanced layouts may differ from Microsoft Word's display.",
+    )]
+    if records.get("warnings", 0):
+        unresolved = records["warnings"]
+        warnings.append(_l(
+            f"정의를 찾지 못한 자동 번호 {unresolved}개는 번호 없이 표시했습니다.",
+            f"Displayed {unresolved} automatic numbers without labels because their definitions were unavailable.",
+        ))
+
+    model = {
+        "blocks": blocks,
+        "headerFooter": [record_of(record) for record in records["headerFooter"]],
+        "notes": [record_of(record) for record in records["note"]],
+        "comments": [record_of(record) for record in records["comment"]],
+        "warnings": warnings,
+    }
+    return json.dumps(model, ensure_ascii=False)

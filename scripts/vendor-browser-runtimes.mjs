@@ -7,6 +7,7 @@ const publicVendorRoot = path.join(projectRoot, "public", "vendor");
 await copyPyodide();
 await copyTesseract();
 await copyVideoRuntime();
+await vendorZetaOffice();
 
 async function copyPyodide() {
   const source = path.join(projectRoot, "node_modules", "pyodide");
@@ -65,4 +66,58 @@ async function copyVideoRuntime() {
     [path.join(multiCoreSource, "ffmpeg-core.wasm"), path.join(destination, "multi", "ffmpeg-core.wasm")],
     [path.join(multiCoreSource, "ffmpeg-core.worker.js"), path.join(destination, "multi", "ffmpeg-core.worker.js")],
   ].map(([source, target]) => fs.copyFile(source, target)));
+}
+
+async function vendorZetaOffice() {
+  const version = "2026-08-26";
+  const sourceSnapshotVersion = "2026-08-25";
+  const sourceBaseUrl = process.env.ZETAOFFICE_ASSET_BASE_URL || "https://cdn.zetaoffice.net/zetaoffice_latest/";
+  const cacheDirectory = path.join(projectRoot, ".cache", "zetaoffice", sourceSnapshotVersion);
+  const destination = path.join(publicVendorRoot, "zetaoffice", version);
+  const assets = [
+    { name: "soffice.js", size: 858124, sha256: "5143e5354f470b87f86ba272bcfef857bd13e6f07b59666e48a7ccb89643cd77" },
+    { name: "soffice.wasm", size: 161667499, sha256: "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4" },
+    { name: "soffice.data", size: 99520604, sha256: "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c" },
+    { name: "soffice.data.js.metadata", size: 215180, sha256: "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3" },
+  ];
+  await fs.mkdir(cacheDirectory, { recursive: true });
+  for (const asset of assets) {
+    const target = path.join(cacheDirectory, asset.name);
+    if (!(await matchesAsset(target, asset))) {
+      const response = await fetch(new URL(asset.name, ensureTrailingSlash(sourceBaseUrl)), {
+        headers: { "Accept-Encoding": "identity" },
+      });
+      if (!response.ok || !response.body) throw new Error(`Unable to download pinned office asset ${asset.name}: HTTP ${response.status}`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      await fs.writeFile(target, bytes);
+      if (!(await matchesAsset(target, asset))) {
+        await fs.rm(target, { force: true });
+        throw new Error(`Pinned office asset verification failed: ${asset.name}`);
+      }
+    }
+  }
+  await fs.rm(destination, { recursive: true, force: true });
+  await fs.mkdir(destination, { recursive: true });
+  await Promise.all(assets.map((asset) => fs.copyFile(path.join(cacheDirectory, asset.name), path.join(destination, asset.name))));
+  await Promise.all([
+    fs.copyFile(path.join(projectRoot, "node_modules", "zetajs", "source", "zeta.js"), path.join(destination, "zeta.js")),
+    fs.copyFile(path.join(projectRoot, "src", "features", "office-editor", "office_thread.js"), path.join(destination, "office_thread.js")),
+  ]);
+  await fs.writeFile(path.join(destination, "manifest.json"), `${JSON.stringify({ version, assets }, null, 2)}\n`);
+}
+
+async function matchesAsset(filePath, asset) {
+  try {
+    const stats = await fs.stat(filePath);
+    if (stats.size !== asset.size) return false;
+    const { createHash } = await import("node:crypto");
+    const bytes = await fs.readFile(filePath);
+    return createHash("sha256").update(bytes).digest("hex") === asset.sha256;
+  } catch {
+    return false;
+  }
+}
+
+function ensureTrailingSlash(value) {
+  return value.endsWith("/") ? value : `${value}/`;
 }

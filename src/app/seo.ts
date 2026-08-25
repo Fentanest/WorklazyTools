@@ -7,11 +7,50 @@ export interface SeoDefinition {
   title: string;
   description: string;
   noIndex?: boolean;
+  faq?: Array<{
+    question: string;
+    answer: string;
+  }>;
   application?: {
     name: string;
     featureList: string[];
   };
 }
+
+const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDefinition["faq"]>>> = {
+  ko: {
+    "/tools/excel-merger": [
+      { question: "XLS 수식과 서식도 보존할 수 있나요?", answer: "가능합니다. 출력 설정의 XLS 입력에서 보존 옵션을 켜세요. XLS를 호환 XLSX 구조로 먼저 변환하며, XLS 파일을 처음 선택할 때 약 250MB의 추가 파일을 내려받습니다." },
+      { question: "보존 옵션을 켜면 모든 XLS 기능이 완전히 유지되나요?", answer: "수식과 일반 셀 서식을 우선 보존하지만 차트, 외부 연결, 매크로와 일부 고급 개체는 달라질 수 있으므로 중요한 결과는 Excel에서 확인하세요." },
+    ],
+    "/tools/document-compare": [
+      { question: "DOC와 DOCX를 서로 비교할 수 있나요?", answer: "가능합니다. 둘 다 Word 계열이므로 어느 쪽 순서든 비교할 수 있습니다." },
+      { question: "DOCX와 HWP를 비교할 수 있나요?", answer: "불가능합니다. 분석 전에 해당 쌍을 차단하므로 Word 문서끼리, HWP 문서끼리 짝지어 주세요." },
+      { question: "DOC도 Word 변경 추적 파일을 만들 수 있나요?", answer: "아닙니다. 두 파일이 모두 DOCX인 문서 쌍에만 적용됩니다." },
+    ],
+    "/tools/office-editor": [
+      { question: "처음 실행 용량이 큰 이유는 무엇인가요?", answer: "오피스 프로그램과 글꼴·리소스를 브라우저에 저장해야 하기 때문입니다. 다음 실행부터는 저장된 파일을 재사용할 수 있습니다." },
+      { question: "Microsoft의 공식 웹 오피스인가요?", answer: "아닙니다. LibreOffice 기반 브라우저 편집기이며 Microsoft Office와 호환성 차이가 있을 수 있습니다." },
+      { question: "HWP도 여기서 편집할 수 있나요?", answer: "HWP/HWPX는 전용 HWP 편집기를 이용하세요. 이 편집기는 Writer·Calc·Impress 형식에 초점을 둡니다." },
+    ],
+  },
+  en: {
+    "/tools/excel-merger": [
+      { question: "Can XLS formulas and formatting be preserved?", answer: "Yes. Turn on the preservation option under XLS input in Output settings. XLS is first converted to a compatible XLSX structure, and the first XLS selection downloads about 250 MB of additional files." },
+      { question: "Does preservation retain every XLS feature perfectly?", answer: "It prioritizes formulas and common cell formatting, but charts, external links, macros and some advanced objects can differ. Verify important output in Excel." },
+    ],
+    "/tools/document-compare": [
+      { question: "Can I compare DOC with DOCX?", answer: "Yes. Both belong to the Word family, so either order is supported." },
+      { question: "Can I compare DOCX with HWP?", answer: "No. The pair is rejected before analysis. Pair Word files together and HWP files together." },
+      { question: "Does tracked Word output work for DOC?", answer: "No. It is limited to pairs where both files are DOCX." },
+    ],
+    "/tools/office-editor": [
+      { question: "Why is the first start large?", answer: "A browser build of the office suite and its fonts and resources must be stored locally. Later starts can reuse the cache." },
+      { question: "Is this an official Microsoft Office web app?", answer: "No. It is a LibreOffice-based browser editor and compatibility can differ from Microsoft Office." },
+      { question: "Are HWP files supported here?", answer: "Use the dedicated HWP editor for HWP/HWPX files. This editor focuses on Writer, Calc, and Impress formats." },
+    ],
+  },
+};
 
 export interface SocialImageDefinition {
   path: string;
@@ -40,13 +79,13 @@ export const socialImages = {
 
 const socialImageSlugByPath: Record<string, string> = {
   "/tools/excel-merger": "excel-merger",
-  "/tools/word-compare": "word-compare",
+  "/tools/document-compare": "document-compare",
   "/tools/pdf-editor": "pdf-tools",
   "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
   "/tools/pdf-editor/pdf-to-image": "pdf-to-image",
   "/tools/pdf-editor/convert": "pdf-convert",
   "/tools/hwp-editor": "hwp-editor",
-  "/tools/hwp-compare": "hwp-compare",
+  "/tools/office-editor": "office-editor",
   "/tools/video-studio": "video-studio",
   "/tools/audio-studio": "audio-studio",
   "/tools/image-studio": "image-studio",
@@ -72,18 +111,18 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/excel-merger": {
     title: "Excel 파일 병합 - XLSX·XLS·XLSB·XLSM·CSV 합치기",
-    description: "여러 XLSX, XLS, XLSB, XLSM, CSV 파일을 하나의 XLSX로 병합하세요. XLSX 수식·서식 보존과 암호 입출력을 지원하며 파일은 브라우저에서 처리됩니다.",
+    description: "여러 XLSX, XLS, XLSB, XLSM, CSV 파일을 하나의 XLSX로 병합하세요. XLSX와 선택형 XLS 수식·서식 보존, 암호 입출력을 지원하며 파일은 브라우저에서 처리됩니다.",
     application: {
       name: "Excel Merger",
-      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 수식·서식 보존", "암호화 파일 입출력"],
+      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 및 선택형 XLS 수식·서식 보존", "암호화 파일 입출력"],
     },
   },
-  "/tools/word-compare": {
-    title: "Word 문서 비교 - DOCX 텍스트 Diff·변경 추적",
-    description: "수정 전후 Word 문서의 본문과 문장을 웹에서 Diff 비교하고 추가·삭제 내용을 확인하세요. 계약서·기획 문서·표·서식·메모·개요 번호와 변경 추적 DOCX도 지원합니다.",
+  "/tools/document-compare": {
+    title: "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
+    description: "DOCX·DOC 또는 HWP·HWPX 문서의 문단·표·서식 차이를 같은 기준으로 비교하세요. 문단 이동과 분할을 구분하고 웹·Excel 결과와 DOCX 변경 추적을 제공합니다.",
     application: {
-      name: "Word Compare",
-      featureList: ["문단·문장 텍스트 Diff", "추가·삭제 내용 하이라이트", "DOCX 본문·서식 비교", "표 구조 변경 비교", "머리말·꼬리말·메모 비교", "Excel 비교 보고서", "Word 변경 추적 DOCX"],
+      name: "Document Compare",
+      featureList: ["DOCX·DOC Word 문서 비교", "HWP·HWPX 한글 문서 비교", "문단 이동·분할·병합 판정", "표 구조 변경 비교", "머리말·꼬리말·메모 비교", "Excel 비교 보고서", "DOCX 전용 Word 변경 추적"],
     },
   },
   "/tools/pdf-editor": {
@@ -114,10 +153,10 @@ export const seoByPath: Record<string, SeoDefinition> = {
     description: "HWP와 HWPX 문서를 공식 rhwp Studio에서 열어 본문·서식·표·개체를 편집하고 HWP·HWPX·HML로 저장하세요.",
     application: { name: "HWP Editor", featureList: ["HWP·HWPX·HML 문서 열기", "본문과 글자 서식 편집", "표·그림·도형·수식 편집", "실행 취소와 문서 찾기", "HWP·HWPX 저장", "HWP 재열기 검증"] },
   },
-  "/tools/hwp-compare": {
-    title: "HWP 문서 비교 - 한글 문서 텍스트 Diff·표 변경 확인",
-    description: "수정 전후 HWP·HWPX 문서의 본문과 문장을 웹에서 Diff 비교하고 추가·삭제 내용을 확인하세요. 계약서·개요 번호·서식·표 구조 변경과 Excel 보고서도 지원합니다.",
-    application: { name: "HWP Compare", featureList: ["HWP 문단·문장 텍스트 Diff", "추가·삭제 내용 하이라이트", "HWP·HWPX 본문 비교", "개요 번호·서식 비교", "스마트 표 행·열 비교", "머리말·꼬리말·각주·미주", "Excel 비교 보고서", "다중 동시 비교"] },
+  "/tools/office-editor": {
+    title: "브라우저 오피스 편집기 - DOCX·XLSX·PPTX 온라인 편집",
+    description: "LibreOffice 기반 Writer·Calc·Impress 화면에서 DOCX·DOC·ODT, XLSX·XLS·ODS, PPTX·PPT·ODP 파일을 브라우저 안에서 편집하고 저장하세요.",
+    application: { name: "Browser Office Editor", featureList: ["LibreOffice 기반 브라우저 편집", "DOCX·DOC·ODT Writer", "XLSX·XLS·ODS Calc", "PPTX·PPT·ODP Impress", "실제 다운로드 진행률", "매크로·외부 갱신 차단", "브라우저 내 파일 처리"] },
   },
   "/tools/video-studio": {
     title: "비디오 스튜디오 | 영상 자르기·이어붙이기·음원 추출",
@@ -204,9 +243,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
 const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "excel-merger": "Excel Merger | Combine Excel & CSV Files",
   "pdf-editor": "PDF Tools | Edit, Merge, Convert & OCR PDFs",
-  "word-compare": "Word Compare | Compare DOCX Text, Tables & Formatting",
+  "document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
   "hwp-editor": "HWP Editor | Edit HWP & HWPX Documents",
-  "hwp-compare": "HWP Compare | Compare HWP Text, Tables & Numbering",
+  "office-editor": "Browser Office Editor | Edit DOCX, XLSX & PPTX",
   "video-studio": "Video Studio | Trim, Join & Extract Audio",
   "audio-studio": "Audio Studio | Waveform Editing, Trimming & Pitch",
   "image-studio": "Image Studio | Edit Photos, Mosaic, Collage & GIF",
@@ -224,6 +263,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
 const englishPageSeo: Record<string, SeoDefinition> = {
   "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
+  "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with optional high-fidelity XLS formula and formatting preservation in your browser.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "XLSX and optional XLS formula and formatting preservation", "Encrypted input and output"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
   "/tools/pdf-editor/convert": { title: "Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", description: "Convert selected PDF pages to DOCX, XLSX, TXT or searchable PDF using self-hosted English and Korean OCR in your browser.", application: { name: "PDF Document Conversion and OCR", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },
@@ -235,8 +275,8 @@ const englishPageSeo: Record<string, SeoDefinition> = {
 };
 
 const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
-  "/tools/excel-merger": "excel-merger", "/tools/word-compare": "word-compare", "/tools/pdf-editor": "pdf-editor",
-  "/tools/hwp-editor": "hwp-editor", "/tools/hwp-compare": "hwp-compare", "/tools/video-studio": "video-studio",
+  "/tools/excel-merger": "excel-merger", "/tools/document-compare": "document-compare", "/tools/pdf-editor": "pdf-editor",
+  "/tools/hwp-editor": "hwp-editor", "/tools/office-editor": "office-editor", "/tools/video-studio": "video-studio",
   "/tools/audio-studio": "audio-studio", "/tools/image-studio": "image-studio", "/tools/text-tools": "text-tools",
   "/tools/text-formatter": "text-formatter", "/tools/work-calculator": "work-calculator", "/tools/timezone-calculator": "timezone-calculator",
   "/tools/payroll-calculator": "payroll-calculator", "/tools/image-privacy": "image-privacy", "/tools/security-tools": "security-tools",
@@ -245,16 +285,21 @@ const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
 
 export function getSeoDefinition(language: AppLanguage, pathname: string): SeoDefinition {
   const path = normalizeSeoPath(stripLanguagePrefix(pathname));
-  if (language === "ko") return seoByPath[path] ?? seoByPath["/"];
-  if (englishPageSeo[path]) return englishPageSeo[path];
+  if (language === "ko") return withFaq(language, path, seoByPath[path] ?? seoByPath["/"]);
+  if (englishPageSeo[path]) return withFaq(language, path, englishPageSeo[path]);
   const slug = toolSlugByPath[path];
-  if (!slug) return englishPageSeo["/"];
+  if (!slug) return withFaq(language, path, englishPageSeo["/"]);
   const tool = enTools.items[slug];
-  return {
+  return withFaq(language, path, {
     title: englishToolTitles[slug],
     description: tool.description,
     application: { name: tool.title, featureList: tool.highlights },
-  };
+  });
+}
+
+function withFaq(language: AppLanguage, path: string, definition: SeoDefinition): SeoDefinition {
+  const faq = faqByLanguageAndPath[language][path];
+  return faq ? { ...definition, faq } : definition;
 }
 
 export function normalizeSeoPath(pathname: string) {

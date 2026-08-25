@@ -4,14 +4,21 @@ self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
   const isVideoResource = requestUrl.origin === self.location.origin
     && /(?:^|\/)tools\/video-studio(?:\/|$)/.test(requestUrl.pathname);
-  if (!isVideoResource) return;
+  const isOfficeResource = requestUrl.origin === self.location.origin
+    && (/(?:^|\/)tools\/office-editor\/app(?:\/|$)/.test(requestUrl.pathname)
+      || /(?:^|\/)tools\/excel-merger\/xls-preserve(?:\/|$)/.test(requestUrl.pathname)
+      || /(?:^|\/)vendor\/zetaoffice(?:\/|$)/.test(requestUrl.pathname));
+  if (!isVideoResource && !isOfficeResource) return;
 
-  event.respondWith(fetch(event.request).then((response) => {
+  const responsePromise = isOfficeResource && /(?:^|\/)vendor\/zetaoffice(?:\/|$)/.test(requestUrl.pathname)
+    ? caches.match(event.request).then((cached) => cached || fetch(event.request))
+    : fetch(event.request);
+  event.respondWith(responsePromise.then((response) => {
     if (response.status === 0) return response;
     const headers = new Headers(response.headers);
-    headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+    headers.set("Cross-Origin-Embedder-Policy", isOfficeResource ? "require-corp" : "credentialless");
     headers.set("Cross-Origin-Opener-Policy", "same-origin");
-    headers.set("Cross-Origin-Resource-Policy", "cross-origin");
+    headers.set("Cross-Origin-Resource-Policy", isOfficeResource ? "same-origin" : "cross-origin");
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,

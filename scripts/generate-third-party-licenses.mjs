@@ -16,6 +16,9 @@ const sections = [
   "RUNTIME-LOADED COMPONENTS",
   "Pyodide 0.29.4 — MPL-2.0 — https://github.com/pyodide/pyodide",
   "Tesseract language data — see the model's upstream notice and https://github.com/tesseract-ocr/tessdata",
+  "ZetaOffice / LibreOffice browser build snapshot 2026-08-25 — MPL-2.0 — https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2",
+  "LibreOffice source and license information — https://www.libreoffice.org/about-us/licenses/",
+  "JSDoc legacy Word reader snapshot 821695a — 0BSD — https://github.com/Alpaq92/JSDoc",
 ];
 
 for (const [packagePath, lockMetadata] of productionPackages) {

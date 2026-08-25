@@ -167,7 +167,7 @@ export function HwpComparePage() {
         </SectionCard>
       </div>
 
-      <div className="comparison-prepare-note"><Info size={16} /><span><strong>{L("첫 실행에는 HWP 분석 모듈을 준비합니다.", "The HWP analysis module is prepared on the first run.")}</strong><small>{L("준비가 끝나면 선택한 문서 쌍을 Worker에서 순서대로 비교합니다.", "After it is ready, selected document pairs are compared in order in a worker.")}</small></span></div>
+      <div className="comparison-prepare-note"><Info size={16} /><span><strong>{L("첫 실행에는 HWP 문서 비교 기능을 준비합니다.", "HWP document comparison is prepared on the first run.")}</strong><small>{L("준비가 끝나면 선택한 문서 쌍을 순서대로 비교합니다.", "After preparation, the selected document pairs are compared in order.")}</small></span></div>
       <div className="tool-action-bar">
         <div><TextSearch size={20} /><span><strong>{ready ? L(`${session.beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.`, `${session.beforeFiles.length} document pairs are ready.`) : pairingError ? L("양쪽 파일 개수를 맞춰 주세요.", "Use the same number of files on both sides.") : !hasOutput ? L("결과 형식을 하나 이상 선택해 주세요.", "Select at least one output format.") : L("수정 전·후 문서를 선택해 주세요.", "Choose before and after documents.")}</strong><small>{L("파일과 입력한 암호는 현재 브라우저 메모리에서만 사용됩니다.", "Files and passwords are used only in current browser memory.")}</small></span></div>
         <PrimaryButton accent="orange" disabled={!ready || Boolean(pairingError)} loading={loading} onClick={() => void runComparison()}>{loading ? L(`${operation.progress}% 비교 중`, `Comparing ${operation.progress}%`) : session.beforeFiles.length ? L(`${session.beforeFiles.length}개 문서 쌍 비교`, `Compare ${session.beforeFiles.length} document pairs`) : L("문서 쌍 비교", "Compare document pairs")}</PrimaryButton>

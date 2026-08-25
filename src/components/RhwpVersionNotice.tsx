@@ -9,8 +9,8 @@ export function RhwpVersionNotice({ mode, compact = false }: {
 }) {
   const language = useAppLanguage();
   const detail = mode === "editor"
-    ? (language === "en" ? "Official Studio static build bundled with this site" : "공식 Studio 정적 빌드를 이 사이트에 포함해 실행")
-    : (language === "en" ? "@rhwp/core WebAssembly bundled and run in a worker" : "@rhwp/core WebAssembly를 이 사이트에 포함해 Worker에서 실행");
+    ? (language === "en" ? "Official Studio files are included with this site" : "공식 Studio 파일을 이 사이트에 포함해 제공")
+    : (language === "en" ? "Official comparison files are included with this site" : "공식 비교 파일을 이 사이트에 포함해 제공");
 
   return (
     <footer className={`rhwp-version-notice${compact ? " compact" : ""}`} aria-label={language === "en" ? "rhwp version in use" : "rhwp 사용 버전"}>

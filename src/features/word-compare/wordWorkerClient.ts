@@ -55,7 +55,8 @@ export async function compareWordFilePairs(
     };
     worker.onerror = (event) => {
       if (!finish()) return;
-      reject(new Error(event.message || (language === "en" ? "Could not start Word comparison." : "Word 문서 비교를 시작하지 못했습니다.")));
+      event.preventDefault();
+      reject(new Error(language === "en" ? "Could not start Word comparison. Reload the page and try again." : "Word 문서 비교를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."));
     };
     worker.postMessage({
       pairs: payloads,

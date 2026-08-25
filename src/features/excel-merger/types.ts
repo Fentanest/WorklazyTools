@@ -5,6 +5,8 @@ export type SheetSelectionMode = "all" | "positions" | "custom";
 export interface ExcelInputPayload {
   id: string;
   name: string;
+  displayName?: string;
+  preservedLegacy?: boolean;
   buffer: ArrayBuffer;
   password?: string;
   selectedSheetNames?: string[];
@@ -39,7 +41,7 @@ export interface ExcelInspectionResult {
   error?: string;
 }
 
-export type WordChangeKind = "added" | "deleted" | "changed" | "format";
+export type WordChangeKind = "added" | "deleted" | "changed" | "format" | "moved";
 export type WordRecordKind = "body" | "table" | "headerFooter" | "comment" | "note";
 export type WordViewKind = WordChangeKind | "comment" | "unchanged";
 
@@ -57,6 +59,7 @@ export interface WordDiffItem {
   before: string;
   after: string;
   segments: WordDiffSegment[];
+  moved?: boolean;
 }
 
 export interface WordCommentViewItem {
@@ -81,6 +84,7 @@ export interface WordDocumentViewItem {
   after: string;
   segments: WordDiffSegment[];
   comments: WordCommentViewItem[];
+  moved?: boolean;
 }
 
 export interface WordCellComment {
@@ -124,6 +128,7 @@ export interface WordCompareResult {
     changed: number;
     format: number;
     unchanged: number;
+    moved?: number;
   };
   changes: WordDiffItem[];
   tables: WordTableComparison[];

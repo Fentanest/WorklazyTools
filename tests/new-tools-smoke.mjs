@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import initRhwp, { HwpDocument } from "@rhwp/core";
+import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
 
 const execFileAsync = promisify(execFile);
@@ -38,21 +39,25 @@ try {
     const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
     const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
     const onlyImage = process.env.TEST_ONLY_IMAGE === "1";
-    if (!onlyVideo && !onlyAudio) {
+    const onlyHwp = process.env.TEST_ONLY_HWP === "1";
+    if (onlyHwp) {
+      console.log("[1/1] HWP editor and comparison");
+      await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
+    } else if (!onlyVideo && !onlyAudio) {
       if (!onlyImage) {
         console.log("[1/4] HWP editor");
-        await testHwpEditor(page, fixtures.hwpFiles);
+        await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
       }
       console.log("[2/4] Image studio");
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
       await testImageStudio(page, fixtures.images);
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
     }
-    if (!onlyVideo && !onlyImage) {
+    if (!onlyHwp && !onlyVideo && !onlyImage) {
       console.log("[3/4] Audio studio");
       await testAudioStudio(page, fixtures.audio);
     }
-    if (!onlyAudio && !onlyImage) {
+    if (!onlyHwp && !onlyAudio && !onlyImage) {
       console.log("[4/4] Video studio");
       await testVideoStudio(page, fixtures.videos, fixtures.largeVideo, fixtures.largePassThroughVideos);
     }
@@ -62,26 +67,56 @@ try {
   } finally {
     await browser.close();
   }
-  console.log("New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, video group timelines and grouped output.");
+  console.log(process.env.TEST_ONLY_HWP === "1"
+    ? "HWP editor and unified document comparison smoke tests passed."
+    : "New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, video group timelines and grouped output.");
 } finally {
   await fs.rm(tempDirectory, { recursive: true, force: true });
 }
 
-async function testHwpEditor(page, hwpPaths) {
-  await page.goto(`${koBaseUrl}/tools/hwp-compare`, { waitUntil: "domcontentloaded" });
+async function testHwpEditor(page, hwpPaths, wordDocx) {
+  await page.goto(`${koBaseUrl}/tools/document-compare`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".rhwp-version-notice");
   const compareVersion = await page.$eval(".rhwp-version-notice", (element) => element.textContent || "");
-  if (!compareVersion.includes("rhwp 0.8.4") || !compareVersion.includes("@rhwp/core WebAssembly")) {
+  if (!compareVersion.includes("rhwp 0.8.4") || !compareVersion.includes("공식 비교 파일")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
   let compareInputs = await page.$$(".hwp-compare-page input[type=file]");
   await compareInputs[0].uploadFile(hwpPaths[0]);
   await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 1);
   compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  await compareInputs[1].uploadFile(wordDocx);
+  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[1]?.children.length === 1);
+  await page.$eval(".tool-action-bar .primary-button", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".error-banner")?.textContent?.includes("Word 문서와 HWP 문서는 서로 비교할 수 없습니다"));
+  await page.evaluate(() => {
+    const lists = document.querySelectorAll(".hwp-sortable-files");
+    const remove = lists[1]?.querySelector(".sortable-file-actions button:last-child");
+    if (!(remove instanceof HTMLButtonElement)) throw new Error("Cross-family test file remove button was not found.");
+    remove.click();
+  });
+  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files").length === 1);
+  compareInputs = await page.$$(".hwp-compare-page input[type=file]");
   await compareInputs[0].uploadFile(hwpPaths[1]);
   await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 2);
   const hwpAddButton = await page.$eval(".hwp-compare-page .drop-zone .secondary-button", (button) => button.textContent || "");
   if (!hwpAddButton.includes("더 추가")) throw new Error(`HWP comparison does not expose incremental file addition: ${hwpAddButton}`);
+  await page.$eval(".hwp-sortable-files .move-across-button", (button) => button.click());
+  await page.waitForFunction(() => {
+    const lists = document.querySelectorAll(".hwp-sortable-files");
+    return lists.length === 2 && lists[0].children.length === 1 && lists[1].children.length === 1;
+  });
+  await page.$eval(".tool-action-bar .primary-button", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".operation-progress.status-success") || document.querySelector(".error-banner"), { timeout: 120_000 });
+  const compareError = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
+  if (compareError) throw new Error(`Unified HWP comparison failed: ${compareError}`);
+  if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 1
+    || await page.$$(".word-pair-result-card .blue-download").then((items) => items.length) !== 1
+    || await page.$$(".word-pair-result-card .tracked-download").then((items) => items.length) !== 0) {
+    throw new Error("Unified HWP comparison outputs do not match the selected formats.");
+  }
+  await page.$eval(".word-pair-result-card .secondary-button", (button) => button.click());
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1") && document.querySelector(".comparison-summary"));
 
   const forbiddenRhwpRequests = [];
   const recordRhwpRequest = (request) => {
@@ -931,9 +966,9 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     const selects = document.querySelectorAll(".encoding-grid select");
     return {
       bitrate: document.querySelector(".video-bitrate-control select")?.value,
-      resolution: selects[1]?.value,
-      aspect: selects[2]?.value,
-      rotation: selects[3]?.value,
+      resolution: selects[2]?.value,
+      aspect: selects[3]?.value,
+      rotation: selects[4]?.value,
       actionDisabled: document.querySelector(".video-studio-page .section-actions .primary-button")?.disabled,
       notice: Array.from(document.querySelectorAll(".video-studio-page .inline-notice"), (element) => element.textContent || "").find((text) => text.includes("모바일")) || "",
     };
@@ -947,22 +982,22 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.evaluate(() => {
     const selects = document.querySelectorAll(".encoding-grid select");
     const bitrate = document.querySelector(".video-bitrate-control select");
-    if (!(bitrate instanceof HTMLSelectElement) || !(selects[1] instanceof HTMLSelectElement) || !(selects[2] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement)) throw new Error("Mobile encoding controls are unavailable");
+    if (!(bitrate instanceof HTMLSelectElement) || !(selects[2] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement) || !(selects[4] instanceof HTMLSelectElement)) throw new Error("Mobile encoding controls are unavailable");
     bitrate.value = "0";
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
-    selects[1].value = "1080";
-    selects[1].dispatchEvent(new Event("change", { bubbles: true }));
-    selects[2].value = "9:16";
+    selects[2].value = "1080";
     selects[2].dispatchEvent(new Event("change", { bubbles: true }));
-    selects[3].value = "90";
+    selects[3].value = "9:16";
     selects[3].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[4].value = "90";
+    selects[4].dispatchEvent(new Event("change", { bubbles: true }));
     bitrate.value = "copy";
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await page.waitForFunction(() => {
     const selects = document.querySelectorAll(".encoding-grid select");
     const button = document.querySelector(".video-studio-page .section-actions .primary-button");
-    return selects[1]?.value === "source" && selects[2]?.value === "source" && selects[3]?.value === "0" && button instanceof HTMLButtonElement && !button.disabled;
+    return selects[2]?.value === "source" && selects[3]?.value === "source" && selects[4]?.value === "0" && button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
 }
@@ -1018,12 +1053,14 @@ async function createFixtures(directory) {
   const document = HwpDocument.createEmpty();
   const blankHwp = path.join(directory, "blank.hwp");
   const blankHwpTwo = path.join(directory, "blank-two.hwp");
+  const wordDocx = path.join(directory, "word-family.docx");
   try {
     const bytes = document.exportHwp();
     await Promise.all([fs.writeFile(blankHwp, bytes), fs.writeFile(blankHwpTwo, bytes)]);
   } finally {
     document.free();
   }
+  await fs.writeFile(wordDocx, await createMinimalDocx());
 
   const imageOne = path.join(directory, "one.png");
   const imageTwo = path.join(directory, "two.png");
@@ -1072,5 +1109,13 @@ async function createFixtures(directory) {
   } finally {
     await largeHandle.close();
   }
-  return { hwpFiles: [blankHwp, blankHwpTwo], images: [imageOne, imageTwo], audio, videos: [video, videoTwo, ...videoCopies], largeVideo, largePassThroughVideos };
+  return { hwpFiles: [blankHwp, blankHwpTwo], wordDocx, images: [imageOne, imageTwo], audio, videos: [video, videoTwo, ...videoCopies], largeVideo, largePassThroughVideos };
+}
+
+async function createMinimalDocx() {
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Word family verification file.</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`);
+  return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 }

@@ -3,16 +3,14 @@
 import initRhwp, { HwpDocument } from "@rhwp/core";
 import rhwpWasmUrl from "@rhwp/core/rhwp_bg.wasm?url";
 
-import type {
-  WordCompareResult,
-  WordDiffItem,
-  WordDiffSegment,
-  WordDocumentViewItem,
-  WordTableAxisPair,
-  WordTableCell,
-  WordTableComparison,
-  WordViewKind,
-} from "../excel-merger/types";
+import type { WordTableCell } from "../excel-merger/types";
+import {
+  compareDocumentModels,
+  type ComparisonBlock,
+  type ComparisonModel,
+  type ComparisonRecord,
+  type ComparisonTable,
+} from "../document-compare/documentComparison";
 import type { HwpCompareOptions, HwpWorkerPairResult } from "./hwpWorkerClient";
 
 interface PairPayload {
@@ -24,13 +22,9 @@ interface PairPayload {
   afterPassword?: string;
 }
 
-interface HwpParagraph {
-  text: string;
-  format: string;
-  location: string;
-}
+interface HwpParagraph extends ComparisonRecord {}
 
-interface HwpTable {
+interface HwpTable extends ComparisonTable {
   section: number;
   paragraph: number;
   control: number;
@@ -38,29 +32,14 @@ interface HwpTable {
   grid: WordTableCell[][];
 }
 
-interface HwpBlock {
-  type: "paragraph" | "table";
-  text: string;
-  format: string;
-  location: string;
+interface HwpBlock extends ComparisonBlock {
   table?: HwpTable;
 }
 
-interface HwpModel {
+interface HwpModel extends ComparisonModel {
   blocks: HwpBlock[];
   headerFooter: HwpParagraph[];
   notes: HwpParagraph[];
-  warnings: string[];
-}
-
-interface SequencePair {
-  beforeIndex: number | null;
-  afterIndex: number | null;
-}
-
-interface SequenceGroup {
-  beforeIndexes: number[];
-  afterIndexes: number[];
 }
 
 interface ControlLayout {
@@ -93,7 +72,7 @@ worker.onmessage = async (event: MessageEvent<{ pairs: PairPayload[]; options: H
       progress(start + size * 0.38, L(`[${index + 1}/${pairs.length}] ${pair.afterName} 문서 구조를 읽는 중…`, `[${index + 1}/${pairs.length}] Reading the structure of ${pair.afterName}…`));
       const after = parseDocument(pair.afterName, pair.afterBuffer, pair.afterPassword, options);
       progress(start + size * 0.72, L(`[${index + 1}/${pairs.length}] 문단과 표의 대응 관계를 분석하는 중…`, `[${index + 1}/${pairs.length}] Matching paragraphs and tables…`));
-      results.push({ result: compareModels(pair.beforeName, pair.afterName, before, after, options) });
+      results.push({ result: compareDocumentModels(pair.beforeName, pair.afterName, before, after, options, currentLanguage) });
       progress(start + size, L(`[${index + 1}/${pairs.length}] HWP 비교 완료`, `[${index + 1}/${pairs.length}] HWP comparison complete`));
       await yieldToWorker();
     }
@@ -234,7 +213,7 @@ function readTable(document: HwpDocument, control: ControlLayout, index: number)
       comments: [],
     };
   }
-  return { section, paragraph, control: controlIndex, location: L(`표 ${index + 1}`, `Table ${index + 1}`), grid };
+  return { section, paragraph, control: controlIndex, sourceIndex: index, location: L(`표 ${index + 1}`, `Table ${index + 1}`), grid };
 }
 
 function readHeaderFooters(document: HwpDocument, formatting: boolean) {
@@ -304,392 +283,6 @@ function bodyFormat(document: HwpDocument, section: number, paragraph: number, l
   return stableStringify(values);
 }
 
-function compareModels(beforeName: string, afterName: string, before: HwpModel, after: HwpModel, options: HwpCompareOptions): WordCompareResult {
-  const changes: WordDiffItem[] = [];
-  const tables: WordTableComparison[] = [];
-  const documentViews: WordDocumentViewItem[] = [];
-  const blockPairs = alignSequence(before.blocks, after.blocks, (item) => item.text, (left, right) => left.type === right.type);
-  for (const group of groupParagraphSplits(blockPairs, before.blocks, after.blocks, (item) => item.text, (item) => item.type === "paragraph")) {
-    const leftBlocks = group.beforeIndexes.map((index) => before.blocks[index]);
-    const rightBlocks = group.afterIndexes.map((index) => after.blocks[index]);
-    const left = leftBlocks[0];
-    const right = rightBlocks[0];
-    if (left?.type === "table" || right?.type === "table") {
-      const table = compareTable(left?.table, right?.table, tables.length, changes, options.formatting);
-      tables.push(table);
-      documentViews.push({
-        kind: tableViewKind(table),
-        section: "table",
-        blockType: "table",
-        tableIndex: table.index,
-        beforeLocation: left?.location ?? "",
-        afterLocation: right?.location ?? "",
-        before: left?.text ?? "",
-        after: right?.text ?? "",
-        segments: diffText(left?.text ?? "", right?.text ?? ""),
-        comments: [],
-      });
-      continue;
-    }
-    documentViews.push(compareRecord(combineParagraphRecords(leftBlocks), combineParagraphRecords(rightBlocks), "body", changes, options.formatting));
-  }
-
-  const headerFooter = compareRecordList(before.headerFooter, after.headerFooter, "headerFooter", changes, options.formatting);
-  const note = compareRecordList(before.notes, after.notes, "note", changes, options.formatting);
-  const summary = { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0 };
-  for (const change of changes) summary[change.kind] += 1;
-  summary.unchanged = [...documentViews, ...headerFooter, ...note]
-    .filter((view) => view.kind === "unchanged" || view.kind === "comment")
-    .length;
-
-  return {
-    beforeName,
-    afterName,
-    summary,
-    changes,
-    tables,
-    views: { document: documentViews, headerFooter, note },
-    warnings: [...new Set([...before.warnings, ...after.warnings])],
-  };
-}
-
-function compareRecordList(before: HwpParagraph[], after: HwpParagraph[], section: "headerFooter" | "note", changes: WordDiffItem[], formatting: boolean) {
-  const pairs = alignSequence(before, after, (item) => item.text);
-  return groupParagraphSplits(pairs, before, after, (item) => item.text).map((group) => compareRecord(
-    combineParagraphRecords(group.beforeIndexes.map((index) => before[index])),
-    combineParagraphRecords(group.afterIndexes.map((index) => after[index])),
-    section,
-    changes,
-    formatting,
-  ));
-}
-
-function combineParagraphRecords(records: Array<Pick<HwpParagraph, "text" | "format" | "location"> | HwpBlock>) {
-  if (!records.length) return undefined;
-  const first = records[0];
-  const last = records[records.length - 1];
-  return {
-    text: records.map((record) => record.text).join("\n"),
-    format: records.map((record) => record.format).join("||paragraph-break||"),
-    location: first.location === last.location ? first.location : `${first.location}~${last.location}`,
-  };
-}
-
-function compareRecord(
-  before: Pick<HwpParagraph, "text" | "format" | "location"> | undefined,
-  after: Pick<HwpParagraph, "text" | "format" | "location"> | undefined,
-  section: "body" | "headerFooter" | "note",
-  changes: WordDiffItem[],
-  formatting: boolean,
-): WordDocumentViewItem {
-  const beforeText = before?.text ?? "";
-  const afterText = after?.text ?? "";
-  const kind: WordViewKind = !before ? "added" : !after ? "deleted" : beforeText !== afterText ? "changed" : formatting && before.format !== after.format ? "format" : "unchanged";
-  const segments = diffText(beforeText, afterText);
-  if (kind !== "unchanged") {
-    changes.push({
-      kind,
-      section,
-      location: after?.location || before?.location || "",
-      beforeLocation: before?.location ?? "",
-      afterLocation: after?.location ?? "",
-      before: beforeText,
-      after: afterText,
-      segments,
-    });
-  }
-  return {
-    kind,
-    section,
-    blockType: "paragraph",
-    beforeLocation: before?.location ?? "",
-    afterLocation: after?.location ?? "",
-    before: beforeText,
-    after: afterText,
-    segments,
-    comments: [],
-  };
-}
-
-function compareTable(before: HwpTable | undefined, after: HwpTable | undefined, index: number, changes: WordDiffItem[], formatting: boolean): WordTableComparison {
-  const beforeGrid = before?.grid ?? [];
-  const afterGrid = after?.grid ?? [];
-  const rowPairs = before && after
-    ? alignSequence(beforeGrid, afterGrid, rowText).map(toAxisPair)
-    : before ? beforeGrid.map((_, row) => ({ beforeIndex: row, afterIndex: null })) : afterGrid.map((_, row) => ({ beforeIndex: null, afterIndex: row }));
-  const beforeColumns = transpose(beforeGrid);
-  const afterColumns = transpose(afterGrid);
-  const columnPairs = before && after
-    ? alignSequence(beforeColumns, afterColumns, rowText).map(toAxisPair)
-    : before ? beforeColumns.map((_, col) => ({ beforeIndex: col, afterIndex: null })) : afterColumns.map((_, col) => ({ beforeIndex: null, afterIndex: col }));
-  const beforeKinds = beforeGrid.map((row) => row.map<WordViewKind>(() => "unchanged"));
-  const afterKinds = afterGrid.map((row) => row.map<WordViewKind>(() => "unchanged"));
-
-  for (const rowPair of rowPairs) {
-    for (const columnPair of columnPairs) {
-      const beforeCell = rowPair.beforeIndex === null || columnPair.beforeIndex === null ? undefined : beforeGrid[rowPair.beforeIndex]?.[columnPair.beforeIndex];
-      const afterCell = rowPair.afterIndex === null || columnPair.afterIndex === null ? undefined : afterGrid[rowPair.afterIndex]?.[columnPair.afterIndex];
-      if (!beforeCell && !afterCell) continue;
-      const kind: WordViewKind = !beforeCell ? "added" : !afterCell ? "deleted" : beforeCell.text !== afterCell.text ? "changed" : formatting && beforeCell.format !== afterCell.format ? "format" : "unchanged";
-      const segments = diffText(beforeCell?.text ?? "", afterCell?.text ?? "");
-      if (beforeCell) {
-        beforeCell.segments = segments;
-        beforeKinds[rowPair.beforeIndex!][columnPair.beforeIndex!] = kind;
-      }
-      if (afterCell) {
-        afterCell.segments = segments;
-        afterKinds[rowPair.afterIndex!][columnPair.afterIndex!] = kind;
-      }
-      if (kind !== "unchanged") {
-        changes.push({
-          kind,
-          section: "table",
-          location: afterCell?.location || beforeCell?.location || L(`표 ${index + 1}`, `Table ${index + 1}`),
-          beforeLocation: beforeCell?.location ?? "",
-          afterLocation: afterCell?.location ?? "",
-          before: beforeCell?.text ?? "",
-          after: afterCell?.text ?? "",
-          segments,
-        });
-      }
-    }
-  }
-
-  const allKinds = [...beforeKinds.flat(), ...afterKinds.flat()];
-  const kind = !before ? "added" : !after ? "deleted" : allKinds.some((value) => value !== "unchanged") ? "changed" : "unchanged";
-  return {
-    index,
-    kind,
-    beforeIndex: before ? index : null,
-    afterIndex: after ? index : null,
-    before: beforeGrid,
-    after: afterGrid,
-    rowPairs,
-    columnPairs,
-    beforeKinds,
-    afterKinds,
-  };
-}
-
-function alignSequence<T>(before: T[], after: T[], textOf: (item: T) => string, compatible: (before: T, after: T) => boolean = () => true): SequencePair[] {
-  const rows = before.length + 1;
-  const cols = after.length + 1;
-  if (rows * cols > 4_000_000) return greedyAlign(before, after, textOf, compatible);
-  const scores = new Float32Array(rows * cols);
-  const directions = new Uint8Array(rows * cols);
-  const gap = -1;
-  for (let row = 1; row < rows; row += 1) { scores[row * cols] = row * gap; directions[row * cols] = 1; }
-  for (let col = 1; col < cols; col += 1) { scores[col] = col * gap; directions[col] = 2; }
-  for (let row = 1; row < rows; row += 1) {
-    for (let col = 1; col < cols; col += 1) {
-      const similarity = compatible(before[row - 1], after[col - 1]) ? textSimilarity(textOf(before[row - 1]), textOf(after[col - 1])) : 0;
-      const diagonal = scores[(row - 1) * cols + col - 1] + (similarity === 1 ? 5 : similarity >= 0.24 ? 0.15 + similarity * 3 : -2.2);
-      const up = scores[(row - 1) * cols + col] + gap;
-      const left = scores[row * cols + col - 1] + gap;
-      const offset = row * cols + col;
-      if (diagonal >= up && diagonal >= left) { scores[offset] = diagonal; directions[offset] = 3; }
-      else if (up >= left) { scores[offset] = up; directions[offset] = 1; }
-      else { scores[offset] = left; directions[offset] = 2; }
-    }
-  }
-  const result: SequencePair[] = [];
-  let row = before.length;
-  let col = after.length;
-  while (row > 0 || col > 0) {
-    const direction = directions[row * cols + col];
-    if (row > 0 && col > 0 && direction === 3) {
-      const similarity = compatible(before[row - 1], after[col - 1]) ? textSimilarity(textOf(before[row - 1]), textOf(after[col - 1])) : 0;
-      if (similarity >= 0.24) result.push({ beforeIndex: row - 1, afterIndex: col - 1 });
-      else {
-        result.push({ beforeIndex: null, afterIndex: col - 1 });
-        result.push({ beforeIndex: row - 1, afterIndex: null });
-      }
-      row -= 1;
-      col -= 1;
-    } else if (row > 0 && (direction === 1 || col === 0)) {
-      result.push({ beforeIndex: row - 1, afterIndex: null });
-      row -= 1;
-    } else {
-      result.push({ beforeIndex: null, afterIndex: col - 1 });
-      col -= 1;
-    }
-  }
-  return result.reverse();
-}
-
-function groupParagraphSplits<T>(
-  pairs: SequencePair[],
-  before: T[],
-  after: T[],
-  textOf: (item: T) => string,
-  canGroup: (item: T) => boolean = () => true,
-): SequenceGroup[] {
-  const groups: SequenceGroup[] = pairs.map((pair) => ({
-    beforeIndexes: pair.beforeIndex === null ? [] : [pair.beforeIndex],
-    afterIndexes: pair.afterIndex === null ? [] : [pair.afterIndex],
-  }));
-  const result: SequenceGroup[] = [];
-
-  for (let index = 0; index < groups.length; index += 1) {
-    const current = groups[index];
-    const next = groups[index + 1];
-    if (!next) { result.push(current); continue; }
-
-    const currentBefore = current.beforeIndexes[0];
-    const currentAfter = current.afterIndexes[0];
-    const nextBefore = next.beforeIndexes[0];
-    const nextAfter = next.afterIndexes[0];
-
-    if (!current.beforeIndexes.length && current.afterIndexes.length === 1
-      && next.beforeIndexes.length === 1 && next.afterIndexes.length === 1
-      && [after[currentAfter], before[nextBefore], after[nextAfter]].every(canGroup)
-      && looksLikeSplit(textOf(before[nextBefore]), textOf(after[currentAfter]), textOf(after[nextAfter]))) {
-      result.push({ beforeIndexes: [nextBefore], afterIndexes: [currentAfter, nextAfter] });
-      index += 1;
-      continue;
-    }
-
-    if (current.beforeIndexes.length === 1 && current.afterIndexes.length === 1
-      && !next.beforeIndexes.length && next.afterIndexes.length === 1
-      && [before[currentBefore], after[currentAfter], after[nextAfter]].every(canGroup)
-      && looksLikeSplit(textOf(before[currentBefore]), textOf(after[currentAfter]), textOf(after[nextAfter]))) {
-      result.push({ beforeIndexes: [currentBefore], afterIndexes: [currentAfter, nextAfter] });
-      index += 1;
-      continue;
-    }
-
-    if (!current.afterIndexes.length && current.beforeIndexes.length === 1
-      && next.beforeIndexes.length === 1 && next.afterIndexes.length === 1
-      && [before[currentBefore], before[nextBefore], after[nextAfter]].every(canGroup)
-      && looksLikeSplit(textOf(after[nextAfter]), textOf(before[currentBefore]), textOf(before[nextBefore]))) {
-      result.push({ beforeIndexes: [currentBefore, nextBefore], afterIndexes: [nextAfter] });
-      index += 1;
-      continue;
-    }
-
-    if (current.beforeIndexes.length === 1 && current.afterIndexes.length === 1
-      && next.beforeIndexes.length === 1 && !next.afterIndexes.length
-      && [before[currentBefore], before[nextBefore], after[currentAfter]].every(canGroup)
-      && looksLikeSplit(textOf(after[currentAfter]), textOf(before[currentBefore]), textOf(before[nextBefore]))) {
-      result.push({ beforeIndexes: [currentBefore, nextBefore], afterIndexes: [currentAfter] });
-      index += 1;
-      continue;
-    }
-
-    result.push(current);
-  }
-  return result;
-}
-
-function looksLikeSplit(singleValue: string, firstValue: string, secondValue: string) {
-  const single = normalizeForMatch(singleValue);
-  const first = normalizeForMatch(firstValue);
-  const second = normalizeForMatch(secondValue);
-  if (single.length < 20 || first.length < 8 || second.length < 8) return false;
-  const prefix = commonPrefixLength(single, first);
-  const suffix = commonSuffixLength(single, second);
-  const minimumPrefix = Math.min(24, Math.max(8, Math.round(Math.min(single.length, first.length) * 0.12)));
-  const minimumSuffix = Math.min(24, Math.max(8, Math.round(Math.min(single.length, second.length) * 0.12)));
-  const covered = Math.min(single.length, prefix + suffix) / single.length;
-  const nonOverlapping = prefix < single.length - Math.floor(minimumSuffix / 2)
-    && suffix < single.length - Math.floor(minimumPrefix / 2);
-  return prefix >= minimumPrefix && suffix >= minimumSuffix && covered >= 0.58 && nonOverlapping;
-}
-
-function commonPrefixLength(left: string, right: string) {
-  const limit = Math.min(left.length, right.length);
-  let index = 0;
-  while (index < limit && left[index] === right[index]) index += 1;
-  return index;
-}
-
-function commonSuffixLength(left: string, right: string) {
-  const limit = Math.min(left.length, right.length);
-  let index = 0;
-  while (index < limit && left[left.length - index - 1] === right[right.length - index - 1]) index += 1;
-  return index;
-}
-
-function greedyAlign<T>(before: T[], after: T[], textOf: (item: T) => string, compatible: (before: T, after: T) => boolean) {
-  const result: SequencePair[] = [];
-  let beforeIndex = 0;
-  let afterIndex = 0;
-  while (beforeIndex < before.length || afterIndex < after.length) {
-    if (beforeIndex >= before.length) { result.push({ beforeIndex: null, afterIndex: afterIndex++ }); continue; }
-    if (afterIndex >= after.length) { result.push({ beforeIndex: beforeIndex++, afterIndex: null }); continue; }
-    const direct = compatible(before[beforeIndex], after[afterIndex]) ? textSimilarity(textOf(before[beforeIndex]), textOf(after[afterIndex])) : 0;
-    if (direct >= 0.24) { result.push({ beforeIndex: beforeIndex++, afterIndex: afterIndex++ }); continue; }
-    const nextAfter = afterIndex + 1 < after.length && compatible(before[beforeIndex], after[afterIndex + 1]) ? textSimilarity(textOf(before[beforeIndex]), textOf(after[afterIndex + 1])) : 0;
-    const nextBefore = beforeIndex + 1 < before.length && compatible(before[beforeIndex + 1], after[afterIndex]) ? textSimilarity(textOf(before[beforeIndex + 1]), textOf(after[afterIndex])) : 0;
-    if (nextAfter > nextBefore && nextAfter >= 0.4) result.push({ beforeIndex: null, afterIndex: afterIndex++ });
-    else if (nextBefore >= 0.4) result.push({ beforeIndex: beforeIndex++, afterIndex: null });
-    else { result.push({ beforeIndex: beforeIndex++, afterIndex: null }); result.push({ beforeIndex: null, afterIndex: afterIndex++ }); }
-  }
-  return result;
-}
-
-function diffText(before: string, after: string): WordDiffSegment[] {
-  if (before === after) return before ? [{ type: "equal", text: before }] : [];
-  const left = tokenize(before);
-  const right = tokenize(after);
-  const rows = left.length + 1;
-  const cols = right.length + 1;
-  if (rows * cols > 1_500_000) return [{ type: "deleted", text: before }, { type: "added", text: after }];
-  const matrix = new Uint32Array(rows * cols);
-  for (let row = 1; row < rows; row += 1) {
-    for (let col = 1; col < cols; col += 1) {
-      matrix[row * cols + col] = left[row - 1] === right[col - 1]
-        ? matrix[(row - 1) * cols + col - 1] + 1
-        : Math.max(matrix[(row - 1) * cols + col], matrix[row * cols + col - 1]);
-    }
-  }
-  const reversed: WordDiffSegment[] = [];
-  let row = left.length;
-  let col = right.length;
-  while (row > 0 || col > 0) {
-    if (row > 0 && col > 0 && left[row - 1] === right[col - 1]) { reversed.push({ type: "equal", text: left[--row] }); col -= 1; }
-    else if (col > 0 && (row === 0 || matrix[row * cols + col - 1] >= matrix[(row - 1) * cols + col])) reversed.push({ type: "added", text: right[--col] });
-    else reversed.push({ type: "deleted", text: left[--row] });
-  }
-  const result: WordDiffSegment[] = [];
-  for (const segment of reversed.reverse()) {
-    const previous = result[result.length - 1];
-    if (previous?.type === segment.type) previous.text += segment.text;
-    else result.push({ ...segment });
-  }
-  return result;
-}
-
-function tokenize(text: string) {
-  return text.match(/\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu) ?? [];
-}
-
-function textSimilarity(leftValue: string, rightValue: string) {
-  const left = normalizeForMatch(leftValue);
-  const right = normalizeForMatch(rightValue);
-  if (left === right) return 1;
-  if (!left || !right) return 0;
-  const a = ngrams(left, left.length < 8 ? 1 : 2);
-  const b = ngrams(right, right.length < 8 ? 1 : 2);
-  const counts = new Map<string, number>();
-  a.forEach((item) => counts.set(item, (counts.get(item) ?? 0) + 1));
-  let matches = 0;
-  b.forEach((item) => {
-    const count = counts.get(item) ?? 0;
-    if (count > 0) { matches += 1; counts.set(item, count - 1); }
-  });
-  return (2 * matches) / (a.length + b.length);
-}
-
-function ngrams(value: string, size: number) {
-  if (value.length <= size) return [value];
-  return Array.from({ length: value.length - size + 1 }, (_, index) => value.slice(index, index + size));
-}
-
-function normalizeForMatch(value: string) {
-  return value.normalize("NFC").toLocaleLowerCase("ko-KR").replace(/\s+/g, " ").trim();
-}
-
 function cleanText(value: string) {
   return String(value ?? "")
     .replace(/\r\n?/g, "\n")
@@ -731,24 +324,6 @@ function rowText(row: WordTableCell[]) {
   return row.map((cell) => cell.text).join("\u241f");
 }
 
-function transpose(grid: WordTableCell[][]) {
-  const width = Math.max(0, ...grid.map((row) => row.length));
-  return Array.from({ length: width }, (_, column) => grid.map((row, rowIndex) => row[column] ?? emptyCell(L(`빈 셀 ${rowIndex + 1}:${column + 1}`, `Empty cell ${rowIndex + 1}:${column + 1}`))));
-}
-
-function toAxisPair(pair: SequencePair): WordTableAxisPair {
-  return { beforeIndex: pair.beforeIndex, afterIndex: pair.afterIndex };
-}
-
-function tableViewKind(table: WordTableComparison): WordViewKind {
-  if (table.beforeIndex === null) return "added";
-  if (table.afterIndex === null) return "deleted";
-  const kinds = [...table.beforeKinds.flat(), ...table.afterKinds.flat()];
-  if (kinds.some((kind) => kind === "added" || kind === "deleted" || kind === "changed")) return "changed";
-  if (kinds.some((kind) => kind === "format")) return "format";
-  return "unchanged";
-}
-
 function progress(value: number, message: string) {
   worker.postMessage({ type: "progress", progress: Math.max(0, Math.min(100, Math.round(value))), message });
 }
@@ -758,7 +333,14 @@ function yieldToWorker() {
 }
 
 function normalizeError(error: unknown) {
-  return error instanceof Error ? error.message : String(error || L("HWP 문서를 처리하지 못했습니다.", "Unable to process the HWP document."));
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/password|decrypt|encrypted|암호/i.test(message)) {
+    return L("암호를 확인하거나 암호를 해제한 HWP 사본으로 다시 시도해 주세요.", "Check the password or retry with an unlocked HWP copy.");
+  }
+  if (/memory|allocation|out of bounds|too large/i.test(message)) {
+    return L("문서가 너무 커서 현재 브라우저에서 비교하지 못했습니다. 다른 탭을 닫고 다시 시도해 주세요.", "The document is too large for this browser session. Close other tabs and try again.");
+  }
+  return L("HWP 문서를 읽지 못했습니다. 올바른 HWP·HWPX 파일인지, 파일이 손상되지 않았는지 확인해 주세요.", "Could not read the HWP document. Check that it is a valid, undamaged HWP or HWPX file.");
 }
 
 export {};

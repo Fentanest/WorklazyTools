@@ -39,6 +39,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Restore pinned office editor snapshot
+        uses: actions/cache@v4
+        with:
+          path: .cache/zetaoffice/2026-08-25
+          key: zetaoffice-2026-08-25-9ebd9a48-3dab0a54
+
       - name: Build static site
         run: npm run build
         env:

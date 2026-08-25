@@ -37,7 +37,11 @@ export function AppShell() {
   const location = useLocation();
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
   const videoStudioActive = normalizedPath === "/tools/video-studio";
+  const officeEditorAppActive = normalizedPath === "/tools/office-editor/app";
+  const excelPreserveActive = normalizedPath === "/tools/excel-merger/xls-preserve";
   const videoIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-video-isolation"]'));
+  const officeIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-office-isolation"]'));
+  const excelIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-excel-preserve-isolation"]'));
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -67,8 +71,10 @@ export function AppShell() {
     <div className="app-shell">
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} language={language} />
-      <AnalyticsLoader disabled={videoStudioActive && !videoIsolationDocument} />
-      {!videoStudioActive && !videoIsolationDocument && <AdSenseLoader />}
+      <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
+      <ExcelPreserveIsolationBoundary active={excelPreserveActive} isolationDocument={excelIsolationDocument} language={language} />
+      <AnalyticsLoader disabled={(videoStudioActive && !videoIsolationDocument) || officeEditorAppActive || excelPreserveActive} />
+      {!videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand brand-image-link" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
           <img className="brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
@@ -211,6 +217,36 @@ function VideoIsolationBoundary({ active, isolationDocument, language }: { activ
     if (active && !isolationDocument) {
       const target = new URL(window.location.href);
       target.pathname = localizedPath(language, "/tools/video-studio/");
+      window.location.replace(target.href);
+      return;
+    }
+    if (!active && isolationDocument) window.location.replace(window.location.href);
+  }, [active, isolationDocument, language]);
+
+  return null;
+}
+
+function OfficeIsolationBoundary({ active, isolationDocument, language }: { active: boolean; isolationDocument: boolean; language: "ko" | "en" }) {
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    if (active && !isolationDocument) {
+      const target = new URL(window.location.href);
+      target.pathname = localizedPath(language, "/tools/office-editor/app/");
+      window.location.replace(target.href);
+      return;
+    }
+    if (!active && isolationDocument) window.location.replace(window.location.href);
+  }, [active, isolationDocument, language]);
+
+  return null;
+}
+
+function ExcelPreserveIsolationBoundary({ active, isolationDocument, language }: { active: boolean; isolationDocument: boolean; language: "ko" | "en" }) {
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    if (active && !isolationDocument) {
+      const target = new URL(window.location.href);
+      target.pathname = localizedPath(language, "/tools/excel-merger/xls-preserve/");
       window.location.replace(target.href);
       return;
     }

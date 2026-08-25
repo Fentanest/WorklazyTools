@@ -29,16 +29,17 @@ export async function buildWordReport(result: WordCompareResult, language: "ko" 
     { label: local("삭제", "Deleted"), value: result.summary.deleted },
     { label: local("내용 변경", "Content changed"), value: result.summary.changed },
     { label: local("서식 변경", "Formatting changed"), value: result.summary.format },
+    { label: local("이동", "Moved"), value: result.summary.moved ?? 0 },
   ]);
   styleHeader(summary.getRow(1), "D3D3D3", "FF1D1D1F");
-  summary.getCell("B8").value = {
+  summary.getCell("B9").value = {
     richText: [{ text: local("파란색 취소선", "Blue strikethrough"), font: { color: { argb: "FF0000FF" }, strike: true } }],
   };
-  summary.getCell("A8").value = local("삭제 표시", "Deletion mark");
-  summary.getCell("B9").value = {
+  summary.getCell("A9").value = local("삭제 표시", "Deletion mark");
+  summary.getCell("B10").value = {
     richText: [{ text: local("빨간색 굵게", "Bold red"), font: { color: { argb: "FFFF0000" }, bold: true } }],
   };
-  summary.getCell("A9").value = local("삽입 표시", "Insertion mark");
+  summary.getCell("A10").value = local("삽입 표시", "Insertion mark");
 
   const generalChanges = result.changes.filter((change) => change.section !== "table");
   const changes = workbook.addWorksheet(local("변경 내용", "Changes"));
@@ -54,7 +55,7 @@ export async function buildWordReport(result: WordCompareResult, language: "ko" 
     const row = changes.addRow({
       section: sectionLabel(change.section, local),
       location: change.location,
-      kind: changeKindLabel(change.kind, local),
+      kind: `${changeKindLabel(change.kind, local)}${change.moved && change.kind !== "moved" ? ` · ${local("이동", "Moved")}` : ""}`,
     });
     row.getCell(3).value = wordDiffRichText(change, "before");
     row.getCell(4).value = wordDiffRichText(change, "after");
@@ -76,6 +77,7 @@ export async function buildWordReport(result: WordCompareResult, language: "ko" 
     if (kind === local("추가", "Added")) row.getCell(5).font = { color: { argb: "FFFF0000" }, bold: true };
     if (kind === local("삭제", "Deleted")) row.getCell(5).font = { color: { argb: "FF0000FF" }, bold: true };
     if (kind === local("서식 변경", "Formatting changed")) row.getCell(5).font = { color: { argb: "FF7C3AED" }, bold: true };
+    if (String(kind).includes(local("이동", "Moved"))) row.getCell(5).font = { color: { argb: "FF0F8B8D" }, bold: true };
   });
   changes.views = [{ state: "frozen", ySplit: 1 }];
   changes.autoFilter = "A1:E1";
@@ -193,5 +195,5 @@ function sectionLabel(section: string, local: Localizer) {
 }
 
 function changeKindLabel(kind: string, local: Localizer) {
-  return kind === "added" ? local("추가", "Added") : kind === "deleted" ? local("삭제", "Deleted") : kind === "format" ? local("서식 변경", "Formatting changed") : local("내용 변경", "Content changed");
+  return kind === "added" ? local("추가", "Added") : kind === "deleted" ? local("삭제", "Deleted") : kind === "format" ? local("서식 변경", "Formatting changed") : kind === "moved" ? local("이동", "Moved") : local("내용 변경", "Content changed");
 }

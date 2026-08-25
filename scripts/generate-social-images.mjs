@@ -6,13 +6,13 @@ const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
   tool("excel-merger", "#22a65a", "문서·스프레드시트", "Excel 병합기", "여러 파일 · 시트별 · 세로 · 가로 병합", "Documents & spreadsheets", "Excel Merger", "Combine files · sheets · rows · columns"),
-  tool("word-compare", "#0879d9", "문서 비교", "Word 문서 비교", "본문 · 표 · 서식 · 변경 추적", "Document comparison", "Word Compare", "Text · tables · formatting · tracked changes"),
+  tool("document-compare", "#0879d9", "문서 비교", "Word·HWP 문서 비교", "DOCX·DOC · HWP·HWPX · 이동·분할 판정", "Document comparison", "Document Compare", "DOCX & DOC · HWP & HWPX · move detection"),
   tool("pdf-tools", "#7554d8", "PDF 편집·변환", "PDF 도구", "페이지 편집 · 병합 · 변환 · OCR", "PDF editing & conversion", "PDF Tools", "Edit · merge · convert · OCR"),
   tool("image-to-pdf", "#7554d8", "PDF 편집·변환", "이미지를 PDF로 변환", "JPG·PNG · 순서 변경 · A4 맞춤", "PDF editing & conversion", "Image to PDF", "JPG & PNG · reorder · A4 fit"),
   tool("pdf-to-image", "#7554d8", "PDF 편집·변환", "PDF를 이미지로 변환", "PNG·JPG · 해상도 선택 · ZIP 저장", "PDF editing & conversion", "PDF to Image", "PNG & JPG · resolution · ZIP download"),
   tool("pdf-convert", "#7554d8", "PDF 편집·변환", "PDF 문서 변환·OCR", "DOCX·XLSX·TXT · 한국어·영어 OCR", "PDF editing & conversion", "PDF Conversion & OCR", "DOCX · XLSX · TXT · Korean & English OCR"),
   tool("hwp-editor", "#db7a16", "한글 문서", "HWP 편집기", "HWP·HWPX · 본문 · 표 · 개체 편집", "Hangul documents", "HWP Editor", "HWP & HWPX · text · tables · objects"),
-  tool("hwp-compare", "#db7a16", "한글 문서 비교", "HWP 문서 비교", "본문 · 표 · 개요 번호 · Excel 보고서", "Hangul comparison", "HWP Compare", "Text · tables · numbering · Excel report"),
+  tool("office-editor", "#7554d8", "브라우저 오피스", "오피스 편집기", "Writer · Calc · Impress · 브라우저 저장", "Browser office", "Office Editor", "Writer · Calc · Impress · local saving"),
   tool("video-studio", "#d8468f", "미디어", "비디오 스튜디오", "영상 자르기 · 이어붙이기 · 음원 추출", "Media", "Video Studio", "Trim · join · extract audio"),
   tool("audio-studio", "#7554d8", "미디어", "오디오 스튜디오", "파형 편집 · 구간 자르기 · 피치 조절", "Media", "Audio Studio", "Waveform editing · trimming · pitch"),
   tool("image-studio", "#0b91c9", "미디어", "이미지 스튜디오", "사진 편집 · 모자이크 · 콜라주 · GIF", "Media", "Image Studio", "Photo editing · mosaic · collage · GIF"),

@@ -13,12 +13,24 @@ export function RouteSeo() {
     const path = normalizeSeoPath(location.pathname);
     const language = languageFromPath(path) ?? "ko";
     const routePath = normalizeSeoPath(stripLanguagePrefix(path));
-    const isTemporaryResult = routePath.startsWith("/tools/word-compare/results/") || routePath.startsWith("/tools/hwp-compare/results/");
-    const baseResultPath = routePath.startsWith("/tools/hwp-compare") ? "/tools/hwp-compare" : "/tools/word-compare";
+    const isTemporaryResult = routePath.startsWith("/tools/document-compare/results/");
+    const isOfficeWorkspace = routePath === "/tools/office-editor/app";
+    const isExcelPreserveWorkspace = routePath === "/tools/excel-merger/xls-preserve";
+    const baseResultPath = "/tools/document-compare";
     const seo = isTemporaryResult
-      ? { ...getSeoDefinition(language, baseResultPath), title: language === "en" ? `${baseResultPath.includes("hwp") ? "HWP" : "Word"} Comparison Result | Worklazy Tools` : `${baseResultPath.includes("hwp") ? "HWP" : "Word"} 문서 비교 결과 | Worklazy Tools`, noIndex: true }
+      ? { ...getSeoDefinition(language, baseResultPath), title: language === "en" ? "Document Comparison Result | Worklazy Tools" : "문서 비교 결과 | Worklazy Tools", noIndex: true }
+      : isOfficeWorkspace
+        ? { ...getSeoDefinition(language, "/tools/office-editor"), noIndex: true }
+        : isExcelPreserveWorkspace
+          ? { ...getSeoDefinition(language, "/tools/excel-merger"), noIndex: true }
       : getSeoDefinition(language, routePath);
-    const canonicalPath = isTemporaryResult ? baseResultPath : routePath;
+    const canonicalPath = isTemporaryResult
+      ? baseResultPath
+      : isOfficeWorkspace
+        ? "/tools/office-editor"
+        : isExcelPreserveWorkspace
+          ? "/tools/excel-merger"
+          : routePath;
     const canonical = getCanonicalUrl(language, canonicalPath);
     const imageDefinition = getSocialImageDefinition(language, canonicalPath);
     const image = getSocialImageUrl(language, canonicalPath);
@@ -121,6 +133,18 @@ function createStructuredData(language: "ko" | "en", path: string, canonical: st
       operatingSystem: "Any",
       featureList: seo.application.featureList,
       offers: { "@type": "Offer", price: "0", priceCurrency: "KRW" },
+    });
+  }
+
+  if (seo.faq?.length) {
+    data.push({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: seo.faq.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: { "@type": "Answer", text: item.answer },
+      })),
     });
   }
 
