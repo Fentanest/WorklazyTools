@@ -1,4 +1,4 @@
-import { OFFICE_ASSETS, OFFICE_DOWNLOAD_BYTES, OFFICE_ASSET_VERSION, officeAssetBaseUrl } from "./officeAssets";
+import { OFFICE_ASSETS, OFFICE_CORE_ASSETS, OFFICE_DOWNLOAD_BYTES, OFFICE_CORE_DOWNLOAD_BYTES, OFFICE_ASSET_VERSION, officeAssetBaseUrl } from "./officeAssets";
 
 export interface OfficeDownloadProgress {
   loaded: number;
@@ -11,19 +11,22 @@ export interface OfficeDownloadProgress {
 export async function prepareOfficeAssets(
   onProgress: (progress: OfficeDownloadProgress) => void,
   signal?: AbortSignal,
+  profile: "editor" | "converter" = "editor",
 ) {
   if (!("caches" in window)) throw new Error("cache-unavailable");
   const cache = await caches.open(`worklazy-office-${OFFICE_ASSET_VERSION}`);
   const baseUrl = officeAssetBaseUrl();
+  const assets = profile === "editor" ? OFFICE_ASSETS : OFFICE_CORE_ASSETS;
+  const downloadBytes = profile === "editor" ? OFFICE_DOWNLOAD_BYTES : OFFICE_CORE_DOWNLOAD_BYTES;
   let completedBytes = 0;
-  for (let index = 0; index < OFFICE_ASSETS.length; index += 1) {
+  for (let index = 0; index < assets.length; index += 1) {
     if (signal?.aborted) throw signal.reason ?? new DOMException("Cancelled", "AbortError");
-    const asset = OFFICE_ASSETS[index];
+    const asset = assets[index];
     const url = new URL(asset.name, baseUrl).href;
     const cached = await cache.match(url);
     if (cached && Number(cached.headers.get("x-worklazy-office-size")) === asset.size) {
       completedBytes += asset.size;
-      onProgress({ loaded: completedBytes, total: OFFICE_DOWNLOAD_BYTES, fileNumber: index + 1, fileCount: OFFICE_ASSETS.length, cached: true });
+      onProgress({ loaded: completedBytes, total: downloadBytes, fileNumber: index + 1, fileCount: assets.length, cached: true });
       continue;
     }
     if (cached) await cache.delete(url);
@@ -45,10 +48,10 @@ export async function prepareOfficeAssets(
         if (done) break;
         currentBytes += value.byteLength;
         onProgress({
-          loaded: Math.min(OFFICE_DOWNLOAD_BYTES, completedBytes + currentBytes),
-          total: OFFICE_DOWNLOAD_BYTES,
+          loaded: Math.min(downloadBytes, completedBytes + currentBytes),
+          total: downloadBytes,
           fileNumber: index + 1,
-          fileCount: OFFICE_ASSETS.length,
+          fileCount: assets.length,
           cached: false,
         });
       }

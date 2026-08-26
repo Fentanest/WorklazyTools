@@ -3,6 +3,7 @@ interface OfficeModule {
   uno_scripts: string[];
   locateFile: (path: string, prefix: string) => string;
   mainScriptUrlOrBlob: Blob;
+  preRun?: Array<() => void>;
   uno_main?: Promise<MessagePort>;
 }
 
@@ -26,7 +27,13 @@ export interface OfficeRuntime {
 export async function launchOfficeRuntime(
   canvas: HTMLCanvasElement,
   assetBaseUrl: string,
+  editorFontNames: readonly string[] = [],
 ): Promise<OfficeRuntime> {
+  const editorFonts = await Promise.all(editorFontNames.map(async (name) => {
+    const response = await fetch(new URL(name, assetBaseUrl));
+    if (!response.ok) throw new Error("asset-download-failed");
+    return { name, bytes: new Uint8Array(await response.arrayBuffer()) };
+  }));
   const mainScriptUrlOrBlob = new Blob(
     [`importScripts('${new URL("soffice.js", assetBaseUrl).href}');`],
     { type: "text/javascript" },
@@ -39,6 +46,7 @@ export async function launchOfficeRuntime(
     ],
     locateFile: (path) => new URL(path, assetBaseUrl).href,
     mainScriptUrlOrBlob,
+    ...(editorFonts.length ? { preRun: [() => installEditorFonts(editorFonts)] } : {}),
   };
 
   await loadClassicScript(new URL("soffice.js", assetBaseUrl).href);
@@ -113,6 +121,14 @@ export async function launchOfficeRuntime(
       }
     },
   };
+}
+
+function installEditorFonts(fonts: Array<{ name: string; bytes: Uint8Array }>) {
+  const fileSystem = (globalThis as typeof globalThis & { FS: OfficeFileSystem }).FS;
+  for (const directory of ["/usr", "/usr/share", "/usr/share/fonts"]) {
+    try { fileSystem.mkdir(directory); } catch { /* 이미 준비된 폴더입니다. */ }
+  }
+  for (const font of fonts) fileSystem.writeFile(`/usr/share/fonts/${safeFileName(font.name)}`, font.bytes);
 }
 
 function loadClassicScript(url: string) {

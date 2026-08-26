@@ -59,17 +59,17 @@ test("English tool titles do not fall back to a generic browser-tool label", () 
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {
-  for (const route of ["/tools/document-compare", "/tools/office-editor"]) {
+  for (const [route, expectedCount] of [["/tools/document-compare", 3], ["/tools/office-editor", 5]] as const) {
     const koreanFaq = getSeoDefinition("ko", route).faq;
     const englishFaq = getSeoDefinition("en", route).faq;
-    assert.equal(koreanFaq?.length, 3);
-    assert.equal(englishFaq?.length, 3);
+    assert.equal(koreanFaq?.length, expectedCount);
+    assert.equal(englishFaq?.length, expectedCount);
     assert.ok(koreanFaq?.every((item) => item.question && item.answer));
     assert.ok(englishFaq?.every((item) => item.question && item.answer));
   }
   for (const language of ["ko", "en"] as const) {
     const excelFaq = getSeoDefinition(language, "/tools/excel-merger").faq;
-    assert.equal(excelFaq?.length, 2);
+    assert.equal(excelFaq?.length, 3);
     assert.ok(excelFaq?.every((item) => item.question && item.answer));
   }
 });

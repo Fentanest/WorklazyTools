@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/zetaoffice/2026-08-25
-          key: zetaoffice-2026-08-25-9ebd9a48-3dab0a54
+          key: zetaoffice-2026-08-25-9ebd9a48-3dab0a54-nanum76f45ef4
 
       - name: Build static site
         run: npm run build

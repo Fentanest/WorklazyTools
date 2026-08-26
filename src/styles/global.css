@@ -970,19 +970,35 @@ input:focus-visible {
 .office-start-panel strong { font-size: 14px; }
 .office-start-panel small { margin-top: 3px; color: var(--label-secondary); font-size: 13px; line-height: 1.45; }
 .office-start-panel .primary-button { min-width: 176px; }
+.office-landing-drop { display: grid; gap: 8px; margin-top: 14px; }
+.office-landing-drop > small { color: var(--label-secondary); font-size: 12px; text-align: center; }
+.office-landing-drop .field-error { margin: 0; text-align: center; }
 .office-editor-app { width: min(1440px,100%); }
 .office-app-toolbar { position: sticky; z-index: 8; top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 13px; padding: 11px; border: 1px solid var(--glass-border); border-radius: 16px; background: var(--bg-elevated); box-shadow: var(--card-shadow); backdrop-filter: blur(18px); }
 .office-app-toolbar .primary-button, .office-app-toolbar .secondary-button { min-height: 40px; }
+.office-toolbar-document { min-width: 0; display: flex; flex: 1; align-items: center; gap: 8px; color: var(--violet); }
+.office-toolbar-document > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.office-toolbar-document strong { max-width: 420px; overflow: hidden; color: var(--label); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.office-toolbar-document small { max-width: 520px; overflow: hidden; color: var(--label-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .office-file-picker { position: relative; overflow: hidden; cursor: pointer; }
 .office-file-picker.disabled { opacity: .42; cursor: not-allowed; }
 .office-file-picker input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .office-canvas-shell { position: relative; min-height: 680px; margin-top: 13px; overflow: hidden; border: 1px solid var(--separator); border-radius: 16px; background: #303035; box-shadow: var(--card-shadow); }
 .office-canvas-shell.active { min-height: max(680px,calc(100vh - 230px)); }
-.office-canvas { display: block; width: 100%; min-height: inherit; outline: 0; }
+.office-canvas { display: block; width: 100%; height: 100%; min-height: inherit; border: 0; padding: 0; outline: 0; }
 .office-canvas-placeholder { position: absolute; z-index: 2; inset: 0; display: grid; place-items: center; align-content: center; gap: 8px; padding: 24px; color: #d7d7dc; background: radial-gradient(circle at 50% 35%,#47474f,#29292e 68%); text-align: center; }
+.office-canvas-placeholder .drop-zone-wrap { width: min(720px, 100%); }
 .office-canvas-placeholder svg { color: #b496ff; }
 .office-canvas-placeholder strong { max-width: 620px; font-size: 16px; overflow-wrap: anywhere; }
 .office-canvas-placeholder span { color: #aaaab3; font-size: 13px; }
+.office-editor-focus { position: fixed; z-index: 20; inset: 0 0 0 280px; display: flex; flex-direction: column; width: auto; max-width: none; height: 100dvh; margin: 0; padding: 8px; overflow: hidden; background: var(--bg); animation: none; }
+.office-editor-focus .office-app-toolbar { position: static; top: auto; min-height: 54px; flex: 0 0 auto; margin: 0 0 8px; padding: 7px 9px; border-radius: 14px; }
+.office-editor-focus > .office-progress-region, .office-editor-focus > .error-banner { flex: 0 0 auto; margin: 0 0 8px; }
+.office-progress-region[hidden] { display: none; }
+.office-editor-focus .office-canvas-shell, .office-editor-focus .office-canvas-shell.active { height: auto; min-height: 0; flex: 1; margin: 0; border-radius: 14px; }
+.office-editor-focus .office-canvas { min-height: 0; }
+.office-drop-overlay { position: fixed; z-index: 80; inset: 16px 16px 16px 296px; display: grid; place-items: center; align-content: center; gap: 10px; color: #fff; border: 3px dashed #b496ff; border-radius: 20px; background: rgba(54,37,82,.88); pointer-events: none; }
+.office-drop-overlay svg { color: #c8b3ff; }
 .inline-comment-list { display: flex; flex-direction: column; gap: 6px; margin-top: 11px; padding-top: 9px; border-top: 1px dashed #e0c276; }
 .inline-comment-card { padding: 8px 9px; border: 1px solid #f0d58d; border-radius: 8px; background: #fff9df; }
 .inline-comment-card > div { display: flex; align-items: center; gap: 5px; color: #8b6300; }
@@ -1862,6 +1878,8 @@ label.invalid > small { color: #c9342f; }
   .compact-home-hero { padding: 29px 33px; }
   .pdf-workflow-grid { grid-template-columns: minmax(0, 1fr) 270px; }
   .hwp-editor-focus { left: 250px; }
+  .office-editor-focus { left: 250px; }
+  .office-drop-overlay { left: 266px; }
   .tool-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .editor-toolbar { grid-template-columns: 1fr auto; }
   .editor-draw-width { grid-column: 1/-1; }
@@ -1904,6 +1922,10 @@ label.invalid > small { color: #c9342f; }
   .page { padding-top: calc(84px + env(safe-area-inset-top)); padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
   .hwp-editor-focus { z-index: 60; inset: 0; width: auto; height: 100dvh; padding: 0; }
   .hwp-editor-focus .hwp-editor-section { border-radius: 0; }
+  .office-editor-focus { z-index: 60; inset: 0; width: auto; height: 100dvh; padding: 0; }
+  .office-editor-focus .office-app-toolbar { border-width: 0 0 1px; border-radius: 0; }
+  .office-editor-focus .office-canvas-shell, .office-editor-focus .office-canvas-shell.active { border-radius: 0; }
+  .office-drop-overlay { inset: 8px; border-radius: 14px; }
   .sheet-backdrop { display: flex; }
   .hero { min-height: auto; grid-template-columns: 1fr; padding: 45px; }
   .hero-content { max-width: 580px; }
@@ -2073,6 +2095,8 @@ label.invalid > small { color: #c9342f; }
   .office-format-grid > div { min-height: 84px; }
   .office-app-toolbar { position: static; display: grid; grid-template-columns: 1fr 1fr; }
   .office-app-toolbar > * { width: 100%; justify-content: center; }
+  .office-editor-focus .office-toolbar-document { grid-column: 1 / -1; justify-content: flex-start; }
+  .office-editor-focus .office-toolbar-document > span { align-items: flex-start; }
   .office-canvas-shell, .office-canvas-shell.active { min-height: max(500px,calc(100vh - 330px)); }
   .section-actions, .section-actions .primary-button { width: 100%; }
   .qr-scan-actions .qr-photo-picker { width: 100%; min-height: 44px; }

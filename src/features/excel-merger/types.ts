@@ -11,11 +11,16 @@ export interface ExcelInputPayload {
   password?: string;
   selectedSheetNames?: string[];
   csvEncoding?: "auto" | "utf-8" | "euc-kr";
+  retention?: ExcelRetentionOptions;
+}
+
+export interface ExcelRetentionOptions {
+  formulas: boolean;
+  formatting: boolean;
 }
 
 export interface ExcelMergeOptions {
   mergeMode: MergeMode;
-  onlyValues: boolean;
   trimEmptyEdges: boolean;
   sheetTrimRows: boolean;
   sheetTrimColumns: boolean;

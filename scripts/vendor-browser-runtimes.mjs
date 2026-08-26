@@ -80,11 +80,26 @@ async function vendorZetaOffice() {
     { name: "soffice.data", size: 99520604, sha256: "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c" },
     { name: "soffice.data.js.metadata", size: 215180, sha256: "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3" },
   ];
+  const editorFontAssets = [
+    {
+      name: "NanumGothic-Regular.ttf",
+      size: 2054744,
+      sha256: "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      sourceUrl: "https://raw.githubusercontent.com/google/fonts/6a003b5eb672dc8bf5bff5937cf5863f8b175445/ofl/nanumgothic/NanumGothic-Regular.ttf",
+    },
+  ];
+  const fontLicenseAssets = [{
+    name: "NanumGothic-OFL.txt",
+    size: 4534,
+    sha256: "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f",
+    sourceUrl: "https://raw.githubusercontent.com/google/fonts/6a003b5eb672dc8bf5bff5937cf5863f8b175445/ofl/nanumgothic/OFL.txt",
+  }];
+  const allAssets = [...assets, ...editorFontAssets, ...fontLicenseAssets];
   await fs.mkdir(cacheDirectory, { recursive: true });
-  for (const asset of assets) {
+  for (const asset of allAssets) {
     const target = path.join(cacheDirectory, asset.name);
     if (!(await matchesAsset(target, asset))) {
-      const response = await fetch(new URL(asset.name, ensureTrailingSlash(sourceBaseUrl)), {
+      const response = await fetch(asset.sourceUrl ?? new URL(asset.name, ensureTrailingSlash(sourceBaseUrl)), {
         headers: { "Accept-Encoding": "identity" },
       });
       if (!response.ok || !response.body) throw new Error(`Unable to download pinned office asset ${asset.name}: HTTP ${response.status}`);
@@ -98,12 +113,12 @@ async function vendorZetaOffice() {
   }
   await fs.rm(destination, { recursive: true, force: true });
   await fs.mkdir(destination, { recursive: true });
-  await Promise.all(assets.map((asset) => fs.copyFile(path.join(cacheDirectory, asset.name), path.join(destination, asset.name))));
+  await Promise.all(allAssets.map((asset) => fs.copyFile(path.join(cacheDirectory, asset.name), path.join(destination, asset.name))));
   await Promise.all([
     fs.copyFile(path.join(projectRoot, "node_modules", "zetajs", "source", "zeta.js"), path.join(destination, "zeta.js")),
     fs.copyFile(path.join(projectRoot, "src", "features", "office-editor", "office_thread.js"), path.join(destination, "office_thread.js")),
   ]);
-  await fs.writeFile(path.join(destination, "manifest.json"), `${JSON.stringify({ version, assets }, null, 2)}\n`);
+  await fs.writeFile(path.join(destination, "manifest.json"), `${JSON.stringify({ version, assets, editorFontAssets, fontLicenseAssets }, null, 2)}\n`);
 }
 
 async function matchesAsset(filePath, asset) {

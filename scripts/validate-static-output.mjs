@@ -66,7 +66,7 @@ for (const route of routes) {
   }
   if (["tools/excel-merger", "tools/document-compare", "tools/office-editor"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
-      ? language === "ko" ? "XLS 수식과 서식도 보존할 수 있나요?" : "Can XLS formulas and formatting be preserved?"
+      ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/document-compare"
         ? language === "ko" ? "DOC와 DOCX를 서로 비교할 수 있나요?" : "Can I compare DOC with DOCX?"
         : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";
@@ -141,6 +141,8 @@ const officeAssets = [
   ["soffice.wasm", 161667499, "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4"],
   ["soffice.data", 99520604, "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c"],
   ["soffice.data.js.metadata", 215180, "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3"],
+  ["NanumGothic-Regular.ttf", 2054744, "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31"],
+  ["NanumGothic-OFL.txt", 4534, "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f"],
 ];
 for (const [name, expectedSize, expectedHash] of officeAssets) {
   const filePath = path.join("dist", "vendor", "zetaoffice", "2026-08-26", name);
@@ -150,7 +152,7 @@ for (const [name, expectedSize, expectedHash] of officeAssets) {
   }
 }
 const officeThread = await fs.stat(path.join("dist", "vendor", "zetaoffice", "2026-08-26", "office_thread.js"));
-if (officeThread.size !== 2636) throw new Error("The pinned office command bridge is missing or does not match the current bundle.");
+if (officeThread.size !== 2752) throw new Error("The pinned office command bridge is missing or does not match the current bundle.");
 for (const language of ["ko", "en"]) {
   for (const isolatedRoute of [["tools", "office-editor", "app"], ["tools", "excel-merger", "xls-preserve"]]) {
     const officeIsolationPath = path.join("dist", language, ...isolatedRoute, "coi-serviceworker.js");

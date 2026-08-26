@@ -84,16 +84,16 @@ export async function inspectExcelFiles(files: Array<{ id: string; file: File; d
 }
 
 export async function mergeExcelFiles(
-  files: Array<{ id: string; file: File; displayName?: string; preservedLegacy?: boolean; password?: string; selectedSheetNames: string[]; csvEncoding?: ExcelInputPayload["csvEncoding"] }>,
+  files: Array<{ id: string; file: File; displayName?: string; preservedLegacy?: boolean; password?: string; selectedSheetNames: string[]; csvEncoding?: ExcelInputPayload["csvEncoding"]; retention?: ExcelInputPayload["retention"] }>,
   options: ExcelMergeOptions,
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
   signal?: AbortSignal,
 ) {
   const payloads: ExcelInputPayload[] = [];
-  for (const { id, file, displayName, preservedLegacy, password, selectedSheetNames, csvEncoding } of files) {
+  for (const { id, file, displayName, preservedLegacy, password, selectedSheetNames, csvEncoding, retention } of files) {
     if (signal?.aborted) throw new DOMException(language === "en" ? "The spreadsheet merge was cancelled." : "스프레드시트 병합을 취소했습니다.", "AbortError");
-    payloads.push({ id, name: file.name, displayName, preservedLegacy, buffer: await file.arrayBuffer(), password, selectedSheetNames, csvEncoding });
+    payloads.push({ id, name: file.name, displayName, preservedLegacy, buffer: await file.arrayBuffer(), password, selectedSheetNames, csvEncoding, retention });
   }
 
   return runWorker<ExcelMergeResult>(

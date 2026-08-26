@@ -1,15 +1,19 @@
-import { AlertCircle, Download, FileUp, Save } from "lucide-react";
+import { AlertCircle, Download, FileText, FileUp, Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
-import { PrimaryButton } from "../../components/ui";
+import { FileDropZone, PrimaryButton } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import { prepareOfficeAssets } from "./officeAssetLoader";
+import { OFFICE_EDITOR_FONT_ASSETS } from "./officeAssets";
 import { launchOfficeRuntime, type OfficeRuntime } from "./officeRuntime";
+import { takePendingOfficeFile } from "./pendingOfficeFile";
 
 type EditorState = "idle" | "downloading" | "preparing" | "ready" | "opening" | "editing" | "saving" | "error";
+const OFFICE_ACCEPT = ".docx,.doc,.odt,.xlsx,.xls,.ods,.pptx,.ppt,.odp";
+const OFFICE_EXTENSIONS = new Set(["docx", "doc", "odt", "xlsx", "xls", "ods", "pptx", "ppt", "odp"]);
 
 export function OfficeEditorAppPage() {
   const language = useAppLanguage();
@@ -19,10 +23,12 @@ export function OfficeEditorAppPage() {
   const [state, setState] = useState<EditorState>("idle");
   const [error, setError] = useState<string>();
   const [elapsed, setElapsed] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<OfficeRuntime | undefined>(undefined);
   const controllerRef = useRef<AbortController | undefined>(undefined);
   const assetUiRef = useRef({ fileNumber: 0, percent: -1 });
+  const pendingFileCheckedRef = useRef(false);
   const operation = useOperationProgress();
 
   useEffect(() => {
@@ -32,9 +38,43 @@ export function OfficeEditorAppPage() {
     return () => window.clearInterval(timer);
   }, [state]);
   useEffect(() => () => controllerRef.current?.abort(), []);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const preventPageMovement = (event: KeyboardEvent | WheelEvent) => event.preventDefault();
+    canvas.addEventListener("keydown", preventPageMovement);
+    canvas.addEventListener("wheel", preventPageMovement, { passive: false });
+    return () => {
+      canvas.removeEventListener("keydown", preventPageMovement);
+      canvas.removeEventListener("wheel", preventPageMovement);
+    };
+  }, []);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const shell = canvas?.parentElement;
+    if (!canvas || !shell || typeof ResizeObserver === "undefined") return;
+    let frame = 0;
+    let lastWidth = 0;
+    let lastHeight = 0;
+    const notifyEditor = (entries: ResizeObserverEntry[]) => {
+      const { width, height } = entries[0]?.contentRect ?? { width: 0, height: 0 };
+      if (Math.abs(width - lastWidth) < 1 && Math.abs(height - lastHeight) < 1) return;
+      lastWidth = width;
+      lastHeight = height;
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+    };
+    const observer = new ResizeObserver(notifyEditor);
+    observer.observe(shell);
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
-  const start = async () => {
+  const start = async (requestedFile = file) => {
     if (!canvasRef.current) return;
+    if (requestedFile) setFile(requestedFile);
     setError(undefined);
     setState("downloading");
     const controller = new AbortController();
@@ -56,11 +96,11 @@ export function OfficeEditorAppPage() {
       setState("preparing");
       setElapsed(0);
       operation.update(84, L("편집 화면을 준비하고 있습니다. 잠시만 기다려 주세요.", "Preparing the editor. Please wait."));
-      const runtime = await launchOfficeRuntime(canvasRef.current, assetBaseUrl);
+      const runtime = await launchOfficeRuntime(canvasRef.current, assetBaseUrl, OFFICE_EDITOR_FONT_ASSETS.map((asset) => asset.name));
       runtimeRef.current = runtime;
       setState("ready");
       operation.update(92, L("편집 화면을 준비했습니다. 문서를 선택해 주세요.", "The editor is ready. Choose a document."));
-      if (file) await openFile(file, runtime);
+      if (requestedFile) await openFile(requestedFile, runtime);
       else operation.succeed(L("편집 화면을 사용할 수 있습니다.", "The editor is ready to use."));
     } catch (reason) {
       const message = editorError(reason, language);
@@ -74,6 +114,7 @@ export function OfficeEditorAppPage() {
 
   const openFile = async (nextFile: File, runtime = runtimeRef.current) => {
     setFile(nextFile);
+    setError(undefined);
     if (!runtime) return;
     setState("opening");
     setElapsed(0);
@@ -93,6 +134,7 @@ export function OfficeEditorAppPage() {
   const save = async () => {
     const runtime = runtimeRef.current;
     if (!runtime) return;
+    setError(undefined);
     setState("saving");
     operation.start(L("변경 내용을 저장하고 파일을 확인하는 중…", "Saving changes and checking the file…"));
     try {
@@ -108,28 +150,76 @@ export function OfficeEditorAppPage() {
     } catch (reason) {
       const message = editorError(reason, language);
       setError(message);
-      setState("error");
+      setState("editing");
       operation.fail(message);
     }
   };
 
+  const chooseFile = (nextFile: File) => {
+    if (!isSupportedOfficeFile(nextFile)) {
+      const message = L("DOCX, DOC, ODT, XLSX, XLS, ODS, PPTX, PPT 또는 ODP 파일 한 개를 선택해 주세요.", "Choose one DOCX, DOC, ODT, XLSX, XLS, ODS, PPTX, PPT or ODP file.");
+      setError(message);
+      operation.fail(message);
+      return;
+    }
+    if (state === "editing" && !window.confirm(L("현재 문서의 변경 내용을 저장했는지 확인해 주세요. 다른 문서를 여시겠어요?", "Make sure you saved changes to the current document. Open another document?"))) return;
+    const runtime = runtimeRef.current;
+    if (runtime) void openFile(nextFile, runtime);
+    else void start(nextFile);
+  };
+
+  useEffect(() => {
+    if (pendingFileCheckedRef.current) return;
+    pendingFileCheckedRef.current = true;
+    void takePendingOfficeFile()
+      .then((pendingFile) => { if (pendingFile) chooseFile(pendingFile); })
+      .catch(() => {
+        const message = L("이전에 선택한 파일을 가져오지 못했습니다. 아래 영역에서 파일을 다시 선택해 주세요.", "The previously selected file could not be retrieved. Choose it again below.");
+        setError(message);
+        operation.fail(message);
+      });
+  }, []);
+
   const busy = state === "downloading" || state === "preparing" || state === "opening" || state === "saving";
-  return <div className="page office-editor-app page-enter">
+  const focusMode = Boolean(file);
+  return <div
+    className={`page office-editor-app page-enter${focusMode ? " office-editor-focus" : ""}`}
+    onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files") && !busy) { event.preventDefault(); setDragging(true); } }}
+    onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = busy ? "none" : "copy"; } }}
+    onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+    onDrop={(event) => {
+      if ((event.target as Element).closest(".drop-zone")) return;
+      event.preventDefault();
+      setDragging(false);
+      if (!busy && event.dataTransfer.files[0]) chooseFile(event.dataTransfer.files[0]);
+    }}
+  >
     <div className="office-app-toolbar">
       <Link className="secondary-button" to={landingPath}>{L("편집기 안내", "Editor guide")}</Link>
-      <label className={`secondary-button office-file-picker${busy ? " disabled" : ""}`}><FileUp size={15} /> {file ? L("다른 파일 열기", "Open another file") : L("파일 선택", "Choose file")}<input type="file" accept=".docx,.doc,.odt,.xlsx,.xls,.ods,.pptx,.ppt,.odp" disabled={busy} onChange={(event) => { const selected = event.target.files?.[0]; if (selected) void openFile(selected); }} /></label>
-      {state === "idle" || state === "error" ? <PrimaryButton accent="violet" loading={busy} onClick={() => void start()}>{L("편집 화면 준비", "Prepare editor")}</PrimaryButton> : null}
+      {file && <span className="office-toolbar-document"><FileText size={17} /><span><strong>{file.name}</strong><small>{state === "editing" ? L("브라우저에서 편집 중", "Editing in this browser") : operation.message}</small></span></span>}
+      <label className={`secondary-button office-file-picker${busy ? " disabled" : ""}`}><FileUp size={15} /> {file ? L("다른 파일 열기", "Open another file") : L("파일 선택", "Choose file")}<input type="file" accept={OFFICE_ACCEPT} disabled={busy} onChange={(event) => { const selected = event.target.files?.[0]; event.currentTarget.value = ""; if (selected) chooseFile(selected); }} /></label>
+      {state === "error" && file ? <PrimaryButton accent="violet" loading={busy} onClick={() => { const runtime = runtimeRef.current; if (runtime) void openFile(file, runtime); else void start(file); }}>{L("다시 시도", "Try again")}</PrimaryButton> : null}
       <button type="button" className="primary-button accent-violet" disabled={state !== "editing"} onClick={() => void save()}><Save size={15} /> {L("저장 및 다운로드", "Save and download")}</button>
       {state === "downloading" && <button type="button" className="secondary-button" onClick={() => controllerRef.current?.abort()}>{L("취소", "Cancel")}</button>}
     </div>
 
-    <OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} accent="violet" title={L("오피스 편집기 준비 상태", "Office editor preparation")} />
+    <div className="office-progress-region" hidden={focusMode && state === "editing"}><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} accent="violet" title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
     {error && <div className="error-banner" role="alert"><AlertCircle size={19} /><div><strong>{L("편집기를 준비하지 못했습니다.", "Could not prepare the editor.")}</strong><span>{error}</span></div></div>}
     <div className={`office-canvas-shell${state === "editing" ? " active" : ""}`}>
-      {state !== "editing" && <div className="office-canvas-placeholder"><Download size={30} /><strong>{file ? file.name : L("편집할 파일을 선택하고 편집 화면을 준비하세요.", "Choose a file and prepare the editor.")}</strong><span>{state === "preparing" || state === "opening" ? L(`준비 중 · ${elapsed}초 경과`, `Preparing · ${elapsed}s elapsed`) : L("최초 실행은 약 250MB를 내려받습니다.", "The first run downloads about 250 MB.")}</span></div>}
-      <canvas ref={canvasRef} id="qtcanvas" contentEditable className="office-canvas" onContextMenu={(event) => event.preventDefault()} />
+      {state !== "editing" && <div className="office-canvas-placeholder">
+        {state === "idle" || (state === "error" && !file) ? <>
+          <FileDropZone files={[]} onFiles={(files) => { const selected = files.at(-1); if (selected) chooseFile(selected); }} accept={OFFICE_ACCEPT} hint={L("파일을 놓거나 선택하면 편집 준비와 문서 열기를 자동으로 시작합니다.", "Drop or choose a file to prepare the editor and open it automatically.")} accent="violet" disabled={busy} />
+          <span>{L("최초 실행에는 대용량 편집 파일과 한글 글꼴을 내려받습니다.", "The first run downloads the editor and a Korean font file.")}</span>
+        </> : <><Download size={30} /><strong>{file?.name}</strong><span>{state === "preparing" || state === "opening" ? L(`준비 중 · ${elapsed}초 경과`, `Preparing · ${elapsed}s elapsed`) : operation.message}</span></>}
+      </div>}
+      <canvas ref={canvasRef} id="qtcanvas" contentEditable tabIndex={0} className="office-canvas" onPointerDown={(event) => event.currentTarget.focus()} onContextMenu={(event) => event.preventDefault()} />
     </div>
+    {dragging && !busy && <div className="office-drop-overlay"><FileUp size={32} /><strong>{L("여기에 놓아 문서 열기", "Drop to open the document")}</strong></div>}
   </div>;
+}
+
+function isSupportedOfficeFile(file: File) {
+  return OFFICE_EXTENSIONS.has(file.name.split(".").pop()?.toLowerCase() ?? "");
 }
 
 function formatBytes(bytes: number) {

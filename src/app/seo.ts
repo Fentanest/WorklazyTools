@@ -20,7 +20,8 @@ export interface SeoDefinition {
 const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDefinition["faq"]>>> = {
   ko: {
     "/tools/excel-merger": [
-      { question: "XLS 수식과 서식도 보존할 수 있나요?", answer: "가능합니다. 출력 설정의 XLS 입력에서 보존 옵션을 켜세요. XLS를 호환 XLSX 구조로 먼저 변환하며, XLS 파일을 처음 선택할 때 약 250MB의 추가 파일을 내려받습니다." },
+      { question: "XLSX 수식과 서식을 따로 보존할 수 있나요?", answer: "가능합니다. XLSX 수식 보존과 서식 보존을 현재 화면에서 각각 선택할 수 있으며 추가 파일을 준비하지 않습니다." },
+      { question: "XLS 수식과 서식을 따로 보존할 수 있나요?", answer: "가능합니다. XLS 수식 보존과 XLS 서식 보존을 각각 선택할 수 있으며, 둘 중 하나만 켜도 정밀 변환 화면으로 이동합니다." },
       { question: "보존 옵션을 켜면 모든 XLS 기능이 완전히 유지되나요?", answer: "수식과 일반 셀 서식을 우선 보존하지만 차트, 외부 연결, 매크로와 일부 고급 개체는 달라질 수 있으므로 중요한 결과는 Excel에서 확인하세요." },
     ],
     "/tools/document-compare": [
@@ -30,13 +31,16 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
     "/tools/office-editor": [
       { question: "처음 실행 용량이 큰 이유는 무엇인가요?", answer: "오피스 프로그램과 글꼴·리소스를 브라우저에 저장해야 하기 때문입니다. 다음 실행부터는 저장된 파일을 재사용할 수 있습니다." },
+      { question: "파일을 놓으면 바로 열리나요?", answer: "지원 파일 한 개를 놓으면 집중 편집 화면 이동, 편집기 준비와 문서 열기가 자동으로 이어집니다." },
+      { question: "한글 글꼴도 표시되나요?", answer: "한글 대체 글꼴을 함께 제공하지만 상용 전용 글꼴을 사용한 문서는 줄바꿈과 간격이 달라질 수 있습니다." },
       { question: "Microsoft의 공식 웹 오피스인가요?", answer: "아닙니다. LibreOffice 기반 브라우저 편집기이며 Microsoft Office와 호환성 차이가 있을 수 있습니다." },
       { question: "HWP도 여기서 편집할 수 있나요?", answer: "HWP/HWPX는 전용 HWP 편집기를 이용하세요. 이 편집기는 Writer·Calc·Impress 형식에 초점을 둡니다." },
     ],
   },
   en: {
     "/tools/excel-merger": [
-      { question: "Can XLS formulas and formatting be preserved?", answer: "Yes. Turn on the preservation option under XLS input in Output settings. XLS is first converted to a compatible XLSX structure, and the first XLS selection downloads about 250 MB of additional files." },
+      { question: "Can XLSX formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate XLSX switches on the current screen and require no additional files." },
+      { question: "Can XLS formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate switches, and either one opens the higher-fidelity conversion workspace." },
       { question: "Does preservation retain every XLS feature perfectly?", answer: "It prioritizes formulas and common cell formatting, but charts, external links, macros and some advanced objects can differ. Verify important output in Excel." },
     ],
     "/tools/document-compare": [
@@ -46,6 +50,8 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
     "/tools/office-editor": [
       { question: "Why is the first start large?", answer: "A browser build of the office suite and its fonts and resources must be stored locally. Later starts can reuse the cache." },
+      { question: "Does dropping a file open it automatically?", answer: "Yes. Dropping one supported file moves to the focused workspace, prepares the editor and opens the document in one flow." },
+      { question: "Does it include a Korean font?", answer: "A Korean fallback font is included, though documents requiring proprietary fonts can have different spacing or line breaks." },
       { question: "Is this an official Microsoft Office web app?", answer: "No. It is a LibreOffice-based browser editor and compatibility can differ from Microsoft Office." },
       { question: "Are HWP files supported here?", answer: "Use the dedicated HWP editor for HWP/HWPX files. This editor focuses on Writer, Calc, and Impress formats." },
     ],
@@ -111,10 +117,10 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/excel-merger": {
     title: "Excel 파일 병합 - XLSX·XLS·XLSB·XLSM·CSV 합치기",
-    description: "여러 XLSX, XLS, XLSB, XLSM, CSV 파일을 하나의 XLSX로 병합하세요. XLSX와 선택형 XLS 수식·서식 보존, 암호 입출력을 지원하며 파일은 브라우저에서 처리됩니다.",
+    description: "여러 XLSX, XLS, XLSB, XLSM, CSV 파일을 하나의 XLSX로 병합하세요. XLSX와 XLS의 수식·서식을 각각 선택해 보존하고 암호 입출력을 지원합니다.",
     application: {
       name: "Excel Merger",
-      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 및 선택형 XLS 수식·서식 보존", "암호화 파일 입출력"],
+      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 수식·서식 개별 보존", "XLS 수식·서식 개별 보존", "암호화 파일 입출력"],
     },
   },
   "/tools/document-compare": {
@@ -155,8 +161,8 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/office-editor": {
     title: "브라우저 오피스 편집기 - DOCX·XLSX·PPTX 온라인 편집",
-    description: "LibreOffice 기반 Writer·Calc·Impress 화면에서 DOCX·DOC·ODT, XLSX·XLS·ODS, PPTX·PPT·ODP 파일을 브라우저 안에서 편집하고 저장하세요.",
-    application: { name: "Browser Office Editor", featureList: ["LibreOffice 기반 브라우저 편집", "DOCX·DOC·ODT Writer", "XLSX·XLS·ODS Calc", "PPTX·PPT·ODP Impress", "실제 다운로드 진행률", "매크로·외부 갱신 차단", "브라우저 내 파일 처리"] },
+    description: "DOCX·XLSX·PPTX 파일을 놓으면 LibreOffice 기반 전체 화면 편집기를 자동으로 준비하고, 한글 대체 글꼴로 브라우저 안에서 편집·저장합니다.",
+    application: { name: "Browser Office Editor", featureList: ["파일 드롭 자동 시작", "전체 화면 집중 편집", "한글 대체 글꼴", "DOCX·DOC·ODT Writer", "XLSX·XLS·ODS Calc", "PPTX·PPT·ODP Impress", "실제 다운로드 진행률", "매크로·외부 갱신 차단", "브라우저 내 파일 처리"] },
   },
   "/tools/video-studio": {
     title: "비디오 스튜디오 | 영상 자르기·이어붙이기·음원 추출",
@@ -263,7 +269,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
 const englishPageSeo: Record<string, SeoDefinition> = {
   "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
-  "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with optional high-fidelity XLS formula and formatting preservation in your browser.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "XLSX and optional XLS formula and formatting preservation", "Encrypted input and output"] } },
+  "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with separate formula and formatting controls for XLSX and XLS input.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "Independent XLSX formula and formatting preservation", "Independent XLS formula and formatting preservation", "Encrypted input and output"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
   "/tools/pdf-editor/convert": { title: "Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", description: "Convert selected PDF pages to DOCX, XLSX, TXT or searchable PDF using self-hosted English and Korean OCR in your browser.", application: { name: "PDF Document Conversion and OCR", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },

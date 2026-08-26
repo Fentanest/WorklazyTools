@@ -56,6 +56,7 @@ function convertSpreadsheet(filename, output) {
 
 function openFile(filename) {
   try {
+    try { documentModel?.dispose(); } catch { /* 이전 문서는 새 문서를 열기 전에 정리합니다. */ }
     const properties = [
       new css.beans.PropertyValue({ Name: 'MacroExecutionMode', Value: 0 }),
       new css.beans.PropertyValue({ Name: 'UpdateDocMode', Value: 0 }),

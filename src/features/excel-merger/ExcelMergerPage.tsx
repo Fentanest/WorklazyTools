@@ -72,11 +72,15 @@ export function ExcelMergerPage() {
   const language = i18n.resolvedLanguage === "en" ? "en" : "ko";
   const location = useLocation();
   const preserveLegacyXls = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") === "/tools/excel-merger/xls-preserve";
+  const initialXlsRetention = getInitialXlsRetention(preserveLegacyXls, location.search);
   const standardPath = useLocalizedPath("/tools/excel-merger/");
   const preservePath = useLocalizedPath("/tools/excel-merger/xls-preserve/");
   const [entries, setEntries] = useState<ExcelFileEntry[]>([]);
   const [mergeMode, setMergeMode] = useState<MergeMode>("sheets");
-  const [onlyValues, setOnlyValues] = useState(false);
+  const [xlsxFormulas, setXlsxFormulas] = useState(true);
+  const [xlsxFormatting, setXlsxFormatting] = useState(true);
+  const [xlsFormulas, setXlsFormulas] = useState(initialXlsRetention.formulas);
+  const [xlsFormatting, setXlsFormatting] = useState(initialXlsRetention.formatting);
   const [trimEmptyEdges, setTrimEmptyEdges] = useState(true);
   const [sheetTrimRows, setSheetTrimRows] = useState(false);
   const [sheetTrimColumns, setSheetTrimColumns] = useState(false);
@@ -130,7 +134,6 @@ export function ExcelMergerPage() {
     && !outputPasswordMismatch;
 
   const mergeModeLabel = t(`excel.modes.${mergeMode}`);
-  const formulaLabel = t(onlyValues ? "excel.valuesOnly" : "excel.keepFormulas");
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
   const handleFiles = (nextFiles: File[]) => {
@@ -212,7 +215,7 @@ export function ExcelMergerPage() {
           if (assetUiRef.current.fileNumber === fileNumber) operation.updateCurrent(percent, message);
           else operation.update(percent, message);
           assetUiRef.current = { fileNumber, percent };
-        }, controller.signal);
+        }, controller.signal, "converter");
         operation.update(78, t("excel.xlsPreserve.status.preparing"));
         runtime = await launchOfficeRuntime(converterCanvasRef.current, assetBaseUrl);
         officeRuntimeRef.current = runtime;
@@ -266,10 +269,26 @@ export function ExcelMergerPage() {
     }
   };
 
-  const changePreserveMode = (enabled: boolean) => {
-    if (enabled === preserveLegacyXls || precisionPreparing || loading) return;
-    if (entries.length > 0 && !window.confirm(t("excel.xlsPreserve.switchConfirm"))) return;
-    window.location.assign(enabled ? preservePath : standardPath);
+  const changeXlsRetention = (kind: "formulas" | "formatting", checked: boolean) => {
+    if (precisionPreparing || loading) return;
+    const next = {
+      formulas: kind === "formulas" ? checked : xlsFormulas,
+      formatting: kind === "formatting" ? checked : xlsFormatting,
+    };
+    const requiresNavigation = preserveLegacyXls ? !next.formulas && !next.formatting : next.formulas || next.formatting;
+    if (requiresNavigation) {
+      if (entries.length > 0 && !window.confirm(t("excel.xlsPreserve.switchConfirm"))) return;
+      if (!next.formulas && !next.formatting) {
+        window.location.assign(standardPath);
+        return;
+      }
+      window.location.assign(createPreserveUrl(preservePath, next));
+      return;
+    }
+    setXlsFormulas(next.formulas);
+    setXlsFormatting(next.formatting);
+    window.history.replaceState(window.history.state, "", createPreserveUrl(preservePath, next));
+    clearResult();
   };
 
   const removeFile = (id: string) => {
@@ -354,10 +373,13 @@ export function ExcelMergerPage() {
           password: entry.password || undefined,
           selectedSheetNames,
           csvEncoding,
+          retention: retentionForFile(entry.file.name, {
+            xlsx: { formulas: xlsxFormulas, formatting: xlsxFormatting },
+            xls: { formulas: xlsFormulas, formatting: xlsFormatting },
+          }),
         })),
         {
           mergeMode,
-          onlyValues,
           trimEmptyEdges,
           sheetTrimRows,
           sheetTrimColumns,
@@ -500,18 +522,20 @@ export function ExcelMergerPage() {
           <SectionCard step={4} title={t("excel.steps.output.title")} description={t("excel.steps.output.description")}>
             <div className="settings-categories">
               <section className="settings-category">
-                <h3>{t("excel.output.categories.cellContent")}</h3>
+                <h3>{t("excel.output.categories.xlsxInput")}</h3>
                 <div className="settings-list">
                   <ToggleRow
-                    label={t("excel.output.valuesLabel")}
-                    description={t(onlyValues ? "excel.output.valuesOn" : "excel.output.valuesOff")}
-                    checked={onlyValues}
-                    onChange={(checked) => { setOnlyValues(checked); clearResult(); }}
+                    label={t("excel.output.xlsxFormulas")}
+                    description={t(xlsxFormulas ? "excel.output.xlsxFormulasOn" : "excel.output.xlsxFormulasOff")}
+                    checked={xlsxFormulas}
+                    onChange={(checked) => { setXlsxFormulas(checked); clearResult(); }}
                   />
-                  <label className="settings-row select-row">
-                    <span><strong>{t("excel.output.csvEncoding")}</strong><small>{t("excel.output.csvEncodingHelp")}</small></span>
-                    <select value={csvEncoding} onChange={(event) => { setCsvEncoding(event.target.value as "auto" | "utf-8" | "euc-kr"); clearResult(); }}><option value="auto">{t("excel.output.csvAuto")}</option><option value="utf-8">UTF-8</option><option value="euc-kr">CP949 / EUC-KR</option></select>
-                  </label>
+                  <ToggleRow
+                    label={t("excel.output.xlsxFormatting")}
+                    description={t(xlsxFormatting ? "excel.output.xlsxFormattingOn" : "excel.output.xlsxFormattingOff")}
+                    checked={xlsxFormatting}
+                    onChange={(checked) => { setXlsxFormatting(checked); clearResult(); }}
+                  />
                 </div>
               </section>
 
@@ -519,12 +543,30 @@ export function ExcelMergerPage() {
                 <h3>{t("excel.output.categories.xlsInput")}</h3>
                 <div className="settings-list">
                   <ToggleRow
-                    label={t("excel.xlsPreserve.label")}
-                    description={t(preserveLegacyXls ? "excel.xlsPreserve.onHelp" : "excel.xlsPreserve.offHelp")}
-                    checked={preserveLegacyXls}
-                    onChange={changePreserveMode}
+                    label={t("excel.xlsPreserve.formulasLabel")}
+                    description={t(xlsFormulas ? "excel.xlsPreserve.formulasOn" : "excel.xlsPreserve.formulasOff")}
+                    checked={xlsFormulas}
+                    onChange={(checked) => changeXlsRetention("formulas", checked)}
                     disabled={precisionPreparing || loading}
                   />
+                  <ToggleRow
+                    label={t("excel.xlsPreserve.formattingLabel")}
+                    description={t(xlsFormatting ? "excel.xlsPreserve.formattingOn" : "excel.xlsPreserve.formattingOff")}
+                    checked={xlsFormatting}
+                    onChange={(checked) => changeXlsRetention("formatting", checked)}
+                    disabled={precisionPreparing || loading}
+                  />
+                </div>
+                <div className="inline-notice warning"><Info size={15} /><span>{t("excel.xlsPreserve.reloadNotice")}</span></div>
+              </section>
+
+              <section className="settings-category">
+                <h3>{t("excel.output.categories.csvInput")}</h3>
+                <div className="settings-list">
+                  <label className="settings-row select-row">
+                    <span><strong>{t("excel.output.csvEncoding")}</strong><small>{t("excel.output.csvEncodingHelp")}</small></span>
+                    <select value={csvEncoding} onChange={(event) => { setCsvEncoding(event.target.value as "auto" | "utf-8" | "euc-kr"); clearResult(); }}><option value="auto">{t("excel.output.csvAuto")}</option><option value="utf-8">UTF-8</option><option value="euc-kr">CP949 / EUC-KR</option></select>
+                  </label>
                 </div>
               </section>
 
@@ -632,7 +674,10 @@ export function ExcelMergerPage() {
               <div><dt>{t("excel.summary.sheets")}</dt><dd>{t("excel.summary.count", { count: selectedSheetCount })}</dd></div>
               <div><dt>{t("excel.summary.encryptedInputs")}</dt><dd>{t("excel.summary.count", { count: encryptedCount })}</dd></div>
               <div><dt>{t("excel.summary.mode")}</dt><dd>{mergeModeLabel}</dd></div>
-              <div><dt>{t("excel.summary.cells")}</dt><dd>{formulaLabel}</dd></div>
+              <div><dt>{t("excel.summary.xlsxFormulas")}</dt><dd>{t(xlsxFormulas ? "excel.summary.enabled" : "excel.summary.disabled")}</dd></div>
+              <div><dt>{t("excel.summary.xlsxFormatting")}</dt><dd>{t(xlsxFormatting ? "excel.summary.enabled" : "excel.summary.disabled")}</dd></div>
+              <div><dt>{t("excel.summary.xlsFormulas")}</dt><dd>{t(xlsFormulas ? "excel.summary.enabled" : "excel.summary.disabled")}</dd></div>
+              <div><dt>{t("excel.summary.xlsFormatting")}</dt><dd>{t(xlsFormatting ? "excel.summary.enabled" : "excel.summary.disabled")}</dd></div>
               <div><dt>{t("excel.summary.middleEmpty")}</dt><dd>{sheetTrimRows || sheetTrimColumns ? t("excel.summary.emptyEnabled", { axes: `${sheetTrimRows ? t("excel.summary.rows") : ""}${sheetTrimRows && sheetTrimColumns ? "·" : ""}${sheetTrimColumns ? t("excel.summary.columns") : ""}`, count: sheetTrimThreshold }) : t("excel.summary.disabled")}</dd></div>
               <div><dt>{t("excel.summary.format")}</dt><dd>{t(protectOutput ? "excel.summary.protected" : "excel.summary.unprotected")}</dd></div>
             </dl>
@@ -847,6 +892,34 @@ function fileKey(file: File) {
 
 function getExtension(fileName: string) {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function getInitialXlsRetention(preserveRoute: boolean, search: string) {
+  if (!preserveRoute) return { formulas: false, formatting: false };
+  const parameters = new URLSearchParams(search);
+  if (!parameters.has("formula") && !parameters.has("format")) return { formulas: true, formatting: true };
+  return {
+    formulas: parameters.get("formula") === "1",
+    formatting: parameters.get("format") === "1",
+  };
+}
+
+function createPreserveUrl(path: string, retention: { formulas: boolean; formatting: boolean }) {
+  const target = new URL(path, window.location.origin);
+  target.searchParams.set("formula", retention.formulas ? "1" : "0");
+  target.searchParams.set("format", retention.formatting ? "1" : "0");
+  return `${target.pathname}${target.search}`;
+}
+
+function retentionForFile(fileName: string, retention: {
+  xlsx: { formulas: boolean; formatting: boolean };
+  xls: { formulas: boolean; formatting: boolean };
+}) {
+  const extension = getExtension(fileName);
+  if (extension === "xlsx") return retention.xlsx;
+  if (extension === "xls") return retention.xls;
+  if (extension === "csv") return { formulas: false, formatting: false };
+  return { formulas: true, formatting: true };
 }
 
 function xlsPreserveError(reason: unknown, language: "ko" | "en") {

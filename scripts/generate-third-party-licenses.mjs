@@ -18,8 +18,12 @@ const sections = [
   "Tesseract language data — see the model's upstream notice and https://github.com/tesseract-ocr/tessdata",
   "ZetaOffice / LibreOffice browser build snapshot 2026-08-25 — MPL-2.0 — https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2",
   "LibreOffice source and license information — https://www.libreoffice.org/about-us/licenses/",
+  "Nanum Gothic — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/nanumgothic",
   "JSDoc legacy Word reader snapshot 821695a — 0BSD — https://github.com/Alpaq92/JSDoc",
 ];
+
+const nanumLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "zetaoffice", "2026-08-26", "NanumGothic-OFL.txt"), "utf8");
+sections.push("", "=".repeat(78), "Nanum Gothic", "Declared license: SIL Open Font License 1.1", "", "--- LICENSE ---", nanumLicense.trim().replace(/[ \t]+$/gm, ""));
 
 for (const [packagePath, lockMetadata] of productionPackages) {
   const directory = path.join(projectRoot, packagePath);

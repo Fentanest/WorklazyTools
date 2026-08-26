@@ -14,6 +14,7 @@ import type {
   ExcelInspectionResult,
   ExcelMergeOptions,
   ExcelMergeResult,
+  ExcelRetentionOptions,
   MergeMode,
   SheetNameRule,
   WordCompareResult,
@@ -25,6 +26,7 @@ Object.assign(globalThis, { Buffer, process });
 interface ParsedInput {
   fileName: string;
   workbook: ExcelJS.Workbook;
+  retention: ExcelRetentionOptions;
   selectedWorksheets?: ExcelJS.Worksheet[];
   incomingSheetReferences?: IncomingSheetReferenceIndex;
 }
@@ -42,6 +44,7 @@ interface SheetPlan {
   columnOffset: number;
   bounds: SheetBounds;
   skipRows: number;
+  retention: ExcelRetentionOptions;
 }
 
 interface SheetTrimStats {
@@ -148,10 +151,10 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
 
   const warnings = new Set<string>();
   if (files.some((file) => file.preservedLegacy)) {
-    warnings.add(local("XLS 입력을 호환 XLSX 구조로 먼저 변환해 수식과 일반 셀 서식을 보존했습니다. 차트·외부 연결·일부 고급 개체는 결과에서 확인해 주세요.", "Legacy XLS input was first converted to a compatible XLSX structure to preserve formulas and common cell formatting. Verify charts, external links and advanced objects in the result."));
+    warnings.add(local("XLS 입력을 호환 XLSX 구조로 먼저 변환한 뒤 선택한 수식·서식 보존 설정을 적용했습니다. 차트·외부 연결·일부 고급 개체는 결과에서 확인해 주세요.", "Legacy XLS input was first converted to a compatible XLSX structure, then the selected formula and formatting settings were applied. Verify charts, external links and advanced objects in the result."));
   }
   if (files.some((file) => !file.preservedLegacy && ["xls", "xlsb", "xlsm"].includes(getExtension(file.name)))) {
-    warnings.add(local("XLS·XLSB·XLSM 입력은 값과 기본 시트 구조를 XLSX로 변환합니다. 수식과 서식은 XLSX 입력에서만 보존됩니다.", "XLS, XLSB and XLSM inputs are converted to XLSX with values and basic sheet structure. Formulas and formatting are preserved only for XLSX inputs."));
+    warnings.add(local("일반 처리의 XLS·XLSB·XLSM 입력은 값과 기본 시트 구조를 XLSX로 변환합니다. XLS 수식 또는 서식을 정밀하게 유지하려면 해당 보존 옵션을 켜세요.", "XLS, XLSB and XLSM inputs in standard processing are converted to XLSX with values and basic sheet structure. Enable the corresponding XLS preservation option for higher-fidelity formulas or formatting."));
   }
   if (files.some((file) => getExtension(file.name) === "xlsm")) {
     warnings.add(local("XLSM의 매크로는 XLSX 출력 파일에 보존되지 않습니다.", "XLSM macros are not preserved in the XLSX output."));
@@ -168,7 +171,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
     parsed.selectedWorksheets = selectedSheetNames
       .map((sheetName) => parsed.workbook.getWorksheet(sheetName))
       .filter((sheet): sheet is ExcelJS.Worksheet => Boolean(sheet));
-    if (options.trimEmptyEdges) parsed.incomingSheetReferences = buildIncomingSheetReferenceIndex(parsed.workbook);
+    if (options.trimEmptyEdges && parsed.retention.formulas) parsed.incomingSheetReferences = buildIncomingSheetReferenceIndex(parsed.workbook);
     if (!parsed.selectedWorksheets.length) {
       throw new ExcelWorkerError(local(`${displayName}에서 병합할 시트를 선택해 주세요.`, `Select at least one sheet from ${displayName}.`), "NO_SHEETS", displayName);
     }
@@ -191,23 +194,20 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
     inputs.forEach((input, fileIndex) => {
       (input.selectedWorksheets ?? []).forEach((source) => {
         inputSheetCount += 1;
-        const referencedByAnotherSheet = options.trimEmptyEdges && hasIncomingSheetReference(input.workbook, source, input.incomingSheetReferences);
+        const referencedByAnotherSheet = options.trimEmptyEdges && input.retention.formulas && hasIncomingSheetReference(input.workbook, source, input.incomingSheetReferences);
         if (referencedByAnotherSheet) warnings.add(local(`'${source.name}' 시트는 다른 시트 수식에서 참조하므로 끝의 빈 영역 정리를 건너뛰었습니다.`, `Skipped ending-empty-area trim in '${source.name}' because another sheet formula references it.`));
         const targetName = createSheetName(input.fileName, source.name, options.sheetNameRule, usedNames);
-        const target = output.addWorksheet(targetName, {
-          properties: cloneData(source.properties),
-          pageSetup: cloneData(source.pageSetup),
-          views: cloneData(source.views),
-        });
-        target.state = source.state;
+        const target = output.addWorksheet(targetName, parsedSheetOptions(source, input.retention));
+        if (input.retention.formatting) target.state = source.state;
         plans.push({
           fileIndex,
           source,
           target,
           rowOffset: 0,
           columnOffset: 0,
-          bounds: getSheetBounds(source, options.trimEmptyEdges && !referencedByAnotherSheet),
+          bounds: getSheetBounds(source, options.trimEmptyEdges && !referencedByAnotherSheet, input.retention.formatting),
           skipRows: 0,
+          retention: input.retention,
         });
       });
     });
@@ -219,10 +219,10 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
     inputs.forEach((input, fileIndex) => {
       (input.selectedWorksheets ?? []).forEach((source) => {
         inputSheetCount += 1;
-        const sourceBounds = getSheetBounds(source, options.trimEmptyEdges);
+        const sourceBounds = getSheetBounds(source, options.trimEmptyEdges, input.retention.formatting);
         const skipRows = options.mergeMode === "vertical" && plans.length > 0 ? Math.min(sourceBounds.rows, Math.max(0, Math.floor(options.skipHeaderRows || 0))) : 0;
         const bounds = { rows: Math.max(0, sourceBounds.rows - skipRows), columns: sourceBounds.columns };
-        plans.push({ fileIndex, source, target, rowOffset, columnOffset, bounds, skipRows });
+        plans.push({ fileIndex, source, target, rowOffset, columnOffset, bounds, skipRows, retention: input.retention });
         if (options.mergeMode === "vertical") rowOffset += bounds.rows;
         if (options.mergeMode === "horizontal") columnOffset += bounds.columns;
       });
@@ -235,7 +235,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
 
   for (let index = 0; index < plans.length; index += 1) {
     const plan = plans[index];
-    progress(47 + Math.round((index / Math.max(1, plans.length)) * 37), local(`[${index + 1}/${plans.length}] ${plan.source.name} 셀·수식·서식 복사 중…`, `[${index + 1}/${plans.length}] Copying cells, formulas and formatting from ${plan.source.name}…`));
+    progress(47 + Math.round((index / Math.max(1, plans.length)) * 37), local(`[${index + 1}/${plans.length}] ${plan.source.name}에서 선택한 내용을 복사하는 중…`, `[${index + 1}/${plans.length}] Copying selected content from ${plan.source.name}…`));
     copyWorksheet(plan, planLookup, options, warnings);
   }
 
@@ -290,14 +290,15 @@ async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
   }
 
   try {
-    if (extension === "csv") return { fileName: displayName, workbook: await readCsv(displayName, data, file.csvEncoding) };
+    const retention = file.retention ?? { formulas: true, formatting: true };
+    if (extension === "csv") return { fileName: displayName, workbook: await readCsv(displayName, data, file.csvEncoding), retention: { formulas: false, formatting: false } };
     if (["xls", "xlsb", "xlsm"].includes(extension)) {
-      return { fileName: displayName, workbook: readConvertedWorkbook(data) };
+      return { fileName: displayName, workbook: readConvertedWorkbook(data), retention };
     }
     if (extension === "xlsx") {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(Buffer.from(data));
-      return { fileName: displayName, workbook };
+      return { fileName: displayName, workbook, retention };
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -375,10 +376,10 @@ function copyWorksheet(
   options: ExcelMergeOptions,
   warnings: Set<string>,
 ) {
-  const { source, target, rowOffset, columnOffset, bounds, skipRows } = plan;
+  const { source, target, rowOffset, columnOffset, bounds, skipRows, retention } = plan;
   if (!bounds.rows || !bounds.columns) return;
 
-  for (let columnIndex = 1; columnIndex <= bounds.columns; columnIndex += 1) {
+  for (let columnIndex = 1; retention.formatting && columnIndex <= bounds.columns; columnIndex += 1) {
     const sourceColumn = source.getColumn(columnIndex);
     const targetColumn = target.getColumn(columnIndex + columnOffset);
     if (sourceColumn.width && (!targetColumn.width || sourceColumn.width > targetColumn.width)) targetColumn.width = sourceColumn.width;
@@ -390,21 +391,23 @@ function copyWorksheet(
     const rowIndex = outputRowIndex + skipRows;
     const sourceRow = source.getRow(rowIndex);
     const targetRow = target.getRow(outputRowIndex + rowOffset);
-    if (sourceRow.height && (!targetRow.height || sourceRow.height > targetRow.height)) targetRow.height = sourceRow.height;
-    if (sourceRow.hidden && options.mergeMode !== "horizontal") targetRow.hidden = true;
-    if (sourceRow.outlineLevel) targetRow.outlineLevel = sourceRow.outlineLevel;
+    if (retention.formatting) {
+      if (sourceRow.height && (!targetRow.height || sourceRow.height > targetRow.height)) targetRow.height = sourceRow.height;
+      if (sourceRow.hidden && options.mergeMode !== "horizontal") targetRow.hidden = true;
+      if (sourceRow.outlineLevel) targetRow.outlineLevel = sourceRow.outlineLevel;
+    }
 
     for (let columnIndex = 1; columnIndex <= bounds.columns; columnIndex += 1) {
       const sourceCell = source.getCell(rowIndex, columnIndex);
       if (sourceCell.type === ExcelJS.ValueType.Merge) continue;
-      if (sourceCell.value === null && !hasCellStyle(sourceCell)) continue;
+      if (sourceCell.value === null && (!retention.formatting || !hasCellStyle(sourceCell)) && !hasCellMetadata(sourceCell)) continue;
 
       const targetCell = target.getCell(outputRowIndex + rowOffset, columnIndex + columnOffset);
       copyCell(sourceCell, targetCell, plan, planLookup, options, warnings);
     }
   }
 
-  for (const mergeRange of source.model.merges || []) {
+  for (const mergeRange of retention.formatting ? source.model.merges || [] : []) {
     const merge = XLSX.utils.decode_range(mergeRange);
     if (merge.e.r < skipRows || merge.s.r < skipRows || merge.s.r - skipRows >= bounds.rows || merge.s.c >= bounds.columns) continue;
     target.mergeCells(
@@ -428,8 +431,11 @@ function copyCell(
   warnings: Set<string>,
 ) {
   if (source.type === ExcelJS.ValueType.Formula) {
-    if (options.onlyValues) {
+    if (!plan.retention.formulas) {
       target.value = cloneCellValue(source.result ?? source.text ?? null);
+      if (source.result === undefined || source.result === null) {
+        warnings.add(local("저장된 계산 결과가 없는 수식은 빈 값으로 복사될 수 있습니다.", "Formulas without a stored calculation result may be copied as blank values."));
+      }
     } else {
       target.value = {
         formula: translateFormula(source.formula, plan, planLookup, options.mergeMode, warnings),
@@ -440,7 +446,7 @@ function copyCell(
     target.value = cloneCellValue(source.value);
   }
 
-  if (source.style && Object.keys(source.style).length) target.style = cloneData(source.style);
+  if (plan.retention.formatting && source.style && Object.keys(source.style).length) target.style = cloneData(source.style);
   if (source.dataValidation && Object.keys(source.dataValidation).length) target.dataValidation = cloneData(source.dataValidation);
   if (source.note) target.note = cloneData(source.note);
   if (source.protection) target.protection = cloneData(source.protection);
@@ -498,21 +504,21 @@ function findPlan(planLookup: Map<string, SheetPlan>, fileIndex: number, sheetNa
   return undefined;
 }
 
-function getSheetBounds(sheet: ExcelJS.Worksheet, trim: boolean): SheetBounds {
-  if (!trim) return { rows: sheet.rowCount, columns: sheet.columnCount };
+function getSheetBounds(sheet: ExcelJS.Worksheet, trim: boolean, retainFormatting = true): SheetBounds {
+  if (!trim && retainFormatting) return { rows: sheet.rowCount, columns: sheet.columnCount };
   let rows = 0;
   let columns = 0;
 
   sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    row.eachCell({ includeEmpty: false }, (cell, columnNumber) => {
-      if (cell.value !== null && cell.value !== "") {
+    row.eachCell({ includeEmpty: true }, (cell, columnNumber) => {
+      if ((cell.value !== null && cell.value !== "") || hasCellMetadata(cell)) {
         rows = Math.max(rows, rowNumber);
         columns = Math.max(columns, columnNumber);
       }
     });
   });
 
-  for (const mergeRange of sheet.model.merges || []) {
+  for (const mergeRange of retainFormatting ? sheet.model.merges || [] : []) {
     const merge = XLSX.utils.decode_range(mergeRange);
     rows = Math.max(rows, merge.e.r + 1);
     columns = Math.max(columns, merge.e.c + 1);
@@ -599,6 +605,19 @@ function buildSheetTrimBlocks(indexes: number[], threshold: number): Array<[numb
 
 function hasCellStyle(cell: ExcelJS.Cell) {
   return Boolean(cell.style && Object.keys(cell.style).length);
+}
+
+function hasCellMetadata(cell: ExcelJS.Cell) {
+  return Boolean(cell.note || (cell.dataValidation && Object.keys(cell.dataValidation).length) || cell.protection);
+}
+
+function parsedSheetOptions(source: ExcelJS.Worksheet, retention: ExcelRetentionOptions) {
+  if (!retention.formatting) return undefined;
+  return {
+    properties: cloneData(source.properties),
+    pageSetup: cloneData(source.pageSetup),
+    views: cloneData(source.views),
+  };
 }
 
 function cloneCellValue(value: ExcelJS.CellValue | undefined): ExcelJS.CellValue {

@@ -313,7 +313,7 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   });
   if (!formulaCells.some((formula) => formula.includes("SUM(A1:A2)"))) throw new Error("Formula was not preserved.");
   const warningText = await page.$eval(".result-card", (element) => element.textContent || "");
-  if (!warningText.includes("XLSM의 매크로") || !warningText.includes("수식과 서식은 XLSX 입력에서만")) {
+  if (!warningText.includes("XLSM의 매크로") || !warningText.includes("XLS 수식 또는 서식을 정밀하게 유지")) {
     throw new Error(`Converted format limitations were not shown after merge: ${warningText}`);
   }
 }
