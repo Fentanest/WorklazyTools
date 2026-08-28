@@ -24,6 +24,9 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "XLS 수식과 서식을 따로 보존할 수 있나요?", answer: "가능합니다. XLS 수식 보존과 XLS 서식 보존을 각각 선택할 수 있으며, 둘 중 하나만 켜도 정밀 변환 화면으로 이동합니다." },
       { question: "보존 옵션을 켜면 모든 XLS 기능이 완전히 유지되나요?", answer: "수식과 일반 셀 서식을 우선 보존하지만 차트, 외부 연결, 매크로와 일부 고급 개체는 달라질 수 있으므로 중요한 결과는 Excel에서 확인하세요." },
     ],
+    "/tools/pdf-editor": [
+      { question: "여러 페이지 범위는 어떻게 선택하나요?", answer: "편집할 결과 범위를 고르고 페이지 체크박스를 누르세요. 연속 문서는 페이지 뒤의 나누기 위치를 정해 범위를 한 번에 만들 수 있고, 숫자 입력으로 비연속 페이지와 사용자 지정 순서도 선택할 수 있습니다." },
+    ],
     "/tools/document-compare": [
       { question: "DOC와 DOCX를 서로 비교할 수 있나요?", answer: "가능합니다. 둘 다 Word 계열이므로 어느 쪽 순서든 비교할 수 있습니다." },
       { question: "DOCX와 HWP를 비교할 수 있나요?", answer: "불가능합니다. 분석 전에 해당 쌍을 차단하므로 Word 문서끼리, HWP 문서끼리 짝지어 주세요." },
@@ -42,6 +45,9 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Can XLSX formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate XLSX switches on the current screen and require no additional files." },
       { question: "Can XLS formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate switches, and either one opens the higher-fidelity conversion workspace." },
       { question: "Does preservation retain every XLS feature perfectly?", answer: "It prioritizes formulas and common cell formatting, but charts, external links, macros and some advanced objects can differ. Verify important output in Excel." },
+    ],
+    "/tools/pdf-editor": [
+      { question: "How do I select multiple page ranges?", answer: "Choose the output range to edit and use the page checkboxes. For a continuous document, mark split positions after pages to build the ranges at once. Number entry remains available for non-contiguous pages and custom ordering." },
     ],
     "/tools/document-compare": [
       { question: "Can I compare DOC with DOCX?", answer: "Yes. Both belong to the Word family, so either order is supported." },
@@ -136,7 +142,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
     description: "PDF 페이지를 편집·병합·추출하고 JPG·PNG 이미지와 PDF를 서로 변환하거나 한국어·영어 OCR로 DOCX·XLSX·TXT를 만드세요.",
     application: {
       name: "PDF Tools",
-      featureList: ["PDF 페이지 편집·병합·추출", "페이지 순서 변경·회전", "이미지를 PDF로 변환", "PDF를 PNG·JPG로 변환", "PDF DOCX·XLSX·TXT 변환", "한국어·영어 OCR"],
+      featureList: ["PDF 페이지 편집·병합·추출", "체크박스 범위 선택·연속 분할", "페이지 순서 변경·회전", "이미지를 PDF로 변환", "PDF를 PNG·JPG로 변환", "PDF DOCX·XLSX·TXT 변환", "한국어·영어 OCR"],
     },
   },
   "/tools/pdf-editor/image-to-pdf": {

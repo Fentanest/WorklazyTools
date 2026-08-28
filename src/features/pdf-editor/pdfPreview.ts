@@ -18,7 +18,22 @@ interface CachedPdfDocument {
   promise: Promise<PDFDocumentProxy>;
 }
 
+export interface CachedPdfThumbnail {
+  url: string;
+  width: number;
+  height: number;
+}
+
+interface PdfThumbnailCacheEntry {
+  promise: Promise<CachedPdfThumbnail>;
+  url?: string;
+}
+
 const documentCache = new Map<File, CachedPdfDocument>();
+const thumbnailCache = new Map<File, Map<string, PdfThumbnailCacheEntry>>();
+const thumbnailRenderQueue: Array<() => void> = [];
+const THUMBNAIL_RENDER_CONCURRENCY = 3;
+let activeThumbnailRenders = 0;
 const TESSERACT_BASE_URL = new URL(
   "vendor/tesseract/7.0.0/",
   new URL(import.meta.env.BASE_URL, window.location.origin),
@@ -59,10 +74,64 @@ export async function inspectPdf(file: File, language: AppLanguage = "ko", optio
 
 export async function releasePdf(file: File) {
   const cached = documentCache.get(file);
+  const cachedThumbnails = thumbnailCache.get(file);
   documentCache.delete(file);
+  thumbnailCache.delete(file);
+  cachedThumbnails?.forEach((entry) => { if (entry.url) URL.revokeObjectURL(entry.url); });
   if (cached) {
     try { await cached.loadingTask.destroy(); } catch { /* 이미 종료된 문서는 무시합니다. */ }
   }
+}
+
+export function getCachedPdfThumbnail(file: File, pageIndex: number, targetWidth = 172, language: AppLanguage = "ko") {
+  const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+  const cacheKey = `${pageIndex}:${targetWidth}:${outputScale}`;
+  let fileCache = thumbnailCache.get(file);
+  if (!fileCache) {
+    fileCache = new Map();
+    thumbnailCache.set(file, fileCache);
+  }
+  const cached = fileCache.get(cacheKey);
+  if (cached) return cached.promise;
+
+  const entry = {} as PdfThumbnailCacheEntry;
+  fileCache.set(cacheKey, entry);
+  entry.promise = queueThumbnailRender(async () => {
+    if (thumbnailCache.get(file)?.get(cacheKey) !== entry) throw new DOMException("Thumbnail no longer needed", "AbortError");
+    const canvas = document.createElement("canvas");
+    try {
+      const dimensions = await renderPdfThumbnail(file, pageIndex, canvas, targetWidth, language);
+      const blob = await canvasToBlob(canvas, "image/webp", 0.86, language);
+      const url = URL.createObjectURL(blob);
+      if (thumbnailCache.get(file)?.get(cacheKey) !== entry) {
+        URL.revokeObjectURL(url);
+        throw new DOMException("Thumbnail no longer needed", "AbortError");
+      }
+      entry.url = url;
+      return { url, ...dimensions };
+    } finally {
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+  }).catch((error) => {
+    if (thumbnailCache.get(file)?.get(cacheKey) === entry) fileCache?.delete(cacheKey);
+    throw error;
+  });
+  return entry.promise;
+}
+
+function queueThumbnailRender<T>(task: () => Promise<T>) {
+  return new Promise<T>((resolve, reject) => {
+    const run = () => {
+      activeThumbnailRenders += 1;
+      void task().then(resolve, reject).finally(() => {
+        activeThumbnailRenders -= 1;
+        thumbnailRenderQueue.shift()?.();
+      });
+    };
+    if (activeThumbnailRenders < THUMBNAIL_RENDER_CONCURRENCY) run();
+    else thumbnailRenderQueue.push(run);
+  });
 }
 
 export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172, language: AppLanguage = "ko", signal?: AbortSignal) {

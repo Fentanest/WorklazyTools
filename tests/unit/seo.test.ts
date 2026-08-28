@@ -71,5 +71,8 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     const excelFaq = getSeoDefinition(language, "/tools/excel-merger").faq;
     assert.equal(excelFaq?.length, 3);
     assert.ok(excelFaq?.every((item) => item.question && item.answer));
+    const pdfFaq = getSeoDefinition(language, "/tools/pdf-editor").faq;
+    assert.equal(pdfFaq?.length, 1);
+    assert.ok(pdfFaq?.[0]?.question && pdfFaq[0].answer);
   }
 });

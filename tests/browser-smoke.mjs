@@ -78,12 +78,17 @@ async function testPdfTools(page, fixtures, tempDir) {
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
-  await page.waitForFunction(() => Array.from(document.querySelectorAll(".pdf-page-card canvas")).every((canvas) => canvas.width > 1));
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".pdf-page-card .pdf-thumbnail-frame img")).length === 2 && Array.from(document.querySelectorAll(".pdf-page-card .pdf-thumbnail-frame img")).every((image) => image.complete && image.naturalWidth > 1));
+  const firstThumbnailSrc = await page.$eval(".pdf-page-card:first-child .pdf-thumbnail-frame img", (image) => image.src);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForFunction((src) => document.querySelector(".pdf-page-card:first-child .pdf-thumbnail-frame img")?.src === src && !document.querySelector(".pdf-page-card:first-child .pdf-thumbnail-placeholder"), {}, firstThumbnailSrc);
   await page.waitForFunction(() => document.querySelector("#pdf-selection-range")?.value === "1-2");
   await page.click('.pdf-page-card:first-child button[aria-label="오른쪽으로 90도 회전"]');
   const rotationState = await page.$eval(".pdf-page-card:first-child", (card) => ({
     data: card.getAttribute("data-rotation"),
-    transform: card.querySelector("canvas")?.style.transform || "",
+    transform: card.querySelector(".pdf-thumbnail-frame img")?.style.transform || "",
   }));
   if (rotationState.data !== "90" || !rotationState.transform.includes("rotate(90deg)")) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
@@ -99,12 +104,12 @@ async function testPdfTools(page, fixtures, tempDir) {
     throw new Error(`PDF output rotation was not persisted: pages=${rotated.getPageCount()}, rotation=${rotated.getPage(0).getRotation().angle}`);
   }
 
-  await page.$eval('.pdf-page-card:first-child button[aria-label="1번 페이지 선택 해제"]', (button) => button.click());
+  await page.$eval('.pdf-page-card:first-child input[aria-label="1번 페이지 선택 해제"]', (checkbox) => checkbox.click());
   try {
-    await page.waitForFunction(() => document.querySelector('.pdf-page-card:first-child .pdf-page-select')?.getAttribute("aria-pressed") === "false" && document.querySelector("#pdf-selection-range")?.value === "2", { timeout: 5_000 });
+    await page.waitForFunction(() => document.querySelector('.pdf-page-card:first-child .pdf-page-select input')?.checked === false && document.querySelector("#pdf-selection-range")?.value === "2", { timeout: 5_000 });
   } catch (reason) {
     const state = await page.evaluate(() => ({
-      pressed: document.querySelector('.pdf-page-card:first-child .pdf-page-select')?.getAttribute("aria-pressed"),
+      checked: document.querySelector('.pdf-page-card:first-child .pdf-page-select input')?.checked,
       range: document.querySelector("#pdf-selection-range")?.value,
       selected: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => card.classList.contains("selected")),
     }));
@@ -113,10 +118,10 @@ async function testPdfTools(page, fixtures, tempDir) {
   const selectionRangeInput = await page.$("#pdf-selection-range");
   await replaceInputValue(page, selectionRangeInput, "1");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => document.querySelector('.pdf-page-card:first-child .pdf-page-select')?.getAttribute("aria-pressed") === "true" && document.querySelector('.pdf-page-card:nth-child(2) .pdf-page-select')?.getAttribute("aria-pressed") === "false");
+  await page.waitForFunction(() => document.querySelector('.pdf-page-card:first-child .pdf-page-select input')?.checked === true && document.querySelector('.pdf-page-card:nth-child(2) .pdf-page-select input')?.checked === false);
   await replaceInputValue(page, selectionRangeInput, "2");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => document.querySelector('.pdf-page-card:first-child .pdf-page-select')?.getAttribute("aria-pressed") === "false" && document.querySelector('.pdf-page-card:nth-child(2) .pdf-page-select')?.getAttribute("aria-pressed") === "true");
+  await page.waitForFunction(() => document.querySelector('.pdf-page-card:first-child .pdf-page-select input')?.checked === false && document.querySelector('.pdf-page-card:nth-child(2) .pdf-page-select input')?.checked === true);
   await clickPrimaryAction(page);
   await waitForResult(page);
   const extractedPath = path.join(tempDir, "extracted.pdf");
@@ -127,18 +132,30 @@ async function testPdfTools(page, fixtures, tempDir) {
   await page.$eval('.pdf-output-mode-list button:nth-child(2)', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(2)')?.getAttribute("aria-checked") === "true");
   await page.waitForSelector(".pdf-multi-range-panel");
-  if (await page.$(".pdf-selection-range-form") || await page.$(".pdf-page-select")) throw new Error("Single-output selection controls remained visible in multi-range mode.");
+  if (await page.$(".pdf-selection-range-form") || !(await page.$(".pdf-page-select input[type=checkbox]"))) throw new Error("Visual range checkboxes were not shown in multi-range mode.");
   let groupRows = await page.$$(".pdf-range-group");
   if (groupRows.length !== 1) throw new Error(`Expected one seeded PDF range row, got ${groupRows.length}.`);
-  await page.$eval(".pdf-multi-range-heading .secondary-button", (button) => button.click());
+  let groupInputs = await page.$$(".pdf-range-group input");
+  await replaceInputValue(page, groupInputs[1], "1");
+  await page.$eval(".pdf-multi-range-actions .secondary-button:last-child", (button) => button.click());
   groupRows = await page.$$(".pdf-range-group");
   if (groupRows.length !== 2) throw new Error(`Expected a second PDF range row after adding one, got ${groupRows.length}.`);
-  const groupInputs = await page.$$(".pdf-range-group input");
-  await replaceInputValue(page, groupInputs[1], "1");
-  await replaceInputValue(page, groupInputs[3], "2, 1");
+  await page.$eval(".pdf-page-card:first-child .pdf-page-select input", (checkbox) => checkbox.click());
+  await page.$eval(".pdf-page-card:nth-child(2) .pdf-page-select input", (checkbox) => checkbox.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, shiftKey: true })));
+  groupInputs = await page.$$(".pdf-range-group input");
+  try {
+    await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group")[1]?.querySelectorAll("input")[1]?.value === "1-2", { timeout: 5_000 });
+  } catch (reason) {
+    const rangeState = await page.evaluate(() => ({
+      ranges: Array.from(document.querySelectorAll(".pdf-range-group"), (row) => Array.from(row.querySelectorAll("input"), (input) => ({ value: input.value, checked: input.checked }))),
+      cards: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => ({ selected: card.classList.contains("selected"), checked: card.querySelector(".pdf-page-select input")?.checked })),
+    }));
+    throw new Error(`Visual PDF range selection did not update the active range: ${JSON.stringify(rangeState)}\n${reason.message || reason}`);
+  }
   const firstGroups = await page.$$eval(".pdf-page-card:first-child .pdf-group-badges b", (badges) => badges.map((badge) => badge.textContent));
   const secondGroups = await page.$$eval(".pdf-page-card:nth-child(2) .pdf-group-badges b", (badges) => badges.map((badge) => badge.textContent));
   if (firstGroups.join(",") !== "1,2" || secondGroups.join(",") !== "2") throw new Error(`PDF range badges are incorrect: first=${firstGroups}, second=${secondGroups}`);
+  await replaceInputValue(page, groupInputs[3], "2, 1");
   await clickPrimaryAction(page);
   await waitForResult(page);
   const rangeZipPath = path.join(tempDir, "range-pdfs.zip");
@@ -150,6 +167,13 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (secondRangePdf.getPageCount() !== 2 || Math.round(secondRangePdf.getPage(0).getWidth()) !== 600 || secondRangePdf.getPage(1).getRotation().angle !== 90) {
     throw new Error("Range PDF did not preserve the entered page order and rotations.");
   }
+  await page.$eval(".pdf-multi-range-actions .secondary-button:first-child", (button) => button.click());
+  await page.waitForSelector(".pdf-range-selection-toolbar.quick-split");
+  await page.$eval(".pdf-page-card:first-child .pdf-split-after", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".pdf-range-selection-toolbar.quick-split > b")?.textContent?.includes("2"));
+  await page.$eval(".pdf-range-selection-toolbar.quick-split .pdf-range-toolbar-actions .primary", (button) => button.click());
+  await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group").length === 2 && Array.from(document.querySelectorAll(".pdf-range-group"), (row) => row.querySelectorAll("input")[1]?.value).join(",") === "1,2");
+  groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[2], "분할-01");
   await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group.invalid").length === 2);
   if (!await page.$eval(".summary-card .primary-button", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");

@@ -12,7 +12,7 @@
   },
   "items": {
     "excel-merger": { "title": "Excel Merger", "shortTitle": "Excel 병합", "description": "여러 Excel 파일과 CSV를 원하는 방식으로 하나의 파일에 정리합니다.", "eyebrow": "스프레드시트", "highlights": ["시트별 병합", "세로 병합", "가로 병합", "빈 영역·암호"] },
-    "pdf-editor": { "title": "PDF Tools", "shortTitle": "PDF 도구", "description": "PDF 페이지를 편집·병합·범위별 추출하고 이미지·DOCX·XLSX·TXT로 변환하거나 브라우저 OCR을 실행합니다.", "eyebrow": "PDF 편집·변환", "highlights": ["편집·범위 추출", "이미지 변환", "DOCX·TXT", "XLSX·OCR"] },
+    "pdf-editor": { "title": "PDF Tools", "shortTitle": "PDF 도구", "description": "PDF 페이지를 편집·병합·범위별 추출하고 이미지·DOCX·XLSX·TXT로 변환하거나 브라우저 OCR을 실행합니다.", "eyebrow": "PDF 편집·변환", "highlights": ["체크 선택·연속 분할", "이미지 변환", "DOCX·TXT", "XLSX·OCR"] },
     "document-compare": { "title": "Document Compare", "shortTitle": "문서 비교", "description": "DOCX·DOC와 HWP·HWPX 문서의 본문·표·서식 변경을 같은 기준으로 비교합니다.", "eyebrow": "문서 비교", "highlights": ["Word·HWP 통합", "이동·분할 판정", "Excel 보고서", "다중 동시 비교"] },
     "hwp-editor": { "title": "HWP Editor", "shortTitle": "HWP 편집", "description": "HWP·HWPX 문서를 공식 rhwp Studio에서 편집하고 다시 HWP·HWPX로 저장합니다.", "eyebrow": "한글 문서", "highlights": ["HWP·HWPX·HML", "전체 문서 편집", "서식·표·개체", "암호 문서"] },
     "office-editor": { "title": "Browser Office Editor", "shortTitle": "오피스 편집기", "description": "파일을 놓으면 LibreOffice 기반 전체 화면을 자동으로 준비해 Writer·Calc·Impress 문서를 편집합니다.", "eyebrow": "브라우저 오피스", "highlights": ["드롭 자동 시작", "전체 화면 편집", "한글 대체 글꼴", "브라우저 내 처리"] },

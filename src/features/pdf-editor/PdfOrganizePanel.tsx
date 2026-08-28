@@ -1,4 +1,4 @@
-import { FileArchive, FileCheck2, Info, Layers3, Plus, Trash2 } from "lucide-react";
+import { FileArchive, FileCheck2, Info, Layers3, Plus, Scissors, Trash2 } from "lucide-react";
 import Sortable from "sortablejs";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,7 +12,7 @@ import { inspectPdf, parsePageRange, releasePdf, renderPdfPageAsJpeg } from "./p
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
 import { exportPdfGroups, imagesToPdf, mergePdfPages } from "./pdfWorkerClient";
 import { createLocalId, type PdfPageItem, type PdfSourceFile } from "./types";
-import { mapWithConcurrency, movePdfItem as moveItem, normalizePdfRotation as normalizeRotation } from "./pdfShared";
+import { compactPdfPageRange, mapWithConcurrency, movePdfItem as moveItem, normalizePdfRotation as normalizeRotation, splitPdfPageRanges } from "./pdfShared";
 import { featureMessage } from "../../i18n/featureMessages";
 
 type OutputMode = "merged" | "ranges" | "separate";
@@ -37,6 +37,9 @@ export function PdfOrganizePanel() {
   const [selectionError, setSelectionError] = useState("");
   const [outputMode, setOutputMode] = useState<OutputMode>("merged");
   const [rangeRows, setRangeRows] = useState<RangeRow[]>(() => [createRangeRow(1, language)]);
+  const [activeRangeId, setActiveRangeId] = useState(() => rangeRows[0].id);
+  const [quickSplitOpen, setQuickSplitOpen] = useState(false);
+  const [splitAfterPageIds, setSplitAfterPageIds] = useState<Set<string>>(new Set());
   const [outputName, setOutputName] = useState(featureMessage(language, "pdf.messages.PdfOrganizePanel.worklazyPdfEdited"));
   const [watermarkText, setWatermarkText] = useState("");
   const [pageNumbers, setPageNumbers] = useState(false);
@@ -46,6 +49,7 @@ export function PdfOrganizePanel() {
   const gridRef = useRef<HTMLDivElement>(null);
   const multiRangePanelRef = useRef<HTMLDivElement>(null);
   const sourcesRef = useRef<PdfSourceFile[]>([]);
+  const selectionAnchorsRef = useRef(new Map<string, string>());
   const operation = useOperationProgress();
   const download = useDownloadResult();
   const locked = inspecting || operation.status === "running";
@@ -56,7 +60,7 @@ export function PdfOrganizePanel() {
   useEffect(() => {
     if (outputMode === "ranges") return;
     const indexes = pages.flatMap((page, index) => selectedPageIds.has(page.id) ? [index] : []);
-    setSelectionRange(compactPageRange(indexes));
+    setSelectionRange(compactPdfPageRange(indexes, true));
   }, [outputMode, pages, selectedPageIds]);
 
   useEffect(() => {
@@ -66,8 +70,13 @@ export function PdfOrganizePanel() {
   }, [outputMode]);
 
   useEffect(() => {
+    if (rangeRows.some((row) => row.id === activeRangeId)) return;
+    if (rangeRows[0]) setActiveRangeId(rangeRows[0].id);
+  }, [activeRangeId, rangeRows]);
+
+  useEffect(() => {
     const grid = gridRef.current;
-    if (!grid || locked) return;
+    if (!grid || locked || quickSplitOpen) return;
     const sortable = Sortable.create(grid, {
       animation: 170,
       handle: ".pdf-drag-handle",
@@ -83,7 +92,7 @@ export function PdfOrganizePanel() {
       },
     });
     return () => sortable.destroy();
-  }, [download.clearResult, locked, pages.length]);
+  }, [download.clearResult, locked, pages.length, quickSplitOpen]);
 
   const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
   const groupMembership = useMemo(() => {
@@ -98,6 +107,10 @@ export function PdfOrganizePanel() {
     return membership;
   }, [evaluatedRanges, pages]);
   const selectedPages = pages.filter((page) => selectedPageIds.has(page.id));
+  const activeRange = evaluatedRanges.find((row) => row.id === activeRangeId) ?? evaluatedRanges[0];
+  let activeIndexes: number[] = [];
+  try { if (activeRange) activeIndexes = parsePageRange(activeRange.range, pages.length, language); } catch { /* 입력 중인 범위는 아직 선택으로 표시하지 않습니다. */ }
+  const activeRangeIndexes = new Set(activeIndexes);
   const rangesValid = evaluatedRanges.length > 0 && evaluatedRanges.every((row) => !row.error);
   const rangePageCount = groupMembership.size;
   const resultFileCount = outputMode === "merged" ? (selectedPages.length ? 1 : 0) : outputMode === "ranges" ? (rangesValid ? rangeRows.length : 0) : selectedPages.length;
@@ -145,6 +158,7 @@ export function PdfOrganizePanel() {
     setSources((current) => current.filter((_, currentIndex) => currentIndex !== index));
     setPages((current) => current.filter((page) => page.sourceId !== source.id));
     setSelectedPageIds((current) => new Set([...current].filter((id) => !removedIds.has(id))));
+    setSplitAfterPageIds((current) => new Set([...current].filter((id) => !removedIds.has(id))));
     void releasePdf(source.file);
     download.clearResult();
   };
@@ -208,6 +222,7 @@ export function PdfOrganizePanel() {
 
   const updateRangeRow = (id: string, field: "name" | "range", value: string) => {
     setRangeRows((current) => current.map((row) => row.id === id ? { ...row, [field]: value } : row));
+    setActiveRangeId(id);
     download.clearResult();
   };
 
@@ -215,6 +230,7 @@ export function PdfOrganizePanel() {
     if (locked) return;
     setPages((current) => current.filter((page) => page.id !== id));
     setSelectedPageIds((current) => { const next = new Set(current); next.delete(id); return next; });
+    setSplitAfterPageIds((current) => { const next = new Set(current); next.delete(id); return next; });
     download.clearResult();
   };
 
@@ -235,11 +251,13 @@ export function PdfOrganizePanel() {
   const setMode = (mode: OutputMode) => {
     if (mode === "ranges") {
       const selectedIndexes = pages.flatMap((page, index) => selectedPageIds.has(page.id) ? [index] : []);
-      const selectedRange = compactPageRange(selectedIndexes);
+      const selectedRange = compactPdfPageRange(selectedIndexes, true);
       setRangeRows((current) => current.some((row) => row.range.trim())
         ? current
         : [{ ...(current[0] ?? createRangeRow(1, language)), range: selectedRange }]);
     }
+    setQuickSplitOpen(false);
+    setSplitAfterPageIds(new Set());
     setOutputMode(mode);
     setSelectionError("");
     setError("");
@@ -258,9 +276,87 @@ export function PdfOrganizePanel() {
     download.clearResult();
   };
 
-  const togglePageSelection = (id: string) => {
-    setSelectedPageIds((current) => toggleSetItem(current, id));
+  const togglePageSelection = (id: string, selected: boolean, extend: boolean) => {
+    const affectedIds = extend ? pageIdsBetweenAnchor(pages, selectionAnchorsRef.current.get("single"), id) : [id];
+    setSelectedPageIds((current) => setItemsSelected(current, affectedIds, selected));
+    selectionAnchorsRef.current.set("single", id);
     setSelectionError("");
+    download.clearResult();
+  };
+
+  const addRange = () => {
+    const row = createRangeRow(rangeRows.length + 1, language);
+    setRangeRows((current) => [...current, row]);
+    setActiveRangeId(row.id);
+    download.clearResult();
+  };
+
+  const removeRange = (id: string) => {
+    if (rangeRows.length === 1) return;
+    const removedIndex = rangeRows.findIndex((row) => row.id === id);
+    const nextRows = rangeRows.filter((row) => row.id !== id);
+    setRangeRows(nextRows);
+    if (activeRangeId === id) setActiveRangeId(nextRows[Math.min(Math.max(removedIndex, 0), nextRows.length - 1)]?.id ?? "");
+    selectionAnchorsRef.current.delete(id);
+    download.clearResult();
+  };
+
+  const toggleRangePage = (id: string, selected: boolean, extend: boolean) => {
+    const row = rangeRows.find((candidate) => candidate.id === activeRangeId) ?? rangeRows[0];
+    if (!row) return;
+    let indexes: number[] = [];
+    try { indexes = parsePageRange(row.range, pages.length, language); } catch { /* 빈 범위는 체크한 페이지부터 구성합니다. */ }
+    const pageIndex = pages.findIndex((page) => page.id === id);
+    if (pageIndex < 0) return;
+    const affectedIds = extend ? pageIdsBetweenAnchor(pages, selectionAnchorsRef.current.get(row.id), id) : [id];
+    const affectedIndexes = affectedIds.map((pageId) => pages.findIndex((page) => page.id === pageId)).filter((index) => index >= 0);
+    const nextIndexes = [...indexes];
+    for (const index of affectedIndexes) {
+      const position = nextIndexes.indexOf(index);
+      if (selected && position < 0) nextIndexes.push(index);
+      if (!selected && position >= 0) nextIndexes.splice(position, 1);
+    }
+    setRangeRows((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, range: compactPdfPageRange(nextIndexes) } : candidate));
+    selectionAnchorsRef.current.set(row.id, id);
+    setActiveRangeId(row.id);
+    setError("");
+    download.clearResult();
+  };
+
+  const setActiveRangePages = (selected: boolean) => {
+    const row = rangeRows.find((candidate) => candidate.id === activeRangeId) ?? rangeRows[0];
+    if (!row) return;
+    setRangeRows((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, range: selected ? compactPdfPageRange(pages.map((_, index) => index)) : "" } : candidate));
+    selectionAnchorsRef.current.delete(row.id);
+    download.clearResult();
+  };
+
+  const toggleSplitAfter = (id: string) => {
+    setSplitAfterPageIds((current) => toggleSetItem(current, id));
+  };
+
+  const startQuickSplit = () => {
+    setQuickSplitOpen(true);
+    setSplitAfterPageIds(new Set());
+  };
+
+  const cancelQuickSplit = () => {
+    setQuickSplitOpen(false);
+    setSplitAfterPageIds(new Set());
+  };
+
+  const applyQuickSplit = () => {
+    const boundaryIndexes = pages.flatMap((page, index) => splitAfterPageIds.has(page.id) ? [index] : []);
+    const groups = splitPdfPageRanges(pages.length, boundaryIndexes);
+    const nextRows = groups.map((indexes, index) => ({
+      id: rangeRows[index]?.id ?? createLocalId("pdf-range"),
+      name: `${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`,
+      range: compactPdfPageRange(indexes),
+    }));
+    setRangeRows(nextRows);
+    setActiveRangeId(nextRows[0]?.id ?? "");
+    cancelQuickSplit();
+    setError("");
     download.clearResult();
   };
 
@@ -277,22 +373,42 @@ export function PdfOrganizePanel() {
             <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.editAndSelectPages")} description={outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.defineEachOutputRangeThenDragRotateOr") : featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseOutputPagesInTheCurrentOrderThen")} className="accent-context-violet pdf-page-section">
               <div className="pdf-editor-note"><Info size={15} /><span>{outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.numberBadgesShowWhichOutputRangesIncludeA") : featureMessage(language, "pdf.messages.PdfOrganizePanel.deselectingExcludesAPageFromThisOutputDeleting")}</span></div>
               {outputMode === "ranges" ? (
-                <div ref={multiRangePanelRef} className="pdf-multi-range-panel">
-                  <div className="pdf-multi-range-heading">
-                    <div><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputRanges")}</strong><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.eachRowCreatesOnePdfAndAPage")}</span></div>
-                    <button type="button" className="secondary-button" onClick={() => setRangeRows((current) => [...current, createRangeRow(current.length + 1, language)])}><Plus size={15} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.addRange")}</button>
+                <>
+                  <div ref={multiRangePanelRef} className="pdf-multi-range-panel">
+                    <div className="pdf-multi-range-heading">
+                      <div><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputRanges")}</strong><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.eachRowCreatesOnePdfAndAPage")}</span></div>
+                      <div className="pdf-multi-range-actions">
+                        <button type="button" className="secondary-button" onClick={startQuickSplit} disabled={quickSplitOpen}><Scissors size={15} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.quickContinuousSplit")}</button>
+                        <button type="button" className="secondary-button" onClick={addRange} disabled={quickSplitOpen}><Plus size={15} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.addRange")}</button>
+                      </div>
+                    </div>
+                    <div className="pdf-range-groups">
+                      {evaluatedRanges.map((row, index) => <div className={`pdf-range-group${row.error ? " invalid" : ""}${row.id === activeRange?.id ? " active" : ""}`} key={row.id}>
+                        <button type="button" className="pdf-range-activate" onClick={() => setActiveRangeId(row.id)} aria-pressed={row.id === activeRange?.id} disabled={quickSplitOpen}><b>{index + 1}</b><span>{featureMessage(language, row.id === activeRange?.id ? "pdf.messages.PdfOrganizePanel.editing" : "pdf.messages.PdfOrganizePanel.editWithChecks")}</span></button>
+                        <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName")}</span><input value={row.name} disabled={quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`} /><small>.pdf</small></label>
+                        <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageRangeInCurrentOrder")}</span><input value={row.range} disabled={quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "range", event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eG135")} /></label>
+                        <button type="button" onClick={() => removeRange(row.id)} disabled={rangeRows.length === 1 || quickSplitOpen} aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.deleteRange", { p0: index + 1 })}><Trash2 size={16} /></button>
+                        {row.error && <em>{row.error}</em>}
+                      </div>)}
+                    </div>
+                    <p className="pdf-range-help">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageNumbersFollowTheCurrentEditorOrderFor")} <code>5, 1-3</code>{featureMessage(language, "pdf.messages.PdfOrganizePanel.createsAPdfOrdered5123")}</p>
                   </div>
-                  <div className="pdf-range-groups">
-                    {evaluatedRanges.map((row, index) => <div className={`pdf-range-group${row.error ? " invalid" : ""}`} key={row.id}>
-                      <b>{index + 1}</b>
-                      <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName")}</span><input value={row.name} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`} /><small>.pdf</small></label>
-                      <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageRangeInCurrentOrder")}</span><input value={row.range} onChange={(event) => updateRangeRow(row.id, "range", event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eG135")} /></label>
-                      <button type="button" onClick={() => setRangeRows((current) => current.filter((candidate) => candidate.id !== row.id))} disabled={rangeRows.length === 1} aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.deleteRange", { p0: index + 1 })}><Trash2 size={16} /></button>
-                      {row.error && <em>{row.error}</em>}
-                    </div>)}
-                  </div>
-                  <p className="pdf-range-help">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageNumbersFollowTheCurrentEditorOrderFor")} <code>5, 1-3</code>{featureMessage(language, "pdf.messages.PdfOrganizePanel.createsAPdfOrdered5123")}</p>
-                </div>
+                  {quickSplitOpen ? (
+                    <div className="pdf-range-selection-toolbar quick-split" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.quickContinuousSplit")}>
+                      <Scissors size={17} />
+                      <div><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseWhereToSplit")}</strong><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.quickSplitReplacesCurrentRanges")}</span></div>
+                      <b>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputCount", { p0: splitAfterPageIds.size + 1 })}</b>
+                      <div className="pdf-range-toolbar-actions"><button type="button" onClick={cancelQuickSplit}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.cancel")}</button><button type="button" className="primary" onClick={applyQuickSplit}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.applyContinuousSplit")}</button></div>
+                    </div>
+                  ) : (
+                    <div className="pdf-range-selection-toolbar" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.visualRangeSelection")}>
+                      <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.editingRange")}</span><select value={activeRange?.id ?? ""} onChange={(event) => setActiveRangeId(event.target.value)}>{evaluatedRanges.map((row, index) => <option value={row.id} key={row.id}>{index + 1}. {row.name || featureMessage(language, "pdf.messages.PdfOrganizePanel.unnamedRange")}</option>)}</select></label>
+                      <strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.pagesChecked", { p0: activeRangeIndexes.size, p1: pages.length })}</strong>
+                      <span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.shiftClickSelectsBetween")}</span>
+                      <div className="pdf-range-toolbar-actions"><button type="button" onClick={() => setActiveRangePages(true)}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.selectAll")}</button><button type="button" onClick={() => setActiveRangePages(false)}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.clearSelection")}</button></div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="pdf-selection-toolbar">
                   <div>
@@ -312,7 +428,8 @@ export function PdfOrganizePanel() {
                 {pages.map((page, index) => {
                   const source = sources.find((candidate) => candidate.id === page.sourceId);
                   if (!source) return null;
-                  return <PdfThumbnail key={page.id} item={page} file={source.file} outputIndex={index} totalItems={pages.length} selected={outputMode !== "ranges" && selectedPageIds.has(page.id)} groupNumbers={outputMode === "ranges" ? groupMembership.get(page.id) : []} draggable={!locked} onSelect={locked || outputMode === "ranges" ? undefined : () => togglePageSelection(page.id)} onRotate={locked ? undefined : () => rotatePage(page.id)} onRemove={locked ? undefined : () => removePage(page.id)} onMove={locked ? undefined : (direction) => movePage(index, direction)} />;
+                  const pageEditingLocked = locked || quickSplitOpen;
+                  return <PdfThumbnail key={page.id} item={page} file={source.file} outputIndex={index} totalItems={pages.length} selected={outputMode === "ranges" ? !quickSplitOpen && activeRangeIndexes.has(index) : selectedPageIds.has(page.id)} groupNumbers={outputMode === "ranges" ? groupMembership.get(page.id) : []} draggable={!pageEditingLocked} onSelect={locked || quickSplitOpen ? undefined : outputMode === "ranges" ? (selected, extend) => toggleRangePage(page.id, selected, extend) : (selected, extend) => togglePageSelection(page.id, selected, extend)} onSplitAfter={outputMode === "ranges" && quickSplitOpen && index < pages.length - 1 ? () => toggleSplitAfter(page.id) : undefined} splitAfter={splitAfterPageIds.has(page.id)} onRotate={pageEditingLocked ? undefined : () => rotatePage(page.id)} onRemove={pageEditingLocked ? undefined : () => removePage(page.id)} onMove={pageEditingLocked ? undefined : (direction) => movePage(index, direction)} />;
                 })}
               </div>
             </SectionCard>
@@ -337,7 +454,7 @@ export function PdfOrganizePanel() {
             <label className="pdf-output-field"><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.watermarkTextOptional")}</span><input value={watermarkText} maxLength={120} onChange={(event) => setWatermarkText(event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eGInternalReview")} /></label>
             <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPageNumbers")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.numberEachOutputPdfFrom1AtThe")} checked={pageNumbers} onChange={setPageNumbers} />
             <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.imageBasedCompression")} description={outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.redrawPagesAs144DpiJpegToReduce") : featureMessage(language, "pdf.messages.PdfOrganizePanel.availableOnlyWhenCreatingOnePdf")} checked={imageCompression && outputMode === "merged"} onChange={setImageCompression} disabled={outputMode !== "merged"} />
-            <PrimaryButton accent="violet" disabled={!pages.length || !resultFileCount || inspecting || operation.status === "running"} loading={operation.status === "running"} onClick={exportPdf}>{outputMode === "merged" ? <FileCheck2 size={18} /> : <FileArchive size={18} />} {outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.createPdf") : featureMessage(language, "pdf.messages.PdfOrganizePanel.createPdfZip")}</PrimaryButton>
+            <PrimaryButton accent="violet" disabled={!pages.length || !resultFileCount || inspecting || operation.status === "running" || quickSplitOpen} loading={operation.status === "running"} onClick={exportPdf}>{outputMode === "merged" ? <FileCheck2 size={18} /> : <FileArchive size={18} />} {outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.createPdf") : featureMessage(language, "pdf.messages.PdfOrganizePanel.createPdfZip")}</PrimaryButton>
             <p className="prototype-note">{featureMessage(language, "pdf.messages.PdfOrganizePanel.passwordProtectedPdfsRequireAnUnlockedCopy")}</p>
           </section>
           <OperationProgress {...operation} accent="violet" title={featureMessage(language, "pdf.messages.PdfOrganizePanel.pdfEditExtractLog")} />
@@ -368,25 +485,6 @@ function evaluateRangeRows(rows: RangeRow[], pageCount: number, language: AppLan
   });
 }
 
-function compactPageRange(indexes: number[]) {
-  if (!indexes.length) return "";
-  const numbers = [...new Set(indexes.map((index) => index + 1))].sort((left, right) => left - right);
-  const parts: string[] = [];
-  let start = numbers[0];
-  let previous = numbers[0];
-  for (let index = 1; index <= numbers.length; index += 1) {
-    const current = numbers[index];
-    if (current === previous + 1) {
-      previous = current;
-      continue;
-    }
-    parts.push(start === previous ? String(start) : `${start}-${previous}`);
-    start = current;
-    previous = current;
-  }
-  return parts.join(", ");
-}
-
 function toPagePlan(page: PdfPageItem) {
   return { sourceId: page.sourceId, pageIndex: page.sourcePageIndex, rotation: page.rotation };
 }
@@ -396,6 +494,21 @@ function toggleSetItem(current: Set<string>, id: string) {
   if (next.has(id)) next.delete(id);
   else next.add(id);
   return next;
+}
+
+function setItemsSelected(current: Set<string>, ids: readonly string[], selected: boolean) {
+  const next = new Set(current);
+  ids.forEach((id) => { if (selected) next.add(id); else next.delete(id); });
+  return next;
+}
+
+function pageIdsBetweenAnchor(pages: readonly PdfPageItem[], anchorId: string | undefined, targetId: string) {
+  const targetIndex = pages.findIndex((page) => page.id === targetId);
+  const anchorIndex = anchorId ? pages.findIndex((page) => page.id === anchorId) : -1;
+  if (targetIndex < 0 || anchorIndex < 0) return [targetId];
+  const start = Math.min(anchorIndex, targetIndex);
+  const end = Math.max(anchorIndex, targetIndex);
+  return pages.slice(start, end + 1).map((page) => page.id);
 }
 
 function restoreSortableDom(container: HTMLElement, oldIndex: number, newIndex: number) {

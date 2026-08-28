@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { mapWithConcurrency } from "../../src/features/pdf-editor/pdfShared.ts";
+import { compactPdfPageRange, mapWithConcurrency, splitPdfPageRanges } from "../../src/features/pdf-editor/pdfShared.ts";
 
 test("bounded PDF page rendering preserves order and concurrency", async () => {
   let active = 0;
@@ -15,4 +15,17 @@ test("bounded PDF page rendering preserves order and concurrency", async () => {
   });
   assert.deepEqual(values, [10, 8, 6, 4, 2]);
   assert.equal(peak, 3);
+});
+
+test("PDF page ranges compact visual selection without losing custom order", () => {
+  assert.equal(compactPdfPageRange([0, 1, 2, 4]), "1-3, 5");
+  assert.equal(compactPdfPageRange([4, 0, 1, 2]), "5, 1-3");
+  assert.equal(compactPdfPageRange([4, 3, 2]), "5-3");
+  assert.equal(compactPdfPageRange([4, 0, 1, 2], true), "1-3, 5");
+});
+
+test("quick PDF splitting creates complete continuous page groups", () => {
+  assert.deepEqual(splitPdfPageRanges(7, [1, 4]), [[0, 1], [2, 3, 4], [5, 6]]);
+  assert.deepEqual(splitPdfPageRanges(3, []), [[0, 1, 2]]);
+  assert.deepEqual(splitPdfPageRanges(4, [2, 2, 9, -1]), [[0, 1, 2], [3]]);
 });

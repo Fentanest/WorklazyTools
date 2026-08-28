@@ -669,11 +669,24 @@
         "editAndSelectPages": "Edit and select pages",
         "defineEachOutputRangeThenDragRotateOr": "Define each output range, then drag, rotate, or delete pages.",
         "chooseOutputPagesInTheCurrentOrderThen": "Choose output pages in the current order, then drag, rotate, or delete them.",
-        "numberBadgesShowWhichOutputRangesIncludeA": "Number badges show which output ranges include a page. Deleting removes it from every result, and rotations are written to the exported PDFs.",
+        "numberBadgesShowWhichOutputRangesIncludeA": "Number badges show which output ranges include a page. Choose a range to edit, then use the page checkboxes to change its contents.",
         "deselectingExcludesAPageFromThisOutputDeleting": "Deselecting excludes a page from this output. Deleting removes it from the editor, and rotations are written to the exported PDF.",
         "outputRanges": "Output ranges",
         "eachRowCreatesOnePdfAndAPage": "Each row creates one PDF, and a page may appear in multiple results.",
         "addRange": "Add range",
+        "quickContinuousSplit": "Quick continuous split",
+        "editing": "Editing",
+        "editWithChecks": "Edit with checks",
+        "chooseWhereToSplit": "Use the split button after each page to set the boundaries.",
+        "quickSplitReplacesCurrentRanges": "Applying replaces the current ranges with continuous sections that include every page.",
+        "outputCount": "{{p0}} outputs",
+        "cancel": "Cancel",
+        "applyContinuousSplit": "Apply continuous ranges",
+        "visualRangeSelection": "Select ranges with checkboxes",
+        "editingRange": "Range to edit with checks",
+        "unnamedRange": "Unnamed range",
+        "pagesChecked": "{{p0}}/{{p1}} pages checked",
+        "shiftClickSelectsBetween": "Hold Shift while checking to select through from the previous page.",
         "outputFileName": "Output file name",
         "split": "split",
         "pageRangeInCurrentOrder": "Page range in current order",
@@ -735,7 +748,9 @@
         "largePdfPagePreview": "Large PDF page preview",
         "close": "Close",
         "select": "Select",
-        "deselect": "Deselect"
+        "deselect": "Deselect",
+        "splitAfterPage": "Split after page {{p0}}",
+        "removeSplitAfterPage": "Remove split after page {{p0}}"
       },
       "pdfUi": {
         "yourFileIsReady": "Your file is ready.",
@@ -804,7 +819,7 @@
             {
               "title": "Page-level editing",
               "paragraphs": [
-                "Drag previews to reorder pages, remove unwanted pages, and rotate them. The chosen rotation is written to the exported PDF.",
+                "Drag previews to reorder pages and remove unwanted pages. For PDFs by range, choose a range and use page checkboxes, or quickly split the document between pages.",
                 "If a source page is already rotated, your rotation is added to its existing orientation so the exported page matches the preview."
               ]
             },
@@ -846,6 +861,10 @@
             {
               "question": "Does rotation reduce PDF quality?",
               "answer": "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages."
+            },
+            {
+              "question": "How do I select multiple page ranges?",
+              "answer": "Choose the output range to edit and use each page checkbox. For a continuous document, mark split positions after pages to build all ranges at once. Number entry remains available for non-contiguous pages and custom ordering."
             },
             {
               "question": "Can it perfectly restore Word or Excel structure?",

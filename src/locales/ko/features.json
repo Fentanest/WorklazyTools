@@ -669,11 +669,24 @@
         "editAndSelectPages": "페이지 편집·선택",
         "defineEachOutputRangeThenDragRotateOr": "결과별 범위를 지정하고, 페이지를 끌어서 이동하거나 회전·삭제하세요.",
         "chooseOutputPagesInTheCurrentOrderThen": "현재 순서를 기준으로 출력할 페이지를 고르고, 끌어서 이동하거나 회전·삭제하세요.",
-        "numberBadgesShowWhichOutputRangesIncludeA": "번호 배지는 페이지가 포함된 결과 범위를 뜻합니다. 휴지통은 모든 결과에서 해당 페이지를 제거하며, 회전값은 실제 출력 PDF에도 기록됩니다.",
+        "numberBadgesShowWhichOutputRangesIncludeA": "번호 배지는 페이지가 포함된 결과 범위를 뜻합니다. 편집할 범위를 고른 뒤 페이지 체크박스로 포함 여부를 바꿀 수 있습니다.",
         "deselectingExcludesAPageFromThisOutputDeleting": "선택 해제는 현재 출력에서만 제외합니다. 휴지통은 편집 목록에서 페이지를 완전히 제거하며, 회전값은 실제 출력 PDF에도 기록됩니다.",
         "outputRanges": "출력 범위 설정",
         "eachRowCreatesOnePdfAndAPage": "각 행이 하나의 PDF가 되며, 같은 페이지를 여러 결과에 넣을 수 있습니다.",
         "addRange": "범위 추가",
+        "quickContinuousSplit": "빠른 연속 분할",
+        "editing": "편집 중",
+        "editWithChecks": "체크로 편집",
+        "chooseWhereToSplit": "각 페이지 뒤의 나누기 버튼으로 경계를 정하세요.",
+        "quickSplitReplacesCurrentRanges": "적용하면 현재 범위 설정을 모든 페이지가 포함된 연속 구간으로 바꿉니다.",
+        "outputCount": "결과 {{p0}}개",
+        "cancel": "취소",
+        "applyContinuousSplit": "연속 범위 적용",
+        "visualRangeSelection": "체크박스로 범위 선택",
+        "editingRange": "체크로 편집할 범위",
+        "unnamedRange": "이름 없는 범위",
+        "pagesChecked": "{{p0}}/{{p1}}페이지 체크",
+        "shiftClickSelectsBetween": "Shift를 누른 채 체크하면 직전 페이지와의 사이를 한 번에 선택합니다.",
         "outputFileName": "결과 파일명",
         "split": "분할",
         "pageRangeInCurrentOrder": "현재 순서의 페이지 범위",
@@ -735,7 +748,9 @@
         "largePdfPagePreview": "PDF 페이지 확대 미리보기",
         "close": "닫기",
         "select": "선택",
-        "deselect": "선택 해제"
+        "deselect": "선택 해제",
+        "splitAfterPage": "{{p0}}페이지 뒤에서 나누기",
+        "removeSplitAfterPage": "{{p0}}페이지 뒤 나누기 취소"
       },
       "pdfUi": {
         "yourFileIsReady": "결과 파일이 준비됐어요.",
@@ -804,7 +819,7 @@
             {
               "title": "페이지 단위 편집",
               "paragraphs": [
-                "페이지 미리보기를 끌어 순서를 바꾸고 필요 없는 페이지를 제거할 수 있습니다. 회전 버튼은 화면에서 즉시 방향을 바꾸며, 새 PDF를 만들 때 해당 각도가 실제 페이지 속성에 반영됩니다.",
+                "페이지 미리보기를 끌어 순서를 바꾸고 필요 없는 페이지를 제거할 수 있습니다. 여러 범위별 PDF에서는 편집할 범위를 고른 뒤 페이지 체크박스를 누르거나 페이지 사이를 빠르게 나눌 수 있습니다.",
                 "원본이 이미 회전된 페이지라면 원본 방향에 사용자가 선택한 회전을 더합니다. 따라서 화면에서 확인한 방향과 출력 PDF의 방향이 일치합니다."
               ]
             },
@@ -846,6 +861,10 @@
             {
               "question": "회전하면 PDF 화질이 떨어지나요?",
               "answer": "페이지 편집의 회전은 페이지 속성만 바꾸므로 내용을 이미지로 다시 압축하지 않습니다. 이미지 변환과 OCR PDF는 페이지를 다시 렌더링하므로 원본 벡터 구조와 달라집니다."
+            },
+            {
+              "question": "여러 페이지 범위는 어떻게 선택하나요?",
+              "answer": "편집할 결과 범위를 고르고 각 페이지의 체크박스를 누르세요. 연속된 문서는 페이지 뒤의 나누기 위치를 정해 한 번에 범위로 만들 수 있고, 숫자 입력으로 비연속 페이지나 사용자 지정 순서도 유지할 수 있습니다."
             },
             {
               "question": "PDF를 Word나 Excel로 완벽하게 복원할 수 있나요?",

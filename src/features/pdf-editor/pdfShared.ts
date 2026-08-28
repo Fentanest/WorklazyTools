@@ -25,6 +25,46 @@ export function sanitizePdfFileName(name: string, fallback: string) {
   return name.trim().replace(/[\\/:*?"<>|]+/g, "-") || fallback;
 }
 
+export function compactPdfPageRange(indexes: readonly number[], sortAscending = false) {
+  const uniqueIndexes = [...new Set(indexes.filter((index) => Number.isInteger(index) && index >= 0))];
+  if (!uniqueIndexes.length) return "";
+  if (sortAscending) uniqueIndexes.sort((left, right) => left - right);
+  const numbers = uniqueIndexes.map((index) => index + 1);
+  const parts: string[] = [];
+  let start = numbers[0];
+  let previous = numbers[0];
+  let direction = 0;
+  for (let index = 1; index <= numbers.length; index += 1) {
+    const current = numbers[index];
+    const nextDirection = current === undefined ? 0 : Math.sign(current - previous);
+    if (current !== undefined && Math.abs(current - previous) === 1 && (direction === 0 || direction === nextDirection)) {
+      direction = nextDirection;
+      previous = current;
+      continue;
+    }
+    parts.push(start === previous ? String(start) : `${start}-${previous}`);
+    start = current;
+    previous = current;
+    direction = 0;
+  }
+  return parts.join(", ");
+}
+
+export function splitPdfPageRanges(pageCount: number, boundaryAfterIndexes: readonly number[]) {
+  if (pageCount <= 0) return [];
+  const boundaries = [...new Set(boundaryAfterIndexes)]
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < pageCount - 1)
+    .sort((left, right) => left - right);
+  const groups: number[][] = [];
+  let start = 0;
+  for (const boundary of boundaries) {
+    groups.push(Array.from({ length: boundary - start + 1 }, (_, index) => start + index));
+    start = boundary + 1;
+  }
+  groups.push(Array.from({ length: pageCount - start }, (_, index) => start + index));
+  return groups;
+}
+
 export async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number, mapper: (item: T, index: number) => Promise<R>) {
   const results = new Array<R>(items.length);
   let nextIndex = 0;
