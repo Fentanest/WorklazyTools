@@ -26,6 +26,7 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
     "/tools/pdf-editor": [
       { question: "여러 페이지 범위는 어떻게 선택하나요?", answer: "편집할 결과 범위를 고르고 페이지 체크박스를 누르세요. 연속 문서는 페이지 뒤의 나누기 위치를 정해 범위를 한 번에 만들 수 있고, 숫자 입력으로 비연속 페이지와 사용자 지정 순서도 선택할 수 있습니다." },
+      { question: "완성된 PDF나 ZIP은 어디에서 받나요?", answer: "오른쪽 출력 작업 영역에서 진행 상황을 확인하고 완료된 파일을 바로 내려받을 수 있습니다. 모바일에서는 화면 아래의 출력 작업 버튼을 누르세요." },
     ],
     "/tools/document-compare": [
       { question: "DOC와 DOCX를 서로 비교할 수 있나요?", answer: "가능합니다. 둘 다 Word 계열이므로 어느 쪽 순서든 비교할 수 있습니다." },
@@ -48,6 +49,7 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
     "/tools/pdf-editor": [
       { question: "How do I select multiple page ranges?", answer: "Choose the output range to edit and use the page checkboxes. For a continuous document, mark split positions after pages to build the ranges at once. Number entry remains available for non-contiguous pages and custom ordering." },
+      { question: "Where do I download the finished PDF or ZIP?", answer: "Follow progress and download the completed file in the output workspace on the right. On mobile, open it from the output button at the bottom of the screen." },
     ],
     "/tools/document-compare": [
       { question: "Can I compare DOC with DOCX?", answer: "Yes. Both belong to the Word family, so either order is supported." },

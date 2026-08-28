@@ -1,4 +1,4 @@
-import { AlertTriangle, Download } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ResultCard, formatBytes } from "../../components/ui";
@@ -37,10 +37,23 @@ export function useDownloadResult() {
   return useMemo(() => ({ result, makeResult, makeBlobResult, clearResult }), [clearResult, makeBlobResult, makeResult, result]);
 }
 
-export function PdfDownloadCard({ result, title }: { result: DownloadResult; title?: string }) {
+export function PdfDownloadCard({ result, title, compact = false }: { result: DownloadResult; title?: string; compact?: boolean }) {
   const language = useAppLanguage();
+  const displayTitle = title ?? featureMessage(language, "pdf.messages.pdfUi.yourFileIsReady");
+  if (compact) {
+    return (
+      <section className="pdf-download-compact" aria-live="polite">
+        <div><CheckCircle2 size={18} /><strong>{displayTitle}</strong></div>
+        <a className="result-download accent-violet" href={result.url} download={result.fileName}>
+          <Download size={16} /> <span>{result.fileName}</span><small>{formatBytes(result.size)}</small>
+        </a>
+        <FileShareButton url={result.url} fileName={result.fileName} className="secondary-button pdf-download-share" />
+        {!!result.warnings.length && <div className="result-warnings">{result.warnings.map((warning) => <p key={warning}><AlertTriangle size={13} /> {warning}</p>)}</div>}
+      </section>
+    );
+  }
   return (
-    <ResultCard accent="violet" title={title ?? (featureMessage(language, "pdf.messages.pdfUi.yourFileIsReady"))} message={featureMessage(language, "pdf.messages.pdfUi.thisFileWasCreatedInYourBrowserDownload")}>
+    <ResultCard accent="violet" title={displayTitle} message={featureMessage(language, "pdf.messages.pdfUi.thisFileWasCreatedInYourBrowserDownload")}>
       <a className="result-download accent-violet" href={result.url} download={result.fileName}>
         <Download size={16} /> {result.fileName}<small>{formatBytes(result.size)}</small>
       </a>

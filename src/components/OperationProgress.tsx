@@ -13,6 +13,7 @@ export function OperationProgress({
   logs,
   accent,
   title,
+  compact = false,
 }: {
   status: OperationStatus;
   progress: number;
@@ -20,15 +21,16 @@ export function OperationProgress({
   logs: OperationLogEntry[];
   accent: ToolAccent;
   title?: string;
+  compact?: boolean;
 }) {
   const { t } = useTranslation("common");
   const displayTitle = title ?? t("progress.title");
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(!compact);
   const logRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
-    if (status === "running") setExpanded(true);
-  }, [status]);
+    if (status === "running" && !compact) setExpanded(true);
+  }, [compact, status]);
 
   useLayoutEffect(() => {
     if (!expanded) return;
@@ -42,7 +44,7 @@ export function OperationProgress({
   const StateIcon = status === "running" ? LoaderCircle : status === "success" ? CheckCircle2 : AlertCircle;
 
   return (
-    <section className={`operation-progress accent-${accent} status-${status}`} aria-label={displayTitle}>
+    <section className={`operation-progress accent-${accent} status-${status}${compact ? " compact" : ""}`} aria-label={displayTitle}>
       <div className="operation-progress-heading">
         <span className="operation-state-icon"><StateIcon className={status === "running" ? "spin" : ""} size={17} /></span>
         <div>

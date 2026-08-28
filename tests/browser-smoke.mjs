@@ -74,7 +74,10 @@ try {
 }
 
 async function testPdfTools(page, fixtures, tempDir) {
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
   await navigateTo(page, `${koBaseUrl}/tools/pdf-editor/`);
+  const privacyChoice = await page.$(".privacy-consent-actions .secondary-button");
+  if (privacyChoice) await privacyChoice.click();
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
@@ -95,7 +98,15 @@ async function testPdfTools(page, fixtures, tempDir) {
   }
   await page.waitForFunction(() => !document.querySelector(".summary-card .primary-button")?.disabled);
   await clickPrimaryAction(page);
+  const immediateFeedback = await page.$eval(".pdf-output-action-zone", (element) => ({
+    running: Boolean(element.querySelector(".operation-progress.status-running")),
+    ready: Boolean(element.querySelector(".pdf-download-compact .result-download")),
+    buttonText: element.querySelector(".primary-button")?.textContent || "",
+  }));
+  if (!immediateFeedback.running && !immediateFeedback.ready) throw new Error(`PDF export feedback was not shown beside the action: ${JSON.stringify(immediateFeedback)}`);
+  if (immediateFeedback.running && !immediateFeedback.buttonText.includes("만드는 중")) throw new Error(`PDF export button did not announce its running state: ${JSON.stringify(immediateFeedback)}`);
   await waitForResult(page);
+  if (!await page.$eval(".pdf-download-compact .result-download", (link) => Boolean(link.closest(".pdf-output-action-zone")))) throw new Error("PDF download was not kept in the sticky output action zone.");
   await assertProgressLog(page, "PDF 페이지 편집");
   const rotatedPath = path.join(tempDir, "rotated.pdf");
   await saveBlobLink(page, ".result-download", rotatedPath);
@@ -132,6 +143,14 @@ async function testPdfTools(page, fixtures, tempDir) {
   await page.$eval('.pdf-output-mode-list button:nth-child(2)', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(2)')?.getAttribute("aria-checked") === "true");
   await page.waitForSelector(".pdf-multi-range-panel");
+  const rangeWorkspaceLayout = await page.$eval(".pdf-range-selection-toolbar", (toolbar) => ({
+    toolbarPosition: getComputedStyle(toolbar).position,
+    insideWorkspace: Boolean(toolbar.closest(".pdf-output-workspace")),
+    workspacePosition: getComputedStyle(toolbar.closest(".pdf-output-workspace")).position,
+  }));
+  if (!rangeWorkspaceLayout.insideWorkspace || rangeWorkspaceLayout.toolbarPosition !== "static" || rangeWorkspaceLayout.workspacePosition !== "sticky") {
+    throw new Error(`PDF range controls are not using the sticky sidebar layout: ${JSON.stringify(rangeWorkspaceLayout)}`);
+  }
   if (await page.$(".pdf-selection-range-form") || !(await page.$(".pdf-page-select input[type=checkbox]"))) throw new Error("Visual range checkboxes were not shown in multi-range mode.");
   let groupRows = await page.$$(".pdf-range-group");
   if (groupRows.length !== 1) throw new Error(`Expected one seeded PDF range row, got ${groupRows.length}.`);
@@ -187,6 +206,32 @@ async function testPdfTools(page, fixtures, tempDir) {
   const separateZip = await JSZip.loadAsync(await fs.readFile(separateZipPath));
   const separatePdfNames = Object.keys(separateZip.files).filter((name) => name.endsWith(".pdf"));
   if (separatePdfNames.length !== 1) throw new Error(`Expected one selected page PDF, got ${separatePdfNames.length}.`);
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.waitForSelector(".pdf-mobile-output-dock", { visible: true });
+  const mobileDockLayout = await page.evaluate(() => {
+    const dock = document.querySelector(".pdf-mobile-output-dock");
+    const tabs = document.querySelector(".bottom-tabs");
+    const dockRect = dock?.getBoundingClientRect();
+    const tabsRect = tabs?.getBoundingClientRect();
+    return {
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      dockBottom: dockRect?.bottom,
+      tabsTop: tabsRect?.top,
+      downloadVisible: Boolean(document.querySelector(".pdf-mobile-download")),
+    };
+  });
+  if (mobileDockLayout.scrollWidth !== mobileDockLayout.clientWidth || !mobileDockLayout.downloadVisible
+    || mobileDockLayout.dockBottom > mobileDockLayout.tabsTop) {
+    throw new Error(`PDF mobile output dock overlaps or overflows: ${JSON.stringify(mobileDockLayout)}`);
+  }
+  await page.click(".pdf-mobile-output-summary");
+  await page.waitForSelector(".pdf-output-sidebar-shell.mobile-open .pdf-output-workspace", { visible: true, timeout: 5_000 });
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector(".pdf-output-sidebar-shell")?.classList.contains("mobile-open")
+    && document.activeElement?.classList.contains("pdf-mobile-output-summary"));
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
 
   await navigatePdfTab(page, 2, "/tools/pdf-editor/image-to-pdf", "image-to-pdf", "image/jpeg");
   await (await page.$('input[type="file"][accept*="image/jpeg"]')).uploadFile(fixtures.tinyPng);
@@ -691,6 +736,10 @@ async function clickPrimaryAction(page) {
 }
 
 async function assertProgressLog(page, label) {
+  if (!await page.$(".operation-progress .operation-log")) {
+    await page.$eval(".operation-progress .operation-log-toggle", (button) => button.click());
+    await page.waitForSelector(".operation-progress .operation-log");
+  }
   const state = await page.$eval(".operation-progress", (element) => ({
     className: element.className,
     progress: element.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),

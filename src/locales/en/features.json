@@ -723,6 +723,14 @@
         "availableOnlyWhenCreatingOnePdf": "Available only when creating one PDF.",
         "createPdf": "Create PDF",
         "createPdfZip": "Create PDF ZIP",
+        "creatingPdf": "Creating PDF… {{p0}}%",
+        "creatingPdfZip": "Creating PDF ZIP… {{p0}}%",
+        "retryOutput": "Create result again",
+        "retry": "Try again",
+        "downloadResult": "Download result",
+        "outputWorkspace": "Output workspace",
+        "outputWorkspaceSummary": "{{p0}} results · {{p1}} pages",
+        "closeOutputWorkspace": "Close output workspace",
         "passwordProtectedPdfsRequireAnUnlockedCopy": "Password-protected PDFs require an unlocked copy.",
         "pdfEditExtractLog": "PDF edit & extract log",
         "enterAnOutputFileName": "Enter an output file name.",
@@ -819,7 +827,7 @@
             {
               "title": "Page-level editing",
               "paragraphs": [
-                "Drag previews to reorder pages and remove unwanted pages. For PDFs by range, choose a range and use page checkboxes, or quickly split the document between pages.",
+                "Drag previews to reorder pages and remove unwanted pages. For PDFs by range, choose a range in the output workspace on the right and use page checkboxes, or quickly split the document between pages.",
                 "If a source page is already rotated, your rotation is added to its existing orientation so the exported page matches the preview."
               ]
             },
@@ -864,7 +872,11 @@
             },
             {
               "question": "How do I select multiple page ranges?",
-              "answer": "Choose the output range to edit and use each page checkbox. For a continuous document, mark split positions after pages to build all ranges at once. Number entry remains available for non-contiguous pages and custom ordering."
+              "answer": "Choose the output range in the output workspace on the right and use each page checkbox. For a continuous document, mark split positions after pages to build all ranges at once. Number entry remains available for non-contiguous pages and custom ordering."
+            },
+            {
+              "question": "Where do I download the finished PDF or ZIP?",
+              "answer": "Follow progress and download the completed file in the output workspace. On mobile, open it from the output button at the bottom of the screen."
             },
             {
               "question": "Can it perfectly restore Word or Excel structure?",
