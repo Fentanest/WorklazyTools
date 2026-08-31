@@ -45,6 +45,9 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Microsoft의 공식 웹 오피스인가요?", answer: "아닙니다. LibreOffice 기반 브라우저 편집기이며 Microsoft Office와 호환성 차이가 있을 수 있습니다." },
       { question: "HWP도 여기서 편집할 수 있나요?", answer: "HWP/HWPX는 전용 HWP 편집기를 이용하세요. 이 편집기는 Writer·Calc·Impress 형식에 초점을 둡니다." },
     ],
+    "/tools/video-studio": [
+      { question: "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?", answer: "가능합니다. 대상 그룹을 고르면 카드 순서가 같은 영상끼리 시작·종료 시간을 복사하며, 더 짧은 영상은 재생 시간 안으로 자동 조정합니다." },
+    ],
   },
   en: {
     "/tools/excel-merger": [
@@ -72,6 +75,9 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Does it include a Korean font?", answer: "A Korean fallback font is included, though documents requiring proprietary fonts can have different spacing or line breaks." },
       { question: "Is this an official Microsoft Office web app?", answer: "No. It is a LibreOffice-based browser editor and compatibility can differ from Microsoft Office." },
       { question: "Are HWP files supported here?", answer: "Use the dedicated HWP editor for HWP/HWPX files. This editor focuses on Writer, Calc, and Impress formats." },
+    ],
+    "/tools/video-studio": [
+      { question: "Can I apply one group's video ranges to other groups?", answer: "Yes. Choose the target groups to copy start and end times between videos in the same card positions. Ranges are fitted when a target video is shorter." },
     ],
   },
 };
@@ -186,7 +192,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   "/tools/video-studio": {
     title: "비디오 스튜디오 | 영상 자르기·이어붙이기·음원 추출",
     description: "영상 수 제한 없이 최대 10개 그룹에서 영상을 자르거나 이어붙이세요. 빠른 무손실 저장, 영상 속 음성 제어와 GIF·MP3·AAC 출력을 지원합니다.",
-    application: { name: "Video Studio", featureList: ["영상 수 제한 없는 추가·10개 그룹", "빠른 무손실 자르기", "그룹별 개별 출력·이어붙이기", "동기 재생·분할 전체화면", "개별·폴더·ZIP 저장", "영상 속 음성 복사·제거·변환", "화질·음질 설정", "GIF·MP3·AAC 출력"] },
+    application: { name: "Video Studio", featureList: ["영상 수 제한 없는 추가·10개 그룹", "빠른 무손실 자르기", "그룹 간 구간 일괄 적용", "그룹별 개별 출력·이어붙이기", "동기 재생·분할 전체화면", "개별·폴더·ZIP 저장", "영상 속 음성 복사·제거·변환", "화질·음질 설정", "GIF·MP3·AAC 출력"] },
   },
   "/tools/audio-studio": {
     title: "오디오 스튜디오 | 파형 편집·구간 자르기·피치 조절",

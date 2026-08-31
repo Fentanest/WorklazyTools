@@ -910,6 +910,99 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 7);
   const groupOptionCount = await page.$eval(".video-group-select select", (select) => select.options.length);
   if (groupOptionCount !== 10) throw new Error(`Video group limit is not 10: ${groupOptionCount}`);
+  const rangeGroupFiles = await page.$$eval(".video-card-footer strong", (elements) => elements.map((element) => (element.textContent || "").replace(/^\d+\.\s*/, "")));
+  const moveVideoByName = async (fileName, group) => {
+    await page.evaluate(({ fileName, group }) => {
+      const article = Array.from(document.querySelectorAll(".multi-video-grid article")).find((candidate) => candidate.querySelector(".video-card-footer strong")?.textContent?.endsWith(fileName));
+      const select = article?.querySelector(".video-group-select select");
+      if (!(select instanceof HTMLSelectElement)) throw new Error(`Group selector for ${fileName} is unavailable`);
+      select.value = String(group);
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }, { fileName, group });
+    await page.waitForFunction(({ fileName, group }) => {
+      const article = Array.from(document.querySelectorAll(".multi-video-grid article")).find((candidate) => candidate.querySelector(".video-card-footer strong")?.textContent?.endsWith(fileName));
+      return article?.querySelector(".video-group-select select")?.value === String(group);
+    }, {}, { fileName, group });
+  };
+  await moveVideoByName(rangeGroupFiles[6], 10);
+  for (let index = 0; index < 6; index += 1) await moveVideoByName(rangeGroupFiles[index], Math.floor(index / 2) + 1);
+  await page.waitForFunction(() => {
+    const sizes = Array.from(document.querySelectorAll(".video-sync-group")).map((section) => ({
+      group: section.querySelector(".video-group-title strong")?.textContent,
+      count: section.querySelectorAll(".multi-video-grid article").length,
+    }));
+    return [1, 2, 3].every((group) => sizes.some((entry) => entry.group === `그룹 ${group}` && entry.count === 2));
+  });
+
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1")?.querySelectorAll("video")[1]?.readyState >= 1);
+  await page.evaluate(() => {
+    const group = Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1");
+    const player = group?.querySelectorAll("video")[1];
+    if (!(player instanceof HTMLVideoElement)) throw new Error("The second Group 1 player is unavailable");
+    player.currentTime = player.duration * 0.2;
+    player.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1")?.querySelectorAll(".multi-video-grid article")[1]?.classList.contains("active"));
+  await page.evaluate(() => {
+    const group = Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1");
+    const button = Array.from(group?.querySelectorAll(".video-group-actions button") || []).find((candidate) => candidate.textContent?.includes("분할 전체화면"));
+    if (!(button instanceof HTMLButtonElement)) throw new Error("Group 1 split fullscreen button is unavailable");
+    button.click();
+  });
+  await page.waitForFunction(() => Boolean(document.fullscreenElement));
+  await page.evaluate(() => {
+    const group = document.fullscreenElement;
+    const player = group?.querySelectorAll("video")[1];
+    const buttons = group?.querySelectorAll(".video-fullscreen-trim-actions button");
+    if (!(player instanceof HTMLVideoElement) || !buttons?.length) throw new Error("Fullscreen range controls are unavailable");
+    player.currentTime = player.duration * 0.2;
+    buttons[0].click();
+    player.currentTime = player.duration * 0.7;
+    buttons[1].click();
+  });
+  await page.waitForFunction(() => {
+    const lanes = document.fullscreenElement?.querySelectorAll(".video-trim-lane");
+    const start = Number(lanes?.[1]?.querySelector('[data-trim-boundary="start"] input')?.value);
+    const end = Number(lanes?.[1]?.querySelector('[data-trim-boundary="end"] input')?.value);
+    return start > 0 && end > start;
+  });
+  await page.evaluate(() => document.exitFullscreen());
+  await page.waitForFunction(() => !document.fullscreenElement);
+
+  await page.evaluate(() => {
+    const group = Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1");
+    const button = group?.querySelector(".video-copy-group-ranges");
+    if (!(button instanceof HTMLButtonElement)) throw new Error("Cross-group range button is unavailable");
+    button.click();
+  });
+  await page.waitForSelector(".video-group-range-copy");
+  await page.evaluate(() => {
+    const panel = document.querySelector(".video-group-range-copy");
+    const group10 = Array.from(panel?.querySelectorAll(".video-group-range-targets label") || []).find((label) => label.textContent?.trim() === "그룹 10");
+    const checkbox = group10?.querySelector("input");
+    if (!(checkbox instanceof HTMLInputElement) || !checkbox.checked) throw new Error("Group 10 range target is unavailable");
+    checkbox.click();
+    const apply = panel?.querySelector(".video-group-range-copy-actions .primary-button");
+    if (!(apply instanceof HTMLButtonElement)) throw new Error("Apply ranges button is unavailable");
+    apply.click();
+  });
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-range-notice")).some((element) => element.textContent?.includes("2개 그룹의 4개 영상에 적용했습니다")));
+  const copiedRangeState = await page.evaluate(() => {
+    const ranges = new Map(Array.from(document.querySelectorAll(".video-sync-group"), (section) => [
+      section.querySelector(".video-group-title strong")?.textContent,
+      Array.from(section.querySelectorAll(".video-trim-lane"), (lane) => ({
+        start: Number(lane.querySelector('[data-trim-boundary="start"] input')?.value),
+        end: Number(lane.querySelector('[data-trim-boundary="end"] input')?.value),
+      })),
+    ]));
+    return { source: ranges.get("그룹 1"), second: ranges.get("그룹 2"), third: ranges.get("그룹 3") };
+  });
+  if (!copiedRangeState.source || !copiedRangeState.second || !copiedRangeState.third
+    || copiedRangeState.source.length !== 2 || copiedRangeState.second.length !== 2 || copiedRangeState.third.length !== 2
+    || JSON.stringify(copiedRangeState.second) !== JSON.stringify(copiedRangeState.source)
+    || JSON.stringify(copiedRangeState.third) !== JSON.stringify(copiedRangeState.source)) {
+    throw new Error(`Cross-group range copy did not preserve card positions: ${JSON.stringify(copiedRangeState)}`);
+  }
   await page.evaluate(() => {
     const select = document.querySelectorAll(".video-group-select select")[6];
     if (!(select instanceof HTMLSelectElement)) throw new Error("Seventh video group selector is unavailable");

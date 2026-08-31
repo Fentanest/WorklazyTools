@@ -4,6 +4,7 @@ interface VideoGroupMemoInput {
   language: string;
   players: unknown;
   items: ReadonlyArray<{ id: string }>;
+  availableGroups: ReadonlyArray<number>;
   activeId?: string;
 }
 
@@ -20,6 +21,7 @@ interface VideoTrimMemoInput {
 export function areVideoGroupRenderInputsEqual(previous: VideoGroupMemoInput, next: VideoGroupMemoInput) {
   if (previous.group !== next.group || previous.settings !== next.settings || previous.language !== next.language || previous.players !== next.players) return false;
   if (previous.items.length !== next.items.length || previous.items.some((item, index) => item !== next.items[index])) return false;
+  if (previous.availableGroups.length !== next.availableGroups.length || previous.availableGroups.some((group, index) => group !== next.availableGroups[index])) return false;
   const previousActiveInGroup = previous.items.some((item) => item.id === previous.activeId);
   const nextActiveInGroup = next.items.some((item) => item.id === next.activeId);
   return (!previousActiveInGroup && !nextActiveInGroup) || previous.activeId === next.activeId;

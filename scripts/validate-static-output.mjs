@@ -64,11 +64,13 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/document-compare", "tools/office-editor", "tools/text-merger"].includes(route)) {
+  if (["tools/excel-merger", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
       ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/document-compare"
         ? language === "ko" ? "DOC와 DOCX를 서로 비교할 수 있나요?" : "Can I compare DOC with DOCX?"
+        : route === "tools/video-studio"
+          ? language === "ko" ? "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?" : "Can I apply one group's video ranges to other groups?"
         : route === "tools/text-merger"
           ? language === "ko" ? "직접 입력을 TXT 파일 사이에 놓을 수 있나요?" : "Can pasted text be placed between TXT files?"
           : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";

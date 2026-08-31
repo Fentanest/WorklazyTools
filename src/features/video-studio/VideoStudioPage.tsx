@@ -45,6 +45,7 @@ import { VIDEO_GROUP_IDS } from "./types";
 import { VideoGroupSection } from "./VideoGroupSection";
 import { hasUsableVideoRange, shouldProbeVideoMetadata } from "./videoMetadata";
 import { isUserFacingVideoError } from "./videoErrors";
+import { applyGroupRangesByPosition, applyVideoRangeToGroup } from "./videoRanges";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
@@ -146,6 +147,7 @@ export function VideoStudioPage() {
   const usedGroups = useMemo(() => GROUP_IDS
     .map((group) => ({ group, items: items.filter((item) => item.group === group) }))
     .filter((entry) => entry.items.length), [items]);
+  const usedGroupIds = useMemo(() => usedGroups.map(({ group }) => group), [usedGroups]);
   const metadataBlockedItems = items.filter((item) => !hasUsableVideoRange(item));
   const ready = items.length > 0 && metadataBlockedItems.length === 0;
   const isVideoOutput = outputFormat === "mp4" || outputFormat === "mkv" || outputFormat === "webm";
@@ -284,11 +286,14 @@ export function VideoStudioPage() {
   }, []);
 
   const applyRangeToGroup = useCallback((source: VideoItem) => {
-    setItems((current) => current.map((item) => item.group !== source.group ? item : {
-      ...item,
-      start: Math.min(source.start, Math.max(0, item.duration - 0.05)),
-      end: Math.min(source.end, item.duration),
-    }));
+    setItems((current) => applyVideoRangeToGroup(current, source));
+  }, []);
+
+  const applyRangesToGroups = useCallback((sourceGroup: VideoGroupId, targetGroups: VideoGroupId[]) => {
+    const result = applyGroupRangesByPosition(itemsRef.current, sourceGroup, targetGroups);
+    itemsRef.current = result.items;
+    setItems(result.items);
+    return result.summary;
   }, []);
 
   const clearVideoOutputs = () => {
@@ -528,6 +533,7 @@ export function VideoStudioPage() {
                 group={group}
                 items={groupItems}
                 settings={groupSettings[group]}
+                availableGroups={usedGroupIds}
                 activeId={activeId}
                 language={language}
                 players={players}
@@ -538,6 +544,7 @@ export function VideoStudioPage() {
                 onRemoveItem={removeItem}
                 onProbeItem={probeItem}
                 onApplyRange={applyRangeToGroup}
+                onApplyGroupRanges={applyRangesToGroups}
                 onNotice={setLastResult}
               />
             ))}

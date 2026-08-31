@@ -79,5 +79,9 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     const pdfFaq = getSeoDefinition(language, "/tools/pdf-editor").faq;
     assert.equal(pdfFaq?.length, 2);
     assert.ok(pdfFaq?.every((item) => item.question && item.answer));
+    const videoFaq = getSeoDefinition(language, "/tools/video-studio").faq;
+    assert.equal(videoFaq?.length, 1);
+    assert.ok(videoFaq?.every((item) => item.question && item.answer));
+    assert.ok(getSeoDefinition(language, "/tools/video-studio").application?.featureList.some((feature) => /구간 일괄|ranges across groups/i.test(feature)));
   }
 });

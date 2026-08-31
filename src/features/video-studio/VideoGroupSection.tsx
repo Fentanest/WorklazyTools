@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Expand, Film, Gauge, GripVertical, Link2, Minimize2, Pause, Play, Scissors, Timer, Volume2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Expand, Film, Gauge, GripVertical, Link2, Minimize2, Pause, Play, Scissors, Timer, Volume2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState, type DragEvent, type MutableRefObject } from "react";
 
 import { SegmentedControl, formatBytes } from "../../components/ui";
@@ -7,11 +7,13 @@ import type { AppLanguage } from "../../i18n/languages";
 import { MAX_VIDEO_GROUP, VIDEO_GROUP_IDS, type VideoGroupId, type VideoGroupSettings, type VideoItem } from "./types";
 import { VideoTrimLane } from "./VideoTrimLane";
 import { areVideoGroupRenderInputsEqual } from "./videoMemo";
+import { MIN_VIDEO_RANGE_SECONDS, type VideoRangeApplicationSummary } from "./videoRanges";
 
 interface VideoGroupSectionProps {
   group: VideoGroupId;
   items: VideoItem[];
   settings: VideoGroupSettings;
+  availableGroups: VideoGroupId[];
   activeId?: string;
   language: AppLanguage;
   players: MutableRefObject<Record<string, HTMLVideoElement | null>>;
@@ -22,6 +24,7 @@ interface VideoGroupSectionProps {
   onRemoveItem: (itemId: string) => void;
   onProbeItem: (itemId: string, preserveTiming?: boolean) => void;
   onApplyRange: (source: VideoItem) => void;
+  onApplyGroupRanges: (sourceGroup: VideoGroupId, targetGroups: VideoGroupId[]) => VideoRangeApplicationSummary;
   onNotice: (message: string) => void;
 }
 
@@ -29,6 +32,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
   group,
   items,
   settings,
+  availableGroups,
   activeId,
   language,
   players,
@@ -39,6 +43,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
   onRemoveItem,
   onProbeItem,
   onApplyRange,
+  onApplyGroupRanges,
   onNotice,
 }: VideoGroupSectionProps) {
   const containerRef = useRef<HTMLElement | null>(null);
@@ -48,9 +53,14 @@ export const VideoGroupSection = memo(function VideoGroupSection({
   const syncing = useRef(false);
   const [draggedId, setDraggedId] = useState<string>();
   const [fullscreen, setFullscreen] = useState(false);
+  const [rangeCopyOpen, setRangeCopyOpen] = useState(false);
+  const [rangeCopyTargets, setRangeCopyTargets] = useState<VideoGroupId[]>([]);
+  const [rangeNotice, setRangeNotice] = useState("");
   const audioItemId = settings.audioItemId && items.some((item) => item.id === settings.audioItemId) ? settings.audioItemId : items[0].id;
   const activeItemIndex = Math.max(0, items.findIndex((item) => item.id === activeId));
   const activeItem = items[activeItemIndex];
+  const otherGroups = availableGroups.filter((candidate) => candidate !== group);
+  const availableGroupsKey = availableGroups.join("|");
   const groupDuration = Math.max(...items.map((item) => item.duration || 0), 0.01);
   const synchronizationKey = `${settings.sync}:${items.map((item) => `${item.id}:${item.duration}`).join("|")}`;
 
@@ -125,10 +135,20 @@ export const VideoGroupSection = memo(function VideoGroupSection({
   }, [activeId, items, language, onActivate, onNotice]);
 
   const setCurrentAsBoundary = useCallback((item: VideoItem, boundary: "start" | "end") => {
-    const current = players.current[item.id]?.currentTime ?? 0;
-    if (boundary === "start") onUpdateItem(item.id, { start: Math.max(0, Math.min(current, item.end - 0.05)) });
-    else onUpdateItem(item.id, { end: Math.min(item.duration, Math.max(current, item.start + 0.05)) });
-  }, [onUpdateItem, players]);
+    const player = players.current[item.id];
+    const current = player?.currentTime;
+    if (!player || player.readyState < 1 || typeof current !== "number" || !Number.isFinite(current)) {
+      setRangeNotice(featureMessage(language, "video.messages.VideoGroupSection.currentPositionUnavailable", { p0: item.file.name }));
+      return;
+    }
+    const next = boundary === "start"
+      ? Math.max(0, Math.min(current, item.end - Math.min(MIN_VIDEO_RANGE_SECONDS, item.duration)))
+      : Math.min(item.duration, Math.max(current, item.start + Math.min(MIN_VIDEO_RANGE_SECONDS, item.duration)));
+    onUpdateItem(item.id, { [boundary]: next });
+    setRangeNotice(featureMessage(language, boundary === "start"
+      ? "video.messages.VideoGroupSection.startPositionSet"
+      : "video.messages.VideoGroupSection.endPositionSet", { p0: item.file.name, p1: formatTime(next) }));
+  }, [language, onUpdateItem, players]);
 
   const playItemRange = useCallback((item: VideoItem) => {
     const player = players.current[item.id];
@@ -147,6 +167,29 @@ export const VideoGroupSection = memo(function VideoGroupSection({
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    setRangeCopyTargets((current) => current.filter((target) => availableGroups.includes(target) && target !== group));
+  }, [availableGroupsKey, group]);
+
+  const openRangeCopy = () => {
+    setRangeCopyTargets(otherGroups);
+    setRangeCopyOpen(true);
+  };
+
+  const applyRangesToSelectedGroups = () => {
+    if (!rangeCopyTargets.length) return;
+    const summary = onApplyGroupRanges(group, rangeCopyTargets);
+    const messages = [featureMessage(language, "video.messages.VideoGroupSection.groupRangesApplied", {
+      p0: group,
+      p1: summary.appliedGroups,
+      p2: summary.appliedItems,
+    })];
+    if (summary.adjustedItems) messages.push(featureMessage(language, "video.messages.VideoGroupSection.groupRangesAdjusted", { p0: summary.adjustedItems }));
+    if (summary.unmatchedSlots) messages.push(featureMessage(language, "video.messages.VideoGroupSection.groupRangePositionsSkipped", { p0: summary.unmatchedSlots }));
+    setRangeNotice(messages.join(" "));
+    setRangeCopyOpen(false);
+  };
 
   const drop = (event: DragEvent, targetId?: string) => {
     event.preventDefault();
@@ -170,9 +213,23 @@ export const VideoGroupSection = memo(function VideoGroupSection({
         </div>
         <div className="video-group-actions">
           <label className="compact-sync-toggle"><input type="checkbox" checked={settings.sync} disabled={items.length < 2} onChange={(event) => onUpdateSettings(group, { sync: event.target.checked })} /><span>{featureMessage(language, "video.messages.VideoGroupSection.syncPlayback")}</span></label>
+          {otherGroups.length > 0 && <button type="button" className="secondary-button small video-copy-group-ranges" onClick={openRangeCopy}><Copy size={15} /> {featureMessage(language, "video.messages.VideoGroupSection.copyRangesToOtherGroups")}</button>}
           {items.length > 1 && <button type="button" className="secondary-button small" onClick={() => void toggleFullscreen()}>{fullscreen ? <Minimize2 size={15} /> : <Expand size={15} />} {featureMessage(language, fullscreen ? "video.messages.VideoGroupSection.closeSplitFullscreen" : "video.messages.VideoGroupSection.splitFullscreen")}</button>}
         </div>
       </header>
+
+      {rangeCopyOpen && (
+        <div className="video-group-range-copy" role="group" aria-label={featureMessage(language, "video.messages.VideoGroupSection.copyGroupRangesTitle", { p0: group })}>
+          <span><strong>{featureMessage(language, "video.messages.VideoGroupSection.copyGroupRangesTitle", { p0: group })}</strong><small>{featureMessage(language, "video.messages.VideoGroupSection.copyGroupRangesHelp")}</small></span>
+          <div className="video-group-range-targets">
+            {otherGroups.map((target) => <label key={target}><input type="checkbox" checked={rangeCopyTargets.includes(target)} onChange={(event) => setRangeCopyTargets((current) => event.target.checked ? [...current, target].sort((left, right) => left - right) : current.filter((candidate) => candidate !== target))} /><span>{featureMessage(language, "video.messages.VideoGroupSection.group")} {target}</span></label>)}
+          </div>
+          <div className="video-group-range-copy-actions">
+            <button type="button" className="secondary-button small" onClick={() => setRangeCopyOpen(false)}>{featureMessage(language, "video.messages.VideoGroupSection.cancelRangeCopy")}</button>
+            <button type="button" className="primary-button small" disabled={!rangeCopyTargets.length} onClick={applyRangesToSelectedGroups}>{featureMessage(language, "video.messages.VideoGroupSection.applyToSelectedGroups", { p0: rangeCopyTargets.length })}</button>
+          </div>
+        </div>
+      )}
 
       {items.length > 1 && (
         <div className="video-group-master-controls">
@@ -206,6 +263,8 @@ export const VideoGroupSection = memo(function VideoGroupSection({
                 ref={(element) => { players.current[item.id] = element; }}
                 src={item.url}
                 controls
+                onPointerDownCapture={() => onActivate(item.id)}
+                onFocusCapture={() => onActivate(item.id)}
                 muted={mutedForGroupView}
                 preload="metadata"
                 onLoadedMetadata={(event) => {
@@ -274,6 +333,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
           <div className="video-fullscreen-trim-selection">
             <span><Scissors size={15} /><small>{featureMessage(language, "video.messages.VideoGroupSection.selectedVideo")} {activeItemIndex + 1}</small><strong title={activeItem.file.name}>{activeItem.file.name}</strong></span>
             <b>{formatTime(activeItem.start)} — {formatTime(activeItem.end)}</b>
+            {rangeNotice && <small className="video-range-notice" aria-live="polite">{rangeNotice}</small>}
           </div>
           <div className="video-fullscreen-trim-actions">
             <button type="button" disabled={!(activeItem.duration > 0)} onClick={() => setCurrentAsBoundary(activeItem, "start")}><Timer size={14} /> {featureMessage(language, "video.messages.VideoTrimLane.currentStart")}</button>
@@ -288,6 +348,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
 
       <div className="group-trim-editor">
         <div className="group-trim-heading"><span><Scissors size={17} /><strong>{featureMessage(language, "video.messages.VideoGroupSection.groupTrimRanges", { p0: group })}</strong></span><small>{featureMessage(language, "video.messages.VideoGroupSection.eachVideoCanUseADifferentRange")}</small></div>
+        {rangeNotice && <div className="video-range-notice" aria-live="polite">{rangeNotice}</div>}
         {items.map((item, groupIndex) => (
           <VideoTrimLane
             key={item.id}

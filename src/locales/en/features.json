@@ -166,7 +166,18 @@
         "moveToTheNextGroup": "Move {{p0}} to the next group",
         "remove": "Remove {{p0}}",
         "groupTrimRanges": "Group {{p0}} trim ranges",
-        "eachVideoCanUseADifferentRange": "Each video can use a different range."
+        "eachVideoCanUseADifferentRange": "Each video can use a different range.",
+        "currentPositionUnavailable": "The current playback position for {{p0}} is unavailable. Move the preview position and try again, or enter the time numerically.",
+        "startPositionSet": "Set the start of {{p0}} to {{p1}}.",
+        "endPositionSet": "Set the end of {{p0}} to {{p1}}.",
+        "copyRangesToOtherGroups": "Apply ranges to other groups",
+        "copyGroupRangesTitle": "Apply group {{p0}} ranges to other groups",
+        "copyGroupRangesHelp": "Copies start and end ranges between videos in the same card position. Ranges are fitted when a target video is shorter.",
+        "cancelRangeCopy": "Cancel",
+        "applyToSelectedGroups": "Apply to {{p0}} selected groups",
+        "groupRangesApplied": "Applied group {{p0}} ranges to {{p2}} videos in {{p1}} groups.",
+        "groupRangesAdjusted": "Adjusted the ranges of {{p0}} videos to fit their playback duration.",
+        "groupRangePositionsSkipped": "Left {{p0}} positions unchanged because the card counts differ."
       },
       "VideoTrimLane": {
         "message1Frame": "1 frame",
@@ -426,7 +437,7 @@
           {
             "title": "Synchronized playback and split fullscreen",
             "paragraphs": [
-              "Play videos in a group together and move them with one playhead. Split fullscreen lets you compare the group on one screen while listening to one selected video."
+              "Play videos in a group together and move them with one playhead. Split fullscreen lets you compare the group on one screen while listening to one selected video. Start and end ranges from one group can be applied at once to videos in the same card positions in other groups."
             ]
           },
           {
@@ -456,6 +467,10 @@
           {
             "question": "How do I download group outputs?",
             "answer": "Each completed file gets its own download button. You can also download all individually, save to a folder in supported browsers, or create an optional ZIP."
+          },
+          {
+            "question": "Can I apply one group's ranges to other groups?",
+            "answer": "Yes. Select Apply ranges to other groups and choose the targets. Start and end times are copied between videos in the same card positions and fitted when a target video is shorter."
           },
           {
             "question": "Where do I select GIF or audio extraction?",

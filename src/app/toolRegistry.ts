@@ -6,6 +6,7 @@ import {
   Clock3,
   Columns3,
   Combine,
+  Copy,
   FileSearch2,
   FileEdit,
   FileSpreadsheet,
@@ -171,6 +172,7 @@ export const tools: ToolDefinition[] = [
     highlights: [
       { icon: Film, label: "무제한 추가·10개 그룹" },
       { icon: Scissors, label: "무손실 빠른 자르기" },
+      { icon: Copy, label: "그룹 간 구간 일괄 적용" },
       { icon: Files, label: "개별 저장·선택 ZIP" },
       { icon: Music2, label: "영상 속 음성 제어" },
     ],
