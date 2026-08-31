@@ -172,11 +172,12 @@
         "endPositionSet": "Set the end of {{p0}} to {{p1}}.",
         "copyRangesToOtherGroups": "Apply ranges to other groups",
         "copyGroupRangesTitle": "Apply group {{p0}} ranges to other groups",
-        "copyGroupRangesHelp": "Copies start and end ranges between videos in the same card position. Ranges are fitted when a target video is shorter.",
+        "copyGroupRangesHelp": "Copies start and end ranges between videos in the same card position. If a target ends before the copied end time, its end point is set to the end of that video. Targets that end before the copied start time are left unchanged.",
         "cancelRangeCopy": "Cancel",
         "applyToSelectedGroups": "Apply to {{p0}} selected groups",
         "groupRangesApplied": "Applied group {{p0}} ranges to {{p2}} videos in {{p1}} groups.",
-        "groupRangesAdjusted": "Adjusted the ranges of {{p0}} videos to fit their playback duration.",
+        "groupRangesShortened": "{{p0}} target videos ended before the copied end time, so their end points were set to the end of each video.",
+        "groupRangesTooShortSkipped": "Skipped {{p0}} target videos because they end before the copied start time.",
         "groupRangePositionsSkipped": "Left {{p0}} positions unchanged because the card counts differ."
       },
       "VideoTrimLane": {
@@ -470,7 +471,7 @@
           },
           {
             "question": "Can I apply one group's ranges to other groups?",
-            "answer": "Yes. Select Apply ranges to other groups and choose the targets. Start and end times are copied between videos in the same card positions and fitted when a target video is shorter."
+            "answer": "Yes. Select Apply ranges to other groups and choose the targets. Start and end times are copied between videos in the same card positions. If a target ends before the copied end time, its end point is set to the end of that video; if it also ends before the copied start time, it is left unchanged."
           },
           {
             "question": "Where do I select GIF or audio extraction?",

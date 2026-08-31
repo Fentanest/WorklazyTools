@@ -17,26 +17,28 @@ test("group ranges copy by card position and report duration and size difference
     item("target-2-a", 2, 90),
     item("target-2-b", 2, 50),
     item("target-3-a", 3, 15),
-    item("target-3-b", 3, 100),
+    item("target-3-b", 3, 15, 2, 8),
     item("target-3-extra", 3, 100, 5, 10),
   ];
 
   const result = applyGroupRangesByPosition(items, 1, [2, 3]);
   assert.deepEqual(result.items.map(({ start, end }) => [start, end]), [
-    [10, 80], [20, 70], [10, 80], [20, 50], [10, 15], [20, 70], [5, 10],
+    [10, 80], [20, 70], [10, 80], [20, 50], [10, 15], [2, 8], [5, 10],
   ]);
-  assert.deepEqual(result.summary, { appliedGroups: 2, appliedItems: 4, adjustedItems: 2, unmatchedSlots: 1 });
+  assert.deepEqual(result.summary, { appliedGroups: 2, appliedItems: 3, shortenedItems: 2, skippedShortItems: 1, unmatchedSlots: 1 });
   assert.equal(result.items[0], items[0]);
   assert.equal(result.items[6], items[6]);
 });
 
-test("applying one video range to its group clamps every target independently", () => {
+test("applying one video range clamps viable targets and leaves too-short targets unchanged", () => {
   const source = item("source", 1, 100, 25, 75);
   const shorter = item("shorter", 1, 40);
+  const tooShort = item("too-short", 1, 20, 2, 8);
   const outside = item("outside", 2, 100, 5, 10);
-  const result = applyVideoRangeToGroup([source, shorter, outside], source);
-  assert.deepEqual(result.map(({ start, end }) => [start, end]), [[25, 75], [25, 40], [5, 10]]);
-  assert.equal(result[2], outside);
+  const result = applyVideoRangeToGroup([source, shorter, tooShort, outside], source);
+  assert.deepEqual(result.map(({ start, end }) => [start, end]), [[25, 75], [25, 40], [2, 8], [5, 10]]);
+  assert.equal(result[2], tooShort);
+  assert.equal(result[3], outside);
 });
 
 function item(id: string, group: VideoGroupId, duration: number, start = 0, end = duration): VideoItem {

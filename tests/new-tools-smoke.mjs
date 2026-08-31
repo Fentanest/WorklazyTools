@@ -943,6 +943,15 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     player.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
   });
   await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1")?.querySelectorAll(".multi-video-grid article")[1]?.classList.contains("active"));
+  await page.waitForFunction(() => {
+    const group = Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1");
+    const player = group?.querySelectorAll("video")[1];
+    const playhead = group?.querySelector(".video-group-master-controls input");
+    const label = group?.querySelector(".video-group-master-controls b");
+    return player instanceof HTMLVideoElement && playhead instanceof HTMLInputElement
+      && player.currentTime > 0.05 && Math.abs(Number(playhead.value) - player.currentTime) < 0.05
+      && label?.textContent !== "00:00:00.00";
+  });
   await page.evaluate(() => {
     const group = Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1");
     const button = Array.from(group?.querySelectorAll(".video-group-actions button") || []).find((candidate) => candidate.textContent?.includes("분할 전체화면"));
@@ -984,6 +993,10 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     checkbox.click();
     const apply = panel?.querySelector(".video-group-range-copy-actions .primary-button");
     if (!(apply instanceof HTMLButtonElement)) throw new Error("Apply ranges button is unavailable");
+    const style = getComputedStyle(apply);
+    if (apply.disabled || !style.backgroundImage.includes("linear-gradient") || Number(style.opacity) < 0.9) {
+      throw new Error(`Apply ranges button does not look active: ${JSON.stringify({ disabled: apply.disabled, background: style.backgroundImage, opacity: style.opacity })}`);
+    }
     apply.click();
   });
   await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-range-notice")).some((element) => element.textContent?.includes("2개 그룹의 4개 영상에 적용했습니다")));

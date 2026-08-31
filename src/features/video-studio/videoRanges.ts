@@ -5,7 +5,8 @@ export const MIN_VIDEO_RANGE_SECONDS = 0.05;
 export interface VideoRangeApplicationSummary {
   appliedGroups: number;
   appliedItems: number;
-  adjustedItems: number;
+  shortenedItems: number;
+  skippedShortItems: number;
   unmatchedSlots: number;
 }
 
@@ -29,6 +30,7 @@ export function clampVideoRange(start: number, end: number, duration: number) {
 export function applyVideoRangeToGroup(items: VideoItem[], source: VideoItem) {
   return items.map((item) => {
     if (item.group !== source.group) return item;
+    if (item.id !== source.id && item.duration <= source.start) return item;
     const range = clampVideoRange(source.start, source.end, item.duration);
     if (item.start === range.start && item.end === range.end) return item;
     return { ...item, ...range };
@@ -53,16 +55,21 @@ export function applyGroupRangesByPosition(
   });
 
   let appliedItems = 0;
-  let adjustedItems = 0;
+  let shortenedItems = 0;
+  let skippedShortItems = 0;
   const groupsWithApplications = new Set<VideoGroupId>();
   const nextItems = items.map((item) => {
     if (!targetSet.has(item.group)) return item;
     const source = sourceItems[positions.get(item.id) ?? -1];
     if (!source) return item;
+    if (item.duration <= source.start) {
+      skippedShortItems += 1;
+      return item;
+    }
     const range = clampVideoRange(source.start, source.end, item.duration);
     appliedItems += 1;
     groupsWithApplications.add(item.group);
-    if (Math.abs(range.start - source.start) > 0.000_001 || Math.abs(range.end - source.end) > 0.000_001) adjustedItems += 1;
+    if (range.end < source.end) shortenedItems += 1;
     if (item.start === range.start && item.end === range.end) return item;
     return { ...item, ...range };
   });
@@ -76,7 +83,8 @@ export function applyGroupRangesByPosition(
     summary: {
       appliedGroups: groupsWithApplications.size,
       appliedItems,
-      adjustedItems,
+      shortenedItems,
+      skippedShortItems,
       unmatchedSlots,
     } satisfies VideoRangeApplicationSummary,
   };

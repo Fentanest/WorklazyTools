@@ -46,7 +46,7 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "HWP도 여기서 편집할 수 있나요?", answer: "HWP/HWPX는 전용 HWP 편집기를 이용하세요. 이 편집기는 Writer·Calc·Impress 형식에 초점을 둡니다." },
     ],
     "/tools/video-studio": [
-      { question: "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?", answer: "가능합니다. 대상 그룹을 고르면 카드 순서가 같은 영상끼리 시작·종료 시간을 복사하며, 더 짧은 영상은 재생 시간 안으로 자동 조정합니다." },
+      { question: "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?", answer: "가능합니다. 대상 그룹을 고르면 카드 순서가 같은 영상끼리 시작·종료 시간을 복사합니다. 대상 영상이 복사한 종료 시각보다 짧으면 종료 지점을 영상 끝으로 맞추고, 시작 시각보다도 짧으면 해당 영상은 변경하지 않습니다." },
     ],
   },
   en: {
@@ -77,7 +77,7 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Are HWP files supported here?", answer: "Use the dedicated HWP editor for HWP/HWPX files. This editor focuses on Writer, Calc, and Impress formats." },
     ],
     "/tools/video-studio": [
-      { question: "Can I apply one group's video ranges to other groups?", answer: "Yes. Choose the target groups to copy start and end times between videos in the same card positions. Ranges are fitted when a target video is shorter." },
+      { question: "Can I apply one group's video ranges to other groups?", answer: "Yes. Choose the target groups to copy start and end times between videos in the same card positions. If a target ends before the copied end time, its end point is set to the end of that video; if it also ends before the copied start time, it is left unchanged." },
     ],
   },
 };

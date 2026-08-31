@@ -70,6 +70,15 @@ export const VideoGroupSection = memo(function VideoGroupSection({
     if (playheadLabelRef.current) playheadLabelRef.current.textContent = formatTime(value);
   }, []);
 
+  const activateItem = useCallback((itemId: string) => {
+    onActivate(itemId);
+    const player = players.current[itemId];
+    const currentTime = player?.currentTime;
+    if (player && player.readyState >= 1 && typeof currentTime === "number" && Number.isFinite(currentTime)) {
+      updatePlayhead(currentTime);
+    }
+  }, [onActivate, players, updatePlayhead]);
+
   const synchronizePlayers = useCallback(async (sourceId: string, action: "play" | "pause" | "seek") => {
     if (!settings.sync || syncing.current) return;
     const source = players.current[sourceId];
@@ -126,13 +135,13 @@ export const VideoGroupSection = memo(function VideoGroupSection({
       return;
     }
     try {
-      if (!items.some((item) => item.id === activeId)) onActivate(items[0].id);
+      if (!items.some((item) => item.id === activeId)) activateItem(items[0].id);
       await element.requestFullscreen();
       setFullscreen(true);
     } catch {
       onNotice(featureMessage(language, "video.messages.VideoGroupSection.unableToEnterFullscreenCheckTheBrowserS"));
     }
-  }, [activeId, items, language, onActivate, onNotice]);
+  }, [activateItem, activeId, items, language, onNotice]);
 
   const setCurrentAsBoundary = useCallback((item: VideoItem, boundary: "start" | "end") => {
     const player = players.current[item.id];
@@ -185,7 +194,8 @@ export const VideoGroupSection = memo(function VideoGroupSection({
       p1: summary.appliedGroups,
       p2: summary.appliedItems,
     })];
-    if (summary.adjustedItems) messages.push(featureMessage(language, "video.messages.VideoGroupSection.groupRangesAdjusted", { p0: summary.adjustedItems }));
+    if (summary.shortenedItems) messages.push(featureMessage(language, "video.messages.VideoGroupSection.groupRangesShortened", { p0: summary.shortenedItems }));
+    if (summary.skippedShortItems) messages.push(featureMessage(language, "video.messages.VideoGroupSection.groupRangesTooShortSkipped", { p0: summary.skippedShortItems }));
     if (summary.unmatchedSlots) messages.push(featureMessage(language, "video.messages.VideoGroupSection.groupRangePositionsSkipped", { p0: summary.unmatchedSlots }));
     setRangeNotice(messages.join(" "));
     setRangeCopyOpen(false);
@@ -226,7 +236,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
           </div>
           <div className="video-group-range-copy-actions">
             <button type="button" className="secondary-button small" onClick={() => setRangeCopyOpen(false)}>{featureMessage(language, "video.messages.VideoGroupSection.cancelRangeCopy")}</button>
-            <button type="button" className="primary-button small" disabled={!rangeCopyTargets.length} onClick={applyRangesToSelectedGroups}>{featureMessage(language, "video.messages.VideoGroupSection.applyToSelectedGroups", { p0: rangeCopyTargets.length })}</button>
+            <button type="button" className="primary-button accent-pink small" disabled={!rangeCopyTargets.length} onClick={applyRangesToSelectedGroups}>{featureMessage(language, "video.messages.VideoGroupSection.applyToSelectedGroups", { p0: rangeCopyTargets.length })}</button>
           </div>
         </div>
       )}
@@ -248,7 +258,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
             <article
               className={`${activeId === item.id ? "active" : ""}${draggedId === item.id ? " dragging" : ""}`}
               key={item.id}
-              onClick={() => onActivate(item.id)}
+              onClick={() => activateItem(item.id)}
               onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = "move"; }}
               onDrop={(event) => drop(event, item.id)}
             >
@@ -263,8 +273,8 @@ export const VideoGroupSection = memo(function VideoGroupSection({
                 ref={(element) => { players.current[item.id] = element; }}
                 src={item.url}
                 controls
-                onPointerDownCapture={() => onActivate(item.id)}
-                onFocusCapture={() => onActivate(item.id)}
+                onPointerDownCapture={() => activateItem(item.id)}
+                onFocusCapture={() => activateItem(item.id)}
                 muted={mutedForGroupView}
                 preload="metadata"
                 onLoadedMetadata={(event) => {
@@ -274,6 +284,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
                     return;
                   }
                   onUpdateItem(item.id, { duration, width: event.currentTarget.videoWidth, height: event.currentTarget.videoHeight, end: item.end || duration, metadataSource: "browser", probing: false, metadataError: undefined });
+                  if (activeItem.id === item.id) updatePlayhead(event.currentTarget.currentTime);
                   if (!(item.frameRate && item.frameRate > 0)) onProbeItem(item.id, true);
                 }}
                 onError={() => onProbeItem(item.id)}
@@ -294,7 +305,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
                     event.currentTarget.pause();
                     event.currentTarget.currentTime = item.end;
                   }
-                  if (audioItemId !== item.id) return;
+                  if (activeItem.id !== item.id) return;
                   const currentTime = event.currentTarget.currentTime;
                   updatePlayhead(currentTime);
                   if (!settings.sync) return;
@@ -358,7 +369,7 @@ export const VideoGroupSection = memo(function VideoGroupSection({
             groupSize={items.length}
             synchronizationKey={synchronizationKey}
             language={language}
-            onActivate={() => onActivate(item.id)}
+            onActivate={() => activateItem(item.id)}
             onStart={(value, seek) => { onUpdateItem(item.id, { start: value }); if (seek) seekItem(item, value); }}
             onEnd={(value, seek) => { onUpdateItem(item.id, { end: value }); if (seek) seekItem(item, value); }}
             onBoundary={(boundary) => setCurrentAsBoundary(item, boundary)}
