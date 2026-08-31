@@ -24,6 +24,7 @@ const DocumentCompareResultPage = lazy(() => import("../features/document-compar
 const VideoStudioPage = lazy(() => import("../features/video-studio/VideoStudioPage").then((module) => ({ default: module.VideoStudioPage })));
 const AudioStudioPage = lazy(() => import("../features/audio-studio/AudioStudioPage").then((module) => ({ default: module.AudioStudioPage })));
 const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioPage").then((module) => ({ default: module.ImageStudioPage })));
+const TextMergerPage = lazy(() => import("../features/text-merger/TextMergerPage").then((module) => ({ default: module.TextMergerPage })));
 const TextToolsPage = lazy(() => import("../features/text-tools/TextToolsPage").then((module) => ({ default: module.TextToolsPage })));
 const TextFormatterPage = lazy(() => import("../features/text-formatter/TextFormatterPage").then((module) => ({ default: module.TextFormatterPage })));
 const WorkCalculatorPage = lazy(() => import("../features/work-calculator/WorkCalculatorPage").then((module) => ({ default: module.WorkCalculatorPage })));
@@ -63,6 +64,7 @@ export function App() {
           <Route path="tools/video-studio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage /></LazyToolRoute>} />
           <Route path="tools/audio-studio" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage /></LazyToolRoute>} />
           <Route path="tools/image-studio" element={<LazyToolRoute label="Image Studio"><ImageStudioPage /></LazyToolRoute>} />
+          <Route path="tools/text-merger" element={<LazyToolRoute label="Text Merger"><TextMergerPage /></LazyToolRoute>} />
           <Route path="tools/text-tools" element={<LazyToolRoute label="Text Tools"><TextToolsPage /></LazyToolRoute>} />
           <Route path="tools/text-formatter" element={<LazyToolRoute label="Formatter"><TextFormatterPage /></LazyToolRoute>} />
           <Route path="tools/work-calculator" element={<LazyToolRoute label="Workday Calculator"><WorkCalculatorPage /></LazyToolRoute>} />
@@ -76,6 +78,7 @@ export function App() {
           <Route path="video-studio" element={<LocalizedNavigate to="/tools/video-studio/" />} />
           <Route path="audio-studio" element={<LocalizedNavigate to="/tools/audio-studio" />} />
           <Route path="image-studio" element={<LocalizedNavigate to="/tools/image-studio" />} />
+          <Route path="text-merger" element={<LocalizedNavigate to="/tools/text-merger" />} />
           <Route path="text-tools" element={<LocalizedNavigate to="/tools/text-tools" />} />
           <Route path="text-formatter" element={<LocalizedNavigate to="/tools/text-formatter" />} />
           <Route path="work-calculator" element={<LocalizedNavigate to="/tools/work-calculator" />} />

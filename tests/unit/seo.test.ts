@@ -6,7 +6,7 @@ import { getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts
 const toolRoutes = [
   "/tools/excel-merger", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
   "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
-  "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-tools",
+  "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
   "/tools/text-formatter", "/tools/work-calculator", "/tools/timezone-calculator", "/tools/payroll-calculator",
   "/tools/image-privacy", "/tools/security-tools", "/tools/qr-studio", "/tools/data-converter",
 ];
@@ -22,6 +22,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/data-converter": "표 데이터 변환기 | CSV·JSON·HTML 상호 변환",
       "/tools/document-compare": "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
       "/tools/office-editor": "브라우저 오피스 편집기 - DOCX·XLSX·PPTX 온라인 편집",
+      "/tools/text-merger": "텍스트 병합 | 직접 입력·TXT 파일 순서대로 합치기",
     },
     en: {
       "/tools/video-studio": "Video Studio | Trim, Join & Extract Audio",
@@ -32,6 +33,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/data-converter": "Table Data Converter | Convert CSV, JSON & HTML",
       "/tools/document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
       "/tools/office-editor": "Browser Office Editor | Edit DOCX, XLSX & PPTX",
+      "/tools/text-merger": "Text Merger | Combine Pasted Text & TXT Files",
     },
   } as const;
 
@@ -68,6 +70,9 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     assert.ok(englishFaq?.every((item) => item.question && item.answer));
   }
   for (const language of ["ko", "en"] as const) {
+    const textMergerFaq = getSeoDefinition(language, "/tools/text-merger").faq;
+    assert.equal(textMergerFaq?.length, 3);
+    assert.ok(textMergerFaq?.every((item) => item.question && item.answer));
     const excelFaq = getSeoDefinition(language, "/tools/excel-merger").faq;
     assert.equal(excelFaq?.length, 3);
     assert.ok(excelFaq?.every((item) => item.question && item.answer));

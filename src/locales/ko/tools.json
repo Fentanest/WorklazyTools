@@ -19,6 +19,7 @@
     "video-studio": { "title": "Video Studio", "shortTitle": "비디오 스튜디오", "description": "영상 수 제한 없이 최대 10개 그룹으로 편집하고 영상·오디오 스트림을 원하는 방식으로 변환합니다.", "eyebrow": "비디오 편집", "highlights": ["무제한 추가·10개 그룹", "무손실 빠른 자르기", "개별 저장·선택 ZIP", "영상 속 음성 제어"] },
     "audio-studio": { "title": "Audio Studio", "shortTitle": "오디오 스튜디오", "description": "오디오 파형에서 선택한 구간을 편집하고 피치·음색 효과를 적용한 뒤 WAV·MP3로 저장합니다.", "eyebrow": "오디오 편집", "highlights": ["고해상도 파형", "구간 편집", "피치·로봇 효과", "WAV·MP3"] },
     "image-studio": { "title": "Image Studio", "shortTitle": "이미지 스튜디오", "description": "선택 영역 모자이크·블러, 사진 보정과 자유 그리기를 한 편집기에서 사용하고 여러 파일은 일괄 편집·콜라주·GIF로 만듭니다.", "eyebrow": "이미지 편집", "highlights": ["영역 모자이크·블러", "사진·그리기 통합", "일괄 리사이즈", "콜라주·GIF"] },
+    "text-merger": { "title": "Text Merger", "shortTitle": "텍스트 병합", "description": "직접 입력한 텍스트와 TXT 파일을 원하는 순서와 구분자로 하나로 합칩니다.", "eyebrow": "텍스트 생산성", "highlights": ["직접 입력", "TXT 불러오기", "통합 순서 변경", "복사·다운로드"] },
     "text-tools": { "title": "Text Tools", "shortTitle": "텍스트 정돈", "description": "공백·줄바꿈을 정리하고 케이스 변환과 로컬 한국어 문장 검사를 실행합니다.", "eyebrow": "텍스트 생산성", "highlights": ["공백·줄 정돈", "중복 줄 제거", "Case 변환", "한국어 가이드"] },
     "text-formatter": { "title": "Code Formatter", "shortTitle": "코드 포맷터", "description": "JSON·SQL·XML 문법을 검사하고 들여쓰기 또는 한 줄 형식으로 정돈합니다.", "eyebrow": "개발·데이터", "highlights": ["JSON", "SQL", "XML", "오류 탐지"] },
     "work-calculator": { "title": "Workday Calculator", "shortTitle": "영업일·연차", "description": "대한민국 공휴일을 제외한 영업일과 입사일·회계연도 기준 연차를 계산합니다.", "eyebrow": "근무 일정", "highlights": ["영업일", "대체공휴일", "입사일 기준", "회계연도 기준"] },

@@ -9,7 +9,7 @@ const routes = [
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
-  "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
+  "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
@@ -18,7 +18,7 @@ const socialSlugByRoute = {
   "tools/excel-merger": "excel-merger", "tools/document-compare": "document-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
   "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",
-  "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-tools": "text-tools",
+  "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-merger": "text-merger", "tools/text-tools": "text-tools",
   "tools/text-formatter": "code-formatter", "tools/work-calculator": "workday-calculator", "tools/timezone-calculator": "world-time-planner",
   "tools/payroll-calculator": "payroll-calculator", "tools/image-privacy": "photo-metadata-remover", "tools/security-tools": "password-generator",
   "tools/qr-studio": "qr-studio", "tools/data-converter": "table-data-converter",
@@ -64,12 +64,14 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/document-compare", "tools/office-editor"].includes(route)) {
+  if (["tools/excel-merger", "tools/document-compare", "tools/office-editor", "tools/text-merger"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
       ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/document-compare"
         ? language === "ko" ? "DOC와 DOCX를 서로 비교할 수 있나요?" : "Can I compare DOC with DOCX?"
-        : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";
+        : route === "tools/text-merger"
+          ? language === "ko" ? "직접 입력을 TXT 파일 사이에 놓을 수 있나요?" : "Can pasted text be placed between TXT files?"
+          : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";
     if (!html.includes('"@type":"FAQPage"') || !html.includes(expectedQuestion)) {
       throw new Error(`${filePath} is missing its localized static FAQ and FAQPage metadata.`);
     }

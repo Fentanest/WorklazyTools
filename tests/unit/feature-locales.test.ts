@@ -4,7 +4,7 @@ import test from "node:test";
 
 const root = new URL("../../", import.meta.url);
 
-const migratedNamespaces = ["video", "pdf", "audio", "qr"];
+const migratedNamespaces = ["video", "pdf", "audio", "qr", "textMerger"];
 
 test("migrated feature locale namespaces have identical key shapes", async () => {
   const [ko, en] = await Promise.all(["ko", "en"].map(async (language) => JSON.parse(await readFile(new URL(`src/locales/${language}/features.json`, root), "utf8"))));

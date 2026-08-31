@@ -28,6 +28,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "여러 페이지 범위는 어떻게 선택하나요?", answer: "편집할 결과 범위를 고르고 페이지 체크박스를 누르세요. 연속 문서는 페이지 뒤의 나누기 위치를 정해 범위를 한 번에 만들 수 있고, 숫자 입력으로 비연속 페이지와 사용자 지정 순서도 선택할 수 있습니다." },
       { question: "완성된 PDF나 ZIP은 어디에서 받나요?", answer: "오른쪽 출력 작업 영역에서 진행 상황을 확인하고 완료된 파일을 바로 내려받을 수 있습니다. 모바일에서는 화면 아래의 출력 작업 버튼을 누르세요." },
     ],
+    "/tools/text-merger": [
+      { question: "직접 입력을 TXT 파일 사이에 놓을 수 있나요?", answer: "가능합니다. 직접 입력과 TXT 파일은 같은 카드 목록에 추가되며 드래그하거나 위·아래 버튼으로 자유롭게 순서를 바꿀 수 있습니다." },
+      { question: "붙여넣은 글이나 TXT 파일이 서버로 전송되나요?", answer: "아니요. 내용은 현재 브라우저에서만 읽고 병합하며 서버나 브라우저 저장소에 보관하지 않습니다." },
+      { question: "불러온 TXT 내용을 수정하면 원본 파일도 바뀌나요?", answer: "아니요. 카드와 병합 결과만 달라지고 원본 TXT 파일은 그대로 유지됩니다." },
+    ],
     "/tools/document-compare": [
       { question: "DOC와 DOCX를 서로 비교할 수 있나요?", answer: "가능합니다. 둘 다 Word 계열이므로 어느 쪽 순서든 비교할 수 있습니다." },
       { question: "DOCX와 HWP를 비교할 수 있나요?", answer: "불가능합니다. 분석 전에 해당 쌍을 차단하므로 Word 문서끼리, HWP 문서끼리 짝지어 주세요." },
@@ -50,6 +55,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     "/tools/pdf-editor": [
       { question: "How do I select multiple page ranges?", answer: "Choose the output range to edit and use the page checkboxes. For a continuous document, mark split positions after pages to build the ranges at once. Number entry remains available for non-contiguous pages and custom ordering." },
       { question: "Where do I download the finished PDF or ZIP?", answer: "Follow progress and download the completed file in the output workspace on the right. On mobile, open it from the output button at the bottom of the screen." },
+    ],
+    "/tools/text-merger": [
+      { question: "Can pasted text be placed between TXT files?", answer: "Yes. Pasted text and TXT files share one card list and can be reordered freely by dragging or with the up and down buttons." },
+      { question: "Are pasted text or TXT files sent to a server?", answer: "No. Content is read and merged only in the current browser and is not kept on a server or in browser storage." },
+      { question: "Does editing loaded TXT content change the original file?", answer: "No. Only the card and merged result change. The original TXT file remains untouched." },
     ],
     "/tools/document-compare": [
       { question: "Can I compare DOC with DOCX?", answer: "Yes. Both belong to the Word family, so either order is supported." },
@@ -103,6 +113,7 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/video-studio": "video-studio",
   "/tools/audio-studio": "audio-studio",
   "/tools/image-studio": "image-studio",
+  "/tools/text-merger": "text-merger",
   "/tools/text-tools": "text-tools",
   "/tools/text-formatter": "code-formatter",
   "/tools/work-calculator": "workday-calculator",
@@ -187,6 +198,11 @@ export const seoByPath: Record<string, SeoDefinition> = {
     description: "사진 편집과 그림판을 하나로 합쳐 선택 영역 모자이크·블러, 자르기·필터·자유 그리기·Undo를 사용하고 콜라주·GIF도 만드세요.",
     application: { name: "Image Studio", featureList: ["사진·빈 캔버스 통합 편집", "선택 영역 모자이크·블러", "블러 강도 조절", "연필·붓·지우개", "Undo·Redo", "필터와 자르기", "텍스트·도형 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
   },
+  "/tools/text-merger": {
+    title: "텍스트 병합 | 직접 입력·TXT 파일 순서대로 합치기",
+    description: "직접 붙여넣은 텍스트와 여러 TXT 파일을 한 목록에서 자유롭게 정렬하고 줄바꿈·공백·쉼표·사용자 지정 구분자로 하나로 합치세요.",
+    application: { name: "Text Merger", featureList: ["직접 입력 텍스트 추가", "여러 TXT 파일 불러오기", "직접 입력과 파일 통합 순서 변경", "구분자 선택", "앞뒤 공백 제거", "빈 텍스트 제외", "결과 복사와 TXT 다운로드"] },
+  },
   "/tools/text-tools": {
     title: "텍스트 정돈·케이스 변환 - 공백·줄바꿈·중복 줄 제거",
     description: "불필요한 공백과 줄바꿈, 중복 줄을 제거하고 Camel·Snake·Kebab·Title Case 변환과 로컬 한국어 문장 검사를 실행하세요.",
@@ -263,6 +279,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "video-studio": "Video Studio | Trim, Join & Extract Audio",
   "audio-studio": "Audio Studio | Waveform Editing, Trimming & Pitch",
   "image-studio": "Image Studio | Edit Photos, Mosaic, Collage & GIF",
+  "text-merger": "Text Merger | Combine Pasted Text & TXT Files",
   "text-tools": "Text Cleanup | Whitespace, Lines & Case Conversion",
   "text-formatter": "Code Formatter | Format & Validate JSON, SQL & XML",
   "work-calculator": "Korean Workday Calculator | Business Days & Leave",
@@ -292,6 +309,7 @@ const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
   "/tools/excel-merger": "excel-merger", "/tools/document-compare": "document-compare", "/tools/pdf-editor": "pdf-editor",
   "/tools/hwp-editor": "hwp-editor", "/tools/office-editor": "office-editor", "/tools/video-studio": "video-studio",
   "/tools/audio-studio": "audio-studio", "/tools/image-studio": "image-studio", "/tools/text-tools": "text-tools",
+  "/tools/text-merger": "text-merger",
   "/tools/text-formatter": "text-formatter", "/tools/work-calculator": "work-calculator", "/tools/timezone-calculator": "timezone-calculator",
   "/tools/payroll-calculator": "payroll-calculator", "/tools/image-privacy": "image-privacy", "/tools/security-tools": "security-tools",
   "/tools/qr-studio": "qr-studio", "/tools/data-converter": "data-converter",

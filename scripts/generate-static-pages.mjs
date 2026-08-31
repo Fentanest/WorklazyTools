@@ -9,7 +9,7 @@ const { getSeoDefinition, getSocialImageDefinition } = await import("../src/app/
 
 const toolRoutes = [
   "excel-merger", "document-compare", "pdf-editor", "hwp-editor", "office-editor", "video-studio", "audio-studio",
-  "image-studio", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
+  "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "image-privacy", "security-tools", "qr-studio", "data-converter",
 ];
 const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert"];
