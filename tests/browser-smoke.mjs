@@ -50,6 +50,7 @@ try {
       await testEncryptedExcelMerge(page, fixtures, tempDir);
       await testFormulaTranslation(page, fixtures, tempDir);
       await testExcelSheetSelection(page, fixtures, tempDir);
+      await testExcelSheetGridLayout(page, fixtures);
       await testExcelSheetTrim(page, fixtures, tempDir);
     } else if (process.env.TEST_SCOPE === "word") {
       await testWordCompare(page, fixtures, tempDir);
@@ -57,6 +58,7 @@ try {
       await testEncryptedExcelMerge(page, fixtures, tempDir);
       await testFormulaTranslation(page, fixtures, tempDir);
       await testExcelSheetSelection(page, fixtures, tempDir);
+      await testExcelSheetGridLayout(page, fixtures);
       await testExcelSheetTrim(page, fixtures, tempDir);
       await testWordCompare(page, fixtures, tempDir);
       await testPdfTools(page, fixtures, tempDir);
@@ -414,14 +416,14 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.sheetSelectionXlsx);
   await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 4);
-  const sheetNames = await page.$$eval(".sheet-file-group .sheet-name-list li span", (items) => items.map((item) => item.textContent));
+  const sheetNames = await page.$$eval(".sheet-file-group .sheet-name-chip > span", (items) => items.map((item) => item.textContent));
   if (sheetNames.join(",") !== "첫째,둘째,셋째,넷째") throw new Error(`Sheet names were not inspected in order: ${sheetNames.join(",")}`);
 
   const customButton = await findButtonByText(page, ".section-card .segmented-control button", "직접 선택");
   await customButton.click();
-  const checkboxes = await page.$$(".sheet-name-list input[type=checkbox]");
-  await checkboxes[0].click();
-  await checkboxes[2].click();
+  const sheetButtons = await page.$$(".sheet-name-list button[aria-pressed]");
+  await sheetButtons[0].click();
+  await sheetButtons[2].click();
   const customSelected = await page.$$(".sheet-name-list li.selected").then((items) => items.length);
   if (customSelected !== 2) throw new Error(`Direct sheet selection did not update: ${customSelected}`);
 
@@ -450,6 +452,240 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   if (workbook.worksheets.length !== 2 || !workbook.worksheets.every((sheet) => /첫째|둘째/.test(sheet.name))) {
     throw new Error(`Selected sheet merge output is incorrect: ${workbook.worksheets.map((sheet) => sheet.name).join(",")}`);
   }
+}
+
+async function testExcelSheetGridLayout(page, fixtures) {
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheet-grid`);
+  const input = await page.$('input[type="file"]');
+  await input.uploadFile(...fixtures.sheetGridXlsx);
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group").length === 6
+    && document.querySelectorAll(".sheet-name-list li").length === 39
+    && !document.querySelector(".file-security-status.checking"));
+
+  const desktopLayout = await page.evaluate(() => {
+    const selector = document.querySelector(".excel-sheet-selector");
+    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
+    const selectorRect = selector?.getBoundingClientRect();
+    const cardRects = cards.map((card) => card.getBoundingClientRect());
+    const columnLefts = [...new Set(cardRects.map((rect) => Math.round(rect.left)))];
+    const rowTops = [...new Set(cardRects.map((rect) => Math.round(rect.top)))];
+    const rowGap = Number.parseFloat(selector ? getComputedStyle(selector).rowGap : "0") || 0;
+    const stackedHeight = cardRects.reduce((sum, rect) => sum + rect.height, 0) + rowGap * Math.max(0, cardRects.length - 1);
+    const firstList = cards[0]?.querySelector(".sheet-name-list");
+    const firstHeading = cards[0]?.querySelector(".sheet-file-heading");
+    const headingId = cards[0]?.getAttribute("aria-labelledby") || "";
+    const labelledHeading = headingId ? document.getElementById(headingId) : null;
+    const chip = firstList?.querySelector(".sheet-name-chip");
+    const chipStyle = chip ? getComputedStyle(chip) : null;
+    const listStyle = firstList ? getComputedStyle(firstList) : null;
+    return {
+      columns: columnLefts.length,
+      rows: rowTops.length,
+      selectorHeight: selectorRect?.height ?? 0,
+      stackedHeight,
+      selectorOverflow: selector ? selector.scrollWidth - selector.clientWidth : 1,
+      cardsInside: Boolean(selectorRect) && cardRects.every((rect) => rect.left >= selectorRect.left - 1 && rect.right <= selectorRect.right + 1),
+      listClientHeight: firstList?.clientHeight ?? 0,
+      listScrollHeight: firstList?.scrollHeight ?? 0,
+      listOverflowY: listStyle?.overflowY,
+      listFlexWrap: listStyle?.flexWrap,
+      headingTag: labelledHeading?.tagName,
+      headingMatches: labelledHeading === firstHeading?.querySelector("h3"),
+      headingTitle: labelledHeading?.getAttribute("title"),
+      headingLabel: labelledHeading?.getAttribute("aria-label"),
+      allModeButtons: document.querySelectorAll(".sheet-name-list button").length,
+      allModeActions: document.querySelectorAll(".sheet-select-actions").length,
+      allModeSelected: document.querySelectorAll(".sheet-name-list li.selected").length,
+      allChipStyle: chipStyle ? { display: chipStyle.display, minHeight: chipStyle.minHeight, borderRadius: chipStyle.borderRadius } : null,
+      mobileSummaryDisplay: getComputedStyle(document.querySelector(".excel-mobile-sheet-summary")).display,
+    };
+  });
+  if (desktopLayout.columns !== 2 || desktopLayout.rows !== 3
+    || desktopLayout.selectorHeight >= desktopLayout.stackedHeight * 0.8) {
+    throw new Error(`Excel sheet cards did not form the measured two-column desktop grid: ${JSON.stringify(desktopLayout)}`);
+  }
+  if (desktopLayout.selectorOverflow > 0 || !desktopLayout.cardsInside) {
+    throw new Error(`Excel sheet grid overflowed its desktop selector: ${JSON.stringify(desktopLayout)}`);
+  }
+  if (desktopLayout.listClientHeight >= desktopLayout.listScrollHeight || desktopLayout.listOverflowY !== "auto"
+    || desktopLayout.listFlexWrap !== "wrap") {
+    throw new Error(`The 20+ sheet viewport did not wrap and scroll internally: ${JSON.stringify(desktopLayout)}`);
+  }
+  if (desktopLayout.headingTag !== "H3" || !desktopLayout.headingMatches
+    || desktopLayout.headingTitle !== fixtures.sheetGridLongFileName
+    || desktopLayout.headingLabel !== fixtures.sheetGridLongFileName) {
+    throw new Error(`Excel file cards are missing their labelled full-name heading: ${JSON.stringify(desktopLayout)}`);
+  }
+  if (desktopLayout.allModeButtons !== 0 || desktopLayout.allModeActions !== 0 || desktopLayout.allModeSelected !== 39
+    || desktopLayout.mobileSummaryDisplay !== "none") {
+    throw new Error(`All-sheets mode exposed controls or a desktop duplicate summary: ${JSON.stringify(desktopLayout)}`);
+  }
+
+  const customModeButton = await findButtonByText(page, ".section-card .segmented-control button", "직접 선택");
+  await customModeButton.click();
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list button[aria-pressed]").length === 39);
+  const customContract = await page.evaluate((expectedStyle) => {
+    const buttons = Array.from(document.querySelectorAll(".sheet-name-list button[aria-pressed]"));
+    const chipStyle = buttons[0] ? getComputedStyle(buttons[0]) : null;
+    return {
+      count: buttons.length,
+      types: [...new Set(buttons.map((button) => button.getAttribute("type")))],
+      states: [...new Set(buttons.map((button) => button.getAttribute("aria-pressed")))],
+      actions: document.querySelectorAll(".sheet-select-actions").length,
+      checkboxes: document.querySelectorAll('.sheet-name-list input[type="checkbox"]').length,
+      sameAppearance: Boolean(chipStyle && expectedStyle
+        && chipStyle.display === expectedStyle.display
+        && chipStyle.minHeight === expectedStyle.minHeight
+        && chipStyle.borderRadius === expectedStyle.borderRadius),
+    };
+  }, desktopLayout.allChipStyle);
+  if (customContract.count !== 39 || customContract.types.join() !== "button" || customContract.states.join() !== "true"
+    || customContract.actions !== 6 || customContract.checkboxes !== 0 || !customContract.sameAppearance) {
+    throw new Error(`Custom sheet chips do not match the aria-pressed button contract: ${JSON.stringify(customContract)}`);
+  }
+
+  await page.click(".sheet-file-group:first-child .sheet-select-actions button:last-child");
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group:first-child .sheet-name-list li.selected").length === 0);
+  await page.click(".sheet-file-group:first-child .sheet-select-actions button:first-child");
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group:first-child .sheet-name-list li.selected").length === 24);
+  await page.click(".sheet-file-group:first-child .sheet-name-list button");
+  await page.waitForFunction(() => document.querySelector(".sheet-file-group:first-child .sheet-name-list button")?.getAttribute("aria-pressed") === "false");
+  await page.click(".sheet-file-group:first-child .sheet-name-list button");
+
+  const headerTopBeforeKeyboard = await page.$eval(".sheet-file-group:first-child .sheet-file-heading", (heading) => heading.getBoundingClientRect().top);
+  await page.$eval(".sheet-file-group:first-child .sheet-name-list button", (button) => {
+    button.closest(".sheet-name-list").scrollTop = 0;
+    button.focus();
+  });
+  for (let index = 1; index < 24; index += 1) await page.keyboard.press("Tab");
+  const keyboardScroll = await page.evaluate(() => {
+    const card = document.querySelector(".sheet-file-group:first-child");
+    const list = card?.querySelector(".sheet-name-list");
+    const buttons = Array.from(card?.querySelectorAll(".sheet-name-list button") || []);
+    const focusedStyle = document.activeElement instanceof HTMLElement ? getComputedStyle(document.activeElement) : null;
+    return {
+      focusedLast: document.activeElement === buttons.at(-1),
+      scrollTop: list?.scrollTop ?? 0,
+      headerTop: card?.querySelector(".sheet-file-heading")?.getBoundingClientRect().top ?? 0,
+      outlineStyle: focusedStyle?.outlineStyle,
+      outlineWidth: focusedStyle?.outlineWidth,
+    };
+  });
+  if (!keyboardScroll.focusedLast || keyboardScroll.scrollTop <= 0
+    || Math.abs(keyboardScroll.headerTop - headerTopBeforeKeyboard) > 1
+    || keyboardScroll.outlineStyle === "none" || keyboardScroll.outlineWidth === "0px") {
+    throw new Error(`Keyboard focus did not scroll only the chip viewport with a visible focus ring: ${JSON.stringify(keyboardScroll)}`);
+  }
+
+  const positionsButton = await findButtonByText(page, ".section-card .segmented-control button", "순번 선택");
+  await positionsButton.click();
+  await replaceInputValue(page, await page.$("#sheet-position-pattern"), "2");
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 6);
+  const positionsContract = await page.evaluate(() => ({
+    buttons: document.querySelectorAll(".sheet-name-list button").length,
+    actions: document.querySelectorAll(".sheet-select-actions").length,
+    selected: document.querySelectorAll(".sheet-name-list li.selected").length,
+    statusChips: document.querySelectorAll(".sheet-name-list li > span.sheet-name-chip").length,
+  }));
+  if (positionsContract.buttons !== 0 || positionsContract.actions !== 0
+    || positionsContract.selected !== 6 || positionsContract.statusChips !== 39) {
+    throw new Error(`Position mode did not preserve non-interactive status chips: ${JSON.stringify(positionsContract)}`);
+  }
+
+  const allButton = await findButtonByText(page, ".section-card .segmented-control button", "모든 시트");
+  await allButton.click();
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 39);
+
+  await page.setViewport({ width: 821, height: 900, deviceScaleFactor: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const narrowDesktop = await page.evaluate(() => {
+    const selector = document.querySelector(".excel-sheet-selector");
+    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
+    const selectorRect = selector?.getBoundingClientRect();
+    return {
+      columns: new Set(cards.map((card) => Math.round(card.getBoundingClientRect().left))).size,
+      overflow: selector ? selector.scrollWidth - selector.clientWidth : 1,
+      cardsInside: Boolean(selectorRect) && cards.every((card) => card.getBoundingClientRect().right <= selectorRect.right + 1),
+      mobileSummaryDisplay: getComputedStyle(document.querySelector(".excel-mobile-sheet-summary")).display,
+    };
+  });
+  if (narrowDesktop.columns !== 1 || narrowDesktop.overflow > 0 || !narrowDesktop.cardsInside
+    || narrowDesktop.mobileSummaryDisplay !== "none") {
+    throw new Error(`The 821px Excel grid overflow-prevention contract failed: ${JSON.stringify(narrowDesktop)}`);
+  }
+
+  await customModeButton.click();
+  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list button[aria-pressed]").length === 39);
+  const longNames = await page.evaluate((longFileName, longSheetName) => {
+    const card = document.querySelector(".sheet-file-group:first-child");
+    const heading = card?.querySelector(".sheet-file-heading h3");
+    const chip = card?.querySelector(".sheet-name-list button.sheet-name-chip");
+    const chipText = chip?.querySelector("span");
+    return {
+      sectionLabelledBy: card?.getAttribute("aria-labelledby"),
+      headingId: heading?.id,
+      headingTitle: heading?.getAttribute("title"),
+      headingLabel: heading?.getAttribute("aria-label"),
+      headingEllipsis: heading ? getComputedStyle(heading).textOverflow : "",
+      headingClipped: heading ? heading.scrollWidth > heading.clientWidth : false,
+      chipTitle: chip?.getAttribute("title"),
+      chipLabel: chip?.getAttribute("aria-label"),
+      chipPressed: chip?.getAttribute("aria-pressed"),
+      chipEllipsis: chipText ? getComputedStyle(chipText).textOverflow : "",
+      chipClipped: chipText ? chipText.scrollWidth > chipText.clientWidth : false,
+      expected: { longFileName, longSheetName },
+    };
+  }, fixtures.sheetGridLongFileName, fixtures.sheetGridLongSheetName);
+  if (longNames.sectionLabelledBy !== longNames.headingId
+    || longNames.headingTitle !== fixtures.sheetGridLongFileName || longNames.headingLabel !== fixtures.sheetGridLongFileName
+    || longNames.headingEllipsis !== "ellipsis" || !longNames.headingClipped
+    || longNames.chipTitle !== fixtures.sheetGridLongSheetName || longNames.chipLabel !== fixtures.sheetGridLongSheetName
+    || longNames.chipPressed !== "true" || longNames.chipEllipsis !== "ellipsis" || !longNames.chipClipped) {
+    throw new Error(`Long Excel names lost ellipsis or their full accessible names: ${JSON.stringify(longNames)}`);
+  }
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await page.evaluate(() => {
+    const summary = document.querySelector(".excel-mobile-sheet-summary");
+    if (summary) window.scrollTo(0, window.scrollY + summary.getBoundingClientRect().top + 120);
+  });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const mobileLayout = await page.evaluate(() => {
+    const selector = document.querySelector(".excel-sheet-selector");
+    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
+    const summary = document.querySelector(".excel-mobile-sheet-summary");
+    const list = document.querySelector(".sheet-file-group:first-child .sheet-name-list");
+    const chip = document.querySelector(".sheet-file-group:first-child .sheet-name-chip");
+    if (list) list.scrollTop = Math.min(80, list.scrollHeight - list.clientHeight);
+    const summaryStyle = summary ? getComputedStyle(summary) : null;
+    const selectorRect = selector?.getBoundingClientRect();
+    return {
+      columns: new Set(cards.map((card) => Math.round(card.getBoundingClientRect().left))).size,
+      selectorOverflow: selector ? selector.scrollWidth - selector.clientWidth : 1,
+      cardsInside: Boolean(selectorRect) && cards.every((card) => card.getBoundingClientRect().right <= selectorRect.right + 1),
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      summaryDisplay: summaryStyle?.display,
+      summaryPosition: summaryStyle?.position,
+      summaryTop: Number.parseFloat(summaryStyle?.top || "0"),
+      summaryRectTop: summary?.getBoundingClientRect().top ?? 0,
+      summaryText: summary?.textContent,
+      chipHeight: chip?.getBoundingClientRect().height ?? 0,
+      listScrollTop: list?.scrollTop ?? 0,
+      listOverscroll: list ? getComputedStyle(list).overscrollBehaviorY : "",
+      pageScrollTop: window.scrollY,
+    };
+  });
+  if (mobileLayout.columns !== 1 || mobileLayout.selectorOverflow > 0 || !mobileLayout.cardsInside || mobileLayout.pageOverflow > 0
+    || mobileLayout.summaryDisplay !== "flex" || mobileLayout.summaryPosition !== "sticky" || mobileLayout.summaryTop < 70
+    || Math.abs(mobileLayout.summaryRectTop - mobileLayout.summaryTop) > 2
+    || !mobileLayout.summaryText?.includes("6개 파일 · 39개 시트 포함") || mobileLayout.chipHeight < 44
+    || mobileLayout.listScrollTop <= 0 || mobileLayout.listOverscroll !== "contain" || mobileLayout.pageScrollTop <= 0) {
+    throw new Error(`The mobile one-column, sticky summary or nested scrolling contract failed: ${JSON.stringify(mobileLayout)}`);
+  }
+
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
 }
 
 async function testExcelSheetTrim(page, fixtures, tempDir) {
@@ -823,6 +1059,12 @@ async function createFixtures(directory) {
   const xlsm = path.join(directory, "macro.xlsm");
   const encryptedXlsx = path.join(directory, "protected.xlsx");
   const sheetSelectionXlsx = path.join(directory, "sheet-selection.xlsx");
+  const sheetGridLongFileName = "quarterly-regional-consolidated-financial-results-accessibility-contract-2026.xlsx";
+  const sheetGridLongSheetName = "Quarterly results finalized";
+  const sheetGridXlsx = [
+    path.join(directory, sheetGridLongFileName),
+    ...Array.from({ length: 5 }, (_, index) => path.join(directory, `sheet-grid-region-${index + 2}.xlsx`)),
+  ];
   const sheetTrimXlsx = path.join(directory, "sheet-trim.xlsx");
   const beforeDocx = path.join(directory, "before.docx");
   const afterDocx = path.join(directory, "after.docx");
@@ -860,6 +1102,17 @@ async function createFixtures(directory) {
     sheetSelectionBook.addWorksheet(name).getCell("A1").value = index + 1;
   });
   await sheetSelectionBook.xlsx.writeFile(sheetSelectionXlsx);
+  for (let fileIndex = 0; fileIndex < sheetGridXlsx.length; fileIndex += 1) {
+    const gridBook = new ExcelJS.Workbook();
+    const sheetCount = fileIndex === 0 ? 24 : 3;
+    for (let sheetIndex = 0; sheetIndex < sheetCount; sheetIndex += 1) {
+      const name = fileIndex === 0 && sheetIndex === 0
+        ? sheetGridLongSheetName
+        : `Region ${fileIndex + 1} Sheet ${String(sheetIndex + 1).padStart(2, "0")}`;
+      gridBook.addWorksheet(name).getCell("A1").value = `${fileIndex + 1}-${sheetIndex + 1}`;
+    }
+    await gridBook.xlsx.writeFile(sheetGridXlsx[fileIndex]);
+  }
   const sheetTrimBook = new ExcelJS.Workbook();
   const sheetTrimSheet = sheetTrimBook.addWorksheet("SheetTrim 확인");
   sheetTrimSheet.getCell("A1").value = "첫 행";
@@ -910,7 +1163,7 @@ async function createFixtures(directory) {
   await fs.writeFile(textPdf, await pdf.save());
   await fs.writeFile(tinyPng, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zk90AAAAASUVORK5CYII=", "base64"));
 
-  return { xlsxOne, xlsxTwo, csv, xls, xlsb, xlsm, encryptedXlsx, sheetSelectionXlsx, sheetTrimXlsx, beforeDocx, afterDocx, beforeDocxTwo, afterDocxTwo, textPdf, tinyPng };
+  return { xlsxOne, xlsxTwo, csv, xls, xlsb, xlsm, encryptedXlsx, sheetSelectionXlsx, sheetGridXlsx, sheetGridLongFileName, sheetGridLongSheetName, sheetTrimXlsx, beforeDocx, afterDocx, beforeDocxTwo, afterDocxTwo, textPdf, tinyPng };
 }
 
 async function createDocx(paragraph, tableValue, headerValue, commentValue, bold) {

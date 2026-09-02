@@ -4,6 +4,7 @@
 
 ## 2026-09-02
 
+- Excel 시트 선택기를 가용 폭 기준 1~2열 카드 그리드로 바꾸고, custom 모드는 `aria-pressed` 버튼 칩·all/positions 모드는 비인터랙티브 상태 칩으로 분리했다. 파일 카드 heading/전체 이름 접근성·ellipsis·키보드 focus ring, 목록 전용 내부 스크롤, 모바일 44px 타깃과 Step 2 sticky 파일·시트 요약을 ko/en으로 추가했으며 6개 파일·24개 시트 fixture에서 열 수·높이·821px overflow·모바일 1열·모드별 상호작용을 계측하는 스모크를 보강했다. 기능 의미가 바뀌지 않아 SEO·정적 페이지 변경은 불필요하고 광고 배치·격리 경로 영향도 없음으로 판단했다. — Codx
 - VP9 인코딩에 `-deadline good -cpu-used 4`를 명시하고 전체 인자 배열 회귀 테스트와 고정 벤치 fixture·스크립트를 추가. warm-up 뒤 3회 host libvpx 중앙값이 7,882.015ms→2,462.353ms로 68.76% 감소(3.201×), 출력은 672,326→720,187 bytes(+7.12%), SSIM 0.971567→0.971193·PSNR 28.713933→28.708202dB, 양쪽 전체 디코드 통과. 브라우저 FFmpeg.wasm VP9은 기존 런타임에서 작은 fixture도 메모리 오류가 나 별도 런타임 결함으로 기록했다. B1b에서는 zip.js 2.9.0의 순차 Blob 스트림·강제 ZIP64·외부 unzip 왕복을 통과했지만 Mediabunny 1.55.5 trim은 B-frame fixture duration이 FFmpeg보다 2프레임 길어 B2 후보에서 기각하고 mp4box.js+고정 mp4-muxer 대안으로 회귀했다. 사용자 문구·SEO·정적 페이지·광고 격리 경로 변경 없음. — Codx
 - Gemini 위임 경로를 확립: 이 호스트의 Gemini 호출은 agy CLI로 수행하며(`--add-dir` 필수 — 없으면 저장소 파일 접근 불가 실측), 타임아웃 상향·`--json-schema` 구조화·`--sandbox` 사용 기준과 산출물 검증 절차를 `CLAUDE.md` 「호스트 참고」에 기록. — Claude
 - Chrome 기반 앱 아이콘 생성기를 추가해 SVG 그라데이션을 8-bit RGBA PNG 5종으로 재생성하고 manifest의 `any`/`maskable` 자산을 분리했다. 그라데이션 미지원 래스터라이저 재사용과 투명 라운드 아이콘의 Apple·maskable 겸용은 각각 색상 소실·마스크 크롭 문제로 기각했으며 픽셀·알파 검증, 빌드, 단위 테스트 58개, 정적 산출물 검증을 통과했다. — Codx

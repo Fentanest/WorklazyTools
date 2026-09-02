@@ -491,6 +491,12 @@ export function ExcelMergerPage() {
                 <small>{t("excel.sheetSelection.help")}</small>
               </div>
             )}
+            {entries.length > 0 && (
+              <div className="excel-mobile-sheet-summary" role="status">
+                <FileSpreadsheet size={16} aria-hidden="true" />
+                <span>{t("excel.sheetList.mobileSummary", { files: entries.length, sheets: selectedSheetCount })}</span>
+              </div>
+            )}
             <ExcelSheetSelector
               entries={entries}
               mode={sheetSelectionMode}
@@ -756,10 +762,11 @@ function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll, t }: {
     <div className="excel-sheet-selector">
       {entries.map((entry) => {
         const selectedNames = new Set(resolveSelectedSheetNames(entry, mode, pattern));
+        const headingId = `sheet-file-heading-${entry.id}`;
         return (
-          <section className="sheet-file-group" key={entry.id}>
+          <section className="sheet-file-group" key={entry.id} aria-labelledby={headingId}>
             <div className="sheet-file-heading">
-              <span><strong>{entry.file.name}</strong><small>{entry.sheetNames.length ? t("excel.sheetList.included", { selected: selectedNames.size, total: entry.sheetNames.length }) : t("excel.sheetList.needsCheck")}</small></span>
+              <span><h3 id={headingId} title={entry.file.name} aria-label={entry.file.name}>{entry.file.name}</h3><small>{entry.sheetNames.length ? t("excel.sheetList.included", { selected: selectedNames.size, total: entry.sheetNames.length }) : t("excel.sheetList.needsCheck")}</small></span>
               {mode === "custom" && entry.sheetNames.length > 0 && (
                 <span className="sheet-select-actions">
                   <button type="button" onClick={() => onSetAll(entry.id, true)}>{t("excel.sheetList.all")}</button>
@@ -778,13 +785,23 @@ function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll, t }: {
                 {entry.sheetNames.map((sheetName, index) => {
                   const selected = selectedNames.has(sheetName);
                   return (
-                    <li className={selected ? "selected" : ""} key={sheetName}>
+                    <li className={selected ? "selected" : ""} key={sheetName} aria-label={mode === "custom" ? undefined : sheetName}>
                       {mode === "custom" ? (
-                        <label>
-                          <input type="checkbox" checked={selected} onChange={() => onToggle(entry.id, sheetName)} />
-                          <b>{index + 1}</b><span>{sheetName}</span>
-                        </label>
-                      ) : <><b>{index + 1}</b><span>{sheetName}</span>{selected && <small>{t("excel.sheetList.include")}</small>}</>}
+                        <button
+                          type="button"
+                          className="sheet-name-chip"
+                          aria-pressed={selected}
+                          aria-label={sheetName}
+                          title={sheetName}
+                          onClick={() => onToggle(entry.id, sheetName)}
+                        >
+                          <b aria-hidden="true">{index + 1}</b><span>{sheetName}</span>
+                        </button>
+                      ) : (
+                        <span className="sheet-name-chip" title={sheetName}>
+                          <b aria-hidden="true">{index + 1}</b><span>{sheetName}</span>{selected && <small>{t("excel.sheetList.include")}</small>}
+                        </span>
+                      )}
                     </li>
                   );
                 })}
