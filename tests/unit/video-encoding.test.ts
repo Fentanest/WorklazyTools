@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { appendVideoRateControl, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate } from "../../src/features/video-studio/videoEncoding.ts";
+import { appendVideoRateControl, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate, resolveVideoEncodingThreadCount } from "../../src/features/video-studio/videoEncoding.ts";
 
 test("H.264 target bitrate does not also enable CRF", () => {
   const args: string[] = [];
@@ -23,6 +23,23 @@ test("H.264 automatic quality and VP9 retain their intended CRF modes", () => {
     "-deadline", "good",
     "-cpu-used", "4",
   ]);
+});
+
+test("single-threaded video encoding preserves the existing one-to-four thread cap", () => {
+  assert.equal(resolveVideoEncodingThreadCount(undefined, false), 2);
+  assert.equal(resolveVideoEncodingThreadCount(0, false), 2);
+  assert.equal(resolveVideoEncodingThreadCount(1, false), 1);
+  assert.equal(resolveVideoEncodingThreadCount(2, false), 2);
+  assert.equal(resolveVideoEncodingThreadCount(4, false), 4);
+  assert.equal(resolveVideoEncodingThreadCount(16, false), 4);
+});
+
+test("multi-threaded video encoding retains the measured one-to-four thread cap", () => {
+  assert.equal(resolveVideoEncodingThreadCount(1, true), 1);
+  assert.equal(resolveVideoEncodingThreadCount(2, true), 2);
+  assert.equal(resolveVideoEncodingThreadCount(4, true), 4);
+  assert.equal(resolveVideoEncodingThreadCount(5, true), 4);
+  assert.equal(resolveVideoEncodingThreadCount(16, true), 4);
 });
 
 test("resolution uses the short edge and never upscales the source", () => {

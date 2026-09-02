@@ -13,6 +13,11 @@ export function appendVideoRateControl(args: string[], codec: VideoCodec, bitrat
   args.push("-b:v", bitrate, "-maxrate", bitrate, "-bufsize", doubleBitrate(bitrate));
 }
 
+export function resolveVideoEncodingThreadCount(hardwareConcurrency: number | undefined, _multiThreaded: boolean) {
+  const concurrency = hardwareConcurrency || 2;
+  return Math.min(4, Math.max(1, concurrency));
+}
+
 export function resolveAudioSampleRate(sampleRate: "source" | number, codec: "aac" | "mp3" | "opus") {
   if (sampleRate === "source") return sampleRate;
   if (codec === "opus") return nearest(sampleRate, [8_000, 12_000, 16_000, 24_000, 48_000]);

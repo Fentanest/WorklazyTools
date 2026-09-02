@@ -6,7 +6,7 @@ import type {
   VideoTask,
   VideoWorkerInput,
 } from "./types";
-import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate } from "./videoEncoding";
+import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate, resolveVideoEncodingThreadCount } from "./videoEncoding";
 import { classifyVideoProcessingFailure } from "./videoErrors";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
 
@@ -141,7 +141,7 @@ async function processRequest(request: VideoWorkerStartRequest) {
       const job = request.jobs[jobIndex];
       const jobStart = 23 + (completedJobDuration / totalJobDuration) * 67;
       const jobEnd = 23 + ((completedJobDuration + jobDurations[jobIndex]) / totalJobDuration) * 67;
-      const result = await processJob(ffmpeg, job, request.task, jobIndex, temporaryFiles, mountedDirectories, (ratioStart, ratioEnd, duration, label) => {
+      const result = await processJob(ffmpeg, job, request.task, jobIndex, temporaryFiles, mountedDirectories, multiThreaded, (ratioStart, ratioEnd, duration, label) => {
         progressStage = createProgressStage(
           jobStart + (jobEnd - jobStart) * ratioStart,
           jobStart + (jobEnd - jobStart) * ratioEnd,
@@ -188,6 +188,7 @@ async function processJob(
   jobIndex: number,
   temporaryFiles: Set<string>,
   mountedDirectories: Set<string>,
+  multiThreaded: boolean,
   setStage: (start: number, end: number, duration: number, label: string) => void,
 ) {
   const inputNames: string[] = [];
@@ -216,13 +217,13 @@ async function processJob(
       const outputName = createOutputName(job.name || input.fileName, task, false);
       temporaryFiles.add(outputName);
       setStage(0.08, 0.92, input.end - input.start, featureMessage(currentLanguage, "video.messages.video.jobTask", { p0: job.name, p1: describeTask(task) }));
-      const exitCode = await ffmpeg.exec(createSingleArguments(input, inputNames[0], outputName, task));
+      const exitCode = await ffmpeg.exec(createSingleArguments(input, inputNames[0], outputName, task, multiThreaded));
       if (exitCode !== 0) throw new Error(processingFailureMessage(job.name, task));
       const bytes = await readBytes(ffmpeg, outputName);
       return { name: outputName, bytes };
     }
 
-    return await processConcatJob(ffmpeg, job, task, jobIndex, inputNames, temporaryFiles, setStage);
+    return await processConcatJob(ffmpeg, job, task, jobIndex, inputNames, temporaryFiles, multiThreaded, setStage);
   } finally {
     for (const name of [...temporaryFiles]) {
       if (existingTemporaryFiles.has(name)) continue;
@@ -244,6 +245,7 @@ async function processConcatJob(
   jobIndex: number,
   inputNames: string[],
   temporaryFiles: Set<string>,
+  multiThreaded: boolean,
   setStage: (start: number, end: number, duration: number, label: string) => void,
 ) {
   const segmentNames: string[] = [];
@@ -271,7 +273,7 @@ async function processConcatJob(
       inputDuration,
       featureMessage(currentLanguage, "video.messages.video.preparingSelectedRange", { p0: job.name, p1: inputIndex + 1, p2: job.inputs.length }),
     );
-    const exitCode = await ffmpeg.exec(createConcatSegmentArguments(input, inputNames[inputIndex], segmentName, task, concatDimensions, concatFrameRate));
+    const exitCode = await ffmpeg.exec(createConcatSegmentArguments(input, inputNames[inputIndex], segmentName, task, multiThreaded, concatDimensions, concatFrameRate));
     if (exitCode !== 0) throw new Error(processingFailureMessage(featureMessage(currentLanguage, "video.messages.video.videoIn", { p0: job.name, p1: inputIndex + 1 }), task));
     completedDuration += inputDuration;
   }
@@ -310,7 +312,7 @@ async function processConcatJob(
   return { name: outputName, bytes: await readBytes(ffmpeg, outputName) };
 }
 
-function createSingleArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask) {
+function createSingleArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask, multiThreaded: boolean) {
   const prefix = trimPrefix(input, inputName);
   if (task.kind === "gif") return [...prefix, "-filter_complex", gifFilter(task), "-loop", "0", outputName];
   if (task.kind === "audio") return createAudioOnlyArguments(prefix, task, outputName);
@@ -322,10 +324,10 @@ function createSingleArguments(input: VideoWorkerInputDescriptor, inputName: str
     args.push(outputName);
     return args;
   }
-  return createEncodeArguments(prefix, task, outputName, false, outputDimensions(input, task), input.fileSize);
+  return createEncodeArguments(prefix, task, outputName, false, multiThreaded, outputDimensions(input, task), input.fileSize);
 }
 
-function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask, concatDimensions?: readonly [number, number], concatFrameRate?: number) {
+function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask, multiThreaded: boolean, concatDimensions?: readonly [number, number], concatFrameRate?: number) {
   const prefix = trimPrefix(input, inputName);
   if (task.kind === "audio") {
     return createAudioOnlyArguments(prefix, task, outputName);
@@ -341,16 +343,16 @@ function createConcatSegmentArguments(input: VideoWorkerInputDescriptor, inputNa
     args.push("-avoid_negative_ts", "make_zero", outputName);
     return args;
   }
-  return createEncodeArguments(prefix, task, outputName, true, concatDimensions, 0, concatFrameRate);
+  return createEncodeArguments(prefix, task, outputName, true, multiThreaded, concatDimensions, 0, concatFrameRate);
 }
 
-function createEncodeArguments(prefix: string[], task: Extract<VideoTask, { kind: "encode" }>, outputName: string, normalizeForConcat: boolean, concatDimensions?: readonly [number, number], inputFileSize = 0, concatFrameRate?: number) {
+function createEncodeArguments(prefix: string[], task: Extract<VideoTask, { kind: "encode" }>, outputName: string, normalizeForConcat: boolean, multiThreaded: boolean, concatDimensions?: readonly [number, number], inputFileSize = 0, concatFrameRate?: number) {
   const args = [...prefix, "-map", "0:v:0"];
   const filter = createVideoFilter(task, normalizeForConcat, concatDimensions, concatFrameRate);
   if (filter) args.push("-vf", filter);
   args.push("-c:v", codecName(task.codec));
   appendVideoRateControl(args, task.codec, task.bitrate, task.crf);
-  args.push("-threads", String(encodingThreadCount()));
+  args.push("-threads", String(resolveVideoEncodingThreadCount(worker.navigator.hardwareConcurrency, multiThreaded)));
   if (task.codec === "hevc" && task.container === "mp4") args.push("-tag:v", "hvc1");
   appendVideoAudioArguments(args, task, normalizeForConcat);
   if (task.container === "mp4" && !normalizeForConcat && inputFileSize < 512 * 1024 * 1024) args.push("-movflags", "+faststart");
@@ -589,10 +591,6 @@ function appendTransformFilters(base: string, task: Extract<VideoTask, { kind: "
 
 function codecName(codec: "h264" | "hevc" | "vp9") {
   return codec === "h264" ? "libx264" : codec === "hevc" ? "libx265" : "libvpx-vp9";
-}
-
-function encodingThreadCount() {
-  return Math.min(4, Math.max(1, worker.navigator.hardwareConcurrency || 2));
 }
 
 function progress(value: number, message: string) {
