@@ -22,7 +22,7 @@
 
 **6. 「권한을 묻지 말 것」** — 지시했다면 그 일에 필요한 행위까지 허락한 것이다.
 
-**7. 「작업 기록」** — 한 일은 자신의 이름(Claude · Codx · Gemini)으로 `CHANGELOG.md`에 남긴다. 커밋 메시지는 저장소 관례(영어 한 줄 요약)를 따른다.
+**7. 「작업 기록」** — 기록은 두 파일로 나눈다(2026-09-02 사용자 결정). **`CHANGELOG.md`에는 코드에 일어난 변경을 간결히**(무엇이 바뀌었나 — 한 작업당 몇 줄), **검토 과정에서 산출된 사고의 결과물 — 판정·기각 사유·실측 수치·가설 검증 — 은 [`docs/review-notes.md`](docs/review-notes.md)에** 남긴다. 둘 다 자신의 이름(Claude · Codx · Gemini)으로 서명한다. CHANGELOG에 검토 서사를 섞지 말고, review-notes에서 해당 CHANGELOG 항목을 알아볼 수 있게 작업 단위 제목을 붙인다. 커밋 메시지는 저장소 관례(영어 한 줄 요약)를 따른다.
 
 **8. 「검증은 실행이다」** — 완료 기준의 검증 명령을 실제로 실행하고 출력을 기록한다. "통과했을 것"은 완료가 아니다. 이 저장소의 기본 검증 명령: `npm run build` · `npm run test:unit` · 변경 범위에 해당하는 스모크 테스트(`test:browser` · `test:office` · `test:new-tools` · `test:utilities` 등) · 정적 산출물 검증 `npm run test:static`.
 
