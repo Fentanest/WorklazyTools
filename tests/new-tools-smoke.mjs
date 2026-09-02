@@ -38,11 +38,16 @@ try {
 
     const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
     const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
-    const onlyImage = process.env.TEST_ONLY_IMAGE === "1";
+    const onlyImageSizing = process.env.TEST_ONLY_IMAGE_SIZING === "1";
+    const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing;
     const onlyHwp = process.env.TEST_ONLY_HWP === "1";
     if (onlyHwp) {
       console.log("[1/1] HWP editor and comparison");
       await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
+    } else if (onlyImageSizing) {
+      console.log("[1/1] Image studio sizing and panel");
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
+      await testImageStudioSizingAndPanel(page);
     } else if (!onlyVideo && !onlyAudio) {
       if (!onlyImage) {
         console.log("[1/4] HWP editor");
@@ -60,6 +65,7 @@ try {
       }
     }
     console.log(`  image: P4 crop overlay matrix ${JSON.stringify(cropMatrix)}`);
+    await testImageStudioSizingAndPanel(page);
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
     await testImageStudioMobile(page);
     for (const deviceScaleFactor of [2, 1]) {
@@ -192,10 +198,11 @@ async function testImageStudio(page, imagePaths) {
   });
   const editorControls = await page.evaluate(() => ({
     hasVerticalFlip: Boolean(document.querySelector('button[aria-label="상하 반전"]')),
-    toolbarPanels: document.querySelectorAll('[data-testid^="image-editor-panel-"]').length,
+    toolbarPanels: document.querySelectorAll('.image-editor-panel-tabs [data-testid^="image-editor-panel-"]').length,
+    hasPanelToggle: Boolean(document.querySelector('[data-testid="image-editor-panel-toggle"]')),
     jpgNotice: document.querySelector(".image-format-control small")?.textContent || "",
   }));
-  if (!editorControls.hasVerticalFlip || editorControls.toolbarPanels !== 8 || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
+  if (!editorControls.hasVerticalFlip || editorControls.toolbarPanels !== 9 || !editorControls.hasPanelToggle || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
     throw new Error(`Unified editor controls are incomplete: ${JSON.stringify(editorControls)}`);
   }
   await page.click('[data-testid="image-editor-panel-canvas"]');
@@ -1077,6 +1084,210 @@ async function testImageStudioCropBoxEditing(page) {
   console.log("  image: editable crop box, ratio boundaries, modifiers, input branches, viewport gestures, ownership, history, and export isolation verified");
 }
 
+async function testImageStudioSizingAndPanel(page) {
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
+  await loadSyntheticImageEditor(page, { width: 1800, height: 1200 });
+  await installImageEditorExportCapture(page);
+
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await dragImageEditorRegion(page, 1);
+  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-effect-selection"]'));
+  await page.click('[data-testid="image-editor-panel-shapes"]');
+  await page.click('[data-testid="image-editor-shape-rounded-rect"]');
+  await page.click('[data-testid="image-editor-panel-select"]');
+  await page.click('button[aria-label="오른쪽으로 90도 회전"]');
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  const beforeResample = await readImageEditorSizingDebug(page);
+  if (!beforeResample.base || !beforeResample.effect || !beforeResample.shape || beforeResample.shape.angle !== 90) {
+    throw new Error(`Sizing fixture is incomplete: ${JSON.stringify(beforeResample)}`);
+  }
+
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-panel-size"]');
+  await setImageEditorNumber(page, "image-editor-resample-width", 1200);
+  let sizeInputs = await readDimensionFields(page, "image-editor-resample");
+  if (sizeInputs.width !== 1200 || sizeInputs.height !== 800) throw new Error(`Resample ratio lock did not calculate height: ${JSON.stringify(sizeInputs)}`);
+  await setImageEditorNumber(page, "image-editor-resample-width", 5000);
+  sizeInputs = await readDimensionFields(page, "image-editor-resample");
+  if (sizeInputs.width !== 4096 || sizeInputs.height !== 2731) throw new Error(`Resample dimensions exceeded the 4096px cap: ${JSON.stringify(sizeInputs)}`);
+  await setImageEditorNumber(page, "image-editor-resample-width", 1200);
+  await page.click(".image-size-toggle button[role=switch]");
+  await setImageEditorNumber(page, "image-editor-resample-height", 720);
+  sizeInputs = await readDimensionFields(page, "image-editor-resample");
+  if (sizeInputs.width !== 1200 || sizeInputs.height !== 720) throw new Error(`Unlocked resample dimensions did not remain independent: ${JSON.stringify(sizeInputs)}`);
+  await page.click('[data-testid="image-editor-resample-apply"]');
+  await page.waitForFunction(() => {
+    const fields = document.querySelector('[data-testid="image-editor-resample"]');
+    return fields?.getAttribute("data-width") === "1200" && fields?.getAttribute("data-height") === "720"
+      && document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%";
+  });
+  const afterResample = await readImageEditorSizingDebug(page);
+  const scaleTransform = [1200 / 900, 0, 0, 720 / 600, 0, 0];
+  assertMatrixClose(afterResample.base.matrix, multiplyEditorMatrices(scaleTransform, beforeResample.base.matrix), "resampled base");
+  assertMatrixClose(afterResample.shape.matrix, multiplyEditorMatrices(scaleTransform, beforeResample.shape.matrix), "resampled rotated shape");
+  assertAnchoredEffect(afterResample.base, afterResample.effect, "resampled effect");
+  if (afterResample.width !== 1200 || afterResample.height !== 720 || afterResample.count !== beforeResample.count || afterResample.zoom !== 1) {
+    throw new Error(`Resample did not preserve content count, dimensions, or view reset: ${JSON.stringify({ beforeResample, afterResample })}`);
+  }
+
+  const historyProbe = await mutatePreviousImageEditorMultiplierSnapshot(page, 1);
+  if (!historyProbe.everySnapshotStoredMultiplier || historyProbe.previous.width !== 900 || historyProbe.previous.height !== 600) {
+    throw new Error(`Output multiplier was not stored in each history snapshot: ${JSON.stringify(historyProbe)}`);
+  }
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-export-result"]')?.getAttribute("data-width") === "900");
+  const undoneResample = await readImageEditorSizingDebug(page);
+  assertMatrixClose(undoneResample.base.matrix, beforeResample.base.matrix, "resample undo base");
+  assertMatrixClose(undoneResample.shape.matrix, beforeResample.shape.matrix, "resample undo shape");
+  if (undoneResample.width !== 900 || undoneResample.height !== 600 || undoneResample.zoom !== 1) throw new Error(`Resample undo did not restore dimensions and view: ${JSON.stringify(undoneResample)}`);
+  await page.click('[data-testid="image-editor-redo"]');
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid="image-editor-export-result"]')?.getAttribute("data-width")) > 2500);
+  const redoneResample = await readImageEditorSizingDebug(page);
+  assertMatrixClose(redoneResample.base.matrix, afterResample.base.matrix, "resample redo base");
+  if (redoneResample.width !== 1200 || redoneResample.height !== 720 || redoneResample.zoom !== 1) throw new Error(`Resample redo did not restore dimensions and view: ${JSON.stringify(redoneResample)}`);
+
+  await page.click('[data-testid="image-editor-panel-size"]');
+  await setImageEditorNumber(page, "image-editor-canvas-resize-width", 400);
+  await setImageEditorNumber(page, "image-editor-canvas-resize-height", 300);
+  await page.click('[data-testid="image-editor-canvas-resize-apply"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-resample"]')?.getAttribute("data-width") === "400");
+  const afterCanvasResize = await readImageEditorSizingDebug(page);
+  const translateTransform = [1, 0, 0, 1, (400 - 1200) / 2, (300 - 720) / 2];
+  assertMatrixClose(afterCanvasResize.base.matrix, multiplyEditorMatrices(translateTransform, redoneResample.base.matrix), "canvas-resized base");
+  assertMatrixClose(afterCanvasResize.shape.matrix, multiplyEditorMatrices(translateTransform, redoneResample.shape.matrix), "canvas-resized shape");
+  assertAnchoredEffect(afterCanvasResize.base, afterCanvasResize.effect, "canvas-resized effect");
+  const hasClippedObject = afterCanvasResize.objects.some((object) => object.bounds.left < 0 || object.bounds.top < 0 || object.bounds.left + object.bounds.width > 400 || object.bounds.top + object.bounds.height > 300);
+  if (afterCanvasResize.count !== redoneResample.count || !hasClippedObject || afterCanvasResize.zoom !== 1) {
+    throw new Error(`Canvas resize deleted clipped content or missed its view reset: ${JSON.stringify(afterCanvasResize)}`);
+  }
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-resample"]')?.getAttribute("data-width") === "1200");
+  await page.click('[data-testid="image-editor-redo"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-resample"]')?.getAttribute("data-width") === "400");
+  if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "100%") throw new Error("Canvas dimension redo did not reset the view");
+
+  await page.click('[data-testid="image-editor-panel-size"]');
+  await setImageEditorNumber(page, "image-editor-canvas-resize-width", 5000);
+  await setImageEditorNumber(page, "image-editor-canvas-resize-height", 600);
+  const cappedCanvasInputs = await readDimensionFields(page, "image-editor-canvas-resize");
+  if (cappedCanvasInputs.width !== 4096 || cappedCanvasInputs.height !== 600) throw new Error(`Canvas size exceeded the 4096px cap: ${JSON.stringify(cappedCanvasInputs)}`);
+  await page.click('[data-testid="image-editor-canvas-resize-apply"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-export-result"]')?.getAttribute("data-limited") === "true");
+  const limitedOriginal = await page.$eval('[data-testid="image-editor-export-result"]', (result) => ({
+    width: Number(result.getAttribute("data-width")),
+    height: Number(result.getAttribute("data-height")),
+    text: result.textContent || "",
+  }));
+  if (limitedOriginal.width !== 8192 || limitedOriginal.height > 8192 || !limitedOriginal.text.includes("자동 조정")) {
+    throw new Error(`Original-quality export did not apply the 8192px cap with result guidance: ${JSON.stringify(limitedOriginal)}`);
+  }
+  console.log("  image: resample matrices, anchored effects, ratio/caps, canvas centering, non-deletion, history, and view reset verified");
+
+  await loadSyntheticImageEditor(page, { width: 1800, height: 1200 });
+  await installImageEditorExportCapture(page);
+  await clickImageEditorOption(page, ".image-export-size-control .segmented-control", "크기 지정");
+  await setImageEditorNumber(page, "image-editor-export-size-width", 600);
+  let exportSize = await readDimensionFields(page, "image-editor-export-size");
+  if (exportSize.width !== 600 || exportSize.height !== 400) throw new Error(`Locked custom export did not preserve ratio: ${JSON.stringify(exportSize)}`);
+  const lockedIdentityExport = await captureImageEditorExport(page, "PNG");
+  const lockedBounds = await readGreenExportBounds(page, lockedIdentityExport);
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  const lockedZoomExport = await captureImageEditorExport(page, "PNG");
+  if (lockedZoomExport !== lockedIdentityExport) throw new Error("Custom-size export changed with the canvas view transform");
+  await page.click('[data-testid="image-editor-fit"]');
+  await page.click(".image-export-ratio-toggle button[role=switch]");
+  await setImageEditorNumber(page, "image-editor-export-size-height", 600);
+  const stretchedExport = await captureImageEditorExport(page, "PNG");
+  const stretchedBounds = await readGreenExportBounds(page, stretchedExport);
+  if (lockedBounds.width !== 600 || lockedBounds.height !== 400 || stretchedBounds.width !== 600 || stretchedBounds.height !== 600
+    || Math.abs(stretchedBounds.greenWidth - lockedBounds.greenWidth) > 2 || stretchedBounds.greenHeight < lockedBounds.greenHeight * 1.4) {
+    throw new Error(`Custom export uniform/stretch paths are incorrect: ${JSON.stringify({ lockedBounds, stretchedBounds })}`);
+  }
+  await setImageEditorNumber(page, "image-editor-export-size-width", 9000);
+  exportSize = await readDimensionFields(page, "image-editor-export-size");
+  if (exportSize.width !== 8192 || exportSize.height !== 600) throw new Error(`Custom export exceeded the 8192px cap: ${JSON.stringify(exportSize)}`);
+  console.log("  image: destination-canvas export verified for locked, stretched, capped, and view-independent output");
+
+  await page.evaluate(() => sessionStorage.removeItem("worklazy:image-editor-panel-collapsed"));
+  await loadSyntheticImageEditor(page);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.$eval('[data-testid="image-editor-panel-shapes"]', (button) => button.click());
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-options-panel"]')?.getAttribute("data-panel") === "shapes");
+  await page.$eval('[data-testid="image-editor-shape-rounded-rect"]', (button) => button.click());
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  if (!await page.$('[data-testid="image-editor-minibar"]')) {
+    await page.click('[data-testid="image-editor-panel-select"]');
+    const selectionMapping = await getImageEditorSceneMapping(page, 1);
+    const shapeCenter = mapImageEditorScenePoint(selectionMapping, { x: 120, y: 120 });
+    await page.mouse.click(shapeCenter.x, shapeCenter.y);
+  }
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  if (!await page.$('[data-testid="image-editor-minibar"]')) throw new Error(`Minibar fixture could not be selected: ${JSON.stringify(await readImageEditorSizingDebug(page))}`);
+  const minibarMapping = await getImageEditorSceneMapping(page, 1);
+  const minibarStart = mapImageEditorScenePoint(minibarMapping, { x: 120, y: 120 });
+  const minibarEnd = mapImageEditorScenePoint(minibarMapping, { x: 450, y: 300 });
+  await page.mouse.move(minibarStart.x, minibarStart.y);
+  await page.mouse.down();
+  await page.mouse.move(minibarEnd.x, minibarEnd.y, { steps: 7 });
+  await page.mouse.up();
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  let minibarRecalculated = false;
+  for (const width of [821, 1020, 1440]) {
+    console.log(`  image: probing collapsible panel at ${width}px`);
+    await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
+    await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "false");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const before = await readImageEditorPanelLayout(page);
+    await page.click('[data-testid="image-editor-panel-toggle"]');
+    await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "true");
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const after = await readImageEditorPanelLayout(page);
+    if (before.panelDisplay === "none" || after.panelDisplay !== "none" || after.stageWidth < before.stageWidth + 100 || after.canvasWidth <= before.canvasWidth
+      || before.canvasSticky !== "sticky" || after.canvasSticky !== "sticky" || after.toggleExpanded !== "false") {
+      throw new Error(`Collapsible panel did not expand the ${width}px canvas workspace: ${JSON.stringify({ width, before, after })}`);
+    }
+    if (before.minibar && after.minibar && Math.hypot(after.minibar.left - before.minibar.left, after.minibar.top - before.minibar.top) > 5) minibarRecalculated = true;
+    await page.click('[data-testid="image-editor-panel-toggle"]');
+    await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "false");
+  }
+  if (!minibarRecalculated) throw new Error("The floating minibar did not recalculate after the panel width changed");
+
+  await page.setViewport({ width: 1020, height: 900, deviceScaleFactor: 1 });
+  console.log("  image: probing collapsible panel session and mobile overrides");
+  await page.click('[data-testid="image-editor-panel-toggle"]');
+  await page.waitForFunction(() => sessionStorage.getItem("worklazy:image-editor-panel-collapsed") === "1");
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "true");
+  await page.setViewport({ width: 820, height: 900, deviceScaleFactor: 1 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "false");
+  let mobilePanel = await readImageEditorPanelLayout(page);
+  if (mobilePanel.panelDisplay === "none" || !mobilePanel.toggleDisabled || mobilePanel.panelPosition !== "relative") throw new Error(`820px panel did not remain a forced sheet: ${JSON.stringify(mobilePanel)}`);
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "false");
+  mobilePanel = await readImageEditorPanelLayout(page);
+  if (mobilePanel.panelDisplay === "none" || !mobilePanel.toggleDisabled) throw new Error(`390px panel did not remain visible: ${JSON.stringify(mobilePanel)}`);
+  await page.setViewport({ width: 821, height: 900, deviceScaleFactor: 1 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "true");
+  await page.click('[data-testid="image-editor-panel-toggle"]');
+  await page.waitForFunction(() => sessionStorage.getItem("worklazy:image-editor-panel-collapsed") === "0");
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+  await page.goto(`${baseUrl}/en/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-testid="image-editor-panel-size"]');
+  const englishLabels = await page.evaluate(() => ({
+    size: document.querySelector('[data-testid="image-editor-panel-size"]')?.textContent?.trim(),
+    toggle: document.querySelector('[data-testid="image-editor-panel-toggle"]')?.getAttribute("aria-label"),
+  }));
+  if (englishLabels.size !== "Resize" || englishLabels.toggle !== "Collapse options panel") throw new Error(`English size/collapse labels are incomplete: ${JSON.stringify(englishLabels)}`);
+  console.log("  image: collapsible panel verified at 821/1020/1440px with fit, minibar, session memory, mobile sheet, and ko/en controls");
+}
+
 async function testImageStudioCropOverlayMatrix(page, { transformed, zoom, erased }) {
   await loadSyntheticImageEditor(page);
   await installImageEditorExportCapture(page);
@@ -1124,18 +1335,18 @@ async function testImageStudioCropOverlayMatrix(page, { transformed, zoom, erase
   };
 }
 
-async function loadSyntheticImageEditor(page) {
+async function loadSyntheticImageEditor(page, dimensions = { width: 600, height: 400 }) {
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".fabric-stage .upper-canvas");
-  await page.evaluate(async () => {
+  await page.evaluate(async (sourceDimensions) => {
     const canvas = document.createElement("canvas");
-    canvas.width = 600;
-    canvas.height = 400;
+    canvas.width = sourceDimensions.width;
+    canvas.height = sourceDimensions.height;
     const context = canvas.getContext("2d");
     context.fillStyle = "#d1d1d6";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#34c759";
-    context.fillRect(270, 180, 60, 40);
+    context.fillRect(Math.round(canvas.width * 0.45), Math.round(canvas.height * 0.45), Math.round(canvas.width * 0.1), Math.round(canvas.height * 0.1));
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     const transfer = new DataTransfer();
     transfer.items.add(new File([blob], "synthetic-crop-fixture.png", { type: "image/png" }));
@@ -1144,13 +1355,209 @@ async function loadSyntheticImageEditor(page) {
     stage.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     canvas.width = 1;
     canvas.height = 1;
-  });
+  }, dimensions);
   await page.waitForFunction(() => document.querySelector(".image-studio-page .drop-zone strong")?.textContent?.includes("1개 파일 선택됨"));
   await page.waitForFunction(() => {
     const canvas = document.querySelector(".fabric-stage .lower-canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
     const pixel = canvas.getContext("2d")?.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data;
     return pixel && pixel[1] > 150;
+  });
+}
+
+async function setImageEditorNumber(page, testId, value) {
+  await page.$eval(`[data-testid="${testId}"]`, (input, nextValue) => {
+    if (!(input instanceof HTMLInputElement)) throw new Error("Image editor number field is unavailable");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, String(nextValue));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+}
+
+async function readDimensionFields(page, testId) {
+  return page.$eval(`[data-testid="${testId}"]`, (fields) => ({
+    width: Number(fields.getAttribute("data-width")),
+    height: Number(fields.getAttribute("data-height")),
+  }));
+}
+
+async function clickImageEditorOption(page, containerSelector, label) {
+  await page.$$eval(`${containerSelector} button`, (buttons, expected) => {
+    const option = buttons.find((button) => button.textContent?.trim() === expected);
+    if (!(option instanceof HTMLButtonElement)) throw new Error(`Image editor option ${expected} is unavailable`);
+    option.click();
+  }, label);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+}
+
+async function readImageEditorSizingDebug(page) {
+  return page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    if (!(stage instanceof HTMLElement)) throw new Error("Image editor stage is unavailable");
+    const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+    let fiber = fiberKey ? stage[fiberKey] : null;
+    let fabricCanvas;
+    while (fiber && !fabricCanvas) {
+      let hook = fiber.memoizedState;
+      while (hook) {
+        const candidate = hook.memoizedState?.current;
+        if (candidate && typeof candidate.getObjects === "function" && candidate.upperCanvasEl instanceof HTMLCanvasElement) {
+          fabricCanvas = candidate;
+          break;
+        }
+        hook = hook.next;
+      }
+      fiber = fiber.return;
+    }
+    if (!fabricCanvas) throw new Error("Fabric canvas is unavailable");
+    const objects = fabricCanvas.getObjects().map((object, index) => {
+      const bounds = object.getBoundingRect();
+      return {
+        index,
+        role: object.worklazyRole || "",
+        shapeKind: object.worklazyShapeKind || "",
+        type: object.type,
+        angle: object.angle,
+        anchorX: object.worklazyAnchorX,
+        anchorY: object.worklazyAnchorY,
+        matrix: object.calcTransformMatrix().map(Number),
+        bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+      };
+    });
+    return {
+      width: fabricCanvas.getWidth(),
+      height: fabricCanvas.getHeight(),
+      zoom: fabricCanvas.getZoom(),
+      count: objects.length,
+      objects,
+      base: objects.find((object) => object.role === "base"),
+      effect: objects.find((object) => object.role === "region-effect"),
+      shape: objects.find((object) => object.shapeKind === "rounded-rect"),
+      active: (() => {
+        const active = fabricCanvas.getActiveObject();
+        return active ? { role: active.worklazyRole || "", shapeKind: active.worklazyShapeKind || "", type: active.type } : null;
+      })(),
+    };
+  });
+}
+
+function multiplyEditorMatrices(left, right) {
+  return [
+    left[0] * right[0] + left[2] * right[1],
+    left[1] * right[0] + left[3] * right[1],
+    left[0] * right[2] + left[2] * right[3],
+    left[1] * right[2] + left[3] * right[3],
+    left[0] * right[4] + left[2] * right[5] + left[4],
+    left[1] * right[4] + left[3] * right[5] + left[5],
+  ];
+}
+
+function assertMatrixClose(actual, expected, label, tolerance = 1e-4) {
+  if (!actual || !expected || actual.length !== 6 || Math.max(...actual.map((value, index) => Math.abs(value - expected[index]))) > tolerance) {
+    throw new Error(`${label} matrix differs: ${JSON.stringify({ actual, expected })}`);
+  }
+}
+
+function assertAnchoredEffect(base, effect, label) {
+  if (!base || !effect || !Number.isFinite(effect.anchorX) || !Number.isFinite(effect.anchorY)) throw new Error(`${label} anchor is unavailable`);
+  const [a, b, c, d, tx, ty] = base.matrix;
+  assertMatrixClose(effect.matrix, [a, b, c, d, tx + a * effect.anchorX + c * effect.anchorY, ty + b * effect.anchorX + d * effect.anchorY], label);
+}
+
+async function mutatePreviousImageEditorMultiplierSnapshot(page, nextMultiplier) {
+  return page.evaluate((multiplier) => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    if (!(stage instanceof HTMLElement)) throw new Error("Image editor stage is unavailable");
+    const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+    let fiber = fiberKey ? stage[fiberKey] : null;
+    let history;
+    while (fiber && !history) {
+      let hook = fiber.memoizedState;
+      while (hook) {
+        const candidate = hook.memoizedState?.current;
+        if (Array.isArray(candidate) && candidate.length >= 2 && candidate.every((entry) => typeof entry === "string" && entry.includes('"canvas"') && entry.includes('"width"'))) {
+          history = candidate;
+          break;
+        }
+        hook = hook.next;
+      }
+      fiber = fiber.return;
+    }
+    if (!history) throw new Error("Image editor history snapshots are unavailable");
+    const parsed = history.map((entry) => JSON.parse(entry));
+    const previous = parsed.at(-2);
+    previous.outputMultiplier = multiplier;
+    history[history.length - 2] = JSON.stringify(previous);
+    return {
+      length: history.length,
+      everySnapshotStoredMultiplier: parsed.every((snapshot) => Number.isFinite(snapshot.outputMultiplier)),
+      previous: { width: previous.width, height: previous.height, outputMultiplier: previous.outputMultiplier },
+      current: { width: parsed.at(-1).width, height: parsed.at(-1).height, outputMultiplier: parsed.at(-1).outputMultiplier },
+    };
+  }, nextMultiplier);
+}
+
+async function readGreenExportBounds(page, dataUrl) {
+  return page.evaluate(async (source) => {
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let minX = canvas.width;
+    let minY = canvas.height;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const offset = (y * canvas.width + x) * 4;
+        const red = pixels[offset];
+        const green = pixels[offset + 1];
+        const blue = pixels[offset + 2];
+        if (green > 140 && green > red * 1.35 && green > blue * 1.35) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    const result = { width: canvas.width, height: canvas.height, greenWidth: maxX >= minX ? maxX - minX + 1 : 0, greenHeight: maxY >= minY ? maxY - minY + 1 : 0 };
+    canvas.width = 1;
+    canvas.height = 1;
+    return result;
+  }, dataUrl);
+}
+
+async function readImageEditorPanelLayout(page) {
+  return page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    const panel = document.querySelector('[data-testid="image-editor-options-panel"]');
+    const canvas = document.querySelector(".fabric-stage .upper-canvas");
+    const canvasColumn = document.querySelector(".image-editor-canvas-column");
+    const toggle = document.querySelector('[data-testid="image-editor-panel-toggle"]');
+    const minibar = document.querySelector('[data-testid="image-editor-minibar"]')?.getBoundingClientRect();
+    if (!(stage instanceof HTMLElement) || !(panel instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement) || !(canvasColumn instanceof HTMLElement) || !(toggle instanceof HTMLButtonElement)) {
+      throw new Error("Image editor panel layout is unavailable");
+    }
+    const stageBounds = stage.getBoundingClientRect();
+    const canvasBounds = canvas.getBoundingClientRect();
+    const panelStyle = getComputedStyle(panel);
+    return {
+      stageWidth: stageBounds.width,
+      canvasWidth: canvasBounds.width,
+      panelDisplay: panelStyle.display,
+      panelPosition: panelStyle.position,
+      canvasSticky: getComputedStyle(canvasColumn).position,
+      toggleDisabled: toggle.disabled,
+      toggleExpanded: toggle.getAttribute("aria-expanded"),
+      minibar: minibar ? { left: minibar.left, top: minibar.top } : null,
+    };
   });
 }
 

@@ -201,8 +201,8 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/image-studio": {
     title: "이미지 스튜디오 | 사진 편집·모자이크·콜라주·GIF",
-    description: "사진 편집과 그림판을 하나로 합쳐 선택 영역 모자이크·블러, 자르기·필터·자유 그리기·Undo를 사용하고 콜라주·GIF도 만드세요.",
-    application: { name: "Image Studio", featureList: ["사진·빈 캔버스 통합 편집", "선택 영역 모자이크·블러", "블러 강도 조절", "연필·붓·지우개", "Undo·Redo", "필터와 자르기", "텍스트·도형·스티커 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
+    description: "사진 편집과 그림판을 하나로 합쳐 선택 영역 모자이크·블러, 자르기·크기 조절·필터·자유 그리기·Undo를 사용하고 원하는 픽셀 크기로 저장하세요.",
+    application: { name: "Image Studio", featureList: ["사진·빈 캔버스 통합 편집", "선택 영역 모자이크·블러", "블러 강도 조절", "연필·붓·지우개", "Undo·Redo", "자르기·이미지·캔버스 크기 조절", "내보내기 크기 지정", "텍스트·도형·스티커 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
   },
   "/tools/text-merger": {
     title: "텍스트 병합 | 직접 입력·TXT 파일 순서대로 합치기",

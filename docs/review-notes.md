@@ -4,6 +4,14 @@
 
 ## 2026-09-02
 
+### 이미지 P4 착수 3묶음 — 크기·내보내기·접이식 패널 판정 (Codx)
+
+- **리샘플 판정**: 작업 캔버스 상한을 4096px로 두고 base·회전 도형·그리기 등 일반 객체의 기존 `calcTransformMatrix()` 앞에 전역 scale 행렬을 합성해 `util.applyTransformToObject`로 적용했다. region-effect는 직접 변환에서 제외하고 base의 원본 로컬 anchor로 다시 동기화했다. 1800×1200 fixture를 둔 900×600 작업공간에서 회전 도형·base를 1200×720 비균일 리샘플했을 때 합성 행렬과 일치했고 효과 행렬도 anchor 산식과 일치했다. 비율 잠금은 가로 1200 입력을 1200×800으로 계산했고, 잠금 해제 뒤 1200×720을 독립 적용했으며 5000 입력은 4096×2731로 제한됐다. 치수 변경 뒤 view는 100%로 초기화됐다.
+- **캔버스·히스토리 판정**: 1200×720→400×300 변경은 모든 객체에 중앙 이동 `dx=-400`, `dy=-210`을 적용했고 캔버스 밖으로 잘린 객체를 포함해 객체 수를 보존했다. 치수 undo/redo 모두 1200×720↔400×300과 100% view reset을 복원했다. 모든 메모리 스냅샷에 `outputMultiplier`가 저장됨을 확인하고 이전 스냅샷 값을 1로 강제한 검증에서 undo 결과 안내가 900×600, redo가 원본 화질 배율 결과로 되돌아와 restore 배선을 확정했다. 파일 로드·빈 캔버스·restore 외 크기 작업에서는 multiplier를 바꾸지 않았다.
+- **내보내기 판정**: 원본 화질은 기존 multiplier 렌더를 유지하되 4096px 작업 폭에서 결과 폭이 8192px을 넘지 않도록 유효 multiplier를 자동 축소하고 실제 8192px 결과 안내를 표시했다. 지정 크기는 VPT identity의 1× 결과를 목적지 캔버스에 재렌더한다. 잠금 ON 600×400과 잠금 OFF 600×600 결과에서 녹색 대조군 가로폭은 동일하고 세로만 1.4배 이상 늘어 균일/스트레치 분기를 확인했으며, 200% view에서도 data URL이 byte-identical이었다. 9000 입력은 8192로 제한됐다.
+- **접이식 판정**: 우측 패널 토글은 `sessionStorage`로 기억되고 821·1020·1440px에서 패널이 사라진 만큼 stage 폭과 반응형 canvas fit이 증가했으며 ResizeObserver가 선택 미니바를 재계산했다. 1020px 접힘 뒤 reload에서도 유지됐고 820·390px에서는 저장값을 무시해 패널을 상대 위치 하단 시트로 강제 표시하고 토글을 비활성화했다. 821px로 돌아오면 저장된 접힘이 다시 적용됐다. sticky canvas는 데스크톱 전 구간에서 유지됐고 ko/en 라벨·aria를 확인했다.
+- **완료 검증·동반 영향**: `npm run build`(2,346 modules, Image Studio lazy chunk 402.23KB/125.51KB gzip, 정적 55페이지) · `npm run test:unit`(65/65) · `TEST_ONLY_IMAGE=1 npm run test:new-tools`(P4 1·2묶음과 DPR/effect 회귀 포함) · `npm run test:utilities` · `npm run test:static` 전부 통과했다. 크기·출력 기능은 ko/en UI와 이미지 가이드·도구 메타·SEO featureList를 함께 갱신했다. URL·사이트맵 구조·광고 위치·광고 제외 격리 경로·서버 전제는 바뀌지 않아 AdSense/GitHub Pages 계약에 추가 변경이 없다.
+
 ### 이미지 P4 착수 2묶음 — 편집 가능한 자르기 박스·비율 경계 판정 (Codx)
 
 - **박스 편집 판정**: crop overlay만 selectable/evented인 전용 객체로 두고 코너4+변4 컨트롤을 구성했다. 회전·skew 컨트롤은 없고 flip lock을 고정했으며, 박스 위 좌클릭은 Fabric 이동/scale에 위임하고 밖 좌클릭만 한 개의 새 박스로 교체한다. 이동·scale 중 캔버스 경계를 넘지 않았고 scale 동안 패널/플로팅 px 라벨이 변한 뒤 `object:modified`가 정확히 1회 발생해 `scaleX=scaleY=1`·정수 width/height로 정규화됐다. 일반 선택·Delete·미니바·히스토리에는 잡히지 않았다.

@@ -11,6 +11,11 @@ interface RegionSelectionSummary {
   height: number;
 }
 
+interface EditorDimensions {
+  width: number;
+  height: number;
+}
+
 interface ImageEditorPanelProps {
   activePanel: EditorPanelName;
   drawTool: EditorDrawTool;
@@ -25,6 +30,10 @@ interface ImageEditorPanelProps {
   regionSelection?: RegionSelectionSummary;
   cropRatio?: number;
   unavailableCropRatios: readonly number[];
+  canvasDimensions: EditorDimensions;
+  resampleDimensions: EditorDimensions;
+  canvasResizeDimensions: EditorDimensions;
+  resampleRatioLocked: boolean;
   brightness: number;
   contrast: number;
   hue: number;
@@ -43,6 +52,11 @@ interface ImageEditorPanelProps {
   onCropRatio: (ratio?: number) => void;
   onCropCancel: () => void;
   onCropApply: () => void;
+  onResampleDimensionChange: (axis: keyof EditorDimensions, value: number) => void;
+  onResampleRatioLockChange: (locked: boolean) => void;
+  onResampleApply: () => void;
+  onCanvasResizeDimensionChange: (axis: keyof EditorDimensions, value: number) => void;
+  onCanvasResizeApply: () => void;
   onRegionEffectChange: (effect: RegionEffect) => void;
   onRegionEffectStrengthChange: (strength: number) => void;
   onRegionEffectCancel: () => void;
@@ -69,6 +83,7 @@ export function ImageEditorPanel(props: ImageEditorPanelProps) {
       <div className="image-editor-panel-body">
         {props.activePanel === "select" && <SelectPanel {...props} />}
         {props.activePanel === "crop" && <CropPanel {...props} />}
+        {props.activePanel === "size" && <SizePanel {...props} />}
         {props.activePanel === "effect" && <EffectPanel {...props} />}
         {props.activePanel === "draw" && <DrawPanel {...props} />}
         {props.activePanel === "text" && <TextPanel {...props} />}
@@ -156,6 +171,46 @@ function EffectPanel(props: ImageEditorPanelProps) {
   );
 }
 
+function SizePanel(props: ImageEditorPanelProps) {
+  const { t } = useTranslation("features");
+  const resampleUnchanged = props.resampleDimensions.width === props.canvasDimensions.width && props.resampleDimensions.height === props.canvasDimensions.height;
+  const canvasResizeUnchanged = props.canvasResizeDimensions.width === props.canvasDimensions.width && props.canvasResizeDimensions.height === props.canvasDimensions.height;
+  return <div className="editor-tool-group image-size-controls">
+    <section>
+      <strong>{t("image.editor.resampleTitle")}</strong>
+      <small>{t("image.editor.resampleHelp", { max: 4096 })}</small>
+      <DimensionFields
+        dimensions={props.resampleDimensions}
+        max={4096}
+        testId="image-editor-resample"
+        onChange={props.onResampleDimensionChange}
+      />
+      <div className="image-size-toggle"><ToggleRow label={t("image.editor.keepRatio")} description={t("image.editor.keepRatioHelp")} checked={props.resampleRatioLocked} onChange={props.onResampleRatioLockChange} /></div>
+      <button type="button" className="primary-button accent-sky" data-testid="image-editor-resample-apply" disabled={resampleUnchanged} onClick={props.onResampleApply}>{t("image.editor.resampleApply")}</button>
+    </section>
+    <section>
+      <strong>{t("image.editor.canvasResizeTitle")}</strong>
+      <small>{t("image.editor.canvasResizeHelp", { max: 4096 })}</small>
+      <DimensionFields
+        dimensions={props.canvasResizeDimensions}
+        max={4096}
+        testId="image-editor-canvas-resize"
+        onChange={props.onCanvasResizeDimensionChange}
+      />
+      <button type="button" className="primary-button accent-sky" data-testid="image-editor-canvas-resize-apply" disabled={canvasResizeUnchanged} onClick={props.onCanvasResizeApply}>{t("image.editor.canvasResizeApply")}</button>
+    </section>
+  </div>;
+}
+
+function DimensionFields({ dimensions, max, testId, onChange }: { dimensions: EditorDimensions; max: number; testId: string; onChange: (axis: keyof EditorDimensions, value: number) => void }) {
+  const { t } = useTranslation("features");
+  return <div className="image-dimension-fields" data-testid={testId} data-width={dimensions.width} data-height={dimensions.height}>
+    <label><span>{t("image.editor.dimensionWidth")}</span><input type="number" min={1} max={max} step={1} value={dimensions.width} aria-label={t("image.editor.dimensionWidth")} data-testid={`${testId}-width`} onChange={(event) => onChange("width", Number(event.target.value))} /></label>
+    <span aria-hidden="true">×</span>
+    <label><span>{t("image.editor.dimensionHeight")}</span><input type="number" min={1} max={max} step={1} value={dimensions.height} aria-label={t("image.editor.dimensionHeight")} data-testid={`${testId}-height`} onChange={(event) => onChange("height", Number(event.target.value))} /></label>
+  </div>;
+}
+
 function DrawPanel(props: ImageEditorPanelProps) {
   const { t } = useTranslation("features");
   const tools = [["pencil", Pencil], ["brush", Brush], ["erase", Eraser]] as const;
@@ -216,6 +271,7 @@ function SelectionActions({ selection, busy, onCancel, onApply, applyLabel, test
 const PANEL_TITLE_KEYS = {
   select: "image.editor.panelSelect",
   crop: "image.editor.panelCrop",
+  size: "image.editor.panelSize",
   effect: "image.editor.panelEffect",
   draw: "image.editor.panelDraw",
   text: "image.editor.panelText",

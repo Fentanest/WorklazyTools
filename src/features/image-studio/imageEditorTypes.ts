@@ -1,6 +1,7 @@
 export type EditorInteractionMode = "select" | "pencil" | "brush" | "erase" | "crop" | "effect";
 export type EditorDrawTool = Extract<EditorInteractionMode, "pencil" | "brush" | "erase">;
-export type EditorPanelName = "select" | "crop" | "effect" | "draw" | "text" | "shapes" | "stickers" | "canvas";
+// Keep this union cumulative: the planned P3 layer panel will append "layers" without replacing P4's "size" panel.
+export type EditorPanelName = "select" | "crop" | "size" | "effect" | "draw" | "text" | "shapes" | "stickers" | "canvas";
 export type RegionEffect = "mosaic" | "blur";
 export type EditorShapeKind = "line" | "circle" | "rounded-rect" | "triangle" | "star" | "hexagon" | "speech-bubble" | "arrow" | "double-arrow" | "highlighter";
 

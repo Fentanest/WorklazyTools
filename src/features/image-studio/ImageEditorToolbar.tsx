@@ -1,4 +1,4 @@
-import { Brush, Crop, Grid3X3, MousePointer2, Palette, Redo2, Smile, Square, Trash2, Type, Undo2 } from "lucide-react";
+import { Brush, Crop, Grid3X3, Maximize2, MousePointer2, Palette, PanelRightClose, PanelRightOpen, Redo2, Smile, Square, Trash2, Type, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { EditorPanelName } from "./imageEditorTypes";
@@ -10,10 +10,13 @@ interface ImageEditorToolbarProps {
   canDelete: boolean;
   historyIndex: number;
   historyLength: number;
+  panelCollapsed: boolean;
+  panelToggleDisabled: boolean;
   onPanelChange: (panel: EditorPanelName) => void;
   onUndo: () => void;
   onRedo: () => void;
   onDelete: () => void;
+  onPanelToggle: () => void;
 }
 
 export function ImageEditorToolbar({
@@ -23,15 +26,19 @@ export function ImageEditorToolbar({
   canDelete,
   historyIndex,
   historyLength,
+  panelCollapsed,
+  panelToggleDisabled,
   onPanelChange,
   onUndo,
   onRedo,
   onDelete,
+  onPanelToggle,
 }: ImageEditorToolbarProps) {
   const { t } = useTranslation("features");
   const panels = [
     ["select", t("image.editor.panelSelect"), MousePointer2],
     ["crop", t("image.editor.panelCrop"), Crop],
+    ["size", t("image.editor.panelSize"), Maximize2],
     ["effect", t("image.editor.panelEffect"), Grid3X3],
     ["draw", t("image.editor.panelDraw"), Brush],
     ["text", t("image.editor.panelText"), Type],
@@ -66,6 +73,14 @@ export function ImageEditorToolbar({
         <button type="button" disabled={historyIndex <= 0} aria-label={t("image.editor.undo")} data-testid="image-editor-undo" onClick={onUndo}><Undo2 /></button>
         <button type="button" disabled={historyIndex >= historyLength - 1} aria-label={t("image.editor.redo")} data-testid="image-editor-redo" onClick={onRedo}><Redo2 /></button>
         <button type="button" disabled={!canDelete} aria-label={t("image.editor.deleteObject")} data-testid="image-editor-delete" onClick={onDelete}><Trash2 /></button>
+        <button
+          type="button"
+          disabled={panelToggleDisabled}
+          aria-label={t(panelCollapsed ? "image.editor.panelExpand" : "image.editor.panelCollapse")}
+          aria-expanded={!panelCollapsed}
+          data-testid="image-editor-panel-toggle"
+          onClick={onPanelToggle}
+        >{panelCollapsed ? <PanelRightOpen /> : <PanelRightClose />}</button>
       </div>
     </div>
   );

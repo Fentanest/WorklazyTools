@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
+import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { BatchImagePanel, CollagePanel, GifPanel } from "./ImageProcessingPanels";
 import { ImageEditorMinibar } from "./ImageEditorMinibar";
@@ -41,6 +41,9 @@ const EDITOR_MIN_ZOOM = 0.25;
 const EDITOR_MAX_ZOOM = 4;
 const EDITOR_ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
 const IDENTITY_VIEWPORT: TMat2D = [1, 0, 0, 1, 0, 0];
+const EDITOR_WORK_MAX_DIMENSION = 4096;
+const EDITOR_EXPORT_MAX_DIMENSION = 8192;
+const EDITOR_PANEL_STORAGE_KEY = "worklazy:image-editor-panel-collapsed";
 
 export function ImageStudioPage() {
   const { t } = useTranslation("features");
@@ -97,6 +100,12 @@ interface RegionLabelPosition {
 }
 
 type CropRatio = number | undefined;
+type EditorExportMode = "original" | "custom";
+
+interface EditorDimensions {
+  width: number;
+  height: number;
+}
 
 const CROP_PRESET_RATIOS = [1, 4 / 3, 3 / 4, 16 / 9, 9 / 16] as const;
 const CROP_MIN_SIZE = 10;
@@ -117,6 +126,7 @@ interface EditorHistorySnapshot {
   background: string;
   transparentBackground: boolean;
   baseLocked: boolean;
+  outputMultiplier: number;
 }
 
 function ImageEditor() {
@@ -126,7 +136,7 @@ function ImageEditor() {
   const canvas = useRef<Canvas | undefined>(undefined);
   const baseImage = useRef<FabricImage | undefined>(undefined);
   const sourceUrl = useRef<string | undefined>(undefined);
-  const outputMultiplier = useRef(1);
+  const outputMultiplierRef = useRef(1);
   const cropOverlay = useRef<Rect | undefined>(undefined);
   const effectOverlay = useRef<Rect | undefined>(undefined);
   const cropOrigin = useRef<{ x: number; y: number } | undefined>(undefined);
@@ -148,6 +158,14 @@ function ImageEditor() {
   const [contrast, setContrast] = useState(0);
   const [hue, setHue] = useState(0);
   const [format, setFormat] = useState<ImageOutputFormat>("png");
+  const [outputMultiplier, setOutputMultiplier] = useState(1);
+  const [canvasDimensions, setCanvasDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
+  const [resampleDimensions, setResampleDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
+  const [canvasResizeDimensions, setCanvasResizeDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
+  const [resampleRatioLocked, setResampleRatioLocked] = useState(true);
+  const [exportMode, setExportMode] = useState<EditorExportMode>("original");
+  const [exportDimensions, setExportDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
+  const [exportRatioLocked, setExportRatioLocked] = useState(true);
   const [background, setBackground] = useState("#ffffff");
   const [transparentBackground, setTransparentBackground] = useState(false);
   const [baseLocked, setBaseLocked] = useState(true);
@@ -170,9 +188,26 @@ function ImageEditor() {
   const [regionEffectStrength, setRegionEffectStrength] = useState(16);
   const [regionEffectBusy, setRegionEffectBusy] = useState(false);
   const [stickerBusy, setStickerBusy] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(readStoredEditorPanelCollapsed);
+  const mobilePanelLayout = useEditorMobilePanelLayout();
+  const effectivePanelCollapsed = panelCollapsed && !mobilePanelLayout;
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
   cropRatioRef.current = cropRatio;
+
+  const updateOutputMultiplier = useCallback((value: number) => {
+    const normalized = Math.max(Number.EPSILON, Number.isFinite(value) ? value : 1);
+    outputMultiplierRef.current = normalized;
+    setOutputMultiplier(normalized);
+  }, []);
+
+  const syncDimensionControls = useCallback((width: number, height: number) => {
+    const next = { width: clampEditorDimension(width, EDITOR_WORK_MAX_DIMENSION), height: clampEditorDimension(height, EDITOR_WORK_MAX_DIMENSION) };
+    setCanvasDimensions(next);
+    setResampleDimensions(next);
+    setCanvasResizeDimensions(next);
+    setExportDimensions(next);
+  }, []);
 
   const updateMinibarPosition = useCallback(() => {
     const instance = canvas.current;
@@ -228,6 +263,18 @@ function ImageEditor() {
 
   const syncCanvasDisplay = useResponsiveFabricCanvas(canvas, stageElement, updateFloatingOverlays);
 
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(EDITOR_PANEL_STORAGE_KEY, panelCollapsed ? "1" : "0");
+    } catch {
+      // The editor remains usable when session storage is unavailable.
+    }
+  }, [panelCollapsed]);
+
+  useEffect(() => {
+    window.requestAnimationFrame(syncCanvasDisplay);
+  }, [effectivePanelCollapsed, syncCanvasDisplay]);
+
   const applyViewportTransform = useCallback((instance: Canvas, viewport: TMat2D) => {
     instance.setViewportTransform(viewport);
     setViewZoom(instance.getZoom());
@@ -265,6 +312,7 @@ function ImageEditor() {
         width: instance.getWidth(),
         height: instance.getHeight(),
         ...settings,
+        outputMultiplier: outputMultiplierRef.current,
       } satisfies EditorHistorySnapshot);
       if (reset) {
         historyRef.current = [];
@@ -536,7 +584,7 @@ function ImageEditor() {
       instance.setDimensions({ width: 900, height: 600 });
       resetViewport(instance);
       const scale = Math.min(1, 860 / image.width, 560 / image.height);
-      outputMultiplier.current = Math.max(1, 1 / scale);
+      updateOutputMultiplier(Math.max(1, 1 / scale));
       (image as EditorFabricObject).worklazyRole = "base";
       image.set({ left: 450, top: 300, originX: "center", originY: "center", scaleX: scale, scaleY: scale, selectable: false, evented: false });
       baseImage.current = image;
@@ -552,6 +600,7 @@ function ImageEditor() {
       setInteractionMode("select");
       interactionModeRef.current = "select";
       setActivePanel("select");
+      syncDimensionControls(900, 600);
       applyEditorInteractivity(instance, image, "select", true);
       instance.requestRenderAll();
       syncSelectedObject();
@@ -579,9 +628,10 @@ function ImageEditor() {
     if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
     sourceUrl.current = undefined;
     setFile(undefined);
-    outputMultiplier.current = 1;
+    updateOutputMultiplier(1);
     setEditorError("");
     setBrightness(0); setContrast(0); setHue(0); setBaseLocked(true); setInteractionMode("select"); setActivePanel("select");
+    syncDimensionControls(900, 600);
     interactionModeRef.current = "select";
     editorSettings.current = { ...editorSettings.current, brightness: 0, contrast: 0, hue: 0, baseLocked: true };
     instance.requestRenderAll();
@@ -646,7 +696,10 @@ function ImageEditor() {
       object.set({ left: (object.left || 0) - selection.left, top: (object.top || 0) - selection.top });
       object.setCoords();
     });
-    instance.setDimensions({ width: Math.max(1, Math.round(selection.width)), height: Math.max(1, Math.round(selection.height)) });
+    const nextWidth = Math.max(1, Math.round(selection.width));
+    const nextHeight = Math.max(1, Math.round(selection.height));
+    instance.setDimensions({ width: nextWidth, height: nextHeight });
+    syncDimensionControls(nextWidth, nextHeight);
     resetViewport(instance);
     instance.discardActiveObject();
     setCropSelection(undefined);
@@ -659,7 +712,7 @@ function ImageEditor() {
     restoringRef.current = false;
     pushSnapshot(true);
     window.requestAnimationFrame(syncCanvasDisplay);
-  }, [baseLocked, pushSnapshot, resetViewport, syncCanvasDisplay, syncSelectedObject]);
+  }, [baseLocked, pushSnapshot, resetViewport, syncCanvasDisplay, syncDimensionControls, syncSelectedObject]);
 
   const applyRegionEffect = useCallback(async () => {
     const instance = canvas.current;
@@ -931,6 +984,106 @@ function ImageEditor() {
     pushSnapshot();
   };
 
+  const changeResampleDimension = (axis: keyof EditorDimensions, value: number) => {
+    setResampleDimensions((current) => resampleRatioLocked
+      ? resizeLockedDimensions(value, axis, canvasDimensions, EDITOR_WORK_MAX_DIMENSION)
+      : { ...current, [axis]: clampEditorDimension(value, EDITOR_WORK_MAX_DIMENSION) });
+  };
+
+  const changeResampleRatioLock = (locked: boolean) => {
+    setResampleRatioLocked(locked);
+    if (locked) setResampleDimensions((current) => resizeLockedDimensions(current.width, "width", canvasDimensions, EDITOR_WORK_MAX_DIMENSION));
+  };
+
+  const changeCanvasResizeDimension = (axis: keyof EditorDimensions, value: number) => {
+    setCanvasResizeDimensions((current) => ({ ...current, [axis]: clampEditorDimension(value, EDITOR_WORK_MAX_DIMENSION) }));
+  };
+
+  const changeExportDimension = (axis: keyof EditorDimensions, value: number) => {
+    setExportDimensions((current) => exportRatioLocked
+      ? resizeLockedDimensions(value, axis, canvasDimensions, EDITOR_EXPORT_MAX_DIMENSION)
+      : { ...current, [axis]: clampEditorDimension(value, EDITOR_EXPORT_MAX_DIMENSION) });
+  };
+
+  const changeExportRatioLock = (locked: boolean) => {
+    setExportRatioLocked(locked);
+    if (locked) setExportDimensions((current) => resizeLockedDimensions(current.width, "width", canvasDimensions, EDITOR_EXPORT_MAX_DIMENSION));
+  };
+
+  const applyImageResample = () => {
+    const instance = canvas.current;
+    if (!instance) return;
+    const target = normalizeEditorDimensions(resampleDimensions, EDITOR_WORK_MAX_DIMENSION);
+    const previous = { width: instance.getWidth(), height: instance.getHeight() };
+    if (target.width === previous.width && target.height === previous.height) return;
+    restoringRef.current = true;
+    setEditorError("");
+    try {
+      clearRegionSelection();
+      instance.discardActiveObject();
+      const scaleTransform: TMat2D = [target.width / previous.width, 0, 0, target.height / previous.height, 0, 0];
+      instance.getObjects().forEach((object) => {
+        const role = (object as EditorFabricObject).worklazyRole;
+        if (role === "region-effect" || role === "crop-overlay") return;
+        util.applyTransformToObject(object, util.multiplyTransformMatrices(scaleTransform, object.calcTransformMatrix()));
+        object.setCoords();
+      });
+      if (baseImage.current) {
+        syncRegionEffectTransforms(instance, baseImage.current);
+        keepRegionEffectsAboveBase(instance, baseImage.current);
+      }
+      instance.setDimensions(target);
+      resetViewport(instance);
+      syncDimensionControls(target.width, target.height);
+      applyEditorInteractivity(instance, baseImage.current, interactionModeRef.current, baseLocked);
+      syncSelectedObject();
+      instance.requestRenderAll();
+    } catch {
+      setEditorError(t("image.editor.resizeError"));
+      return;
+    } finally {
+      restoringRef.current = false;
+    }
+    pushSnapshot(true);
+    window.requestAnimationFrame(syncCanvasDisplay);
+  };
+
+  const applyCanvasResize = () => {
+    const instance = canvas.current;
+    if (!instance) return;
+    const target = normalizeEditorDimensions(canvasResizeDimensions, EDITOR_WORK_MAX_DIMENSION);
+    const previous = { width: instance.getWidth(), height: instance.getHeight() };
+    if (target.width === previous.width && target.height === previous.height) return;
+    restoringRef.current = true;
+    setEditorError("");
+    try {
+      clearRegionSelection();
+      instance.discardActiveObject();
+      const translateTransform: TMat2D = [1, 0, 0, 1, (target.width - previous.width) / 2, (target.height - previous.height) / 2];
+      instance.getObjects().forEach((object) => {
+        util.applyTransformToObject(object, util.multiplyTransformMatrices(translateTransform, object.calcTransformMatrix()));
+        object.setCoords();
+      });
+      if (baseImage.current) {
+        syncRegionEffectTransforms(instance, baseImage.current);
+        keepRegionEffectsAboveBase(instance, baseImage.current);
+      }
+      instance.setDimensions(target);
+      resetViewport(instance);
+      syncDimensionControls(target.width, target.height);
+      applyEditorInteractivity(instance, baseImage.current, interactionModeRef.current, baseLocked);
+      syncSelectedObject();
+      instance.requestRenderAll();
+    } catch {
+      setEditorError(t("image.editor.resizeError"));
+      return;
+    } finally {
+      restoringRef.current = false;
+    }
+    pushSnapshot(true);
+    window.requestAnimationFrame(syncCanvasDisplay);
+  };
+
   const restore = async (index: number) => {
     const instance = canvas.current;
     const serialized = historyRef.current[index];
@@ -947,6 +1100,8 @@ function ImageEditor() {
         ?? instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && !(object as EditorFabricObject).worklazyRole);
       setBrightness(snapshot.brightness); setContrast(snapshot.contrast); setHue(snapshot.hue);
       setBackground(snapshot.background); setTransparentBackground(snapshot.transparentBackground); setBaseLocked(snapshot.baseLocked);
+      updateOutputMultiplier(snapshot.outputMultiplier ?? 1);
+      syncDimensionControls(snapshot.width, snapshot.height);
       editorSettings.current = {
         brightness: snapshot.brightness,
         contrast: snapshot.contrast,
@@ -982,6 +1137,11 @@ function ImageEditor() {
     setInteractionMode(nextMode);
   };
 
+  const toggleEditorPanel = () => {
+    if (mobilePanelLayout) return;
+    setPanelCollapsed((current) => !current);
+  };
+
   const changeDrawTool = (tool: EditorDrawTool) => {
     setDrawTool(tool);
     interactionModeRef.current = tool;
@@ -993,6 +1153,9 @@ function ImageEditor() {
     if (effect === "blur") setRegionEffectStrength((current) => Math.max(10, current));
   };
 
+  const originalExportPlan = getOriginalQualityExportPlan(canvasDimensions, outputMultiplier, EDITOR_EXPORT_MAX_DIMENSION);
+  const exportResultDimensions = exportMode === "original" ? originalExportPlan.dimensions : normalizeEditorDimensions(exportDimensions, EDITOR_EXPORT_MAX_DIMENSION);
+
   const exportImage = () => {
     const instance = canvas.current;
     if (!instance) return;
@@ -1001,30 +1164,28 @@ function ImageEditor() {
     const viewport = [...instance.viewportTransform] as TMat2D;
     if (baseImage.current) keepRegionEffectsAboveBase(instance, baseImage.current);
     overlays.forEach((overlay) => { if (instance.getObjects().includes(overlay)) instance.remove(overlay); });
+    setEditorError("");
     try {
       instance.setViewportTransform([...IDENTITY_VIEWPORT]);
       instance.renderAll();
-      const multiplier = outputMultiplier.current;
-      let dataUrl: string;
-      if (format === "jpeg") {
-        const rendered = instance.toCanvasElement(multiplier);
-        const flattened = document.createElement("canvas");
-        flattened.width = rendered.width;
-        flattened.height = rendered.height;
-        const context = flattened.getContext("2d");
-        if (!context) return;
-        context.fillStyle = "#ffffff";
-        context.fillRect(0, 0, flattened.width, flattened.height);
-        context.drawImage(rendered, 0, 0);
-        dataUrl = flattened.toDataURL("image/jpeg", 0.92);
-        flattened.width = 1; flattened.height = 1;
-        rendered.width = 1; rendered.height = 1;
-      } else dataUrl = instance.toDataURL({ format, quality: 0.92, multiplier });
+      const source = instance.toCanvasElement(exportMode === "original" ? originalExportPlan.multiplier : 1);
+      const rendered = exportMode === "custom"
+        ? renderEditorExportSize(source, exportResultDimensions, exportRatioLocked, format === "jpeg")
+        : source;
+      const dataUrl = encodeEditorExportCanvas(rendered, format);
+      if (rendered !== source) {
+        rendered.width = 1;
+        rendered.height = 1;
+      }
+      source.width = 1;
+      source.height = 1;
       const actualFormat = dataUrl.startsWith("data:image/png") ? "png" : dataUrl.startsWith("data:image/webp") ? "webp" : "jpeg";
       const anchor = document.createElement("a");
       anchor.href = dataUrl;
       anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${actualFormat === "jpeg" ? "jpg" : actualFormat}`;
       anchor.click();
+    } catch {
+      setEditorError(t("image.editor.exportError"));
     } finally {
       instance.setViewportTransform(viewport);
       overlays.forEach((overlay) => {
@@ -1052,12 +1213,15 @@ function ImageEditor() {
         canDelete={selectionState.kind !== "none" && !selectionState.isBase}
         historyIndex={historyState.index}
         historyLength={historyState.length}
+        panelCollapsed={effectivePanelCollapsed}
+        panelToggleDisabled={mobilePanelLayout}
         onPanelChange={changePanel}
         onUndo={() => void restore(historyState.index - 1)}
         onRedo={() => void restore(historyState.index + 1)}
         onDelete={() => { removeSelectedLayers(); }}
+        onPanelToggle={toggleEditorPanel}
       />
-      <div className="image-editor-layout" data-testid="image-editor-workspace">
+      <div className={`image-editor-layout${effectivePanelCollapsed ? " is-panel-collapsed" : ""}`} data-testid="image-editor-workspace" data-panel-collapsed={effectivePanelCollapsed}>
         <div className="image-editor-canvas-column">
           <ImageEditorViewportControls
             zoom={viewZoom}
@@ -1130,9 +1294,18 @@ function ImageEditor() {
           onFlipVertical={() => mutateActive((object) => object.set("flipY", !object.flipY))}
           cropRatio={cropRatio}
           unavailableCropRatios={CROP_PRESET_RATIOS.filter((ratio) => !canFitCropRatio(canvas.current?.getWidth() || 900, canvas.current?.getHeight() || 600, ratio))}
+          canvasDimensions={canvasDimensions}
+          resampleDimensions={resampleDimensions}
+          canvasResizeDimensions={canvasResizeDimensions}
+          resampleRatioLocked={resampleRatioLocked}
           onCropRatio={changeCropRatio}
           onCropCancel={clearCropSelection}
           onCropApply={applyCropSelection}
+          onResampleDimensionChange={changeResampleDimension}
+          onResampleRatioLockChange={changeResampleRatioLock}
+          onResampleApply={applyImageResample}
+          onCanvasResizeDimensionChange={changeCanvasResizeDimension}
+          onCanvasResizeApply={applyCanvasResize}
           onRegionEffectChange={changeRegionEffect}
           onRegionEffectStrengthChange={setRegionEffectStrength}
           onRegionEffectCancel={clearEffectSelection}
@@ -1149,9 +1322,149 @@ function ImageEditor() {
           onClearLayers={clearAddedLayers}
         />
       </div>
-      <div className="export-row"><div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label={t("image.editor.format")} /><small>{t("image.editor.formatHelp")}</small></div><PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> {t("image.editor.download")}</PrimaryButton></div>
+      <div className="export-row image-editor-export-row">
+        <div className="image-editor-export-settings">
+          <div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label={t("image.editor.format")} /><small>{t("image.editor.formatHelp")}</small></div>
+          <div className="image-export-size-control">
+            <SegmentedControl
+              value={exportMode}
+              options={[{ value: "original", label: t("image.editor.exportOriginalQuality") }, { value: "custom", label: t("image.editor.exportCustomSize") }]}
+              onChange={setExportMode}
+              label={t("image.editor.exportSize")}
+            />
+            {exportMode === "custom" && <>
+              <ExportDimensionFields
+                dimensions={exportDimensions}
+                max={EDITOR_EXPORT_MAX_DIMENSION}
+                testId="image-editor-export-size"
+                onChange={changeExportDimension}
+                widthLabel={t("image.editor.dimensionWidth")}
+                heightLabel={t("image.editor.dimensionHeight")}
+              />
+              <div className="image-export-ratio-toggle"><ToggleRow label={t("image.editor.keepRatio")} description={t("image.editor.exportRatioHelp")} checked={exportRatioLocked} onChange={changeExportRatioLock} /></div>
+            </>}
+            <p
+              className={originalExportPlan.reduced && exportMode === "original" ? "is-limited" : ""}
+              data-testid="image-editor-export-result"
+              data-width={exportResultDimensions.width}
+              data-height={exportResultDimensions.height}
+              data-limited={originalExportPlan.reduced && exportMode === "original"}
+            >{t("image.editor.exportResult", { width: exportResultDimensions.width, height: exportResultDimensions.height })}{originalExportPlan.reduced && exportMode === "original" ? ` ${t("image.editor.exportLimited", { max: EDITOR_EXPORT_MAX_DIMENSION })}` : ""}</p>
+          </div>
+        </div>
+        <PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> {t("image.editor.download")}</PrimaryButton>
+      </div>
     </SectionCard>
   );
+}
+
+function ExportDimensionFields({ dimensions, max, testId, onChange, widthLabel, heightLabel }: { dimensions: EditorDimensions; max: number; testId: string; onChange: (axis: keyof EditorDimensions, value: number) => void; widthLabel: string; heightLabel: string }) {
+  return <div className="image-dimension-fields" data-testid={testId} data-width={dimensions.width} data-height={dimensions.height}>
+    <label><span>{widthLabel}</span><input type="number" min={1} max={max} step={1} value={dimensions.width} aria-label={`${widthLabel} (${max})`} data-testid={`${testId}-width`} onChange={(event) => onChange("width", Number(event.target.value))} /></label>
+    <span aria-hidden="true">×</span>
+    <label><span>{heightLabel}</span><input type="number" min={1} max={max} step={1} value={dimensions.height} aria-label={`${heightLabel} (${max})`} data-testid={`${testId}-height`} onChange={(event) => onChange("height", Number(event.target.value))} /></label>
+  </div>;
+}
+
+function clampEditorDimension(value: number, max: number) {
+  return Math.min(max, Math.max(1, Math.round(Number.isFinite(value) ? value : 1)));
+}
+
+function normalizeEditorDimensions(dimensions: EditorDimensions, max: number): EditorDimensions {
+  return {
+    width: clampEditorDimension(dimensions.width, max),
+    height: clampEditorDimension(dimensions.height, max),
+  };
+}
+
+function resizeLockedDimensions(value: number, axis: keyof EditorDimensions, source: EditorDimensions, max: number): EditorDimensions {
+  const ratio = Math.max(Number.EPSILON, source.width / Math.max(1, source.height));
+  if (axis === "width") {
+    let width = clampEditorDimension(value, max);
+    let height = Math.max(1, Math.round(width / ratio));
+    if (height > max) {
+      height = max;
+      width = Math.max(1, Math.min(max, Math.round(height * ratio)));
+    }
+    return { width, height };
+  }
+  let height = clampEditorDimension(value, max);
+  let width = Math.max(1, Math.round(height * ratio));
+  if (width > max) {
+    width = max;
+    height = Math.max(1, Math.min(max, Math.round(width / ratio)));
+  }
+  return { width, height };
+}
+
+function getOriginalQualityExportPlan(dimensions: EditorDimensions, multiplier: number, max: number) {
+  const requestedMultiplier = Math.max(Number.EPSILON, Number.isFinite(multiplier) ? multiplier : 1);
+  const effectiveMultiplier = Math.min(requestedMultiplier, max / dimensions.width, max / dimensions.height);
+  return {
+    multiplier: effectiveMultiplier,
+    reduced: effectiveMultiplier < requestedMultiplier - 1e-9,
+    dimensions: {
+      width: Math.max(1, Math.min(max, Math.floor(dimensions.width * effectiveMultiplier + 1e-6))),
+      height: Math.max(1, Math.min(max, Math.floor(dimensions.height * effectiveMultiplier + 1e-6))),
+    },
+  };
+}
+
+function renderEditorExportSize(source: HTMLCanvasElement, dimensions: EditorDimensions, ratioLocked: boolean, whiteBackground: boolean) {
+  const destination = document.createElement("canvas");
+  destination.width = dimensions.width;
+  destination.height = dimensions.height;
+  const context = destination.getContext("2d");
+  if (!context) throw new Error("Canvas context unavailable");
+  if (whiteBackground) {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, destination.width, destination.height);
+  }
+  if (ratioLocked) {
+    const scale = Math.min(destination.width / source.width, destination.height / source.height);
+    const width = source.width * scale;
+    const height = source.height * scale;
+    context.drawImage(source, (destination.width - width) / 2, (destination.height - height) / 2, width, height);
+  } else {
+    context.drawImage(source, 0, 0, destination.width, destination.height);
+  }
+  return destination;
+}
+
+function encodeEditorExportCanvas(source: HTMLCanvasElement, format: ImageOutputFormat) {
+  if (format !== "jpeg") return source.toDataURL(`image/${format}`, 0.92);
+  const flattened = document.createElement("canvas");
+  flattened.width = source.width;
+  flattened.height = source.height;
+  const context = flattened.getContext("2d");
+  if (!context) throw new Error("Canvas context unavailable");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, flattened.width, flattened.height);
+  context.drawImage(source, 0, 0);
+  const dataUrl = flattened.toDataURL("image/jpeg", 0.92);
+  flattened.width = 1;
+  flattened.height = 1;
+  return dataUrl;
+}
+
+function readStoredEditorPanelCollapsed() {
+  try {
+    return sessionStorage.getItem(EDITOR_PANEL_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function useEditorMobilePanelLayout() {
+  const [mobile, setMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 820px)").matches);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 820px)");
+    const update = () => setMobile(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return mobile;
 }
 
 function applyEditorInteractivity(instance: Canvas, image: FabricImage | undefined, mode: EditorInteractionMode, baseLocked: boolean) {
