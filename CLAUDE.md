@@ -14,6 +14,16 @@
 - 막힌 문제를 Gemini 에 넘길 때는 **증거 번들**(시도 내역 · 측정 결과 · 계약 원문 · 출력 스키마)을 함께 만든다 — 맨몸 질문은 이미 기각된 길을 다시 제안받는다.
 - **부하 분산 판단의 주체**(「부하 분산과 대체 경로」 규칙): 다관점 검증·팬아웃 감사 등 서브에이전트를 헤비하게 돌릴 때는 일부 또는 전부를 Gemini 호출로 수행한다. Gemini 한도 초과 시 서브에이전트 역할은 Opus 계열 호출로 대체하고 인터넷 검색 등 조사는 Codex 에 임시 위임한다(검색 위임 조건은 Gemini 한도 초과뿐). 자신의 한도가 많이 부족하면(5시간 20% 이하 또는 주간 10% 이하) Opus 로 전환해 직접 수행한다.
 
+## 호스트 참고 — Gemini 호출은 agy CLI
+
+Gemini 위임(조사·팬아웃 감사·검색·시각 검토)은 이 호스트에서 **`agy` CLI**(Antigravity, `~/.local/bin/agy`)로 호출한다. mytradingdesk 와 같은 방식이다.
+
+- 기본 호출: `agy -p "<지시>" --add-dir /home/better0101/projects/worklazytools --model <모델> --print-timeout <시간>`. **`--add-dir` 를 빼면 저장소가 워크스페이스에 잡히지 않아 파일을 못 본다**(2026-09-02 실측 — 없이 호출하면 "파일이 존재하지 않습니다"가 온다).
+- 모델: 조사·감사 기본은 `gemini-3.1-pro-high`, 가벼운 확인은 `gemini-3.7-flash-*`(`agy models`로 현행 목록 확인).
+- 기본 print-timeout 은 5분이다 — 무거운 위임은 상향하라. 구조화 출력이 필요하면 `--output-format json --json-schema <스키마>` 로 강제하라. (mytradingdesk 27건 위임 실측: 타임아웃 10건 · 구조화 출력 누락 7건 · 권한 2건 — 이 세 플래그가 그 교훈이다.)
+- 읽기 전용 위임에는 `--sandbox` 를 붙인다. 쓰기가 필요해 보이는 위임은 범위를 재고하라 — 코드 수정은 「코드 단일 작성자」 규칙상 애초에 Gemini 소관이 아니다.
+- 디스패치 프롬프트에 `GEMINI.md`(역할)·`PROJECT_RULES.md`(공통 규칙) **선독 지시**와 "모든 수치·경로·해시에 산출 명령 병기" 요구를 포함한다. 돌아온 산출물은 「Gemini 산출물은 단서다」 규칙대로 실측 검증 후에만 편입한다.
+
 ## 호스트 참고 — Codex CLI 샌드박스
 
 이 호스트의 Codex 샌드박스 bwrap/AppArmor 문제는 해결되어 있다 — 타깃 프로필 `/etc/apparmor.d/codex-bwrap`(시스템 bwrap + vendored bwrap 글롭). 검증은 `codex sandbox /bin/true` → exit 0. 상세 경위와 재발 조건은 `../mytradingdesk/CLAUDE.md`의 「호스트 참고」 절에 있다. workspace-write 디스패치에서 로컬 소켓 바인드나 `.git` 쓰기가 막히면 저장소 루트 `.codex/config.toml`(`[sandbox_workspace_write] network_access` · `writable_roots`)로 푼다 — 프로젝트가 `~/.codex/config.toml`에 trusted 여야 로드된다.
