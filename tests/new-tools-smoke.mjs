@@ -3215,6 +3215,66 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     throw new Error(`Progress and error guidance fonts are still too small: ${JSON.stringify(progressFontSizes)}`);
   }
 
+  const streamRequestsBeforeEncoding = videoStreamWorkerRequests.length;
+  await page.evaluate(() => {
+    const selects = document.querySelectorAll(".encoding-grid select");
+    const audioRemove = document.querySelector(".video-audio-settings .segmented-control button:nth-child(2)");
+    const flip = document.querySelector(".encoding-grid button[role=switch]");
+    if (!(selects[0] instanceof HTMLSelectElement) || !(selects[1] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement)
+      || !(selects[4] instanceof HTMLSelectElement) || !(audioRemove instanceof HTMLButtonElement)
+      || !(flip instanceof HTMLButtonElement)) throw new Error("Streaming encoding controls are unavailable");
+    selects[0].value = "2M";
+    selects[0].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[1].value = "h264";
+    selects[1].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[3].value = "1:1";
+    selects[3].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[4].value = "90";
+    selects[4].dispatchEvent(new Event("change", { bubbles: true }));
+    if (flip.getAttribute("aria-checked") !== "true") flip.click();
+    audioRemove.click();
+  });
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.waitForSelector(".operation-progress.status-running");
+  await waitForTerminalStatus(page);
+  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Streaming video encoding error"));
+  const encodedVideoState = await page.evaluate(async () => {
+    const anchors = Array.from(document.querySelectorAll(".video-result-item a"));
+    const dimensions = [];
+    for (const anchor of anchors) {
+      const video = document.createElement("video");
+      video.muted = true;
+      video.src = anchor.href;
+      await new Promise((resolve, reject) => {
+        video.onloadedmetadata = resolve;
+        video.onerror = () => reject(new Error("Encoded result metadata could not be loaded"));
+      });
+      dimensions.push([video.videoWidth, video.videoHeight]);
+      video.removeAttribute("src");
+      video.load();
+    }
+    const progress = Array.from(document.querySelectorAll(".operation-log li"), (item) => Number((item.textContent || "").match(/^(\d+)%/)?.[1])).filter(Number.isFinite);
+    return {
+      count: anchors.length,
+      dimensions,
+      finalProgress: document.querySelector('.operation-progress [role="progressbar"]')?.getAttribute("aria-valuenow"),
+      progressMonotonic: progress.every((value, index) => index === 0 || value >= progress[index - 1]),
+    };
+  });
+  if (encodedVideoState.count !== 2 || JSON.stringify(encodedVideoState.dimensions) !== JSON.stringify([[180, 180], [240, 240]])
+    || encodedVideoState.finalProgress !== "100" || !encodedVideoState.progressMonotonic
+    || videoStreamWorkerRequests.length < streamRequestsBeforeEncoding + 4) {
+    throw new Error(`Target-bitrate streaming encode did not preserve transform/output contracts: ${JSON.stringify({ encodedVideoState, videoStreamWorkerRequests })}`);
+  }
+  await page.evaluate(() => {
+    const bitrate = document.querySelector(".video-bitrate-control select");
+    const audioCopy = document.querySelector(".video-audio-settings .segmented-control button:nth-child(1)");
+    if (!(bitrate instanceof HTMLSelectElement) || !(audioCopy instanceof HTMLButtonElement)) throw new Error("Video reset controls are unavailable");
+    bitrate.value = "copy";
+    bitrate.dispatchEvent(new Event("change", { bubbles: true }));
+    audioCopy.click();
+  });
+
   await page.evaluate(() => {
     const output = document.querySelector(".video-output-format-grid select");
     if (!(output instanceof HTMLSelectElement)) throw new Error("Output format selector is unavailable");
@@ -3250,7 +3310,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     .map((element) => element.textContent).slice(0, 5));
   if (rawVideoMessages.length) throw new Error(`A raw i18n worker token was exposed in video progress UI: ${JSON.stringify(rawVideoMessages)}`);
   const internalVideoMessages = await page.$$eval(".video-studio-page *", (elements) => elements
-    .filter((element) => element.children.length === 0 && /\b(?:OPFS|SyncAccessHandle|zip\.js|mp4box(?:\.js)?|mp4-muxer|WebCodecs?|remux|worker)\b/i.test(element.textContent || ""))
+    .filter((element) => element.children.length === 0 && /\b(?:OPFS|SyncAccessHandle|zip\.js|mp4box(?:\.js)?|mp4-muxer|WebCodecs?|VideoEncoder|VideoDecoder|AudioEncoder|AudioDecoder|OffscreenCanvas|remux|worker)\b/i.test(element.textContent || ""))
     .map((element) => element.textContent).slice(0, 5));
   if (internalVideoMessages.length) throw new Error(`Internal video storage names were exposed in the UI: ${JSON.stringify(internalVideoMessages)}`);
   const audioResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  compareVideoStreamAudioProfiles,
   compareVideoStreamInputProfiles,
   selectAudioStreamSamples,
   selectVideoStreamSamples,
@@ -35,6 +36,9 @@ test("concat direct copy requires identical codec names, sample entries, configu
   assert.equal(compareVideoStreamInputProfiles([profile, { ...clone, audio: { ...clone.audio!, channelCount: 1 } }], true), false);
   assert.equal(compareVideoStreamInputProfiles([profile, { ...clone, audio: undefined }], true), false);
   assert.equal(compareVideoStreamInputProfiles([profile, { ...clone, audio: undefined }], false), true);
+  assert.equal(compareVideoStreamAudioProfiles([profile, clone]), true);
+  assert.equal(compareVideoStreamAudioProfiles([profile, { ...clone, audio: { ...clone.audio!, sampleRate: 44_100 } }]), false);
+  assert.equal(compareVideoStreamAudioProfiles([profile, { ...clone, audio: undefined }]), false);
 });
 
 test("trim selection snaps to the nearest preceding keyframe and ends by decode timestamp", () => {

@@ -8,6 +8,7 @@ import { createVideoWorkerResult, createVideoOutputName, type VideoFileLabels } 
 import { createVideoResultRandomAccessTarget, type VideoResultRandomAccessTarget } from "./videoResultStorage.worker.ts";
 import {
   compareVideoStreamInputProfiles,
+  compareVideoStreamAudioProfiles,
   selectAudioStreamSamples,
   selectVideoStreamSamples,
   type VideoStreamCopyMetrics,
@@ -16,6 +17,19 @@ import {
   type VideoStreamSampleInfo,
   type VideoStreamCopyReasonCode,
 } from "./videoStreamCopy.ts";
+import {
+  assessVideoWebCodecsSupport,
+  createVideoWebCodecsAudioEncoderConfig,
+  createVideoWebCodecsEncoderConfig,
+  parsedVideoTrackFrameRate,
+  resolveVideoFrameCanvasTransform,
+  resolveVideoFrameTransformLayout,
+  resolveVideoWebCodecsBaseDimensions,
+  resolveVideoWebCodecsFrameRate,
+  resolveVideoWebCodecsOutputDimensions,
+  type VideoWebCodecsMetrics,
+  type VideoWebCodecsProbeResult,
+} from "./videoWebCodecs.ts";
 import type {
   VideoStreamInputDescriptor,
   VideoStreamJobDescriptor,
@@ -23,7 +37,7 @@ import type {
   VideoStreamRunRequest,
 } from "./videoStreamWorkerClient.ts";
 import type { VideoProgressStage } from "./videoProcessingProgress.ts";
-import type { VideoAudioMode } from "./types.ts";
+import type { VideoAudioMode, VideoTask } from "./types.ts";
 
 const worker = self as DedicatedWorkerGlobalScope;
 const METADATA_CHUNK_BYTES = 1024 * 1024;
@@ -91,7 +105,9 @@ interface PendingInput {
 
 const pendingInputs = new Map<string, PendingInput>();
 let active = false;
-let activeMetrics: VideoStreamCopyMetrics | undefined;
+let activeCopyMetrics: VideoStreamCopyMetrics | undefined;
+let activeWebCodecsMetrics: VideoWebCodecsMetrics | undefined;
+let activeAbortController: AbortController | undefined;
 
 worker.onmessage = (event: MessageEvent) => {
   if (event.data?.type === "input-file") {
@@ -102,36 +118,55 @@ worker.onmessage = (event: MessageEvent) => {
     pending.resolve(event.data.file);
     return;
   }
+  if (event.data?.type === "cancel") {
+    activeAbortController?.abort();
+    for (const pending of pendingInputs.values()) {
+      worker.clearTimeout(pending.timeout);
+      pending.reject(new DOMException("Canceled", "AbortError"));
+    }
+    pendingInputs.clear();
+    return;
+  }
   if (active || (event.data?.type !== "preflight" && event.data?.type !== "start")) return;
   active = true;
+  activeAbortController = new AbortController();
   void (event.data.type === "preflight"
-    ? handlePreflight(event.data.request as VideoStreamPreflightRequest)
-    : handleStart(event.data.request as VideoStreamRunRequest)
-  ).catch(() => {
-    worker.postMessage({ type: "error" });
-    closeWorker();
-  });
+    ? handlePreflight(event.data.request as VideoStreamPreflightRequest, activeAbortController.signal)
+    : handleStart(event.data.request as VideoStreamRunRequest, activeAbortController.signal)
+  ).catch((error) => {
+    worker.postMessage({ type: isAbortError(error) ? "canceled" : "error" });
+  }).finally(closeWorker);
 };
 
 worker.postMessage({ type: "ready" });
 
-async function handlePreflight(request: VideoStreamPreflightRequest) {
-  const probe = await inspectJob(request.job, request.audioMode);
+async function handlePreflight(request: VideoStreamPreflightRequest, signal: AbortSignal) {
+  const probe = request.operation === "webcodecs"
+    ? await inspectWebCodecsJob(request.job, request.task, signal)
+    : await inspectJob(request.job, request.audioMode, signal);
   worker.postMessage({ type: "preflight-result", probe });
-  closeWorker();
 }
 
-async function handleStart(request: VideoStreamRunRequest) {
-  if (request.task.bitrate !== "copy" || request.task.container !== "mp4" || !request.resultStorage) {
+async function handleStart(request: VideoStreamRunRequest, signal: AbortSignal) {
+  if (request.task.container !== "mp4" || !request.resultStorage) {
+    throw new Error("Unsupported streaming request");
+  }
+  if (request.operation === "webcodecs") {
+    if (request.task.bitrate === "copy" || request.task.bitrate === "0") throw new Error("Unsupported encoding request");
+    await handleWebCodecsStart(request, signal);
+    return;
+  }
+  if (request.task.bitrate !== "copy") {
     throw new Error("Unsupported direct-copy request");
   }
-  activeMetrics = request.collectMetrics ? createMetrics() : undefined;
-  const files = await requestJobFiles(request.job, Boolean(activeMetrics));
+  activeCopyMetrics = request.collectMetrics ? createMetrics() : undefined;
+  const files = await requestJobFiles(request.job, Boolean(activeCopyMetrics), signal);
   const parsedInputs: ParsedInput[] = [];
   let metadataCompleted = 0;
   const metadataTotal = Math.max(1, files.reduce((total, file) => total + file.size, 0));
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
+    throwIfAborted(signal);
     const parsed = await parseInput(file, request.task.audioMode, (logicalPosition) => {
       reportProgress(
         "demux",
@@ -139,7 +174,7 @@ async function handleStart(request: VideoStreamRunRequest) {
         metadataTotal,
         workerMessage(request.language, "video.messages.video.checkingSourceForDirectCopy", { p0: index + 1, p1: files.length }),
       );
-    });
+    }, signal);
     parsedInputs.push(parsed);
     metadataCompleted += file.size;
   }
@@ -159,11 +194,11 @@ async function handleStart(request: VideoStreamRunRequest) {
       outputName,
       request.estimatedOutputBytes,
       (cumulativeBytes, _position, byteLength) => {
-        if (activeMetrics) {
-          activeMetrics.outputCumulativeBytesMonotonic &&= cumulativeBytes >= activeMetrics.outputLastCumulativeBytes;
-          activeMetrics.outputLastCumulativeBytes = cumulativeBytes;
-          activeMetrics.outputWriteCalls += 1;
-          activeMetrics.maxOutputWriteBytes = Math.max(activeMetrics.maxOutputWriteBytes, byteLength);
+        if (activeCopyMetrics) {
+          activeCopyMetrics.outputCumulativeBytesMonotonic &&= cumulativeBytes >= activeCopyMetrics.outputLastCumulativeBytes;
+          activeCopyMetrics.outputLastCumulativeBytes = cumulativeBytes;
+          activeCopyMetrics.outputWriteCalls += 1;
+          activeCopyMetrics.maxOutputWriteBytes = Math.max(activeCopyMetrics.maxOutputWriteBytes, byteLength);
         }
         writtenBytes = cumulativeBytes;
         reportProgress(
@@ -174,39 +209,744 @@ async function handleStart(request: VideoStreamRunRequest) {
         );
       },
     );
-    const output = await muxJob(request, parsedInputs, target);
-    if (activeMetrics) activeMetrics.outputFileSize = output.size;
+    const output = await muxJob(request, parsedInputs, target, signal);
+    if (activeCopyMetrics) activeCopyMetrics.outputFileSize = output.size;
     worker.postMessage({ type: "output", output });
     worker.postMessage({
       type: "result",
       result: {
         ...createVideoWorkerResult(1, request.task, (key, values) => workerMessage(request.language, key, values)),
-        metrics: activeMetrics,
+        metrics: activeCopyMetrics,
       },
     });
-    closeWorker();
   } catch (error) {
     await target?.discard().catch(() => undefined);
     throw error;
   }
 }
 
-async function inspectJob(job: VideoStreamJobDescriptor, audioMode: VideoAudioMode): Promise<VideoStreamCopyProbeResult> {
+async function inspectWebCodecsJob(
+  job: VideoStreamJobDescriptor,
+  task: Extract<VideoTask, { kind: "encode" }>,
+  signal?: AbortSignal,
+): Promise<VideoWebCodecsProbeResult> {
   try {
-    const files = await requestJobFiles(job);
+    if (task.container !== "mp4" || task.bitrate === "copy" || task.bitrate === "0" || task.codec === "vp9") {
+      return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" };
+    }
+    if (job.mode === "concat" && job.inputs.some((input) => !validDescriptorFrameRate(input.frameRate))) {
+      return { compatible: false, reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE" };
+    }
+    const files = await requestJobFiles(job, false, signal);
     const inputs: ParsedInput[] = [];
-    for (const file of files) inputs.push(await parseInput(file, audioMode));
+    for (const file of files) {
+      throwIfAborted(signal);
+      inputs.push(await parseInput(file, task.audioMode, undefined, signal));
+    }
+    return assessParsedWebCodecsSupport(job, task, inputs);
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" };
+  }
+}
+
+async function assessParsedWebCodecsSupport(
+  job: VideoStreamJobDescriptor,
+  task: Extract<VideoTask, { kind: "encode" }>,
+  inputs: readonly ParsedInput[],
+) {
+  const baseDimensions = resolveVideoWebCodecsBaseDimensions(job, task);
+  const measuredFrameRates = inputs.map((input) => parsedVideoTrackFrameRate(input.video.samples));
+  const frameRate = resolveVideoWebCodecsFrameRate(job, measuredFrameRates.filter((value): value is number => value !== undefined));
+  if (!baseDimensions || !frameRate) return { compatible: false, reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE" } as const;
+  const [outputWidth, outputHeight] = resolveVideoWebCodecsOutputDimensions(baseDimensions, task.rotation);
+  const audioPresenceMatches = inputs.every((input) => Boolean(input.audio) === Boolean(inputs[0]?.audio));
+  const audioTracksCompatible = audioPresenceMatches && (
+    task.audioMode !== "copy" || job.mode !== "concat" || compareAudioProfiles(inputs)
+  );
+  const firstAudio = inputs[0]?.profile.audio;
+  const audioEncoderConfig = firstAudio
+    ? createVideoWebCodecsAudioEncoderConfig(task, firstAudio.sampleRate!, firstAudio.channelCount!, job.mode === "concat")
+    : undefined;
+  return assessVideoWebCodecsSupport({
+    videoDecoderConfigs: inputs.map(videoDecoderConfig),
+    videoEncoderConfig: createVideoWebCodecsEncoderConfig(task, outputWidth, outputHeight, frameRate),
+    audioMode: task.audioMode,
+    audioDecoderConfigs: task.audioMode === "encode"
+      ? inputs.flatMap((input) => input.profile.audio ? [audioDecoderConfig(input.profile.audio)] : [])
+      : [],
+    audioEncoderConfig,
+    audioTracksCompatible: task.audioMode === "remove" ? true : audioTracksCompatible,
+  });
+}
+
+async function handleWebCodecsStart(request: VideoStreamRunRequest, signal: AbortSignal) {
+  activeWebCodecsMetrics = request.collectMetrics ? createWebCodecsMetrics() : undefined;
+  const files = await requestJobFiles(request.job, Boolean(activeWebCodecsMetrics), signal);
+  const parsedInputs: ParsedInput[] = [];
+  let metadataCompleted = 0;
+  const metadataTotal = Math.max(1, files.reduce((total, file) => total + file.size, 0));
+  for (let index = 0; index < files.length; index += 1) {
+    throwIfAborted(signal);
+    const parsed = await parseInput(files[index], request.task.audioMode, (logicalPosition) => {
+      reportProgress(
+        "demux",
+        metadataCompleted + logicalPosition,
+        metadataTotal,
+        workerMessage(request.language, "video.messages.video.checkingSourceForEncoding", { p0: index + 1, p1: files.length }),
+      );
+    }, signal);
+    parsedInputs.push(parsed);
+    metadataCompleted += files[index].size;
+  }
+  const support = await assessParsedWebCodecsSupport(request.job, request.task, parsedInputs);
+  if (!support.compatible) throw new Error(support.reasonCode);
+  reportProgress("demux", metadataTotal, metadataTotal, workerMessage(request.language, "video.messages.video.sourceReadyForEncoding"));
+
+  const outputName = createVideoOutputName(request.job.name, request.task, request.job.mode === "concat", request.fileLabels as VideoFileLabels);
+  let target: VideoResultRandomAccessTarget | undefined;
+  try {
+    target = await createVideoResultRandomAccessTarget(
+      request.resultStorage!,
+      outputName,
+      request.estimatedOutputBytes,
+      (cumulativeBytes, _position, byteLength) => {
+        if (activeWebCodecsMetrics) {
+          activeWebCodecsMetrics.outputCumulativeBytesMonotonic &&= cumulativeBytes >= activeWebCodecsMetrics.outputLastCumulativeBytes;
+          activeWebCodecsMetrics.outputLastCumulativeBytes = cumulativeBytes;
+          activeWebCodecsMetrics.outputWriteCalls += 1;
+          activeWebCodecsMetrics.maxOutputWriteBytes = Math.max(activeWebCodecsMetrics.maxOutputWriteBytes, byteLength);
+        }
+        reportProgress(
+          "write",
+          cumulativeBytes,
+          Math.max(request.estimatedOutputBytes, cumulativeBytes),
+          workerMessage(request.language, "video.messages.video.savingCompletedVideoProgressively"),
+        );
+      },
+    );
+    const output = await encodeWebCodecsJob(request, parsedInputs, target, signal);
+    if (activeWebCodecsMetrics) activeWebCodecsMetrics.outputFileSize = output.size;
+    worker.postMessage({ type: "output", output });
+    worker.postMessage({
+      type: "result",
+      result: {
+        ...createVideoWorkerResult(1, request.task, (key, values) => workerMessage(request.language, key, values)),
+        metrics: activeWebCodecsMetrics,
+      },
+    });
+  } catch (error) {
+    await target?.discard().catch(() => undefined);
+    throw error;
+  }
+}
+
+function videoDecoderConfig(input: ParsedInput): VideoDecoderConfig {
+  return {
+    codec: input.profile.video.codecName,
+    codedWidth: input.profile.video.width,
+    codedHeight: input.profile.video.height,
+    description: exactArrayBuffer(input.profile.video.configuration),
+    hardwareAcceleration: "no-preference",
+  };
+}
+
+function audioDecoderConfig(profile: NonNullable<VideoStreamInputProfile["audio"]>): AudioDecoderConfig {
+  return {
+    codec: profile.codecName,
+    sampleRate: profile.sampleRate!,
+    numberOfChannels: profile.channelCount!,
+    description: exactArrayBuffer(profile.configuration),
+  };
+}
+
+function compareAudioProfiles(inputs: readonly ParsedInput[]) {
+  return compareVideoStreamAudioProfiles(inputs.map((input) => input.profile));
+}
+
+function validDescriptorFrameRate(value: number | undefined) {
+  return Number.isFinite(value) && (value ?? 0) > 0 && (value ?? 0) <= 240;
+}
+
+async function encodeWebCodecsJob(
+  request: VideoStreamRunRequest,
+  inputs: ParsedInput[],
+  target: VideoResultRandomAccessTarget,
+  signal: AbortSignal,
+) {
+  const baseDimensions = resolveVideoWebCodecsBaseDimensions(request.job, request.task);
+  const frameRate = resolveVideoWebCodecsFrameRate(
+    request.job,
+    inputs.map((input) => parsedVideoTrackFrameRate(input.video.samples)).filter((value): value is number => value !== undefined),
+  );
+  if (!baseDimensions || !frameRate) throw new Error("Output video configuration is unavailable");
+  const [outputWidth, outputHeight] = resolveVideoWebCodecsOutputDimensions(baseDimensions, request.task.rotation);
+  const firstAudio = inputs[0]?.profile.audio;
+  const includeCopiedAudio = request.task.audioMode === "copy" && Boolean(firstAudio);
+  const audioEncoderConfig = request.task.audioMode === "encode" && firstAudio
+    ? createVideoWebCodecsAudioEncoderConfig(
+        request.task,
+        firstAudio.sampleRate!,
+        firstAudio.channelCount!,
+        request.job.mode === "concat",
+      )
+    : undefined;
+  const streamTarget = new StreamTarget({
+    chunked: true,
+    chunkSize: OUTPUT_CHUNK_BYTES,
+    onData(data, position) {
+      throwIfAborted(signal);
+      target.write(data, position);
+    },
+  });
+  const muxer = new Muxer({
+    target: streamTarget,
+    video: {
+      codec: request.task.codec === "h264" ? "avc" : "hevc",
+      width: outputWidth,
+      height: outputHeight,
+      frameRate,
+    },
+    audio: includeCopiedAudio ? {
+      codec: "aac",
+      numberOfChannels: firstAudio!.channelCount!,
+      sampleRate: firstAudio!.sampleRate!,
+    } : audioEncoderConfig ? {
+      codec: "aac",
+      numberOfChannels: audioEncoderConfig.numberOfChannels,
+      sampleRate: audioEncoderConfig.sampleRate,
+    } : undefined,
+    fastStart: false,
+    firstTimestampBehavior: "cross-track-offset",
+  });
+
+  let codecFailure: unknown;
+  let submittedVideoFrames = 0;
+  let lastKeyFrameTimestamp = Number.NEGATIVE_INFINITY;
+  const totalDurationMicroseconds = Math.max(1, Math.round(request.job.inputs.reduce(
+    (total, input) => total + Math.max(0.05, input.end - input.start),
+    0,
+  ) * 1_000_000));
+  const videoEncoder = new VideoEncoder({
+    output(chunk, metadata) {
+      try {
+        muxer.addVideoChunk(chunk, metadata);
+        if (activeWebCodecsMetrics) activeWebCodecsMetrics.encodedVideoFrames += 1;
+        reportProgress(
+          "mux",
+          Math.min(totalDurationMicroseconds, chunk.timestamp + (chunk.duration ?? 0)),
+          totalDurationMicroseconds,
+          workerMessage(request.language, "video.messages.video.finalizingCompletedVideo"),
+        );
+      } catch (error) {
+        codecFailure ||= error;
+      }
+    },
+    error(error) {
+      codecFailure ||= error;
+    },
+  });
+  videoEncoder.configure(createVideoWebCodecsEncoderConfig(request.task, outputWidth, outputHeight, frameRate));
+
+  let audioEncoder: AudioEncoder | undefined;
+  if (audioEncoderConfig) {
+    audioEncoder = new AudioEncoder({
+      output(chunk, metadata) {
+        try {
+          muxer.addAudioChunk(chunk, metadata);
+          if (activeWebCodecsMetrics) activeWebCodecsMetrics.encodedAudioData += 1;
+        } catch (error) {
+          codecFailure ||= error;
+        }
+      },
+      error(error) {
+        codecFailure ||= error;
+      },
+    });
+    audioEncoder.configure(audioEncoderConfig);
+  }
+
+  try {
+    let segmentOffsetMicroseconds = 0;
+    for (let index = 0; index < inputs.length; index += 1) {
+      throwIfAborted(signal);
+      const descriptor = request.job.inputs[index];
+      await encodeVideoInput({
+        input: inputs[index],
+        descriptor,
+        task: request.task,
+        baseDimensions,
+        frameRate,
+        segmentOffsetMicroseconds,
+        totalDurationMicroseconds,
+        normalizeForConcat: request.job.mode === "concat",
+        language: request.language,
+        videoEncoder,
+        target,
+        signal,
+        onEncodedFrame(timestamp, segmentStart) {
+          throwCodecFailure(codecFailure);
+          const keyFrame = segmentStart || timestamp - lastKeyFrameTimestamp >= 2_000_000;
+          if (keyFrame) lastKeyFrameTimestamp = timestamp;
+          submittedVideoFrames += 1;
+          reportProgress(
+            "encode",
+            Math.min(totalDurationMicroseconds, timestamp + Math.round(1_000_000 / frameRate)),
+            totalDurationMicroseconds,
+            workerMessage(request.language, "video.messages.video.encoding", { p0: "MP4" }),
+          );
+          return keyFrame;
+        },
+      });
+      segmentOffsetMicroseconds += Math.max(1, Math.round((descriptor.end - descriptor.start) * 1_000_000));
+    }
+    await videoEncoder.flush();
+    throwCodecFailure(codecFailure);
+
+    if (includeCopiedAudio) {
+      await muxCopiedAudio(request, inputs, muxer, target, signal);
+    } else if (audioEncoder) {
+      await encodeAudioInputs(request, inputs, audioEncoder, target, signal, () => throwCodecFailure(codecFailure));
+      await audioEncoder.flush();
+      throwCodecFailure(codecFailure);
+    }
+    if (!submittedVideoFrames) throw new Error("No video frames were encoded");
+    throwIfAborted(signal);
+    muxer.finalize();
+    await target.flush();
+    const outputName = createVideoOutputName(request.job.name, request.task, request.job.mode === "concat", request.fileLabels as VideoFileLabels);
+    const output = await target.complete(outputName, "video/mp4");
+    reportProgress("write", output.size, output.size, workerMessage(request.language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: 1, p1: 1 }));
+    return output;
+  } finally {
+    await flushAndCloseCodec(videoEncoder);
+    if (audioEncoder) await flushAndCloseCodec(audioEncoder);
+  }
+}
+
+interface EncodeVideoInputOptions {
+  input: ParsedInput;
+  descriptor: VideoStreamInputDescriptor;
+  task: Extract<VideoTask, { kind: "encode" }>;
+  baseDimensions: readonly [number, number];
+  frameRate: number;
+  segmentOffsetMicroseconds: number;
+  totalDurationMicroseconds: number;
+  normalizeForConcat: boolean;
+  language: "ko" | "en";
+  videoEncoder: VideoEncoder;
+  target: VideoResultRandomAccessTarget;
+  signal: AbortSignal;
+  onEncodedFrame: (timestamp: number, segmentStart: boolean) => boolean;
+}
+
+async function encodeVideoInput(options: EncodeVideoInputOptions) {
+  const { input, descriptor, task, baseDimensions, frameRate, segmentOffsetMicroseconds, videoEncoder, target, signal } = options;
+  const selection = selectVideoStreamSamples(input.video.samples, descriptor.start, descriptor.end, input.video.mediaTimeOffsetSeconds);
+  if (!selection) throw new Error("The selected video range is unavailable");
+  const selectedRecords = selection.samples.map((sample) => ({
+    kind: "video" as const,
+    sample,
+    mediaTimeOffsetSeconds: input.video.mediaTimeOffsetSeconds,
+  }));
+  const canvasDimensions = resolveVideoWebCodecsOutputDimensions(baseDimensions, task.rotation);
+  const canvas = new OffscreenCanvas(canvasDimensions[0], canvasDimensions[1]);
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error("Video frame rendering is unavailable");
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  const segmentDurationMicroseconds = Math.max(1, Math.round((descriptor.end - descriptor.start) * 1_000_000));
+  const expectedFrameCount = Math.max(1, Math.round((descriptor.end - descriptor.start) * frameRate));
+  const startMicroseconds = Math.round(descriptor.start * 1_000_000);
+  const endMicroseconds = Math.round(descriptor.end * 1_000_000);
+  let nextFrameIndex = 0;
+  let heldFrame: VideoFrame | undefined;
+  let pendingFrames = 0;
+  let processing = Promise.resolve();
+  let decoderFailure: unknown;
+  const decoder = new VideoDecoder({
+    output(frame) {
+      pendingFrames += 1;
+      if (activeWebCodecsMetrics) activeWebCodecsMetrics.decodedVideoFrames += 1;
+      processing = processing.then(async () => {
+        throwIfAborted(signal);
+        const timestamp = frame.timestamp;
+        if (timestamp < startMicroseconds - 1 || timestamp >= endMicroseconds) {
+          closeVideoFrame(frame);
+          return;
+        }
+        const localTimestamp = Math.max(0, timestamp - startMicroseconds);
+        if (heldFrame) {
+          while (nextFrameIndex < expectedFrameCount && frameTimestamp(nextFrameIndex, frameRate) < Math.min(localTimestamp, segmentDurationMicroseconds)) {
+            await encodeCanvasFrame(heldFrame, nextFrameIndex);
+            nextFrameIndex += 1;
+          }
+          closeVideoFrame(heldFrame);
+        }
+        heldFrame = frame;
+      }).catch((error) => {
+        decoderFailure ||= error;
+        closeVideoFrame(frame);
+      }).finally(() => {
+        pendingFrames -= 1;
+      });
+    },
+    error(error) {
+      decoderFailure ||= error;
+    },
+  });
+  decoder.configure(videoDecoderConfig(input));
+
+  const encodeCanvasFrame = async (source: VideoFrame, frameIndex: number) => {
+    throwIfAborted(signal);
+    throwCodecFailure(decoderFailure);
+    await waitForCodecQueue(videoEncoder, "encodeQueueSize", 6, signal);
+    if (activeWebCodecsMetrics) {
+      activeWebCodecsMetrics.maxVideoEncodeQueueSize = Math.max(
+        activeWebCodecsMetrics.maxVideoEncodeQueueSize,
+        videoEncoder.encodeQueueSize,
+      );
+    }
+    drawVideoFrame(context, source, descriptor, task, baseDimensions, options.normalizeForConcat);
+    const localTimestamp = frameTimestamp(frameIndex, frameRate);
+    const frameDurationMicroseconds = Math.max(1, frameTimestamp(frameIndex + 1, frameRate) - localTimestamp);
+    const outputTimestamp = segmentOffsetMicroseconds + localTimestamp;
+    const frame = new VideoFrame(canvas, { timestamp: outputTimestamp, duration: frameDurationMicroseconds, alpha: "discard" });
+    try {
+      videoEncoder.encode(frame, { keyFrame: options.onEncodedFrame(outputTimestamp, frameIndex === 0) });
+    } finally {
+      closeVideoFrame(frame);
+    }
+  };
+
+  try {
+    await readSelectedRecords(input.file, selectedRecords, async (record, data) => {
+      throwCodecFailure(decoderFailure);
+      await waitForCombinedDecodeCapacity(decoder, () => pendingFrames, signal);
+      const timestamp = Math.round((record.sample.cts / record.sample.timescale - record.mediaTimeOffsetSeconds) * 1_000_000);
+      const duration = Math.max(1, Math.round(record.sample.duration / record.sample.timescale * 1_000_000));
+      decoder.decode(new EncodedVideoChunk({
+        type: record.sample.isSync ? "key" : "delta",
+        timestamp,
+        duration,
+        data,
+      }));
+      if (activeWebCodecsMetrics) {
+        activeWebCodecsMetrics.maxVideoDecodeQueueSize = Math.max(
+          activeWebCodecsMetrics.maxVideoDecodeQueueSize,
+          decoder.decodeQueueSize,
+        );
+      }
+      reportProgress(
+        "decode",
+        Math.min(options.totalDurationMicroseconds, segmentOffsetMicroseconds + Math.max(0, timestamp - startMicroseconds)),
+        options.totalDurationMicroseconds,
+        workerMessage(options.language, "video.messages.video.processing"),
+      );
+    }, target, signal);
+    await decoder.flush();
+    await processing;
+    throwCodecFailure(decoderFailure);
+    if (!heldFrame) throw new Error("The selected range contains no decodable video frames");
+    while (nextFrameIndex < expectedFrameCount) {
+      await encodeCanvasFrame(heldFrame, nextFrameIndex);
+      nextFrameIndex += 1;
+    }
+  } finally {
+    if (heldFrame) closeVideoFrame(heldFrame);
+    await flushAndCloseCodec(decoder);
+  }
+}
+
+function frameTimestamp(frameIndex: number, frameRate: number) {
+  return Math.round(frameIndex * 1_000_000 / frameRate);
+}
+
+function drawVideoFrame(
+  context: OffscreenCanvasRenderingContext2D,
+  frame: VideoFrame,
+  descriptor: VideoStreamInputDescriptor,
+  task: Extract<VideoTask, { kind: "encode" }>,
+  baseDimensions: readonly [number, number],
+  normalizeForConcat: boolean,
+) {
+  const sourceWidth = frame.displayWidth || descriptor.width;
+  const sourceHeight = frame.displayHeight || descriptor.height;
+  const layout = resolveVideoFrameTransformLayout(
+    { width: sourceWidth, height: sourceHeight },
+    task,
+    baseDimensions,
+    normalizeForConcat,
+  );
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.fillStyle = "#000";
+  context.fillRect(0, 0, layout.outputWidth, layout.outputHeight);
+  const matrix = resolveVideoFrameCanvasTransform(task.rotation, task.flipHorizontal, baseDimensions);
+  context.setTransform(...matrix);
+  context.drawImage(
+    frame,
+    layout.sourceX,
+    layout.sourceY,
+    layout.sourceWidth,
+    layout.sourceHeight,
+    layout.destinationX,
+    layout.destinationY,
+    layout.destinationWidth,
+    layout.destinationHeight,
+  );
+  context.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function closeVideoFrame(frame: VideoFrame) {
+  try {
+    frame.close();
+  } finally {
+    if (activeWebCodecsMetrics) activeWebCodecsMetrics.closedVideoFrames += 1;
+  }
+}
+
+async function muxCopiedAudio(
+  request: VideoStreamRunRequest,
+  inputs: ParsedInput[],
+  muxer: Muxer<StreamTarget>,
+  target: VideoResultRandomAccessTarget,
+  signal: AbortSignal,
+) {
+  const firstAudio = inputs[0]?.profile.audio;
+  if (!firstAudio) return;
+  let sentMetadata = false;
+  let segmentOffsetMicroseconds = 0;
+  for (let inputIndex = 0; inputIndex < inputs.length; inputIndex += 1) {
+    throwIfAborted(signal);
+    const input = inputs[inputIndex];
+    const descriptor = request.job.inputs[inputIndex];
+    if (!input.audio) throw new Error("The audio track is unavailable");
+    const samples = selectAudioStreamSamples(
+      input.audio.samples,
+      descriptor.start,
+      descriptor.end,
+      input.audio.mediaTimeOffsetSeconds,
+    );
+    const records = samples.map((sample) => ({
+      kind: "audio" as const,
+      sample,
+      mediaTimeOffsetSeconds: input.audio!.mediaTimeOffsetSeconds,
+    }));
+    await readSelectedRecords(input.file, records, (record, data) => {
+      const sourceTimestamp = record.sample.cts / record.sample.timescale - record.mediaTimeOffsetSeconds;
+      const timestamp = segmentOffsetMicroseconds + Math.max(0, Math.round((sourceTimestamp - descriptor.start) * 1_000_000));
+      const duration = Math.max(1, Math.round(record.sample.duration / record.sample.timescale * 1_000_000));
+      const metadata = sentMetadata ? undefined : {
+        decoderConfig: {
+          codec: firstAudio.codecName,
+          numberOfChannels: firstAudio.channelCount!,
+          sampleRate: firstAudio.sampleRate!,
+          description: exactArrayBuffer(firstAudio.configuration),
+        },
+      };
+      muxer.addAudioChunkRaw(data, "key", timestamp, duration, metadata);
+      sentMetadata = true;
+    }, target, signal);
+    segmentOffsetMicroseconds += Math.max(1, Math.round((descriptor.end - descriptor.start) * 1_000_000));
+  }
+}
+
+async function encodeAudioInputs(
+  request: VideoStreamRunRequest,
+  inputs: ParsedInput[],
+  encoder: AudioEncoder,
+  target: VideoResultRandomAccessTarget,
+  signal: AbortSignal,
+  throwAsyncFailure: () => void,
+) {
+  const firstAudio = inputs[0]?.profile.audio;
+  if (!firstAudio) return;
+  const outputConfig = createVideoWebCodecsAudioEncoderConfig(
+    request.task,
+    firstAudio.sampleRate!,
+    firstAudio.channelCount!,
+    request.job.mode === "concat",
+  );
+  let segmentOffsetMicroseconds = 0;
+  for (let inputIndex = 0; inputIndex < inputs.length; inputIndex += 1) {
+    throwIfAborted(signal);
+    const input = inputs[inputIndex];
+    const descriptor = request.job.inputs[inputIndex];
+    if (!input.audio || !input.profile.audio) throw new Error("The audio track is unavailable");
+    const samples = input.audio.samples.filter((sample) => {
+      const start = sample.dts / sample.timescale - input.audio!.mediaTimeOffsetSeconds;
+      const end = (sample.dts + sample.duration) / sample.timescale - input.audio!.mediaTimeOffsetSeconds;
+      return end > descriptor.start + 1e-9 && start < descriptor.end - 1e-9;
+    });
+    const records = samples.map((sample) => ({
+      kind: "audio" as const,
+      sample,
+      mediaTimeOffsetSeconds: input.audio!.mediaTimeOffsetSeconds,
+    }));
+    let decoderFailure: unknown;
+    let pendingAudio = 0;
+    let processing = Promise.resolve();
+    let encodedFrames = 0;
+    const decoder = new AudioDecoder({
+      output(data) {
+        pendingAudio += 1;
+        if (activeWebCodecsMetrics) activeWebCodecsMetrics.decodedAudioData += 1;
+        processing = processing.then(async () => {
+          throwIfAborted(signal);
+          throwAsyncFailure();
+          const converted = convertAudioData(
+            data,
+            descriptor.start,
+            descriptor.end,
+            outputConfig.sampleRate,
+            outputConfig.numberOfChannels,
+            segmentOffsetMicroseconds,
+            encodedFrames,
+          );
+          if (!converted) return;
+          await waitForCodecQueue(encoder, "encodeQueueSize", 8, signal);
+          if (activeWebCodecsMetrics) {
+            activeWebCodecsMetrics.maxAudioEncodeQueueSize = Math.max(
+              activeWebCodecsMetrics.maxAudioEncodeQueueSize,
+              encoder.encodeQueueSize,
+            );
+          }
+          try {
+            encoder.encode(converted.data);
+            encodedFrames += converted.numberOfFrames;
+          } finally {
+            converted.data.close();
+          }
+        }).catch((error) => {
+          decoderFailure ||= error;
+        }).finally(() => {
+          closeAudioData(data);
+          pendingAudio -= 1;
+        });
+      },
+      error(error) {
+        decoderFailure ||= error;
+      },
+    });
+    decoder.configure(audioDecoderConfig(input.profile.audio));
+    try {
+      await readSelectedRecords(input.file, records, async (record, bytes) => {
+        throwCodecFailure(decoderFailure);
+        await waitForCombinedAudioDecodeCapacity(decoder, () => pendingAudio, signal);
+        const timestamp = Math.round((record.sample.dts / record.sample.timescale - record.mediaTimeOffsetSeconds) * 1_000_000);
+        const duration = Math.max(1, Math.round(record.sample.duration / record.sample.timescale * 1_000_000));
+        decoder.decode(new EncodedAudioChunk({ type: "key", timestamp, duration, data: bytes }));
+        if (activeWebCodecsMetrics) {
+          activeWebCodecsMetrics.maxAudioDecodeQueueSize = Math.max(
+            activeWebCodecsMetrics.maxAudioDecodeQueueSize,
+            decoder.decodeQueueSize,
+          );
+        }
+      }, target, signal);
+      await decoder.flush();
+      await processing;
+      throwCodecFailure(decoderFailure);
+    } finally {
+      await flushAndCloseCodec(decoder);
+    }
+    segmentOffsetMicroseconds += Math.max(1, Math.round((descriptor.end - descriptor.start) * 1_000_000));
+  }
+}
+
+function convertAudioData(
+  data: AudioData,
+  trimStartSeconds: number,
+  trimEndSeconds: number,
+  outputSampleRate: number,
+  outputChannels: number,
+  segmentOffsetMicroseconds: number,
+  priorOutputFrames: number,
+) {
+  const dataStartSeconds = data.timestamp / 1_000_000;
+  const startFrame = Math.max(0, Math.ceil((trimStartSeconds - dataStartSeconds) * data.sampleRate - 1e-6));
+  const endFrame = Math.min(
+    data.numberOfFrames,
+    Math.max(startFrame, Math.floor((trimEndSeconds - dataStartSeconds) * data.sampleRate + 1e-6)),
+  );
+  const sourceFrameCount = endFrame - startFrame;
+  if (sourceFrameCount <= 0) return undefined;
+  const planes: Float32Array[] = [];
+  for (let channel = 0; channel < data.numberOfChannels; channel += 1) {
+    const plane = new Float32Array(sourceFrameCount);
+    data.copyTo(plane, {
+      format: "f32-planar",
+      planeIndex: channel,
+      frameOffset: startFrame,
+      frameCount: sourceFrameCount,
+    });
+    planes.push(plane);
+  }
+  const outputFrameCount = Math.max(1, Math.round(sourceFrameCount * outputSampleRate / data.sampleRate));
+  const output = new Float32Array(outputFrameCount * outputChannels);
+  for (let channel = 0; channel < outputChannels; channel += 1) {
+    const destination = output.subarray(channel * outputFrameCount, (channel + 1) * outputFrameCount);
+    for (let frameIndex = 0; frameIndex < outputFrameCount; frameIndex += 1) {
+      const sourcePosition = Math.min(sourceFrameCount - 1, frameIndex * data.sampleRate / outputSampleRate);
+      const leftIndex = Math.floor(sourcePosition);
+      const rightIndex = Math.min(sourceFrameCount - 1, leftIndex + 1);
+      const fraction = sourcePosition - leftIndex;
+      const left = channelSample(planes, channel, leftIndex, outputChannels);
+      const right = channelSample(planes, channel, rightIndex, outputChannels);
+      destination[frameIndex] = left + (right - left) * fraction;
+    }
+  }
+  const timestamp = segmentOffsetMicroseconds + Math.round(priorOutputFrames / outputSampleRate * 1_000_000);
+  return {
+    numberOfFrames: outputFrameCount,
+    data: new AudioData({
+      format: "f32-planar",
+      sampleRate: outputSampleRate,
+      numberOfFrames: outputFrameCount,
+      numberOfChannels: outputChannels,
+      timestamp,
+      data: output,
+    }),
+  };
+}
+
+function channelSample(planes: readonly Float32Array[], outputChannel: number, frameIndex: number, outputChannels: number) {
+  if (outputChannels === 1 && planes.length > 1) {
+    return planes.reduce((total, plane) => total + plane[frameIndex], 0) / planes.length;
+  }
+  if (planes.length === 1) return planes[0][frameIndex];
+  return planes[Math.min(outputChannel, planes.length - 1)][frameIndex];
+}
+
+function closeAudioData(data: AudioData) {
+  try {
+    data.close();
+  } finally {
+    if (activeWebCodecsMetrics) activeWebCodecsMetrics.closedAudioData += 1;
+  }
+}
+
+async function inspectJob(job: VideoStreamJobDescriptor, audioMode: VideoAudioMode, signal?: AbortSignal): Promise<VideoStreamCopyProbeResult> {
+  try {
+    const files = await requestJobFiles(job, false, signal);
+    const inputs: ParsedInput[] = [];
+    for (const file of files) inputs.push(await parseInput(file, audioMode, undefined, signal));
     if (!compareVideoStreamInputProfiles(inputs.map((input) => input.profile), audioMode === "copy")) {
       return { compatible: false, reasonCode: "CONCAT_TRACK_MISMATCH" };
     }
     return { compatible: true, codec: inputs[0].profile.codec, reasonCode: "READY" };
   } catch (error) {
+    if (isAbortError(error)) throw error;
     const reasonCode = isReasonError(error) ? error.reasonCode : "NOT_ISO_BMFF";
     return { compatible: false, reasonCode };
   }
 }
 
-async function parseInput(file: File, audioMode: VideoAudioMode, onProgress?: (logicalPosition: number) => void): Promise<ParsedInput> {
+async function parseInput(
+  file: File,
+  audioMode: VideoAudioMode,
+  onProgress?: (logicalPosition: number) => void,
+  signal?: AbortSignal,
+): Promise<ParsedInput> {
   if (!file.size) throw reasonError("NOT_ISO_BMFF");
   const parser = createFile(false) as ISOFile<unknown, unknown>;
   let info: Movie | undefined;
@@ -218,10 +958,11 @@ async function parseInput(file: File, audioMode: VideoAudioMode, onProgress?: (l
   let bytesRead = 0;
   const visitedOffsets = new Set<number>();
   while (!info && offset < file.size) {
+    throwIfAborted(signal);
     if (visitedOffsets.has(offset)) throw reasonError("NOT_ISO_BMFF");
     visitedOffsets.add(offset);
     const end = Math.min(file.size, offset + METADATA_CHUNK_BYTES);
-    const buffer = await readInputSlice(file, offset, end) as MP4BoxBuffer;
+    const buffer = await readInputSlice(file, offset, end, signal) as MP4BoxBuffer;
     buffer.fileStart = offset;
     bytesRead += buffer.byteLength;
     const nextOffset = parser.appendBuffer(buffer, end === file.size);
@@ -250,7 +991,7 @@ async function parseInput(file: File, audioMode: VideoAudioMode, onProgress?: (l
 
   let audio: ParsedTrack | undefined;
   let audioProfile: VideoStreamInputProfile["audio"];
-  if (audioMode === "copy" && info.audioTracks[0]) {
+  if (audioMode !== "remove" && info.audioTracks[0]) {
     const audioTrack = info.audioTracks[0];
     if (!audioTrack.codec.startsWith("mp4a.40.")) throw reasonError("AUDIO_CODEC_UNSUPPORTED");
     audio = parseTrack(parser, audioTrack);
@@ -332,7 +1073,7 @@ function simpleMediaTimeOffset(track: Track) {
   return edit.media_time! / track.timescale;
 }
 
-async function muxJob(request: VideoStreamRunRequest, inputs: ParsedInput[], target: VideoResultRandomAccessTarget) {
+async function muxJob(request: VideoStreamRunRequest, inputs: ParsedInput[], target: VideoResultRandomAccessTarget, signal?: AbortSignal) {
   const first = inputs[0];
   const includeAudio = request.task.audioMode === "copy" && Boolean(first.audio && first.profile.audio);
   const streamTarget = new StreamTarget({
@@ -359,8 +1100,8 @@ async function muxJob(request: VideoStreamRunRequest, inputs: ParsedInput[], tar
   });
 
   const selections = inputs.map((input, inputIndex) => selectInputSamples(input, request.job.inputs[inputIndex], includeAudio));
-  if (activeMetrics) {
-    activeMetrics.segments = selections.map((selection, index) => ({
+  if (activeCopyMetrics) {
+    activeCopyMetrics.segments = selections.map((selection, index) => ({
       requestedStartSeconds: request.job.inputs[index].start,
       requestedEndSeconds: request.job.inputs[index].end,
       snappedPresentationSeconds: selection.snappedPresentationSeconds,
@@ -374,6 +1115,7 @@ async function muxJob(request: VideoStreamRunRequest, inputs: ParsedInput[], tar
   let sentVideoMetadata = false;
   let sentAudioMetadata = false;
   for (let inputIndex = 0; inputIndex < inputs.length; inputIndex += 1) {
+    throwIfAborted(signal);
     const input = inputs[inputIndex];
     const selection = selections[inputIndex];
     await readSelectedRecords(input.file, selection.records, async (record, data) => {
@@ -419,7 +1161,7 @@ async function muxJob(request: VideoStreamRunRequest, inputs: ParsedInput[], tar
         Math.max(1, selectedBytes),
         workerMessage(request.language, "video.messages.video.copyingSelectedRange", { p0: inputIndex + 1, p1: inputs.length }),
       );
-    }, target);
+    }, target, signal);
     segmentOffsetMicroseconds += Math.max(1, Math.round(selection.durationSeconds * 1_000_000));
   }
   muxer.finalize();
@@ -474,9 +1216,11 @@ async function readSelectedRecords(
   records: readonly SelectedRecord[],
   onRecord: (record: SelectedRecord, data: Uint8Array) => void | Promise<void>,
   target: VideoResultRandomAccessTarget,
+  signal?: AbortSignal,
 ) {
   let index = 0;
   while (index < records.length) {
+    throwIfAborted(signal);
     const start = records[index].sample.offset;
     const windowLimit = Math.min(file.size, start + SAMPLE_READ_WINDOW_BYTES);
     let end = windowLimit;
@@ -493,9 +1237,10 @@ async function readSelectedRecords(
       endIndex += 1;
     }
     if (end > file.size || end <= start) throw reasonError("SAMPLE_TABLE_UNAVAILABLE");
-    const bytes = new Uint8Array(await readInputSlice(file, start, end));
+    const bytes = new Uint8Array(await readInputSlice(file, start, end, signal));
     for (let recordIndex = index; recordIndex < endIndex; recordIndex += 1) {
       const record = records[recordIndex];
+      throwIfAborted(signal);
       const relativeStart = record.sample.offset - start;
       const relativeEnd = relativeStart + record.sample.size;
       if (relativeStart < 0 || relativeEnd > bytes.byteLength) throw reasonError("SAMPLE_TABLE_UNAVAILABLE");
@@ -539,9 +1284,10 @@ function classifyVideoCodec(codecName: string) {
   return undefined;
 }
 
-async function requestJobFiles(job: VideoStreamJobDescriptor, instrumentWholeReads = false) {
+async function requestJobFiles(job: VideoStreamJobDescriptor, instrumentWholeReads = false, signal?: AbortSignal) {
   const files: File[] = [];
   for (const input of job.inputs) {
+    throwIfAborted(signal);
     const file = await requestInputFile(input.fileId, input.fileName);
     if (instrumentWholeReads) instrumentWholeFileArrayBuffer(file);
     files.push(file);
@@ -570,6 +1316,7 @@ function closeWorker() {
     pending.reject(new Error("Video operation ended"));
   }
   pendingInputs.clear();
+  activeAbortController = undefined;
   worker.close();
 }
 
@@ -600,13 +1347,38 @@ function createMetrics(): VideoStreamCopyMetrics {
   };
 }
 
+function createWebCodecsMetrics(): VideoWebCodecsMetrics {
+  return {
+    inputWholeArrayBufferCalls: 0,
+    inputSliceArrayBufferCalls: 0,
+    inputBytesRead: 0,
+    maxInputSliceBytes: 0,
+    outputWriteCalls: 0,
+    outputCumulativeBytesMonotonic: true,
+    outputLastCumulativeBytes: 0,
+    maxOutputWriteBytes: 0,
+    outputFileSize: 0,
+    decodedVideoFrames: 0,
+    closedVideoFrames: 0,
+    encodedVideoFrames: 0,
+    decodedAudioData: 0,
+    closedAudioData: 0,
+    encodedAudioData: 0,
+    maxVideoDecodeQueueSize: 0,
+    maxVideoEncodeQueueSize: 0,
+    maxAudioDecodeQueueSize: 0,
+    maxAudioEncodeQueueSize: 0,
+  };
+}
+
 function instrumentWholeFileArrayBuffer(file: File) {
   const original = file.arrayBuffer.bind(file);
   try {
     Object.defineProperty(file, "arrayBuffer", {
       configurable: true,
       value: () => {
-        if (activeMetrics) activeMetrics.inputWholeArrayBufferCalls += 1;
+        const metrics = activeCopyMetrics || activeWebCodecsMetrics;
+        if (metrics) metrics.inputWholeArrayBufferCalls += 1;
         return original();
       },
     });
@@ -615,12 +1387,79 @@ function instrumentWholeFileArrayBuffer(file: File) {
   }
 }
 
-function readInputSlice(file: File, start: number, end: number) {
+type QueueCodec = EventTarget & {
+  state: CodecState;
+  decodeQueueSize?: number;
+  encodeQueueSize?: number;
+};
+
+async function waitForCombinedDecodeCapacity(decoder: VideoDecoder, pending: () => number, signal: AbortSignal) {
+  while (decoder.decodeQueueSize + pending() >= 8) await waitForCodecQueueSignal(decoder, signal);
+}
+
+async function waitForCombinedAudioDecodeCapacity(decoder: AudioDecoder, pending: () => number, signal: AbortSignal) {
+  while (decoder.decodeQueueSize + pending() >= 12) await waitForCodecQueueSignal(decoder, signal);
+}
+
+async function waitForCodecQueue(
+  codec: QueueCodec,
+  property: "decodeQueueSize" | "encodeQueueSize",
+  limit: number,
+  signal: AbortSignal,
+) {
+  while ((codec[property] ?? 0) >= limit) await waitForCodecQueueSignal(codec, signal);
+}
+
+function waitForCodecQueueSignal(codec: QueueCodec, signal: AbortSignal) {
+  throwIfAborted(signal);
+  return new Promise<void>((resolve, reject) => {
+    const timeout = worker.setTimeout(done, 8);
+    const aborted = () => {
+      cleanup();
+      reject(new DOMException("Canceled", "AbortError"));
+    };
+    function cleanup() {
+      worker.clearTimeout(timeout);
+      codec.removeEventListener("dequeue", done);
+      signal.removeEventListener("abort", aborted);
+    }
+    function done() {
+      cleanup();
+      resolve();
+    }
+    codec.addEventListener("dequeue", done, { once: true });
+    signal.addEventListener("abort", aborted, { once: true });
+  });
+}
+
+async function flushAndCloseCodec(codec: { state: CodecState; flush: () => Promise<void>; close: () => void }) {
+  if (codec.state === "closed") return;
+  await codec.flush().catch(() => undefined);
+  try { codec.close(); } catch { /* the error callback may have closed it */ }
+}
+
+function throwCodecFailure(error: unknown): asserts error is undefined {
+  if (error) throw error;
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw new DOMException("Canceled", "AbortError");
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function readInputSlice(file: File, start: number, end: number, signal?: AbortSignal) {
+  throwIfAborted(signal);
   const byteLength = Math.max(0, end - start);
-  if (activeMetrics) {
-    activeMetrics.inputSliceArrayBufferCalls += 1;
-    activeMetrics.inputBytesRead += byteLength;
-    activeMetrics.maxInputSliceBytes = Math.max(activeMetrics.maxInputSliceBytes, byteLength);
+  const metrics = activeCopyMetrics || activeWebCodecsMetrics;
+  if (metrics) {
+    metrics.inputSliceArrayBufferCalls += 1;
+    metrics.inputBytesRead += byteLength;
+    metrics.maxInputSliceBytes = Math.max(metrics.maxInputSliceBytes, byteLength);
   }
-  return file.slice(start, end).arrayBuffer();
+  const buffer = await file.slice(start, end).arrayBuffer();
+  throwIfAborted(signal);
+  return buffer;
 }

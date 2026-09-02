@@ -3,6 +3,7 @@ import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessage
 import { FEATURE_MESSAGE_TOKEN_PREFIX } from "../../i18n/workerMessages";
 import type { VideoProgressStage } from "./videoProcessingProgress";
 import type { VideoStreamCopyMetrics, VideoStreamCopyProbeResult } from "./videoStreamCopy";
+import type { VideoWebCodecsMetrics, VideoWebCodecsProbeResult } from "./videoWebCodecs";
 import type {
   VideoAudioMode,
   VideoOutputJob,
@@ -24,11 +25,13 @@ interface VideoStreamWorkerRequestBase {
   language: AppLanguage;
 }
 
-interface VideoStreamPreflightRequest extends VideoStreamWorkerRequestBase {
-  audioMode: VideoAudioMode;
-}
+type VideoStreamPreflightRequest = VideoStreamWorkerRequestBase & (
+  | { operation: "stream-copy"; audioMode: VideoAudioMode }
+  | { operation: "webcodecs"; task: Extract<VideoWorkerRequest["task"], { kind: "encode" }> }
+);
 
 interface VideoStreamRunRequest extends VideoStreamWorkerRequestBase {
+  operation: "stream-copy" | "webcodecs";
   task: Extract<VideoWorkerRequest["task"], { kind: "encode" }>;
   resultStorage: VideoWorkerRequest["resultStorage"];
   estimatedOutputBytes: number;
@@ -37,7 +40,7 @@ interface VideoStreamRunRequest extends VideoStreamWorkerRequestBase {
 }
 
 export interface VideoStreamWorkerResult extends VideoWorkerResult {
-  metrics?: VideoStreamCopyMetrics;
+  metrics?: VideoStreamCopyMetrics | VideoWebCodecsMetrics;
 }
 
 export type VideoStreamWorkerProgress = (
@@ -56,7 +59,25 @@ export function preflightVideoStreamCopyJob(
   const prepared = prepareJob(job);
   return runVideoStreamWorker<VideoStreamCopyProbeResult>(
     "preflight",
-    { job: prepared.job, audioMode, language },
+    { operation: "stream-copy", job: prepared.job, audioMode, language },
+    prepared.files,
+    undefined,
+    undefined,
+    signal,
+    language,
+  );
+}
+
+export function preflightVideoWebCodecsJob(
+  job: VideoOutputJob,
+  task: Extract<VideoWorkerRequest["task"], { kind: "encode" }>,
+  signal?: AbortSignal,
+  language: AppLanguage = "ko",
+) {
+  const prepared = prepareJob(job);
+  return runVideoStreamWorker<VideoWebCodecsProbeResult>(
+    "preflight",
+    { operation: "webcodecs", job: prepared.job, task, language },
     prepared.files,
     undefined,
     undefined,
@@ -80,6 +101,45 @@ export function runVideoStreamCopyJob(
   return runVideoStreamWorker<VideoStreamWorkerResult>(
     "start",
     {
+      operation: "stream-copy",
+      job: prepared.job,
+      task,
+      resultStorage,
+      estimatedOutputBytes,
+      collectMetrics: options.collectMetrics,
+      language,
+      fileLabels: {
+        concatenated: featureMessage(language, "video.messages.video.concatenated"),
+        passthrough: featureMessage(language, "video.messages.video.passthrough"),
+        converted: featureMessage(language, "video.messages.video.converted"),
+        animation: featureMessage(language, "video.messages.video.animation"),
+        audio: featureMessage(language, "video.messages.video.audio"),
+      },
+    },
+    prepared.files,
+    onProgress,
+    onOutput,
+    signal,
+    language,
+  );
+}
+
+export function runVideoWebCodecsJob(
+  job: VideoOutputJob,
+  task: Extract<VideoWorkerRequest["task"], { kind: "encode" }>,
+  resultStorage: VideoWorkerRequest["resultStorage"],
+  estimatedOutputBytes: number,
+  onProgress?: VideoStreamWorkerProgress,
+  onOutput?: VideoWorkerOutputHandler,
+  signal?: AbortSignal,
+  language: AppLanguage = "ko",
+  options: { collectMetrics?: boolean } = {},
+) {
+  const prepared = prepareJob(job);
+  return runVideoStreamWorker<VideoStreamWorkerResult>(
+    "start",
+    {
+      operation: "webcodecs",
       job: prepared.job,
       task,
       resultStorage,
@@ -130,6 +190,8 @@ function runVideoStreamWorker<Result>(
   return new Promise<Result>((resolve, reject) => {
     let settled = false;
     let terminal = false;
+    let cancelTimeout: number | undefined;
+    let abortError: DOMException | undefined;
     const outputHandlers = new VideoOutputQueue();
     const timeout = window.setTimeout(() => {
       if (finish()) reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.theVideoWorkspaceDidNotStartWithin30")));
@@ -138,6 +200,7 @@ function runVideoStreamWorker<Result>(
       if (settled) return false;
       settled = true;
       window.clearTimeout(timeout);
+      if (cancelTimeout !== undefined) window.clearTimeout(cancelTimeout);
       signal?.removeEventListener("abort", abort);
       files.clear();
       worker.terminate();
@@ -149,15 +212,20 @@ function runVideoStreamWorker<Result>(
     const abort = () => {
       if (settled) return;
       terminal = true;
-      worker.terminate();
-      rejectAfterOutputs(new DOMException(featureMessage(language, "video.messages.videoWorkerClient.videoProcessingWasCanceled"), "AbortError"));
+      abortError = new DOMException(featureMessage(language, "video.messages.videoWorkerClient.videoProcessingWasCanceled"), "AbortError");
+      try {
+        worker.postMessage({ type: "cancel" });
+        cancelTimeout = window.setTimeout(() => rejectAfterOutputs(abortError), 5_000);
+      } catch {
+        rejectAfterOutputs(abortError);
+      }
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) return abort();
 
     worker.onmessage = (event: MessageEvent) => {
       const data = event.data as {
-        type: "ready" | "request-input-file" | "progress" | "output" | "preflight-result" | "result" | "error";
+        type: "ready" | "request-input-file" | "progress" | "output" | "preflight-result" | "result" | "canceled" | "error";
         fileId?: string;
         fileName?: string;
         stage?: VideoProgressStage;
@@ -170,6 +238,7 @@ function runVideoStreamWorker<Result>(
       };
       if (data.type === "ready") {
         if (terminal || settled) return;
+        window.clearTimeout(timeout);
         try {
           worker.postMessage({ type: mode, request });
         } catch {
@@ -178,6 +247,7 @@ function runVideoStreamWorker<Result>(
         return;
       }
       if (data.type === "request-input-file") {
+        if (terminal || settled) return;
         const file = data.fileId ? files.get(data.fileId) : undefined;
         if (!file) {
           terminal = true;
@@ -197,8 +267,13 @@ function runVideoStreamWorker<Result>(
         return;
       }
       if (data.type === "output" && data.output) {
+        if (terminal || settled) return;
         const pending = outputHandlers.enqueue(() => onOutput?.(data.output!));
         void pending.catch(() => rejectAfterOutputs(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStoreTheCompletedVideoResult"))));
+        return;
+      }
+      if (data.type === "canceled") {
+        rejectAfterOutputs(abortError || new DOMException(featureMessage(language, "video.messages.videoWorkerClient.videoProcessingWasCanceled"), "AbortError"));
         return;
       }
       if (terminal || settled) return;

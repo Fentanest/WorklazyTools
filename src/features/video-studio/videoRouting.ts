@@ -27,6 +27,8 @@ export type VideoRouteReasonCode =
   | "STREAM_COPY_INCOMPATIBLE"
   | "STREAM_COPY_READY"
   | "STREAM_COPY_PENDING"
+  | "WEBCODECS_INCOMPATIBLE"
+  | "WEBCODECS_READY"
   | "WEBCODECS_PENDING";
 
 export type VideoStreamingFailureReasonCode =
@@ -42,6 +44,7 @@ export interface VideoRouteInput {
   quota: VideoStorageQuotaState;
   estimatedOutputBytes: number;
   streamCopyCompatible?: boolean;
+  webCodecsCompatible?: boolean;
 }
 
 export interface VideoRouteDecision {
@@ -79,6 +82,12 @@ export function decideVideoProcessingRoute(input: VideoRouteInput): VideoRouteDe
   }
   if (plannedStreamingRoute === "stream-copy" && input.streamCopyCompatible === true) {
     return { route: "stream-copy", plannedStreamingRoute, reasonCode: "STREAM_COPY_READY", streamingFailure };
+  }
+  if (plannedStreamingRoute === "webcodecs" && input.webCodecsCompatible === false) {
+    return { route: "ffmpeg", plannedStreamingRoute, reasonCode: "WEBCODECS_INCOMPATIBLE", streamingFailure };
+  }
+  if (plannedStreamingRoute === "webcodecs" && input.webCodecsCompatible === true) {
+    return { route: "webcodecs", plannedStreamingRoute, reasonCode: "WEBCODECS_READY", streamingFailure };
   }
   return {
     route: "ffmpeg",

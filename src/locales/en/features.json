@@ -285,7 +285,9 @@
         "engineSingleThreaded": "single-thread compatibility",
         "thereIsNotEnoughBrowserStorageForThisResult": "There is not enough browser storage to keep this completed result safely. Shorten the output range, lower the resolution, or clear unneeded browser data and try again.",
         "checkingSourceForDirectCopy": "Checking source {{p0}}/{{p1}} for lossless copying…",
+        "checkingSourceForEncoding": "Checking the video and audio details for source {{p0}}/{{p1}}…",
         "sourceTracksReady": "The source video and audio settings are compatible.",
+        "sourceReadyForEncoding": "The source video and audio details are ready.",
         "copyingWithoutChangingPictureQuality": "Keeping the original picture quality…",
         "copyingSelectedRange": "{{p0}}/{{p1}} Copying the selected range…",
         "savingCompletedVideoProgressively": "Saving the completed video as it is produced…",
@@ -307,6 +309,7 @@
         "theVideoWorkspaceDidNotStartWithin30": "Video processing did not start within 30 seconds. Refresh the page and try again.",
         "unableToStoreTheCompletedVideoResult": "The completed video result could not be kept. Check available browser storage and try again.",
         "largePassthroughCouldNotBeCompletedSafely": "This large lossless-copy result could not be completed safely. Shorten the selected range, free browser storage, or choose re-encoding and try again.",
+        "largeStreamingEncodeCouldNotBeCompletedSafely": "This large video result could not be completed safely. Shorten the selected range or free browser storage, then try again.",
         "originalVideo": "source video"
       },
       "VideoStudioPage": {
@@ -332,7 +335,7 @@
         "checkingEstimatedPassthroughOutputSize": "Checking estimated passthrough output size…",
         "isEstimatedAtAboutLargeSourceFilesAre": "{{p0}} is estimated at about {{p1}}. Large source files are not inherently unsafe, but this browser output path cannot create a single result over 1.5 GB. Shorten the range or select CRF encoding.",
         "largeFileNoticeTheSelectedSourcesTotalThey": "Large-file notice: the selected sources total {{p0}}. They are attached without copying the entire files into memory, but conversion may take longer or run out of memory on this device. Continue?",
-        "largeStreamingFileNotice": "Large lossless-copy notice: the selected sources total {{p0}}. Compatible results are saved progressively without the 1.5 GB conversion limit, but they still need enough browser storage. Continue?",
+        "largeStreamingFileNotice": "Large progressive-save notice: the selected sources total {{p0}}. Compatible jobs are saved as they finish without the 1.5 GB conversion limit, but they still need enough browser storage. Continue?",
         "attachingSourceVideosToTheProcessingEngineWithout": "Loading source videos…",
         "allResultsAreReady": "All {{p0}} results are ready.{{p1}}",
         "resultsCreated": "{{p0}} results created",

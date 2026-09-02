@@ -83,6 +83,11 @@ export function compareVideoStreamInputProfiles(profiles: readonly VideoStreamIn
   ));
 }
 
+export function compareVideoStreamAudioProfiles(profiles: readonly VideoStreamInputProfile[]) {
+  const first = profiles[0]?.audio;
+  return profiles.length > 0 && profiles.every((profile) => equalOptionalTrackProfile(profile.audio, first));
+}
+
 export function selectVideoStreamSamples(
   samples: readonly VideoStreamSampleInfo[],
   startSeconds: number,

@@ -16,7 +16,12 @@ import {
 import { estimateVideoStorageQuota, type VideoStorageQuotaState } from "./videoResultStorage";
 import { UserFacingVideoError } from "./videoErrors";
 import { createVideoWorkerResult } from "./videoProcessingShared";
-import { preflightVideoStreamCopyJob, runVideoStreamCopyJob } from "./videoStreamWorkerClient";
+import {
+  preflightVideoStreamCopyJob,
+  preflightVideoWebCodecsJob,
+  runVideoStreamCopyJob,
+  runVideoWebCodecsJob,
+} from "./videoStreamWorkerClient";
 import { runFfmpegVideoTask } from "./videoWorkerClient";
 
 export interface VideoProcessingJobRoute {
@@ -34,6 +39,7 @@ export interface VideoProcessingPreflightOptions {
   opfsAvailable?: boolean;
   estimateQuota?: (requiredBytes: number) => Promise<VideoStorageQuotaState>;
   probeStreamCopyJob?: typeof preflightVideoStreamCopyJob;
+  probeWebCodecsJob?: typeof preflightVideoWebCodecsJob;
 }
 
 export async function preflightVideoProcessingRoutes(
@@ -43,6 +49,7 @@ export async function preflightVideoProcessingRoutes(
   const opfsAvailable = options.opfsAvailable ?? browserOpfsAvailable();
   const estimateQuota = options.estimateQuota ?? estimateVideoStorageQuota;
   const probeStreamCopyJob = options.probeStreamCopyJob ?? preflightVideoStreamCopyJob;
+  const probeWebCodecsJob = options.probeWebCodecsJob ?? preflightVideoWebCodecsJob;
   const jobs: VideoProcessingJobRoute[] = [];
   for (let jobIndex = 0; jobIndex < request.jobs.length; jobIndex += 1) {
     const job = request.jobs[jobIndex];
@@ -74,6 +81,18 @@ export async function preflightVideoProcessingRoutes(
         ...routeInput,
         codec: probe.codec ?? routeInput.codec,
         streamCopyCompatible: probe.compatible,
+      });
+    }
+    if (decision.reasonCode === "WEBCODECS_PENDING") {
+      let probe;
+      try {
+        probe = await probeWebCodecsJob(job, request.task);
+      } catch {
+        probe = { compatible: false as const, reasonCode: "INPUT_UNSUPPORTED" as const };
+      }
+      decision = decideVideoProcessingRoute({
+        ...routeInput,
+        webCodecsCompatible: probe.compatible,
       });
     }
     jobs.push({
@@ -133,6 +152,34 @@ export async function runVideoProcessingTask(
           if (error instanceof DOMException && error.name === "AbortError") throw error;
           if (routeJob.decision.streamingFailure.route === "reject") {
             throw new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.largePassthroughCouldNotBeCompletedSafely"));
+          }
+        }
+      }
+      if (routeJob.decision.route === "webcodecs" && request.task.kind === "encode") {
+        try {
+          const result = await runVideoWebCodecsJob(
+            job,
+            request.task,
+            request.resultStorage,
+            routeJob.estimatedOutputBytes,
+            (stage, completedUnits, totalUnits, message) => progress.reportJobStage(
+              routeJob.jobIndex,
+              stage,
+              completedUnits,
+              totalUnits,
+              message,
+            ),
+            onOutput,
+            signal,
+            language,
+          );
+          outputCounts.push(result.outputCount);
+          progress.reportJobOverall(routeJob.jobIndex, 100, featureMessage(language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: routeJob.jobIndex + 1, p1: routePlan.jobs.length }));
+          continue;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") throw error;
+          if (routeJob.decision.streamingFailure.route === "reject") {
+            throw new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.largeStreamingEncodeCouldNotBeCompletedSafely"));
           }
         }
       }

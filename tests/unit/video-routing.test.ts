@@ -72,6 +72,19 @@ test("streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio
   assert.equal(decideVideoProcessingRoute({ ...base, streamCopyCompatible: false }).reasonCode, "STREAM_COPY_INCOMPATIBLE");
   assert.equal(decideVideoProcessingRoute({ ...base, container: "mov" }).reasonCode, "STREAM_COPY_PENDING");
   assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "target", audioMode: "encode" }).reasonCode, "WEBCODECS_PENDING");
+  assert.deepEqual(decideVideoProcessingRoute({ ...base, bitrateMode: "target", audioMode: "remove", webCodecsCompatible: true }), {
+    route: "webcodecs",
+    plannedStreamingRoute: "webcodecs",
+    reasonCode: "WEBCODECS_READY",
+    streamingFailure: {
+      route: "ffmpeg",
+      reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
+    },
+  });
+  assert.equal(
+    decideVideoProcessingRoute({ ...base, bitrateMode: "target", audioMode: "copy", webCodecsCompatible: false }).reasonCode,
+    "WEBCODECS_INCOMPATIBLE",
+  );
   assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "crf" }).reasonCode, "CRF_REQUIRES_FFMPEG");
   assert.equal(decideVideoProcessingRoute({ ...base, container: "webm", codec: "vp9" }).reasonCode, "CONTAINER_REQUIRES_FFMPEG");
   assert.equal(decideVideoProcessingRoute({ ...base, container: "mkv" }).reasonCode, "CONTAINER_REQUIRES_FFMPEG");
