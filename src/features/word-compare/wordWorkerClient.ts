@@ -5,6 +5,7 @@ export interface WordCompareOptions {
   tables: boolean;
   metadata: boolean;
   trackedDocument: boolean;
+  rewriteRevisionAuthor: boolean;
   revisionAuthor: string;
 }
 

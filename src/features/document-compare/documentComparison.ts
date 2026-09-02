@@ -15,6 +15,7 @@ import { alignDocumentSequence, alignSequence, type SequenceGroup, type Sequence
 export interface ComparisonRecord {
   text: string;
   format: string;
+  formatRuns?: Array<{ text: string; style: string }>;
   location: string;
   comments?: WordCellComment[];
 }
@@ -29,6 +30,7 @@ export interface ComparisonBlock {
   type: "paragraph" | "table";
   text: string;
   format: string;
+  formatRuns?: Array<{ text: string; style: string }>;
   location: string;
   comments?: WordCellComment[];
   table?: ComparisonTable;
@@ -151,13 +153,20 @@ function compareRecordList(
   ));
 }
 
-function combineRecords(records: Array<Pick<ComparisonRecord, "text" | "format" | "location" | "comments"> | ComparisonBlock>) {
+function combineRecords(records: Array<Pick<ComparisonRecord, "text" | "format" | "formatRuns" | "location" | "comments"> | ComparisonBlock>) {
   if (!records.length) return undefined;
   const first = records[0];
   const last = records[records.length - 1];
+  const formatRuns = records.every((record) => record.formatRuns)
+    ? records.flatMap((record, index) => [
+      ...(index ? [{ text: "\n", style: "__paragraph-break__" }] : []),
+      ...record.formatRuns!,
+    ])
+    : undefined;
   return {
     text: records.map((record) => record.text).join("\n"),
     format: records.map((record) => record.format).join("||paragraph-break||"),
+    formatRuns,
     location: first.location === last.location ? first.location : `${first.location}~${last.location}`,
     comments: records.flatMap((record) => record.comments ?? []),
   };
@@ -200,6 +209,9 @@ function compareRecord(
       segments,
       moved,
     });
+    if (baseKind === "changed" && formatting) {
+      changes.push(...inlineFormattingChanges(before, after, section));
+    }
   }
   return {
     kind,
@@ -213,6 +225,58 @@ function compareRecord(
     comments,
     moved,
   };
+}
+
+function inlineFormattingChanges(
+  before: ComparisonRecord | undefined,
+  after: ComparisonRecord | undefined,
+  section: Exclude<WordRecordKind, "table">,
+): WordDiffItem[] {
+  if (!before?.formatRuns || !after?.formatRuns) return [];
+  const beforeStyles = expandedStyles(before.text, before.formatRuns);
+  const afterStyles = expandedStyles(after.text, after.formatRuns);
+  if (!beforeStyles || !afterStyles) return [];
+
+  const result: WordDiffItem[] = [];
+  let beforeIndex = 0;
+  let afterIndex = 0;
+  for (const segment of diffCharacters(before.text, after.text)) {
+    const characters = Array.from(segment.text);
+    if (segment.type === "equal") {
+      let start = -1;
+      for (let index = 0; index <= characters.length; index += 1) {
+        const changed = index < characters.length
+          && beforeStyles[beforeIndex + index] !== afterStyles[afterIndex + index];
+        if (changed && start < 0) start = index;
+        if ((!changed || index === characters.length) && start >= 0) {
+          const text = characters.slice(start, index).join("");
+          result.push({
+            kind: "format",
+            section,
+            location: after.location || before.location,
+            beforeLocation: before.location,
+            afterLocation: after.location,
+            before: text,
+            after: text,
+            segments: [{ type: "equal", text }],
+          });
+          start = -1;
+        }
+      }
+      beforeIndex += characters.length;
+      afterIndex += characters.length;
+    } else if (segment.type === "deleted") {
+      beforeIndex += characters.length;
+    } else {
+      afterIndex += characters.length;
+    }
+  }
+  return result;
+}
+
+function expandedStyles(text: string, runs: Array<{ text: string; style: string }>) {
+  if (runs.map((run) => run.text).join("") !== text) return undefined;
+  return runs.flatMap((run) => Array.from(run.text, () => run.style));
 }
 
 function compareComments(before: WordCellComment[], after: WordCellComment[]): WordDocumentViewItem["comments"] {
@@ -313,6 +377,81 @@ export function diffText(before: string, after: string): WordDiffSegment[] {
   if (before === after) return before ? [{ type: "equal", text: before }] : [];
   const left = tokenize(before);
   const right = tokenize(after);
+  return diffUnits(left, right, before, after);
+}
+
+function diffCharacters(before: string, after: string): WordDiffSegment[] {
+  if (before === after) return before ? [{ type: "equal", text: before }] : [];
+  const left = Array.from(before);
+  const right = Array.from(after);
+  if ((left.length + 1) * (right.length + 1) > 1_500_000) return diffText(before, after);
+
+  const matches: Array<{ left: number; right: number; size: number }> = [];
+  const pending = [{ leftStart: 0, leftEnd: left.length, rightStart: 0, rightEnd: right.length }];
+  while (pending.length) {
+    const range = pending.pop()!;
+    const match = longestContiguousMatch(left, right, range);
+    if (!match.size) continue;
+    matches.push(match);
+    if (range.leftStart < match.left && range.rightStart < match.right) {
+      pending.push({ leftStart: range.leftStart, leftEnd: match.left, rightStart: range.rightStart, rightEnd: match.right });
+    }
+    const leftAfter = match.left + match.size;
+    const rightAfter = match.right + match.size;
+    if (leftAfter < range.leftEnd && rightAfter < range.rightEnd) {
+      pending.push({ leftStart: leftAfter, leftEnd: range.leftEnd, rightStart: rightAfter, rightEnd: range.rightEnd });
+    }
+  }
+  matches.sort((a, b) => a.left - b.left || a.right - b.right);
+
+  const segments: WordDiffSegment[] = [];
+  const append = (type: WordDiffSegment["type"], text: string) => {
+    if (!text) return;
+    const previous = segments[segments.length - 1];
+    if (previous?.type === type) previous.text += text;
+    else segments.push({ type, text });
+  };
+  let leftIndex = 0;
+  let rightIndex = 0;
+  for (const match of matches) {
+    append("deleted", left.slice(leftIndex, match.left).join(""));
+    append("added", right.slice(rightIndex, match.right).join(""));
+    append("equal", left.slice(match.left, match.left + match.size).join(""));
+    leftIndex = match.left + match.size;
+    rightIndex = match.right + match.size;
+  }
+  append("deleted", left.slice(leftIndex).join(""));
+  append("added", right.slice(rightIndex).join(""));
+  return segments;
+}
+
+function longestContiguousMatch(
+  left: string[],
+  right: string[],
+  range: { leftStart: number; leftEnd: number; rightStart: number; rightEnd: number },
+) {
+  const width = range.rightEnd - range.rightStart;
+  let previous = new Uint32Array(width + 1);
+  let best = { left: range.leftStart, right: range.rightStart, size: 0 };
+  for (let leftIndex = range.leftStart; leftIndex < range.leftEnd; leftIndex += 1) {
+    const current = new Uint32Array(width + 1);
+    for (let offset = 1; offset <= width; offset += 1) {
+      const rightIndex = range.rightStart + offset - 1;
+      if (left[leftIndex] !== right[rightIndex]) continue;
+      current[offset] = previous[offset - 1] + 1;
+      const size = current[offset];
+      const candidateLeft = leftIndex - size + 1;
+      const candidateRight = rightIndex - size + 1;
+      if (size > best.size || (size === best.size && (candidateLeft < best.left || (candidateLeft === best.left && candidateRight < best.right)))) {
+        best = { left: candidateLeft, right: candidateRight, size };
+      }
+    }
+    previous = current;
+  }
+  return best;
+}
+
+function diffUnits(left: string[], right: string[], before: string, after: string): WordDiffSegment[] {
   const rows = left.length + 1;
   const cols = right.length + 1;
   if (rows * cols > 1_500_000) return [{ type: "deleted", text: before }, { type: "added", text: after }];

@@ -10,6 +10,12 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import puppeteer from "puppeteer-core";
 import * as XLSX from "xlsx";
 
+const WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const WORD_2010_NS = "http://schemas.microsoft.com/office/word/2010/wordml";
+const WORD_2012_NS = "http://schemas.microsoft.com/office/word/2012/wordml";
+const WORD_CID_NS = "http://schemas.microsoft.com/office/word/2016/wordml/cid";
+const WORD_CEX_NS = "http://schemas.microsoft.com/office/word/2018/wordml/cex";
+
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:5173";
 const koBaseUrl = `${baseUrl}/ko`;
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "worklazytools-test-"));
@@ -781,6 +787,15 @@ async function testWordCompare(page, fixtures, tempDir) {
   const moveTooltip = await page.$eval('.move-across-button', (button) => ({ label: button.getAttribute("aria-label"), title: button.getAttribute("title") }));
   if (!moveTooltip.title || moveTooltip.title !== moveTooltip.label) throw new Error(`Move-across tooltip is missing: ${JSON.stringify(moveTooltip)}`);
   if (await page.$eval(".pairing-preview ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");
+  const defaultAuthorOption = await page.evaluate(() => {
+    const label = Array.from(document.querySelectorAll(".settings-row strong")).find((element) => element.textContent === "변경 내용 작성자 통일");
+    const toggle = label?.closest(".settings-row")?.querySelector("button");
+    const input = document.querySelector(".revision-author-field input");
+    return { checked: toggle?.getAttribute("aria-checked"), inputDisabled: input instanceof HTMLInputElement && input.disabled };
+  });
+  if (defaultAuthorOption.checked !== "false" || !defaultAuthorOption.inputDisabled) {
+    throw new Error(`Revision-author rewrite was not disabled by default: ${JSON.stringify(defaultAuthorOption)}`);
+  }
 
   await page.click(".tool-action-bar .primary-button");
   await waitForResult(page, 240_000);
@@ -917,7 +932,10 @@ async function testWordCompare(page, fixtures, tempDir) {
     throw new Error(`Word result back navigation failed (link=${backHref}): ${JSON.stringify(state)}\n${error.message || error}`);
   }
   if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 2) throw new Error("Pair results were lost after returning from detail view.");
-  await page.click(".word-pair-result-card:nth-child(2) .secondary-button");
+  await page.$eval(".word-pair-result-card:nth-child(2) .secondary-button", (link) => {
+    if (!(link instanceof HTMLAnchorElement)) throw new Error("The second Word result link was not found.");
+    link.click();
+  });
   try {
     await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2")
       && document.querySelector("h1")?.textContent?.includes("2번 문서 비교")
@@ -947,6 +965,53 @@ async function testWordCompare(page, fixtures, tempDir) {
     || splitParagraph.added.length !== 1 || !splitParagraph.added[0].includes("다만, 관계 법령에 따른 추가 확인")) {
     throw new Error(`Split paragraph was still rendered as a whole replacement: ${JSON.stringify(splitParagraph)}`);
   }
+
+  await testWordFormattingBoundaries(page, fixtures);
+  await testWordUnifiedRevisionAuthor(page, fixtures, tempDir);
+}
+
+async function testWordFormattingBoundaries(page, fixtures) {
+  await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
+  await dropFiles(page, ".drop-zone", [fixtures.boundaryBeforeDocx, fixtures.formattingBeforeDocx], 0);
+  await dropFiles(page, ".drop-zone", [fixtures.boundaryAfterDocx, fixtures.formattingAfterDocx], 1);
+  await clickSetting(page, "Excel 보고서");
+  await clickSetting(page, "Word 변경 추적 (DOCX 전용)");
+  await page.click(".tool-action-bar .primary-button");
+  await page.waitForFunction(() => !document.querySelector(".operation-progress.status-running")
+    && (document.querySelector(".word-pair-result-card") || document.querySelector(".error-banner")), { timeout: 240_000 });
+  if (await page.$(".error-banner")) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Word boundary fixture failed."));
+  const cards = await page.$$eval(".word-pair-result-card", (items) => items.map((item) => item.textContent || ""));
+  if (cards.length !== 2 || !cards[0].includes("변경 없음") || !cards[1].includes("6개 변경 발견")) {
+    throw new Error(`Boundary-aware formatting fixture produced unexpected results: ${JSON.stringify(cards)}`);
+  }
+  await page.click(".word-pair-result-card:nth-child(2) .secondary-button");
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2") && document.querySelectorAll(".document-page-row").length > 0);
+  const formatRows = await page.$$eval(".document-page-row.format", (items) => items.map((item) => item.textContent || ""));
+  const expectedLabels = ["Bold change", "Color change", "Highlight change", "Size change", "Font change", "Table highlight"];
+  if (formatRows.length !== expectedLabels.length || expectedLabels.some((label) => !formatRows.some((row) => row.includes(label)))) {
+    throw new Error(`True formatting changes were not separated correctly: ${JSON.stringify(formatRows)}`);
+  }
+}
+
+async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
+  await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
+  await dropFiles(page, ".drop-zone", [fixtures.revisionsBeforeDocx], 0);
+  await dropFiles(page, ".drop-zone", [fixtures.revisionsAfterDocx], 1);
+  await clickSetting(page, "Excel 보고서");
+  const input = await page.$(".revision-author-field input");
+  if (!input || !await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not rendered disabled while rewriting was off.");
+  await clickSetting(page, "변경 내용 작성자 통일");
+  if (await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input did not become enabled.");
+  await replaceInputValue(page, input, "Unified Reviewer");
+  await page.click(".tool-action-bar .primary-button");
+  await waitForResult(page, 240_000);
+  const trackedPath = path.join(tempDir, "word-unified-author.docx");
+  await saveBlobLink(page, ".word-pair-result-card .tracked-download", trackedPath);
+  await assertUnifiedTrackedDocument(trackedPath, fixtures.revisionsBeforeDocx, fixtures.revisionsAfterDocx, fixtures.revisionOracle);
+
+  await clickSetting(page, "변경 내용 작성자 통일");
+  await page.waitForFunction(() => !document.querySelector(".word-pair-result-card"));
+  if (!await input.evaluate((element) => element.disabled)) throw new Error("Changing the rewrite option did not disable its input and clear prior results.");
 }
 
 async function waitForResult(page, timeout = 180_000) {
@@ -1070,6 +1135,12 @@ async function createFixtures(directory) {
   const afterDocx = path.join(directory, "after.docx");
   const beforeDocxTwo = path.join(directory, "before-two.docx");
   const afterDocxTwo = path.join(directory, "after-two.docx");
+  const boundaryBeforeDocx = path.join(directory, "word-boundary-before.docx");
+  const boundaryAfterDocx = path.join(directory, "word-boundary-after.docx");
+  const formattingBeforeDocx = path.join(directory, "word-formatting-before.docx");
+  const formattingAfterDocx = path.join(directory, "word-formatting-after.docx");
+  const revisionsBeforeDocx = path.join(directory, "word-revisions-before.docx");
+  const revisionsAfterDocx = path.join(directory, "word-revisions-after.docx");
   const textPdf = path.join(directory, "text-pages.pdf");
   const tinyPng = path.join(directory, "tiny.png");
 
@@ -1151,7 +1222,15 @@ async function createFixtures(directory) {
   const splitAt = splitOriginal.indexOf(" 또한");
   await fs.writeFile(beforeDocxTwo, await createDocx(splitOriginal, "두 번째 기존 표", "두 번째 기존 머리말", "두 번째 기존 메모", false));
   await fs.writeFile(afterDocxTwo, await createDocx([splitOriginal.slice(0, splitAt) + splitInserted, splitOriginal.slice(splitAt + 1)], "두 번째 변경 표", "두 번째 변경 머리말", "두 번째 변경 메모", true));
-
+  const boundaryFixtures = await createWordBoundaryFixtures();
+  await fs.writeFile(boundaryBeforeDocx, boundaryFixtures.before);
+  await fs.writeFile(boundaryAfterDocx, boundaryFixtures.after);
+  const formattingFixtures = await createWordFormattingFixtures();
+  await fs.writeFile(formattingBeforeDocx, formattingFixtures.before);
+  await fs.writeFile(formattingAfterDocx, formattingFixtures.after);
+  const revisionFixtures = await createWordRevisionFixtures();
+  await fs.writeFile(revisionsBeforeDocx, revisionFixtures.before);
+  await fs.writeFile(revisionsAfterDocx, revisionFixtures.after);
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const firstPdfPage = pdf.addPage([400, 600]);
@@ -1163,7 +1242,200 @@ async function createFixtures(directory) {
   await fs.writeFile(textPdf, await pdf.save());
   await fs.writeFile(tinyPng, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zk90AAAAASUVORK5CYII=", "base64"));
 
-  return { xlsxOne, xlsxTwo, csv, xls, xlsb, xlsm, encryptedXlsx, sheetSelectionXlsx, sheetGridXlsx, sheetGridLongFileName, sheetGridLongSheetName, sheetTrimXlsx, beforeDocx, afterDocx, beforeDocxTwo, afterDocxTwo, textPdf, tinyPng };
+  return { xlsxOne, xlsxTwo, csv, xls, xlsb, xlsm, encryptedXlsx, sheetSelectionXlsx, sheetGridXlsx, sheetGridLongFileName, sheetGridLongSheetName, sheetTrimXlsx, beforeDocx, afterDocx, beforeDocxTwo, afterDocxTwo, boundaryBeforeDocx, boundaryAfterDocx, formattingBeforeDocx, formattingAfterDocx, revisionsBeforeDocx, revisionsAfterDocx, revisionOracle: revisionFixtures.oracle, textPdf, tinyPng };
+}
+
+async function createMinimalDocx(body) {
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="${WORD_NS}"><w:body>${body}<w:sectPr/></w:body></w:document>`);
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+function wordRun(text, properties = "", attributes = "") {
+  return `<w:r${attributes}>${properties ? `<w:rPr>${properties}</w:rPr>` : ""}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+}
+
+async function createWordBoundaryFixtures() {
+  const before = [
+    `<w:p>${wordRun("Proofing split remains stable", "", ' w:rsidR="00000001"')}</w:p>`,
+    `<w:p><w:hyperlink>${wordRun("Hyperlink boundary")}</w:hyperlink></w:p>`,
+    `<w:p><w:ins w:id="1" w:author="Existing">${wordRun("Revision boundary")}</w:ins></w:p>`,
+    `<w:p><w:fldSimple w:instr=" DATE ">${wordRun("Field result")}</w:fldSimple></w:p>`,
+    `<w:p><w:r><w:fldChar w:fldCharType="begin"/><w:instrText>PAGE</w:instrText></w:r>${wordRun("Complex field result")}<w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>`,
+    `<w:p><w:r><w:t>A</w:t><w:tab/><w:t>B</w:t><w:br/><w:t>C</w:t></w:r></w:p>`,
+    `<w:p>${wordRun("Foot")}<w:r><w:footnoteReference w:id="1"/></w:r>${wordRun("note")}</w:p>`,
+    `<w:p>${wordRun("A")}${wordRun("B", "<w:b/>")}${wordRun("A")}</w:p>`,
+    `<w:tbl><w:tr><w:tc><w:p>${wordRun("Table cell split")}</w:p></w:tc></w:tr></w:tbl>`,
+  ].join("");
+  const after = [
+    `<w:p><w:proofErr w:type="spellStart"/>${wordRun("Proofing ", "", ' w:rsidR="99999999"')}<w:proofErr w:type="spellEnd"/>${wordRun("split remains ", "", ' w:rsidR="88888888"')}${wordRun("stable")}</w:p>`,
+    `<w:p><w:hyperlink>${wordRun("Hyperlink ")}${wordRun("boundary")}</w:hyperlink></w:p>`,
+    `<w:p><w:ins w:id="99" w:author="Another">${wordRun("Revision ")}${wordRun("boundary")}</w:ins></w:p>`,
+    `<w:p><w:fldSimple w:instr=" DATE ">${wordRun("Field ")}${wordRun("result")}</w:fldSimple></w:p>`,
+    `<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText>PAGE</w:instrText></w:r>${wordRun("Complex ")}${wordRun("field result")}<w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>`,
+    `<w:p>${wordRun("A")}<w:r><w:tab/></w:r>${wordRun("B")}<w:r><w:br/></w:r>${wordRun("C")}</w:p>`,
+    `<w:p>${wordRun("Fo")}${wordRun("ot")}<w:r><w:footnoteReference w:id="1"/></w:r>${wordRun("no")}${wordRun("te")}</w:p>`,
+    `<w:p>${wordRun("A")}${wordRun("B", "<w:b/>")}${wordRun("A")}</w:p>`,
+    `<w:tbl><w:tr><w:tc><w:p><w:proofErr w:type="spellStart"/>${wordRun("Table cell ")}<w:proofErr w:type="spellEnd"/>${wordRun("split")}</w:p></w:tc></w:tr></w:tbl>`,
+  ].join("");
+  return { before: await createMinimalDocx(before), after: await createMinimalDocx(after) };
+}
+
+async function createWordFormattingFixtures() {
+  const paragraph = (text, properties) => `<w:p>${wordRun(text, properties)}</w:p>`;
+  const before = [
+    paragraph("Bold change", ""),
+    paragraph("Color change", '<w:color w:val="FF0000"/>'),
+    paragraph("Highlight change", '<w:highlight w:val="yellow"/>'),
+    paragraph("Size change", '<w:sz w:val="20"/>'),
+    paragraph("Font change", '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'),
+    `<w:tbl><w:tr><w:tc>${paragraph("Table highlight", '<w:highlight w:val="yellow"/>')}</w:tc></w:tr></w:tbl>`,
+  ].join("");
+  const after = [
+    paragraph("Bold change", "<w:b/>"),
+    paragraph("Color change", '<w:color w:val="0000FF"/>'),
+    paragraph("Highlight change", '<w:highlight w:val="cyan"/>'),
+    paragraph("Size change", '<w:sz w:val="28"/>'),
+    paragraph("Font change", '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>'),
+    `<w:tbl><w:tr><w:tc>${paragraph("Table highlight", '<w:highlight w:val="cyan"/>')}</w:tc></w:tr></w:tbl>`,
+  ].join("");
+  return { before: await createMinimalDocx(before), after: await createMinimalDocx(after) };
+}
+
+function legacyRevision(kind, content, id) {
+  return `<w:${kind} w:id="${id}" w:author="Legacy Revision" w:date="2026-01-01T00:00:00Z">${content}</w:${kind}>`;
+}
+
+function commentAnchor(commentId, label, deleted = false) {
+  const anchors = `<w:commentRangeStart w:id="${commentId}"/>${deleted ? '<w:r><w:delText>discarded anchor text</w:delText></w:r>' : wordRun(label)}<w:commentRangeEnd w:id="${commentId}"/><w:r><w:commentReference w:id="${commentId}"/></w:r>`;
+  return `<w:p>${deleted ? legacyRevision("del", anchors, `7${commentId}`) : anchors}</w:p>`;
+}
+
+function revisionDocument(side, commentIds) {
+  const capitalized = side[0].toUpperCase() + side.slice(1);
+  const anchors = commentIds.map((item, index) => commentAnchor(item, `${capitalized} anchor ${index + 1}`, index === 0)).join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="${WORD_NS}" xmlns:w14="${WORD_2010_NS}"><w:body>
+    <w:p><w:pPr><w:numPr><w:numberingChange w:id="101" w:author="Legacy Revision"/></w:numPr><w:pPrChange w:id="102" w:author="Legacy Revision"><w:pPr/></w:pPrChange></w:pPr>
+      ${legacyRevision("del", '<w:r><w:delText>discard inline</w:delText></w:r>', "103")}
+      ${legacyRevision("ins", wordRun(`${capitalized} accepted`), "104")}
+      ${legacyRevision("moveFrom", wordRun(" discard move"), "105")}${legacyRevision("moveTo", wordRun(" moved"), "106")}
+      <w:moveFromRangeStart w:id="105"/><w:moveFromRangeEnd w:id="105"/><w:moveToRangeStart w:id="106"/><w:moveToRangeEnd w:id="106"/>
+      <w:customXmlInsRangeStart w:id="107"/><w:customXmlInsRangeEnd w:id="107"/><w:customXmlDelRangeStart w:id="108"/><w:customXmlDelRangeEnd w:id="108"/>
+    </w:p>
+    <w:p><w:pPr><w:rPr><w:del w:id="109" w:author="Legacy Revision"/></w:rPr></w:pPr>${wordRun("Merge ")}</w:p><w:p>${wordRun(`tail ${side}`)}</w:p>
+    <w:p><w:pPr><w:rPr><w:ins w:id="110" w:author="Legacy Revision"/></w:rPr></w:pPr>${wordRun(`Split ${side} A`)}</w:p><w:p>${wordRun(`Split ${side} B`)}</w:p>
+    <w:tbl><w:tblPr><w:tblPrChange w:id="111" w:author="Legacy Revision"><w:tblPr/></w:tblPrChange></w:tblPr><w:tblGrid><w:gridCol w:w="2000"/><w:tblGridChange w:id="112" w:author="Legacy Revision"><w:tblGrid/></w:tblGridChange></w:tblGrid>
+      <w:tr><w:trPr><w:del w:id="113" w:author="Legacy Revision"/></w:trPr><w:tc><w:p>${wordRun("discard row")}</w:p></w:tc></w:tr>
+      <w:tr><w:tblPrEx><w:tblPrExChange w:id="114" w:author="Legacy Revision"><w:tblPrEx/></w:tblPrExChange></w:tblPrEx><w:trPr><w:ins w:id="115" w:author="Legacy Revision"/><w:trPrChange w:id="116" w:author="Legacy Revision"><w:trPr/></w:trPrChange></w:trPr>
+        <w:tc><w:tcPr><w:cellDel w:id="117" w:author="Legacy Revision"/></w:tcPr><w:p>${wordRun("discard cell")}</w:p></w:tc>
+        <w:tc><w:tcPr><w:vMerge w:val="restart"/><w:cellIns w:id="118" w:author="Legacy Revision"/><w:cellMerge w:id="119" w:author="Legacy Revision"/><w:tcPrChange w:id="120" w:author="Legacy Revision"><w:tcPr/></w:tcPrChange></w:tcPr><w:p><w:r><w:rPr><w:b/><w:rPrChange w:id="121" w:author="Legacy Revision"><w:rPr/></w:rPrChange></w:rPr><w:t>Kept ${side}</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>${anchors}<w:sectPr><w:sectPrChange w:id="122" w:author="Legacy Revision"><w:sectPr/></w:sectPrChange></w:sectPr>
+  </w:body></w:document>`;
+}
+
+function revisionComment(id, author, initials, paraId, finalText, draftText) {
+  const paragraphId = paraId ? ` w14:paraId="${paraId}"` : "";
+  return `<w:comment w:id="${id}" w:author="${author}" w:initials="${initials}" w:date="2026-09-01T00:00:00Z"><w:p${paragraphId}>${legacyRevision("ins", wordRun(finalText), `8${id}`)}${legacyRevision("del", `<w:r><w:delText>${draftText}</w:delText></w:r>`, `9${id}`)}</w:p></w:comment>`;
+}
+
+function revisionComments(after) {
+  const rows = after ? [
+    ["10", "Legacy Reviewer", "LR", "A0000001", "Shared final", "Shared draft"],
+    ["11", "Existing Author", "EA", "A0000002", "Para identity", "Para draft"],
+    ["12", "Duplicate Author", "DA", null, "Duplicate body", "Duplicate draft"],
+    ["13", "Reply Author", "RA", "A0000003", "Existing reply", "Reply draft"],
+    ["18", "SML", "SML", "A0000008", "Duplicate body", "New duplicate draft"],
+    ["19", "SML", "SML", "A0000009", "New reply final", "New reply draft"],
+  ] : [
+    ["0", "Legacy Reviewer", "LR", "A0000001", "Shared final", "Shared draft"],
+    ["1", "Existing Author", "EA", "A0000002", "Para identity", "Para draft"],
+    ["2", "Duplicate Author", "DA", null, "Duplicate body", "Duplicate draft"],
+    ["3", "Reply Author", "RA", "A0000003", "Existing reply", "Reply draft"],
+  ];
+  return `<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="${WORD_NS}" xmlns:w14="${WORD_2010_NS}">${rows.map((row) => revisionComment(...row)).join("")}</w:comments>`;
+}
+
+function commentsIds(after) {
+  const rows = after
+    ? [["A0000001", "D0000001"], ["A0000003", "D0000003"], ["A0000008", "D0000008"], ["A0000009", "D0000009"]]
+    : [["A0000001", "D0000001"], ["A0000003", "D0000003"]];
+  return `<?xml version="1.0" encoding="UTF-8"?><w16cid:commentsIds xmlns:w16cid="${WORD_CID_NS}">${rows.map(([paraId, durableId]) => `<w16cid:commentId w16cid:paraId="${paraId}" w16cid:durableId="${durableId}"/>`).join("")}</w16cid:commentsIds>`;
+}
+
+function commentsExtended(after) {
+  const rows = after
+    ? [["A0000001", ""], ["A0000002", ""], ["A0000003", "A0000001"], ["A0000008", ""], ["A0000009", "A0000008"]]
+    : [["A0000001", ""], ["A0000002", ""], ["A0000003", "A0000001"]];
+  return `<?xml version="1.0" encoding="UTF-8"?><w15:commentsEx xmlns:w15="${WORD_2012_NS}">${rows.map(([paraId, parent]) => `<w15:commentEx w15:paraId="${paraId}"${parent ? ` w15:paraIdParent="${parent}"` : ""} w15:done="0"/>`).join("")}</w15:commentsEx>`;
+}
+
+function commentsExtensible(after) {
+  const ids = after ? ["D0000001", "D0000003", "D0000008", "D0000009"] : ["D0000001", "D0000003"];
+  return `<?xml version="1.0" encoding="UTF-8"?><w16cex:commentsExtensible xmlns:w16cex="${WORD_CEX_NS}">${ids.map((id) => `<w16cex:commentExtensible w16cex:durableId="${id}" w16cex:dateUtc="2026-09-01T00:00:00Z"/>`).join("")}</w16cex:commentsExtensible>`;
+}
+
+function peopleXml(after) {
+  return `<?xml version="1.0" encoding="UTF-8"?><w15:people xmlns:w15="${WORD_2012_NS}"><w15:person w15:author="Legacy Reviewer"><w15:presenceInfo w15:providerId="AD" w15:userId="legacy-id"/></w15:person>${after ? '<w15:person w15:author="SML"><w15:presenceInfo w15:providerId="None" w15:userId="SML"/></w15:person>' : ""}</w15:people>`;
+}
+
+function revisionStory(rootTag, side, label) {
+  const capitalized = side[0].toUpperCase() + side.slice(1);
+  return `<?xml version="1.0" encoding="UTF-8"?><w:${rootTag} xmlns:w="${WORD_NS}"><w:p>${legacyRevision("del", '<w:r><w:delText>discard story</w:delText></w:r>', "201")}${legacyRevision("ins", wordRun(`${capitalized} ${label}`), "202")}</w:p></w:${rootTag}>`;
+}
+
+function revisionNotes(rootTag, noteTag, side, label) {
+  const capitalized = side[0].toUpperCase() + side.slice(1);
+  return `<?xml version="1.0" encoding="UTF-8"?><w:${rootTag} xmlns:w="${WORD_NS}"><w:${noteTag} w:id="1"><w:p>${legacyRevision("del", '<w:r><w:delText>discard note</w:delText></w:r>', "211")}${legacyRevision("ins", wordRun(`${capitalized} ${label}`), "212")}</w:p></w:${noteTag}></w:${rootTag}>`;
+}
+
+async function createWordRevisionFixture(after) {
+  const side = after ? "after" : "before";
+  const commentIds = after ? ["10", "11", "12", "13", "18", "19"] : ["0", "1", "2", "3"];
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/><Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/><Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file("word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/></Relationships>`);
+  zip.file("word/document.xml", revisionDocument(side, commentIds));
+  zip.file("word/header1.xml", revisionStory("hdr", side, "header"));
+  zip.file("word/footer1.xml", revisionStory("ftr", side, "footer"));
+  zip.file("word/footnotes.xml", revisionNotes("footnotes", "footnote", side, "footnote"));
+  zip.file("word/endnotes.xml", revisionNotes("endnotes", "endnote", side, "endnote"));
+  zip.file("word/comments.xml", revisionComments(after));
+  zip.file("word/commentsIds.xml", commentsIds(after));
+  zip.file("word/commentsExtended.xml", commentsExtended(after));
+  zip.file("word/commentsExtensible.xml", commentsExtensible(after));
+  zip.file("word/people.xml", peopleXml(after));
+  zip.file("word/styles.xml", `<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="${WORD_NS}"><w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="${after ? "160" : "80"}"/><w:pPrChange w:id="301" w:author="Legacy Revision"><w:pPr/></w:pPrChange></w:pPr><w:rPr>${after ? "<w:b/>" : "<w:i/>"}<w:rPrChange w:id="302" w:author="Legacy Revision"><w:rPr/></w:rPrChange></w:rPr></w:style></w:styles>`);
+  zip.file("word/settings.xml", `<?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="${WORD_NS}"><w:trackRevisions/><w:defaultTabStop w:val="720"/><w:compat/></w:settings>`);
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+function acceptedOracle(side, commentCount) {
+  const capitalized = side[0].toUpperCase() + side.slice(1);
+  const anchorText = Array.from({ length: commentCount - 1 }, (_, index) => `${capitalized} anchor ${index + 2}`).join("");
+  return `<w:root xmlns:w="${WORD_NS}"><w:t>${capitalized} accepted</w:t><w:t> moved</w:t><w:t>Merge </w:t><w:t>tail ${side}</w:t><w:t>Split ${side} A</w:t><w:t>Split ${side} B</w:t><w:t>Kept ${side}</w:t><w:t>${anchorText}</w:t></w:root>`;
+}
+
+async function createWordRevisionFixtures() {
+  return {
+    before: await createWordRevisionFixture(false),
+    after: await createWordRevisionFixture(true),
+    oracle: {
+      beforeDocument: acceptedOracle("before", 4),
+      afterDocument: acceptedOracle("after", 6),
+      beforeHeader: `<w:t xmlns:w="${WORD_NS}">Before header</w:t>`,
+      afterHeader: `<w:t xmlns:w="${WORD_NS}">After header</w:t>`,
+      beforeFooter: `<w:t xmlns:w="${WORD_NS}">Before footer</w:t>`,
+      afterFooter: `<w:t xmlns:w="${WORD_NS}">After footer</w:t>`,
+      beforeFootnote: `<w:t xmlns:w="${WORD_NS}">Before footnote</w:t>`,
+      afterFootnote: `<w:t xmlns:w="${WORD_NS}">After footnote</w:t>`,
+      beforeEndnote: `<w:t xmlns:w="${WORD_NS}">Before endnote</w:t>`,
+      afterEndnote: `<w:t xmlns:w="${WORD_NS}">After endnote</w:t>`,
+    },
+  };
 }
 
 async function createDocx(paragraph, tableValue, headerValue, commentValue, bold) {
@@ -1302,6 +1574,113 @@ async function assertTrackedDocument(trackedPath, beforePath, afterPath, require
   }
 }
 
+async function assertUnifiedTrackedDocument(trackedPath, beforePath, afterPath, oracle) {
+  const [trackedZip, afterZip] = await Promise.all([
+    JSZip.loadAsync(await fs.readFile(trackedPath)),
+    JSZip.loadAsync(await fs.readFile(afterPath)),
+  ]);
+  const partNames = [
+    "word/document.xml",
+    "word/header1.xml",
+    "word/footer1.xml",
+    "word/footnotes.xml",
+    "word/endnotes.xml",
+    "word/comments.xml",
+    "word/styles.xml",
+    "word/settings.xml",
+    "word/people.xml",
+  ];
+  const parts = Object.fromEntries(await Promise.all(partNames.map(async (name) => [name, await trackedZip.file(name).async("string")])));
+  const documentXml = parts["word/document.xml"];
+  const revisionAuthors = Array.from(documentXml.matchAll(/<w:(?:ins|del|moveFrom|moveTo|rPrChange|pPrChange|tblPrChange|tblPrExChange|tblGridChange|trPrChange|tcPrChange|sectPrChange|cellIns|cellDel|cellMerge|numberingChange)\b[^>]*w:author="([^"]+)"/g), (match) => match[1]);
+  if (!revisionAuthors.length || revisionAuthors.some((author) => author !== "Unified Reviewer")) {
+    throw new Error(`Tracked revisions were not assigned to one author: ${JSON.stringify([...new Set(revisionAuthors)])}`);
+  }
+  if (Object.values(parts).some((xml) => /<w:(?:ins|del|moveFrom|moveTo|rPrChange|pPrChange|tblPrChange|tblPrExChange|tblGridChange|trPrChange|tcPrChange|sectPrChange|cellIns|cellDel|cellMerge|numberingChange)\b[^>]*w:author="Legacy Revision"/.test(xml))) {
+    throw new Error("An input revision author survived the accept-before-compare path.");
+  }
+  for (const marker of ["moveFromRangeStart", "moveFromRangeEnd", "moveToRangeStart", "moveToRangeEnd", "customXmlInsRangeStart", "customXmlInsRangeEnd", "customXmlDelRangeStart", "customXmlDelRangeEnd", "tblGridChange", "tblPrExChange", "cellMerge", "numberingChange"]) {
+    if (documentXml.includes(`:${marker}`)) throw new Error(`Accepted tracked output retained ${marker}.`);
+  }
+  for (const discarded of ["discard inline", "discard move", "discard row", "discard cell", "discarded anchor text"]) {
+    if (documentXml.includes(discarded)) throw new Error(`Accepted tracked output retained deleted content: ${discarded}`);
+  }
+  if (parts["word/settings.xml"].includes("trackRevisions")) throw new Error("Accepted tracked output still enables revision tracking.");
+
+  assertRevisionOutcome("unified document accept", documentXml, oracle.afterDocument, "accept", [], "Unified Reviewer");
+  assertRevisionOutcome("unified document reject", documentXml, oracle.beforeDocument, "reject", [], "Unified Reviewer");
+  assertRevisionOutcome("unified header accept", parts["word/header1.xml"], oracle.afterHeader, "accept", [], "Unified Reviewer");
+  assertRevisionOutcome("unified header reject", parts["word/header1.xml"], oracle.beforeHeader, "reject", [], "Unified Reviewer");
+  assertRevisionOutcome("unified footer accept", parts["word/footer1.xml"], oracle.afterFooter, "accept", [], "Unified Reviewer");
+  assertRevisionOutcome("unified footer reject", parts["word/footer1.xml"], oracle.beforeFooter, "reject", [], "Unified Reviewer");
+  assertRevisionOutcome("unified footnote accept", parts["word/footnotes.xml"], oracle.afterFootnote, "accept", [], "Unified Reviewer");
+  assertRevisionOutcome("unified footnote reject", parts["word/footnotes.xml"], oracle.beforeFootnote, "reject", [], "Unified Reviewer");
+  assertRevisionOutcome("unified endnote accept", parts["word/endnotes.xml"], oracle.afterEndnote, "accept", [], "Unified Reviewer");
+  assertRevisionOutcome("unified endnote reject", parts["word/endnotes.xml"], oracle.beforeEndnote, "reject", [], "Unified Reviewer");
+
+  const comments = Array.from(parts["word/comments.xml"].matchAll(/<w:comment\b([^>]*)>([\s\S]*?)<\/w:comment>/g), (match) => ({
+    id: match[1].match(/w:id="([^"]+)"/)?.[1],
+    author: match[1].match(/w:author="([^"]+)"/)?.[1],
+    initials: match[1].match(/w:initials="([^"]+)"/)?.[1],
+    text: xmlText(match[2]),
+  }));
+  const expectedComments = new Map([
+    ["10", ["Legacy Reviewer", "LR", "Shared final"]],
+    ["11", ["Existing Author", "EA", "Para identity"]],
+    ["12", ["Duplicate Author", "DA", "Duplicate body"]],
+    ["13", ["Reply Author", "RA", "Existing reply"]],
+    ["18", ["Unified Reviewer", "UR", "Duplicate body"]],
+    ["19", ["Unified Reviewer", "UR", "New reply final"]],
+  ]);
+  for (const [id, expected] of expectedComments) {
+    const actual = comments.find((comment) => comment.id === id);
+    if (!actual || actual.author !== expected[0] || actual.initials !== expected[1] || actual.text !== expected[2]) {
+      throw new Error(`Comment ${id} was not preserved or rewritten correctly: ${JSON.stringify(actual)}`);
+    }
+    for (const marker of ["commentRangeStart", "commentRangeEnd", "commentReference"]) {
+      const count = documentXml.match(new RegExp(`<w:${marker}\\b[^>]*w:id="${id}"`, "g"))?.length ?? 0;
+      if (count !== 1) throw new Error(`Comment ${id} has ${count} ${marker} anchors after acceptance.`);
+    }
+  }
+
+  for (const name of ["word/commentsExtended.xml", "word/commentsIds.xml", "word/commentsExtensible.xml"]) {
+    const [actual, expected] = await Promise.all([trackedZip.file(name).async("nodebuffer"), afterZip.file(name).async("nodebuffer")]);
+    if (!actual.equals(expected)) throw new Error(`${name} changed during comment-author rewriting.`);
+  }
+  const originalPeople = await afterZip.file("word/people.xml").async("string");
+  const originalLegacy = personIdentity(originalPeople, "Legacy Reviewer");
+  const trackedLegacy = personIdentity(parts["word/people.xml"], "Legacy Reviewer");
+  if (JSON.stringify(originalLegacy) !== JSON.stringify(trackedLegacy)) throw new Error("An existing people.xml entry was changed globally.");
+  const unifiedPerson = personIdentity(parts["word/people.xml"], "Unified Reviewer");
+  if (!unifiedPerson || unifiedPerson.presence) throw new Error(`The new author entry copied presence information: ${JSON.stringify(unifiedPerson)}`);
+
+  let libreOfficeAvailable = true;
+  try {
+    await fs.access("/usr/bin/libreoffice");
+  } catch (error) {
+    if (error?.code === "ENOENT") libreOfficeAvailable = false;
+    else throw error;
+  }
+  if (libreOfficeAvailable) {
+    const validationDirectory = path.join(path.dirname(trackedPath), "libreoffice-unified-validation");
+    const profileDirectory = path.join(path.dirname(trackedPath), "libreoffice-unified-profile");
+    await fs.mkdir(validationDirectory, { recursive: true });
+    await runExecutable("/usr/bin/libreoffice", ["--headless", `-env:UserInstallation=file://${profileDirectory}`, "--convert-to", "pdf", "--outdir", validationDirectory, trackedPath]);
+    await fs.access(path.join(validationDirectory, `${path.basename(trackedPath, ".docx")}.pdf`));
+  }
+}
+
+function personIdentity(xml, author) {
+  const person = Array.from(xml.matchAll(/<w15:person\b([^>]*)(?:\/>|>([\s\S]*?)<\/w15:person>)/g))
+    .find((match) => match[1].includes(`w15:author="${author}"`));
+  if (!person) return null;
+  const presence = person[2]?.match(/<w15:presenceInfo\b([^>]*)\/>/);
+  return {
+    author,
+    presence: presence ? Object.fromEntries(Array.from(presence[1].matchAll(/w15:([^=\s]+)="([^"]*)"/g), (match) => [match[1], match[2]])) : null,
+  };
+}
+
 function assertTrackedDocumentStructure(documentXml, commentsXml, numberingXml) {
   const revisionIds = Array.from(documentXml.matchAll(/<w:(?:ins|del|moveFrom|moveTo|rPrChange|pPrChange|tblPrChange|trPrChange|tcPrChange|sectPrChange|cellIns|cellDel)\b[^>]*w:id="([^"]+)"/g), (match) => match[1]);
   if (new Set(revisionIds).size !== revisionIds.length) {
@@ -1344,8 +1723,8 @@ function runExecutable(command, args) {
   });
 }
 
-function assertRevisionOutcome(label, trackedXml, expectedXml, action, substitutions = []) {
-  const actual = trackedTextAfterAction(trackedXml, action);
+function assertRevisionOutcome(label, trackedXml, expectedXml, action, substitutions = [], targetAuthor = "Worklazy Tools") {
+  const actual = trackedTextAfterAction(trackedXml, action, targetAuthor);
   const expected = substitutions.reduce(
     (value, [before, after]) => value.replace(before, after),
     xmlText(expectedXml),
@@ -1353,11 +1732,10 @@ function assertRevisionOutcome(label, trackedXml, expectedXml, action, substitut
   if (actual !== expected) throw new Error(`${label} does not reproduce its source.\nactual=${actual}\nexpected=${expected}`);
 }
 
-function trackedTextAfterAction(xml, action) {
+function trackedTextAfterAction(xml, action, targetAuthor = "Worklazy Tools") {
   let result = xml;
   const unwanted = action === "accept" ? "del" : "ins";
   const unwantedCell = action === "accept" ? "cellDel" : "cellIns";
-  const targetAuthor = "Worklazy Tools";
   result = result.replace(new RegExp(`<w:tr\\b(?:(?!<\\/w:tr>)[\\s\\S])*?<w:${unwanted}\\b(?=[^>]*w:author="${targetAuthor}")[^>]*/>(?:(?!<\\/w:tr>)[\\s\\S])*?<\\/w:tr>`, "g"), "");
   result = result.replace(new RegExp(`<w:tc\\b(?:(?!<\\/w:tc>)[\\s\\S])*?<w:${unwantedCell}\\b(?=[^>]*w:author="${targetAuthor}")[^>]*/>(?:(?!<\\/w:tc>)[\\s\\S])*?<\\/w:tc>`, "g"), "");
   result = result.replace(new RegExp(`<w:${unwanted}\\b(?=[^>]*w:author="${targetAuthor}")(?![^>]*\\/>)[^>]*>[\\s\\S]*?<\\/w:${unwanted}>`, "g"), "");

@@ -24,6 +24,8 @@ interface WordCompareSessionValue {
   setExcelOutput: Dispatch<SetStateAction<boolean>>;
   trackedOutput: boolean;
   setTrackedOutput: Dispatch<SetStateAction<boolean>>;
+  rewriteRevisionAuthor: boolean;
+  setRewriteRevisionAuthor: Dispatch<SetStateAction<boolean>>;
   revisionAuthor: string;
   setRevisionAuthor: Dispatch<SetStateAction<string>>;
   formatting: boolean;
@@ -45,6 +47,7 @@ export function WordCompareSessionProvider() {
   const [webOutput, setWebOutput] = useState(true);
   const [excelOutput, setExcelOutput] = useState(true);
   const [trackedOutput, setTrackedOutput] = useState(true);
+  const [rewriteRevisionAuthor, setRewriteRevisionAuthor] = useState(false);
   const [revisionAuthor, setRevisionAuthor] = useState("Worklazy Tools");
   const [formatting, setFormatting] = useState(true);
   const [tables, setTables] = useState(true);
@@ -62,6 +65,8 @@ export function WordCompareSessionProvider() {
     setExcelOutput,
     trackedOutput,
     setTrackedOutput,
+    rewriteRevisionAuthor,
+    setRewriteRevisionAuthor,
     revisionAuthor,
     setRevisionAuthor,
     formatting,

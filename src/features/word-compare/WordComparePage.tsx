@@ -42,6 +42,8 @@ export function WordComparePage() {
     setExcelOutput,
     trackedOutput,
     setTrackedOutput,
+    rewriteRevisionAuthor,
+    setRewriteRevisionAuthor,
     revisionAuthor,
     setRevisionAuthor,
     formatting,
@@ -109,6 +111,7 @@ export function WordComparePage() {
           tables,
           metadata,
           trackedDocument: trackedOutput,
+          rewriteRevisionAuthor: trackedOutput && rewriteRevisionAuthor,
           revisionAuthor: revisionAuthor.trim() || "Worklazy Tools",
         },
         (nextProgress, message) => {
@@ -202,16 +205,27 @@ export function WordComparePage() {
             <ToggleRow label={L("Word 변경 추적", "Tracked-changes Word file")} description={L("Word에서 변경을 수락·거부할 수 있는 DOCX를 만듭니다.", "Create a DOCX whose changes can be accepted or rejected in Word.")} checked={trackedOutput} onChange={(checked) => { setTrackedOutput(checked); resetOutput(); }} />
           </div>
           {trackedOutput && (
-            <label className="revision-author-field">
-              <span>{L("변경 내용 작성자", "Revision author")}</span>
-              <input
-                type="text"
-                value={revisionAuthor}
-                maxLength={80}
-                placeholder="Worklazy Tools"
-                onChange={(event) => { setRevisionAuthor(event.target.value); resetOutput(); }}
-              />
-            </label>
+            <>
+              <div className="settings-list compact-settings output-selection-list">
+                <ToggleRow
+                  label={L("변경 내용 작성자 통일", "Use one revision author")}
+                  description={L("기존 변경 내용을 먼저 수락하고 새 변경 기록의 작성자를 아래 이름으로 통일합니다.", "Accept existing revisions first, then use the name below for all new tracked changes.")}
+                  checked={rewriteRevisionAuthor}
+                  onChange={(checked) => { setRewriteRevisionAuthor(checked); resetOutput(); }}
+                />
+              </div>
+              <label className="revision-author-field">
+                <span>{L("변경 내용 작성자", "Revision author")}</span>
+                <input
+                  type="text"
+                  value={revisionAuthor}
+                  maxLength={80}
+                  placeholder="Worklazy Tools"
+                  disabled={!rewriteRevisionAuthor}
+                  onChange={(event) => { setRevisionAuthor(event.target.value); resetOutput(); }}
+                />
+              </label>
+            </>
           )}
           <div className="output-preview">
             <FileText size={20} />
@@ -273,14 +287,14 @@ export function WordComparePage() {
           { title: "Creating document pairs", paragraphs: ["Add the same number of DOCX files to Before and After. Files are paired by list position; drag to reorder or use the side arrows to move a file."] },
           { title: "First run and connectivity", paragraphs: ["The required comparison files must be downloaded on the first run. Documents and results are never sent to a comparison server."] },
           { title: "Comparison scope", paragraphs: ["Body paragraphs are compared by default. Tables, formatting, headers, footers, comments, footnotes and endnotes can be included."] },
-          { title: "Web, Excel and tracked Word output", paragraphs: ["Each pair can have an independent web view, an Excel report, and a DOCX with supported tracked insertions, deletions and formatting changes."] },
+          { title: "Web, Excel and tracked Word output", paragraphs: ["Each pair can have an independent web view, an Excel report, and a tracked DOCX. By default, existing revision authors are preserved. Turn on Use one revision author to accept existing revisions first, assign new tracked changes to the name you enter, preserve existing comments, and use that name only for comments newly added to the revised document."] },
           { title: "Items to verify", paragraphs: ["Automatic numbering, fields, text in shapes and complex layouts may differ from Microsoft Word. Verify important results in the original documents."] },
         ] : [
           { title: "문서 쌍 만들기", paragraphs: ["수정 전과 수정 후 영역에 같은 개수의 DOCX를 넣으세요. 각 목록의 1번끼리, 2번끼리 순서대로 비교합니다. 드래그로 순서를 바꾸거나 좌우 화살표로 파일을 반대 목록에 옮길 수 있습니다."] },
           { title: "최초 실행과 인터넷 연결", paragraphs: ["오프라인에서 사이트를 처음 열면 브라우저용 문서 비교 실행 환경을 받을 수 없어 비교를 시작할 수 없습니다. 실행 환경은 Worklazy Tools와 같은 GitHub Pages 배포 경로에서 제공되며 외부 CDN을 사용하지 않습니다. DOCX 파일과 비교 결과는 외부 작업 서버로 전송하지 않습니다."] },
           { title: "비교하는 범위", paragraphs: ["본문 문단을 기본으로 비교하며, 선택에 따라 표 셀과 머리말·꼬리말, 메모, 각주·미주의 텍스트도 각각 구분해 분석합니다."] },
           { title: "다중 동시 비교", paragraphs: ["여러 문서 쌍을 한 번에 비교하고, 웹에서는 각 문서 쌍의 독립된 상세 화면을 확인할 수 있습니다. Excel 보고서에서는 일반 변경과 표 변경을 나누고, 각 표를 별도 시트에서 수정 전·후 격자로 비교합니다."] },
-          { title: "Word 변경 추적 파일", paragraphs: ["수정 후 문서를 바탕으로 삽입·삭제와 지원되는 서식 변경 기록이 포함된 DOCX를 만듭니다. 기존 작성자 기록은 유지하며, 문서 간 자동 번호 정의도 함께 보완합니다."] },
+          { title: "Word 변경 추적 파일", paragraphs: ["기본값에서는 기존 변경 내용의 작성자를 보존합니다. 작성자 통일을 켜면 기존 변경 내용을 먼저 수락한 뒤 새 변경 기록을 입력한 이름으로 통일합니다. 기존 메모는 유지하고 수정 후 문서에 새로 추가된 메모만 같은 이름을 사용합니다."] },
           { title: "표 구조 변경", paragraphs: ["표 중간에 행이나 열이 추가되면 내용 유사도로 기존 행·열의 대응 관계를 찾습니다. 뒤로 밀린 기존 셀 전체를 변경으로 표시하지 않고 실제 추가·삭제·수정된 셀만 구분합니다."] },
           { title: "표시 차이가 생길 수 있는 항목", paragraphs: ["자동 번호, 계산 필드, 도형 안의 텍스트와 복잡한 레이아웃은 실제 Word 화면과 다를 수 있으므로 중요한 결과는 원본 문서에서도 확인하세요."] },
         ]}

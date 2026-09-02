@@ -229,7 +229,7 @@ def _run_style(run):
         item = props.find(W + name)
         if item is not None:
             values.append(name + ":" + item.attrib.get(W + "val", "1"))
-    for name in ("color", "sz", "rFonts"):
+    for name in ("color", "highlight", "sz", "rFonts"):
         item = props.find(W + name)
         if item is not None:
             values.append(name + ":" + json.dumps(item.attrib, sort_keys=True))
@@ -240,10 +240,78 @@ def _paragraph_record(paragraph, section, location, numbering=None):
     text = _text(paragraph)
     list_label = numbering.label(paragraph) if numbering is not None else ""
     formats = []
-    for run in paragraph.iter(W + "r"):
-        run_text = _text(run)
-        if run_text:
-            formats.append(run_text + "=" + _run_style(run))
+    pending_text = ""
+    pending_style = None
+
+    def flush():
+        nonlocal pending_text, pending_style
+        if pending_text:
+            formats.append(pending_text + "=" + (pending_style or ""))
+            format_runs.append({"text": pending_text, "style": pending_style or ""})
+        pending_text = ""
+        pending_style = None
+
+    def append_text(value, style):
+        nonlocal pending_text, pending_style
+        if not value:
+            return
+        if pending_text and pending_style == style:
+            pending_text += value
+        else:
+            flush()
+            pending_text = value
+            pending_style = style
+
+    def visit_run(run):
+        style = _run_style(run)
+        for child in run:
+            if child.tag == W + "rPr":
+                continue
+            if child.tag == W + "t":
+                append_text(child.text or "", style)
+            elif child.tag == W + "tab":
+                flush()
+                append_text("\t", style)
+                flush()
+            elif child.tag in (W + "br", W + "cr"):
+                flush()
+                append_text("\n", style)
+                flush()
+            else:
+                # Field instructions, note references, drawings and every other
+                # non-text run child are semantic boundaries. Equal formatting
+                # on either side must not collapse across them.
+                flush()
+
+    def visit_container(container):
+        for child in container:
+            if child.tag == W + "r":
+                visit_run(child)
+                continue
+            if child.tag in {
+                W + "pPr",
+                W + "proofErr",
+                W + "bookmarkStart",
+                W + "bookmarkEnd",
+                W + "commentRangeStart",
+                W + "commentRangeEnd",
+                W + "permStart",
+                W + "permEnd",
+            }:
+                # Proofing, bookmark, comment and permission markers do not
+                # introduce visible formatting boundaries.
+                continue
+            # Hyperlinks, revision wrappers, fields and other run containers
+            # delimit independent runs. Merge inside a container, never across
+            # its entry or exit boundary.
+            flush()
+            if child.find(".//" + W + "r") is not None:
+                visit_container(child)
+            flush()
+
+    format_runs = []
+    visit_container(paragraph)
+    flush()
     return {
         "section": section,
         "location": location,
@@ -251,7 +319,29 @@ def _paragraph_record(paragraph, section, location, numbering=None):
         "displayText": f"{list_label} {text}" if list_label and text else list_label or text,
         "listLabel": list_label,
         "format": "||".join(formats),
+        "formatRuns": format_runs,
     }
+
+
+def _display_format_runs(record):
+    runs = record.get("formatRuns", [])
+    if "".join(run["text"] for run in runs) == record.get("displayText", ""):
+        return runs
+    text = record.get("text", "")
+    list_label = record.get("listLabel", "")
+    run_text = "".join(run["text"] for run in runs)
+    position = text.find(run_text)
+    if position < 0:
+        return []
+    body_runs = []
+    if position:
+        body_runs.append({"text": text[:position], "style": "__structure__"})
+    body_runs.extend(runs)
+    if position + len(run_text) < len(text):
+        body_runs.append({"text": text[position + len(run_text):], "style": "__structure__"})
+    prefix = f"{list_label} " if list_label and text else list_label
+    result = ([{"text": prefix, "style": "__list-label__"}] if prefix else []) + body_runs
+    return result if "".join(run["text"] for run in result) == record.get("displayText", "") else []
 
 
 def _read_comments(archive, numbering):
@@ -263,14 +353,18 @@ def _read_comments(archive, numbering):
     for comment_index, comment in enumerate(comments_root.findall(W + "comment"), 1):
         comment_id = comment.attrib.get(W + "id", str(comment_index))
         paragraphs = list(comment.iter(W + "p"))
+        paragraph_records = [_paragraph_record(paragraph, "comment", "", numbering) for paragraph in paragraphs]
+        format_runs = []
+        for index, record in enumerate(paragraph_records):
+            if index:
+                format_runs.append({"text": "\n", "style": "__paragraph-break__"})
+            format_runs.extend(_display_format_runs(record))
         comments[comment_id] = {
             "id": comment_id,
             "author": comment.attrib.get(W + "author", "").strip(),
             "text": "\n".join(_text(paragraph) for paragraph in paragraphs).strip(),
-            "format": "||".join(
-                _paragraph_record(paragraph, "comment", "", numbering)["format"]
-                for paragraph in paragraphs
-            ),
+            "format": "||".join(record["format"] for record in paragraph_records),
+            "formatRuns": format_runs,
         }
     return comments
 
@@ -339,6 +433,11 @@ def _parse_document(data, include_tables, include_metadata):
                             display_text = "\n".join(record["displayText"] for record in paragraph_records)
                             list_labels = "\n".join(record["listLabel"] for record in paragraph_records)
                             formatting = "||".join(record["format"] for record in paragraph_records)
+                            format_runs = []
+                            for paragraph_record_index, paragraph_record in enumerate(paragraph_records):
+                                if paragraph_record_index:
+                                    format_runs.append({"text": "\n", "style": "__paragraph-break__"})
+                                format_runs.extend(_display_format_runs(paragraph_record))
                             comment_ids = []
                             for paragraph in paragraphs:
                                 for comment_id in _paragraph_comment_ids(paragraph):
@@ -351,6 +450,7 @@ def _parse_document(data, include_tables, include_metadata):
                                 "displayText": display_text,
                                 "listLabel": list_labels,
                                 "format": formatting,
+                                "formatRuns": format_runs,
                                 "comments": [comments[item] for item in comment_ids if item in comments],
                                 "tableIndex": table_index - 1,
                                 "rowIndex": row_index - 1,
@@ -853,6 +953,7 @@ def _cell_payload(cell):
     return {
         "text": _display_text(cell),
         "format": cell.get("format", ""),
+        "formatRuns": _display_format_runs(cell),
         "location": cell.get("location", ""),
         "segments": [],
         "comments": [
@@ -1147,6 +1248,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         return {
             "text": _display_text(record),
             "format": record.get("format", ""),
+            "formatRuns": _display_format_runs(record),
             "location": record.get("location", ""),
             "comments": comments_of(record),
         }
@@ -1178,6 +1280,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
                 if any(cell.get("text", "") for cell in row)
             ),
             "format": "",
+            "formatRuns": [],
             "location": table["location"],
             "table": table,
         })

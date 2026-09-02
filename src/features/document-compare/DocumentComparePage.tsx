@@ -78,6 +78,7 @@ export function DocumentComparePage() {
         tables: session.tables,
         metadata: session.metadata,
         trackedDocument: session.trackedOutput,
+        rewriteRevisionAuthor: session.trackedOutput && session.rewriteRevisionAuthor,
         revisionAuthor: session.revisionAuthor.trim() || "Worklazy Tools",
       }, (nextProgress, message) => {
         operation.update(session.excelOutput ? Math.round(nextProgress * 0.8) : nextProgress, message);
@@ -174,7 +175,17 @@ export function DocumentComparePage() {
             <ToggleRow label={L("Excel 보고서", "Excel report")} description={L("일반 변경과 표별 비교 시트를 만듭니다.", "Create worksheets for general changes and tables.")} checked={session.excelOutput} onChange={(checked) => { session.setExcelOutput(checked); resetOutput(); }} />
             <ToggleRow label={L("Word 변경 추적 (DOCX 전용)", "Tracked-changes Word file (DOCX only)")} description={L("두 파일 모두 DOCX인 비교 결과에만 적용됩니다.", "Applied only when both files in a pair are DOCX.")} checked={session.trackedOutput} onChange={(checked) => { session.setTrackedOutput(checked); resetOutput(); }} />
           </div>
-          {session.trackedOutput && <label className="revision-author-field"><span>{L("변경 내용 작성자", "Revision author")}</span><input type="text" value={session.revisionAuthor} maxLength={80} placeholder="Worklazy Tools" onChange={(event) => { session.setRevisionAuthor(event.target.value); resetOutput(); }} /></label>}
+          {session.trackedOutput && <>
+            <div className="settings-list compact-settings output-selection-list">
+              <ToggleRow
+                label={L("변경 내용 작성자 통일", "Use one revision author")}
+                description={L("기존 변경 내용을 먼저 수락하고 새 변경 기록의 작성자를 아래 이름으로 통일합니다.", "Accept existing revisions first, then use the name below for all new tracked changes.")}
+                checked={session.rewriteRevisionAuthor}
+                onChange={(checked) => { session.setRewriteRevisionAuthor(checked); resetOutput(); }}
+              />
+            </div>
+            <label className="revision-author-field"><span>{L("변경 내용 작성자", "Revision author")}</span><input type="text" value={session.revisionAuthor} maxLength={80} placeholder="Worklazy Tools" disabled={!session.rewriteRevisionAuthor} onChange={(event) => { session.setRevisionAuthor(event.target.value); resetOutput(); }} /></label>
+          </>}
           <div className="output-preview"><FileText size={20} /><span><strong>{hasOutput ? [session.webOutput && L("웹", "Web"), session.excelOutput && "Excel", session.trackedOutput && L("DOCX 변경 추적", "Tracked DOCX")].filter(Boolean).join(" · ") : L("결과 형식을 하나 이상 선택하세요.", "Select at least one output format.")}</strong><small>{L("지원되는 결과만 문서 쌍별로 제공합니다.", "Supported outputs are provided separately for each pair.")}</small></span></div>
         </SectionCard>
         <SectionCard step={3} title={L("비교 범위", "Comparison scope")}>
@@ -215,12 +226,12 @@ export function DocumentComparePage() {
         blocks={language === "en" ? [
           { title: "Supported pairs", paragraphs: ["DOCX and DOC can be compared with each other. HWP and HWPX can be compared with each other. A Word file cannot be paired with an HWP file."] },
           { title: "How matching works", paragraphs: ["The same alignment rules handle empty paragraphs, nearby edits, paragraph splits or merges, and moved paragraphs for every supported format."] },
-          { title: "Tracked Word output", paragraphs: ["Tracked-changes output is generated only when both files in that pair are DOCX. DOC and HWP-family pairs still receive selected web and Excel results."] },
+          { title: "Tracked Word output", paragraphs: ["Tracked output is limited to DOCX pairs. By default, existing revision authors are preserved. Turn on Use one revision author to accept existing revisions first, assign new tracked changes to the name you enter, preserve existing comments, and use that name only for comments newly added to the revised document."] },
           { title: "Items to verify", paragraphs: ["Exact page layout, drawing objects, calculated fields, review data, and complex nested tables may differ from desktop office applications."] },
         ] : [
           { title: "지원 조합", paragraphs: ["DOCX와 DOC는 서로 비교할 수 있고, HWP와 HWPX도 서로 비교할 수 있습니다. Word 문서와 HWP 문서를 한 쌍으로 비교할 수는 없습니다."] },
           { title: "문단 대응 방식", paragraphs: ["모든 지원 형식에 같은 정렬 규칙을 적용해 빈 문단, 가까운 문구 수정, 문단 분할·병합과 문단 이동을 구분합니다."] },
-          { title: "Word 변경 추적", paragraphs: ["한 쌍의 두 파일이 모두 DOCX일 때만 변경 추적 DOCX를 만듭니다. DOC와 HWP 계열 문서에는 선택한 웹 비교와 Excel 보고서를 제공합니다."] },
+          { title: "Word 변경 추적", paragraphs: ["DOCX 문서 쌍에서만 변경 추적 파일을 만듭니다. 기본값에서는 기존 변경 내용의 작성자를 보존합니다. 작성자 통일을 켜면 기존 변경 내용을 먼저 수락한 뒤 새 변경 기록을 입력한 이름으로 통일하며, 기존 메모는 유지하고 수정 후 문서에 새로 추가된 메모만 같은 이름을 사용합니다."] },
           { title: "확인이 필요한 항목", paragraphs: ["정확한 페이지 배치, 도형, 계산 필드, 검토 기록과 복잡한 중첩 표는 데스크톱 오피스 프로그램의 결과와 다를 수 있습니다."] },
         ]}
         faq={language === "en" ? [

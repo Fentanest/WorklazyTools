@@ -101,6 +101,7 @@ export interface WordCellComment {
 export interface WordTableCell {
   text: string;
   format: string;
+  formatRuns?: Array<{ text: string; style: string }>;
   location: string;
   segments: WordDiffSegment[];
   comments: WordCellComment[];
