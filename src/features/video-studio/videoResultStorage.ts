@@ -29,7 +29,7 @@ interface StorageManagerLike {
   estimate?: () => Promise<StorageEstimate>;
 }
 
-interface DirectoryHandleWithEntries extends FileSystemDirectoryHandle {
+interface DirectoryHandleWithEntries {
   entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>;
 }
 
@@ -129,10 +129,22 @@ export async function cleanupPartialVideoResults(session: VideoResultStorageSess
   let removed = 0;
   for await (const [name] of entries) {
     if (keep.has(name)) continue;
-    await sessionDirectory.removeEntry(name, { recursive: true }).catch(() => undefined);
-    removed += 1;
+    if (await removeResultEntryAfterWorkerRelease(sessionDirectory, name)) removed += 1;
   }
   return removed;
+}
+
+async function removeResultEntryAfterWorkerRelease(directory: FileSystemDirectoryHandle, name: string) {
+  for (const retryDelay of [0, 50, 150, 500]) {
+    if (retryDelay) await new Promise<void>((resolve) => globalThis.setTimeout(resolve, retryDelay));
+    try {
+      await directory.removeEntry(name, { recursive: true });
+      return true;
+    } catch {
+      // A terminated worker can retain its file lock briefly while the browser releases the worker scope.
+    }
+  }
+  return false;
 }
 
 export async function releaseVideoResultStorageSession(session: VideoResultStorageSession) {

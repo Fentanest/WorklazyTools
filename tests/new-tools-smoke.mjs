@@ -3043,9 +3043,11 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
   const videoAdRequests = [];
   const videoZipWorkerRequests = [];
+  const videoStreamWorkerRequests = [];
   const captureVideoRequests = (request) => {
     if (request.url().includes("pagead2.googlesyndication.com")) videoAdRequests.push(request.url());
     if (request.url().includes("video-zip.worker-")) videoZipWorkerRequests.push(request.url());
+    if (request.url().includes("videoStream.worker-")) videoStreamWorkerRequests.push(request.url());
   };
   page.on("request", captureVideoRequests);
   await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
@@ -3101,6 +3103,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (readState.arrayBufferReads !== 0) {
     throw new Error(`Video selection copied a source into one contiguous ArrayBuffer: ${JSON.stringify(readState)}`);
   }
+  if (videoStreamWorkerRequests.length !== 0) throw new Error(`The direct-copy worker loaded before export: ${JSON.stringify(videoStreamWorkerRequests)}`);
   await page.evaluate(() => {
     const player = document.querySelector(".multi-video-grid video");
     if (!(player instanceof HTMLVideoElement)) throw new Error("Video player is unavailable");
@@ -3202,6 +3205,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (firstResultState.length !== 2 || firstResultState.some((result) => !result.href.startsWith("blob:") || !result.download)) {
     throw new Error(`Video outputs were not exposed as individual downloads: ${JSON.stringify(firstResultState)}`);
   }
+  if (videoStreamWorkerRequests.length < 4) throw new Error(`The direct-copy worker was not loaded on demand for preflight and output: ${JSON.stringify(videoStreamWorkerRequests)}`);
   if (await page.$(".audio-handoff-button")) throw new Error("Audio studio handoff was shown for a video result.");
   const progressFontSizes = await page.evaluate(() => ({
     message: Number.parseFloat(getComputedStyle(document.querySelector(".operation-current-message")).fontSize),
@@ -3246,7 +3250,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     .map((element) => element.textContent).slice(0, 5));
   if (rawVideoMessages.length) throw new Error(`A raw i18n worker token was exposed in video progress UI: ${JSON.stringify(rawVideoMessages)}`);
   const internalVideoMessages = await page.$$eval(".video-studio-page *", (elements) => elements
-    .filter((element) => element.children.length === 0 && /\b(?:OPFS|SyncAccessHandle|zip\.js|WebCodecs?|remux|worker)\b/i.test(element.textContent || ""))
+    .filter((element) => element.children.length === 0 && /\b(?:OPFS|SyncAccessHandle|zip\.js|mp4box(?:\.js)?|mp4-muxer|WebCodecs?|remux|worker)\b/i.test(element.textContent || ""))
     .map((element) => element.textContent).slice(0, 5));
   if (internalVideoMessages.length) throw new Error(`Internal video storage names were exposed in the UI: ${JSON.stringify(internalVideoMessages)}`);
   const audioResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({
@@ -3473,9 +3477,9 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   }));
   if (largePassThroughState.outputs !== 2
     || largePassThroughState.transfer.startContainsFile
-    || largePassThroughState.transfer.inputFileSizes.length !== 2
-    || !largePassThroughState.logs.some((message) => message.includes("영상 처리 준비 완료"))
-    || !largePassThroughState.logs.some((message) => message.includes("영상 불러오는 중"))) {
+    || largePassThroughState.transfer.inputFileSizes.length !== 4
+    || !largePassThroughState.logs.some((message) => message.includes("원본 화질"))
+    || !largePassThroughState.logs.some((message) => message.includes("선택 구간"))) {
     throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
   }
 

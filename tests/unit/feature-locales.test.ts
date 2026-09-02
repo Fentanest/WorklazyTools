@@ -30,7 +30,7 @@ test("video messages in both languages hide internal processing names", async ()
   const resources = await Promise.all(["ko", "en"].map(async (language) => JSON.parse(await readFile(new URL(`src/locales/${language}/features.json`, root), "utf8"))));
   for (const resource of resources) {
     for (const [key, value] of Object.entries(stringLeaves(resource.video))) {
-      assert.doesNotMatch(value, /\b(?:OPFS|SyncAccessHandle|zip\.js|WebCodecs?|remux|worker)\b/i, `video.${key} exposes an internal processing name`);
+      assert.doesNotMatch(value, /\b(?:OPFS|SyncAccessHandle|zip\.js|mp4box(?:\.js)?|mp4-muxer|WebCodecs?|remux|worker)\b/i, `video.${key} exposes an internal processing name`);
     }
   }
 });

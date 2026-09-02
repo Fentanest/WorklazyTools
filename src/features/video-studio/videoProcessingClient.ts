@@ -1,4 +1,5 @@
 import type { AppLanguage } from "../../i18n/languages";
+import { featureMessage } from "../../i18n/featureMessages";
 import type {
   VideoOutputJob,
   VideoTask,
@@ -13,6 +14,9 @@ import {
   type VideoRouteDecision,
 } from "./videoRouting";
 import { estimateVideoStorageQuota, type VideoStorageQuotaState } from "./videoResultStorage";
+import { UserFacingVideoError } from "./videoErrors";
+import { createVideoWorkerResult } from "./videoProcessingShared";
+import { preflightVideoStreamCopyJob, runVideoStreamCopyJob } from "./videoStreamWorkerClient";
 import { runFfmpegVideoTask } from "./videoWorkerClient";
 
 export interface VideoProcessingJobRoute {
@@ -29,6 +33,7 @@ export interface VideoProcessingPreflight {
 export interface VideoProcessingPreflightOptions {
   opfsAvailable?: boolean;
   estimateQuota?: (requiredBytes: number) => Promise<VideoStorageQuotaState>;
+  probeStreamCopyJob?: typeof preflightVideoStreamCopyJob;
 }
 
 export async function preflightVideoProcessingRoutes(
@@ -37,28 +42,47 @@ export async function preflightVideoProcessingRoutes(
 ): Promise<VideoProcessingPreflight> {
   const opfsAvailable = options.opfsAvailable ?? browserOpfsAvailable();
   const estimateQuota = options.estimateQuota ?? estimateVideoStorageQuota;
-  const jobs = await Promise.all(request.jobs.map(async (job, jobIndex) => {
+  const probeStreamCopyJob = options.probeStreamCopyJob ?? preflightVideoStreamCopyJob;
+  const jobs: VideoProcessingJobRoute[] = [];
+  for (let jobIndex = 0; jobIndex < request.jobs.length; jobIndex += 1) {
+    const job = request.jobs[jobIndex];
     const durationSeconds = estimateVideoJobDuration(job);
     const estimatedOutputBytes = estimateVideoJobOutputBytes(job);
     if (request.task.kind !== "encode") {
-      return { jobIndex, durationSeconds, estimatedOutputBytes, decision: decideFfmpegOnlyRoute(estimatedOutputBytes) };
+      jobs.push({ jobIndex, durationSeconds, estimatedOutputBytes, decision: decideFfmpegOnlyRoute(estimatedOutputBytes) });
+      continue;
     }
     const quota = opfsAvailable ? await safeQuotaEstimate(estimateQuota, estimatedOutputBytes) : "unknown";
-    return {
+    const routeInput = {
+      container: request.task.container,
+      codec: request.task.bitrate === "copy" ? "h264" as const : request.task.codec,
+      bitrateMode: videoBitrateMode(request.task),
+      audioMode: request.task.audioMode,
+      opfsAvailable,
+      quota,
+      estimatedOutputBytes,
+    };
+    let decision = decideVideoProcessingRoute(routeInput);
+    if (decision.reasonCode === "STREAM_COPY_PENDING") {
+      let probe;
+      try {
+        probe = await probeStreamCopyJob(job, request.task.audioMode);
+      } catch {
+        probe = { compatible: false as const, reasonCode: "NOT_ISO_BMFF" as const };
+      }
+      decision = decideVideoProcessingRoute({
+        ...routeInput,
+        codec: probe.codec ?? routeInput.codec,
+        streamCopyCompatible: probe.compatible,
+      });
+    }
+    jobs.push({
       jobIndex,
       durationSeconds,
       estimatedOutputBytes,
-      decision: decideVideoProcessingRoute({
-        container: request.task.container,
-        codec: request.task.codec,
-        bitrateMode: videoBitrateMode(request.task),
-        audioMode: request.task.audioMode,
-        opfsAvailable,
-        quota,
-        estimatedOutputBytes,
-      }),
-    };
-  }));
+      decision,
+    });
+  }
   return { jobs };
 }
 
@@ -77,12 +101,52 @@ export async function runVideoProcessingTask(
     durationSeconds: job.durationSeconds,
     expectedOutputBytes: job.estimatedOutputBytes,
   })));
+  const outputCounts: number[] = [];
   try {
-    // B4 establishes job-level ownership here. B2/B3 will dispatch their eligible jobs from this table.
-    if (routePlan.jobs.some(({ decision }) => decision.route !== "ffmpeg")) {
-      throw new Error("Unsupported video processing route");
+    for (const routeJob of routePlan.jobs) {
+      const job = request.jobs[routeJob.jobIndex];
+      const subRequest = { ...request, jobs: [job] };
+      if (routeJob.decision.route === "stream-copy" && request.task.kind === "encode") {
+        progress.reportJobStage(routeJob.jobIndex, "decode", 1, 1, featureMessage(language, "video.messages.video.copyingWithoutChangingPictureQuality"));
+        progress.reportJobStage(routeJob.jobIndex, "encode", 1, 1, featureMessage(language, "video.messages.video.copyingWithoutChangingPictureQuality"));
+        try {
+          const result = await runVideoStreamCopyJob(
+            job,
+            request.task,
+            request.resultStorage,
+            routeJob.estimatedOutputBytes,
+            (stage, completedUnits, totalUnits, message) => progress.reportJobStage(
+              routeJob.jobIndex,
+              stage,
+              completedUnits,
+              totalUnits,
+              message,
+            ),
+            onOutput,
+            signal,
+            language,
+          );
+          outputCounts.push(result.outputCount);
+          progress.reportJobOverall(routeJob.jobIndex, 100, featureMessage(language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: routeJob.jobIndex + 1, p1: routePlan.jobs.length }));
+          continue;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") throw error;
+          if (routeJob.decision.streamingFailure.route === "reject") {
+            throw new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.largePassthroughCouldNotBeCompletedSafely"));
+          }
+        }
+      }
+      const result = await runFfmpegVideoTask(
+        subRequest,
+        (value, message) => progress.reportJobOverall(routeJob.jobIndex, value, message),
+        onOutput,
+        signal,
+        language,
+      );
+      outputCounts.push(result.outputCount);
+      progress.reportJobOverall(routeJob.jobIndex, 100, featureMessage(language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: routeJob.jobIndex + 1, p1: routePlan.jobs.length }));
     }
-    return await runFfmpegVideoTask(request, progress.reportOverall, onOutput, signal, language);
+    return createVideoWorkerResult(outputCounts, request.task, (key, values) => featureMessage(language, key, values));
   } finally {
     progress.terminate();
   }

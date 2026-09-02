@@ -486,7 +486,12 @@ export function VideoStudioPage() {
     }
     const totalSize = items.reduce((sum, item) => sum + item.file.size, 0);
     const cautionBytes = mobileDevice ? 250 * 1024 * 1024 : 500 * 1024 * 1024;
-    if (totalSize > cautionBytes && !window.confirm(featureMessage(language, "video.messages.VideoStudioPage.largeFileNoticeTheSelectedSourcesTotalThey", { p0: formatBytes(totalSize) }))) return;
+    const onlyProgressivePassthrough = routePreflight.jobs.length > 0
+      && routePreflight.jobs.every(({ decision }) => decision.route === "stream-copy");
+    const largeFileMessage = onlyProgressivePassthrough
+      ? "video.messages.VideoStudioPage.largeStreamingFileNotice"
+      : "video.messages.VideoStudioPage.largeFileNoticeTheSelectedSourcesTotalThey";
+    if (totalSize > cautionBytes && !window.confirm(featureMessage(language, largeFileMessage, { p0: formatBytes(totalSize) }))) return;
     await executeTask((controller, onOutput, resultStorage) => {
       return runVideoProcessingTask(
         { mode: "batch", jobs, task, resultStorage },

@@ -28,6 +28,14 @@ export interface VideoResultWritableTarget {
   discard: () => Promise<void>;
 }
 
+export interface VideoResultRandomAccessTarget {
+  entryName: string;
+  write: (bytes: Uint8Array, position: number) => void;
+  flush: () => Promise<void>;
+  complete: (fileName: string, mimeType: string) => Promise<VideoWorkerOutput>;
+  discard: () => Promise<void>;
+}
+
 export async function persistVideoWorkerResult(
   bytes: Uint8Array,
   fileName: string,
@@ -108,6 +116,119 @@ export async function createVideoResultWritableTarget(
     };
   } catch (error) {
     try { syncAccessHandle?.close(); } catch { /* already closed */ }
+    await sessionDirectory.removeEntry(entryName).catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function createVideoResultRandomAccessTarget(
+  session: VideoResultStorageSession,
+  fileName: string,
+  expectedSize: number,
+  onWrite?: (cumulativeBytes: number, position: number, byteLength: number) => void,
+): Promise<VideoResultRandomAccessTarget> {
+  if (session.mode !== "opfs") throw new Error("Persistent browser result storage is unavailable");
+  if (await estimateVideoStorageQuota(expectedSize) === "insufficient") throw new VideoResultQuotaError();
+
+  const sessionDirectory = await openVideoResultSessionDirectory(session);
+  const entryName = createVideoResultEntryName(fileName);
+  const fileHandle = await sessionDirectory.getFileHandle(entryName, { create: true });
+  let discarded = false;
+  let completed = false;
+  let cumulativeBytes = 0;
+  let syncAccessHandle: SyncAccessHandleLike | undefined;
+  let asyncWritable: FileSystemWritableFileStream | undefined;
+  let pendingWrites = Promise.resolve();
+  let pendingError: unknown;
+
+  const recordWrite = (position: number, byteLength: number) => {
+    cumulativeBytes += byteLength;
+    onWrite?.(cumulativeBytes, position, byteLength);
+  };
+  const close = async () => {
+    if (completed) return;
+    completed = true;
+    await pendingWrites;
+    if (pendingError) throw pendingError;
+    if (syncAccessHandle) {
+      syncAccessHandle.flush();
+      syncAccessHandle.close();
+      syncAccessHandle = undefined;
+    } else if (asyncWritable) {
+      await asyncWritable.close();
+      asyncWritable = undefined;
+    }
+  };
+
+  try {
+    const createSyncAccessHandle = (fileHandle as unknown as { createSyncAccessHandle?: () => Promise<SyncAccessHandleLike> }).createSyncAccessHandle;
+    if (createSyncAccessHandle) {
+      try {
+        syncAccessHandle = await createSyncAccessHandle.call(fileHandle);
+        syncAccessHandle.truncate(0);
+      } catch (error) {
+        try { syncAccessHandle?.close(); } catch { /* cleanup continues below */ }
+        syncAccessHandle = undefined;
+        if (isStorageQuotaError(error)) throw error;
+      }
+    }
+    if (!syncAccessHandle) asyncWritable = await fileHandle.createWritable();
+
+    return {
+      entryName,
+      write: (bytes, position) => {
+        if (discarded || completed) throw new Error("Result file is no longer writable");
+        if (!Number.isSafeInteger(position) || position < 0) throw new Error("Invalid result write position");
+        if (syncAccessHandle) {
+          let written = 0;
+          while (written < bytes.byteLength) {
+            const count = syncAccessHandle.write(bytes.subarray(written), { at: position + written });
+            if (!Number.isFinite(count) || count <= 0) throw new Error("Unable to write result data");
+            written += count;
+          }
+          recordWrite(position, bytes.byteLength);
+          return;
+        }
+        const copy = bytes.slice();
+        pendingWrites = pendingWrites.then(async () => {
+          if (!asyncWritable) throw new Error("Result file is no longer writable");
+          await asyncWritable.write({ type: "write", position, data: copy });
+          recordWrite(position, copy.byteLength);
+        }).catch((error) => {
+          pendingError = error;
+          throw error;
+        });
+      },
+      flush: async () => {
+        await pendingWrites;
+        if (pendingError) throw pendingError;
+        syncAccessHandle?.flush();
+      },
+      complete: async (completedFileName, mimeType) => {
+        await close();
+        const file = await fileHandle.getFile();
+        await refreshVideoResultStorageSession(session).catch(() => undefined);
+        return {
+          data: createOpfsResultReference(session, entryName),
+          fileName: completedFileName,
+          mimeType,
+          size: file.size,
+        };
+      },
+      discard: async () => {
+        if (discarded) return;
+        discarded = true;
+        await pendingWrites.catch(() => undefined);
+        try { syncAccessHandle?.close(); } catch { /* already closed */ }
+        syncAccessHandle = undefined;
+        if (asyncWritable) await asyncWritable.abort().catch(() => undefined);
+        asyncWritable = undefined;
+        await sessionDirectory.removeEntry(entryName).catch(() => undefined);
+      },
+    };
+  } catch (error) {
+    try { syncAccessHandle?.close(); } catch { /* already closed */ }
+    if (asyncWritable) await asyncWritable.abort().catch(() => undefined);
     await sessionDirectory.removeEntry(entryName).catch(() => undefined);
     throw error;
   }

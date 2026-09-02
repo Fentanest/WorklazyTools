@@ -24,6 +24,8 @@ export type VideoRouteReasonCode =
   | "OPFS_UNAVAILABLE"
   | "QUOTA_UNKNOWN"
   | "QUOTA_INSUFFICIENT"
+  | "STREAM_COPY_INCOMPATIBLE"
+  | "STREAM_COPY_READY"
   | "STREAM_COPY_PENDING"
   | "WEBCODECS_PENDING";
 
@@ -39,6 +41,7 @@ export interface VideoRouteInput {
   opfsAvailable: boolean;
   quota: VideoStorageQuotaState;
   estimatedOutputBytes: number;
+  streamCopyCompatible?: boolean;
 }
 
 export interface VideoRouteDecision {
@@ -70,6 +73,12 @@ export function decideVideoProcessingRoute(input: VideoRouteInput): VideoRouteDe
   }
   if (input.quota === "insufficient") {
     return { route: "ffmpeg", plannedStreamingRoute, reasonCode: "QUOTA_INSUFFICIENT", streamingFailure };
+  }
+  if (plannedStreamingRoute === "stream-copy" && input.streamCopyCompatible === false) {
+    return { route: "ffmpeg", plannedStreamingRoute, reasonCode: "STREAM_COPY_INCOMPATIBLE", streamingFailure };
+  }
+  if (plannedStreamingRoute === "stream-copy" && input.streamCopyCompatible === true) {
+    return { route: "stream-copy", plannedStreamingRoute, reasonCode: "STREAM_COPY_READY", streamingFailure };
   }
   return {
     route: "ffmpeg",

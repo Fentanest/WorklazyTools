@@ -18,6 +18,7 @@ import {
 } from "../../src/features/video-studio/videoResultStorage.ts";
 import {
   createVideoResultWritableTarget,
+  createVideoResultRandomAccessTarget,
   persistVideoWorkerResult,
   VideoResultQuotaError,
 } from "../../src/features/video-studio/videoResultStorage.worker.ts";
@@ -59,8 +60,15 @@ test("completed OPFS results resolve as Files and cancellation cleanup removes o
   const sessionDirectory = await getSessionDirectory(storage, session);
   const partial = await sessionDirectory.getFileHandle("result-interrupted.mp4", { create: true }) as FakeFileHandle;
   partial.bytes = new Uint8Array([9, 9]);
+  const removeEntry = sessionDirectory.removeEntry.bind(sessionDirectory);
+  let lockedRemovalAttempts = 0;
+  sessionDirectory.removeEntry = async (name) => {
+    if (name === "result-interrupted.mp4" && lockedRemovalAttempts++ < 2) throw new DOMException("File is still locked", "InvalidStateError");
+    return removeEntry(name);
+  };
 
   assert.equal(await cleanupPartialVideoResults(session, [completedEntry]), 1);
+  assert.equal(lockedRemovalAttempts, 3);
   assert.equal(sessionDirectory.children.has(completedEntry), true);
   assert.equal(sessionDirectory.children.has("result-interrupted.mp4"), false);
   const file = await resolveVideoResultFile(stored.output);
@@ -81,6 +89,27 @@ test("canceling an active result write discards its partial file", async () => {
 
   const sessionDirectory = await getSessionDirectory(storage, session);
   assert.equal(sessionDirectory.children.has(target.entryName), false);
+});
+
+test("random-access result writes keep cumulative bytes monotonic while patching an earlier MP4 header", async () => {
+  const storage = new FakeStorageManager();
+  installStorage(storage);
+  const session = await createVideoResultStorageSession({ now: 6_500, createId: idSequence("random-session", "random-owner"), storage });
+  const writes: Array<{ cumulative: number; position: number }> = [];
+  const target = await createVideoResultRandomAccessTarget(session, "large.mp4", 12, (cumulative, position) => {
+    writes.push({ cumulative, position });
+  });
+  target.write(new Uint8Array([0, 0, 0, 0]), 0);
+  target.write(new Uint8Array([5, 6, 7, 8]), 4);
+  target.write(new Uint8Array([9, 9]), 0);
+  await target.flush();
+  const output = await target.complete("large.mp4", "video/mp4");
+  assert.deepEqual(writes, [
+    { cumulative: 4, position: 0 },
+    { cumulative: 8, position: 4 },
+    { cumulative: 10, position: 0 },
+  ]);
+  assert.deepEqual(new Uint8Array(await (await resolveVideoResultFile(output)).arrayBuffer()), new Uint8Array([9, 9, 0, 0, 5, 6, 7, 8]));
 });
 
 test("quota shortage uses the bounded Blob fallback and rejects large temporary results", async () => {

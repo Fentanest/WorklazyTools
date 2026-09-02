@@ -15,6 +15,7 @@ export interface VideoProcessingProgressController {
   reportOverall: VideoWorkerProgress;
   reportStage: (stage: VideoProgressStage, progress: number, message: string) => void;
   reportJobStage: (jobIndex: number, stage: VideoProgressStage, completedUnits: number, totalUnits: number, message: string) => void;
+  reportJobOverall: (jobIndex: number, progress: number, message: string) => void;
   terminate: () => void;
   current: () => number;
 }
@@ -32,6 +33,14 @@ export function createVideoProcessingProgressController(
   let terminal = false;
   const stageProgress = Object.fromEntries(VIDEO_PROGRESS_STAGES.map((stage) => [stage, 0])) as Record<VideoProgressStage, number>;
   const jobStageProgress = VIDEO_PROGRESS_STAGES.map(() => jobWeights.map(() => 0));
+  const reportJobProgress = (jobIndex: number, message: string) => {
+    for (let stageIndex = 0; stageIndex < VIDEO_PROGRESS_STAGES.length; stageIndex += 1) {
+      const stage = VIDEO_PROGRESS_STAGES[stageIndex];
+      const weights = jobWeights.map((job) => stage === "write" ? job.expectedOutputBytes : job.durationSeconds);
+      stageProgress[stage] = weightedAverage(jobStageProgress[stageIndex], weights);
+    }
+    reportOverall(weightedStageProgress(stageProgress), message);
+  };
   const reportOverall: VideoWorkerProgress = (progress, message) => {
     if (terminal) return;
     const nextProgress = normalizeProgress(progress);
@@ -51,6 +60,17 @@ export function createVideoProcessingProgressController(
       const weights = jobWeights.map((job) => stage === "write" ? job.expectedOutputBytes : job.durationSeconds);
       stageProgress[stage] = weightedAverage(jobStageProgress[stageIndex], weights);
       reportOverall(weightedStageProgress(stageProgress), message);
+    },
+    reportJobOverall: (jobIndex, progress, message) => {
+      if (!jobWeights[jobIndex]) return;
+      const ratio = normalizeProgress(progress) / 100;
+      let consumed = 0;
+      VIDEO_PROGRESS_STAGES.forEach((stage, stageIndex) => {
+        const weight = VIDEO_PROGRESS_STAGE_WEIGHTS[stage];
+        jobStageProgress[stageIndex][jobIndex] = Math.max(0, Math.min(1, (ratio - consumed) / weight));
+        consumed += weight;
+      });
+      reportJobProgress(jobIndex, message);
     },
     terminate: () => { terminal = true; },
     current: () => currentProgress,

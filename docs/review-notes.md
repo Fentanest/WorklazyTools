@@ -4,6 +4,16 @@
 
 ## 2026-09-03
 
+### 비디오 B2 — MP4/MOV 패스스루 스트리밍 판정 (Codx)
+
+- **의존성·지연 로드 판정**: B1b에서 Mediabunny 1.55.5가 B-frame trim 종료 오차 2프레임으로 기각된 판정을 유지하고 `mp4box@2.4.1`(BSD-3-Clause)과 deprecated를 감수한 `mp4-muxer@5.2.2`(MIT)를 exact lock했다. 라이선스 생성기가 두 패키지와 타입 의존성 고지를 자동 반영했다. 두 라이브러리는 별도 `videoStream.worker` chunk 안에서만 정적 import하며 Chrome 요청 계측에서 비디오 페이지 진입·파일 선택까지 요청 0건, 패스스루 preflight/실행 때만 요청됨을 확인했다. 빌드 결과 워커는 `232.46kB` 독립 chunk였다.
+- **preflight·route 판정**: `File.slice()`와 `fileStart`를 붙인 점진 append로 실제 video/audio track을 읽고 codec 이름·sample entry·`avcC`/`hvcC`·AAC AudioSpecificConfig·해상도·채널·sample rate·edit/sample table을 비교한다. H.264+AAC MP4, H.264+AAC MOV, HEVC+hvc1 MP4, 동일 파라미터 concat은 stream-copy, VP9 WebM·VP9 MKV와 해상도/구성 불일치 concat은 FFmpeg로 판정했다. 상위 오케스트레이터는 한 요청 안에서도 job별로 두 경로를 혼합 실행한다. 스트리밍 실패 예상 출력이 `1.5GiB` 이하일 때만 FFmpeg 재시도, 초과 시 ko/en 안전 오류로 종결하고 1.5GiB 사전 가드는 FFmpeg job에만 남겼다.
+- **샘플·출력 계약 판정**: 선택 시작 이전 최근접 video sync sample부터 decode timestamp가 선택 종료보다 작은 sample까지 복사하고, audio는 스냅된 video 첫 DTS부터 선택한다. concat은 완전 동일한 track profile만 segment offset으로 이어 붙인다. 입력 sample은 최대 `8MiB` window, metadata는 `1MiB` chunk로 읽고, 출력은 `StreamTarget(chunked:true, chunkSize:1MiB)`·`fastStart:false`로 A4 세션의 random-access 임시 파일에 직접 기록한다. `fastStart:"in-memory"`, WebM 스트리밍, WebCodecs 인코딩은 도입하지 않았다.
+- **2GiB 초과 실측**: `node scripts/benchmark-video-stream-copy.mjs --output-dir /tmp/worklazy-video-stream-copy-b2-final`로 70.4초/2,112-frame 합성 H.264 fixture를 실제 Chrome 제품 워커 경로에 넣었다. 입력과 ffprobe 확인 출력은 모두 `2,214,602,200B`로 2GiB를 `67,118,552B` 초과했다. 입력 전체 `arrayBuffer()`는 `0`회, slice read `267`회/총 `2,215,650,779B`/최대 `8,388,608B`; 출력은 `2,114`회 write/최대 `1,048,576B`, 누적 write byte는 끝까지 단조 증가했다. 출력 video는 H.264/avc1, `70.400000s`, 2,112 packets의 DTS가 단조 증가했고 취소 뒤 `result-*` 부분 파일은 `0`건이었다. 보고서는 `/tmp/worklazy-video-stream-copy-b2-final/video-stream-copy-benchmark.json`이다.
+- **키프레임·A/V 수치 판정**: 1.650–4.450초 B-frame trim에서 원본의 선택 이전 최근접 keyframe PTS는 `1.000000s`였고 신규 스냅도 `1.000000s`로 오차 `0ms`였다. 원본·현행 FFmpeg copy·신규 출력 첫 video packet SHA-256은 모두 `80c25aaf78cda8b121abd10e1a1692074587ca096892671042d3ac2edee30a09`로 동일했다. FFmpeg와 신규 video duration은 모두 `3.533333s`로 오차 `0프레임`, 신규 첫 video/audio DTS는 모두 `0.000000s`로 정렬 오차 `0ms`; 신규 271개 packet의 stream별 DTS도 단조 증가했다. 동일 profile 2구간 concat 출력도 H.264/AAC 354 packets의 DTS 단조성을 통과했다.
+- **현지화·SEO·배포 표면 판정**: 점진 저장·원본 화질 복사·대용량 안전 오류를 ko/en 동일 키로 추가하고 UI/DOM에서 OPFS·SyncAccessHandle·zip.js·mp4box·mp4-muxer·WebCodecs·remux·worker 비노출을 검사했다. URL·검색 의미·정적 페이지·광고 위치·광고 제외 격리 경로·GitHub Pages 서버리스 계약은 변하지 않아 별도 SEO/AdSense 변경은 불필요로 판정했다.
+- **완료 검증**: `npm run build` exit 0(2,358 modules, 정적 55페이지), `npm run test:unit` exit 0(97/97), `npm run test:new-tools` exit 0(HWP·이미지·오디오·비디오 전체와 스트리밍 워커 지연 로드), `npm run test:utilities` exit 0, `npm run test:static` exit 0. `git diff --check`와 2GiB 실측 명령도 exit 0이었다.
+
 ### 비디오 B4 — route·오케스트레이터·진행률 기반 판정 (Codx)
 
 - **route 결정표 판정**: 순수 함수 입력을 컨테이너(MP4/MOV/MKV/WebM)·코덱(H.264/HEVC/VP9)·bitrate(copy/CRF/target)·audio(copy/remove/encode)·OPFS 가용성·quota(enough/insufficient/unknown)로 고정했다. MP4/MOV+H.264/HEVC의 copy는 stream-copy, target bitrate는 WebCodecs 후보로 분류하되, B2/B3 미구현 상태에서는 648개 범주 조합 전부를 사유 코드와 함께 FFmpeg로 확정했다. MKV/WebM·VP9·CRF·copy+audio encode는 적합성 단계에서 FFmpeg로 남고, OPFS 미지원·quota 미확인/부족은 별도 사유로 구분했다.

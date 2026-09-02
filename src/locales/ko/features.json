@@ -283,7 +283,13 @@
         "minSec": "{{p0}}분 {{p1}}초",
         "engineMultiThreaded": "멀티스레드",
         "engineSingleThreaded": "단일 스레드 호환",
-        "thereIsNotEnoughBrowserStorageForThisResult": "완성된 결과를 안전하게 보관할 브라우저 저장 공간이 부족합니다. 출력 구간·해상도를 줄이거나 불필요한 브라우저 데이터를 정리한 뒤 다시 시도해 주세요."
+        "thereIsNotEnoughBrowserStorageForThisResult": "완성된 결과를 안전하게 보관할 브라우저 저장 공간이 부족합니다. 출력 구간·해상도를 줄이거나 불필요한 브라우저 데이터를 정리한 뒤 다시 시도해 주세요.",
+        "checkingSourceForDirectCopy": "원본 {{p0}}/{{p1}}의 무손실 복사 가능 여부를 확인하는 중…",
+        "sourceTracksReady": "원본 영상과 음성 설정이 서로 호환됩니다.",
+        "copyingWithoutChangingPictureQuality": "원본 화질을 그대로 유지하는 중…",
+        "copyingSelectedRange": "{{p0}}/{{p1}} 선택 구간을 복사하는 중…",
+        "savingCompletedVideoProgressively": "완성되는 영상을 순서대로 저장하는 중…",
+        "finalizingCompletedVideo": "완성된 영상을 마무리하는 중…"
       },
       "videoWorkerClient": {
         "videoMetadataInspectionWasCanceled": "영상 정보 확인을 취소했습니다.",
@@ -300,11 +306,12 @@
         "unableToStartVideoProcessing": "비디오 작업을 시작하지 못했습니다.",
         "theVideoWorkspaceDidNotStartWithin30": "영상 처리를 30초 안에 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.",
         "unableToStoreTheCompletedVideoResult": "완성된 비디오 결과를 보관하지 못했습니다. 브라우저 저장 공간을 확인한 뒤 다시 시도해 주세요.",
+        "largePassthroughCouldNotBeCompletedSafely": "대용량 무손실 복사 결과를 안전하게 완성하지 못했습니다. 선택 구간을 줄이거나 브라우저 저장 공간을 비운 뒤 다시 시도해 주세요. 또는 재인코딩 방식을 선택해 주세요.",
         "originalVideo": "원본 영상"
       },
       "VideoStudioPage": {
         "unsupportedFilesWereSkipped": "지원하지 않는 파일을 제외했습니다: {{p0}}",
-        "wereAttachedWithoutCopyingTheEntireSourceInto": "{{p0}}은 원본을 메모리에 통째로 복사하지 않고 연결했습니다. 원본 그대로 복사(패스스루)한 결과가 너무 크면 출력 전에 구간 축소 안내가 표시됩니다.",
+        "wereAttachedWithoutCopyingTheEntireSourceInto": "{{p0}}은 원본을 메모리에 통째로 복사하지 않고 연결했습니다. 호환되는 MP4·MOV 패스스루 결과는 완성되는 대로 저장하며, 다른 출력 방식의 대용량 결과는 구간 축소 안내가 표시될 수 있습니다.",
         "unableToReadVideoMetadata": "영상 정보를 확인하지 못했습니다.",
         "isReadyDownloadItFromTheResultsBelow": "{{p0}} 준비 완료 · 아래 결과 목록에서 내려받을 수 있습니다.",
         "requestedIndividualDownloadsAllowMultipleDownloadsIfYour": "{{p0}}개 파일의 개별 다운로드를 요청했습니다. 브라우저가 여러 파일 다운로드 허용 여부를 물으면 허용해 주세요.",
@@ -325,6 +332,7 @@
         "checkingEstimatedPassthroughOutputSize": "원본 그대로 복사할 결과 크기를 확인하는 중…",
         "isEstimatedAtAboutLargeSourceFilesAre": "{{p0}}의 예상 결과가 약 {{p1}}입니다. 대형 원본 자체가 위험한 것은 아니지만, 현재 브라우저 출력 방식은 1.5GB를 넘는 단일 결과를 만들 수 없습니다. 출력 구간을 줄이거나 화질 기준 자동 용량 조절(CRF)을 선택해 주세요.",
         "largeFileNoticeTheSelectedSourcesTotalThey": "대형 파일 처리 주의: 선택한 원본이 {{p0}}입니다. 원본은 전체 메모리 복사 없이 연결하지만, 이 기기에서는 변환 시간이 길어지거나 메모리가 부족할 수 있습니다. 계속할까요?",
+        "largeStreamingFileNotice": "대용량 무손실 복사 안내: 선택한 원본이 {{p0}}입니다. 호환되는 결과는 1.5GB 변환 한도 없이 완성되는 대로 저장하지만, 브라우저 저장 공간은 충분해야 합니다. 계속할까요?",
         "attachingSourceVideosToTheProcessingEngineWithout": "원본 영상을 불러오는 중…",
         "allResultsAreReady": "{{p0}}개 결과가 모두 준비되었습니다.{{p1}}",
         "resultsCreated": "{{p0}}개 결과 생성 완료",
@@ -354,7 +362,7 @@
         "outputFiles": "{{p0}}개 결과 파일",
         "completedFilesAppearInTheIndividualDownloadList": "완성되는 파일부터 개별 다운로드 목록에 표시합니다.",
         "browserRecommendationUnder1GbPerOutput": "브라우저 출력 권장: 파일당 1GB 이하",
-        "theCurrentSafetyLimitIs15Gb": "현재 안전 한도는 결과 파일 1개당 1.5GB입니다. 원본 파일 크기와는 별도로 계산합니다.",
+        "theCurrentSafetyLimitIs15Gb": "호환되는 MP4·MOV 패스스루는 저장 공간이 충분하면 1.5GB를 넘을 수 있으며, 다른 패스스루 방식은 1.5GB 안전 한도를 유지합니다.",
         "gifFrameRate": "GIF 초당 프레임",
         "smaller": "작은 용량",
         "recommended": "권장",

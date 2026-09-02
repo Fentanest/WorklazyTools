@@ -14,7 +14,7 @@ import {
   type VideoRouteReasonCode,
 } from "../../src/features/video-studio/videoRouting.ts";
 
-test("the complete route table keeps every B2/B3 combination on FFmpeg until those paths ship", () => {
+test("the complete route table keeps copy candidates on FFmpeg until compatibility preflight succeeds", () => {
   let combinations = 0;
   for (const container of VIDEO_ROUTE_CONTAINERS) {
     for (const codec of VIDEO_ROUTE_CODECS) {
@@ -60,6 +60,16 @@ test("streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio
     estimatedOutputBytes: 512 * 1024 * 1024,
   } as const;
   assert.equal(decideVideoProcessingRoute(base).reasonCode, "STREAM_COPY_PENDING");
+  assert.deepEqual(decideVideoProcessingRoute({ ...base, streamCopyCompatible: true }), {
+    route: "stream-copy",
+    plannedStreamingRoute: "stream-copy",
+    reasonCode: "STREAM_COPY_READY",
+    streamingFailure: {
+      route: "ffmpeg",
+      reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
+    },
+  });
+  assert.equal(decideVideoProcessingRoute({ ...base, streamCopyCompatible: false }).reasonCode, "STREAM_COPY_INCOMPATIBLE");
   assert.equal(decideVideoProcessingRoute({ ...base, container: "mov" }).reasonCode, "STREAM_COPY_PENDING");
   assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "target", audioMode: "encode" }).reasonCode, "WEBCODECS_PENDING");
   assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "crf" }).reasonCode, "CRF_REQUIRES_FFMPEG");

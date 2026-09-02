@@ -283,7 +283,13 @@
         "minSec": "{{p0}} min {{p1}} sec",
         "engineMultiThreaded": "multi-threaded",
         "engineSingleThreaded": "single-thread compatibility",
-        "thereIsNotEnoughBrowserStorageForThisResult": "There is not enough browser storage to keep this completed result safely. Shorten the output range, lower the resolution, or clear unneeded browser data and try again."
+        "thereIsNotEnoughBrowserStorageForThisResult": "There is not enough browser storage to keep this completed result safely. Shorten the output range, lower the resolution, or clear unneeded browser data and try again.",
+        "checkingSourceForDirectCopy": "Checking source {{p0}}/{{p1}} for lossless copying…",
+        "sourceTracksReady": "The source video and audio settings are compatible.",
+        "copyingWithoutChangingPictureQuality": "Keeping the original picture quality…",
+        "copyingSelectedRange": "{{p0}}/{{p1}} Copying the selected range…",
+        "savingCompletedVideoProgressively": "Saving the completed video as it is produced…",
+        "finalizingCompletedVideo": "Finalizing the completed video…"
       },
       "videoWorkerClient": {
         "videoMetadataInspectionWasCanceled": "Reading video details was canceled.",
@@ -300,11 +306,12 @@
         "unableToStartVideoProcessing": "Unable to start video processing.",
         "theVideoWorkspaceDidNotStartWithin30": "Video processing did not start within 30 seconds. Refresh the page and try again.",
         "unableToStoreTheCompletedVideoResult": "The completed video result could not be kept. Check available browser storage and try again.",
+        "largePassthroughCouldNotBeCompletedSafely": "This large lossless-copy result could not be completed safely. Shorten the selected range, free browser storage, or choose re-encoding and try again.",
         "originalVideo": "source video"
       },
       "VideoStudioPage": {
         "unsupportedFilesWereSkipped": "Unsupported files were skipped: {{p0}}",
-        "wereAttachedWithoutCopyingTheEntireSourceInto": "{{p0}} were attached without copying the entire source into memory. If a passthrough result is too large, you will be asked to shorten the range before export.",
+        "wereAttachedWithoutCopyingTheEntireSourceInto": "{{p0}} were attached without copying the entire source into memory. Compatible MP4 and MOV passthrough results are saved progressively; other output paths may ask you to shorten a large range.",
         "unableToReadVideoMetadata": "Unable to read video details.",
         "isReadyDownloadItFromTheResultsBelow": "{{p0}} is ready. Download it from the results below.",
         "requestedIndividualDownloadsAllowMultipleDownloadsIfYour": "Requested {{p0}} individual downloads. Allow multiple downloads if your browser asks.",
@@ -325,6 +332,7 @@
         "checkingEstimatedPassthroughOutputSize": "Checking estimated passthrough output size…",
         "isEstimatedAtAboutLargeSourceFilesAre": "{{p0}} is estimated at about {{p1}}. Large source files are not inherently unsafe, but this browser output path cannot create a single result over 1.5 GB. Shorten the range or select CRF encoding.",
         "largeFileNoticeTheSelectedSourcesTotalThey": "Large-file notice: the selected sources total {{p0}}. They are attached without copying the entire files into memory, but conversion may take longer or run out of memory on this device. Continue?",
+        "largeStreamingFileNotice": "Large lossless-copy notice: the selected sources total {{p0}}. Compatible results are saved progressively without the 1.5 GB conversion limit, but they still need enough browser storage. Continue?",
         "attachingSourceVideosToTheProcessingEngineWithout": "Loading source videos…",
         "allResultsAreReady": "All {{p0}} results are ready.{{p1}}",
         "resultsCreated": "{{p0}} results created",
@@ -354,7 +362,7 @@
         "outputFiles": "{{p0}} output files",
         "completedFilesAppearInTheIndividualDownloadList": "Completed files appear in the individual download list immediately.",
         "browserRecommendationUnder1GbPerOutput": "Browser recommendation: under 1 GB per output",
-        "theCurrentSafetyLimitIs15Gb": "The current safety limit is 1.5 GB per result, calculated separately from source file size.",
+        "theCurrentSafetyLimitIs15Gb": "Compatible MP4/MOV passthrough can exceed 1.5 GB when browser storage allows; other passthrough paths keep the 1.5 GB safety limit.",
         "gifFrameRate": "GIF frame rate",
         "smaller": "smaller",
         "recommended": "recommended",
