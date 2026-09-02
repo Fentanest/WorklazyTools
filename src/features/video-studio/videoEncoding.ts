@@ -2,7 +2,7 @@ import type { VideoCodec } from "./types";
 
 export function appendVideoRateControl(args: string[], codec: VideoCodec, bitrate: string, crf: number) {
   if (codec === "vp9") {
-    args.push("-b:v", bitrate || "0", "-crf", String(crf), "-row-mt", "1");
+    args.push("-b:v", bitrate || "0", "-crf", String(crf), "-row-mt", "1", "-deadline", "good", "-cpu-used", "4");
     return;
   }
   args.push("-preset", "veryfast");

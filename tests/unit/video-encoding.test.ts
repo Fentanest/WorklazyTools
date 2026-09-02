@@ -16,7 +16,13 @@ test("H.264 automatic quality and VP9 retain their intended CRF modes", () => {
   assert.deepEqual(h264, ["-preset", "veryfast", "-crf", "22"]);
   const vp9: string[] = [];
   appendVideoRateControl(vp9, "vp9", "5M", 28);
-  assert.ok(vp9.includes("-crf") && vp9.includes("-b:v"));
+  assert.deepEqual(vp9, [
+    "-b:v", "5M",
+    "-crf", "28",
+    "-row-mt", "1",
+    "-deadline", "good",
+    "-cpu-used", "4",
+  ]);
 });
 
 test("resolution uses the short edge and never upscales the source", () => {
