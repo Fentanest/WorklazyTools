@@ -23,6 +23,8 @@ interface ImageEditorPanelProps {
   regionEffectStrength: number;
   regionEffectBusy: boolean;
   regionSelection?: RegionSelectionSummary;
+  cropRatio?: number;
+  unavailableCropRatios: readonly number[];
   brightness: number;
   contrast: number;
   hue: number;
@@ -38,7 +40,7 @@ interface ImageEditorPanelProps {
   onRotate: () => void;
   onFlipHorizontal: () => void;
   onFlipVertical: () => void;
-  onCropRatio: (ratio: number) => void;
+  onCropRatio: (ratio?: number) => void;
   onCropCancel: () => void;
   onCropApply: () => void;
   onRegionEffectChange: (effect: RegionEffect) => void;
@@ -109,14 +111,21 @@ function SelectPanel(props: ImageEditorPanelProps) {
 
 function CropPanel(props: ImageEditorPanelProps) {
   const { t } = useTranslation("features");
+  const ratios = [
+    [1, "1:1"],
+    [4 / 3, "4:3"],
+    [3 / 4, "3:4"],
+    [16 / 9, "16:9"],
+    [9 / 16, "9:16"],
+  ] as const;
   return (
     <div className="editor-tool-group">
       <div className="button-grid" data-testid="image-editor-crop-presets">
-        <button type="button" onClick={() => props.onCropRatio(1)}>1:1</button>
-        <button type="button" onClick={() => props.onCropRatio(4 / 3)}>4:3</button>
-        <button type="button" onClick={() => props.onCropRatio(3 / 4)}>3:4</button>
-        <button type="button" onClick={() => props.onCropRatio(16 / 9)}>16:9</button>
-        <button type="button" onClick={() => props.onCropRatio(9 / 16)}>9:16</button>
+        {ratios.map(([ratio, label]) => {
+          const disabled = props.unavailableCropRatios.includes(ratio);
+          return <button type="button" className={props.cropRatio === ratio ? "active" : ""} aria-pressed={props.cropRatio === ratio} disabled={disabled} title={disabled ? t("image.editor.cropRatioUnavailable") : undefined} onClick={() => props.onCropRatio(ratio)} key={label}>{label}</button>;
+        })}
+        <button type="button" className={props.cropRatio === undefined ? "active" : ""} aria-pressed={props.cropRatio === undefined} onClick={() => props.onCropRatio(undefined)}>{t("image.editor.cropFree")}</button>
       </div>
       <p className="image-crop-hint">{t("image.editor.cropHint")}</p>
       <SelectionActions selection={props.regionSelection} busy={false} onCancel={props.onCropCancel} onApply={props.onCropApply} applyLabel={t("image.editor.cropApply")} testId="image-editor-crop-selection" />

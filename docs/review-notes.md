@@ -4,6 +4,14 @@
 
 ## 2026-09-02
 
+### 이미지 P4 착수 2묶음 — 편집 가능한 자르기 박스·비율 경계 판정 (Codx)
+
+- **박스 편집 판정**: crop overlay만 selectable/evented인 전용 객체로 두고 코너4+변4 컨트롤을 구성했다. 회전·skew 컨트롤은 없고 flip lock을 고정했으며, 박스 위 좌클릭은 Fabric 이동/scale에 위임하고 밖 좌클릭만 한 개의 새 박스로 교체한다. 이동·scale 중 캔버스 경계를 넘지 않았고 scale 동안 패널/플로팅 px 라벨이 변한 뒤 `object:modified`가 정확히 1회 발생해 `scaleX=scaleY=1`·정수 width/height로 정규화됐다. 일반 선택·Delete·미니바·히스토리에는 잡히지 않았다.
+- **비율 판정**: `cropTo`의 900px 캔버스 재구성을 폐기하고 1:1·4:3·3:4·16:9·9:16+자유를 박스 상태로 분리했다. 기존 박스는 `w'=min(w,h×r)` 축소 우선 뒤 중심 유지·경계 이동·최소 확대 순으로 바뀌고 모든 preset이 ±1px 비율 오차를 통과했다. preset에서는 코너 4개만, 자유에서는 8개가 노출됐다. 경계의 9:16 최소 결과는 `10×18px`, 10×10 캔버스에서는 9:16이 ko 사유 tooltip과 함께 비활성화됐다. 무박스 preset 드래그와 적용 뒤 비율 유지, 자유 상태 Shift 드래그/핸들 1:1, Alt 드래그/핸들 중심 유지도 통과했다. Fabric 전역 `uniformScaling=true`는 바꾸지 않았다.
+- **입력·소유권·출력 판정**: 박스 안/밖 좌클릭과 안/밖 우클릭 네 분기, 단일 touch 드래그, 200% zoom+Space pan 후 핸들 적중, 두 손가락 pinch 뒤 박스 기하 동일을 실동작으로 검증했다. crop↔effect 전환 시 상대 overlay 수는 항상 0이었고, crop 박스를 직접 제거해 내보낸 결과는 박스 취소 뒤 결과와 byte-identical data URL이었다. 핸들 조정 뒤 적용 캔버스 치수는 선택 정수 치수와 정확히 같고 합성 fixture의 녹색 대조군 픽셀도 보존됐다.
+- **회귀·완료 검증**: `npm run build`(TypeScript+Vite, 2,346 modules, 55 정적 페이지) · `npm run test:unit`(65/65) · `TEST_ONLY_IMAGE=1 npm run test:new-tools` · `npm run test:utilities` · `npm run test:static` 전부 통과. P4-0 합성 8조합도 표시/저장·적용 오차 `0px`, 저장 치수 오차 `0px`, 펜·지우개·녹색 대조군 보존을 유지했다. 최초 이미지 스모크 사전 시도 1회는 preview 미기동으로 `ERR_CONNECTION_REFUSED`가 나 검증 시작 전 중단됐고, 로컬 preview 기동 후 동일 명령을 재실행해 통과했다.
+- **동반 영향 검토**: crop 조작 안내와 극단 비율 사유는 ko/en을 함께 갱신했다. 기능 URL·핵심 검색 의미·SEO 메타데이터·가이드 정적 페이지·광고 위치·광고 제외 격리 경로는 바뀌지 않아 추가 변경 불필요로 판정했다. P4-3 크기 도구와 P4-4 접이식 패널은 건드리지 않았다.
+
 ### 이미지 P4 착수 1묶음 — overlay 좌표·상태 의미·선택 UI 판정 (Codx)
 
 - **P4-0 판정**: crop/effect `Rect`의 `originX/Y`를 `left/top`으로 고정하고 비선택·비이벤트·내보내기 제외 속성을 유지했다. effect anchor는 계속 원본 이미지 로컬 좌표이고 히스토리는 세션 메모리뿐이므로 마이그레이션은 불필요하다. 합성 fixture(600×400 회색 바탕+녹색 대조군, `dummyfortest` 미사용)에서 없음/이동+90° 회전+flip × crop zoom 100/200% × 지우개 유무 8조합 모두 stroke 제외 overlay 표시-저장·적용 최대 오차 `0px`, 박스 안 펜 보존, 대조군 보존을 통과했다.

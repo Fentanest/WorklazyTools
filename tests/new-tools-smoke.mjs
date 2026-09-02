@@ -52,6 +52,7 @@ try {
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
     await testImageStudio(page, fixtures.images);
     await testImageStudioRegionInteractions(page);
+    await testImageStudioCropBoxEditing(page);
     const cropMatrix = [];
     for (const transformed of [false, true]) {
       for (const zoom of [1, 2]) {
@@ -527,32 +528,27 @@ async function testImageStudio(page, imagePaths) {
   console.log("  image: region overlay export verified");
   await page.click('[data-testid="image-editor-panel-crop"]');
   const portraitPresets = await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean));
-  if (!portraitPresets.includes("3:4") || !portraitPresets.includes("9:16")) throw new Error("Portrait crop presets are unavailable");
+  if (!portraitPresets.includes("3:4") || !portraitPresets.includes("9:16") || !portraitPresets.includes("자유") || portraitPresets.length !== 6) throw new Error(`Crop presets are incomplete: ${JSON.stringify(portraitPresets)}`);
+  await dragImageEditorRegion(page, 1);
+  const ratioBefore = await readImageEditorRegionGeometry(page, "crop");
   await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => {
     const ratio = buttons.find((button) => button.textContent?.trim() === "4:3");
     if (!(ratio instanceof HTMLButtonElement)) throw new Error("4:3 crop preset is unavailable");
     ratio.click();
   });
-  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
-  await new Promise((resolve) => setTimeout(resolve, 160));
-  let ratioCanvasSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
-  if (ratioCanvasSize.width !== 900 || ratioCanvasSize.height !== 675) throw new Error(`4:3 crop did not resize the canvas: ${JSON.stringify(ratioCanvasSize)}`);
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.$eval('[data-testid="image-editor-undo"]', (button) => button.click());
-  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
-  ratioCanvasSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
-  if (ratioCanvasSize.width !== 900 || ratioCanvasSize.height !== 600) throw new Error(`Dimension-changing undo did not restore the previous canvas: ${JSON.stringify(ratioCanvasSize)}`);
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.$eval('[data-testid="image-editor-redo"]', (button) => button.click());
-  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
-  ratioCanvasSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
-  if (ratioCanvasSize.width !== 900 || ratioCanvasSize.height !== 675) throw new Error(`Dimension-changing redo did not restore the cropped canvas: ${JSON.stringify(ratioCanvasSize)}`);
-  console.log("  image: ratio crop and dimension-changing undo/redo view reset verified");
+  const ratioAfter = await readImageEditorRegionGeometry(page, "crop");
+  const ratioCanvasSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  const expectedRatioWidth = Math.min(ratioBefore.selection.width, ratioBefore.selection.height * 4 / 3);
+  if (ratioCanvasSize.width !== 900 || ratioCanvasSize.height !== 600 || Math.abs(ratioAfter.selection.width - expectedRatioWidth) > 1 || Math.abs(ratioAfter.selection.width - ratioAfter.selection.height * 4 / 3) > 1) {
+    throw new Error(`4:3 preset changed the canvas instead of the crop box: ${JSON.stringify({ ratioCanvasSize, ratioBefore, ratioAfter, expectedRatioWidth })}`);
+  }
+  console.log("  image: ratio preset changes the crop box without resizing the canvas");
   await page.click('[data-testid="image-editor-panel-crop"]');
+  await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => {
+    const free = buttons.find((button) => button.textContent?.trim() === "자유");
+    if (!(free instanceof HTMLButtonElement)) throw new Error("Free crop option is unavailable");
+    free.click();
+  });
   await page.click('[data-testid="image-editor-zoom-in"]');
   await page.click('[data-testid="image-editor-zoom-in"]');
   await page.click('[data-testid="image-editor-zoom-in"]');
@@ -575,12 +571,13 @@ async function testImageStudio(page, imagePaths) {
     const button = document.querySelector('[data-testid="image-editor-crop-selection"] .primary-button');
     return button instanceof HTMLButtonElement && !button.disabled;
   });
+  const freeCropGeometry = await readImageEditorRegionGeometry(page, "crop");
   await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-crop-selection"]'));
   if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "100%") throw new Error("Free crop did not reset the canvas view");
   const croppedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
-  if (croppedSize.width >= 360 || croppedSize.height >= 280 || croppedSize.width < 240 || croppedSize.height < 160) {
-    throw new Error(`Free crop did not resize the canvas as selected: ${JSON.stringify(croppedSize)}`);
+  if (croppedSize.width !== Math.round(freeCropGeometry.selection.width) || croppedSize.height !== Math.round(freeCropGeometry.selection.height)) {
+    throw new Error(`Free crop did not resize the canvas as selected: ${JSON.stringify({ croppedSize, selection: freeCropGeometry.selection })}`);
   }
   await page.click('[data-testid="image-editor-zoom-in"]');
   await page.click('[data-testid="image-editor-zoom-in"]');
@@ -787,6 +784,297 @@ async function testImageStudioRegionInteractions(page) {
   });
   if (!englishReason.disabled || englishReason.reason !== "Drag an area on the canvas first.") throw new Error(`English crop disabled reason is invalid: ${JSON.stringify(englishReason)}`);
   console.log(`  image: P4 crop/effect actions and live labels verified (crop error ${cropGeometry.error}px, effect error ${effectGeometry.error}px)`);
+}
+
+async function testImageStudioCropBoxEditing(page) {
+  await loadSyntheticImageEditor(page);
+  await installImageEditorExportCapture(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  await dragImageEditorRegion(page, 1);
+  let crop = await readImageEditorCropDebug(page);
+  if (!crop || crop.controls.join(",") !== "bl,br,mb,ml,mr,mt,tl,tr" || crop.hasRotation || !crop.lockScalingFlip || crop.canvasUniformScaling !== true
+    || crop.minibar || !crop.selectionControlsDisabled || !crop.selectionDeleteDisabled || !crop.undoDisabled || !crop.excludeFromExport || crop.count !== 1) {
+    throw new Error(`Editable crop box controls or isolation are invalid: ${JSON.stringify(crop)}`);
+  }
+  await page.keyboard.press("Delete");
+  const afterDeleteShortcut = await readImageEditorCropDebug(page);
+  if (!afterDeleteShortcut || afterDeleteShortcut.count !== 1 || !sameSelection(afterDeleteShortcut.selection, crop.selection) || !afterDeleteShortcut.undoDisabled) {
+    throw new Error(`General delete/history handling captured the crop box: ${JSON.stringify({ crop, afterDeleteShortcut })}`);
+  }
+  crop = afterDeleteShortcut;
+  await installCropTransformCounters(page);
+  const beforeScale = crop.selection;
+  const beforeScaleLabel = await page.$eval('[data-testid="image-editor-region-size-label"]', (label) => label.textContent || "");
+  await page.mouse.move(crop.controlClients.br.x, crop.controlClients.br.y);
+  await page.mouse.down();
+  await page.mouse.move(crop.controlClients.br.x + 72, crop.controlClients.br.y + 44, { steps: 8 });
+  const liveScale = await readImageEditorCropDebug(page);
+  const liveScaleLabel = await page.$eval('[data-testid="image-editor-region-size-label"]', (label) => label.textContent || "");
+  if (!liveScale || (Math.abs(liveScale.scaleX - 1) < 0.001 && Math.abs(liveScale.scaleY - 1) < 0.001) || liveScaleLabel === beforeScaleLabel) {
+    throw new Error(`Crop handle did not update scale and labels live: ${JSON.stringify({ beforeScaleLabel, liveScaleLabel, liveScale })}`);
+  }
+  await page.mouse.up();
+  crop = await readImageEditorCropDebug(page);
+  const transformCounts = await page.evaluate(() => window.__worklazyCropTransformCounts);
+  if (!crop || crop.scaleX !== 1 || crop.scaleY !== 1 || crop.selection.width <= beforeScale.width || crop.selection.height <= beforeScale.height
+    || transformCounts.modified !== 1 || transformCounts.scaling < 1 || !crop.undoDisabled || crop.minibar || !crop.selectionControlsDisabled) {
+    throw new Error(`Crop scale normalization or history isolation failed: ${JSON.stringify({ crop, transformCounts, beforeScale })}`);
+  }
+  const appliedSelection = crop.selection;
+  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  const appliedDimensions = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  const appliedPixels = await readImageRasterStats(page, await captureImageEditorExport(page, "PNG"));
+  if (appliedDimensions.width !== Math.round(appliedSelection.width) || appliedDimensions.height !== Math.round(appliedSelection.height) || appliedPixels.control < 1_700) {
+    throw new Error(`Handle-edited crop was not applied pixel-accurately: ${JSON.stringify({ appliedSelection, appliedDimensions, appliedPixels })}`);
+  }
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  await dragImageEditorRegion(page, 1);
+  crop = await readImageEditorCropDebug(page);
+  const originalBranchSelection = crop.selection;
+  const mapping = await getImageEditorSceneMapping(page, 1);
+  const center = mapImageEditorScenePoint(mapping, {
+    x: crop.selection.left + crop.selection.width / 2,
+    y: crop.selection.top + crop.selection.height / 2,
+  });
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(mapping.bounds.x + mapping.bounds.width + 80, mapping.bounds.y + mapping.bounds.height + 50, { steps: 10 });
+  const movingCrop = await readImageEditorCropDebug(page);
+  if (movingCrop.selection.left < -0.001 || movingCrop.selection.top < -0.001
+    || movingCrop.selection.left + movingCrop.selection.width > movingCrop.canvas.width + 0.001
+    || movingCrop.selection.top + movingCrop.selection.height > movingCrop.canvas.height + 0.001) {
+    throw new Error(`Crop move escaped the canvas during movement: ${JSON.stringify(movingCrop)}`);
+  }
+  await page.mouse.up();
+  const movedCrop = await readImageEditorCropDebug(page);
+  if (movedCrop.count !== 1 || movedCrop.selection.width !== originalBranchSelection.width || movedCrop.selection.height !== originalBranchSelection.height) {
+    throw new Error(`Dragging on the crop box created a replacement instead of moving it: ${JSON.stringify({ originalBranchSelection, movedCrop })}`);
+  }
+  const movedSnapshot = movedCrop.selection;
+  const movedCenter = mapImageEditorScenePoint(mapping, { x: movedSnapshot.left + movedSnapshot.width / 2, y: movedSnapshot.top + movedSnapshot.height / 2 });
+  const outside = mapImageEditorScenePoint(mapping, { x: 80, y: 80 });
+  await page.mouse.click(movedCenter.x, movedCenter.y, { button: "right" });
+  await page.mouse.click(outside.x, outside.y, { button: "right" });
+  const afterRightClicks = await readImageEditorCropDebug(page);
+  if (!sameSelection(afterRightClicks.selection, movedSnapshot) || afterRightClicks.count !== 1) throw new Error(`Right click changed the crop box: ${JSON.stringify({ movedSnapshot, afterRightClicks })}`);
+  await page.mouse.move(outside.x, outside.y);
+  await page.mouse.down();
+  await page.mouse.move(outside.x + 95, outside.y + 70, { steps: 6 });
+  await page.mouse.up();
+  const replacedCrop = await readImageEditorCropDebug(page);
+  if (replacedCrop.count !== 1 || sameSelection(replacedCrop.selection, movedSnapshot) || replacedCrop.selection.left > 90 || replacedCrop.selection.top > 90) {
+    throw new Error(`Left drag outside the crop box did not create one replacement box: ${JSON.stringify({ movedSnapshot, replacedCrop })}`);
+  }
+  await page.mouse.move(replacedCrop.controlClients.br.x, replacedCrop.controlClients.br.y);
+  await page.mouse.down();
+  await page.mouse.move(replacedCrop.canvasBounds.left + replacedCrop.canvasBounds.width + 100, replacedCrop.canvasBounds.top + replacedCrop.canvasBounds.height + 80, { steps: 8 });
+  const scaledAtBoundary = await readImageEditorCropDebug(page);
+  if (scaledAtBoundary.selection.left < -0.001 || scaledAtBoundary.selection.top < -0.001
+    || scaledAtBoundary.selection.left + scaledAtBoundary.selection.width > scaledAtBoundary.canvas.width + 0.001
+    || scaledAtBoundary.selection.top + scaledAtBoundary.selection.height > scaledAtBoundary.canvas.height + 0.001) {
+    throw new Error(`Crop scale escaped the canvas during scaling: ${JSON.stringify(scaledAtBoundary)}`);
+  }
+  await page.mouse.up();
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const presetButtons = await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => buttons.map((button) => button.textContent?.trim() || ""));
+  if (JSON.stringify(presetButtons) !== JSON.stringify(["1:1", "4:3", "3:4", "16:9", "9:16", "자유"])) throw new Error(`Crop ratio order is invalid: ${JSON.stringify(presetButtons)}`);
+  const ratioCases = [["1:1", 1], ["4:3", 4 / 3], ["3:4", 3 / 4], ["16:9", 16 / 9], ["9:16", 9 / 16]];
+  for (const [label, ratio] of ratioCases) {
+    const status = await page.$('[data-testid="image-editor-crop-selection"] .secondary-button');
+    if (status && !(await status.evaluate((button) => button.disabled))) await status.click();
+    await clickCropRatio(page, "자유");
+    await dragImageEditorRegion(page, 1);
+    const before = (await readImageEditorCropDebug(page)).selection;
+    await clickCropRatio(page, label);
+    const after = await readImageEditorCropDebug(page);
+    const expectedWidth = Math.min(before.width, before.height * ratio);
+    if (Math.abs(after.selection.width - after.selection.height * ratio) > 1 || Math.abs(after.selection.width - expectedWidth) > 1
+      || after.controls.join(",") !== "bl,br,tl,tr" || after.scaleX !== 1 || after.scaleY !== 1 || after.activeRatio !== label) {
+      throw new Error(`Crop ratio ${label} did not use the shrink-first formula or locked controls: ${JSON.stringify({ before, after, expectedWidth })}`);
+    }
+    const lockedBefore = after.selection;
+    await page.mouse.move(after.controlClients.br.x, after.controlClients.br.y);
+    await page.mouse.down();
+    await page.mouse.move(after.controlClients.br.x + 75, after.controlClients.br.y + 12, { steps: 7 });
+    await page.mouse.up();
+    const lockedAfter = await readImageEditorCropDebug(page);
+    if (Math.abs(lockedAfter.selection.width - lockedAfter.selection.height * ratio) > 1 || sameSelection(lockedAfter.selection, lockedBefore)) {
+      throw new Error(`Crop ratio ${label} was not retained by its corner handle: ${JSON.stringify({ lockedBefore, lockedAfter })}`);
+    }
+  }
+  await clickCropRatio(page, "자유");
+  crop = await readImageEditorCropDebug(page);
+  if (crop.controls.join(",") !== "bl,br,mb,ml,mr,mt,tl,tr" || crop.activeRatio !== "자유") throw new Error(`Free crop did not restore eight handles: ${JSON.stringify(crop)}`);
+  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await clickCropRatio(page, "16:9");
+  await dragImageEditorRegion(page, 1);
+  crop = await readImageEditorCropDebug(page);
+  if (Math.abs(crop.selection.width - crop.selection.height * 16 / 9) > 1) throw new Error(`A preset did not lock a new drag: ${JSON.stringify(crop)}`);
+  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const retainedRatio = await page.$eval('[data-testid="image-editor-crop-presets"] button.active', (button) => button.textContent?.trim() || "");
+  if (retainedRatio !== "16:9") throw new Error(`Applied crop did not retain its ratio state: ${retainedRatio}`);
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  await clickCropRatio(page, "9:16");
+  const edgeMapping = await getImageEditorSceneMapping(page, 1);
+  const edgeStart = mapImageEditorScenePoint(edgeMapping, { x: 899, y: 599 });
+  const edgeEnd = mapImageEditorScenePoint(edgeMapping, { x: 898, y: 598 });
+  await page.mouse.move(edgeStart.x, edgeStart.y);
+  await page.mouse.down();
+  await page.mouse.move(edgeEnd.x, edgeEnd.y, { steps: 3 });
+  await page.mouse.up();
+  crop = await readImageEditorCropDebug(page);
+  if (crop.selection.width !== 10 || crop.selection.height !== 18 || Math.abs(crop.selection.width - crop.selection.height * 9 / 16) > 1
+    || crop.selection.left + crop.selection.width > 900 || crop.selection.top + crop.selection.height > 600
+    || 900 - (crop.selection.left + crop.selection.width) > 2 || 600 - (crop.selection.top + crop.selection.height) > 2) {
+    throw new Error(`9:16 minimum-size boundary clamp or rounding failed: ${JSON.stringify(crop)}`);
+  }
+
+  await clickCropRatio(page, "자유");
+  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  const squareStart = mapImageEditorScenePoint(edgeMapping, { x: 100, y: 100 });
+  const squareEnd = mapImageEditorScenePoint(edgeMapping, { x: 110, y: 110 });
+  await page.mouse.move(squareStart.x, squareStart.y);
+  await page.mouse.down();
+  await page.mouse.move(squareEnd.x, squareEnd.y, { steps: 3 });
+  await page.mouse.up();
+  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const extremePreset = await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => {
+    const preset = buttons.find((button) => button.textContent?.trim() === "9:16");
+    return preset instanceof HTMLButtonElement ? { disabled: preset.disabled, title: preset.title } : undefined;
+  });
+  if (!extremePreset?.disabled || !extremePreset.title.includes("최소 10px")) throw new Error(`Extreme preset was not disabled with a reason: ${JSON.stringify(extremePreset)}`);
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const modifierMapping = await getImageEditorSceneMapping(page, 1);
+  const modifierStart = mapImageEditorScenePoint(modifierMapping, { x: 220, y: 160 });
+  const modifierEnd = mapImageEditorScenePoint(modifierMapping, { x: 430, y: 300 });
+  await page.keyboard.down("Shift");
+  await page.mouse.move(modifierStart.x, modifierStart.y);
+  await page.mouse.down();
+  await page.mouse.move(modifierEnd.x, modifierEnd.y, { steps: 7 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  crop = await readImageEditorCropDebug(page);
+  if (Math.abs(crop.selection.width - crop.selection.height) > 1) throw new Error(`Shift did not lock a free drag to 1:1: ${JSON.stringify(crop)}`);
+  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  const altStart = mapImageEditorScenePoint(modifierMapping, { x: 450, y: 300 });
+  const altEnd = mapImageEditorScenePoint(modifierMapping, { x: 560, y: 370 });
+  await page.keyboard.down("Alt");
+  await page.mouse.move(altStart.x, altStart.y);
+  await page.mouse.down();
+  await page.mouse.move(altEnd.x, altEnd.y, { steps: 7 });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  crop = await readImageEditorCropDebug(page);
+  const altCenter = { x: crop.selection.left + crop.selection.width / 2, y: crop.selection.top + crop.selection.height / 2 };
+  if (Math.abs(altCenter.x - 450) > 2 || Math.abs(altCenter.y - 300) > 2) throw new Error(`Alt did not expand a free drag from its center: ${JSON.stringify({ crop, altCenter })}`);
+  const handleCenterBefore = altCenter;
+  await page.keyboard.down("Alt");
+  await page.mouse.move(crop.controlClients.br.x, crop.controlClients.br.y);
+  await page.mouse.down();
+  await page.mouse.move(crop.controlClients.br.x + 45, crop.controlClients.br.y + 30, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  crop = await readImageEditorCropDebug(page);
+  const handleCenterAfter = { x: crop.selection.left + crop.selection.width / 2, y: crop.selection.top + crop.selection.height / 2 };
+  if (Math.abs(handleCenterAfter.x - handleCenterBefore.x) > 1 || Math.abs(handleCenterAfter.y - handleCenterBefore.y) > 1) {
+    throw new Error(`Alt crop handle did not preserve the center: ${JSON.stringify({ handleCenterBefore, handleCenterAfter, crop })}`);
+  }
+  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await dragImageEditorRegion(page, 1);
+  crop = await readImageEditorCropDebug(page);
+  await page.keyboard.down("Shift");
+  await page.mouse.move(crop.controlClients.br.x, crop.controlClients.br.y);
+  await page.mouse.down();
+  await page.mouse.move(crop.controlClients.br.x + 68, crop.controlClients.br.y + 8, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  crop = await readImageEditorCropDebug(page);
+  if (Math.abs(crop.selection.width - crop.selection.height) > 1) throw new Error(`Shift did not lock a free crop handle to 1:1: ${JSON.stringify(crop)}`);
+
+  const controlBeforeViewport = crop.controlClients.br;
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  let viewportCrop = await readImageEditorCropDebug(page);
+  if (Math.hypot(viewportCrop.controlClients.br.x - controlBeforeViewport.x, viewportCrop.controlClients.br.y - controlBeforeViewport.y) < 20) {
+    throw new Error(`Crop handles did not follow zoom: ${JSON.stringify({ controlBeforeViewport, viewportCrop })}`);
+  }
+  const zoomedHandleBefore = viewportCrop.selection;
+  await page.mouse.move(viewportCrop.controlClients.br.x, viewportCrop.controlClients.br.y);
+  await page.mouse.down();
+  await page.mouse.move(viewportCrop.controlClients.br.x - 30, viewportCrop.controlClients.br.y - 24, { steps: 5 });
+  await page.mouse.up();
+  viewportCrop = await readImageEditorCropDebug(page);
+  if (sameSelection(viewportCrop.selection, zoomedHandleBefore)) throw new Error(`Crop handle coordinates missed after zoom: ${JSON.stringify({ zoomedHandleBefore, viewportCrop })}`);
+  const beforePanControl = viewportCrop.controlClients.br;
+  const panStart = { x: viewportCrop.canvasBounds.left + viewportCrop.canvasBounds.width / 2, y: viewportCrop.canvasBounds.top + viewportCrop.canvasBounds.height / 2 };
+  await page.keyboard.down("Space");
+  await page.mouse.move(panStart.x, panStart.y);
+  await page.mouse.down();
+  await page.mouse.move(panStart.x + 36, panStart.y + 24, { steps: 5 });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  viewportCrop = await readImageEditorCropDebug(page);
+  if (Math.hypot(viewportCrop.controlClients.br.x - beforePanControl.x, viewportCrop.controlClients.br.y - beforePanControl.y) < 20) {
+    throw new Error(`Crop handles did not follow pan: ${JSON.stringify({ beforePanControl, viewportCrop })}`);
+  }
+
+  const beforePinch = viewportCrop.selection;
+  const touchClient = await page.createCDPSession();
+  const touchCenter = viewportCrop.centerClient;
+  const firstTouch = { x: touchCenter.x, y: touchCenter.y, id: 31, radiusX: 5, radiusY: 5, force: 1 };
+  const secondTouch = { x: touchCenter.x + 55, y: touchCenter.y + 8, id: 32, radiusX: 5, radiusY: 5, force: 1 };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [firstTouch] });
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [firstTouch, secondTouch] });
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...firstTouch, x: firstTouch.x - 18 }, { ...secondTouch, x: secondTouch.x + 24 }] });
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  const afterPinch = await readImageEditorCropDebug(page);
+  if (!afterPinch || afterPinch.count !== 1 || !sameSelection(afterPinch.selection, beforePinch)) throw new Error(`Pinch removed or changed the crop box: ${JSON.stringify({ beforePinch, afterPinch })}`);
+  await installImageEditorExportCapture(page);
+  const exportWithCrop = await captureImageEditorExport(page, "PNG");
+  const afterCropExport = await readImageEditorCropDebug(page);
+  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  const exportWithoutCrop = await captureImageEditorExport(page, "PNG");
+  if (!exportWithCrop || exportWithCrop !== exportWithoutCrop || !afterCropExport || afterCropExport.count !== 1 || !afterCropExport.active) {
+    throw new Error(`Crop overlay contaminated export or lost editability: ${JSON.stringify({ exportMatch: exportWithCrop === exportWithoutCrop, afterCropExport })}`);
+  }
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  await dragImageEditorRegion(page, 1);
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  let overlays = await readImageEditorOverlayCounts(page);
+  if (overlays.crop !== 0 || overlays.effect !== 0) throw new Error(`Crop overlay leaked into effect mode: ${JSON.stringify(overlays)}`);
+  await dragImageEditorRegion(page, 1);
+  overlays = await readImageEditorOverlayCounts(page);
+  if (overlays.crop !== 0 || overlays.effect !== 1) throw new Error(`Effect overlay ownership is invalid: ${JSON.stringify(overlays)}`);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  overlays = await readImageEditorOverlayCounts(page);
+  if (overlays.crop !== 0 || overlays.effect !== 0) throw new Error(`Effect overlay leaked into crop mode: ${JSON.stringify(overlays)}`);
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const touchMapping = await getImageEditorSceneMapping(page, 1);
+  const touchStartClient = mapImageEditorScenePoint(touchMapping, { x: 250, y: 170 });
+  const touchEndClient = mapImageEditorScenePoint(touchMapping, { x: 520, y: 360 });
+  const singleTouch = await page.createCDPSession();
+  const touchPoint = { x: touchStartClient.x, y: touchStartClient.y, id: 41, radiusX: 5, radiusY: 5, force: 1 };
+  await singleTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [touchPoint] });
+  await singleTouch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...touchPoint, x: touchEndClient.x, y: touchEndClient.y }] });
+  await singleTouch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  crop = await readImageEditorCropDebug(page);
+  if (!crop || crop.count !== 1 || crop.selection.width < 100 || crop.selection.height < 100) throw new Error(`Touch-safe crop creation failed: ${JSON.stringify(crop)}`);
+  console.log("  image: editable crop box, ratio boundaries, modifiers, input branches, viewport gestures, ownership, history, and export isolation verified");
 }
 
 async function testImageStudioCropOverlayMatrix(page, { transformed, zoom, erased }) {
@@ -1064,6 +1352,143 @@ async function readImageEditorRegionGeometry(page, mode) {
       inkInside,
     };
   }, mode);
+}
+
+async function readImageEditorCropDebug(page) {
+  return page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    if (!(stage instanceof HTMLElement)) return null;
+    const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+    let fiber = fiberKey ? stage[fiberKey] : null;
+    let fabricCanvas;
+    while (fiber && !fabricCanvas) {
+      let hook = fiber.memoizedState;
+      while (hook) {
+        const candidate = hook.memoizedState?.current;
+        if (candidate && typeof candidate.getObjects === "function" && candidate.upperCanvasEl instanceof HTMLCanvasElement) {
+          fabricCanvas = candidate;
+          break;
+        }
+        hook = hook.next;
+      }
+      fiber = fiber.return;
+    }
+    if (!fabricCanvas) return null;
+    const crops = fabricCanvas.getObjects().filter((object) => object.worklazyRole === "crop-overlay");
+    const overlay = crops[0];
+    if (!overlay) return null;
+    const topLeft = overlay.getPointByOrigin("left", "top");
+    const selection = {
+      left: topLeft.x,
+      top: topLeft.y,
+      width: Math.abs(overlay.width * overlay.scaleX),
+      height: Math.abs(overlay.height * overlay.scaleY),
+    };
+    const bounds = fabricCanvas.upperCanvasEl.getBoundingClientRect();
+    const scaleX = bounds.width / fabricCanvas.getWidth();
+    const scaleY = bounds.height / fabricCanvas.getHeight();
+    const controlClients = Object.fromEntries(Object.entries(overlay.oCoords || {}).map(([name, point]) => [name, {
+      x: bounds.left + point.x * scaleX,
+      y: bounds.top + point.y * scaleY,
+    }]));
+    const [zoomX, , , zoomY, panX, panY] = fabricCanvas.viewportTransform;
+    const centerX = selection.left + selection.width / 2;
+    const centerY = selection.top + selection.height / 2;
+    const activeRatio = Array.from(document.querySelectorAll('[data-testid="image-editor-crop-presets"] button')).find((button) => button.classList.contains("active"))?.textContent?.trim() || "";
+    return {
+      count: crops.length,
+      selection,
+      scaleX: overlay.scaleX,
+      scaleY: overlay.scaleY,
+      controls: Object.keys(overlay.controls).sort(),
+      controlClients,
+      centerClient: { x: bounds.left + (centerX * zoomX + panX) * scaleX, y: bounds.top + (centerY * zoomY + panY) * scaleY },
+      hasRotation: "mtr" in overlay.controls || overlay.angle !== 0 || overlay.skewX !== 0 || overlay.skewY !== 0,
+      lockScalingFlip: overlay.lockScalingFlip,
+      excludeFromExport: overlay.excludeFromExport,
+      active: fabricCanvas.getActiveObject() === overlay,
+      canvasUniformScaling: fabricCanvas.uniformScaling,
+      canvas: { width: fabricCanvas.getWidth(), height: fabricCanvas.getHeight() },
+      canvasBounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+      zoom: fabricCanvas.getZoom(),
+      activeRatio,
+      minibar: Boolean(document.querySelector('[data-testid="image-editor-minibar"]')),
+      selectionControlsDisabled: !document.querySelector('[data-testid="image-editor-selection-controls"]') || document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"),
+      selectionDeleteDisabled: document.querySelector('[data-testid="image-editor-delete"]')?.disabled ?? false,
+      undoDisabled: document.querySelector('[data-testid="image-editor-undo"]')?.disabled ?? false,
+    };
+  });
+}
+
+async function installCropTransformCounters(page) {
+  await page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    if (!(stage instanceof HTMLElement)) throw new Error("Image editor stage is unavailable");
+    const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+    let fiber = fiberKey ? stage[fiberKey] : null;
+    let fabricCanvas;
+    while (fiber && !fabricCanvas) {
+      let hook = fiber.memoizedState;
+      while (hook) {
+        const candidate = hook.memoizedState?.current;
+        if (candidate && typeof candidate.getObjects === "function" && candidate.upperCanvasEl instanceof HTMLCanvasElement) {
+          fabricCanvas = candidate;
+          break;
+        }
+        hook = hook.next;
+      }
+      fiber = fiber.return;
+    }
+    if (!fabricCanvas) throw new Error("Fabric canvas is unavailable");
+    window.__worklazyCropTransformCounts = { scaling: 0, modified: 0 };
+    fabricCanvas.on("object:scaling", (event) => { if (event.target?.worklazyRole === "crop-overlay") window.__worklazyCropTransformCounts.scaling += 1; });
+    fabricCanvas.on("object:modified", (event) => { if (event.target?.worklazyRole === "crop-overlay") window.__worklazyCropTransformCounts.modified += 1; });
+  });
+}
+
+async function readImageEditorOverlayCounts(page) {
+  return page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    if (!(stage instanceof HTMLElement)) throw new Error("Image editor stage is unavailable");
+    const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+    let fiber = fiberKey ? stage[fiberKey] : null;
+    let fabricCanvas;
+    while (fiber && !fabricCanvas) {
+      let hook = fiber.memoizedState;
+      while (hook) {
+        const candidate = hook.memoizedState?.current;
+        if (candidate && typeof candidate.getObjects === "function" && candidate.upperCanvasEl instanceof HTMLCanvasElement) {
+          fabricCanvas = candidate;
+          break;
+        }
+        hook = hook.next;
+      }
+      fiber = fiber.return;
+    }
+    const objects = fabricCanvas?.getObjects() || [];
+    return {
+      crop: objects.filter((object) => object.worklazyRole === "crop-overlay").length,
+      effect: objects.filter((object) => object.type === "rect" && object.stroke === "#af52de" && object.excludeFromExport).length,
+    };
+  });
+}
+
+async function clickCropRatio(page, label) {
+  await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons, expected) => {
+    const button = buttons.find((candidate) => candidate.textContent?.trim() === expected);
+    if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error(`Crop ratio ${expected} is unavailable`);
+    button.click();
+  }, label);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+function sameSelection(first, second, tolerance = 1e-6) {
+  return Math.max(
+    Math.abs(first.left - second.left),
+    Math.abs(first.top - second.top),
+    Math.abs(first.width - second.width),
+    Math.abs(first.height - second.height),
+  ) <= tolerance;
 }
 
 async function readImageRasterStats(page, dataUrl) {

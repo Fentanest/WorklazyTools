@@ -1630,6 +1630,8 @@ label.invalid > small { color: #c9342f; }
 .selection-style-controls.is-disabled, .editor-tool-group.is-disabled { opacity: .68; }
 .button-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
 .button-grid button, .icon-tool-row button, .inline-input-action button { min-height: 32px; display: grid; place-items: center; padding: 0 7px; color: var(--sky); background: var(--sky-soft); border: 0; border-radius: 8px; font-size: 13px; font-weight: 750; cursor: pointer; }
+[data-testid="image-editor-crop-presets"] button.active { color: #fff; background: var(--sky); box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 34%, transparent); }
+[data-testid="image-editor-crop-presets"] button:disabled { opacity: .38; cursor: not-allowed; }
 .icon-tool-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .icon-tool-row button { width: 34px; }
 .shape-picker-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
@@ -1656,7 +1658,7 @@ label.invalid > small { color: #c9342f; }
 .fabric-stage { position: relative; min-width: 0; overflow: auto; padding: 12px; background: repeating-conic-gradient(#ececf0 0 25%,#f8f8fa 0 50%) 50% / 16px 16px; border: 1px solid var(--separator); border-radius: 14px; }
 .fabric-stage.is-pan-ready .upper-canvas { cursor: grab !important; }
 .fabric-stage.is-panning .upper-canvas, .fabric-stage.is-viewport-gesture .upper-canvas { cursor: grabbing !important; }
-.fabric-stage.is-crop-mode .upper-canvas, .fabric-stage.is-effect-mode .upper-canvas { cursor: crosshair !important; touch-action: none; }
+.fabric-stage.is-crop-mode .upper-canvas, .fabric-stage.is-effect-mode .upper-canvas { cursor: crosshair; touch-action: none; }
 .fabric-stage .canvas-container { margin: 0 auto; box-shadow: 0 10px 32px rgba(20,25,35,.15); }
 .image-crop-hint { margin: 9px 0 0; color: var(--text-secondary); font-size: .84rem; line-height: 1.45; }
 .image-crop-selection-status { display: grid; gap: 8px; margin-top: 10px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent-sky) 38%, var(--separator)); border-radius: 12px; background: color-mix(in srgb, var(--accent-sky) 8%, transparent); }

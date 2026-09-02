@@ -1,5 +1,5 @@
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
-import { Canvas, Circle, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, filters, util, type TMat2D } from "fabric";
+import { Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -82,7 +82,7 @@ export function ImageStudioPage() {
   );
 }
 
-type EditorObjectRole = "base" | "region-effect" | "sticker";
+type EditorObjectRole = "base" | "region-effect" | "sticker" | "crop-overlay";
 
 interface RegionSelection {
   left: number;
@@ -95,6 +95,11 @@ interface RegionLabelPosition {
   left: number;
   top: number;
 }
+
+type CropRatio = number | undefined;
+
+const CROP_PRESET_RATIOS = [1, 4 / 3, 3 / 4, 16 / 9, 9 / 16] as const;
+const CROP_MIN_SIZE = 10;
 
 type EditorFabricObject = FabricObject & { worklazyRole?: EditorObjectRole; worklazyAnchorX?: number; worklazyAnchorY?: number; worklazyShapeKind?: EditorShapeKind };
 
@@ -128,6 +133,8 @@ function ImageEditor() {
   const effectOrigin = useRef<{ x: number; y: number } | undefined>(undefined);
   const cropSelectionRef = useRef<RegionSelection | undefined>(undefined);
   const effectSelectionRef = useRef<RegionSelection | undefined>(undefined);
+  const cropRatioRef = useRef<CropRatio>(undefined);
+  const cropDragRatioRef = useRef<CropRatio>(undefined);
   const regionEffectUrls = useRef(new Set<string>());
   const regionEffectBusyRef = useRef(false);
   const interactionModeRef = useRef<EditorInteractionMode>("select");
@@ -156,6 +163,7 @@ function ImageEditor() {
   const [minibarPosition, setMinibarPosition] = useState<EditorMinibarPosition>();
   const [editorError, setEditorError] = useState("");
   const [cropSelection, setCropSelection] = useState<RegionSelection>();
+  const [cropRatio, setCropRatio] = useState<CropRatio>(undefined);
   const [effectSelection, setEffectSelection] = useState<RegionSelection>();
   const [regionLabelPosition, setRegionLabelPosition] = useState<RegionLabelPosition>();
   const [regionEffect, setRegionEffect] = useState<RegionEffect>("mosaic");
@@ -164,12 +172,14 @@ function ImageEditor() {
   const [stickerBusy, setStickerBusy] = useState(false);
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
+  cropRatioRef.current = cropRatio;
 
   const updateMinibarPosition = useCallback(() => {
     const instance = canvas.current;
     const stage = stageElement.current;
     const object = instance?.getActiveObject();
-    if (!instance || !stage || !object || (object as EditorFabricObject).worklazyRole === "region-effect") {
+    const role = object && (object as EditorFabricObject).worklazyRole;
+    if (!instance || !stage || !object || object === cropOverlay.current || object === effectOverlay.current || role === "region-effect" || role === "crop-overlay") {
       setMinibarPosition(undefined);
       return;
     }
@@ -278,7 +288,8 @@ function ImageEditor() {
   }, []);
 
   const syncSelectedObject = useCallback((object?: FabricObject) => {
-    if (!object || (object as EditorFabricObject).worklazyRole === "region-effect") {
+    const role = object && (object as EditorFabricObject).worklazyRole;
+    if (!object || object === cropOverlay.current || object === effectOverlay.current || role === "region-effect" || role === "crop-overlay") {
       setSelectionState(EMPTY_EDITOR_SELECTION);
       setMinibarPosition(undefined);
       return;
@@ -287,10 +298,21 @@ function ImageEditor() {
     window.requestAnimationFrame(updateMinibarPosition);
   }, [updateMinibarPosition]);
 
+  const syncCropOverlaySelection = useCallback((overlay: Rect, normalize = false, activeRatio: CropRatio = cropRatioRef.current) => {
+    const instance = canvas.current;
+    if (!instance || cropOverlay.current !== overlay) return;
+    const selection = constrainCropOverlay(overlay, instance, normalize, activeRatio);
+    cropSelectionRef.current = selection;
+    setCropSelection(selection);
+    instance.requestRenderAll();
+    window.requestAnimationFrame(updateRegionLabelPosition);
+  }, [updateRegionLabelPosition]);
+
   const clearCropSelection = useCallback(() => {
     const instance = canvas.current;
     const overlay = cropOverlay.current;
     cropOrigin.current = undefined;
+    cropDragRatioRef.current = undefined;
     cropSelectionRef.current = undefined;
     setCropSelection(undefined);
     if (instance && overlay) {
@@ -320,11 +342,6 @@ function ImageEditor() {
     clearEffectSelection();
   }, [clearCropSelection, clearEffectSelection]);
 
-  const clearActiveRegionSelection = useCallback(() => {
-    if (interactionModeRef.current === "crop") clearCropSelection();
-    if (interactionModeRef.current === "effect") clearEffectSelection();
-  }, [clearCropSelection, clearEffectSelection]);
-
   useEffect(() => {
     if (!canvasElement.current) return;
     const instance = new Canvas(canvasElement.current, { width: 900, height: 600, backgroundColor: "#ffffff", preserveObjectStacking: true });
@@ -333,9 +350,11 @@ function ImageEditor() {
       instance,
       stage: stageElement.current,
       onGestureStart: () => {
-        clearActiveRegionSelection();
+        cropOrigin.current = undefined;
+        effectOrigin.current = undefined;
         const cancelledTarget = cancelCurrentFabricInteraction(instance);
         if (cancelledTarget === baseImage.current && baseImage.current) syncRegionEffectTransforms(instance, baseImage.current);
+        if (cancelledTarget === cropOverlay.current && cropOverlay.current) syncCropOverlaySelection(cropOverlay.current);
         syncSelectedObject(instance.getActiveObject());
       },
       onViewportChange: (viewport) => applyViewportTransform(instance, viewport),
@@ -356,16 +375,42 @@ function ImageEditor() {
       }
       updateMinibarPosition();
     };
-    instance.on("object:moving", syncObjectTransform);
+    instance.on("object:moving", (event) => {
+      if (event.target === cropOverlay.current) {
+        syncCropOverlaySelection(event.target as Rect);
+        return;
+      }
+      syncObjectTransform(event);
+    });
     instance.on("object:rotating", syncObjectTransform);
-    instance.on("object:scaling", syncObjectTransform);
+    instance.on("object:scaling", (event) => {
+      if (event.target === cropOverlay.current) {
+        const activeRatio = cropRatioRef.current ?? (event.e.shiftKey ? 1 : undefined);
+        syncCropOverlaySelection(event.target as Rect, false, activeRatio);
+        return;
+      }
+      syncObjectTransform(event);
+    });
     instance.on("object:skewing", syncObjectTransform);
-    instance.on("object:modified", (event) => { syncObjectTransform(event); syncSelectedObject(event.target); pushSnapshot(); });
+    instance.on("object:modified", (event) => {
+      if (event.target === cropOverlay.current) {
+        const activeRatio = cropRatioRef.current ?? (event.e?.shiftKey ? 1 : undefined);
+        syncCropOverlaySelection(event.target as Rect, true, activeRatio);
+        instance.setActiveObject(event.target);
+        syncSelectedObject();
+        return;
+      }
+      syncObjectTransform(event);
+      syncSelectedObject(event.target);
+      pushSnapshot();
+    });
     instance.on("object:added", (event) => { if (event.target !== cropOverlay.current && event.target !== effectOverlay.current) pushSnapshot(); });
     instance.on("object:removed", (event) => { if (event.target !== cropOverlay.current && event.target !== effectOverlay.current) pushSnapshot(); });
     instance.on("mouse:down", (event) => {
       const mode = interactionModeRef.current;
       if (!isRegionMode(mode) || regionEffectBusyRef.current) return;
+      if (isNonPrimaryMouseEvent(event.e)) return;
+      if (mode === "crop" && cropOverlay.current && event.target === cropOverlay.current) return;
       const point = event.scenePoint;
       const x = Math.max(0, Math.min(instance.getWidth(), point.x));
       const y = Math.max(0, Math.min(instance.getHeight(), point.y));
@@ -375,7 +420,12 @@ function ImageEditor() {
       const originRef = effectMode ? effectOrigin : cropOrigin;
       const overlayRef = effectMode ? effectOverlay : cropOverlay;
       originRef.current = { x, y };
-      const overlay = new Rect({ left: x, top: y, width: 1, height: 1, originX: "left", originY: "top", fill: effectMode ? "rgba(175,82,222,.14)" : "rgba(10,132,255,.14)", stroke: effectMode ? "#af52de" : "#0a84ff", strokeWidth: 2, strokeDashArray: [9, 6], strokeUniform: true, selectable: false, evented: false, excludeFromExport: true });
+      cropDragRatioRef.current = effectMode ? undefined : cropRatioRef.current;
+      const overlay = new Rect({ left: x, top: y, width: 1, height: 1, originX: "left", originY: "top", fill: effectMode ? "rgba(175,82,222,.14)" : "rgba(10,132,255,.14)", stroke: effectMode ? "#af52de" : "#0a84ff", strokeWidth: 2, strokeDashArray: [9, 6], strokeUniform: true, selectable: !effectMode, evented: !effectMode, excludeFromExport: true });
+      if (!effectMode) {
+        (overlay as EditorFabricObject).worklazyRole = "crop-overlay";
+        configureCropOverlay(overlay, () => cropRatioRef.current);
+      }
       overlayRef.current = overlay;
       instance.add(overlay);
       instance.requestRenderAll();
@@ -389,9 +439,13 @@ function ImageEditor() {
       if (!origin || !overlay) return;
       const x = Math.max(0, Math.min(instance.getWidth(), event.scenePoint.x));
       const y = Math.max(0, Math.min(instance.getHeight(), event.scenePoint.y));
-      overlay.set({ left: Math.min(origin.x, x), top: Math.min(origin.y, y), width: Math.abs(x - origin.x), height: Math.abs(y - origin.y) });
+      const nativeEvent = event.e as TPointerEvent;
+      const requestedRatio = effectMode ? undefined : cropRatioRef.current ?? (nativeEvent.shiftKey ? 1 : undefined);
+      const activeRatio = requestedRatio && canFitCropRatio(instance.getWidth(), instance.getHeight(), requestedRatio) ? requestedRatio : undefined;
+      cropDragRatioRef.current = activeRatio;
+      const selection = createRegionDragSelection(origin, { x, y }, instance.getWidth(), instance.getHeight(), activeRatio, !effectMode && nativeEvent.altKey);
+      overlay.set({ ...selection, scaleX: 1, scaleY: 1 });
       overlay.setCoords();
-      const selection = { left: overlay.left || 0, top: overlay.top || 0, width: overlay.width || 0, height: overlay.height || 0 };
       if (effectMode) {
         effectSelectionRef.current = selection;
         setEffectSelection(selection);
@@ -402,7 +456,7 @@ function ImageEditor() {
       instance.requestRenderAll();
       window.requestAnimationFrame(updateRegionLabelPosition);
     });
-    instance.on("mouse:up", () => {
+    instance.on("mouse:up", (event) => {
       const mode = interactionModeRef.current;
       if (!isRegionMode(mode)) return;
       const effectMode = mode === "effect";
@@ -410,7 +464,12 @@ function ImageEditor() {
       const overlay = (effectMode ? effectOverlay : cropOverlay).current;
       originRef.current = undefined;
       if (!overlay) return;
-      const selection = { left: overlay.left || 0, top: overlay.top || 0, width: overlay.width || 0, height: overlay.height || 0 };
+      if (!effectMode && event.target === overlay && event.transform) return;
+      const activeRatio = effectMode ? undefined : cropDragRatioRef.current;
+      const selection = effectMode
+        ? getCropOverlaySelection(overlay)
+        : constrainCropOverlay(overlay, instance, true, activeRatio);
+      cropDragRatioRef.current = undefined;
       if (selection.width < 10 || selection.height < 10) {
         if (effectMode) clearEffectSelection();
         else clearCropSelection();
@@ -420,6 +479,10 @@ function ImageEditor() {
       } else {
         cropSelectionRef.current = selection;
         setCropSelection(selection);
+        instance.setActiveObject(overlay);
+        syncSelectedObject();
+        instance.requestRenderAll();
+        window.requestAnimationFrame(updateRegionLabelPosition);
       }
     });
     pushSnapshot(true, true);
@@ -435,7 +498,7 @@ function ImageEditor() {
       instance.dispose();
       canvas.current = undefined;
     };
-  }, [applyViewportTransform, clearActiveRegionSelection, clearCropSelection, clearEffectSelection, pushSnapshot, syncCanvasDisplay, syncSelectedObject, updateMinibarPosition, updateRegionLabelPosition]);
+  }, [applyViewportTransform, clearCropSelection, clearEffectSelection, pushSnapshot, syncCanvasDisplay, syncCropOverlaySelection, syncSelectedObject, updateMinibarPosition, updateRegionLabelPosition]);
 
   useEffect(() => {
     const instance = canvas.current;
@@ -559,7 +622,7 @@ function ImageEditor() {
   const removeSelectedLayers = useCallback(() => {
     const instance = canvas.current;
     if (!instance) return false;
-    const removable = instance.getActiveObjects().filter((object) => object !== baseImage.current && (object as EditorFabricObject).worklazyRole !== "region-effect");
+    const removable = instance.getActiveObjects().filter((object) => object !== baseImage.current && !["region-effect", "crop-overlay"].includes((object as EditorFabricObject).worklazyRole || ""));
     if (!removable.length) return false;
     instance.remove(...removable);
     instance.discardActiveObject();
@@ -571,7 +634,7 @@ function ImageEditor() {
 
   const applyCropSelection = useCallback(() => {
     const instance = canvas.current;
-    const selection = cropSelection;
+    const selection = cropSelectionRef.current;
     const overlay = cropOverlay.current;
     if (!instance || !selection || selection.width < 10 || selection.height < 10) return;
     restoringRef.current = true;
@@ -596,7 +659,7 @@ function ImageEditor() {
     restoringRef.current = false;
     pushSnapshot(true);
     window.requestAnimationFrame(syncCanvasDisplay);
-  }, [baseLocked, cropSelection, pushSnapshot, resetViewport, syncCanvasDisplay, syncSelectedObject]);
+  }, [baseLocked, pushSnapshot, resetViewport, syncCanvasDisplay, syncSelectedObject]);
 
   const applyRegionEffect = useCallback(async () => {
     const instance = canvas.current;
@@ -723,31 +786,33 @@ function ImageEditor() {
     return () => document.removeEventListener("keydown", handleEditorShortcut);
   }, [applyCropSelection, applyRegionEffect, clearCropSelection, clearEffectSelection, removeSelectedLayers]);
 
-  const cropTo = (ratio: number) => {
+  const changeCropRatio = (ratio: CropRatio) => {
     const instance = canvas.current;
-    const image = baseImage.current;
     if (!instance) return;
-    const width = 900;
-    const height = Math.round(width / ratio);
-    const previousWidth = instance.getWidth();
-    const previousHeight = instance.getHeight();
-    clearRegionSelection();
-    setInteractionMode("select");
-    interactionModeRef.current = "select";
-    instance.setDimensions({ width, height });
-    resetViewport(instance);
-    if (image) {
-      const scale = Math.max(width / image.width, height / image.height);
-      image.set({ left: width / 2, top: height / 2, scaleX: scale, scaleY: scale });
-      image.setCoords();
+    if (ratio && !canFitCropRatio(instance.getWidth(), instance.getHeight(), ratio)) return;
+    cropRatioRef.current = ratio;
+    setCropRatio(ratio);
+    const overlay = cropOverlay.current;
+    if (!overlay) return;
+    configureCropOverlay(overlay, () => cropRatioRef.current);
+    if (ratio) {
+      const current = getCropOverlaySelection(overlay);
+      const dimensions = fitCropRatioDimensions(instance.getWidth(), instance.getHeight(), ratio, Math.min(current.width, current.height * ratio));
+      if (!dimensions) return;
+      const centerX = current.left + current.width / 2;
+      const centerY = current.top + current.height / 2;
+      overlay.set({
+        left: Math.max(0, Math.min(instance.getWidth() - dimensions.width, centerX - dimensions.width / 2)),
+        top: Math.max(0, Math.min(instance.getHeight() - dimensions.height, centerY - dimensions.height / 2)),
+        width: dimensions.width,
+        height: dimensions.height,
+        scaleX: 1,
+        scaleY: 1,
+      });
     }
-    instance.getObjects().filter((object) => object !== image && (object as EditorFabricObject).worklazyRole !== "region-effect").forEach((object) => {
-      object.set({ left: (object.left || 0) * width / previousWidth, top: (object.top || 0) * height / previousHeight });
-      object.setCoords();
-    });
-    if (image) syncRegionEffectTransforms(instance, image);
+    syncCropOverlaySelection(overlay, true, ratio);
+    instance.setActiveObject(overlay);
     instance.requestRenderAll();
-    pushSnapshot();
   };
 
   const addObject = (object: FabricObject) => {
@@ -932,6 +997,7 @@ function ImageEditor() {
     const instance = canvas.current;
     if (!instance) return;
     const overlays = [cropOverlay.current, effectOverlay.current].filter((overlay): overlay is Rect => Boolean(overlay));
+    const activeOverlay = overlays.find((overlay) => instance.getActiveObject() === overlay);
     const viewport = [...instance.viewportTransform] as TMat2D;
     if (baseImage.current) keepRegionEffectsAboveBase(instance, baseImage.current);
     overlays.forEach((overlay) => { if (instance.getObjects().includes(overlay)) instance.remove(overlay); });
@@ -965,6 +1031,7 @@ function ImageEditor() {
         const remainsCurrent = cropOverlay.current === overlay || effectOverlay.current === overlay;
         if (remainsCurrent && !instance.getObjects().includes(overlay)) instance.add(overlay);
       });
+      if (activeOverlay && cropOverlay.current === activeOverlay && interactionModeRef.current === "crop") instance.setActiveObject(activeOverlay);
       instance.requestRenderAll();
       window.requestAnimationFrame(updateFloatingOverlays);
     }
@@ -1061,7 +1128,9 @@ function ImageEditor() {
           onRotate={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}
           onFlipHorizontal={() => mutateActive((object) => object.set("flipX", !object.flipX))}
           onFlipVertical={() => mutateActive((object) => object.set("flipY", !object.flipY))}
-          onCropRatio={cropTo}
+          cropRatio={cropRatio}
+          unavailableCropRatios={CROP_PRESET_RATIOS.filter((ratio) => !canFitCropRatio(canvas.current?.getWidth() || 900, canvas.current?.getHeight() || 600, ratio))}
+          onCropRatio={changeCropRatio}
           onCropCancel={clearCropSelection}
           onCropApply={applyCropSelection}
           onRegionEffectChange={changeRegionEffect}
@@ -1088,14 +1157,170 @@ function ImageEditor() {
 function applyEditorInteractivity(instance: Canvas, image: FabricImage | undefined, mode: EditorInteractionMode, baseLocked: boolean) {
   instance.forEachObject((object) => {
     const eraserPath = object.globalCompositeOperation === "destination-out";
-    const fixedEffect = (object as EditorFabricObject).worklazyRole === "region-effect";
-    const interactive = mode === "select" && !eraserPath && !fixedEffect && (object !== image || !baseLocked);
+    const role = (object as EditorFabricObject).worklazyRole;
+    const fixedEffect = role === "region-effect";
+    const cropBox = role === "crop-overlay";
+    const interactive = cropBox ? mode === "crop" : mode === "select" && !eraserPath && !fixedEffect && (object !== image || !baseLocked);
     object.set({ selectable: interactive, evented: interactive });
   });
 }
 
 function isRegionMode(mode: EditorInteractionMode) {
   return mode === "crop" || mode === "effect";
+}
+
+function isNonPrimaryMouseEvent(event: TPointerEvent) {
+  const pointerType = "pointerType" in event ? event.pointerType : undefined;
+  const mouseLike = pointerType ? pointerType === "mouse" : typeof MouseEvent !== "undefined" && event instanceof MouseEvent;
+  return mouseLike && "button" in event && event.button !== 0;
+}
+
+function canFitCropRatio(width: number, height: number, ratio: number) {
+  return Boolean(fitCropRatioDimensions(width, height, ratio, CROP_MIN_SIZE));
+}
+
+function fitCropRatioDimensions(maxWidth: number, maxHeight: number, ratio: number, preferredWidth: number) {
+  const widthLimit = Math.max(0, Math.floor(maxWidth + 1e-9));
+  const heightLimit = Math.max(0, Math.floor(maxHeight + 1e-9));
+  if (!Number.isFinite(ratio) || ratio <= 0 || widthLimit < CROP_MIN_SIZE || heightLimit < CROP_MIN_SIZE) return undefined;
+  const minimumHeight = Math.max(CROP_MIN_SIZE, Math.ceil(CROP_MIN_SIZE / ratio - 1e-9));
+  let maximumHeight = Math.min(heightLimit, Math.floor((widthLimit + 0.499999) / ratio));
+  while (maximumHeight >= minimumHeight && Math.round(maximumHeight * ratio) > widthLimit) maximumHeight -= 1;
+  if (maximumHeight < minimumHeight) return undefined;
+  const preferredHeight = Math.round(preferredWidth / ratio);
+  const height = Math.max(minimumHeight, Math.min(maximumHeight, preferredHeight));
+  const width = Math.round(height * ratio);
+  if (width < CROP_MIN_SIZE || width > widthLimit || Math.abs(width - height * ratio) > 1) return undefined;
+  return { width, height };
+}
+
+function createRegionDragSelection(
+  origin: { x: number; y: number },
+  point: { x: number; y: number },
+  canvasWidth: number,
+  canvasHeight: number,
+  ratio: CropRatio,
+  centered: boolean,
+): RegionSelection {
+  const deltaX = point.x - origin.x;
+  const deltaY = point.y - origin.y;
+  const centeredWidthLimit = Math.max(0, 2 * Math.min(origin.x, canvasWidth - origin.x));
+  const centeredHeightLimit = Math.max(0, 2 * Math.min(origin.y, canvasHeight - origin.y));
+  const widthLimit = centered ? centeredWidthLimit : canvasWidth;
+  const heightLimit = centered ? centeredHeightLimit : canvasHeight;
+  const rawWidth = Math.min(widthLimit, Math.abs(deltaX) * (centered ? 2 : 1));
+  const rawHeight = Math.min(heightLimit, Math.abs(deltaY) * (centered ? 2 : 1));
+  const dimensions = ratio ? fitCropRatioDimensions(widthLimit, heightLimit, ratio, Math.min(rawWidth, rawHeight * ratio)) : undefined;
+  const width = dimensions?.width ?? rawWidth;
+  const height = dimensions?.height ?? rawHeight;
+  const left = centered ? origin.x - width / 2 : deltaX >= 0 ? origin.x : origin.x - width;
+  const top = centered ? origin.y - height / 2 : deltaY >= 0 ? origin.y : origin.y - height;
+  return {
+    left: Math.max(0, Math.min(canvasWidth - width, left)),
+    top: Math.max(0, Math.min(canvasHeight - height, top)),
+    width,
+    height,
+  };
+}
+
+function getCropOverlaySelection(overlay: Rect): RegionSelection {
+  const topLeft = overlay.getPointByOrigin("left", "top");
+  return {
+    left: topLeft.x,
+    top: topLeft.y,
+    width: Math.abs(overlay.width * overlay.scaleX),
+    height: Math.abs(overlay.height * overlay.scaleY),
+  };
+}
+
+function constrainCropOverlay(overlay: Rect, instance: Canvas, normalize: boolean, ratio: CropRatio): RegionSelection {
+  const current = getCropOverlaySelection(overlay);
+  const ratioDimensions = ratio
+    ? fitCropRatioDimensions(instance.getWidth(), instance.getHeight(), ratio, Math.min(current.width, current.height * ratio))
+    : undefined;
+  const width = ratioDimensions?.width
+    ?? Math.min(instance.getWidth(), Math.max(CROP_MIN_SIZE, normalize ? Math.round(current.width) : current.width));
+  const height = ratioDimensions?.height
+    ?? Math.min(instance.getHeight(), Math.max(CROP_MIN_SIZE, normalize ? Math.round(current.height) : current.height));
+  const left = Math.max(0, Math.min(instance.getWidth() - width, current.left));
+  const top = Math.max(0, Math.min(instance.getHeight() - height, current.top));
+  if (normalize) overlay.set({ left, top, width, height, scaleX: 1, scaleY: 1, flipX: false, flipY: false, skewX: 0, skewY: 0, angle: 0 });
+  else overlay.set({ left, top, scaleX: width / Math.max(1e-9, overlay.width), scaleY: height / Math.max(1e-9, overlay.height), flipX: false, flipY: false });
+  overlay.setCoords();
+  return { left, top, width, height };
+}
+
+function configureCropOverlay(overlay: Rect, getRatio: () => CropRatio) {
+  const cornerControl = (x: -0.5 | 0.5, y: -0.5 | 0.5, cursorStyle: string) => new Control({
+    x,
+    y,
+    cursorStyle,
+    actionName: "scale",
+    actionHandler: createCropScaleHandler("both", getRatio),
+  });
+  const controls = {
+    tl: cornerControl(-0.5, -0.5, "nwse-resize"),
+    tr: cornerControl(0.5, -0.5, "nesw-resize"),
+    bl: cornerControl(-0.5, 0.5, "nesw-resize"),
+    br: cornerControl(0.5, 0.5, "nwse-resize"),
+    ...(getRatio() === undefined ? {
+      ml: new Control({ x: -0.5, y: 0, cursorStyle: "ew-resize", actionName: "scaleX", actionHandler: createCropScaleHandler("x", getRatio) }),
+      mr: new Control({ x: 0.5, y: 0, cursorStyle: "ew-resize", actionName: "scaleX", actionHandler: createCropScaleHandler("x", getRatio) }),
+      mt: new Control({ x: 0, y: -0.5, cursorStyle: "ns-resize", actionName: "scaleY", actionHandler: createCropScaleHandler("y", getRatio) }),
+      mb: new Control({ x: 0, y: 0.5, cursorStyle: "ns-resize", actionName: "scaleY", actionHandler: createCropScaleHandler("y", getRatio) }),
+    } : {}),
+  };
+  overlay.controls = controls;
+  overlay.set({
+    selectable: true,
+    evented: true,
+    hasBorders: true,
+    hasControls: true,
+    lockRotation: true,
+    lockSkewingX: true,
+    lockSkewingY: true,
+    lockScalingFlip: true,
+    centeredScaling: false,
+    transparentCorners: false,
+    cornerColor: "#ffffff",
+    cornerStrokeColor: "#0a84ff",
+    borderColor: "#0a84ff",
+    cornerStyle: "circle",
+    cornerSize: 13,
+    touchCornerSize: 30,
+  });
+  overlay.setCoords();
+}
+
+function createCropScaleHandler(axis: "x" | "y" | "both", getRatio: () => CropRatio) {
+  return controlsUtils.wrapWithFireEvent("scaling", controlsUtils.wrapWithFixedAnchor((event: TPointerEvent, transform: Transform, x: number, y: number) => {
+    const target = transform.target as Rect;
+    const instance = target.canvas;
+    if (!instance) return false;
+    const anchor = target.getPositionByOrigin(transform.originX, transform.originY);
+    const horizontalDirection = transform.corner.includes("l") ? -1 : 1;
+    const verticalDirection = transform.corner.includes("t") ? -1 : 1;
+    const changesWidth = axis !== "y";
+    const changesHeight = axis !== "x";
+    const centeredX = transform.originX === "center";
+    const centeredY = transform.originY === "center";
+    const horizontalDistance = horizontalDirection * (x - anchor.x);
+    const verticalDistance = verticalDirection * (y - anchor.y);
+    if ((changesWidth && horizontalDistance <= 0) || (changesHeight && verticalDistance <= 0)) return false;
+    const current = getCropOverlaySelection(target);
+    const rawWidth = changesWidth ? horizontalDistance * (centeredX ? 2 : 1) : current.width;
+    const rawHeight = changesHeight ? verticalDistance * (centeredY ? 2 : 1) : current.height;
+    const requestedRatio = getRatio() ?? (event.shiftKey ? 1 : undefined);
+    const ratio = requestedRatio && canFitCropRatio(instance.getWidth(), instance.getHeight(), requestedRatio) ? requestedRatio : undefined;
+    const preferredWidth = axis === "x" ? rawWidth : axis === "y" ? rawHeight * (ratio || 1) : Math.min(rawWidth, rawHeight * (ratio || 1));
+    const dimensions = ratio ? fitCropRatioDimensions(instance.getWidth(), instance.getHeight(), ratio, preferredWidth) : undefined;
+    const width = dimensions?.width ?? Math.max(CROP_MIN_SIZE, Math.min(instance.getWidth(), rawWidth));
+    const height = dimensions?.height ?? Math.max(CROP_MIN_SIZE, Math.min(instance.getHeight(), rawHeight));
+    const previousScaleX = target.scaleX;
+    const previousScaleY = target.scaleY;
+    target.set({ scaleX: width / Math.max(1e-9, target.width), scaleY: height / Math.max(1e-9, target.height), flipX: false, flipY: false });
+    return previousScaleX !== target.scaleX || previousScaleY !== target.scaleY;
+  }));
 }
 
 function mapSelectionToImagePixels(selection: RegionSelection, image: FabricImage, sourceWidth: number, sourceHeight: number): ImagePixelRegion {
