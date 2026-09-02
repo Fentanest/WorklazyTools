@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Brush, CircleIcon, ClipboardPaste, Crop, Download, Eraser, FlipHorizontal2, FlipVertical2, Grid3X3, ImageIcon, Images, LayoutGrid, Minus, MousePointer2, Pencil, Redo2, RotateCw, Sparkles, Square, Trash2, Type, Undo2 } from "lucide-react";
+import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { Canvas, Circle, FabricImage, FabricObject, IText, Line, PencilBrush, Rect, filters, util } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,10 +6,22 @@ import { useTranslation } from "react-i18next";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
+import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { BatchImagePanel, CollagePanel, GifPanel } from "./ImageProcessingPanels";
+import { ImageEditorMinibar } from "./ImageEditorMinibar";
+import { ImageEditorPanel } from "./ImageEditorPanel";
+import { ImageEditorToolbar } from "./ImageEditorToolbar";
 import { ClipboardHint, RASTER_IMAGE_ACCEPT, filterRasterImages, useClipboardImages } from "./imageStudioShared";
+import {
+  EMPTY_EDITOR_SELECTION,
+  type EditorDrawTool,
+  type EditorInteractionMode,
+  type EditorMinibarPosition,
+  type EditorPanelName,
+  type EditorSelectionState,
+  type RegionEffect,
+} from "./imageEditorTypes";
 import {
   anchorRegionEffect,
   mapCanvasSelectionToImagePixels,
@@ -61,8 +73,6 @@ export function ImageStudioPage() {
   );
 }
 
-type EditorMode = "select" | "pencil" | "brush" | "erase" | "crop" | "effect";
-type RegionEffect = "mosaic" | "blur";
 type EditorObjectRole = "base" | "region-effect";
 
 interface RegionSelection {
@@ -102,7 +112,7 @@ function ImageEditor() {
   const regionOrigin = useRef<{ x: number; y: number } | undefined>(undefined);
   const regionEffectUrls = useRef(new Set<string>());
   const regionEffectBusyRef = useRef(false);
-  const modeRef = useRef<EditorMode>("select");
+  const interactionModeRef = useRef<EditorInteractionMode>("select");
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
   const restoringRef = useRef(false);
@@ -116,15 +126,15 @@ function ImageEditor() {
   const [background, setBackground] = useState("#ffffff");
   const [transparentBackground, setTransparentBackground] = useState(false);
   const [baseLocked, setBaseLocked] = useState(true);
-  const [mode, setMode] = useState<EditorMode>("select");
+  const [interactionMode, setInteractionMode] = useState<EditorInteractionMode>("select");
+  const [activePanel, setActivePanel] = useState<EditorPanelName>("select");
+  const [drawTool, setDrawTool] = useState<EditorDrawTool>("pencil");
   const [drawColor, setDrawColor] = useState("#1d1d1f");
   const [drawWidth, setDrawWidth] = useState(7);
   const [historyState, setHistoryState] = useState({ index: -1, length: 0 });
   const [stageDragging, setStageDragging] = useState(false);
-  const [shapeSelected, setShapeSelected] = useState(false);
-  const [shapeFill, setShapeFill] = useState("#0a84ff");
-  const [shapeStroke, setShapeStroke] = useState("#ffffff");
-  const [shapeStrokeWidth, setShapeStrokeWidth] = useState(0);
+  const [selectionState, setSelectionState] = useState<EditorSelectionState>(EMPTY_EDITOR_SELECTION);
+  const [minibarPosition, setMinibarPosition] = useState<EditorMinibarPosition>();
   const [editorError, setEditorError] = useState("");
   const [regionSelection, setRegionSelection] = useState<RegionSelection>();
   const [regionEffect, setRegionEffect] = useState<RegionEffect>("mosaic");
@@ -132,7 +142,32 @@ function ImageEditor() {
   const [regionEffectBusy, setRegionEffectBusy] = useState(false);
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
-  const syncCanvasDisplay = useResponsiveFabricCanvas(canvas, stageElement);
+
+  const updateMinibarPosition = useCallback(() => {
+    const instance = canvas.current;
+    const stage = stageElement.current;
+    const object = instance?.getActiveObject();
+    if (!instance || !stage || !object || (object as EditorFabricObject).worklazyRole === "region-effect") {
+      setMinibarPosition(undefined);
+      return;
+    }
+    const canvasBounds = instance.upperCanvasEl.getBoundingClientRect();
+    const stageBounds = stage.getBoundingClientRect();
+    const objectBounds = object.getBoundingRect();
+    const scaleX = canvasBounds.width / Math.max(1, instance.getWidth());
+    const scaleY = canvasBounds.height / Math.max(1, instance.getHeight());
+    const rawLeft = canvasBounds.left - stageBounds.left + (objectBounds.left + objectBounds.width / 2) * scaleX;
+    const rawTop = canvasBounds.top - stageBounds.top + objectBounds.top * scaleY - 10;
+    const minibar = stage.querySelector<HTMLElement>("[data-testid='image-editor-minibar']");
+    const minibarWidth = minibar?.getBoundingClientRect().width || Math.min(310, stage.clientWidth - 16);
+    const horizontalInset = Math.min(stage.clientWidth / 2, minibarWidth / 2 + 8);
+    setMinibarPosition({
+      left: Math.max(horizontalInset, Math.min(stage.clientWidth - horizontalInset, rawLeft)),
+      top: Math.max(58, rawTop),
+    });
+  }, []);
+
+  const syncCanvasDisplay = useResponsiveFabricCanvas(canvas, stageElement, updateMinibarPosition);
 
   const pushSnapshot = useCallback((immediate = false, reset = false) => {
     const save = () => {
@@ -166,14 +201,15 @@ function ImageEditor() {
     else snapshotTimerRef.current = window.setTimeout(save, 80);
   }, []);
 
-  const syncSelectedShape = useCallback((object?: FabricObject) => {
-    const shape = (object as EditorFabricObject | undefined)?.worklazyRole !== "region-effect" && (object instanceof Rect || object instanceof Circle || object instanceof Line || object instanceof IText) ? object : undefined;
-    setShapeSelected(Boolean(shape));
-    if (!shape) return;
-    setShapeFill(fabricColorToHex(shape.fill, "#0a84ff"));
-    setShapeStroke(fabricColorToHex(shape.stroke, "#ffffff"));
-    setShapeStrokeWidth(Math.max(0, Math.round(shape.strokeWidth || 0)));
-  }, []);
+  const syncSelectedObject = useCallback((object?: FabricObject) => {
+    if (!object || (object as EditorFabricObject).worklazyRole === "region-effect") {
+      setSelectionState(EMPTY_EDITOR_SELECTION);
+      setMinibarPosition(undefined);
+      return;
+    }
+    setSelectionState(getEditorSelectionState(object));
+    window.requestAnimationFrame(updateMinibarPosition);
+  }, [updateMinibarPosition]);
 
   const clearRegionSelection = useCallback(() => {
     const instance = canvas.current;
@@ -191,35 +227,37 @@ function ImageEditor() {
     if (!canvasElement.current) return;
     const instance = new Canvas(canvasElement.current, { width: 900, height: 600, backgroundColor: "#ffffff", preserveObjectStacking: true });
     canvas.current = instance;
-    const syncSelection = () => syncSelectedShape(instance.getActiveObject());
+    const syncSelection = () => syncSelectedObject(instance.getActiveObject());
     const onPath = (event: { path: FabricObject }) => {
-      if (modeRef.current === "erase") event.path.set({ globalCompositeOperation: "destination-out", selectable: false, evented: false });
+      if (interactionModeRef.current === "erase") event.path.set({ globalCompositeOperation: "destination-out", selectable: false, evented: false });
       pushSnapshot();
     };
     instance.on("selection:created", syncSelection);
     instance.on("selection:updated", syncSelection);
     instance.on("selection:cleared", syncSelection);
     instance.on("path:created", onPath);
-    const syncBaseTransform = (event: { target?: FabricObject }) => {
-      if (event.target !== baseImage.current || !baseImage.current) return;
-      syncRegionEffectTransforms(instance, baseImage.current);
-      instance.requestRenderAll();
+    const syncObjectTransform = (event: { target?: FabricObject }) => {
+      if (event.target === baseImage.current && baseImage.current) {
+        syncRegionEffectTransforms(instance, baseImage.current);
+        instance.requestRenderAll();
+      }
+      updateMinibarPosition();
     };
-    instance.on("object:moving", syncBaseTransform);
-    instance.on("object:rotating", syncBaseTransform);
-    instance.on("object:scaling", syncBaseTransform);
-    instance.on("object:skewing", syncBaseTransform);
-    instance.on("object:modified", (event) => { syncBaseTransform(event); pushSnapshot(); });
+    instance.on("object:moving", syncObjectTransform);
+    instance.on("object:rotating", syncObjectTransform);
+    instance.on("object:scaling", syncObjectTransform);
+    instance.on("object:skewing", syncObjectTransform);
+    instance.on("object:modified", (event) => { syncObjectTransform(event); syncSelectedObject(event.target); pushSnapshot(); });
     instance.on("object:added", (event) => { if (event.target !== regionOverlay.current) pushSnapshot(); });
     instance.on("object:removed", (event) => { if (event.target !== regionOverlay.current) pushSnapshot(); });
     instance.on("mouse:down", (event) => {
-      if (!isRegionMode(modeRef.current) || regionEffectBusyRef.current) return;
+      if (!isRegionMode(interactionModeRef.current) || regionEffectBusyRef.current) return;
       const point = event.scenePoint;
       const x = Math.max(0, Math.min(instance.getWidth(), point.x));
       const y = Math.max(0, Math.min(instance.getHeight(), point.y));
       clearRegionSelection();
       regionOrigin.current = { x, y };
-      const effectMode = modeRef.current === "effect";
+      const effectMode = interactionModeRef.current === "effect";
       const overlay = new Rect({ left: x, top: y, width: 1, height: 1, fill: effectMode ? "rgba(175,82,222,.14)" : "rgba(10,132,255,.14)", stroke: effectMode ? "#af52de" : "#0a84ff", strokeWidth: 2, strokeDashArray: [9, 6], strokeUniform: true, selectable: false, evented: false, excludeFromExport: true });
       regionOverlay.current = overlay;
       instance.add(overlay);
@@ -228,7 +266,7 @@ function ImageEditor() {
     instance.on("mouse:move", (event) => {
       const origin = regionOrigin.current;
       const overlay = regionOverlay.current;
-      if (!isRegionMode(modeRef.current) || !origin || !overlay) return;
+      if (!isRegionMode(interactionModeRef.current) || !origin || !overlay) return;
       const x = Math.max(0, Math.min(instance.getWidth(), event.scenePoint.x));
       const y = Math.max(0, Math.min(instance.getHeight(), event.scenePoint.y));
       overlay.set({ left: Math.min(origin.x, x), top: Math.min(origin.y, y), width: Math.abs(x - origin.x), height: Math.abs(y - origin.y) });
@@ -255,28 +293,29 @@ function ImageEditor() {
       instance.dispose();
       canvas.current = undefined;
     };
-  }, [clearRegionSelection, pushSnapshot, syncCanvasDisplay, syncSelectedShape]);
+  }, [clearRegionSelection, pushSnapshot, syncCanvasDisplay, syncSelectedObject, updateMinibarPosition]);
 
   useEffect(() => {
     const instance = canvas.current;
     if (!instance) return;
-    modeRef.current = mode;
-    instance.isDrawingMode = mode === "pencil" || mode === "brush" || mode === "erase";
-    instance.selection = mode === "select";
-    applyEditorInteractivity(instance, baseImage.current, mode, baseLocked);
-    if (mode !== "select") {
+    interactionModeRef.current = interactionMode;
+    instance.isDrawingMode = interactionMode === "pencil" || interactionMode === "brush" || interactionMode === "erase";
+    instance.selection = interactionMode === "select";
+    applyEditorInteractivity(instance, baseImage.current, interactionMode, baseLocked);
+    if (interactionMode !== "select") {
       const brush = new PencilBrush(instance);
-      brush.color = mode === "erase" ? "rgba(0,0,0,1)" : drawColor;
-      brush.width = mode === "brush" ? Math.max(10, drawWidth * 2.2) : mode === "erase" ? Math.max(12, drawWidth * 2.5) : drawWidth;
+      brush.color = interactionMode === "erase" ? "rgba(0,0,0,1)" : drawColor;
+      brush.width = interactionMode === "brush" ? Math.max(10, drawWidth * 2.2) : interactionMode === "erase" ? Math.max(12, drawWidth * 2.5) : drawWidth;
       instance.freeDrawingBrush = brush;
     }
     instance.discardActiveObject();
+    syncSelectedObject();
     instance.requestRenderAll();
-  }, [baseLocked, drawColor, drawWidth, mode]);
+  }, [baseLocked, drawColor, drawWidth, interactionMode, syncSelectedObject]);
 
   useEffect(() => {
-    if (!isRegionMode(mode)) clearRegionSelection();
-  }, [clearRegionSelection, mode]);
+    if (!isRegionMode(interactionMode)) clearRegionSelection();
+  }, [clearRegionSelection, interactionMode]);
 
   const loadFile = async (next?: File) => {
     if (!next || !canvas.current) return;
@@ -303,18 +342,19 @@ function ImageEditor() {
       setBaseLocked(true);
       setBrightness(0); setContrast(0); setHue(0);
       editorSettings.current = { ...editorSettings.current, brightness: 0, contrast: 0, hue: 0, baseLocked: true };
-      setMode("select");
-      modeRef.current = "select";
+      setInteractionMode("select");
+      interactionModeRef.current = "select";
+      setActivePanel("select");
       applyEditorInteractivity(instance, image, "select", true);
       instance.requestRenderAll();
-      syncSelectedShape();
+      syncSelectedObject();
       restoringRef.current = false;
       pushSnapshot(true, true);
       window.requestAnimationFrame(syncCanvasDisplay);
-    } catch (error) {
+    } catch {
       restoringRef.current = false;
       URL.revokeObjectURL(url);
-      setEditorError(error instanceof Error ? error.message : t("image.common.failed"));
+      setEditorError(t("image.common.failed"));
     }
   };
 
@@ -333,11 +373,11 @@ function ImageEditor() {
     setFile(undefined);
     outputMultiplier.current = 1;
     setEditorError("");
-    setBrightness(0); setContrast(0); setHue(0); setBaseLocked(true); setMode("select");
-    modeRef.current = "select";
+    setBrightness(0); setContrast(0); setHue(0); setBaseLocked(true); setInteractionMode("select"); setActivePanel("select");
+    interactionModeRef.current = "select";
     editorSettings.current = { ...editorSettings.current, brightness: 0, contrast: 0, hue: 0, baseLocked: true };
     instance.requestRenderAll();
-    syncSelectedShape();
+    syncSelectedObject();
     restoringRef.current = false;
     pushSnapshot(true, true);
     window.requestAnimationFrame(syncCanvasDisplay);
@@ -367,21 +407,22 @@ function ImageEditor() {
       keepRegionEffectsAboveBase(instance, baseImage.current);
     }
     instance.requestRenderAll();
+    syncSelectedObject(object);
     pushSnapshot();
   };
 
   const removeSelectedLayers = useCallback(() => {
     const instance = canvas.current;
     if (!instance) return false;
-    const removable = instance.getActiveObjects().filter((object) => object !== baseImage.current);
+    const removable = instance.getActiveObjects().filter((object) => object !== baseImage.current && (object as EditorFabricObject).worklazyRole !== "region-effect");
     if (!removable.length) return false;
     instance.remove(...removable);
     instance.discardActiveObject();
-    syncSelectedShape();
+    syncSelectedObject();
     instance.requestRenderAll();
     pushSnapshot();
     return true;
-  }, [pushSnapshot, syncSelectedShape]);
+  }, [pushSnapshot, syncSelectedObject]);
 
   const applyCropSelection = useCallback(() => {
     const instance = canvas.current;
@@ -399,15 +440,15 @@ function ImageEditor() {
     instance.setDimensions({ width: Math.max(1, Math.round(selection.width)), height: Math.max(1, Math.round(selection.height)) });
     instance.discardActiveObject();
     setRegionSelection(undefined);
-    setMode("select");
-    modeRef.current = "select";
+    setInteractionMode("select");
+    interactionModeRef.current = "select";
     applyEditorInteractivity(instance, baseImage.current, "select", baseLocked);
     instance.requestRenderAll();
-    syncSelectedShape();
+    syncSelectedObject();
     restoringRef.current = false;
     pushSnapshot(true);
     window.requestAnimationFrame(syncCanvasDisplay);
-  }, [baseLocked, pushSnapshot, regionSelection, syncCanvasDisplay, syncSelectedShape]);
+  }, [baseLocked, pushSnapshot, regionSelection, syncCanvasDisplay, syncSelectedObject]);
 
   const applyRegionEffect = useCallback(async () => {
     const instance = canvas.current;
@@ -477,11 +518,11 @@ function ImageEditor() {
       instance.insertAt(lastEffectIndex + 1, effectImage);
       clearRegionSelection();
       instance.discardActiveObject();
-      setMode("select");
-      modeRef.current = "select";
+      setInteractionMode("select");
+      interactionModeRef.current = "select";
       applyEditorInteractivity(instance, image, "select", baseLocked);
       instance.requestRenderAll();
-      syncSelectedShape();
+      syncSelectedObject();
       restoringRef.current = false;
       pushSnapshot(true);
     } catch {
@@ -499,24 +540,24 @@ function ImageEditor() {
       regionEffectBusyRef.current = false;
       setRegionEffectBusy(false);
     }
-  }, [baseLocked, clearRegionSelection, file, pushSnapshot, regionEffect, regionEffectStrength, regionSelection, syncSelectedShape, t]);
+  }, [baseLocked, clearRegionSelection, file, pushSnapshot, regionEffect, regionEffectStrength, regionSelection, syncSelectedObject, t]);
 
   useEffect(() => {
     const handleEditorShortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
-      if (isRegionMode(modeRef.current) && event.key === "Escape") {
+      if (isRegionMode(interactionModeRef.current) && event.key === "Escape") {
         event.preventDefault();
         clearRegionSelection();
-        setMode("select");
+        setInteractionMode("select");
         return;
       }
-      if (modeRef.current === "crop" && event.key === "Enter" && regionOverlay.current) {
+      if (interactionModeRef.current === "crop" && event.key === "Enter" && regionOverlay.current) {
         event.preventDefault();
         applyCropSelection();
         return;
       }
-      if (modeRef.current === "effect" && event.key === "Enter" && regionOverlay.current) {
+      if (interactionModeRef.current === "effect" && event.key === "Enter" && regionOverlay.current) {
         event.preventDefault();
         void applyRegionEffect();
         return;
@@ -537,8 +578,8 @@ function ImageEditor() {
     const previousWidth = instance.getWidth();
     const previousHeight = instance.getHeight();
     clearRegionSelection();
-    setMode("select");
-    modeRef.current = "select";
+    setInteractionMode("select");
+    interactionModeRef.current = "select";
     instance.setDimensions({ width, height });
     window.requestAnimationFrame(syncCanvasDisplay);
     if (image) {
@@ -558,12 +599,12 @@ function ImageEditor() {
   const addObject = (object: FabricObject) => {
     const instance = canvas.current;
     if (!instance) return;
-    setMode("select");
-    modeRef.current = "select";
+    setInteractionMode("select");
+    interactionModeRef.current = "select";
     instance.isDrawingMode = false;
     instance.add(object);
     instance.setActiveObject(object);
-    syncSelectedShape(object);
+    syncSelectedObject(object);
     instance.requestRenderAll();
     pushSnapshot();
   };
@@ -579,11 +620,12 @@ function ImageEditor() {
     if (kind === "circle") addObject(new Circle({ left: 120, top: 120, radius: 90, fill: "#ff375f", stroke: "#ffffff", strokeWidth: 0 }));
   };
 
-  const setSelectedShapeStyle = (property: "fill" | "stroke" | "strokeWidth", value: string | number) => {
+  const setSelectedObjectStyle = (property: "color" | "stroke" | "width", value: string | number) => {
     mutateActive((object) => {
-      if (object instanceof Rect || object instanceof Circle) object.set(property, value);
-      if (object instanceof IText && property === "fill") object.set("fill", value);
-      if (object instanceof Line && property !== "fill") object.set(property, value);
+      if ((object as EditorFabricObject).worklazyRole === "base") return;
+      if (property === "color") object.set(object instanceof Line || object.type === "path" ? "stroke" : "fill", value);
+      if (property === "stroke" && (object instanceof Rect || object instanceof Circle)) object.set("stroke", value);
+      if (property === "width") object.set("strokeWidth", value);
     });
   };
 
@@ -633,7 +675,7 @@ function ImageEditor() {
     setBaseLocked(locked);
     editorSettings.current = { ...editorSettings.current, baseLocked: locked };
     if (canvas.current) {
-      applyEditorInteractivity(canvas.current, baseImage.current, modeRef.current, locked);
+      applyEditorInteractivity(canvas.current, baseImage.current, interactionModeRef.current, locked);
       canvas.current.requestRenderAll();
       pushSnapshot();
     }
@@ -646,7 +688,7 @@ function ImageEditor() {
     if (!removable.length) return;
     instance.remove(...removable);
     instance.discardActiveObject();
-    syncSelectedShape();
+    syncSelectedObject();
     instance.requestRenderAll();
     pushSnapshot();
   };
@@ -678,17 +720,41 @@ function ImageEditor() {
         syncRegionEffectTransforms(instance, baseImage.current);
         keepRegionEffectsAboveBase(instance, baseImage.current);
       }
-      applyEditorInteractivity(instance, baseImage.current, modeRef.current, snapshot.baseLocked);
+      applyEditorInteractivity(instance, baseImage.current, interactionModeRef.current, snapshot.baseLocked);
       instance.discardActiveObject();
       instance.requestRenderAll();
       historyIndexRef.current = index;
       setHistoryState({ index, length: historyRef.current.length });
-      syncSelectedShape();
+      syncSelectedObject();
       window.requestAnimationFrame(syncCanvasDisplay);
     } finally {
       window.clearTimeout(snapshotTimerRef.current);
       restoringRef.current = false;
     }
+  };
+
+  const changePanel = (panel: EditorPanelName) => {
+    setActivePanel(panel);
+    const nextMode: EditorInteractionMode = panel === "draw" ? drawTool : panel === "crop" || panel === "effect" ? panel : "select";
+    interactionModeRef.current = nextMode;
+    setInteractionMode(nextMode);
+  };
+
+  const changeDrawTool = (tool: EditorDrawTool) => {
+    setDrawTool(tool);
+    interactionModeRef.current = tool;
+    setInteractionMode(tool);
+  };
+
+  const cancelRegionInteraction = () => {
+    clearRegionSelection();
+    interactionModeRef.current = "select";
+    setInteractionMode("select");
+  };
+
+  const changeRegionEffect = (effect: RegionEffect) => {
+    setRegionEffect(effect);
+    if (effect === "blur") setRegionEffectStrength((current) => Math.max(10, current));
   };
 
   const exportImage = () => {
@@ -732,45 +798,94 @@ function ImageEditor() {
       {editorError && <p className="utility-error" role="alert">{editorError}</p>}
       <ClipboardHint mode="replace" />
       <div className="editor-source-actions"><button type="button" className="secondary-button" onClick={newBlankCanvas}><ImageIcon size={16} /> {t("image.editor.blank")}</button>{file && <span>{t("image.editor.editing", { name: file.name })}</span>}</div>
-      <div className="editor-toolbar">
-        <div className="editor-draw-tools" aria-label={t("image.editor.tools")}>
-          <ToolButton active={mode === "select"} label={t("image.editor.select")} onClick={() => setMode("select")}><MousePointer2 /></ToolButton>
-          <ToolButton active={mode === "pencil"} label={t("image.editor.pencil")} onClick={() => setMode("pencil")}><Pencil /></ToolButton>
-          <ToolButton active={mode === "brush"} label={t("image.editor.brush")} onClick={() => setMode("brush")}><Brush /></ToolButton>
-          <ToolButton active={mode === "erase"} label={t("image.editor.eraser")} onClick={() => setMode("erase")}><Eraser /></ToolButton>
-          <ToolButton active={mode === "crop"} label={t("image.editor.cropDrag")} onClick={() => setMode("crop")}><Crop /></ToolButton>
-          <ToolButton active={mode === "effect"} disabled={!file || regionEffectBusy} label={t("image.editor.effectTool")} onClick={() => setMode("effect")}><Grid3X3 /></ToolButton>
+      <ImageEditorToolbar
+        activePanel={activePanel}
+        hasFile={Boolean(file)}
+        effectBusy={regionEffectBusy}
+        canDelete={selectionState.kind !== "none" && !selectionState.isBase}
+        historyIndex={historyState.index}
+        historyLength={historyState.length}
+        onPanelChange={changePanel}
+        onUndo={() => void restore(historyState.index - 1)}
+        onRedo={() => void restore(historyState.index + 1)}
+        onDelete={() => { removeSelectedLayers(); }}
+      />
+      <div className="image-editor-layout" data-testid="image-editor-workspace">
+        <div className="image-editor-canvas-column">
+          <div
+            ref={stageElement}
+            className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}${interactionMode === "crop" ? " is-crop-mode" : interactionMode === "effect" ? " is-effect-mode" : ""}`}
+            aria-label={t("image.editor.canvasArea")}
+            data-testid="image-editor-canvas-stage"
+            onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setStageDragging(true); } }}
+            onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
+            onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setStageDragging(false); }}
+            onDrop={dropOnPreview}
+          >
+            <canvas ref={canvasElement} />
+            <ImageEditorMinibar
+              position={minibarPosition}
+              selection={selectionState}
+              onColorChange={(color) => setSelectedObjectStyle("color", color)}
+              onWidthChange={(width) => setSelectedObjectStyle("width", width)}
+              onBringToFront={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}
+              onSendToBack={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}
+              onDuplicate={() => void duplicateSelectedLayer()}
+              onDelete={() => { removeSelectedLayers(); }}
+            />
+            {stageDragging && <span className="image-preview-drop-hint">{t("image.editor.drop")}</span>}
+          </div>
         </div>
-        <label className="editor-draw-color"><span>{t("image.editor.color")}</span><input type="color" value={drawColor} onChange={(event) => setDrawColor(event.target.value)} /></label>
-        <label className="editor-draw-width"><span>{t("image.editor.width", { count: drawWidth })}</span><input type="range" min={1} max={40} value={drawWidth} onChange={(event) => setDrawWidth(Number(event.target.value))} /></label>
-        <div className="editor-history-actions"><button type="button" disabled={historyState.index <= 0} aria-label={t("image.editor.undo")} onClick={() => void restore(historyState.index - 1)}><Undo2 /></button><button type="button" disabled={historyState.index >= historyState.length - 1} aria-label={t("image.editor.redo")} onClick={() => void restore(historyState.index + 1)}><Redo2 /></button><button type="button" aria-label={t("image.editor.deleteObject")} onClick={removeSelectedLayers}><Trash2 /></button></div>
-      </div>
-      <div className="image-editor-layout">
-        <aside className="image-editor-controls">
-          <div className="editor-tool-group"><strong>{t("image.editor.crop")}</strong><div className="button-grid"><button type="button" onClick={() => cropTo(1)}>1:1</button><button type="button" onClick={() => cropTo(4 / 3)}>4:3</button><button type="button" onClick={() => cropTo(3 / 4)}>3:4</button><button type="button" onClick={() => cropTo(16 / 9)}>16:9</button><button type="button" onClick={() => cropTo(9 / 16)}>9:16</button></div><p className="image-crop-hint">{t("image.editor.cropHint")}</p>{mode === "crop" && regionSelection && <div className="image-crop-selection-status"><span>{t("image.editor.cropSelection", { width: Math.round(regionSelection.width), height: Math.round(regionSelection.height) })}</span><div><button type="button" className="secondary-button" onClick={() => { clearRegionSelection(); setMode("select"); }}>{t("image.editor.cropCancel")}</button><button type="button" className="primary-button" onClick={applyCropSelection}>{t("image.editor.cropApply")}</button></div></div>}</div>
-          <div className={`editor-tool-group region-effect-controls${file ? "" : " is-disabled"}`}><strong>{t("image.editor.effectTitle")}</strong><div className="button-grid region-effect-options"><button type="button" className={regionEffect === "mosaic" ? "active" : ""} aria-pressed={regionEffect === "mosaic"} disabled={!file || regionEffectBusy} onClick={() => setRegionEffect("mosaic")}>{t("image.editor.mosaic")}</button><button type="button" className={regionEffect === "blur" ? "active" : ""} aria-pressed={regionEffect === "blur"} disabled={!file || regionEffectBusy} onClick={() => { setRegionEffect("blur"); setRegionEffectStrength((current) => Math.max(10, current)); }}>{t("image.editor.blur")}</button></div><label>{t("image.editor.effectStrength")} <b>{regionEffectStrength}</b><input aria-label={t("image.editor.effectStrength")} disabled={!file || regionEffectBusy} type="range" min={regionEffect === "blur" ? 10 : 4} max={40} step={1} value={regionEffectStrength} onChange={(event) => setRegionEffectStrength(Number(event.target.value))} /></label><p className="image-crop-hint">{t("image.editor.effectHint")}</p>{mode === "effect" && regionSelection && <div className="image-crop-selection-status region-effect-selection"><span>{t("image.editor.cropSelection", { width: Math.round(regionSelection.width), height: Math.round(regionSelection.height) })}</span><div><button type="button" className="secondary-button" disabled={regionEffectBusy} onClick={() => { clearRegionSelection(); setMode("select"); }}>{t("image.editor.cropCancel")}</button><button type="button" className="primary-button" disabled={regionEffectBusy} onClick={() => void applyRegionEffect()}>{regionEffectBusy ? t("image.editor.effectBusy") : t(regionEffect === "mosaic" ? "image.editor.applyMosaic" : "image.editor.applyBlur")}</button></div></div>}</div>
-          <div className="editor-tool-group"><strong>{t("image.editor.layer")}</strong><div className="icon-tool-row"><button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" onClick={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}><RotateCw size={18} /></button><button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" onClick={() => mutateActive((object) => object.set("flipX", !object.flipX))}><FlipHorizontal2 size={18} /></button><button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" onClick={() => mutateActive((object) => object.set("flipY", !object.flipY))}><FlipVertical2 size={18} /></button><button title={t("image.editor.front")} aria-label={t("image.editor.front")} type="button" onClick={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}><ArrowUpToLine size={18} /></button><button title={t("image.editor.back")} aria-label={t("image.editor.back")} type="button" onClick={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}><ArrowDownToLine size={18} /></button><button title={t("image.editor.duplicate")} aria-label={t("image.editor.duplicate")} type="button" onClick={() => void duplicateSelectedLayer()}><ClipboardPaste size={18} /></button><button title={t("image.editor.delete")} aria-label={t("image.editor.delete")} type="button" onClick={removeSelectedLayers}><Trash2 size={18} /></button></div></div>
-          <div className={`editor-tool-group${file ? "" : " is-disabled"}`}><strong>{t("image.editor.adjust")}</strong><label>{t("image.editor.brightness")} <b>{brightness}</b><input disabled={!file} type="range" min={-80} max={80} value={brightness} onChange={(event) => updateFilter("brightness", Number(event.target.value))} /></label><label>{t("image.editor.contrast")} <b>{contrast}</b><input disabled={!file} type="range" min={-80} max={80} value={contrast} onChange={(event) => updateFilter("contrast", Number(event.target.value))} /></label><label>{t("image.editor.hue")} <b>{hue}°</b><input disabled={!file} type="range" min={-180} max={180} value={hue} onChange={(event) => updateFilter("hue", Number(event.target.value))} /></label>{file && <ToggleRow label={t("image.editor.lock")} description={t("image.editor.lockHelp")} checked={baseLocked} onChange={updateBaseLock} />}</div>
-          <div className="editor-tool-group"><strong>{t("image.editor.text")}</strong><div className="inline-input-action"><input value={text} onChange={(event) => setText(event.target.value)} /><button type="button" onClick={() => addText()}><Type size={16} /></button></div><div className="button-grid sticker-grid">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" key={emoji} onClick={() => addText(emoji)}>{emoji}</button>)}</div></div>
-          <div className="editor-tool-group"><strong>{t("image.editor.shapes")}</strong><div className="icon-tool-row"><button title={t("image.editor.line")} aria-label={t("image.editor.line")} type="button" onClick={() => addShape("line")}><Minus size={18} /></button><button title={t("image.editor.rect")} aria-label={t("image.editor.rect")} type="button" onClick={() => addShape("rect")}><Square size={18} /></button><button title={t("image.editor.circle")} aria-label={t("image.editor.circle")} type="button" onClick={() => addShape("circle")}><CircleIcon size={18} /></button></div></div>
-          <div className={`editor-tool-group shape-style-controls${shapeSelected ? "" : " is-disabled"}`}><strong>{t("image.editor.shapeStyle")}</strong><label><span>{t("image.editor.fill")}</span><input aria-label={t("image.editor.fillLabel")} type="color" value={shapeFill} disabled={!shapeSelected} onChange={(event) => { setShapeFill(event.target.value); setSelectedShapeStyle("fill", event.target.value); }} /></label><label><span>{t("image.editor.stroke")}</span><input aria-label={t("image.editor.strokeLabel")} type="color" value={shapeStroke} disabled={!shapeSelected} onChange={(event) => { setShapeStroke(event.target.value); setSelectedShapeStyle("stroke", event.target.value); }} /></label><label><span>{t("image.editor.strokeWidth", { count: shapeStrokeWidth })}</span><input aria-label={t("image.editor.strokeWidthLabel")} type="range" min={0} max={30} step={1} value={shapeStrokeWidth} disabled={!shapeSelected} onChange={(event) => { const value = Number(event.target.value); setShapeStrokeWidth(value); setSelectedShapeStyle("strokeWidth", value); }} /></label>{!shapeSelected && <small>{t("image.editor.selectShape")}</small>}</div>
-          <div className="editor-tool-group editor-background-control"><strong>{t("image.editor.backgroundGroup")}</strong><label><span>{t("image.editor.background")}</span><input type="color" value={background} disabled={transparentBackground} onChange={(event) => updateBackground(event.target.value, transparentBackground)} /></label><div className="image-background-options compact"><ToggleRow label={t("image.editor.transparent")} description={t("image.editor.transparentOutput")} checked={transparentBackground} onChange={(checked) => updateBackground(background, checked)} /></div><button type="button" className="secondary-button" onClick={clearAddedLayers}><Trash2 size={15} /> {t("image.editor.clearLayers")}</button></div>
-        </aside>
-        <div
-          ref={stageElement}
-          className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}${mode === "crop" ? " is-crop-mode" : mode === "effect" ? " is-effect-mode" : ""}`}
-          onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setStageDragging(true); } }}
-          onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
-          onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setStageDragging(false); }}
-          onDrop={dropOnPreview}
-        ><canvas ref={canvasElement} />{stageDragging && <span className="image-preview-drop-hint">{t("image.editor.drop")}</span>}</div>
+        <ImageEditorPanel
+          activePanel={activePanel}
+          drawTool={drawTool}
+          drawColor={drawColor}
+          drawWidth={drawWidth}
+          selection={selectionState}
+          text={text}
+          hasFile={Boolean(file)}
+          regionEffect={regionEffect}
+          regionEffectStrength={regionEffectStrength}
+          regionEffectBusy={regionEffectBusy}
+          regionSelection={regionSelection}
+          brightness={brightness}
+          contrast={contrast}
+          hue={hue}
+          baseLocked={baseLocked}
+          background={background}
+          transparentBackground={transparentBackground}
+          onDrawToolChange={changeDrawTool}
+          onDrawColorChange={setDrawColor}
+          onDrawWidthChange={setDrawWidth}
+          onSelectionColorChange={(color) => setSelectedObjectStyle("color", color)}
+          onSelectionStrokeColorChange={(color) => setSelectedObjectStyle("stroke", color)}
+          onSelectionWidthChange={(width) => setSelectedObjectStyle("width", width)}
+          onRotate={() => mutateActive((object) => object.rotate((object.angle || 0) + 90))}
+          onFlipHorizontal={() => mutateActive((object) => object.set("flipX", !object.flipX))}
+          onFlipVertical={() => mutateActive((object) => object.set("flipY", !object.flipY))}
+          onCropRatio={cropTo}
+          onCropCancel={cancelRegionInteraction}
+          onCropApply={applyCropSelection}
+          onRegionEffectChange={changeRegionEffect}
+          onRegionEffectStrengthChange={setRegionEffectStrength}
+          onRegionEffectCancel={cancelRegionInteraction}
+          onRegionEffectApply={() => void applyRegionEffect()}
+          onFilterChange={updateFilter}
+          onBaseLockChange={updateBaseLock}
+          onTextChange={setText}
+          onAddText={addText}
+          onAddShape={addShape}
+          onBackgroundChange={(color) => updateBackground(color, transparentBackground)}
+          onTransparentBackgroundChange={(transparent) => updateBackground(background, transparent)}
+          onClearLayers={clearAddedLayers}
+        />
       </div>
       <div className="export-row"><div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label={t("image.editor.format")} /><small>{t("image.editor.formatHelp")}</small></div><PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> {t("image.editor.download")}</PrimaryButton></div>
     </SectionCard>
   );
 }
 
-function applyEditorInteractivity(instance: Canvas, image: FabricImage | undefined, mode: EditorMode, baseLocked: boolean) {
+function applyEditorInteractivity(instance: Canvas, image: FabricImage | undefined, mode: EditorInteractionMode, baseLocked: boolean) {
   instance.forEachObject((object) => {
     const eraserPath = object.globalCompositeOperation === "destination-out";
     const fixedEffect = (object as EditorFabricObject).worklazyRole === "region-effect";
@@ -779,7 +894,7 @@ function applyEditorInteractivity(instance: Canvas, image: FabricImage | undefin
   });
 }
 
-function isRegionMode(mode: EditorMode) {
+function isRegionMode(mode: EditorInteractionMode) {
   return mode === "crop" || mode === "effect";
 }
 
@@ -939,9 +1054,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string) {
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("The browser could not encode the image canvas.")), type));
 }
 
-function ToolButton({ active, disabled = false, label, onClick, children }: { active: boolean; disabled?: boolean; label: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" className={active ? "active" : ""} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick}>{children}<span>{label}</span></button>; }
-
-function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | undefined>, stageRef: React.RefObject<HTMLDivElement | null>) {
+function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | undefined>, stageRef: React.RefObject<HTMLDivElement | null>, onResize: () => void) {
   const sync = useCallback(() => {
     const canvas = canvasRef.current;
     const stage = stageRef.current;
@@ -951,7 +1064,8 @@ function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | un
     const scale = Math.min(1, availableWidth / canvas.getWidth());
     canvas.setDimensions({ width: `${Math.round(canvas.getWidth() * scale)}px`, height: `${Math.round(canvas.getHeight() * scale)}px` }, { cssOnly: true });
     canvas.calcOffset();
-  }, [canvasRef, stageRef]);
+    onResize();
+  }, [canvasRef, onResize, stageRef]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -966,6 +1080,25 @@ function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | un
     };
   }, [stageRef, sync]);
   return sync;
+}
+
+function getEditorSelectionState(object: FabricObject): EditorSelectionState {
+  const isBase = (object as EditorFabricObject).worklazyRole === "base";
+  const isDrawing = object.type === "path";
+  const isLine = object instanceof Line;
+  const isShape = object instanceof Rect || object instanceof Circle;
+  const isText = object instanceof IText;
+  const colorSource = isLine || isDrawing ? object.stroke : object.fill;
+  return {
+    kind: isBase ? "base" : isText ? "text" : isLine ? "line" : isShape ? "shape" : isDrawing ? "drawing" : "shape",
+    color: fabricColorToHex(colorSource, "#1d1d1f"),
+    strokeColor: fabricColorToHex(object.stroke, "#ffffff"),
+    width: Math.max(0, Math.round(object.strokeWidth || 0)),
+    colorEnabled: !isBase && (isDrawing || isLine || isShape || isText),
+    strokeColorEnabled: !isBase && isShape,
+    widthEnabled: !isBase && (isDrawing || isLine || isShape || isText),
+    isBase,
+  };
 }
 
 function fabricColorToHex(value: FabricObject["fill"] | FabricObject["stroke"], fallback: string) {

@@ -51,6 +51,8 @@ try {
       console.log("[2/4] Image studio");
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
       await testImageStudio(page, fixtures.images);
+      await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+      await testImageStudioMobile(page);
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
     }
     if (!onlyHwp && !onlyVideo && !onlyImage) {
@@ -176,32 +178,53 @@ async function testImageStudio(page, imagePaths) {
     return pixel && pixel[2] > 150;
   });
   const editorControls = await page.evaluate(() => ({
-    hasRectangleLabel: Boolean(document.querySelector('button[aria-label="사각형 추가"]')),
     hasVerticalFlip: Boolean(document.querySelector('button[aria-label="상하 반전"]')),
+    toolbarPanels: document.querySelectorAll('[data-testid^="image-editor-panel-"]').length,
     jpgNotice: document.querySelector(".image-format-control small")?.textContent || "",
   }));
-  if (!editorControls.hasRectangleLabel || !editorControls.hasVerticalFlip || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
+  if (!editorControls.hasVerticalFlip || editorControls.toolbarPanels !== 8 || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
     throw new Error(`Unified editor controls are incomplete: ${JSON.stringify(editorControls)}`);
   }
+  await page.click('[data-testid="image-editor-panel-canvas"]');
   await page.click('.image-background-options.compact button[role="switch"]');
   await page.waitForFunction(() => {
     const canvas = document.querySelector(".fabric-stage .lower-canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
     return canvas.getContext("2d")?.getImageData(1, 1, 1, 1).data[3] === 0;
   });
+  await page.click('[data-testid="image-editor-panel-shapes"]');
   await page.click('button[aria-label="사각형 추가"]');
-  await page.waitForFunction(() => !document.querySelector(".shape-style-controls")?.classList.contains("is-disabled"));
+  await page.waitForSelector('[data-testid="image-editor-minibar"]');
+  const panelAfterInsert = await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.getAttribute("data-panel"));
+  if (panelAfterInsert !== "shapes") throw new Error(`Shape insertion closed its tool panel: ${panelAfterInsert}`);
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => window.scrollTo({ top: canvas.getBoundingClientRect().top + scrollY - 180, behavior: "instant" }));
+  const minibarBeforeMove = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
+  const objectCanvas = await page.$(".fabric-stage .upper-canvas");
+  const objectCanvasBox = await objectCanvas?.boundingBox();
+  if (!objectCanvasBox) throw new Error("Image canvas is unavailable for the minibar movement test");
+  const objectScale = objectCanvasBox.width / 900;
+  await page.mouse.move(objectCanvasBox.x + 120 * objectScale, objectCanvasBox.y + 120 * objectScale);
+  await page.mouse.down();
+  await page.mouse.move(objectCanvasBox.x + 220 * objectScale, objectCanvasBox.y + 190 * objectScale, { steps: 8 });
+  await page.mouse.up();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const minibarAfterMove = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
+  if (Math.hypot(minibarAfterMove.left - minibarBeforeMove.left, minibarAfterMove.top - minibarBeforeMove.top) < 20) throw new Error(`Floating minibar did not follow the moved object: ${JSON.stringify({ minibarBeforeMove, minibarAfterMove })}`);
+  await page.click('[data-testid="image-editor-panel-select"]');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"));
   await page.evaluate(() => {
-    const controls = document.querySelector(".shape-style-controls");
-    const colors = controls?.querySelectorAll("input[type=color]");
-    const width = controls?.querySelector("input[type=range]");
-    if (!(colors?.[0] instanceof HTMLInputElement) || !(colors?.[1] instanceof HTMLInputElement) || !(width instanceof HTMLInputElement)) throw new Error("Shape controls are unavailable");
-    colors[0].value = "#00ff00";
-    colors[0].dispatchEvent(new Event("change", { bubbles: true }));
-    colors[1].value = "#000000";
-    colors[1].dispatchEvent(new Event("change", { bubbles: true }));
-    width.value = "8";
-    width.dispatchEvent(new Event("change", { bubbles: true }));
+    const setValue = (input, value) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const fill = document.querySelector('[data-testid="image-editor-select-color"]');
+    const stroke = document.querySelector('[data-testid="image-editor-select-stroke"]');
+    const width = document.querySelector('[data-testid="image-editor-select-width"]');
+    if (!(fill instanceof HTMLInputElement) || !(stroke instanceof HTMLInputElement) || !(width instanceof HTMLInputElement)) throw new Error("Shape controls are unavailable");
+    setValue(fill, "#00ff00");
+    setValue(stroke, "#000000");
+    setValue(width, "8");
   });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const styledCanvas = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
@@ -239,7 +262,7 @@ async function testImageStudio(page, imagePaths) {
     for (let y = 0; y < canvas.height; y += 1) {
       for (let x = 0; x < canvas.width; x += 1) {
         const offset = (y * canvas.width + x) * 4;
-        if (pixels[offset] < 18 && pixels[offset + 1] > 110 && pixels[offset + 1] < 150 && pixels[offset + 2] > 238) {
+        if (pixels[offset] < 30 && pixels[offset + 1] > 220 && pixels[offset + 2] < 40) {
           minX = Math.min(minX, x);
           maxX = Math.max(maxX, x);
         }
@@ -257,16 +280,22 @@ async function testImageStudio(page, imagePaths) {
   console.log("  image: high-resolution export verified");
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
   await page.keyboard.press("Delete");
-  await page.waitForFunction(() => document.querySelector(".shape-style-controls")?.classList.contains("is-disabled"));
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"));
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const deletedCanvas = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
   if (!styledCanvas || styledCanvas === deletedCanvas) throw new Error("Delete did not remove the selected Fabric layer");
+  await page.click('[data-testid="image-editor-panel-shapes"]');
   await page.click('button[aria-label="사각형 추가"]');
+  await page.click('[data-testid="image-editor-panel-select"]');
   await page.evaluate(() => {
-    const fill = document.querySelector('.shape-style-controls input[aria-label="도형 채움색"]');
+    const setValue = (input, value) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const fill = document.querySelector('[data-testid="image-editor-select-color"]');
     if (!(fill instanceof HTMLInputElement)) throw new Error("Shape fill control is unavailable for the region-effect test");
-    fill.value = "#ff375f";
-    fill.dispatchEvent(new Event("change", { bubbles: true }));
+    setValue(fill, "#ff375f");
   });
   await new Promise((resolve) => setTimeout(resolve, 160));
   const beforeRegionEffect = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
@@ -277,15 +306,16 @@ async function testImageStudio(page, imagePaths) {
     Object.defineProperty(window, "CanvasRenderingContext2D", { configurable: true, writable: true, value: undefined });
     return true;
   });
-  await page.click('button[aria-label="영역 효과"]');
-  await page.$$eval(".region-effect-options button", (buttons) => {
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await page.$$eval('[data-testid="image-editor-effect-options"] button', (buttons) => {
     const blur = buttons.find((button) => button.textContent?.trim() === "블러");
     if (!(blur instanceof HTMLButtonElement)) throw new Error("Blur region effect is unavailable");
     blur.click();
   });
-  await page.$eval('input[aria-label="효과 강도"]', (input) => {
-    input.value = "10";
+  await page.$eval('[data-testid="image-editor-effect-strength"]', (input) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "10");
     input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await page.waitForFunction(() => document.querySelector('input[aria-label="효과 강도"]')?.value === "10");
   await page.waitForSelector(".fabric-stage.is-effect-mode");
@@ -297,9 +327,9 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.down();
   await page.mouse.move(effectBox.x + effectBox.width * 0.42, effectBox.y + effectBox.height * 0.36, { steps: 8 });
   await page.mouse.up();
-  await page.waitForSelector(".region-effect-selection");
-  await page.click(".region-effect-selection .primary-button");
-  await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode") && !document.querySelector(".region-effect-selection"));
+  await page.waitForSelector('[data-testid="image-editor-effect-selection"]');
+  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode") && !document.querySelector('[data-testid="image-editor-effect-selection"]'));
   if (disabledNativeCanvasBlur) {
     await page.evaluate(() => Object.defineProperty(window, "CanvasRenderingContext2D", window.__canvasContextConstructorDescriptor));
   }
@@ -308,26 +338,33 @@ async function testImageStudio(page, imagePaths) {
   if (beforeRegionEffect === afterRegionEffect) throw new Error("Blur did not change the selected image region");
   const blurredEdgeAlpha = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.getContext("2d").getImageData(Math.floor(canvas.width * 0.04), Math.floor(canvas.height * 0.04), 1, 1).data[3]);
   if (blurredEdgeAlpha < 250) throw new Error(`Blur introduced transparency at the source-image edge: ${blurredEdgeAlpha}`);
-  await page.click('.editor-history-actions button[aria-label="실행 취소"]');
+  await page.$eval('[data-testid="image-editor-undo"]', (button) => button.click());
   await page.waitForFunction((effected) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() !== effected, {}, afterRegionEffect);
   const undoneRegionEffect = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
-  await page.click('.editor-history-actions button[aria-label="다시 실행"]');
+  console.log("  image: region effect undo verified");
+  await page.$eval('[data-testid="image-editor-redo"]', (button) => button.click());
   await page.waitForFunction((undone) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() !== undone, {}, undoneRegionEffect);
+  console.log("  image: region effect redo verified");
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.evaluate(() => {
-    const clearLayers = Array.from(document.querySelectorAll(".image-editor-controls button")).find((button) => button.textContent?.includes("추가 레이어 모두 지우기"));
-    if (!(clearLayers instanceof HTMLButtonElement)) throw new Error("Clear-added-layers control is unavailable");
-    clearLayers.click();
-  });
+  await page.click('[data-testid="image-editor-panel-canvas"]');
+  await page.click('[data-testid="image-editor-clear-layers"]');
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.$eval(".fabric-stage .lower-canvas", (canvas) => {
     window.__protectedEffectBeforeLayerMove = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
   });
+  await page.click('[data-testid="image-editor-panel-effect"]');
   await page.click('button[aria-label="원본 사진 잠금"]');
+  await page.click('[data-testid="image-editor-panel-select"]');
   const baseCanvas = await page.$(".fabric-stage .upper-canvas");
   const baseBox = await baseCanvas?.boundingBox();
   if (!baseBox) throw new Error("Image base canvas is unavailable for the layer-order test");
   await page.mouse.click(baseBox.x + baseBox.width * 0.8, baseBox.y + baseBox.height * 0.8);
+  await page.waitForSelector('[data-testid="image-editor-minibar"]');
+  const baseMinibarState = await page.evaluate(() => ({
+    duplicateDisabled: document.querySelector('[data-testid="image-editor-minibar-duplicate"]')?.disabled,
+    deleteDisabled: document.querySelector('[data-testid="image-editor-minibar-delete"]')?.disabled,
+  }));
+  if (!baseMinibarState.duplicateDisabled || !baseMinibarState.deleteDisabled) throw new Error(`Base image duplication/deletion is not disabled: ${JSON.stringify(baseMinibarState)}`);
   await page.click('button[aria-label="맨 앞으로"]');
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const protectedEffectDifference = await page.$eval(".fabric-stage .lower-canvas", (canvas) => {
@@ -344,7 +381,7 @@ async function testImageStudio(page, imagePaths) {
   });
   if (protectedEffectDifference.changedRatio > 0.02 || protectedEffectDifference.meanChannelDelta > 3) throw new Error(`Bringing the base image forward exposed pixels concealed by a region effect: ${JSON.stringify(protectedEffectDifference)}`);
   console.log("  image: protected effect layer order verified");
-  await page.click('button[aria-label="영역 효과"]');
+  await page.click('[data-testid="image-editor-panel-effect"]');
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const overlayCanvas = await page.$(".fabric-stage .upper-canvas");
   const overlayBox = await overlayCanvas?.boundingBox();
@@ -353,21 +390,18 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.down();
   await page.mouse.move(overlayBox.x + overlayBox.width * 0.34, overlayBox.y + overlayBox.height * 0.32, { steps: 6 });
   await page.mouse.up();
-  await page.waitForSelector(".region-effect-selection");
+  await page.waitForSelector('[data-testid="image-editor-effect-selection"]');
   await page.click(".export-row .primary-button");
   const exportWithSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
-  await page.click(".region-effect-selection .secondary-button");
+  await page.click('[data-testid="image-editor-effect-selection"] .secondary-button');
   await page.click(".export-row .primary-button");
   const exportWithoutSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
   if (!exportWithSelection || exportWithSelection !== exportWithoutSelection) throw new Error("The region-selection overlay contaminated the raster export");
   console.log("  image: region overlay export verified");
-  const portraitPresets = await page.$$eval(".image-editor-controls .button-grid button", (buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean));
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const portraitPresets = await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean));
   if (!portraitPresets.includes("3:4") || !portraitPresets.includes("9:16")) throw new Error("Portrait crop presets are unavailable");
-  await page.$$eval(".editor-draw-tools button", (buttons) => {
-    const crop = buttons.find((button) => button.textContent?.includes("범위 자르기"));
-    if (!(crop instanceof HTMLButtonElement)) throw new Error("Free crop tool is unavailable");
-    crop.click();
-  });
+  await page.click('[data-testid="image-editor-panel-crop"]');
   await page.waitForSelector(".fabric-stage.is-crop-mode");
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   await page.waitForFunction(() => {
@@ -383,9 +417,9 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.down();
   await page.mouse.move(cropBox.x + cropBox.width * 0.8, cropBox.y + cropBox.height * 0.8, { steps: 8 });
   await page.mouse.up();
-  await page.waitForSelector(".image-crop-selection-status");
-  await page.click(".image-crop-selection-status .primary-button");
-  await page.waitForFunction(() => !document.querySelector(".image-crop-selection-status"));
+  await page.waitForSelector('[data-testid="image-editor-crop-selection"]');
+  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-crop-selection"]'));
   const croppedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
   if (croppedSize.width >= 850 || croppedSize.height >= 570 || croppedSize.width < 450 || croppedSize.height < 280) {
     throw new Error(`Free crop did not resize the canvas as selected: ${JSON.stringify(croppedSize)}`);
@@ -394,6 +428,7 @@ async function testImageStudio(page, imagePaths) {
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
   await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 2);
   await page.waitForFunction(() => !document.querySelector(".image-studio-page .section-actions .primary-button")?.disabled);
+  await page.$eval(".image-studio-page .section-actions .primary-button", (button) => button.scrollIntoView({ block: "center", behavior: "instant" }));
   await page.click(".image-studio-page .section-actions .primary-button");
   await waitForTerminalStatus(page);
   if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Image error"));
@@ -458,6 +493,89 @@ async function testImageStudio(page, imagePaths) {
     const current = Array.from(document.querySelectorAll(".gif-frame-row"), (row) => row.textContent || "");
     return JSON.stringify(current) !== JSON.stringify(before);
   }, {}, initialFrameOrder);
+}
+
+async function testImageStudioMobile(page) {
+  await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-testid="image-editor-canvas-stage"] .upper-canvas');
+  const layout = await page.evaluate(() => {
+    const workspace = document.querySelector('[data-testid="image-editor-workspace"]');
+    const canvasColumn = workspace?.querySelector(".image-editor-canvas-column");
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    const panel = document.querySelector('[data-testid="image-editor-options-panel"]');
+    if (!(workspace instanceof HTMLElement) || !(canvasColumn instanceof HTMLElement) || !(stage instanceof HTMLElement) || !(panel instanceof HTMLElement)) return null;
+    const workspaceStyle = getComputedStyle(workspace);
+    const panelStyle = getComputedStyle(panel);
+    const stageBounds = stage.getBoundingClientRect();
+    const panelBounds = panel.getBoundingClientRect();
+    return {
+      columns: workspaceStyle.gridTemplateColumns,
+      stageTop: stageBounds.top,
+      panelTop: panelBounds.top,
+      stageWidth: stageBounds.width,
+      panelWidth: panelBounds.width,
+      sticky: getComputedStyle(canvasColumn).position,
+      workspacePosition: workspaceStyle.position,
+      panelPosition: panelStyle.position,
+      stagePosition: getComputedStyle(stage).position,
+      panelRadius: parseFloat(panelStyle.borderTopLeftRadius),
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: innerWidth,
+      toolbarTargetMin: Math.min(...Array.from(document.querySelectorAll(".image-editor-panel-tabs button"), (button) => button.getBoundingClientRect().height)),
+    };
+  });
+  if (!layout || layout.columns.split(" ").length !== 1 || layout.stageTop >= layout.panelTop || Math.abs(layout.stageWidth - layout.panelWidth) > 1 || layout.sticky !== "sticky"
+    || layout.workspacePosition === "fixed" || layout.panelPosition === "fixed" || layout.stagePosition === "fixed" || layout.panelRadius < 18
+    || layout.documentWidth > layout.viewportWidth || layout.toolbarTargetMin < 44) {
+    throw new Error(`Mobile image editor is not a sticky canvas with a bottom sheet: ${JSON.stringify(layout)}`);
+  }
+
+  await page.$eval('[data-testid="image-editor-panel-draw"]', (button) => button.click());
+  await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
+  await page.click('[data-testid="image-editor-draw-brush"]');
+  await page.evaluate(() => {
+    const color = document.querySelector('[data-testid="image-editor-draw-color"]');
+    const width = document.querySelector('[data-testid="image-editor-draw-width"]');
+    if (!(color instanceof HTMLInputElement) || !(width instanceof HTMLInputElement)) throw new Error("Mobile drawing controls are unavailable");
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    setter.call(color, "#123456");
+    color.dispatchEvent(new Event("input", { bubbles: true }));
+    color.dispatchEvent(new Event("change", { bubbles: true }));
+    setter.call(width, "13");
+    width.dispatchEvent(new Event("input", { bubbles: true }));
+    width.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.$eval('[data-testid="image-editor-panel-canvas"]', (button) => button.click());
+  await page.$eval('[data-testid="image-editor-panel-draw"]', (button) => button.click());
+  const restoredDraw = await page.evaluate(() => ({
+    brush: document.querySelector('[data-testid="image-editor-draw-brush"]')?.getAttribute("aria-pressed"),
+    color: document.querySelector('[data-testid="image-editor-draw-color"]')?.value,
+    width: document.querySelector('[data-testid="image-editor-draw-width"]')?.value,
+  }));
+  if (restoredDraw.brush !== "true" || restoredDraw.color !== "#123456" || restoredDraw.width !== "13") throw new Error(`Drawing options were not restored after panel re-entry: ${JSON.stringify(restoredDraw)}`);
+
+  await page.$eval('[data-testid="image-editor-panel-shapes"]', (button) => button.click());
+  await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
+  await page.click('button[aria-label="사각형 추가"]');
+  await page.waitForSelector('[data-testid="image-editor-minibar"]');
+  const mobileControls = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="image-editor-options-panel"]');
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    const minibar = document.querySelector('[data-testid="image-editor-minibar"]');
+    if (!(panel instanceof HTMLElement) || !(stage instanceof HTMLElement) || !(minibar instanceof HTMLElement)) return null;
+    const stageBounds = stage.getBoundingClientRect();
+    const minibarBounds = minibar.getBoundingClientRect();
+    return {
+      activePanel: panel.getAttribute("data-panel"),
+      panelButtonMin: Math.min(...Array.from(panel.querySelectorAll("button"), (button) => button.getBoundingClientRect().height)),
+      minibarButtonMin: Math.min(...Array.from(minibar.querySelectorAll("button"), (button) => button.getBoundingClientRect().height)),
+      minibarInsideStage: minibarBounds.left >= stageBounds.left && minibarBounds.right <= stageBounds.right,
+    };
+  });
+  if (!mobileControls || mobileControls.activePanel !== "shapes" || mobileControls.panelButtonMin < 44 || mobileControls.minibarButtonMin < 44 || !mobileControls.minibarInsideStage) {
+    throw new Error(`Mobile bottom sheet or floating minibar targets are invalid: ${JSON.stringify(mobileControls)}`);
+  }
+  console.log("  image: 390x844 bottom sheet, drawing state, and floating minibar verified");
 }
 
 async function pasteCanvasImages(page, colors) {

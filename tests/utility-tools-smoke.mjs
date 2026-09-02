@@ -230,10 +230,11 @@ try {
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4);
   await page.waitForSelector(".fabric-stage .upper-canvas");
-  await page.click(".editor-draw-tools button:nth-child(2)");
+  await page.click('[data-testid="image-editor-panel-draw"]');
+  await page.click('[data-testid="image-editor-draw-pencil"]');
   const bounds = await page.$eval(".fabric-stage .upper-canvas", (element) => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height }; });
   await page.mouse.move(bounds.x + 80, bounds.y + 80); await page.mouse.down(); await page.mouse.move(bounds.x + 220, bounds.y + 150, { steps: 8 }); await page.mouse.up();
-  await page.waitForFunction(() => !document.querySelector('.editor-history-actions button[aria-label="실행 취소"]')?.disabled);
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-undo"]')?.disabled);
 
   const googleVideoVisit = page.waitForRequest((request) => {
     const url = new URL(request.url());
