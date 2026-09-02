@@ -8,6 +8,8 @@ public/vendor/tesseract/
 public/tools/video-studio/runtime/
 public/vendor/zetaoffice/
 .cache/zetaoffice/
+public/vendor/emoji/
+.cache/image-studio-assets/
 /compareexample/
 /comparesample/
 __pycache__/

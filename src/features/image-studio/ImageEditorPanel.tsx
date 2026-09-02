@@ -1,8 +1,10 @@
-import { CircleIcon, Eraser, FlipHorizontal2, FlipVertical2, Minus, Pencil, RotateCw, Square, Trash2, Type, Brush } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Brush, CircleIcon, Eraser, FlipHorizontal2, FlipVertical2, Hexagon, Highlighter, MessageSquare, Minus, Pencil, RotateCw, Square, Star, Trash2, TriangleIcon, Type } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ToggleRow } from "../../components/ui";
-import type { EditorDrawTool, EditorPanelName, EditorSelectionState, RegionEffect } from "./imageEditorTypes";
+import { ImageStickerPicker } from "./ImageStickerPicker";
+import type { ImageStudioSticker } from "./imageStudioStickers";
+import type { EditorDrawTool, EditorPanelName, EditorSelectionState, EditorShapeKind, RegionEffect } from "./imageEditorTypes";
 
 interface RegionSelectionSummary {
   width: number;
@@ -47,7 +49,9 @@ interface ImageEditorPanelProps {
   onBaseLockChange: (locked: boolean) => void;
   onTextChange: (text: string) => void;
   onAddText: (text?: string) => void;
-  onAddShape: (kind: "line" | "rect" | "circle") => void;
+  onAddShape: (kind: EditorShapeKind) => void;
+  stickerBusy: boolean;
+  onAddSticker: (sticker: ImageStudioSticker) => void;
   onBackgroundChange: (color: string) => void;
   onTransparentBackgroundChange: (transparent: boolean) => void;
   onClearLayers: () => void;
@@ -78,7 +82,16 @@ function SelectPanel(props: ImageEditorPanelProps) {
   const { t } = useTranslation("features");
   const hasSelection = props.selection.kind !== "none";
   return (
-    <div className={`editor-tool-group selection-style-controls${hasSelection ? "" : " is-disabled"}`} data-testid="image-editor-selection-controls">
+    <div
+      className={`editor-tool-group selection-style-controls${hasSelection ? "" : " is-disabled"}`}
+      data-testid="image-editor-selection-controls"
+      data-shape-kind={props.selection.shapeKind}
+      data-shape-geometry={props.selection.geometry}
+      data-shape-opacity={props.selection.opacity}
+      data-shape-color={props.selection.color}
+      data-shape-stroke={props.selection.strokeColor}
+      data-shape-width={props.selection.width}
+    >
       <strong>{hasSelection ? t(`image.editor.selectionKind.${props.selection.kind}`) : t("image.editor.noSelection")}</strong>
       <label><span>{t("image.editor.objectColor")}</span><input type="color" value={props.selection.color} aria-label={t("image.editor.objectColor")} data-testid="image-editor-select-color" disabled={!props.selection.colorEnabled} onChange={(event) => props.onSelectionColorChange(event.target.value)} /></label>
       {props.selection.strokeColorEnabled && <label><span>{t("image.editor.stroke")}</span><input type="color" value={props.selection.strokeColor} aria-label={t("image.editor.strokeLabel")} data-testid="image-editor-select-stroke" onChange={(event) => props.onSelectionStrokeColorChange(event.target.value)} /></label>}
@@ -155,12 +168,23 @@ function TextPanel(props: ImageEditorPanelProps) {
 
 function ShapesPanel(props: ImageEditorPanelProps) {
   const { t } = useTranslation("features");
-  return <div className="editor-tool-group"><div className="icon-tool-row" data-testid="image-editor-shapes"><button title={t("image.editor.line")} aria-label={t("image.editor.line")} type="button" onClick={() => props.onAddShape("line")}><Minus size={18} /></button><button title={t("image.editor.rect")} aria-label={t("image.editor.rect")} type="button" onClick={() => props.onAddShape("rect")}><Square size={18} /></button><button title={t("image.editor.circle")} aria-label={t("image.editor.circle")} type="button" onClick={() => props.onAddShape("circle")}><CircleIcon size={18} /></button></div></div>;
+  const shapes = [
+    ["line", "line", Minus],
+    ["circle", "circle", CircleIcon],
+    ["rounded-rect", "roundedRect", Square],
+    ["triangle", "triangle", TriangleIcon],
+    ["star", "star", Star],
+    ["hexagon", "hexagon", Hexagon],
+    ["speech-bubble", "speechBubble", MessageSquare],
+    ["arrow", "arrow", ArrowRight],
+    ["double-arrow", "doubleArrow", ArrowLeftRight],
+    ["highlighter", "highlighter", Highlighter],
+  ] as const satisfies ReadonlyArray<readonly [EditorShapeKind, string, typeof Square]>;
+  return <div className="editor-tool-group"><div className="shape-picker-grid" data-testid="image-editor-shapes">{shapes.map(([kind, labelKey, Icon]) => <button title={t(`image.editor.${labelKey}`)} aria-label={t(`image.editor.${labelKey}`)} data-testid={`image-editor-shape-${kind}`} type="button" onClick={() => props.onAddShape(kind)} key={kind}><Icon size={19} /><span>{t(`image.editor.${labelKey}Short`)}</span></button>)}</div></div>;
 }
 
 function StickersPanel(props: ImageEditorPanelProps) {
-  const { t } = useTranslation("features");
-  return <div className="editor-tool-group"><p className="image-crop-hint">{t("image.editor.stickerHint")}</p><div className="button-grid sticker-grid" data-testid="image-editor-stickers">{["✨", "✅", "❤️", "📌"].map((emoji) => <button type="button" aria-label={t("image.editor.addSticker", { sticker: emoji })} onClick={() => props.onAddText(emoji)} key={emoji}>{emoji}</button>)}</div></div>;
+  return <ImageStickerPicker busy={props.stickerBusy} onAddSticker={props.onAddSticker} />;
 }
 
 function CanvasPanel(props: ImageEditorPanelProps) {

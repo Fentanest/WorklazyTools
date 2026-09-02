@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
+const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/stickers.manifest.json", "utf8"));
 
 const routes = [
   "", "tools", "tools/excel-merger", "tools/document-compare",
@@ -183,6 +184,22 @@ for (const [name, expectedSize, expectedHash] of officeAssets) {
     throw new Error(`Pinned office asset verification failed in static output: ${name}`);
   }
 }
+if (stickerManifest.vendor !== "Twemoji" || stickerManifest.version !== "17.0.3" || stickerManifest.commit !== "b6b55fef1e8636b540a6d016a4729ca8cdf2e60b"
+  || stickerManifest.curationLimit !== 120 || stickerManifest.assets.length !== 112 || stickerManifest.assets.length > stickerManifest.curationLimit) {
+  throw new Error("The Image Studio sticker manifest version or curation limit is invalid.");
+}
+const stickerOutputRoot = path.join("dist", "vendor", "emoji", stickerManifest.version);
+for (const asset of [...stickerManifest.assets, stickerManifest.license]) {
+  const bytes = await fs.readFile(path.join(stickerOutputRoot, asset.file));
+  if (bytes.length !== asset.bytes || createHash("sha256").update(bytes).digest("hex") !== asset.sha256) {
+    throw new Error(`Pinned Image Studio sticker verification failed in static output: ${asset.file}`);
+  }
+}
+const [sourceStickerManifest, outputStickerManifest] = await Promise.all([
+  fs.readFile("src/features/image-studio/stickers.manifest.json"),
+  fs.readFile(path.join(stickerOutputRoot, "manifest.json")),
+]);
+if (!sourceStickerManifest.equals(outputStickerManifest)) throw new Error("The emitted Image Studio sticker manifest does not match its source.");
 const [officeThread, officeThreadSource] = await Promise.all([
   fs.readFile(path.join("dist", "vendor", "zetaoffice", "2026-08-26", "office_thread.js")),
   fs.readFile(path.join("src", "features", "office-editor", "office_thread.js")),
@@ -231,7 +248,8 @@ if (!ads.includes("pub-8940087269746960")) throw new Error("ads.txt publisher ID
 if (cname.trim() !== "worklazy.net") throw new Error("CNAME does not point to worklazy.net.");
 if (!worklazyLicense.includes("All rights reserved")) throw new Error("Worklazy proprietary license is missing.");
 if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker") || !thirdPartyLicenses.includes("@rhwp/core")
-  || !thirdPartyLicenses.includes("ZetaOffice / LibreOffice") || !thirdPartyLicenses.includes("zetajs") || !thirdPartyLicenses.includes("JSDoc legacy Word reader")) throw new Error("Third-party license bundle is incomplete.");
+  || !thirdPartyLicenses.includes("ZetaOffice / LibreOffice") || !thirdPartyLicenses.includes("zetajs") || !thirdPartyLicenses.includes("JSDoc legacy Word reader")
+  || !thirdPartyLicenses.includes("Twemoji graphics 17.0.3") || !thirdPartyLicenses.includes("Attribution 4.0 International")) throw new Error("Third-party license bundle is incomplete.");
 if (!favicon.includes("facet-4") || !logo.includes("Worklazy")) throw new Error("Worklazy favicon or logo is missing from the build.");
 const manifest = JSON.parse(manifestText);
 if (manifest.display !== "standalone" || manifest.scope !== "./" || manifest.start_url !== "./"

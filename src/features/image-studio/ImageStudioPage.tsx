@@ -13,7 +13,9 @@ import { ImageEditorMinibar } from "./ImageEditorMinibar";
 import { ImageEditorPanel } from "./ImageEditorPanel";
 import { ImageEditorToolbar } from "./ImageEditorToolbar";
 import { ImageEditorViewportControls } from "./ImageEditorViewportControls";
+import { getImageStudioStickerUrl, type ImageStudioSticker } from "./imageStudioStickers";
 import { ClipboardHint, RASTER_IMAGE_ACCEPT, filterRasterImages, useClipboardImages } from "./imageStudioShared";
+import { applyEditorShapeStyle, createEditorShape, getEditorShapeGeometry, getEditorShapeKind, getEditorShapeStyleCapabilities } from "./imageEditorShapes";
 import {
   EMPTY_EDITOR_SELECTION,
   type EditorDrawTool,
@@ -21,6 +23,7 @@ import {
   type EditorMinibarPosition,
   type EditorPanelName,
   type EditorSelectionState,
+  type EditorShapeKind,
   type RegionEffect,
 } from "./imageEditorTypes";
 import {
@@ -79,7 +82,7 @@ export function ImageStudioPage() {
   );
 }
 
-type EditorObjectRole = "base" | "region-effect";
+type EditorObjectRole = "base" | "region-effect" | "sticker";
 
 interface RegionSelection {
   left: number;
@@ -88,9 +91,9 @@ interface RegionSelection {
   height: number;
 }
 
-type EditorFabricObject = FabricObject & { worklazyRole?: EditorObjectRole; worklazyAnchorX?: number; worklazyAnchorY?: number };
+type EditorFabricObject = FabricObject & { worklazyRole?: EditorObjectRole; worklazyAnchorX?: number; worklazyAnchorY?: number; worklazyShapeKind?: EditorShapeKind };
 
-for (const property of ["worklazyRole", "worklazyAnchorX", "worklazyAnchorY", "imageSmoothing"]) {
+for (const property of ["worklazyRole", "worklazyAnchorX", "worklazyAnchorY", "worklazyShapeKind", "imageSmoothing"]) {
   if (!FabricObject.customProperties.includes(property)) FabricObject.customProperties.push(property);
 }
 
@@ -147,6 +150,7 @@ function ImageEditor() {
   const [regionEffect, setRegionEffect] = useState<RegionEffect>("mosaic");
   const [regionEffectStrength, setRegionEffectStrength] = useState(16);
   const [regionEffectBusy, setRegionEffectBusy] = useState(false);
+  const [stickerBusy, setStickerBusy] = useState(false);
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
 
@@ -664,15 +668,34 @@ function ImageEditor() {
     addObject(new IText(value, { left: 90, top: 90, fontFamily: "sans-serif", fontSize: 48, fontWeight: "700", fill: drawColor, stroke: "rgba(255,255,255,.55)", strokeWidth: 1 }));
   };
 
-  const addShape = (kind: "line" | "rect" | "circle") => {
-    if (kind === "line") addObject(new Line([130, 150, 430, 300], { stroke: drawColor, strokeWidth: drawWidth, strokeLineCap: "round" }));
-    if (kind === "rect") addObject(new Rect({ left: 120, top: 120, width: 220, height: 140, rx: 24, ry: 24, fill: "#0a84ff", stroke: "#ffffff", strokeWidth: 0 }));
-    if (kind === "circle") addObject(new Circle({ left: 120, top: 120, radius: 90, fill: "#ff375f", stroke: "#ffffff", strokeWidth: 0 }));
+  const addShape = (kind: EditorShapeKind) => {
+    addObject(createEditorShape(kind, drawColor, drawWidth));
+  };
+
+  const addSticker = async (sticker: ImageStudioSticker) => {
+    if (stickerBusy) return;
+    setStickerBusy(true);
+    setEditorError("");
+    try {
+      const image = await FabricImage.fromURL(getImageStudioStickerUrl(sticker));
+      const scale = 150 / Math.max(1, image.width, image.height);
+      (image as EditorFabricObject).worklazyRole = "sticker";
+      image.set({ left: 120, top: 120, scaleX: scale, scaleY: scale });
+      addObject(image);
+    } catch {
+      setEditorError(t("image.editor.stickerError"));
+    } finally {
+      setStickerBusy(false);
+    }
   };
 
   const setSelectedObjectStyle = (property: "color" | "stroke" | "width", value: string | number) => {
     mutateActive((object) => {
-      if ((object as EditorFabricObject).worklazyRole === "base") return;
+      if (["base", "sticker"].includes((object as EditorFabricObject).worklazyRole || "")) return;
+      if (getEditorShapeKind(object)) {
+        applyEditorShapeStyle(object, property, value);
+        return;
+      }
       if (property === "color") object.set(object instanceof Line || object.type === "path" ? "stroke" : "fill", value);
       if (property === "stroke" && (object instanceof Rect || object instanceof Circle)) object.set("stroke", value);
       if (property === "width") object.set("strokeWidth", value);
@@ -756,7 +779,7 @@ function ImageEditor() {
       instance.setDimensions({ width: snapshot.width, height: snapshot.height });
       await instance.loadFromJSON(snapshot.canvas);
       baseImage.current = instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && (object as EditorFabricObject).worklazyRole === "base")
-        ?? instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage);
+        ?? instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && !(object as EditorFabricObject).worklazyRole);
       setBrightness(snapshot.brightness); setContrast(snapshot.contrast); setHue(snapshot.hue);
       setBackground(snapshot.background); setTransparentBackground(snapshot.transparentBackground); setBaseLocked(snapshot.baseLocked);
       editorSettings.current = {
@@ -941,6 +964,8 @@ function ImageEditor() {
           onTextChange={setText}
           onAddText={addText}
           onAddShape={addShape}
+          stickerBusy={stickerBusy}
+          onAddSticker={(sticker) => void addSticker(sticker)}
           onBackgroundChange={(color) => updateBackground(color, transparentBackground)}
           onTransparentBackgroundChange={(transparent) => updateBackground(background, transparent)}
           onClearLayers={clearAddedLayers}
@@ -1360,20 +1385,26 @@ function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | un
 
 function getEditorSelectionState(object: FabricObject): EditorSelectionState {
   const isBase = (object as EditorFabricObject).worklazyRole === "base";
-  const isDrawing = object.type === "path";
-  const isLine = object instanceof Line;
-  const isShape = object instanceof Rect || object instanceof Circle;
+  const isSticker = (object as EditorFabricObject).worklazyRole === "sticker";
+  const shapeKind = getEditorShapeKind(object);
+  const shapeCapabilities = shapeKind ? getEditorShapeStyleCapabilities(shapeKind) : undefined;
+  const isDrawing = object.type === "path" && !shapeKind;
+  const isLine = shapeKind === "line" || object instanceof Line;
+  const isShape = Boolean(shapeKind && shapeKind !== "line") || object instanceof Rect || object instanceof Circle;
   const isText = object instanceof IText;
   const colorSource = isLine || isDrawing ? object.stroke : object.fill;
   return {
-    kind: isBase ? "base" : isText ? "text" : isLine ? "line" : isShape ? "shape" : isDrawing ? "drawing" : "shape",
+    kind: isBase ? "base" : isSticker ? "sticker" : isText ? "text" : isLine ? "line" : isShape ? "shape" : isDrawing ? "drawing" : "shape",
     color: fabricColorToHex(colorSource, "#1d1d1f"),
     strokeColor: fabricColorToHex(object.stroke, "#ffffff"),
     width: Math.max(0, Math.round(object.strokeWidth || 0)),
-    colorEnabled: !isBase && (isDrawing || isLine || isShape || isText),
-    strokeColorEnabled: !isBase && isShape,
-    widthEnabled: !isBase && (isDrawing || isLine || isShape || isText),
+    colorEnabled: !isBase && !isSticker && (isDrawing || isLine || isShape || isText),
+    strokeColorEnabled: !isBase && !isSticker && (shapeCapabilities ? shapeCapabilities.stroke : isShape),
+    widthEnabled: !isBase && !isSticker && (shapeCapabilities ? shapeCapabilities.strokeWidth : isDrawing || isLine || isShape || isText),
     isBase,
+    shapeKind,
+    geometry: shapeKind ? getEditorShapeGeometry(object) : undefined,
+    opacity: object.opacity,
   };
 }
 

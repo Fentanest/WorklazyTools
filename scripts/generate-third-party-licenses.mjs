@@ -3,6 +3,7 @@ import path from "node:path";
 
 const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const lock = JSON.parse(await fs.readFile(path.join(projectRoot, "package-lock.json"), "utf8"));
+const stickerManifest = JSON.parse(await fs.readFile(path.join(projectRoot, "src", "features", "image-studio", "stickers.manifest.json"), "utf8"));
 const productionPackages = Object.entries(lock.packages || {})
   .filter(([packagePath, metadata]) => packagePath.startsWith("node_modules/") && metadata?.dev !== true)
   .sort(([left], [right]) => left.localeCompare(right));
@@ -20,10 +21,14 @@ const sections = [
   "LibreOffice source and license information — https://www.libreoffice.org/about-us/licenses/",
   "Nanum Gothic — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/nanumgothic",
   "JSDoc legacy Word reader snapshot 821695a — 0BSD — https://github.com/Alpaq92/JSDoc",
+  `Twemoji graphics ${stickerManifest.version} — CC BY 4.0 — https://github.com/jdecked/twemoji/tree/${stickerManifest.commit}/assets/svg`,
 ];
 
 const nanumLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "zetaoffice", "2026-08-26", "NanumGothic-OFL.txt"), "utf8");
 sections.push("", "=".repeat(78), "Nanum Gothic", "Declared license: SIL Open Font License 1.1", "", "--- LICENSE ---", nanumLicense.trim().replace(/[ \t]+$/gm, ""));
+
+const stickerLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "emoji", stickerManifest.version, stickerManifest.license.file), "utf8");
+sections.push("", "=".repeat(78), `Twemoji graphics ${stickerManifest.version}`, "Declared license: CC BY 4.0", "", `--- ${stickerManifest.license.sourcePath} ---`, stickerLicense.trim().replace(/[ \t]+$/gm, ""));
 
 for (const [packagePath, lockMetadata] of productionPackages) {
   const directory = path.join(projectRoot, packagePath);

@@ -196,8 +196,60 @@ async function testImageStudio(page, imagePaths) {
     if (!(canvas instanceof HTMLCanvasElement)) return false;
     return canvas.getContext("2d")?.getImageData(1, 1, 1, 1).data[3] === 0;
   });
+  const expandedShapeKinds = ["rounded-rect", "triangle", "star", "hexagon", "speech-bubble", "arrow", "double-arrow", "highlighter"];
   await page.click('[data-testid="image-editor-panel-shapes"]');
-  await page.click('button[aria-label="사각형 추가"]');
+  for (const kind of expandedShapeKinds) {
+    console.log(`  image: probing shape ${kind}`);
+    await page.$eval(`[data-testid="image-editor-shape-${kind}"]`, (button) => button.click());
+    const panelAfterShapeInsert = await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.getAttribute("data-panel"));
+    if (panelAfterShapeInsert !== "shapes") throw new Error(`${kind} insertion closed its tool panel: ${panelAfterShapeInsert}`);
+    await page.$eval('[data-testid="image-editor-panel-select"]', (button) => button.click());
+    await page.waitForFunction((expectedKind) => document.querySelector('[data-testid="image-editor-selection-controls"]')?.getAttribute("data-shape-kind") === expectedKind, {}, kind);
+    const beforeStyle = await page.$eval('[data-testid="image-editor-selection-controls"]', (controls) => ({
+      geometry: controls.getAttribute("data-shape-geometry"),
+      opacity: controls.getAttribute("data-shape-opacity"),
+      width: controls.getAttribute("data-shape-width"),
+      hasStroke: Boolean(controls.querySelector('[data-testid="image-editor-select-stroke"]')),
+      widthDisabled: controls.querySelector('[data-testid="image-editor-select-width"]')?.disabled,
+    }));
+    await page.evaluate((shapeKind) => {
+      const setValue = (input, value) => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      const fill = document.querySelector('[data-testid="image-editor-select-color"]');
+      const stroke = document.querySelector('[data-testid="image-editor-select-stroke"]');
+      const width = document.querySelector('[data-testid="image-editor-select-width"]');
+      if (!(fill instanceof HTMLInputElement) || !(width instanceof HTMLInputElement)) throw new Error(`${shapeKind} style controls are unavailable`);
+      setValue(fill, "#00aa55");
+      if (stroke instanceof HTMLInputElement) setValue(stroke, "#112233");
+      setValue(width, "12");
+    }, kind);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const afterStyle = await page.$eval('[data-testid="image-editor-selection-controls"]', (controls) => ({
+      geometry: controls.getAttribute("data-shape-geometry"),
+      opacity: controls.getAttribute("data-shape-opacity"),
+      color: controls.getAttribute("data-shape-color"),
+      stroke: controls.getAttribute("data-shape-stroke"),
+      width: controls.getAttribute("data-shape-width"),
+    }));
+    if (afterStyle.color !== "#00aa55") throw new Error(`${kind} ignored an applicable fill change: ${JSON.stringify(afterStyle)}`);
+    if (kind === "highlighter") {
+      if (beforeStyle.hasStroke || !beforeStyle.widthDisabled || afterStyle.stroke !== "#ffffff" || afterStyle.width !== "0" || afterStyle.opacity !== "0.45") {
+        throw new Error(`Highlighter accepted a non-applicable border style or lost fixed opacity: ${JSON.stringify({ beforeStyle, afterStyle })}`);
+      }
+    } else if (afterStyle.stroke !== "#112233" || afterStyle.width !== "12") {
+      throw new Error(`${kind} ignored an applicable border style: ${JSON.stringify(afterStyle)}`);
+    }
+    if ((kind === "arrow" || kind === "double-arrow") && afterStyle.geometry !== beforeStyle.geometry) {
+      throw new Error(`${kind} border width rewrote fixed points/width/height: ${JSON.stringify({ before: beforeStyle.geometry, after: afterStyle.geometry })}`);
+    }
+    await page.$eval('[data-testid="image-editor-delete"]', (button) => button.click());
+    await page.$eval('[data-testid="image-editor-panel-shapes"]', (button) => button.click());
+  }
+  console.log("  image: expanded single-object shape matrix and fixed arrow geometry verified");
+  await page.$eval('[data-testid="image-editor-shape-rounded-rect"]', (button) => button.click());
   await page.waitForSelector('[data-testid="image-editor-minibar"]');
   const panelAfterInsert = await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.getAttribute("data-panel"));
   if (panelAfterInsert !== "shapes") throw new Error(`Shape insertion closed its tool panel: ${panelAfterInsert}`);
@@ -317,7 +369,7 @@ async function testImageStudio(page, imagePaths) {
   const deletedCanvas = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
   if (!styledCanvas || styledCanvas === deletedCanvas) throw new Error("Delete did not remove the selected Fabric layer");
   await page.click('[data-testid="image-editor-panel-shapes"]');
-  await page.click('button[aria-label="사각형 추가"]');
+  await page.$eval('[data-testid="image-editor-shape-rounded-rect"]', (button) => button.click());
   await page.click('[data-testid="image-editor-panel-select"]');
   const centeredShapeCanvas = await page.$(".fabric-stage .upper-canvas");
   const centeredShapeBox = await centeredShapeCanvas?.boundingBox();
@@ -533,6 +585,35 @@ async function testImageStudio(page, imagePaths) {
   await page.click(".editor-source-actions button");
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
   console.log("  image: free crop, file replacement, and blank-canvas view reset verified");
+  await page.click('[data-testid="image-editor-panel-stickers"]');
+  const stickerPicker = await page.evaluate(() => ({
+    count: document.querySelectorAll('[data-testid="image-editor-stickers"] button').length,
+    categories: document.querySelectorAll('[data-testid="image-editor-sticker-categories"] button').length,
+    urls: Array.from(document.querySelectorAll('[data-testid="image-editor-stickers"] img'), (image) => image.getAttribute("src")),
+  }));
+  if (stickerPicker.count !== 16 || stickerPicker.categories !== 7 || stickerPicker.urls.some((url) => !url?.includes("/vendor/emoji/17.0.3/") || !url.endsWith(".svg"))) {
+    throw new Error(`Sticker picker did not use its categorized static SVG URLs: ${JSON.stringify(stickerPicker)}`);
+  }
+  const beforeSticker = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  await page.$eval('[data-testid="image-editor-sticker-search"]', (input) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "로켓");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="image-editor-stickers"] button').length === 1
+    && document.querySelector('[data-testid="image-editor-stickers"] button')?.getAttribute("data-codepoint") === "1f680");
+  await page.click('[data-testid="image-editor-stickers"] button[data-codepoint="1f680"]');
+  await page.waitForSelector('[data-testid="image-editor-minibar"]');
+  const stickerInsert = await page.evaluate(() => ({
+    panel: document.querySelector('[data-testid="image-editor-options-panel"]')?.getAttribute("data-panel"),
+    kind: document.querySelector('[data-testid="image-editor-minibar"]') ? "selected" : "missing",
+  }));
+  const afterSticker = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  const stickerExport = await captureImageEditorExport(page, "PNG");
+  if (stickerInsert.panel !== "stickers" || stickerInsert.kind !== "selected" || beforeSticker === afterSticker || stickerExport.length < 1_000) {
+    throw new Error(`SVG sticker insertion or export failed: ${JSON.stringify({ stickerInsert, canvasChanged: beforeSticker !== afterSticker, exportLength: stickerExport.length })}`);
+  }
+  console.log("  image: categorized sticker search, SVG insertion, and export verified");
   await page.click(".studio-tabs button:nth-child(2)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
   await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 2);
@@ -740,6 +821,29 @@ async function testImageStudioMobile(page) {
     throw new Error(`Mobile image editor is not a sticky canvas with a bottom sheet: ${JSON.stringify(layout)}`);
   }
 
+  await page.$eval('[data-testid="image-editor-panel-stickers"]', (button) => button.click());
+  await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
+  const mobileStickerPicker = await page.evaluate(() => ({
+    categoryTargets: Array.from(document.querySelectorAll('[data-testid="image-editor-sticker-categories"] button'), (button) => button.getBoundingClientRect().height),
+    stickerTargets: Array.from(document.querySelectorAll('[data-testid="image-editor-stickers"] button'), (button) => button.getBoundingClientRect().height),
+    searchHeight: document.querySelector('[data-testid="image-editor-sticker-search"]')?.getBoundingClientRect().height,
+  }));
+  if (!mobileStickerPicker.categoryTargets.length || Math.min(...mobileStickerPicker.categoryTargets) < 44
+    || !mobileStickerPicker.stickerTargets.length || Math.min(...mobileStickerPicker.stickerTargets) < 44
+    || (mobileStickerPicker.searchHeight || 0) < 44) {
+    throw new Error(`Mobile sticker picker targets are too small: ${JSON.stringify(mobileStickerPicker)}`);
+  }
+  await page.$eval('[data-testid="image-editor-sticker-search"]', (input) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "로켓");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForSelector('[data-testid="image-editor-stickers"] button[data-codepoint="1f680"]');
+  await page.click('[data-testid="image-editor-stickers"] button[data-codepoint="1f680"]');
+  await page.waitForSelector('[data-testid="image-editor-minibar"]');
+  if (await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.getAttribute("data-panel")) !== "stickers") throw new Error("Mobile sticker insertion closed the bottom-sheet picker");
+  await page.click('[data-testid="image-editor-delete"]');
+
   await page.$eval('[data-testid="image-editor-panel-draw"]', (button) => button.click());
   await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
   await page.click('[data-testid="image-editor-draw-brush"]');
@@ -789,7 +893,7 @@ async function testImageStudioMobile(page) {
 
   await page.$eval('[data-testid="image-editor-panel-shapes"]', (button) => button.click());
   await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
-  await page.click('button[aria-label="사각형 추가"]');
+  await page.$eval('[data-testid="image-editor-shape-rounded-rect"]', (button) => button.click());
   await page.waitForSelector('[data-testid="image-editor-minibar"]');
   const mobileControls = await page.evaluate(() => {
     const panel = document.querySelector('[data-testid="image-editor-options-panel"]');

@@ -2,8 +2,9 @@ export type EditorInteractionMode = "select" | "pencil" | "brush" | "erase" | "c
 export type EditorDrawTool = Extract<EditorInteractionMode, "pencil" | "brush" | "erase">;
 export type EditorPanelName = "select" | "crop" | "effect" | "draw" | "text" | "shapes" | "stickers" | "canvas";
 export type RegionEffect = "mosaic" | "blur";
+export type EditorShapeKind = "line" | "circle" | "rounded-rect" | "triangle" | "star" | "hexagon" | "speech-bubble" | "arrow" | "double-arrow" | "highlighter";
 
-export type EditorSelectionKind = "none" | "base" | "text" | "line" | "shape" | "drawing";
+export type EditorSelectionKind = "none" | "base" | "text" | "line" | "shape" | "drawing" | "sticker";
 
 export interface EditorSelectionState {
   kind: EditorSelectionKind;
@@ -14,6 +15,9 @@ export interface EditorSelectionState {
   strokeColorEnabled: boolean;
   widthEnabled: boolean;
   isBase: boolean;
+  shapeKind?: EditorShapeKind;
+  geometry?: string;
+  opacity?: number;
 }
 
 export interface EditorMinibarPosition {
