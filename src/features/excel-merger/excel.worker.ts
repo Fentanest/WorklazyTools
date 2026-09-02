@@ -293,7 +293,10 @@ async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
     const retention = file.retention ?? { formulas: true, formatting: true };
     if (extension === "csv") return { fileName: displayName, workbook: await readCsv(displayName, data, file.csvEncoding), retention: { formulas: false, formatting: false } };
     if (["xls", "xlsb", "xlsm"].includes(extension)) {
-      return { fileName: displayName, workbook: readConvertedWorkbook(data), retention };
+      const workbook = extension === "xls" && isSpreadsheetMl(data)
+        ? readSpreadsheetMlWorkbook(data)
+        : readConvertedWorkbook(data);
+      return { fileName: displayName, workbook, retention };
     }
     if (extension === "xlsx") {
       const workbook = new ExcelJS.Workbook();
@@ -334,6 +337,22 @@ function readConvertedWorkbook(data: Uint8Array) {
     cellNF: true,
     cellStyles: true,
   });
+  return convertSheetJsWorkbook(source);
+}
+
+function readSpreadsheetMlWorkbook(data: Uint8Array) {
+  const raw = expandSpreadsheetMlCdata(new TextDecoder("utf-8").decode(data));
+  const source = XLSX.read(raw, {
+    type: "string",
+    cellDates: true,
+    cellFormula: true,
+    cellNF: true,
+    cellStyles: true,
+  });
+  return convertSheetJsWorkbook(source);
+}
+
+function convertSheetJsWorkbook(source: XLSX.WorkBook) {
   const workbook = new ExcelJS.Workbook();
   const usedNames = new Set<string>();
 
@@ -381,6 +400,13 @@ function isSpreadsheetMl(data: Uint8Array) {
     .toLowerCase();
   return header.startsWith("<?xml")
     && (header.includes("<?mso-application") || header.includes("urn:schemas-microsoft-com:office:spreadsheet"));
+}
+
+function expandSpreadsheetMlCdata(raw: string) {
+  return raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_section, content: string) => content
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;"));
 }
 
 function normalizeSheetJsValue(value: unknown) {

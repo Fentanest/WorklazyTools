@@ -107,7 +107,11 @@ try {
       || officeRequests.length) {
       throw new Error(`SpreadsheetML signature routing or original-name display failed: ${JSON.stringify({ disguisedXmlBatch, officeRequests })}`);
     }
-    assertRetention(await mergeAndInspect(page), { formula: true, formatting: true }, "XLSX + disguised SpreadsheetML batch");
+    const disguisedXmlMerged = await mergeAndInspect(page);
+    assertRetention(disguisedXmlMerged, { formula: true, formatting: true }, "XLSX + disguised SpreadsheetML batch");
+    if (!disguisedXmlMerged.worksheets.some((sheet) => sheet.a1 === "SpreadsheetML <CDATA> & merged")) {
+      throw new Error(`SpreadsheetML CDATA content was not preserved in the merged workbook: ${JSON.stringify(disguisedXmlMerged.worksheets)}`);
+    }
     await page.reload({ waitUntil: "networkidle0" });
     await page.waitForSelector('.ios-switch[aria-label="XLS 수식 보존"][aria-checked="true"]');
 
@@ -244,6 +248,10 @@ async function mergeAndInspect(page) {
     alignment: sheet.getCell("A1").alignment?.horizontal,
     numberFormat: sheet.getCell("A1").numFmt,
     merged: sheet.getCell("B1").isMerged && sheet.getCell("C1").isMerged,
+    worksheets: merged.worksheets.map((worksheet) => ({
+      name: worksheet.name,
+      a1: worksheet.getCell("A1").value,
+    })),
   };
 }
 
@@ -284,7 +292,7 @@ async function createSpreadsheetMl(filePath) {
  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
  <Worksheet ss:Name="XML 혼합 시트">
   <Table>
-   <Row><Cell><Data ss:Type="String">SpreadsheetML</Data></Cell></Row>
+   <Row><Cell><Data ss:Type="String"><![CDATA[SpreadsheetML <CDATA> & merged]]></Data></Cell></Row>
    <Row><Cell><Data ss:Type="Number">858</Data></Cell></Row>
   </Table>
  </Worksheet>
