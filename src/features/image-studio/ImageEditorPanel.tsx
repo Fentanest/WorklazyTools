@@ -2,9 +2,10 @@ import { ArrowLeftRight, ArrowRight, Brush, CircleIcon, Eraser, FlipHorizontal2,
 import { useTranslation } from "react-i18next";
 
 import { ToggleRow } from "../../components/ui";
+import { ImageEditorLayersPanel } from "./ImageEditorLayersPanel";
 import { ImageStickerPicker } from "./ImageStickerPicker";
 import type { ImageStudioSticker } from "./imageStudioStickers";
-import type { EditorDrawTool, EditorPanelName, EditorSelectionState, EditorShapeKind, RegionEffect } from "./imageEditorTypes";
+import type { EditorDrawTool, EditorLayerItem, EditorPanelName, EditorSelectionState, EditorShapeKind, RegionEffect } from "./imageEditorTypes";
 
 interface RegionSelectionSummary {
   width: number;
@@ -40,6 +41,7 @@ interface ImageEditorPanelProps {
   baseLocked: boolean;
   background: string;
   transparentBackground: boolean;
+  layers: readonly EditorLayerItem[];
   onDrawToolChange: (tool: EditorDrawTool) => void;
   onDrawColorChange: (color: string) => void;
   onDrawWidthChange: (width: number) => void;
@@ -71,6 +73,10 @@ interface ImageEditorPanelProps {
   onBackgroundChange: (color: string) => void;
   onTransparentBackgroundChange: (transparent: boolean) => void;
   onClearLayers: () => void;
+  onLayerSelect: (id: string) => void;
+  onLayerVisibilityChange: (id: string) => void;
+  onLayerDelete: (id: string) => void;
+  onLayerReorder: (id: string, topIndex: number) => void;
 }
 
 export function ImageEditorPanel(props: ImageEditorPanelProps) {
@@ -90,6 +96,7 @@ export function ImageEditorPanel(props: ImageEditorPanelProps) {
         {props.activePanel === "shapes" && <ShapesPanel {...props} />}
         {props.activePanel === "stickers" && <StickersPanel {...props} />}
         {props.activePanel === "canvas" && <CanvasPanel {...props} />}
+        {props.activePanel === "layers" && <ImageEditorLayersPanel layers={props.layers} onSelect={props.onLayerSelect} onVisibilityChange={props.onLayerVisibilityChange} onDelete={props.onLayerDelete} onReorder={props.onLayerReorder} />}
       </div>
     </aside>
   );
@@ -98,6 +105,7 @@ export function ImageEditorPanel(props: ImageEditorPanelProps) {
 function SelectPanel(props: ImageEditorPanelProps) {
   const { t } = useTranslation("features");
   const hasSelection = props.selection.kind !== "none";
+  const multiple = props.selection.kind === "multiple";
   return (
     <div
       className={`editor-tool-group selection-style-controls${hasSelection ? "" : " is-disabled"}`}
@@ -113,11 +121,11 @@ function SelectPanel(props: ImageEditorPanelProps) {
       <label><span>{t("image.editor.objectColor")}</span><input type="color" value={props.selection.color} aria-label={t("image.editor.objectColor")} data-testid="image-editor-select-color" disabled={!props.selection.colorEnabled} onChange={(event) => props.onSelectionColorChange(event.target.value)} /></label>
       {props.selection.strokeColorEnabled && <label><span>{t("image.editor.stroke")}</span><input type="color" value={props.selection.strokeColor} aria-label={t("image.editor.strokeLabel")} data-testid="image-editor-select-stroke" onChange={(event) => props.onSelectionStrokeColorChange(event.target.value)} /></label>}
       <label><span>{t("image.editor.objectWidth", { count: props.selection.width })}</span><input type="range" min={0} max={40} step={1} value={props.selection.width} aria-label={t("image.editor.objectWidthLabel")} data-testid="image-editor-select-width" disabled={!props.selection.widthEnabled} onChange={(event) => props.onSelectionWidthChange(Number(event.target.value))} /></label>
-      <div className="icon-tool-row selection-transform-actions">
+      {!multiple && <div className="icon-tool-row selection-transform-actions">
         <button title={t("image.editor.rotate")} aria-label={t("image.editor.rotate")} type="button" disabled={!hasSelection} onClick={props.onRotate}><RotateCw size={18} /></button>
         <button title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" disabled={!hasSelection} onClick={props.onFlipHorizontal}><FlipHorizontal2 size={18} /></button>
         <button title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" disabled={!hasSelection} onClick={props.onFlipVertical}><FlipVertical2 size={18} /></button>
-      </div>
+      </div>}
       {!hasSelection && <small>{t("image.editor.selectObject")}</small>}
       {props.selection.isBase && <small>{t("image.editor.baseStyleHint")}</small>}
     </div>
@@ -278,4 +286,5 @@ const PANEL_TITLE_KEYS = {
   shapes: "image.editor.panelShapes",
   stickers: "image.editor.panelStickers",
   canvas: "image.editor.panelCanvas",
+  layers: "image.editor.panelLayers",
 } as const satisfies Record<EditorPanelName, string>;

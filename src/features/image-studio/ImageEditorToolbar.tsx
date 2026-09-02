@@ -1,4 +1,4 @@
-import { Brush, Crop, Grid3X3, Maximize2, MousePointer2, Palette, PanelRightClose, PanelRightOpen, Redo2, Smile, Square, Trash2, Type, Undo2 } from "lucide-react";
+import { Brush, Crop, Grid3X3, Layers3, Maximize2, MousePointer2, Palette, PanelRightClose, PanelRightOpen, Redo2, Smile, Square, Trash2, Type, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { EditorPanelName } from "./imageEditorTypes";
@@ -45,6 +45,7 @@ export function ImageEditorToolbar({
     ["shapes", t("image.editor.panelShapes"), Square],
     ["stickers", t("image.editor.panelStickers"), Smile],
     ["canvas", t("image.editor.panelCanvas"), Palette],
+    ["layers", t("image.editor.panelLayers"), Layers3],
   ] as const;
 
   return (

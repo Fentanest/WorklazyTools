@@ -1,5 +1,5 @@
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
-import { Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
+import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +9,7 @@ import { ToolGuide } from "../../components/ToolGuide";
 import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { BatchImagePanel, CollagePanel, GifPanel } from "./ImageProcessingPanels";
+import { ImageEditorContextMenu } from "./ImageEditorContextMenu";
 import { ImageEditorMinibar } from "./ImageEditorMinibar";
 import { ImageEditorPanel } from "./ImageEditorPanel";
 import { ImageEditorToolbar } from "./ImageEditorToolbar";
@@ -16,10 +17,14 @@ import { ImageEditorViewportControls } from "./ImageEditorViewportControls";
 import { getImageStudioStickerUrl, type ImageStudioSticker } from "./imageStudioStickers";
 import { ClipboardHint, RASTER_IMAGE_ACCEPT, filterRasterImages, useClipboardImages } from "./imageStudioShared";
 import { applyEditorShapeStyle, createEditorShape, getEditorShapeGeometry, getEditorShapeKind, getEditorShapeStyleCapabilities } from "./imageEditorShapes";
+import { alignEditorObjects, enforceEditorLayerInvariant, isEditorAdditionalLayer, isEditorOverlay, isEditorRegionEffect, moveEditorLayer } from "./imageEditorLayers";
 import {
   EMPTY_EDITOR_SELECTION,
+  type EditorAlignment,
   type EditorDrawTool,
   type EditorInteractionMode,
+  type EditorLayerItem,
+  type EditorLayerKind,
   type EditorMinibarPosition,
   type EditorPanelName,
   type EditorSelectionState,
@@ -29,7 +34,6 @@ import {
 import {
   anchorRegionEffect,
   mapCanvasSelectionToImagePixels,
-  orderRegionEffectsAboveBase,
   resolveRegionEffectSourceStrength,
   type ImagePixelRegion,
 } from "./regionEffectTransform";
@@ -99,6 +103,14 @@ interface RegionLabelPosition {
   top: number;
 }
 
+interface EditorContextMenuState {
+  left: number;
+  top: number;
+  target: FabricObject;
+  multiple: boolean;
+  text: boolean;
+}
+
 type CropRatio = number | undefined;
 type EditorExportMode = "original" | "custom";
 
@@ -148,6 +160,11 @@ function ImageEditor() {
   const regionEffectUrls = useRef(new Set<string>());
   const regionEffectBusyRef = useRef(false);
   const interactionModeRef = useRef<EditorInteractionMode>("select");
+  const mobilePanelLayoutRef = useRef(false);
+  const sanitizingSelectionRef = useRef(false);
+  const layerIdsRef = useRef(new WeakMap<FabricObject, string>());
+  const layerObjectsRef = useRef(new Map<string, FabricObject>());
+  const nextLayerIdRef = useRef(1);
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
   const restoringRef = useRef(false);
@@ -178,7 +195,9 @@ function ImageEditor() {
   const [historyState, setHistoryState] = useState({ index: -1, length: 0 });
   const [stageDragging, setStageDragging] = useState(false);
   const [selectionState, setSelectionState] = useState<EditorSelectionState>(EMPTY_EDITOR_SELECTION);
+  const [layers, setLayers] = useState<EditorLayerItem[]>([]);
   const [minibarPosition, setMinibarPosition] = useState<EditorMinibarPosition>();
+  const [contextMenu, setContextMenu] = useState<EditorContextMenuState>();
   const [editorError, setEditorError] = useState("");
   const [cropSelection, setCropSelection] = useState<RegionSelection>();
   const [cropRatio, setCropRatio] = useState<CropRatio>(undefined);
@@ -190,6 +209,7 @@ function ImageEditor() {
   const [stickerBusy, setStickerBusy] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState(readStoredEditorPanelCollapsed);
   const mobilePanelLayout = useEditorMobilePanelLayout();
+  mobilePanelLayoutRef.current = mobilePanelLayout;
   const effectivePanelCollapsed = panelCollapsed && !mobilePanelLayout;
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
@@ -235,6 +255,33 @@ function ImageEditor() {
     });
   }, []);
 
+  const syncLayerPanel = useCallback(() => {
+    const instance = canvas.current;
+    if (!instance) {
+      layerObjectsRef.current.clear();
+      setLayers([]);
+      return;
+    }
+    const active = new Set(instance.getActiveObjects());
+    const nextObjects = instance.getObjects().filter((object) => !isEditorRegionEffect(object) && !isEditorOverlay(object)).reverse();
+    layerObjectsRef.current.clear();
+    setLayers(nextObjects.map((object) => {
+      let id = layerIdsRef.current.get(object);
+      if (!id) {
+        id = `layer-${nextLayerIdRef.current++}`;
+        layerIdsRef.current.set(object, id);
+      }
+      layerObjectsRef.current.set(id, object);
+      return {
+        id,
+        kind: getEditorLayerKind(object),
+        visible: object.visible,
+        isBase: object === baseImage.current || (object as EditorFabricObject).worklazyRole === "base",
+        active: active.has(object),
+      };
+    }));
+  }, []);
+
   const updateRegionLabelPosition = useCallback(() => {
     const instance = canvas.current;
     const stage = stageElement.current;
@@ -270,6 +317,26 @@ function ImageEditor() {
       // The editor remains usable when session storage is unavailable.
     }
   }, [panelCollapsed]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest("[data-testid='image-editor-context-menu']")) setContextMenu(undefined);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setContextMenu(undefined); };
+    const close = () => setContextMenu(undefined);
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     window.requestAnimationFrame(syncCanvasDisplay);
@@ -340,11 +407,32 @@ function ImageEditor() {
     if (!object || object === cropOverlay.current || object === effectOverlay.current || role === "region-effect" || role === "crop-overlay") {
       setSelectionState(EMPTY_EDITOR_SELECTION);
       setMinibarPosition(undefined);
+      syncLayerPanel();
       return;
     }
     setSelectionState(getEditorSelectionState(object));
+    syncLayerPanel();
     window.requestAnimationFrame(updateMinibarPosition);
-  }, [updateMinibarPosition]);
+  }, [syncLayerPanel, updateMinibarPosition]);
+
+  const sanitizeEditorSelection = useCallback((instance: Canvas, event?: Event) => {
+    if (sanitizingSelectionRef.current) return instance.getActiveObject();
+    const active = instance.getActiveObject();
+    const rubberBandBaseOnly = active === baseImage.current && event?.type === "mouseup" && !mobilePanelLayoutRef.current;
+    if (!(active instanceof ActiveSelection) && !rubberBandBaseOnly) return active;
+    const selected = active instanceof ActiveSelection ? active.getObjects() : active ? [active] : [];
+    const filtered = selected.filter((object) => object !== baseImage.current && isEditorAdditionalLayer(object, baseImage.current) && object.visible);
+    if (active instanceof ActiveSelection && filtered.length === selected.length) return active;
+    sanitizingSelectionRef.current = true;
+    try {
+      instance.discardActiveObject(event as TPointerEvent | undefined);
+      setEditorActiveObjects(instance, filtered, event as TPointerEvent | undefined);
+      instance.requestRenderAll();
+      return instance.getActiveObject();
+    } finally {
+      sanitizingSelectionRef.current = false;
+    }
+  }, []);
 
   const syncCropOverlaySelection = useCallback((overlay: Rect, normalize = false, activeRatio: CropRatio = cropRatioRef.current) => {
     const instance = canvas.current;
@@ -407,10 +495,11 @@ function ImageEditor() {
       },
       onViewportChange: (viewport) => applyViewportTransform(instance, viewport),
     });
-    const syncSelection = () => syncSelectedObject(instance.getActiveObject());
+    const syncSelection = (event?: { e?: Event }) => syncSelectedObject(sanitizeEditorSelection(instance, event?.e));
     const onPath = (event: { path: FabricObject }) => {
       if (interactionModeRef.current === "erase") event.path.set({ globalCompositeOperation: "destination-out", selectable: false, evented: false });
       pushSnapshot();
+      syncLayerPanel();
     };
     instance.on("selection:created", syncSelection);
     instance.on("selection:updated", syncSelection);
@@ -452,8 +541,41 @@ function ImageEditor() {
       syncSelectedObject(event.target);
       pushSnapshot();
     });
-    instance.on("object:added", (event) => { if (event.target !== cropOverlay.current && event.target !== effectOverlay.current) pushSnapshot(); });
-    instance.on("object:removed", (event) => { if (event.target !== cropOverlay.current && event.target !== effectOverlay.current) pushSnapshot(); });
+    instance.on("object:added", (event) => {
+      if (event.target !== cropOverlay.current && event.target !== effectOverlay.current) pushSnapshot();
+      syncLayerPanel();
+    });
+    instance.on("object:removed", (event) => {
+      if (event.target !== cropOverlay.current && event.target !== effectOverlay.current) pushSnapshot();
+      syncLayerPanel();
+    });
+    instance.on("contextmenu", (event) => {
+      setContextMenu(undefined);
+      if (mobilePanelLayoutRef.current) return;
+      const active = instance.getActiveObject();
+      const eventTarget = event.target;
+      const multiple = active instanceof ActiveSelection && (eventTarget === active || Boolean(eventTarget && active.getObjects().includes(eventTarget)));
+      const target = multiple ? active : eventTarget;
+      const role = target && (target as EditorFabricObject).worklazyRole;
+      if (!target || target === baseImage.current || role === "base" || role === "region-effect" || role === "crop-overlay") return;
+      if (!multiple && target !== active) {
+        instance.setActiveObject(target, event.e as TPointerEvent);
+        syncSelectedObject(target);
+        instance.requestRenderAll();
+      }
+      const stage = stageElement.current;
+      const pointer = event.e as Event & { clientX?: number; clientY?: number };
+      if (!stage || pointer.clientX === undefined || pointer.clientY === undefined) return;
+      const bounds = stage.getBoundingClientRect();
+      setContextMenu({
+        left: Math.max(8, Math.min(Math.max(8, stage.clientWidth - 200), pointer.clientX - bounds.left)),
+        top: Math.max(8, Math.min(Math.max(8, stage.clientHeight - 190), pointer.clientY - bounds.top)),
+        target,
+        multiple,
+        text: target instanceof IText,
+      });
+    });
+    instance.on("mouse:down", () => setContextMenu(undefined));
     instance.on("mouse:down", (event) => {
       const mode = interactionModeRef.current;
       if (!isRegionMode(mode) || regionEffectBusyRef.current) return;
@@ -546,14 +668,15 @@ function ImageEditor() {
       instance.dispose();
       canvas.current = undefined;
     };
-  }, [applyViewportTransform, clearCropSelection, clearEffectSelection, pushSnapshot, syncCanvasDisplay, syncCropOverlaySelection, syncSelectedObject, updateMinibarPosition, updateRegionLabelPosition]);
+  }, [applyViewportTransform, clearCropSelection, clearEffectSelection, pushSnapshot, sanitizeEditorSelection, syncCanvasDisplay, syncCropOverlaySelection, syncLayerPanel, syncSelectedObject, updateMinibarPosition, updateRegionLabelPosition]);
 
   useEffect(() => {
     const instance = canvas.current;
     if (!instance) return;
     interactionModeRef.current = interactionMode;
     instance.isDrawingMode = interactionMode === "pencil" || interactionMode === "brush" || interactionMode === "erase";
-    instance.selection = interactionMode === "select";
+    instance.selection = interactionMode === "select" && !mobilePanelLayout;
+    instance.selectionKey = mobilePanelLayout ? null : "shiftKey";
     applyEditorInteractivity(instance, baseImage.current, interactionMode, baseLocked);
     if (interactionMode !== "select") {
       const brush = new PencilBrush(instance);
@@ -564,7 +687,7 @@ function ImageEditor() {
     instance.discardActiveObject();
     syncSelectedObject();
     instance.requestRenderAll();
-  }, [baseLocked, drawColor, drawWidth, interactionMode, syncSelectedObject]);
+  }, [baseLocked, drawColor, drawWidth, interactionMode, mobilePanelLayout, syncSelectedObject]);
 
   useEffect(() => {
     if (interactionMode !== "crop") clearCropSelection();
@@ -657,30 +780,93 @@ function ImageEditor() {
   const mutateActive = (action: (object: FabricObject) => void) => {
     const instance = canvas.current;
     const object = instance?.getActiveObject();
-    if (!instance || !object) return;
+    if (!instance || !object || object instanceof ActiveSelection) return;
     action(object);
     object.setCoords();
     if (object === baseImage.current) {
       syncRegionEffectTransforms(instance, baseImage.current);
-      keepRegionEffectsAboveBase(instance, baseImage.current);
+      enforceEditorLayerInvariant(instance, baseImage.current);
     }
     instance.requestRenderAll();
     syncSelectedObject(object);
     pushSnapshot();
   };
 
-  const removeSelectedLayers = useCallback(() => {
+  const moveLayerObject = useCallback((object: FabricObject, destination: "front" | "back" | { additionalIndex: number }) => {
+    const instance = canvas.current;
+    if (!instance || !moveEditorLayer(instance, baseImage.current, object, destination)) return false;
+    instance.requestRenderAll();
+    syncSelectedObject(instance.getActiveObject());
+    syncLayerPanel();
+    pushSnapshot(true);
+    return true;
+  }, [pushSnapshot, syncLayerPanel, syncSelectedObject]);
+
+  const removeLayerObjects = useCallback((requested: readonly FabricObject[]) => {
     const instance = canvas.current;
     if (!instance) return false;
-    const removable = instance.getActiveObjects().filter((object) => object !== baseImage.current && !["region-effect", "crop-overlay"].includes((object as EditorFabricObject).worklazyRole || ""));
+    const removable = requested.filter((object) => isEditorAdditionalLayer(object, baseImage.current) && instance.getObjects().includes(object));
     if (!removable.length) return false;
+    const previousSelection = instance.getActiveObjects();
+    const selectionChanged = previousSelection.some((object) => removable.includes(object));
+    if (selectionChanged) instance.discardActiveObject();
     instance.remove(...removable);
-    instance.discardActiveObject();
-    syncSelectedObject();
+    enforceEditorLayerInvariant(instance, baseImage.current);
+    if (selectionChanged) setEditorActiveObjects(instance, previousSelection.filter((object) => !removable.includes(object) && object.visible));
     instance.requestRenderAll();
-    pushSnapshot();
+    syncSelectedObject(instance.getActiveObject());
+    syncLayerPanel();
+    pushSnapshot(true);
     return true;
-  }, [pushSnapshot, syncSelectedObject]);
+  }, [pushSnapshot, syncLayerPanel, syncSelectedObject]);
+
+  const removeSelectedLayers = useCallback(() => {
+    const instance = canvas.current;
+    return instance ? removeLayerObjects(instance.getActiveObjects()) : false;
+  }, [removeLayerObjects]);
+
+  const selectLayer = useCallback((id: string) => {
+    const instance = canvas.current;
+    const object = layerObjectsRef.current.get(id);
+    if (!instance || !object || !object.visible) return;
+    instance.setActiveObject(object);
+    syncSelectedObject(object);
+    instance.requestRenderAll();
+  }, [syncSelectedObject]);
+
+  const changeLayerVisibility = useCallback((id: string) => {
+    const instance = canvas.current;
+    const object = layerObjectsRef.current.get(id);
+    if (!instance || !object || isEditorOverlay(object) || isEditorRegionEffect(object)) return;
+    const nextVisible = !object.visible;
+    const previousSelection = instance.getActiveObjects();
+    const affected = object === baseImage.current
+      ? [object, ...instance.getObjects().filter(isEditorRegionEffect)]
+      : [object];
+    affected.forEach((candidate) => candidate.set("visible", nextVisible));
+    if (!nextVisible && previousSelection.some((candidate) => affected.includes(candidate))) {
+      instance.discardActiveObject();
+      setEditorActiveObjects(instance, previousSelection.filter((candidate) => !affected.includes(candidate) && candidate.visible));
+    }
+    enforceEditorLayerInvariant(instance, baseImage.current);
+    instance.requestRenderAll();
+    syncSelectedObject(instance.getActiveObject());
+    syncLayerPanel();
+    pushSnapshot(true);
+  }, [pushSnapshot, syncLayerPanel, syncSelectedObject]);
+
+  const deleteLayer = useCallback((id: string) => {
+    const object = layerObjectsRef.current.get(id);
+    if (object) removeLayerObjects([object]);
+  }, [removeLayerObjects]);
+
+  const reorderLayer = useCallback((id: string, topIndex: number) => {
+    const instance = canvas.current;
+    const object = layerObjectsRef.current.get(id);
+    if (!instance || !object) return;
+    const additionalCount = instance.getObjects().filter((candidate) => isEditorAdditionalLayer(candidate, baseImage.current)).length;
+    moveLayerObject(object, { additionalIndex: Math.max(0, additionalCount - 1 - topIndex) });
+  }, [moveLayerObject]);
 
   const applyCropSelection = useCallback(() => {
     const instance = canvas.current;
@@ -773,7 +959,7 @@ function ImageEditor() {
       effectObject.worklazyRole = "region-effect";
       effectObject.worklazyAnchorX = pixelRegion.bounds.left + pixelRegion.bounds.width / 2 - image.cropX - image.width / 2;
       effectObject.worklazyAnchorY = pixelRegion.bounds.top + pixelRegion.bounds.height / 2 - image.cropY - image.height / 2;
-      effectImage.set({ imageSmoothing: regionEffect === "blur", selectable: false, evented: false });
+      effectImage.set({ imageSmoothing: regionEffect === "blur", selectable: false, evented: false, visible: image.visible });
       effectImage.filters = [...image.filters];
       if (effectImage.filters.length) effectImage.applyFilters();
       syncRegionEffectTransform(effectImage, image);
@@ -781,6 +967,7 @@ function ImageEditor() {
       const baseIndex = instance.getObjects().indexOf(image);
       const lastEffectIndex = instance.getObjects().reduce((lastIndex, object, index) => (object as EditorFabricObject).worklazyRole === "region-effect" ? index : lastIndex, baseIndex);
       instance.insertAt(lastEffectIndex + 1, effectImage);
+      enforceEditorLayerInvariant(instance, image);
       clearEffectSelection();
       instance.discardActiveObject();
       setInteractionMode("select");
@@ -875,6 +1062,7 @@ function ImageEditor() {
     interactionModeRef.current = "select";
     instance.isDrawingMode = false;
     instance.add(object);
+    enforceEditorLayerInvariant(instance, baseImage.current);
     instance.setActiveObject(object);
     syncSelectedObject(object);
     instance.requestRenderAll();
@@ -920,13 +1108,53 @@ function ImageEditor() {
     });
   };
 
-  const duplicateSelectedLayer = async () => {
-    const active = canvas.current?.getActiveObject();
-    if (!active || active === baseImage.current) return;
-    const clone = await active.clone();
-    clone.set({ left: (active.left || 0) + 24, top: (active.top || 0) + 24 });
-    addObject(clone);
-  };
+  const duplicateSelectedLayers = useCallback(async () => {
+    const instance = canvas.current;
+    if (!instance) return;
+    const originals = instance.getActiveObjects()
+      .filter((object) => isEditorAdditionalLayer(object, baseImage.current))
+      .sort((left, right) => instance.getObjects().indexOf(left) - instance.getObjects().indexOf(right));
+    if (!originals.length) return;
+    if (instance.getActiveObject() instanceof ActiveSelection) instance.discardActiveObject();
+    restoringRef.current = true;
+    const clones: FabricObject[] = [];
+    try {
+      for (const original of originals) {
+        const clone = await original.clone();
+        util.applyTransformToObject(clone, util.multiplyTransformMatrices([1, 0, 0, 1, 24, 24], original.calcTransformMatrix()));
+        clone.setCoords();
+        instance.add(clone);
+        clones.push(clone);
+      }
+      enforceEditorLayerInvariant(instance, baseImage.current);
+    } catch {
+      if (clones.length) instance.remove(...clones);
+      setEditorError(t("image.editor.duplicateError"));
+      return;
+    } finally {
+      restoringRef.current = false;
+    }
+    pushSnapshot(true);
+    setEditorActiveObjects(instance, clones);
+    instance.requestRenderAll();
+    syncSelectedObject(instance.getActiveObject());
+    syncLayerPanel();
+  }, [pushSnapshot, syncLayerPanel, syncSelectedObject, t]);
+
+  const alignSelectedLayers = useCallback((alignment: EditorAlignment) => {
+    const instance = canvas.current;
+    if (!instance) return;
+    const selected = instance.getActiveObjects().filter((object) => isEditorAdditionalLayer(object, baseImage.current));
+    if (selected.length < 2) return;
+    instance.discardActiveObject();
+    if (!alignEditorObjects(selected, alignment)) return;
+    enforceEditorLayerInvariant(instance, baseImage.current);
+    pushSnapshot(true);
+    setEditorActiveObjects(instance, selected);
+    instance.requestRenderAll();
+    syncSelectedObject(instance.getActiveObject());
+    syncLayerPanel();
+  }, [pushSnapshot, syncLayerPanel, syncSelectedObject]);
 
   const updateFilter = (kind: "brightness" | "contrast" | "hue", value: number) => {
     if (kind === "brightness") setBrightness(value);
@@ -975,13 +1203,7 @@ function ImageEditor() {
   const clearAddedLayers = () => {
     const instance = canvas.current;
     if (!instance) return;
-    const removable = instance.getObjects().filter((object) => object !== baseImage.current && (object as EditorFabricObject).worklazyRole !== "region-effect");
-    if (!removable.length) return;
-    instance.remove(...removable);
-    instance.discardActiveObject();
-    syncSelectedObject();
-    instance.requestRenderAll();
-    pushSnapshot();
+    removeLayerObjects(instance.getObjects());
   };
 
   const changeResampleDimension = (axis: keyof EditorDimensions, value: number) => {
@@ -1030,7 +1252,7 @@ function ImageEditor() {
       });
       if (baseImage.current) {
         syncRegionEffectTransforms(instance, baseImage.current);
-        keepRegionEffectsAboveBase(instance, baseImage.current);
+        enforceEditorLayerInvariant(instance, baseImage.current);
       }
       instance.setDimensions(target);
       resetViewport(instance);
@@ -1066,7 +1288,7 @@ function ImageEditor() {
       });
       if (baseImage.current) {
         syncRegionEffectTransforms(instance, baseImage.current);
-        keepRegionEffectsAboveBase(instance, baseImage.current);
+        enforceEditorLayerInvariant(instance, baseImage.current);
       }
       instance.setDimensions(target);
       resetViewport(instance);
@@ -1113,7 +1335,7 @@ function ImageEditor() {
       instance.backgroundColor = snapshot.transparentBackground ? "" : snapshot.background;
       if (baseImage.current) {
         syncRegionEffectTransforms(instance, baseImage.current);
-        keepRegionEffectsAboveBase(instance, baseImage.current);
+        enforceEditorLayerInvariant(instance, baseImage.current);
       }
       applyEditorInteractivity(instance, baseImage.current, interactionModeRef.current, snapshot.baseLocked);
       instance.discardActiveObject();
@@ -1131,6 +1353,7 @@ function ImageEditor() {
   };
 
   const changePanel = (panel: EditorPanelName) => {
+    setContextMenu(undefined);
     setActivePanel(panel);
     const nextMode: EditorInteractionMode = panel === "draw" ? drawTool : panel === "crop" || panel === "effect" ? panel : "select";
     interactionModeRef.current = nextMode;
@@ -1162,7 +1385,7 @@ function ImageEditor() {
     const overlays = [cropOverlay.current, effectOverlay.current].filter((overlay): overlay is Rect => Boolean(overlay));
     const activeOverlay = overlays.find((overlay) => instance.getActiveObject() === overlay);
     const viewport = [...instance.viewportTransform] as TMat2D;
-    if (baseImage.current) keepRegionEffectsAboveBase(instance, baseImage.current);
+    if (baseImage.current) enforceEditorLayerInvariant(instance, baseImage.current);
     overlays.forEach((overlay) => { if (instance.getObjects().includes(overlay)) instance.remove(overlay); });
     setEditorError("");
     try {
@@ -1247,11 +1470,33 @@ function ImageEditor() {
               selection={selectionState}
               onColorChange={(color) => setSelectedObjectStyle("color", color)}
               onWidthChange={(width) => setSelectedObjectStyle("width", width)}
-              onBringToFront={() => mutateActive((object) => canvas.current?.bringObjectToFront(object))}
-              onSendToBack={() => mutateActive((object) => canvas.current?.sendObjectToBack(object))}
-              onDuplicate={() => void duplicateSelectedLayer()}
+              onBringToFront={() => { const object = canvas.current?.getActiveObject(); if (object) moveLayerObject(object, "front"); }}
+              onSendToBack={() => { const object = canvas.current?.getActiveObject(); if (object) moveLayerObject(object, "back"); }}
+              onDuplicate={() => void duplicateSelectedLayers()}
               onDelete={() => { removeSelectedLayers(); }}
+              onAlign={alignSelectedLayers}
             />
+            {contextMenu && <ImageEditorContextMenu
+              left={contextMenu.left}
+              top={contextMenu.top}
+              multiple={contextMenu.multiple}
+              text={contextMenu.text}
+              onDuplicate={() => { setContextMenu(undefined); void duplicateSelectedLayers(); }}
+              onDelete={() => { const target = contextMenu.target; const multiple = contextMenu.multiple; setContextMenu(undefined); if (multiple) removeSelectedLayers(); else removeLayerObjects([target]); }}
+              onBringToFront={() => { const target = contextMenu.target; setContextMenu(undefined); moveLayerObject(target, "front"); }}
+              onSendToBack={() => { const target = contextMenu.target; setContextMenu(undefined); moveLayerObject(target, "back"); }}
+              onEditText={() => {
+                const target = contextMenu.target;
+                setContextMenu(undefined);
+                if (!(target instanceof IText) || !canvas.current) return;
+                canvas.current.setActiveObject(target);
+                target.enterEditing();
+                target.selectAll();
+                canvas.current.requestRenderAll();
+                syncSelectedObject(target);
+              }}
+              onAlign={(alignment) => { setContextMenu(undefined); alignSelectedLayers(alignment); }}
+            />}
             {floatingRegionSelection && regionLabelPosition && <span
               className={`image-region-size-label${interactionMode === "effect" ? " is-effect" : ""}`}
               style={{ left: regionLabelPosition.left, top: regionLabelPosition.top }}
@@ -1283,6 +1528,7 @@ function ImageEditor() {
           baseLocked={baseLocked}
           background={background}
           transparentBackground={transparentBackground}
+          layers={layers}
           onDrawToolChange={changeDrawTool}
           onDrawColorChange={setDrawColor}
           onDrawWidthChange={setDrawWidth}
@@ -1320,6 +1566,10 @@ function ImageEditor() {
           onBackgroundChange={(color) => updateBackground(color, transparentBackground)}
           onTransparentBackgroundChange={(transparent) => updateBackground(background, transparent)}
           onClearLayers={clearAddedLayers}
+          onLayerSelect={selectLayer}
+          onLayerVisibilityChange={changeLayerVisibility}
+          onLayerDelete={deleteLayer}
+          onLayerReorder={reorderLayer}
         />
       </div>
       <div className="export-row image-editor-export-row">
@@ -1662,18 +1912,6 @@ function syncRegionEffectTransform(effect: FabricImage, image: FabricImage) {
 function syncRegionEffectTransforms(instance: Canvas, image: FabricImage) {
   instance.getObjects().forEach((object) => {
     if (object instanceof FabricImage && (object as EditorFabricObject).worklazyRole === "region-effect") syncRegionEffectTransform(object, image);
-  });
-}
-
-function keepRegionEffectsAboveBase(instance: Canvas, image: FabricImage) {
-  const current = instance.getObjects();
-  const desired = orderRegionEffectsAboveBase(
-    current,
-    image,
-    (object) => (object as EditorFabricObject).worklazyRole === "region-effect",
-  );
-  desired.forEach((object, index) => {
-    if (instance.getObjects()[index] !== object) instance.moveObjectTo(object, index);
   });
 }
 
@@ -2031,6 +2269,13 @@ function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | un
 }
 
 function getEditorSelectionState(object: FabricObject): EditorSelectionState {
+  if (object instanceof ActiveSelection) {
+    return {
+      ...EMPTY_EDITOR_SELECTION,
+      kind: "multiple",
+      count: object.size(),
+    };
+  }
   const isBase = (object as EditorFabricObject).worklazyRole === "base";
   const isSticker = (object as EditorFabricObject).worklazyRole === "sticker";
   const shapeKind = getEditorShapeKind(object);
@@ -2053,6 +2298,17 @@ function getEditorSelectionState(object: FabricObject): EditorSelectionState {
     geometry: shapeKind ? getEditorShapeGeometry(object) : undefined,
     opacity: object.opacity,
   };
+}
+
+function getEditorLayerKind(object: FabricObject): EditorLayerKind {
+  const kind = getEditorSelectionState(object).kind;
+  return kind === "none" || kind === "multiple" ? "shape" : kind;
+}
+
+function setEditorActiveObjects(instance: Canvas, objects: readonly FabricObject[], event?: TPointerEvent) {
+  const selectable = objects.filter((object) => object.visible);
+  if (selectable.length === 1) instance.setActiveObject(selectable[0], event);
+  else if (selectable.length > 1) instance.setActiveObject(new ActiveSelection([...selectable], { canvas: instance }), event);
 }
 
 function fabricColorToHex(value: FabricObject["fill"] | FabricObject["stroke"], fallback: string) {

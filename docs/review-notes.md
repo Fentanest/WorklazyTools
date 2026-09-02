@@ -4,6 +4,16 @@
 
 ## 2026-09-03
 
+### 이미지 P3 — 레이어·다중 선택·컨텍스트 메뉴 판정 (Codx)
+
+- **고정 블록·공통 순서 판정**: `[base,effects…,additional…,overlay…]`를 만드는 공통 helper를 신설하고 미니바 front/back, 레이어 패널 Sortable 재정렬, 컨텍스트 메뉴가 모두 같은 이동 함수만 사용하게 했다. `back`은 effect 개수와 무관하게 고정 블록 바로 위, `front`는 추가 레이어 최상단으로 제한하며 base·effect·crop overlay의 이동 요청은 거부한다. effect는 목록에 노출하지 않고 base 표시 상태를 강제 상속한다. 단위 테스트에서 뒤섞인 6객체를 고정 순서로 복원하고 세 이동 경로의 base/effect 거부를 확인했다.
+- **레이어 상태·히스토리 판정**: 목록은 Fabric z순을 역순으로 표시하고 객체별 WeakMap ID로 선택을 연결한다. `moveObjectTo`와 `visible`이 이벤트를 내지 않는 전제를 따라 재정렬·표시 변경마다 즉시 snapshot과 패널 동기화를 수행했다. 활성 레이어 숨김은 단일 선택을 해제하거나 남은 ActiveSelection을 재구성하며, base 숨김은 모든 effect를 함께 숨긴다. Chrome에서 추가 레이어와 base 표시 변경 각각의 undo→redo→undo, 패널 재정렬 undo, 정렬 undo/redo, 다중 복제 undo/redo 뒤 패널 상태와 고정 순서를 직접 읽어 일치함을 확인했다. 숨긴 텍스트 레이어의 PNG data URL이 표시 상태와 달라 export 제외도 확정했다.
+- **선택·정렬·복제 판정**: 데스크톱에서 Fabric `selectionKey=shiftKey`와 러버밴드를 켜고, selection hook이 base를 제거한 뒤 잔여 0/1/복수에 맞춰 해제·단일·ActiveSelection으로 강등/재구성한다. 실제 base 우선 Shift 선택은 base+텍스트에서 텍스트 단일로 강등되고 두 번째 도형 추가 시 base 없는 2객체 선택이 됐다. 러버밴드는 unlocked base를 후보로 포함시킨 상태에서도 추가 레이어 3개만 남겼다. 회전 `-8°/23°/-17°`, 비균일 scale 3객체를 scene `getBoundingRect()` 기준으로 좌·가로중앙·우·상·세로중앙·하 6종 × zoom 100/200%에서 정렬했고 12조합 모두 bbox 좌표 편차 0.75px 이하를 통과했다. 다중 복제는 구성 객체를 z순으로 각각 clone하고 24px scene translation을 합성해 활성 clone의 종류·상대 z순을 원본과 같게 유지했다.
+- **우클릭·보호 경로 판정**: document 전역 contextmenu 공급은 기각하고 Fabric 7.4의 `instance.on("contextmenu")`만 사용했다. 일반 객체 메뉴는 복제·삭제·앞/뒤, IText는 편집 진입을 추가하며 ActiveSelection은 복제·삭제·6정렬만 제공한다. base·effect·빈 캔버스는 메뉴를 만들지 않고 Fabric upper canvas의 기본 메뉴만 억제했으며 캔버스 밖 우클릭은 `defaultPrevented=false`를 유지했다. Escape·외부 pointerdown·resize·scroll 네 닫힘 조건과 ko/en 문구를 실제 우클릭으로 확인했다. 객체 붙여넣기 공급원이 없고 복제로 요구를 충족하므로 클립보드 상태·붙여넣기 항목은 도입하지 않았다.
+- **P4 입력 교차·모바일 판정**: 기존 touch-safe 비주버튼 guard와 crop 박스 target 조기 반환을 유지했다. zoom 200%에서 Space+드래그는 VPT만 바꾸고 ActiveSelection을 만들지 않았으며 crop 모드 드래그는 crop overlay가 소유하고 러버밴드를 만들지 않았다. 기존 P4 crop/effect 동작과 crop overlay 8조합(변형 유무×zoom 100/200%×지우개 유무)은 geometry/saved error 모두 0px로 재통과했다. 390×844에서는 `selection=false`, `selectionKey=null`, layers 하단 시트·44px 이상 행 버튼·패널 유지·삭제 동기화를 확인해 모바일 다중 선택 제외를 고정했다.
+- **현지화·SEO·배포 표면 판정**: layers/유형/표시/삭제/정렬/우클릭/다중 선택 문구를 ko/en 동일 키로 추가했고 내부 Fabric 명칭·원시 예외는 화면에 노출하지 않았다. 기존 도구 메타와 SEO featureList가 이미 통합 편집 및 “텍스트·도형·스티커 레이어”를 명시하므로 URL·검색 의미·가이드 정합은 유지되며 별도 SEO 문구 변경은 불필요로 판정했다. 정적 페이지 수, GitHub Pages 단일 페이지 전제, 광고 위치와 광고 제외 격리 경로는 바뀌지 않았다.
+- **완료 검증**: `npm run build` exit 0(2,351 modules, Image Studio 416.67KB/129.16KB gzip, 정적 55페이지), `npm run test:unit` exit 0(82/82), `TEST_ONLY_IMAGE=1 npm run test:new-tools` exit 0(P3 전체+P4 전체+DPR/effect), `npm run test:utilities` exit 0, `npm run test:static` exit 0. `git diff --check`와 `node --check tests/new-tools-smoke.mjs`도 exit 0.
+
 ### 비디오 A4 — 결과 저장 추상화·스트리밍 ZIP 판정 (Codx)
 
 - **결과 계약·완료 순서**: `VideoWorkerOutput`을 buffer 전용에서 buffer/File/브라우저 임시 파일 참조 공통 계약으로 확장했다. 처리 워커는 완성 바이트를 워커 전용 동기 파일 핸들(미지원 시 비동기 writable)에 먼저 기록한 뒤 참조만 전달한다. 클라이언트의 출력 콜백은 직렬 Promise 큐로 대기해 마지막 `result` 이벤트가 먼저 와도 모든 File 해석·UI 저장이 끝나기 전 작업 성공을 resolve하지 않는다.

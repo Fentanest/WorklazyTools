@@ -56,6 +56,7 @@ try {
     console.log("[2/4] Image studio");
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
     await testImageStudio(page, fixtures.images);
+    await testImageStudioLayersAndSelection(page);
     await testImageStudioRegionInteractions(page);
     await testImageStudioCropBoxEditing(page);
     const cropMatrix = [];
@@ -202,7 +203,7 @@ async function testImageStudio(page, imagePaths) {
     hasPanelToggle: Boolean(document.querySelector('[data-testid="image-editor-panel-toggle"]')),
     jpgNotice: document.querySelector(".image-format-control small")?.textContent || "",
   }));
-  if (!editorControls.hasVerticalFlip || editorControls.toolbarPanels !== 9 || !editorControls.hasPanelToggle || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
+  if (!editorControls.hasVerticalFlip || editorControls.toolbarPanels !== 10 || !editorControls.hasPanelToggle || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
     throw new Error(`Unified editor controls are incomplete: ${JSON.stringify(editorControls)}`);
   }
   await page.click('[data-testid="image-editor-panel-canvas"]');
@@ -698,6 +699,339 @@ async function testImageStudio(page, imagePaths) {
     const current = Array.from(document.querySelectorAll(".gif-frame-row"), (row) => row.textContent || "");
     return JSON.stringify(current) !== JSON.stringify(before);
   }, {}, initialFrameOrder);
+}
+
+async function testImageStudioLayersAndSelection(page) {
+  console.log("  image: probing P3 layers, multi-selection, and context menu");
+  await loadSyntheticImageEditor(page);
+  await installImageEditorExportCapture(page);
+  await readImageEditorP3State(page);
+
+  // Use the public effect workflow so every layer-order assertion includes the fixed base+effect block.
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await dragImageEditorRegion(page, 1);
+  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode"));
+  await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.objects.some((object) => object.role === "region-effect"));
+
+  await page.click('[data-testid="image-editor-panel-text"]');
+  await page.click('[data-testid="image-editor-add-text"]');
+  await page.click('[data-testid="image-editor-panel-shapes"]');
+  await page.click('[data-testid="image-editor-shape-rounded-rect"]');
+  await page.click('[data-testid="image-editor-shape-triangle"]');
+  await configureImageEditorP3Geometry(page, true);
+
+  await page.click('[data-testid="image-editor-panel-layers"]');
+  await page.waitForFunction(() => document.querySelectorAll(".image-editor-layer-row").length === 4);
+  let state = await readImageEditorP3State(page);
+  const initialKinds = state.additional.map((object) => object.kind);
+  if (!state.blockValid || state.effects.length !== 1 || initialKinds.join(",") !== "text,rounded-rect,triangle"
+    || state.layerRows.map((row) => row.kind).join(",") !== "shape,shape,text,base" || !state.layerRows.at(-1)?.base
+    || state.layerRows.at(-1)?.movable || !state.layerRows.at(-1)?.deleteDisabled) {
+    throw new Error(`Layer panel did not expose the fixed base block and top-to-bottom additional order: ${JSON.stringify(state)}`);
+  }
+
+  // A panel row owns selection without forcing the tool sheet back to Select.
+  await page.click('.image-editor-layer-row[data-layer-kind="text"] .image-editor-layer-select');
+  await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.classList.contains("is-active"));
+  const panelSelection = await page.evaluate(() => ({
+    panel: document.querySelector('[data-testid="image-editor-options-panel"]')?.getAttribute("data-panel"),
+    activeRows: document.querySelectorAll(".image-editor-layer-row.is-active").length,
+  }));
+  if (panelSelection.panel !== "layers" || panelSelection.activeRows !== 1) throw new Error(`Layer selection did not retain the panel: ${JSON.stringify(panelSelection)}`);
+
+  // Base selection keeps all four destructive/order minibar actions visible but disabled.
+  await page.click('.image-editor-layer-row[data-layer-base="true"] .image-editor-layer-select');
+  await page.waitForSelector('[data-testid="image-editor-minibar"][data-selection-kind="base"]');
+  const baseActions = await page.evaluate(() => ({
+    front: document.querySelector('[data-testid="image-editor-minibar-front"]')?.disabled,
+    back: document.querySelector('[data-testid="image-editor-minibar-back"]')?.disabled,
+    duplicate: document.querySelector('[data-testid="image-editor-minibar-duplicate"]')?.disabled,
+    remove: document.querySelector('[data-testid="image-editor-minibar-delete"]')?.disabled,
+    toolbarDelete: document.querySelector('[data-testid="image-editor-delete"]')?.disabled,
+  }));
+  if (Object.values(baseActions).some((value) => value !== true)) throw new Error(`Base actions are not uniformly disabled: ${JSON.stringify(baseActions)}`);
+  const beforeBaseKeyboardDelete = (await readImageEditorP3State(page)).objects.length;
+  await page.keyboard.press("Delete");
+  if ((await readImageEditorP3State(page)).objects.length !== beforeBaseKeyboardDelete) throw new Error("Keyboard Delete removed the base layer");
+
+  // Unlock only for the shift-click and base/effect context-target probes below.
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await page.click('button[aria-label="원본 사진 잠금"]');
+  await page.click('[data-testid="image-editor-panel-layers"]');
+
+  // Hiding the active additional layer clears selection, excludes it from export, and is fully restorable.
+  await page.click('.image-editor-layer-row[data-layer-kind="text"] .image-editor-layer-select');
+  const visibleExport = await captureImageEditorExport(page, "PNG");
+  await page.click('.image-editor-layer-row[data-layer-kind="text"] .image-editor-layer-visibility');
+  await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.getAttribute("data-layer-visible") === "false");
+  state = await readImageEditorP3State(page);
+  if (state.activeCount !== 0 || state.additional.find((object) => object.kind === "text")?.visible !== false) throw new Error(`Hiding an active layer left a stale selection: ${JSON.stringify(state)}`);
+  const hiddenExport = await captureImageEditorExport(page, "PNG");
+  if (hiddenExport === visibleExport) throw new Error("Hidden layer remained in the image export");
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.getAttribute("data-layer-visible") === "true");
+  await page.click('[data-testid="image-editor-redo"]');
+  await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.getAttribute("data-layer-visible") === "false");
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.getAttribute("data-layer-visible") === "true");
+
+  // Base visibility is atomic with every region effect, including undo and redo.
+  await page.click('.image-editor-layer-row[data-layer-base="true"] .image-editor-layer-select');
+  await page.click('.image-editor-layer-row[data-layer-base="true"] .image-editor-layer-visibility');
+  state = await readImageEditorP3State(page);
+  if (state.base?.visible !== false || state.effects.some((effect) => effect.visible) || state.activeCount !== 0) throw new Error(`Base/effect visibility was not coupled: ${JSON.stringify(state)}`);
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(async () => { const value = await window.__readImageEditorP3State?.(); return value?.base?.visible && value.effects.every((effect) => effect.visible) && document.querySelector('.image-editor-layer-row[data-layer-base="true"]')?.getAttribute("data-layer-visible") === "true"; });
+  await page.click('[data-testid="image-editor-redo"]');
+  await page.waitForFunction(async () => { const value = await window.__readImageEditorP3State?.(); return value?.base?.visible === false && value.effects.every((effect) => !effect.visible) && document.querySelector('.image-editor-layer-row[data-layer-base="true"]')?.getAttribute("data-layer-visible") === "false"; });
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.base?.visible === true && document.querySelector('.image-editor-layer-row[data-layer-base="true"]')?.getAttribute("data-layer-visible") === "true");
+  console.log("  image: P3 visibility/history verified");
+
+  // Minibar and context menu share the same block-aware back clamp.
+  await page.click('.image-editor-layer-row:first-child .image-editor-layer-select');
+  await page.waitForSelector('[data-testid="image-editor-minibar-back"]');
+  await page.click('[data-testid="image-editor-minibar-back"]');
+  state = await readImageEditorP3State(page);
+  if (!state.blockValid || state.additional[0]?.kind !== "triangle") throw new Error(`Minibar back crossed or missed the base block: ${JSON.stringify(state)}`);
+  await assertImageEditorUndoRedoOrder(page, "triangle,text,rounded-rect", "text,rounded-rect,triangle", "minibar reorder");
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle");
+  console.log("  image: P3 three-route z-order clamp verified");
+
+  let triangle = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle");
+  await openImageEditorContextMenu(page, triangle);
+  await page.$eval('[data-testid="image-editor-context-back"]', (button) => button.click());
+  state = await readImageEditorP3State(page);
+  if (!state.blockValid || state.additional[0]?.kind !== "triangle") throw new Error(`Context-menu back crossed or missed the base block: ${JSON.stringify(state)}`);
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle");
+  console.log("  image: P3 context clamp verified");
+
+  // Sortable only exposes handles on additional rows and must produce the same clamp and snapshot.
+  const dragRows = await page.$$(".image-editor-layer-row.is-movable");
+  const dragHandle = await dragRows[0]?.$(".image-editor-layer-drag");
+  const dragTarget = dragRows.at(-1);
+  const dragBox = await dragHandle?.boundingBox();
+  const targetBox = await dragTarget?.boundingBox();
+  if (!dragBox || !targetBox) throw new Error("Layer reorder handles are unavailable");
+  await page.mouse.move(dragBox.x + dragBox.width / 2, dragBox.y + dragBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height * 0.8, { steps: 12 });
+  await page.mouse.up();
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 180)));
+  state = await readImageEditorP3State(page);
+  if (!state.blockValid || state.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle" || state.layerRows.at(-1)?.kind !== "base") {
+    throw new Error(`Panel drag broke or missed the fixed base block: ${JSON.stringify(state)}`);
+  }
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle");
+
+  // Rubber-band selection includes the unlocked base as a candidate, then the selection hook removes it.
+  await configureImageEditorP3Geometry(page, true);
+  await setImageEditorBaseHitTesting(page, false);
+  const rubberMapping = await getImageEditorSceneMapping(page, 1);
+  const rubberStart = mapImageEditorScenePoint(rubberMapping, { x: 30, y: 25 });
+  const rubberEnd = mapImageEditorScenePoint(rubberMapping, { x: 790, y: 530 });
+  await page.mouse.move(rubberStart.x, rubberStart.y);
+  await page.mouse.down();
+  await page.mouse.move(rubberEnd.x, rubberEnd.y, { steps: 10 });
+  await page.mouse.up();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  state = await readImageEditorP3State(page);
+  if (state.activeType !== "activeselection" || state.activeKinds.includes("base") || state.activeCount !== 3 || state.layerRows.filter((row) => row.active).length !== 3) {
+    throw new Error(`Rubber-band selection did not exclude the base: ${JSON.stringify(state)}`);
+  }
+  await cacheImageEditorActiveSelectionConstructor(page);
+  await setImageEditorBaseHitTesting(page, true);
+
+  // Base-first Shift selection degrades to one additional object, then upgrades to a base-free pair.
+  await discardImageEditorSelection(page);
+  state = await readImageEditorP3State(page);
+  await clickImageEditorScenePoint(page, { x: 500, y: 480 });
+  const textObject = state.additional.find((object) => object.kind === "text");
+  const rectObject = state.additional.find((object) => object.kind === "rounded-rect");
+  await clickImageEditorObject(page, textObject, ["Shift"]);
+  state = await readImageEditorP3State(page);
+  if (state.activeCount !== 1 || state.activeKinds.join(",") !== "text") throw new Error(`Base-first Shift selection was not degraded: ${JSON.stringify(state)}`);
+  await clickImageEditorObject(page, rectObject, ["Shift"]);
+  state = await readImageEditorP3State(page);
+  if (state.activeType !== "activeselection" || state.activeKinds.join(",") !== "text,rounded-rect") throw new Error(`Shift multi-selection retained the base or lost an object: ${JSON.stringify(state)}`);
+  console.log("  image: P3 rubber-band and Shift base exclusion verified");
+
+  // Six scene-bbox alignments must remain invariant under object transforms and VPT zoom.
+  const alignments = ["left", "center-horizontal", "right", "top", "center-vertical", "bottom"];
+  for (const zoom of [1, 2]) {
+    await page.click('[data-testid="image-editor-fit"]');
+    if (zoom === 2) for (let index = 0; index < 3; index += 1) await page.click('[data-testid="image-editor-zoom-in"]');
+    await page.waitForFunction((expected) => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === `${expected * 100}%`, {}, zoom);
+    for (const alignment of alignments) {
+      await configureImageEditorP3Geometry(page, true, ["text", "rounded-rect", "triangle"]);
+      await page.click(`[data-testid="image-editor-align-${alignment}"]`);
+      state = await readImageEditorP3State(page);
+      assertImageEditorAlignment(state.activeObjects, alignment, `zoom ${zoom * 100}%`);
+    }
+  }
+  const alignedState = await readImageEditorP3State(page);
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-redo"]')?.disabled === false);
+  const undoneAlignment = await readImageEditorP3State(page);
+  if (JSON.stringify(undoneAlignment.additional.map((object) => object.bounds)) === JSON.stringify(alignedState.additional.map((object) => object.bounds))) {
+    throw new Error("Alignment undo did not restore the preceding geometry");
+  }
+  await page.click('[data-testid="image-editor-redo"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-redo"]')?.disabled === true);
+  assertImageEditorAlignment((await readImageEditorP3State(page)).additional, "bottom", "alignment redo");
+  await page.click('[data-testid="image-editor-fit"]');
+  console.log("  image: P3 six-way scene alignment at 100/200% verified");
+
+  // Multiple clone is per-object, translated as a set, and preserves the originals' relative z-order.
+  await configureImageEditorP3Geometry(page, true, ["text", "rounded-rect"]);
+  state = await readImageEditorP3State(page);
+  const beforeCloneCount = state.additional.length;
+  const beforeCloneKinds = state.activeKinds.join(",");
+  await page.click('[data-testid="image-editor-minibar-duplicate"]');
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count + 2), {}, beforeCloneCount);
+  state = await readImageEditorP3State(page);
+  if (!state.blockValid || state.additional.length !== beforeCloneCount + 2 || state.activeCount !== 2 || state.activeKinds.join(",") !== beforeCloneKinds) {
+    throw new Error(`Multi-clone did not preserve relative z-order: ${JSON.stringify(state)}`);
+  }
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
+  console.log("  image: P3 multi-clone relative order/history verified");
+  await page.click('[data-testid="image-editor-redo"]');
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count + 2), {}, beforeCloneCount);
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
+
+  // Multiple context policy: duplicate/delete/alignment only; delete is independently undoable.
+  await configureImageEditorP3Geometry(page, false, ["text", "rounded-rect"]);
+  state = await readImageEditorP3State(page);
+  await openImageEditorContextMenu(page, state.activeObjects[0]);
+  const multipleMenu = await page.$eval('[data-testid="image-editor-context-menu"]', (menu) => ({
+    target: menu.getAttribute("data-context-target"),
+    duplicate: Boolean(menu.querySelector('[data-testid="image-editor-context-duplicate"]')),
+    remove: Boolean(menu.querySelector('[data-testid="image-editor-context-delete"]')),
+    align: menu.querySelectorAll('[data-testid^="image-editor-context-align-"]').length,
+    front: Boolean(menu.querySelector('[data-testid="image-editor-context-front"]')),
+    back: Boolean(menu.querySelector('[data-testid="image-editor-context-back"]')),
+    edit: Boolean(menu.querySelector('[data-testid="image-editor-context-edit-text"]')),
+  }));
+  if (multipleMenu.target !== "multiple" || !multipleMenu.duplicate || !multipleMenu.remove || multipleMenu.align !== 6 || multipleMenu.front || multipleMenu.back || multipleMenu.edit) {
+    throw new Error(`ActiveSelection context policy is invalid: ${JSON.stringify(multipleMenu)}`);
+  }
+  await page.$eval('[data-testid="image-editor-context-delete"]', (button) => button.click());
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count - 2), {}, beforeCloneCount);
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
+
+  // Every normal-object menu command receives an actual right-click path.
+  state = await readImageEditorP3State(page);
+  triangle = state.additional.find((object) => object.kind === "triangle");
+  await openImageEditorContextMenu(page, triangle);
+  await page.$eval('[data-testid="image-editor-context-duplicate"]', (button) => button.click());
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count + 1), {}, beforeCloneCount);
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
+  triangle = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle");
+  await openImageEditorContextMenu(page, triangle);
+  await page.$eval('[data-testid="image-editor-context-front"]', (button) => button.click());
+  if ((await readImageEditorP3State(page)).additional.at(-1)?.kind !== "triangle") throw new Error("Context-menu front did not move the object to the additional-layer front");
+  await page.click('[data-testid="image-editor-undo"]');
+  triangle = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle");
+  await openImageEditorContextMenu(page, triangle);
+  await page.$eval('[data-testid="image-editor-context-back"]', (button) => button.click());
+  if ((await readImageEditorP3State(page)).additional[0]?.kind !== "triangle") throw new Error("Context-menu back did not clamp above the fixed block");
+  await page.click('[data-testid="image-editor-undo"]');
+  triangle = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle");
+  await openImageEditorContextMenu(page, triangle);
+  await page.$eval('[data-testid="image-editor-context-delete"]', (button) => button.click());
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count - 1), {}, beforeCloneCount);
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
+  const textLayer = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "text");
+  await openImageEditorContextMenu(page, textLayer);
+  await page.$eval('[data-testid="image-editor-context-edit-text"]', (button) => button.click());
+  if (!(await readImageEditorP3State(page)).additional.find((object) => object.kind === "text")?.editing) throw new Error("IText context action did not enter editing mode");
+  await page.keyboard.press("Escape");
+  console.log("  image: P3 target-specific context actions verified");
+
+  // Menu suppression is scoped to the Fabric canvas; all closing paths are explicit.
+  await installContextMenuDefaultProbe(page);
+  state = await readImageEditorP3State(page);
+  await openImageEditorContextMenu(page, state.additional.find((object) => object.kind === "triangle"));
+  await page.keyboard.press("Escape");
+  if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Escape did not close the object menu");
+  await openImageEditorContextMenu(page, (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle"));
+  await page.click('[data-testid="image-editor-panel-layers"]');
+  if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Outside click did not close the object menu");
+  await openImageEditorContextMenu(page, (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle"));
+  await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-context-menu"]'));
+  await openImageEditorContextMenu(page, (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle"));
+  await page.evaluate(() => window.dispatchEvent(new Event("scroll")));
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-context-menu"]'));
+
+  const base = (await readImageEditorP3State(page)).base;
+  await rightClickImageEditorObject(page, base);
+  if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Base right-click opened an object menu");
+  const effect = (await readImageEditorP3State(page)).effects[0];
+  await rightClickImageEditorObject(page, effect);
+  if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Effect right-click opened an object menu");
+  await setImageEditorAllCanvasObjectsHitTesting(page, false);
+  const blankPoint = mapImageEditorScenePoint(await getImageEditorSceneMapping(page, 1), { x: 850, y: 550 });
+  await page.mouse.click(blankPoint.x, blankPoint.y, { button: "right" });
+  if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Blank canvas right-click opened an object menu");
+  await setImageEditorAllCanvasObjectsHitTesting(page, true);
+  await page.click('[data-testid="image-editor-panel-layers"]', { button: "right" });
+  const defaults = await page.evaluate(() => window.__imageEditorContextDefaults || []);
+  if (defaults.filter((entry) => entry.inside).some((entry) => !entry.prevented) || !defaults.some((entry) => !entry.inside && !entry.prevented)) {
+    throw new Error(`Context-menu default suppression escaped the Fabric canvas: ${JSON.stringify(defaults)}`);
+  }
+
+  // Space pan wins over group selection, while crop owns drag and never creates an ActiveSelection.
+  await discardImageEditorSelection(page);
+  for (let index = 0; index < 3; index += 1) await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "200%");
+  const beforePanState = await readImageEditorP3State(page);
+  const beforePan = beforePanState.viewport;
+  const panMapping = await getImageEditorSceneMapping(page, beforePanState.zoom);
+  const panStart = mapImageEditorScenePoint(panMapping, { x: 500, y: 350 });
+  await page.mouse.move(panStart.x, panStart.y);
+  await page.keyboard.down("Space");
+  await page.mouse.down();
+  await page.mouse.move(panStart.x + 46, panStart.y + 28, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  state = await readImageEditorP3State(page);
+  if (JSON.stringify(state.viewport) === JSON.stringify(beforePan) || state.activeType === "activeselection") throw new Error(`Space pan lost input priority: ${JSON.stringify(state)}`);
+  await page.click('[data-testid="image-editor-fit"]');
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  await dragImageEditorRegion(page, 1);
+  state = await readImageEditorP3State(page);
+  if (state.activeType === "activeselection" || !state.objects.some((object) => object.role === "crop-overlay")) throw new Error(`Crop drag lost ownership to rubber-band selection: ${JSON.stringify(state)}`);
+  await page.keyboard.press("Escape");
+  console.log("  image: P3 context suppression/closing and input priority verified");
+
+  // English labels are rendered from the same target policy, with no clipboard/paste command.
+  await page.goto(`${baseUrl}/en/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-testid="image-editor-panel-text"]');
+  await page.click('[data-testid="image-editor-panel-text"]');
+  await page.click('[data-testid="image-editor-add-text"]');
+  await configureImageEditorP3Geometry(page, false);
+  const englishText = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "text");
+  await openImageEditorContextMenu(page, englishText);
+  const englishMenu = await page.$eval('[data-testid="image-editor-context-menu"]', (menu) => ({
+    text: menu.textContent || "",
+    items: Array.from(menu.querySelectorAll('[role="menuitem"]'), (item) => item.textContent?.trim() || item.getAttribute("aria-label") || ""),
+  }));
+  const englishLayers = await page.$eval('[data-testid="image-editor-panel-layers"]', (button) => button.textContent || button.getAttribute("aria-label") || "");
+  if (!["Duplicate", "Delete", "Bring to front", "Send to back", "Edit text"].every((label) => englishMenu.text.includes(label))
+    || englishMenu.text.toLowerCase().includes("paste") || !englishLayers.includes("Layers")) {
+    throw new Error(`English P3 labels are incomplete: ${JSON.stringify({ englishMenu, englishLayers })}`);
+  }
+  console.log("  image: P3 layer invariants, visibility/export/history, base guards, selection, alignments, cloning, menus, and input priority verified");
 }
 
 async function testImageStudioRegionInteractions(page) {
@@ -1362,6 +1696,275 @@ async function loadSyntheticImageEditor(page, dimensions = { width: 600, height:
     if (!(canvas instanceof HTMLCanvasElement)) return false;
     const pixel = canvas.getContext("2d")?.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data;
     return pixel && pixel[1] > 150;
+  });
+}
+
+async function readImageEditorP3State(page) {
+  return page.evaluate(async () => {
+    window.__readImageEditorP3State = async () => {
+      const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+      if (!(stage instanceof HTMLElement)) throw new Error("Image editor stage is unavailable");
+      const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+      let fiber = fiberKey ? stage[fiberKey] : null;
+      let fabricCanvas;
+      while (fiber && !fabricCanvas) {
+        let hook = fiber.memoizedState;
+        while (hook) {
+          const candidate = hook.memoizedState?.current;
+          if (candidate && typeof candidate.getObjects === "function" && candidate.upperCanvasEl instanceof HTMLCanvasElement) {
+            fabricCanvas = candidate;
+            break;
+          }
+          hook = hook.next;
+        }
+        fiber = fiber.return;
+      }
+      if (!fabricCanvas) throw new Error("Fabric canvas is unavailable");
+      window.__imageEditorFabricCanvas = fabricCanvas;
+      const activeMembers = fabricCanvas.getActiveObjects();
+      const objectDetails = fabricCanvas.getObjects().map((object, index) => {
+        const bounds = object.getBoundingRect();
+        const role = object.worklazyRole || "";
+        const shapeKind = object.worklazyShapeKind || "";
+        const type = String(object.type || object.constructor?.type || "");
+        const normalizedType = type.toLowerCase().replace(/[^a-z]/g, "");
+        const kind = role === "base" || role === "region-effect" || role === "crop-overlay"
+          ? role
+          : shapeKind || (normalizedType === "itext" ? "text" : role === "sticker" ? "sticker" : normalizedType === "path" ? "drawing" : type.toLowerCase());
+        return {
+          index,
+          role,
+          shapeKind,
+          kind,
+          type,
+          visible: object.visible,
+          evented: object.evented,
+          selectable: object.selectable,
+          editing: Boolean(object.isEditing),
+          left: object.left,
+          top: object.top,
+          angle: object.angle,
+          scaleX: object.scaleX,
+          scaleY: object.scaleY,
+          bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+        };
+      });
+      const base = objectDetails.find((object) => object.role === "base");
+      const effects = objectDetails.filter((object) => object.role === "region-effect");
+      const overlays = objectDetails.filter((object) => object.role === "crop-overlay");
+      const additional = objectDetails.filter((object) => !object.role || !["base", "region-effect", "crop-overlay"].includes(object.role));
+      const fixedCount = (base ? 1 : 0) + effects.length;
+      const blockValid = (!base || base.index === 0)
+        && effects.every((object, index) => object.index === index + (base ? 1 : 0))
+        && additional.every((object) => object.index >= fixedCount)
+        && overlays.every((object) => object.index >= fixedCount + additional.length);
+      const activeObjects = activeMembers
+        .map((object) => objectDetails[fabricCanvas.getObjects().indexOf(object)])
+        .filter(Boolean)
+        .sort((left, right) => left.index - right.index);
+      const active = fabricCanvas.getActiveObject();
+      return {
+        width: fabricCanvas.getWidth(),
+        height: fabricCanvas.getHeight(),
+        zoom: fabricCanvas.getZoom(),
+        viewport: [...fabricCanvas.viewportTransform],
+        selection: fabricCanvas.selection,
+        selectionKey: fabricCanvas.selectionKey,
+        objects: objectDetails,
+        base,
+        effects,
+        overlays,
+        additional,
+        blockValid,
+        activeType: String(active?.type || active?.constructor?.type || "").toLowerCase(),
+        activeCount: activeObjects.length,
+        activeKinds: activeObjects.map((object) => object.kind),
+        activeObjects,
+        layerRows: Array.from(document.querySelectorAll(".image-editor-layer-row"), (row) => ({
+          id: row.getAttribute("data-layer-id") || "",
+          kind: row.getAttribute("data-layer-kind") || "",
+          visible: row.getAttribute("data-layer-visible") === "true",
+          base: row.getAttribute("data-layer-base") === "true",
+          active: row.classList.contains("is-active"),
+          movable: row.classList.contains("is-movable"),
+          deleteDisabled: row.querySelector(".image-editor-layer-delete")?.disabled === true,
+        })),
+      };
+    };
+    return window.__readImageEditorP3State();
+  });
+}
+
+async function configureImageEditorP3Geometry(page, recordSnapshot, selectedKinds) {
+  await readImageEditorP3State(page);
+  await page.evaluate((record, requestedKinds) => {
+    const canvas = window.__imageEditorFabricCanvas;
+    if (!canvas) throw new Error("Fabric canvas is unavailable for P3 geometry");
+    const active = canvas.getActiveObject();
+    if (String(active?.type || active?.constructor?.type || "").toLowerCase() === "activeselection") window.__imageEditorActiveSelection = active.constructor;
+    canvas.discardActiveObject();
+    const objects = canvas.getObjects();
+    const text = objects.find((object) => String(object.type || object.constructor?.type || "").toLowerCase().replace(/[^a-z]/g, "") === "itext");
+    const rounded = objects.find((object) => object.worklazyShapeKind === "rounded-rect");
+    const triangle = objects.find((object) => object.worklazyShapeKind === "triangle");
+    if (text) text.set({ left: 120, top: 90, angle: -8, scaleX: 1.1, scaleY: 0.9, fill: "#ff2d55" });
+    if (rounded) rounded.set({ left: 370, top: 220, angle: 23, scaleX: 1.15, scaleY: 0.8, fill: "#0a84ff" });
+    if (triangle) triangle.set({ left: 650, top: 370, angle: -17, scaleX: 0.9, scaleY: 1.25, fill: "#34c759" });
+    [text, rounded, triangle].filter(Boolean).forEach((object) => object.setCoords());
+    const findKind = (kind) => kind === "text" ? text : kind === "rounded-rect" ? rounded : kind === "triangle" ? triangle : undefined;
+    if (record && (triangle || rounded || text)) canvas.fire("object:modified", { target: triangle || rounded || text });
+    const selected = Array.isArray(requestedKinds) ? requestedKinds.map(findKind).filter(Boolean) : [];
+    if (selected.length > 1) {
+      const ActiveSelectionConstructor = window.__imageEditorActiveSelection;
+      if (!ActiveSelectionConstructor) throw new Error("ActiveSelection constructor was not cached");
+      canvas.setActiveObject(new ActiveSelectionConstructor(selected, { canvas }));
+    } else if (selected.length === 1) canvas.setActiveObject(selected[0]);
+    else if (triangle || rounded || text) canvas.setActiveObject(triangle || rounded || text);
+    canvas.requestRenderAll();
+  }, recordSnapshot, selectedKinds);
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 140)));
+}
+
+async function cacheImageEditorActiveSelectionConstructor(page) {
+  await readImageEditorP3State(page);
+  await page.evaluate(() => {
+    const active = window.__imageEditorFabricCanvas?.getActiveObject();
+    if (String(active?.type || active?.constructor?.type || "").toLowerCase() !== "activeselection") throw new Error("ActiveSelection is unavailable");
+    window.__imageEditorActiveSelection = active.constructor;
+  });
+}
+
+async function discardImageEditorSelection(page) {
+  await readImageEditorP3State(page);
+  await page.evaluate(() => {
+    const canvas = window.__imageEditorFabricCanvas;
+    if (!canvas) return;
+    canvas.discardActiveObject();
+    canvas.requestRenderAll();
+  });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function setImageEditorBaseHitTesting(page, evented) {
+  await readImageEditorP3State(page);
+  await page.evaluate((enabled) => {
+    const canvas = window.__imageEditorFabricCanvas;
+    const base = canvas?.getObjects().find((object) => object.worklazyRole === "base");
+    if (!canvas || !base) throw new Error("Image editor base is unavailable");
+    base.set({ selectable: true, evented: enabled });
+    base.setCoords();
+    canvas.requestRenderAll();
+  }, evented);
+}
+
+async function setImageEditorAllCanvasObjectsHitTesting(page, enabled) {
+  await readImageEditorP3State(page);
+  await page.evaluate((nextEnabled) => {
+    const canvas = window.__imageEditorFabricCanvas;
+    if (!canvas) throw new Error("Fabric canvas is unavailable");
+    if (!window.__imageEditorHitTesting) window.__imageEditorHitTesting = new WeakMap();
+    canvas.getObjects().forEach((object) => {
+      if (!nextEnabled) {
+        window.__imageEditorHitTesting.set(object, { selectable: object.selectable, evented: object.evented });
+        object.set({ selectable: false, evented: false });
+      } else {
+        const previous = window.__imageEditorHitTesting.get(object);
+        if (previous) object.set(previous);
+      }
+      object.setCoords();
+    });
+    canvas.requestRenderAll();
+  }, enabled);
+}
+
+async function clickImageEditorObject(page, object, modifiers = []) {
+  if (!object?.bounds) throw new Error("Image editor object bounds are unavailable");
+  const state = await readImageEditorP3State(page);
+  const mapping = await getImageEditorSceneMapping(page, state.zoom);
+  const point = mapImageEditorScenePoint(mapping, {
+    x: object.bounds.left + object.bounds.width / 2,
+    y: object.bounds.top + object.bounds.height / 2,
+  });
+  for (const modifier of modifiers) await page.keyboard.down(modifier);
+  await page.mouse.click(point.x, point.y);
+  for (const modifier of [...modifiers].reverse()) await page.keyboard.up(modifier);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function clickImageEditorScenePoint(page, scenePoint, modifiers = []) {
+  const state = await readImageEditorP3State(page);
+  const point = mapImageEditorScenePoint(await getImageEditorSceneMapping(page, state.zoom), scenePoint);
+  for (const modifier of modifiers) await page.keyboard.down(modifier);
+  await page.mouse.click(point.x, point.y);
+  for (const modifier of [...modifiers].reverse()) await page.keyboard.up(modifier);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function rightClickImageEditorObject(page, object) {
+  if (!object?.bounds) throw new Error("Image editor context target bounds are unavailable");
+  const state = await readImageEditorP3State(page);
+  await page.evaluate(() => {
+    window.__imageEditorLastFabricContext = null;
+    window.__imageEditorFabricCanvas?.once("contextmenu", (event) => {
+      window.__imageEditorLastFabricContext = {
+        target: event.target?.worklazyShapeKind || event.target?.worklazyRole || event.target?.type || "",
+        x: event.e?.clientX,
+        y: event.e?.clientY,
+      };
+    });
+  });
+  const mapping = await getImageEditorSceneMapping(page, state.zoom);
+  const point = mapImageEditorScenePoint(mapping, {
+    x: object.bounds.left + object.bounds.width / 2,
+    y: object.bounds.top + object.bounds.height / 2,
+  });
+  // getImageEditorSceneMapping intentionally scrolls the canvas into view; let that
+  // scroll event settle before asserting the product's scroll-to-close contract.
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+  await page.mouse.click(point.x, point.y, { button: "right" });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function openImageEditorContextMenu(page, object) {
+  await rightClickImageEditorObject(page, object);
+  try {
+    await page.waitForSelector('[data-testid="image-editor-context-menu"]', { timeout: 3_000 });
+  } catch {
+    const fabricEvent = await page.evaluate(() => window.__imageEditorLastFabricContext);
+    throw new Error(`Image editor context menu did not open: ${JSON.stringify({ target: object, fabricEvent, state: await readImageEditorP3State(page) })}`);
+  }
+}
+
+async function assertImageEditorUndoRedoOrder(page, afterOrder, beforeOrder, label) {
+  await page.click('[data-testid="image-editor-undo"]');
+  await page.waitForFunction((order) => window.__readImageEditorP3State?.().then((value) => value.additional.map((object) => object.kind).join(",") === order), {}, beforeOrder);
+  if (!(await readImageEditorP3State(page)).blockValid) throw new Error(`${label} undo broke the base block`);
+  await page.click('[data-testid="image-editor-redo"]');
+  await page.waitForFunction((order) => window.__readImageEditorP3State?.().then((value) => value.additional.map((object) => object.kind).join(",") === order), {}, afterOrder);
+  if (!(await readImageEditorP3State(page)).blockValid) throw new Error(`${label} redo broke the base block`);
+}
+
+function assertImageEditorAlignment(objects, alignment, label) {
+  if (objects.length < 2) throw new Error(`${label} ${alignment} has no ActiveSelection`);
+  const values = alignment === "left"
+    ? objects.map((object) => object.bounds.left)
+    : alignment === "center-horizontal" ? objects.map((object) => object.bounds.left + object.bounds.width / 2)
+      : alignment === "right" ? objects.map((object) => object.bounds.left + object.bounds.width)
+        : alignment === "top" ? objects.map((object) => object.bounds.top)
+          : alignment === "center-vertical" ? objects.map((object) => object.bounds.top + object.bounds.height / 2)
+            : objects.map((object) => object.bounds.top + object.bounds.height);
+  if (Math.max(...values) - Math.min(...values) > 0.75) throw new Error(`${label} ${alignment} did not use scene bboxes: ${JSON.stringify(values)}`);
+}
+
+async function installContextMenuDefaultProbe(page) {
+  await page.evaluate(() => {
+    window.__imageEditorContextDefaults = [];
+    document.addEventListener("contextmenu", (event) => {
+      window.__imageEditorContextDefaults.push({
+        inside: event.target instanceof Element && Boolean(event.target.closest(".fabric-stage .upper-canvas")),
+        prevented: event.defaultPrevented,
+      });
+    });
   });
 }
 
@@ -2085,7 +2688,39 @@ async function testImageStudioMobile(page) {
   await page.click('[data-testid="image-editor-stickers"] button[data-codepoint="1f680"]');
   await page.waitForSelector('[data-testid="image-editor-minibar"]');
   if (await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.getAttribute("data-panel")) !== "stickers") throw new Error("Mobile sticker insertion closed the bottom-sheet picker");
-  await page.click('[data-testid="image-editor-delete"]');
+  await page.click('[data-testid="image-editor-panel-layers"]');
+  await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
+  await page.waitForSelector(".image-editor-layer-row.is-movable");
+  const mobileLayerState = await readImageEditorP3State(page);
+  const mobileLayers = await page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    const panel = document.querySelector('[data-testid="image-editor-options-panel"]');
+    const row = document.querySelector(".image-editor-layer-row");
+    if (!(stage instanceof HTMLElement) || !(panel instanceof HTMLElement) || !(row instanceof HTMLElement)) return null;
+    const stageBounds = stage.getBoundingClientRect();
+    const panelBounds = panel.getBoundingClientRect();
+    return {
+      panel: panel.getAttribute("data-panel"),
+      panelBelowStage: panelBounds.top > stageBounds.top,
+      rowHeight: row.getBoundingClientRect().height,
+      actionHeights: Array.from(row.querySelectorAll("button"), (button) => button.getBoundingClientRect().height),
+      hasDragHandle: Boolean(row.querySelector(".image-editor-layer-drag")),
+    };
+  });
+  if (!mobileLayers || mobileLayers.panel !== "layers" || !mobileLayers.panelBelowStage || mobileLayers.rowHeight < 44
+    || Math.min(...mobileLayers.actionHeights) < 44 || !mobileLayers.hasDragHandle || mobileLayerState.selection || mobileLayerState.selectionKey !== null) {
+    throw new Error(`Mobile layers sheet or desktop-only selection guard is invalid: ${JSON.stringify({ mobileLayers, mobileLayerState })}`);
+  }
+  await page.click(".image-editor-layer-row .image-editor-layer-select");
+  if (await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.getAttribute("data-panel")) !== "layers") throw new Error("Mobile layer selection closed the layers sheet");
+  console.log("  image: mobile 390x844 layers sheet verified");
+  await page.$eval(".image-editor-layer-row .image-editor-layer-delete", (button) => button.click());
+  try {
+    await page.waitForFunction(() => document.querySelectorAll(".image-editor-layer-row").length === 0, { timeout: 3_000 });
+  } catch {
+    throw new Error(`Mobile layer delete did not update the sheet: ${JSON.stringify(await readImageEditorP3State(page))}`);
+  }
+  console.log("  image: mobile layer deletion synchronized");
 
   await page.$eval('[data-testid="image-editor-panel-draw"]', (button) => button.click());
   await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
