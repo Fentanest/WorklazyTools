@@ -98,13 +98,15 @@ for (const language of ["ko", "en"]) {
 for (const language of ["ko", "en"]) {
   const filePath = path.join("dist", language, "tools", "excel-merger", "xls-preserve", "index.html");
   const html = await fs.readFile(filePath, "utf8");
+  const expectedCanonical = `https://worklazy.net/${language}/tools/excel-merger/`;
   if (!html.includes('name="robots" content="noindex, nofollow"')
     || !html.includes('name="worklazy-excel-preserve-isolation"')
     || !html.includes('data-worklazy-excel-preserve-isolation')
     || !html.includes('./coi-serviceworker.js')
-    || !html.includes(`/${language}/tools/excel-merger/`)
+    || !html.includes(`<link rel="canonical" href="${expectedCanonical}" />`)
+    || html.includes('rel="alternate" hreflang=')
     || html.includes("pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) {
-    throw new Error(`${filePath} does not keep the XLS preservation workspace noindex, isolated, canonicalized to Excel Merger, and free of ad code.`);
+    throw new Error(`${filePath} does not keep the XLS preservation workspace noindex, isolated, canonicalized only to its localized Excel Merger guide, excluded from hreflang, and free of ad code.`);
   }
 }
 
@@ -166,7 +168,8 @@ for (const language of ["ko", "en"]) {
   for (const isolatedRoute of [["tools", "office-editor", "app"], ["tools", "excel-merger", "xls-preserve"]]) {
     const officeIsolationPath = path.join("dist", language, ...isolatedRoute, "coi-serviceworker.js");
     const [officeIsolationWorker, officeIsolationText] = await Promise.all([fs.stat(officeIsolationPath), fs.readFile(officeIsolationPath, "utf8")]);
-    if (officeIsolationWorker.size < 1_000 || !officeIsolationText.includes("caches.match(request)") || !officeIsolationText.includes("vendor\\/zetaoffice")) {
+    if (officeIsolationWorker.size < 1_000 || !officeIsolationText.includes("caches.match(request)") || !officeIsolationText.includes("vendor\\/zetaoffice")
+      || !officeIsolationText.includes("worklazy_coi_reload:") || !officeIsolationText.includes("sessionStorage")) {
       throw new Error(`${language}/${isolatedRoute.join("/")} is missing its document-scoped preparation and asset-cache behavior.`);
     }
   }
@@ -212,6 +215,7 @@ if (manifest.display !== "standalone" || manifest.scope !== "./" || manifest.sta
 if (!serviceWorker.includes('addEventListener("install"') || !serviceWorker.includes('addEventListener("fetch"') || !serviceWorker.includes('"credentialless"')
   || !serviceWorker.includes('Cross-Origin-Embedder-Policy') || !serviceWorker.includes('Cross-Origin-Opener-Policy')
   || !serviceWorker.includes('Cross-Origin-Resource-Policy') || !serviceWorker.includes('vendor\\/zetaoffice')
+  || !serviceWorker.includes('event.request.destination === "worker"') || !serviceWorker.includes('event.request.destination === "sharedworker"')
   || installIcon180.size < 5_000 || installIcon192.size < 5_000 || installIcon512.size < 10_000) {
   throw new Error("The mobile web app service worker or install icons are incomplete.");
 }

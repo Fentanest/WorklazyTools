@@ -39,11 +39,32 @@ if (typeof window === 'undefined') {
     quiet: false,
     ...window.coi,
   };
-  if (!window.crossOriginIsolated && configuration.shouldRegister() && window.isSecureContext && navigator.serviceWorker) {
-    navigator.serviceWorker.register(document.currentScript.src).then((registration) => {
+  const scriptUrl = document.currentScript.src;
+  const reloadKey = `worklazy_coi_reload:${new URL(scriptUrl).pathname}`;
+  const reloadTarget = `${window.location.pathname}${window.location.search}`;
+  const isolationReady = window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
+  const reloadOnce = () => {
+    if (sessionStorage.getItem(reloadKey) === reloadTarget) return;
+    sessionStorage.setItem(reloadKey, reloadTarget);
+    configuration.doReload();
+  };
+  const reloadWhenActivated = (worker) => {
+    if (!worker || worker.state === 'redundant') return;
+    if (worker.state === 'activated') {
+      reloadOnce();
+      return;
+    }
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'activated') reloadOnce();
+    });
+  };
+  if (isolationReady) sessionStorage.removeItem(reloadKey);
+  if (!isolationReady && configuration.shouldRegister() && window.isSecureContext && navigator.serviceWorker) {
+    navigator.serviceWorker.register(scriptUrl).then((registration) => {
       if (!configuration.quiet) console.log('Document preparation registered', registration.scope);
-      registration.addEventListener('updatefound', configuration.doReload);
-      if (registration.active && !navigator.serviceWorker.controller) configuration.doReload();
+      if (registration.active) reloadOnce();
+      else if (registration.waiting || registration.installing) reloadWhenActivated(registration.waiting || registration.installing);
+      else registration.addEventListener('updatefound', () => reloadWhenActivated(registration.installing));
     }, () => undefined);
   }
 }

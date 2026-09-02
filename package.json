@@ -14,6 +14,7 @@
     "test:browser": "node tests/browser-smoke.mjs",
     "test:office": "node tests/office-editor-smoke.mjs",
     "test:xls-preserve": "node tests/xls-preserve-smoke.mjs",
+    "test:xls-first-load": "node tests/xls-preserve-first-load-smoke.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
