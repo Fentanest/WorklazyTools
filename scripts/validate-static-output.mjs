@@ -95,6 +95,20 @@ for (const language of ["ko", "en"]) {
   }
 }
 
+{
+  const filePath = path.join("dist", "tools", "excel-merger", "xls-preserve", "index.html");
+  const html = await fs.readFile(filePath, "utf8");
+  if (!html.includes('name="robots" content="noindex, nofollow"')
+    || !html.includes('name="worklazy-excel-preserve-isolation"')
+    || !html.includes('data-worklazy-excel-preserve-isolation')
+    || !html.includes('./coi-serviceworker.js')
+    || !html.includes('<link rel="canonical" href="https://worklazy.net/ko/tools/excel-merger/" />')
+    || html.includes('rel="alternate" hreflang=')
+    || html.includes("pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) {
+    throw new Error(`${filePath} does not keep the unprefixed XLS preservation workspace aligned with the Korean noindex and canonical policy.`);
+  }
+}
+
 for (const language of ["ko", "en"]) {
   const filePath = path.join("dist", language, "tools", "excel-merger", "xls-preserve", "index.html");
   const html = await fs.readFile(filePath, "utf8");
@@ -107,6 +121,18 @@ for (const language of ["ko", "en"]) {
     || html.includes('rel="alternate" hreflang=')
     || html.includes("pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) {
     throw new Error(`${filePath} does not keep the XLS preservation workspace noindex, isolated, canonicalized only to its localized Excel Merger guide, excluded from hreflang, and free of ad code.`);
+  }
+}
+{
+  const unprefixedIsolationPath = path.join("dist", "tools", "excel-merger", "xls-preserve", "coi-serviceworker.js");
+  const [unprefixedIsolationWorker, unprefixedIsolationText] = await Promise.all([
+    fs.stat(unprefixedIsolationPath),
+    fs.readFile(unprefixedIsolationPath, "utf8"),
+  ]);
+  if (unprefixedIsolationWorker.size < 1_000 || !unprefixedIsolationText.includes("caches.match(request)")
+    || !unprefixedIsolationText.includes("vendor\\/zetaoffice") || !unprefixedIsolationText.includes("worklazy_coi_reload:")
+    || !unprefixedIsolationText.includes("sessionStorage")) {
+    throw new Error("The unprefixed XLS preservation route is missing its document-scoped preparation and asset-cache behavior.");
   }
 }
 

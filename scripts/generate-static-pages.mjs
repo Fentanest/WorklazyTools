@@ -44,6 +44,9 @@ for (const language of languages) {
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(path.join(directory, "index.html"), renderExcelPreserveApp(sourceHtml, language));
 }
+const unprefixedExcelPreserveDirectory = path.join(outputDirectory, excelPreserveRoute);
+await fs.mkdir(unprefixedExcelPreserveDirectory, { recursive: true });
+await fs.writeFile(path.join(unprefixedExcelPreserveDirectory, "index.html"), renderExcelPreserveApp(sourceHtml, "ko"));
 
 await fs.writeFile(path.join(outputDirectory, "index.html"), renderLanding(sourceHtml));
 await fs.writeFile(path.join(outputDirectory, "404.html"), renderNotFound(sourceHtml));
@@ -92,6 +95,7 @@ for (const language of languages) {
     await fs.writeFile(target, officeCoiSourceText);
   }
 }
+await fs.writeFile(path.join(unprefixedExcelPreserveDirectory, "coi-serviceworker.js"), officeCoiSourceText);
 
 await fs.writeFile(path.join(outputDirectory, "sitemap.xml"), createSitemap(generated));
 await fs.writeFile(path.join(outputDirectory, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${new URL("sitemap.xml", siteUrl).href}\n`);
