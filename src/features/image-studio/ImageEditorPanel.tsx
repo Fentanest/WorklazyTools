@@ -119,7 +119,7 @@ function CropPanel(props: ImageEditorPanelProps) {
         <button type="button" onClick={() => props.onCropRatio(9 / 16)}>9:16</button>
       </div>
       <p className="image-crop-hint">{t("image.editor.cropHint")}</p>
-      {props.regionSelection && <SelectionActions selection={props.regionSelection} busy={false} onCancel={props.onCropCancel} onApply={props.onCropApply} applyLabel={t("image.editor.cropApply")} testId="image-editor-crop-selection" />}
+      <SelectionActions selection={props.regionSelection} busy={false} onCancel={props.onCropCancel} onApply={props.onCropApply} applyLabel={t("image.editor.cropApply")} testId="image-editor-crop-selection" />
     </div>
   );
 }
@@ -192,9 +192,16 @@ function CanvasPanel(props: ImageEditorPanelProps) {
   return <div className="editor-tool-group editor-background-control"><label><span>{t("image.editor.background")}</span><input type="color" value={props.background} aria-label={t("image.editor.background")} disabled={props.transparentBackground} onChange={(event) => props.onBackgroundChange(event.target.value)} /></label><div className="image-background-options compact"><ToggleRow label={t("image.editor.transparent")} description={t("image.editor.transparentOutput")} checked={props.transparentBackground} onChange={props.onTransparentBackgroundChange} /></div><button type="button" className="secondary-button" aria-label={t("image.editor.clearLayers")} data-testid="image-editor-clear-layers" onClick={props.onClearLayers}><Trash2 size={15} /> {t("image.editor.clearLayers")}</button></div>;
 }
 
-function SelectionActions({ selection, busy, onCancel, onApply, applyLabel, testId, effect = false }: { selection: RegionSelectionSummary; busy: boolean; onCancel: () => void; onApply: () => void; applyLabel: string; testId: string; effect?: boolean }) {
+function SelectionActions({ selection, busy, onCancel, onApply, applyLabel, testId, effect = false }: { selection?: RegionSelectionSummary; busy: boolean; onCancel: () => void; onApply: () => void; applyLabel: string; testId: string; effect?: boolean }) {
   const { t } = useTranslation("features");
-  return <div className={`image-crop-selection-status${effect ? " region-effect-selection" : ""}`} data-testid={testId}><span>{t("image.editor.cropSelection", { width: Math.round(selection.width), height: Math.round(selection.height) })}</span><div><button type="button" className="secondary-button" disabled={busy} onClick={onCancel}>{t("image.editor.cropCancel")}</button><button type="button" className="primary-button" disabled={busy} onClick={onApply}>{applyLabel}</button></div></div>;
+  const hasSelection = Boolean(selection && selection.width >= 10 && selection.height >= 10);
+  const disabled = busy || !hasSelection;
+  const reasonId = `${testId}-reason`;
+  return <div className={`image-crop-selection-status${effect ? " region-effect-selection" : ""}`} data-testid={testId}>
+    <span>{selection ? t("image.editor.cropSelection", { width: Math.round(selection.width), height: Math.round(selection.height) }) : t("image.editor.cropSelectionEmpty")}</span>
+    {!hasSelection && <small id={reasonId}>{t("image.editor.cropSelectionRequired")}</small>}
+    <div><button type="button" className="secondary-button" disabled={disabled} onClick={onCancel}>{t("image.editor.cropCancel")}</button><button type="button" className={`primary-button${effect ? "" : " accent-sky"}`} disabled={disabled} aria-describedby={!hasSelection ? reasonId : undefined} onClick={onApply}>{applyLabel}</button></div>
+  </div>;
 }
 
 const PANEL_TITLE_KEYS = {

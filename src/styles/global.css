@@ -1661,8 +1661,11 @@ label.invalid > small { color: #c9342f; }
 .image-crop-hint { margin: 9px 0 0; color: var(--text-secondary); font-size: .84rem; line-height: 1.45; }
 .image-crop-selection-status { display: grid; gap: 8px; margin-top: 10px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent-sky) 38%, var(--separator)); border-radius: 12px; background: color-mix(in srgb, var(--accent-sky) 8%, transparent); }
 .image-crop-selection-status > span { font-size: .86rem; font-weight: 700; }
+.image-crop-selection-status > small { color: var(--label-secondary); font-size: .76rem; line-height: 1.4; }
 .image-crop-selection-status > div { display: flex; flex-wrap: wrap; gap: 7px; }
 .image-crop-selection-status button { min-height: 36px; padding: 7px 10px; }
+.image-region-size-label { position: absolute; z-index: 20; padding: 4px 7px; color: #fff; background: rgba(10,132,255,.92); border: 1px solid rgba(255,255,255,.72); border-radius: 7px; box-shadow: 0 4px 12px rgba(20,25,35,.22); font-size: 11px; font-weight: 800; line-height: 1; white-space: nowrap; pointer-events: none; transform: translate(-100%,calc(-100% - 6px)); }
+.image-region-size-label.is-effect { background: rgba(175,82,222,.92); }
 .region-effect-options { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .region-effect-options button.active { color: var(--violet); background: var(--violet-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 36%, transparent); }
 .region-effect-selection { border-color: color-mix(in srgb, var(--violet) 42%, var(--separator)); background: color-mix(in srgb, var(--violet) 9%, transparent); }

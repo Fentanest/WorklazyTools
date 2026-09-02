@@ -51,6 +51,14 @@ try {
     console.log("[2/4] Image studio");
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
     await testImageStudio(page, fixtures.images);
+    await testImageStudioRegionInteractions(page);
+    const cropMatrix = [];
+    for (const transformed of [false, true]) {
+      for (const zoom of [1, 2]) {
+        for (const erased of [false, true]) cropMatrix.push(await testImageStudioCropOverlayMatrix(page, { transformed, zoom, erased }));
+      }
+    }
+    console.log(`  image: P4 crop overlay matrix ${JSON.stringify(cropMatrix)}`);
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
     await testImageStudioMobile(page);
     for (const deviceScaleFactor of [2, 1]) {
@@ -563,7 +571,10 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.down();
   await page.mouse.move(cropBox.x + cropBox.width * 0.8, cropBox.y + cropBox.height * 0.8, { steps: 8 });
   await page.mouse.up();
-  await page.waitForSelector('[data-testid="image-editor-crop-selection"]');
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="image-editor-crop-selection"] .primary-button');
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
   await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-crop-selection"]'));
   if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "100%") throw new Error("Free crop did not reset the canvas view");
@@ -683,6 +694,406 @@ async function testImageStudio(page, imagePaths) {
     const current = Array.from(document.querySelectorAll(".gif-frame-row"), (row) => row.textContent || "");
     return JSON.stringify(current) !== JSON.stringify(before);
   }, {}, initialFrameOrder);
+}
+
+async function testImageStudioRegionInteractions(page) {
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const emptyCropState = await page.$eval('[data-testid="image-editor-crop-selection"]', (status) => {
+    const apply = status.querySelector(".primary-button");
+    const reasonId = apply?.getAttribute("aria-describedby") || "";
+    const reason = reasonId ? document.getElementById(reasonId) : null;
+    return {
+      applyExists: apply instanceof HTMLButtonElement,
+      disabled: apply instanceof HTMLButtonElement ? apply.disabled : false,
+      accent: apply?.classList.contains("accent-sky"),
+      reason: reason?.textContent || "",
+      reasonVisible: reason instanceof HTMLElement && reason.getBoundingClientRect().height > 0,
+    };
+  });
+  if (!emptyCropState.applyExists || !emptyCropState.disabled || !emptyCropState.accent || !emptyCropState.reasonVisible || !emptyCropState.reason.includes("먼저 드래그")) {
+    throw new Error(`Crop apply button does not expose its disabled reason: ${JSON.stringify(emptyCropState)}`);
+  }
+
+  const liveDrag = await getImageEditorRegionDrag(page, 1);
+  await page.mouse.move(liveDrag.start.x, liveDrag.start.y);
+  await page.mouse.down();
+  await page.mouse.move((liveDrag.start.x + liveDrag.end.x) / 2, (liveDrag.start.y + liveDrag.end.y) / 2, { steps: 4 });
+  await page.waitForSelector('[data-testid="image-editor-region-size-label"]');
+  const firstSize = await page.$eval('[data-testid="image-editor-region-size-label"]', (label) => label.textContent || "");
+  await page.mouse.move(liveDrag.end.x, liveDrag.end.y, { steps: 4 });
+  await page.waitForFunction((previous) => document.querySelector('[data-testid="image-editor-region-size-label"]')?.textContent !== previous, {}, firstSize);
+  const liveCropState = await page.$eval('[data-testid="image-editor-crop-selection"]', (status) => {
+    const apply = status.querySelector(".primary-button");
+    const style = apply ? getComputedStyle(apply) : null;
+    return { text: status.querySelector("span")?.textContent || "", disabled: apply instanceof HTMLButtonElement ? apply.disabled : true, background: style?.backgroundImage || "" };
+  });
+  if (liveCropState.disabled || !liveCropState.text.includes("×") || !liveCropState.background.includes("linear-gradient")) {
+    throw new Error(`Live crop size or active accent is missing: ${JSON.stringify(liveCropState)}`);
+  }
+  await page.mouse.up();
+  const cropGeometry = await readImageEditorRegionGeometry(page, "crop");
+  if (cropGeometry.error !== 0 || cropGeometry.originX !== "left" || cropGeometry.originY !== "top") throw new Error(`Crop overlay geometry is misaligned: ${JSON.stringify(cropGeometry)}`);
+  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await assertRegionModeRetained(page, "crop", "crop cancel");
+
+  await dragImageEditorRegion(page, 1);
+  await page.keyboard.press("Escape");
+  await assertRegionModeRetained(page, "crop", "crop Escape");
+
+  await dragImageEditorRegion(page, 1);
+  await page.keyboard.press("Enter");
+  await assertCropAppliedToSelect(page, "crop Enter");
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  await dragImageEditorRegion(page, 1);
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="image-editor-crop-selection"] .primary-button');
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await assertCropAppliedToSelect(page, "crop button");
+
+  await loadSyntheticImageEditor(page);
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  const effectDrag = await getImageEditorRegionDrag(page, 1);
+  await page.mouse.move(effectDrag.start.x, effectDrag.start.y);
+  await page.mouse.down();
+  await page.mouse.move((effectDrag.start.x + effectDrag.end.x) / 2, (effectDrag.start.y + effectDrag.end.y) / 2, { steps: 4 });
+  await page.waitForSelector('[data-testid="image-editor-region-size-label"]');
+  const firstEffectSize = await page.$eval('[data-testid="image-editor-region-size-label"]', (label) => label.textContent || "");
+  await page.mouse.move(effectDrag.end.x, effectDrag.end.y, { steps: 4 });
+  await page.waitForFunction((previous) => document.querySelector('[data-testid="image-editor-region-size-label"]')?.textContent !== previous, {}, firstEffectSize);
+  await page.mouse.up();
+  const effectGeometry = await readImageEditorRegionGeometry(page, "effect");
+  if (effectGeometry.error !== 0 || effectGeometry.originX !== "left" || effectGeometry.originY !== "top" || effectGeometry.selectable || effectGeometry.evented || !effectGeometry.excludeFromExport) {
+    throw new Error(`Effect overlay contract is invalid: ${JSON.stringify(effectGeometry)}`);
+  }
+  const effectLabelMode = await page.$eval('[data-testid="image-editor-region-size-label"]', (label) => label.getAttribute("data-region-mode"));
+  if (effectLabelMode !== "effect") throw new Error(`Effect size label is not attached to the effect box: ${effectLabelMode}`);
+  await page.click('[data-testid="image-editor-effect-selection"] .secondary-button');
+  await assertRegionModeRetained(page, "effect", "effect cancel");
+  await dragImageEditorRegion(page, 1);
+  await page.keyboard.press("Escape");
+  await assertRegionModeRetained(page, "effect", "effect Escape");
+
+  await page.goto(`${baseUrl}/en/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-testid="image-editor-panel-crop"]');
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const englishReason = await page.$eval('[data-testid="image-editor-crop-selection"] .primary-button', (button) => {
+    const description = button.getAttribute("aria-describedby");
+    return { disabled: button.disabled, reason: description ? document.getElementById(description)?.textContent || "" : "" };
+  });
+  if (!englishReason.disabled || englishReason.reason !== "Drag an area on the canvas first.") throw new Error(`English crop disabled reason is invalid: ${JSON.stringify(englishReason)}`);
+  console.log(`  image: P4 crop/effect actions and live labels verified (crop error ${cropGeometry.error}px, effect error ${effectGeometry.error}px)`);
+}
+
+async function testImageStudioCropOverlayMatrix(page, { transformed, zoom, erased }) {
+  await loadSyntheticImageEditor(page);
+  await installImageEditorExportCapture(page);
+  await drawImageEditorStroke(page, "pencil", "#ff00ff", 22, [{ x: 330, y: 235 }, { x: 380, y: 220 }, { x: 440, y: 255 }, { x: 510, y: 230 }, { x: 550, y: 250 }]);
+  if (erased) await drawImageEditorStroke(page, "erase", "#ff00ff", 8, [{ x: 405, y: 225 }, { x: 440, y: 255 }, { x: 475, y: 230 }]);
+  if (transformed) await transformImageEditorBase(page);
+  if (zoom === 2) {
+    await page.click('[data-testid="image-editor-zoom-in"]');
+    await page.click('[data-testid="image-editor-zoom-in"]');
+    await page.click('[data-testid="image-editor-zoom-in"]');
+    await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "200%");
+  }
+  const before = await readImageRasterStats(page, await captureImageEditorExport(page, "PNG"));
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  await dragImageEditorRegion(page, zoom);
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="image-editor-crop-selection"] .primary-button');
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  const geometry = await readImageEditorRegionGeometry(page, "crop");
+  if (geometry.error !== 0 || geometry.originX !== "left" || geometry.originY !== "top" || !geometry.inkInside) {
+    throw new Error(`Crop matrix overlay does not match its stored region: ${JSON.stringify({ transformed, zoom, erased, geometry })}`);
+  }
+  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await assertCropAppliedToSelect(page, `matrix ${transformed}/${zoom}/${erased}`);
+  const dimensions = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  const savedError = Math.max(Math.abs(dimensions.width - Math.round(geometry.selection.width)), Math.abs(dimensions.height - Math.round(geometry.selection.height)));
+  const after = await readImageRasterStats(page, await captureImageEditorExport(page, "PNG"));
+  const inkDeltaRatio = Math.abs(after.ink - before.ink) / Math.max(1, before.ink);
+  const controlDeltaRatio = Math.abs(after.control - before.control) / Math.max(1, before.control);
+  const erasedDeltaRatio = Math.abs(after.erased - before.erased) / Math.max(1, before.erased);
+  if (before.ink < 100 || after.ink < 100 || inkDeltaRatio > 0.03 || before.control < 500 || after.control < 500 || controlDeltaRatio > 0.03
+    || (erased && (before.erased < 10 || after.erased < 10 || erasedDeltaRatio > 0.05)) || (!erased && (before.erased !== 0 || after.erased !== 0)) || savedError !== 0) {
+    throw new Error(`Crop matrix did not preserve in-box drawing/control pixels: ${JSON.stringify({ transformed, zoom, erased, geometry, dimensions, before, after, inkDeltaRatio, controlDeltaRatio, erasedDeltaRatio, savedError })}`);
+  }
+  return {
+    transform: transformed ? "move+rotate+flip" : "none",
+    zoom: `${zoom * 100}%`,
+    eraser: erased,
+    geometryError: geometry.error,
+    savedError,
+    ink: `${before.ink}->${after.ink}`,
+    erasedPixels: `${before.erased}->${after.erased}`,
+    control: `${before.control}->${after.control}`,
+  };
+}
+
+async function loadSyntheticImageEditor(page) {
+  await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".fabric-stage .upper-canvas");
+  await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 600;
+    canvas.height = 400;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#d1d1d6";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#34c759";
+    context.fillRect(270, 180, 60, 40);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([blob], "synthetic-crop-fixture.png", { type: "image/png" }));
+    const stage = document.querySelector(".fabric-stage");
+    if (!(stage instanceof HTMLElement)) throw new Error("Image editor stage is unavailable");
+    stage.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    canvas.width = 1;
+    canvas.height = 1;
+  });
+  await page.waitForFunction(() => document.querySelector(".image-studio-page .drop-zone strong")?.textContent?.includes("1개 파일 선택됨"));
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".fabric-stage .lower-canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return false;
+    const pixel = canvas.getContext("2d")?.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data;
+    return pixel && pixel[1] > 150;
+  });
+}
+
+async function installImageEditorExportCapture(page) {
+  await page.evaluate(() => {
+    window.__worklazyExportDataUrl = "";
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function captureImageExport() {
+      if (this.href.startsWith("data:image/")) {
+        window.__worklazyExportDataUrl = this.href;
+        return;
+      }
+      return originalClick.call(this);
+    };
+  });
+}
+
+async function drawImageEditorStroke(page, tool, color, width, points) {
+  await page.click('[data-testid="image-editor-panel-draw"]');
+  await page.click(`[data-testid="image-editor-draw-${tool}"]`);
+  await page.evaluate((nextColor, nextWidth) => {
+    const setValue = (input, value) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const colorInput = document.querySelector('[data-testid="image-editor-draw-color"]');
+    const widthInput = document.querySelector('[data-testid="image-editor-draw-width"]');
+    if (!(colorInput instanceof HTMLInputElement) || !(widthInput instanceof HTMLInputElement)) throw new Error("Drawing controls are unavailable");
+    setValue(colorInput, nextColor);
+    setValue(widthInput, String(nextWidth));
+  }, color, width);
+  const mapping = await getImageEditorSceneMapping(page, 1);
+  const clientPoints = points.map((point) => mapImageEditorScenePoint(mapping, point));
+  await page.mouse.move(clientPoints[0].x, clientPoints[0].y);
+  await page.mouse.down();
+  for (const point of clientPoints.slice(1)) await page.mouse.move(point.x, point.y, { steps: 3 });
+  await page.mouse.up();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function transformImageEditorBase(page) {
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await page.click('button[aria-label="원본 사진 잠금"]');
+  await page.click('[data-testid="image-editor-panel-select"]');
+  const mapping = await getImageEditorSceneMapping(page, 1);
+  const start = mapImageEditorScenePoint(mapping, { x: 690, y: 180 });
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 30 * mapping.scaleX, start.y + 20 * mapping.scaleY, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"));
+  await page.click('button[aria-label="오른쪽으로 90도 회전"]');
+  await page.click('button[aria-label="좌우 반전"]');
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const transform = await page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    if (!(stage instanceof HTMLElement)) return null;
+    const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+    let fiber = fiberKey ? stage[fiberKey] : null;
+    let fabricCanvas;
+    while (fiber && !fabricCanvas) {
+      let hook = fiber.memoizedState;
+      while (hook) {
+        const candidate = hook.memoizedState?.current;
+        if (candidate && typeof candidate.getObjects === "function" && candidate.upperCanvasEl instanceof HTMLCanvasElement) {
+          fabricCanvas = candidate;
+          break;
+        }
+        hook = hook.next;
+      }
+      fiber = fiber.return;
+    }
+    const base = fabricCanvas?.getObjects().find((object) => object.worklazyRole === "base");
+    return base ? { left: base.left, top: base.top, angle: base.angle, flipX: base.flipX } : null;
+  });
+  if (!transform || Math.abs(transform.left - 450) < 10 || Math.abs(transform.top - 300) < 10 || transform.angle !== 90 || !transform.flipX) {
+    throw new Error(`Synthetic matrix base transform was not applied: ${JSON.stringify(transform)}`);
+  }
+}
+
+async function getImageEditorSceneMapping(page, zoom) {
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  const canvas = await page.$(".fabric-stage .upper-canvas");
+  const bounds = await canvas?.boundingBox();
+  if (!bounds) throw new Error("Image editor canvas is unavailable");
+  const logical = await page.$eval(".fabric-stage .lower-canvas", (element) => ({ width: element.width / devicePixelRatio, height: element.height / devicePixelRatio }));
+  return { bounds, logical, zoom, scaleX: bounds.width / logical.width, scaleY: bounds.height / logical.height };
+}
+
+function mapImageEditorScenePoint(mapping, point) {
+  return {
+    x: mapping.bounds.x + (point.x * mapping.zoom + (1 - mapping.zoom) * mapping.logical.width / 2) * mapping.scaleX,
+    y: mapping.bounds.y + (point.y * mapping.zoom + (1 - mapping.zoom) * mapping.logical.height / 2) * mapping.scaleY,
+  };
+}
+
+async function getImageEditorRegionDrag(page, zoom) {
+  const mapping = await getImageEditorSceneMapping(page, zoom);
+  return {
+    start: mapImageEditorScenePoint(mapping, { x: 280, y: 180 }),
+    end: mapImageEditorScenePoint(mapping, { x: 620, y: 420 }),
+  };
+}
+
+async function dragImageEditorRegion(page, zoom) {
+  const drag = await getImageEditorRegionDrag(page, zoom);
+  await page.mouse.move(drag.start.x, drag.start.y);
+  await page.mouse.down();
+  await page.mouse.move(drag.end.x, drag.end.y, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForSelector('[data-testid="image-editor-region-size-label"]');
+}
+
+async function assertRegionModeRetained(page, mode, action) {
+  await page.waitForFunction((expectedMode) => {
+    const panel = document.querySelector('[data-testid="image-editor-options-panel"]');
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    const toolbar = document.querySelector(`[data-testid="image-editor-panel-${expectedMode}"]`);
+    const selection = document.querySelector(`[data-testid="image-editor-${expectedMode === "crop" ? "crop" : "effect"}-selection"]`);
+    const hasSelection = expectedMode === "crop"
+      ? selection?.querySelector(".primary-button") instanceof HTMLButtonElement && !selection.querySelector(".primary-button").disabled
+      : Boolean(selection);
+    return panel?.getAttribute("data-panel") === expectedMode && stage?.classList.contains(`is-${expectedMode}-mode`) && toolbar?.getAttribute("aria-pressed") === "true"
+      && !hasSelection && !document.querySelector('[data-testid="image-editor-region-size-label"]');
+  }, {}, mode);
+  const state = await page.evaluate((expectedMode) => ({
+    panel: document.querySelector('[data-testid="image-editor-options-panel"]')?.getAttribute("data-panel"),
+    mode: document.querySelector('[data-testid="image-editor-canvas-stage"]')?.classList.contains(`is-${expectedMode}-mode`),
+  }), mode);
+  if (state.panel !== mode || !state.mode) throw new Error(`${action} left its region mode: ${JSON.stringify(state)}`);
+}
+
+async function assertCropAppliedToSelect(page, action) {
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-options-panel"]')?.getAttribute("data-panel") === "select"
+    && document.querySelector('[data-testid="image-editor-panel-select"]')?.getAttribute("aria-pressed") === "true"
+    && !document.querySelector('[data-testid="image-editor-canvas-stage"]')?.classList.contains("is-crop-mode"));
+  const state = await page.evaluate(() => ({
+    panel: document.querySelector('[data-testid="image-editor-options-panel"]')?.getAttribute("data-panel"),
+    selectPressed: document.querySelector('[data-testid="image-editor-panel-select"]')?.getAttribute("aria-pressed"),
+    cropMode: document.querySelector('[data-testid="image-editor-canvas-stage"]')?.classList.contains("is-crop-mode"),
+  }));
+  if (state.panel !== "select" || state.selectPressed !== "true" || state.cropMode) throw new Error(`${action} did not synchronize panel and mode: ${JSON.stringify(state)}`);
+}
+
+async function readImageEditorRegionGeometry(page, mode) {
+  return page.evaluate((expectedMode) => {
+    const stage = document.querySelector('[data-testid="image-editor-canvas-stage"]');
+    const label = document.querySelector('[data-testid="image-editor-region-size-label"]');
+    if (!(stage instanceof HTMLElement) || !(label instanceof HTMLElement)) throw new Error("Region geometry UI is unavailable");
+    const fiberKey = Object.keys(stage).find((key) => key.startsWith("__reactFiber$"));
+    let fiber = fiberKey ? stage[fiberKey] : null;
+    let fabricCanvas;
+    while (fiber && !fabricCanvas) {
+      let hook = fiber.memoizedState;
+      while (hook) {
+        const candidate = hook.memoizedState?.current;
+        if (candidate && typeof candidate.getObjects === "function" && candidate.upperCanvasEl instanceof HTMLCanvasElement) {
+          fabricCanvas = candidate;
+          break;
+        }
+        hook = hook.next;
+      }
+      fiber = fiber.return;
+    }
+    if (!fabricCanvas) throw new Error("Fabric canvas was not found from the editor component");
+    const expectedStroke = expectedMode === "crop" ? "#0a84ff" : "#af52de";
+    const overlay = fabricCanvas.getObjects().find((object) => object.type === "rect" && object.stroke === expectedStroke && object.excludeFromExport);
+    if (!overlay) throw new Error(`${expectedMode} overlay was not found`);
+    const selection = {
+      left: Number(label.dataset.selectionLeft),
+      top: Number(label.dataset.selectionTop),
+      width: Number(label.dataset.selectionWidth),
+      height: Number(label.dataset.selectionHeight),
+    };
+    const topLeft = typeof overlay.getPointByOrigin === "function" ? overlay.getPointByOrigin("left", "top") : { x: overlay.left, y: overlay.top };
+    const visual = { left: topLeft.x, top: topLeft.y, width: overlay.width * Math.abs(overlay.scaleX || 1), height: overlay.height * Math.abs(overlay.scaleY || 1) };
+    const rawError = Math.max(
+      Math.abs(visual.left - selection.left),
+      Math.abs(visual.top - selection.top),
+      Math.abs(visual.width - selection.width),
+      Math.abs(visual.height - selection.height),
+    );
+    const error = rawError < 1e-9 ? 0 : rawError;
+    const ink = fabricCanvas.getObjects().find((object) => object.type === "path" && object.globalCompositeOperation !== "destination-out" && String(object.stroke).toLowerCase() === "#ff00ff");
+    const inkBounds = ink?.getBoundingRect();
+    const inkInside = !inkBounds || (inkBounds.left >= selection.left && inkBounds.top >= selection.top
+      && inkBounds.left + inkBounds.width <= selection.left + selection.width && inkBounds.top + inkBounds.height <= selection.top + selection.height);
+    return {
+      originX: overlay.originX,
+      originY: overlay.originY,
+      selectable: overlay.selectable,
+      evented: overlay.evented,
+      excludeFromExport: overlay.excludeFromExport,
+      selection,
+      visual,
+      error,
+      inkBounds: inkBounds && { left: inkBounds.left, top: inkBounds.top, width: inkBounds.width, height: inkBounds.height },
+      inkInside,
+    };
+  }, mode);
+}
+
+async function readImageRasterStats(page, dataUrl) {
+  return page.evaluate(async (source) => {
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let ink = 0;
+    let erased = 0;
+    let control = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const red = pixels[offset];
+      const green = pixels[offset + 1];
+      const blue = pixels[offset + 2];
+      const alpha = pixels[offset + 3];
+      if (red > 210 && green < 90 && blue > 180 && alpha > 180) ink += 1;
+      if (red < 110 && green > 150 && green > red * 1.7 && blue < 150 && alpha > 200) control += 1;
+      if (alpha < 32) erased += 1;
+    }
+    const result = { width: canvas.width, height: canvas.height, ink, erased, control };
+    canvas.width = 1;
+    canvas.height = 1;
+    return result;
+  }, dataUrl);
 }
 
 async function captureImageEditorExport(page, format) {
