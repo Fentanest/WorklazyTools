@@ -80,6 +80,7 @@ export async function launchOfficeRuntime(
   };
   await waitFor("ready");
   let fileName = "document.odt";
+  let spreadsheetConversionSequence = 0;
 
   return {
     async open(file) {
@@ -101,8 +102,9 @@ export async function launchOfficeRuntime(
       return { bytes, fileName };
     },
     async convertLegacySpreadsheet(file) {
-      const inputName = safeFileName(file.name);
-      const outputName = `${stripExtension(inputName)}-worklazy.xlsx`;
+      spreadsheetConversionSequence += 1;
+      const inputName = `input-${spreadsheetConversionSequence}.xls`;
+      const outputName = `output-${spreadsheetConversionSequence}.xlsx`;
       const inputPath = `/tmp/office/${inputName}`;
       const outputPath = `/tmp/office/${outputName}`;
       const fileSystem = (globalThis as typeof globalThis & { FS: OfficeFileSystem }).FS;
@@ -145,10 +147,6 @@ function loadClassicScript(url: string) {
 function safeFileName(value: string) {
   const cleaned = value.replace(/[\\/:*?"<>|%#\u0000-\u001f]/g, "_").trim();
   return cleaned || "document.odt";
-}
-
-function stripExtension(value: string) {
-  return value.replace(/\.[^.]+$/, "") || "spreadsheet";
 }
 
 function isPlausibleOfficeFile(bytes: Uint8Array) {

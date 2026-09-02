@@ -6,7 +6,7 @@ export const OFFICE_CORE_ASSETS = [
   { name: "soffice.data", size: 99520604 },
   { name: "soffice.data.js.metadata", size: 215180 },
   { name: "zeta.js", size: 42946 },
-  { name: "office_thread.js", size: 2752 },
+  { name: "office_thread.js", size: 2983 },
 ] as const;
 
 export const OFFICE_EDITOR_FONT_ASSETS = [

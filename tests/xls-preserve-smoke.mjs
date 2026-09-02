@@ -12,10 +12,14 @@ const run = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-xls-preserve-"));
 const sourceXlsx = path.join(temporaryDirectory, "styled-legacy.xlsx");
-const sourceXls = path.join(temporaryDirectory, "styled-legacy.xls");
+const convertedSourceXls = path.join(temporaryDirectory, "styled-legacy.xls");
+const sourceXls = path.join(temporaryDirectory, "전각 ８５８ 실제 OLE 보존.xls");
+const spreadsheetMl = path.join(temporaryDirectory, "전각 ８５８ 한글 공백 SpreadsheetML.xls");
+const brokenOleXls = path.join(temporaryDirectory, "개별 변환 실패.xls");
 
 try {
   await createStyledWorkbook(sourceXlsx);
+  await createSpreadsheetMl(spreadsheetMl);
   const profileDirectory = path.join(temporaryDirectory, "libreoffice-profile");
   await fs.mkdir(profileDirectory);
   await run("/usr/bin/libreoffice", [
@@ -27,7 +31,8 @@ try {
     temporaryDirectory,
     sourceXlsx,
   ], { timeout: 60_000 });
-  await fs.access(sourceXls);
+  await fs.rename(convertedSourceXls, sourceXls);
+  await fs.copyFile(sourceXls, brokenOleXls);
 
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -88,6 +93,24 @@ try {
       throw new Error(`XLS preservation boundary or shared UI is incomplete: ${JSON.stringify(boundary)}`);
     }
 
+    await (await page.$('input[type="file"]')).uploadFile(sourceXlsx, spreadsheetMl);
+    await page.waitForFunction(() => {
+      const cards = [...document.querySelectorAll(".excel-file-item")];
+      return cards.length === 2 && cards.every((card) => card.querySelector(".file-security-status.ready"));
+    });
+    const disguisedXmlBatch = await page.evaluate(() => ({
+      names: [...document.querySelectorAll(".excel-file-item .file-meta strong")].map((item) => item.textContent),
+      sheetNames: [...document.querySelectorAll(".sheet-name-chip > span")].map((item) => item.textContent),
+    }));
+    if (!disguisedXmlBatch.names.includes("전각 ８５８ 한글 공백 SpreadsheetML.xls")
+      || !disguisedXmlBatch.sheetNames.includes("XML 혼합 시트")
+      || officeRequests.length) {
+      throw new Error(`SpreadsheetML signature routing or original-name display failed: ${JSON.stringify({ disguisedXmlBatch, officeRequests })}`);
+    }
+    assertRetention(await mergeAndInspect(page), { formula: true, formatting: true }, "XLSX + disguised SpreadsheetML batch");
+    await page.reload({ waitUntil: "networkidle0" });
+    await page.waitForSelector('.ios-switch[aria-label="XLS 수식 보존"][aria-checked="true"]');
+
     await page.evaluate(() => {
       window.__xlsProgressSamples = [];
       new MutationObserver(() => {
@@ -146,6 +169,35 @@ try {
     }
     await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/xls-preserve/") && location.search.includes("formula=0") && location.search.includes("format=1"));
+    await (await page.$('input[type="file"]')).uploadFile(sourceXlsx, brokenOleXls);
+    await page.waitForFunction(() => document.querySelector(".operation-current-message")?.textContent?.includes("개별 변환 실패.xls"));
+    await page.evaluate(async () => {
+      const port = await window.Module.uno_main;
+      for (let attempt = 0; attempt < 100 && document.querySelector(".file-security-status.checking"); attempt += 1) {
+        port.onmessage?.({ data: { cmd: "convert-failed" } });
+        await new Promise((resolve) => window.setTimeout(resolve, 20));
+      }
+    });
+    await page.waitForFunction(() => {
+      const cards = [...document.querySelectorAll(".excel-file-item")];
+      return cards.length === 2 && cards.every((card) => !card.querySelector(".file-security-status.checking"));
+    });
+    const isolatedFailure = await page.evaluate(() => ({
+      banner: document.querySelector(".error-banner")?.textContent || "",
+      cards: [...document.querySelectorAll(".excel-file-item")].map((card) => ({
+        name: card.querySelector(".file-meta strong")?.textContent || "",
+        state: card.querySelector(".file-security-status")?.className || "",
+        error: card.querySelector(".file-item-error")?.textContent || "",
+      })),
+    }));
+    const readyXlsx = isolatedFailure.cards.find((card) => card.name === path.basename(sourceXlsx));
+    const failedXls = isolatedFailure.cards.find((card) => card.name === path.basename(brokenOleXls));
+    if (!readyXlsx?.state.includes("ready") || !failedXls?.state.includes("error")
+      || !failedXls.error.includes("개별 변환 실패.xls") || !failedXls.error.includes("변환하지 못했습니다")
+      || isolatedFailure.banner) {
+      throw new Error(`A failed legacy conversion contaminated its batch: ${JSON.stringify(isolatedFailure)}`);
+    }
+    page.once("dialog", (dialog) => dialog.accept());
     await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/") && !location.search);
     if (pageErrors.length) throw new Error(`XLS preservation browser errors:\n${pageErrors.join("\n")}`);
@@ -223,4 +275,19 @@ async function createStyledWorkbook(filePath) {
   sheet.mergeCells("B1:C1");
   sheet.getCell("B1").value = "병합 셀";
   await workbook.xlsx.writeFile(filePath);
+}
+
+async function createSpreadsheetMl(filePath) {
+  await fs.writeFile(filePath, `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Worksheet ss:Name="XML 혼합 시트">
+  <Table>
+   <Row><Cell><Data ss:Type="String">SpreadsheetML</Data></Cell></Row>
+   <Row><Cell><Data ss:Type="Number">858</Data></Cell></Row>
+  </Table>
+ </Worksheet>
+</Workbook>
+`, "utf8");
 }

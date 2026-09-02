@@ -155,8 +155,13 @@ for (const [name, expectedSize, expectedHash] of officeAssets) {
     throw new Error(`Pinned office asset verification failed in static output: ${name}`);
   }
 }
-const officeThread = await fs.stat(path.join("dist", "vendor", "zetaoffice", "2026-08-26", "office_thread.js"));
-if (officeThread.size !== 2752) throw new Error("The pinned office command bridge is missing or does not match the current bundle.");
+const [officeThread, officeThreadSource] = await Promise.all([
+  fs.readFile(path.join("dist", "vendor", "zetaoffice", "2026-08-26", "office_thread.js")),
+  fs.readFile(path.join("src", "features", "office-editor", "office_thread.js")),
+]);
+if (officeThread.length !== 2983 || !officeThread.equals(officeThreadSource)) {
+  throw new Error("The pinned office command bridge is missing or does not match the current source.");
+}
 for (const language of ["ko", "en"]) {
   for (const isolatedRoute of [["tools", "office-editor", "app"], ["tools", "excel-merger", "xls-preserve"]]) {
     const officeIsolationPath = path.join("dist", language, ...isolatedRoute, "coi-serviceworker.js");

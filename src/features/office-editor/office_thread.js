@@ -34,24 +34,31 @@ function startOffice() {
 function convertSpreadsheet(filename, output) {
   let sourceModel;
   try {
+    const sourceUrl = conversionFileUrl(filename);
+    const outputUrl = conversionFileUrl(output);
     const openProperties = [
       new css.beans.PropertyValue({ Name: 'MacroExecutionMode', Value: 0 }),
       new css.beans.PropertyValue({ Name: 'UpdateDocMode', Value: 0 }),
       new css.beans.PropertyValue({ Name: 'Hidden', Value: true }),
     ];
-    sourceModel = desktop.loadComponentFromURL(`file:///tmp/office/${filename}`, '_blank', 0, openProperties);
+    sourceModel = desktop.loadComponentFromURL(sourceUrl, '_blank', 0, openProperties);
     if (!sourceModel) throw new Error('convert-open-failed');
     const saveProperties = [
       new css.beans.PropertyValue({ Name: 'FilterName', Value: 'Calc MS Excel 2007 XML' }),
       new css.beans.PropertyValue({ Name: 'Overwrite', Value: true }),
     ];
-    sourceModel.storeAsURL(`file:///tmp/office/${output}`, saveProperties);
+    sourceModel.storeAsURL(outputUrl, saveProperties);
     zetajs.mainPort.postMessage({ cmd: 'converted' });
   } catch {
     zetajs.mainPort.postMessage({ cmd: 'convert-failed' });
   } finally {
     try { sourceModel?.dispose(); } catch { /* 변환 문서는 다음 작업 전에 정리합니다. */ }
   }
+}
+
+function conversionFileUrl(filename) {
+  if (!/^[A-Za-z0-9._-]+$/.test(filename)) throw new Error('unsafe-conversion-filename');
+  return `file:///tmp/office/${filename}`;
 }
 
 function openFile(filename) {

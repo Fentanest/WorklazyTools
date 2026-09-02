@@ -42,6 +42,7 @@ import { useLocalizedPath } from "../../i18n/routing";
 import { prepareOfficeAssets } from "../office-editor/officeAssetLoader";
 import { launchOfficeRuntime, type OfficeRuntime } from "../office-editor/officeRuntime";
 import type { ExcelInspectionResult, ExcelMergeResult, MergeMode, SheetNameRule, SheetSelectionMode } from "./types";
+import { hasOleCompoundSignature, xlsPreserveError } from "./xlsPreserve";
 
 type InspectionState = "checking" | "ready" | "error";
 
@@ -136,7 +137,7 @@ export function ExcelMergerPage() {
   const mergeModeLabel = t(`excel.modes.${mergeMode}`);
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
-  const handleFiles = (nextFiles: File[]) => {
+  const handleFiles = async (nextFiles: File[]) => {
     if (precisionPreparing) return;
     const accepted: File[] = [];
     const rejected: string[] = [];
@@ -171,7 +172,10 @@ export function ExcelMergerPage() {
     setError(null);
 
     const legacyAdditions = preserveLegacyXls
-      ? additions.filter((entry) => getExtension(entry.file.name) === "xls")
+      ? (await Promise.all(additions.map(async (entry) => ({
+          entry,
+          requiresConversion: getExtension(entry.file.name) === "xls" && await hasOleCompoundSignature(entry.file),
+        })))).filter(({ requiresConversion }) => requiresConversion).map(({ entry }) => entry)
       : [];
     if (legacyAdditions.length) {
       void prepareLegacyInputs(additions, legacyAdditions);
@@ -200,6 +204,12 @@ export function ExcelMergerPage() {
     setPrecisionPreparing(true);
     assetUiRef.current = { fileNumber: 0, percent: -1 };
     operation.start(t("excel.xlsPreserve.status.checking"));
+    const additionIds = new Set(additions.map((entry) => entry.id));
+    const failEntries = (ids: Set<string>, message: string) => {
+      setEntries((current) => current.map((entry) => ids.has(entry.id)
+        ? { ...entry, inspection: "error", error: message }
+        : entry));
+    };
     try {
       if (!crossOriginIsolated || typeof SharedArrayBuffer === "undefined" || !converterCanvasRef.current) {
         throw new Error("isolation-required");
@@ -224,25 +234,40 @@ export function ExcelMergerPage() {
       }
 
       const convertedById = new Map<string, File>();
+      const conversionErrors = new Map<string, string>();
       for (let index = 0; index < legacyAdditions.length; index += 1) {
         if (controller.signal.aborted) throw controller.signal.reason ?? new DOMException("Cancelled", "AbortError");
         const entry = legacyAdditions[index];
         const progress = 80 + Math.round((index / Math.max(1, legacyAdditions.length)) * 14);
         operation.update(progress, t("excel.xlsPreserve.status.converting", { current: index + 1, total: legacyAdditions.length, name: entry.file.name }));
-        const converted = await runtime.convertLegacySpreadsheet(entry.file);
-        convertedById.set(entry.id, new File([converted.bytes], converted.fileName, {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          lastModified: entry.file.lastModified,
-        }));
+        try {
+          const converted = await runtime.convertLegacySpreadsheet(entry.file);
+          convertedById.set(entry.id, new File([converted.bytes], converted.fileName, {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            lastModified: entry.file.lastModified,
+          }));
+        } catch (reason) {
+          if (controller.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError")) throw reason;
+          conversionErrors.set(entry.id, xlsPreserveError(reason, language, entry.file.name));
+        }
       }
       if (controller.signal.aborted) throw controller.signal.reason ?? new DOMException("Cancelled", "AbortError");
       const prepared = additions.map((entry) => {
         const processingFile = convertedById.get(entry.id);
         return processingFile ? { ...entry, processingFile, preservedLegacy: true } : entry;
       });
-      setEntries((current) => current.map((entry) => prepared.find((item) => item.id === entry.id) ?? entry));
+      setEntries((current) => current.map((entry) => {
+        const conversionError = conversionErrors.get(entry.id);
+        if (conversionError) return { ...entry, inspection: "error", error: conversionError };
+        return prepared.find((item) => item.id === entry.id) ?? entry;
+      }));
+      const inspectable = prepared.filter((entry) => !conversionErrors.has(entry.id));
+      if (!inspectable.length) {
+        operation.fail(conversionErrors.values().next().value ?? xlsPreserveError(new Error("convert-failed"), language));
+        return;
+      }
       operation.update(96, t("excel.xlsPreserve.status.inspecting"));
-      const inspectionResults = await inspectExcelFiles(prepared.map((entry) => ({
+      const inspectionResults = await inspectExcelFiles(inspectable.map((entry) => ({
         id: entry.id,
         file: entry.processingFile ?? entry.file,
         displayName: entry.file.name,
@@ -255,12 +280,13 @@ export function ExcelMergerPage() {
         if (!inspectionResult) return entry;
         return applyInspectionResult(entry, inspectionResult);
       }));
-      operation.succeed(t("excel.xlsPreserve.status.ready", { count: legacyAdditions.length }));
+      const firstError = conversionErrors.values().next().value
+        ?? inspectionResults.find((result) => result.error)?.error;
+      if (firstError) operation.fail(firstError);
+      else operation.succeed(t("excel.xlsPreserve.status.ready", { count: legacyAdditions.length }));
     } catch (reason) {
       const message = xlsPreserveError(reason, language);
-      setEntries((current) => current.map((entry) => additions.some((item) => item.id === entry.id)
-        ? { ...entry, inspection: "error", error: message }
-        : entry));
+      failEntries(additionIds, message);
       setError(message);
       operation.fail(message);
     } finally {
@@ -937,36 +963,6 @@ function retentionForFile(fileName: string, retention: {
   if (extension === "xls") return retention.xls;
   if (extension === "csv") return { formulas: false, formatting: false };
   return { formulas: true, formatting: true };
-}
-
-function xlsPreserveError(reason: unknown, language: "ko" | "en") {
-  if (reason instanceof DOMException && reason.name === "AbortError") {
-    return language === "en" ? "XLS preparation was cancelled." : "XLS 보존 준비를 취소했습니다.";
-  }
-  const code = reason instanceof Error ? reason.message : "";
-  if (code === "isolation-required") {
-    return language === "en"
-      ? "This browser session cannot prepare XLS preservation. Reload this page in a current Chrome or Edge browser."
-      : "현재 브라우저 환경에서 XLS 보존을 준비할 수 없습니다. 최신 Chrome 또는 Edge에서 이 페이지를 다시 열어 주세요.";
-  }
-  if (code === "cache-unavailable") {
-    return language === "en"
-      ? "Browser storage is unavailable. Allow site storage and try again."
-      : "브라우저 저장 공간을 사용할 수 없습니다. 사이트 저장을 허용한 뒤 다시 시도해 주세요.";
-  }
-  if (code === "asset-download-failed") {
-    return language === "en"
-      ? "The files needed for XLS preservation could not be downloaded. Check your connection and available storage, then try again."
-      : "XLS 보존에 필요한 파일을 내려받지 못했습니다. 인터넷 연결과 저장 공간을 확인한 뒤 다시 시도해 주세요.";
-  }
-  if (code === "office-operation-timeout") {
-    return language === "en"
-      ? "XLS conversion took longer than expected. Keep this tab open and try again."
-      : "XLS 변환 시간이 예상보다 길어 중단했습니다. 이 탭을 유지한 채 다시 시도해 주세요.";
-  }
-  return language === "en"
-    ? "The XLS file could not be prepared. Check that it is not damaged or password-protected, then try again."
-    : "XLS 파일을 준비하지 못했습니다. 파일이 손상되지 않았는지, 암호로 보호되지 않았는지 확인한 뒤 다시 시도해 주세요.";
 }
 
 function resolveSelectedSheetNames(entry: ExcelFileEntry, mode: SheetSelectionMode, pattern: string) {

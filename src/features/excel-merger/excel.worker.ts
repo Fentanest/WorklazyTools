@@ -305,6 +305,16 @@ async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
     if (/password|encrypted|EncryptionInfo/i.test(detail)) {
       throw new ExcelWorkerError(local(`${displayName}은 암호로 보호되어 있습니다. 비밀번호를 입력해 주세요.`, `${displayName} is password-protected. Enter its password.`), "PASSWORD_REQUIRED", displayName);
     }
+    if (extension === "xls" && isSpreadsheetMl(data)) {
+      throw new ExcelWorkerError(
+        local(
+          `'${displayName}' 파일의 XML 스프레드시트 구조를 읽지 못했습니다. Excel에서 XLSX로 다시 저장한 뒤 시도해 주세요.`,
+          `Could not read the XML spreadsheet structure in '${displayName}'. Save it as XLSX in Excel, then try again.`,
+        ),
+        "READ_XML_SPREADSHEET_FAILED",
+        displayName,
+      );
+    }
     throw new ExcelWorkerError(local(`${displayName}을 읽지 못했습니다. 파일 형식과 손상 여부를 확인해 주세요.`, `Could not read ${displayName}. Check the file format and whether the file is damaged.`), "READ_FAILED", displayName);
   }
 
@@ -362,6 +372,15 @@ function readConvertedWorkbook(data: Uint8Array) {
   });
 
   return workbook;
+}
+
+function isSpreadsheetMl(data: Uint8Array) {
+  const header = new TextDecoder("utf-8").decode(data.subarray(0, Math.min(data.length, 4096)))
+    .replace(/^\uFEFF/, "")
+    .trimStart()
+    .toLowerCase();
+  return header.startsWith("<?xml")
+    && (header.includes("<?mso-application") || header.includes("urn:schemas-microsoft-com:office:spreadsheet"));
 }
 
 function normalizeSheetJsValue(value: unknown) {
