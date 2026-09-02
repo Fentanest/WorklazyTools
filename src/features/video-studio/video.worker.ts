@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate, resolveVideoEncodingThreadCount } from "./videoEncoding";
 import { classifyVideoProcessingFailure } from "./videoErrors";
+import { offloadConcatSegment, withMountedConcatSegments, type ConcatSegmentBlob } from "./videoConcatSegments";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
@@ -248,7 +249,8 @@ async function processConcatJob(
   multiThreaded: boolean,
   setStage: (start: number, end: number, duration: number, label: string) => void,
 ) {
-  const segmentNames: string[] = [];
+  const segmentBlobs: ConcatSegmentBlob[] = [];
+  const segmentMountPoint = `/worklazy-concat-segments-${jobIndex}`;
   const concatDimensions = task.kind === "encode"
     ? outputDimensions(job.inputs[0], task)
     : task.kind === "gif"
@@ -265,7 +267,6 @@ async function processConcatJob(
     const input = job.inputs[inputIndex];
     const inputDuration = Math.max(0.05, input.end - input.start);
     const segmentName = `job-${jobIndex}-segment-${inputIndex}.${segmentExtension(task)}`;
-    segmentNames.push(segmentName);
     temporaryFiles.add(segmentName);
     setStage(
       0.04 + (completedDuration / totalDuration) * segmentBudget,
@@ -275,41 +276,45 @@ async function processConcatJob(
     );
     const exitCode = await ffmpeg.exec(createConcatSegmentArguments(input, inputNames[inputIndex], segmentName, task, multiThreaded, concatDimensions, concatFrameRate));
     if (exitCode !== 0) throw new Error(processingFailureMessage(featureMessage(currentLanguage, "video.messages.video.videoIn", { p0: job.name, p1: inputIndex + 1 }), task));
+    segmentBlobs.push(await offloadConcatSegment(ffmpeg, segmentName));
+    temporaryFiles.delete(segmentName);
     completedDuration += inputDuration;
   }
 
-  const listName = `job-${jobIndex}-concat.txt`;
-  temporaryFiles.add(listName);
-  await ffmpeg.writeFile(listName, segmentNames.map((name) => `file '${name}'`).join("\n"));
-  if (task.kind === "gif") {
-    const joinedName = `job-${jobIndex}-joined.mp4`;
-    temporaryFiles.add(joinedName);
-    setStage(0.76, 0.84, totalDuration, featureMessage(currentLanguage, "video.messages.video.concatenatingVideosInOrder", { p0: job.name }));
-    const concatCode = await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", listName, "-c", "copy", joinedName]);
-    if (concatCode !== 0) throw new Error(featureMessage(currentLanguage, "video.messages.video.unableToConcatenateGifSegmentsFor", { p0: job.name }));
+  return withMountedConcatSegments(ffmpeg, segmentMountPoint, segmentBlobs, async (segmentNames) => {
+    const listName = `job-${jobIndex}-concat.txt`;
+    temporaryFiles.add(listName);
+    await ffmpeg.writeFile(listName, segmentNames.map((name) => `file '${name}'`).join("\n"));
+    if (task.kind === "gif") {
+      const joinedName = `job-${jobIndex}-joined.mp4`;
+      temporaryFiles.add(joinedName);
+      setStage(0.76, 0.84, totalDuration, featureMessage(currentLanguage, "video.messages.video.concatenatingVideosInOrder", { p0: job.name }));
+      const concatCode = await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", listName, "-c", "copy", joinedName]);
+      if (concatCode !== 0) throw new Error(featureMessage(currentLanguage, "video.messages.video.unableToConcatenateGifSegmentsFor", { p0: job.name }));
+      const outputName = createOutputName(job.name, task, true);
+      temporaryFiles.add(outputName);
+      setStage(0.84, 0.96, totalDuration, featureMessage(currentLanguage, "video.messages.video.creatingGif", { p0: job.name }));
+      const filter = gifFilter(task, concatDimensions);
+      const gifCode = await ffmpeg.exec(["-i", joinedName, "-filter_complex", filter, "-loop", "0", outputName]);
+      if (gifCode !== 0) throw new Error(featureMessage(currentLanguage, "video.messages.video.unableToCreateTheGif", { p0: job.name }));
+      return { name: outputName, bytes: await readBytes(ffmpeg, outputName) };
+    }
+
     const outputName = createOutputName(job.name, task, true);
     temporaryFiles.add(outputName);
-    setStage(0.84, 0.96, totalDuration, featureMessage(currentLanguage, "video.messages.video.creatingGif", { p0: job.name }));
-    const filter = gifFilter(task, concatDimensions);
-    const gifCode = await ffmpeg.exec(["-i", joinedName, "-filter_complex", filter, "-loop", "0", outputName]);
-    if (gifCode !== 0) throw new Error(featureMessage(currentLanguage, "video.messages.video.unableToCreateTheGif", { p0: job.name }));
-    return { name: outputName, bytes: await readBytes(ffmpeg, outputName) };
-  }
-
-  const outputName = createOutputName(job.name, task, true);
-  temporaryFiles.add(outputName);
-  setStage(0.9, 0.96, totalDuration, featureMessage(currentLanguage, "video.messages.video.concatenatingInOrder", { p0: job.name }));
-  const concatArgs = ["-f", "concat", "-safe", "0", "-i", listName, "-c", "copy"];
-  if (task.kind === "encode" && task.container === "mp4") concatArgs.push("-movflags", "+faststart");
-  concatArgs.push(outputName);
-  const concatCode = await ffmpeg.exec(concatArgs);
-  if (concatCode !== 0) {
-    if (task.kind === "encode" && (task.bitrate === "copy" || task.audioMode === "copy")) {
-      throw new Error(featureMessage(currentLanguage, "video.messages.video.containsIncompatibleCodecsDimensionsOrAudioStreamsAnd", { p0: job.name }));
+    setStage(0.9, 0.96, totalDuration, featureMessage(currentLanguage, "video.messages.video.concatenatingInOrder", { p0: job.name }));
+    const concatArgs = ["-f", "concat", "-safe", "0", "-i", listName, "-c", "copy"];
+    if (task.kind === "encode" && task.container === "mp4") concatArgs.push("-movflags", "+faststart");
+    concatArgs.push(outputName);
+    const concatCode = await ffmpeg.exec(concatArgs);
+    if (concatCode !== 0) {
+      if (task.kind === "encode" && (task.bitrate === "copy" || task.audioMode === "copy")) {
+        throw new Error(featureMessage(currentLanguage, "video.messages.video.containsIncompatibleCodecsDimensionsOrAudioStreamsAnd", { p0: job.name }));
+      }
+      throw new Error(featureMessage(currentLanguage, "video.messages.video.unableToCombineTheSelectedRangesForInto", { p0: job.name }));
     }
-    throw new Error(featureMessage(currentLanguage, "video.messages.video.unableToCombineTheSelectedRangesForInto", { p0: job.name }));
-  }
-  return { name: outputName, bytes: await readBytes(ffmpeg, outputName) };
+    return { name: outputName, bytes: await readBytes(ffmpeg, outputName) };
+  });
 }
 
 function createSingleArguments(input: VideoWorkerInputDescriptor, inputName: string, outputName: string, task: VideoTask, multiThreaded: boolean) {

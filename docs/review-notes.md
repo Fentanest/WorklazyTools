@@ -4,6 +4,24 @@
 
 ## 2026-09-02
 
+### 비디오 A3 — concat 세그먼트 오프로드 실측·판정 (Codx)
+
+- **구현 판정**: 각 세그먼트 생성 직후 `readFile`→`Blob`→`deleteFile` 순서로 MEMFS 파일을 즉시 해제하고, 전체 Blob을 `processConcatJob` 지역 mount 수명주기에서 WORKERFS로 재마운트했다. concat list는 `-safe 0`과 `/worklazy-concat-segments-<job>/...` 절대경로를 쓴다. mount 디렉터리는 operation 성공·실패 모두 `finally` unmount/delete하며 전역 `mountedDirectories`에 소유권을 넘기지 않는다.
+- **1GB급 실측 절차**: Chrome 152/Linux/16 logical CPU·16GiB·COI=true에서 배포 MT FFmpeg.wasm 0.12.10을 사용했다. `node scripts/benchmark-video-concat-memory.mjs --output-dir /tmp/worklazy-video-concat-memory-a3 --runs 3 --comparison-inputs 8 --boundary-high 40 --case-timeout-ms 720000` → 14초 640×360 H.264 고엔트로피 fixture `149,833,058B`, SHA-256 `7fd34d3d…fc02a`를 8개 논리 입력(`1,198,664,464B`)으로 마운트하고 각 4.5초를 패스스루 세그먼트로 만들었다. warm-up 1회 후 before/after 각 3회, Chrome 루트+모든 하위 프로세스 RSS를 100ms로 표본화했다.
+
+| 지표(3회 중앙값) | before: 세그먼트 MEMFS 누적 | after: Blob+WORKERFS 오프로드 | 변화 |
+|---|---:|---:|---:|
+| MEMFS 파일 합계 피크 | 750,799,433B | 375,397,665B | -50.00% |
+| Chrome 프로세스 합산 RSS 피크 | 4,271,190,016B | 3,424,997,376B | -19.81% |
+| 경과 시간 | 8,780ms | 10,102ms | +15.06% |
+| 출력 크기 | 375,397,362B | 375,397,362B | 동일 |
+
+- **바이트 동일성**: before/after 6회 출력 SHA-256은 모두 `0f5f880412bbe00e1d461d1ec8aa95f77831c01a721aa6070758f8e648d9eefb`, 전체 decode exit 0. 현행 1.5GiB 패스스루 출력 가드 내 최대인 33개 입력(`4,944,490,914B` 논리 합계, 선택분 예상 `1,589,300,651B`)도 양쪽 모두 성공해 **성공 상한 증가는 관측되지 않았고 34개부터 기존 가드가 먼저 차단**한다. 33개 출력은 양쪽 `1,548,511,476B`, SHA-256 `614f7778…10a` 동일이며 MEMFS 피크는 `3,097,045,045B`→`1,548,512,752B`.
+- **효과 범위**: 결론은 **“고정 wasm/MEMFS 압박 해제”**로 한정한다. `readFile`→Blob→delete 순간의 MEMFS+JS/Blob 일시 중복은 남고 총 메모리 감소를 보장하지 않는다. 실제로 1GB급 3회 중앙 RSS는 낮았지만 33개 단일 상한 실행에서는 after RSS `7,134,687,232B`가 before `6,894,424,064B`보다 높았다. 따라서 wasm buffer 1GiB는 측정 지표에서 제외하고 MEMFS 파일 합계와 브라우저 프로세스 RSS를 분리해 기록했다.
+- **정리 스모크**: 실 FFmpeg WORKERFS mount 후 조인 실패형 `Error`와 취소형 `AbortError`를 각각 강제했고 루트 `listDir` 잔재가 모두 0건이었다. 단위 테스트도 `read`→`delete` 순서와 성공·실패·취소 정리 4건을 통과했다. 외부 취소는 현행 클라이언트가 전용 Worker를 종료하므로 해당 인스턴스의 MEMFS/WORKERFS 자체가 폐기된다.
+- **완료 검증**: `npm run build` → exit 0(2,346 modules, video worker 22.46kB, 정적 55페이지), `npm run test:unit` → 69/69, `TEST_ONLY_VIDEO=1 npm run test:new-tools` → grouped concat 포함 비디오 스모크 통과, `npm run test:new-tools` → HWP·이미지·오디오·비디오 전체 통과, `npm run test:utilities` → ko/en·비디오 격리 포함 통과, `npm run test:static` → 현지화 페이지·self-hosted 런타임·ads/robots/sitemap 통과.
+- **동반 영향**: 사용자 문구·URL·SEO·정적 페이지·광고 배치·광고 제외 격리 경로·서버 전제는 바뀌지 않아 ko/en·SEO·AdSense에 추가 코드 변경은 불필요로 판정했다.
+
 ### 이미지 P4 착수 3묶음 — 크기·내보내기·접이식 패널 판정 (Codx)
 
 - **리샘플 판정**: 작업 캔버스 상한을 4096px로 두고 base·회전 도형·그리기 등 일반 객체의 기존 `calcTransformMatrix()` 앞에 전역 scale 행렬을 합성해 `util.applyTransformToObject`로 적용했다. region-effect는 직접 변환에서 제외하고 base의 원본 로컬 anchor로 다시 동기화했다. 1800×1200 fixture를 둔 900×600 작업공간에서 회전 도형·base를 1200×720 비균일 리샘플했을 때 합성 행렬과 일치했고 효과 행렬도 anchor 산식과 일치했다. 비율 잠금은 가로 1200 입력을 1200×800으로 계산했고, 잠금 해제 뒤 1200×720을 독립 적용했으며 5000 입력은 4096×2731로 제한됐다. 치수 변경 뒤 view는 100%로 초기화됐다.
