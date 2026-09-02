@@ -4,6 +4,15 @@
 
 ## 2026-09-03
 
+### 비디오 B4 — route·오케스트레이터·진행률 기반 판정 (Codx)
+
+- **route 결정표 판정**: 순수 함수 입력을 컨테이너(MP4/MOV/MKV/WebM)·코덱(H.264/HEVC/VP9)·bitrate(copy/CRF/target)·audio(copy/remove/encode)·OPFS 가용성·quota(enough/insufficient/unknown)로 고정했다. MP4/MOV+H.264/HEVC의 copy는 stream-copy, target bitrate는 WebCodecs 후보로 분류하되, B2/B3 미구현 상태에서는 648개 범주 조합 전부를 사유 코드와 함께 FFmpeg로 확정했다. MKV/WebM·VP9·CRF·copy+audio encode는 적합성 단계에서 FFmpeg로 남고, OPFS 미지원·quota 미확인/부족은 별도 사유로 구분했다.
+- **용량·폴백 판정**: job 선택 구간의 예상 출력 크기를 route 계획에 저장하고, 스트리밍 실패 시 `1.5GiB` 이하만 FFmpeg 폴백, 초과·미확정은 reject로 고정했다. 페이지는 job 생성→OPFS/quota route preflight→`decision.route === "ffmpeg"` job의 1.5GiB 가드 순서로 바꿨다. 현재 route가 모두 FFmpeg이므로 기존 패스스루 제한과 사용자 동작은 동일하다.
+- **오케스트레이터·진행률 판정**: `videoProcessingClient.ts`가 job route 계획과 실행을 소유하고 `videoWorkerClient.ts`는 FFmpeg 전용 어댑터로 유지했다. 단계 가중치는 demux/decode/encode/mux/write=`10/25/40/15/10%`로 두고, job별 영상 처리는 선택 duration, 결과 쓰기는 예상 bytes로 전체 진행률을 집계한다. 하위 콜백의 하락 값은 단조 가드가 이전 값으로 유지하고, resolve/reject 종결 후는 모든 이벤트를 차단한다. `useOperationProgress` 역시 단조 정규화와 종결 상태 지연 update 차단을 적용했다.
+- **공통화·동작 동등성 판정**: `video.worker.ts` private이던 출력 이름·MIME·warning·오류 정규화·output count를 `videoProcessingShared.ts`로 추출했다. 이름/MIME 전 출력군, warning 조합·다중 route 개수 합산, quota/OOM/codec/일반 오류를 단위 테스트했다. 실제 브라우저 전체 스모크에서 개별·그룹 concat 비디오 결과, A3 세그먼트 정리, A4 File/ZIP64·오디오 handoff가 전부 통과해 사용자 가시 변화 0을 확인했다.
+- **현지화·SEO·AdSense·범위 판정**: 새 사용자 문구를 추가하지 않아 ko/en 번역 변경은 불필요했다. 두 locale의 비디오 문구와 브라우저 DOM에서 OPFS·SyncAccessHandle·zip.js·WebCodecs·remux·worker 비노출을 검사했다. URL·SEO 메타·정적 페이지·광고 배치·격리 경로·서버 전제는 변화가 없고 정적 검증이 통과했다. B2/B3 스트리밍 워커·실제 스트리밍 분기는 추가하지 않았다.
+- **완료 검증**: `npm run build` exit 0(2,355 modules, video worker 26.87kB, 정적 55페이지), `npm run test:unit` exit 0(94/94), `npm run test:new-tools` exit 0(HWP·이미지·오디오·비디오 전체), `npm run test:utilities` exit 0(ko/en·비디오 호환 포함), `npm run test:static` exit 0. `test:new-tools` 최초 1회는 preview 미기동으로 `ERR_CONNECTION_REFUSED`로 검증 시작 전 종료되었고, 빌드 산출물 preview 기동 후 동일 명령 재실행이 통과했다. `git diff --check`도 exit 0.
+
 ### 이미지 P3 — 레이어·다중 선택·컨텍스트 메뉴 판정 (Codx)
 
 - **고정 블록·공통 순서 판정**: `[base,effects…,additional…,overlay…]`를 만드는 공통 helper를 신설하고 미니바 front/back, 레이어 패널 Sortable 재정렬, 컨텍스트 메뉴가 모두 같은 이동 함수만 사용하게 했다. `back`은 effect 개수와 무관하게 고정 블록 바로 위, `front`는 추가 레이어 최상단으로 제한하며 base·effect·crop overlay의 이동 요청은 거부한다. effect는 목록에 노출하지 않고 base 표시 상태를 강제 상속한다. 단위 테스트에서 뒤섞인 6객체를 고정 순서로 복원하고 세 이동 경로의 base/effect 거부를 확인했다.

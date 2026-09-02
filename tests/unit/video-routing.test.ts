@@ -1,0 +1,115 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  MAX_SAFE_FFMPEG_OUTPUT_BYTES,
+  VIDEO_ROUTE_AUDIO_MODES,
+  VIDEO_ROUTE_BITRATE_MODES,
+  VIDEO_ROUTE_CODECS,
+  VIDEO_ROUTE_CONTAINERS,
+  VIDEO_ROUTE_OPFS_STATES,
+  VIDEO_ROUTE_QUOTA_STATES,
+  decideVideoProcessingRoute,
+  type VideoRouteInput,
+  type VideoRouteReasonCode,
+} from "../../src/features/video-studio/videoRouting.ts";
+
+test("the complete route table keeps every B2/B3 combination on FFmpeg until those paths ship", () => {
+  let combinations = 0;
+  for (const container of VIDEO_ROUTE_CONTAINERS) {
+    for (const codec of VIDEO_ROUTE_CODECS) {
+      for (const bitrateMode of VIDEO_ROUTE_BITRATE_MODES) {
+        for (const audioMode of VIDEO_ROUTE_AUDIO_MODES) {
+          for (const opfsAvailable of VIDEO_ROUTE_OPFS_STATES) {
+            for (const quota of VIDEO_ROUTE_QUOTA_STATES) {
+              const input: VideoRouteInput = {
+                container,
+                codec,
+                bitrateMode,
+                audioMode,
+                opfsAvailable,
+                quota,
+                estimatedOutputBytes: 64 * 1024 * 1024,
+              };
+              const decision = decideVideoProcessingRoute(input);
+              assert.equal(decision.route, "ffmpeg");
+              assert.equal(decision.reasonCode, expectedReason(input));
+              assert.equal(decision.plannedStreamingRoute, expectedPlannedRoute(input));
+              assert.deepEqual(decision.streamingFailure, {
+                route: "ffmpeg",
+                reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
+              });
+              combinations += 1;
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.equal(combinations, 648);
+});
+
+test("streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio, OPFS, and quota", () => {
+  const base = {
+    container: "mp4",
+    codec: "h264",
+    bitrateMode: "copy",
+    audioMode: "copy",
+    opfsAvailable: true,
+    quota: "enough",
+    estimatedOutputBytes: 512 * 1024 * 1024,
+  } as const;
+  assert.equal(decideVideoProcessingRoute(base).reasonCode, "STREAM_COPY_PENDING");
+  assert.equal(decideVideoProcessingRoute({ ...base, container: "mov" }).reasonCode, "STREAM_COPY_PENDING");
+  assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "target", audioMode: "encode" }).reasonCode, "WEBCODECS_PENDING");
+  assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "crf" }).reasonCode, "CRF_REQUIRES_FFMPEG");
+  assert.equal(decideVideoProcessingRoute({ ...base, container: "webm", codec: "vp9" }).reasonCode, "CONTAINER_REQUIRES_FFMPEG");
+  assert.equal(decideVideoProcessingRoute({ ...base, container: "mkv" }).reasonCode, "CONTAINER_REQUIRES_FFMPEG");
+  assert.equal(decideVideoProcessingRoute({ ...base, codec: "vp9" }).reasonCode, "CODEC_REQUIRES_FFMPEG");
+  assert.equal(decideVideoProcessingRoute({ ...base, audioMode: "encode" }).reasonCode, "COPY_AUDIO_ENCODE_REQUIRES_FFMPEG");
+  assert.equal(decideVideoProcessingRoute({ ...base, opfsAvailable: false }).reasonCode, "OPFS_UNAVAILABLE");
+  assert.equal(decideVideoProcessingRoute({ ...base, quota: "unknown" }).reasonCode, "QUOTA_UNKNOWN");
+  assert.equal(decideVideoProcessingRoute({ ...base, quota: "insufficient" }).reasonCode, "QUOTA_INSUFFICIENT");
+});
+
+test("streaming failure only falls back when the estimated output is within the FFmpeg safety limit", () => {
+  const base = {
+    container: "mp4",
+    codec: "hevc",
+    bitrateMode: "target",
+    audioMode: "remove",
+    opfsAvailable: true,
+    quota: "enough",
+  } as const;
+  assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES }).streamingFailure, {
+    route: "ffmpeg",
+    reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
+  });
+  assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES + 1 }).streamingFailure, {
+    route: "reject",
+    reasonCode: "FALLBACK_OUTPUT_EXCEEDS_SAFE_LIMIT",
+  });
+  assert.equal(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: Number.NaN }).streamingFailure.route, "reject");
+});
+
+function expectedPlannedRoute(input: VideoRouteInput) {
+  if (input.bitrateMode === "crf") return null;
+  if (input.container !== "mp4" && input.container !== "mov") return null;
+  if (input.codec !== "h264" && input.codec !== "hevc") return null;
+  if (input.bitrateMode === "copy" && input.audioMode === "encode") return null;
+  return input.bitrateMode === "copy" ? "stream-copy" : "webcodecs";
+}
+
+function expectedReason(input: VideoRouteInput): VideoRouteReasonCode {
+  const plannedRoute = expectedPlannedRoute(input);
+  if (!plannedRoute) {
+    if (input.bitrateMode === "crf") return "CRF_REQUIRES_FFMPEG";
+    if (input.container !== "mp4" && input.container !== "mov") return "CONTAINER_REQUIRES_FFMPEG";
+    if (input.codec === "vp9") return "CODEC_REQUIRES_FFMPEG";
+    return "COPY_AUDIO_ENCODE_REQUIRES_FFMPEG";
+  }
+  if (!input.opfsAvailable) return "OPFS_UNAVAILABLE";
+  if (input.quota === "unknown") return "QUOTA_UNKNOWN";
+  if (input.quota === "insufficient") return "QUOTA_INSUFFICIENT";
+  return plannedRoute === "stream-copy" ? "STREAM_COPY_PENDING" : "WEBCODECS_PENDING";
+}

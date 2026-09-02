@@ -3246,7 +3246,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     .map((element) => element.textContent).slice(0, 5));
   if (rawVideoMessages.length) throw new Error(`A raw i18n worker token was exposed in video progress UI: ${JSON.stringify(rawVideoMessages)}`);
   const internalVideoMessages = await page.$$eval(".video-studio-page *", (elements) => elements
-    .filter((element) => element.children.length === 0 && /\b(?:OPFS|SyncAccessHandle|zip\.js)\b/i.test(element.textContent || ""))
+    .filter((element) => element.children.length === 0 && /\b(?:OPFS|SyncAccessHandle|zip\.js|WebCodecs?|remux|worker)\b/i.test(element.textContent || ""))
     .map((element) => element.textContent).slice(0, 5));
   if (internalVideoMessages.length) throw new Error(`Internal video storage names were exposed in the UI: ${JSON.stringify(internalVideoMessages)}`);
   const audioResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({

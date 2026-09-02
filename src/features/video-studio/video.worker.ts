@@ -8,10 +8,16 @@ import type {
   VideoWorkerInput,
 } from "./types";
 import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSampleRate, resolveConcatFrameRate, resolveVideoEncodingThreadCount } from "./videoEncoding";
-import { classifyVideoProcessingFailure } from "./videoErrors";
 import { offloadConcatSegment, withMountedConcatSegments, type ConcatSegmentBlob } from "./videoConcatSegments";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
-import { persistVideoWorkerResult, VideoResultQuotaError } from "./videoResultStorage.worker";
+import { persistVideoWorkerResult } from "./videoResultStorage.worker";
+import {
+  createVideoOutputName,
+  createVideoWorkerResult,
+  getVideoOutputMimeType,
+  normalizeVideoProcessingError,
+  type VideoFileLabels,
+} from "./videoProcessingShared";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 const runtimeLanguage = worker.location.pathname.match(new RegExp(`^${import.meta.env.BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(ko|en)(?:/|$)`))?.[1];
@@ -49,7 +55,6 @@ interface VideoWorkerStartRequest {
   fileLabels: VideoFileLabels;
   resultStorage?: VideoResultStorageSession;
 }
-interface VideoFileLabels { concatenated: string; passthrough: string; converted: string; animation: string; audio: string }
 type VideoWorkerCommand =
   | { type: "start"; request: VideoWorkerStartRequest }
   | { type: "input-file"; fileId: string; file: File };
@@ -159,7 +164,7 @@ async function processRequest(request: VideoWorkerStartRequest) {
       const storedResult = await persistVideoWorkerResult(
         result.bytes,
         result.name,
-        getMimeType(result.name),
+        getVideoOutputMimeType(result.name),
         request.resultStorage,
       );
       worker.postMessage({
@@ -172,11 +177,14 @@ async function processRequest(request: VideoWorkerStartRequest) {
       );
     }
 
-    const result = { outputCount: request.jobs.length, warnings: createWarnings(request) };
+    const result = createVideoWorkerResult(request.jobs.length, request.task, (key, values) => featureMessage(currentLanguage, key, values));
     progress(100, featureMessage(currentLanguage, "video.messages.video.resultsCreated", { p0: result.outputCount }));
     worker.postMessage({ type: "result", result });
   } catch (error) {
-    worker.postMessage({ type: "error", error: normalizeError(error, ffmpegDiagnostics) });
+    worker.postMessage({
+      type: "error",
+      error: normalizeVideoProcessingError(error, ffmpegDiagnostics, (key, values) => featureMessage(currentLanguage, key, values)),
+    });
   } finally {
     pendingInputFiles.forEach(({ reject }) => reject(new Error(featureMessage(currentLanguage, "video.messages.video.sourceFileAttachmentWasCanceledBecauseTheVideo"))));
     pendingInputFiles.clear();
@@ -223,7 +231,7 @@ async function processJob(
 
     if (job.mode === "individual") {
       const input = job.inputs[0];
-      const outputName = createOutputName(job.name || input.fileName, task, false);
+      const outputName = createVideoOutputName(job.name || input.fileName, task, false, currentFileLabels);
       temporaryFiles.add(outputName);
       setStage(0.08, 0.92, input.end - input.start, featureMessage(currentLanguage, "video.messages.video.jobTask", { p0: job.name, p1: describeTask(task) }));
       const exitCode = await ffmpeg.exec(createSingleArguments(input, inputNames[0], outputName, task, multiThreaded));
@@ -299,7 +307,7 @@ async function processConcatJob(
       setStage(0.76, 0.84, totalDuration, featureMessage(currentLanguage, "video.messages.video.concatenatingVideosInOrder", { p0: job.name }));
       const concatCode = await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", listName, "-c", "copy", joinedName]);
       if (concatCode !== 0) throw new Error(featureMessage(currentLanguage, "video.messages.video.unableToConcatenateGifSegmentsFor", { p0: job.name }));
-      const outputName = createOutputName(job.name, task, true);
+      const outputName = createVideoOutputName(job.name, task, true, currentFileLabels);
       temporaryFiles.add(outputName);
       setStage(0.84, 0.96, totalDuration, featureMessage(currentLanguage, "video.messages.video.creatingGif", { p0: job.name }));
       const filter = gifFilter(task, concatDimensions);
@@ -308,7 +316,7 @@ async function processConcatJob(
       return { name: outputName, bytes: await readBytes(ffmpeg, outputName) };
     }
 
-    const outputName = createOutputName(job.name, task, true);
+    const outputName = createVideoOutputName(job.name, task, true, currentFileLabels);
     temporaryFiles.add(outputName);
     setStage(0.9, 0.96, totalDuration, featureMessage(currentLanguage, "video.messages.video.concatenatingInOrder", { p0: job.name }));
     const concatArgs = ["-f", "concat", "-safe", "0", "-i", listName, "-c", "copy"];
@@ -495,14 +503,6 @@ async function readBytes(ffmpeg: FFmpeg, outputName: string) {
   return data;
 }
 
-function createOutputName(name: string, task: VideoTask, concat: boolean) {
-  const base = sanitizeFileName(name.replace(/\.[^.]+$/, "")) || "worklazy-video";
-  const suffix = concat ? currentFileLabels.concatenated : task.kind === "encode" && task.bitrate === "copy" ? currentFileLabels.passthrough : currentFileLabels.converted;
-  if (task.kind === "gif") return `${base}-${concat ? `${currentFileLabels.concatenated}-` : ""}${currentFileLabels.animation}.gif`;
-  if (task.kind === "audio") return `${base}-${concat ? `${currentFileLabels.concatenated}-` : ""}${currentFileLabels.audio}.${task.format === "aac" ? "m4a" : "mp3"}`;
-  return `${base}-${suffix}.${task.container}`;
-}
-
 function segmentExtension(task: VideoTask) {
   if (task.kind === "gif") return "mp4";
   if (task.kind === "audio") return task.format === "aac" ? "m4a" : "mp3";
@@ -521,15 +521,6 @@ function processingFailureMessage(name: string, task: VideoTask) {
   }
   if (task.kind === "audio") return featureMessage(currentLanguage, "video.messages.video.unableToExtractTheFirstAudioTrackFrom", { p0: name, p1: task.format.toUpperCase() });
   return featureMessage(currentLanguage, "video.messages.video.unableToProcessUsing", { p0: name, p1: describeTask(task) });
-}
-
-function createWarnings(request: VideoWorkerStartRequest) {
-  const warnings = [featureMessage(currentLanguage, "video.messages.video.processedOutputJobsAccordingToGroupSettings", { p0: request.jobs.length })];
-  if (request.task.kind === "encode" && request.task.bitrate === "copy") warnings.push(featureMessage(currentLanguage, "video.messages.video.passthroughTrimmingMayStartSlightlyEarlierAtA"));
-  if (request.task.kind === "encode" && request.task.audioMode === "copy") warnings.push(featureMessage(currentLanguage, "video.messages.video.theFirstAudioTrackWasPreservedWithoutRe"));
-  if (request.task.kind === "encode" && request.task.audioMode === "remove") warnings.push(featureMessage(currentLanguage, "video.messages.video.theAudioTrackWasRemovedFromTheOutput"));
-  if (request.task.kind === "encode" && request.task.codec === "hevc") warnings.push(featureMessage(currentLanguage, "video.messages.video.hevcMayNotPlayOnEveryDeviceOr"));
-  return warnings;
 }
 
 function createProgressStage(start: number, end: number, duration: number, label: string): ProgressStage {
@@ -610,30 +601,8 @@ function progress(value: number, message: string) {
   worker.postMessage({ type: "progress", progress: Math.round(value), message });
 }
 
-function normalizeError(error: unknown, diagnosticMessages: readonly string[] = []) {
-  if (error instanceof VideoResultQuotaError) {
-    return {
-      message: featureMessage(currentLanguage, "video.messages.video.thereIsNotEnoughBrowserStorageForThisResult"),
-      code: "RESULT_STORAGE_QUOTA",
-    };
-  }
-  const code = classifyVideoProcessingFailure(error, diagnosticMessages);
-  if (code === "OUT_OF_MEMORY") return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserRanOutOfMemoryTryA"), code };
-  if (code === "CODEC_UNAVAILABLE") return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserEncodingEngineDoesNotSupportThe"), code };
-  return { message: featureMessage(currentLanguage, "video.messages.video.theInputFormatOrCodecMayNotBe"), code: "VIDEO_PROCESSING_ERROR" };
-}
-
 function getExtension(name: string) { return name.split(".").pop()?.toLowerCase() || ""; }
 function sanitizeExtension(value: string) { return value.replace(/[^a-z0-9]/gi, "").slice(0, 8) || "mp4"; }
-function sanitizeFileName(value: string) { return value.trim().replace(/[\\/:*?"<>|]+/g, "-"); }
-function getMimeType(name: string) {
-  if (name.endsWith(".gif")) return "image/gif";
-  if (name.endsWith(".mp3")) return "audio/mpeg";
-  if (name.endsWith(".m4a")) return "audio/mp4";
-  if (name.endsWith(".webm")) return "video/webm";
-  if (name.endsWith(".mkv")) return "video/x-matroska";
-  return "video/mp4";
-}
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
 function formatDuration(seconds: number) {
   if (seconds < 60) return featureMessage(currentLanguage, "video.messages.video.sec", { p0: Math.max(1, Math.round(seconds)) });

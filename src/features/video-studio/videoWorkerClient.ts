@@ -64,7 +64,7 @@ export function probeVideoMetadata(file: File, signal?: AbortSignal, language: A
   });
 }
 
-export function runVideoTask(
+export function runFfmpegVideoTask(
   request: VideoWorkerRequest,
   onProgress?: VideoWorkerProgress,
   onOutput?: VideoWorkerOutputHandler,
@@ -175,6 +175,7 @@ export function runVideoTask(
         return;
       }
       if (data.type === "progress") {
+        if (terminalMessageReceived || settled) return;
         onProgress?.(data.progress ?? 0, resolveSafeWorkerMessage(data.message, language, "video.messages.videoWorkerClient.processingVideo"));
         return;
       }

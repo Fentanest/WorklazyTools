@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import type { VideoResultStorageSession, VideoWorkerOutput } from "./types";
+import { VideoResultQuotaError } from "./videoProcessingShared.ts";
 import {
   canFallbackToBlobAfterQuotaFailure,
   createOpfsResultReference,
@@ -18,12 +19,7 @@ interface SyncAccessHandleLike {
   close: () => void;
 }
 
-export class VideoResultQuotaError extends Error {
-  constructor() {
-    super("Temporary result storage quota is insufficient");
-    this.name = "VideoResultQuotaError";
-  }
-}
+export { VideoResultQuotaError } from "./videoProcessingShared.ts";
 
 export interface VideoResultWritableTarget {
   entryName: string;

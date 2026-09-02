@@ -26,6 +26,15 @@ test("migrated feature locale templates use the same interpolation slots", async
   }
 });
 
+test("video messages in both languages hide internal processing names", async () => {
+  const resources = await Promise.all(["ko", "en"].map(async (language) => JSON.parse(await readFile(new URL(`src/locales/${language}/features.json`, root), "utf8"))));
+  for (const resource of resources) {
+    for (const [key, value] of Object.entries(stringLeaves(resource.video))) {
+      assert.doesNotMatch(value, /\b(?:OPFS|SyncAccessHandle|zip\.js|WebCodecs?|remux|worker)\b/i, `video.${key} exposes an internal processing name`);
+    }
+  }
+});
+
 function leafKeys(value: unknown, prefix = ""): string[] {
   if (!value || typeof value !== "object") return [prefix];
   return Object.entries(value).flatMap(([key, child]) => leafKeys(child, prefix ? `${prefix}.${key}` : key)).sort();

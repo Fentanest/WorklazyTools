@@ -41,7 +41,9 @@ import type {
   VideoWorkerInput,
   VideoWorkerOutput,
 } from "./types";
-import { probeVideoMetadata, runVideoTask } from "./videoWorkerClient";
+import { probeVideoMetadata } from "./videoWorkerClient";
+import { preflightVideoProcessingRoutes, runVideoProcessingTask } from "./videoProcessingClient";
+import { MAX_SAFE_FFMPEG_OUTPUT_BYTES } from "./videoRouting";
 import { createVideoZip } from "./videoZipClient";
 import { VIDEO_GROUP_IDS } from "./types";
 import { VideoGroupSection } from "./VideoGroupSection";
@@ -98,7 +100,6 @@ type DirectoryPickerWindow = Window & {
 };
 
 const GROUP_IDS = VIDEO_GROUP_IDS;
-const MAX_SAFE_BROWSER_OUTPUT_BYTES = 1.5 * 1024 * 1024 * 1024;
 
 export function VideoStudioPage() {
   const language = useAppLanguage();
@@ -202,7 +203,7 @@ export function VideoStudioPage() {
     setItems(next);
     setActiveId((current) => next.some((item) => item.id === current) ? current : next[0]?.id);
     const incomingFiles = unique.filter((file) => !existing.has(fileKey(file)));
-    const largeFiles = incomingFiles.filter((file) => file.size > MAX_SAFE_BROWSER_OUTPUT_BYTES);
+    const largeFiles = incomingFiles.filter((file) => file.size > MAX_SAFE_FFMPEG_OUTPUT_BYTES);
     const rejected = nextFiles.filter((file) => !supported.includes(file));
     const notices = [
       rejected.length ? featureMessage(language, "video.messages.VideoStudioPage.unsupportedFilesWereSkipped", { p0: rejected.map((file) => file.name).join(", ") }) : "",
@@ -463,10 +464,20 @@ export function VideoStudioPage() {
       gifWidth,
     });
     const jobEntries = createJobEntries(usedGroups, groupSettings, allGroupsOneFile, language);
+    const jobs: VideoOutputJob[] = jobEntries.map((job) => ({
+      name: job.name,
+      mode: job.mode,
+      inputs: job.items.map(toWorkerInput),
+    }));
+    const routePreflight = await preflightVideoProcessingRoutes({ mode: "batch", jobs, task });
     if (task.kind === "encode" && task.bitrate === "copy") {
-      const oversized = jobEntries
-        .map((job) => ({ job, estimate: estimatePassthroughBytes(job) }))
-        .find(({ estimate }) => estimate > MAX_SAFE_BROWSER_OUTPUT_BYTES);
+      const oversizedRoute = routePreflight.jobs.find(({ decision, estimatedOutputBytes }) => (
+        decision.route === "ffmpeg" && estimatedOutputBytes > MAX_SAFE_FFMPEG_OUTPUT_BYTES
+      ));
+      const oversized = oversizedRoute && {
+        job: jobEntries[oversizedRoute.jobIndex],
+        estimate: oversizedRoute.estimatedOutputBytes,
+      };
       if (oversized) {
         progress.start(featureMessage(language, "video.messages.VideoStudioPage.checkingEstimatedPassthroughOutputSize"));
         progress.fail(featureMessage(language, "video.messages.VideoStudioPage.isEstimatedAtAboutLargeSourceFilesAre", { p0: oversized.job.name, p1: formatBytes(oversized.estimate) }));
@@ -477,12 +488,14 @@ export function VideoStudioPage() {
     const cautionBytes = mobileDevice ? 250 * 1024 * 1024 : 500 * 1024 * 1024;
     if (totalSize > cautionBytes && !window.confirm(featureMessage(language, "video.messages.VideoStudioPage.largeFileNoticeTheSelectedSourcesTotalThey", { p0: formatBytes(totalSize) }))) return;
     await executeTask((controller, onOutput, resultStorage) => {
-      const jobs: VideoOutputJob[] = jobEntries.map((job) => ({
-        name: job.name,
-        mode: job.mode,
-        inputs: job.items.map(toWorkerInput),
-      }));
-      return runVideoTask({ mode: "batch", jobs, task, resultStorage }, progress.update, onOutput, controller.signal, language);
+      return runVideoProcessingTask(
+        { mode: "batch", jobs, task, resultStorage },
+        progress.update,
+        onOutput,
+        controller.signal,
+        language,
+        routePreflight,
+      );
     });
   };
 
@@ -490,7 +503,7 @@ export function VideoStudioPage() {
     controller: AbortController,
     onOutput: (output: VideoWorkerOutput) => Promise<void>,
     resultStorage: VideoResultStorageSession,
-  ) => ReturnType<typeof runVideoTask>) => {
+  ) => ReturnType<typeof runVideoProcessingTask>) => {
     const controller = new AbortController();
     activeController.current = controller;
     clearVideoOutputs();
@@ -875,13 +888,6 @@ function createJobEntries(
 
 function toWorkerInput(item: VideoItem): VideoWorkerInput {
   return { fileName: item.file.name, file: item.file, fileSize: item.file.size, duration: item.duration, width: item.width, height: item.height, frameRate: item.frameRate, start: item.start, end: item.end };
-}
-
-function estimatePassthroughBytes(job: VideoJobEntry) {
-  return job.items.reduce((sum, item) => {
-    const selectedRatio = item.duration > 0 ? Math.min(1, Math.max(0, (item.end - item.start) / item.duration)) : 1;
-    return sum + item.file.size * selectedRatio;
-  }, 0);
 }
 
 function hasIncompatibleConcatDimensions(

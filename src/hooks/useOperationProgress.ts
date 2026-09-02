@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { normalizeMonotonicOperationProgress } from "./operationProgress";
 
 export type OperationStatus = "idle" | "running" | "success" | "error";
 
@@ -20,11 +21,13 @@ export function useOperationProgress() {
   const startedAt = useRef(0);
   const nextId = useRef(1);
   const progressRef = useRef(0);
+  const statusRef = useRef<OperationStatus>("idle");
 
   const append = useCallback((nextProgress: number, nextMessage: string, nextStatus: Exclude<OperationStatus, "idle">) => {
-    const normalizedProgress = Math.max(0, Math.min(100, Math.round(nextProgress)));
+    const normalizedProgress = normalizeMonotonicOperationProgress(progressRef.current, nextProgress);
     const elapsedMs = startedAt.current ? performance.now() - startedAt.current : 0;
     progressRef.current = normalizedProgress;
+    statusRef.current = nextStatus;
     setProgress(normalizedProgress);
     setMessage(nextMessage);
     setStatus(nextStatus);
@@ -47,6 +50,7 @@ export function useOperationProgress() {
     startedAt.current = performance.now();
     nextId.current = 2;
     progressRef.current = 1;
+    statusRef.current = "running";
     setStatus("running");
     setProgress(1);
     setMessage(startMessage);
@@ -54,11 +58,13 @@ export function useOperationProgress() {
   }, []);
 
   const update = useCallback((nextProgress: number, nextMessage: string) => {
+    if (statusRef.current !== "running") return;
     append(nextProgress, nextMessage, "running");
   }, [append]);
 
   const updateCurrent = useCallback((nextProgress: number, nextMessage: string) => {
-    const normalizedProgress = Math.max(0, Math.min(100, Math.round(nextProgress)));
+    if (statusRef.current !== "running") return;
+    const normalizedProgress = normalizeMonotonicOperationProgress(progressRef.current, nextProgress);
     const elapsedMs = startedAt.current ? performance.now() - startedAt.current : 0;
     progressRef.current = normalizedProgress;
     setProgress(normalizedProgress);
@@ -72,16 +78,19 @@ export function useOperationProgress() {
   }, []);
 
   const succeed = useCallback((successMessage = t("status.complete")) => {
+    if (statusRef.current !== "running") return;
     append(100, successMessage, "success");
   }, [append, t]);
 
   const fail = useCallback((errorMessage: string) => {
+    if (statusRef.current !== "running") return;
     append(progressRef.current, errorMessage, "error");
   }, [append]);
 
   const reset = useCallback(() => {
     startedAt.current = 0;
     progressRef.current = 0;
+    statusRef.current = "idle";
     setStatus("idle");
     setProgress(0);
     setMessage("");
