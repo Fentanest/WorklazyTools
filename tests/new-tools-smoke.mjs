@@ -48,11 +48,15 @@ try {
         console.log("[1/4] HWP editor");
         await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
       }
-      console.log("[2/4] Image studio");
-      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
-      await testImageStudio(page, fixtures.images);
-      await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
-      await testImageStudioMobile(page);
+    console.log("[2/4] Image studio");
+    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
+    await testImageStudio(page, fixtures.images);
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+    await testImageStudioMobile(page);
+    for (const deviceScaleFactor of [2, 1]) {
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor });
+      for (const zoom of [1, 2]) await testImageStudioEffectStrength(page, deviceScaleFactor, zoom);
+    }
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
     }
     if (!onlyHwp && !onlyVideo && !onlyImage) {
@@ -232,19 +236,15 @@ async function testImageStudio(page, imagePaths) {
     window.__worklazyExportDataUrl = "";
     const originalClick = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function captureImageExport() {
-      if (this.href.startsWith("data:image/jpeg")) {
+      if (this.href.startsWith("data:image/")) {
         window.__worklazyExportDataUrl = this.href;
         return;
       }
       return originalClick.call(this);
     };
   });
-  await page.$$eval(".image-format-control button", (buttons) => {
-    const jpg = buttons.find((button) => button.textContent?.trim() === "JPG");
-    if (!(jpg instanceof HTMLButtonElement)) throw new Error("JPG export option is unavailable");
-    jpg.click();
-  });
-  await page.click(".export-row .primary-button");
+  const identityExports = {};
+  for (const format of ["PNG", "JPG", "WebP"]) identityExports[format] = await captureImageEditorExport(page, format);
   const jpegGreenBounds = await page.evaluate(async () => {
     const dataUrl = window.__worklazyExportDataUrl;
     if (!dataUrl) throw new Error("JPEG export was not captured");
@@ -278,6 +278,38 @@ async function testImageStudio(page, imagePaths) {
     throw new Error(`High-resolution JPEG export is cropped, blurred, or scaled incorrectly: ${JSON.stringify(jpegGreenBounds)}`);
   }
   console.log("  image: high-resolution export verified");
+  const viewportCanvas = await page.$(".fabric-stage .upper-canvas");
+  const viewportCanvasBox = await viewportCanvas?.boundingBox();
+  if (!viewportCanvasBox) throw new Error("Image canvas is unavailable for zoom and pan");
+  await page.mouse.move(viewportCanvasBox.x + viewportCanvasBox.width / 2, viewportCanvasBox.y + viewportCanvasBox.height / 2);
+  await page.mouse.wheel({ deltaY: -400 });
+  await page.waitForFunction(() => parseInt(document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent || "0", 10) > 100);
+  await page.click('[data-testid="image-editor-fit"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  const minibarBeforeViewportChange = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "200%");
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  const panCanvasBox = await (await page.$(".fabric-stage .upper-canvas"))?.boundingBox();
+  if (!panCanvasBox) throw new Error("Image canvas is unavailable for Space pan");
+  await page.mouse.move(panCanvasBox.x + panCanvasBox.width / 2, panCanvasBox.y + panCanvasBox.height / 2);
+  await page.keyboard.down("Space");
+  await page.mouse.down();
+  await page.mouse.move(panCanvasBox.x + panCanvasBox.width / 2 + 38, panCanvasBox.y + panCanvasBox.height / 2 + 24, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const minibarAfterViewportChange = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
+  if (Math.hypot(minibarAfterViewportChange.left - minibarBeforeViewportChange.left, minibarAfterViewportChange.top - minibarBeforeViewportChange.top) < 20) {
+    throw new Error(`Floating minibar did not follow zoom and pan: ${JSON.stringify({ minibarBeforeViewportChange, minibarAfterViewportChange })}`);
+  }
+  for (const format of ["PNG", "JPG", "WebP"]) {
+    const transformedViewExport = await captureImageEditorExport(page, format);
+    if (transformedViewExport !== identityExports[format]) throw new Error(`${format} export changed with user zoom or pan`);
+  }
+  console.log("  image: wheel zoom, Space pan, minibar tracking, and view-independent raster exports verified");
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
   await page.keyboard.press("Delete");
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"));
@@ -287,6 +319,14 @@ async function testImageStudio(page, imagePaths) {
   await page.click('[data-testid="image-editor-panel-shapes"]');
   await page.click('button[aria-label="사각형 추가"]');
   await page.click('[data-testid="image-editor-panel-select"]');
+  const centeredShapeCanvas = await page.$(".fabric-stage .upper-canvas");
+  const centeredShapeBox = await centeredShapeCanvas?.boundingBox();
+  if (!centeredShapeBox) throw new Error("Image canvas is unavailable for centered view tracking");
+  const centeredShapeScale = centeredShapeBox.width / 900;
+  await page.mouse.move(centeredShapeBox.x + 230 * centeredShapeScale, centeredShapeBox.y + 190 * centeredShapeScale);
+  await page.mouse.down();
+  await page.mouse.move(centeredShapeBox.x + 450 * centeredShapeScale, centeredShapeBox.y + 300 * centeredShapeScale, { steps: 8 });
+  await page.mouse.up();
   await page.evaluate(() => {
     const setValue = (input, value) => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
@@ -341,11 +381,38 @@ async function testImageStudio(page, imagePaths) {
   await page.$eval('[data-testid="image-editor-undo"]', (button) => button.click());
   await page.waitForFunction((effected) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() !== effected, {}, afterRegionEffect);
   const undoneRegionEffect = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "200%") throw new Error("Dimension-preserving undo reset the canvas view");
   console.log("  image: region effect undo verified");
   await page.$eval('[data-testid="image-editor-redo"]', (button) => button.click());
   await page.waitForFunction((undone) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() !== undone, {}, undoneRegionEffect);
+  if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "200%") throw new Error("Dimension-preserving redo reset the canvas view");
   console.log("  image: region effect redo verified");
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await page.click('button[aria-label="원본 사진 잠금"]');
+  await page.click('[data-testid="image-editor-panel-select"]');
+  const transformedBaseCanvas = await page.$(".fabric-stage .upper-canvas");
+  const transformedBaseBox = await transformedBaseCanvas?.boundingBox();
+  if (!transformedBaseBox) throw new Error("Base canvas is unavailable for transform history");
+  await page.mouse.click(transformedBaseBox.x + transformedBaseBox.width * 0.8, transformedBaseBox.y + transformedBaseBox.height * 0.8);
+  await page.waitForSelector('[data-testid="image-editor-minibar"]');
+  const beforeBaseTransform = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  await page.mouse.move(transformedBaseBox.x + transformedBaseBox.width * 0.8, transformedBaseBox.y + transformedBaseBox.height * 0.8);
+  await page.mouse.down();
+  await page.mouse.move(transformedBaseBox.x + transformedBaseBox.width * 0.8 + 28, transformedBaseBox.y + transformedBaseBox.height * 0.8 + 18, { steps: 6 });
+  await page.mouse.up();
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  const afterBaseTransform = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  if (afterBaseTransform === beforeBaseTransform) throw new Error("Moving the base image did not move its anchored effect block");
+  await page.$eval('[data-testid="image-editor-undo"]', (button) => button.click());
+  await page.waitForFunction((expected) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() === expected, {}, beforeBaseTransform);
+  if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "200%") throw new Error("Base-transform undo reset a dimension-preserving view");
+  await page.$eval('[data-testid="image-editor-redo"]', (button) => button.click());
+  await page.waitForFunction((expected) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() === expected, {}, afterBaseTransform);
+  if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "200%") throw new Error("Base-transform redo reset a dimension-preserving view");
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await page.click('button[aria-label="원본 사진 잠금"]');
+  console.log("  image: anchored effect alignment and dimension-preserving transform history verified");
   await page.click('[data-testid="image-editor-panel-canvas"]');
   await page.click('[data-testid="image-editor-clear-layers"]');
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -401,7 +468,34 @@ async function testImageStudio(page, imagePaths) {
   await page.click('[data-testid="image-editor-panel-crop"]');
   const portraitPresets = await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean));
   if (!portraitPresets.includes("3:4") || !portraitPresets.includes("9:16")) throw new Error("Portrait crop presets are unavailable");
+  await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => {
+    const ratio = buttons.find((button) => button.textContent?.trim() === "4:3");
+    if (!(ratio instanceof HTMLButtonElement)) throw new Error("4:3 crop preset is unavailable");
+    ratio.click();
+  });
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  let ratioCanvasSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  if (ratioCanvasSize.width !== 900 || ratioCanvasSize.height !== 675) throw new Error(`4:3 crop did not resize the canvas: ${JSON.stringify(ratioCanvasSize)}`);
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.$eval('[data-testid="image-editor-undo"]', (button) => button.click());
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  ratioCanvasSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  if (ratioCanvasSize.width !== 900 || ratioCanvasSize.height !== 600) throw new Error(`Dimension-changing undo did not restore the previous canvas: ${JSON.stringify(ratioCanvasSize)}`);
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.$eval('[data-testid="image-editor-redo"]', (button) => button.click());
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  ratioCanvasSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  if (ratioCanvasSize.width !== 900 || ratioCanvasSize.height !== 675) throw new Error(`Dimension-changing redo did not restore the cropped canvas: ${JSON.stringify(ratioCanvasSize)}`);
+  console.log("  image: ratio crop and dimension-changing undo/redo view reset verified");
   await page.click('[data-testid="image-editor-panel-crop"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
   await page.waitForSelector(".fabric-stage.is-crop-mode");
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   await page.waitForFunction(() => {
@@ -420,10 +514,25 @@ async function testImageStudio(page, imagePaths) {
   await page.waitForSelector('[data-testid="image-editor-crop-selection"]');
   await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-crop-selection"]'));
+  if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "100%") throw new Error("Free crop did not reset the canvas view");
   const croppedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
-  if (croppedSize.width >= 850 || croppedSize.height >= 570 || croppedSize.width < 450 || croppedSize.height < 280) {
+  if (croppedSize.width >= 360 || croppedSize.height >= 280 || croppedSize.width < 240 || croppedSize.height < 160) {
     throw new Error(`Free crop did not resize the canvas as selected: ${JSON.stringify(croppedSize)}`);
   }
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await dropCanvasImages(page, ".fabric-stage", ["#34c759"]);
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  const replacedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
+  if (replacedSize.width !== 900 || replacedSize.height !== 600) throw new Error(`Replacing a file did not restore the fitted canvas: ${JSON.stringify(replacedSize)}`);
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  await page.click('[data-testid="image-editor-zoom-in"]');
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.click(".editor-source-actions button");
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  console.log("  image: free crop, file replacement, and blank-canvas view reset verified");
   await page.click(".studio-tabs button:nth-child(2)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
   await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 2);
@@ -495,6 +604,107 @@ async function testImageStudio(page, imagePaths) {
   }, {}, initialFrameOrder);
 }
 
+async function captureImageEditorExport(page, format) {
+  await page.$$eval(".image-format-control button", (buttons, label) => {
+    const option = buttons.find((button) => button.textContent?.trim() === label);
+    if (!(option instanceof HTMLButtonElement)) throw new Error(`${label} export option is unavailable`);
+    option.click();
+  }, format);
+  await page.evaluate(() => { window.__worklazyExportDataUrl = ""; });
+  await page.click(".export-row .primary-button");
+  const dataUrl = await page.evaluate(() => window.__worklazyExportDataUrl);
+  if (!dataUrl) throw new Error(`${format} export was not captured`);
+  return dataUrl;
+}
+
+async function testImageStudioEffectStrength(page, deviceScaleFactor, zoom) {
+  console.log(`  image: probing DPR ${deviceScaleFactor}, zoom ${zoom * 100}% effect strength`);
+  await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".fabric-stage .upper-canvas");
+  await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 800;
+    canvas.height = 500;
+    const context = canvas.getContext("2d");
+    const gradient = context.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, "#000000");
+    gradient.addColorStop(1, "#ffffff");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([blob], "gradient.png", { type: "image/png" }));
+    const stage = document.querySelector(".fabric-stage");
+    stage.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    canvas.width = 1;
+    canvas.height = 1;
+  });
+  await page.waitForFunction(() => document.querySelector(".image-studio-page .drop-zone strong")?.textContent?.includes("1개 파일 선택됨"), { timeout: 15_000 });
+  await page.evaluate(() => {
+    window.__worklazyExportDataUrl = "";
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function captureImageExport() {
+      if (this.href.startsWith("data:image/")) {
+        window.__worklazyExportDataUrl = this.href;
+        return;
+      }
+      return originalClick.call(this);
+    };
+  });
+  if (zoom === 2) {
+    await page.click('[data-testid="image-editor-zoom-in"]');
+    await page.click('[data-testid="image-editor-zoom-in"]');
+    await page.click('[data-testid="image-editor-zoom-in"]');
+    await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "200%");
+  }
+  await page.click('[data-testid="image-editor-panel-effect"]');
+  await page.waitForSelector(".fabric-stage.is-effect-mode");
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  const canvas = await page.$(".fabric-stage .upper-canvas");
+  const bounds = await canvas?.boundingBox();
+  if (!bounds) throw new Error("Gradient canvas is unavailable for the effect-strength matrix");
+  const leftRatio = zoom === 1 ? 0.28 : 0.2;
+  const rightRatio = zoom === 1 ? 0.72 : 0.8;
+  await page.mouse.move(bounds.x + bounds.width * leftRatio, bounds.y + bounds.height * 0.35);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * rightRatio, bounds.y + bounds.height * 0.65, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForSelector('[data-testid="image-editor-effect-selection"]', { timeout: 15_000 });
+  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-effect-selection"]'));
+  const dataUrl = await captureImageEditorExport(page, "PNG");
+  const medianRun = await page.evaluate(async (source, matrixZoom) => {
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const output = document.createElement("canvas");
+    output.width = image.naturalWidth;
+    output.height = image.naturalHeight;
+    const context = output.getContext("2d");
+    context.drawImage(image, 0, 0);
+    const start = matrixZoom === 1 ? 310 : 350;
+    const end = matrixZoom === 1 ? 590 : 550;
+    const row = context.getImageData(start, 300, end - start, 1).data;
+    const runs = [];
+    let length = 1;
+    for (let offset = 4; offset < row.length; offset += 4) {
+      if (row[offset] === row[offset - 4] && row[offset + 1] === row[offset - 3] && row[offset + 2] === row[offset - 2]) length += 1;
+      else {
+        if (length >= 4 && length <= 40) runs.push(length);
+        length = 1;
+      }
+    }
+    if (length >= 4 && length <= 40) runs.push(length);
+    runs.sort((a, b) => a - b);
+    output.width = 1;
+    output.height = 1;
+    return runs.length ? runs[Math.floor(runs.length / 2)] : 0;
+  }, dataUrl, zoom);
+  const expected = zoom === 1 ? 16 : 8;
+  if (Math.abs(medianRun - expected) > 2) throw new Error(`Effect strength changed across DPR/zoom: ${JSON.stringify({ deviceScaleFactor, zoom, medianRun, expected })}`);
+  console.log(`  image: DPR ${deviceScaleFactor}, zoom ${zoom * 100}% effect strength verified (${medianRun}px)`);
+}
+
 async function testImageStudioMobile(page) {
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector('[data-testid="image-editor-canvas-stage"] .upper-canvas');
@@ -554,6 +764,29 @@ async function testImageStudioMobile(page) {
   }));
   if (restoredDraw.brush !== "true" || restoredDraw.color !== "#123456" || restoredDraw.width !== "13") throw new Error(`Drawing options were not restored after panel re-entry: ${JSON.stringify(restoredDraw)}`);
 
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  const touchClient = await page.createCDPSession();
+  let touchCanvasBounds = await (await page.$(".fabric-stage .upper-canvas"))?.boundingBox();
+  if (!touchCanvasBounds) throw new Error("Mobile canvas is unavailable for touch gesture arbitration");
+  const blankBeforeGesture = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  const drawStart = { x: touchCanvasBounds.x + touchCanvasBounds.width * 0.35, y: touchCanvasBounds.y + touchCanvasBounds.height * 0.45, id: 1, radiusX: 6, radiusY: 6, force: 1 };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [drawStart] });
+  const drawMove = { ...drawStart, x: drawStart.x + 12, y: drawStart.y + 8 };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [drawMove] });
+  const drawSecond = { x: drawStart.x + 70, y: drawStart.y + 10, id: 2, radiusX: 6, radiusY: 6, force: 1 };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [drawMove, drawSecond] });
+  await touchClient.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ ...drawMove, x: drawMove.x - 30, y: drawMove.y - 12 }, { ...drawSecond, x: drawSecond.x + 40, y: drawSecond.y + 18 }],
+  });
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.waitForFunction(() => parseInt(document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent || "0", 10) > 150);
+  await page.$eval('[data-testid="image-editor-fit"]', (button) => button.click());
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const blankAfterGesture = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  if (blankAfterGesture !== blankBeforeGesture) throw new Error("Starting a two-finger gesture committed the in-progress drawing stroke");
+
   await page.$eval('[data-testid="image-editor-panel-shapes"]', (button) => button.click());
   await page.$eval('[data-testid="image-editor-options-panel"]', (panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
   await page.click('button[aria-label="사각형 추가"]');
@@ -575,7 +808,69 @@ async function testImageStudioMobile(page) {
   if (!mobileControls || mobileControls.activePanel !== "shapes" || mobileControls.panelButtonMin < 44 || mobileControls.minibarButtonMin < 44 || !mobileControls.minibarInsideStage) {
     throw new Error(`Mobile bottom sheet or floating minibar targets are invalid: ${JSON.stringify(mobileControls)}`);
   }
-  console.log("  image: 390x844 bottom sheet, drawing state, and floating minibar verified");
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  touchCanvasBounds = await (await page.$(".fabric-stage .upper-canvas"))?.boundingBox();
+  if (!touchCanvasBounds) throw new Error("Mobile canvas is unavailable for one-finger object movement");
+  const objectStart = { x: touchCanvasBounds.x + touchCanvasBounds.width * (230 / 900), y: touchCanvasBounds.y + touchCanvasBounds.height * (190 / 600), id: 3, radiusX: 6, radiusY: 6, force: 1 };
+  const minibarBeforeSingleTouch = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
+  const inspectBlueShape = (canvas) => {
+    const context = canvas.getContext("2d");
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let minX = canvas.width; let minY = canvas.height; let maxX = -1; let maxY = -1;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const offset = (y * canvas.width + x) * 4;
+        if (pixels[offset] < 40 && pixels[offset + 1] > 80 && pixels[offset + 2] > 200) {
+          minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    return { dataUrl: canvas.toDataURL(), width: canvas.width, height: canvas.height, bounds: { minX, minY, maxX, maxY } };
+  };
+  const canvasBeforeSingleTouch = await page.$eval(".fabric-stage .lower-canvas", inspectBlueShape);
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [objectStart] });
+  const objectMoved = { ...objectStart, x: objectStart.x + 10, y: objectStart.y + 80 };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [objectMoved] });
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const minibarAfterSingleTouch = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
+  const canvasAfterSingleTouch = await page.$eval(".fabric-stage .lower-canvas", inspectBlueShape);
+  const oneFingerChangedObject = JSON.stringify(canvasBeforeSingleTouch.bounds) !== JSON.stringify(canvasAfterSingleTouch.bounds);
+  const oneFingerZoom = await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent);
+  if (!oneFingerChangedObject || oneFingerZoom !== "100%") {
+    throw new Error(`One-finger object movement was intercepted by stage gestures: ${JSON.stringify({ minibarBeforeSingleTouch, minibarAfterSingleTouch, canvasChanged: canvasBeforeSingleTouch.dataUrl !== canvasAfterSingleTouch.dataUrl, beforeBounds: canvasBeforeSingleTouch.bounds, afterBounds: canvasAfterSingleTouch.bounds, objectStart, touchCanvasBounds })}`);
+  }
+
+  const transformStart = {
+    x: touchCanvasBounds.x + ((canvasAfterSingleTouch.bounds.minX + canvasAfterSingleTouch.bounds.maxX) / 2) / canvasAfterSingleTouch.width * touchCanvasBounds.width,
+    y: touchCanvasBounds.y + ((canvasAfterSingleTouch.bounds.minY + canvasAfterSingleTouch.bounds.maxY) / 2) / canvasAfterSingleTouch.height * touchCanvasBounds.height,
+    id: 4,
+    radiusX: 6,
+    radiusY: 6,
+    force: 1,
+  };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [transformStart] });
+  const transformMove = { ...transformStart, x: transformStart.x + 10, y: transformStart.y + 6 };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [transformMove] });
+  const transformSecond = { x: transformStart.x + 70, y: transformStart.y, id: 5, radiusX: 6, radiusY: 6, force: 1 };
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [transformMove, transformSecond] });
+  await touchClient.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ ...transformMove, x: transformMove.x - 30, y: transformMove.y - 12 }, { ...transformSecond, x: transformSecond.x + 44, y: transformSecond.y + 18 }],
+  });
+  await touchClient.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.waitForFunction(() => parseInt(document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent || "0", 10) > 150);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.$eval('[data-testid="image-editor-fit"]', (button) => button.click());
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const minibarAfterPinchReset = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
+  const canvasAfterPinchReset = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
+  if (canvasAfterPinchReset !== canvasAfterSingleTouch.dataUrl) {
+    throw new Error(`Two-finger gesture changed the selected object instead of only the view: ${JSON.stringify({ minibarAfterSingleTouch, minibarAfterPinchReset, beforeBounds: canvasAfterSingleTouch.bounds })}`);
+  }
+  await touchClient.detach();
+  console.log("  image: 390x844 bottom sheet, one-finger objects, two-finger drawing arbitration, pinch/pan, and floating minibar verified");
 }
 
 async function pasteCanvasImages(page, colors) {

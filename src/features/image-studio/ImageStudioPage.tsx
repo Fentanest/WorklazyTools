@@ -1,5 +1,5 @@
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
-import { Canvas, Circle, FabricImage, FabricObject, IText, Line, PencilBrush, Rect, filters, util } from "fabric";
+import { Canvas, Circle, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, filters, util, type TMat2D } from "fabric";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +12,7 @@ import { BatchImagePanel, CollagePanel, GifPanel } from "./ImageProcessingPanels
 import { ImageEditorMinibar } from "./ImageEditorMinibar";
 import { ImageEditorPanel } from "./ImageEditorPanel";
 import { ImageEditorToolbar } from "./ImageEditorToolbar";
+import { ImageEditorViewportControls } from "./ImageEditorViewportControls";
 import { ClipboardHint, RASTER_IMAGE_ACCEPT, filterRasterImages, useClipboardImages } from "./imageStudioShared";
 import {
   EMPTY_EDITOR_SELECTION,
@@ -32,6 +33,11 @@ import {
 import type { ImageOutputFormat } from "./types";
 
 type StudioTab = "editor" | "batch" | "collage" | "gif";
+
+const EDITOR_MIN_ZOOM = 0.25;
+const EDITOR_MAX_ZOOM = 4;
+const EDITOR_ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
+const IDENTITY_VIEWPORT: TMat2D = [1, 0, 0, 1, 0, 0];
 
 export function ImageStudioPage() {
   const { t } = useTranslation("features");
@@ -131,6 +137,7 @@ function ImageEditor() {
   const [drawTool, setDrawTool] = useState<EditorDrawTool>("pencil");
   const [drawColor, setDrawColor] = useState("#1d1d1f");
   const [drawWidth, setDrawWidth] = useState(7);
+  const [viewZoom, setViewZoom] = useState(1);
   const [historyState, setHistoryState] = useState({ index: -1, length: 0 });
   const [stageDragging, setStageDragging] = useState(false);
   const [selectionState, setSelectionState] = useState<EditorSelectionState>(EMPTY_EDITOR_SELECTION);
@@ -156,18 +163,46 @@ function ImageEditor() {
     const objectBounds = object.getBoundingRect();
     const scaleX = canvasBounds.width / Math.max(1, instance.getWidth());
     const scaleY = canvasBounds.height / Math.max(1, instance.getHeight());
-    const rawLeft = canvasBounds.left - stageBounds.left + (objectBounds.left + objectBounds.width / 2) * scaleX;
-    const rawTop = canvasBounds.top - stageBounds.top + objectBounds.top * scaleY - 10;
+    const [zoomX, , , zoomY, panX, panY] = instance.viewportTransform;
+    const rawLeft = canvasBounds.left - stageBounds.left + ((objectBounds.left + objectBounds.width / 2) * zoomX + panX) * scaleX;
+    const rawTop = canvasBounds.top - stageBounds.top + (objectBounds.top * zoomY + panY) * scaleY - 10;
     const minibar = stage.querySelector<HTMLElement>("[data-testid='image-editor-minibar']");
     const minibarWidth = minibar?.getBoundingClientRect().width || Math.min(310, stage.clientWidth - 16);
     const horizontalInset = Math.min(stage.clientWidth / 2, minibarWidth / 2 + 8);
     setMinibarPosition({
       left: Math.max(horizontalInset, Math.min(stage.clientWidth - horizontalInset, rawLeft)),
-      top: Math.max(58, rawTop),
+      top: Math.max(58, Math.min(stage.clientHeight - 8, rawTop)),
     });
   }, []);
 
   const syncCanvasDisplay = useResponsiveFabricCanvas(canvas, stageElement, updateMinibarPosition);
+
+  const applyViewportTransform = useCallback((instance: Canvas, viewport: TMat2D) => {
+    instance.setViewportTransform(viewport);
+    setViewZoom(instance.getZoom());
+    instance.requestRenderAll();
+    window.requestAnimationFrame(updateMinibarPosition);
+  }, [updateMinibarPosition]);
+
+  const resetViewport = useCallback((instance = canvas.current) => {
+    if (!instance) return;
+    applyViewportTransform(instance, [...IDENTITY_VIEWPORT]);
+    window.requestAnimationFrame(syncCanvasDisplay);
+  }, [applyViewportTransform, syncCanvasDisplay]);
+
+  const changeViewZoom = useCallback((direction: "in" | "out") => {
+    const instance = canvas.current;
+    if (!instance) return;
+    const current = instance.getZoom();
+    const candidates = direction === "in" ? EDITOR_ZOOM_STEPS : [...EDITOR_ZOOM_STEPS].reverse();
+    const next = candidates.find((value) => direction === "in" ? value > current + 0.001 : value < current - 0.001);
+    if (next === undefined) return;
+    const center = new Point(instance.getWidth() / 2, instance.getHeight() / 2);
+    instance.zoomToPoint(center, next);
+    setViewZoom(instance.getZoom());
+    instance.requestRenderAll();
+    window.requestAnimationFrame(updateMinibarPosition);
+  }, [updateMinibarPosition]);
 
   const pushSnapshot = useCallback((immediate = false, reset = false) => {
     const save = () => {
@@ -227,6 +262,17 @@ function ImageEditor() {
     if (!canvasElement.current) return;
     const instance = new Canvas(canvasElement.current, { width: 900, height: 600, backgroundColor: "#ffffff", preserveObjectStacking: true });
     canvas.current = instance;
+    const disposeViewportGestures = installEditorViewportGestures({
+      instance,
+      stage: stageElement.current,
+      onGestureStart: () => {
+        clearRegionSelection();
+        const cancelledTarget = cancelCurrentFabricInteraction(instance);
+        if (cancelledTarget === baseImage.current && baseImage.current) syncRegionEffectTransforms(instance, baseImage.current);
+        syncSelectedObject(instance.getActiveObject());
+      },
+      onViewportChange: (viewport) => applyViewportTransform(instance, viewport),
+    });
     const syncSelection = () => syncSelectedObject(instance.getActiveObject());
     const onPath = (event: { path: FabricObject }) => {
       if (interactionModeRef.current === "erase") event.path.set({ globalCompositeOperation: "destination-out", selectable: false, evented: false });
@@ -290,10 +336,11 @@ function ImageEditor() {
       regionEffectUrls.current.clear();
       sourceUrl.current = undefined;
       baseImage.current = undefined;
+      disposeViewportGestures();
       instance.dispose();
       canvas.current = undefined;
     };
-  }, [clearRegionSelection, pushSnapshot, syncCanvasDisplay, syncSelectedObject, updateMinibarPosition]);
+  }, [applyViewportTransform, clearRegionSelection, pushSnapshot, syncCanvasDisplay, syncSelectedObject, updateMinibarPosition]);
 
   useEffect(() => {
     const instance = canvas.current;
@@ -328,6 +375,7 @@ function ImageEditor() {
       instance.clear();
       instance.backgroundColor = transparentBackground ? "" : background;
       instance.setDimensions({ width: 900, height: 600 });
+      resetViewport(instance);
       const scale = Math.min(1, 860 / image.width, 560 / image.height);
       outputMultiplier.current = Math.max(1, 1 / scale);
       (image as EditorFabricObject).worklazyRole = "base";
@@ -366,6 +414,7 @@ function ImageEditor() {
     clearRegionSelection();
     instance.clear();
     instance.setDimensions({ width: 900, height: 600 });
+    resetViewport(instance);
     instance.backgroundColor = transparentBackground ? "" : background;
     baseImage.current = undefined;
     if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
@@ -438,6 +487,7 @@ function ImageEditor() {
       object.setCoords();
     });
     instance.setDimensions({ width: Math.max(1, Math.round(selection.width)), height: Math.max(1, Math.round(selection.height)) });
+    resetViewport(instance);
     instance.discardActiveObject();
     setRegionSelection(undefined);
     setInteractionMode("select");
@@ -448,7 +498,7 @@ function ImageEditor() {
     restoringRef.current = false;
     pushSnapshot(true);
     window.requestAnimationFrame(syncCanvasDisplay);
-  }, [baseLocked, pushSnapshot, regionSelection, syncCanvasDisplay, syncSelectedObject]);
+  }, [baseLocked, pushSnapshot, regionSelection, resetViewport, syncCanvasDisplay, syncSelectedObject]);
 
   const applyRegionEffect = useCallback(async () => {
     const instance = canvas.current;
@@ -581,7 +631,7 @@ function ImageEditor() {
     setInteractionMode("select");
     interactionModeRef.current = "select";
     instance.setDimensions({ width, height });
-    window.requestAnimationFrame(syncCanvasDisplay);
+    resetViewport(instance);
     if (image) {
       const scale = Math.max(width / image.width, height / image.height);
       image.set({ left: width / 2, top: height / 2, scaleX: scale, scaleY: scale });
@@ -701,6 +751,8 @@ function ImageEditor() {
     window.clearTimeout(snapshotTimerRef.current);
     restoringRef.current = true;
     try {
+      const dimensionsChanged = instance.getWidth() !== snapshot.width || instance.getHeight() !== snapshot.height;
+      const preservedViewport = [...instance.viewportTransform] as TMat2D;
       instance.setDimensions({ width: snapshot.width, height: snapshot.height });
       await instance.loadFromJSON(snapshot.canvas);
       baseImage.current = instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && (object as EditorFabricObject).worklazyRole === "base")
@@ -722,6 +774,8 @@ function ImageEditor() {
       }
       applyEditorInteractivity(instance, baseImage.current, interactionModeRef.current, snapshot.baseLocked);
       instance.discardActiveObject();
+      if (dimensionsChanged) resetViewport(instance);
+      else applyViewportTransform(instance, preservedViewport);
       instance.requestRenderAll();
       historyIndexRef.current = index;
       setHistoryState({ index, length: historyRef.current.length });
@@ -761,9 +815,11 @@ function ImageEditor() {
     const instance = canvas.current;
     if (!instance) return;
     const overlay = regionOverlay.current;
+    const viewport = [...instance.viewportTransform] as TMat2D;
     if (baseImage.current) keepRegionEffectsAboveBase(instance, baseImage.current);
     if (overlay && instance.getObjects().includes(overlay)) instance.remove(overlay);
     try {
+      instance.setViewportTransform([...IDENTITY_VIEWPORT]);
       instance.renderAll();
       const multiplier = outputMultiplier.current;
       let dataUrl: string;
@@ -787,8 +843,10 @@ function ImageEditor() {
       anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${actualFormat === "jpeg" ? "jpg" : actualFormat}`;
       anchor.click();
     } finally {
+      instance.setViewportTransform(viewport);
       if (overlay && regionOverlay.current === overlay && !instance.getObjects().includes(overlay)) instance.add(overlay);
       instance.requestRenderAll();
+      window.requestAnimationFrame(updateMinibarPosition);
     }
   };
 
@@ -812,6 +870,14 @@ function ImageEditor() {
       />
       <div className="image-editor-layout" data-testid="image-editor-workspace">
         <div className="image-editor-canvas-column">
+          <ImageEditorViewportControls
+            zoom={viewZoom}
+            minZoom={EDITOR_MIN_ZOOM}
+            maxZoom={EDITOR_MAX_ZOOM}
+            onFit={() => resetViewport()}
+            onZoomIn={() => changeViewZoom("in")}
+            onZoomOut={() => changeViewZoom("out")}
+          />
           <div
             ref={stageElement}
             className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}${interactionMode === "crop" ? " is-crop-mode" : interactionMode === "effect" ? " is-effect-mode" : ""}`}
@@ -1052,6 +1118,216 @@ function drawApproximateBlur(context: CanvasRenderingContext2D, source: HTMLCanv
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string) {
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("The browser could not encode the image canvas.")), type));
+}
+
+interface InternalGestureCanvas {
+  _currentTransform: { target: FabricObject; original: Partial<FabricObject> } | null;
+  _groupSelector: unknown;
+  _isCurrentlyDrawing: boolean;
+}
+
+function cancelCurrentFabricInteraction(instance: Canvas) {
+  const internal = instance as unknown as InternalGestureCanvas;
+  const transform = internal._currentTransform;
+  if (transform) {
+    transform.target.set(transform.original);
+    transform.target.isMoving = false;
+    transform.target.setCoords();
+  }
+  internal._currentTransform = null;
+  internal._groupSelector = null;
+  if (internal._isCurrentlyDrawing) {
+    internal._isCurrentlyDrawing = false;
+    instance.clearContext(instance.contextTop);
+  }
+  instance.requestRenderAll();
+  return transform?.target;
+}
+
+function installEditorViewportGestures({
+  instance,
+  stage,
+  onGestureStart,
+  onViewportChange,
+}: {
+  instance: Canvas;
+  stage: HTMLDivElement | null;
+  onGestureStart: () => void;
+  onViewportChange: (viewport: TMat2D) => void;
+}) {
+  const upperCanvas = instance.upperCanvasEl;
+  let pointerOverCanvas = false;
+  let spacePressed = false;
+  let mousePan: { clientX: number; clientY: number; viewport: TMat2D } | undefined;
+  let touchGesture: { ids: [number, number]; distance: number; sceneCenter: Point; viewport: TMat2D } | undefined;
+
+  const toViewportPoint = (clientX: number, clientY: number) => {
+    const bounds = upperCanvas.getBoundingClientRect();
+    return new Point(
+      (clientX - bounds.left) * instance.getWidth() / Math.max(1, bounds.width),
+      (clientY - bounds.top) * instance.getHeight() / Math.max(1, bounds.height),
+    );
+  };
+
+  const notifyViewport = (viewport: TMat2D) => onViewportChange(viewport);
+
+  const handleWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const point = toViewportPoint(event.clientX, event.clientY);
+    const currentViewport = [...instance.viewportTransform] as TMat2D;
+    const nextZoom = Math.max(EDITOR_MIN_ZOOM, Math.min(EDITOR_MAX_ZOOM, instance.getZoom() * Math.exp(-event.deltaY * 0.0015)));
+    const scenePoint = point.transform(util.invertTransform(currentViewport));
+    notifyViewport([
+      nextZoom,
+      0,
+      0,
+      nextZoom,
+      point.x - scenePoint.x * nextZoom,
+      point.y - scenePoint.y * nextZoom,
+    ]);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (event.code !== "Space" || target?.closest("input, textarea, select, [contenteditable='true']") || !pointerOverCanvas) return;
+    event.preventDefault();
+    spacePressed = true;
+    stage?.classList.add("is-pan-ready");
+  };
+
+  const clearSpaceState = () => {
+    spacePressed = false;
+    if (!mousePan) stage?.classList.remove("is-pan-ready");
+  };
+
+  const handleKeyUp = (event: KeyboardEvent) => {
+    if (event.code === "Space") clearSpaceState();
+  };
+
+  const handleMouseDown = (event: MouseEvent) => {
+    if (!spacePressed || event.button !== 0) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    mousePan = { clientX: event.clientX, clientY: event.clientY, viewport: [...instance.viewportTransform] as TMat2D };
+    stage?.classList.add("is-panning");
+  };
+
+  const handleMouseMove = (event: MouseEvent) => {
+    if (!mousePan) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const bounds = upperCanvas.getBoundingClientRect();
+    const scaleX = instance.getWidth() / Math.max(1, bounds.width);
+    const scaleY = instance.getHeight() / Math.max(1, bounds.height);
+    const viewport = [...mousePan.viewport] as TMat2D;
+    viewport[4] += (event.clientX - mousePan.clientX) * scaleX;
+    viewport[5] += (event.clientY - mousePan.clientY) * scaleY;
+    notifyViewport(viewport);
+  };
+
+  const handleMouseUp = (event: MouseEvent) => {
+    if (!mousePan) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    mousePan = undefined;
+    stage?.classList.remove("is-panning");
+    if (!spacePressed) stage?.classList.remove("is-pan-ready");
+  };
+
+  const touchPoints = (touches: TouchList, ids?: [number, number]) => {
+    const all = Array.from(touches);
+    const selected = ids
+      ? ids.map((id) => all.find((touch) => touch.identifier === id)).filter((touch): touch is Touch => Boolean(touch))
+      : all.slice(0, 2);
+    return selected.length === 2 ? selected : undefined;
+  };
+
+  const beginTouchGesture = (event: TouchEvent) => {
+    const points = touchPoints(event.touches);
+    if (!points) return;
+    onGestureStart();
+    const first = toViewportPoint(points[0].clientX, points[0].clientY);
+    const second = toViewportPoint(points[1].clientX, points[1].clientY);
+    const center = first.midPointFrom(second);
+    const viewport = [...instance.viewportTransform] as TMat2D;
+    touchGesture = {
+      ids: [points[0].identifier, points[1].identifier],
+      distance: Math.max(1, first.distanceFrom(second)),
+      sceneCenter: center.transform(util.invertTransform(viewport)),
+      viewport,
+    };
+    stage?.classList.add("is-viewport-gesture");
+  };
+
+  const handleTouchStart = (event: TouchEvent) => {
+    if (event.touches.length < 2 && !touchGesture) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!touchGesture) beginTouchGesture(event);
+  };
+
+  const handleTouchMove = (event: TouchEvent) => {
+    if (!touchGesture) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const points = touchPoints(event.touches, touchGesture.ids);
+    if (!points) return;
+    const first = toViewportPoint(points[0].clientX, points[0].clientY);
+    const second = toViewportPoint(points[1].clientX, points[1].clientY);
+    const center = first.midPointFrom(second);
+    const startZoom = Math.hypot(touchGesture.viewport[0], touchGesture.viewport[1]);
+    const zoom = Math.max(EDITOR_MIN_ZOOM, Math.min(EDITOR_MAX_ZOOM, startZoom * first.distanceFrom(second) / touchGesture.distance));
+    notifyViewport([
+      zoom,
+      0,
+      0,
+      zoom,
+      center.x - touchGesture.sceneCenter.x * zoom,
+      center.y - touchGesture.sceneCenter.y * zoom,
+    ]);
+  };
+
+  const handleTouchEnd = (event: TouchEvent) => {
+    if (!touchGesture) return;
+    if (event.touches.length > 0) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    touchGesture = undefined;
+    stage?.classList.remove("is-viewport-gesture");
+  };
+
+  const handleMouseEnter = () => { pointerOverCanvas = true; };
+  const handleMouseLeave = () => { pointerOverCanvas = false; clearSpaceState(); };
+  upperCanvas.addEventListener("mouseenter", handleMouseEnter);
+  upperCanvas.addEventListener("mouseleave", handleMouseLeave);
+  upperCanvas.addEventListener("wheel", handleWheel, { capture: true, passive: false });
+  upperCanvas.addEventListener("mousedown", handleMouseDown, true);
+  upperCanvas.addEventListener("touchstart", handleTouchStart, { capture: true, passive: false });
+  document.addEventListener("keydown", handleKeyDown);
+  document.addEventListener("keyup", handleKeyUp);
+  window.addEventListener("blur", clearSpaceState);
+  document.addEventListener("mousemove", handleMouseMove, true);
+  document.addEventListener("mouseup", handleMouseUp, true);
+  document.addEventListener("touchmove", handleTouchMove, { capture: true, passive: false });
+  document.addEventListener("touchend", handleTouchEnd, { capture: true, passive: false });
+
+  return () => {
+    upperCanvas.removeEventListener("mouseenter", handleMouseEnter);
+    upperCanvas.removeEventListener("mouseleave", handleMouseLeave);
+    upperCanvas.removeEventListener("wheel", handleWheel, true);
+    upperCanvas.removeEventListener("mousedown", handleMouseDown, true);
+    upperCanvas.removeEventListener("touchstart", handleTouchStart, true);
+    document.removeEventListener("keydown", handleKeyDown);
+    document.removeEventListener("keyup", handleKeyUp);
+    window.removeEventListener("blur", clearSpaceState);
+    document.removeEventListener("mousemove", handleMouseMove, true);
+    document.removeEventListener("mouseup", handleMouseUp, true);
+    document.removeEventListener("touchmove", handleTouchMove, true);
+    document.removeEventListener("touchend", handleTouchEnd, true);
+  };
 }
 
 function useResponsiveFabricCanvas(canvasRef: React.MutableRefObject<Canvas | undefined>, stageRef: React.RefObject<HTMLDivElement | null>, onResize: () => void) {

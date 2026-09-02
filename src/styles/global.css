@@ -1610,6 +1610,11 @@ label.invalid > small { color: #c9342f; }
 .studio-tabs button.active { color: var(--sky); background: var(--bg-solid); box-shadow: 0 3px 9px rgba(60,60,70,.1); }
 .image-editor-layout { display: grid; grid-template-columns: minmax(0,1fr) 270px; align-items: start; gap: 13px; margin-top: 14px; }
 .image-editor-canvas-column { position: sticky; top: 24px; min-width: 0; }
+.image-editor-viewport-controls { min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 4px; width: max-content; max-width: 100%; margin: 0 auto 8px; padding: 4px; color: var(--label-secondary); background: var(--bg-muted); border: 1px solid var(--separator); border-radius: 12px; }
+.image-editor-viewport-controls button { min-width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 8px; color: var(--label-secondary); background: var(--bg-solid); border: 1px solid var(--separator); border-radius: 8px; font-size: 12px; font-weight: 750; cursor: pointer; }
+.image-editor-viewport-controls button:disabled { opacity: .35; cursor: default; }
+.image-editor-viewport-controls output { min-width: 48px; color: var(--label); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; }
+.image-editor-viewport-divider { width: 1px; height: 24px; background: var(--separator); }
 .image-editor-panel { min-width: 0; overflow: hidden; background: color-mix(in srgb, var(--bg-solid) 94%, transparent); border: 1px solid var(--separator); border-radius: 15px; box-shadow: 0 10px 26px rgba(30,35,45,.07); }
 .image-editor-panel > header { min-height: 44px; display: flex; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--separator); }
 .image-editor-panel > header strong { font-size: 14px; }
@@ -1631,6 +1636,8 @@ label.invalid > small { color: #c9342f; }
 .inline-input-action input { width: 100%; min-width: 0; min-height: 32px; padding: 0 8px; color: var(--label); background: var(--bg-solid); border: 1px solid var(--separator); border-radius: 8px; font-size: 12px; }
 .sticker-grid { margin-top: 6px; grid-template-columns: repeat(4,1fr); }
 .fabric-stage { position: relative; min-width: 0; overflow: auto; padding: 12px; background: repeating-conic-gradient(#ececf0 0 25%,#f8f8fa 0 50%) 50% / 16px 16px; border: 1px solid var(--separator); border-radius: 14px; }
+.fabric-stage.is-pan-ready .upper-canvas { cursor: grab !important; }
+.fabric-stage.is-panning .upper-canvas, .fabric-stage.is-viewport-gesture .upper-canvas { cursor: grabbing !important; }
 .fabric-stage.is-crop-mode .upper-canvas, .fabric-stage.is-effect-mode .upper-canvas { cursor: crosshair !important; touch-action: none; }
 .fabric-stage .canvas-container { margin: 0 auto; box-shadow: 0 10px 32px rgba(20,25,35,.15); }
 .image-crop-hint { margin: 9px 0 0; color: var(--text-secondary); font-size: .84rem; line-height: 1.45; }

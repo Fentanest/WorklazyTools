@@ -15,10 +15,16 @@ test("region effects retain their source-image anchor through move, scale and ro
 });
 
 test("region effect strength follows object zoom but never display DPR", () => {
-  assert.equal(resolveRegionEffectSourceStrength(10, 0.5, 0.5), 20);
-  assert.equal(resolveRegionEffectSourceStrength(10, 0.5, 0.5, 2), 10);
-  // DPR is deliberately absent from the API, so the same edit has the same source strength on DPR 1, 2, or 3.
-  assert.equal(resolveRegionEffectSourceStrength(10, 1, 1), 10);
+  const matrix = [
+    { dpr: 1, zoom: 1, expected: 20 },
+    { dpr: 2, zoom: 1, expected: 20 },
+    { dpr: 1, zoom: 2, expected: 10 },
+    { dpr: 2, zoom: 2, expected: 10 },
+  ];
+  matrix.forEach(({ dpr, zoom, expected }) => {
+    // DPR is deliberately absent from the API. Object scaling plus user zoom is the entire visible-strength contract.
+    assert.equal(resolveRegionEffectSourceStrength(10, 0.5, 0.5, zoom), expected, `DPR ${dpr}, zoom ${zoom}`);
+  });
 });
 
 test("region effect layers stay directly above the base image", () => {
