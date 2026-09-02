@@ -84,12 +84,38 @@ export interface VideoWorkerRequest {
   mode: "batch";
   jobs: VideoOutputJob[];
   task: VideoTask;
+  resultStorage?: VideoResultStorageSession;
 }
 
+export interface VideoResultStorageSession {
+  mode: "memory" | "opfs";
+  rootDirectoryName: string;
+  sessionDirectoryName: string;
+  sessionId: string;
+  ownerId: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface VideoOpfsResultReference {
+  kind: "opfs";
+  rootDirectoryName: string;
+  sessionDirectoryName: string;
+  sessionId: string;
+  ownerId: string;
+  entryName: string;
+}
+
+export type VideoResultData =
+  | { kind: "buffer"; buffer: ArrayBuffer }
+  | { kind: "file"; file: File }
+  | VideoOpfsResultReference;
+
 export interface VideoWorkerOutput {
-  buffer: ArrayBuffer;
+  data: VideoResultData;
   fileName: string;
   mimeType: string;
+  size: number;
 }
 
 export interface VideoWorkerResult {
@@ -98,4 +124,4 @@ export interface VideoWorkerResult {
 }
 
 export type VideoWorkerProgress = (progress: number, message: string) => void;
-export type VideoWorkerOutputHandler = (output: VideoWorkerOutput) => void;
+export type VideoWorkerOutputHandler = (output: VideoWorkerOutput) => void | Promise<void>;

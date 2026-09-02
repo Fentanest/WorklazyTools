@@ -136,6 +136,8 @@
         "thereAreNoResultFilesToAddTo": "ZIP으로 묶을 결과 파일이 없습니다.",
         "addingResultToZip": "{{p0}}/{{p1}} 결과를 ZIP에 추가하는 중…",
         "creatingZipFile": "ZIP 파일 만드는 중… {{p0}}%",
+        "finalizingZipFile": "{{p0}} 마무리 중…",
+        "thereIsNotEnoughBrowserStorageForThisZip": "ZIP 파일을 완성할 브라우저 저장 공간이 부족합니다. 불필요한 브라우저 데이터를 정리하거나 결과를 개별로 내려받아 주세요.",
         "worklazyVideoResultsZip": "worklazy-비디오-결과-{{p0}}개.zip"
       },
       "videoProbe": {
@@ -279,7 +281,8 @@
         "sec": "{{p0}}초",
         "minSec": "{{p0}}분 {{p1}}초",
         "engineMultiThreaded": "멀티스레드",
-        "engineSingleThreaded": "단일 스레드 호환"
+        "engineSingleThreaded": "단일 스레드 호환",
+        "thereIsNotEnoughBrowserStorageForThisResult": "완성된 결과를 안전하게 보관할 브라우저 저장 공간이 부족합니다. 출력 구간·해상도를 줄이거나 불필요한 브라우저 데이터를 정리한 뒤 다시 시도해 주세요."
       },
       "videoWorkerClient": {
         "videoMetadataInspectionWasCanceled": "영상 정보 확인을 취소했습니다.",
@@ -295,6 +298,7 @@
         "anErrorOccurredWhileProcessingTheVideo": "비디오 처리 중 오류가 발생했습니다.",
         "unableToStartVideoProcessing": "비디오 작업을 시작하지 못했습니다.",
         "theVideoWorkspaceDidNotStartWithin30": "영상 처리를 30초 안에 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.",
+        "unableToStoreTheCompletedVideoResult": "완성된 비디오 결과를 보관하지 못했습니다. 브라우저 저장 공간을 확인한 뒤 다시 시도해 주세요.",
         "originalVideo": "원본 영상"
       },
       "VideoStudioPage": {
@@ -456,7 +460,7 @@
           {
             "title": "대용량 원본과 결과 한도",
             "paragraphs": [
-              "대용량 원본은 한 번에 메모리로 복사하지 않습니다. 다만 변환 중간 데이터와 완성된 결과는 브라우저 메모리를 사용하므로, 긴 4K 영상은 필요한 구간을 먼저 줄이는 것이 좋습니다. 원본 그대로 복사한 예상 결과가 안전 한도를 넘으면 작업 전에 안내합니다."
+              "대용량 원본은 한 번에 메모리로 복사하지 않습니다. 완성된 결과와 ZIP은 지원되는 브라우저에서 임시 파일로 보관하고, 이 방식을 쓸 수 없으면 기존 메모리 방식으로 자동 전환합니다. 원본 그대로 복사한 예상 결과가 안전 한도를 넘으면 작업 전에 안내합니다."
             ]
           },
           {
@@ -512,7 +516,7 @@
         ]
       },
       "downloadGuidanceLabel": "전체 개별 다운로드",
-      "downloadGuidance": "는 브라우저가 여러 파일 다운로드 허용을 요청할 수 있습니다. ZIP은 영상 용량이 거의 줄지 않고 원본 결과와 ZIP을 함께 메모리에 두므로, 공유용 묶음이 꼭 필요할 때만 사용하세요."
+      "downloadGuidance": "는 브라우저가 여러 파일 다운로드 허용을 요청할 수 있습니다. ZIP은 영상 용량이 거의 줄지 않지만, 지원되는 브라우저에서 결과를 한 개씩 읽어 임시 파일로 만듭니다. 공유용 묶음이 필요할 때 사용하세요."
     }
   },
   "pdf": {

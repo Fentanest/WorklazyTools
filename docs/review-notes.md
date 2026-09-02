@@ -2,6 +2,18 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-03
+
+### 비디오 A4 — 결과 저장 추상화·스트리밍 ZIP 판정 (Codx)
+
+- **결과 계약·완료 순서**: `VideoWorkerOutput`을 buffer 전용에서 buffer/File/브라우저 임시 파일 참조 공통 계약으로 확장했다. 처리 워커는 완성 바이트를 워커 전용 동기 파일 핸들(미지원 시 비동기 writable)에 먼저 기록한 뒤 참조만 전달한다. 클라이언트의 출력 콜백은 직렬 Promise 큐로 대기해 마지막 `result` 이벤트가 먼저 와도 모든 File 해석·UI 저장이 끝나기 전 작업 성공을 resolve하지 않는다.
+- **수명주기·폴백 판정**: 실행마다 난수 세션·소유 ID와 24시간 lease를 만들고, 시작 시 공유 루트 전체가 아니라 만료된 `session-*`만 청소한다. 소유 메타데이터가 다른 세션은 release하지 않으며 성공 파일은 유지하고 실패·취소 시 부분 파일만 삭제한다. 저장 방식 미지원 또는 일반 쓰기 실패는 기존 메모리 결과로 자동 전환한다. 용량 부족은 결과 예상 크기와 16MiB/5% 여유를 검사해 128MiB 이하만 메모리 폴백하고 그보다 크면 내부 명칭·원시 예외 없이 안전 오류를 표시한다. 단위 테스트에서 성공·미지원·소유권 불일치 폴백·용량 부족 소/대 분기·활성 쓰기 취소·TTL 잔재 청소·소유자 전용 해제를 통과했다.
+- **메인 힙 실측**: Chrome 152/Linux/16 logical CPU·16.69GB RAM에서 `node scripts/benchmark-video-result-storage.mjs --runs 3 --outputs 4 --bytes-per-output 67108864 --output-dir /tmp/worklazy-video-result-storage-a4`를 실행했다. 64MiB 결과 4개(총 `268,435,456B`)의 File wrapper와 object URL을 모두 유지하고 강제 GC 뒤 측정한 세 실행의 메인 JS 힙 증분은 모두 `69,604B`, worker→main 전송 ArrayBuffer는 `0`이었다. 출력 바이트/힙 바이트 비율은 `3,856.61`, 결과 크기 대비 힙 상주 비율은 `0.02593%`였다.
+- **ZIP 구현·스트리밍 실측**: 비디오 경로의 JSZip 참조를 0건으로 만들고 `@zip.js/zip.js@2.9.0`을 exact lock했다. `BlobReader` 입력을 `for` 루프의 순차 `await ZipWriter.add`로만 추가하고 입력·출력 모두 `bufferedWrite:false`, 각 add와 close에 `zip64:true`를 강제했다. 프로덕션 helper의 `8,388,731B` 계측 입력은 전체 `arrayBuffer()` `0`회, stream `1`회, `129`개 입력 구간·최대 `65,536B`; ZIP 출력은 `8,389,205B`를 `136`회 write·최대 `65,536B`로 기록했다. ZIP64 EOCD·locator·classic EOCD를 모두 확인하고 런타임 fixture를 시스템 `unzip -t/-p`로 왕복해 payload SHA-256 동일성을 통과했다.
+- **브라우저 회귀·번들 판정**: 실제 Chrome 비디오 스모크에서 그룹 결과 2개가 세션 임시 파일로 남고 ZIP도 같은 세션의 ZIP64 파일로 생성됨을 확인했다. ZIP 워커 요청은 화면·결과 생성 전 `0`건, ZIP 버튼 뒤 정확히 `1`건으로 지연 로드를 유지했다. 사용자 화면에는 내부 저장/라이브러리 명칭이나 원시 번역 토큰이 없고, 새 ko/en 임시 파일 안내와 오디오 스튜디오 BroadcastChannel handoff도 통과했다. URL·검색 의미·정적 SEO 페이지·광고 위치·광고 제외 격리 경로·서버 전제는 바뀌지 않아 추가 SEO/AdSense 코드는 불필요로 판정했다.
+- **의존성·범위 판정**: 라이선스 생성기가 zip.js 2.9.0 BSD-3-Clause 고지를 자동 반영했다. JSZip은 다른 도구가 사용하므로 전역 제거하지 않고 비디오 경로에서만 교체했다. B1b에서 기각된 Mediabunny는 manifest·lock·소스에 추가하지 않았고 B4·B2·B3은 진행하지 않았다.
+- **완료 검증**: `npm run build` → exit 0(2,348 modules, video worker 26.76kB, ZIP worker 144.66kB, 정적 55페이지), `npm run test:unit` → 79/79, `npm run test:new-tools` → HWP·이미지·오디오·비디오 전체 통과, `npm run test:utilities` → ko/en·비디오 호환 포함 통과, `npm run test:static` → 현지화 페이지·self-hosted 런타임·ads/robots/sitemap 통과. `git diff --check`와 비디오 경로 JSZip 0건 검사도 통과했다.
+
 ## 2026-09-02
 
 ### 비디오 A3 — concat 세그먼트 오프로드 실측·판정 (Codx)

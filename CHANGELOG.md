@@ -2,6 +2,10 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-03
+
+- 비디오 완성 결과를 공통 buffer/File/브라우저 임시 파일 계약으로 확장하고 세션 소유권·만료·실패/취소 정리를 도입했다. 비디오 ZIP은 zip.js 순차 스트리밍·강제 ZIP64로 교체했으며 비동기 결과 저장 대기, 용량 부족 폴백, ko/en 안내와 힙·ZIP64·수명주기 회귀를 추가했다. — Codx
+
 ## 2026-09-02
 
 - 비디오 concat 세그먼트를 생성 직후 Blob으로 오프로드하고 MEMFS 파일을 삭제한 뒤 WORKERFS 절대경로로 재마운트해 조인하도록 변경했다. mount 수명주기 정리 단위 테스트와 Chrome 대용량 MEMFS·RSS·SHA 벤치를 추가했다. — Codx

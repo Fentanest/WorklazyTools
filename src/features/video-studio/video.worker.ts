@@ -3,6 +3,7 @@
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 
 import type {
+  VideoResultStorageSession,
   VideoTask,
   VideoWorkerInput,
 } from "./types";
@@ -10,6 +11,7 @@ import { appendVideoRateControl, even, outputDimensionsForSource, resolveAudioSa
 import { classifyVideoProcessingFailure } from "./videoErrors";
 import { offloadConcatSegment, withMountedConcatSegments, type ConcatSegmentBlob } from "./videoConcatSegments";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
+import { persistVideoWorkerResult, VideoResultQuotaError } from "./videoResultStorage.worker";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 const runtimeLanguage = worker.location.pathname.match(new RegExp(`^${import.meta.env.BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(ko|en)(?:/|$)`))?.[1];
@@ -45,6 +47,7 @@ interface VideoWorkerStartRequest {
   task: VideoTask;
   language: "ko" | "en";
   fileLabels: VideoFileLabels;
+  resultStorage?: VideoResultStorageSession;
 }
 interface VideoFileLabels { concatenated: string; passthrough: string; converted: string; animation: string; audio: string }
 type VideoWorkerCommand =
@@ -153,11 +156,16 @@ async function processRequest(request: VideoWorkerStartRequest) {
         progress(progressStage.start, featureMessage(currentLanguage, "video.messages.video.preparing", { p0: label }));
       });
       completedJobDuration += jobDurations[jobIndex];
-      const buffer = result.bytes.buffer as ArrayBuffer;
+      const storedResult = await persistVideoWorkerResult(
+        result.bytes,
+        result.name,
+        getMimeType(result.name),
+        request.resultStorage,
+      );
       worker.postMessage({
         type: "output",
-        output: { buffer, fileName: result.name, mimeType: getMimeType(result.name) },
-      }, [buffer]);
+        output: storedResult.output,
+      }, storedResult.transfer);
       progress(
         23 + (completedJobDuration / totalJobDuration) * 67,
         featureMessage(currentLanguage, "video.messages.video.resultReadyCheckingTheNextJob", { p0: jobIndex + 1, p1: request.jobs.length }),
@@ -603,6 +611,12 @@ function progress(value: number, message: string) {
 }
 
 function normalizeError(error: unknown, diagnosticMessages: readonly string[] = []) {
+  if (error instanceof VideoResultQuotaError) {
+    return {
+      message: featureMessage(currentLanguage, "video.messages.video.thereIsNotEnoughBrowserStorageForThisResult"),
+      code: "RESULT_STORAGE_QUOTA",
+    };
+  }
   const code = classifyVideoProcessingFailure(error, diagnosticMessages);
   if (code === "OUT_OF_MEMORY") return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserRanOutOfMemoryTryA"), code };
   if (code === "CODEC_UNAVAILABLE") return { message: featureMessage(currentLanguage, "video.messages.video.theBrowserEncodingEngineDoesNotSupportThe"), code };

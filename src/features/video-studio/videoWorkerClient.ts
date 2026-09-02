@@ -6,12 +6,14 @@ import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
 import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessages";
 import { FEATURE_MESSAGE_TOKEN_PREFIX } from "../../i18n/workerMessages";
 import { UserFacingVideoError } from "./videoErrors";
+import { VideoOutputQueue } from "./videoOutputQueue";
 
 type VideoWorkerInputDescriptor = Omit<VideoWorkerRequest["jobs"][number]["inputs"][number], "file"> & { fileId: string };
 interface VideoWorkerStartRequest {
   mode: "batch";
   jobs: Array<{ name: string; mode: "individual" | "concat"; inputs: VideoWorkerInputDescriptor[] }>;
   task: VideoWorkerRequest["task"];
+  resultStorage?: VideoWorkerRequest["resultStorage"];
   language: AppLanguage;
   fileLabels: { concatenated: string; passthrough: string; converted: string; animation: string; audio: string };
 }
@@ -69,11 +71,12 @@ export function runVideoTask(
   signal?: AbortSignal,
   language: AppLanguage = "ko",
 ) {
-    const worker = new Worker(localizedVideoWorkerUrl(videoProcessorWorkerUrl), { type: "module" });
+  const worker = new Worker(localizedVideoWorkerUrl(videoProcessorWorkerUrl), { type: "module" });
   const inputFiles = new Map<string, File>();
   const startRequest: VideoWorkerStartRequest = {
     mode: request.mode,
     task: request.task,
+    resultStorage: request.resultStorage,
     language,
     fileLabels: {
       concatenated: featureMessage(language, "video.messages.video.concatenated"),
@@ -95,6 +98,9 @@ export function runVideoTask(
   return new Promise<VideoWorkerResult>((resolve, reject) => {
     let settled = false;
     let started = false;
+    let terminalMessageReceived = false;
+    let abortRequested = false;
+    const outputHandlers = new VideoOutputQueue();
     let startupTimer: number | undefined;
     const finish = () => {
       if (settled) return false;
@@ -106,8 +112,15 @@ export function runVideoTask(
       return true;
     };
     const abort = () => {
-      if (!finish()) return;
-      reject(new DOMException(featureMessage(language, "video.messages.videoWorkerClient.videoProcessingWasCanceled"), "AbortError"));
+      if (settled || abortRequested) return;
+      abortRequested = true;
+      terminalMessageReceived = true;
+      if (startupTimer !== undefined) window.clearTimeout(startupTimer);
+      worker.terminate();
+      const rejectAfterOutputs = () => {
+        if (finish()) reject(new DOMException(featureMessage(language, "video.messages.videoWorkerClient.videoProcessingWasCanceled"), "AbortError"));
+      };
+      void outputHandlers.wait().then(rejectAfterOutputs, rejectAfterOutputs);
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) {
@@ -143,13 +156,21 @@ export function runVideoTask(
       if (data.type === "request-input-file") {
         const file = data.fileId ? inputFiles.get(data.fileId) : undefined;
         if (!file) {
-          if (finish()) reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.theBrowserFileReferenceForIsUnavailableSelect", { p0: data.fileName || featureMessage(language, "video.messages.videoWorkerClient.originalVideo") })));
+          terminalMessageReceived = true;
+          worker.terminate();
+          const inputError = new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.theBrowserFileReferenceForIsUnavailableSelect", { p0: data.fileName || featureMessage(language, "video.messages.videoWorkerClient.originalVideo") }));
+          const rejectAfterOutputs = () => { if (finish()) reject(inputError); };
+          void outputHandlers.wait().then(rejectAfterOutputs, rejectAfterOutputs);
           return;
         }
         try {
           worker.postMessage({ type: "input-file", fileId: data.fileId, file });
         } catch (error) {
-          if (finish()) reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToSendTheFileReferenceToThe", { p0: file.name })));
+          terminalMessageReceived = true;
+          worker.terminate();
+          const inputError = new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToSendTheFileReferenceToThe", { p0: file.name }));
+          const rejectAfterOutputs = () => { if (finish()) reject(inputError); };
+          void outputHandlers.wait().then(rejectAfterOutputs, rejectAfterOutputs);
         }
         return;
       }
@@ -158,18 +179,44 @@ export function runVideoTask(
         return;
       }
       if (data.type === "output") {
-        if (data.output) onOutput?.(data.output);
+        if (data.output) {
+          const pendingOutput = outputHandlers.enqueue(async () => {
+            if (settled) return;
+            await onOutput?.(data.output!);
+          });
+          void pendingOutput.catch(() => {
+            if (!finish()) return;
+            reject(abortRequested
+              ? new DOMException(featureMessage(language, "video.messages.videoWorkerClient.videoProcessingWasCanceled"), "AbortError")
+              : new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStoreTheCompletedVideoResult")));
+          });
+        }
         return;
       }
-      if (!finish()) return;
+      if (terminalMessageReceived || settled) return;
+      terminalMessageReceived = true;
       if (data.type === "result") {
         const result = data.result as VideoWorkerResult;
-        resolve({ ...result, warnings: result.warnings.map((warning) => resolveFeatureMessage(language, warning)) });
-      } else reject(new UserFacingVideoError(resolveSafeWorkerMessage(data.error?.message, language, "video.messages.videoWorkerClient.anErrorOccurredWhileProcessingTheVideo"), data.error?.code));
+        void outputHandlers.wait().then(() => {
+          if (!finish()) return;
+          resolve({ ...result, warnings: result.warnings.map((warning) => resolveFeatureMessage(language, warning)) });
+        }, () => {
+          if (!finish()) return;
+          reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStoreTheCompletedVideoResult")));
+        });
+      } else {
+        const workerError = new UserFacingVideoError(resolveSafeWorkerMessage(data.error?.message, language, "video.messages.videoWorkerClient.anErrorOccurredWhileProcessingTheVideo"), data.error?.code);
+        const rejectAfterOutputs = () => { if (finish()) reject(workerError); };
+        void outputHandlers.wait().then(rejectAfterOutputs, rejectAfterOutputs);
+      }
     };
     worker.onerror = (event) => {
-      if (!finish()) return;
-      reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStartVideoProcessing")));
+      if (terminalMessageReceived || settled) return;
+      terminalMessageReceived = true;
+      const rejectAfterOutputs = () => {
+        if (finish()) reject(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStartVideoProcessing")));
+      };
+      void outputHandlers.wait().then(rejectAfterOutputs, rejectAfterOutputs);
     };
     startupTimer = window.setTimeout(() => {
       if (!finish()) return;

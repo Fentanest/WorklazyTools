@@ -33,6 +33,8 @@ import type {
   VideoItem,
   VideoOutputFormat,
   VideoOutputJob,
+  VideoResultData,
+  VideoResultStorageSession,
   VideoResolution,
   VideoRotation,
   VideoTask,
@@ -49,6 +51,13 @@ import { applyGroupRangesByPosition, applyVideoRangeToGroup } from "./videoRange
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
+import {
+  cleanupPartialVideoResults,
+  createVideoResultStorageSession,
+  opfsEntryNames,
+  releaseVideoResultStorageSession,
+  resolveVideoResultFile,
+} from "./videoResultStorage";
 
 type GroupSettings = VideoGroupSettings;
 
@@ -71,7 +80,8 @@ interface DownloadableVideoOutput {
   id: string;
   fileName: string;
   mimeType: string;
-  blob: Blob;
+  blob: File;
+  data: VideoResultData;
   url: string;
 }
 
@@ -122,6 +132,8 @@ export function VideoStudioPage() {
   const players = useRef<Record<string, HTMLVideoElement | null>>({});
   const itemsRef = useRef<VideoItem[]>([]);
   const videoOutputsRef = useRef<DownloadableVideoOutput[]>([]);
+  const resultStorageRef = useRef<VideoResultStorageSession | undefined>(undefined);
+  const archiveEntriesRef = useRef(new Set<string>());
   const activeController = useRef<AbortController | undefined>(undefined);
   const probeControllers = useRef(new Map<string, AbortController>());
   const probeQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -132,6 +144,7 @@ export function VideoStudioPage() {
     itemsRef.current.forEach((item) => URL.revokeObjectURL(item.url));
     videoOutputsRef.current.forEach((output) => URL.revokeObjectURL(output.url));
     activeController.current?.abort();
+    if (resultStorageRef.current) void releaseVideoResultStorageSession(resultStorageRef.current);
     probeControllers.current.forEach((controller) => controller.abort());
     probeControllers.current.clear();
     audioHandoffChannels.current.forEach((channel) => channel.close());
@@ -300,15 +313,20 @@ export function VideoStudioPage() {
     videoOutputsRef.current.forEach((output) => URL.revokeObjectURL(output.url));
     videoOutputsRef.current = [];
     setVideoOutputs([]);
+    archiveEntriesRef.current.clear();
+    const session = resultStorageRef.current;
+    resultStorageRef.current = undefined;
+    if (session) void releaseVideoResultStorageSession(session);
   };
 
-  const appendVideoOutput = (output: VideoWorkerOutput) => {
-    const blob = new Blob([output.buffer], { type: output.mimeType });
+  const appendVideoOutput = async (output: VideoWorkerOutput) => {
+    const blob = await resolveVideoResultFile(output);
     const next = {
       id: createId(),
       fileName: output.fileName,
       mimeType: output.mimeType,
       blob,
+      data: output.data,
       url: URL.createObjectURL(blob),
     } satisfies DownloadableVideoOutput;
     videoOutputsRef.current = [...videoOutputsRef.current, next];
@@ -355,13 +373,21 @@ export function VideoStudioPage() {
         progress.update,
         controller.signal,
         language,
+        resultStorageRef.current,
       );
-      downloadBuffer(result.buffer, result.mimeType, result.fileName);
+      const archive = await resolveVideoResultFile(result);
+      if (result.data.kind === "opfs") archiveEntriesRef.current.add(result.data.entryName);
+      downloadBlob(archive, result.fileName);
       progress.succeed(featureMessage(language, "video.messages.VideoStudioPage.created", { p0: result.fileName }));
       setLastResult(featureMessage(language, "video.messages.VideoStudioPage.createdAndDownloaded", { p0: result.fileName }));
     } catch (error) {
       progress.fail(error instanceof DOMException && error.name === "AbortError" ? featureMessage(language, "video.messages.VideoStudioPage.zipCreationWasCanceled") : toUserFacingVideoError(error, language));
     } finally {
+      const session = resultStorageRef.current;
+      if (session) {
+        const keepEntries = [...opfsEntryNames(videoOutputsRef.current), ...archiveEntriesRef.current];
+        await cleanupPartialVideoResults(session, keepEntries).catch(() => undefined);
+      }
       if (activeController.current === controller) activeController.current = undefined;
     }
   };
@@ -450,30 +476,48 @@ export function VideoStudioPage() {
     const totalSize = items.reduce((sum, item) => sum + item.file.size, 0);
     const cautionBytes = mobileDevice ? 250 * 1024 * 1024 : 500 * 1024 * 1024;
     if (totalSize > cautionBytes && !window.confirm(featureMessage(language, "video.messages.VideoStudioPage.largeFileNoticeTheSelectedSourcesTotalThey", { p0: formatBytes(totalSize) }))) return;
-    await executeTask((controller, onOutput) => {
+    await executeTask((controller, onOutput, resultStorage) => {
       const jobs: VideoOutputJob[] = jobEntries.map((job) => ({
         name: job.name,
         mode: job.mode,
         inputs: job.items.map(toWorkerInput),
       }));
-      return runVideoTask({ mode: "batch", jobs, task }, progress.update, onOutput, controller.signal, language);
+      return runVideoTask({ mode: "batch", jobs, task, resultStorage }, progress.update, onOutput, controller.signal, language);
     });
   };
 
-  const executeTask = async (task: (controller: AbortController, onOutput: (output: VideoWorkerOutput) => void) => ReturnType<typeof runVideoTask>) => {
+  const executeTask = async (task: (
+    controller: AbortController,
+    onOutput: (output: VideoWorkerOutput) => Promise<void>,
+    resultStorage: VideoResultStorageSession,
+  ) => ReturnType<typeof runVideoTask>) => {
     const controller = new AbortController();
     activeController.current = controller;
     clearVideoOutputs();
     progress.start(featureMessage(language, "video.messages.VideoStudioPage.attachingSourceVideosToTheProcessingEngineWithout"));
     setLastResult("");
     try {
-      const result = await task(controller, appendVideoOutput);
+      const resultStorage = await createVideoResultStorageSession();
+      if (controller.signal.aborted) {
+        await releaseVideoResultStorageSession(resultStorage);
+        throw new DOMException(featureMessage(language, "video.messages.VideoStudioPage.videoProcessingWasCanceled"), "AbortError");
+      }
+      resultStorageRef.current = resultStorage;
+      const result = await task(controller, appendVideoOutput, resultStorage);
       setLastResult(featureMessage(language, "video.messages.VideoStudioPage.allResultsAreReady", { p0: result.outputCount, p1: result.warnings.length ? ` ${result.warnings[0]}` : "" }));
       progress.succeed(featureMessage(language, "video.messages.VideoStudioPage.resultsCreated", { p0: result.outputCount }));
     } catch (error) {
       progress.fail(error instanceof DOMException && error.name === "AbortError" ? featureMessage(language, "video.messages.VideoStudioPage.videoProcessingWasCanceled") : toUserFacingVideoError(error, language));
       if (videoOutputsRef.current.length) setLastResult(featureMessage(language, "video.messages.VideoStudioPage.resultsCompletedAndCanBeDownloadedIndividuallyBelow", { p0: videoOutputsRef.current.length }));
     } finally {
+      const session = resultStorageRef.current;
+      if (session) {
+        await cleanupPartialVideoResults(session, opfsEntryNames(videoOutputsRef.current)).catch(() => undefined);
+        if (!videoOutputsRef.current.length) {
+          resultStorageRef.current = undefined;
+          await releaseVideoResultStorageSession(session);
+        }
+      }
       if (activeController.current === controller) activeController.current = undefined;
     }
   };
@@ -887,8 +931,8 @@ function formatTime(seconds: number) {
   const remaining = seconds % 60;
   return `${String(minutes).padStart(2, "0")}:${remaining.toFixed(1).padStart(4, "0")}`;
 }
-function downloadBuffer(buffer: ArrayBuffer, mimeType: string, fileName: string) {
-  const url = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
   triggerDownloadUrl(url, fileName);
   window.setTimeout(() => URL.revokeObjectURL(url), 15_000);
 }

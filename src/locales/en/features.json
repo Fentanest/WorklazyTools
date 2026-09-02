@@ -136,6 +136,8 @@
         "thereAreNoResultFilesToAddTo": "There are no result files to add to a ZIP.",
         "addingResultToZip": "{{p0}}/{{p1}} Adding result to ZIP…",
         "creatingZipFile": "Creating ZIP file… {{p0}}%",
+        "finalizingZipFile": "Finishing {{p0}}…",
+        "thereIsNotEnoughBrowserStorageForThisZip": "There is not enough browser storage to finish this ZIP. Clear unneeded browser data or download the results individually.",
         "worklazyVideoResultsZip": "worklazy-video-results-{{p0}}.zip"
       },
       "videoProbe": {
@@ -279,7 +281,8 @@
         "sec": "{{p0}} sec",
         "minSec": "{{p0}} min {{p1}} sec",
         "engineMultiThreaded": "multi-threaded",
-        "engineSingleThreaded": "single-thread compatibility"
+        "engineSingleThreaded": "single-thread compatibility",
+        "thereIsNotEnoughBrowserStorageForThisResult": "There is not enough browser storage to keep this completed result safely. Shorten the output range, lower the resolution, or clear unneeded browser data and try again."
       },
       "videoWorkerClient": {
         "videoMetadataInspectionWasCanceled": "Reading video details was canceled.",
@@ -295,6 +298,7 @@
         "anErrorOccurredWhileProcessingTheVideo": "An error occurred while processing the video.",
         "unableToStartVideoProcessing": "Unable to start video processing.",
         "theVideoWorkspaceDidNotStartWithin30": "Video processing did not start within 30 seconds. Refresh the page and try again.",
+        "unableToStoreTheCompletedVideoResult": "The completed video result could not be kept. Check available browser storage and try again.",
         "originalVideo": "source video"
       },
       "VideoStudioPage": {
@@ -456,7 +460,7 @@
           {
             "title": "Large sources and output limits",
             "paragraphs": [
-              "Large source videos are not copied into memory all at once. Intermediate data and final results still use browser memory, so trim long 4K sources first. Oversized passthrough estimates are reported before processing."
+              "Large source videos are not copied into memory all at once. Completed results and ZIP files are kept as temporary files in supported browsers, with the existing memory path used automatically when that is unavailable. Oversized passthrough estimates are reported before processing."
             ]
           },
           {
@@ -512,7 +516,7 @@
         ]
       },
       "downloadGuidanceLabel": "Download all individually",
-      "downloadGuidance": " may prompt your browser to allow multiple downloads. ZIP barely reduces video size and keeps both results and the archive in memory, so use it only when you need one bundle."
+      "downloadGuidance": " may prompt your browser to allow multiple downloads. ZIP barely reduces video size, but supported browsers build it as a temporary file while reading one result at a time. Use it when you need one bundle."
     }
   },
   "pdf": {

@@ -2407,14 +2407,15 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   }
   await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
   const videoAdRequests = [];
+  const videoZipWorkerRequests = [];
   const captureVideoRequests = (request) => {
     if (request.url().includes("pagead2.googlesyndication.com")) videoAdRequests.push(request.url());
+    if (request.url().includes("video-zip.worker-")) videoZipWorkerRequests.push(request.url());
   };
   page.on("request", captureVideoRequests);
   await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
   await page.waitForSelector(".video-studio-page input[type=file]");
-  page.off("request", captureVideoRequests);
   const isolation = await page.evaluate(() => ({
     marker: Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')),
     ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
@@ -2609,6 +2610,10 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     .filter((element) => element.children.length === 0 && element.textContent?.includes("__worklazy_i18n__:"))
     .map((element) => element.textContent).slice(0, 5));
   if (rawVideoMessages.length) throw new Error(`A raw i18n worker token was exposed in video progress UI: ${JSON.stringify(rawVideoMessages)}`);
+  const internalVideoMessages = await page.$$eval(".video-studio-page *", (elements) => elements
+    .filter((element) => element.children.length === 0 && /\b(?:OPFS|SyncAccessHandle|zip\.js)\b/i.test(element.textContent || ""))
+    .map((element) => element.textContent).slice(0, 5));
+  if (internalVideoMessages.length) throw new Error(`Internal video storage names were exposed in the UI: ${JSON.stringify(internalVideoMessages)}`);
   const audioResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({
     fileName: element.querySelector("a")?.getAttribute("download") || "",
     handoff: element.querySelector(".audio-handoff-button")?.textContent || "",
@@ -2661,10 +2666,30 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Video concat error"));
   const groupedResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => element.textContent || ""));
   if (groupedResults.length !== 2) throw new Error(`Grouped concat did not expose two individual results: ${JSON.stringify(groupedResults)}`);
+  const resultStorageState = await inspectVideoResultStorage(page);
+  if (resultStorageState.mode !== "opfs" || resultStorageState.resultFiles.length !== 2 || resultStorageState.resultFiles.some((file) => file.size <= 0)) {
+    throw new Error(`Video outputs were not retained as browser temporary files: ${JSON.stringify(resultStorageState)}`);
+  }
   const resultActions = await page.$eval(".video-result-actions", (element) => element.textContent || "");
   if (!resultActions.includes("전체 개별 다운로드") || !resultActions.includes("ZIP으로 묶기")) throw new Error(`Video result actions are incomplete: ${resultActions}`);
+  const downloadGuidance = await page.$eval(".video-download-guidance", (element) => element.textContent || "");
+  if (!downloadGuidance.includes("결과를 한 개씩 읽어 임시 파일로") || downloadGuidance.includes("원본 결과와 ZIP을 함께 메모리에")) {
+    throw new Error(`Video ZIP memory guidance is stale: ${downloadGuidance}`);
+  }
+  if (videoZipWorkerRequests.length !== 0) {
+    throw new Error(`Video ZIP worker loaded before ZIP creation: ${JSON.stringify(videoZipWorkerRequests)}`);
+  }
   await page.evaluate(() => Array.from(document.querySelectorAll(".video-result-actions button")).find((button) => button.textContent?.includes("ZIP으로 묶기"))?.click());
   await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("worklazy-비디오-결과-2개.zip"), { timeout: 60_000 });
+  page.off("request", captureVideoRequests);
+  if (videoZipWorkerRequests.length !== 1) {
+    throw new Error(`Video ZIP worker request count is not one: ${JSON.stringify(videoZipWorkerRequests)}`);
+  }
+  const zipStorageState = await inspectVideoResultStorage(page);
+  const zipFile = zipStorageState.resultFiles.find((file) => file.name.endsWith(".zip"));
+  if (!zipFile?.zip64Eocd || !zipFile.zip64Locator || !zipFile.classicEocd) {
+    throw new Error(`The browser ZIP result is not forced ZIP64: ${JSON.stringify(zipStorageState)}`);
+  }
 
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(...videoPaths.slice(2));
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 7);
@@ -2883,6 +2908,46 @@ async function installVideoTransferProbe(page) {
       if (message?.type === "input-file" && message.file instanceof File) window.__videoWorkerTransferState.inputFileSizes.push(message.file.size);
       return Reflect.apply(nativePostMessage, this, arguments);
     };
+  });
+}
+
+async function inspectVideoResultStorage(page) {
+  return page.evaluate(async () => {
+    if (!navigator.storage?.getDirectory) return { mode: "memory", resultFiles: [] };
+    try {
+      const storageRoot = await navigator.storage.getDirectory();
+      const root = await storageRoot.getDirectoryHandle("worklazy-video-results-v1");
+      const sessions = [];
+      for await (const [sessionName, sessionHandle] of root.entries()) {
+        if (sessionHandle.kind !== "directory") continue;
+        const resultFiles = [];
+        for await (const [name, handle] of sessionHandle.entries()) {
+          if (handle.kind !== "file" || !name.startsWith("result-")) continue;
+          const file = await handle.getFile();
+          const signatures = name.endsWith(".zip") ? new Uint8Array(await file.arrayBuffer()) : undefined;
+          const includes = (signature) => {
+            if (!signatures) return false;
+            outer: for (let index = 0; index <= signatures.length - signature.length; index += 1) {
+              for (let offset = 0; offset < signature.length; offset += 1) if (signatures[index + offset] !== signature[offset]) continue outer;
+              return true;
+            }
+            return false;
+          };
+          resultFiles.push({
+            name,
+            size: file.size,
+            zip64Eocd: includes([0x50, 0x4b, 0x06, 0x06]),
+            zip64Locator: includes([0x50, 0x4b, 0x06, 0x07]),
+            classicEocd: includes([0x50, 0x4b, 0x05, 0x06]),
+          });
+        }
+        sessions.push({ sessionName, resultFiles });
+      }
+      const current = sessions.sort((left, right) => right.resultFiles.length - left.resultFiles.length)[0];
+      return { mode: "opfs", resultFiles: current?.resultFiles || [], sessions: sessions.length };
+    } catch (error) {
+      return { mode: "error", resultFiles: [], error: error instanceof Error ? error.name : String(error) };
+    }
   });
 }
 
