@@ -5,6 +5,7 @@
 ## 2026-09-03
 
 - 라이브 화면을 파손한 shadcn UI 마이그레이션 6개 커밋을 역순으로 되돌려 전환 이전 UI를 복구했다. Excel 비교·Excel 정리 도구와 P-V 시각 회귀 하네스는 유지했다. — Codx
+- 공용 UI 8종을 shadcn Base UI 기반 호환 어댑터로 전환하고 6색 accent·파일 누적/비동기·접근성·키보드 계약을 보존했다. 미사용 NavigationRow를 제거하고 전 화면 시각 기준선과 회귀 검증을 갱신했다. — Codx
 - Tailwind preflight를 전역 base layer로 활성화하고, 기존 화면의 heading·small text·목록 marker·폼 기본값·pseudo-element box model·line-height를 legacy layer에서 보정해 기존 시각 기준선을 유지했다. — Codx
 - shadcn 4.20.1의 Base UI `base-luma` preset 기반과 Tailwind CSS 4.3.3을 설치했다. preflight 없이 theme/base/legacy/components/utilities layer를 분리하고 현행 CSS를 legacy에 격리했으며, prefers-color-scheme용 토큰 브리지와 소유 소스만 스캔하는 구성을 추가했다. — Codx
 - Chrome 기반 시각 회귀 하네스를 추가해 홈·미디어 필터·Excel 비교 빈 상태를 ko/en·light/dark·desktop/mobile 24개 고정 화면으로 비교한다. 애니메이션 제거·허용 영역·픽셀 임계값을 명시하고 shadcn 도입 전 PNG 기준선을 함께 고정했다. — Codx

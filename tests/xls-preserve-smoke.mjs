@@ -186,6 +186,7 @@ try {
     }
     await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/xls-preserve/") && location.search.includes("formula=0") && location.search.includes("format=1"));
+    await page.waitForSelector('input[type="file"]');
     await (await page.$('input[type="file"]')).uploadFile(sourceXlsx, brokenOleXls);
     await page.waitForFunction(() => document.querySelector(".operation-current-message")?.textContent?.includes("개별 변환 실패.xls"));
     await page.evaluate(async () => {
