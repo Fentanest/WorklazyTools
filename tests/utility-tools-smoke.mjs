@@ -35,6 +35,23 @@ try {
   if (!analyticsBootstrap.google || !analyticsBootstrap.naver || analyticsBootstrap.malformedCommands) {
     throw new Error(`Analytics bootstrap is incomplete or uses malformed gtag commands: ${JSON.stringify(analyticsBootstrap)}`);
   }
+  const languageSwitcher = await page.$eval(".language-switcher", (group) => ({
+    tagName: group.tagName,
+    role: group.getAttribute("role"),
+    label: group.getAttribute("aria-label") || "",
+    values: Array.from(group.querySelectorAll("button"), (button) => ({ text: button.textContent?.trim(), pressed: button.getAttribute("aria-pressed") })),
+  }));
+  if (languageSwitcher.tagName !== "DIV" || languageSwitcher.role !== "group" || !languageSwitcher.label
+    || JSON.stringify(languageSwitcher.values) !== JSON.stringify([{ text: "KO", pressed: "true" }, { text: "EN", pressed: "false" }])) {
+    throw new Error(`Language switcher accessibility contract failed: ${JSON.stringify(languageSwitcher)}`);
+  }
+  await page.focus('.desktop-language-switcher .language-switcher button[aria-pressed="true"]');
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => location.pathname.startsWith("/en") && document.documentElement.lang === "en"
+    && document.querySelector('.desktop-language-switcher .language-switcher button:nth-child(2)')?.getAttribute("aria-pressed") === "true");
+  await page.click(".desktop-language-switcher .language-switcher button:first-child");
+  await page.waitForFunction(() => location.pathname.startsWith("/ko") && document.documentElement.lang === "ko");
   const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
   const homeFeedback = await page.$eval(".hero-feedback", (element) => ({
@@ -58,6 +75,16 @@ try {
   }));
   if (categoryOverview.filters !== 6 || categoryOverview.sections !== 5 || categoryOverview.repeatedLocalBadges !== 0 || !categoryOverview.headings.includes("이미지·영상·오디오")) {
     throw new Error(`Tool categories are incomplete: ${JSON.stringify(categoryOverview)}`);
+  }
+  const toolCards = await page.$$eval(".all-tools-grid .tool-card", (cards) => cards.map((card) => ({
+    tagName: card.tagName,
+    slot: card.getAttribute("data-slot"),
+    accent: Array.from(card.classList).find((name) => name.startsWith("accent-")),
+    iconAccent: Array.from(card.querySelector(".tool-icon")?.classList || []).find((name) => name.startsWith("accent-")),
+    href: card.getAttribute("href"),
+  })));
+  if (toolCards.length !== 20 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== card.iconAccent)) {
+    throw new Error(`Tool card link or accent contract failed: ${JSON.stringify(toolCards)}`);
   }
   await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
   await page.waitForFunction(() => window.matchMedia("(prefers-color-scheme: dark)").matches && getComputedStyle(document.querySelector(".tool-category-filter button.selected")).color !== "rgb(255, 255, 255)");
@@ -111,6 +138,20 @@ try {
   await page.setViewport({ width: 1440, height: 1000 });
 
   await page.goto(`${koBaseUrl}/tools/text-merger`, { waitUntil: "networkidle0" });
+  const toolGuide = await page.$eval(".tool-guide", (guide) => ({
+    tagName: guide.tagName,
+    slot: guide.getAttribute("data-slot"),
+    labelledBy: guide.getAttribute("aria-labelledby"),
+    eyebrow: guide.querySelector(".content-heading .eyebrow")?.textContent,
+    titleId: guide.querySelector(".content-heading h2")?.id,
+    articles: Array.from(guide.querySelectorAll(".tool-guide-grid > article"), (article) => article.getAttribute("data-slot")),
+    faq: Array.from(guide.querySelectorAll(".tool-faq details"), (item) => Boolean(item.querySelector("summary") && item.querySelector("p"))),
+  }));
+  if (toolGuide.tagName !== "SECTION" || toolGuide.slot !== "card" || toolGuide.labelledBy !== "tool-guide-title"
+    || toolGuide.eyebrow !== "안내" || toolGuide.titleId !== "tool-guide-title" || !toolGuide.articles.length
+    || toolGuide.articles.some((slot) => slot !== "card") || !toolGuide.faq.length || toolGuide.faq.some((valid) => !valid)) {
+    throw new Error(`Tool guide structure or localization contract failed: ${JSON.stringify(toolGuide)}`);
+  }
   await page.type(".text-merge-editor textarea", "첫 번째");
   await page.evaluate(() => {
     const transfer = new DataTransfer();
