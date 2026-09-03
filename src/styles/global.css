@@ -555,7 +555,7 @@ input:focus-visible {
   gap: 13px;
   padding: 17px;
   border: 1.5px dashed rgba(118,118,128,.29);
-  border-radius: var(--legacy-radius-md);
+  border-radius: var(--radius-4xl);
   background: rgba(118,118,128,.045);
   cursor: pointer;
   transition: border-color .18s, background .18s, transform .18s;
@@ -576,7 +576,8 @@ input:focus-visible {
 .drop-zone.accent-sky .drop-icon { color: var(--sky); background: var(--sky-soft); }
 .drop-zone > div { flex: 1; min-width: 0; }
 .drop-zone strong { display: block; margin-bottom: 4px; font-size: 15px; }
-.drop-zone span:not(.drop-icon) { display: block; color: var(--label-secondary); font-size: 14px; }
+.drop-zone > div > .drop-hint { display: block; color: var(--label-secondary); font-size: 14px; }
+.drop-hint-segment { white-space: nowrap; }
 .drop-added-status { position: absolute; right: 12px; bottom: 8px; display: flex; align-items: center; gap: 4px; color: var(--success); font-size: 13px; font-style: normal; font-weight: 750; animation: result-in .25s ease both; }
 .secondary-button {
   min-height: 38px;
@@ -2172,7 +2173,7 @@ label.invalid > small { color: #c9342f; }
   }
   .bottom-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--label-tertiary); border-radius: 16px; font-size: 12px; font-weight: 700; }
   .bottom-tab.active { color: var(--blue); background: rgba(0,122,255,.08); }
-  .main-content { margin: 0; padding: 0 16px; }
+  .main-content { margin: 0; padding: 0 16px calc(80px + env(safe-area-inset-bottom)); }
   .page { padding-top: calc(84px + env(safe-area-inset-top)); padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
   .hwp-editor-focus { z-index: 60; inset: 0; width: auto; height: 100dvh; padding: 0; }
   .hwp-editor-focus .hwp-editor-section { border-radius: 0; }
@@ -2225,7 +2226,7 @@ label.invalid > small { color: #c9342f; }
   .tool-page a.secondary-button,
   .tool-page a.result-download { min-height: 44px; }
   .remove-button, .file-order-actions button, .pdf-drag-handle, .pdf-image-remove, .editor-history-actions button, .icon-tool-row button { min-width: 44px; min-height: 44px; }
-  .main-content { padding: 0 12px; }
+  .main-content { padding: 0 12px calc(80px + env(safe-area-inset-bottom)); }
   .hero { padding: 34px 24px 31px; border-radius: 26px; }
   .compact-home-hero { padding: 24px 22px; }
   .compact-home-hero h1 { font-size: 32px; }
