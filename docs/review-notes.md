@@ -4,6 +4,14 @@
 
 ## 2026-09-03
 
+### shadcn 마이그레이션 P-V — 시각 회귀 기준선 판정 (Codx)
+
+- **고정 매트릭스**: 홈 기본 상태·도구 목록의 `category=media` 필터 상태·Excel 비교 빈 상태 3개를 ko/en × light/dark × desktop 1365×900/mobile 390×844(DPR 1)로 전개해 정확히 24개 viewport PNG를 고정했다. Chrome 152.0.7977.64에서 채집한 before 기준선은 4,979,977B(약 4.8MiB)이며 대표 desktop/mobile 화면을 직접 확인해 lazy route 로딩 잔상과 빈 화면이 없음을 확인했다.
+- **재현 계약**: `npm run test:visual`이 고정 포트의 로컬 Vite를 자체 기동하고 외부 origin 요청과 서비스워커를 차단한다. privacy consent는 denied, locale은 route와 localStorage에 일치시키고 `prefers-color-scheme`을 명시한다. 모든 animation·transition·smooth scroll·caret를 비활성화하고 폰트 준비와 2 RAF 뒤 viewport만 캡처한다. 허용 영역은 시간 의존적인 `.global-footer > span:first-child` 한 곳뿐이다.
+- **회귀 0 판정**: pixelmatch per-pixel threshold 0.1, antialiasing 제외, 전체 픽셀 중 diff 비율 ≤0.100%를 “시각 회귀 0”으로 정의했다. 크기 불일치·기준선 누락/잉여·페이지 오류는 비율과 무관하게 실패하며, 초과 시 actual/diff PNG를 `/tmp/worklazytools-visual-regression`에 남긴다. 기준 갱신은 명시적인 `UPDATE_VISUAL_BASELINES=1`에서만 가능하다.
+- **도구·검증 실측**: 비교기는 exact dev dependency `pixelmatch@7.1.0`·`pngjs@7.0.0`을 사용한다. 최초 `npm install`은 기본 `~/.npm` 캐시가 read-only여서 `EROFS`로 중단됐고, `/tmp/worklazytools-npm-cache`를 지정한 동일 설치는 성공했다. 기준선 채집 뒤 연속 자기 비교 2회가 24/24 통과했고 `npm run build` exit 0(2,429 modules, 정적 59페이지), `npm run test:unit` 158/158, `npm run test:static`, `git diff --check`가 통과했다.
+- **제품 영향**: 테스트 전용 코드·dev dependency·license 생성물만 변해 사용자 문구·ko/en 리소스·SEO·정적 route·광고 배치/격리·GitHub Pages 런타임에는 제품 코드 변경이 없다.
+
 ### Excel 데이터 정리 U2 — 규칙 파이프라인·수식·출력·메모리 판정 (Codx)
 
 - **스키마·lineage 판정**: version 1 discriminated union에 고정 type ID 28종을 두고 규칙 100개·JSON 256KiB·일반 문자열 1,000자·정규식 500자·수치 범위를 runtime에서 검사한다. variant별 unknown key, 필수 키, 기본값, 경계값, `y` flag, 잘못된 정규식을 거부한다. 첫 선택 시트의 `column:N`을 기준으로 다른 시트는 NFC 헤더명에 결합하고, 파생 열 ID는 JSON에 영속화해 생성 후 참조는 허용하되 기존/과거 파생 ID 재사용·삭제된 ID 참조·불완전 재정렬은 실행 전에 차단한다.
