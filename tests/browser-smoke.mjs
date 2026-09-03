@@ -340,6 +340,8 @@ async function navigatePdfTab(page, index, pathname, mode, acceptedType) {
 
 async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/`);
+  const uiAdapterKeyboard = await assertUiAdapterKeyboardContracts(page, fixtures.xlsxOne);
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/`);
   const acceptedFormats = await page.$eval('input[type="file"]', (input) => input.accept);
   if (!acceptedFormats.includes(".xlsb") || !acceptedFormats.includes(".xlsm")) {
     throw new Error(`XLSB/XLSM were not exposed as accepted inputs: ${acceptedFormats}`);
@@ -351,6 +353,7 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   const excelAddButton = await page.$eval(".drop-zone .secondary-button", (button) => button.textContent || "");
   if (!excelAddButton.includes("더 추가")) throw new Error(`Excel merger does not expose incremental file addition: ${excelAddButton}`);
   await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
+  console.log(`  shared UI adapter keyboard contracts: ${JSON.stringify(uiAdapterKeyboard)}`);
 
   const protectedInput = await page.$('.input-password-row input[type="password"]');
   if (!protectedInput) {
@@ -395,6 +398,66 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   if (!warningText.includes("XLSM의 매크로") || !warningText.includes("XLS 수식 또는 서식을 정밀하게 유지")) {
     throw new Error(`Converted format limitations were not shown after merge: ${warningText}`);
   }
+}
+
+async function assertUiAdapterKeyboardContracts(page, filePath) {
+  const initial = await page.evaluate(() => {
+    const group = document.querySelector(".segmented-control");
+    const options = Array.from(group?.querySelectorAll("button") || []);
+    return {
+      pageHeader: document.querySelector(".page-header")?.tagName,
+      sectionCard: document.querySelector(".section-card")?.tagName,
+      dropRole: document.querySelector(".drop-zone")?.getAttribute("role"),
+      dropTabIndex: document.querySelector(".drop-zone")?.getAttribute("tabindex"),
+      groupRole: group?.getAttribute("role"),
+      groupLabel: group?.getAttribute("aria-label") || "",
+      pressedStates: options.map((option) => option.getAttribute("aria-pressed")),
+    };
+  });
+  if (initial.pageHeader !== "HEADER" || initial.sectionCard !== "SECTION" || initial.dropRole !== "button" || initial.dropTabIndex !== "0"
+    || initial.groupRole !== "group" || !initial.groupLabel || !initial.pressedStates.includes("true") || !initial.pressedStates.includes("false")) {
+    throw new Error(`Shared UI semantic contract failed: ${JSON.stringify(initial)}`);
+  }
+
+  const chooserPromise = page.waitForFileChooser();
+  await page.focus(".drop-zone");
+  await page.keyboard.press("Enter");
+  const chooser = await chooserPromise;
+  await chooser.accept([filePath]);
+  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 1);
+  await page.waitForFunction(() => document.querySelector('.drop-zone-wrap input[type="file"]')?.value === "");
+  const drop = await page.evaluate(() => ({
+    activeRole: document.activeElement?.getAttribute("role"),
+    files: document.querySelectorAll(".excel-file-item").length,
+    inputReset: document.querySelector('.drop-zone-wrap input[type="file"]')?.value === "",
+  }));
+
+  const groupButtons = await page.$$(".segmented-control button");
+  if (groupButtons.length < 2) throw new Error("SegmentedControl keyboard fixture has fewer than two options.");
+  await groupButtons[0].focus();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(() => document.activeElement === document.querySelector(".segmented-control button:nth-child(2)"));
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.querySelector(".segmented-control button:nth-child(2)")?.getAttribute("aria-pressed") === "true");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.querySelector(".segmented-control button:first-child")?.getAttribute("aria-pressed") === "true");
+
+  const switchSelector = '.settings-row button[role="switch"]:not([disabled])';
+  await page.waitForSelector(switchSelector);
+  const originalSwitchState = await page.$eval(switchSelector, (element) => element.getAttribute("aria-checked"));
+  await page.focus(switchSelector);
+  await page.keyboard.press("Space");
+  await page.waitForFunction((previous) => document.querySelector('.settings-row button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
+  await page.keyboard.press("Enter");
+  await page.waitForFunction((expected) => document.querySelector('.settings-row button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
+
+  return {
+    semanticRoles: "passed",
+    fileDropEnter: drop,
+    segmentedArrowAndSpace: "passed",
+    switchSpaceAndEnter: "passed",
+  };
 }
 
 async function testExcelThemeColors(page, fixtures, tempDir) {
