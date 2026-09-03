@@ -1,45 +1,26 @@
 import { BlobWriter } from "@zip.js/zip.js";
-import { AlertCircle, Download, FileSpreadsheet, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowLeftRight, Download, FileSpreadsheet, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, ToggleRow, formatBytes } from "../../components/ui";
+import { PageHeader, PrimaryButton, SectionCard, ToggleRow, formatBytes } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { createUniqueSafeFileName, SafeFileNameRegistry, type SafeFileName } from "../../utils/fileNameSafety.ts";
 import { writeZipArchive } from "../../utils/zipArchive.ts";
 import { inspectExcelCompareFile, runExcelComparePair } from "./excelCompareClient.ts";
+import { PairFileDropZone } from "./PairFileDropZone.tsx";
+import { assignPairFiles, swapPairSides, type PairState } from "./pairFiles.ts";
 import { assertReportBlobSize } from "./reportIntegrity.ts";
 import {
   DEFAULT_EXCEL_COMPARE_OPTIONS,
   type DuplicateKeyPolicy,
-  type ExcelCompareInspection,
   type ExcelCompareMode,
   type ExcelComparePairOptions,
   type ExcelComparePairResult,
   type ExcelCompareStatus,
 } from "./types.ts";
-
-interface PairState {
-  id: number;
-  left?: File;
-  right?: File;
-  leftInspection?: ExcelCompareInspection;
-  rightInspection?: ExcelCompareInspection;
-  leftError?: string;
-  rightError?: string;
-  leftSheet: string;
-  rightSheet: string;
-  leftHeaderRow: number;
-  rightHeaderRow: number;
-  primaryLeft: number[];
-  primaryRight: number[];
-  secondaryLeft: number[];
-  secondaryRight: number[];
-  duplicatePolicy: DuplicateKeyPolicy;
-  reconcile: NonNullable<ExcelComparePairOptions["reconcile"]>;
-}
 
 interface CompletedPair {
   pairId: number;
@@ -104,7 +85,8 @@ export function ExcelComparePage() {
     const fileKey = side;
     const inspectionKey = `${side}Inspection` as const;
     const errorKey = `${side}Error` as const;
-    updatePair(pairId, { [fileKey]: file, [inspectionKey]: undefined, [errorKey]: undefined } as Partial<PairState>);
+    const inspectingKey = `${side}Inspecting` as const;
+    updatePair(pairId, { [fileKey]: file, [inspectionKey]: undefined, [errorKey]: undefined, [inspectingKey]: Boolean(file) } as Partial<PairState>);
     if (!file) return;
     try {
       const inspection = await inspectExcelCompareFile(file, language);
@@ -115,6 +97,8 @@ export function ExcelComparePage() {
       });
     } catch (error) {
       updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [errorKey]: safeError(error, translate) } : pair);
+    } finally {
+      updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
     }
   };
 
@@ -280,11 +264,22 @@ function PairCard({ pair, index, mode, busy, t, updatePair, selectFile, refreshH
 }) {
   const leftHeaders = headersFor(pair, "left");
   const rightHeaders = headersFor(pair, "right");
+  const inspectionBusy = pair.leftInspecting || pair.rightInspecting;
+  const addFiles = async (files: File[]) => {
+    const assignment = assignPairFiles({ left: pair.left, right: pair.right }, files);
+    updatePair(pair.id, { unassignedFileCount: assignment.unassignedFiles.length });
+    const selections: Array<Promise<void>> = [];
+    if (!pair.left && assignment.left) selections.push(selectFile(pair.id, "left", assignment.left));
+    if (!pair.right && assignment.right) selections.push(selectFile(pair.id, "right", assignment.right));
+    await Promise.all(selections);
+  };
   return <article className="excel-compare-pair" data-testid="excel-compare-pair">
-    <div className="excel-pair-heading"><span className="pair-number">{index + 1}</span><div><strong>{t("features:excelCompare.pairs.pair", { number: index + 1 })}</strong><small>{t("features:excelCompare.pairs.pairHint")}</small></div>{canRemove && <button className="remove-button" type="button" disabled={busy} onClick={() => removePair(pair.id)} aria-label={t("features:excelCompare.pairs.remove", { number: index + 1 })}><Trash2 size={17} /></button>}</div>
+    <div className="excel-pair-heading"><span className="pair-number">{index + 1}</span><div><strong>{t("features:excelCompare.pairs.pair", { number: index + 1 })}</strong><small>{t("features:excelCompare.pairs.pairHint")}</small></div><div className="excel-pair-actions"><button className="secondary-button small excel-pair-swap" type="button" disabled={busy || inspectionBusy} onClick={() => updatePair(pair.id, swapPairSides)} aria-label={t("features:excelCompare.pairs.swap")}><ArrowLeftRight size={17} /><span aria-hidden="true">⇄</span></button>{canRemove && <button className="remove-button" type="button" disabled={busy} onClick={() => removePair(pair.id)} aria-label={t("features:excelCompare.pairs.remove", { number: index + 1 })}><Trash2 size={17} /></button>}</div></div>
+    <PairFileDropZone label={t("features:excelCompare.pairs.dropLabel")} hint={t("features:excelCompare.pairs.fileHint")} accept={ACCEPT} files={[pair.left, pair.right].filter((file): file is File => Boolean(file))} onFiles={addFiles} disabled={busy} />
+    {pair.unassignedFileCount > 0 && <p className="inline-notice warning excel-pair-overflow" role="status"><AlertCircle size={15} /> {t("features:excelCompare.pairs.overflow", { count: pair.unassignedFileCount })}</p>}
     <div className="excel-pair-files">
       {(["left", "right"] as const).map((side) => <div className="excel-pair-side" key={side}>
-        <FileDropZone label={t(`features:excelCompare.pairs.${side}` as never)} hint={t("features:excelCompare.pairs.fileHint")} accept={ACCEPT} files={pair[side] ? [pair[side]!] : []} onFiles={(files) => selectFile(pair.id, side, files[0])} accent={side === "left" ? "blue" : "green"} disabled={busy} />
+        <p className="field-label">{t(`features:excelCompare.pairs.${side}` as never)}</p>
         {pair[side] && <div className="excel-selected-file"><FileSpreadsheet size={16} /><span><strong>{pair[side]!.name}</strong><small>{formatBytes(pair[side]!.size)}</small></span><button type="button" className="remove-button" onClick={() => void selectFile(pair.id, side, undefined)} aria-label={t("common:files.remove", { name: pair[side]!.name })}><X size={15} /></button></div>}
         {pair[`${side}Error`] && <p className="field-error"><AlertCircle size={14} /> {pair[`${side}Error`]}</p>}
         {pair[`${side}Inspection`] && <div className="excel-sheet-fields">
@@ -333,7 +328,7 @@ function SupportTable({ t }: { t: LooseT }) {
 }
 
 function newPair(id: number): PairState {
-  return { id, leftSheet: "", rightSheet: "", leftHeaderRow: 1, rightHeaderRow: 1, primaryLeft: [1], primaryRight: [1], secondaryLeft: [], secondaryRight: [], duplicatePolicy: "error", reconcile: { leftAmountColumn: 1, rightAmountColumn: 1, leftDateColumn: 2, rightDateColumn: 2, leftPartnerColumn: 3, rightPartnerColumn: 3, dateToleranceDays: 0, allowGroupedMatches: false, roundingUnit: 0.01 } };
+  return { id, leftInspecting: false, rightInspecting: false, leftSheet: "", rightSheet: "", leftHeaderRow: 1, rightHeaderRow: 1, primaryLeft: [1], primaryRight: [1], secondaryLeft: [], secondaryRight: [], duplicatePolicy: "error", reconcile: { leftAmountColumn: 1, rightAmountColumn: 1, leftDateColumn: 2, rightDateColumn: 2, leftPartnerColumn: 3, rightPartnerColumn: 3, dateToleranceDays: 0, allowGroupedMatches: false, roundingUnit: 0.01 }, unassignedFileCount: 0 };
 }
 
 function pairOptions(pair: PairState, mode: ExcelCompareMode, normalization: typeof DEFAULT_EXCEL_COMPARE_OPTIONS): ExcelComparePairOptions {

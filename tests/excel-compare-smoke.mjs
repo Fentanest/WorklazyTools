@@ -16,6 +16,8 @@ const downloadRoot = path.join(temporaryDirectory, "downloads");
 try {
   await run(process.execPath, ["scripts/generate-excel-compare-fixtures.mjs", temporaryDirectory]);
   await fs.mkdir(downloadRoot);
+  await fs.writeFile(path.join(temporaryDirectory, "direction-left.csv"), "ID,Value\nA,left\n", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "direction-right.csv"), "ID,Value\nA,left\nB,right-only\n", "utf8");
   const fixture = (name) => path.join(temporaryDirectory, name);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -36,6 +38,11 @@ try {
       };
     });
     const client = await page.createCDPSession();
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.url().includes("excelCompare.worker")) setTimeout(() => request.continue(), 250);
+      else void request.continue();
+    });
     const pageErrors = [];
     const failedRequests = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -61,14 +68,23 @@ try {
       ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
       isolated: Boolean(document.querySelector('meta[name="worklazy-video-isolation"], meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"]')),
     }));
-    if (initial.title !== "Excel 비교·대사" || initial.modes !== 3 || initial.supportRows !== 6 || initial.inputCount !== 2 || initial.dragButtons !== 2 || !initial.ads || initial.isolated) {
+    if (initial.title !== "Excel 비교·대사" || initial.modes !== 3 || initial.supportRows !== 6 || initial.inputCount !== 1 || initial.dragButtons !== 1 || !initial.ads || initial.isolated) {
       throw new Error(`Initial Excel comparison UI or standard ad boundary is incomplete: ${JSON.stringify(initial)}`);
     }
 
     let inputs = await page.$$('.excel-compare-page input[type="file"]');
-    await inputs[0].uploadFile(fixture("left.xlsx"));
-    await inputs[1].uploadFile(fixture("right.xlsx"));
+    await inputs[0].uploadFile(fixture("left.xlsx"), fixture("right.xlsx"));
+    await page.waitForFunction(() => document.querySelector(".excel-pair-swap")?.disabled);
     await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
+    if (await page.$eval(".excel-pair-swap", (button) => button.disabled)) throw new Error("Pair swap did not become available after both inspections completed.");
+    const namesBeforeSwap = await selectedPairNames(page);
+    await page.click(".excel-pair-swap");
+    const namesAfterSwap = await selectedPairNames(page);
+    if (JSON.stringify(namesAfterSwap) !== JSON.stringify([...namesBeforeSwap].reverse())) throw new Error(`Pair files did not swap: ${JSON.stringify({ namesBeforeSwap, namesAfterSwap })}`);
+    await page.click(".excel-pair-swap");
+    await inputs[0].uploadFile(fixture("sample.csv"), fixture("damaged.xlsx"));
+    await page.waitForFunction(() => document.querySelector(".excel-pair-overflow")?.textContent?.includes("2개"));
+    if (JSON.stringify(await selectedPairNames(page)) !== JSON.stringify(namesBeforeSwap)) throw new Error("An overflow drop replaced an occupied slot.");
     await page.click('.excel-compare-page > .primary-button');
     await page.waitForSelector(".operation-progress.status-success");
     const onePair = await downloadReportLinks(page, client, downloadRoot, "one-pair");
@@ -84,14 +100,12 @@ try {
     await page.click(".excel-add-pair");
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
     inputs = await page.$$('.excel-compare-page input[type="file"]');
-    await inputs[2].uploadFile(fixture("formula.xlsb"));
-    await inputs[3].uploadFile(fixture("macro.xlsm"));
+    await inputs[1].uploadFile(fixture("formula.xlsb"), fixture("macro.xlsm"));
     await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 4 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
     await page.click(".excel-add-pair");
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 3);
     inputs = await page.$$('.excel-compare-page input[type="file"]');
-    await inputs[4].uploadFile(fixture("damaged.xlsx"));
-    await inputs[5].uploadFile(fixture("macro.xlsm"));
+    await inputs[2].uploadFile(fixture("damaged.xlsx"), fixture("macro.xlsm"));
     await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 5 && document.querySelector(".field-error") && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
     const formatLabels = await page.$$eval(".excel-sheet-fields p", (items) => items.map((item) => item.textContent || ""));
     if (!formatLabels.some((text) => text.includes("XLSB") && text.includes("서식 비교 제외")) || !formatLabels.some((text) => text.includes("XLSM") && text.includes("서식 비교 가능"))) {
@@ -132,8 +146,7 @@ try {
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     inputs = await page.$$('.excel-compare-page input[type="file"]');
-    await inputs[0].uploadFile(fixture("cancel-left.xlsx"));
-    await inputs[1].uploadFile(fixture("cancel-right.xlsx"));
+    await inputs[0].uploadFile(fixture("cancel-left.xlsx"), fixture("cancel-right.xlsx"));
     await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
     await page.click('.excel-compare-page > .primary-button');
     await page.waitForSelector(".cancel-operation button");
@@ -152,6 +165,7 @@ try {
 
     const integrityFailures = [];
     for (const mode of ["zero", "mismatch"]) integrityFailures.push(await assertIntegrityFailure(browser, fixture("left.xlsx"), fixture("right.xlsx"), mode));
+    const swapDirection = await assertSwapDirection(browser, path.join(temporaryDirectory, "direction-left.csv"), path.join(temporaryDirectory, "direction-right.csv"));
 
     if (pageErrors.length) throw new Error(`Browser page errors:\n${pageErrors.join("\n")}`);
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
@@ -164,6 +178,8 @@ try {
       isolation,
       replacementRevokedAfterAnchorRemoval: previousReportUrl,
       integrityFailures,
+      pairAssignment: { namesBeforeSwap, namesAfterSwap, overflowRejected: 2 },
+      swapDirection,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
       cancellation: "passed",
@@ -219,6 +235,10 @@ async function waitForDownload(directory, fileName) {
   throw new Error(`Excel comparison download did not finish: ${fileName}`);
 }
 
+async function selectedPairNames(page) {
+  return page.$$eval('[data-testid="excel-compare-pair"]:first-of-type .excel-selected-file strong', (items) => items.map((item) => item.textContent || ""));
+}
+
 async function assertIntegrityFailure(browser, leftPath, rightPath, mode) {
   const page = await browser.newPage();
   try {
@@ -240,8 +260,7 @@ async function assertIntegrityFailure(browser, leftPath, rightPath, mode) {
       });
     }, mode);
     const inputs = await page.$$('.excel-compare-page input[type="file"]');
-    await inputs[0].uploadFile(leftPath);
-    await inputs[1].uploadFile(rightPath);
+    await inputs[0].uploadFile(leftPath, rightPath);
     await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
     await page.click('.excel-compare-page > .primary-button');
     await page.waitForSelector(".operation-progress.status-success");
@@ -251,6 +270,41 @@ async function assertIntegrityFailure(browser, leftPath, rightPath, mode) {
     }
     if (await page.$(".excel-report-downloads a")) throw new Error(`Integrity failure exposed a download (${mode}).`);
     return { mode, message };
+  } finally {
+    await page.close();
+  }
+}
+
+async function assertSwapDirection(browser, leftPath, rightPath) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const input = await page.$('.excel-compare-page input[type="file"]');
+    await input.uploadFile(leftPath, rightPath);
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2);
+    await page.click('.excel-compare-mode-grid button:nth-child(2)');
+    await page.waitForFunction(() => !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
+    await page.click('.excel-compare-page > .primary-button');
+    await page.waitForSelector(".operation-progress.status-success");
+    const before = await page.evaluate(() => ({
+      added: document.querySelectorAll('.excel-result-table tbody tr[data-status="added"]').length,
+      removed: document.querySelectorAll('.excel-result-table tbody tr[data-status="removed"]').length,
+    }));
+    await page.click(".excel-pair-swap");
+    await page.click('.excel-compare-page > .primary-button');
+    await page.waitForFunction(() => document.querySelector(".operation-progress")?.classList.contains("status-running"));
+    await page.waitForSelector(".operation-progress.status-success");
+    const after = await page.evaluate(() => ({
+      added: document.querySelectorAll('.excel-result-table tbody tr[data-status="added"]').length,
+      removed: document.querySelectorAll('.excel-result-table tbody tr[data-status="removed"]').length,
+    }));
+    if (before.added === 0 || before.removed !== 0 || after.removed !== before.added || after.added !== 0) {
+      throw new Error(`Pair swap did not reverse added/removed semantics: ${JSON.stringify({ before, after })}`);
+    }
+    return { before, after };
   } finally {
     await page.close();
   }
