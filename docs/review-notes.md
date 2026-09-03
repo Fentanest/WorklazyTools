@@ -4,6 +4,12 @@
 
 ## 2026-09-03
 
+### Excel 데이터 정리 U0.1 — 편집 메타데이터·append 경계 판정 (Codx)
+
+- OOXML 의미 모델은 ExcelJS 단일 파싱을 유지했다. ExcelJS가 빈 문자열 수식 캐시의 `<v></v>`를 `undefined`로 축약하므로, 이미 형식 판별에 연 OOXML ZIP의 worksheet XML에서 수식 셀별 `<v>` 존재 여부만 읽어 `present|missing`을 보존한다. `0`·`false`·`""`·오류 캐시와 캐시 누락 골든을 통과했다.
+- shared master/slave·array ref, workbook defined name, table 범위·열, 원본 행/열 lineage를 공용 투영에 추가했다. 보고서 append helper는 기존 선택 시트를 보존하고 Excel 31자/금지문자 규칙과 대소문자·NFC 충돌을 결정적 `(2)` suffix로 해소한다.
+- 표적 검증: `npx tsc -b --pretty false`와 `node --test --experimental-strip-types tests/unit/spreadsheet-core.test.ts` 6/6, `git diff --check` exit 0.
+
 ### Excel 비교 U1 후속 X-A~X-C — 보고서·파일 배치·선택 대사 판정 (Codx)
 
 - **X-A 보고서 무결성 판정**: worker는 생성 직후 양수 byteLength와 `PK\x03\x04`를 검사하고 transfer와 별개인 `reportByteLength`를 동봉한다. client는 수신 buffer 길이, page는 Blob 크기를 각각 대조하며 세 실패는 `REPORT_INTEGRITY_FAILED`의 ko/en 재실행·재다운로드 안내로만 노출한다. 0바이트와 길이 불일치 page 주입은 다운로드 링크 없이 같은 안전 문구로 귀결됐다. 브라우저가 OS 다운로드로 넘긴 뒤의 저장 파일은 앱이 사후 검사할 수 없으므로, 재발 시 저장 파일 크기와 브라우저 이름을 받는 안내를 결과와 오류에 함께 두었다.

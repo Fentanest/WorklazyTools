@@ -27,8 +27,16 @@ export function buildXlsxReport(definition: XlsxReportDefinition) {
   workbook.creator = definition.creator ?? "Worklazy Tools";
   workbook.created = new Date();
   workbook.modified = new Date();
-  definition.sheets.forEach((definitionSheet) => {
-    const sheet = workbook.addWorksheet(definitionSheet.name);
+  appendXlsxReportSheets(workbook, definition.sheets);
+  return workbook;
+}
+
+export function appendXlsxReportSheets(workbook: ExcelJS.Workbook, sheets: XlsxReportSheet[]) {
+  const names: string[] = [];
+  sheets.forEach((definitionSheet) => {
+    const name = uniqueWorksheetName(workbook, definitionSheet.name);
+    const sheet = workbook.addWorksheet(name);
+    names.push(name);
     const header = sheet.addRow([]);
     definitionSheet.headers.forEach((value, index) => writeUntrustedText(header.getCell(index + 1), value));
     header.font = { bold: true };
@@ -42,9 +50,20 @@ export function buildXlsxReport(definition: XlsxReportDefinition) {
       sheet.getColumn(index + 1).width = Math.min(48, Math.max(12, ...sheet.getColumn(index + 1).values.map((value) => String(value ?? "").length + 2)));
     });
   });
-  return workbook;
+  return names;
 }
 
 export async function writeXlsxReport(definition: XlsxReportDefinition) {
   return buildXlsxReport(definition).xlsx.writeBuffer();
+}
+
+function uniqueWorksheetName(workbook: ExcelJS.Workbook, requested: string) {
+  const base = (String(requested).replace(/[\\/*?:\[\]]/gu, " ").trim() || "Report").slice(0, 31);
+  const used = new Set(workbook.worksheets.map((sheet) => sheet.name.normalize("NFC").toLocaleLowerCase("en-US")));
+  if (!used.has(base.normalize("NFC").toLocaleLowerCase("en-US"))) return base;
+  for (let index = 2; ; index += 1) {
+    const suffix = ` (${index})`;
+    const candidate = `${base.slice(0, 31 - suffix.length)}${suffix}`;
+    if (!used.has(candidate.normalize("NFC").toLocaleLowerCase("en-US"))) return candidate;
+  }
 }

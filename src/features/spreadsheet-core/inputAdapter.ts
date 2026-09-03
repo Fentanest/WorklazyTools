@@ -14,6 +14,18 @@ import { bakeThemeColorsInStyle, parseThemePalette, type ExcelThemePalette } fro
 export type SpreadsheetInputFormat = "xlsx" | "xlsm" | "xls" | "xlsb" | "spreadsheetml" | "csv";
 export type SpreadsheetCellType = "blank" | "string" | "number" | "boolean" | "date" | "error";
 export type SpreadsheetScalar = string | number | boolean | Date | null;
+export type SpreadsheetFormulaType = "normal" | "shared" | "array";
+export type SpreadsheetFormulaCacheState = "present" | "missing";
+
+export interface SpreadsheetRowLineage {
+  id: string;
+  sourceRow: number;
+}
+
+export interface SpreadsheetColumnLineage {
+  id: string;
+  sourceColumn: number;
+}
 
 export interface SpreadsheetCellData {
   row: number;
@@ -23,6 +35,14 @@ export interface SpreadsheetCellData {
   value: SpreadsheetScalar;
   formula?: string;
   cachedValue?: SpreadsheetScalar;
+  cacheState?: SpreadsheetFormulaCacheState;
+  formulaType?: SpreadsheetFormulaType;
+  formulaRef?: string;
+  sharedFormulaMaster?: string;
+  sourceRow: number;
+  sourceColumn: number;
+  rowLineageId: string;
+  columnLineageId: string;
   displayValue?: string;
   numberFormat?: string;
   style?: SpreadsheetComparableStyle;
@@ -43,6 +63,24 @@ export interface SpreadsheetSheetData {
   columnCount: number;
   cells: SpreadsheetCellData[];
   merges: string[];
+  rowLineage: SpreadsheetRowLineage[];
+  columnLineage: SpreadsheetColumnLineage[];
+  tables: SpreadsheetTableData[];
+}
+
+export interface SpreadsheetDefinedNameData {
+  name: string;
+  ranges: string[];
+  formula?: string;
+  localSheetId?: number;
+  hidden?: boolean;
+}
+
+export interface SpreadsheetTableData {
+  name: string;
+  displayName: string;
+  ref: string;
+  columns: string[];
 }
 
 export interface SpreadsheetBookData {
@@ -50,6 +88,7 @@ export interface SpreadsheetBookData {
   date1904: boolean;
   supportsStyleComparison: boolean;
   themePalette?: ExcelThemePalette;
+  definedNames: SpreadsheetDefinedNameData[];
   sheets: SpreadsheetSheetData[];
 }
 
@@ -128,6 +167,10 @@ async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: Ab
     archive.file("xl/workbook.xml")?.async("string"),
   ]);
   const themePalette = themeXml ? parseThemePalette(themeXml) : undefined;
+  const [formulaCacheStates, rawDefinedNames] = await Promise.all([
+    readOoxmlFormulaCacheStates(archive, workbookXml ?? ""),
+    Promise.resolve(readOoxmlDefinedNames(workbookXml ?? "")),
+  ]);
   throwIfAborted(signal);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(data));
@@ -136,12 +179,16 @@ async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: Ab
   // only when ExcelJS did not report that it already handled the date system.
   const date1904 = /\bdate1904\s*=\s*["'](?:1|true)["']/iu.test(workbookXml ?? "");
   const adjustExcelJsDate = date1904 && workbook.properties.date1904 !== true;
-  const sheets = workbook.worksheets.map((worksheet) => {
+  const sheets = workbook.worksheets.map((worksheet, sheetIndex) => {
     const cells: SpreadsheetCellData[] = [];
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       row.eachCell({ includeEmpty: false }, (cell, columnNumber) => {
         const formula = cell.formula || undefined;
-        const cachedValue = formula ? normalizeExcelJsValue(cell.result, adjustExcelJsDate) : undefined;
+        const rawModel = cell.model as ExcelJS.CellModel & { shareType?: "shared" | "array"; ref?: string };
+        const cacheState = formula ? formulaCacheStates[sheetIndex]?.get(cell.address) ?? (cell.result === undefined ? "missing" : "present") : undefined;
+        const cachedValue = formula && cacheState === "present"
+          ? cell.result === undefined ? "" : normalizeExcelJsValue(cell.result, adjustExcelJsDate)
+          : undefined;
         const value = formula ? cachedValue ?? null : normalizeExcelJsValue(cell.value, adjustExcelJsDate);
         const numberFormat = cell.numFmt || undefined;
         cells.push({
@@ -152,6 +199,14 @@ async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: Ab
           value,
           formula,
           cachedValue,
+          cacheState,
+          formulaType: formula ? formulaType(rawModel) : undefined,
+          formulaRef: rawModel.ref,
+          sharedFormulaMaster: rawModel.sharedFormula,
+          sourceRow: rowNumber,
+          sourceColumn: columnNumber,
+          rowLineageId: rowLineageId(rowNumber),
+          columnLineageId: columnLineageId(columnNumber),
           displayValue: formatDisplayValue(value, numberFormat, date1904),
           numberFormat,
           style: comparableStyle(cell.style, themePalette),
@@ -165,9 +220,24 @@ async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: Ab
       columnCount: worksheet.columnCount,
       cells,
       merges: [...(worksheet.model.merges ?? [])],
+      rowLineage: createRowLineage(worksheet.rowCount),
+      columnLineage: createColumnLineage(worksheet.columnCount),
+      tables: (worksheet.getTables() as unknown as Array<{ model: ExcelJS.TableProperties & { tableRef?: string } }>).map(({ model }) => ({
+        name: model.name,
+        displayName: model.displayName ?? model.name,
+        ref: model.tableRef ?? model.ref,
+        columns: model.columns.map((column) => column.name),
+      })),
     };
   });
-  return { format, date1904, supportsStyleComparison: true, themePalette, sheets };
+  return {
+    format,
+    date1904,
+    supportsStyleComparison: true,
+    themePalette,
+    definedNames: mergeDefinedNames(workbook.definedNames.model, rawDefinedNames),
+    sheets,
+  };
 }
 
 function parseSheetJs(
@@ -205,6 +275,12 @@ function parseSheetJs(
             value,
             formula: cell.f === undefined ? undefined : String(cell.f),
             cachedValue: cell.f ? value : undefined,
+            cacheState: cell.f ? (cell.v === undefined ? "missing" : "present") : undefined,
+            formulaType: cell.f ? "normal" : undefined,
+            sourceRow: row + 1,
+            sourceColumn: column + 1,
+            rowLineageId: rowLineageId(row + 1),
+            columnLineageId: columnLineageId(column + 1),
             displayValue: cell.w ?? formatDisplayValue(value, cell.z, date1904),
             numberFormat: cell.z || undefined,
           });
@@ -218,9 +294,12 @@ function parseSheetJs(
       columnCount: range ? range.e.c + 1 : 0,
       cells,
       merges: (worksheet["!merges"] ?? []).map((merge) => XLSX.utils.encode_range(merge)),
+      rowLineage: createRowLineage(range ? range.e.r + 1 : 0),
+      columnLineage: createColumnLineage(range ? range.e.c + 1 : 0),
+      tables: [],
     };
   });
-  return { format, date1904, supportsStyleComparison: false, sheets };
+  return { format, date1904, supportsStyleComparison: false, definedNames: [], sheets };
 }
 
 function parseCsv(data: Uint8Array, encoding: "auto" | "utf-8" | "euc-kr" = "auto", signal?: AbortSignal): SpreadsheetBookData {
@@ -240,6 +319,10 @@ function parseCsv(data: Uint8Array, encoding: "auto" | "utf-8" | "euc-kr" = "aut
         address: XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex }),
         type: "string",
         value,
+        sourceRow: rowIndex + 1,
+        sourceColumn: columnIndex + 1,
+        rowLineageId: rowLineageId(rowIndex + 1),
+        columnLineageId: columnLineageId(columnIndex + 1),
         displayValue: value,
       });
     });
@@ -248,8 +331,95 @@ function parseCsv(data: Uint8Array, encoding: "auto" | "utf-8" | "euc-kr" = "aut
     format: "csv",
     date1904: false,
     supportsStyleComparison: false,
-    sheets: [{ name: "CSV", rowCount: result.data.length, columnCount, cells, merges: [] }],
+    definedNames: [],
+    sheets: [{
+      name: "CSV",
+      rowCount: result.data.length,
+      columnCount,
+      cells,
+      merges: [],
+      rowLineage: createRowLineage(result.data.length),
+      columnLineage: createColumnLineage(columnCount),
+      tables: [],
+    }],
   };
+}
+
+function formulaType(model: ExcelJS.CellModel & { shareType?: "shared" | "array" }): SpreadsheetFormulaType {
+  if (model.shareType === "array") return "array";
+  if (model.shareType === "shared" || model.sharedFormula) return "shared";
+  return "normal";
+}
+
+async function readOoxmlFormulaCacheStates(archive: JSZip, workbookXml: string) {
+  const relationshipXml = await archive.file("xl/_rels/workbook.xml.rels")?.async("string") ?? "";
+  const targets = new Map<string, string>();
+  for (const match of relationshipXml.matchAll(/<Relationship\b([^>]*)\/?\s*>/giu)) {
+    const id = xmlAttribute(match[1], "Id");
+    const target = xmlAttribute(match[1], "Target");
+    if (id && target) targets.set(id, target);
+  }
+  const paths = [...workbookXml.matchAll(/<sheet\b([^>]*)\/?\s*>/giu)].map((match, index) => {
+    const relationId = xmlAttribute(match[1], "r:id");
+    const target = relationId ? targets.get(relationId) : undefined;
+    if (!target) return `xl/worksheets/sheet${index + 1}.xml`;
+    const normalized = target.replace(/^\/+|\.\.\//gu, "");
+    return normalized.startsWith("xl/") ? normalized : `xl/${normalized}`;
+  });
+  return Promise.all(paths.map(async (path) => {
+    const states = new Map<string, SpreadsheetFormulaCacheState>();
+    const xml = await archive.file(path)?.async("string") ?? "";
+    for (const match of xml.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/giu)) {
+      if (!/<f(?:\s[^>]*)?>/iu.test(match[2])) continue;
+      const address = xmlAttribute(match[1], "r");
+      if (address) states.set(address, /<v(?:\s[^>]*)?>/iu.test(match[2]) ? "present" : "missing");
+    }
+    return states;
+  }));
+}
+
+function readOoxmlDefinedNames(workbookXml: string): SpreadsheetDefinedNameData[] {
+  return [...workbookXml.matchAll(/<definedName\b([^>]*)>([\s\S]*?)<\/definedName>/giu)].map((match) => ({
+    name: decodeXmlText(xmlAttribute(match[1], "name") ?? ""),
+    ranges: [],
+    formula: decodeXmlText(match[2]),
+    localSheetId: optionalInteger(xmlAttribute(match[1], "localSheetId")),
+    hidden: /^(?:1|true)$/iu.test(xmlAttribute(match[1], "hidden") ?? ""),
+  })).filter((item) => item.name.length > 0);
+}
+
+function mergeDefinedNames(excelNames: ExcelJS.DefinedNamesModel, rawNames: SpreadsheetDefinedNameData[]) {
+  const remaining = [...rawNames];
+  const result = excelNames.map((item) => {
+    const index = remaining.findIndex((raw) => raw.name === item.name);
+    const raw = index >= 0 ? remaining.splice(index, 1)[0] : undefined;
+    return { ...raw, name: item.name, ranges: [...item.ranges] };
+  });
+  return [...result, ...remaining];
+}
+
+function xmlAttribute(attributes: string, name: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return attributes.match(new RegExp(`(?:^|\\s)${escaped}=["']([^"']*)["']`, "iu"))?.[1];
+}
+
+function decodeXmlText(value: string) {
+  return value.replace(/&lt;/gu, "<").replace(/&gt;/gu, ">").replace(/&quot;/gu, '"').replace(/&apos;/gu, "'").replace(/&amp;/gu, "&");
+}
+
+function optionalInteger(value: string | undefined) {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : undefined;
+}
+
+function rowLineageId(row: number) { return `row:${row}`; }
+function columnLineageId(column: number) { return `column:${column}`; }
+function createRowLineage(count: number): SpreadsheetRowLineage[] {
+  return Array.from({ length: count }, (_, index) => ({ id: rowLineageId(index + 1), sourceRow: index + 1 }));
+}
+function createColumnLineage(count: number): SpreadsheetColumnLineage[] {
+  return Array.from({ length: count }, (_, index) => ({ id: columnLineageId(index + 1), sourceColumn: index + 1 }));
 }
 
 function comparableStyle(style: Partial<ExcelJS.Style>, palette?: ExcelThemePalette): SpreadsheetComparableStyle | undefined {

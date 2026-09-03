@@ -15,7 +15,7 @@ import {
   UnsafeFileNameError,
   validateSafeFileName,
 } from "../../src/utils/fileNameSafety.ts";
-import { writeUntrustedText, writeXlsxReport } from "../../src/utils/xlsxReport.ts";
+import { appendXlsxReportSheets, writeUntrustedText, writeXlsxReport } from "../../src/utils/xlsxReport.ts";
 
 test("spreadsheet adapter classifies OOXML from package contents and parses it only once into the common model", async () => {
   const workbook = new ExcelJS.Workbook();
@@ -68,6 +68,42 @@ test("spreadsheet adapter uses SheetJS for BIFF8/XLSB and Papa Parse for CSV tex
   assert.equal(parsedCsv.sheets[0].cells.find((cell) => cell.address === "B2")?.value, " Alpha ");
 });
 
+test("OOXML editing metadata distinguishes formula kinds, cached values, names, tables, and source lineage", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Data");
+  sheet.addRows([["Input", "Shared", "Zero", "False", "Empty", "Missing", "Error", "TableValue"], [1], [2]]);
+  sheet.fillFormula("B2:B3", "A2*2", [2, 4]);
+  sheet.getCell("C2").value = { formula: "1-1", result: 0 };
+  sheet.getCell("D2").value = { formula: "1=2", result: false };
+  sheet.getCell("E2").value = { formula: "\"\"", result: "" };
+  sheet.getCell("F2").value = { formula: "NOW()" };
+  sheet.getCell("G2").value = { formula: "1/0", result: { error: "#DIV/0!" } };
+  sheet.getCell("H2").value = "value";
+  sheet.getCell("I2").value = { formula: "SUM(A2:A3)", result: 3, shareType: "array", ref: "I2:I3" } as ExcelJS.CellValue;
+  workbook.definedNames.add("Data!$A$2:$A$3", "InputRange");
+  sheet.addTable({ name: "InputTable", ref: "H1", headerRow: true, totalsRow: false, style: { theme: "TableStyleMedium2" }, columns: [{ name: "TableValue" }], rows: [["value"]] });
+
+  const parsed = await parseSpreadsheetInput("metadata.xlsx", transferable(await workbook.xlsx.writeBuffer()));
+  const cells = new Map(parsed.sheets[0].cells.map((cell) => [cell.address, cell]));
+  assert.equal(cells.get("B2")?.formulaType, "shared");
+  assert.equal(cells.get("B2")?.formulaRef, "B2:B3");
+  assert.equal(cells.get("B3")?.formulaType, "shared");
+  assert.equal(cells.get("B3")?.sharedFormulaMaster, "B2");
+  assert.equal(cells.get("I2")?.formulaType, "array");
+  assert.equal(cells.get("I2")?.formulaRef, "I2:I3");
+  for (const address of ["B2", "C2", "D2", "E2", "G2"]) assert.equal(cells.get(address)?.cacheState, "present", address);
+  assert.equal(cells.get("F2")?.cacheState, "missing");
+  assert.equal(cells.get("C2")?.cachedValue, 0);
+  assert.equal(cells.get("D2")?.cachedValue, false);
+  assert.equal(cells.get("E2")?.cachedValue, "");
+  assert.equal(cells.get("G2")?.cachedValue, "#DIV/0!");
+  assert.deepEqual(parsed.definedNames.map(({ name, ranges, formula }) => ({ name, ranges, formula })), [{ name: "InputRange", ranges: ["Data!$A$2:$A$3"], formula: "Data!$A$2:$A$3" }]);
+  assert.deepEqual(parsed.sheets[0].tables.map(({ name, ref, columns }) => ({ name, ref, columns })), [{ name: "InputTable", ref: "H1:H2", columns: ["TableValue"] }]);
+  assert.equal(cells.get("H2")?.rowLineageId, "row:2");
+  assert.equal(cells.get("H2")?.columnLineageId, "column:8");
+  assert.deepEqual(parsed.sheets[0].columnLineage[7], { id: "column:8", sourceColumn: 8 });
+});
+
 test("file-name safety blocks traversal, controls and reserved names and resolves normalized collisions", () => {
   for (const unsafe of ["", "../report.xlsx", "folder/report.xlsx", "bad\u0000.xlsx", "CON.xlsx", "name. "]) {
     assert.throws(() => validateSafeFileName(unsafe), UnsafeFileNameError);
@@ -96,3 +132,23 @@ test("writeUntrustedText stores every external value as text without formula coe
   values.forEach((_value, index) => assert.equal(typeof reopenedSheet.getCell(index + 2, 1).value, "string"));
   assert.equal(reopenedSheet.getCell(9, 1).value, "[object Object]");
 });
+
+test("appendXlsxReportSheets preserves cleaned sheets and resolves report-name collisions deterministically", () => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.addWorksheet("Summary").getCell("A1").value = "cleaned";
+  const names = appendXlsxReportSheets(workbook, [
+    { name: "Summary", headers: ["Value"], rows: [["=1+1"]] },
+    { name: "Summary", headers: ["Value"], rows: [["second"]] },
+    { name: "Invalid/Report", headers: [], rows: [] },
+  ]);
+  assert.deepEqual(names, ["Summary (2)", "Summary (3)", "Invalid Report"]);
+  assert.equal(workbook.getWorksheet("Summary")?.getCell("A1").value, "cleaned");
+  assert.equal(workbook.getWorksheet("Summary (2)")?.getCell("A2").value, "=1+1");
+  assert.equal(workbook.getWorksheet("Summary (2)")?.getCell("A2").numFmt, "@");
+});
+
+function transferable(value: ExcelJS.Buffer): ArrayBuffer {
+  if (value instanceof ArrayBuffer) return value;
+  const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  return bytes.slice().buffer;
+}
