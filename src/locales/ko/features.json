@@ -1091,6 +1091,7 @@
       "rightDate": "오른쪽 날짜",
       "leftPartner": "왼쪽 거래처·설명",
       "rightPartner": "오른쪽 거래처·설명",
+      "unused": "사용 안 함",
       "dateTolerance": "날짜 허용 범위(±일)",
       "roundingUnit": "합산 반올림 단위",
       "grouped": "1:N·N:1 합계 대사",
@@ -1170,7 +1171,7 @@
       "generic": "세부 판정을 보고서에서 확인하세요.",
       "MATCHED": "완전 일치", "ADDED": "오른쪽에 추가", "REMOVED": "오른쪽에서 삭제", "VALUE": "셀 값 차이", "FORMULA": "수식 차이", "CACHED_VALUE": "저장된 계산값 차이", "DISPLAY_VALUE": "표시값 차이", "FORMATTING": "셀 서식 차이",
       "CALCULATION_VALUE_UNAVAILABLE": "저장된 계산값 없음", "DISPLAY_VALUE_UNAVAILABLE": "표시값 없음", "ALIGN_LIMIT_FALLBACK": "정렬 계산 한도를 넘어 위치 대조로 전환", "MERGE_ADDED": "병합 영역 추가", "MERGE_REMOVED": "병합 영역 삭제",
-      "DUPLICATE_KEY": "중복키", "MULTIPLE_CANDIDATES": "후보가 여러 개라 자동 확정하지 않음", "INVALID_TRANSACTION": "금액·날짜·거래처 값을 확인할 수 없음", "ONE_TO_ONE": "1:1 대사", "ONE_TO_MANY": "1:N 합계 대사", "MANY_TO_ONE": "N:1 합계 대사", "MULTIPLE_COMBINATIONS": "만족하는 합계 조합이 여러 개라 자동 확정하지 않음", "AMOUNT_DIFFERENCE": "금액 허용 오차 초과", "DATE_DIFFERENCE": "날짜 허용 범위 초과", "NO_CANDIDATE": "대사 후보 없음", "RECON_SEARCH_LIMIT": "거래 대사 탐색 한도 초과", "KEY_MAPPING_REQUIRED": "키 열 연결 필요", "RECON_MAPPING_REQUIRED": "거래 열 연결 필요", "RECONCILIATION": "거래 대사", "CELL": "셀 비교", "ALIGNMENT": "행·열 정렬", "KEY": "키 비교"
+      "DUPLICATE_KEY": "중복키", "MULTIPLE_CANDIDATES": "후보가 여러 개라 자동 확정하지 않음", "INVALID_AMOUNT": "금액 값을 확인할 수 없음", "INVALID_DATE": "날짜 값을 확인할 수 없음", "INVALID_PARTNER": "거래처·설명 값을 확인할 수 없음", "ONE_TO_ONE": "1:1 대사", "ONE_TO_MANY": "1:N 합계 대사", "MANY_TO_ONE": "N:1 합계 대사", "MULTIPLE_COMBINATIONS": "만족하는 합계 조합이 여러 개라 자동 확정하지 않음", "AMOUNT_DIFFERENCE": "금액 허용 오차 초과", "DATE_DIFFERENCE": "날짜 허용 범위 초과", "NO_CANDIDATE": "대사 후보 없음", "RECON_SEARCH_LIMIT": "거래 대사 탐색 한도 초과", "KEY_MAPPING_REQUIRED": "키 열 연결 필요", "RECON_MAPPING_REQUIRED": "거래 열 연결 필요", "RECONCILIATION": "거래 대사", "CELL": "셀 비교", "ALIGNMENT": "행·열 정렬", "KEY": "키 비교"
     },
     "error": {
       "UNSUPPORTED_FORMAT": "지원하지 않는 파일 형식입니다.",

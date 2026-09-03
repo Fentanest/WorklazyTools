@@ -12,6 +12,7 @@ import { writeZipArchive } from "../../utils/zipArchive.ts";
 import { inspectExcelCompareFile, runExcelComparePair } from "./excelCompareClient.ts";
 import { PairFileDropZone } from "./PairFileDropZone.tsx";
 import { assignPairFiles, swapPairSides, type PairState } from "./pairFiles.ts";
+import { isReconcileConfigValid } from "./reconcileConfig.ts";
 import { assertReportBlobSize } from "./reportIntegrity.ts";
 import {
   DEFAULT_EXCEL_COMPARE_OPTIONS,
@@ -304,13 +305,47 @@ function ColumnPicker({ label, headers, value, onChange }: { label: string; head
 }
 
 function ReconcileOptions({ pair, leftHeaders, rightHeaders, updatePair, t }: { pair: PairState; leftHeaders: string[]; rightHeaders: string[]; updatePair: (id: number, update: Partial<PairState>) => void; t: LooseT }) {
-  const update = (key: keyof PairState["reconcile"], value: number | boolean) => updatePair(pair.id, { reconcile: { ...pair.reconcile, [key]: value } });
-  const fields = [
+  const update = (key: keyof PairState["reconcile"], value: number | boolean | undefined) => updatePair(pair.id, { reconcile: { ...pair.reconcile, [key]: value } });
+  const updateOptionalPair = (
+    leftKey: "leftDateColumn" | "leftPartnerColumn",
+    rightKey: "rightDateColumn" | "rightPartnerColumn",
+    side: "left" | "right",
+    rawValue: string,
+  ) => {
+    if (!rawValue) {
+      updatePair(pair.id, { reconcile: { ...pair.reconcile, [leftKey]: undefined, [rightKey]: undefined } });
+      return;
+    }
+    const counterpartHeaders = side === "left" ? rightHeaders : leftHeaders;
+    if (!counterpartHeaders.length) {
+      updatePair(pair.id, { reconcile: { ...pair.reconcile, [leftKey]: undefined, [rightKey]: undefined } });
+      return;
+    }
+    const ownKey = side === "left" ? leftKey : rightKey;
+    const counterpartKey = side === "left" ? rightKey : leftKey;
+    updatePair(pair.id, { reconcile: {
+      ...pair.reconcile,
+      [ownKey]: Number(rawValue),
+      [counterpartKey]: pair.reconcile[counterpartKey] ?? 1,
+    } });
+  };
+  const amountFields = [
     ["leftAmountColumn", "leftAmount", leftHeaders], ["rightAmountColumn", "rightAmount", rightHeaders],
-    ["leftDateColumn", "leftDate", leftHeaders], ["rightDateColumn", "rightDate", rightHeaders],
-    ["leftPartnerColumn", "leftPartner", leftHeaders], ["rightPartnerColumn", "rightPartner", rightHeaders],
   ] as const;
-  return <div className="excel-pair-mode-options"><h3>{t("features:excelCompare.reconcile.title")}</h3><div className="excel-reconcile-grid">{fields.map(([key, label, headers]) => <label key={key}><span>{t(`features:excelCompare.reconcile.${label}` as never)}</span><select value={pair.reconcile[key]} onChange={(event) => update(key, Number(event.target.value))}>{headers.map((header, index) => <option value={index + 1} key={`${index}-${header}`}>{columnLabel(index + 1)} · {header}</option>)}</select></label>)}</div><div className="excel-number-options"><label><span>{t("features:excelCompare.reconcile.dateTolerance")}</span><input type="number" min={0} value={pair.reconcile.dateToleranceDays} onChange={(event) => update("dateToleranceDays", Math.max(0, Number(event.target.value) || 0))} /></label><label><span>{t("features:excelCompare.reconcile.roundingUnit")}</span><input type="number" min="0.000001" step="0.01" value={pair.reconcile.roundingUnit} onChange={(event) => update("roundingUnit", Math.max(0.000001, Number(event.target.value) || 0.01))} /></label></div><ToggleRow label={t("features:excelCompare.reconcile.grouped")} description={t("features:excelCompare.reconcile.groupedDescription")} checked={pair.reconcile.allowGroupedMatches} onChange={(checked) => update("allowGroupedMatches", checked)} /></div>;
+  const optionalFields = [
+    ["leftDateColumn", "rightDateColumn", "left", "leftDate", leftHeaders],
+    ["leftDateColumn", "rightDateColumn", "right", "rightDate", rightHeaders],
+    ["leftPartnerColumn", "rightPartnerColumn", "left", "leftPartner", leftHeaders],
+    ["leftPartnerColumn", "rightPartnerColumn", "right", "rightPartner", rightHeaders],
+  ] as const;
+  const dateUnused = pair.reconcile.leftDateColumn === undefined;
+  return <div className="excel-pair-mode-options"><h3>{t("features:excelCompare.reconcile.title")}</h3><div className="excel-reconcile-grid">
+    {amountFields.map(([key, label, headers]) => <label key={key} data-reconcile-field={key}><span>{t(`features:excelCompare.reconcile.${label}` as never)}</span><select value={pair.reconcile[key]} onChange={(event) => update(key, Number(event.target.value))}>{headers.map((header, index) => <option value={index + 1} key={`${index}-${header}`}>{columnLabel(index + 1)} · {header}</option>)}</select></label>)}
+    {optionalFields.map(([leftKey, rightKey, side, label, headers]) => {
+      const key = side === "left" ? leftKey : rightKey;
+      return <label key={key} data-reconcile-field={key}><span>{t(`features:excelCompare.reconcile.${label}` as never)}</span><select value={pair.reconcile[key] ?? ""} onChange={(event) => updateOptionalPair(leftKey, rightKey, side, event.target.value)}><option value="">{t("features:excelCompare.reconcile.unused")}</option>{headers.map((header, index) => <option value={index + 1} key={`${index}-${header}`}>{columnLabel(index + 1)} · {header}</option>)}</select></label>;
+    })}
+  </div><div className="excel-number-options"><label><span>{t("features:excelCompare.reconcile.dateTolerance")}</span><input type="number" min={0} disabled={dateUnused} value={pair.reconcile.dateToleranceDays} onChange={(event) => update("dateToleranceDays", Math.max(0, Number(event.target.value) || 0))} /></label><label><span>{t("features:excelCompare.reconcile.roundingUnit")}</span><input type="number" min="0.000001" step="0.01" value={pair.reconcile.roundingUnit} onChange={(event) => update("roundingUnit", Math.max(0.000001, Number(event.target.value) || 0.01))} /></label></div><ToggleRow label={t("features:excelCompare.reconcile.grouped")} description={t("features:excelCompare.reconcile.groupedDescription")} checked={pair.reconcile.allowGroupedMatches} onChange={(checked) => update("allowGroupedMatches", checked)} /></div>;
 }
 
 function NormalizationOptions({ value, onChange, t }: { value: typeof DEFAULT_EXCEL_COMPARE_OPTIONS; onChange: (value: typeof DEFAULT_EXCEL_COMPARE_OPTIONS) => void; t: LooseT }) {
@@ -332,12 +367,13 @@ function newPair(id: number): PairState {
 }
 
 function pairOptions(pair: PairState, mode: ExcelCompareMode, normalization: typeof DEFAULT_EXCEL_COMPARE_OPTIONS): ExcelComparePairOptions {
-  return { mode, left: { sheetName: pair.leftSheet, headerRow: pair.leftHeaderRow }, right: { sheetName: pair.rightSheet, headerRow: pair.rightHeaderRow }, normalization, key: { leftColumns: pair.primaryLeft, rightColumns: pair.primaryRight, secondaryLeftColumns: pair.secondaryLeft, secondaryRightColumns: pair.secondaryRight, duplicatePolicy: pair.duplicatePolicy }, reconcile: pair.reconcile };
+  return { mode, left: { sheetName: pair.leftSheet, headerRow: pair.leftHeaderRow }, right: { sheetName: pair.rightSheet, headerRow: pair.rightHeaderRow }, normalization, key: mode === "key" ? { leftColumns: pair.primaryLeft, rightColumns: pair.primaryRight, secondaryLeftColumns: pair.secondaryLeft, secondaryRightColumns: pair.secondaryRight, duplicatePolicy: pair.duplicatePolicy } : undefined, reconcile: mode === "reconcile" ? pair.reconcile : undefined };
 }
 
 function pairReady(pair: PairState, mode: ExcelCompareMode) {
   if (!pair.left || !pair.right || !pair.leftInspection || !pair.rightInspection || pair.leftError || pair.rightError || !pair.leftSheet || !pair.rightSheet) return false;
   if (mode === "key") return pair.primaryLeft.length > 0 && pair.primaryLeft.length === pair.primaryRight.length && (pair.duplicatePolicy !== "secondary" || pair.secondaryLeft.length === pair.secondaryRight.length);
+  if (mode === "reconcile") return isReconcileConfigValid(pair.reconcile);
   return true;
 }
 

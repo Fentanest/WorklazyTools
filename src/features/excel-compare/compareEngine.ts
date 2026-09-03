@@ -7,6 +7,7 @@ import {
   normalizedCellIdentity,
   normalizeKeyPart,
 } from "./normalization.ts";
+import { isReconcileConfigValid, type ReconcileConfig } from "./reconcileConfig.ts";
 import type {
   ExcelComparePairOptions,
   ExcelCompareRecord,
@@ -35,6 +36,16 @@ const DEFAULT_ALIGNMENT_CELL_BUDGET = 12_000_000;
 const RECON_CANDIDATE_LIMIT = 10;
 const RECON_COMPONENT_COMBINATIONS = 1_023;
 const RECON_GLOBAL_BUDGET = 1_000_000;
+const UNUSED_PARAMETER = "UNUSED";
+
+interface ReconciliationTransaction {
+  row: number;
+  amount: number;
+  day?: number;
+  partner: string;
+  amountText: string;
+  invalidReasons: string[];
+}
 
 export function compareSpreadsheetPair(
   leftBook: SpreadsheetBookData,
@@ -162,48 +173,87 @@ function compareByReconciliation(
   checkCanceled: () => void,
 ) {
   const config = options.reconcile;
-  if (!config) return [record("error", null, null, null, null, "", "", "", "RECONCILIATION", "RECON_MAPPING_REQUIRED")];
-  const leftTransactions = dataRows(left.sheet, options.left.headerRow).map((row) => transaction(left, row, config.leftAmountColumn, config.leftDateColumn, config.leftPartnerColumn, options));
-  const rightTransactions = dataRows(right.sheet, options.right.headerRow).map((row) => transaction(right, row, config.rightAmountColumn, config.rightDateColumn, config.rightPartnerColumn, options));
+  if (!isReconcileConfigValid(config)) return [record("error", null, null, null, null, "", "", "", "RECONCILIATION", "RECON_MAPPING_REQUIRED")];
+  const activeConfig = config as ReconcileConfig;
+  const leftTransactions = dataRows(left.sheet, options.left.headerRow).map((row) => transaction(left, row, activeConfig.leftAmountColumn, activeConfig.leftDateColumn, activeConfig.leftPartnerColumn, options));
+  const rightTransactions = dataRows(right.sheet, options.right.headerRow).map((row) => transaction(right, row, activeConfig.rightAmountColumn, activeConfig.rightDateColumn, activeConfig.rightPartnerColumn, options));
   const records: ExcelCompareRecord[] = [];
   const validLeft = leftTransactions.filter((item) => {
-    if (item.valid) return true;
-    records.push(record("error", item.row, null, null, null, item.partner, item.amountText, "", "RECONCILIATION", "INVALID_TRANSACTION"));
+    if (!item.invalidReasons.length) return true;
+    records.push(record("error", item.row, null, null, null, item.partner, item.amountText, "", "RECONCILIATION", item.invalidReasons.join("+")));
     return false;
   });
   const validRight = rightTransactions.filter((item) => {
-    if (item.valid) return true;
-    records.push(record("error", null, item.row, null, null, item.partner, "", item.amountText, "RECONCILIATION", "INVALID_TRANSACTION"));
+    if (!item.invalidReasons.length) return true;
+    records.push(record("error", null, item.row, null, null, item.partner, "", item.amountText, "RECONCILIATION", item.invalidReasons.join("+")));
     return false;
   });
   const usedLeft = new Set<number>();
   const usedRight = new Set<number>();
   const unmatchedLeftReasons = new Map<number, string>();
   let evaluations = 0;
-  let limitReached = false;
+  let globalLimitReached = false;
 
-  const evaluateSubsets = (targetAmount: number, candidates: typeof validRight) => {
-    const bounded = candidates.slice(0, RECON_CANDIDATE_LIMIT);
-    const maximum = Math.min(RECON_COMPONENT_COMBINATIONS, (1 << bounded.length) - 1);
-    const matches: Array<typeof bounded> = [];
+  const recordLimit = () => {
+    if (!warnings.includes("RECON_SEARCH_LIMIT")) warnings.push("RECON_SEARCH_LIMIT");
+  };
+
+  const evaluateSubsets = (targetAmount: number, candidates: ReconciliationTransaction[]) => {
+    const maximum = Math.min(RECON_COMPONENT_COMBINATIONS, (1 << candidates.length) - 1);
+    const matches: ReconciliationTransaction[][] = [];
     for (let mask = 1; mask <= maximum; mask += 1) {
+      if (evaluations >= RECON_GLOBAL_BUDGET) {
+        globalLimitReached = true;
+        recordLimit();
+        return { matches, limited: true };
+      }
       evaluations += 1;
       if ((evaluations & 4095) === 0) checkCanceled();
-      if (evaluations > RECON_GLOBAL_BUDGET) { limitReached = true; break; }
-      const subset = bounded.filter((_candidate, index) => (mask & (1 << index)) !== 0);
-      const sum = roundAmount(subset.reduce((total, candidate) => total + candidate.amount, 0), config.roundingUnit);
+      const subset = candidates.filter((_candidate, index) => (mask & (1 << index)) !== 0);
+      const sum = roundAmount(subset.reduce((total, candidate) => total + candidate.amount, 0), activeConfig.roundingUnit);
       if (amountsEqual(targetAmount, sum, options)) matches.push(subset);
       if (matches.length > 1) break;
     }
-    return matches;
+    return { matches, limited: false };
+  };
+
+  const candidateMatches = (candidate: ReconciliationTransaction, target: ReconciliationTransaction) =>
+    (activeConfig.leftPartnerColumn === undefined || candidate.partner === target.partner)
+    && (activeConfig.leftDateColumn === undefined || Math.abs(candidate.day! - target.day!) <= activeConfig.dateToleranceDays);
+
+  const ambiguousLeftTarget = (target: ReconciliationTransaction, candidates: ReconciliationTransaction[], reason: string) => {
+    records.push(reconciliationRecord("ambiguous", [target], candidates.slice(0, RECON_CANDIDATE_LIMIT), reason));
+    usedLeft.add(target.row);
+  };
+
+  const ambiguousRightTarget = (candidates: ReconciliationTransaction[], target: ReconciliationTransaction, reason: string) => {
+    const uniqueLeft = [...new Map(candidates.map((candidate) => [candidate.row, candidate])).values()];
+    uniqueLeft.forEach((candidate) => records.push(reconciliationRecord("ambiguous", [candidate], [target], reason)));
+    uniqueLeft.forEach((candidate) => usedLeft.add(candidate.row));
+    usedRight.add(target.row);
   };
 
   for (const target of validLeft) {
     checkCanceled();
     if (usedLeft.has(target.row)) continue;
-    const component = validRight.filter((candidate) => !usedRight.has(candidate.row) && candidate.partner === target.partner && Math.abs(candidate.day - target.day) <= config.dateToleranceDays);
-    if (config.allowGroupedMatches && component.length > 1 && !limitReached) {
-      const combinations = evaluateSubsets(roundAmount(target.amount, config.roundingUnit), component);
+    const availableRight = validRight.filter((candidate) => !usedRight.has(candidate.row));
+    const component = availableRight.filter((candidate) => candidateMatches(candidate, target));
+    if (component.length > RECON_CANDIDATE_LIMIT) {
+      recordLimit();
+      ambiguousLeftTarget(target, component, "RECON_SEARCH_LIMIT");
+      continue;
+    }
+    if (activeConfig.allowGroupedMatches && component.length > 1) {
+      if (globalLimitReached) {
+        recordLimit();
+        ambiguousLeftTarget(target, component, "RECON_SEARCH_LIMIT");
+        continue;
+      }
+      const { matches: combinations, limited } = evaluateSubsets(roundAmount(target.amount, activeConfig.roundingUnit), component);
+      if (limited) {
+        ambiguousLeftTarget(target, component, "RECON_SEARCH_LIMIT");
+        continue;
+      }
       if (combinations.length === 1) {
         usedLeft.add(target.row); combinations[0].forEach((candidate) => usedRight.add(candidate.row));
         records.push(reconciliationRecord("matched", [target], combinations[0], combinations[0].length === 1 ? "ONE_TO_ONE" : "ONE_TO_MANY"));
@@ -222,34 +272,37 @@ function compareByReconciliation(
       continue;
     }
     if (exact.length > 1) {
-      records.push(reconciliationRecord("ambiguous", [target], exact, "MULTIPLE_CANDIDATES"));
-      usedLeft.add(target.row);
+      ambiguousLeftTarget(target, exact, "MULTIPLE_CANDIDATES");
       continue;
     }
-    const samePartner = validRight.filter((candidate) => !usedRight.has(candidate.row) && candidate.partner === target.partner);
-    unmatchedLeftReasons.set(target.row, component.length ? "AMOUNT_DIFFERENCE" : samePartner.length ? "DATE_DIFFERENCE" : "NO_CANDIDATE");
+    const samePartner = availableRight.filter((candidate) => activeConfig.leftPartnerColumn === undefined || candidate.partner === target.partner);
+    unmatchedLeftReasons.set(target.row, component.length ? "AMOUNT_DIFFERENCE" : activeConfig.leftDateColumn !== undefined && samePartner.length ? "DATE_DIFFERENCE" : "NO_CANDIDATE");
   }
 
-  if (config.allowGroupedMatches && !limitReached) {
+  if (activeConfig.allowGroupedMatches) {
     for (const target of validRight.filter((item) => !usedRight.has(item.row))) {
-      const component = validLeft.filter((candidate) => !usedLeft.has(candidate.row) && candidate.partner === target.partner && Math.abs(candidate.day - target.day) <= config.dateToleranceDays);
+      const component = validLeft.filter((candidate) => !usedLeft.has(candidate.row) && candidateMatches(candidate, target));
       if (component.length <= 1) continue;
-      const combinations = evaluateSubsets(roundAmount(target.amount, config.roundingUnit), component);
+      if (component.length > RECON_CANDIDATE_LIMIT || globalLimitReached) {
+        recordLimit();
+        ambiguousRightTarget(component, target, "RECON_SEARCH_LIMIT");
+        continue;
+      }
+      const { matches: combinations, limited } = evaluateSubsets(roundAmount(target.amount, activeConfig.roundingUnit), component);
+      if (limited) {
+        ambiguousRightTarget(component, target, "RECON_SEARCH_LIMIT");
+        continue;
+      }
       if (combinations.length === 1) {
         combinations[0].forEach((candidate) => usedLeft.add(candidate.row)); usedRight.add(target.row);
         records.push(reconciliationRecord("matched", combinations[0], [target], "MANY_TO_ONE"));
       } else if (combinations.length > 1) {
-        records.push(reconciliationRecord("ambiguous", combinations.flat(), [target], "MULTIPLE_COMBINATIONS"));
-        usedRight.add(target.row);
+        ambiguousRightTarget(combinations.flat(), target, "MULTIPLE_COMBINATIONS");
       }
     }
   }
   validLeft.filter((item) => !usedLeft.has(item.row)).forEach((item) => records.push(reconciliationRecord("unmatched", [item], [], unmatchedLeftReasons.get(item.row) ?? "NO_CANDIDATE")));
   validRight.filter((item) => !usedRight.has(item.row)).forEach((item) => records.push(reconciliationRecord("unmatched", [], [item], "NO_CANDIDATE")));
-  if (limitReached) {
-    warnings.push("RECON_SEARCH_LIMIT");
-    records.push(record("error", null, null, null, null, "", "", "", "RECONCILIATION", "RECON_SEARCH_LIMIT"));
-  }
   return records;
 }
 
@@ -359,14 +412,19 @@ function fnv1a(value: string) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function transaction(index: SheetIndex, row: number, amountColumn: number, dateColumn: number, partnerColumn: number, options: ExcelComparePairOptions) {
+function transaction(index: SheetIndex, row: number, amountColumn: number, dateColumn: number | undefined, partnerColumn: number | undefined, options: ExcelComparePairOptions): ReconciliationTransaction {
   const amountCell = getCell(index, row, amountColumn);
-  const dateCell = getCell(index, row, dateColumn);
-  const partner = normalizeComparableText(cellText(getCell(index, row, partnerColumn)), options.normalization);
+  const dateCell = dateColumn === undefined ? undefined : getCell(index, row, dateColumn);
+  const partner = partnerColumn === undefined ? "" : normalizeComparableText(cellText(getCell(index, row, partnerColumn)), options.normalization);
   const amountText = cellText(amountCell);
   const amount = parseAmount(amountCell?.value, options.normalization.stripNumberSymbols);
-  const day = parseDay(dateCell?.value);
-  return { row, amount, day, partner, amountText, valid: Number.isFinite(amount) && Number.isFinite(day) && Boolean(partner) };
+  const day = dateColumn === undefined ? undefined : parseDay(dateCell?.value);
+  const invalidReasons = [
+    ...(!Number.isFinite(amount) ? ["INVALID_AMOUNT"] : []),
+    ...(dateColumn !== undefined && !Number.isFinite(day) ? ["INVALID_DATE"] : []),
+    ...(partnerColumn !== undefined && !partner ? ["INVALID_PARTNER"] : []),
+  ];
+  return { row, amount, day, partner, amountText, invalidReasons };
 }
 
 function parseAmount(value: SpreadsheetCellData["value"] | undefined, stripSymbols: boolean) {
@@ -437,6 +495,9 @@ function summarize(records: ExcelCompareRecord[]): ExcelCompareSummary {
 
 function comparisonParameters(left: SpreadsheetBookData, right: SpreadsheetBookData, options: ExcelComparePairOptions): Array<[string, string]> {
   const normalization = options.normalization;
+  const key = options.mode === "key" ? options.key : undefined;
+  const reconcile = options.mode === "reconcile" ? options.reconcile : undefined;
+  const dateActive = reconcile?.leftDateColumn !== undefined && reconcile.rightDateColumn !== undefined;
   return [
     ["mode", options.mode],
     ["leftFormat", left.format],
@@ -463,24 +524,32 @@ function comparisonParameters(left: SpreadsheetBookData, right: SpreadsheetBookD
     ["formulaMode", normalization.formulaMode],
     ["absoluteTolerance", String(normalization.absoluteTolerance)],
     ["relativeTolerance", String(normalization.relativeTolerance)],
-    ["keyLeftColumns", (options.key?.leftColumns ?? []).join(",")],
-    ["keyRightColumns", (options.key?.rightColumns ?? []).join(",")],
-    ["keySecondaryLeftColumns", (options.key?.secondaryLeftColumns ?? []).join(",")],
-    ["keySecondaryRightColumns", (options.key?.secondaryRightColumns ?? []).join(",")],
-    ["duplicateKeyPolicy", options.key?.duplicatePolicy ?? ""],
-    ["reconcileLeftAmountColumn", String(options.reconcile?.leftAmountColumn ?? "")],
-    ["reconcileRightAmountColumn", String(options.reconcile?.rightAmountColumn ?? "")],
-    ["reconcileLeftDateColumn", String(options.reconcile?.leftDateColumn ?? "")],
-    ["reconcileRightDateColumn", String(options.reconcile?.rightDateColumn ?? "")],
-    ["reconcileLeftPartnerColumn", String(options.reconcile?.leftPartnerColumn ?? "")],
-    ["reconcileRightPartnerColumn", String(options.reconcile?.rightPartnerColumn ?? "")],
-    ["reconcileDateToleranceDays", String(options.reconcile?.dateToleranceDays ?? "")],
-    ["reconcileGroupedMatches", String(options.reconcile?.allowGroupedMatches ?? false)],
-    ["roundingUnit", String(options.reconcile?.roundingUnit ?? 0.01)],
+    ["keyLeftColumns", parameterColumns(key?.leftColumns)],
+    ["keyRightColumns", parameterColumns(key?.rightColumns)],
+    ["keySecondaryLeftColumns", parameterColumns(key?.secondaryLeftColumns)],
+    ["keySecondaryRightColumns", parameterColumns(key?.secondaryRightColumns)],
+    ["duplicateKeyPolicy", parameterValue(key?.duplicatePolicy)],
+    ["reconcileLeftAmountColumn", parameterValue(reconcile?.leftAmountColumn)],
+    ["reconcileRightAmountColumn", parameterValue(reconcile?.rightAmountColumn)],
+    ["reconcileLeftDateColumn", parameterValue(reconcile?.leftDateColumn)],
+    ["reconcileRightDateColumn", parameterValue(reconcile?.rightDateColumn)],
+    ["reconcileLeftPartnerColumn", parameterValue(reconcile?.leftPartnerColumn)],
+    ["reconcileRightPartnerColumn", parameterValue(reconcile?.rightPartnerColumn)],
+    ["reconcileDateToleranceDays", dateActive ? String(reconcile!.dateToleranceDays) : UNUSED_PARAMETER],
+    ["reconcileGroupedMatches", parameterValue(reconcile?.allowGroupedMatches)],
+    ["roundingUnit", parameterValue(reconcile?.roundingUnit)],
     ["relativeToleranceZeroDenominator", "exact-zero-only"],
-    ["alignmentCellBudget", String(options.alignmentCellBudget ?? DEFAULT_ALIGNMENT_CELL_BUDGET)],
-    ["reconciliationCandidatesPerTarget", String(RECON_CANDIDATE_LIMIT)],
-    ["reconciliationCombinationBudgetPerComponent", String(RECON_COMPONENT_COMBINATIONS)],
-    ["reconciliationGlobalCombinationBudget", String(RECON_GLOBAL_BUDGET)],
+    ["alignmentCellBudget", options.mode === "reconcile" ? UNUSED_PARAMETER : String(options.alignmentCellBudget ?? DEFAULT_ALIGNMENT_CELL_BUDGET)],
+    ["reconciliationCandidatesPerTarget", reconcile ? String(RECON_CANDIDATE_LIMIT) : UNUSED_PARAMETER],
+    ["reconciliationCombinationBudgetPerComponent", reconcile?.allowGroupedMatches ? String(RECON_COMPONENT_COMBINATIONS) : UNUSED_PARAMETER],
+    ["reconciliationGlobalCombinationBudget", reconcile?.allowGroupedMatches ? String(RECON_GLOBAL_BUDGET) : UNUSED_PARAMETER],
   ];
+}
+
+function parameterValue(value: string | number | boolean | undefined) {
+  return value === undefined ? UNUSED_PARAMETER : String(value);
+}
+
+function parameterColumns(value: number[] | undefined) {
+  return value?.length ? value.join(",") : UNUSED_PARAMETER;
 }

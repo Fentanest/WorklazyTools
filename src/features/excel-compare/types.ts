@@ -43,10 +43,10 @@ export interface ExcelComparePairOptions {
   reconcile?: {
     leftAmountColumn: number;
     rightAmountColumn: number;
-    leftDateColumn: number;
-    rightDateColumn: number;
-    leftPartnerColumn: number;
-    rightPartnerColumn: number;
+    leftDateColumn?: number;
+    rightDateColumn?: number;
+    leftPartnerColumn?: number;
+    rightPartnerColumn?: number;
     dateToleranceDays: number;
     allowGroupedMatches: boolean;
     roundingUnit: number;

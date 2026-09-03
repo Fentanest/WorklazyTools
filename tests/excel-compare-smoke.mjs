@@ -16,8 +16,10 @@ const downloadRoot = path.join(temporaryDirectory, "downloads");
 try {
   await run(process.execPath, ["scripts/generate-excel-compare-fixtures.mjs", temporaryDirectory]);
   await fs.mkdir(downloadRoot);
-  await fs.writeFile(path.join(temporaryDirectory, "direction-left.csv"), "ID,Value\nA,left\n", "utf8");
-  await fs.writeFile(path.join(temporaryDirectory, "direction-right.csv"), "ID,Value\nA,left\nB,right-only\n", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "direction-left.csv"), "ID,Value\nA,left", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "direction-right.csv"), "ID,Value\nA,left\nB,right-only", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "amount-left.csv"), "Amount\n10\n10", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "amount-right.csv"), "Amount\n10\n10\n10", "utf8");
   const fixture = (name) => path.join(temporaryDirectory, name);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -166,6 +168,7 @@ try {
     const integrityFailures = [];
     for (const mode of ["zero", "mismatch"]) integrityFailures.push(await assertIntegrityFailure(browser, fixture("left.xlsx"), fixture("right.xlsx"), mode));
     const swapDirection = await assertSwapDirection(browser, path.join(temporaryDirectory, "direction-left.csv"), path.join(temporaryDirectory, "direction-right.csv"));
+    const optionalReconciliation = await assertOptionalReconciliation(browser, path.join(temporaryDirectory, "amount-left.csv"), path.join(temporaryDirectory, "amount-right.csv"), downloadRoot);
 
     if (pageErrors.length) throw new Error(`Browser page errors:\n${pageErrors.join("\n")}`);
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
@@ -180,6 +183,7 @@ try {
       integrityFailures,
       pairAssignment: { namesBeforeSwap, namesAfterSwap, overflowRejected: 2 },
       swapDirection,
+      optionalReconciliation,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
       cancellation: "passed",
@@ -305,6 +309,55 @@ async function assertSwapDirection(browser, leftPath, rightPath) {
       throw new Error(`Pair swap did not reverse added/removed semantics: ${JSON.stringify({ before, after })}`);
     }
     return { before, after };
+  } finally {
+    await page.close();
+  }
+}
+
+async function assertOptionalReconciliation(browser, leftPath, rightPath, root) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const client = await page.createCDPSession();
+    const input = await page.$('.excel-compare-page input[type="file"]');
+    await input.uploadFile(leftPath, rightPath);
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2);
+    await page.click('.excel-compare-mode-grid button:nth-child(3)');
+    await page.waitForSelector('[data-reconcile-field="leftDateColumn"] select');
+
+    await page.select('[data-reconcile-field="leftDateColumn"] select', "");
+    await page.waitForFunction(() => ["leftDateColumn", "rightDateColumn"].every((key) => document.querySelector(`[data-reconcile-field="${key}"] select`)?.value === ""));
+    await page.select('[data-reconcile-field="rightDateColumn"] select', "1");
+    await page.waitForFunction(() => ["leftDateColumn", "rightDateColumn"].every((key) => document.querySelector(`[data-reconcile-field="${key}"] select`)?.value === "1"));
+    await page.select('[data-reconcile-field="rightDateColumn"] select', "");
+    await page.select('[data-reconcile-field="leftPartnerColumn"] select', "");
+    await page.waitForFunction(() => ["leftDateColumn", "rightDateColumn", "leftPartnerColumn", "rightPartnerColumn"].every((key) => document.querySelector(`[data-reconcile-field="${key}"] select`)?.value === ""));
+    const mappingState = await page.evaluate(() => ({
+      dateToleranceDisabled: document.querySelector('.excel-number-options input[type="number"]')?.disabled,
+      compareDisabled: document.querySelector('.excel-compare-page > .primary-button')?.disabled,
+      unusedLabels: Array.from(document.querySelectorAll('.excel-reconcile-grid option[value=""]'), (option) => option.textContent || ""),
+    }));
+    if (!mappingState.dateToleranceDisabled || mappingState.compareDisabled || mappingState.unusedLabels.length !== 4 || mappingState.unusedLabels.some((label) => label !== "사용 안 함")) {
+      throw new Error(`Optional reconciliation mapping UI is inconsistent: ${JSON.stringify(mappingState)}`);
+    }
+    await page.click('.excel-compare-page > .primary-button');
+    await page.waitForSelector(".operation-progress.status-success");
+    const report = (await downloadReportLinks(page, client, root, "amount-only"))[0];
+    const summary = await assertNineSheetReport(report.bytes, {
+      matched: 0, changed: 0, added: 0, removed: 0, duplicate: 0, ambiguous: 2, unmatched: 3, error: 0,
+    });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(report.bytes);
+    const sheet = workbook.getWorksheet("Parameters");
+    const parameters = Object.fromEntries(sheet.getRows(2, sheet.rowCount - 1).map((row) => [String(row.getCell(1).value), String(row.getCell(2).value)]));
+    for (const key of ["reconcileLeftDateColumn", "reconcileRightDateColumn", "reconcileLeftPartnerColumn", "reconcileRightPartnerColumn", "reconcileDateToleranceDays"]) {
+      if (parameters[key] !== "UNUSED") throw new Error(`Amount-only report did not mark ${key} as UNUSED: ${parameters[key]}`);
+    }
+    if (parameters.reconciliationCandidatesPerTarget !== "10") throw new Error(`Candidate limit did not match Parameters: ${parameters.reconciliationCandidatesPerTarget}`);
+    return { size: report.size, summary, unused: "date+partner", candidateLimit: parameters.reconciliationCandidatesPerTarget };
   } finally {
     await page.close();
   }

@@ -147,6 +147,122 @@ test("reconciliation finds deterministic 1:N matches and never auto-confirms mul
   assert.ok(ambiguous.records.some((item) => item.status === "ambiguous" && item.reason === "MULTIPLE_COMBINATIONS"));
 });
 
+test("reconciliation excludes disabled date and partner criteria symmetrically", () => {
+  const dateUnused = reconciliationOptions();
+  dateUnused.reconcile!.leftDateColumn = undefined;
+  dateUnused.reconcile!.rightDateColumn = undefined;
+  const dateResult = compareSpreadsheetPair(
+    book([["Amount", "Date", "Partner"], [10, "not-a-date", "Vendor"]]),
+    book([["Amount", "Date", "Partner"], [10, "also-not-a-date", "Vendor"]]),
+    dateUnused,
+  );
+  assert.equal(dateResult.summary.matched, 1);
+  assert.equal(dateResult.records.some((item) => item.reason.includes("INVALID_DATE")), false);
+
+  const partnerUnused = reconciliationOptions();
+  partnerUnused.reconcile!.leftPartnerColumn = undefined;
+  partnerUnused.reconcile!.rightPartnerColumn = undefined;
+  const partnerResult = compareSpreadsheetPair(
+    book([["Amount", "Date", "Partner"], [10, "2026-09-01", ""]]),
+    book([["Amount", "Date", "Partner"], [10, "2026-09-01", ""]]),
+    partnerUnused,
+  );
+  assert.equal(partnerResult.summary.matched, 1);
+  assert.equal(partnerResult.records.some((item) => item.reason.includes("INVALID_PARTNER")), false);
+});
+
+test("amount-only reconciliation counts ambiguity once per unresolved left target", () => {
+  const options = reconciliationOptions();
+  options.reconcile = {
+    ...options.reconcile!,
+    leftDateColumn: undefined,
+    rightDateColumn: undefined,
+    leftPartnerColumn: undefined,
+    rightPartnerColumn: undefined,
+  };
+  const result = compareSpreadsheetPair(
+    book([["Amount"], [10], [10]]),
+    book([["Amount"], [10], [10], [10]]),
+    options,
+  );
+  assert.equal(result.summary.ambiguous, 2);
+  assert.deepEqual(result.records.filter((item) => item.status === "ambiguous").map((item) => item.leftRow), [2, 3]);
+  assert.equal(result.records.some((item) => /INVALID_DATE|INVALID_PARTNER/u.test(item.reason)), false);
+});
+
+test("active reconciliation criteria report amount, date, and partner errors separately", () => {
+  const options = reconciliationOptions();
+  const result = compareSpreadsheetPair(
+    book([
+      ["Amount", "Date", "Partner"],
+      ["bad", "2026-09-01", "Vendor"],
+      [10, "bad", "Vendor"],
+      [10, "2026-09-01", ""],
+    ]),
+    book([["Amount", "Date", "Partner"], [10, "2026-09-01", "Vendor"]]),
+    options,
+  );
+  assert.deepEqual(
+    result.records.filter((item) => item.status === "error").map((item) => item.reason),
+    ["INVALID_AMOUNT", "INVALID_DATE", "INVALID_PARTNER"],
+  );
+});
+
+test("reconciliation validator rejects one-sided optional mappings", () => {
+  const options = reconciliationOptions();
+  options.reconcile!.rightDateColumn = undefined;
+  const result = compareSpreadsheetPair(book([["Amount"], [10]]), book([["Amount"], [10]]), options);
+  assert.equal(result.summary.error, 1);
+  assert.equal(result.records[0].reason, "RECON_MAPPING_REQUIRED");
+});
+
+test("reverse grouped ambiguity is recorded once for every involved left target", () => {
+  const options = reconciliationOptions();
+  options.reconcile = {
+    ...options.reconcile!,
+    leftDateColumn: undefined,
+    rightDateColumn: undefined,
+    leftPartnerColumn: undefined,
+    rightPartnerColumn: undefined,
+    allowGroupedMatches: true,
+  };
+  const result = compareSpreadsheetPair(
+    book([["Amount"], [4], [6], [3], [7]]),
+    book([["Amount"], [10]]),
+    options,
+  );
+  const ambiguous = result.records.filter((item) => item.status === "ambiguous");
+  assert.equal(result.summary.ambiguous, 4);
+  assert.deepEqual(ambiguous.map((item) => item.leftRow).sort(), [2, 3, 4, 5]);
+  assert.ok(ambiguous.every((item) => item.reason === "MULTIPLE_COMBINATIONS" && item.rightRow === 2));
+});
+
+test("candidate-limit overflow prevents exact auto-matching and matches Parameters", () => {
+  const options = reconciliationOptions();
+  options.reconcile = {
+    ...options.reconcile!,
+    leftDateColumn: undefined,
+    rightDateColumn: undefined,
+    leftPartnerColumn: undefined,
+    rightPartnerColumn: undefined,
+    allowGroupedMatches: false,
+  };
+  const result = compareSpreadsheetPair(
+    book([["Amount"], [10]]),
+    book([["Amount"], ...Array.from({ length: 11 }, () => [10])]),
+    options,
+  );
+  assert.equal(result.summary.matched, 0);
+  assert.equal(result.summary.ambiguous, 1);
+  assert.ok(result.warnings.includes("RECON_SEARCH_LIMIT"));
+  assert.equal(result.records.find((item) => item.status === "ambiguous")?.reason, "RECON_SEARCH_LIMIT");
+  const parameters = Object.fromEntries(result.parameters);
+  assert.equal(parameters.reconciliationCandidatesPerTarget, "10");
+  assert.equal(parameters.reconciliationCombinationBudgetPerComponent, "UNUSED");
+  assert.equal(parameters.reconcileLeftDateColumn, "UNUSED");
+  assert.equal(parameters.reconcileLeftPartnerColumn, "UNUSED");
+});
+
 test("reconciliation records the pair-wide combination budget as RECON_SEARCH_LIMIT", () => {
   const options = baseOptions();
   options.mode = "reconcile";
@@ -175,7 +291,29 @@ test("pair report always has nine sheets and stores external values as primitive
     assert.equal(typeof cell.value, "string");
     assert.equal(cell.formula, undefined);
   })));
+  const parameters = Object.fromEntries(workbook.getWorksheet("Parameters").getRows(2, workbook.getWorksheet("Parameters").rowCount - 1).map((row) => [String(row.getCell(1).value), String(row.getCell(2).value)]));
+  assert.equal(parameters.keyLeftColumns, "UNUSED");
+  assert.equal(parameters.reconcileLeftAmountColumn, "UNUSED");
+  assert.equal(parameters.reconciliationCandidatesPerTarget, "UNUSED");
 });
+
+function reconciliationOptions(): ExcelComparePairOptions {
+  return {
+    ...baseOptions(),
+    mode: "reconcile",
+    reconcile: {
+      leftAmountColumn: 1,
+      rightAmountColumn: 1,
+      leftDateColumn: 2,
+      rightDateColumn: 2,
+      leftPartnerColumn: 3,
+      rightPartnerColumn: 3,
+      dateToleranceDays: 0,
+      allowGroupedMatches: false,
+      roundingUnit: 0.01,
+    },
+  };
+}
 
 function book(rows: SpreadsheetScalar[][], date1904 = false): SpreadsheetBookData {
   const cells: SpreadsheetCellData[] = [];
