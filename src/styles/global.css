@@ -1,3 +1,4 @@
+@layer legacy {
 :root {
   color-scheme: light;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
@@ -29,10 +30,10 @@
   --sky: #159bd7;
   --sky-soft: rgba(21, 155, 215, 0.12);
   --success: #159947;
-  --radius-sm: 11px;
-  --radius-md: 17px;
-  --radius-lg: 24px;
-  --radius-xl: 32px;
+  --legacy-radius-sm: 11px;
+  --legacy-radius-md: 17px;
+  --legacy-radius-lg: 24px;
+  --legacy-radius-xl: 32px;
 }
 
 * { box-sizing: border-box; }
@@ -237,7 +238,7 @@ input:focus-visible {
   overflow: hidden;
   padding: 55px 64px;
   border: 1px solid rgba(255,255,255,.75);
-  border-radius: var(--radius-xl);
+  border-radius: var(--legacy-radius-xl);
   background:
     linear-gradient(135deg, rgba(255,255,255,.93), rgba(245,248,253,.7)),
     linear-gradient(135deg, #fff, #eef4ff);
@@ -349,7 +350,7 @@ input:focus-visible {
   margin-top: 22px;
   padding: 23px 25px;
   border: 1px solid rgba(32,177,90,.16);
-  border-radius: var(--radius-lg);
+  border-radius: var(--legacy-radius-lg);
   background: linear-gradient(120deg, rgba(238,252,243,.94), rgba(248,254,250,.72));
   box-shadow: 0 12px 30px rgba(35, 129, 70, .055);
 }
@@ -387,7 +388,7 @@ input:focus-visible {
   overflow: hidden;
   padding: 18px;
   border: 1px solid rgba(255,255,255,.8);
-  border-radius: var(--radius-lg);
+  border-radius: var(--legacy-radius-lg);
   background: var(--bg-elevated);
   box-shadow: var(--card-shadow);
   backdrop-filter: blur(18px);
@@ -481,7 +482,7 @@ input:focus-visible {
 .comparison-preview {
   padding: 23px;
   border: 1px solid rgba(255,255,255,.74);
-  border-radius: var(--radius-lg);
+  border-radius: var(--legacy-radius-lg);
   background: var(--bg-elevated);
   box-shadow: var(--card-shadow);
   backdrop-filter: blur(18px);
@@ -517,7 +518,7 @@ input:focus-visible {
   gap: 13px;
   padding: 17px;
   border: 1.5px dashed rgba(118,118,128,.29);
-  border-radius: var(--radius-md);
+  border-radius: var(--legacy-radius-md);
   background: rgba(118,118,128,.045);
   cursor: pointer;
   transition: border-color .18s, background .18s, transform .18s;
@@ -775,7 +776,7 @@ button.sheet-name-chip:focus-visible { outline: 2px solid var(--green); outline-
 .spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.result-card { display: grid; grid-template-columns: auto 1fr; gap: 15px; margin-top: 16px; padding: 22px; border: 1px solid; border-radius: var(--radius-lg); animation: result-in .35s cubic-bezier(.2,.8,.2,1) both; }
+.result-card { display: grid; grid-template-columns: auto 1fr; gap: 15px; margin-top: 16px; padding: 22px; border: 1px solid; border-radius: var(--legacy-radius-lg); animation: result-in .35s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes result-in { from { opacity: 0; transform: translateY(8px) scale(.99); } }
 .result-card.accent-green { border-color: rgba(32,177,90,.18); background: linear-gradient(120deg, rgba(238,252,243,.92), rgba(255,255,255,.68)); }
 .result-card.accent-blue { border-color: rgba(0,122,255,.18); background: linear-gradient(120deg, rgba(237,246,255,.92), rgba(255,255,255,.68)); }
@@ -1022,7 +1023,7 @@ button.sheet-name-chip:focus-visible { outline: 2px solid var(--green); outline-
 .document-empty { margin-top: 12px; border: 1px dashed var(--separator); border-radius: 14px; }
 .pair-result-navigation { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
 .pair-result-navigation a { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 11px; color: var(--blue); background: var(--blue-soft); border-radius: 10px; font-size: 13px; font-weight: 750; }
-.expired-result-card { min-height: 280px; display: grid; place-items: center; align-content: center; padding: 30px; text-align: center; border: 1px solid var(--separator); border-radius: var(--radius-lg); background: var(--bg-elevated); }
+.expired-result-card { min-height: 280px; display: grid; place-items: center; align-content: center; padding: 30px; text-align: center; border: 1px solid var(--separator); border-radius: var(--legacy-radius-lg); background: var(--bg-elevated); }
 .expired-result-card > svg { color: var(--blue); }
 .expired-result-card h2 { margin: 12px 0 0; font-size: 17px; }
 .expired-result-card p { max-width: 500px; margin: 8px 0 17px; color: var(--label-secondary); font-size: 14px; line-height: 1.6; }
@@ -1085,7 +1086,7 @@ button.sheet-name-chip:focus-visible { outline: 2px solid var(--green); outline-
 
 .about-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 16px; margin-bottom: 16px; }
 .about-grid .section-card { margin: 0; }
-.about-hero-card { min-height: 310px; display: flex; flex-direction: column; justify-content: space-between; padding: 27px; color: white; border-radius: var(--radius-lg); background: linear-gradient(145deg, #17191e, #3b424f); box-shadow: 0 24px 50px rgba(30,34,42,.16); }
+.about-hero-card { min-height: 310px; display: flex; flex-direction: column; justify-content: space-between; padding: 27px; color: white; border-radius: var(--legacy-radius-lg); background: linear-gradient(145deg, #17191e, #3b424f); box-shadow: 0 24px 50px rgba(30,34,42,.16); }
 .about-icon { width: 58px; height: 58px; display: grid; place-items: center; color: #6ee7a0; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; }
 .about-hero-card h2 { margin: 0 0 9px; font-size: 24px; letter-spacing: -.045em; }
 .about-hero-card p:last-child { margin: 0; color: rgba(255,255,255,.67); font-size: 14px; line-height: 1.7; }
@@ -2645,4 +2646,5 @@ label.invalid > small { color: #c9342f; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 }
