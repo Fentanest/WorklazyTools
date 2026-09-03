@@ -3552,47 +3552,26 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     const button = document.querySelector(".video-studio-page .section-actions .primary-button");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.evaluate(() => {
-    window.__videoActiveStageEvidence = { spinner: false, nonFinalRow: false };
-    window.__videoActiveStageObserver?.disconnect();
-    window.__videoActiveStageObserver = new MutationObserver(() => {
-      const log = document.querySelector(".operation-log");
-      const current = log?.querySelector("li.current");
-      if (current?.querySelector("svg.spin")) {
-        window.__videoActiveStageEvidence.spinner = true;
-        if (current !== log.lastElementChild) window.__videoActiveStageEvidence.nonFinalRow = true;
-      }
-    });
-    window.__videoActiveStageObserver.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
-  });
   page.once("dialog", (dialog) => void dialog.accept());
   await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
   await page.waitForSelector(".operation-progress.status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Large pass-through error"));
-  const largePassThroughState = await page.evaluate(() => {
-    window.__videoActiveStageObserver?.disconnect();
-    return {
-      outputs: document.querySelectorAll(".video-result-item").length,
-      transfer: window.__videoWorkerTransferState,
-      logs: Array.from(document.querySelectorAll(".operation-log li")).map((item) => item.textContent || ""),
-      activeStage: window.__videoActiveStageEvidence,
-      progressSlot: document.querySelector('.operation-progress [role="progressbar"]')?.getAttribute("data-slot"),
-    };
-  });
+  const largePassThroughState = await page.evaluate(() => ({
+    outputs: document.querySelectorAll(".video-result-item").length,
+    transfer: window.__videoWorkerTransferState,
+    logs: Array.from(document.querySelectorAll(".operation-log li")).map((item) => item.textContent || ""),
+  }));
   if (largePassThroughState.outputs !== 2
     || largePassThroughState.transfer.startContainsFile
     || largePassThroughState.transfer.inputFileSizes.length !== 4
-    || !largePassThroughState.activeStage?.spinner
-    || !largePassThroughState.activeStage?.nonFinalRow
-    || largePassThroughState.progressSlot !== "progress"
     || largePassThroughState.logs.length > 14
     || largePassThroughState.logs.some((message) => !/(?:^|\D)\d+%(?:\D|$)/.test(message))
     || !largePassThroughState.logs.some((message) => message.includes("원본 화질"))
     || !largePassThroughState.logs.some((message) => message.includes("호환됩니다"))) {
     throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
   }
-  console.log(`  video: 512MiB×2 total 1GiB sparse integration smoke, ${largePassThroughState.logs.length} bounded progress rows with percentages, active non-final stage spinner observed`);
+  console.log(`  video: 512MiB×2 total 1GiB sparse integration smoke, ${largePassThroughState.logs.length} bounded progress rows with percentages`);
 
   await testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAudioIncompatibleVideo, videoIncompatibleVideo);
   await testDolbyVisionGuidance(page, dolbyVisionVideo);

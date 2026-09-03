@@ -742,14 +742,14 @@ button.sheet-name-chip:focus-visible { outline: 2px solid var(--green); outline-
 .operation-progress-heading strong { margin-top: 2px; font-size: 14px; }
 .operation-progress-heading b { min-width: 44px; font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: -.04em; text-align: right; }
 .operation-progress-track { height: 7px; margin-top: 12px; overflow: hidden; background: rgba(118,118,128,.13); border-radius: 999px; }
-.operation-progress-track > [data-slot="progress-indicator"] { display: block; height: 100%; border-radius: inherit; transition: width .24s ease; }
-.operation-progress.accent-green .operation-progress-track > [data-slot="progress-indicator"] { background: var(--green); }
-.operation-progress.accent-blue .operation-progress-track > [data-slot="progress-indicator"] { background: var(--blue); }
-.operation-progress.accent-violet .operation-progress-track > [data-slot="progress-indicator"] { background: var(--violet); }
-.operation-progress.accent-orange .operation-progress-track > [data-slot="progress-indicator"] { background: var(--orange); }
-.operation-progress.accent-pink .operation-progress-track > [data-slot="progress-indicator"] { background: var(--pink); }
-.operation-progress.accent-sky .operation-progress-track > [data-slot="progress-indicator"] { background: var(--sky); }
-.operation-progress.status-error .operation-progress-track > [data-slot="progress-indicator"] { background: #d34840; }
+.operation-progress-track > span { display: block; height: 100%; border-radius: inherit; transition: width .24s ease; }
+.operation-progress.accent-green .operation-progress-track > span { background: var(--green); }
+.operation-progress.accent-blue .operation-progress-track > span { background: var(--blue); }
+.operation-progress.accent-violet .operation-progress-track > span { background: var(--violet); }
+.operation-progress.accent-orange .operation-progress-track > span { background: var(--orange); }
+.operation-progress.accent-pink .operation-progress-track > span { background: var(--pink); }
+.operation-progress.accent-sky .operation-progress-track > span { background: var(--sky); }
+.operation-progress.status-error .operation-progress-track > span { background: #d34840; }
 .operation-current-message { height: 32px; display: -webkit-box; margin: 8px 1px 0; overflow: hidden; color: var(--label-secondary); font-size: 14px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .operation-log-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-top: 5px; padding: 8px 0 3px; color: var(--label-tertiary); background: transparent; border: 0; border-top: 1px solid var(--separator); font-size: 13px; font-weight: 750; cursor: pointer; }
 .operation-log { height: 176px; min-height: 176px; display: flex; flex-direction: column; gap: 7px; margin: 9px 0 0; padding: 2px 8px 2px 2px; overflow-x: hidden; overflow-y: scroll; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-color: rgba(118,118,128,.38) transparent; scrollbar-width: thin; list-style: none; }

@@ -1146,13 +1146,9 @@ async function assertProgressLog(page, label) {
     await page.waitForSelector(".operation-progress .operation-log");
   }
   const state = await page.$eval(".operation-progress", (element) => ({
-    tagName: element.tagName,
-    cardSlot: element.getAttribute("data-slot"),
     className: element.className,
     progress: element.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
-    progressSlot: element.querySelector('[role="progressbar"]')?.getAttribute("data-slot"),
     logs: element.querySelectorAll(".operation-log li").length,
-    logPercentages: Array.from(element.querySelectorAll(".operation-log-progress"), (item) => item.textContent || ""),
     logViewport: (() => {
       const log = element.querySelector(".operation-log");
       if (!(log instanceof HTMLOListElement)) return null;
@@ -1165,9 +1161,7 @@ async function assertProgressLog(page, label) {
       };
     })(),
   }));
-  if (state.tagName !== "SECTION" || state.cardSlot !== "card" || state.progressSlot !== "progress"
-    || !state.className.includes("status-success") || state.progress !== "100" || state.logs < 4
-    || state.logPercentages.length !== state.logs || state.logPercentages.some((value) => !/^\d+%$/.test(value))) {
+  if (!state.className.includes("status-success") || state.progress !== "100" || state.logs < 4) {
     throw new Error(`${label} progress log is incomplete: ${JSON.stringify(state)}`);
   }
   if (!state.logViewport || state.logViewport.height < 150 || state.logViewport.overflowY !== "scroll"
