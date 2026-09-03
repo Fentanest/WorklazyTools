@@ -54,6 +54,7 @@ try {
       await testPdfTools(page, fixtures, tempDir);
     } else if (process.env.TEST_SCOPE === "excel") {
       await testEncryptedExcelMerge(page, fixtures, tempDir);
+      await testExcelThemeColors(page, fixtures, tempDir);
       await testFormulaTranslation(page, fixtures, tempDir);
       await testExcelSheetSelection(page, fixtures, tempDir);
       await testExcelSheetGridLayout(page, fixtures);
@@ -62,6 +63,7 @@ try {
       await testWordCompare(page, fixtures, tempDir);
     } else {
       await testEncryptedExcelMerge(page, fixtures, tempDir);
+      await testExcelThemeColors(page, fixtures, tempDir);
       await testFormulaTranslation(page, fixtures, tempDir);
       await testExcelSheetSelection(page, fixtures, tempDir);
       await testExcelSheetGridLayout(page, fixtures);
@@ -392,6 +394,45 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   const warningText = await page.$eval(".result-card", (element) => element.textContent || "");
   if (!warningText.includes("XLSM의 매크로") || !warningText.includes("XLS 수식 또는 서식을 정밀하게 유지")) {
     throw new Error(`Converted format limitations were not shown after merge: ${warningText}`);
+  }
+}
+
+async function testExcelThemeColors(page, fixtures, tempDir) {
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=theme-colors`);
+  const input = await page.$('input[type="file"]');
+  await input.uploadFile(fixtures.themeXlsxOne, fixtures.themeXlsxTwo);
+  await page.waitForFunction(() => document.querySelectorAll(".file-security-status.ready").length === 2);
+  await clickPrimaryAction(page);
+  await waitForResult(page);
+
+  const resultPath = path.join(tempDir, "theme-colors-result.xlsx");
+  await saveBlobLink(page, ".result-download", resultPath);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await fs.readFile(resultPath));
+  const [first, second] = workbook.worksheets;
+  const actual = {
+    firstFill: first.getCell("A1").fill?.fgColor,
+    firstFont: first.getCell("A1").font?.color,
+    firstBorder: first.getCell("A1").border?.top?.color,
+    secondFill: second.getCell("A1").fill?.fgColor,
+    rgb: first.getCell("B1").fill?.fgColor,
+    indexed: first.getCell("B2").fill?.fgColor,
+    gradient: first.getCell("C1").fill,
+    richText: first.getCell("D1").value,
+  };
+  if (actual.firstFill?.argb !== "FFFFF2CC" || actual.firstFill?.theme !== undefined
+    || actual.firstFont?.argb !== "FFED7D31" || actual.firstBorder?.argb !== "FF2F5597"
+    || actual.secondFill?.argb !== "FF112233" || actual.secondFill?.theme !== undefined
+    || actual.rgb?.argb !== "FF123456" || actual.indexed?.indexed !== 64
+    || actual.gradient?.type !== "gradient" || actual.gradient.stops?.[0]?.color?.theme !== 4
+    || actual.richText?.richText?.[0]?.font?.color?.theme !== 4) {
+    throw new Error(`Theme color baking did not preserve the input-specific appearance boundary: ${JSON.stringify(actual)}`);
+  }
+
+  const archive = await JSZip.loadAsync(await fs.readFile(resultPath));
+  const stylesXml = await archive.file("xl/styles.xml").async("string");
+  if (!stylesXml.includes('rgb="FFFFF2CC"') || !stylesXml.includes('rgb="FF112233"')) {
+    throw new Error("Baked theme colors were not serialized as RGB values in styles.xml.");
   }
 }
 
@@ -1131,6 +1172,8 @@ async function createFixtures(directory) {
     ...Array.from({ length: 5 }, (_, index) => path.join(directory, `sheet-grid-region-${index + 2}.xlsx`)),
   ];
   const sheetTrimXlsx = path.join(directory, "sheet-trim.xlsx");
+  const themeXlsxOne = path.join(directory, "theme-office-2022.xlsx");
+  const themeXlsxTwo = path.join(directory, "theme-custom.xlsx");
   const beforeDocx = path.join(directory, "before.docx");
   const afterDocx = path.join(directory, "after.docx");
   const beforeDocxTwo = path.join(directory, "before-two.docx");
@@ -1204,6 +1247,20 @@ async function createFixtures(directory) {
   const referenceSummary = sheetTrimBook.addWorksheet("참조 요약");
   referenceSummary.getCell("A1").value = { formula: "'참조 대상'!A5", result: "참조 유지" };
   await sheetTrimBook.xlsx.writeFile(sheetTrimXlsx);
+  await createThemeWorkbook(themeXlsxOne, {
+    accent1: "4472C4",
+    accent2: "ED7D31",
+    accent4: "FFC000",
+    a1Theme: 7,
+    a1Tint: 0.7999816888943144,
+  });
+  await createThemeWorkbook(themeXlsxTwo, {
+    accent1: "112233",
+    accent2: "654321",
+    accent4: "00B050",
+    a1Theme: 4,
+    a1Tint: 0,
+  });
   await fs.writeFile(beforeDocx, await createDocx("업무 파일을 빠르게 처리합니다.", [
     ["항목", "금액", "비고"],
     ["A", "10", "유지"],
@@ -1242,7 +1299,39 @@ async function createFixtures(directory) {
   await fs.writeFile(textPdf, await pdf.save());
   await fs.writeFile(tinyPng, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zk90AAAAASUVORK5CYII=", "base64"));
 
-  return { xlsxOne, xlsxTwo, csv, xls, xlsb, xlsm, encryptedXlsx, sheetSelectionXlsx, sheetGridXlsx, sheetGridLongFileName, sheetGridLongSheetName, sheetTrimXlsx, beforeDocx, afterDocx, beforeDocxTwo, afterDocxTwo, boundaryBeforeDocx, boundaryAfterDocx, formattingBeforeDocx, formattingAfterDocx, revisionsBeforeDocx, revisionsAfterDocx, revisionOracle: revisionFixtures.oracle, textPdf, tinyPng };
+  return { xlsxOne, xlsxTwo, csv, xls, xlsb, xlsm, encryptedXlsx, sheetSelectionXlsx, sheetGridXlsx, sheetGridLongFileName, sheetGridLongSheetName, sheetTrimXlsx, themeXlsxOne, themeXlsxTwo, beforeDocx, afterDocx, beforeDocxTwo, afterDocxTwo, boundaryBeforeDocx, boundaryAfterDocx, formattingBeforeDocx, formattingAfterDocx, revisionsBeforeDocx, revisionsAfterDocx, revisionOracle: revisionFixtures.oracle, textPdf, tinyPng };
+}
+
+async function createThemeWorkbook(filePath, colors) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Theme colors");
+  sheet.getCell("A1").value = path.basename(filePath);
+  sheet.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { theme: colors.a1Theme, tint: colors.a1Tint }, bgColor: { indexed: 64 } };
+  sheet.getCell("A1").font = { color: { theme: 5 } };
+  sheet.getCell("A1").border = { top: { style: "thin", color: { theme: 4, tint: -0.25 } } };
+  sheet.getCell("B1").value = "explicit rgb";
+  sheet.getCell("B1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123456" } };
+  sheet.getCell("B2").value = "indexed";
+  sheet.getCell("B2").fill = { type: "pattern", pattern: "solid", fgColor: { indexed: 64 } };
+  sheet.getCell("C1").value = "gradient excluded";
+  sheet.getCell("C1").fill = { type: "gradient", gradient: "angle", degree: 0, stops: [{ position: 0, color: { theme: 4 } }, { position: 1, color: { theme: 5 } }] };
+  sheet.getCell("D1").value = { richText: [{ text: "rich text excluded", font: { color: { theme: 4 } } }] };
+
+  const archive = await JSZip.loadAsync(await workbook.xlsx.writeBuffer());
+  const themePath = "xl/theme/theme1.xml";
+  let themeXml = await archive.file(themePath).async("string");
+  themeXml = replaceThemeColor(themeXml, "accent1", colors.accent1);
+  themeXml = replaceThemeColor(themeXml, "accent2", colors.accent2);
+  themeXml = replaceThemeColor(themeXml, "accent4", colors.accent4);
+  archive.file(themePath, themeXml);
+  await fs.writeFile(filePath, await archive.generateAsync({ type: "nodebuffer" }));
+}
+
+function replaceThemeColor(xml, key, rgb) {
+  const pattern = new RegExp(`(<a:${key}>\\s*<a:srgbClr\\s+val=")[0-9A-Fa-f]{6}("\\s*\\/>\\s*<\\/a:${key}>)`);
+  const replaced = xml.replace(pattern, `$1${rgb}$2`);
+  if (replaced === xml) throw new Error(`Could not replace ${key} in the synthetic Excel theme.`);
+  return replaced;
 }
 
 async function createMinimalDocx(body) {

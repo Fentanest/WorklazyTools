@@ -1,12 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { hasOleCompoundSignature, xlsPreserveError } from "../../src/features/excel-merger/xlsPreserve.ts";
+import {
+  hasOleCompoundSignature,
+  hasSpreadsheetMlSignature,
+  requiresLegacySpreadsheetConversion,
+  xlsPreserveError,
+} from "../../src/features/excel-merger/xlsPreserve.ts";
 
-test("XLS preservation routes only OLE compound inputs to legacy conversion", async () => {
-  assert.equal(await hasOleCompoundSignature(new Blob([Uint8Array.of(0xd0, 0xcf, 0x11, 0xe0, 0xa1)])), true);
-  assert.equal(await hasOleCompoundSignature(new Blob([new TextEncoder().encode("\uFEFF<?xml version=\"1.0\"?>")])), false);
+test("XLS preservation routes OLE and SpreadsheetML signatures to legacy conversion", async () => {
+  const ole = new Blob([Uint8Array.of(0xd0, 0xcf, 0x11, 0xe0, 0xa1)]);
+  const spreadsheetMl = new Blob([new TextEncoder().encode("\uFEFF  <?xml version=\"1.0\"?><?mso-application progid=\"Excel.Sheet\"?><Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\"/>")]);
+  assert.equal(await hasOleCompoundSignature(ole), true);
+  assert.equal(await requiresLegacySpreadsheetConversion(ole), true);
+  assert.equal(await hasOleCompoundSignature(spreadsheetMl), false);
+  assert.equal(await requiresLegacySpreadsheetConversion(spreadsheetMl), true);
+  assert.equal(hasSpreadsheetMlSignature(new Uint8Array(await spreadsheetMl.arrayBuffer())), true);
   assert.equal(await hasOleCompoundSignature(new Blob([Uint8Array.of(0xd0, 0xcf, 0x11)])), false);
+  assert.equal(await requiresLegacySpreadsheetConversion(new Blob([new TextEncoder().encode("plain text")])), false);
 });
 
 test("XLS conversion errors identify the original file in Korean and English", () => {

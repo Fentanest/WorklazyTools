@@ -16,6 +16,7 @@ const convertedSourceXls = path.join(temporaryDirectory, "styled-legacy.xls");
 const sourceXls = path.join(temporaryDirectory, "전각 ８５８ 실제 OLE 보존.xls");
 const spreadsheetMl = path.join(temporaryDirectory, "전각 ８５８ 한글 공백 SpreadsheetML.xls");
 const brokenOleXls = path.join(temporaryDirectory, "개별 변환 실패.xls");
+const sheetJsFailureXls = path.join(temporaryDirectory, "값 경로도 실패.xls");
 
 try {
   await createStyledWorkbook(sourceXlsx);
@@ -33,6 +34,7 @@ try {
   ], { timeout: 60_000 });
   await fs.rename(convertedSourceXls, sourceXls);
   await fs.copyFile(sourceXls, brokenOleXls);
+  await fs.writeFile(sheetJsFailureXls, Uint8Array.of(0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1));
 
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -104,14 +106,24 @@ try {
     }));
     if (!disguisedXmlBatch.names.includes("전각 ８５８ 한글 공백 SpreadsheetML.xls")
       || !disguisedXmlBatch.sheetNames.includes("XML 혼합 시트")
-      || officeRequests.length) {
+      || !officeRequests.length) {
       throw new Error(`SpreadsheetML signature routing or original-name display failed: ${JSON.stringify({ disguisedXmlBatch, officeRequests })}`);
     }
     const disguisedXmlMerged = await mergeAndInspect(page);
     assertRetention(disguisedXmlMerged, { formula: true, formatting: true }, "XLSX + disguised SpreadsheetML batch");
-    if (!disguisedXmlMerged.worksheets.some((sheet) => sheet.a1 === "SpreadsheetML <CDATA> & merged")) {
+    const convertedXmlSheet = disguisedXmlMerged.worksheets.find((sheet) => sheet.a1 === "SpreadsheetML <CDATA> & merged");
+    if (!convertedXmlSheet || convertedXmlSheet.fill || convertedXmlSheet.bold) {
       throw new Error(`SpreadsheetML CDATA content was not preserved in the merged workbook: ${JSON.stringify(disguisedXmlMerged.worksheets)}`);
     }
+    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.waitForFunction(() => location.search.includes("formula=1") && location.search.includes("format=1"));
+    const formattedSpreadsheetMl = await mergeAndInspect(page);
+    const formattedXmlSheet = formattedSpreadsheetMl.worksheets.find((sheet) => sheet.a1 === "SpreadsheetML <CDATA> & merged");
+    if (!formattedXmlSheet || formattedXmlSheet.fill !== "FFFFE699" || formattedXmlSheet.bold !== true) {
+      throw new Error(`Converted SpreadsheetML formatting was not preserved: ${JSON.stringify(formattedSpreadsheetMl.worksheets)}`);
+    }
+    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.waitForFunction(() => location.search.includes("formula=1") && location.search.includes("format=0"));
     await page.reload({ waitUntil: "networkidle0" });
     await page.waitForSelector('.ios-switch[aria-label="XLS 수식 보존"][aria-checked="true"]');
 
@@ -134,7 +146,7 @@ try {
       cacheNames: (await caches.keys()).filter((name) => name.startsWith("worklazy-office-")),
       cachedAssets: (await (await caches.open("worklazy-office-2026-08-26")).keys()).filter((request) => request.url.includes("/vendor/zetaoffice/")).length,
     }));
-    if (!preparation.samples.some((sample) => sample.includes("MB"))
+    if (!preparation.samples.some((sample) => sample.includes("MB") || sample.includes("저장된 변환 파일"))
       || new Set(preparation.samples.map((sample) => sample.split(":", 1)[0])).size < 4
       || preparation.samples.length > 140
       || preparation.cacheNames.length !== 1
@@ -152,7 +164,8 @@ try {
     await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.search.includes("formula=1") && location.search.includes("format=1"));
     if (await page.$$eval(".excel-file-item", (items) => items.length) !== 1) throw new Error("Switching between XLS preservation options cleared the selected file.");
-    assertRetention(await mergeAndInspect(page), { formula: true, formatting: true }, "XLS formulas + formatting");
+    const formulasAndFormatting = await mergeAndInspect(page);
+    assertRetention(formulasAndFormatting, { formula: true, formatting: true }, "XLS formulas + formatting");
 
     await page.click('.ios-switch[aria-label="XLS 수식 보존"]');
     await page.waitForFunction(() => location.search.includes("formula=0") && location.search.includes("format=1"));
@@ -191,21 +204,78 @@ try {
       cards: [...document.querySelectorAll(".excel-file-item")].map((card) => ({
         name: card.querySelector(".file-meta strong")?.textContent || "",
         state: card.querySelector(".file-security-status")?.className || "",
-        error: card.querySelector(".file-item-error")?.textContent || "",
+        error: card.querySelector(".file-item-warning, .file-item-error")?.textContent || "",
       })),
     }));
     const readyXlsx = isolatedFailure.cards.find((card) => card.name === path.basename(sourceXlsx));
     const failedXls = isolatedFailure.cards.find((card) => card.name === path.basename(brokenOleXls));
-    if (!readyXlsx?.state.includes("ready") || !failedXls?.state.includes("error")
-      || !failedXls.error.includes("개별 변환 실패.xls") || !failedXls.error.includes("변환하지 못했습니다")
-      || isolatedFailure.banner) {
+    if (!readyXlsx?.state.includes("ready") || !failedXls?.state.includes("degradedLegacy")
+      || !failedXls.error.includes("이 파일은 서식 없이 병합됩니다") || !failedXls.error.includes("수식은 보존되지 않습니다")
+      || isolatedFailure.banner || await page.$eval(".summary-card .primary-button", (button) => button.disabled)) {
       throw new Error(`A failed legacy conversion contaminated its batch: ${JSON.stringify(isolatedFailure)}`);
+    }
+    const degradedMerged = await mergeAndInspect(page);
+    const degradedSheet = degradedMerged.worksheets.at(-1);
+    if (degradedSheet?.formula || degradedSheet?.fill || degradedSheet?.bold) {
+      throw new Error(`A degraded legacy input retained formulas or formatting: ${JSON.stringify(degradedSheet)}`);
+    }
+
+    await page.reload({ waitUntil: "networkidle0" });
+    await page.waitForSelector('.ios-switch[aria-label="XLS 서식 보존"][aria-checked="true"]');
+    await (await page.$('input[type="file"]')).uploadFile(sourceXlsx, sheetJsFailureXls);
+    await page.waitForFunction(() => document.querySelector(".operation-current-message")?.textContent?.includes("값 경로도 실패.xls"));
+    await page.evaluate(async () => {
+      const port = await window.Module.uno_main;
+      for (let attempt = 0; attempt < 100 && document.querySelector(".file-security-status.checking"); attempt += 1) {
+        port.onmessage?.({ data: { cmd: "convert-failed" } });
+        await new Promise((resolve) => window.setTimeout(resolve, 20));
+      }
+    });
+    await page.waitForFunction(() => {
+      const cards = [...document.querySelectorAll(".excel-file-item")];
+      return cards.length === 2 && cards.every((card) => !card.querySelector(".file-security-status.checking"));
+    });
+    const sheetJsFailure = await page.evaluate(() => ({
+      banner: document.querySelector(".error-banner")?.textContent || "",
+      cards: [...document.querySelectorAll(".excel-file-item")].map((card) => ({
+        name: card.querySelector(".file-meta strong")?.textContent || "",
+        state: card.querySelector(".file-security-status")?.className || "",
+        error: card.querySelector(".file-item-error")?.textContent || "",
+      })),
+    }));
+    const failedValuePath = sheetJsFailure.cards.find((card) => card.name === path.basename(sheetJsFailureXls));
+    if (!failedValuePath?.state.includes("error") || !failedValuePath.error.includes("XLSX로 다시 저장")
+      || sheetJsFailure.banner) {
+      throw new Error(`SheetJS fallback failure did not use the isolated resave guidance: ${JSON.stringify(sheetJsFailure)}`);
+    }
+
+    const runtimeFailureContext = await browser.createBrowserContext();
+    try {
+      const runtimeFailurePage = await runtimeFailureContext.newPage();
+      runtimeFailurePage.setDefaultTimeout(60_000);
+      await runtimeFailurePage.evaluateOnNewDocument(() => {
+        Object.defineProperty(globalThis, "SharedArrayBuffer", { configurable: true, value: undefined });
+      });
+      await runtimeFailurePage.goto(`${baseUrl}/ko/tools/excel-merger/xls-preserve/?formula=0&format=1`, { waitUntil: "networkidle0" });
+      await runtimeFailurePage.waitForSelector('input[type="file"]');
+      await (await runtimeFailurePage.$('input[type="file"]')).uploadFile(sourceXlsx, sourceXls);
+      await runtimeFailurePage.waitForFunction(() => document.querySelectorAll(".file-security-status.error").length === 2);
+      const runtimeFailure = await runtimeFailurePage.evaluate(() => ({
+        errorCards: document.querySelectorAll(".file-security-status.error").length,
+        banner: document.querySelector(".error-banner")?.textContent || "",
+        degradedCards: document.querySelectorAll(".file-security-status.degradedLegacy").length,
+      }));
+      if (runtimeFailure.errorCards !== 2 || runtimeFailure.degradedCards !== 0 || !runtimeFailure.banner.includes("브라우저 환경")) {
+        throw new Error(`Runtime startup failure did not stop the complete added batch: ${JSON.stringify(runtimeFailure)}`);
+      }
+    } finally {
+      await runtimeFailureContext.close();
     }
     page.once("dialog", (dialog) => dialog.accept());
     await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/") && !location.search);
     if (pageErrors.length) throw new Error(`XLS preservation browser errors:\n${pageErrors.join("\n")}`);
-    console.log(`Excel retention smoke passed: four XLSX states, three XLS preservation states, ${preparation.samples.length} progress states.`);
+    console.log(`Excel retention smoke passed: four XLSX states, three XLS preservation states, ${preparation.samples.length} progress states, and all three degradation branches.`);
   } finally {
     await browser.close();
   }
@@ -251,6 +321,9 @@ async function mergeAndInspect(page) {
     worksheets: merged.worksheets.map((worksheet) => ({
       name: worksheet.name,
       a1: worksheet.getCell("A1").value,
+      formula: worksheet.getCell("A3").formula,
+      bold: worksheet.getCell("A1").font?.bold,
+      fill: worksheet.getCell("A1").fill?.fgColor?.argb,
     })),
   };
 }
@@ -290,9 +363,12 @@ async function createSpreadsheetMl(filePath) {
 <?mso-application progid="Excel.Sheet"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#FFE699" ss:Pattern="Solid"/></Style>
+ </Styles>
  <Worksheet ss:Name="XML 혼합 시트">
   <Table>
-   <Row><Cell><Data ss:Type="String"><![CDATA[SpreadsheetML <CDATA> & merged]]></Data></Cell></Row>
+   <Row><Cell ss:StyleID="Header"><Data ss:Type="String"><![CDATA[SpreadsheetML <CDATA> & merged]]></Data></Cell></Row>
    <Row><Cell><Data ss:Type="Number">858</Data></Cell></Row>
   </Table>
  </Worksheet>

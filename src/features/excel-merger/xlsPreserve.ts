@@ -1,11 +1,30 @@
 export type XlsPreserveLanguage = "ko" | "en";
 
 const OLE_COMPOUND_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0] as const;
+const SIGNATURE_READ_SIZE = 4096;
 
 export async function hasOleCompoundSignature(file: Blob) {
   const signature = new Uint8Array(await file.slice(0, OLE_COMPOUND_SIGNATURE.length).arrayBuffer());
-  return signature.length === OLE_COMPOUND_SIGNATURE.length
-    && OLE_COMPOUND_SIGNATURE.every((value, index) => signature[index] === value);
+  return hasOleCompoundSignatureBytes(signature);
+}
+
+export function hasOleCompoundSignatureBytes(data: Uint8Array) {
+  return data.length >= OLE_COMPOUND_SIGNATURE.length
+    && OLE_COMPOUND_SIGNATURE.every((value, index) => data[index] === value);
+}
+
+export function hasSpreadsheetMlSignature(data: Uint8Array) {
+  const header = new TextDecoder("utf-8").decode(data.subarray(0, Math.min(data.length, SIGNATURE_READ_SIZE)))
+    .replace(/^\uFEFF/, "")
+    .trimStart()
+    .toLowerCase();
+  return header.startsWith("<?xml")
+    && (header.includes("<?mso-application") || header.includes("urn:schemas-microsoft-com:office:spreadsheet"));
+}
+
+export async function requiresLegacySpreadsheetConversion(file: Blob) {
+  const header = new Uint8Array(await file.slice(0, SIGNATURE_READ_SIZE).arrayBuffer());
+  return hasOleCompoundSignatureBytes(header) || hasSpreadsheetMlSignature(header);
 }
 
 export function xlsPreserveError(reason: unknown, language: XlsPreserveLanguage, fileName?: string) {

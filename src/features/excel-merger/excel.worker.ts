@@ -2,12 +2,15 @@
 
 import { Buffer } from "buffer";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 import officeCrypto from "officecrypto-tool";
 import process from "process";
 import * as XLSX from "xlsx";
 
 import { readCsvWorkbook } from "./csvImport";
+import { bakeThemeColorsInStyle, parseThemePalette, type ExcelThemePalette } from "./excelThemeColors";
 import { buildIncomingSheetReferenceIndex, hasIncomingSheetReference, type IncomingSheetReferenceIndex } from "./sheetReferences";
+import { hasSpreadsheetMlSignature } from "./xlsPreserve";
 import { buildWordReport } from "./wordReport";
 import type {
   ExcelInputPayload,
@@ -27,6 +30,8 @@ interface ParsedInput {
   fileName: string;
   workbook: ExcelJS.Workbook;
   retention: ExcelRetentionOptions;
+  themePalette?: ExcelThemePalette;
+  styleCache: WeakMap<object, Partial<ExcelJS.Style>>;
   selectedWorksheets?: ExcelJS.Worksheet[];
   incomingSheetReferences?: IncomingSheetReferenceIndex;
 }
@@ -45,6 +50,8 @@ interface SheetPlan {
   bounds: SheetBounds;
   skipRows: number;
   retention: ExcelRetentionOptions;
+  themePalette?: ExcelThemePalette;
+  styleCache: WeakMap<object, Partial<ExcelJS.Style>>;
 }
 
 interface SheetTrimStats {
@@ -83,6 +90,7 @@ worker.onmessage = async (event: MessageEvent) => {
       const result = await mergeFiles(
         event.data.files as ExcelInputPayload[],
         event.data.options as ExcelMergeOptions,
+        event.data.themePalettes as Record<string, ExcelThemePalette> | undefined,
       );
       worker.postMessage({ type: "result", result }, [result.buffer]);
       return;
@@ -134,6 +142,7 @@ async function inspectFiles(files: ExcelInputPayload[]): Promise<ExcelInspection
         id: file.id,
         encrypted,
         sheetNames: parsed.workbook.worksheets.map((sheet) => sheet.name),
+        themePalette: parsed.themePalette,
       };
     } catch (error) {
       return {
@@ -146,14 +155,24 @@ async function inspectFiles(files: ExcelInputPayload[]): Promise<ExcelInspection
   }));
 }
 
-async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions): Promise<ExcelMergeResult> {
+async function mergeFiles(
+  files: ExcelInputPayload[],
+  options: ExcelMergeOptions,
+  themePalettes: Record<string, ExcelThemePalette> = {},
+): Promise<ExcelMergeResult> {
   if (!files.length) throw new ExcelWorkerError(local("병합할 파일이 없습니다.", "There are no files to merge."), "NO_FILES");
 
   const warnings = new Set<string>();
   if (files.some((file) => file.preservedLegacy)) {
     warnings.add(local("XLS 입력을 호환 XLSX 구조로 먼저 변환한 뒤 선택한 수식·서식 보존 설정을 적용했습니다. 차트·외부 연결·일부 고급 개체는 결과에서 확인해 주세요.", "Legacy XLS input was first converted to a compatible XLSX structure, then the selected formula and formatting settings were applied. Verify charts, external links and advanced objects in the result."));
   }
-  if (files.some((file) => !file.preservedLegacy && ["xls", "xlsb", "xlsm"].includes(getExtension(file.name)))) {
+  if (files.some((file) => file.degradedLegacy)) {
+    warnings.add(local(
+      "보존 변환에 실패한 XLS 입력은 서식 없이 병합했습니다. 이 입력의 수식은 보존되지 않고 저장된 값만 복사되었습니다.",
+      "XLS input that could not be converted for preservation was merged without formatting. Its formulas were not preserved; only stored values were copied.",
+    ));
+  }
+  if (files.some((file) => !file.preservedLegacy && !file.degradedLegacy && ["xls", "xlsb", "xlsm"].includes(getExtension(file.name)))) {
     warnings.add(local("일반 처리의 XLS·XLSB·XLSM 입력은 값과 기본 시트 구조를 XLSX로 변환합니다. XLS 수식 또는 서식을 정밀하게 유지하려면 해당 보존 옵션을 켜세요.", "XLS, XLSB and XLSM inputs in standard processing are converted to XLSX with values and basic sheet structure. Enable the corresponding XLS preservation option for higher-fidelity formulas or formatting."));
   }
   if (files.some((file) => getExtension(file.name) === "xlsm")) {
@@ -166,7 +185,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
     const file = files[index];
     const displayName = file.displayName ?? file.name;
     progress(5 + Math.round((index / files.length) * 35), local(`[${index + 1}/${files.length}] ${displayName} 읽는 중…`, `[${index + 1}/${files.length}] Reading ${displayName}…`));
-    const parsed = await parseInput(file);
+    const parsed = await parseInput(file, themePalettes[file.id]);
     const selectedSheetNames = file.selectedSheetNames ?? parsed.workbook.worksheets.map((sheet) => sheet.name);
     parsed.selectedWorksheets = selectedSheetNames
       .map((sheetName) => parsed.workbook.getWorksheet(sheetName))
@@ -208,6 +227,8 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
           bounds: getSheetBounds(source, options.trimEmptyEdges && !referencedByAnotherSheet, input.retention.formatting),
           skipRows: 0,
           retention: input.retention,
+          themePalette: input.themePalette,
+          styleCache: input.styleCache,
         });
       });
     });
@@ -222,7 +243,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
         const sourceBounds = getSheetBounds(source, options.trimEmptyEdges, input.retention.formatting);
         const skipRows = options.mergeMode === "vertical" && plans.length > 0 ? Math.min(sourceBounds.rows, Math.max(0, Math.floor(options.skipHeaderRows || 0))) : 0;
         const bounds = { rows: Math.max(0, sourceBounds.rows - skipRows), columns: sourceBounds.columns };
-        plans.push({ fileIndex, source, target, rowOffset, columnOffset, bounds, skipRows, retention: input.retention });
+        plans.push({ fileIndex, source, target, rowOffset, columnOffset, bounds, skipRows, retention: input.retention, themePalette: input.themePalette, styleCache: input.styleCache });
         if (options.mergeMode === "vertical") rowOffset += bounds.rows;
         if (options.mergeMode === "horizontal") columnOffset += bounds.columns;
       });
@@ -268,7 +289,7 @@ async function mergeFiles(files: ExcelInputPayload[], options: ExcelMergeOptions
   };
 }
 
-async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
+async function parseInput(file: ExcelInputPayload, suppliedThemePalette?: ExcelThemePalette): Promise<ParsedInput> {
   const extension = getExtension(file.name);
   const displayName = file.displayName ?? file.name;
   let data = new Uint8Array(file.buffer);
@@ -290,31 +311,43 @@ async function parseInput(file: ExcelInputPayload): Promise<ParsedInput> {
   }
 
   try {
-    const retention = file.retention ?? { formulas: true, formatting: true };
-    if (extension === "csv") return { fileName: displayName, workbook: await readCsv(displayName, data, file.csvEncoding), retention: { formulas: false, formatting: false } };
+    const retention = file.degradedLegacy ? { formulas: false, formatting: false } : file.retention ?? { formulas: true, formatting: true };
+    const base = { fileName: displayName, retention, styleCache: new WeakMap<object, Partial<ExcelJS.Style>>() };
+    if (extension === "csv") return { ...base, workbook: await readCsv(displayName, data, file.csvEncoding), retention: { formulas: false, formatting: false } };
     if (["xls", "xlsb", "xlsm"].includes(extension)) {
-      const workbook = extension === "xls" && isSpreadsheetMl(data)
+      const workbook = extension === "xls" && hasSpreadsheetMlSignature(data)
         ? readSpreadsheetMlWorkbook(data)
         : readConvertedWorkbook(data);
-      return { fileName: displayName, workbook, retention };
+      return { ...base, workbook };
     }
     if (extension === "xlsx") {
+      const themePalette = suppliedThemePalette ?? await readThemePalette(data);
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(Buffer.from(data));
-      return { fileName: displayName, workbook, retention };
+      return { ...base, workbook, themePalette };
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     if (/password|encrypted|EncryptionInfo/i.test(detail)) {
       throw new ExcelWorkerError(local(`${displayName}은 암호로 보호되어 있습니다. 비밀번호를 입력해 주세요.`, `${displayName} is password-protected. Enter its password.`), "PASSWORD_REQUIRED", displayName);
     }
-    if (extension === "xls" && isSpreadsheetMl(data)) {
+    if (extension === "xls" && hasSpreadsheetMlSignature(data)) {
       throw new ExcelWorkerError(
         local(
           `'${displayName}' 파일의 XML 스프레드시트 구조를 읽지 못했습니다. Excel에서 XLSX로 다시 저장한 뒤 시도해 주세요.`,
           `Could not read the XML spreadsheet structure in '${displayName}'. Save it as XLSX in Excel, then try again.`,
         ),
         "READ_XML_SPREADSHEET_FAILED",
+        displayName,
+      );
+    }
+    if (file.degradedLegacy) {
+      throw new ExcelWorkerError(
+        local(
+          `'${displayName}' 파일에 저장된 값을 읽지 못했습니다. Excel에서 XLSX로 다시 저장한 뒤 시도해 주세요.`,
+          `Could not read the stored values in '${displayName}'. Save it as XLSX in Excel, then try again.`,
+        ),
+        "READ_LEGACY_FALLBACK_FAILED",
         displayName,
       );
     }
@@ -391,15 +424,6 @@ function convertSheetJsWorkbook(source: XLSX.WorkBook) {
   });
 
   return workbook;
-}
-
-function isSpreadsheetMl(data: Uint8Array) {
-  const header = new TextDecoder("utf-8").decode(data.subarray(0, Math.min(data.length, 4096)))
-    .replace(/^\uFEFF/, "")
-    .trimStart()
-    .toLowerCase();
-  return header.startsWith("<?xml")
-    && (header.includes("<?mso-application") || header.includes("urn:schemas-microsoft-com:office:spreadsheet"));
 }
 
 function expandSpreadsheetMlCdata(raw: string) {
@@ -491,7 +515,15 @@ function copyCell(
     target.value = cloneCellValue(source.value);
   }
 
-  if (plan.retention.formatting && source.style && Object.keys(source.style).length) target.style = cloneData(source.style);
+  if (plan.retention.formatting && source.style && Object.keys(source.style).length) {
+    const cached = plan.styleCache.get(source.style);
+    if (cached) target.style = cached;
+    else {
+      const style = bakeThemeColorsInStyle(cloneData(source.style), plan.themePalette);
+      plan.styleCache.set(source.style, style);
+      target.style = style;
+    }
+  }
   if (source.dataValidation && Object.keys(source.dataValidation).length) target.dataValidation = cloneData(source.dataValidation);
   if (source.note) target.note = cloneData(source.note);
   if (source.protection) target.protection = cloneData(source.protection);
@@ -627,6 +659,16 @@ function decodeCsv(data: Uint8Array, encoding: ExcelInputPayload["csvEncoding"])
   catch { return new TextDecoder("euc-kr", { fatal: true }).decode(data); }
 }
 
+async function readThemePalette(data: Uint8Array) {
+  try {
+    const archive = await JSZip.loadAsync(data);
+    const theme = archive.file("xl/theme/theme1.xml");
+    return theme ? parseThemePalette(await theme.async("string")) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildSheetTrimBlocks(indexes: number[], threshold: number): Array<[number, number]> {
   if (!indexes.length) return [];
   const blocks: Array<[number, number]> = [];
@@ -681,7 +723,10 @@ function isEncryptedFile(fileName: string, data: Uint8Array) {
     && data[0] === 0xd0 && data[1] === 0xcf && data[2] === 0x11 && data[3] === 0xe0
     && data[4] === 0xa1 && data[5] === 0xb1 && data[6] === 0x1a && data[7] === 0xe1;
   if (["xlsx", "xlsb", "xlsm"].includes(extension)) return isCompoundFile;
-  if (extension === "xls" && isCompoundFile) return officeCrypto.isEncrypted(Buffer.from(data));
+  if (extension === "xls" && isCompoundFile) {
+    try { return officeCrypto.isEncrypted(Buffer.from(data)); }
+    catch { return false; }
+  }
   return false;
 }
 

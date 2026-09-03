@@ -42,15 +42,18 @@ import { useLocalizedPath } from "../../i18n/routing";
 import { prepareOfficeAssets } from "../office-editor/officeAssetLoader";
 import { launchOfficeRuntime, type OfficeRuntime } from "../office-editor/officeRuntime";
 import type { ExcelInspectionResult, ExcelMergeResult, MergeMode, SheetNameRule, SheetSelectionMode } from "./types";
-import { hasOleCompoundSignature, xlsPreserveError } from "./xlsPreserve";
+import type { ExcelThemePalette } from "./excelThemeColors";
+import { requiresLegacySpreadsheetConversion, xlsPreserveError } from "./xlsPreserve";
 
-type InspectionState = "checking" | "ready" | "error";
+type InspectionState = "checking" | "ready" | "degradedLegacy" | "error";
 
 interface ExcelFileEntry {
   id: string;
   file: File;
   processingFile?: File;
   preservedLegacy?: boolean;
+  degradedLegacy?: boolean;
+  themePalette?: ExcelThemePalette;
   inspection: InspectionState;
   encrypted: boolean;
   password: string;
@@ -174,7 +177,7 @@ export function ExcelMergerPage() {
     const legacyAdditions = preserveLegacyXls
       ? (await Promise.all(additions.map(async (entry) => ({
           entry,
-          requiresConversion: getExtension(entry.file.name) === "xls" && await hasOleCompoundSignature(entry.file),
+          requiresConversion: getExtension(entry.file.name) === "xls" && await requiresLegacySpreadsheetConversion(entry.file),
         })))).filter(({ requiresConversion }) => requiresConversion).map(({ entry }) => entry)
       : [];
     if (legacyAdditions.length) {
@@ -234,7 +237,7 @@ export function ExcelMergerPage() {
       }
 
       const convertedById = new Map<string, File>();
-      const conversionErrors = new Map<string, string>();
+      const degradedIds = new Set<string>();
       for (let index = 0; index < legacyAdditions.length; index += 1) {
         if (controller.signal.aborted) throw controller.signal.reason ?? new DOMException("Cancelled", "AbortError");
         const entry = legacyAdditions[index];
@@ -248,41 +251,37 @@ export function ExcelMergerPage() {
           }));
         } catch (reason) {
           if (controller.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError")) throw reason;
-          conversionErrors.set(entry.id, xlsPreserveError(reason, language, entry.file.name));
+          degradedIds.add(entry.id);
         }
       }
       if (controller.signal.aborted) throw controller.signal.reason ?? new DOMException("Cancelled", "AbortError");
       const prepared = additions.map((entry) => {
         const processingFile = convertedById.get(entry.id);
-        return processingFile ? { ...entry, processingFile, preservedLegacy: true } : entry;
+        if (processingFile) return { ...entry, processingFile, preservedLegacy: true, degradedLegacy: false };
+        if (degradedIds.has(entry.id)) return { ...entry, processingFile: undefined, preservedLegacy: false, degradedLegacy: true };
+        return entry;
       });
       setEntries((current) => current.map((entry) => {
-        const conversionError = conversionErrors.get(entry.id);
-        if (conversionError) return { ...entry, inspection: "error", error: conversionError };
         return prepared.find((item) => item.id === entry.id) ?? entry;
       }));
-      const inspectable = prepared.filter((entry) => !conversionErrors.has(entry.id));
-      if (!inspectable.length) {
-        operation.fail(conversionErrors.values().next().value ?? xlsPreserveError(new Error("convert-failed"), language));
-        return;
-      }
       operation.update(96, t("excel.xlsPreserve.status.inspecting"));
-      const inspectionResults = await inspectExcelFiles(inspectable.map((entry) => ({
+      const inspectionResults = await inspectExcelFiles(prepared.map((entry) => ({
         id: entry.id,
         file: entry.processingFile ?? entry.file,
         displayName: entry.file.name,
         preservedLegacy: entry.preservedLegacy,
+        degradedLegacy: entry.degradedLegacy,
         csvEncoding,
       })), language);
       const byId = new Map(inspectionResults.map((item) => [item.id, item]));
       setEntries((current) => current.map((entry) => {
         const inspectionResult = byId.get(entry.id);
         if (!inspectionResult) return entry;
-        return applyInspectionResult(entry, inspectionResult);
+        return applyInspectionResult(prepared.find((item) => item.id === entry.id) ?? entry, inspectionResult);
       }));
-      const firstError = conversionErrors.values().next().value
-        ?? inspectionResults.find((result) => result.error)?.error;
+      const firstError = inspectionResults.find((result) => result.error)?.error;
       if (firstError) operation.fail(firstError);
+      else if (degradedIds.size) operation.succeed(t("excel.xlsPreserve.status.degraded", { count: degradedIds.size }));
       else operation.succeed(t("excel.xlsPreserve.status.ready", { count: legacyAdditions.length }));
     } catch (reason) {
       const message = xlsPreserveError(reason, language);
@@ -348,6 +347,7 @@ export function ExcelMergerPage() {
       file: entry.processingFile ?? entry.file,
       displayName: entry.file.name,
       preservedLegacy: entry.preservedLegacy,
+      degradedLegacy: entry.degradedLegacy,
       password,
     }], language).then(([inspectionResult]) => {
       setEntries((current) => current.map((item) => item.id === id ? applyInspectionResult(item, inspectionResult, true) : item));
@@ -396,10 +396,12 @@ export function ExcelMergerPage() {
           file: entry.processingFile ?? entry.file,
           displayName: entry.file.name,
           preservedLegacy: entry.preservedLegacy,
+          degradedLegacy: entry.degradedLegacy,
+          themePalette: entry.themePalette,
           password: entry.password || undefined,
           selectedSheetNames,
           csvEncoding,
-          retention: retentionForFile(entry.file.name, {
+          retention: entry.degradedLegacy ? { formulas: false, formatting: false } : retentionForFile(entry.file.name, {
             xlsx: { formulas: xlsxFormulas, formatting: xlsxFormatting },
             xls: { formulas: xlsFormulas, formatting: xlsFormatting },
           }),
@@ -764,12 +766,13 @@ export function ExcelMergerPage() {
 function applyInspectionResult(entry: ExcelFileEntry, result: ExcelInspectionResult, preserveSelection = false): ExcelFileEntry {
   return {
     ...entry,
-    inspection: result.error ? "error" : "ready",
+    inspection: result.error ? "error" : entry.degradedLegacy ? "degradedLegacy" : "ready",
     encrypted: result.encrypted,
     sheetNames: result.sheetNames,
     selectedSheetNames: preserveSelection && entry.sheetNames.length
       ? result.sheetNames.filter((name) => entry.selectedSheetNames.includes(name))
       : result.sheetNames,
+    themePalette: result.themePalette,
     error: result.error,
   };
 }
@@ -872,6 +875,8 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
                   ? <><FileLock2 size={14} /> {t("excel.fileList.encrypted")}</>
                   : entry.inspection === "error"
                     ? <><AlertCircle size={14} /> {t("excel.fileList.needsCheck")}</>
+                    : entry.inspection === "degradedLegacy"
+                      ? <><AlertCircle size={14} /> {t("excel.fileList.degradedLegacy")}</>
                     : <><CheckCircle2 size={14} /> {t("excel.fileList.available")}</>}
             </span>
             <span className="file-order-actions">
@@ -902,6 +907,7 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
               <small>{t("excel.fileList.passwordHelp")}</small>
             </div>
           )}
+          {entry.degradedLegacy && !entry.error && <p className="file-item-warning"><AlertCircle size={13} /> {t("excel.fileList.degradedLegacyHelp")}</p>}
           {entry.error && <p className="file-item-error"><AlertCircle size={13} /> {entry.error}</p>}
         </div>
       ))}

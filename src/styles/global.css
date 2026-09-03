@@ -603,7 +603,7 @@ input:focus-visible {
 .excel-file-item.encrypted { background: rgba(255,159,10,.045); }
 .file-security-status { min-width: 82px; display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--success); font-size: 13px; font-weight: 750; }
 .file-security-status.checking { color: var(--label-tertiary); }
-.file-security-status.error, .excel-file-item.encrypted .file-security-status { color: #bd7005; }
+.file-security-status.error, .file-security-status.degradedLegacy, .excel-file-item.encrypted .file-security-status { color: #bd7005; }
 .file-order-actions { display: flex; overflow: hidden; border: 1px solid var(--separator); border-radius: 8px; }
 .file-order-actions button { width: 27px; height: 27px; display: grid; place-items: center; padding: 0; color: var(--label-secondary); background: transparent; border: 0; cursor: pointer; }
 .file-order-actions button + button { border-left: 1px solid var(--separator); }
@@ -612,6 +612,7 @@ input:focus-visible {
 .input-password-row > label { font-size: 13px; font-weight: 750; }
 .input-password-row > small { color: var(--label-tertiary); font-size: 12px; }
 .file-item-error { display: flex; align-items: center; gap: 5px; margin: 0; padding: 0 12px 10px 61px; color: #c9342d; font-size: 13px; }
+.file-item-warning { display: flex; align-items: center; gap: 5px; margin: 0; padding: 0 12px 10px 61px; color: #9a5a00; font-size: 13px; }
 .sheet-position-input { display: grid; grid-template-columns: auto minmax(180px, 1fr); align-items: center; gap: 8px 12px; margin-top: 13px; padding: 12px; background: var(--bg-muted); border-radius: 12px; }
 .sheet-position-input label { font-size: 14px; font-weight: 750; }
 .sheet-position-input input { min-height: 36px; padding: 0 11px; color: var(--label); background: var(--bg-solid); border: 1px solid var(--separator); border-radius: 9px; outline: 0; font-size: 14px; }

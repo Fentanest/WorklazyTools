@@ -5,6 +5,7 @@ import type {
   ExcelMergeResult,
   WordCompareResult,
 } from "./types";
+import type { ExcelThemePalette } from "./excelThemeColors";
 
 type WorkerProgress = (progress: number, message: string) => void;
 type AppLanguage = "ko" | "en";
@@ -70,10 +71,10 @@ function runWorker<T>(
   });
 }
 
-export async function inspectExcelFiles(files: Array<{ id: string; file: File; displayName?: string; preservedLegacy?: boolean; password?: string; csvEncoding?: ExcelInputPayload["csvEncoding"] }>, language: AppLanguage = "ko") {
+export async function inspectExcelFiles(files: Array<{ id: string; file: File; displayName?: string; preservedLegacy?: boolean; degradedLegacy?: boolean; password?: string; csvEncoding?: ExcelInputPayload["csvEncoding"] }>, language: AppLanguage = "ko") {
   const payloads: ExcelInputPayload[] = [];
-  for (const { id, file, displayName, preservedLegacy, password, csvEncoding } of files) {
-    payloads.push({ id, name: file.name, displayName, preservedLegacy, buffer: await file.arrayBuffer(), password, csvEncoding });
+  for (const { id, file, displayName, preservedLegacy, degradedLegacy, password, csvEncoding } of files) {
+    payloads.push({ id, name: file.name, displayName, preservedLegacy, degradedLegacy, buffer: await file.arrayBuffer(), password, csvEncoding });
   }
   return runWorker<ExcelInspectionResult[]>(
     { type: "inspect", files: payloads, language },
@@ -84,20 +85,22 @@ export async function inspectExcelFiles(files: Array<{ id: string; file: File; d
 }
 
 export async function mergeExcelFiles(
-  files: Array<{ id: string; file: File; displayName?: string; preservedLegacy?: boolean; password?: string; selectedSheetNames: string[]; csvEncoding?: ExcelInputPayload["csvEncoding"]; retention?: ExcelInputPayload["retention"] }>,
+  files: Array<{ id: string; file: File; displayName?: string; preservedLegacy?: boolean; degradedLegacy?: boolean; themePalette?: ExcelThemePalette; password?: string; selectedSheetNames: string[]; csvEncoding?: ExcelInputPayload["csvEncoding"]; retention?: ExcelInputPayload["retention"] }>,
   options: ExcelMergeOptions,
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
   signal?: AbortSignal,
 ) {
   const payloads: ExcelInputPayload[] = [];
-  for (const { id, file, displayName, preservedLegacy, password, selectedSheetNames, csvEncoding, retention } of files) {
+  const themePalettes: Record<string, ExcelThemePalette> = {};
+  for (const { id, file, displayName, preservedLegacy, degradedLegacy, themePalette, password, selectedSheetNames, csvEncoding, retention } of files) {
     if (signal?.aborted) throw new DOMException(language === "en" ? "The spreadsheet merge was cancelled." : "스프레드시트 병합을 취소했습니다.", "AbortError");
-    payloads.push({ id, name: file.name, displayName, preservedLegacy, buffer: await file.arrayBuffer(), password, selectedSheetNames, csvEncoding, retention });
+    payloads.push({ id, name: file.name, displayName, preservedLegacy, degradedLegacy, buffer: await file.arrayBuffer(), password, selectedSheetNames, csvEncoding, retention });
+    if (themePalette) themePalettes[id] = themePalette;
   }
 
   return runWorker<ExcelMergeResult>(
-    { type: "merge", files: payloads, options, language },
+    { type: "merge", files: payloads, options, themePalettes, language },
     payloads.map((file) => file.buffer),
     onProgress,
     language,

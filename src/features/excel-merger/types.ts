@@ -1,3 +1,5 @@
+import type { ExcelThemePalette } from "./excelThemeColors";
+
 export type MergeMode = "sheets" | "vertical" | "horizontal";
 export type SheetNameRule = "file-sheet" | "sheet-file" | "sheet";
 export type SheetSelectionMode = "all" | "positions" | "custom";
@@ -7,6 +9,7 @@ export interface ExcelInputPayload {
   name: string;
   displayName?: string;
   preservedLegacy?: boolean;
+  degradedLegacy?: boolean;
   buffer: ArrayBuffer;
   password?: string;
   selectedSheetNames?: string[];
@@ -43,6 +46,7 @@ export interface ExcelInspectionResult {
   id: string;
   encrypted: boolean;
   sheetNames: string[];
+  themePalette?: ExcelThemePalette;
   error?: string;
 }
 

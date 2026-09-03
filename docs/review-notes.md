@@ -4,6 +4,16 @@
 
 ## 2026-09-03
 
+### Excel E-A+E-B — 위장 XLS 서식·입력별 테마색 판정 (Codx)
+
+- **legacy 라우팅·강등 판정**: OLE/SpreadsheetML 시그니처를 공용 헬퍼로 통합하되 보존 화면에서만 두 종류를 정밀 변환 대상으로 삼았다. 일반 화면의 SpreadsheetML은 기존 SheetJS 값 경로와 CDATA 전개를 유지한다. 변환 명령의 파일별 실패는 별도 `degradedLegacy` 경고 상태로 두고 서식·수식을 끈 저장값 경로로 재검사해 병합 가능 상태를 유지한다. 이 값 경로까지 실패하면 해당 파일에 XLSX 재저장 안내를 표시하고, 격리·자산·기동 조건 실패는 추가 배치 전체를 중단한다. Chrome 이벤트 주입 스모크에서 세 분기를 각각 단언했다.
+- **테마 판정·명시 제외**: 검사 워커가 각 XLSX의 `xl/theme/theme1.xml`만 ZIP에서 읽어 dk1/lt1/dk2/lt2/accent1~6/hlink/folHlink 순서의 파일 id별 팔레트를 만들고 병합 워커 payload에 전달한다. 누락·손상 팔레트는 오류 없이 현행 theme 참조를 유지한다. ExcelJS가 노출한 솔리드 pattern fill의 fg/bg, font, border 단색만 입력 팔레트 RGB로 베이크하고 gradient fill·rich-text run·DXF·차트/도형/그림은 건드리지 않았다. RGB·indexed(64 포함)·auto도 그대로 둔다.
+- **색 정확성 실측**: ECMA-376 HSL 휘도식(음수 `L'=L(1+tint)`, 양수 `L'=L(1-tint)+tint`)과 채널별 최근접 정수/[0,255] 클램프를 적용했다. 6개 accent×tint `-0.25/0/0.6` 고정값 테스트와 서로 다른 테마 2파일 브라우저 병합이 통과했다. 실파일 `(회신필요) 금융기관별 시스템 구축 가능여부 및 담당자 확인 요청.xlsx`의 A1 `accent4=FFC000`, `tint=0.7999816888943144`는 출력 `ARGB=FFFFF2CC`(표시 RGB `#FFF2CC`)였고 `styles.xml`에도 `rgb="FFFFF2CC"`로 기록됐다.
+- **AC285·XML 정합 실측**: `dummyfortest/AC285_202606.xls`와 `AC285_20260８５８6.xls`를 보존 화면(formula=1, format=1)에서 함께 병합해 2시트/15,800B 출력 생성. 첫 시트는 33×11, 스타일 셀 330·솔리드 채움 200·글꼴색 330, 둘째는 108×12, 스타일 셀 1,236·솔리드 채움 666·글꼴색 1,236으로 확인했다. 이 출력과 테마 실파일 출력의 `xl/styles.xml`은 각각 `xmllint --noout` exit 0이었다.
+- **성능 판정**: 동일 production build·Chrome에서 150×80=12,000개 theme fill/font/border 스타일 셀 병합을 3회 측정했다. 변경 전 `1086.17/1080.28/1076.01ms`(중앙값 `1080.28ms`), 변경 후 `929.00/900.94/950.18ms`(중앙값 `929.00ms`)로 14.0% 감소했다. 입력별 WeakMap 스타일 캐시로 같은 원본 스타일의 반복 베이크/복제를 피했으며 성능 악화 없음으로 판정했다.
+- **제품 범위 판정**: 신규 경고·상태 문구는 ko/en 동형이며 사용자에게 내부 처리 명칭이나 원시 예외를 노출하지 않는다. URL·SEO 메타·가이드 의미·정적 페이지 수·광고 배치·광고 제외 격리 경로·GitHub Pages 서버리스 구조는 변하지 않아 SEO/AdSense 코드 변경은 불필요하다.
+- **완료 검증**: `npm run build` exit 0(2,358 modules, Excel worker 2,479.26kB, 정적 55페이지), `npm run test:unit` exit 0(103/103), `TEST_SCOPE=excel npm run test:browser`, `npm run test:xls-preserve`, `npm run test:xls-first-load`, `npm run test:static`, 두 출력의 `styles.xml` xmllint, 실파일 재현 및 성능 벤치가 모두 exit 0이었다. `TEST_SCOPE=excel` 최초 실행 1회는 Vite가 새 의존성을 처음 최적화한 직후 자동 reload되어 빈 DOM으로 종료됐고, 서버 로그에서 원인을 확인한 뒤 warm 상태의 동일 명령 재실행이 통과했다.
+
 ### 비디오 B3 — 목표 비트레이트 브라우저 인코딩 판정 (Codx)
 
 - **범위·라우팅 판정**: MP4 H.264/HEVC 목표 비트레이트 job만 실제 입력 decoder와 사용자가 선택한 output encoder의 `isConfigSupported()`를 통과한 뒤 새 경로로 보낸다. 코덱을 바꾸지 않고 `hardwareAcceleration:"no-preference"`를 고정했다. CRF·VP9·WebM·MKV, 코덱 설정 미지원, concat 입력 중 FPS unknown은 FFmpeg로 유지했다. 오디오는 remove면 영상만 점진 처리, copy면 AAC mux 호환 시 encoded sample을 보존, encode면 decoder+encoder 설정을 모두 지원할 때만 처리하며 어느 하나라도 미지원이면 오디오-only 하이브리드 없이 job 전체를 FFmpeg로 보낸다. 무음 소스는 오디오 인코더가 필요하지 않은 것으로 판정한다.
