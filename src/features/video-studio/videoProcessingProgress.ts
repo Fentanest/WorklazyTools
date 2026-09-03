@@ -1,13 +1,14 @@
 import type { VideoWorkerProgress } from "./types";
 
-export const VIDEO_PROGRESS_STAGES = ["demux", "decode", "encode", "mux", "write"] as const;
+export const VIDEO_PROGRESS_STAGES = ["audio", "demux", "decode", "encode", "mux", "write"] as const;
 export type VideoProgressStage = typeof VIDEO_PROGRESS_STAGES[number];
 
 export const VIDEO_PROGRESS_STAGE_WEIGHTS: Readonly<Record<VideoProgressStage, number>> = {
-  demux: 0.1,
-  decode: 0.25,
-  encode: 0.4,
-  mux: 0.15,
+  audio: 0.15,
+  demux: 0.08,
+  decode: 0.2,
+  encode: 0.35,
+  mux: 0.12,
   write: 0.1,
 };
 

@@ -34,6 +34,7 @@ export interface VideoStreamCopyProbeResult {
   compatible: boolean;
   codec?: Extract<VideoCodec, "h264" | "hevc">;
   reasonCode: VideoStreamCopyReasonCode;
+  sourceAudioBitratesBps?: Array<number | null | undefined>;
 }
 
 export interface VideoStreamCopyMetrics {

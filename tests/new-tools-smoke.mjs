@@ -81,7 +81,14 @@ try {
     }
     if (!onlyHwp && !onlyAudio && !onlyImage) {
       console.log("[4/4] Video studio");
-      await testVideoStudio(page, fixtures.videos, fixtures.largeVideo, fixtures.largePassThroughVideos);
+      await testVideoStudio(
+        page,
+        fixtures.videos,
+        fixtures.largeVideo,
+        fixtures.largePassThroughVideos,
+        fixtures.largeAudioIncompatibleVideo,
+        fixtures.videoIncompatibleVideo,
+      );
     }
 
     if (pageErrors.length) throw new Error(`Browser errors:\n${pageErrors.join("\n")}`);
@@ -3036,7 +3043,7 @@ async function waitForAudioSuccess(page, text, timeout = 60_000) {
   await page.waitForFunction((expected) => document.querySelector(".operation-progress.status-success")?.textContent?.includes(expected), { timeout }, text);
 }
 
-async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths) {
+async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths, largeAudioIncompatibleVideo, videoIncompatibleVideo) {
   if (new URL(page.url()).origin !== new URL(baseUrl).origin) {
     await page.goto(`${koBaseUrl}/`, { waitUntil: "domcontentloaded" });
   }
@@ -3543,6 +3550,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
   }
 
+  await testVideoCopyGuidance(page, largeAudioIncompatibleVideo, videoIncompatibleVideo);
+
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
@@ -3590,6 +3599,57 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     return selects[2]?.value === "source" && selects[3]?.value === "source" && selects[4]?.value === "0" && button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+}
+
+async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, videoIncompatibleVideo) {
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-studio-page input[type=file]");
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(largeAudioIncompatibleVideo);
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.waitForSelector(".video-audio-removal-suggestion", { timeout: 60_000 });
+  const suggestion = await page.$eval(".video-audio-removal-suggestion", (element) => element.textContent || "");
+  if (!suggestion.includes("음향 형식") || !suggestion.includes("음향 제외") || suggestion.includes("변환")) {
+    throw new Error(`Audio-only copy guidance is incorrect: ${suggestion}`);
+  }
+  await page.click(".video-audio-removal-suggestion button");
+  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 제외를 적용했습니다"));
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.waitForSelector(".operation-progress.status-running");
+  await waitForTerminalStatus(page);
+  if (await page.$(".operation-progress.status-error")) {
+    throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Large audio-removal copy error"));
+  }
+  const audioRemovalResult = await page.evaluate(() => ({
+    outputs: document.querySelectorAll(".video-result-item").length,
+    suggestion: Boolean(document.querySelector(".video-audio-removal-suggestion")),
+    log: Array.from(document.querySelectorAll(".operation-log li"), (item) => item.textContent || ""),
+  }));
+  if (audioRemovalResult.outputs !== 1 || audioRemovalResult.suggestion
+    || !audioRemovalResult.log.some((message) => message.includes("원본 화질"))) {
+    throw new Error(`A 2GB+ audio-removal job did not use direct copy: ${JSON.stringify(audioRemovalResult)}`);
+  }
+
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-studio-page input[type=file]");
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoIncompatibleVideo);
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.waitForSelector(".operation-progress.status-error", { timeout: 60_000 });
+  const videoGuidance = await page.$eval(".operation-current-message", (element) => element.textContent || "");
+  if (!videoGuidance.includes("화면 압축 방식") || await page.$(".video-audio-removal-suggestion")) {
+    throw new Error(`Video-codec copy guidance was not kept separate: ${videoGuidance}`);
+  }
+  console.log("  video: 2GB+ E-AC-3 remove-audio route and separate dvhe guidance verified");
 }
 
 async function installVideoTransferProbe(page) {
@@ -3703,6 +3763,8 @@ async function createFixtures(directory) {
   const videoTwo = path.join(directory, "sample-two.mp4");
   const largeVideo = path.join(directory, "2026_0618_070732_001396F.MP4");
   const largePassThroughVideos = [path.join(directory, "large-pass-through-one.mp4"), path.join(directory, "large-pass-through-two.mp4")];
+  const largeAudioIncompatibleVideo = path.join(directory, "large-eac3-source.mp4");
+  const videoIncompatibleVideo = path.join(directory, "dolby-vision-entry.mov");
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi", "-i", "color=c=0x159bd7:s=320x180:d=1.5",
@@ -3724,6 +3786,31 @@ async function createFixtures(directory) {
   ]);
   const videoCopies = Array.from({ length: 5 }, (_, index) => path.join(directory, `sample-${index + 3}.mp4`));
   await Promise.all(videoCopies.map((target) => fs.copyFile(video, target)));
+  await execFileAsync("ffmpeg", [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi", "-i", "color=c=0x2266aa:s=320x180:r=30:d=2",
+    "-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=2",
+    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "eac3", "-b:a", "192k",
+    "-shortest", "-movflags", "+faststart", largeAudioIncompatibleVideo,
+  ]);
+  const audioIncompatibleHandle = await fs.open(largeAudioIncompatibleVideo, "r+");
+  try {
+    await audioIncompatibleHandle.truncate(2 * 1024 * 1024 * 1024 + 1);
+  } finally {
+    await audioIncompatibleHandle.close();
+  }
+  await execFileAsync("ffmpeg", [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi", "-i", "color=c=0xaa4422:s=320x180:r=30:d=1",
+    "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "log-level=error",
+    "-tag:v", "dvhe", "-an", "-movflags", "+faststart", videoIncompatibleVideo,
+  ]);
+  const videoIncompatibleHandle = await fs.open(videoIncompatibleVideo, "r+");
+  try {
+    await videoIncompatibleHandle.truncate(2 * 1024 * 1024 * 1024 + 2);
+  } finally {
+    await videoIncompatibleHandle.close();
+  }
   await Promise.all(largePassThroughVideos.map(async (target) => {
     await fs.copyFile(video, target);
     const handle = await fs.open(target, "r+");
@@ -3739,7 +3826,17 @@ async function createFixtures(directory) {
   } finally {
     await largeHandle.close();
   }
-  return { hwpFiles: [blankHwp, blankHwpTwo], wordDocx, images: [imageOne, imageTwo], audio, videos: [video, videoTwo, ...videoCopies], largeVideo, largePassThroughVideos };
+  return {
+    hwpFiles: [blankHwp, blankHwpTwo],
+    wordDocx,
+    images: [imageOne, imageTwo],
+    audio,
+    videos: [video, videoTwo, ...videoCopies],
+    largeVideo,
+    largePassThroughVideos,
+    largeAudioIncompatibleVideo,
+    videoIncompatibleVideo,
+  };
 }
 
 async function createMinimalDocx() {

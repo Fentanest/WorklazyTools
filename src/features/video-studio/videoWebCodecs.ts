@@ -16,9 +16,18 @@ export type VideoWebCodecsReasonCode =
   | "AUDIO_ENCODER_UNSUPPORTED"
   | "INPUT_UNSUPPORTED";
 
+export type VideoHybridReasonCode = VideoWebCodecsReasonCode
+  | "AUDIO_TRACK_UNAVAILABLE"
+  | "AUDIO_ENCODER_SUPPORTED";
+
 export interface VideoWebCodecsProbeResult {
   compatible: boolean;
   reasonCode: VideoWebCodecsReasonCode;
+  sourceAudioBitratesBps?: Array<number | null | undefined>;
+}
+
+export interface VideoHybridProbeResult extends Omit<VideoWebCodecsProbeResult, "reasonCode"> {
+  reasonCode: VideoHybridReasonCode;
 }
 
 export interface VideoWebCodecsMetrics {
@@ -133,19 +142,38 @@ export async function assessVideoWebCodecsSupport(
   return { compatible: true, reasonCode: "READY" };
 }
 
+export async function assessVideoHybridSupport(
+  request: Omit<VideoWebCodecsSupportRequest, "audioMode" | "audioDecoderConfigs" | "audioTracksCompatible"> & { hasAudio: boolean },
+  api: VideoWebCodecsSupportApi = browserWebCodecsSupportApi(),
+): Promise<VideoHybridProbeResult> {
+  const video = await assessVideoWebCodecsSupport({
+    ...request,
+    audioMode: "remove",
+    audioDecoderConfigs: [],
+    audioTracksCompatible: true,
+  }, api);
+  if (!video.compatible) return video;
+  if (!request.hasAudio || !request.audioEncoderConfig) return { compatible: false, reasonCode: "AUDIO_TRACK_UNAVAILABLE" };
+  if (api.audioEncoder && await configSupported(request.audioEncoderConfig, api.audioEncoder)) {
+    return { compatible: false, reasonCode: "AUDIO_ENCODER_SUPPORTED" };
+  }
+  return { compatible: true, reasonCode: "READY" };
+}
+
 export function createVideoWebCodecsEncoderConfig(
   task: Extract<VideoTask, { kind: "encode" }>,
   width: number,
   height: number,
   frameRate: number,
 ): VideoEncoderConfig {
+  const bitrate = parseVideoBitrate(task.bitrate);
   const config: VideoEncoderConfig = {
-    codec: task.codec === "h264" ? "avc1.42001f" : "hvc1.1.6.L93.B0",
+    codec: task.codec === "h264" ? h264CodecFor(width, height, frameRate, bitrate) : "hvc1.1.6.L93.B0",
     width,
     height,
     displayWidth: width,
     displayHeight: height,
-    bitrate: parseVideoBitrate(task.bitrate),
+    bitrate,
     bitrateMode: "variable",
     framerate: frameRate,
     hardwareAcceleration: "no-preference",
@@ -153,6 +181,27 @@ export function createVideoWebCodecsEncoderConfig(
   };
   if (task.codec === "h264") config.avc = { format: "avc" };
   return config;
+}
+
+function h264CodecFor(width: number, height: number, frameRate: number, bitrate: number) {
+  const macroblocksPerFrame = Math.ceil(width / 16) * Math.ceil(height / 16);
+  const macroblocksPerSecond = macroblocksPerFrame * frameRate;
+  const levels = [
+    { idc: 0x1f, maxFrame: 3_600, maxRate: 108_000, maxBitrate: 14_000_000 },
+    { idc: 0x20, maxFrame: 5_120, maxRate: 216_000, maxBitrate: 20_000_000 },
+    { idc: 0x28, maxFrame: 8_192, maxRate: 245_760, maxBitrate: 20_000_000 },
+    { idc: 0x29, maxFrame: 8_192, maxRate: 245_760, maxBitrate: 50_000_000 },
+    { idc: 0x2a, maxFrame: 8_704, maxRate: 522_240, maxBitrate: 50_000_000 },
+    { idc: 0x32, maxFrame: 22_080, maxRate: 589_824, maxBitrate: 135_000_000 },
+    { idc: 0x33, maxFrame: 36_864, maxRate: 983_040, maxBitrate: 240_000_000 },
+    { idc: 0x34, maxFrame: 36_864, maxRate: 2_073_600, maxBitrate: 240_000_000 },
+  ];
+  const level = levels.find((candidate) => (
+    macroblocksPerFrame <= candidate.maxFrame
+    && macroblocksPerSecond <= candidate.maxRate
+    && bitrate <= candidate.maxBitrate
+  )) ?? levels[levels.length - 1];
+  return `avc1.4200${level.idc.toString(16).padStart(2, "0")}`;
 }
 
 export function createVideoWebCodecsAudioEncoderConfig(

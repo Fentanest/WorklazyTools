@@ -27,7 +27,7 @@ test("the video orchestrator weights stages and blocks every event after termina
   progress.terminate();
   progress.reportStage("write", 100, "late stage");
   progress.reportOverall(100, "late overall");
-  assert.deepEqual(events, [10, 23]);
+  assert.deepEqual(events, [8, 18]);
 });
 
 test("job stage aggregation uses duration for processing and bytes for result writes", () => {
@@ -36,6 +36,7 @@ test("job stage aggregation uses duration for processing and bytes for result wr
     { durationSeconds: 10, expectedOutputBytes: 100 },
     { durationSeconds: 30, expectedOutputBytes: 300 },
   ]);
+  progress.reportStage("audio", 100, "audio complete");
   progress.reportJobStage(0, "decode", 10, 10, "first decode");
   progress.reportJobStage(1, "decode", 15, 30, "second decode");
   progress.reportStage("demux", 100, "demux complete");
@@ -44,7 +45,7 @@ test("job stage aggregation uses duration for processing and bytes for result wr
   progress.reportStage("mux", 100, "mux complete");
   progress.reportJobStage(0, "write", 100, 100, "first write");
   progress.reportJobStage(1, "write", 300, 300, "second write");
-  assert.deepEqual(events, [6, 16, 26, 35, 75, 90, 93, 100]);
+  assert.deepEqual(events, [15, 20, 28, 36, 43, 78, 90, 93, 100]);
 });
 
 test("operation progress normalization never moves backward or accepts non-finite values", () => {

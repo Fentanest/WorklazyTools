@@ -78,6 +78,8 @@ export interface VideoOutputJob {
   name: string;
   mode: "individual" | "concat";
   inputs: VideoWorkerInput[];
+  /** Selects the existing audio-removal mode for this job without changing the rest of a batch. */
+  audioModeOverride?: "remove";
 }
 
 export interface VideoWorkerRequest {

@@ -42,7 +42,11 @@ import type {
   VideoWorkerOutput,
 } from "./types";
 import { probeVideoMetadata } from "./videoWorkerClient";
-import { preflightVideoProcessingRoutes, runVideoProcessingTask } from "./videoProcessingClient";
+import {
+  preflightVideoProcessingRoutes,
+  runVideoProcessingTask,
+  type VideoProcessingJobRoute,
+} from "./videoProcessingClient";
 import { MAX_SAFE_FFMPEG_OUTPUT_BYTES } from "./videoRouting";
 import { createVideoZip } from "./videoZipClient";
 import { VIDEO_GROUP_IDS } from "./types";
@@ -76,6 +80,12 @@ interface VideoJobEntry {
   name: string;
   mode: "individual" | "concat";
   items: VideoItem[];
+}
+
+interface AudioRemovalSuggestion {
+  jobKey: string;
+  jobName: string;
+  message: string;
 }
 
 interface DownloadableVideoOutput {
@@ -121,6 +131,8 @@ export function VideoStudioPage() {
   const [bitrate, setBitrate] = useState<VideoBitrate>("copy");
   const [customVideoBitrate, setCustomVideoBitrate] = useState("4.5");
   const [audioMode, setAudioMode] = useState<VideoAudioMode>("copy");
+  const [audioRemovalJobKeys, setAudioRemovalJobKeys] = useState<Set<string>>(() => new Set());
+  const [audioRemovalSuggestions, setAudioRemovalSuggestions] = useState<AudioRemovalSuggestion[]>([]);
   const [audioBitrate, setAudioBitrate] = useState<VideoAudioBitrate>("192k");
   const [customAudioBitrate, setCustomAudioBitrate] = useState("192");
   const [audioSampleRate, setAudioSampleRate] = useState<VideoAudioSampleRate>("source");
@@ -468,8 +480,25 @@ export function VideoStudioPage() {
       name: job.name,
       mode: job.mode,
       inputs: job.items.map(toWorkerInput),
+      audioModeOverride: audioRemovalJobKeys.has(videoJobKey(job)) ? "remove" : undefined,
     }));
     const routePreflight = await preflightVideoProcessingRoutes({ mode: "batch", jobs, task });
+    const suggested = routePreflight.jobs.flatMap((route) => {
+      if (!route.audioRemovalSuggested || jobs[route.jobIndex].audioModeOverride === "remove") return [];
+      const entry = jobEntries[route.jobIndex];
+      return [{
+        jobKey: videoJobKey(entry),
+        jobName: entry.name,
+        message: routeGuidanceMessage(streamCopyProbeReason(route.probeDetails), language, true),
+      }];
+    });
+    if (suggested.length) {
+      setAudioRemovalSuggestions(suggested);
+      progress.start(featureMessage(language, "video.messages.VideoStudioPage.checkingSourceCompatibility"));
+      progress.fail(suggested[0].message);
+      return;
+    }
+    setAudioRemovalSuggestions([]);
     if (task.kind === "encode" && task.bitrate === "copy") {
       const oversizedRoute = routePreflight.jobs.find(({ decision, estimatedOutputBytes }) => (
         decision.route === "ffmpeg" && estimatedOutputBytes > MAX_SAFE_FFMPEG_OUTPUT_BYTES
@@ -477,10 +506,11 @@ export function VideoStudioPage() {
       const oversized = oversizedRoute && {
         job: jobEntries[oversizedRoute.jobIndex],
         estimate: oversizedRoute.estimatedOutputBytes,
+        reasonCode: streamCopyProbeReason(oversizedRoute.probeDetails),
       };
       if (oversized) {
         progress.start(featureMessage(language, "video.messages.VideoStudioPage.checkingEstimatedPassthroughOutputSize"));
-        progress.fail(featureMessage(language, "video.messages.VideoStudioPage.isEstimatedAtAboutLargeSourceFilesAre", { p0: oversized.job.name, p1: formatBytes(oversized.estimate) }));
+        progress.fail(`${routeGuidanceMessage(oversized.reasonCode, language, false)} ${featureMessage(language, "video.messages.VideoStudioPage.isEstimatedAtAboutLargeSourceFilesAre", { p0: oversized.job.name, p1: formatBytes(oversized.estimate) })}`);
         return;
       }
     }
@@ -552,6 +582,19 @@ export function VideoStudioPage() {
     setOutputFormat(format);
     if (format === "webm") setCodec("vp9");
     setLastResult("");
+    progress.reset();
+  };
+
+  const changeAudioMode = (value: VideoAudioMode) => {
+    setAudioMode(value);
+    setAudioRemovalJobKeys(new Set());
+    setAudioRemovalSuggestions([]);
+  };
+
+  const acceptAudioRemovalSuggestion = (suggestion: AudioRemovalSuggestion) => {
+    setAudioRemovalJobKeys((current) => new Set(current).add(suggestion.jobKey));
+    setAudioRemovalSuggestions((current) => current.filter((item) => item.jobKey !== suggestion.jobKey));
+    setLastResult(featureMessage(language, "video.messages.VideoStudioPage.audioRemovalSelectedFor", { p0: suggestion.jobName }));
     progress.reset();
   };
 
@@ -654,7 +697,7 @@ export function VideoStudioPage() {
               customBitrate={customAudioBitrate}
               sampleRate={audioSampleRate}
               customSampleRate={customAudioSampleRate}
-              onMode={setAudioMode}
+              onMode={changeAudioMode}
               onBitrate={setAudioBitrate}
               onCustomBitrate={setCustomAudioBitrate}
               onSampleRate={setAudioSampleRate}
@@ -683,6 +726,15 @@ export function VideoStudioPage() {
           {outputFormat === "webm" && bitrate === "copy" && <div className="inline-warning error webm-passthrough-warning"><AlertTriangle size={17} /><span><strong>{featureMessage(language, "video.messages.VideoStudioPage.typicalMp4VideoAndAudioCannotBeCopied")}</strong> {featureMessage(language, "video.messages.VideoStudioPage.reEncodeH264VideoUsingCrfOr")}</span></div>}
           {isVideoOutput && audioMode === "copy" && <div className="inline-warning"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.onlyTheFirstAudioTrackIsCopiedWithout")}</span></div>}
           {isVideoOutput && audioMode === "remove" && <div className="video-output-note"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.audioWillBeRemovedFromTheOutputVideo")}</span></div>}
+          {audioRemovalSuggestions.map((suggestion) => (
+            <div className="inline-warning error video-audio-removal-suggestion" key={suggestion.jobKey}>
+              <AlertTriangle size={17} />
+              <span><strong>{suggestion.jobName}</strong> {suggestion.message}</span>
+              <button type="button" className="secondary-button" onClick={() => acceptAudioRemovalSuggestion(suggestion)}>
+                {featureMessage(language, "video.messages.VideoStudioPage.copyVideoWithoutAudio")}
+              </button>
+            </div>
+          ))}
           {passthroughTransformConflict && <div className="inline-warning error"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.changingAspectRatioOrResolutionRequiresReEncoding")}</span></div>}
           {!passthroughTransformConflict && passthroughConcatConflict && <div className="inline-warning error"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.videosWithDifferentDimensionsOrAspectRatiosCannot")}</span></div>}
           {outputFormat === "gif" && <div className="video-output-note"><Sparkles size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.createsGifsFromEachGroupSSelectedRanges")}</span></div>}
@@ -889,6 +941,28 @@ function createJobEntries(
     else groupItems.forEach((item, index) => entries.push({ name: `${item.file.name.replace(/\.[^.]+$/, "")}-${featureMessage(language, "video.messages.VideoStudioPage.group2")}${group}-${index + 1}`, mode: "individual", items: [item] }));
   });
   return entries;
+}
+
+function videoJobKey(job: VideoJobEntry) {
+  return `${job.mode}:${job.items.map((item) => item.id).join(":")}`;
+}
+
+function routeGuidanceMessage(reasonCode: string | undefined, language: AppLanguage, audioRemovalAvailable: boolean) {
+  if (audioRemovalAvailable) {
+    return featureMessage(language, "video.messages.VideoStudioPage.sourceAudioCannotBeCopiedRemoveItForLargeFiles");
+  }
+  if (reasonCode?.startsWith("VIDEO_") || reasonCode === "INPUT_UNSUPPORTED") {
+    return featureMessage(language, "video.messages.VideoStudioPage.sourcePictureCannotBeCopiedDirectlyChooseEncoding");
+  }
+  if (reasonCode === "EDIT_LIST_UNSUPPORTED" || reasonCode === "SAMPLE_TABLE_UNAVAILABLE") {
+    return featureMessage(language, "video.messages.VideoStudioPage.sourceTimelineCannotBeCopiedDirectlyChooseEncoding");
+  }
+  return featureMessage(language, "video.messages.VideoStudioPage.sourceCannotBeCopiedDirectlyChooseAnotherSetting");
+}
+
+function streamCopyProbeReason(probeDetails: VideoProcessingJobRoute["probeDetails"]) {
+  return probeDetails.find((probe) => probe.operation === "stream-copy" && probe.audioMode === "copy")?.reasonCode
+    ?? probeDetails.find((probe) => probe.operation === "stream-copy")?.reasonCode;
 }
 
 function toWorkerInput(item: VideoItem): VideoWorkerInput {

@@ -5,7 +5,12 @@ import { Muxer, StreamTarget } from "mp4-muxer";
 
 import { workerMessage } from "../../i18n/workerMessages.ts";
 import { createVideoWorkerResult, createVideoOutputName, type VideoFileLabels } from "./videoProcessingShared.ts";
-import { createVideoResultRandomAccessTarget, type VideoResultRandomAccessTarget } from "./videoResultStorage.worker.ts";
+import { isStorageQuotaError } from "./videoResultStorage.ts";
+import {
+  createVideoResultRandomAccessTarget,
+  VideoResultQuotaError,
+  type VideoResultRandomAccessTarget,
+} from "./videoResultStorage.worker.ts";
 import {
   compareVideoStreamInputProfiles,
   compareVideoStreamAudioProfiles,
@@ -19,6 +24,7 @@ import {
 } from "./videoStreamCopy.ts";
 import {
   assessVideoWebCodecsSupport,
+  assessVideoHybridSupport,
   createVideoWebCodecsAudioEncoderConfig,
   createVideoWebCodecsEncoderConfig,
   parsedVideoTrackFrameRate,
@@ -37,6 +43,7 @@ import type {
   VideoStreamRunRequest,
 } from "./videoStreamWorkerClient.ts";
 import type { VideoProgressStage } from "./videoProcessingProgress.ts";
+import type { VideoProcessingFailureStage } from "./videoRouting.ts";
 import type { VideoAudioMode, VideoTask } from "./types.ts";
 
 const worker = self as DedicatedWorkerGlobalScope;
@@ -81,6 +88,7 @@ interface ParsedTrack {
   track: Track;
   samples: VideoStreamSampleInfo[];
   mediaTimeOffsetSeconds: number;
+  bitrateBps: number | undefined;
 }
 
 interface ParsedInput {
@@ -89,6 +97,21 @@ interface ParsedInput {
   video: ParsedTrack;
   audio?: ParsedTrack;
   metadataBytesRead: number;
+  sourceAudio?: { sampleRate: number; channelCount: number; bitrateBps: number | undefined };
+}
+
+interface HybridAudioPacket {
+  data: Uint8Array;
+  timestamp: number;
+  duration: number;
+}
+
+interface HybridAudioQueue {
+  packets: HybridAudioPacket[];
+  codecName: string;
+  configuration: Uint8Array;
+  sampleRate: number;
+  channelCount: number;
 }
 
 interface SelectedRecord {
@@ -108,6 +131,7 @@ let active = false;
 let activeCopyMetrics: VideoStreamCopyMetrics | undefined;
 let activeWebCodecsMetrics: VideoWebCodecsMetrics | undefined;
 let activeAbortController: AbortController | undefined;
+let activeFailureStage: Exclude<VideoProcessingFailureStage, "audio"> = "video-codec";
 
 worker.onmessage = (event: MessageEvent) => {
   if (event.data?.type === "input-file") {
@@ -134,7 +158,10 @@ worker.onmessage = (event: MessageEvent) => {
     ? handlePreflight(event.data.request as VideoStreamPreflightRequest, activeAbortController.signal)
     : handleStart(event.data.request as VideoStreamRunRequest, activeAbortController.signal)
   ).catch((error) => {
-    worker.postMessage({ type: isAbortError(error) ? "canceled" : "error" });
+    worker.postMessage({
+      type: isAbortError(error) ? "canceled" : "error",
+      failureStage: error instanceof VideoStreamingStageError ? error.stage : activeFailureStage,
+    });
   }).finally(closeWorker);
 };
 
@@ -143,15 +170,18 @@ worker.postMessage({ type: "ready" });
 async function handlePreflight(request: VideoStreamPreflightRequest, signal: AbortSignal) {
   const probe = request.operation === "webcodecs"
     ? await inspectWebCodecsJob(request.job, request.task, signal)
-    : await inspectJob(request.job, request.audioMode, signal);
+    : request.operation === "hybrid"
+      ? await inspectHybridJob(request.job, request.task, signal)
+      : await inspectJob(request.job, request.audioMode, signal);
   worker.postMessage({ type: "preflight-result", probe });
 }
 
 async function handleStart(request: VideoStreamRunRequest, signal: AbortSignal) {
+  activeFailureStage = request.operation === "stream-copy" ? "mux-write" : "video-codec";
   if (request.task.container !== "mp4" || !request.resultStorage) {
     throw new Error("Unsupported streaming request");
   }
-  if (request.operation === "webcodecs") {
+  if (request.operation === "webcodecs" || request.operation === "hybrid") {
     if (request.task.bitrate === "copy" || request.task.bitrate === "0") throw new Error("Unsupported encoding request");
     await handleWebCodecsStart(request, signal);
     return;
@@ -189,26 +219,32 @@ async function handleStart(request: VideoStreamRunRequest, signal: AbortSignal) 
   let writtenBytes = 0;
   let target: VideoResultRandomAccessTarget | undefined;
   try {
-    target = await createVideoResultRandomAccessTarget(
-      request.resultStorage,
-      outputName,
-      request.estimatedOutputBytes,
-      (cumulativeBytes, _position, byteLength) => {
-        if (activeCopyMetrics) {
-          activeCopyMetrics.outputCumulativeBytesMonotonic &&= cumulativeBytes >= activeCopyMetrics.outputLastCumulativeBytes;
-          activeCopyMetrics.outputLastCumulativeBytes = cumulativeBytes;
-          activeCopyMetrics.outputWriteCalls += 1;
-          activeCopyMetrics.maxOutputWriteBytes = Math.max(activeCopyMetrics.maxOutputWriteBytes, byteLength);
-        }
-        writtenBytes = cumulativeBytes;
-        reportProgress(
-          "write",
-          writtenBytes,
-          Math.max(request.estimatedOutputBytes, writtenBytes),
-          workerMessage(request.language, "video.messages.video.savingCompletedVideoProgressively"),
-        );
-      },
-    );
+    activeFailureStage = "quota";
+    try {
+      target = await createVideoResultRandomAccessTarget(
+        request.resultStorage,
+        outputName,
+        request.estimatedOutputBytes,
+        (cumulativeBytes, _position, byteLength) => {
+          if (activeCopyMetrics) {
+            activeCopyMetrics.outputCumulativeBytesMonotonic &&= cumulativeBytes >= activeCopyMetrics.outputLastCumulativeBytes;
+            activeCopyMetrics.outputLastCumulativeBytes = cumulativeBytes;
+            activeCopyMetrics.outputWriteCalls += 1;
+            activeCopyMetrics.maxOutputWriteBytes = Math.max(activeCopyMetrics.maxOutputWriteBytes, byteLength);
+          }
+          writtenBytes = cumulativeBytes;
+          reportProgress(
+            "write",
+            writtenBytes,
+            Math.max(request.estimatedOutputBytes, writtenBytes),
+            workerMessage(request.language, "video.messages.video.savingCompletedVideoProgressively"),
+          );
+        },
+      );
+    } catch (error) {
+      throw new VideoStreamingStageError(isQuotaError(error) ? "quota" : "mux-write");
+    }
+    activeFailureStage = "mux-write";
     const output = await muxJob(request, parsedInputs, target, signal);
     if (activeCopyMetrics) activeCopyMetrics.outputFileSize = output.size;
     worker.postMessage({ type: "output", output });
@@ -243,10 +279,54 @@ async function inspectWebCodecsJob(
       throwIfAborted(signal);
       inputs.push(await parseInput(file, task.audioMode, undefined, signal));
     }
-    return assessParsedWebCodecsSupport(job, task, inputs);
+    return {
+      ...await assessParsedWebCodecsSupport(job, task, inputs),
+      sourceAudioBitratesBps: inputs.map((input) => input.audio ? input.audio.bitrateBps : null),
+    };
   } catch (error) {
     if (isAbortError(error)) throw error;
     return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" };
+  }
+}
+
+async function inspectHybridJob(
+  job: VideoStreamJobDescriptor,
+  task: Extract<VideoTask, { kind: "encode" }>,
+  signal?: AbortSignal,
+) {
+  try {
+    if (task.audioMode !== "encode" || task.container !== "mp4" || task.bitrate === "copy" || task.bitrate === "0" || task.codec === "vp9") {
+      return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" } as const;
+    }
+    if (job.mode === "concat" && job.inputs.some((input) => !validDescriptorFrameRate(input.frameRate))) {
+      return { compatible: false, reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE" } as const;
+    }
+    const files = await requestJobFiles(job, false, signal);
+    const inputs: ParsedInput[] = [];
+    for (const file of files) inputs.push(await parseInput(file, "hybrid", undefined, signal));
+    const baseDimensions = resolveVideoWebCodecsBaseDimensions(job, task);
+    const frameRate = resolveVideoWebCodecsFrameRate(
+      job,
+      inputs.map((input) => parsedVideoTrackFrameRate(input.video.samples)).filter((value): value is number => value !== undefined),
+    );
+    const firstAudio = inputs[0]?.sourceAudio;
+    if (!baseDimensions || !frameRate) return { compatible: false, reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE" } as const;
+    const [width, height] = resolveVideoWebCodecsOutputDimensions(baseDimensions, task.rotation);
+    const support = await assessVideoHybridSupport({
+      videoDecoderConfigs: inputs.map(videoDecoderConfig),
+      videoEncoderConfig: createVideoWebCodecsEncoderConfig(task, width, height, frameRate),
+      audioEncoderConfig: firstAudio
+        ? createVideoWebCodecsAudioEncoderConfig(task, firstAudio.sampleRate, firstAudio.channelCount, job.mode === "concat")
+        : undefined,
+      hasAudio: inputs.every((input) => Boolean(input.sourceAudio)),
+    });
+    return {
+      ...support,
+      sourceAudioBitratesBps: inputs.map((input) => input.sourceAudio?.bitrateBps ?? (input.sourceAudio ? undefined : null)),
+    };
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" } as const;
   }
 }
 
@@ -280,6 +360,32 @@ async function assessParsedWebCodecsSupport(
   });
 }
 
+async function inspectParsedHybridSupport(
+  job: VideoStreamJobDescriptor,
+  task: Extract<VideoTask, { kind: "encode" }>,
+  inputs: readonly ParsedInput[],
+) {
+  const baseDimensions = resolveVideoWebCodecsBaseDimensions(job, task);
+  const frameRate = resolveVideoWebCodecsFrameRate(
+    job,
+    inputs.map((input) => parsedVideoTrackFrameRate(input.video.samples)).filter((value): value is number => value !== undefined),
+  );
+  const firstAudio = inputs[0]?.sourceAudio;
+  if (!baseDimensions || !frameRate) return { compatible: false, reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE" } as const;
+  const [width, height] = resolveVideoWebCodecsOutputDimensions(baseDimensions, task.rotation);
+  const videoSupport = await assessVideoWebCodecsSupport({
+    videoDecoderConfigs: inputs.map(videoDecoderConfig),
+    videoEncoderConfig: createVideoWebCodecsEncoderConfig(task, width, height, frameRate),
+    audioMode: "remove",
+    audioDecoderConfigs: [],
+    audioTracksCompatible: true,
+  });
+  if (!videoSupport.compatible) return videoSupport;
+  return firstAudio && inputs.every((input) => Boolean(input.sourceAudio))
+    ? { compatible: true, reasonCode: "READY" } as const
+    : { compatible: false, reasonCode: "AUDIO_TRACK_UNAVAILABLE" } as const;
+}
+
 async function handleWebCodecsStart(request: VideoStreamRunRequest, signal: AbortSignal) {
   activeWebCodecsMetrics = request.collectMetrics ? createWebCodecsMetrics() : undefined;
   const files = await requestJobFiles(request.job, Boolean(activeWebCodecsMetrics), signal);
@@ -288,7 +394,7 @@ async function handleWebCodecsStart(request: VideoStreamRunRequest, signal: Abor
   const metadataTotal = Math.max(1, files.reduce((total, file) => total + file.size, 0));
   for (let index = 0; index < files.length; index += 1) {
     throwIfAborted(signal);
-    const parsed = await parseInput(files[index], request.task.audioMode, (logicalPosition) => {
+    const parsed = await parseInput(files[index], request.operation === "hybrid" ? "hybrid" : request.task.audioMode, (logicalPosition) => {
       reportProgress(
         "demux",
         metadataCompleted + logicalPosition,
@@ -299,33 +405,53 @@ async function handleWebCodecsStart(request: VideoStreamRunRequest, signal: Abor
     parsedInputs.push(parsed);
     metadataCompleted += files[index].size;
   }
-  const support = await assessParsedWebCodecsSupport(request.job, request.task, parsedInputs);
+  const support = request.operation === "hybrid"
+    ? await inspectParsedHybridSupport(request.job, request.task, parsedInputs)
+    : await assessParsedWebCodecsSupport(request.job, request.task, parsedInputs);
   if (!support.compatible) throw new Error(support.reasonCode);
   reportProgress("demux", metadataTotal, metadataTotal, workerMessage(request.language, "video.messages.video.sourceReadyForEncoding"));
 
   const outputName = createVideoOutputName(request.job.name, request.task, request.job.mode === "concat", request.fileLabels as VideoFileLabels);
   let target: VideoResultRandomAccessTarget | undefined;
   try {
-    target = await createVideoResultRandomAccessTarget(
-      request.resultStorage!,
-      outputName,
-      request.estimatedOutputBytes,
-      (cumulativeBytes, _position, byteLength) => {
-        if (activeWebCodecsMetrics) {
-          activeWebCodecsMetrics.outputCumulativeBytesMonotonic &&= cumulativeBytes >= activeWebCodecsMetrics.outputLastCumulativeBytes;
-          activeWebCodecsMetrics.outputLastCumulativeBytes = cumulativeBytes;
-          activeWebCodecsMetrics.outputWriteCalls += 1;
-          activeWebCodecsMetrics.maxOutputWriteBytes = Math.max(activeWebCodecsMetrics.maxOutputWriteBytes, byteLength);
-        }
-        reportProgress(
-          "write",
-          cumulativeBytes,
-          Math.max(request.estimatedOutputBytes, cumulativeBytes),
-          workerMessage(request.language, "video.messages.video.savingCompletedVideoProgressively"),
-        );
-      },
-    );
-    const output = await encodeWebCodecsJob(request, parsedInputs, target, signal);
+    activeFailureStage = "quota";
+    try {
+      target = await createVideoResultRandomAccessTarget(
+        request.resultStorage!,
+        outputName,
+        request.estimatedOutputBytes,
+        (cumulativeBytes, _position, byteLength) => {
+          if (activeWebCodecsMetrics) {
+            activeWebCodecsMetrics.outputCumulativeBytesMonotonic &&= cumulativeBytes >= activeWebCodecsMetrics.outputLastCumulativeBytes;
+            activeWebCodecsMetrics.outputLastCumulativeBytes = cumulativeBytes;
+            activeWebCodecsMetrics.outputWriteCalls += 1;
+            activeWebCodecsMetrics.maxOutputWriteBytes = Math.max(activeWebCodecsMetrics.maxOutputWriteBytes, byteLength);
+          }
+          reportProgress(
+            "write",
+            cumulativeBytes,
+            Math.max(request.estimatedOutputBytes, cumulativeBytes),
+            workerMessage(request.language, "video.messages.video.savingCompletedVideoProgressively"),
+          );
+        },
+      );
+    } catch (error) {
+      throw new VideoStreamingStageError(isQuotaError(error) ? "quota" : "mux-write");
+    }
+    let hybridAudioQueue: HybridAudioQueue | undefined;
+    if (request.operation === "hybrid") {
+      if (!request.hybridAudioBuffer) throw new Error("Hybrid audio is unavailable");
+      activeFailureStage = "audio-demux";
+      try {
+        hybridAudioQueue = await parseHybridAudio(new File([request.hybridAudioBuffer], "hybrid-audio.m4a", { type: "audio/mp4" }), signal);
+      } catch (error) {
+        if (isAbortError(error)) throw error;
+        throw new VideoStreamingStageError("audio-demux");
+      }
+      request.hybridAudioBuffer = undefined;
+    }
+    activeFailureStage = "video-codec";
+    const output = await encodeWebCodecsJob(request, parsedInputs, target, signal, hybridAudioQueue);
     if (activeWebCodecsMetrics) activeWebCodecsMetrics.outputFileSize = output.size;
     worker.postMessage({ type: "output", output });
     worker.postMessage({
@@ -373,6 +499,7 @@ async function encodeWebCodecsJob(
   inputs: ParsedInput[],
   target: VideoResultRandomAccessTarget,
   signal: AbortSignal,
+  hybridAudio?: HybridAudioQueue,
 ) {
   const baseDimensions = resolveVideoWebCodecsBaseDimensions(request.job, request.task);
   const frameRate = resolveVideoWebCodecsFrameRate(
@@ -383,7 +510,7 @@ async function encodeWebCodecsJob(
   const [outputWidth, outputHeight] = resolveVideoWebCodecsOutputDimensions(baseDimensions, request.task.rotation);
   const firstAudio = inputs[0]?.profile.audio;
   const includeCopiedAudio = request.task.audioMode === "copy" && Boolean(firstAudio);
-  const audioEncoderConfig = request.task.audioMode === "encode" && firstAudio
+  const audioEncoderConfig = !hybridAudio && request.task.audioMode === "encode" && firstAudio
     ? createVideoWebCodecsAudioEncoderConfig(
         request.task,
         firstAudio.sampleRate!,
@@ -396,7 +523,11 @@ async function encodeWebCodecsJob(
     chunkSize: OUTPUT_CHUNK_BYTES,
     onData(data, position) {
       throwIfAborted(signal);
-      target.write(data, position);
+      try {
+        target.write(data, position);
+      } catch (error) {
+        throw new VideoStreamingStageError(isQuotaError(error) ? "quota" : "mux-write");
+      }
     },
   });
   const muxer = new Muxer({
@@ -407,7 +538,11 @@ async function encodeWebCodecsJob(
       height: outputHeight,
       frameRate,
     },
-    audio: includeCopiedAudio ? {
+    audio: hybridAudio ? {
+      codec: "aac",
+      numberOfChannels: hybridAudio.channelCount,
+      sampleRate: hybridAudio.sampleRate,
+    } : includeCopiedAudio ? {
       codec: "aac",
       numberOfChannels: firstAudio!.channelCount!,
       sampleRate: firstAudio!.sampleRate!,
@@ -421,6 +556,27 @@ async function encodeWebCodecsJob(
   });
 
   let codecFailure: unknown;
+  let hybridAudioIndex = 0;
+  let hybridAudioMetadataSent = false;
+  if (hybridAudio && Math.abs(hybridAudio.packets[0].timestamp) > 50_000) throw new Error("Encoded audio does not start with the video");
+  const drainHybridAudio = (throughTimestamp = Number.POSITIVE_INFINITY) => {
+    if (!hybridAudio) return;
+    while (hybridAudioIndex < hybridAudio.packets.length && hybridAudio.packets[hybridAudioIndex].timestamp <= throughTimestamp) {
+      const packet = hybridAudio.packets[hybridAudioIndex];
+      const metadata = hybridAudioMetadataSent ? undefined : {
+        decoderConfig: {
+          codec: hybridAudio.codecName,
+          numberOfChannels: hybridAudio.channelCount,
+          sampleRate: hybridAudio.sampleRate,
+          description: exactArrayBuffer(hybridAudio.configuration),
+        },
+      };
+      muxer.addAudioChunkRaw(packet.data, "key", packet.timestamp, packet.duration, metadata);
+      hybridAudioMetadataSent = true;
+      hybridAudioIndex += 1;
+      if (activeWebCodecsMetrics) activeWebCodecsMetrics.encodedAudioData += 1;
+    }
+  };
   let submittedVideoFrames = 0;
   let lastKeyFrameTimestamp = Number.NEGATIVE_INFINITY;
   const totalDurationMicroseconds = Math.max(1, Math.round(request.job.inputs.reduce(
@@ -431,6 +587,7 @@ async function encodeWebCodecsJob(
     output(chunk, metadata) {
       try {
         muxer.addVideoChunk(chunk, metadata);
+        drainHybridAudio(chunk.timestamp + (chunk.duration ?? 0));
         if (activeWebCodecsMetrics) activeWebCodecsMetrics.encodedVideoFrames += 1;
         reportProgress(
           "mux",
@@ -509,11 +666,19 @@ async function encodeWebCodecsJob(
       await encodeAudioInputs(request, inputs, audioEncoder, target, signal, () => throwCodecFailure(codecFailure));
       await audioEncoder.flush();
       throwCodecFailure(codecFailure);
+    } else if (hybridAudio) {
+      drainHybridAudio();
     }
     if (!submittedVideoFrames) throw new Error("No video frames were encoded");
     throwIfAborted(signal);
-    muxer.finalize();
-    await target.flush();
+    activeFailureStage = "mux-write";
+    try {
+      muxer.finalize();
+      await target.flush();
+    } catch (error) {
+      if (error instanceof VideoStreamingStageError) throw error;
+      throw new VideoStreamingStageError(isQuotaError(error) ? "quota" : "mux-write");
+    }
     const outputName = createVideoOutputName(request.job.name, request.task, request.job.mode === "concat", request.fileLabels as VideoFileLabels);
     const output = await target.complete(outputName, "video/mp4");
     reportProgress("write", output.size, output.size, workerMessage(request.language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: 1, p1: 1 }));
@@ -521,7 +686,18 @@ async function encodeWebCodecsJob(
   } finally {
     await flushAndCloseCodec(videoEncoder);
     if (audioEncoder) await flushAndCloseCodec(audioEncoder);
+    if (hybridAudio) hybridAudio.packets.length = 0;
   }
+}
+
+class VideoStreamingStageError extends Error {
+  constructor(readonly stage: Exclude<VideoProcessingFailureStage, "audio">) {
+    super(stage);
+  }
+}
+
+function isQuotaError(error: unknown) {
+  return error instanceof VideoResultQuotaError || isStorageQuotaError(error);
 }
 
 interface EncodeVideoInputOptions {
@@ -933,7 +1109,12 @@ async function inspectJob(job: VideoStreamJobDescriptor, audioMode: VideoAudioMo
     if (!compareVideoStreamInputProfiles(inputs.map((input) => input.profile), audioMode === "copy")) {
       return { compatible: false, reasonCode: "CONCAT_TRACK_MISMATCH" };
     }
-    return { compatible: true, codec: inputs[0].profile.codec, reasonCode: "READY" };
+    return {
+      compatible: true,
+      codec: inputs[0].profile.codec,
+      reasonCode: "READY",
+      sourceAudioBitratesBps: inputs.map((input) => input.audio ? input.audio.bitrateBps : null),
+    };
   } catch (error) {
     if (isAbortError(error)) throw error;
     const reasonCode = isReasonError(error) ? error.reasonCode : "NOT_ISO_BMFF";
@@ -943,7 +1124,7 @@ async function inspectJob(job: VideoStreamJobDescriptor, audioMode: VideoAudioMo
 
 async function parseInput(
   file: File,
-  audioMode: VideoAudioMode,
+  audioMode: VideoAudioMode | "hybrid",
   onProgress?: (logicalPosition: number) => void,
   signal?: AbortSignal,
 ): Promise<ParsedInput> {
@@ -991,7 +1172,15 @@ async function parseInput(
 
   let audio: ParsedTrack | undefined;
   let audioProfile: VideoStreamInputProfile["audio"];
-  if (audioMode !== "remove" && info.audioTracks[0]) {
+  let sourceAudio: ParsedInput["sourceAudio"];
+  if (audioMode === "hybrid" && info.audioTracks[0]) {
+    const audioTrack = info.audioTracks[0];
+    sourceAudio = {
+      sampleRate: audioTrack.audio?.sample_rate || 48_000,
+      channelCount: audioTrack.audio?.channel_count || 2,
+      bitrateBps: Number.isFinite(audioTrack.bitrate) && audioTrack.bitrate > 0 ? audioTrack.bitrate : undefined,
+    };
+  } else if (audioMode !== "remove" && info.audioTracks[0]) {
     const audioTrack = info.audioTracks[0];
     if (!audioTrack.codec.startsWith("mp4a.40.")) throw reasonError("AUDIO_CODEC_UNSUPPORTED");
     audio = parseTrack(parser, audioTrack);
@@ -1011,6 +1200,7 @@ async function parseInput(
   return {
     file,
     metadataBytesRead: bytesRead,
+    sourceAudio,
     video,
     audio,
     profile: {
@@ -1027,6 +1217,56 @@ async function parseInput(
   };
 }
 
+async function parseHybridAudio(file: File, signal?: AbortSignal): Promise<HybridAudioQueue> {
+  const parser = createFile(false) as ISOFile<unknown, unknown>;
+  let info: Movie | undefined;
+  parser.onReady = (value) => { info = value; };
+  parser.onError = () => undefined;
+  let offset = 0;
+  while (!info && offset < file.size) {
+    const end = Math.min(file.size, offset + METADATA_CHUNK_BYTES);
+    const buffer = await readInputSlice(file, offset, end, signal) as MP4BoxBuffer;
+    buffer.fileStart = offset;
+    const next = parser.appendBuffer(buffer, end === file.size);
+    offset = Number.isFinite(next) && next > offset ? Math.min(file.size, next) : end;
+  }
+  if (!info) {
+    parser.flush();
+    if (!info) throw new Error("Encoded audio metadata is unavailable");
+  }
+  const track = info.audioTracks[0];
+  if (!track || !track.codec.startsWith("mp4a.40.")) throw new Error("Encoded audio track is unavailable");
+  const parsed = parseTrack(parser, track);
+  const entry = firstSampleEntry(track, parser);
+  const configuration = decoderSpecificInfo(entry);
+  if (!configuration?.byteLength || !track.audio?.sample_rate || !track.audio.channel_count) throw new Error("Encoded audio configuration is unavailable");
+  const selected = parsed.samples.filter((sample) => (
+    sample.cts / sample.timescale - parsed.mediaTimeOffsetSeconds >= -1e-9
+  ));
+  const packets: HybridAudioPacket[] = [];
+  await readSelectedRecords(
+    file,
+    selected.map((sample) => ({ kind: "audio" as const, sample, mediaTimeOffsetSeconds: parsed.mediaTimeOffsetSeconds })),
+    (record, data) => {
+      packets.push({
+        data: data.slice(),
+        timestamp: Math.max(0, Math.round((record.sample.cts / record.sample.timescale - record.mediaTimeOffsetSeconds) * 1_000_000)),
+        duration: Math.max(1, Math.round(record.sample.duration / record.sample.timescale * 1_000_000)),
+      });
+    },
+    undefined,
+    signal,
+  );
+  if (!packets.length) throw new Error("Encoded audio samples are unavailable");
+  return {
+    packets,
+    codecName: track.codec,
+    configuration: configuration.slice(),
+    sampleRate: track.audio.sample_rate,
+    channelCount: track.audio.channel_count,
+  };
+}
+
 function parseTrack(parser: ISOFile<unknown, unknown>, track: Track): ParsedTrack {
   const sourceSamples = parser.getTrackSamplesInfo(track.id);
   if (!sourceSamples.length) throw reasonError("SAMPLE_TABLE_UNAVAILABLE");
@@ -1036,7 +1276,8 @@ function parseTrack(parser: ISOFile<unknown, unknown>, track: Track): ParsedTrac
   if (sourceSamples.some((sample) => sample.description_index !== firstDescriptionIndex)) {
     throw reasonError(track.type === "audio" ? "AUDIO_CONFIGURATION_UNAVAILABLE" : "VIDEO_CONFIGURATION_UNAVAILABLE");
   }
-  return { track, samples, mediaTimeOffsetSeconds };
+  const bitrateBps = Number.isFinite(track.bitrate) && track.bitrate > 0 ? track.bitrate : undefined;
+  return { track, samples, mediaTimeOffsetSeconds, bitrateBps };
 }
 
 function firstSampleEntry(track: Track, parser: ISOFile<unknown, unknown>) {
@@ -1080,7 +1321,11 @@ async function muxJob(request: VideoStreamRunRequest, inputs: ParsedInput[], tar
     chunked: true,
     chunkSize: OUTPUT_CHUNK_BYTES,
     onData(data, position) {
-      target.write(data, position);
+      try {
+        target.write(data, position);
+      } catch (error) {
+        throw new VideoStreamingStageError(isQuotaError(error) ? "quota" : "mux-write");
+      }
     },
   });
   const muxer = new Muxer({
@@ -1215,7 +1460,7 @@ async function readSelectedRecords(
   file: File,
   records: readonly SelectedRecord[],
   onRecord: (record: SelectedRecord, data: Uint8Array) => void | Promise<void>,
-  target: VideoResultRandomAccessTarget,
+  target: VideoResultRandomAccessTarget | undefined,
   signal?: AbortSignal,
 ) {
   let index = 0;
@@ -1246,7 +1491,7 @@ async function readSelectedRecords(
       if (relativeStart < 0 || relativeEnd > bytes.byteLength) throw reasonError("SAMPLE_TABLE_UNAVAILABLE");
       await onRecord(record, bytes.subarray(relativeStart, relativeEnd));
     }
-    await target.flush();
+    await target?.flush();
     index = endIndex;
   }
 }

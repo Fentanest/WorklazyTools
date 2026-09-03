@@ -4,6 +4,7 @@ import test from "node:test";
 import type { VideoTask, VideoWorkerInput } from "../../src/features/video-studio/types.ts";
 import {
   assessVideoWebCodecsSupport,
+  assessVideoHybridSupport,
   createVideoWebCodecsAudioEncoderConfig,
   createVideoWebCodecsEncoderConfig,
   parsedVideoTrackFrameRate,
@@ -85,6 +86,21 @@ test("missing AudioEncoder and rejected selected video codec cause whole-job fal
     compatible: true,
     reasonCode: "READY",
   });
+  assert.deepEqual(await assessVideoHybridSupport({
+    videoDecoderConfigs: request.videoDecoderConfigs,
+    videoEncoderConfig: request.videoEncoderConfig,
+    audioEncoderConfig: request.audioEncoderConfig,
+    hasAudio: true,
+  }, api), { compatible: true, reasonCode: "READY" });
+  assert.deepEqual(await assessVideoHybridSupport({
+    videoDecoderConfigs: request.videoDecoderConfigs,
+    videoEncoderConfig: request.videoEncoderConfig,
+    audioEncoderConfig: request.audioEncoderConfig,
+    hasAudio: true,
+  }, { ...api, audioEncoder: { isConfigSupported: supported } }), {
+    compatible: false,
+    reasonCode: "AUDIO_ENCODER_SUPPORTED",
+  });
 });
 
 test("encoder configs preserve the selected codec and no-preference hardware policy", () => {
@@ -105,6 +121,7 @@ test("encoder configs preserve the selected codec and no-preference hardware pol
   assert.equal(hevc.codec, "hvc1.1.6.L93.B0");
   assert.equal(hevc.hardwareAcceleration, "no-preference");
   assert.equal(hevc.avc, undefined);
+  assert.equal(createVideoWebCodecsEncoderConfig({ ...targetTask, resolution: "source", aspect: "source", bitrate: "8M" }, 3840, 2160, 30).codec, "avc1.420033");
 });
 
 test("concat requires every measured FPS and applies crop, normalization, rotation, and flip geometry", () => {

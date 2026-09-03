@@ -3,7 +3,7 @@ import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessage
 import { FEATURE_MESSAGE_TOKEN_PREFIX } from "../../i18n/workerMessages";
 import type { VideoProgressStage } from "./videoProcessingProgress";
 import type { VideoStreamCopyMetrics, VideoStreamCopyProbeResult } from "./videoStreamCopy";
-import type { VideoWebCodecsMetrics, VideoWebCodecsProbeResult } from "./videoWebCodecs";
+import type { VideoHybridProbeResult, VideoWebCodecsMetrics, VideoWebCodecsProbeResult } from "./videoWebCodecs";
 import type {
   VideoAudioMode,
   VideoOutputJob,
@@ -15,6 +15,7 @@ import type {
 import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
 import { UserFacingVideoError } from "./videoErrors";
 import { VideoOutputQueue } from "./videoOutputQueue";
+import type { VideoProcessingFailureStage } from "./videoRouting";
 import videoStreamWorkerUrl from "./videoStream.worker.ts?worker&url";
 
 type VideoStreamInputDescriptor = Omit<VideoOutputJob["inputs"][number], "file"> & { fileId: string };
@@ -28,19 +29,28 @@ interface VideoStreamWorkerRequestBase {
 type VideoStreamPreflightRequest = VideoStreamWorkerRequestBase & (
   | { operation: "stream-copy"; audioMode: VideoAudioMode }
   | { operation: "webcodecs"; task: Extract<VideoWorkerRequest["task"], { kind: "encode" }> }
+  | { operation: "hybrid"; task: Extract<VideoWorkerRequest["task"], { kind: "encode" }> }
 );
 
 interface VideoStreamRunRequest extends VideoStreamWorkerRequestBase {
-  operation: "stream-copy" | "webcodecs";
+  operation: "stream-copy" | "webcodecs" | "hybrid";
   task: Extract<VideoWorkerRequest["task"], { kind: "encode" }>;
   resultStorage: VideoWorkerRequest["resultStorage"];
   estimatedOutputBytes: number;
   fileLabels: { concatenated: string; passthrough: string; converted: string; animation: string; audio: string };
   collectMetrics?: boolean;
+  hybridAudioBuffer?: ArrayBuffer;
 }
 
 export interface VideoStreamWorkerResult extends VideoWorkerResult {
   metrics?: VideoStreamCopyMetrics | VideoWebCodecsMetrics;
+}
+
+export class VideoStreamingStageError extends Error {
+  constructor(readonly stage: Exclude<VideoProcessingFailureStage, "audio">) {
+    super(`Video streaming failed during ${stage}`);
+    this.name = "VideoStreamingStageError";
+  }
 }
 
 export type VideoStreamWorkerProgress = (
@@ -78,6 +88,24 @@ export function preflightVideoWebCodecsJob(
   return runVideoStreamWorker<VideoWebCodecsProbeResult>(
     "preflight",
     { operation: "webcodecs", job: prepared.job, task, language },
+    prepared.files,
+    undefined,
+    undefined,
+    signal,
+    language,
+  );
+}
+
+export function preflightVideoHybridJob(
+  job: VideoOutputJob,
+  task: Extract<VideoWorkerRequest["task"], { kind: "encode" }>,
+  signal?: AbortSignal,
+  language: AppLanguage = "ko",
+) {
+  const prepared = prepareJob(job);
+  return runVideoStreamWorker<VideoHybridProbeResult>(
+    "preflight",
+    { operation: "hybrid", job: prepared.job, task, language },
     prepared.files,
     undefined,
     undefined,
@@ -142,6 +170,46 @@ export function runVideoWebCodecsJob(
       operation: "webcodecs",
       job: prepared.job,
       task,
+      resultStorage,
+      estimatedOutputBytes,
+      collectMetrics: options.collectMetrics,
+      language,
+      fileLabels: {
+        concatenated: featureMessage(language, "video.messages.video.concatenated"),
+        passthrough: featureMessage(language, "video.messages.video.passthrough"),
+        converted: featureMessage(language, "video.messages.video.converted"),
+        animation: featureMessage(language, "video.messages.video.animation"),
+        audio: featureMessage(language, "video.messages.video.audio"),
+      },
+    },
+    prepared.files,
+    onProgress,
+    onOutput,
+    signal,
+    language,
+  );
+}
+
+export function runVideoHybridJob(
+  job: VideoOutputJob,
+  task: Extract<VideoWorkerRequest["task"], { kind: "encode" }>,
+  hybridAudioBuffer: ArrayBuffer,
+  resultStorage: VideoWorkerRequest["resultStorage"],
+  estimatedOutputBytes: number,
+  onProgress?: VideoStreamWorkerProgress,
+  onOutput?: VideoWorkerOutputHandler,
+  signal?: AbortSignal,
+  language: AppLanguage = "ko",
+  options: { collectMetrics?: boolean } = {},
+) {
+  const prepared = prepareJob(job);
+  return runVideoStreamWorker<VideoStreamWorkerResult>(
+    "start",
+    {
+      operation: "hybrid",
+      job: prepared.job,
+      task,
+      hybridAudioBuffer,
       resultStorage,
       estimatedOutputBytes,
       collectMetrics: options.collectMetrics,
@@ -233,14 +301,18 @@ function runVideoStreamWorker<Result>(
         totalUnits?: number;
         message?: string;
         output?: VideoWorkerOutput;
-        probe?: VideoStreamCopyProbeResult;
+        probe?: VideoStreamCopyProbeResult | VideoWebCodecsProbeResult | VideoHybridProbeResult;
         result?: VideoStreamWorkerResult;
+        failureStage?: Exclude<VideoProcessingFailureStage, "audio">;
       };
       if (data.type === "ready") {
         if (terminal || settled) return;
         window.clearTimeout(timeout);
         try {
-          worker.postMessage({ type: mode, request });
+          const transfer = "hybridAudioBuffer" in request && request.hybridAudioBuffer
+            ? [request.hybridAudioBuffer]
+            : [];
+          worker.postMessage({ type: mode, request }, transfer);
         } catch {
           rejectAfterOutputs(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToSendTheVideoJobListTo")));
         }
@@ -287,7 +359,9 @@ function runVideoStreamWorker<Result>(
           resolve({ ...result, warnings: result.warnings.map((warning) => resolveFeatureMessage(language, warning)) } as Result);
         }, () => rejectAfterOutputs(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.unableToStoreTheCompletedVideoResult"))));
       } else {
-        rejectAfterOutputs(new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.anErrorOccurredWhileProcessingTheVideo")));
+        rejectAfterOutputs(data.failureStage
+          ? new VideoStreamingStageError(data.failureStage)
+          : new UserFacingVideoError(featureMessage(language, "video.messages.videoWorkerClient.anErrorOccurredWhileProcessingTheVideo")));
       }
     };
     worker.onerror = () => {

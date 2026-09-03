@@ -35,10 +35,8 @@ test("the complete route table keeps copy candidates on FFmpeg until compatibili
               assert.equal(decision.route, "ffmpeg");
               assert.equal(decision.reasonCode, expectedReason(input));
               assert.equal(decision.plannedStreamingRoute, expectedPlannedRoute(input));
-              assert.deepEqual(decision.streamingFailure, {
-                route: "ffmpeg",
-                reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
-              });
+              assert.deepEqual(new Set(Object.keys(decision.failureFallbacks)), new Set(["audio", "audio-demux", "video-codec", "mux-write", "quota"]));
+              assert.ok(Object.values(decision.failureFallbacks).every((fallback) => fallback.route === "ffmpeg" && fallback.reasonCode === "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT"));
               combinations += 1;
             }
           }
@@ -64,10 +62,7 @@ test("streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio
     route: "stream-copy",
     plannedStreamingRoute: "stream-copy",
     reasonCode: "STREAM_COPY_READY",
-    streamingFailure: {
-      route: "ffmpeg",
-      reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
-    },
+    failureFallbacks: safeFallbacks("ffmpeg"),
   });
   assert.equal(decideVideoProcessingRoute({ ...base, streamCopyCompatible: false }).reasonCode, "STREAM_COPY_INCOMPATIBLE");
   assert.equal(decideVideoProcessingRoute({ ...base, container: "mov" }).reasonCode, "STREAM_COPY_PENDING");
@@ -76,15 +71,13 @@ test("streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio
     route: "webcodecs",
     plannedStreamingRoute: "webcodecs",
     reasonCode: "WEBCODECS_READY",
-    streamingFailure: {
-      route: "ffmpeg",
-      reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
-    },
+    failureFallbacks: safeFallbacks("ffmpeg"),
   });
   assert.equal(
     decideVideoProcessingRoute({ ...base, bitrateMode: "target", audioMode: "copy", webCodecsCompatible: false }).reasonCode,
     "WEBCODECS_INCOMPATIBLE",
   );
+  assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "target", audioMode: "encode", webCodecsCompatible: false, hybridCompatible: true }).route, "hybrid");
   assert.equal(decideVideoProcessingRoute({ ...base, bitrateMode: "crf" }).reasonCode, "CRF_REQUIRES_FFMPEG");
   assert.equal(decideVideoProcessingRoute({ ...base, container: "webm", codec: "vp9" }).reasonCode, "CONTAINER_REQUIRES_FFMPEG");
   assert.equal(decideVideoProcessingRoute({ ...base, container: "mkv" }).reasonCode, "CONTAINER_REQUIRES_FFMPEG");
@@ -95,7 +88,7 @@ test("streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio
   assert.equal(decideVideoProcessingRoute({ ...base, quota: "insufficient" }).reasonCode, "QUOTA_INSUFFICIENT");
 });
 
-test("streaming failure only falls back when the estimated output is within the FFmpeg safety limit", () => {
+test("every stage in the fallback matrix only uses FFmpeg within the safety limit", () => {
   const base = {
     container: "mp4",
     codec: "hevc",
@@ -104,16 +97,15 @@ test("streaming failure only falls back when the estimated output is within the 
     opfsAvailable: true,
     quota: "enough",
   } as const;
-  assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES }).streamingFailure, {
-    route: "ffmpeg",
-    reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT",
-  });
-  assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES + 1 }).streamingFailure, {
-    route: "reject",
-    reasonCode: "FALLBACK_OUTPUT_EXCEEDS_SAFE_LIMIT",
-  });
-  assert.equal(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: Number.NaN }).streamingFailure.route, "reject");
+  assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES }).failureFallbacks, safeFallbacks("ffmpeg"));
+  assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES + 1 }).failureFallbacks, safeFallbacks("reject"));
+  assert.ok(Object.values(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: Number.NaN }).failureFallbacks).every((fallback) => fallback.route === "reject"));
 });
+
+function safeFallbacks(route: "ffmpeg" | "reject") {
+  const reasonCode = route === "ffmpeg" ? "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT" : "FALLBACK_OUTPUT_EXCEEDS_SAFE_LIMIT";
+  return { audio: { route, reasonCode }, "audio-demux": { route, reasonCode }, "video-codec": { route, reasonCode }, "mux-write": { route, reasonCode }, quota: { route, reasonCode } };
+}
 
 function expectedPlannedRoute(input: VideoRouteInput) {
   if (input.bitrateMode === "crf") return null;

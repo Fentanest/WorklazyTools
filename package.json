@@ -18,6 +18,7 @@
     "test:xls-first-load": "node tests/xls-preserve-first-load-smoke.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
+    "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },

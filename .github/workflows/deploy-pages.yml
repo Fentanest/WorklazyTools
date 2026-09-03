@@ -54,6 +54,9 @@ jobs:
       - name: Validate SEO and AdSense files
         run: npm run test:static
 
+      - name: Verify the small hybrid video route
+        run: npm run test:video-hybrid
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
