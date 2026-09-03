@@ -4,6 +4,7 @@
 
 ## 2026-09-03
 
+- Tailwind preflight를 전역 base layer로 활성화하고, 기존 화면의 heading·small text·목록 marker·폼 기본값·pseudo-element box model·line-height를 legacy layer에서 보정해 기존 시각 기준선을 유지했다. — Codx
 - shadcn 4.20.1의 Base UI `base-luma` preset 기반과 Tailwind CSS 4.3.3을 설치했다. preflight 없이 theme/base/legacy/components/utilities layer를 분리하고 현행 CSS를 legacy에 격리했으며, prefers-color-scheme용 토큰 브리지와 소유 소스만 스캔하는 구성을 추가했다. — Codx
 - Chrome 기반 시각 회귀 하네스를 추가해 홈·미디어 필터·Excel 비교 빈 상태를 ko/en·light/dark·desktop/mobile 24개 고정 화면으로 비교한다. 애니메이션 제거·허용 영역·픽셀 임계값을 명시하고 shadcn 도입 전 PNG 기준선을 함께 고정했다. — Codx
 - Excel 데이터 정리 도구를 추가해 다중 파일·시트에 28종 구조·텍스트·필터·값 변환 규칙을 순차 적용하고, 수식 참조 갱신·안전 강등·병합 선행 검사·명시 미리보기·규칙 watchdog을 제공한다. 정리 XLSX·시트별 CSV·4시트 보고서·다중 ZIP, ko/en 화면·가이드·SEO·정적 페이지·소셜 이미지와 합성 fixture·Chrome 스모크·heap 게이트를 함께 반영했다. — Codx
