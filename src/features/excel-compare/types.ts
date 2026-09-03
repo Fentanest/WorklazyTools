@@ -87,6 +87,7 @@ export interface ExcelComparePairResult {
   records: ExcelCompareRecord[];
   warnings: string[];
   reportBuffer: ArrayBuffer;
+  reportByteLength: number;
   reportName: string;
 }
 

@@ -3,6 +3,7 @@
 import { parseSpreadsheetInput, spreadsheetHeaders } from "../spreadsheet-core/inputAdapter.ts";
 import { compareSpreadsheetPair } from "./compareEngine.ts";
 import { buildExcelCompareReport } from "./report.ts";
+import { assertGeneratedXlsxReport } from "./reportIntegrity.ts";
 import type { ExcelCompareInspection, ExcelComparePairOptions, ExcelComparePairResult } from "./types.ts";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
@@ -62,6 +63,8 @@ async function handle(request: Request) {
       rightSheet: request.options.right.sheetName,
     });
     const reportBuffer = transferableArrayBuffer(reportBytes);
+    assertGeneratedXlsxReport(reportBuffer);
+    const reportByteLength = reportBuffer.byteLength;
     const result: ExcelComparePairResult = {
       leftName: request.leftName,
       rightName: request.rightName,
@@ -71,6 +74,7 @@ async function handle(request: Request) {
       records: compared.records,
       warnings: compared.warnings,
       reportBuffer,
+      reportByteLength,
       reportName: "report.xlsx",
     };
     leftBook = undefined as unknown as typeof leftBook;

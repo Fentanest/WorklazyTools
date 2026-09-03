@@ -11,9 +11,11 @@ import puppeteer from "puppeteer-core";
 const run = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-excel-compare-smoke-"));
+const downloadRoot = path.join(temporaryDirectory, "downloads");
 
 try {
   await run(process.execPath, ["scripts/generate-excel-compare-fixtures.mjs", temporaryDirectory]);
+  await fs.mkdir(downloadRoot);
   const fixture = (name) => path.join(temporaryDirectory, name);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -24,7 +26,16 @@ try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1360, height: 940, deviceScaleFactor: 1 });
     page.setDefaultTimeout(180_000);
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.evaluateOnNewDocument(() => {
+      localStorage.setItem("worklazy_privacy_consent", "granted");
+      globalThis.__excelCompareRevokedUrls = [];
+      const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
+      URL.revokeObjectURL = (url) => {
+        globalThis.__excelCompareRevokedUrls.push(url);
+        revokeObjectUrl(url);
+      };
+    });
+    const client = await page.createCDPSession();
     const pageErrors = [];
     const failedRequests = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -32,8 +43,15 @@ try {
       if (new URL(request.url()).origin === new URL(baseUrl).origin) failedRequests.push(`${request.url()} ${request.failure()?.errorText || "unknown"}`);
     });
 
-    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    const navigation = await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const responseHeaders = navigation?.headers() ?? {};
+    const isolation = await page.evaluate(() => ({
+      crossOriginIsolated,
+      serviceWorkerControlled: Boolean(navigator.serviceWorker?.controller),
+    }));
+    isolation.coop = responseHeaders["cross-origin-opener-policy"] ?? "absent";
+    isolation.coep = responseHeaders["cross-origin-embedder-policy"] ?? "absent";
     const initial = await page.evaluate(() => ({
       title: document.querySelector("h1")?.textContent || "",
       modes: document.querySelectorAll('.excel-compare-mode-grid button[role="radio"]').length,
@@ -53,12 +71,15 @@ try {
     await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
     await page.click('.excel-compare-page > .primary-button');
     await page.waitForSelector(".operation-progress.status-success");
-    const onePair = await reportLinks(page);
+    const onePair = await downloadReportLinks(page, client, downloadRoot, "one-pair");
     if (onePair.length !== 1 || !onePair[0].name.endsWith(".xlsx")) {
       const state = await page.evaluate(() => ({ progress: document.querySelector(".operation-progress")?.textContent || "", errors: [...document.querySelectorAll(".inline-notice.error")].map((item) => item.textContent || "") }));
       throw new Error(`One pair must create one XLSX and no ZIP: ${JSON.stringify({ onePair, state, pageErrors })}`);
     }
-    await assertNineSheetReport(onePair[0].bytes);
+    const onePairSummary = await assertNineSheetReport(onePair[0].bytes, {
+      matched: 8, changed: 2, added: 0, removed: 0, duplicate: 0, ambiguous: 0, unmatched: 0, error: 0,
+    });
+    const previousReportUrl = await page.$eval('.excel-report-downloads a[download$=".xlsx"]', (anchor) => anchor.href);
 
     await page.click(".excel-add-pair");
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
@@ -77,8 +98,10 @@ try {
       throw new Error(`Format support labels do not match the fixed matrix: ${JSON.stringify(formatLabels)}`);
     }
     await page.click('.excel-compare-page > .primary-button');
+    await page.waitForFunction((url) => !Array.from(document.querySelectorAll(".excel-report-downloads a")).some((anchor) => anchor.href === url), {}, previousReportUrl);
+    await page.waitForFunction((url) => globalThis.__excelCompareRevokedUrls.includes(url), {}, previousReportUrl);
     await page.waitForSelector(".operation-progress.status-success");
-    const multiPair = await reportLinks(page);
+    const multiPair = await downloadReportLinks(page, client, downloadRoot, "multi-pair");
     const reports = multiPair.filter((item) => item.name.endsWith(".xlsx"));
     const archives = multiPair.filter((item) => item.name.endsWith(".zip"));
     if (reports.length !== 2 || archives.length !== 1) throw new Error(`Two successful pairs must create two reports and one ZIP: ${JSON.stringify(multiPair.map(({ name }) => name))}`);
@@ -86,7 +109,8 @@ try {
     if (!isolatedFailure.includes("damaged.xlsx") || !isolatedFailure.includes("macro.xlsm") || isolatedFailure.includes("DAMAGED_FILE") || isolatedFailure.includes("PROCESSING_FAILED")) {
       throw new Error(`A failed pair was not isolated behind a user-facing message: ${isolatedFailure}`);
     }
-    for (const report of reports) await assertNineSheetReport(report.bytes);
+    const multiSummaries = [];
+    for (const report of reports) multiSummaries.push(await assertNineSheetReport(report.bytes));
     const archive = await JSZip.loadAsync(archives[0].bytes);
     const archiveNames = Object.values(archive.files).filter((entry) => !entry.dir).map((entry) => entry.name);
     if (archiveNames.length !== 2 || archiveNames.some((name) => !name.endsWith(".xlsx") || name.includes("/") || name.includes("\\"))) {
@@ -126,12 +150,20 @@ try {
     }));
     if (mobile.overflow > 1 || mobile.pairColumns.split(" ").length !== 1 || mobile.actionHeight < 40) throw new Error(`Mobile layout or file-button alternative failed: ${JSON.stringify(mobile)}`);
 
+    const integrityFailures = [];
+    for (const mode of ["zero", "mismatch"]) integrityFailures.push(await assertIntegrityFailure(browser, fixture("left.xlsx"), fixture("right.xlsx"), mode));
+
     if (pageErrors.length) throw new Error(`Browser page errors:\n${pageErrors.join("\n")}`);
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
     console.log(JSON.stringify({
-      onePairDownloads: onePair.map(({ name }) => name),
-      multiPairDownloads: multiPair.map(({ name }) => name),
+      onePairDownloads: onePair.map(({ name, size }) => ({ name, size })),
+      onePairSummary,
+      multiPairDownloads: multiPair.map(({ name, size }) => ({ name, size })),
+      multiSummaries,
       zipEntries: archiveNames,
+      isolation,
+      replacementRevokedAfterAnchorRemoval: previousReportUrl,
+      integrityFailures,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
       cancellation: "passed",
@@ -144,16 +176,25 @@ try {
   await fs.rm(temporaryDirectory, { recursive: true, force: true });
 }
 
-async function reportLinks(page) {
-  const links = await page.$$eval(".excel-report-downloads .result-download", async (items) => Promise.all(items.map(async (item) => {
-    const anchor = item;
-    const buffer = await (await fetch(anchor.href)).arrayBuffer();
-    return { name: anchor.download, bytes: Array.from(new Uint8Array(buffer)) };
-  })));
-  return links.map((item) => ({ name: item.name, bytes: Buffer.from(item.bytes) }));
+async function downloadReportLinks(page, client, root, phase) {
+  const directory = path.join(root, phase);
+  await fs.mkdir(directory);
+  await client.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: directory });
+  const names = await page.$$eval(".excel-report-downloads .result-download", (items) => items.map((item) => item.download));
+  const results = [];
+  for (let index = 0; index < names.length; index += 1) {
+    await page.$$eval(".excel-report-downloads .result-download", (items, selected) => items[selected].click(), index);
+    const savedPath = await waitForDownload(directory, names[index]);
+    const bytes = await fs.readFile(savedPath);
+    if (bytes.byteLength === 0 || bytes[0] !== 0x50 || bytes[1] !== 0x4b || bytes[2] !== 0x03 || bytes[3] !== 0x04) {
+      throw new Error(`Downloaded report failed the size or ZIP signature check: ${names[index]} (${bytes.byteLength} bytes)`);
+    }
+    results.push({ name: names[index], bytes, size: bytes.byteLength, savedPath });
+  }
+  return results;
 }
 
-async function assertNineSheetReport(bytes) {
+async function assertNineSheetReport(bytes, expectedSummary) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(bytes);
   const names = workbook.worksheets.map((sheet) => sheet.name);
@@ -162,4 +203,55 @@ async function assertNineSheetReport(bytes) {
   workbook.worksheets.forEach((sheet) => sheet.eachRow((row) => row.eachCell((cell) => {
     if (typeof cell.value !== "string" || cell.formula !== undefined) throw new Error(`Report cell was not serialized as untrusted text: ${sheet.name}!${cell.address}`);
   })));
+  const summary = Object.fromEntries(workbook.getWorksheet("Summary").getRows(2, 8).map((row) => [String(row.getCell(1).value), Number(row.getCell(2).value)]));
+  if (Object.values(summary).some((value) => !Number.isSafeInteger(value) || value < 0)) throw new Error(`Summary values are invalid: ${JSON.stringify(summary)}`);
+  if (expectedSummary && JSON.stringify(summary) !== JSON.stringify(expectedSummary)) throw new Error(`Summary values differ: ${JSON.stringify(summary)}`);
+  return summary;
+}
+
+async function waitForDownload(directory, fileName) {
+  const target = path.join(directory, fileName);
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    const entries = await fs.readdir(directory);
+    if (entries.includes(fileName) && !entries.some((name) => name.endsWith(".crdownload"))) return target;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Excel comparison download did not finish: ${fileName}`);
+}
+
+async function assertIntegrityFailure(browser, leftPath, rightPath, mode) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    await page.evaluate((injectionMode) => {
+      const NativeBlob = Blob;
+      Object.defineProperty(window, "Blob", {
+        configurable: true,
+        value: class extends NativeBlob {
+          get size() {
+            const actual = super.size;
+            if (this.type !== "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") return actual;
+            return injectionMode === "zero" ? 0 : actual + 1;
+          }
+        },
+      });
+    }, mode);
+    const inputs = await page.$$('.excel-compare-page input[type="file"]');
+    await inputs[0].uploadFile(leftPath);
+    await inputs[1].uploadFile(rightPath);
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
+    await page.click('.excel-compare-page > .primary-button');
+    await page.waitForSelector(".operation-progress.status-success");
+    const message = await page.$eval(".inline-notice.error", (element) => element.textContent || "");
+    if (!message.includes("다시 실행해 내려받아") || /REPORT_|Worker|worker|ArrayBuffer|Blob/u.test(message)) {
+      throw new Error(`Integrity failure did not use the safe retry guidance (${mode}): ${message}`);
+    }
+    if (await page.$(".excel-report-downloads a")) throw new Error(`Integrity failure exposed a download (${mode}).`);
+    return { mode, message };
+  } finally {
+    await page.close();
+  }
 }

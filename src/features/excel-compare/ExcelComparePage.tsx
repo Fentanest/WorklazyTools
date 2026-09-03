@@ -10,6 +10,7 @@ import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { createUniqueSafeFileName, SafeFileNameRegistry, type SafeFileName } from "../../utils/fileNameSafety.ts";
 import { writeZipArchive } from "../../utils/zipArchive.ts";
 import { inspectExcelCompareFile, runExcelComparePair } from "./excelCompareClient.ts";
+import { assertReportBlobSize } from "./reportIntegrity.ts";
 import {
   DEFAULT_EXCEL_COMPARE_OPTIONS,
   type DuplicateKeyPolicy,
@@ -66,7 +67,8 @@ export function ExcelComparePage() {
   const nextPairId = useRef(2);
   const operation = useOperationProgress();
   const controllerRef = useRef<AbortController | undefined>(undefined);
-  const objectUrls = useRef<string[]>([]);
+  const objectUrls = useRef<Set<string>>(new Set());
+  const pendingRevokeUrls = useRef<string[]>([]);
   const [pairs, setPairs] = useState<PairState[]>([newPair(1)]);
   const [mode, setMode] = useState<ExcelCompareMode>("position");
   const [normalization, setNormalization] = useState({ ...DEFAULT_EXCEL_COMPARE_OPTIONS });
@@ -77,9 +79,21 @@ export function ExcelComparePage() {
   const [statuses, setStatuses] = useState<Set<ExcelCompareStatus>>(() => new Set(STATUSES));
   const [visibleLimit, setVisibleLimit] = useState(500);
 
+  useEffect(() => {
+    const activeUrls = new Set([...completed.map((item) => item.url), ...(zipResult ? [zipResult.url] : [])]);
+    const pending = pendingRevokeUrls.current;
+    pendingRevokeUrls.current = [];
+    pending.forEach((url) => {
+      if (activeUrls.has(url)) return;
+      URL.revokeObjectURL(url);
+      objectUrls.current.delete(url);
+    });
+  }, [completed, zipResult]);
+
   useEffect(() => () => {
     controllerRef.current?.abort();
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.current.clear();
   }, []);
 
   const updatePair = (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => {
@@ -119,8 +133,7 @@ export function ExcelComparePage() {
   const addPair = () => setPairs((current) => [...current, newPair(nextPairId.current++)]);
   const removePair = (id: number) => setPairs((current) => current.length === 1 ? current : current.filter((pair) => pair.id !== id));
   const cleanupResults = () => {
-    objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
-    objectUrls.current = [];
+    pendingRevokeUrls.current.push(...completed.map((item) => item.url), ...(zipResult ? [zipResult.url] : []));
     setCompleted([]);
     setFailed([]);
     setZipResult(undefined);
@@ -148,6 +161,7 @@ export function ExcelComparePage() {
         });
         const fileName = createUniqueSafeFileName(`${fileStem(pair.left!.name)}-vs-${fileStem(pair.right!.name)}.xlsx`, names, `comparison-${index + 1}.xlsx`);
         const blob = new Blob([result.reportBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        assertReportBlobSize(blob, result.reportByteLength);
         result.reportBuffer = new ArrayBuffer(0);
         const url = keepObjectUrl(URL.createObjectURL(blob), objectUrls);
         const item = { pairId: pair.id, result, blob, url, fileName };
@@ -235,6 +249,7 @@ export function ExcelComparePage() {
           {completed.map((item, index) => <a className="result-download accent-green" key={item.pairId} href={item.url} download={item.fileName}><Download size={18} /><span><strong>{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small>{item.fileName} · {formatBytes(item.blob.size)}</small></span></a>)}
           {zipResult && <a className="result-download accent-violet" href={zipResult.url} download={zipResult.fileName}><Download size={18} /><span><strong>{t("features:excelCompare.results.zip")}</strong><small>{zipResult.fileName} · {formatBytes(zipResult.size)}</small></span></a>}
         </div>
+        {completed.length > 0 && <p className="excel-download-note">{t("features:excelCompare.results.downloadCheck")}</p>}
         {failed.map((item) => <div className="inline-notice error" key={`${item.pairId}-${item.leftName}`}><AlertCircle size={16} /><span><strong>{item.leftName && item.rightName ? `${item.leftName} ↔ ${item.rightName}` : t("features:excelCompare.results.zip")}</strong>{item.message}</span></div>)}
         <div className="excel-result-toolbar">
           <div className="excel-status-filters" aria-label={t("features:excelCompare.results.filters")}>
@@ -341,7 +356,7 @@ function selectedSheet(pair: PairState, side: "left" | "right") { return pair[`$
 function headersFor(pair: PairState, side: "left" | "right") { const sheet = selectedSheet(pair, side); const row = sheet?.headerRows.find((item) => item.row === pair[`${side}HeaderRow`]); return row?.values ?? Array.from({ length: sheet?.columnCount ?? 0 }, (_, index) => columnLabel(index + 1)); }
 function columnLabel(column: number) { let value = column; let result = ""; while (value > 0) { value -= 1; result = String.fromCharCode(65 + value % 26) + result; value = Math.floor(value / 26); } return result; }
 function fileStem(name: string) { return name.replace(/\.[^.]+$/u, ""); }
-function keepObjectUrl(url: string, ref: { current: string[] }) { ref.current.push(url); return url; }
+function keepObjectUrl(url: string, ref: { current: Set<string> }) { ref.current.add(url); return url; }
 function locationText(leftRow: number | null, rightRow: number | null, leftColumn: number | null, rightColumn: number | null) { return `L ${leftRow ?? "–"}:${leftColumn ?? "–"} · R ${rightRow ?? "–"}:${rightColumn ?? "–"}`; }
 function formatLabel(format: string, style: boolean, t: LooseT) { return `${format.toUpperCase()} · ${style ? t("features:excelCompare.pairs.styleSupported") : t("features:excelCompare.pairs.styleExcluded")}`; }
 function reasonText(reason: string, t: LooseT) { return reason.split("+").map((code) => t(`features:excelCompare.reason.${code}`, { defaultValue: t("features:excelCompare.reason.generic") })).join(" · "); }

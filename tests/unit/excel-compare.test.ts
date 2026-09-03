@@ -6,6 +6,12 @@ import ExcelJS from "exceljs";
 import { compareSpreadsheetPair } from "../../src/features/excel-compare/compareEngine.ts";
 import { buildExcelCompareReport } from "../../src/features/excel-compare/report.ts";
 import {
+  assertGeneratedXlsxReport,
+  assertReceivedXlsxReport,
+  assertReportBlobSize,
+  REPORT_INTEGRITY_ERROR_CODE,
+} from "../../src/features/excel-compare/reportIntegrity.ts";
+import {
   DEFAULT_EXCEL_COMPARE_OPTIONS,
   type ExcelComparePairOptions,
 } from "../../src/features/excel-compare/types.ts";
@@ -20,6 +26,21 @@ const baseOptions = (): ExcelComparePairOptions => ({
   left: { sheetName: "Data", headerRow: 1 },
   right: { sheetName: "Data", headerRow: 1 },
   normalization: { ...DEFAULT_EXCEL_COMPARE_OPTIONS, compareFormatting: false, compareDisplayValues: false },
+});
+
+test("report integrity checks keep worker, client, and page responsibilities distinct", () => {
+  const valid = Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 0x01]).buffer;
+  assert.doesNotThrow(() => assertGeneratedXlsxReport(valid));
+  assert.doesNotThrow(() => assertReceivedXlsxReport(valid, 5));
+  assert.doesNotThrow(() => assertReportBlobSize(new Blob([valid]), 5));
+  for (const action of [
+    () => assertGeneratedXlsxReport(new ArrayBuffer(0)),
+    () => assertGeneratedXlsxReport(Uint8Array.from([1, 2, 3, 4]).buffer),
+    () => assertReceivedXlsxReport(valid, 4),
+    () => assertReportBlobSize(new Blob([valid]), 4),
+  ]) {
+    assert.throws(action, (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE);
+  }
 });
 
 test("position comparison aligns columns before rows and keeps structural gaps distinct from blank-zero equality", () => {

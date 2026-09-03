@@ -1,4 +1,5 @@
 import { runModuleWorker, type ModuleWorkerProgress } from "../../utils/workerLifecycle.ts";
+import { assertReceivedXlsxReport } from "./reportIntegrity.ts";
 import type { ExcelCompareInspection, ExcelComparePairOptions, ExcelComparePairResult } from "./types.ts";
 
 const messages = {
@@ -45,7 +46,7 @@ export async function runExcelComparePair(
   if (signal?.aborted) throw new DOMException(messages[language].canceled, "AbortError");
   const [leftBuffer, rightBuffer] = await Promise.all([left.arrayBuffer(), right.arrayBuffer()]);
   if (signal?.aborted) throw new DOMException(messages[language].canceled, "AbortError");
-  return runModuleWorker<object, ExcelComparePairResult>(createWorker, {
+  const result = await runModuleWorker<object, ExcelComparePairResult>(createWorker, {
     type: "compare",
     leftName: left.name,
     rightName: right.name,
@@ -60,4 +61,6 @@ export async function runExcelComparePair(
     startErrorMessage: messages[language].start,
     resultErrorMessage: messages[language].result,
   });
+  assertReceivedXlsxReport(result.reportBuffer, result.reportByteLength);
+  return result;
 }
