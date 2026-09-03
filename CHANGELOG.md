@@ -4,8 +4,7 @@
 
 ## 2026-09-03
 
-- AppShell의 모바일 바로가기를 shadcn Base UI Sheet로 전환해 모달·포커스 트랩·닫힘 후 포커스 복귀를 공용 primitive에 위임했다. SEO·분석/광고 로더와 영상·Office·XLS 격리 경계, 사이드바·하단 네비게이션을 보존하고 모바일 목록 스크롤·접근성·광고 격리 회귀를 보강했다. — Codx
-- 모바일 드롭존 확장자 안내를 구분자 단위로 안정적으로 줄바꿈하고, 점선 테두리를 large 카드 radius에 맞췄다. 공통 모바일 콘텐츠에 하단 네비게이션 높이 이상의 여백을 추가했다. — Codx
+- 모바일 드롭존 확장자 안내를 구분자 단위로 안정적으로 줄바꿈하고, 점선 테두리를 large 카드 radius에 맞춰다. 공통 모바일 콘텐츠에 하단 네비게이션 높이 이상의 여백을 추가했다. — Codx
 - ToolGuide·OperationProgress·ToolCard·LanguageSwitcher를 shadcn Base UI 기반 공용 컴포넌트로 전환했다. 기존 section/article/link DOM, ko/en 안내·언어 토글 접근성, 6색 accent와 stage-key 진행 로그·활성 스피너·행별 퍼센트 계약을 보존하고 시각 기준선·스모크를 갱신했다. — Codx
 - 공용 UI 8종을 shadcn Base UI 기반 호환 어댑터로 전환하고 6색 accent·파일 누적/비동기·접근성·키보드 계약을 보존했다. 미사용 NavigationRow를 제거하고 전 화면 시각 기준선과 회귀 검증을 갱신했다. — Codx
 - Tailwind preflight를 전역 base layer로 활성화하고, 기존 화면의 heading·small text·목록 marker·폼 기본값·pseudo-element box model·line-height를 legacy layer에서 보정해 기존 시각 기준선을 유지했다. — Codx

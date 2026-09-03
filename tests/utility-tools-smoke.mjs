@@ -108,52 +108,6 @@ try {
   if (mobileToolsLayout.columns !== 1 || mobileToolsLayout.pageWidth > mobileToolsLayout.viewportWidth + 1 || !mobileToolsLayout.categoryScrollable) {
     throw new Error(`Mobile tool categories overflow incorrectly: ${JSON.stringify(mobileToolsLayout)}`);
   }
-  await page.click('#mobile-navigation-trigger');
-  await page.waitForSelector('[data-slot="sheet-content"]', { visible: true });
-  await page.waitForFunction(() => document.activeElement instanceof HTMLElement && Boolean(document.activeElement.closest('[data-slot="sheet-content"]')));
-  await page.waitForFunction(() => {
-    const sheet = document.querySelector('[data-slot="sheet-content"]');
-    const list = sheet?.querySelector('.sheet-tool-list');
-    if (!(sheet instanceof HTMLElement) || !(list instanceof HTMLElement)) return false;
-    const rect = sheet.getBoundingClientRect();
-    return rect.left >= 9 && rect.right <= window.innerWidth - 9 && rect.top >= 9
-      && rect.bottom <= window.innerHeight - 9 && list.scrollHeight > list.clientHeight;
-  });
-  const mobileNavigationSheet = await page.$eval('[data-slot="sheet-content"]', (sheet) => {
-    const rect = sheet.getBoundingClientRect();
-    const style = getComputedStyle(sheet);
-    const list = sheet.querySelector('.sheet-tool-list');
-    return {
-      role: sheet.getAttribute("role"),
-      modal: sheet.getAttribute("aria-modal"),
-      label: sheet.getAttribute("aria-label"),
-      title: sheet.querySelector('[data-slot="sheet-title"]')?.textContent || "",
-      overlay: Boolean(document.querySelector('[data-slot="sheet-overlay"]')),
-      links: sheet.querySelectorAll(".sheet-tool-item").length,
-      top: rect.top,
-      bottom: rect.bottom,
-      overflowY: style.overflowY,
-      listOverflowY: list ? getComputedStyle(list).overflowY : "",
-      listScrollable: list instanceof HTMLElement && list.scrollHeight > list.clientHeight,
-      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    };
-  });
-  if (mobileNavigationSheet.role !== "dialog" || mobileNavigationSheet.modal !== "true" || mobileNavigationSheet.label !== "바로가기"
-    || mobileNavigationSheet.title !== "어떤 작업을 할까요?" || !mobileNavigationSheet.overlay || mobileNavigationSheet.links !== 21
-    || mobileNavigationSheet.top < -1 || mobileNavigationSheet.bottom > 845 || mobileNavigationSheet.overflowY !== "hidden"
-    || mobileNavigationSheet.listOverflowY !== "auto" || !mobileNavigationSheet.listScrollable || mobileNavigationSheet.pageOverflow > 1) {
-    throw new Error(`Mobile navigation sheet semantics or clipping failed: ${JSON.stringify(mobileNavigationSheet)}`);
-  }
-  await page.$eval('[data-slot="sheet-content"] .sheet-tool-item:last-child', (element) => element.focus());
-  await page.keyboard.press("Tab");
-  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "닫기");
-  await page.keyboard.down("Shift");
-  await page.keyboard.press("Tab");
-  await page.keyboard.up("Shift");
-  await page.waitForFunction(() => document.activeElement?.matches('[data-slot="sheet-content"] .sheet-tool-item:last-child'));
-  await page.keyboard.press("Escape");
-  await page.waitForFunction(() => !document.querySelector('[data-slot="sheet-content"]'));
-  await page.waitForFunction(() => document.activeElement?.id === "mobile-navigation-trigger");
   await page.waitForSelector(".app-install-button");
   await page.evaluate(() => {
     window.__installPromptCalls = 0;

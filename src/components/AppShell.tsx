@@ -7,11 +7,10 @@ import {
   MessageSquarePlus,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
-import { GITHUB_ISSUES_URL } from "../constants/links";
 import { localizedPath, stripLanguagePrefix } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
 import { useToolCatalog } from "../i18n/useToolCatalog";
@@ -22,7 +21,7 @@ import { LanguageSwitcher } from "./LanguageSwitcher";
 import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
 import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
-import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { GITHUB_ISSUES_URL } from "../constants/links";
 
 const primaryNavigation = [
   { to: "/", labelKey: "navigation.home", icon: Home, end: true },
@@ -31,6 +30,7 @@ const primaryNavigation = [
 ];
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileSheetRef = useRef<HTMLElement>(null);
   const { t } = useTranslation("common");
   const language = useAppLanguage();
   const { tools } = useToolCatalog();
@@ -49,17 +49,26 @@ export function AppShell() {
   }, [location.pathname]);
 
   useEffect(() => {
-    const mobileViewport = window.matchMedia("(max-width: 820px)");
-    const closeAtDesktop = (event: MediaQueryListEvent) => {
-      if (!event.matches) setMobileMenuOpen(false);
+    if (!mobileMenuOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const sheet = mobileSheetRef.current;
+    const focusable = () => Array.from(sheet?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []);
+    focusable()[0]?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setMobileMenuOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0]; const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
-    mobileViewport.addEventListener("change", closeAtDesktop);
-    return () => mobileViewport.removeEventListener("change", closeAtDesktop);
-  }, []);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => { document.removeEventListener("keydown", handleKeyDown); previousFocus?.focus(); };
+  }, [mobileMenuOpen]);
 
   return (
-    <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
-      <div className="app-shell">
+    <div className="app-shell">
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} language={language} />
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
@@ -112,12 +121,15 @@ export function AppShell() {
         </NavLink>
         <div className="mobile-header-actions">
           <AppInstallControl />
-          <SheetTrigger
-            id="mobile-navigation-trigger"
-            render={<button className="icon-button" type="button" aria-label={t("navigation.openMenu")} />}
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={t("navigation.openMenu")}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen(true)}
           >
             <Menu size={21} />
-          </SheetTrigger>
+          </button>
           <LanguageSwitcher compact />
         </div>
       </header>
@@ -157,42 +169,45 @@ export function AppShell() {
         })}
       </nav>
 
-      <SheetContent
-        side="bottom"
-        showCloseButton={false}
-        overlayClassName="sheet-backdrop z-[80]"
-        className="mobile-sheet z-[90] max-h-[calc(100dvh-20px)] overflow-hidden data-[side=bottom]:inset-x-[10px] data-[side=bottom]:bottom-[10px] data-[side=bottom]:w-auto data-[side=bottom]:max-w-[520px] data-[side=bottom]:rounded-[28px]"
-        aria-label={t("navigation.shortcuts")}
-        aria-modal="true"
-      >
-        <div className="sheet-grabber" />
-        <div className="sheet-header">
-          <div>
-            <p className="eyebrow text-[var(--label-secondary)]">{t("navigation.shortcuts")}</p>
-            <SheetTitle className="text-[23px] font-bold tracking-[-0.045em]">{t("navigation.chooseTask")}</SheetTitle>
-          </div>
-          <SheetClose render={<button className="icon-button subtle" type="button" aria-label={t("navigation.close")} />}>
-            <X size={20} />
-          </SheetClose>
+      {mobileMenuOpen && (
+        <div className="sheet-backdrop" role="presentation" onMouseDown={() => setMobileMenuOpen(false)}>
+          <section
+            ref={mobileSheetRef}
+            className="mobile-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("navigation.shortcuts")}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="sheet-grabber" />
+            <div className="sheet-header">
+              <div>
+                <p className="eyebrow">{t("navigation.shortcuts")}</p>
+                <h2>{t("navigation.chooseTask")}</h2>
+              </div>
+              <button className="icon-button subtle" type="button" onClick={() => setMobileMenuOpen(false)} aria-label={t("navigation.close")}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="sheet-tool-list">
+              {tools.map((tool) => {
+                const Icon = tool.icon;
+                return (
+                  <NavLink className="sheet-tool-item" to={tool.path} key={tool.id} onClick={() => trackToolOpen(tool.id, "mobile_sheet", language)}>
+                    <span className={`tool-icon small accent-${tool.accent}`}><Icon size={22} /></span>
+                    <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
+                  </NavLink>
+                );
+              })}
+              <a className="sheet-tool-item" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
+                <span className="tool-icon small accent-blue"><MessageSquarePlus size={22} /></span>
+                <span><strong>{t("footer.feedback")}</strong><small>{t("footer.feedbackDescription")}</small></span>
+              </a>
+            </div>
+          </section>
         </div>
-        <div className="sheet-tool-list min-h-0 flex-1 overflow-y-auto">
-          {tools.map((tool) => {
-            const Icon = tool.icon;
-            return (
-              <NavLink className="sheet-tool-item" to={tool.path} key={tool.id} onClick={() => trackToolOpen(tool.id, "mobile_sheet", language)}>
-                <span className={`tool-icon small accent-${tool.accent}`}><Icon size={22} /></span>
-                <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
-              </NavLink>
-            );
-          })}
-          <a className="sheet-tool-item" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
-            <span className="tool-icon small accent-blue"><MessageSquarePlus size={22} /></span>
-            <span><strong>{t("footer.feedback")}</strong><small>{t("footer.feedbackDescription")}</small></span>
-          </a>
-        </div>
-      </SheetContent>
-      </div>
-    </Sheet>
+      )}
+    </div>
   );
 }
 
