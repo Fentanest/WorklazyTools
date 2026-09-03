@@ -2,6 +2,8 @@ import { Check, FilePlus2, UploadCloud } from "lucide-react";
 import { type ChangeEvent, type DragEvent, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { DropZoneHint } from "../../components/DropZoneHint";
+
 export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled = false }: {
   label: string;
   hint: string;
@@ -68,7 +70,7 @@ export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled
       onDrop={(event) => { void handleDrop(event); }}
     >
       <span className="drop-icon">{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
-      <div aria-live="polite"><strong>{files.length ? t("files.selected", { count: files.length }) : t("files.dropHere")}</strong><span>{hint}</span></div>
+      <div aria-live="polite"><strong>{files.length ? t("files.selected", { count: files.length }) : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
       <button className="secondary-button small" type="button" disabled={disabled} onClick={() => inputRef.current?.click()}>{t("actions.selectFile")}</button>
       {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> {t("files.added")}</em>}
     </div>
