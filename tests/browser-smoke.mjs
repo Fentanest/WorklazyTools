@@ -758,7 +758,6 @@ async function testExcelSheetGridLayout(page, fixtures) {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await new Promise((resolve) => setTimeout(resolve, 100));
   await page.evaluate(() => {
-    document.documentElement.style.scrollBehavior = "auto";
     const summary = document.querySelector(".excel-mobile-sheet-summary");
     if (summary) window.scrollTo(0, window.scrollY + summary.getBoundingClientRect().top + 120);
   });

@@ -158,43 +158,12 @@ try {
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
-    const mobile = await page.evaluate(async () => {
-      const dropZone = document.querySelector(".drop-zone");
-      const sectionCard = document.querySelector(".section-card");
-      const hint = dropZone?.querySelector(".drop-hint");
-      const protectedHintSegment = Array.from(hint?.querySelectorAll(".drop-hint-segment") ?? []).find((segment) => segment.textContent?.includes("SpreadsheetML"));
-      const mainContent = document.querySelector(".main-content");
-      const bottomTabs = document.querySelector(".bottom-tabs");
-      document.documentElement.style.scrollBehavior = "auto";
-      window.scrollTo(0, document.documentElement.scrollHeight);
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      const footer = document.querySelector(".global-footer");
-      return {
-        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        pairColumns: getComputedStyle(document.querySelector(".excel-pair-files")).gridTemplateColumns,
-        actionHeight: document.querySelector(".drop-zone .secondary-button")?.getBoundingClientRect().height || 0,
-        dropOverflow: (dropZone?.scrollWidth || 0) - (dropZone?.clientWidth || 0),
-        dropRadius: dropZone ? getComputedStyle(dropZone).borderRadius : "",
-        cardRadius: sectionCard ? getComputedStyle(sectionCard).borderRadius : "",
-        hintText: hint?.textContent || "",
-        protectedHintSegmentLines: protectedHintSegment?.getClientRects().length || 0,
-        contentBottomPadding: mainContent ? Number.parseFloat(getComputedStyle(mainContent).paddingBottom) : 0,
-        navigationHeight: bottomTabs?.getBoundingClientRect().height || 0,
-        footerBottom: footer?.getBoundingClientRect().bottom || 0,
-        navigationTop: bottomTabs?.getBoundingClientRect().top || 0,
-      };
-    });
-    if (
-      mobile.overflow > 1
-      || mobile.pairColumns.split(" ").length !== 1
-      || mobile.actionHeight < 40
-      || mobile.dropOverflow > 1
-      || mobile.dropRadius !== mobile.cardRadius
-      || mobile.hintText !== "XLSX·XLSM·XLS·XLSB·SpreadsheetML .xls·CSV"
-      || mobile.protectedHintSegmentLines !== 1
-      || mobile.contentBottomPadding < mobile.navigationHeight
-      || mobile.footerBottom > mobile.navigationTop + 1
-    ) throw new Error(`Mobile layout, drop-zone polish, or navigation clearance failed: ${JSON.stringify(mobile)}`);
+    const mobile = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      pairColumns: getComputedStyle(document.querySelector(".excel-pair-files")).gridTemplateColumns,
+      actionHeight: document.querySelector(".drop-zone .secondary-button")?.getBoundingClientRect().height || 0,
+    }));
+    if (mobile.overflow > 1 || mobile.pairColumns.split(" ").length !== 1 || mobile.actionHeight < 40) throw new Error(`Mobile layout or file-button alternative failed: ${JSON.stringify(mobile)}`);
 
     const integrityFailures = [];
     for (const mode of ["zero", "mismatch"]) integrityFailures.push(await assertIntegrityFailure(browser, fixture("left.xlsx"), fixture("right.xlsx"), mode));

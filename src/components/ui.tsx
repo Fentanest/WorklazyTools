@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 
 import type { ToolAccent } from "../app/toolRegistry";
 import { cn } from "../lib/utils";
-import { DropZoneHint } from "./DropZoneHint";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Switch } from "./ui/switch";
@@ -230,7 +229,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
         onDrop={(event) => { void handleDrop(event); }}
       >
         <span className={cn("drop-icon rounded-2xl", accentSoftClasses[accent])}>{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
-        <div aria-live="polite"><strong>{files.length ? `${t("files.selected", { count: files.length })}${multiple ? ` · ${t("files.keepAdding")}` : ""}` : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
+        <div aria-live="polite"><strong>{files.length ? `${t("files.selected", { count: files.length })}${multiple ? ` · ${t("files.keepAdding")}` : ""}` : t("files.dropHere")}</strong><span>{hint}</span></div>
         <Button className="secondary-button small h-10 rounded-2xl font-semibold" variant="secondary" size="lg" disabled={disabled} onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</Button>
         {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> {t("files.added")}</em>}
       </Card>
