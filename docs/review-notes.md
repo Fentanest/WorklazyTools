@@ -4,6 +4,17 @@
 
 ## 2026-09-03
 
+### Excel 비교 U1 후속 X-A~X-C — 보고서·파일 배치·선택 대사 판정 (Codx)
+
+- **X-A 보고서 무결성 판정**: worker는 생성 직후 양수 byteLength와 `PK\x03\x04`를 검사하고 transfer와 별개인 `reportByteLength`를 동봉한다. client는 수신 buffer 길이, page는 Blob 크기를 각각 대조하며 세 실패는 `REPORT_INTEGRITY_FAILED`의 ko/en 재실행·재다운로드 안내로만 노출한다. 0바이트와 길이 불일치 page 주입은 다운로드 링크 없이 같은 안전 문구로 귀결됐다. 브라우저가 OS 다운로드로 넘긴 뒤의 저장 파일은 앱이 사후 검사할 수 없으므로, 재발 시 저장 파일 크기와 브라우저 이름을 받는 안내를 결과와 오류에 함께 두었다.
+- **X-A URL·실다운로드 판정**: 이전 결과 URL 목록을 스냅샷한 뒤 `completed`/ZIP 제거가 DOM에 커밋된 다음 effect에서만 revoke하고, 언마운트에서는 소유 URL 전부를 정리한다. Chrome CDP 다운로드 설정으로 실제 디스크 파일을 내려받아 15,392B, PK 서명, ExcelJS 재개방, 정확한 9시트와 Summary `matched=8`·`changed=2`를 확인했다. 다음 실행에서 이전 앵커 부재가 먼저 확인된 뒤 그 URL의 revoke 호출이 관측됐다. preview 상태는 `COOP=same-origin`·`COEP=require-corp`·`crossOriginIsolated=true`·기존 서비스워커 제어였고 같은 환경에서 실다운로드가 정상이라 Excel 경로의 서비스워커/격리 상태를 빈 파일 원인으로 연결하지 않았다.
+- **X-B 파일 배치·교환 판정**: 공용 단일 파일 drop zone 대신 `PairFileDropZone`을 두고, `assignPairFiles`가 빈 슬롯을 왼쪽부터 채우며 점유 슬롯을 보존하고 초과 파일 수를 알린다. 빈2+2·빈2+1·빈1+1·빈1+2·빈0+N의 5종 단위표가 통과했다. 교환은 file·inspection·검사 상태·error·sheet·header row·기본/보조 key·금액/날짜/거래처 mapping을 모두 맞바꾸고 검사 중 비활성화한다. Chrome에서 검사 중 비활성→완료 후 활성, 점유 쌍에 추가한 2개 파일 전량 거부 안내와 기존 이름 불변, 교환 전 `added=2/removed=0`에서 교환 후 `added=0/removed=2` 방향 반전을 확인했다.
+- **X-C 선택 대사·한도 판정**: 금액 열은 필수로 유지하고 날짜·거래처/설명은 좌우 동시 사용/미사용 validator를 UI와 엔진이 공유한다. 정·역방향 partner/day 후보 필터는 활성 기준만 적용하며 비활성 기준에서 `INVALID_DATE`/`INVALID_PARTNER`를 만들지 않는다. 활성 오류는 `INVALID_AMOUNT`·`INVALID_DATE`·`INVALID_PARTNER`로 나뉜다. 정확 금액 후보에도 대상당 10개 상한을 적용해 초과 시 `RECON_SEARCH_LIMIT`로 자동 확정하지 않고, 역방향 복수 조합은 관여한 미확정 좌측 거래마다 Ambiguous 한 행으로 회계한다. 비적용 Parameters는 빈 문자열·거짓 기본값 대신 `UNUSED`로 기록한다.
+- **X-C 골든 판정**: 날짜 미사용·거래처 미사용·금액 단독, 좌우 불변식 위반, 활성 오류 3종, 정방향·역방향 대칭, 후보 11개 초과, 전역 조합 한도를 단위 검사했다. 브라우저 금액 단독 fixture는 15,151B의 9시트 보고서로 재개방됐고 Summary는 `ambiguous=2`·`unmatched=3`·`error=0`, 날짜·거래처·날짜 허용치는 `UNUSED`, 후보 상한은 실제값과 같은 `10`이었다.
+- **신고 파일 로컬 비게이팅 확인**: `dummyfortest/2026년 설 선물 발송처_20260204_취합.xlsx`와 `_김민정.xlsx`를 읽기 전용으로 현행 엔진에 직접 전달했다. `최종` 시트 78행×10열에서 770 records(`matched=761`, `changed=9`, 나머지 0), 보고서 49,958B·`504b0304`·ExcelJS 재개방·9시트를 확인했다. 보고서 데이터 행은 Summary 8·Parameters 46·Matched 761·Changed 9·Added/Removed/Duplicates/Ambiguous/Errors 각 0이었다. `src/`·`tests/`·`scripts/`·`package.json`의 `dummyfortest` 참조는 0건이며 신고 파일은 CI 게이트와 스테이징에서 제외했다.
+- **현지화·SEO·광고 판정**: 변경된 사용자 문구와 접근성 라벨을 ko/en 동형으로 추가했고 내부 실행 명칭·원시 오류를 노출하지 않는다. 기존 `/tools/excel-compare` URL·registry·SEO 정적 페이지·사이트맵·FAQ·소셜 이미지 생성 입력과 일반 AdSense 배치, 광고 제외 격리 경로는 바뀌지 않았다.
+- **완료 검증**: 최종 연속 실행에서 `npm run build` exit 0(2,423 modules, Excel Compare page 170.02kB/70.55kB gzip, worker 1,488.10kB, 정적 57페이지), `npm run test:unit` 147/147, `TEST_BASE_URL=http://127.0.0.1:4174 npm run test:excel-compare`, `npm run test:static`, `git diff --check`가 모두 exit 0이었다. 합성 fixture만 게이트에 사용했고 `dummyfortest` 코드·테스트 참조 0건을 유지했다.
+
 ### 비디오 W-A~W-D — DV base layer·호환 사유·음향 대안·진행 로그 판정 (Codx)
 
 - **DV 판정·격리**: `dvcC`/`dvvC` 첫 5바이트에서 version 1.0·profile 8·BL present·compat 1/2/4만 허용하고, config 누락/단축·그 밖의 version/profile/compat·BL 없음·dual box는 구체 parser cause로 거부한다. `dvh1`/`dvhe`는 target encode/hybrid parse에서만 HEVC base layer로 열고 stream-copy는 계속 거부한다. hvcC에서 만든 base codec string은 32비트 compatibility를 unsigned bit reversal하고 constraint 원순서와 후행 0 생략을 보존한다. job의 compat ID는 중복 제거해 HDR10/SDR/HLG 단일 또는 혼합 안내로 preflight·결과 화면에 유지한다.
