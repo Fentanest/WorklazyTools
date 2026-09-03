@@ -1196,5 +1196,41 @@
         { "q": "파일이 서버로 업로드되나요?", "a": "아니요. 선택한 파일과 생성 보고서는 현재 브라우저에서만 처리합니다. 원본 파일은 변경하지 않습니다." }
       ]
     }
+  },
+  "excelCleaner": {
+    "title": "Excel 데이터 정리",
+    "description": "여러 Excel·CSV 파일에 28종 정리 규칙을 순서대로 적용하고, 원본을 바꾸지 않은 새 XLSX·CSV와 처리 보고서를 만듭니다.",
+    "files": {
+      "title": "파일과 시트 선택", "description": "파일을 여러 번 추가하고 각 파일에서 정리할 시트와 헤더 행을 고르세요.", "hint": "XLSX·XLSM·XLS·XLSB·SpreadsheetML .xls·CSV · 파일은 현재 브라우저에서만 처리", "inspecting": "파일 구조를 확인하고 있습니다.", "headerRow": "헤더 행", "unselectedOmitted": "선택하지 않은 시트는 결과에 포함되지 않습니다.", "large": "예상 {{count}}셀입니다. 큰 파일은 데스크톱 브라우저에서 처리하는 것이 안정적입니다.", "tooLarge": "예상 {{count}}셀로 10,000,000셀 처리 한도를 넘었습니다. 시트나 파일을 나눠 주세요."
+    },
+    "pipeline": {
+      "title": "정리 규칙 파이프라인", "description": "규칙은 위에서 아래 순서로 실행됩니다. 카드를 끌거나 위·아래 버튼으로 순서를 바꾸고 JSON 설정을 편집하세요.", "ruleType": "추가할 규칙", "add": "규칙 추가", "rule": "규칙 {{number}}", "settings": "규칙 {{number}} JSON 설정", "moveUp": "규칙 위로 이동", "moveDown": "규칙 아래로 이동", "remove": "규칙 삭제", "orderLabel": "정리 규칙 실행 순서", "empty": "규칙이 없으면 선택 시트를 그대로 새 파일로 만들고 보고서만 추가합니다.", "invalidRule": "이 규칙의 필수 키·값 범위 또는 JSON 문법을 확인해 주세요.", "invalid": "파이프라인 JSON이 올바르지 않습니다. 알 수 없는 키와 중복 ID도 허용되지 않습니다.", "columnsRequired": "이 규칙을 추가하려면 먼저 열이 있는 파일과 시트를 선택해 주세요.", "json": "파이프라인 JSON 가져오기·내보내기", "export": "현재 version 1 JSON", "import": "가져올 version 1 JSON", "apply": "JSON 적용", "imported": "파이프라인 JSON을 적용했습니다. 미리보기를 다시 계산해 주세요."
+    },
+    "rules": {
+      "trim-edge-empty": "가장자리 빈 행·열 정리", "remove-empty-rows": "빈 행 삭제", "remove-empty-columns": "빈 열 삭제", "collapse-consecutive-empty": "연속 빈 행·열 축약", "unmerge-cells": "셀 병합 해제", "unmerge-fill-down": "병합 해제 후 값 채움", "rename-column": "열 이름 변경", "reorder-columns": "열 순서 변경", "delete-columns": "열 삭제", "combine-columns": "열 결합", "split-column": "열 분리", "add-constant-column": "고정값 열 추가", "add-row-number-column": "행 번호 열 추가", "trim-whitespace": "앞뒤 공백 제거", "collapse-spaces": "연속 공백 축약", "normalize-newlines": "줄바꿈 통일", "remove-invisible-chars": "보이지 않는 문자 제거", "normalize-unicode": "Unicode NFC 통일", "find-replace": "찾아 바꾸기", "regex-replace": "정규식 바꾸기", "dedupe-rows": "전체 행 중복 제거", "dedupe-by-columns": "선택 열 중복 제거", "filter-rows": "행 필터", "fill-empty-cells": "빈 셀 채우기", "convert-numeric-strings": "숫자 문자열 변환", "unify-date-format": "날짜 형식 통일", "format-phone-number": "한국 전화번호 형식", "format-business-number": "한국 사업자번호 형식"
+    },
+    "output": {
+      "title": "출력과 수식 정책", "description": "파일마다 선택 시트와 보고서 4시트가 있는 XLSX를 만들거나, 선택 시트별 CSV를 만들 수 있습니다.", "xlsx": "XLSX", "csv": "CSV", "both": "XLSX + CSV", "csvSafeMode": "CSV 안전 모드 사용", "csvSafeModeDescription": "위험 선행 문자가 있는 값에 작은따옴표를 붙입니다. 끄면 원문을 보존하며, 원문 모드를 안전하다고 보장하지 않습니다.", "formulaConfirmation": "지원 밖 수식을 저장된 계산값으로 바꾸는 데 동의", "formulaConfirmationDescription": "교차 시트·이름·표·동적·공유·배열 수식 또는 XLS·XLSB·SpreadsheetML 수식은 유효한 저장 계산값이 있을 때만 값으로 출력합니다.", "formulaNote": "정확한 수식 갱신은 XLSX·XLSM의 같은 시트 A1 단일·직사각형 참조만 지원합니다. 필터와 중복 판정은 저장된 계산값을 사용하며 브라우저에서 수식을 다시 계산하지 않습니다. XLSM 매크로는 결과에서 제거됩니다."
+    },
+    "actions": { "preview": "미리보기 다시 계산", "run": "{{count}}개 파일 정리", "cancel": "정리 취소" },
+    "progress": { "title": "Excel 정리 진행률", "starting": "{{count}}개 파일 정리를 준비합니다.", "READING": "[{{current}}/{{total}}] 파일 구조를 읽고 있습니다.", "PREFLIGHT": "[{{current}}/{{total}}] 시트·수식·병합 조건을 확인하고 있습니다.", "PROCESSING": "[{{current}}/{{total}}] 규칙 {{rule}}을 적용하고 있습니다.", "WRITING_OUTPUT": "[{{current}}/{{total}}] 결과 파일과 보고서를 만들고 있습니다.", "PREVIEW_READY": "미리보기 집계를 마쳤습니다.", "COMPLETE": "[{{current}}/{{total}}] 파일 처리를 마쳤습니다.", "ZIPPING": "결과 파일을 ZIP으로 묶고 있습니다.", "complete": "정리 완료 · 결과 {{success}}개 · 실패 {{failed}}개", "canceled": "정리를 취소했습니다. 이미 완성된 결과는 내려받을 수 있습니다." },
+    "preview": { "title": "첫 파일 미리보기", "stale": "다시 계산 필요", "summary": "출력 {{rows}}행 · 변경 셀 {{changed}}개. 각 규칙은 전체 집계와 제한된 행 샘플만 보관합니다." },
+    "results": { "title": "정리 결과", "description": "결과 {{success}}개 · 실패 {{failed}}개. 결과가 2개 이상이면 ZIP도 제공합니다.", "zip": "전체 결과 ZIP", "csvRisk": "원문 CSV에 위험 선행 문자가 있는 셀 {{count}}개가 있습니다. 스프레드시트에서 열기 전에 내용을 확인하거나 안전 모드로 다시 실행하세요." },
+    "error": {
+      "UNSUPPORTED_FORMAT": "지원하지 않는 파일 형식입니다.", "ENCRYPTED_FILE": "암호로 보호된 스프레드시트는 지원하지 않습니다. 보호를 해제한 사본을 선택해 주세요.", "DAMAGED_FILE": "파일 구조를 읽지 못했습니다. 파일이 손상되지 않았는지 확인해 주세요.", "CSV_PARSE_ERROR": "CSV 따옴표 구조를 읽지 못했습니다.", "SHEET_REQUIRED": "정리할 시트를 하나 이상 선택해 주세요.", "SHEET_NOT_FOUND": "선택한 시트나 헤더 행을 찾지 못했습니다.", "CELL_LIMIT_EXCEEDED": "선택 범위가 10,000,000셀 처리 한도를 넘었습니다.", "FORMULA_CACHE_MISSING": "저장된 계산값이 없는 수식 셀이 있어 데이터 손상을 막기 위해 실행을 중단했습니다.", "FORMULA_CONFIRMATION_REQUIRED": "지원 밖 수식을 값으로 바꾸는 확인이 필요합니다.", "MERGE_RULE_ORDER": "병합된 셀이 있는 시트에서는 구조 규칙보다 먼저 병합 해제 규칙을 두어야 합니다.", "HEADER_MISMATCH": "선택 시트의 헤더 이름 구성이 첫 시트와 일치하지 않습니다.", "DUPLICATE_HEADERS": "중복 헤더 이름이 있어 열을 안전하게 연결할 수 없습니다.", "COLUMN_ID_MISSING": "앞선 규칙에서 삭제되었거나 존재하지 않는 열 ID를 참조했습니다.", "COLUMN_ID_DUPLICATE": "파생 열 ID가 기존 또는 다른 파생 열 ID와 중복됩니다.", "COLUMN_ORDER_INVALID": "열 순서 규칙에는 현재 열을 중복 없이 모두 포함해야 합니다.", "INVALID_PIPELINE": "규칙 JSON의 필수 키·값 범위·버전을 확인해 주세요.", "WORKER_TIMEOUT": "규칙 처리가 30초 동안 진행되지 않아 종료했습니다. 해당 규칙의 정규식이나 설정을 바꿔 주세요.", "PROCESSING_FAILED": "파일을 정리하지 못했습니다. 파일과 규칙 설정을 확인해 주세요.", "cells": "대상 {{count}}개: {{cells}}", "rule": "규칙 ID: {{id}}"
+    },
+    "guide": {
+      "title": "Excel 데이터 정리 안내", "description": "28개 규칙의 순서, 수식·CSV 안전 정책과 대용량 한도를 확인하세요.",
+      "blocks": [
+        { "title": "28종 규칙과 순서", "text": "구조 13종, 텍스트 7종, 행 필터 3종, 값 변환 5종을 최대 100개까지 조합합니다. 병합된 셀은 병합 해제·값 채움 뒤에만 행·열 구조를 바꿀 수 있습니다." },
+        { "title": "수식과 변환 실패", "text": "XLSX·XLSM의 같은 시트 일반 A1 참조만 좌표를 갱신합니다. 지원 밖 수식은 확인 후 저장 계산값으로 바꾸며 계산값이 없으면 실행하지 않습니다. 값 변환 실패는 원문을 유지하고 오류 행 시트에 기록합니다." },
+        { "title": "결과·메모리·개인정보", "text": "입력 파일별 XLSX에는 정리 시트와 변경 요약·처리 규칙·오류 행·제외 행이 들어갑니다. 단계별로 전체 사본을 쌓지 않으며 오류·제외 기록은 각각 100,000행으로 제한합니다. 파일은 외부 작업 서버로 전송되지 않습니다." }
+      ],
+      "faq": [
+        { "q": "선택하지 않은 시트와 XLSM 매크로도 보존되나요?", "a": "아니요. 선택하지 않은 시트는 출력하지 않으며 XLSM 매크로도 제거됩니다. 정리한 시트의 참조 무결성을 보장할 수 없는 내용을 조용히 보존하지 않기 위한 제한입니다." },
+        { "q": "CSV 원문 모드는 안전한가요?", "a": "안전하다고 보장하지 않습니다. 원문 보존 모드는 위험 선행 문자를 경고하고, 안전 모드는 해당 값에 작은따옴표를 붙입니다." },
+        { "q": "원본 파일이 바뀌거나 서버로 업로드되나요?", "a": "아니요. 모든 처리는 현재 브라우저 탭에서 실행되고 새 결과 파일만 내려받습니다." }
+      ]
+    }
   }
 }

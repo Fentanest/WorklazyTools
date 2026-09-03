@@ -6,7 +6,7 @@ const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/packag
 const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/stickers.manifest.json", "utf8"));
 
 const routes = [
-  "", "tools", "tools/excel-merger", "tools/excel-compare", "tools/document-compare",
+  "", "tools", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-compare",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
@@ -16,7 +16,7 @@ const routes = [
   "about", "privacy", "terms", "contact", "licenses",
 ];
 const socialSlugByRoute = {
-  "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/document-compare": "document-compare", "tools/pdf-editor": "pdf-tools",
+  "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-compare": "document-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
   "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",
   "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-merger": "text-merger", "tools/text-tools": "text-tools",
@@ -65,11 +65,13 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/excel-compare", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger"].includes(route)) {
+  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
       ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/excel-compare"
         ? language === "ko" ? "어떤 Excel 형식을 비교할 수 있나요?" : "Which Excel formats can I compare?"
+      : route === "tools/excel-cleaner"
+        ? language === "ko" ? "수식이 있는 Excel 파일도 정리할 수 있나요?" : "Can I clean an Excel file that contains formulas?"
       : route === "tools/document-compare"
         ? language === "ko" ? "DOC와 DOCX를 서로 비교할 수 있나요?" : "Can I compare DOC with DOCX?"
         : route === "tools/video-studio"

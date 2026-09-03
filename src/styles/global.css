@@ -2479,6 +2479,38 @@ label.invalid > small { color: #c9342f; }
 .excel-report-downloads .result-download span { display: grid; gap: 1px; }
 .excel-report-downloads .result-download small { padding-left: 0; border-left: 0; }
 .excel-download-note { margin: 9px 0 0; color: var(--label-secondary); font-size: 12px; line-height: 1.5; }
+.excel-cleaner-files, .excel-cleaner-rules { display: grid; gap: 12px; }
+.excel-cleaner-file, .excel-cleaner-rule { min-width: 0; padding: 15px; border: 1px solid var(--separator); border-radius: 16px; background: var(--bg-muted); }
+.excel-cleaner-file > header, .excel-cleaner-rule > header { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.excel-cleaner-file > header > span { display: grid; min-width: 0; flex: 1; }
+.excel-cleaner-file > header strong, .excel-cleaner-file > header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.excel-cleaner-file > header small, .excel-cleaner-sheets small, .excel-cleaner-sheet-note { color: var(--label-secondary); }
+.excel-cleaner-file .remove-button { margin-left: auto; }
+.excel-cleaner-sheets { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 13px; }
+.excel-cleaner-sheets > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--separator); border-radius: 12px; background: var(--bg-elevated); }
+.excel-cleaner-sheets label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.excel-cleaner-sheets label > span { display: grid; min-width: 0; }
+.excel-cleaner-header-row input { width: 70px; }
+.excel-cleaner-sheet-note { margin: 9px 2px 0; font-size: 12px; }
+.excel-cleaner-add-rule, .excel-cleaner-actions { display: flex; align-items: end; gap: 10px; }
+.excel-cleaner-add-rule { margin-bottom: 14px; }
+.excel-cleaner-add-rule label { display: grid; flex: 1; gap: 6px; }
+.excel-cleaner-rule > header strong { white-space: nowrap; }
+.excel-cleaner-rule > header > span { min-width: 0; flex: 1; overflow: hidden; color: var(--label-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.excel-cleaner-rule > header button { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; border: 0; border-radius: 10px; color: var(--label-secondary); background: transparent; cursor: pointer; }
+.excel-cleaner-rule > header button:hover:not(:disabled) { color: var(--label); background: var(--bg-elevated); }
+.excel-cleaner-rule textarea, .excel-cleaner-json textarea { width: 100%; min-height: 170px; margin-top: 10px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.45; }
+.excel-cleaner-empty-rules { margin: 0; padding: 28px; border: 1px dashed var(--separator); border-radius: 14px; color: var(--label-secondary); text-align: center; }
+.excel-cleaner-json { margin-top: 14px; }
+.excel-cleaner-json summary { cursor: pointer; }
+.excel-cleaner-json-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
+.excel-cleaner-json-grid label { display: grid; gap: 6px; min-width: 0; }
+.excel-cleaner-actions { justify-content: flex-end; margin: 18px 0; }
+.excel-cleaner-preview, .excel-cleaner-results { margin-top: 22px; }
+.excel-cleaner-stale { display: inline-flex; margin-left: 8px; padding: 3px 7px; border-radius: 999px; color: var(--orange); background: var(--orange-soft); font-size: 11px; vertical-align: middle; }
+.excel-cleaner-preview-table { max-height: 420px; overflow: auto; border: 1px solid var(--separator); border-radius: 14px; }
+.excel-cleaner-preview-table table { min-width: 100%; border-collapse: collapse; }
+.excel-cleaner-preview-table th, .excel-cleaner-preview-table td { max-width: 260px; padding: 9px 11px; border: 1px solid var(--separator); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .excel-result-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 10px; }
 .excel-status-filters { display: flex; flex-wrap: wrap; gap: 6px; }
 .excel-status-filters button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 9px; border: 1px solid var(--separator); border-radius: 9px; color: var(--label-secondary); background: var(--bg-elevated); cursor: pointer; }
@@ -2499,7 +2531,12 @@ label.invalid > small { color: #c9342f; }
 .excel-compare-page .tool-guide-grid p { overflow-wrap: anywhere; }
 
 @media (max-width: 720px) {
-  .excel-pair-files, .excel-key-grid, .excel-normalization-grid, .excel-reconcile-grid, .excel-number-options, .excel-compare-mode-grid { grid-template-columns: 1fr; }
+  .excel-pair-files, .excel-key-grid, .excel-normalization-grid, .excel-reconcile-grid, .excel-number-options, .excel-compare-mode-grid, .excel-cleaner-sheets, .excel-cleaner-json-grid { grid-template-columns: 1fr; }
+  .excel-cleaner-add-rule, .excel-cleaner-actions { align-items: stretch; flex-direction: column; }
+  .excel-cleaner-add-rule button, .excel-cleaner-actions button { width: 100%; justify-content: center; }
+  .excel-cleaner-rule { padding: 12px; }
+  .excel-cleaner-rule > header { flex-wrap: wrap; }
+  .excel-cleaner-rule > header > span { flex-basis: calc(100% - 60px); }
   .excel-result-toolbar { align-items: stretch; flex-direction: column; }
   .excel-result-search { width: 100%; }
   .excel-report-downloads { display: grid; grid-template-columns: 1fr; }

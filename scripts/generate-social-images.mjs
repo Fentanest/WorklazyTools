@@ -7,6 +7,7 @@ const outputDirectory = path.resolve("public/social/tools");
 const tools = [
   tool("excel-merger", "#22a65a", "문서·스프레드시트", "Excel 병합기", "여러 파일 · 시트별 · 세로 · 가로 병합", "Documents & spreadsheets", "Excel Merger", "Combine files · sheets · rows · columns"),
   tool("excel-compare", "#22a65a", "스프레드시트 비교", "Excel 파일 비교", "위치 · 키 · 회계 대사 · 쌍별 보고서", "Spreadsheet comparison", "Excel Compare", "Position · keys · reconciliation · reports"),
+  tool("excel-cleaner", "#22a65a", "스프레드시트 정리", "Excel 데이터 정리", "28종 규칙 · 수식 보호 · XLSX·CSV 보고서", "Spreadsheet cleanup", "Excel Data Cleaner", "28 rules · formula safety · XLSX & CSV reports"),
   tool("document-compare", "#0879d9", "문서 비교", "Word·HWP 문서 비교", "DOCX·DOC · HWP·HWPX · 이동·분할 판정", "Document comparison", "Document Compare", "DOCX & DOC · HWP & HWPX · move detection"),
   tool("pdf-tools", "#7554d8", "PDF 편집·변환", "PDF 도구", "페이지 편집 · 병합 · 변환 · OCR", "PDF editing & conversion", "PDF Tools", "Edit · merge · convert · OCR"),
   tool("image-to-pdf", "#7554d8", "PDF 편집·변환", "이미지를 PDF로 변환", "JPG·PNG · 순서 변경 · A4 맞춤", "PDF editing & conversion", "Image to PDF", "JPG & PNG · reorder · A4 fit"),
