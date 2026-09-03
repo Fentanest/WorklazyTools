@@ -4,14 +4,6 @@
 
 ## 2026-09-03
 
-### shadcn 마이그레이션 P0b — 전역 preflight·legacy 보정 판정 (Codx)
-
-- **전역 적용 판정**: Tailwind 4.3.3 generated `preflight.css` 원문은 398줄·SHA-256 `ace8310eed6dc5568a56fc16e1d695cf58da7528d81d66d81649e93cce644df6`이며 `:host`·`::backdrop`·`::file-selector-button`·WebKit/Firefox 폼 pseudo-element·`[hidden]`을 함께 다룬다. 설치한 Base UI 1.7.0의 `FloatingPortal`은 container 미지정 시 `document.body`를 쓰고 number-field cursor도 body에 portal한다. `#root` scoped reset은 이 body portal과 host/browser pseudo 계약을 누락하므로 기각하고 `tailwindcss/preflight.css`를 전역 `layer(base)`로 확정했다. 브라우저에서 `#root` 밖 body 직속 임시 `<p>`가 `margin-block: 0px`·`border-style: solid`로 계산되어 실제 전역 적용도 확인했다.
-- **무보정 충돌과 보정 8개**: 전역 import만 둔 1차 실측은 P-V 24/24가 실패했고 diff는 2.3848%~12.2323%였다. legacy layer에 ① `::before`·`::after`·`::backdrop`·`::file-selector-button`의 기존 `content-box`, ② `h1`~`h6`의 UA font size/weight, ③ `small`의 `smaller`, ④ `.tool-guide-grid ul`·`.prose-card ul`의 disc marker, ⑤ `.prose-card ol`의 decimal marker, ⑥ button/input/select/optgroup/textarea/file-selector-button의 기존 margin·padding·border·radius·background·font·letter-spacing·color·opacity, ⑦ textarea의 양방향 resize 기본값, ⑧ `html`의 기존 normal line-height를 명시해 상쇄했다. 이후 실측은 hero/page heading `font-weight: 700`, prose ul `disc`, 동적 prose ol `decimal`, hero pseudo-element `content-box`였다.
-- **시각·예산 판정**: Chrome 152 production preview에서 ko/en × light/dark × desktop/mobile 24/24가 P-V 기준선과 임계값 ≤0.100%로 일치했다. 전체 CSS 단일 파일은 232,664B/40,929B gzip으로 P0a 39,730B 대비 **+1,199B**(한도 +10KB), entry JS는 793,774B/246,772B gzip으로 P0a 246,773B 대비 **-1B**(원시 크기 동일, 한도 +0KB)라 통과했다.
-- **불변 계약·제품 영향**: layer 선언은 `theme < base < legacy < components < utilities`, preflight 소유는 base, 기존 CSS 소유는 legacy로 유지했다. `prefers-color-scheme: dark` 토큰 브리지와 `.dark` 비사용 계약은 수정하지 않았다. 사용자 문구·ko/en 리소스·SEO/정적 route·광고 배치/격리 경로·GitHub Pages 구조·JS 동작은 변경하지 않았다.
-- **완료 검증**: `npm run build` exit 0(2,430 modules·정적 59페이지), `npm run test:unit` 158/158, production preview의 `test:visual` 24/24와 `test:browser`·`test:office`·`test:xls-preserve`·`test:excel-compare`·`test:excel-cleaner`·`test:new-tools`·`test:utilities`, 자체 서버의 `test:xls-first-load`, 단일/concat `test:video-hybrid`, `test:static`, `git diff --check`가 모두 exit 0이었다.
-
 ### shadcn 마이그레이션 P0a — preflight 없는 기반 설치 판정 (Codx)
 
 - **CLI·preset 실측**: 최초 체크포인트 `npx shadcn@latest init --help`에서 `--template <next|start|vite|react-router|laravel|astro>`, `--base <base|radix|aria>`, `--preset [name]`을 확인했고 `--version`은 4.20.1이었다. `preset decode b1aK6UEDo --json`은 version `b`, style `luma`, baseColor `olive`, theme `indigo`, chartColor `blue`, iconLibrary `lucide`, font `noto-sans`, radius `large`, menuAccent `subtle`, menuColor `default`를 반환했다. 고정 명령 `npx shadcn@4.20.1 init --template vite --base base --preset b1aK6UEDo --yes` 적용 뒤 `shadcn info`가 `style=base-luma`, `base=base`, 같은 preset, Tailwind v4, alias `@`, 설치 component 0개를 확인했다.
