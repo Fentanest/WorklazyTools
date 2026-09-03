@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 
 import type { ToolDefinition } from "../app/toolRegistry";
 import { useAppLanguage } from "../i18n/routing";
+import { cn } from "../lib/utils";
 import { trackToolOpen } from "./AnalyticsLoader";
+import { Card } from "./ui/card";
 
 interface ToolCardProps {
   tool: ToolDefinition;
@@ -15,8 +17,9 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
   const language = useAppLanguage();
 
   return (
-    <Link
-      className={`tool-card accent-${tool.accent}${featured ? " featured" : ""}`}
+    <Card
+      as={Link}
+      className={cn(`tool-card accent-${tool.accent}${featured ? " featured" : ""}`, "gap-0 rounded-4xl border bg-card p-5 py-5 shadow-md ring-0")}
       to={tool.path}
       onClick={() => trackToolOpen(tool.id, featured ? "home_card" : "tools_card", language)}
     >
@@ -25,7 +28,7 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
         <span className="card-arrow"><ArrowUpRight size={20} /></span>
       </div>
       <div className="tool-card-copy">
-        <p className="eyebrow">{tool.eyebrow}</p>
+        <p className="eyebrow text-muted-foreground">{tool.eyebrow}</p>
         <h2>{tool.title}</h2>
         <p>{tool.description}</p>
       </div>
@@ -35,6 +38,6 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
           return <span key={item.label}><HighlightIcon size={14} /> {item.label}</span>;
         })}
       </div>
-    </Link>
+    </Card>
   );
 }
