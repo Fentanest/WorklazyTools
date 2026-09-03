@@ -29,10 +29,10 @@ export function DropZoneHint({ children }: { children: string }) {
   const segments = groupShortDelimitedSegments(children);
 
   return (
-    <span className="drop-hint">
+    <span data-ui-part="drop-hint" className="block text-sm text-muted-foreground">
       {segments ? segments.map((segment, index) => (
         <Fragment key={`${segment.text}-${index}`}>
-          <span className="drop-hint-segment">{segment.text}</span>
+          <span data-ui-part="drop-hint-segment" className="whitespace-nowrap">{segment.text}</span>
           {index < segments.length - 1 && <><wbr />{segment.trailingSpace}</>}
         </Fragment>
       )) : children}

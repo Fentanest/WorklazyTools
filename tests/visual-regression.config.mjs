@@ -1,23 +1,41 @@
+import { availableToolRoutes } from "./tool-registry-routes.mjs";
+
+const fullProfiles = Object.freeze([
+  Object.freeze({ locale: "ko", theme: "light", viewport: "desktop" }),
+  Object.freeze({ locale: "ko", theme: "light", viewport: "mobile" }),
+  Object.freeze({ locale: "ko", theme: "dark", viewport: "desktop" }),
+  Object.freeze({ locale: "ko", theme: "dark", viewport: "mobile" }),
+  Object.freeze({ locale: "en", theme: "light", viewport: "desktop" }),
+  Object.freeze({ locale: "en", theme: "light", viewport: "mobile" }),
+  Object.freeze({ locale: "en", theme: "dark", viewport: "desktop" }),
+  Object.freeze({ locale: "en", theme: "dark", viewport: "mobile" }),
+]);
+
+const representativeProfiles = Object.freeze([
+  Object.freeze({ locale: "ko", theme: "light", viewport: "desktop" }),
+  Object.freeze({ locale: "ko", theme: "dark", viewport: "mobile" }),
+  Object.freeze({ locale: "en", theme: "light", viewport: "mobile" }),
+  Object.freeze({ locale: "en", theme: "dark", viewport: "desktop" }),
+]);
+
 export const visualRegressionConfig = Object.freeze({
   routes: Object.freeze([
     Object.freeze({
       id: "home-default",
       path: "/",
+      kind: "index",
+      profiles: fullProfiles,
       readySelector: ".home-page .hero",
     }),
     Object.freeze({
       id: "tools-media-filter",
       path: "/tools?category=media",
-      readySelector: ".tools-index-page .tool-category-section .tool-card",
+      kind: "index",
+      profiles: fullProfiles,
+      readySelector: ".tools-index-page .tool-category-section .ui-tool-card",
     }),
-    Object.freeze({
-      id: "excel-compare-empty",
-      path: "/tools/excel-compare",
-      readySelector: '[data-testid="excel-compare-page"] [data-testid="excel-compare-pair"]',
-    }),
+    ...availableToolRoutes.map((route) => Object.freeze({ ...route, profiles: representativeProfiles })),
   ]),
-  locales: Object.freeze(["ko", "en"]),
-  themes: Object.freeze(["light", "dark"]),
   viewports: Object.freeze([
     Object.freeze({ id: "desktop", width: 1365, height: 900, deviceScaleFactor: 1 }),
     Object.freeze({ id: "mobile", width: 390, height: 844, deviceScaleFactor: 1 }),

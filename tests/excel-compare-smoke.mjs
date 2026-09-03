@@ -77,7 +77,7 @@ try {
     let inputs = await page.$$('.excel-compare-page input[type="file"]');
     await inputs[0].uploadFile(fixture("left.xlsx"), fixture("right.xlsx"));
     await page.waitForFunction(() => document.querySelector(".excel-pair-swap")?.disabled);
-    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > :is(.primary-button, .ui-primary-button)')?.disabled);
     if (await page.$eval(".excel-pair-swap", (button) => button.disabled)) throw new Error("Pair swap did not become available after both inspections completed.");
     const namesBeforeSwap = await selectedPairNames(page);
     await page.click(".excel-pair-swap");
@@ -87,11 +87,11 @@ try {
     await inputs[0].uploadFile(fixture("sample.csv"), fixture("damaged.xlsx"));
     await page.waitForFunction(() => document.querySelector(".excel-pair-overflow")?.textContent?.includes("2개"));
     if (JSON.stringify(await selectedPairNames(page)) !== JSON.stringify(namesBeforeSwap)) throw new Error("An overflow drop replaced an occupied slot.");
-    await page.click('.excel-compare-page > .primary-button');
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.click('.excel-compare-page > :is(.primary-button, .ui-primary-button)');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const onePair = await downloadReportLinks(page, client, downloadRoot, "one-pair");
     if (onePair.length !== 1 || !onePair[0].name.endsWith(".xlsx")) {
-      const state = await page.evaluate(() => ({ progress: document.querySelector(".operation-progress")?.textContent || "", errors: [...document.querySelectorAll(".inline-notice.error")].map((item) => item.textContent || "") }));
+      const state = await page.evaluate(() => ({ progress: document.querySelector(".ui-operation-progress")?.textContent || "", errors: [...document.querySelectorAll(".inline-notice.error")].map((item) => item.textContent || "") }));
       throw new Error(`One pair must create one XLSX and no ZIP: ${JSON.stringify({ onePair, state, pageErrors })}`);
     }
     const onePairSummary = await assertNineSheetReport(onePair[0].bytes, {
@@ -103,20 +103,20 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
     inputs = await page.$$('.excel-compare-page input[type="file"]');
     await inputs[1].uploadFile(fixture("formula.xlsb"), fixture("macro.xlsm"));
-    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 4 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 4 && !document.querySelector('.excel-compare-page > :is(.primary-button, .ui-primary-button)')?.disabled);
     await page.click(".excel-add-pair");
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 3);
     inputs = await page.$$('.excel-compare-page input[type="file"]');
     await inputs[2].uploadFile(fixture("damaged.xlsx"), fixture("macro.xlsm"));
-    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 5 && document.querySelector(".field-error") && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 5 && document.querySelector(".field-error") && !document.querySelector('.excel-compare-page > :is(.primary-button, .ui-primary-button)')?.disabled);
     const formatLabels = await page.$$eval(".excel-sheet-fields p", (items) => items.map((item) => item.textContent || ""));
     if (!formatLabels.some((text) => text.includes("XLSB") && text.includes("서식 비교 제외")) || !formatLabels.some((text) => text.includes("XLSM") && text.includes("서식 비교 가능"))) {
       throw new Error(`Format support labels do not match the fixed matrix: ${JSON.stringify(formatLabels)}`);
     }
-    await page.click('.excel-compare-page > .primary-button');
+    await page.click('.excel-compare-page > :is(.primary-button, .ui-primary-button)');
     await page.waitForFunction((url) => !Array.from(document.querySelectorAll(".excel-report-downloads a")).some((anchor) => anchor.href === url), {}, previousReportUrl);
     await page.waitForFunction((url) => globalThis.__excelCompareRevokedUrls.includes(url), {}, previousReportUrl);
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const multiPair = await downloadReportLinks(page, client, downloadRoot, "multi-pair");
     const reports = multiPair.filter((item) => item.name.endsWith(".xlsx"));
     const archives = multiPair.filter((item) => item.name.endsWith(".zip"));
@@ -149,20 +149,20 @@ try {
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     inputs = await page.$$('.excel-compare-page input[type="file"]');
     await inputs[0].uploadFile(fixture("cancel-left.xlsx"), fixture("cancel-right.xlsx"));
-    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
-    await page.click('.excel-compare-page > .primary-button');
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > :is(.primary-button, .ui-primary-button)')?.disabled);
+    await page.click('.excel-compare-page > :is(.primary-button, .ui-primary-button)');
     await page.waitForSelector(".cancel-operation button");
     await page.click(".cancel-operation button");
-    await page.waitForFunction(() => document.querySelector(".operation-progress.status-error")?.textContent?.includes("취소"));
+    await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-error")?.textContent?.includes("취소"));
 
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const mobile = await page.evaluate(async () => {
-      const dropZone = document.querySelector(".drop-zone");
-      const sectionCard = document.querySelector(".section-card");
-      const hint = dropZone?.querySelector(".drop-hint");
-      const protectedHintSegment = Array.from(hint?.querySelectorAll(".drop-hint-segment") ?? []).find((segment) => segment.textContent?.includes("SpreadsheetML"));
+      const dropZone = document.querySelector(".excel-compare-page .drop-zone");
+      const sectionCard = document.querySelector(".ui-section-card");
+      const hint = dropZone?.querySelector('[data-ui-part="drop-hint"]');
+      const protectedHintSegment = Array.from(hint?.querySelectorAll('[data-ui-part="drop-hint-segment"]') ?? []).find((segment) => segment.textContent?.includes("SpreadsheetML"));
       const mainContent = document.querySelector(".main-content");
       const bottomTabs = document.querySelector(".bottom-tabs");
       document.documentElement.style.scrollBehavior = "auto";
@@ -172,7 +172,7 @@ try {
       return {
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         pairColumns: getComputedStyle(document.querySelector(".excel-pair-files")).gridTemplateColumns,
-        actionHeight: document.querySelector(".drop-zone .secondary-button")?.getBoundingClientRect().height || 0,
+        actionHeight: document.querySelector(".excel-compare-page .drop-zone .secondary-button")?.getBoundingClientRect().height || 0,
         dropOverflow: (dropZone?.scrollWidth || 0) - (dropZone?.clientWidth || 0),
         dropRadius: dropZone ? getComputedStyle(dropZone).borderRadius : "",
         cardRadius: sectionCard ? getComputedStyle(sectionCard).borderRadius : "",
@@ -296,9 +296,9 @@ async function assertIntegrityFailure(browser, leftPath, rightPath, mode) {
     }, mode);
     const inputs = await page.$$('.excel-compare-page input[type="file"]');
     await inputs[0].uploadFile(leftPath, rightPath);
-    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
-    await page.click('.excel-compare-page > .primary-button');
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2 && !document.querySelector('.excel-compare-page > :is(.primary-button, .ui-primary-button)')?.disabled);
+    await page.click('.excel-compare-page > :is(.primary-button, .ui-primary-button)');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const message = await page.$eval(".inline-notice.error", (element) => element.textContent || "");
     if (!message.includes("다시 실행해 내려받아") || /REPORT_|Worker|worker|ArrayBuffer|Blob/u.test(message)) {
       throw new Error(`Integrity failure did not use the safe retry guidance (${mode}): ${message}`);
@@ -321,17 +321,17 @@ async function assertSwapDirection(browser, leftPath, rightPath) {
     await input.uploadFile(leftPath, rightPath);
     await page.waitForFunction(() => document.querySelectorAll(".excel-sheet-fields").length === 2);
     await page.click('.excel-compare-mode-grid button:nth-child(2)');
-    await page.waitForFunction(() => !document.querySelector('.excel-compare-page > .primary-button')?.disabled);
-    await page.click('.excel-compare-page > .primary-button');
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.waitForFunction(() => !document.querySelector('.excel-compare-page > :is(.primary-button, .ui-primary-button)')?.disabled);
+    await page.click('.excel-compare-page > :is(.primary-button, .ui-primary-button)');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const before = await page.evaluate(() => ({
       added: document.querySelectorAll('.excel-result-table tbody tr[data-status="added"]').length,
       removed: document.querySelectorAll('.excel-result-table tbody tr[data-status="removed"]').length,
     }));
     await page.click(".excel-pair-swap");
-    await page.click('.excel-compare-page > .primary-button');
-    await page.waitForFunction(() => document.querySelector(".operation-progress")?.classList.contains("status-running"));
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.click('.excel-compare-page > :is(.primary-button, .ui-primary-button)');
+    await page.waitForFunction(() => document.querySelector(".ui-operation-progress")?.classList.contains("ui-status-running"));
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const after = await page.evaluate(() => ({
       added: document.querySelectorAll('.excel-result-table tbody tr[data-status="added"]').length,
       removed: document.querySelectorAll('.excel-result-table tbody tr[data-status="removed"]').length,
@@ -368,14 +368,14 @@ async function assertOptionalReconciliation(browser, leftPath, rightPath, root) 
     await page.waitForFunction(() => ["leftDateColumn", "rightDateColumn", "leftPartnerColumn", "rightPartnerColumn"].every((key) => document.querySelector(`[data-reconcile-field="${key}"] select`)?.value === ""));
     const mappingState = await page.evaluate(() => ({
       dateToleranceDisabled: document.querySelector('.excel-number-options input[type="number"]')?.disabled,
-      compareDisabled: document.querySelector('.excel-compare-page > .primary-button')?.disabled,
+      compareDisabled: document.querySelector('.excel-compare-page > :is(.primary-button, .ui-primary-button)')?.disabled,
       unusedLabels: Array.from(document.querySelectorAll('.excel-reconcile-grid option[value=""]'), (option) => option.textContent || ""),
     }));
     if (!mappingState.dateToleranceDisabled || mappingState.compareDisabled || mappingState.unusedLabels.length !== 4 || mappingState.unusedLabels.some((label) => label !== "사용 안 함")) {
       throw new Error(`Optional reconciliation mapping UI is inconsistent: ${JSON.stringify(mappingState)}`);
     }
-    await page.click('.excel-compare-page > .primary-button');
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.click('.excel-compare-page > :is(.primary-button, .ui-primary-button)');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const report = (await downloadReportLinks(page, client, root, "amount-only"))[0];
     const summary = await assertNineSheetReport(report.bytes, {
       matched: 0, changed: 0, added: 0, removed: 0, duplicate: 0, ambiguous: 2, unmatched: 3, error: 0,

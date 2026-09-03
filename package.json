@@ -25,6 +25,7 @@
     "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
     "test:visual": "node tests/visual-regression.mjs",
+    "test:ui-migration": "node tests/ui-migration-layout-smoke.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },
   "dependencies": {
@@ -101,6 +102,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "pixelmatch": "7.1.0",
     "pngjs": "7.0.0",
+    "postcss": "8.5.26",
     "puppeteer-core": "^25.6.0",
     "tailwindcss": "4.3.3",
     "typescript": "~5.7.2",

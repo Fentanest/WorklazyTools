@@ -21,11 +21,11 @@ export function ToolGuide({ title, description, blocks, faq }: {
 }) {
   const { t } = useTranslation("common");
   return (
-    <Card as="section" className="tool-guide gap-0 overflow-visible rounded-none bg-transparent py-0 shadow-none ring-0" aria-labelledby="tool-guide-title">
-      <div className="content-heading">
-        <div><p className="eyebrow text-muted-foreground">{t("guide.eyebrow")}</p><h2 id="tool-guide-title">{title}</h2><p>{description}</p></div>
+    <Card as="section" data-ui-component="tool-guide" className="ui-tool-guide gap-0 overflow-visible rounded-none bg-transparent py-0 shadow-none ring-0" aria-labelledby="tool-guide-title">
+      <div className="ui-tool-guide-heading">
+        <div><p className="ui-eyebrow text-muted-foreground">{t("guide.eyebrow")}</p><h2 id="tool-guide-title">{title}</h2><p>{description}</p></div>
       </div>
-      <div className="tool-guide-grid">
+      <div className="ui-tool-guide-grid">
         {blocks.map((block) => (
           <Card as="article" size="sm" className="gap-2 rounded-3xl border p-5 py-5 shadow-sm ring-0" key={block.title}>
             <h3>{block.title}</h3>
@@ -34,7 +34,7 @@ export function ToolGuide({ title, description, blocks, faq }: {
           </Card>
         ))}
       </div>
-      <div className="tool-faq">
+      <div className="ui-tool-faq">
         <h2>{t("guide.faq")}</h2>
         {faq.map((item) => (
           <details key={item.question}>

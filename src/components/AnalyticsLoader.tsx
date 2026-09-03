@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { CONSENT_EVENT, getPrivacyConsent, initializeGoogleConsentMode, updateGoogleConsent, type PrivacyConsent } from "./privacyConsent";
+import { isLocalQaBuild } from "./localQa";
 
 const GOOGLE_ANALYTICS_ID = "G-CFSK50SX9R";
 const NAVER_ANALYTICS_ID = "1025dd835558ee0";
@@ -41,7 +42,7 @@ export function AnalyticsLoader({ disabled = false }: { disabled?: boolean }) {
 
   useEffect(() => {
     updateGoogleConsent(consent);
-    if (!import.meta.env.PROD || disabled || consent !== "granted") {
+    if (!import.meta.env.PROD || isLocalQaBuild || disabled || consent !== "granted") {
       resetPageViewState();
       return;
     }
@@ -49,7 +50,7 @@ export function AnalyticsLoader({ disabled = false }: { disabled?: boolean }) {
   }, [consent, disabled]);
 
   useEffect(() => {
-    if (!import.meta.env.PROD || disabled || consent !== "granted") return;
+    if (!import.meta.env.PROD || isLocalQaBuild || disabled || consent !== "granted") return;
     const path = `${location.pathname}${location.search}`;
     const timer = window.setTimeout(() => {
       requestGooglePageView(path);
@@ -62,7 +63,7 @@ export function AnalyticsLoader({ disabled = false }: { disabled?: boolean }) {
 }
 
 export function trackToolOpen(toolId: string, menuSource: string, contentLanguage: "ko" | "en") {
-  if (!import.meta.env.PROD || !initialized || getPrivacyConsent() !== "granted") return;
+  if (!import.meta.env.PROD || isLocalQaBuild || !initialized || getPrivacyConsent() !== "granted") return;
   const safeToolId = sanitizeEventValue(toolId);
   const safeMenuSource = sanitizeEventValue(menuSource);
 

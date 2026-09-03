@@ -15,9 +15,9 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
 
   assert.equal(consumers.length, 22);
   assert.match(source, /<Card as="section"[\s\S]*?aria-labelledby="tool-guide-title"/);
-  assert.match(source, /className="content-heading"[\s\S]*?t\("guide\.eyebrow"\)[\s\S]*?<h2 id="tool-guide-title"/);
-  assert.match(source, /className="tool-guide-grid"[\s\S]*?<Card as="article"[\s\S]*?block\.paragraphs[\s\S]*?block\.items/);
-  assert.match(source, /className="tool-faq"[\s\S]*?t\("guide\.faq"\)[\s\S]*?<details[\s\S]*?<summary[\s\S]*?<p>/);
+  assert.match(source, /data-ui-component="tool-guide"[\s\S]*?className="ui-tool-guide-heading"[\s\S]*?t\("guide\.eyebrow"\)[\s\S]*?<h2 id="tool-guide-title"/);
+  assert.match(source, /className="ui-tool-guide-grid"[\s\S]*?<Card as="article"[\s\S]*?block\.paragraphs[\s\S]*?block\.items/);
+  assert.match(source, /className="ui-tool-faq"[\s\S]*?t\("guide\.faq"\)[\s\S]*?<details[\s\S]*?<summary[\s\S]*?<p>/);
 });
 
 test("OperationProgress keeps W-D stage rows, active spinner, percentages, and progress semantics", () => {
@@ -29,10 +29,10 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   assert.equal(consumers.length, 14);
   assert.match(source, /entry\.id === activeLogId \|\| Boolean\(entry\.stageKey && entry\.stageKey === activeStageKey\)/);
   assert.match(source, /isCurrent && status === "running" \? LoaderCircle : Circle/);
-  assert.match(source, /className=\{isCurrent && status === "running" \? "spin" : ""\}/);
-  assert.match(source, /className="operation-log-progress">\{entry\.progress\}%<\/b>/);
-  assert.match(source, /<ol[\s\S]*?className="operation-log"[\s\S]*?aria-live="polite"[\s\S]*?key=\{entry\.id\}/);
-  assert.match(source, /<Progress[\s\S]*?className="operation-progress-track[\s\S]*?value=\{progress\}[\s\S]*?aria-label=\{message\}/);
+  assert.match(source, /className=\{isCurrent && status === "running" \? "animate-spin" : ""\}/);
+  assert.match(source, /className="ui-operation-log-progress">\{entry\.progress\}%<\/b>/);
+  assert.match(source, /<ol[\s\S]*?className="ui-operation-log"[\s\S]*?aria-live="polite"[\s\S]*?key=\{entry\.id\}/);
+  assert.match(source, /<Progress[\s\S]*?className="ui-operation-progress-track[\s\S]*?value=\{progress\}[\s\S]*?aria-label=\{message\}/);
   assert.match(progressSource, /ProgressPrimitive\.Root[\s\S]*?value=\{value\}/);
   assert.match(baseProgressSource, /'aria-valuenow': clampedValue/);
   for (const declaration of ["progressIndicatorClasses", "progressStateClasses"]) {
@@ -46,10 +46,10 @@ test("ToolCard keeps a link root, analytics behavior, and all six accent identit
   const source = read("src/components/ToolCard.tsx");
   const registry = read("src/app/toolRegistry.ts");
 
-  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?className=\{cn\(`tool-card accent-\$\{tool\.accent\}/);
+  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{tool\.accent\}/);
   assert.match(source, /to=\{tool\.path\}/);
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
-  assert.match(source, /tool-icon accent-\$\{tool\.accent\}/);
+  assert.match(source, /ui-tool-icon ui-accent-\$\{tool\.accent\}/);
   for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) {
     assert.match(registry, new RegExp(`accent: "${accent}"`));
   }
@@ -63,7 +63,7 @@ test("LanguageSwitcher keeps its public prop and KO/EN group toggle accessibilit
   assert.match(source, /export function LanguageSwitcher\(\{ compact = false \}: \{ compact\?: boolean \}\)/);
   assert.match(source, /<ToggleGroup[\s\S]*?value=\{\[language\]\}[\s\S]*?aria-label=\{t\("language\.switchLabel"\)\}/);
   assert.match(source, /\(\["ko", "en"\] as const\)\.map/);
-  assert.match(source, /<ToggleGroupItem[\s\S]*?value=\{item\}[\s\S]*?className=\{language === item \? "selected" : ""\}/);
+  assert.match(source, /<ToggleGroupItem[\s\S]*?value=\{item\}[\s\S]*?className=\{language === item \? "ui-selected" : ""\}/);
   assert.match(toggleGroupSource, /role: 'group'/);
   assert.match(toggleSource, /'aria-pressed': pressed/);
 });

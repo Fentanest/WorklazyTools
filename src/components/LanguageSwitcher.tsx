@@ -23,7 +23,8 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
 
   return (
     <ToggleGroup
-      className={`language-switcher${compact ? " compact" : ""}`}
+      data-ui-component="language-switcher"
+      className={`ui-language-switcher${compact ? " ui-compact" : ""}`}
       value={[language]}
       onValueChange={(nextLanguages) => {
         const nextLanguage = nextLanguages.at(-1) as AppLanguage | undefined;
@@ -36,7 +37,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
         <ToggleGroupItem
           key={item}
           value={item}
-          className={language === item ? "selected" : ""}
+          className={language === item ? "ui-selected" : ""}
         >
           {item.toUpperCase()}
         </ToggleGroupItem>

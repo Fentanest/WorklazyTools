@@ -72,11 +72,12 @@ export function OperationProgress({
   return (
     <Card
       as="section"
-      className={`operation-progress accent-${accent} status-${status}${compact ? " compact" : ""} gap-0 rounded-3xl border p-4 py-4 shadow-md ring-0`}
+      data-ui-component="operation-progress"
+      className={`ui-operation-progress ui-accent-${accent} ui-status-${status}${compact ? " ui-compact" : ""} gap-0 rounded-3xl border p-4 py-4 shadow-md ring-0`}
       aria-label={displayTitle}
     >
-      <div className="operation-progress-heading">
-        <span className={cn("operation-state-icon", status === "error" ? "bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300" : progressStateClasses[accent])}><StateIcon className={status === "running" ? "spin" : ""} size={17} /></span>
+      <div className="ui-operation-progress-heading">
+        <span className={cn("ui-operation-state-icon", status === "error" ? "bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300" : progressStateClasses[accent])}><StateIcon className={status === "running" ? "animate-spin" : ""} size={17} /></span>
         <div>
           <small className="text-muted-foreground">{displayTitle}</small>
           <strong>{stateLabel}</strong>
@@ -85,7 +86,7 @@ export function OperationProgress({
       </div>
 
       <Progress
-        className="operation-progress-track block h-2 gap-0"
+        className="ui-operation-progress-track block h-2 gap-0"
         value={progress}
         aria-label={message}
       >
@@ -94,23 +95,23 @@ export function OperationProgress({
           className={cn("block h-full rounded-full", status === "error" ? "bg-red-700" : progressIndicatorClasses[accent])}
         />
       </Progress>
-      <p className="operation-current-message" aria-live="polite">{message}</p>
+      <p className="ui-operation-current-message" aria-live="polite">{message}</p>
 
-      <Button className="operation-log-toggle h-auto rounded-none text-muted-foreground" variant="ghost" type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>
+      <Button className="ui-operation-log-toggle h-auto rounded-none text-muted-foreground max-[620px]:min-h-11" variant="ghost" type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>
         {t("progress.logs", { count: logs.length })}
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </Button>
 
       {expanded && (
-        <ol ref={logRef} className="operation-log" aria-live="polite" aria-relevant="additions text">
+        <ol ref={logRef} className="ui-operation-log" aria-live="polite" aria-relevant="additions text">
           {logs.map((entry) => {
             const isCurrent = entry.id === activeLogId || Boolean(entry.stageKey && entry.stageKey === activeStageKey);
             const Icon = entry.status === "success" ? CheckCircle2 : entry.status === "error" ? AlertCircle : isCurrent && status === "running" ? LoaderCircle : Circle;
             return (
-              <li className={cn(`log-${entry.status}${isCurrent ? " current" : ""}`, "text-muted-foreground", entry.status === "success" && "text-green-700 dark:text-green-300", entry.status === "error" && "text-red-700 dark:text-red-300")} key={entry.id}>
-                <Icon className={isCurrent && status === "running" ? "spin" : ""} size={13} />
+              <li className={cn(`ui-log-${entry.status}${isCurrent ? " ui-current" : ""}`, "text-muted-foreground", entry.status === "success" && "text-green-700 dark:text-green-300", entry.status === "error" && "text-red-700 dark:text-red-300")} key={entry.id}>
+                <Icon className={isCurrent && status === "running" ? "animate-spin" : ""} size={13} />
                 <span>{entry.message}</span>
-                <b className="operation-log-progress">{entry.progress}%</b>
+                <b className="ui-operation-log-progress">{entry.progress}%</b>
                 <time className="text-muted-foreground">+{formatElapsed(entry.elapsedMs, t)}</time>
               </li>
             );

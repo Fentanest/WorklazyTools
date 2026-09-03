@@ -137,12 +137,12 @@ try {
     });
 
     await page.goto(`${baseUrl}/ko/tools/excel-merger/`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector('.ios-switch[aria-label="XLS 수식 보존"]');
+    await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"]');
     await page.waitForFunction(() => navigator.serviceWorker.controller?.scriptURL.endsWith("/service-worker.js"));
 
     await Promise.all([
       page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-      page.click('.ios-switch[aria-label="XLS 수식 보존"]'),
+      page.click('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"]'),
     ]);
     await page.waitForFunction(() => location.pathname === "/ko/tools/excel-merger/xls-preserve/");
     await page.waitForSelector('input[type="file"]');

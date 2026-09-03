@@ -77,8 +77,8 @@ try {
     await page.waitForSelector(".excel-cleaner-preview");
     await page.type(".excel-cleaner-rule textarea", " ");
     await page.waitForSelector(".excel-cleaner-stale");
-    await page.click(".excel-cleaner-actions .primary-button");
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const exactDownloads = await downloadLinks(page, client, downloads, "exact");
     if (exactDownloads.length !== 1 || !exactDownloads[0].name.endsWith(".xlsx")) throw new Error(`Single input output topology failed: ${JSON.stringify(exactDownloads.map((item) => item.name))}`);
     const exact = await inspectCleanerWorkbook(exactDownloads[0].bytes, "Data");
@@ -89,8 +89,8 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-cleaner-file"]').length === 3 && document.querySelector('[data-testid="excel-cleaner-file"] .inline-notice.error'));
     const damagedMessage = await page.$eval('[data-testid="excel-cleaner-file"] .inline-notice.error', (element) => element.textContent || "");
     if (!damagedMessage.includes("파일 구조") || damagedMessage.includes("DAMAGED_FILE")) throw new Error(`Damaged-file isolation leaked an internal code: ${damagedMessage}`);
-    await page.click(".excel-cleaner-actions .primary-button");
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const multiDownloads = await downloadLinks(page, client, downloads, "multi");
     const xlsx = multiDownloads.filter((item) => item.name.endsWith(".xlsx"));
     const zip = multiDownloads.find((item) => item.name.endsWith(".zip"));
@@ -101,29 +101,29 @@ try {
 
     await openCleaner(page);
     await upload(page, path.join(temporaryDirectory, "dangerous.csv"), 1);
-    await page.click('.segmented-control button:nth-child(2)');
-    await page.click(".excel-cleaner-actions .primary-button");
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.click('.ui-segmented-control button:nth-child(2)');
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     await page.waitForSelector('[data-testid="csv-risk-warning"]');
     const rawUrl = await page.$eval('.excel-report-downloads a[download$=".csv"]', (anchor) => anchor.href);
     const rawCsv = await downloadLinks(page, client, downloads, "csv-raw");
     const rawText = new TextDecoder().decode(rawCsv[0].bytes);
     if (!rawText.includes("=1+1") || rawText.includes("'=1+1")) throw new Error(`CSV original mode changed risky source text: ${rawText}`);
-    await page.click('.settings-row button[role="switch"]');
-    await page.click(".excel-cleaner-actions .primary-button");
+    await page.click(':is(.settings-row, .ui-settings-row) button[role="switch"]');
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
     await page.waitForFunction((url) => globalThis.__excelCleanerRevokedUrls.includes(url), {}, rawUrl);
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
     const safeCsv = await downloadLinks(page, client, downloads, "csv-safe");
     const safeText = new TextDecoder().decode(safeCsv[0].bytes);
     if (!safeText.includes("'=1+1") || await page.$('[data-testid="csv-risk-warning"]')) throw new Error(`CSV safe mode did not prefix and clear its warning: ${safeText}`);
 
     await openCleaner(page);
     await upload(page, path.join(temporaryDirectory, "complex-formula.xlsx"), 1);
-    await page.click(".excel-cleaner-actions .primary-button");
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
     await page.waitForFunction(() => document.querySelector(".excel-cleaner-results .inline-notice.error")?.textContent?.includes("확인"));
     const formulaFailure = await page.$eval(".excel-cleaner-results .inline-notice.error", (element) => element.textContent || "");
-    await page.click('.settings-row button[role="switch"]');
-    await page.click(".excel-cleaner-actions .primary-button");
+    await page.click(':is(.settings-row, .ui-settings-row) button[role="switch"]');
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
     await page.waitForFunction(() => document.querySelectorAll('.excel-report-downloads a[download$=".xlsx"]').length === 1);
     const degraded = await downloadLinks(page, client, downloads, "formula-degraded");
     const degradedBook = new ExcelJS.Workbook();
@@ -137,30 +137,30 @@ try {
     const redosRule = JSON.parse(await page.$eval(".excel-cleaner-rule textarea", (element) => element.value));
     redosRule.pattern = "(a+)+$";
     await replaceTextarea(page, ".excel-cleaner-rule textarea", JSON.stringify(redosRule, null, 2));
-    await page.click(".excel-cleaner-actions .primary-button");
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
     await page.waitForFunction(() => document.querySelector(".excel-cleaner-results .inline-notice.error")?.textContent?.includes("30초"), { timeout: 60_000 });
     const watchdogFailure = await page.$eval(".excel-cleaner-results .inline-notice.error", (element) => element.textContent || "");
     if (!watchdogFailure.includes(redosRule.id) || watchdogFailure.includes("WORKER_TIMEOUT")) throw new Error(`Regex watchdog did not identify the rule safely: ${watchdogFailure}`);
     redosRule.pattern = "a+";
     await replaceTextarea(page, ".excel-cleaner-rule textarea", JSON.stringify(redosRule, null, 2));
-    await page.click(".excel-cleaner-actions .primary-button");
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
     await page.waitForFunction(() => document.querySelectorAll('.excel-report-downloads a[download$=".xlsx"]').length === 1);
 
     await openCleaner(page);
     await upload(page, largeCsv, 1);
-    await page.click(".excel-cleaner-actions .primary-button");
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
     await page.waitForSelector(".cancel-operation button");
     await page.click(".cancel-operation button");
-    await page.waitForFunction(() => document.querySelector(".operation-progress.status-error")?.textContent?.includes("취소"));
-    await page.click(".excel-cleaner-actions .primary-button");
-    await page.waitForSelector(".operation-progress.status-success");
+    await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-error")?.textContent?.includes("취소"));
+    await page.click(".excel-cleaner-actions :is(.primary-button, .ui-primary-button)");
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
 
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
     await openCleaner(page);
     const mobile = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       addButtonHeight: document.querySelector(".excel-cleaner-add-rule button")?.getBoundingClientRect().height || 0,
-      fileButtonHeight: document.querySelector(".drop-zone .secondary-button")?.getBoundingClientRect().height || 0,
+      fileButtonHeight: document.querySelector("[data-ui-part=drop-target] [data-slot=button]")?.getBoundingClientRect().height || 0,
     }));
     if (mobile.overflow > 1 || mobile.addButtonHeight < 40 || mobile.fileButtonHeight < 40) throw new Error(`Mobile overflow or button alternative failed: ${JSON.stringify(mobile)}`);
 

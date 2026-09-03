@@ -30,13 +30,13 @@ try {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto(`${baseUrl}/ko/tools/office-editor`, { waitUntil: "networkidle0" });
-  await page.waitForSelector(".office-landing-drop .drop-zone");
+  await page.waitForSelector(".office-landing-drop [data-ui-part=drop-target]");
   const landingBoundary = await page.evaluate(() => ({
     ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
     dropHint: document.querySelector(".office-landing-drop")?.textContent || "",
   }));
   if (!landingBoundary.dropHint.includes("자동")) throw new Error(`Office landing drop is incomplete: ${JSON.stringify(landingBoundary)}`);
-  await dropFile(page, ".office-landing-drop .drop-zone", documentPath);
+  await dropFile(page, ".office-landing-drop [data-ui-part=drop-target]", documentPath);
   await page.waitForFunction(() => location.pathname.endsWith("/tools/office-editor/app/"));
   await page.waitForSelector(".office-editor-app");
   const boundary = await page.evaluate(() => ({
@@ -55,8 +55,8 @@ try {
   await page.evaluate(() => {
     window.__officeProgressSamples = [];
     new MutationObserver(() => {
-      const progress = document.querySelector(".operation-progress-track")?.getAttribute("aria-valuenow") || "";
-      const message = document.querySelector(".operation-current-message")?.textContent || "";
+      const progress = document.querySelector(".ui-operation-progress-track")?.getAttribute("aria-valuenow") || "";
+      const message = document.querySelector(".ui-operation-current-message")?.textContent || "";
       const sample = `${progress}:${message}`;
       if (message && !window.__officeProgressSamples.includes(sample)) window.__officeProgressSamples.push(sample);
     }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
@@ -105,7 +105,7 @@ try {
   await page.evaluate(() => {
     window.__officeProgressSamples = [];
     new MutationObserver(() => {
-      const message = document.querySelector(".operation-current-message")?.textContent || "";
+      const message = document.querySelector(".ui-operation-current-message")?.textContent || "";
       if (message && !window.__officeProgressSamples.includes(message)) window.__officeProgressSamples.push(message);
     }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
   });
@@ -114,7 +114,7 @@ try {
   const cachedError = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
   if (cachedError) throw new Error(`Cached office editor start reported an error: ${cachedError}`);
   const cacheReuse = await page.evaluate(async () => {
-    const messages = Array.from(document.querySelectorAll(".operation-log li"), (item) => item.textContent || "");
+    const messages = Array.from(document.querySelectorAll(".ui-operation-log li"), (item) => item.textContent || "");
     const cache = await caches.open("worklazy-office-2026-08-26");
     const keys = await cache.keys();
     return { messages, assetCount: keys.filter((request) => request.url.includes("/vendor/zetaoffice/")).length };

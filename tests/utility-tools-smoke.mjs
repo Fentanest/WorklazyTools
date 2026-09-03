@@ -24,7 +24,7 @@ try {
 
   await page.goto(koBaseUrl, { waitUntil: "networkidle0" });
   await page.waitForSelector(".privacy-consent");
-  await page.click(".privacy-consent .primary-button");
+  await page.click(".privacy-consent :is(.primary-button, .ui-primary-button)");
   await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent") === "granted");
   await page.waitForFunction(() => (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"));
   const analyticsBootstrap = await page.evaluate(() => ({
@@ -35,7 +35,7 @@ try {
   if (!analyticsBootstrap.google || !analyticsBootstrap.naver || analyticsBootstrap.malformedCommands) {
     throw new Error(`Analytics bootstrap is incomplete or uses malformed gtag commands: ${JSON.stringify(analyticsBootstrap)}`);
   }
-  const languageSwitcher = await page.$eval(".language-switcher", (group) => ({
+  const languageSwitcher = await page.$eval(".ui-language-switcher", (group) => ({
     tagName: group.tagName,
     role: group.getAttribute("role"),
     label: group.getAttribute("aria-label") || "",
@@ -45,12 +45,12 @@ try {
     || JSON.stringify(languageSwitcher.values) !== JSON.stringify([{ text: "KO", pressed: "true" }, { text: "EN", pressed: "false" }])) {
     throw new Error(`Language switcher accessibility contract failed: ${JSON.stringify(languageSwitcher)}`);
   }
-  await page.focus('.desktop-language-switcher .language-switcher button[aria-pressed="true"]');
+  await page.focus('.desktop-language-switcher .ui-language-switcher button[aria-pressed="true"]');
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Space");
   await page.waitForFunction(() => location.pathname.startsWith("/en") && document.documentElement.lang === "en"
-    && document.querySelector('.desktop-language-switcher .language-switcher button:nth-child(2)')?.getAttribute("aria-pressed") === "true");
-  await page.click(".desktop-language-switcher .language-switcher button:first-child");
+    && document.querySelector('.desktop-language-switcher .ui-language-switcher button:nth-child(2)')?.getAttribute("aria-pressed") === "true");
+  await page.click(".desktop-language-switcher .ui-language-switcher button:first-child");
   await page.waitForFunction(() => location.pathname.startsWith("/ko") && document.documentElement.lang === "ko");
   const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
@@ -64,7 +64,7 @@ try {
   }
 
   await page.goto(`${koBaseUrl}/tools`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .tool-card").length === 20);
+  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .ui-tool-card").length === 20);
   const grid = await page.$eval(".all-tools-grid", (element) => ({ columns: getComputedStyle(element).gridTemplateColumns.split(" ").length, width: element.getBoundingClientRect().width }));
   if (grid.columns !== 4 || grid.width < 900) throw new Error(`Tool grid is not four columns: ${JSON.stringify(grid)}`);
   const categoryOverview = await page.evaluate(() => ({
@@ -76,11 +76,11 @@ try {
   if (categoryOverview.filters !== 6 || categoryOverview.sections !== 5 || categoryOverview.repeatedLocalBadges !== 0 || !categoryOverview.headings.includes("이미지·영상·오디오")) {
     throw new Error(`Tool categories are incomplete: ${JSON.stringify(categoryOverview)}`);
   }
-  const toolCards = await page.$$eval(".all-tools-grid .tool-card", (cards) => cards.map((card) => ({
+  const toolCards = await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.map((card) => ({
     tagName: card.tagName,
     slot: card.getAttribute("data-slot"),
-    accent: Array.from(card.classList).find((name) => name.startsWith("accent-")),
-    iconAccent: Array.from(card.querySelector(".tool-icon")?.classList || []).find((name) => name.startsWith("accent-")),
+    accent: Array.from(card.classList).find((name) => name.startsWith("ui-accent-")),
+    iconAccent: Array.from(card.querySelector(".ui-tool-icon")?.classList || []).find((name) => name.startsWith("ui-accent-")),
     href: card.getAttribute("href"),
   })));
   if (toolCards.length !== 20 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== card.iconAccent)) {
@@ -91,14 +91,14 @@ try {
   const darkSelectedText = await page.$eval(".tool-category-filter button.selected", (element) => getComputedStyle(element).color);
   if (darkSelectedText === "rgb(255, 255, 255)") throw new Error("Selected tool category still uses invisible white text in dark mode.");
   await page.click('.tool-category-filter button[aria-label^="이미지·영상·오디오"]');
-  await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".tool-card").length === 3);
+  await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 3);
   await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
   await page.click(".tool-category-filter button:first-child");
   await page.type('.tool-search input[aria-label="도구 검색"]', "비밀번호");
-  await page.waitForFunction(() => document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".tool-card").length === 1 && document.querySelector(".tool-category-heading h2")?.textContent === "보안·공유");
+  await page.waitForFunction(() => document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 1 && document.querySelector(".tool-category-heading h2")?.textContent === "보안·공유");
   await page.setViewport({ width: 390, height: 844 });
   await page.goto(`${koBaseUrl}/tools`, { waitUntil: "networkidle0" });
-  await page.waitForSelector(".all-tools-grid .tool-card");
+  await page.waitForSelector(".all-tools-grid .ui-tool-card");
   const mobileToolsLayout = await page.evaluate(() => ({
     columns: getComputedStyle(document.querySelector(".all-tools-grid")).gridTemplateColumns.split(" ").length,
     pageWidth: document.documentElement.scrollWidth,
@@ -184,14 +184,14 @@ try {
   await page.setViewport({ width: 1440, height: 1000 });
 
   await page.goto(`${koBaseUrl}/tools/text-merger`, { waitUntil: "networkidle0" });
-  const toolGuide = await page.$eval(".tool-guide", (guide) => ({
+  const toolGuide = await page.$eval(".ui-tool-guide", (guide) => ({
     tagName: guide.tagName,
     slot: guide.getAttribute("data-slot"),
     labelledBy: guide.getAttribute("aria-labelledby"),
-    eyebrow: guide.querySelector(".content-heading .eyebrow")?.textContent,
-    titleId: guide.querySelector(".content-heading h2")?.id,
-    articles: Array.from(guide.querySelectorAll(".tool-guide-grid > article"), (article) => article.getAttribute("data-slot")),
-    faq: Array.from(guide.querySelectorAll(".tool-faq details"), (item) => Boolean(item.querySelector("summary") && item.querySelector("p"))),
+    eyebrow: guide.querySelector(".ui-tool-guide-heading .ui-eyebrow")?.textContent,
+    titleId: guide.querySelector(".ui-tool-guide-heading h2")?.id,
+    articles: Array.from(guide.querySelectorAll(".ui-tool-guide-grid > article"), (article) => article.getAttribute("data-slot")),
+    faq: Array.from(guide.querySelectorAll(".ui-tool-faq details"), (item) => Boolean(item.querySelector("summary") && item.querySelector("p"))),
   }));
   if (toolGuide.tagName !== "SECTION" || toolGuide.slot !== "card" || toolGuide.labelledBy !== "tool-guide-title"
     || toolGuide.eyebrow !== "안내" || toolGuide.titleId !== "tool-guide-title" || !toolGuide.articles.length
@@ -260,7 +260,7 @@ try {
 
   await page.goto(`${koBaseUrl}/tools/security-tools`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.querySelector(".password-output input")?.value.length === 20);
-  await page.click(".primary-button");
+  await page.click(":is(.primary-button, .ui-primary-button)");
   await page.waitForSelector(".strength-meter");
   const passwordStrengthCopy = await page.$eval(".security-page", (element) => element.textContent || "");
   if (!passwordStrengthCopy.includes("예상 해독 시간") || !passwordStrengthCopy.includes("초당 100억 회") || passwordStrengthCopy.includes("오프라인 고속 공격") || passwordStrengthCopy.includes("centuries")) {
@@ -310,8 +310,8 @@ try {
     const transfer = new DataTransfer(); transfer.items.add(new File([blob], "privacy.png", { type: "image/png" }));
     const input = document.querySelector('.image-privacy-page input[type="file"]'); Object.defineProperty(input, "files", { configurable: true, value: transfer.files }); input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.waitForFunction(() => !document.querySelector(".image-privacy-page .primary-button")?.disabled);
-  await page.click(".image-privacy-page .primary-button");
+  await page.waitForFunction(() => !document.querySelector(".image-privacy-page :is(.primary-button, .ui-primary-button)")?.disabled);
+  await page.click(".image-privacy-page :is(.primary-button, .ui-primary-button)");
   await page.waitForSelector(".clean-result");
 
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "networkidle0" });
@@ -374,7 +374,7 @@ try {
     if (localized.lang !== "en" || localized.korean.length || !localized.koAlternate || !localized.enAlternate) throw new Error(`English localization is incomplete at ${route}: ${JSON.stringify(localized)}`);
   }
   await page.goto(`${baseUrl}/en/tools/`, { waitUntil: "networkidle0" });
-  const englishToolCount = await page.$$eval(".all-tools-grid .tool-card", (cards) => cards.length);
+  const englishToolCount = await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.length);
   if (englishToolCount !== 19) throw new Error(`English tool catalog should hide HWP editor: ${englishToolCount}`);
   await page.goto(`${baseUrl}/en/tools/hwp-editor`, { waitUntil: "networkidle0" });
   if (new URL(page.url()).pathname !== "/en/tools") throw new Error(`English HWP editor was not hidden: ${page.url()}`);
@@ -387,7 +387,7 @@ async function clickButton(page, text) { const clicked = await page.evaluate((la
 
 async function assertPairedEditors(page, route) {
   const sizes = await page.$eval(".utility-editor-grid", (grid) => ({
-    cards: Array.from(grid.querySelectorAll(":scope > .section-card"), (element) => element.getBoundingClientRect().height),
+    cards: Array.from(grid.querySelectorAll(":scope > .ui-section-card"), (element) => element.getBoundingClientRect().height),
     textareas: Array.from(grid.querySelectorAll("textarea"), (element) => element.getBoundingClientRect().height),
   }));
   if (sizes.cards.length !== 2 || sizes.textareas.length !== 2 || Math.abs(sizes.cards[0] - sizes.cards[1]) > 1 || Math.abs(sizes.textareas[0] - sizes.textareas[1]) > 1) {

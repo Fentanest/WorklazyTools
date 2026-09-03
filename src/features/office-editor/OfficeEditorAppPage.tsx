@@ -188,7 +188,7 @@ export function OfficeEditorAppPage() {
     onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = busy ? "none" : "copy"; } }}
     onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
     onDrop={(event) => {
-      if ((event.target as Element).closest(".drop-zone")) return;
+      if ((event.target as Element).closest('[data-ui-part="drop-target"]')) return;
       event.preventDefault();
       setDragging(false);
       if (!busy && event.dataTransfer.files[0]) chooseFile(event.dataTransfer.files[0]);

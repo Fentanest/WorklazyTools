@@ -25,6 +25,8 @@ test("ToggleRow keeps a native button switch with checked and disabled state", (
   assert.match(switchSource, /role: 'switch'/);
   assert.match(switchSource, /'aria-checked': checked/);
   assert.match(uiSource, /<Switch[\s\S]*?checked=\{checked\}[\s\S]*?onCheckedChange=[\s\S]*?aria-label=\{label\}[\s\S]*?disabled=\{disabled\}[\s\S]*?nativeButton[\s\S]*?render=\{<button type="button" \/>\}/);
+  assert.match(uiSource, /data-ui-part="toggle-switch"/);
+  assert.doesNotMatch(uiSource, /<Switch[\s\S]*?className="ios-switch/);
 });
 
 test("FileDropZone keeps accumulation, async reset, keyboard, and drag contracts", () => {
@@ -37,9 +39,11 @@ test("FileDropZone keeps accumulation, async reset, keyboard, and drag contracts
 
 test("the eight adapters preserve their structural and live-region contracts", () => {
   assert.match(uiSource, /export function PageHeader[\s\S]*?<header[\s\S]*?<h1/);
-  assert.match(uiSource, /export function SectionCard[\s\S]*?<Card[\s\S]*?as="section"[\s\S]*?className=\{cn\([\s\S]*?"section-card[\s\S]*?className,[\s\S]*?\)\}/);
-  assert.match(uiSource, /export function FileList[\s\S]*?<Card as="ul"[\s\S]*?<li className="file-row"/);
+  assert.match(uiSource, /export function SectionCard[\s\S]*?<Card[\s\S]*?as="section"[\s\S]*?data-ui-component="section-card"[\s\S]*?className=\{cn\([\s\S]*?"ui-section-card[\s\S]*?className,[\s\S]*?\)\}/);
+  assert.match(uiSource, /export function FileList[\s\S]*?<Card as="ul"[\s\S]*?data-ui-component="file-list"[\s\S]*?<li className="flex/);
   assert.match(uiSource, /export function PrimaryButton[\s\S]*?disabled=\{disabled \|\| loading\}[\s\S]*?aria-busy=\{loading\}/);
+  assert.match(uiSource, /data-ui-component="primary-button"[\s\S]*?ui-primary-button ui-accent-/);
+  assert.doesNotMatch(uiSource.match(/export function PrimaryButton[\s\S]*?export function ResultCard/)?.[0] ?? "", /\bw-full\b/);
   assert.match(uiSource, /export function ResultCard[\s\S]*?<Card as="section"[\s\S]*?aria-live="polite"/);
   assert.doesNotMatch(uiSource, /export function NavigationRow/);
 });

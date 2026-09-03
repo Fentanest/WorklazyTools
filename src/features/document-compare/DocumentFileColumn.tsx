@@ -66,7 +66,7 @@ export function DocumentFileColumn({
         if (!isExternalFileDrag(event)) return;
         event.preventDefault();
         setReceivingFiles(false);
-        if ((event.target as Element).closest(".drop-zone")) return;
+        if ((event.target as Element).closest('[data-ui-part="drop-target"]')) return;
         const dropped = Array.from(event.dataTransfer.files);
         if (dropped.length) onFiles([...files, ...dropped]);
       }}

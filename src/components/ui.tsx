@@ -60,11 +60,11 @@ export function PageHeader({ eyebrow, title, description, children }: {
   children?: ReactNode;
 }) {
   return (
-    <header className="page-header mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+    <header data-ui-component="page-header" className="ui-page-header mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
       <div className="min-w-0">
-        <p className="eyebrow">{eyebrow}</p>
+        <p className="ui-eyebrow">{eyebrow}</p>
         <h1 className="font-heading text-4xl font-medium tracking-tight sm:text-5xl">{title}</h1>
-        <p className="page-description mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">{description}</p>
+        <p className="ui-page-description mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">{description}</p>
       </div>
       {children}
     </header>
@@ -81,13 +81,14 @@ export function SectionCard({ title, description, step, children, className = ""
   return (
     <Card
       as="section"
+      data-ui-component="section-card"
       className={cn(
-        "section-card gap-0 overflow-visible rounded-4xl p-6 [.hwp-editor-focus_&]:overflow-hidden [.hwp-editor-focus_&]:rounded-2xl [.hwp-editor-focus_&]:p-0 [.hwp-editor-focus_&]:ring-0",
+        "ui-section-card gap-0 overflow-visible rounded-4xl p-6 [.hwp-editor-focus_&]:overflow-hidden [.hwp-editor-focus_&]:rounded-2xl [.hwp-editor-focus_&]:p-0 [.hwp-editor-focus_&]:ring-0",
         className,
       )}
     >
-      <div className="section-heading mb-5">
-        {step && <span className="step-number rounded-lg">{step}</span>}
+      <div className="ui-section-heading mb-5">
+        {step && <span className="ui-step-number rounded-lg">{step}</span>}
         <div><h2 className="font-heading font-medium">{title}</h2>{description && <p className="text-muted-foreground">{description}</p>}</div>
       </div>
       {children}
@@ -103,7 +104,8 @@ export function SegmentedControl<T extends string>({ value, options, onChange, l
 }) {
   return (
     <ToggleGroup
-      className="segmented-control grid w-full grid-flow-col auto-cols-fr rounded-full bg-muted p-1"
+      data-ui-component="segmented-control"
+      className="ui-segmented-control grid w-full grid-flow-col auto-cols-fr rounded-full bg-muted p-1"
       value={[value]}
       onValueChange={(nextValues) => {
         const nextValue = nextValues.at(-1) as T | undefined;
@@ -116,7 +118,7 @@ export function SegmentedControl<T extends string>({ value, options, onChange, l
         <ToggleGroupItem
           key={option.value}
           value={option.value}
-          className={cn("min-w-0 flex-1 rounded-3xl px-3 text-muted-foreground", value === option.value && "selected")}
+          className={cn("min-w-0 flex-1 rounded-3xl px-3 text-muted-foreground max-[620px]:min-h-11", value === option.value && "ui-selected")}
         >
           {option.label}
         </ToggleGroupItem>
@@ -133,10 +135,10 @@ export function ToggleRow({ label, description, checked, onChange, disabled = fa
   disabled?: boolean;
 }) {
   return (
-    <div className="settings-row">
+    <div data-ui-component="toggle-row" className="ui-settings-row">
       <div><strong>{label}</strong>{description && <small>{description}</small>}</div>
       <Switch
-        className={cn("ios-switch", checked && "checked")}
+        data-ui-part="toggle-switch"
         checked={checked}
         onCheckedChange={(nextChecked) => onChange(nextChecked)}
         aria-label={label}
@@ -196,15 +198,15 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   };
 
   return (
-    <div className="drop-zone-wrap">
-      {label && <label className="field-label" htmlFor={id}>{label}</label>}
-      <input ref={inputRef} id={id} className="visually-hidden" type="file" accept={accept} multiple={multiple} disabled={disabled} onChange={handleChange} />
+    <div data-ui-component="file-drop-zone" className="ui-drop-zone-wrap">
+      {label && <label className="ui-field-label" htmlFor={id}>{label}</label>}
+      <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple={multiple} disabled={disabled} onChange={handleChange} />
       <Card
+        data-ui-part="drop-target"
         className={cn(
-          `drop-zone accent-${accent}`,
-          "min-h-28 flex-row gap-3 overflow-visible rounded-4xl border border-dashed border-border bg-muted/40 p-4 shadow-none ring-0",
-          dragging && ["dragging", accentDraggingClasses[accent]],
-          disabled && "disabled opacity-50",
+          "relative min-h-28 cursor-pointer flex-row items-center gap-3 overflow-visible rounded-4xl border border-dashed border-border bg-muted/40 p-4 shadow-none ring-0 transition-[border-color,background-color,transform] max-[620px]:flex-wrap max-[620px]:items-start",
+          dragging && ["scale-[.995]", accentDraggingClasses[accent]],
+          disabled && "cursor-not-allowed opacity-50",
         )}
         role="button"
         tabIndex={disabled ? -1 : 0}
@@ -229,10 +231,10 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
         onDragLeave={handleDragLeave}
         onDrop={(event) => { void handleDrop(event); }}
       >
-        <span className={cn("drop-icon rounded-2xl", accentSoftClasses[accent])}>{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
-        <div aria-live="polite"><strong>{files.length ? `${t("files.selected", { count: files.length })}${multiple ? ` · ${t("files.keepAdding")}` : ""}` : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
-        <Button className="secondary-button small h-10 rounded-2xl font-semibold" variant="secondary" size="lg" disabled={disabled} onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</Button>
-        {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> {t("files.added")}</em>}
+        <span className={cn("grid size-[43px] shrink-0 place-items-center rounded-2xl", accentSoftClasses[accent])}>{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
+        <div className="min-w-0 flex-1 max-[620px]:min-w-[calc(100%-60px)]" aria-live="polite"><strong className="mb-1 block text-[15px]">{files.length ? `${t("files.selected", { count: files.length })}${multiple ? ` · ${t("files.keepAdding")}` : ""}` : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
+        <Button className="h-10 rounded-2xl font-semibold max-[620px]:h-11 max-[620px]:w-full" variant="secondary" size="lg" disabled={disabled} onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</Button>
+        {files.length > 0 && <em className="absolute right-3 bottom-2 flex items-center gap-1 text-[13px] font-bold not-italic text-green-700 max-[620px]:static max-[620px]:-mt-1 max-[620px]:w-full max-[620px]:justify-center dark:text-green-300" key={files.length}><Check size={12} /> {t("files.added")}</em>}
       </Card>
     </div>
   );
@@ -246,12 +248,12 @@ export function FileList({ files, onRemove, accent = "blue" }: {
   const { t } = useTranslation("common");
   if (!files.length) return null;
   return (
-    <Card as="ul" className="file-list gap-0 rounded-3xl py-0 shadow-sm ring-0">
+    <Card as="ul" data-ui-component="file-list" className="mt-[11px] gap-0 overflow-hidden rounded-3xl border border-border py-0 shadow-sm ring-0">
       {files.map((file, index) => (
-        <li className="file-row" key={`${file.name}-${file.lastModified}-${index}`}>
-          <span className={cn(`file-type accent-${accent}`, accentSoftClasses[accent])}>{file.name.split(".").pop()?.slice(0, 4).toUpperCase()}</span>
-          <span className="file-meta"><strong>{file.name}</strong><small>{formatBytes(file.size)}</small></span>
-          <Button className="remove-button rounded-full" variant="ghost" size="icon-sm" onClick={() => onRemove(index)} aria-label={t("files.remove", { name: file.name })}><X size={17} /></Button>
+        <li className="flex min-h-[53px] items-center gap-2.5 border-t border-border bg-white/40 p-2 first:border-t-0 dark:bg-white/[.025]" key={`${file.name}-${file.lastModified}-${index}`}>
+          <span className={cn("grid h-[31px] w-10 place-items-center rounded-lg text-xs font-extrabold", accentSoftClasses[accent])}>{file.name.split(".").pop()?.slice(0, 4).toUpperCase()}</span>
+          <span className="min-w-0 flex-1"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{file.name}</strong><small className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-sm text-muted-foreground">{formatBytes(file.size)}</small></span>
+          <Button className="size-[31px] rounded-full text-muted-foreground hover:bg-red-500/10 hover:text-red-600 max-[620px]:size-11" variant="ghost" size="icon-sm" onClick={() => onRemove(index)} aria-label={t("files.remove", { name: file.name })}><X size={17} /></Button>
         </li>
       ))}
     </Card>
@@ -267,13 +269,14 @@ export function PrimaryButton({ children, disabled = false, loading = false, onC
 }) {
   return (
     <Button
-      className={cn(`primary-button accent-${accent}`, "h-12 w-full rounded-2xl text-[15px] font-bold", accentButtonClasses[accent])}
+      data-ui-component="primary-button"
+      className={cn(`ui-primary-button ui-accent-${accent}`, "h-12 rounded-2xl text-[15px] font-bold", accentButtonClasses[accent])}
       size="lg"
       disabled={disabled || loading}
       aria-busy={loading}
       onClick={onClick}
     >
-      {loading && <LoaderCircle className="spin" size={19} aria-hidden="true" />}
+      {loading && <LoaderCircle className="animate-spin" size={19} aria-hidden="true" />}
       {children}
     </Button>
   );
@@ -287,9 +290,9 @@ export function ResultCard({ title, message, accent = "blue", children }: {
 }) {
   const { t } = useTranslation("common");
   return (
-    <Card as="section" className={cn(`result-card accent-${accent}`, "grid grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-4xl border p-6 shadow-sm ring-0", accentResultClasses[accent])} aria-live="polite">
-      <span className={cn("result-icon rounded-2xl", accentButtonClasses[accent])}><Check size={24} /></span>
-      <div><p className="eyebrow">{t("status.complete")}</p><h2 className="font-heading font-medium">{title}</h2><p>{message}</p>{children}</div>
+    <Card as="section" data-ui-component="result-card" className={cn(`ui-result-card ui-accent-${accent}`, "grid grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-4xl border p-6 shadow-sm ring-0", accentResultClasses[accent])} aria-live="polite">
+      <span className={cn("ui-result-icon rounded-2xl", accentButtonClasses[accent])}><Check size={24} /></span>
+      <div><p className="ui-eyebrow">{t("status.complete")}</p><h2 className="font-heading font-medium">{title}</h2><p>{message}</p>{children}</div>
     </Card>
   );
 }

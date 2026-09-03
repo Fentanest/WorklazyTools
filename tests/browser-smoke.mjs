@@ -106,12 +106,12 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (rotationState.data !== "90" || !rotationState.transform.includes("rotate(90deg)")) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
   }
-  await page.waitForFunction(() => !document.querySelector(".summary-card .primary-button")?.disabled);
+  await page.waitForFunction(() => !document.querySelector(".summary-card :is(.primary-button, .ui-primary-button)")?.disabled);
   await clickPrimaryAction(page);
   const immediateFeedback = await page.$eval(".pdf-output-action-zone", (element) => ({
-    running: Boolean(element.querySelector(".operation-progress.status-running")),
+    running: Boolean(element.querySelector(".ui-operation-progress.ui-status-running")),
     ready: Boolean(element.querySelector(".pdf-download-compact .result-download")),
-    buttonText: element.querySelector(".primary-button")?.textContent || "",
+    buttonText: element.querySelector(":is(.primary-button, .ui-primary-button)")?.textContent || "",
   }));
   if (!immediateFeedback.running && !immediateFeedback.ready) throw new Error(`PDF export feedback was not shown beside the action: ${JSON.stringify(immediateFeedback)}`);
   if (immediateFeedback.running && !immediateFeedback.buttonText.includes("만드는 중")) throw new Error(`PDF export button did not announce its running state: ${JSON.stringify(immediateFeedback)}`);
@@ -205,7 +205,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[2], "분할-01");
   await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group.invalid").length === 2);
-  if (!await page.$eval(".summary-card .primary-button", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
+  if (!await page.$eval(".summary-card :is(.primary-button, .ui-primary-button)", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
 
   await page.$eval('.pdf-output-mode-list button:nth-child(3)', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(3)')?.getAttribute("aria-checked") === "true");
@@ -268,7 +268,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const convertInput = await page.$('input[type="file"]');
   await convertInput.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
-  const noOcrButton = await findButtonByText(page, ".pdf-summary-control .segmented-control button", "사용 안 함");
+  const noOcrButton = await findButtonByText(page, ".pdf-summary-control .ui-segmented-control button", "사용 안 함");
   await noOcrButton.click();
   await clickPrimaryAction(page);
   await waitForResult(page);
@@ -346,11 +346,11 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   if (!acceptedFormats.includes(".xlsb") || !acceptedFormats.includes(".xlsm")) {
     throw new Error(`XLSB/XLSM were not exposed as accepted inputs: ${acceptedFormats}`);
   }
-  await dropFiles(page, ".drop-zone", [fixtures.xlsxOne, fixtures.csv, fixtures.xls]);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.xlsxOne, fixtures.csv, fixtures.xls]);
   await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 3);
-  await dropFiles(page, ".drop-zone", [fixtures.xlsb, fixtures.xlsm, fixtures.encryptedXlsx]);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.xlsb, fixtures.xlsm, fixtures.encryptedXlsx]);
   await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 6);
-  const excelAddButton = await page.$eval(".drop-zone .secondary-button", (button) => button.textContent || "");
+  const excelAddButton = await page.$eval("[data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
   if (!excelAddButton.includes("더 추가")) throw new Error(`Excel merger does not expose incremental file addition: ${excelAddButton}`);
   await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
   console.log(`  shared UI adapter keyboard contracts: ${JSON.stringify(uiAdapterKeyboard)}`);
@@ -371,10 +371,10 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   await outputPasswords[0].type("output-pass");
   await outputPasswords[1].type("output-pass");
   await page.waitForFunction(() => {
-    const button = document.querySelector(".summary-card .primary-button");
+    const button = document.querySelector(".summary-card :is(.primary-button, .ui-primary-button)");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.$eval(".summary-card .primary-button", (button) => button.click());
+  await page.$eval(".summary-card :is(.primary-button, .ui-primary-button)", (button) => button.click());
   await waitForResult(page);
   await assertProgressLog(page, "Excel 병합");
 
@@ -394,7 +394,7 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
     return values;
   });
   if (!formulaCells.some((formula) => formula.includes("SUM(A1:A2)"))) throw new Error("Formula was not preserved.");
-  const warningText = await page.$eval(".result-card", (element) => element.textContent || "");
+  const warningText = await page.$eval(".ui-result-card", (element) => element.textContent || "");
   if (!warningText.includes("XLSM의 매크로") || !warningText.includes("XLS 수식 또는 서식을 정밀하게 유지")) {
     throw new Error(`Converted format limitations were not shown after merge: ${warningText}`);
   }
@@ -402,13 +402,13 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
 
 async function assertUiAdapterKeyboardContracts(page, filePath) {
   const initial = await page.evaluate(() => {
-    const group = document.querySelector(".segmented-control");
+    const group = document.querySelector(".ui-segmented-control");
     const options = Array.from(group?.querySelectorAll("button") || []);
     return {
-      pageHeader: document.querySelector(".page-header")?.tagName,
-      sectionCard: document.querySelector(".section-card")?.tagName,
-      dropRole: document.querySelector(".drop-zone")?.getAttribute("role"),
-      dropTabIndex: document.querySelector(".drop-zone")?.getAttribute("tabindex"),
+      pageHeader: document.querySelector(".ui-page-header")?.tagName,
+      sectionCard: document.querySelector(".ui-section-card")?.tagName,
+      dropRole: document.querySelector("[data-ui-part=drop-target]")?.getAttribute("role"),
+      dropTabIndex: document.querySelector("[data-ui-part=drop-target]")?.getAttribute("tabindex"),
       groupRole: group?.getAttribute("role"),
       groupLabel: group?.getAttribute("aria-label") || "",
       pressedStates: options.map((option) => option.getAttribute("aria-pressed")),
@@ -420,37 +420,37 @@ async function assertUiAdapterKeyboardContracts(page, filePath) {
   }
 
   const chooserPromise = page.waitForFileChooser();
-  await page.focus(".drop-zone");
+  await page.focus("[data-ui-part=drop-target]");
   await page.keyboard.press("Enter");
   const chooser = await chooserPromise;
   await chooser.accept([filePath]);
   await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 1);
-  await page.waitForFunction(() => document.querySelector('.drop-zone-wrap input[type="file"]')?.value === "");
+  await page.waitForFunction(() => document.querySelector('.ui-drop-zone-wrap input[type="file"]')?.value === "");
   const drop = await page.evaluate(() => ({
     activeRole: document.activeElement?.getAttribute("role"),
     files: document.querySelectorAll(".excel-file-item").length,
-    inputReset: document.querySelector('.drop-zone-wrap input[type="file"]')?.value === "",
+    inputReset: document.querySelector('.ui-drop-zone-wrap input[type="file"]')?.value === "",
   }));
 
-  const groupButtons = await page.$$(".segmented-control button");
+  const groupButtons = await page.$$(".ui-segmented-control button");
   if (groupButtons.length < 2) throw new Error("SegmentedControl keyboard fixture has fewer than two options.");
   await groupButtons[0].focus();
   await page.keyboard.press("ArrowRight");
-  await page.waitForFunction(() => document.activeElement === document.querySelector(".segmented-control button:nth-child(2)"));
+  await page.waitForFunction(() => document.activeElement === document.querySelector(".ui-segmented-control button:nth-child(2)"));
   await page.keyboard.press("Space");
-  await page.waitForFunction(() => document.querySelector(".segmented-control button:nth-child(2)")?.getAttribute("aria-pressed") === "true");
+  await page.waitForFunction(() => document.querySelector(".ui-segmented-control button:nth-child(2)")?.getAttribute("aria-pressed") === "true");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Space");
-  await page.waitForFunction(() => document.querySelector(".segmented-control button:first-child")?.getAttribute("aria-pressed") === "true");
+  await page.waitForFunction(() => document.querySelector(".ui-segmented-control button:first-child")?.getAttribute("aria-pressed") === "true");
 
-  const switchSelector = '.settings-row button[role="switch"]:not([disabled])';
+  const switchSelector = ':is(.settings-row, .ui-settings-row) button[role="switch"]:not([disabled])';
   await page.waitForSelector(switchSelector);
   const originalSwitchState = await page.$eval(switchSelector, (element) => element.getAttribute("aria-checked"));
   await page.focus(switchSelector);
   await page.keyboard.press("Space");
-  await page.waitForFunction((previous) => document.querySelector('.settings-row button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
+  await page.waitForFunction((previous) => document.querySelector(':is(.settings-row, .ui-settings-row) button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
   await page.keyboard.press("Enter");
-  await page.waitForFunction((expected) => document.querySelector('.settings-row button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
+  await page.waitForFunction((expected) => document.querySelector(':is(.settings-row, .ui-settings-row) button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
 
   return {
     semanticRoles: "passed",
@@ -505,7 +505,7 @@ async function testFormulaTranslation(page, fixtures, tempDir) {
   await input.uploadFile(fixtures.xlsxOne, fixtures.xlsxTwo);
   await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 2);
   await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
-  const verticalButton = await findButtonByText(page, ".segmented-control button", "세로");
+  const verticalButton = await findButtonByText(page, ".ui-segmented-control button", "세로");
   await verticalButton.click();
   await clickPrimaryAction(page);
   await waitForResult(page);
@@ -529,7 +529,7 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   const sheetNames = await page.$$eval(".sheet-file-group .sheet-name-chip > span", (items) => items.map((item) => item.textContent));
   if (sheetNames.join(",") !== "첫째,둘째,셋째,넷째") throw new Error(`Sheet names were not inspected in order: ${sheetNames.join(",")}`);
 
-  const customButton = await findButtonByText(page, ".section-card .segmented-control button", "직접 선택");
+  const customButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "직접 선택");
   await customButton.click();
   const sheetButtons = await page.$$(".sheet-name-list button[aria-pressed]");
   await sheetButtons[0].click();
@@ -537,7 +537,7 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   const customSelected = await page.$$(".sheet-name-list li.selected").then((items) => items.length);
   if (customSelected !== 2) throw new Error(`Direct sheet selection did not update: ${customSelected}`);
 
-  const positionsButton = await findButtonByText(page, ".section-card .segmented-control button", "순번 선택");
+  const positionsButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "순번 선택");
   await positionsButton.click();
   const patternInput = await page.$("#sheet-position-pattern");
   await patternInput.click();
@@ -632,7 +632,7 @@ async function testExcelSheetGridLayout(page, fixtures) {
     throw new Error(`All-sheets mode exposed controls or a desktop duplicate summary: ${JSON.stringify(desktopLayout)}`);
   }
 
-  const customModeButton = await findButtonByText(page, ".section-card .segmented-control button", "직접 선택");
+  const customModeButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "직접 선택");
   await customModeButton.click();
   await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list button[aria-pressed]").length === 39);
   const customContract = await page.evaluate((expectedStyle) => {
@@ -644,6 +644,7 @@ async function testExcelSheetGridLayout(page, fixtures) {
       states: [...new Set(buttons.map((button) => button.getAttribute("aria-pressed")))],
       actions: document.querySelectorAll(".sheet-select-actions").length,
       checkboxes: document.querySelectorAll('.sheet-name-list input[type="checkbox"]').length,
+      appearance: chipStyle ? { display: chipStyle.display, minHeight: chipStyle.minHeight, borderRadius: chipStyle.borderRadius } : null,
       sameAppearance: Boolean(chipStyle && expectedStyle
         && chipStyle.display === expectedStyle.display
         && chipStyle.minHeight === expectedStyle.minHeight
@@ -688,7 +689,7 @@ async function testExcelSheetGridLayout(page, fixtures) {
     throw new Error(`Keyboard focus did not scroll only the chip viewport with a visible focus ring: ${JSON.stringify(keyboardScroll)}`);
   }
 
-  const positionsButton = await findButtonByText(page, ".section-card .segmented-control button", "순번 선택");
+  const positionsButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "순번 선택");
   await positionsButton.click();
   await replaceInputValue(page, await page.$("#sheet-position-pattern"), "2");
   await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 6);
@@ -703,7 +704,7 @@ async function testExcelSheetGridLayout(page, fixtures) {
     throw new Error(`Position mode did not preserve non-interactive status chips: ${JSON.stringify(positionsContract)}`);
   }
 
-  const allButton = await findButtonByText(page, ".section-card .segmented-control button", "모든 시트");
+  const allButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "모든 시트");
   await allButton.click();
   await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 39);
 
@@ -832,7 +833,7 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
     || actual.d5 !== "D 유지" || actual.e5 !== "H 이동" || actual.f5 !== "") {
     throw new Error(`SheetTrim did not preserve short gaps and delete long row/column blocks: ${JSON.stringify(actual)}`);
   }
-  const logText = await page.$eval(".operation-log", (element) => element.textContent || "");
+  const logText = await page.$eval(".ui-operation-log", (element) => element.textContent || "");
   if (!logText.includes("빈 행 3개, 빈 열 3개")) throw new Error(`SheetTrim counts were not logged: ${logText}`);
   const referencedSheet = workbook.worksheets.find((candidate) => candidate.name.includes("참조 대상"));
   const summarySheet = workbook.worksheets.find((candidate) => candidate.name.includes("참조 요약"));
@@ -846,10 +847,10 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
 
 async function testWordCompare(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
-  await dropFiles(page, ".drop-zone", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
-  await dropFiles(page, ".drop-zone", [fixtures.afterDocx], 1);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.afterDocx], 1);
   await page.waitForSelector(".pair-count-error");
-  const disabledForMismatch = await page.$eval(".tool-action-bar .primary-button", (button) => button.disabled);
+  const disabledForMismatch = await page.$eval(".tool-action-bar :is(.primary-button, .ui-primary-button)", (button) => button.disabled);
   if (!disabledForMismatch) throw new Error("Word comparison was not blocked for mismatched file counts.");
 
   await page.evaluate(() => {
@@ -871,7 +872,7 @@ async function testWordCompare(page, fixtures, tempDir) {
   await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 2
     && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 2
     && !document.querySelector(".pair-count-error"));
-  const wordAddButtons = await page.$$eval(".word-file-column .drop-zone .secondary-button", (buttons) => buttons.map((button) => button.textContent || ""));
+  const wordAddButtons = await page.$$eval(".word-file-column [data-ui-part=drop-target] [data-slot=button]", (buttons) => buttons.map((button) => button.textContent || ""));
   if (wordAddButtons.length !== 2 || wordAddButtons.some((label) => !label.includes("더 추가"))) throw new Error(`Word comparison does not expose incremental file addition: ${wordAddButtons.join(", ")}`);
   const draggable = await page.$$eval(".sortable-word-files li", (items) => items.every((item) => item.draggable));
   if (!draggable) throw new Error("Word file order list is not draggable.");
@@ -893,8 +894,8 @@ async function testWordCompare(page, fixtures, tempDir) {
   if (!moveTooltip.title || moveTooltip.title !== moveTooltip.label) throw new Error(`Move-across tooltip is missing: ${JSON.stringify(moveTooltip)}`);
   if (await page.$eval(".pairing-preview ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");
   const defaultAuthorOption = await page.evaluate(() => {
-    const label = Array.from(document.querySelectorAll(".settings-row strong")).find((element) => element.textContent === "변경 내용 작성자 통일");
-    const toggle = label?.closest(".settings-row")?.querySelector("button");
+    const label = Array.from(document.querySelectorAll(":is(.settings-row, .ui-settings-row) strong")).find((element) => element.textContent === "변경 내용 작성자 통일");
+    const toggle = label?.closest(":is(.settings-row, .ui-settings-row)")?.querySelector("button");
     const input = document.querySelector(".revision-author-field input");
     return { checked: toggle?.getAttribute("aria-checked"), inputDisabled: input instanceof HTMLInputElement && input.disabled };
   });
@@ -902,7 +903,7 @@ async function testWordCompare(page, fixtures, tempDir) {
     throw new Error(`Revision-author rewrite was not disabled by default: ${JSON.stringify(defaultAuthorOption)}`);
   }
 
-  await page.click(".tool-action-bar .primary-button");
+  await page.click(".tool-action-bar :is(.primary-button, .ui-primary-button)");
   await waitForResult(page, 240_000);
   await assertProgressLog(page, "문서 비교");
   const resultCards = await page.$$(".word-pair-result-card");
@@ -1001,7 +1002,7 @@ async function testWordCompare(page, fixtures, tempDir) {
   }
   const firstComparedParagraph = await page.$eval(".document-page-row p", (element) => element.textContent || "");
   if (!firstComparedParagraph.startsWith("1. ")) throw new Error(`Word list label was not rendered in the web view: ${firstComparedParagraph}`);
-  const hasCommentTab = await page.$$eval(".document-toolbar .segmented-control button", (buttons) => buttons.some((button) => button.textContent === "메모"));
+  const hasCommentTab = await page.$$eval(".document-toolbar .ui-segmented-control button", (buttons) => buttons.some((button) => button.textContent === "메모"));
   if (hasCommentTab) throw new Error("The standalone comment tab was not removed.");
   await page.waitForSelector(".document-page-row .inline-comment-card");
   const commentParagraphLocations = await page.$$eval(".document-page-row:has(.inline-comment-card) .document-block-meta small", (items) => items.map((item) => item.textContent || ""));
@@ -1077,12 +1078,12 @@ async function testWordCompare(page, fixtures, tempDir) {
 
 async function testWordFormattingBoundaries(page, fixtures) {
   await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
-  await dropFiles(page, ".drop-zone", [fixtures.boundaryBeforeDocx, fixtures.formattingBeforeDocx], 0);
-  await dropFiles(page, ".drop-zone", [fixtures.boundaryAfterDocx, fixtures.formattingAfterDocx], 1);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.boundaryBeforeDocx, fixtures.formattingBeforeDocx], 0);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.boundaryAfterDocx, fixtures.formattingAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
   await clickSetting(page, "Word 변경 추적 (DOCX 전용)");
-  await page.click(".tool-action-bar .primary-button");
-  await page.waitForFunction(() => !document.querySelector(".operation-progress.status-running")
+  await page.click(".tool-action-bar :is(.primary-button, .ui-primary-button)");
+  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
     && (document.querySelector(".word-pair-result-card") || document.querySelector(".error-banner")), { timeout: 240_000 });
   if (await page.$(".error-banner")) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Word boundary fixture failed."));
   const cards = await page.$$eval(".word-pair-result-card", (items) => items.map((item) => item.textContent || ""));
@@ -1100,15 +1101,15 @@ async function testWordFormattingBoundaries(page, fixtures) {
 
 async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
-  await dropFiles(page, ".drop-zone", [fixtures.revisionsBeforeDocx], 0);
-  await dropFiles(page, ".drop-zone", [fixtures.revisionsAfterDocx], 1);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsBeforeDocx], 0);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
   const input = await page.$(".revision-author-field input");
   if (!input || !await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not rendered disabled while rewriting was off.");
   await clickSetting(page, "변경 내용 작성자 통일");
   if (await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input did not become enabled.");
   await replaceInputValue(page, input, "Unified Reviewer");
-  await page.click(".tool-action-bar .primary-button");
+  await page.click(".tool-action-bar :is(.primary-button, .ui-primary-button)");
   await waitForResult(page, 240_000);
   const trackedPath = path.join(tempDir, "word-unified-author.docx");
   await saveBlobLink(page, ".word-pair-result-card .tracked-download", trackedPath);
@@ -1120,7 +1121,7 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
 }
 
 async function waitForResult(page, timeout = 180_000) {
-  await page.waitForFunction(() => !document.querySelector(".operation-progress.status-running")
+  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
     && (document.querySelector(".result-download") || document.querySelector(".error-banner")), { timeout });
   const error = await page.$(".error-banner");
   if (error) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Unknown UI error"));
@@ -1128,13 +1129,13 @@ async function waitForResult(page, timeout = 180_000) {
 
 async function clickPrimaryAction(page) {
   const previousHref = await page.$eval(".result-download", (link) => link.href).catch(() => "");
-  await page.$eval(".summary-card .primary-button", (button) => {
+  await page.$eval(".summary-card :is(.primary-button, .ui-primary-button)", (button) => {
     if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error("The primary action is unavailable.");
     button.click();
   });
   await page.waitForFunction((href) => {
     const result = document.querySelector(".result-download");
-    return Boolean(document.querySelector(".operation-progress.status-running")
+    return Boolean(document.querySelector(".ui-operation-progress.ui-status-running")
       || document.querySelector(".error-banner")
       || !result
       || result.href !== href);
@@ -1142,20 +1143,20 @@ async function clickPrimaryAction(page) {
 }
 
 async function assertProgressLog(page, label) {
-  if (!await page.$(".operation-progress .operation-log")) {
-    await page.$eval(".operation-progress .operation-log-toggle", (button) => button.click());
-    await page.waitForSelector(".operation-progress .operation-log");
+  if (!await page.$(".ui-operation-progress .ui-operation-log")) {
+    await page.$eval(".ui-operation-progress .ui-operation-log-toggle", (button) => button.click());
+    await page.waitForSelector(".ui-operation-progress .ui-operation-log");
   }
-  const state = await page.$eval(".operation-progress", (element) => ({
+  const state = await page.$eval(".ui-operation-progress", (element) => ({
     tagName: element.tagName,
     cardSlot: element.getAttribute("data-slot"),
     className: element.className,
     progress: element.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
     progressSlot: element.querySelector('[role="progressbar"]')?.getAttribute("data-slot"),
-    logs: element.querySelectorAll(".operation-log li").length,
-    logPercentages: Array.from(element.querySelectorAll(".operation-log-progress"), (item) => item.textContent || ""),
+    logs: element.querySelectorAll(".ui-operation-log li").length,
+    logPercentages: Array.from(element.querySelectorAll(".ui-operation-log-progress"), (item) => item.textContent || ""),
     logViewport: (() => {
-      const log = element.querySelector(".operation-log");
+      const log = element.querySelector(".ui-operation-log");
       if (!(log instanceof HTMLOListElement)) return null;
       const style = getComputedStyle(log);
       return {
@@ -1179,8 +1180,8 @@ async function assertProgressLog(page, label) {
 
 async function clickSetting(page, label) {
   await page.evaluate((text) => {
-    const strong = Array.from(document.querySelectorAll(".settings-row strong")).find((element) => element.textContent === text);
-    const button = strong?.closest(".settings-row")?.querySelector("button");
+    const strong = Array.from(document.querySelectorAll(":is(.settings-row, .ui-settings-row) strong")).find((element) => element.textContent === text);
+    const button = strong?.closest(":is(.settings-row, .ui-settings-row)")?.querySelector("button");
     if (!(button instanceof HTMLButtonElement)) throw new Error(`Setting not found: ${text}`);
     button.click();
   }, label);

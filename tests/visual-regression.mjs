@@ -16,6 +16,9 @@ const baselineDirectory = path.join(testDirectory, "visual-baselines");
 const artifactDirectory = process.env.VISUAL_ARTIFACT_DIR
   ? path.resolve(process.env.VISUAL_ARTIFACT_DIR)
   : path.join(os.tmpdir(), "worklazytools-visual-regression");
+const captureDirectory = process.env.VISUAL_CAPTURE_DIR
+  ? path.resolve(process.env.VISUAL_CAPTURE_DIR)
+  : undefined;
 const updateBaselines = process.env.UPDATE_VISUAL_BASELINES === "1";
 const externallyManagedBaseUrl = process.env.TEST_BASE_URL;
 const port = Number.parseInt(process.env.VISUAL_TEST_PORT || "4174", 10);
@@ -34,7 +37,15 @@ try {
   await fs.mkdir(baselineDirectory, { recursive: true });
   await fs.rm(artifactDirectory, { recursive: true, force: true });
   await fs.mkdir(artifactDirectory, { recursive: true });
-  if (!externallyManagedBaseUrl) server = await startViteServer();
+  if (captureDirectory) {
+    if (!captureDirectory.startsWith(`${path.join(repositoryRoot, "tests", "visual-artifacts")}${path.sep}`)) {
+      throw new Error("VISUAL_CAPTURE_DIR must be a child of tests/visual-artifacts.");
+    }
+    await fs.rm(captureDirectory, { recursive: true, force: true });
+    await fs.mkdir(captureDirectory, { recursive: true });
+  }
+  if (updateBaselines) await removeUnexpectedBaselines(expectedNames);
+  if (!externallyManagedBaseUrl) server = await startPreviewServer();
 
   browser = await puppeteer.launch({
     executablePath: chromeExecutable,
@@ -48,9 +59,11 @@ try {
   });
 
   const failures = [];
-  for (const capture of buildCaptureMatrix()) {
+  const captures = buildCaptureMatrix();
+  for (const [index, capture] of captures.entries()) {
     const result = await captureAndCompare(capture);
     if (result) failures.push(result);
+    console.log(`[${index + 1}/${captures.length}] ${capture.name}`);
   }
 
   await assertBaselineSet(expectedNames);
@@ -62,19 +75,25 @@ try {
   console.log(`Visual regression ${mode}: ${expectedNames.length} captures, ${browserVersion}.`);
   console.log(`Threshold: <= ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}% differing pixels at per-pixel threshold ${config.diff.perPixelThreshold}; antialiasing ignored.`);
   console.log(`Allowed regions: ${config.allowedRegions.map(({ selector }) => selector).join(", ")}.`);
+  if (captureDirectory) console.log(`Tool QA captures: ${expectedNames.filter((name) => !name.startsWith("home-default__") && !name.startsWith("tools-media-filter__")).length} in ${captureDirectory}.`);
 } finally {
   await browser?.close();
   if (server) await stopServer(server);
 }
 
 function buildCaptureMatrix() {
-  return config.routes.flatMap((route) => config.locales.flatMap((locale) => config.themes.flatMap((theme) => config.viewports.map((viewport) => ({
-    route,
-    locale,
-    theme,
-    viewport,
-    name: `${route.id}__${locale}__${theme}__${viewport.id}.png`,
-  })))));
+  const viewports = new Map(config.viewports.map((viewport) => [viewport.id, viewport]));
+  return config.routes.flatMap((route) => route.profiles.map((profile) => {
+    const viewport = viewports.get(profile.viewport);
+    if (!viewport) throw new Error(`Unknown visual viewport ${profile.viewport} for ${route.id}.`);
+    return {
+      route,
+      locale: profile.locale,
+      theme: profile.theme,
+      viewport,
+      name: `${route.id}__${profile.locale}__${profile.theme}__${viewport.id}.png`,
+    };
+  }));
 }
 
 async function captureAndCompare(capture) {
@@ -103,6 +122,7 @@ async function captureAndCompare(capture) {
     const captureUrl = new URL(`/${capture.locale}${capture.route.path}`, baseUrl);
     await page.goto(captureUrl.href, { waitUntil: "networkidle0" });
     await page.waitForSelector(capture.route.readySelector, { visible: true });
+    await stabilizeRepresentativeState(page, capture.route);
     await page.addStyleTag({ content: buildStabilityCss() });
     await page.evaluate(async () => {
       window.scrollTo(0, 0);
@@ -112,6 +132,9 @@ async function captureAndCompare(capture) {
     if (pageErrors.length) throw new Error(`Page errors: ${pageErrors.join(" | ")}`);
 
     const actualBuffer = await page.screenshot({ type: "png", captureBeyondViewport: false });
+    if (captureDirectory && capture.route.kind === "tool") {
+      await fs.writeFile(path.join(captureDirectory, capture.name), actualBuffer);
+    }
     const baselinePath = path.join(baselineDirectory, capture.name);
     if (updateBaselines) {
       await fs.writeFile(baselinePath, actualBuffer);
@@ -151,6 +174,24 @@ async function captureAndCompare(capture) {
   }
 }
 
+async function stabilizeRepresentativeState(page, route) {
+  if (route.toolId !== "security-tools") return;
+  await page.$eval(".password-output input", (input) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, "Worklazy2!Safe#Tool9");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.waitForFunction(() => document.querySelector(".password-output input")?.value === "Worklazy2!Safe#Tool9");
+}
+
+async function removeUnexpectedBaselines(expected) {
+  const expectedSet = new Set(expected);
+  const actual = (await fs.readdir(baselineDirectory)).filter((name) => name.endsWith(".png"));
+  await Promise.all(actual
+    .filter((name) => !expectedSet.has(name))
+    .map((name) => fs.unlink(path.join(baselineDirectory, name))));
+}
+
 function buildStabilityCss() {
   const allowedSelectors = config.allowedRegions.map(({ selector }) => selector).join(",\n");
   return `
@@ -176,9 +217,9 @@ async function assertBaselineSet(expected) {
   }
 }
 
-async function startViteServer() {
+async function startPreviewServer() {
   const viteBin = path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js");
-  const child = spawn(process.execPath, [viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+  const child = spawn(process.execPath, [viteBin, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: repositoryRoot,
     env: { ...process.env, BROWSER: "none" },
     stdio: ["ignore", "pipe", "pipe"],

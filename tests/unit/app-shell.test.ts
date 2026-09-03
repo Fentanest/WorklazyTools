@@ -57,7 +57,9 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "tests/excel-compare-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/new-tools-smoke.mjs", // Owner: video-isolation absence and request assertions.
     "tests/office-editor-smoke.mjs", // Owner: office-isolation absence assertion.
+    "tests/ui-migration-layout-smoke.mjs", // Owner: local QA tracking-absence assertion.
     "tests/unit/app-shell.test.ts", // Owner: this explicit repository-wide allowlist audit.
+    "tests/unit/local-qa-tracking.test.ts", // Owner: local QA build-gate source assertion.
     "tests/utility-tools-smoke.mjs", // Owner: video-isolation absence and standard-route restoration assertions.
     "tests/xls-preserve-smoke.mjs", // Owner: XLS-isolation absence assertion.
   ].sort();
