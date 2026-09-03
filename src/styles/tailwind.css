@@ -1,6 +1,7 @@
 @layer theme, base, legacy, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
 @import "shadcn/tailwind.css";
 @import "tw-animate-css";
 @import "@fontsource-variable/noto-sans";

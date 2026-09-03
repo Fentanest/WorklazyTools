@@ -38,7 +38,44 @@
 
 * { box-sizing: border-box; }
 
-html { min-width: 320px; min-height: 100%; scroll-behavior: smooth; }
+/* Preserve the legacy browser defaults that Tailwind preflight intentionally resets. */
+::before,
+::after,
+::backdrop,
+::file-selector-button { box-sizing: content-box; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-size: revert;
+  font-weight: revert;
+}
+small { font-size: smaller; }
+
+.tool-guide-grid ul,
+.prose-card ul { list-style-type: disc; }
+.prose-card ol { list-style-type: decimal; }
+
+button,
+input,
+select,
+optgroup,
+textarea,
+::file-selector-button {
+  margin: revert;
+  padding: revert;
+  border: revert;
+  border-radius: revert;
+  background-color: revert;
+  font: revert;
+  font-feature-settings: revert;
+  font-variation-settings: revert;
+  letter-spacing: revert;
+  color: revert;
+  opacity: revert;
+}
+
+textarea { resize: revert; }
+
+html { min-width: 320px; min-height: 100%; line-height: normal; scroll-behavior: smooth; }
 
 body {
   margin: 0;
