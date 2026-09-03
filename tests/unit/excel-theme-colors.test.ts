@@ -6,7 +6,7 @@ import {
   bakeThemeColorsInStyle,
   parseThemePalette,
   THEME_COLOR_KEYS,
-} from "../../src/features/excel-merger/excelThemeColors.ts";
+} from "../../src/features/spreadsheet-core/themeColors.ts";
 
 const OFFICE_2022_COLORS = [
   "000000", "FFFFFF", "44546A", "E7E6E6", "4472C4", "ED7D31",

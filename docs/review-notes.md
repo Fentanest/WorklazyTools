@@ -4,6 +4,14 @@
 
 ## 2026-09-03
 
+### 신규 도구 U0 — 스프레드시트·파일명·ZIP·보고서 공통 경계 판정 (Codx)
+
+- **입력 경계 판정**: 확장자가 아니라 ZIP 내부 `xl/workbook.xml`/`xl/workbook.bin`과 content type, OLE·SpreadsheetML 서명을 우선해 XLSX/XLSM/XLS/XLSB/SpreadsheetML/CSV를 분류한다. OOXML은 ExcelJS 한 번, BIFF8·XLSB·SpreadsheetML은 SheetJS 한 번, CSV는 PapaParse 한 번만 파싱하며 기존 Excel 병합의 일괄 선버퍼링은 편입하지 않았다. 시트명·헤더 행 선택 모델과 수식/캐시값/표시값/numFmt/병합/OOXML 서식 공통 모델을 고정했다.
+- **재사용 경계 판정**: OLE·SpreadsheetML 서명과 CDATA 전개, theme+tint RGB 베이크 구현을 `spreadsheet-core`로 옮기고 기존 병합 표면은 얇은 재노출만 남겼다. `requiresLegacySpreadsheetConversion`은 보존 변환 판정기로 기존 영역에 유지했다. XLS·XLSB 스타일은 어댑터가 비교 가능으로 승격하지 않는다.
+- **파일명·ZIP 판정**: NFC 뒤 빈 이름·경로 구분자/상위 경로·제어/Windows 금지 문자·예약 이름·말단 점/공백·255 UTF-8 byte·대소문자/NFC 충돌을 검사하고 결정적 `-N` 이름을 만든다. 중립 ZIP writer는 branded 이름을 런타임 재검사한 뒤 파일을 한 번에 하나씩 Blob stream으로 읽고 강제 ZIP64로 쓴다. 기존 비디오 경로는 이 공용 writer를 호출하며 회귀에서 전체 `arrayBuffer()` 0회·다중 chunk·ZIP64 EOCD·외부 `unzip -t/-p` 및 SHA-256 왕복을 통과했다.
+- **주입 경계 판정**: `writeUntrustedText`는 값 객체를 수용하지 않고 `String(value)` primitive와 text numFmt로 기록한다. `=`·`+`·`-`·`@`·탭·CR/LF·선행 공백·formula-object 음성 대조를 XLSX 재개봉 후 문자열 타입으로 확인했다.
+- **U0 검증**: TypeScript build 검사 exit 0, 표적 U0/테마/legacy 단위 9/9, 전체 unit 110/110, `video-zip-streaming` 1/1, 정적 산출 검사 exit 0. URL·사용자 문구·광고 배치·격리 경로는 U0 공개 화면이 없어 바뀌지 않았다.
+
 ### 비디오 V-A+V-B — copy 사유 안내·오디오 선행 하이브리드 판정 (Codx)
 
 - **V-A 사유·선택 판정**: `VideoProcessingJobRoute`에 stream-copy/WebCodecs/hybrid probe의 상세 사유를 보존하고, copy 실패 job만 `audio=remove`로 다시 probe해 성공한 job에만 기존 remove 모드 override를 제안한다. 배치의 형제 job 설정은 바꾸지 않는다. ko/en copy 오류·WebM 경고는 음향 변환을 구제책으로 제안하지 않고 음향 제외만 안내한다. 제품 Chrome 스모크에서 faststart H.264+E-AC-3 MP4를 `2,147,483,649B` 희소 파일로 확장해 사유 문구·제안 버튼·수락 후 stream-copy 결과 생성을 확인했고, `2,147,483,650B` `dvhe` sample-entry fixture는 음향 제안 없이 대용량 가드의 화면 압축 방식 안내로 분리했다. 작은 비호환 영상의 기존 FFmpeg 폴백은 유지한다.
