@@ -1018,5 +1018,155 @@
       "loadingLanguage": "한국어·영어 학습 모델 내려받는 중…",
       "initializingApi": "한국어·영어 인식기 준비 중…"
     }
+  },
+  "excelCompare": {
+    "title": "Excel 비교·대사",
+    "description": "여러 스프레드시트 쌍을 위치·키·거래 기준으로 비교하고 쌍별 9시트 XLSX 보고서를 만듭니다. 선택한 파일은 현재 브라우저에서만 처리됩니다.",
+    "pairs": {
+      "title": "비교할 파일 쌍",
+      "description": "왼쪽과 오른쪽 파일을 연결하고 각 파일의 시트와 헤더 행을 직접 지정하세요. 파일을 끌어 놓거나 파일 선택 버튼을 사용할 수 있습니다.",
+      "add": "파일 쌍 추가",
+      "pair": "비교 쌍 {{number}}",
+      "pairHint": "각 쌍은 독립적으로 처리되며 한 쌍이 실패해도 다음 쌍을 계속 처리합니다.",
+      "remove": "비교 쌍 {{number}} 삭제",
+      "left": "왼쪽 파일",
+      "right": "오른쪽 파일",
+      "fileHint": "XLSX·XLSM·XLS·XLSB·SpreadsheetML .xls·CSV",
+      "sheet": "비교 시트",
+      "headerRow": "헤더 행",
+      "styleSupported": "셀 서식 비교 가능",
+      "styleExcluded": "셀 서식 비교 제외"
+    },
+    "method": {
+      "title": "비교 방식",
+      "description": "파일 쌍 전체에 적용할 기준을 선택하세요. 키와 거래 열 연결은 각 쌍에서 따로 지정합니다.",
+      "position": "위치 기준",
+      "positionDescription": "열을 먼저, 행을 다음에 정렬해 추가·삭제·변경을 찾습니다.",
+      "key": "키 기준",
+      "keyDescription": "복합키로 행 순서를 무시하고 중복키 정책을 적용합니다.",
+      "reconcile": "거래 대사",
+      "reconcileDescription": "금액·날짜·거래처를 연결해 1:1 또는 선택적 합계 대사를 수행합니다."
+    },
+    "key": {
+      "title": "키 열 연결",
+      "leftPrimary": "왼쪽 기본키",
+      "rightPrimary": "오른쪽 기본키",
+      "duplicatePolicy": "중복키 처리",
+      "secondary": "보조키를 추가해 다시 구분",
+      "occurrence": "발생 순번대로 연결",
+      "error": "중복 오류로 따로 기록",
+      "leftSecondary": "왼쪽 보조키",
+      "rightSecondary": "오른쪽 보조키"
+    },
+    "reconcile": {
+      "title": "거래 열 연결",
+      "leftAmount": "왼쪽 금액",
+      "rightAmount": "오른쪽 금액",
+      "leftDate": "왼쪽 날짜",
+      "rightDate": "오른쪽 날짜",
+      "leftPartner": "왼쪽 거래처·설명",
+      "rightPartner": "오른쪽 거래처·설명",
+      "dateTolerance": "날짜 허용 범위(±일)",
+      "roundingUnit": "합산 반올림 단위",
+      "grouped": "1:N·N:1 합계 대사",
+      "groupedDescription": "대상당 후보 10개, 구성요소당 1,023개 조합, 파일 쌍당 1,000,000회 탐색 한도 안에서만 자동 대사합니다."
+    },
+    "options": {
+      "title": "정규화와 비교 옵션",
+      "description": "원시 타입을 보존한 뒤 문자 정리, 날짜, 숫자형 문자열, 허용 오차 순서로 적용합니다.",
+      "trimWhitespace": "앞뒤 공백 무시",
+      "collapseWhitespace": "연속 공백 하나로 비교",
+      "normalizeLineBreaks": "줄바꿈 형식 통일",
+      "ignoreCase": "대소문자 무시",
+      "unicodeNfc": "Unicode NFC 정규화",
+      "stripNumberSymbols": "쉼표·통화기호 제거 후 숫자 판독",
+      "numericStrings": "숫자형 문자열을 숫자로 비교",
+      "numericStringsDescription": "텍스트 서식, 의미 있는 선행 0 문자열은 그대로 유지합니다.",
+      "ignoreDateDisplayFormat": "날짜 표시 형식 차이 무시",
+      "blankEqualsEmpty": "빈 셀과 빈 문자열 동일",
+      "blankEqualsZero": "값 비교에서 빈 셀과 0 동일",
+      "blankEqualsZeroDescription": "행·열 구조를 정렬한 다음 셀 값에만 적용합니다.",
+      "compareDisplayValues": "표시 형식 기준 문자열 비교",
+      "compareFormatting": "지원 형식의 셀 서식 비교",
+      "formulaMode": "수식 비교 기준",
+      "formula": "수식",
+      "cached": "저장된 계산값",
+      "both": "수식과 저장된 계산값",
+      "absoluteTolerance": "금액·숫자 절대 허용 오차",
+      "relativeTolerance": "비율 허용 오차(예: 0.01)"
+    },
+    "support": {
+      "title": "형식별 지원 범위",
+      "description": "파일 확장자가 아니라 실제 파일 구조를 판독합니다.",
+      "format": "형식",
+      "value": "값",
+      "display": "표시값(SSF)",
+      "formula": "수식",
+      "cache": "저장된 계산값",
+      "style": "셀 서식 diff",
+      "merge": "병합 셀",
+      "note": "표시값은 SheetJS SSF의 표시 형식 기준 정규화 문자열입니다. XLS·XLSB·SpreadsheetML 셀 서식, 조건부 서식·gradient·차트·도형·VBA 내용 비교는 제외됩니다. XLSM은 VBA 포함 검증 파일에서도 값·수식·일반 셀 서식 비교를 통과했습니다."
+    },
+    "actions": { "compare": "{{count}}개 파일 쌍 비교", "cancel": "비교 취소" },
+    "progress": {
+      "title": "Excel 비교 진행률",
+      "starting": "{{count}}개 파일 쌍 비교를 준비합니다.",
+      "READING": "파일 구조를 확인하고 있습니다.",
+      "READY": "파일을 사용할 수 있습니다.",
+      "READING_LEFT": "[{{current}}/{{total}}] 왼쪽 파일을 읽고 있습니다.",
+      "READING_RIGHT": "[{{current}}/{{total}}] 오른쪽 파일을 읽고 있습니다.",
+      "COMPARING": "[{{current}}/{{total}}] 시트 차이를 비교하고 있습니다.",
+      "WRITING_REPORT": "[{{current}}/{{total}}] 비교 보고서를 만들고 있습니다.",
+      "COMPLETE": "[{{current}}/{{total}}] 보고서 생성을 마쳤습니다.",
+      "ZIPPING": "완료된 보고서를 ZIP으로 묶고 있습니다.",
+      "complete": "비교 완료 · 성공 {{success}}개 · 실패 {{failed}}개",
+      "canceled": "비교를 취소했습니다. 이미 완료된 보고서는 내려받을 수 있습니다."
+    },
+    "results": {
+      "title": "비교 결과와 보고서",
+      "description": "완료 {{success}}개 · 실패 {{failed}}개. 결과가 2개 이상이면 ZIP도 제공합니다.",
+      "pairReport": "비교 쌍 {{number}} 보고서",
+      "zip": "전체 보고서 ZIP",
+      "filters": "결과 상태 필터",
+      "search": "키·값·변경 내용 검색",
+      "pair": "쌍",
+      "state": "상태",
+      "location": "위치",
+      "key": "키",
+      "left": "왼쪽 값",
+      "right": "오른쪽 값",
+      "reason": "판정 근거",
+      "empty": "현재 필터와 검색에 해당하는 결과가 없습니다.",
+      "showMore": "결과 더 보기 ({{remaining}}개 남음)"
+    },
+    "status": { "matched": "일치", "changed": "변경", "added": "추가", "removed": "삭제", "duplicate": "중복키", "ambiguous": "다중 후보", "unmatched": "미대사", "error": "오류" },
+    "reason": {
+      "generic": "세부 판정을 보고서에서 확인하세요.",
+      "MATCHED": "완전 일치", "ADDED": "오른쪽에 추가", "REMOVED": "오른쪽에서 삭제", "VALUE": "셀 값 차이", "FORMULA": "수식 차이", "CACHED_VALUE": "저장된 계산값 차이", "DISPLAY_VALUE": "표시값 차이", "FORMATTING": "셀 서식 차이",
+      "CALCULATION_VALUE_UNAVAILABLE": "저장된 계산값 없음", "DISPLAY_VALUE_UNAVAILABLE": "표시값 없음", "ALIGN_LIMIT_FALLBACK": "정렬 계산 한도를 넘어 위치 대조로 전환", "MERGE_ADDED": "병합 영역 추가", "MERGE_REMOVED": "병합 영역 삭제",
+      "DUPLICATE_KEY": "중복키", "MULTIPLE_CANDIDATES": "후보가 여러 개라 자동 확정하지 않음", "INVALID_TRANSACTION": "금액·날짜·거래처 값을 확인할 수 없음", "ONE_TO_ONE": "1:1 대사", "ONE_TO_MANY": "1:N 합계 대사", "MANY_TO_ONE": "N:1 합계 대사", "MULTIPLE_COMBINATIONS": "만족하는 합계 조합이 여러 개라 자동 확정하지 않음", "AMOUNT_DIFFERENCE": "금액 허용 오차 초과", "DATE_DIFFERENCE": "날짜 허용 범위 초과", "NO_CANDIDATE": "대사 후보 없음", "RECON_SEARCH_LIMIT": "거래 대사 탐색 한도 초과", "KEY_MAPPING_REQUIRED": "키 열 연결 필요", "RECON_MAPPING_REQUIRED": "거래 열 연결 필요", "RECONCILIATION": "거래 대사", "CELL": "셀 비교", "ALIGNMENT": "행·열 정렬", "KEY": "키 비교"
+    },
+    "error": {
+      "UNSUPPORTED_FORMAT": "지원하지 않는 파일 형식입니다.",
+      "ENCRYPTED_FILE": "암호로 보호된 스프레드시트는 지원하지 않습니다. 보호를 해제한 사본을 선택해 주세요.",
+      "DAMAGED_FILE": "파일 구조를 읽지 못했습니다. 파일이 손상되지 않았는지 확인해 주세요.",
+      "CSV_PARSE_ERROR": "CSV 따옴표 구조를 읽지 못했습니다.",
+      "SHEET_NOT_FOUND": "선택한 시트를 찾지 못했습니다. 시트를 다시 선택해 주세요.",
+      "PROCESSING_FAILED": "파일을 비교하지 못했습니다. 손상 여부와 지원 형식을 확인해 주세요."
+    },
+    "guide": {
+      "title": "Excel 비교·대사 사용 안내",
+      "description": "원본을 바꾸지 않고 새 XLSX 보고서를 만드는 방법과 지원 한도를 확인하세요.",
+      "blocks": [
+        { "title": "위치·키·거래 기준", "text": "위치 기준은 열을 먼저 정렬한 뒤 행을 정렬합니다. 키 기준은 복합키와 중복키 정책을 적용하고, 거래 대사는 금액·날짜·거래처 조건과 선택적 1:N·N:1 합계를 사용합니다." },
+        { "title": "큰 파일과 취소", "text": "현재 파일 쌍의 두 Excel 파일을 읽어 선택한 시트를 비교하고 쌍이 끝나면 메모리에서 정리합니다. 큰 파일은 데스크톱이 더 안정적이며 처리 중 언제든 취소할 수 있습니다." },
+        { "title": "보고서와 개인정보", "text": "각 쌍은 Summary·Parameters·Matched·Changed·Added·Removed·Duplicates·Ambiguous·Errors 9시트 보고서를 만듭니다. 파일과 셀 값은 외부 작업 서버로 전송하지 않습니다." }
+      ],
+      "faq": [
+        { "q": "XLS와 XLSB의 셀 서식도 비교하나요?", "a": "아니요. 값·표시값·수식·저장된 계산값과 병합 셀은 비교하지만 XLS·XLSB의 셀 서식 차이는 지원 범위에서 제외합니다." },
+        { "q": "저장된 계산값이 없는 수식은 오류인가요?", "a": "아니요. 수식은 비교하되 계산값 없음과 표시값 없음 상태를 따로 기록하며 브라우저에서 수식을 다시 계산하지 않습니다." },
+        { "q": "파일이 서버로 업로드되나요?", "a": "아니요. 선택한 파일과 생성 보고서는 현재 브라우저에서만 처리합니다. 원본 파일은 변경하지 않습니다." }
+      ]
+    }
   }
 }

@@ -123,19 +123,26 @@ export function spreadsheetHeaders(sheet: SpreadsheetSheetData, headerRow: numbe
 
 async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: AbortSignal): Promise<SpreadsheetBookData> {
   const archive = await JSZip.loadAsync(data);
-  const themeXml = await archive.file("xl/theme/theme1.xml")?.async("string");
+  const [themeXml, workbookXml] = await Promise.all([
+    archive.file("xl/theme/theme1.xml")?.async("string"),
+    archive.file("xl/workbook.xml")?.async("string"),
+  ]);
   const themePalette = themeXml ? parseThemePalette(themeXml) : undefined;
   throwIfAborted(signal);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(data));
-  const date1904 = Boolean(workbook.properties.date1904);
+  // ExcelJS 4.4 applies the 1904 offset inconsistently and does not surface the
+  // workbook flag after loading. Read the OOXML flag directly, then compensate
+  // only when ExcelJS did not report that it already handled the date system.
+  const date1904 = /\bdate1904\s*=\s*["'](?:1|true)["']/iu.test(workbookXml ?? "");
+  const adjustExcelJsDate = date1904 && workbook.properties.date1904 !== true;
   const sheets = workbook.worksheets.map((worksheet) => {
     const cells: SpreadsheetCellData[] = [];
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       row.eachCell({ includeEmpty: false }, (cell, columnNumber) => {
         const formula = cell.formula || undefined;
-        const cachedValue = formula ? normalizeExcelJsValue(cell.result) : undefined;
-        const value = formula ? cachedValue ?? null : normalizeExcelJsValue(cell.value);
+        const cachedValue = formula ? normalizeExcelJsValue(cell.result, adjustExcelJsDate) : undefined;
+        const value = formula ? cachedValue ?? null : normalizeExcelJsValue(cell.value, adjustExcelJsDate);
         const numberFormat = cell.numFmt || undefined;
         cells.push({
           row: rowNumber,
@@ -196,7 +203,7 @@ function parseSheetJs(
             address,
             type: scalarType(value, cell.t === "e"),
             value,
-            formula: cell.f || undefined,
+            formula: cell.f === undefined ? undefined : String(cell.f),
             cachedValue: cell.f ? value : undefined,
             displayValue: cell.w ?? formatDisplayValue(value, cell.z, date1904),
             numberFormat: cell.z || undefined,
@@ -258,13 +265,14 @@ function comparableStyle(style: Partial<ExcelJS.Style>, palette?: ExcelThemePale
   };
 }
 
-function normalizeExcelJsValue(value: ExcelJS.CellValue | undefined): SpreadsheetScalar {
+function normalizeExcelJsValue(value: ExcelJS.CellValue | undefined, adjustDate1904 = false): SpreadsheetScalar {
   if (value === undefined || value === null) return null;
-  if (value instanceof Date || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (value instanceof Date) return adjustDate1904 ? new Date(value.getTime() + 1_462 * 86_400_000) : value;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
   if ("error" in value) return value.error;
   if ("text" in value) return value.text;
   if ("richText" in value) return value.richText.map((run) => run.text).join("");
-  if ("formula" in value) return normalizeExcelJsValue(value.result);
+  if ("formula" in value) return normalizeExcelJsValue(value.result, adjustDate1904);
   return String(value);
 }
 

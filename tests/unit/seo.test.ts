@@ -4,7 +4,7 @@ import test from "node:test";
 import { getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts";
 
 const toolRoutes = [
-  "/tools/excel-merger", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
+  "/tools/excel-merger", "/tools/excel-compare", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
   "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
   "/tools/text-formatter", "/tools/work-calculator", "/tools/timezone-calculator", "/tools/payroll-calculator",
@@ -21,6 +21,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/qr-studio": "QR 스튜디오 | QR 코드 만들기·카메라 스캔",
       "/tools/data-converter": "표 데이터 변환기 | CSV·JSON·HTML 상호 변환",
       "/tools/document-compare": "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
+      "/tools/excel-compare": "Excel 파일 비교 - XLSX·XLSM·XLS·XLSB·CSV Diff",
       "/tools/office-editor": "브라우저 오피스 편집기 - DOCX·XLSX·PPTX 온라인 편집",
       "/tools/text-merger": "텍스트 병합 | 직접 입력·TXT 파일 순서대로 합치기",
     },
@@ -32,6 +33,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/qr-studio": "QR Studio | Create & Scan QR Codes",
       "/tools/data-converter": "Table Data Converter | Convert CSV, JSON & HTML",
       "/tools/document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
+      "/tools/excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
       "/tools/office-editor": "Browser Office Editor | Edit DOCX, XLSX & PPTX",
       "/tools/text-merger": "Text Merger | Combine Pasted Text & TXT Files",
     },
@@ -76,6 +78,9 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     const excelFaq = getSeoDefinition(language, "/tools/excel-merger").faq;
     assert.equal(excelFaq?.length, 3);
     assert.ok(excelFaq?.every((item) => item.question && item.answer));
+    const excelCompareFaq = getSeoDefinition(language, "/tools/excel-compare").faq;
+    assert.equal(excelCompareFaq?.length, 3);
+    assert.ok(excelCompareFaq?.every((item) => item.question && item.answer));
     const pdfFaq = getSeoDefinition(language, "/tools/pdf-editor").faq;
     assert.equal(pdfFaq?.length, 2);
     assert.ok(pdfFaq?.every((item) => item.question && item.answer));

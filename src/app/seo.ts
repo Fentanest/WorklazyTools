@@ -24,6 +24,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "XLS 수식과 서식을 따로 보존할 수 있나요?", answer: "가능합니다. XLS 수식 보존과 XLS 서식 보존을 각각 선택할 수 있으며, 둘 중 하나만 켜도 정밀 변환 화면으로 이동합니다." },
       { question: "보존 옵션을 켜면 모든 XLS 기능이 완전히 유지되나요?", answer: "수식과 일반 셀 서식을 우선 보존하지만 차트, 외부 연결, 매크로와 일부 고급 개체는 달라질 수 있으므로 중요한 결과는 Excel에서 확인하세요." },
     ],
+    "/tools/excel-compare": [
+      { question: "어떤 Excel 형식을 비교할 수 있나요?", answer: "XLSX, XLSM, XLS, XLSB, SpreadsheetML 형식의 XLS와 CSV를 비교할 수 있습니다. XLS와 XLSB는 값과 수식 비교를 지원하지만 서식 차이는 비교하지 않습니다." },
+      { question: "비교한 파일이 서버로 전송되나요?", answer: "아니요. 파일 읽기, 비교와 보고서 생성은 현재 브라우저에서 처리되며 파일 내용을 서버로 보내지 않습니다." },
+      { question: "여러 파일 쌍을 한 번에 비교할 수 있나요?", answer: "가능합니다. 각 쌍의 시트와 비교 기준을 따로 정할 수 있고, 성공한 쌍마다 9개 시트의 XLSX 보고서를 받습니다. 성공한 쌍이 둘 이상이면 ZIP도 제공합니다." },
+    ],
     "/tools/pdf-editor": [
       { question: "여러 페이지 범위는 어떻게 선택하나요?", answer: "편집할 결과 범위를 고르고 페이지 체크박스를 누르세요. 연속 문서는 페이지 뒤의 나누기 위치를 정해 범위를 한 번에 만들 수 있고, 숫자 입력으로 비연속 페이지와 사용자 지정 순서도 선택할 수 있습니다." },
       { question: "완성된 PDF나 ZIP은 어디에서 받나요?", answer: "오른쪽 출력 작업 영역에서 진행 상황을 확인하고 완료된 파일을 바로 내려받을 수 있습니다. 모바일에서는 화면 아래의 출력 작업 버튼을 누르세요." },
@@ -54,6 +59,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Can XLSX formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate XLSX switches on the current screen and require no additional files." },
       { question: "Can XLS formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate switches, and either one opens the higher-fidelity conversion workspace." },
       { question: "Does preservation retain every XLS feature perfectly?", answer: "It prioritizes formulas and common cell formatting, but charts, external links, macros and some advanced objects can differ. Verify important output in Excel." },
+    ],
+    "/tools/excel-compare": [
+      { question: "Which Excel formats can I compare?", answer: "You can compare XLSX, XLSM, XLS, XLSB, SpreadsheetML XLS and CSV files. XLS and XLSB support values and formulas, but formatting differences are excluded." },
+      { question: "Are comparison files uploaded to a server?", answer: "No. Reading, comparison and report generation happen in the current browser, and file contents are not sent to a server." },
+      { question: "Can I compare multiple file pairs at once?", answer: "Yes. Each pair can use its own sheets and matching rules. Every successful pair gets a nine-sheet XLSX report, and two or more successful pairs also get a ZIP." },
     ],
     "/tools/pdf-editor": [
       { question: "How do I select multiple page ranges?", answer: "Choose the output range to edit and use the page checkboxes. For a continuous document, mark split positions after pages to build the ranges at once. Number entry remains available for non-contiguous pages and custom ordering." },
@@ -109,6 +119,7 @@ export const socialImages = {
 
 const socialImageSlugByPath: Record<string, string> = {
   "/tools/excel-merger": "excel-merger",
+  "/tools/excel-compare": "excel-compare",
   "/tools/document-compare": "document-compare",
   "/tools/pdf-editor": "pdf-tools",
   "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
@@ -146,6 +157,14 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: {
       name: "Excel Merger",
       featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 수식·서식 개별 보존", "XLS 수식·서식 개별 보존", "암호화 파일 입출력"],
+    },
+  },
+  "/tools/excel-compare": {
+    title: "Excel 파일 비교 - XLSX·XLSM·XLS·XLSB·CSV Diff",
+    description: "Excel·CSV 파일 쌍을 위치, 키 또는 대사 기준으로 비교하고 값·수식·표시값·서식 차이를 9개 시트의 XLSX 보고서로 확인하세요.",
+    application: {
+      name: "Excel Compare",
+      featureList: ["XLSX·XLSM·XLS·XLSB·SpreadsheetML·CSV", "위치·키·회계 대사 비교", "중복 키 정책", "수식·캐시값 비교", "XLSX·XLSM 서식 비교", "쌍별 9개 시트 보고서", "다중 쌍 ZIP"],
     },
   },
   "/tools/document-compare": {
@@ -278,6 +297,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
 
 const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "excel-merger": "Excel Merger | Combine Excel & CSV Files",
+  "excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
   "pdf-editor": "PDF Tools | Edit, Merge, Convert & OCR PDFs",
   "document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
   "hwp-editor": "HWP Editor | Edit HWP & HWPX Documents",
@@ -301,6 +321,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
   "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with separate formula and formatting controls for XLSX and XLS input.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "Independent XLSX formula and formatting preservation", "Independent XLS formula and formatting preservation", "Encrypted input and output"] } },
+  "/tools/excel-compare": { title: "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files", description: "Compare pairs of Excel and CSV files by position, keys or reconciliation rules and download a nine-sheet XLSX report for every successful pair.", application: { name: "Excel Compare", featureList: ["XLSX, XLSM, XLS, XLSB, SpreadsheetML and CSV", "Position, key and reconciliation matching", "Duplicate-key policies", "Formula and cached-value comparison", "XLSX and XLSM formatting comparison", "Nine-sheet report per pair", "ZIP for multiple successful pairs"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
   "/tools/pdf-editor/convert": { title: "Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", description: "Convert selected PDF pages to DOCX, XLSX, TXT or searchable PDF using self-hosted English and Korean OCR in your browser.", application: { name: "PDF Document Conversion and OCR", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },
@@ -312,7 +333,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
 };
 
 const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
-  "/tools/excel-merger": "excel-merger", "/tools/document-compare": "document-compare", "/tools/pdf-editor": "pdf-editor",
+  "/tools/excel-merger": "excel-merger", "/tools/excel-compare": "excel-compare", "/tools/document-compare": "document-compare", "/tools/pdf-editor": "pdf-editor",
   "/tools/hwp-editor": "hwp-editor", "/tools/office-editor": "office-editor", "/tools/video-studio": "video-studio",
   "/tools/audio-studio": "audio-studio", "/tools/image-studio": "image-studio", "/tools/text-tools": "text-tools",
   "/tools/text-merger": "text-merger",

@@ -21,6 +21,7 @@ const PdfEditorPage = lazy(() => import("../features/pdf-editor/PdfEditorPage").
 const HwpEditorPage = lazy(() => import("../features/hwp-editor/HwpEditorPage").then((module) => ({ default: module.HwpEditorPage })));
 const DocumentComparePage = lazy(() => import("../features/document-compare/DocumentComparePage").then((module) => ({ default: module.DocumentComparePage })));
 const DocumentCompareResultPage = lazy(() => import("../features/document-compare/DocumentCompareResultPage").then((module) => ({ default: module.DocumentCompareResultPage })));
+const ExcelComparePage = lazy(() => import("../features/excel-compare/ExcelComparePage").then((module) => ({ default: module.ExcelComparePage })));
 const VideoStudioPage = lazy(() => import("../features/video-studio/VideoStudioPage").then((module) => ({ default: module.VideoStudioPage })));
 const AudioStudioPage = lazy(() => import("../features/audio-studio/AudioStudioPage").then((module) => ({ default: module.AudioStudioPage })));
 const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioPage").then((module) => ({ default: module.ImageStudioPage })));
@@ -47,6 +48,7 @@ export function App() {
           <Route path="tools" element={<ToolsPage />} />
           <Route path="tools/excel-merger" element={<ExcelMergerPage />} />
           <Route path="tools/excel-merger/xls-preserve" element={<ExcelMergerPage />} />
+          <Route path="tools/excel-compare" element={<LazyToolRoute label="Excel compare"><ExcelComparePage /></LazyToolRoute>} />
           <Route path="tools/pdf-editor" element={<PdfRoute mode="organize" />} />
           <Route path="tools/pdf-editor/split" element={<LocalizedNavigate to="/tools/pdf-editor" />} />
           <Route path="tools/pdf-editor/image-to-pdf" element={<PdfRoute mode="image-to-pdf" />} />

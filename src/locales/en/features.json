@@ -1018,5 +1018,85 @@
       "loadingLanguage": "Loading Korean and English language models…",
       "initializingApi": "Preparing Korean and English recognition…"
     }
+  },
+  "excelCompare": {
+    "title": "Excel Compare & Reconcile",
+    "description": "Compare multiple spreadsheet pairs by position, key, or transaction and create a nine-sheet XLSX report for each pair. Selected files stay in this browser.",
+    "pairs": {
+      "title": "File pairs",
+      "description": "Connect a left and right file, then choose each sheet and header row. Drop a file or use the file-selection button.",
+      "add": "Add file pair",
+      "pair": "Comparison pair {{number}}",
+      "pairHint": "Pairs run independently. A failed pair does not stop the remaining pairs.",
+      "remove": "Remove comparison pair {{number}}",
+      "left": "Left file",
+      "right": "Right file",
+      "fileHint": "XLSX, XLSM, XLS, XLSB, SpreadsheetML .xls, or CSV",
+      "sheet": "Sheet to compare",
+      "headerRow": "Header row",
+      "styleSupported": "Cell-format comparison available",
+      "styleExcluded": "Cell-format comparison excluded"
+    },
+    "method": {
+      "title": "Comparison method",
+      "description": "Choose one method for all pairs. Key and transaction column mappings remain pair-specific.",
+      "position": "By position",
+      "positionDescription": "Align columns first, then rows, to find additions, removals, and changes.",
+      "key": "By key",
+      "keyDescription": "Ignore row order with composite keys and an explicit duplicate-key policy.",
+      "reconcile": "Reconcile transactions",
+      "reconcileDescription": "Map amount, date, and partner fields for 1:1 or optional grouped matching."
+    },
+    "key": {
+      "title": "Key-column mapping",
+      "leftPrimary": "Left primary key",
+      "rightPrimary": "Right primary key",
+      "duplicatePolicy": "Duplicate-key policy",
+      "secondary": "Add secondary keys",
+      "occurrence": "Pair by occurrence order",
+      "error": "Record duplicates as errors",
+      "leftSecondary": "Left secondary key",
+      "rightSecondary": "Right secondary key"
+    },
+    "reconcile": {
+      "title": "Transaction-column mapping",
+      "leftAmount": "Left amount", "rightAmount": "Right amount", "leftDate": "Left date", "rightDate": "Right date", "leftPartner": "Left partner or description", "rightPartner": "Right partner or description",
+      "dateTolerance": "Date tolerance (±days)", "roundingUnit": "Sum rounding unit", "grouped": "1:N and N:1 sum matching",
+      "groupedDescription": "Automatic matching is limited to 10 candidates per target, 1,023 subsets per component, and 1,000,000 combination checks per pair."
+    },
+    "options": {
+      "title": "Normalization and comparison options",
+      "description": "Options apply in this order: preserve raw type, normalize text, normalize dates, opt into numeric strings, then apply tolerances.",
+      "trimWhitespace": "Ignore leading and trailing whitespace", "collapseWhitespace": "Collapse repeated spaces", "normalizeLineBreaks": "Normalize line breaks", "ignoreCase": "Ignore letter case", "unicodeNfc": "Normalize Unicode to NFC", "stripNumberSymbols": "Remove separators and currency symbols before numeric parsing", "numericStrings": "Compare numeric-looking text as numbers", "numericStringsDescription": "Text-formatted cells and meaningful leading-zero strings remain text.", "ignoreDateDisplayFormat": "Ignore date display-format differences", "blankEqualsEmpty": "Treat blank cells and empty strings as equal", "blankEqualsZero": "Treat blanks and zero as equal for cell values", "blankEqualsZeroDescription": "Applied only after row and column structure is aligned.", "compareDisplayValues": "Compare display-format normalized strings", "compareFormatting": "Compare cell formatting where supported", "formulaMode": "Formula comparison", "formula": "Formula", "cached": "Stored calculation result", "both": "Formula and stored result", "absoluteTolerance": "Absolute numeric tolerance", "relativeTolerance": "Relative tolerance (for example, 0.01)"
+    },
+    "support": {
+      "title": "Support by file format", "description": "The tool reads the actual file structure instead of trusting the extension.", "format": "Format", "value": "Value", "display": "Display (SSF)", "formula": "Formula", "cache": "Stored result", "style": "Cell format diff", "merge": "Merged cells",
+      "note": "Display values are normalized strings produced from the display format with SheetJS SSF. Cell-format differences in XLS, XLSB, and SpreadsheetML are excluded, as are conditional formatting, gradients, charts, shapes, and VBA-content comparison. XLSM value, formula, and common cell-format comparison passed a macro-bearing fixture."
+    },
+    "actions": { "compare": "Compare {{count}} file pairs", "cancel": "Cancel comparison" },
+    "progress": {
+      "title": "Excel comparison progress", "starting": "Preparing {{count}} file pairs.", "READING": "Checking the file structure.", "READY": "The file is ready.", "READING_LEFT": "[{{current}}/{{total}}] Reading the left file.", "READING_RIGHT": "[{{current}}/{{total}}] Reading the right file.", "COMPARING": "[{{current}}/{{total}}] Comparing sheet differences.", "WRITING_REPORT": "[{{current}}/{{total}}] Creating the comparison report.", "COMPLETE": "[{{current}}/{{total}}] Report complete.", "ZIPPING": "Packaging completed reports into a ZIP.", "complete": "Comparison complete · {{success}} succeeded · {{failed}} failed", "canceled": "Comparison canceled. Reports already completed remain available."
+    },
+    "results": {
+      "title": "Results and reports", "description": "{{success}} completed · {{failed}} failed. A ZIP is also available when at least two reports complete.", "pairReport": "Pair {{number}} report", "zip": "All reports ZIP", "filters": "Result status filters", "search": "Search keys, values, and changes", "pair": "Pair", "state": "Status", "location": "Location", "key": "Key", "left": "Left value", "right": "Right value", "reason": "Reason", "empty": "No rows match the current filters and search.", "showMore": "Show more ({{remaining}} remaining)"
+    },
+    "status": { "matched": "Matched", "changed": "Changed", "added": "Added", "removed": "Removed", "duplicate": "Duplicate key", "ambiguous": "Multiple candidates", "unmatched": "Unmatched", "error": "Error" },
+    "reason": {
+      "generic": "See the report for details.", "MATCHED": "Exact match", "ADDED": "Added on the right", "REMOVED": "Removed on the right", "VALUE": "Cell values differ", "FORMULA": "Formulas differ", "CACHED_VALUE": "Stored calculation results differ", "DISPLAY_VALUE": "Display values differ", "FORMATTING": "Cell formats differ", "CALCULATION_VALUE_UNAVAILABLE": "No stored calculation result", "DISPLAY_VALUE_UNAVAILABLE": "No display value", "ALIGN_LIMIT_FALLBACK": "Alignment budget exceeded; switched to position matching", "MERGE_ADDED": "Merged range added", "MERGE_REMOVED": "Merged range removed", "DUPLICATE_KEY": "Duplicate key", "MULTIPLE_CANDIDATES": "Multiple candidates; not confirmed automatically", "INVALID_TRANSACTION": "Amount, date, or partner could not be read", "ONE_TO_ONE": "1:1 match", "ONE_TO_MANY": "1:N sum match", "MANY_TO_ONE": "N:1 sum match", "MULTIPLE_COMBINATIONS": "Multiple sums satisfy the rule; not confirmed automatically", "AMOUNT_DIFFERENCE": "Amount is outside tolerance", "DATE_DIFFERENCE": "Date is outside tolerance", "NO_CANDIDATE": "No reconciliation candidate", "RECON_SEARCH_LIMIT": "Reconciliation search budget exceeded", "KEY_MAPPING_REQUIRED": "Key-column mapping required", "RECON_MAPPING_REQUIRED": "Transaction-column mapping required", "RECONCILIATION": "Transaction reconciliation", "CELL": "Cell comparison", "ALIGNMENT": "Row and column alignment", "KEY": "Key comparison"
+    },
+    "error": { "UNSUPPORTED_FORMAT": "This file format is not supported.", "ENCRYPTED_FILE": "Password-protected spreadsheets are not supported. Select an unlocked copy.", "DAMAGED_FILE": "The file structure could not be read. Check whether the file is damaged.", "CSV_PARSE_ERROR": "The CSV quote structure could not be read.", "SHEET_NOT_FOUND": "The selected sheet could not be found. Choose the sheet again.", "PROCESSING_FAILED": "The files could not be compared. Check that they are supported and not damaged." },
+    "guide": {
+      "title": "Excel comparison and reconciliation guide", "description": "Learn how to create new reports without modifying your source files and review the support limits.",
+      "blocks": [
+        { "title": "Position, key, and transaction methods", "text": "Position mode aligns columns before rows. Key mode uses composite keys and a duplicate policy. Reconciliation combines amount, date, and partner rules with optional 1:N and N:1 sums." },
+        { "title": "Large files and cancellation", "text": "The two Excel files in the current pair are read, the selected sheets are compared, and memory is released when that pair finishes. Desktop browsers are more reliable for large files, and you can cancel at any time." },
+        { "title": "Reports and privacy", "text": "Each pair produces Summary, Parameters, Matched, Changed, Added, Removed, Duplicates, Ambiguous, and Errors sheets. Files and cell values are not sent to an external processing server." }
+      ],
+      "faq": [
+        { "q": "Are XLS and XLSB cell formats compared?", "a": "No. Values, display values, formulas, stored results, and merged cells are compared, but XLS and XLSB cell-format differences are excluded." },
+        { "q": "Is a formula without a stored result an error?", "a": "No. The formula can still be compared. Missing stored and display values are recorded separately, and the browser does not recalculate formulas." },
+        { "q": "Are files uploaded to a server?", "a": "No. Selected files and generated reports are processed in this browser, and source files are not modified." }
+      ]
+    }
   }
 }

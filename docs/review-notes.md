@@ -12,6 +12,18 @@
 - **주입 경계 판정**: `writeUntrustedText`는 값 객체를 수용하지 않고 `String(value)` primitive와 text numFmt로 기록한다. `=`·`+`·`-`·`@`·탭·CR/LF·선행 공백·formula-object 음성 대조를 XLSX 재개봉 후 문자열 타입으로 확인했다.
 - **U0 검증**: TypeScript build 검사 exit 0, 표적 U0/테마/legacy 단위 9/9, 전체 unit 110/110, `video-zip-streaming` 1/1, 정적 산출 검사 exit 0. URL·사용자 문구·광고 배치·격리 경로는 U0 공개 화면이 없어 바뀌지 않았다.
 
+### 신규 도구 U1 — Excel 비교·재조정·보고서 판정 (Codx)
+
+- **형식·파서 판정**: XLSX/XLSM은 ExcelJS, BIFF8 XLS·XLSB·SpreadsheetML은 SheetJS, CSV는 PapaParse라는 U0 단일 파서 경계를 그대로 사용했다. XLSX/XLSM만 numFmt·글꼴·솔리드 패턴 채움·테두리·정렬·보호를 비교하고 gradient와 XLS/XLSB 서식은 제외했다. OOXML `date1904`는 `xl/workbook.xml`을 직접 확인하고 ExcelJS의 Date 변환 여부를 대조해 1462일 보정이 중복되지 않게 했으며, 1900/1904 fixture의 날짜·시각이 동일하게 정규화됐다.
+- **비교 판정**: 위치 방식은 열을 먼저 대응한 뒤 행의 FNV 서명과 실제 셀 내용을 재확인하고, patience anchor 사이의 제한 DP를 사용한다. 키 방식은 복합 키와 보조 열·발생 순서·오류 처리 중복 정책을 지원한다. 재조정 방식은 후보 10개, 부분집합 1,023개, 전체 평가 1,000,000회 상한에서 1:N/N:1을 찾고 복수 최적해는 모호함으로 분리한다. 정렬·재조정 루프는 4,096회 이내마다 취소를 확인하며, 상한 초과는 각각 `ALIGN_LIMIT_FALLBACK`·`RECON_SEARCH_LIMIT`의 사용자용 설명으로 강등한다.
+- **정규화·결과 판정**: NFC·공백·줄바꿈·대소문자·날짜·숫자 문자열·수치 허용 오차를 독립 옵션으로 두고 선행 0과 text numFmt `@`는 숫자 승격에서 제외했다. 수식 원문·캐시값·표시값과 수식 캐시 누락 상태를 구분한다. 결과는 Summary·Parameters·Matched·Changed·Added·Removed·Duplicates·Ambiguous·Errors의 정확히 9개 시트이며 외부 유래 값은 모두 문자열 셀로 기록해 재개봉 시 수식 셀이 0개였다.
+- **수명주기·배치 판정**: 비교 쌍을 순차 처리하고 현재 쌍의 ArrayBuffer만 worker로 넘긴다. 성공·실패·취소 모든 종결에서 worker를 종료하며 같은 File은 다음 쌍에서 다시 읽는다. 각 성공 쌍의 보고서는 즉시 개별 다운로드하고 성공 보고서가 2개 이상일 때만 안전 파일명 검사를 거친 ZIP64 묶음을 제공한다. 손상 파일 한 쌍은 실패해도 나머지 두 쌍의 보고서와 ZIP이 생성됐다.
+- **브라우저 스모크**: Chrome 152, 390×844/DPR2/touch에서 단일 쌍은 `left-vs-right.xlsx`만, 2성공+1손상 쌍은 개별 보고서 2개와 `worklazy-excel-comparisons.zip`을 만들었고 ZIP 항목명도 두 보고서와 일치했다. 9시트·전 셀 문자열·수식 0, 상태 색상+텍스트 필터 8종, 검색, 취소, 실패 격리, XLSB/XLSM 지원 문구를 확인했다. 모바일 가로 overflow는 0px, 쌍 카드 열 폭 294px, 파일 선택 동작 높이는 44px였다.
+- **정렬 성능 게이트**: Chrome 152/V8 heap 512MiB·CPU 4배 throttling·390×844에서 3,000×3,000(9,000,000 cell product) 세 표본 `683.4/694.7/643.9ms`, 중앙값 `683.4ms`, peak heap `20,603,501B`, checksum `4018493048`, fallback 없음이었다. 3,465×3,465(12,006,225)은 `2.9ms`에 결정적 위치 대응 3,465개와 `ALIGN_LIMIT_FALLBACK`을 반환했다. 보고서는 `/tmp/worklazy-excel-compare-alignment-final/excel-compare-alignment-mobile-golden.json`이다.
+- **실형식 fixture 판정**: 생성 스크립트가 BIFF8 Formula record, XLSB `BrtFmlaNum`, 수식·서식을 포함한 XLSM과 실제 VBA project, SpreadsheetML 수식, CSV, OOXML 1900/1904 날짜, 손상 파일, 5,000행 취소 입력을 매번 임시 디렉터리에 만든다. BIFF8 수식 `7`, XLSB 참조 수식 `A1`, XLSM 수식 `B2+C2`, VBA project 15,872B와 Module1 stream을 재파싱해 형식 이름만 바꾼 fixture를 배제했다.
+- **현지화·SEO·광고 판정**: ko/en 기능 key 동형과 사용자용 오류·가이드의 내부 명칭 비노출을 단위 검사했다. `/tools/excel-compare` ko/en 정적 페이지·canonical/hreflang·사이트맵·FAQ 각 3개·소셜 이미지 2개를 생성기 입력에서 추가했다. 이 도구는 일반 AppShell 경로이므로 기존 AdSense loader가 활성화되고 비디오·Office App·XLS 보존 격리/광고 제외 목록에는 편입하지 않았다. 스모크에서 광고 loader 존재와 isolation marker 부재를 확인했다.
+- **검증**: U1 표적·fixture·공통 정렬 단위 13/13, SEO·문서 정렬·Excel 비교 단위 19/19, 전체 unit 119/119, 비디오 ZIP 스트리밍 1/1, 제품 브라우저 스모크와 정렬 벤치가 통과했다. 최종 `npm run build`는 exit 0(2,416 modules, Excel Compare page 164.18kB/68.86kB gzip, worker 1,486.75kB, 정적 57페이지), `npm run test:static`은 localized pages·hreflang·self-hosted runtime·ads.txt·robots.txt·sitemap 검증으로 exit 0이었다. `git diff --check`도 커밋 직전 실행한다.
+
 ### 비디오 V-A+V-B — copy 사유 안내·오디오 선행 하이브리드 판정 (Codx)
 
 - **V-A 사유·선택 판정**: `VideoProcessingJobRoute`에 stream-copy/WebCodecs/hybrid probe의 상세 사유를 보존하고, copy 실패 job만 `audio=remove`로 다시 probe해 성공한 job에만 기존 remove 모드 override를 제안한다. 배치의 형제 job 설정은 바꾸지 않는다. ko/en copy 오류·WebM 경고는 음향 변환을 구제책으로 제안하지 않고 음향 제외만 안내한다. 제품 Chrome 스모크에서 faststart H.264+E-AC-3 MP4를 `2,147,483,649B` 희소 파일로 확장해 사유 문구·제안 버튼·수락 후 stream-copy 결과 생성을 확인했고, `2,147,483,650B` `dvhe` sample-entry fixture는 음향 제안 없이 대용량 가드의 화면 압축 방식 안내로 분리했다. 작은 비호환 영상의 기존 FFmpeg 폴백은 유지한다.

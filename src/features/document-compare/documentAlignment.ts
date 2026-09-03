@@ -1,3 +1,5 @@
+import { alignSequenceWithBudget } from "../../utils/sequenceAlignment.ts";
+
 export interface SequencePair {
   beforeIndex: number | null;
   afterIndex: number | null;
@@ -57,24 +59,14 @@ export function alignSequence<T>(
   textOf: (item: T) => string,
   compatible: (before: T, after: T) => boolean = () => true,
 ): SequencePair[] {
-  if (!before.length) return after.map((_, afterIndex) => ({ beforeIndex: null, afterIndex }));
-  if (!after.length) return before.map((_, beforeIndex) => ({ beforeIndex, afterIndex: null }));
-
-  const anchors = exactPatienceAnchors(before, after, textOf, compatible);
-  const result: SequencePair[] = [];
-  let previousBefore = -1;
-  let previousAfter = -1;
-  for (const anchor of [...anchors, { beforeIndex: before.length, afterIndex: after.length }]) {
-    const beforeStart = previousBefore + 1;
-    const afterStart = previousAfter + 1;
-    const beforeEnd = anchor.beforeIndex;
-    const afterEnd = anchor.afterIndex;
-    result.push(...alignRange(before, after, beforeStart, beforeEnd, afterStart, afterEnd, textOf, compatible));
-    if (anchor.beforeIndex < before.length && anchor.afterIndex < after.length) result.push(anchor);
-    previousBefore = anchor.beforeIndex;
-    previousAfter = anchor.afterIndex;
-  }
-  return result;
+  return alignSequenceWithBudget(before, after, {
+    signature: (item) => normalizeForMatch(textOf(item)),
+    equals: (left, right) => compatible(left, right) && normalizeForMatch(textOf(left)) === normalizeForMatch(textOf(right)),
+    score: (left, right) => matchScore(itemSimilarity(left, right, textOf, compatible)),
+    acceptsPair: (left, right) => itemSimilarity(left, right, textOf, compatible) >= MATCH_THRESHOLD,
+    cellBudget: MAX_DYNAMIC_CELLS,
+    fallback: (left, right, beforeStart, beforeEnd, afterStart, afterEnd) => windowAlignRange(left, right, beforeStart, beforeEnd, afterStart, afterEnd, textOf, compatible),
+  }).pairs;
 }
 
 export function groupParagraphSplits<T>(
@@ -126,156 +118,6 @@ export function groupParagraphSplits<T>(
     }
   }
   return result;
-}
-
-function exactPatienceAnchors<T>(
-  before: T[],
-  after: T[],
-  textOf: (item: T) => string,
-  compatible: (before: T, after: T) => boolean,
-) {
-  const beforePositions = positionsByText(before, textOf);
-  const afterPositions = positionsByText(after, textOf);
-  const candidates: Array<{ beforeIndex: number; afterIndex: number }> = [];
-  for (const [key, leftIndexes] of beforePositions) {
-    const rightIndexes = afterPositions.get(key);
-    if (leftIndexes.length !== 1 || rightIndexes?.length !== 1) continue;
-    const beforeIndex = leftIndexes[0];
-    const afterIndex = rightIndexes[0];
-    if (compatible(before[beforeIndex], after[afterIndex])) candidates.push({ beforeIndex, afterIndex });
-  }
-  candidates.sort((left, right) => left.beforeIndex - right.beforeIndex);
-  return longestIncreasingAfterIndexes(candidates);
-}
-
-function positionsByText<T>(items: T[], textOf: (item: T) => string) {
-  const positions = new Map<string, number[]>();
-  items.forEach((item, index) => {
-    const key = normalizeForMatch(textOf(item));
-    if (!key) return;
-    positions.set(key, [...(positions.get(key) ?? []), index]);
-  });
-  return positions;
-}
-
-function longestIncreasingAfterIndexes(candidates: Array<{ beforeIndex: number; afterIndex: number }>) {
-  if (!candidates.length) return [];
-  const tails: number[] = [];
-  const tailCandidateIndexes: number[] = [];
-  const previous = new Int32Array(candidates.length).fill(-1);
-  candidates.forEach((candidate, candidateIndex) => {
-    let low = 0;
-    let high = tails.length;
-    while (low < high) {
-      const middle = (low + high) >>> 1;
-      if (tails[middle] < candidate.afterIndex) low = middle + 1;
-      else high = middle;
-    }
-    tails[low] = candidate.afterIndex;
-    if (low > 0) previous[candidateIndex] = tailCandidateIndexes[low - 1];
-    tailCandidateIndexes[low] = candidateIndex;
-  });
-  const result: Array<{ beforeIndex: number; afterIndex: number }> = [];
-  let candidateIndex = tailCandidateIndexes[tails.length - 1];
-  while (candidateIndex >= 0) {
-    result.push(candidates[candidateIndex]);
-    candidateIndex = previous[candidateIndex];
-  }
-  return result.reverse();
-}
-
-function alignRange<T>(
-  before: T[],
-  after: T[],
-  beforeStart: number,
-  beforeEnd: number,
-  afterStart: number,
-  afterEnd: number,
-  textOf: (item: T) => string,
-  compatible: (before: T, after: T) => boolean,
-) {
-  const beforeLength = beforeEnd - beforeStart;
-  const afterLength = afterEnd - afterStart;
-  if (!beforeLength) return Array.from({ length: afterLength }, (_, offset) => ({ beforeIndex: null, afterIndex: afterStart + offset }));
-  if (!afterLength) return Array.from({ length: beforeLength }, (_, offset) => ({ beforeIndex: beforeStart + offset, afterIndex: null }));
-  if ((beforeLength + 1) * (afterLength + 1) <= MAX_DYNAMIC_CELLS) {
-    return dynamicAlignRange(before, after, beforeStart, beforeEnd, afterStart, afterEnd, textOf, compatible);
-  }
-  return windowAlignRange(before, after, beforeStart, beforeEnd, afterStart, afterEnd, textOf, compatible);
-}
-
-function dynamicAlignRange<T>(
-  before: T[],
-  after: T[],
-  beforeStart: number,
-  beforeEnd: number,
-  afterStart: number,
-  afterEnd: number,
-  textOf: (item: T) => string,
-  compatible: (before: T, after: T) => boolean,
-) {
-  const beforeLength = beforeEnd - beforeStart;
-  const afterLength = afterEnd - afterStart;
-  const cols = afterLength + 1;
-  const directions = new Uint8Array((beforeLength + 1) * cols);
-  let previous = new Float32Array(cols);
-  let current = new Float32Array(cols);
-  for (let col = 1; col <= afterLength; col += 1) {
-    previous[col] = -col;
-    directions[col] = 2;
-  }
-  for (let row = 1; row <= beforeLength; row += 1) {
-    current[0] = -row;
-    directions[row * cols] = 1;
-    for (let col = 1; col <= afterLength; col += 1) {
-      const leftItem = before[beforeStart + row - 1];
-      const rightItem = after[afterStart + col - 1];
-      const similarity = compatible(leftItem, rightItem) ? textSimilarity(textOf(leftItem), textOf(rightItem)) : 0;
-      const diagonal = previous[col - 1] + matchScore(similarity);
-      const up = previous[col] - 1;
-      const left = current[col - 1] - 1;
-      const offset = row * cols + col;
-      if (diagonal >= up && diagonal >= left) {
-        current[col] = diagonal;
-        directions[offset] = 3;
-      } else if (up >= left) {
-        current[col] = up;
-        directions[offset] = 1;
-      } else {
-        current[col] = left;
-        directions[offset] = 2;
-      }
-    }
-    [previous, current] = [current, previous];
-  }
-
-  const result: SequencePair[] = [];
-  let row = beforeLength;
-  let col = afterLength;
-  while (row > 0 || col > 0) {
-    const direction = directions[row * cols + col];
-    if (row > 0 && col > 0 && direction === 3) {
-      const beforeIndex = beforeStart + row - 1;
-      const afterIndex = afterStart + col - 1;
-      const similarity = compatible(before[beforeIndex], after[afterIndex])
-        ? textSimilarity(textOf(before[beforeIndex]), textOf(after[afterIndex]))
-        : 0;
-      if (similarity >= MATCH_THRESHOLD) result.push({ beforeIndex, afterIndex });
-      else {
-        result.push({ beforeIndex: null, afterIndex });
-        result.push({ beforeIndex, afterIndex: null });
-      }
-      row -= 1;
-      col -= 1;
-    } else if (row > 0 && (direction === 1 || col === 0)) {
-      result.push({ beforeIndex: beforeStart + row - 1, afterIndex: null });
-      row -= 1;
-    } else {
-      result.push({ beforeIndex: null, afterIndex: afterStart + col - 1 });
-      col -= 1;
-    }
-  }
-  return result.reverse();
 }
 
 function windowAlignRange<T>(

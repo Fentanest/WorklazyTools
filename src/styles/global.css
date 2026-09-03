@@ -2430,6 +2430,75 @@ label.invalid > small { color: #c9342f; }
   .audio-export-settings { grid-template-columns: 1fr; }
 }
 
+/* Excel comparison */
+.excel-compare-pair-list { display: grid; gap: 16px; }
+.excel-compare-pair { padding: 16px; border: 1px solid var(--separator); border-radius: 18px; background: var(--bg-muted); }
+.excel-pair-heading { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 11px; margin-bottom: 14px; }
+.excel-pair-heading .pair-number { display: grid; width: 32px; height: 32px; place-items: center; color: var(--green); background: var(--green-soft); border-radius: 10px; font-weight: 800; }
+.excel-pair-heading > div { display: grid; gap: 2px; min-width: 0; }
+.excel-pair-heading small, .excel-sheet-fields p, .excel-support-table-wrap p { color: var(--label-secondary); font-size: 13px; }
+.excel-pair-files, .excel-key-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.excel-pair-side { min-width: 0; }
+.excel-selected-file { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 8px; margin-top: 8px; padding: 9px 10px; background: var(--bg-elevated); border: 1px solid var(--separator); border-radius: 12px; }
+.excel-selected-file > span { display: grid; min-width: 0; }
+.excel-selected-file strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.excel-selected-file small { color: var(--label-secondary); font-size: 11px; }
+.excel-sheet-fields { display: grid; grid-template-columns: minmax(0,1fr) 100px; gap: 8px; margin-top: 9px; }
+.excel-sheet-fields label, .excel-reconcile-grid label, .excel-number-options label, .excel-select-field { display: grid; gap: 5px; color: var(--label-secondary); font-size: 12px; font-weight: 700; }
+.excel-sheet-fields input, .excel-sheet-fields select, .excel-reconcile-grid input, .excel-reconcile-grid select, .excel-number-options input, .excel-number-options select, .excel-select-field select { width: 100%; min-height: 40px; padding: 0 10px; border: 1px solid var(--separator); border-radius: 10px; color: var(--label); background: var(--bg-elevated); font: inherit; }
+.excel-sheet-fields p { grid-column: 1 / -1; margin: 0; }
+.excel-add-pair { margin-top: 13px; }
+.excel-compare-mode-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.excel-compare-mode-grid button { display: grid; gap: 5px; min-height: 86px; padding: 15px; border: 1px solid var(--separator); border-radius: 14px; color: var(--label); background: var(--bg-muted); text-align: left; cursor: pointer; }
+.excel-compare-mode-grid button.selected { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 1px var(--green); }
+.excel-compare-mode-grid small { color: var(--label-secondary); line-height: 1.4; }
+.excel-pair-mode-options { display: grid; gap: 12px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--separator); }
+.excel-pair-mode-options h3 { margin: 0; font-size: 15px; }
+.excel-column-picker { min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--separator); border-radius: 13px; }
+.excel-column-picker legend { padding: 0 5px; color: var(--label-secondary); font-size: 12px; font-weight: 700; }
+.excel-column-picker > div { display: flex; flex-wrap: wrap; gap: 6px; max-height: 148px; overflow: auto; }
+.excel-column-picker button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 9px; border: 1px solid var(--separator); border-radius: 9px; color: var(--label); background: var(--bg-elevated); cursor: pointer; }
+.excel-column-picker button span { color: var(--label-secondary); font-size: 11px; font-weight: 800; }
+.excel-column-picker button.selected { color: var(--green); border-color: var(--green); background: var(--green-soft); }
+.excel-reconcile-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+.excel-number-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 12px; }
+.excel-normalization-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.excel-support-table-wrap, .excel-result-table-wrap { overflow-x: auto; }
+.excel-support-table, .excel-result-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.excel-support-table th, .excel-support-table td, .excel-result-table th, .excel-result-table td { padding: 10px; border-bottom: 1px solid var(--separator); text-align: left; white-space: nowrap; }
+.excel-support-table th, .excel-result-table th { color: var(--label-secondary); background: var(--bg-muted); font-size: 12px; }
+.excel-report-downloads { display: flex; flex-wrap: wrap; gap: 9px; }
+.excel-report-downloads .result-download { margin: 0; }
+.excel-report-downloads .result-download span { display: grid; gap: 1px; }
+.excel-report-downloads .result-download small { padding-left: 0; border-left: 0; }
+.excel-result-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 10px; }
+.excel-status-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.excel-status-filters button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 9px; border: 1px solid var(--separator); border-radius: 9px; color: var(--label-secondary); background: var(--bg-elevated); cursor: pointer; }
+.excel-status-filters button:not(.selected) { opacity: .48; }
+.excel-status-filters button > span, .excel-status-text i { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: var(--green); }
+.excel-status-filters button[data-status="changed"] > span, tr[data-status="changed"] .excel-status-text i { background: var(--orange); }
+.excel-status-filters button[data-status="added"] > span, tr[data-status="added"] .excel-status-text i { background: var(--blue); }
+.excel-status-filters button[data-status="removed"] > span, tr[data-status="removed"] .excel-status-text i, .excel-status-filters button[data-status="error"] > span, tr[data-status="error"] .excel-status-text i { background: var(--pink); }
+.excel-status-filters button[data-status="duplicate"] > span, tr[data-status="duplicate"] .excel-status-text i, .excel-status-filters button[data-status="ambiguous"] > span, tr[data-status="ambiguous"] .excel-status-text i { background: var(--violet); }
+.excel-status-filters button[data-status="unmatched"] > span, tr[data-status="unmatched"] .excel-status-text i { background: var(--label-secondary); }
+.excel-result-search { display: flex; align-items: center; gap: 7px; min-width: min(290px,100%); min-height: 40px; padding: 0 10px; border: 1px solid var(--separator); border-radius: 11px; background: var(--bg-elevated); }
+.excel-result-search input { min-width: 0; width: 100%; border: 0; outline: 0; color: var(--label); background: transparent; }
+.excel-result-table td { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.excel-status-text { display: inline-flex; align-items: center; gap: 6px; }
+.excel-empty-result { padding: 24px; color: var(--label-secondary); text-align: center; }
+.excel-show-more { margin-top: 10px; }
+.excel-compare-page .tool-guide-grid > article { min-width: 0; }
+.excel-compare-page .tool-guide-grid p { overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  .excel-pair-files, .excel-key-grid, .excel-normalization-grid, .excel-reconcile-grid, .excel-number-options, .excel-compare-mode-grid { grid-template-columns: 1fr; }
+  .excel-result-toolbar { align-items: stretch; flex-direction: column; }
+  .excel-result-search { width: 100%; }
+  .excel-report-downloads { display: grid; grid-template-columns: 1fr; }
+  .excel-report-downloads .result-download { width: 100%; justify-content: flex-start; }
+  .excel-add-pair, .excel-show-more { width: 100%; justify-content: center; }
+}
+
 .privacy-consent {
   position: fixed;
   z-index: 120;
