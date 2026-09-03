@@ -4,6 +4,7 @@
 
 ## 2026-09-03
 
+- 라이브 화면을 파손한 shadcn UI 마이그레이션 6개 커밋을 역순으로 되돌려 전환 이전 UI를 복구했다. Excel 비교·Excel 정리 도구와 P-V 시각 회귀 하네스는 유지했다. — Codx
 - Chrome 기반 시각 회귀 하네스를 추가해 홈·미디어 필터·Excel 비교 빈 상태를 ko/en·light/dark·desktop/mobile 24개 고정 화면으로 비교한다. 애니메이션 제거·허용 영역·픽셀 임계값을 명시하고 shadcn 도입 전 PNG 기준선을 함께 고정했다. — Codx
 - Excel 데이터 정리 도구를 추가해 다중 파일·시트에 28종 구조·텍스트·필터·값 변환 규칙을 순차 적용하고, 수식 참조 갱신·안전 강등·병합 선행 검사·명시 미리보기·규칙 watchdog을 제공한다. 정리 XLSX·시트별 CSV·4시트 보고서·다중 ZIP, ko/en 화면·가이드·SEO·정적 페이지·소셜 이미지와 합성 fixture·Chrome 스모크·heap 게이트를 함께 반영했다. — Codx
 - 스프레드시트 공용 어댑터에 OOXML 수식 종류·참조·defined name·table·원본 행/열 lineage와 수식 캐시 존재 상태를 추가하고, 기존 workbook에 충돌 없는 보고서 시트를 붙이는 XLSX helper를 추가했다. — Codx

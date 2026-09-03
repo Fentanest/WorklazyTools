@@ -4,6 +4,15 @@
 
 ## 2026-09-03
 
+### shadcn 마이그레이션 라이브 UI 복구 — 6개 revert 판정 (Codx)
+
+- **파손·복구 범위 판정**: 라이브 문서 비교 화면에서 스위치가 얼룩처럼 렌더되고 문서 쌍 영역 텍스트가 세로로 낙하한 현상은 사용자 실측으로 확정됐다. 신규 Excel 비교 U1·Excel 정리 U2와 테스트 전용 P-V(`10a4b72`)는 유지하고, P1c `415e35b` → P1-polish `00bd3fd` → P1b `d998afa` → P1a `fdfb6c3` → P0b `df8e85c` → P0a `c43e1a7` 순서로 revert했다. 6건 모두 충돌 없이 적용되어 수동 충돌 해소는 없었다.
+- **트리·의존성 판정**: revert 뒤 `git diff --exit-code 10a4b72 HEAD --`와 `git diff dac13bb HEAD -- src/`는 모두 출력 없이 exit 0이었다. 따라서 `src/` 잔차는 tests 제외나 U1/U2 예외를 적용하기 전부터 0이며, 실제 이력상 U2는 `dac13bb` 자체이고 U1은 그 이전이라 둘 다 보존됐다. package manifest/lock의 shadcn·Tailwind 참조는 0건이고 `components.json`·`src/lib/utils.ts`·`src/styles/tailwind.css`·`src/components/ui/`는 모두 제거됐다. `global.css`·`ui.tsx`·ToolGuide·OperationProgress·ToolCard·LanguageSwitcher·AppShell은 `dac13bb`와 일치했다.
+- **P-V 시각 판정**: 기준선을 갱신하지 않은 `npm run test:visual`이 Chrome 152.0.7977.64에서 원본 24/24를 일치시켰다(per-pixel threshold 0.1, 전체 diff ≤0.100%, 기존 footer 허용 영역만 적용). 후속 마이그레이션이 재생성했던 기준선이 P-V 원본으로 복원됐다는 점과 전환 이전 UI 복구를 함께 증명한다.
+- **문서 비교 실측**: production build 로컬 preview의 `/ko/tools/document-compare/`를 1440×1200에서 캡처한 `/tmp/worklazytools-live-recovery/document-compare-restored-ko-desktop.png`를 직접 확인했다. 스위치 7개는 모두 43×25px·`border-radius: 999px`의 캡슐형이며 21×21px 원형 노브가 정상 분리됐다. 수정 전/후 문서 영역은 각각 484px 너비로 나란히 놓였고 `writing-mode: horizontal-tb`·페이지 수평 overflow 0으로 텍스트 세로 낙하가 없었다.
+- **추적 제외 로컬 검수**: dev build에서 개인정보 동의를 `granted`로 고정하고 `/tmp/worklazytools-live-recovery/document-compare-restored-ko-dev-no-tracking.png`를 추가 캡처해 같은 정상 배치를 직접 확인했다. Google·Naver 분석 script 0, AdSense script/slot 0, 외부 요청 0으로 로컬 검수 중 추적·광고 로더가 비활성임을 확인했다.
+- **검증 판정**: `npm run build` exit 0(2,429 modules·정적 59페이지), `npm run test:unit` 158/158, `test:visual` 24/24, `test:excel-compare`, `test:excel-cleaner`, `test:utilities`, `test:static`, `test:office`, `test:xls-preserve`, `test:xls-first-load`, `test:new-tools`, `test:video-hybrid`가 모두 exit 0이었다. `test:browser`는 서버 미기동 1회와 Vite cold dependency optimize/reload(Excel·Word·PDF) 중단 뒤 모든 lazy dependency가 warm인 동일 전체 명령에서 Excel·Word·PDF 스모크가 exit 0으로 통과했다. 제품 URL·ko/en 문구·SEO·광고/격리·GitHub Pages 구조에는 전환 이전 상태 이외의 변경을 넣지 않았다.
+
 ### shadcn 마이그레이션 P-V — 시각 회귀 기준선 판정 (Codx)
 
 - **고정 매트릭스**: 홈 기본 상태·도구 목록의 `category=media` 필터 상태·Excel 비교 빈 상태 3개를 ko/en × light/dark × desktop 1365×900/mobile 390×844(DPR 1)로 전개해 정확히 24개 viewport PNG를 고정했다. Chrome 152.0.7977.64에서 채집한 before 기준선은 4,979,977B(약 4.8MiB)이며 대표 desktop/mobile 화면을 직접 확인해 lazy route 로딩 잔상과 빈 화면이 없음을 확인했다.
