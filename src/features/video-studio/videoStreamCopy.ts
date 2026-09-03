@@ -1,18 +1,9 @@
 import type { VideoCodec } from "./types";
+import type { VideoAudioAlternativeProbes, VideoParserReasonCode, VideoProbeCause } from "./videoProbe";
 
 export type VideoStreamCopyReasonCode =
   | "READY"
-  | "NOT_ISO_BMFF"
-  | "FRAGMENTED_INPUT"
-  | "VIDEO_TRACK_UNAVAILABLE"
-  | "VIDEO_CODEC_UNSUPPORTED"
-  | "VIDEO_SAMPLE_ENTRY_UNSUPPORTED"
-  | "VIDEO_CONFIGURATION_UNAVAILABLE"
-  | "AUDIO_CODEC_UNSUPPORTED"
-  | "AUDIO_CONFIGURATION_UNAVAILABLE"
-  | "EDIT_LIST_UNSUPPORTED"
-  | "SAMPLE_TABLE_UNAVAILABLE"
-  | "CONCAT_TRACK_MISMATCH";
+  | VideoParserReasonCode;
 
 export interface VideoStreamTrackProfile {
   codecName: string;
@@ -34,6 +25,8 @@ export interface VideoStreamCopyProbeResult {
   compatible: boolean;
   codec?: Extract<VideoCodec, "h264" | "hevc">;
   reasonCode: VideoStreamCopyReasonCode;
+  cause?: VideoProbeCause;
+  audioAlternatives?: VideoAudioAlternativeProbes;
   sourceAudioBitratesBps?: Array<number | null | undefined>;
 }
 

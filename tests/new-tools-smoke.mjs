@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import initRhwp, { HwpDocument } from "@rhwp/core";
 import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
+import { createFile as createMp4BoxFile } from "mp4box";
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
@@ -87,7 +88,9 @@ try {
         fixtures.largeVideo,
         fixtures.largePassThroughVideos,
         fixtures.largeAudioIncompatibleVideo,
+        fixtures.targetAudioIncompatibleVideo,
         fixtures.videoIncompatibleVideo,
+        fixtures.dolbyVisionVideo,
       );
     }
 
@@ -3043,7 +3046,7 @@ async function waitForAudioSuccess(page, text, timeout = 60_000) {
   await page.waitForFunction((expected) => document.querySelector(".operation-progress.status-success")?.textContent?.includes(expected), { timeout }, text);
 }
 
-async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths, largeAudioIncompatibleVideo, videoIncompatibleVideo) {
+async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths, largeAudioIncompatibleVideo, targetAudioIncompatibleVideo, videoIncompatibleVideo, dolbyVisionVideo) {
   if (new URL(page.url()).origin !== new URL(baseUrl).origin) {
     await page.goto(`${koBaseUrl}/`, { waitUntil: "domcontentloaded" });
   }
@@ -3067,9 +3070,11 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
     googlePageViewQueued: (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"),
     engine: document.querySelector(".video-engine-status")?.textContent || "",
+    guideEyebrow: document.querySelector(".tool-guide .eyebrow")?.textContent || "",
   }));
   if (!isolation.marker || isolation.ads || !isolation.googleAnalytics || !isolation.naverAnalytics || !isolation.googlePageViewQueued
-    || !isolation.engine.includes("멀티스레드") || isolation.engine.includes("광고") || isolation.engine.includes("실행 문서") || videoAdRequests.length) {
+    || !isolation.engine.includes("멀티스레드") || isolation.engine.includes("광고") || isolation.engine.includes("실행 문서")
+    || isolation.guideEyebrow !== "안내" || videoAdRequests.length) {
     throw new Error(`Video isolation or ad exclusion failed: ${JSON.stringify({ isolation, videoAdRequests })}`);
   }
   await page.evaluate(() => {
@@ -3241,6 +3246,15 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     if (flip.getAttribute("aria-checked") !== "true") flip.click();
     audioRemove.click();
   });
+  await page.evaluate(() => {
+    window.__videoProgressHistory = [];
+    window.__videoProgressObserver?.disconnect();
+    window.__videoProgressObserver = new MutationObserver(() => {
+      const value = Number(document.querySelector('.operation-progress [role="progressbar"]')?.getAttribute("aria-valuenow"));
+      if (Number.isFinite(value) && window.__videoProgressHistory.at(-1) !== value) window.__videoProgressHistory.push(value);
+    });
+    window.__videoProgressObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-valuenow"] });
+  });
   await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
   await page.waitForSelector(".operation-progress.status-running");
   await waitForTerminalStatus(page);
@@ -3260,16 +3274,22 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
       video.removeAttribute("src");
       video.load();
     }
-    const progress = Array.from(document.querySelectorAll(".operation-log li"), (item) => Number((item.textContent || "").match(/^(\d+)%/)?.[1])).filter(Number.isFinite);
+    window.__videoProgressObserver?.disconnect();
+    const progress = Array.from(document.querySelectorAll(".operation-log li"), (item) => Number((item.textContent || "").match(/(\d+)%/)?.[1])).filter(Number.isFinite);
+    const history = window.__videoProgressHistory || [];
     return {
       count: anchors.length,
       dimensions,
       finalProgress: document.querySelector('.operation-progress [role="progressbar"]')?.getAttribute("aria-valuenow"),
-      progressMonotonic: progress.every((value, index) => index === 0 || value >= progress[index - 1]),
+      progressRows: progress,
+      progressHistory: history,
+      progressMonotonic: history.length > 0 && history.every((value, index) => index === 0 || value >= history[index - 1]),
     };
   });
   if (encodedVideoState.count !== 2 || JSON.stringify(encodedVideoState.dimensions) !== JSON.stringify([[180, 180], [240, 240]])
     || encodedVideoState.finalProgress !== "100" || !encodedVideoState.progressMonotonic
+    || encodedVideoState.progressRows.length === 0 || encodedVideoState.progressRows.length > 14
+    || encodedVideoState.progressRows.some((value) => value < 0 || value > 100)
     || videoStreamWorkerRequests.length < streamRequestsBeforeEncoding + 4) {
     throw new Error(`Target-bitrate streaming encode did not preserve transform/output contracts: ${JSON.stringify({ encodedVideoState, videoStreamWorkerRequests })}`);
   }
@@ -3545,12 +3565,16 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (largePassThroughState.outputs !== 2
     || largePassThroughState.transfer.startContainsFile
     || largePassThroughState.transfer.inputFileSizes.length !== 4
+    || largePassThroughState.logs.length > 14
+    || largePassThroughState.logs.some((message) => !/(?:^|\D)\d+%(?:\D|$)/.test(message))
     || !largePassThroughState.logs.some((message) => message.includes("원본 화질"))
-    || !largePassThroughState.logs.some((message) => message.includes("선택 구간"))) {
+    || !largePassThroughState.logs.some((message) => message.includes("호환됩니다"))) {
     throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
   }
+  console.log(`  video: 512MiB×2 total 1GiB sparse integration smoke, ${largePassThroughState.logs.length} bounded progress rows with percentages`);
 
-  await testVideoCopyGuidance(page, largeAudioIncompatibleVideo, videoIncompatibleVideo);
+  await testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAudioIncompatibleVideo, videoIncompatibleVideo);
+  await testDolbyVisionGuidance(page, dolbyVisionVideo);
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
@@ -3601,7 +3625,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
 }
 
-async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, videoIncompatibleVideo) {
+async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAudioIncompatibleVideo, videoIncompatibleVideo) {
   await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
   await page.waitForSelector(".video-studio-page input[type=file]");
@@ -3635,6 +3659,39 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, videoInc
     throw new Error(`A 2GB+ audio-removal job did not use direct copy: ${JSON.stringify(audioRemovalResult)}`);
   }
 
+  for (const mode of ["encode", "remove"]) {
+    await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+    await page.waitForSelector(".video-studio-page input[type=file]");
+    await (await page.$(".video-studio-page input[type=file]")).uploadFile(targetAudioIncompatibleVideo);
+    await page.waitForFunction(() => {
+      const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+      return button instanceof HTMLButtonElement && !button.disabled;
+    });
+    await page.select(".video-bitrate-control select", "2M");
+    await page.click(".video-studio-page .section-actions .primary-button");
+    await page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 });
+    const targetSuggestion = await page.$eval(".video-audio-mode-suggestion", (element) => ({
+      text: element.textContent || "",
+      primary: element.querySelector(".video-audio-encode-suggestion")?.textContent || "",
+      secondary: element.querySelector(".video-audio-suggestion-actions .secondary-button")?.textContent || "",
+    }));
+    if (!targetSuggestion.text.includes("음향 형식") || !targetSuggestion.primary.includes("음향 변환") || !targetSuggestion.secondary.includes("음향 제외")) {
+      throw new Error(`Target E-AC-3 CTA is incomplete: ${JSON.stringify(targetSuggestion)}`);
+    }
+    await page.click(mode === "encode" ? ".video-audio-encode-suggestion" : ".video-audio-suggestion-actions .secondary-button");
+    await page.waitForFunction((expected) => document.querySelector(".inline-success")?.textContent?.includes(expected), {}, mode === "encode" ? "음향 변환을 적용했습니다" : "음향 제외를 적용했습니다");
+    await page.click(".video-studio-page .section-actions .primary-button");
+    await page.waitForSelector(".operation-progress.status-running");
+    await waitForTerminalStatus(page);
+    if (await page.$(".operation-progress.status-error")) {
+      throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Target E-AC-3 processing error"));
+    }
+    if (await page.$$eval(".video-result-item", (elements) => elements.length) !== 1) {
+      throw new Error(`Target E-AC-3 ${mode} mode did not create one result`);
+    }
+  }
+
   await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
   await page.waitForSelector(".video-studio-page input[type=file]");
@@ -3643,13 +3700,129 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, videoInc
     const button = document.querySelector(".video-studio-page .section-actions .primary-button");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
+  await page.select(".video-bitrate-control select", "custom");
+  await page.waitForSelector('input[aria-label="영상 비트레이트 직접입력"]');
+  await page.$eval('input[aria-label="영상 비트레이트 직접입력"]', (input) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, "200");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
   await page.waitForSelector(".operation-progress.status-error", { timeout: 60_000 });
   const videoGuidance = await page.$eval(".operation-current-message", (element) => element.textContent || "");
-  if (!videoGuidance.includes("화면 압축 방식") || await page.$(".video-audio-removal-suggestion")) {
+  if (!videoGuidance.includes("원본 화면 형식") || !videoGuidance.includes("1.5GB") || await page.$(".video-audio-removal-suggestion")) {
     throw new Error(`Video-codec copy guidance was not kept separate: ${videoGuidance}`);
   }
-  console.log("  video: 2GB+ E-AC-3 remove-audio route and separate dvhe guidance verified");
+  console.log("  video: 2GB+ E-AC-3 remove-audio route and target-encode dvhe capacity guidance verified");
+}
+
+async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-studio-page input[type=file]");
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.click(".video-studio-page .section-actions .primary-button");
+  await waitForTerminalStatus(page);
+  if (await page.$(".operation-progress.status-error")) {
+    throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision copy isolation error"));
+  }
+  const copyIsolation = await page.evaluate(() => ({
+    outputs: document.querySelectorAll(".video-result-item").length,
+    suggestion: Boolean(document.querySelector(".video-audio-mode-suggestion")),
+    guidance: Array.from(document.querySelectorAll(".video-route-guidance"), (element) => element.textContent || "").join(" "),
+  }));
+  if (copyIsolation.outputs !== 1 || copyIsolation.suggestion || !copyIsolation.guidance.includes("원본 화면 형식")) {
+    throw new Error(`Dolby Vision stream-copy isolation failed: ${JSON.stringify(copyIsolation)}`);
+  }
+
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-studio-page input[type=file]");
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.evaluate(() => {
+    const bitrate = document.querySelector(".video-bitrate-control select");
+    const codec = document.querySelectorAll(".encoding-grid select")[1];
+    const audioCopy = document.querySelector(".video-audio-settings .segmented-control button:nth-child(1)");
+    if (!(bitrate instanceof HTMLSelectElement) || !(codec instanceof HTMLSelectElement) || !(audioCopy instanceof HTMLButtonElement)) {
+      throw new Error("Dolby Vision target controls are unavailable");
+    }
+    bitrate.value = "2M";
+    bitrate.dispatchEvent(new Event("change", { bubbles: true }));
+    codec.value = "h264";
+    codec.dispatchEvent(new Event("change", { bubbles: true }));
+    audioCopy.click();
+  });
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  const firstOutcome = await Promise.race([
+    page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 }).then(() => "suggestion"),
+    waitForTerminalStatus(page).then(() => "terminal"),
+  ]);
+  const suggestionAvailable = await page.$(".video-audio-mode-suggestion");
+  if (firstOutcome === "terminal" && !suggestionAvailable) {
+    await waitForTerminalStatus(page);
+    if (await page.$(".operation-progress.status-error")) {
+      throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision fallback error"));
+    }
+    const notice = await page.$$eval(".video-route-guidance", (elements) => elements.map((element) => element.textContent || "").join(" "));
+    const fallbackOutputs = await page.$$eval(".video-result-item", (elements) => elements.length);
+    if (!notice.includes("HDR10") || !notice.includes("돌비비전 효과") || fallbackOutputs !== 1) {
+      throw new Error(`Dolby Vision fallback guidance is incomplete: ${notice}`);
+    }
+    console.log("  video: Dolby Vision base-layer streaming smoke skipped because this Chrome host exposed no compatible route; deterministic capability units and fallback result guidance passed");
+    return;
+  }
+
+  await page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 });
+  const suggestion = await page.$eval(".video-audio-mode-suggestion", (element) => ({
+    text: element.textContent || "",
+    primary: element.querySelector(".video-audio-encode-suggestion")?.textContent || "",
+    secondary: element.querySelector(".secondary-button")?.textContent || "",
+  }));
+  if (!suggestion.text.includes("음향 형식") || !suggestion.primary.includes("음향 변환") || !suggestion.secondary.includes("음향 제외")) {
+    throw new Error(`Dolby Vision E-AC-3 target CTA is incomplete: ${JSON.stringify(suggestion)}`);
+  }
+  await page.click(".video-audio-encode-suggestion");
+  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 변환을 적용했습니다"));
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await waitForTerminalStatus(page);
+  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision encode error"));
+  const encoded = await page.evaluate(() => ({
+    outputs: document.querySelectorAll(".video-result-item").length,
+    guidance: Array.from(document.querySelectorAll(".video-route-result-guidance"), (element) => element.textContent || "").join(" "),
+  }));
+  if (encoded.outputs !== 1 || !encoded.guidance.includes("HDR10") || !encoded.guidance.includes("돌비비전 효과")) {
+    throw new Error(`Dolby Vision base-layer result guidance is incomplete: ${JSON.stringify(encoded)}`);
+  }
+
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForSelector(".video-studio-page input[type=file]");
+  await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
+  await page.waitForFunction(() => {
+    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await page.evaluate(() => {
+    const bitrate = document.querySelector(".video-bitrate-control select");
+    const audioRemove = document.querySelector(".video-audio-settings .segmented-control button:nth-child(2)");
+    if (!(bitrate instanceof HTMLSelectElement) || !(audioRemove instanceof HTMLButtonElement)) throw new Error("Dolby Vision remove controls are unavailable");
+    bitrate.value = "2M";
+    bitrate.dispatchEvent(new Event("change", { bubbles: true }));
+    audioRemove.click();
+  });
+  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await waitForTerminalStatus(page);
+  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision remove error"));
+  console.log("  video: Dolby Vision base-layer target H.264 encode with E-AC-3 conversion CTA and remove mode verified");
 }
 
 async function installVideoTransferProbe(page) {
@@ -3764,7 +3937,11 @@ async function createFixtures(directory) {
   const largeVideo = path.join(directory, "2026_0618_070732_001396F.MP4");
   const largePassThroughVideos = [path.join(directory, "large-pass-through-one.mp4"), path.join(directory, "large-pass-through-two.mp4")];
   const largeAudioIncompatibleVideo = path.join(directory, "large-eac3-source.mp4");
+  const targetAudioIncompatibleVideo = path.join(directory, "target-eac3-source.mp4");
   const videoIncompatibleVideo = path.join(directory, "dolby-vision-entry.mov");
+  const dolbyVisionBase = path.join(directory, "dolby-vision-hvc1-base.mp4");
+  const dolbyVisionLimitBase = path.join(directory, "dolby-vision-limit-hvc1-base.mp4");
+  const dolbyVisionMatrix = [];
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi", "-i", "color=c=0x159bd7:s=320x180:d=1.5",
@@ -3793,6 +3970,7 @@ async function createFixtures(directory) {
     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "eac3", "-b:a", "192k",
     "-shortest", "-movflags", "+faststart", largeAudioIncompatibleVideo,
   ]);
+  await fs.copyFile(largeAudioIncompatibleVideo, targetAudioIncompatibleVideo);
   const audioIncompatibleHandle = await fs.open(largeAudioIncompatibleVideo, "r+");
   try {
     await audioIncompatibleHandle.truncate(2 * 1024 * 1024 * 1024 + 1);
@@ -3802,15 +3980,33 @@ async function createFixtures(directory) {
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi", "-i", "color=c=0xaa4422:s=320x180:r=30:d=1",
+    "-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=1",
     "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "log-level=error",
-    "-tag:v", "dvhe", "-an", "-movflags", "+faststart", videoIncompatibleVideo,
+    "-tag:v", "hvc1", "-c:a", "eac3", "-b:a", "192k", "-shortest",
+    "-movflags", "+faststart", "-write_btrt", "1", dolbyVisionBase,
   ]);
-  const videoIncompatibleHandle = await fs.open(videoIncompatibleVideo, "r+");
-  try {
-    await videoIncompatibleHandle.truncate(2 * 1024 * 1024 * 1024 + 2);
-  } finally {
-    await videoIncompatibleHandle.close();
+  for (const sampleEntry of ["dvh1", "dvhe"]) {
+    for (const configBox of ["dvcC", "dvvC"]) {
+      const fixture = path.join(directory, `dolby-vision-${sampleEntry}-${configBox}.mp4`);
+      await injectDolbyVisionConfiguration(dolbyVisionBase, fixture, { sampleEntry, configBox, compatibilityId: 1 });
+      await validateDolbyVisionFixture(fixture, sampleEntry, configBox);
+      dolbyVisionMatrix.push(fixture);
+    }
   }
+  await execFileAsync("ffmpeg", [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi", "-i", "color=c=0x663399:s=320x180:r=1:d=70",
+    "-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=70",
+    "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "log-level=error",
+    "-tag:v", "hvc1", "-c:a", "eac3", "-b:a", "192k", "-shortest",
+    "-movflags", "+faststart", "-write_btrt", "1", dolbyVisionLimitBase,
+  ]);
+  await injectDolbyVisionConfiguration(dolbyVisionLimitBase, videoIncompatibleVideo, {
+    sampleEntry: "dvhe",
+    configBox: "dvcC",
+    compatibilityId: 0,
+  });
+  await validateDolbyVisionFixture(videoIncompatibleVideo, "dvhe", "dvcC");
   await Promise.all(largePassThroughVideos.map(async (target) => {
     await fs.copyFile(video, target);
     const handle = await fs.open(target, "r+");
@@ -3835,8 +4031,49 @@ async function createFixtures(directory) {
     largeVideo,
     largePassThroughVideos,
     largeAudioIncompatibleVideo,
+    targetAudioIncompatibleVideo,
     videoIncompatibleVideo,
+    dolbyVisionVideo: dolbyVisionMatrix[0],
   };
+}
+
+async function injectDolbyVisionConfiguration(source, target, { sampleEntry, configBox, compatibilityId }) {
+  const bytes = await fs.readFile(source);
+  const sampleEntryOffset = bytes.indexOf("hvc1");
+  const bitrateBoxOffset = bytes.indexOf("btrt");
+  if (sampleEntryOffset < 4 || bitrateBoxOffset < 4 || bytes.readUInt32BE(bitrateBoxOffset - 4) !== 20) {
+    throw new Error("Dolby Vision fixture requires one hvc1 entry and a 20-byte btrt box");
+  }
+  bytes.write(sampleEntry, sampleEntryOffset, 4, "ascii");
+  bytes.write(configBox, bitrateBoxOffset, 4, "ascii");
+  const level = 9;
+  Buffer.from([1, 0, (8 << 1) | (level >>> 5), ((level & 0x1f) << 3) | 0b101, compatibilityId << 4])
+    .copy(bytes, bitrateBoxOffset + 4);
+  await fs.writeFile(target, bytes);
+}
+
+async function validateDolbyVisionFixture(filePath, sampleEntry, configBox) {
+  const { stdout } = await execFileAsync("ffprobe", [
+    "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,codec_tag_string", "-of", "json", filePath,
+  ]);
+  const stream = JSON.parse(stdout).streams?.[0];
+  if (stream?.codec_name !== "hevc" || stream?.codec_tag_string !== sampleEntry) {
+    throw new Error(`Dolby Vision ffprobe validation failed: ${stdout}`);
+  }
+  await execFileAsync("ffmpeg", ["-v", "error", "-i", filePath, "-f", "null", "-"]);
+  const bytes = await fs.readFile(filePath);
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  buffer.fileStart = 0;
+  const parser = createMp4BoxFile(false);
+  let info;
+  parser.onReady = (value) => { info = value; };
+  parser.appendBuffer(buffer, true);
+  parser.flush();
+  const track = info?.videoTracks?.[0] && parser.getTrackById(info.videoTracks[0].id);
+  const entry = track?.mdia?.minf?.stbl?.stsd?.entries?.[0];
+  if (entry?.type !== sampleEntry || !entry.hvcC || !entry[configBox]) {
+    throw new Error(`Dolby Vision MP4Box validation failed for ${sampleEntry}/${configBox}`);
+  }
 }
 
 async function createMinimalDocx() {

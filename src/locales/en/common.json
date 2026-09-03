@@ -103,6 +103,6 @@
     "loadingTool": "Loading {{tool}}…"
   },
   "progress": { "title":"Progress", "running":"Processing", "success":"Complete", "needsAttention":"Needs attention", "logs":"{{count}} log entries", "seconds":"{{value}}s", "minutesSeconds":"{{minutes}}m {{seconds}}s" },
-  "guide": { "faq":"Frequently asked questions" },
+  "guide": { "eyebrow":"Guide", "faq":"Frequently asked questions" },
   "format": { "characters": "{{count}} characters", "files": "{{count}} files", "tools": "{{count}} tools" }
 }

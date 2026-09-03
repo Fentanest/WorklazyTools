@@ -1,4 +1,5 @@
 import type { VideoWorkerProgress } from "./types";
+import type { VideoProcessingRoute } from "./videoRouting";
 
 export const VIDEO_PROGRESS_STAGES = ["audio", "demux", "decode", "encode", "mux", "write"] as const;
 export type VideoProgressStage = typeof VIDEO_PROGRESS_STAGES[number];
@@ -24,6 +25,7 @@ export interface VideoProcessingProgressController {
 export interface VideoProgressJobWeight {
   durationSeconds: number;
   expectedOutputBytes: number;
+  route: VideoProcessingRoute;
 }
 
 export function createVideoProcessingProgressController(
@@ -34,48 +36,65 @@ export function createVideoProcessingProgressController(
   let terminal = false;
   const stageProgress = Object.fromEntries(VIDEO_PROGRESS_STAGES.map((stage) => [stage, 0])) as Record<VideoProgressStage, number>;
   const jobStageProgress = VIDEO_PROGRESS_STAGES.map(() => jobWeights.map(() => 0));
-  const reportJobProgress = (jobIndex: number, message: string) => {
-    for (let stageIndex = 0; stageIndex < VIDEO_PROGRESS_STAGES.length; stageIndex += 1) {
-      const stage = VIDEO_PROGRESS_STAGES[stageIndex];
+  const activeWeights = jobWeights.map((job) => videoProgressStageWeightsForRoute(job.route));
+  const reportJobProgress = (jobIndex: number, message: string, stageKey: string) => {
+    const overall = VIDEO_PROGRESS_STAGES.reduce((total, stage, stageIndex) => {
       const weights = jobWeights.map((job) => stage === "write" ? job.expectedOutputBytes : job.durationSeconds);
-      stageProgress[stage] = weightedAverage(jobStageProgress[stageIndex], weights);
-    }
-    reportOverall(weightedStageProgress(stageProgress), message);
+      const contributions = jobStageProgress[stageIndex].map((value, index) => value * activeWeights[index][stage]);
+      return total + weightedAverage(contributions, weights);
+    }, 0) * 100;
+    reportOverall(overall, message, stageKey);
   };
-  const reportOverall: VideoWorkerProgress = (progress, message) => {
+  const reportOverall: VideoWorkerProgress = (progress, message, stageKey) => {
     if (terminal) return;
     const nextProgress = normalizeProgress(progress);
     currentProgress = Math.max(currentProgress, nextProgress);
-    onProgress?.(currentProgress, message);
+    onProgress?.(currentProgress, message, stageKey);
   };
   return {
     reportOverall,
     reportStage: (stage, progress, message) => {
-      stageProgress[stage] = normalizeProgress(progress) / 100;
-      reportOverall(weightedStageProgress(stageProgress), message);
+      const ratio = normalizeProgress(progress) / 100;
+      stageProgress[stage] = ratio;
+      if (jobWeights.length) {
+        const stageIndex = VIDEO_PROGRESS_STAGES.indexOf(stage);
+        jobStageProgress[stageIndex].fill(ratio);
+        reportJobProgress(-1, message, `video:${stage}`);
+      } else {
+        reportOverall(weightedStageProgress(stageProgress), message, `video:${stage}`);
+      }
     },
     reportJobStage: (jobIndex, stage, completedUnits, totalUnits, message) => {
       if (!jobWeights[jobIndex]) return;
       const stageIndex = VIDEO_PROGRESS_STAGES.indexOf(stage);
       jobStageProgress[stageIndex][jobIndex] = unitRatio(completedUnits, totalUnits);
-      const weights = jobWeights.map((job) => stage === "write" ? job.expectedOutputBytes : job.durationSeconds);
-      stageProgress[stage] = weightedAverage(jobStageProgress[stageIndex], weights);
-      reportOverall(weightedStageProgress(stageProgress), message);
+      reportJobProgress(jobIndex, message, `video:${jobIndex}:${stage}`);
     },
     reportJobOverall: (jobIndex, progress, message) => {
       if (!jobWeights[jobIndex]) return;
       const ratio = normalizeProgress(progress) / 100;
       let consumed = 0;
       VIDEO_PROGRESS_STAGES.forEach((stage, stageIndex) => {
-        const weight = VIDEO_PROGRESS_STAGE_WEIGHTS[stage];
-        jobStageProgress[stageIndex][jobIndex] = Math.max(0, Math.min(1, (ratio - consumed) / weight));
+        const weight = activeWeights[jobIndex][stage];
+        jobStageProgress[stageIndex][jobIndex] = weight > 0
+          ? Math.max(0, Math.min(1, (ratio - consumed) / weight))
+          : 0;
         consumed += weight;
       });
-      reportJobProgress(jobIndex, message);
+      reportJobProgress(jobIndex, message, `video:${jobIndex}:overall`);
     },
     terminate: () => { terminal = true; },
     current: () => currentProgress,
   };
+}
+
+export function videoProgressStageWeightsForRoute(route: VideoProcessingRoute) {
+  if (route === "hybrid" || route === "ffmpeg") return VIDEO_PROGRESS_STAGE_WEIGHTS;
+  const activeTotal = 1 - VIDEO_PROGRESS_STAGE_WEIGHTS.audio;
+  return Object.fromEntries(VIDEO_PROGRESS_STAGES.map((stage) => [
+    stage,
+    stage === "audio" ? 0 : VIDEO_PROGRESS_STAGE_WEIGHTS[stage] / activeTotal,
+  ])) as Record<VideoProgressStage, number>;
 }
 
 function normalizeProgress(progress: number) {

@@ -111,6 +111,12 @@ export function decideFfmpegOnlyRoute(estimatedOutputBytes: number): VideoRouteD
   };
 }
 
+export function isSafeFfmpegOutputSize(estimatedOutputBytes: number) {
+  return Number.isFinite(estimatedOutputBytes)
+    && estimatedOutputBytes >= 0
+    && estimatedOutputBytes <= MAX_SAFE_FFMPEG_OUTPUT_BYTES;
+}
+
 function plannedStreamingRouteFor(input: VideoRouteInput): VideoPlannedStreamingRoute | null {
   if (input.bitrateMode === "crf") return null;
   if (input.container !== "mp4" && input.container !== "mov") return null;
@@ -127,9 +133,7 @@ function ineligibleReasonFor(input: VideoRouteInput): VideoRouteReasonCode {
 }
 
 function decideFailureFallbacks(estimatedOutputBytes: number): VideoRouteDecision["failureFallbacks"] {
-  const safeForFfmpeg = Number.isFinite(estimatedOutputBytes)
-    && estimatedOutputBytes >= 0
-    && estimatedOutputBytes <= MAX_SAFE_FFMPEG_OUTPUT_BYTES;
+  const safeForFfmpeg = isSafeFfmpegOutputSize(estimatedOutputBytes);
   const fallback: VideoRouteDecision["failureFallbacks"][VideoProcessingFailureStage] = safeForFfmpeg
     ? { route: "ffmpeg", reasonCode: "FALLBACK_OUTPUT_WITHIN_SAFE_LIMIT" }
     : { route: "reject", reasonCode: "FALLBACK_OUTPUT_EXCEEDS_SAFE_LIMIT" };

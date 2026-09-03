@@ -10,6 +10,7 @@ import {
   VIDEO_ROUTE_OPFS_STATES,
   VIDEO_ROUTE_QUOTA_STATES,
   decideVideoProcessingRoute,
+  isSafeFfmpegOutputSize,
   type VideoRouteInput,
   type VideoRouteReasonCode,
 } from "../../src/features/video-studio/videoRouting.ts";
@@ -100,6 +101,10 @@ test("every stage in the fallback matrix only uses FFmpeg within the safety limi
   assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES }).failureFallbacks, safeFallbacks("ffmpeg"));
   assert.deepEqual(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: MAX_SAFE_FFMPEG_OUTPUT_BYTES + 1 }).failureFallbacks, safeFallbacks("reject"));
   assert.ok(Object.values(decideVideoProcessingRoute({ ...base, estimatedOutputBytes: Number.NaN }).failureFallbacks).every((fallback) => fallback.route === "reject"));
+  assert.equal(isSafeFfmpegOutputSize(MAX_SAFE_FFMPEG_OUTPUT_BYTES), true);
+  assert.equal(isSafeFfmpegOutputSize(MAX_SAFE_FFMPEG_OUTPUT_BYTES + 1), false);
+  assert.equal(isSafeFfmpegOutputSize(Number.NaN), false);
+  assert.equal(isSafeFfmpegOutputSize(-1), false);
 });
 
 function safeFallbacks(route: "ffmpeg" | "reject") {

@@ -45,9 +45,11 @@ import { probeVideoMetadata } from "./videoWorkerClient";
 import {
   preflightVideoProcessingRoutes,
   runVideoProcessingTask,
+  isTargetBitrateVideoEncodeTask,
+  taskForVideoJob,
   type VideoProcessingJobRoute,
 } from "./videoProcessingClient";
-import { MAX_SAFE_FFMPEG_OUTPUT_BYTES } from "./videoRouting";
+import { MAX_SAFE_FFMPEG_OUTPUT_BYTES, isSafeFfmpegOutputSize } from "./videoRouting";
 import { createVideoZip } from "./videoZipClient";
 import { VIDEO_GROUP_IDS } from "./types";
 import { VideoGroupSection } from "./VideoGroupSection";
@@ -64,6 +66,13 @@ import {
   releaseVideoResultStorageSession,
   resolveVideoResultFile,
 } from "./videoResultStorage";
+import {
+  guidanceCodeForProbeCause,
+  guidanceCodeForRouteReason,
+  primaryVideoProbeCause,
+  type VideoRouteGuidanceCode,
+} from "./videoRouteGuidance";
+import { dolbyVisionBaseLayerGuidance } from "./videoDolbyVision";
 
 type GroupSettings = VideoGroupSettings;
 
@@ -82,7 +91,14 @@ interface VideoJobEntry {
   items: VideoItem[];
 }
 
-interface AudioRemovalSuggestion {
+interface AudioModeSuggestion {
+  jobKey: string;
+  jobName: string;
+  message: string;
+  modes: Array<"remove" | "encode">;
+}
+
+interface VideoRouteNotice {
   jobKey: string;
   jobName: string;
   message: string;
@@ -131,8 +147,9 @@ export function VideoStudioPage() {
   const [bitrate, setBitrate] = useState<VideoBitrate>("copy");
   const [customVideoBitrate, setCustomVideoBitrate] = useState("4.5");
   const [audioMode, setAudioMode] = useState<VideoAudioMode>("copy");
-  const [audioRemovalJobKeys, setAudioRemovalJobKeys] = useState<Set<string>>(() => new Set());
-  const [audioRemovalSuggestions, setAudioRemovalSuggestions] = useState<AudioRemovalSuggestion[]>([]);
+  const [audioModeOverrides, setAudioModeOverrides] = useState<Map<string, "remove" | "encode">>(() => new Map());
+  const [audioModeSuggestions, setAudioModeSuggestions] = useState<AudioModeSuggestion[]>([]);
+  const [routeNotices, setRouteNotices] = useState<VideoRouteNotice[]>([]);
   const [audioBitrate, setAudioBitrate] = useState<VideoAudioBitrate>("192k");
   const [customAudioBitrate, setCustomAudioBitrate] = useState("192");
   const [audioSampleRate, setAudioSampleRate] = useState<VideoAudioSampleRate>("source");
@@ -480,37 +497,46 @@ export function VideoStudioPage() {
       name: job.name,
       mode: job.mode,
       inputs: job.items.map(toWorkerInput),
-      audioModeOverride: audioRemovalJobKeys.has(videoJobKey(job)) ? "remove" : undefined,
+      audioModeOverride: audioModeOverrides.get(videoJobKey(job)),
     }));
     const routePreflight = await preflightVideoProcessingRoutes({ mode: "batch", jobs, task });
+    const notices = routePreflight.jobs.flatMap((route) => routeNoticesForJob(route, jobEntries[route.jobIndex], task, language));
+    setRouteNotices(notices);
     const suggested = routePreflight.jobs.flatMap((route) => {
-      if (!route.audioRemovalSuggested || jobs[route.jobIndex].audioModeOverride === "remove") return [];
+      const modes = route.audioModeSuggestions.filter((mode) => jobs[route.jobIndex].audioModeOverride !== mode);
+      if (!modes.length) return [];
       const entry = jobEntries[route.jobIndex];
       return [{
         jobKey: videoJobKey(entry),
         jobName: entry.name,
-        message: routeGuidanceMessage(streamCopyProbeReason(route.probeDetails), language, true),
+        message: audioSuggestionMessage(modes, language),
+        modes,
       }];
     });
     if (suggested.length) {
-      setAudioRemovalSuggestions(suggested);
+      setAudioModeSuggestions(suggested);
       progress.start(featureMessage(language, "video.messages.VideoStudioPage.checkingSourceCompatibility"));
       progress.fail(suggested[0].message);
       return;
     }
-    setAudioRemovalSuggestions([]);
-    if (task.kind === "encode" && task.bitrate === "copy") {
+    setAudioModeSuggestions([]);
+    if (isTargetBitrateVideoEncodeTask(task)) {
       const oversizedRoute = routePreflight.jobs.find(({ decision, estimatedOutputBytes }) => (
-        decision.route === "ffmpeg" && estimatedOutputBytes > MAX_SAFE_FFMPEG_OUTPUT_BYTES
+        decision.route === "ffmpeg" && !isSafeFfmpegOutputSize(estimatedOutputBytes)
       ));
       const oversized = oversizedRoute && {
         job: jobEntries[oversizedRoute.jobIndex],
         estimate: oversizedRoute.estimatedOutputBytes,
-        reasonCode: streamCopyProbeReason(oversizedRoute.probeDetails),
+        cause: primaryVideoProbeCause(oversizedRoute.probeDetails),
+        reasonCode: oversizedRoute.decision.reasonCode,
       };
       if (oversized) {
         progress.start(featureMessage(language, "video.messages.VideoStudioPage.checkingEstimatedPassthroughOutputSize"));
-        progress.fail(`${routeGuidanceMessage(oversized.reasonCode, language, false)} ${featureMessage(language, "video.messages.VideoStudioPage.isEstimatedAtAboutLargeSourceFilesAre", { p0: oversized.job.name, p1: formatBytes(oversized.estimate) })}`);
+        const guidanceCode = oversized.cause
+          ? guidanceCodeForProbeCause(oversized.cause)
+          : guidanceCodeForRouteReason(oversized.reasonCode);
+        const causeMessage = guidanceCode ? routeGuidanceMessage(guidanceCode, language) : "";
+        progress.fail(`${causeMessage} ${featureMessage(language, "video.messages.VideoStudioPage.isEstimatedAtAboutLargeSourceFilesAre", { p0: oversized.job.name, p1: formatBytes(oversized.estimate) })}`.trim());
         return;
       }
     }
@@ -587,14 +613,21 @@ export function VideoStudioPage() {
 
   const changeAudioMode = (value: VideoAudioMode) => {
     setAudioMode(value);
-    setAudioRemovalJobKeys(new Set());
-    setAudioRemovalSuggestions([]);
+    setAudioModeOverrides(new Map());
+    setAudioModeSuggestions([]);
+    setRouteNotices([]);
   };
 
-  const acceptAudioRemovalSuggestion = (suggestion: AudioRemovalSuggestion) => {
-    setAudioRemovalJobKeys((current) => new Set(current).add(suggestion.jobKey));
-    setAudioRemovalSuggestions((current) => current.filter((item) => item.jobKey !== suggestion.jobKey));
-    setLastResult(featureMessage(language, "video.messages.VideoStudioPage.audioRemovalSelectedFor", { p0: suggestion.jobName }));
+  const acceptAudioModeSuggestion = (suggestion: AudioModeSuggestion, mode: "remove" | "encode") => {
+    setAudioModeOverrides((current) => new Map(current).set(suggestion.jobKey, mode));
+    setAudioModeSuggestions((current) => current.filter((item) => item.jobKey !== suggestion.jobKey));
+    setLastResult(featureMessage(
+      language,
+      mode === "encode"
+        ? "video.messages.VideoStudioPage.audioEncodingSelectedFor"
+        : "video.messages.VideoStudioPage.audioRemovalSelectedFor",
+      { p0: suggestion.jobName },
+    ));
     progress.reset();
   };
 
@@ -726,15 +759,17 @@ export function VideoStudioPage() {
           {outputFormat === "webm" && bitrate === "copy" && <div className="inline-warning error webm-passthrough-warning"><AlertTriangle size={17} /><span><strong>{featureMessage(language, "video.messages.VideoStudioPage.typicalMp4VideoAndAudioCannotBeCopied")}</strong> {featureMessage(language, "video.messages.VideoStudioPage.reEncodeH264VideoUsingCrfOr")}</span></div>}
           {isVideoOutput && audioMode === "copy" && <div className="inline-warning"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.onlyTheFirstAudioTrackIsCopiedWithout")}</span></div>}
           {isVideoOutput && audioMode === "remove" && <div className="video-output-note"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.audioWillBeRemovedFromTheOutputVideo")}</span></div>}
-          {audioRemovalSuggestions.map((suggestion) => (
-            <div className="inline-warning error video-audio-removal-suggestion" key={suggestion.jobKey}>
+          {audioModeSuggestions.map((suggestion) => (
+            <div className={`inline-warning error video-audio-mode-suggestion${suggestion.modes.length === 1 && suggestion.modes[0] === "remove" ? " video-audio-removal-suggestion" : ""}`} key={suggestion.jobKey}>
               <AlertTriangle size={17} />
               <span><strong>{suggestion.jobName}</strong> {suggestion.message}</span>
-              <button type="button" className="secondary-button" onClick={() => acceptAudioRemovalSuggestion(suggestion)}>
-                {featureMessage(language, "video.messages.VideoStudioPage.copyVideoWithoutAudio")}
-              </button>
+              <span className="video-audio-suggestion-actions">
+                {suggestion.modes.includes("encode") && <button type="button" className="primary-button video-audio-encode-suggestion" onClick={() => acceptAudioModeSuggestion(suggestion, "encode")}>{featureMessage(language, "video.messages.VideoStudioPage.convertAndKeepAudio")}</button>}
+                {suggestion.modes.includes("remove") && <button type="button" className="secondary-button" onClick={() => acceptAudioModeSuggestion(suggestion, "remove")}>{featureMessage(language, "video.messages.VideoStudioPage.copyVideoWithoutAudio")}</button>}
+              </span>
             </div>
           ))}
+          {routeNotices.map((notice) => <div className="inline-warning video-route-guidance" key={`${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></div>)}
           {passthroughTransformConflict && <div className="inline-warning error"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.changingAspectRatioOrResolutionRequiresReEncoding")}</span></div>}
           {!passthroughTransformConflict && passthroughConcatConflict && <div className="inline-warning error"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.videosWithDifferentDimensionsOrAspectRatiosCannot")}</span></div>}
           {outputFormat === "gif" && <div className="video-output-note"><Sparkles size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.createsGifsFromEachGroupSSelectedRanges")}</span></div>}
@@ -781,6 +816,7 @@ export function VideoStudioPage() {
             <AlertTriangle size={16} />
             <span><strong>{videoPage.downloadGuidanceLabel}</strong>{videoPage.downloadGuidance}</span>
           </div>
+          {routeNotices.map((notice) => <div className="inline-warning video-route-result-guidance" key={`result:${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></div>)}
         </SectionCard>
       )}
 
@@ -947,22 +983,70 @@ function videoJobKey(job: VideoJobEntry) {
   return `${job.mode}:${job.items.map((item) => item.id).join(":")}`;
 }
 
-function routeGuidanceMessage(reasonCode: string | undefined, language: AppLanguage, audioRemovalAvailable: boolean) {
-  if (audioRemovalAvailable) {
-    return featureMessage(language, "video.messages.VideoStudioPage.sourceAudioCannotBeCopiedRemoveItForLargeFiles");
-  }
-  if (reasonCode?.startsWith("VIDEO_") || reasonCode === "INPUT_UNSUPPORTED") {
-    return featureMessage(language, "video.messages.VideoStudioPage.sourcePictureCannotBeCopiedDirectlyChooseEncoding");
-  }
-  if (reasonCode === "EDIT_LIST_UNSUPPORTED" || reasonCode === "SAMPLE_TABLE_UNAVAILABLE") {
-    return featureMessage(language, "video.messages.VideoStudioPage.sourceTimelineCannotBeCopiedDirectlyChooseEncoding");
-  }
-  return featureMessage(language, "video.messages.VideoStudioPage.sourceCannotBeCopiedDirectlyChooseAnotherSetting");
+function routeGuidanceMessage(code: VideoRouteGuidanceCode, language: AppLanguage) {
+  const keys: Record<VideoRouteGuidanceCode, string> = {
+    "source-structure": "video.messages.VideoStudioPage.routeSourceStructureRequiresCompatibilityProcessing",
+    "video-format": "video.messages.VideoStudioPage.routeVideoFormatRequiresCompatibilityProcessing",
+    "audio-format": "video.messages.VideoStudioPage.routeAudioFormatRequiresCompatibilityProcessing",
+    timeline: "video.messages.VideoStudioPage.routeTimelineRequiresCompatibilityProcessing",
+    concat: "video.messages.VideoStudioPage.routeConcatTracksRequireCompatibilityProcessing",
+    "frame-rate": "video.messages.VideoStudioPage.routeFrameRateRequiresCompatibilityProcessing",
+    "video-capability": "video.messages.VideoStudioPage.routeVideoCapabilityRequiresCompatibilityProcessing",
+    "audio-capability": "video.messages.VideoStudioPage.routeAudioCapabilityRequiresCompatibilityProcessing",
+    "container-setting": "video.messages.VideoStudioPage.routeContainerSettingUsesCompatibilityProcessing",
+    "codec-setting": "video.messages.VideoStudioPage.routeCodecSettingUsesCompatibilityProcessing",
+    "quality-setting": "video.messages.VideoStudioPage.routeQualitySettingUsesCompatibilityProcessing",
+    "storage-route": "video.messages.VideoStudioPage.routeStorageStateUsesCompatibilityProcessing",
+    generic: "video.messages.VideoStudioPage.routeCurrentSettingsUseCompatibilityProcessing",
+  };
+  return featureMessage(language, keys[code]);
 }
 
-function streamCopyProbeReason(probeDetails: VideoProcessingJobRoute["probeDetails"]) {
-  return probeDetails.find((probe) => probe.operation === "stream-copy" && probe.audioMode === "copy")?.reasonCode
-    ?? probeDetails.find((probe) => probe.operation === "stream-copy")?.reasonCode;
+function audioSuggestionMessage(modes: Array<"remove" | "encode">, language: AppLanguage) {
+  if (modes.includes("encode")) {
+    return featureMessage(language, modes.includes("remove")
+      ? "video.messages.VideoStudioPage.sourceAudioNeedsConversionOrRemoval"
+      : "video.messages.VideoStudioPage.sourceAudioNeedsConversion");
+  }
+  return featureMessage(language, "video.messages.VideoStudioPage.sourceAudioCannotBeCopiedRemoveItForLargeFiles");
+}
+
+function routeNoticesForJob(
+  route: VideoProcessingJobRoute,
+  job: VideoJobEntry,
+  task: VideoTask,
+  language: AppLanguage,
+): VideoRouteNotice[] {
+  const notices: VideoRouteNotice[] = [];
+  const jobKey = videoJobKey(job);
+  if (route.dvBaseLayer) {
+    const guidance = dolbyVisionBaseLayerGuidance(route.dvBaseLayer.compatIds);
+    const key = guidance === "hdr10"
+      ? "video.messages.VideoStudioPage.dolbyVisionHdr10BaseLayerNotice"
+      : guidance === "sdr"
+        ? "video.messages.VideoStudioPage.dolbyVisionSdrBaseLayerNotice"
+        : guidance === "hlg"
+          ? "video.messages.VideoStudioPage.dolbyVisionHlgBaseLayerNotice"
+          : "video.messages.VideoStudioPage.dolbyVisionMixedBaseLayerNotice";
+    notices.push({ jobKey, jobName: job.name, message: featureMessage(language, key) });
+  }
+  if (route.decision.route === "ffmpeg") {
+    const cause = primaryVideoProbeCause(route.probeDetails);
+    const guidanceCode = cause
+      ? guidanceCodeForProbeCause(cause)
+      : guidanceCodeForRouteReason(route.decision.reasonCode);
+    if (guidanceCode) notices.push({ jobKey, jobName: job.name, message: routeGuidanceMessage(guidanceCode, language) });
+    const jobTask = taskForVideoJob(task, { name: job.name, mode: job.mode, inputs: job.items.map(toWorkerInput) });
+    if (jobTask.kind === "encode" && jobTask.bitrate !== "copy" && jobTask.bitrate !== "0"
+      && job.items.some((item) => item.width >= 3840 || item.height >= 2160)) {
+      notices.push({
+        jobKey,
+        jobName: job.name,
+        message: featureMessage(language, "video.messages.VideoStudioPage.highResolutionCompatibilityProcessingNotice"),
+      });
+    }
+  }
+  return notices;
 }
 
 function toWorkerInput(item: VideoItem): VideoWorkerInput {

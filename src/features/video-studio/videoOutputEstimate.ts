@@ -28,9 +28,14 @@ export function estimateVideoJobDuration(job: VideoOutputJob) {
 }
 
 export function taskForVideoJob(task: VideoTask, job: VideoOutputJob): VideoTask {
-  return task.kind === "encode" && job.audioModeOverride === "remove"
-    ? { ...task, audioMode: "remove" }
-    : task;
+  if (task.kind !== "encode" || !job.audioModeOverride) return task;
+  return job.audioModeOverride === "encode"
+    ? { ...task, audioMode: "encode", audioBitrate: "192k", audioSampleRate: "source" }
+    : { ...task, audioMode: "remove" };
+}
+
+export function isTargetBitrateVideoEncodeTask(task: VideoTask): task is Extract<VideoTask, { kind: "encode" }> {
+  return task.kind === "encode" && task.bitrate !== "copy" && task.bitrate !== "0";
 }
 
 function estimateCopiedAudioBitrate(values: readonly (number | null | undefined)[], inputCount: number) {

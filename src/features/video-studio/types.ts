@@ -78,8 +78,8 @@ export interface VideoOutputJob {
   name: string;
   mode: "individual" | "concat";
   inputs: VideoWorkerInput[];
-  /** Selects the existing audio-removal mode for this job without changing the rest of a batch. */
-  audioModeOverride?: "remove";
+  /** Selects an audio rescue mode for this job without changing the rest of a batch. */
+  audioModeOverride?: "remove" | "encode";
 }
 
 export interface VideoWorkerRequest {
@@ -125,5 +125,5 @@ export interface VideoWorkerResult {
   warnings: string[];
 }
 
-export type VideoWorkerProgress = (progress: number, message: string) => void;
+export type VideoWorkerProgress = (progress: number, message: string, stageKey?: string) => void;
 export type VideoWorkerOutputHandler = (output: VideoWorkerOutput) => void | Promise<void>;

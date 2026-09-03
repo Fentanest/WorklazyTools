@@ -21,7 +21,7 @@ export function ToolGuide({ title, description, blocks, faq }: {
   return (
     <section className="tool-guide" aria-labelledby="tool-guide-title">
       <div className="content-heading">
-        <div><p className="eyebrow">GUIDE</p><h2 id="tool-guide-title">{title}</h2><p>{description}</p></div>
+        <div><p className="eyebrow">{t("guide.eyebrow")}</p><h2 id="tool-guide-title">{title}</h2><p>{description}</p></div>
       </div>
       <div className="tool-guide-grid">
         {blocks.map((block) => (

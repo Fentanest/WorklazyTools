@@ -18,7 +18,6 @@ import { UserFacingVideoError } from "./videoErrors";
 import { createVideoWorkerResult } from "./videoProcessingShared";
 import {
   preflightVideoStreamCopyJob,
-  preflightVideoHybridJob,
   preflightVideoWebCodecsJob,
   runVideoHybridJob,
   runVideoStreamCopyJob,
@@ -29,16 +28,17 @@ import { runFfmpegVideoTask } from "./videoWorkerClient";
 import type { VideoStreamCopyReasonCode } from "./videoStreamCopy";
 import type { VideoWebCodecsReasonCode } from "./videoWebCodecs";
 import type { VideoHybridReasonCode } from "./videoWebCodecs";
+import { parserProbeCause, resolveVideoAudioAlternatives, type VideoProbeCause } from "./videoProbe";
 import { runHybridAudioFfmpeg } from "./videoHybridAudioClient";
 import { estimateHybridAudioBytes, parseHybridAudioBitrate } from "./videoHybridAudio";
 import { estimateVideoJobDuration, estimateVideoJobOutputBytes, taskForVideoJob } from "./videoOutputEstimate";
 
-export { estimateVideoJobDuration, estimateVideoJobOutputBytes, taskForVideoJob } from "./videoOutputEstimate";
+export { estimateVideoJobDuration, estimateVideoJobOutputBytes, isTargetBitrateVideoEncodeTask, taskForVideoJob } from "./videoOutputEstimate";
 
 export type VideoProcessingProbeDetail =
-  | { operation: "stream-copy"; audioMode: "copy" | "remove"; reasonCode: VideoStreamCopyReasonCode }
-  | { operation: "webcodecs"; reasonCode: VideoWebCodecsReasonCode }
-  | { operation: "hybrid"; reasonCode: VideoHybridReasonCode };
+  | { operation: "stream-copy"; audioMode: "copy" | "remove"; reasonCode: VideoStreamCopyReasonCode; cause?: VideoProbeCause }
+  | { operation: "webcodecs"; reasonCode: VideoWebCodecsReasonCode; cause?: VideoProbeCause }
+  | { operation: "hybrid"; reasonCode: VideoHybridReasonCode; cause?: VideoProbeCause };
 
 export interface VideoProcessingJobRoute {
   jobIndex: number;
@@ -46,7 +46,8 @@ export interface VideoProcessingJobRoute {
   estimatedOutputBytes: number;
   decision: VideoRouteDecision;
   probeDetails: VideoProcessingProbeDetail[];
-  audioRemovalSuggested: boolean;
+  audioModeSuggestions: Array<"remove" | "encode">;
+  dvBaseLayer?: { compatIds: number[] };
 }
 
 export interface VideoProcessingPreflight {
@@ -58,7 +59,6 @@ export interface VideoProcessingPreflightOptions {
   estimateQuota?: (requiredBytes: number) => Promise<VideoStorageQuotaState>;
   probeStreamCopyJob?: typeof preflightVideoStreamCopyJob;
   probeWebCodecsJob?: typeof preflightVideoWebCodecsJob;
-  probeHybridJob?: typeof preflightVideoHybridJob;
 }
 
 export async function preflightVideoProcessingRoutes(
@@ -69,7 +69,6 @@ export async function preflightVideoProcessingRoutes(
   const estimateQuota = options.estimateQuota ?? estimateVideoStorageQuota;
   const probeStreamCopyJob = options.probeStreamCopyJob ?? preflightVideoStreamCopyJob;
   const probeWebCodecsJob = options.probeWebCodecsJob ?? preflightVideoWebCodecsJob;
-  const probeHybridJob = options.probeHybridJob ?? preflightVideoHybridJob;
   const jobs: VideoProcessingJobRoute[] = [];
   for (let jobIndex = 0; jobIndex < request.jobs.length; jobIndex += 1) {
     const job = request.jobs[jobIndex];
@@ -77,7 +76,7 @@ export async function preflightVideoProcessingRoutes(
     const durationSeconds = estimateVideoJobDuration(job);
     let estimatedOutputBytes = estimateVideoJobOutputBytes(job, jobTask);
     if (jobTask.kind !== "encode") {
-      jobs.push({ jobIndex, durationSeconds, estimatedOutputBytes, decision: decideFfmpegOnlyRoute(estimatedOutputBytes), probeDetails: [], audioRemovalSuggested: false });
+      jobs.push({ jobIndex, durationSeconds, estimatedOutputBytes, decision: decideFfmpegOnlyRoute(estimatedOutputBytes), probeDetails: [], audioModeSuggestions: [] });
       continue;
     }
     const routeInput = {
@@ -91,7 +90,8 @@ export async function preflightVideoProcessingRoutes(
     };
     let decision = decideVideoProcessingRoute(routeInput);
     const probeDetails: VideoProcessingProbeDetail[] = [];
-    let audioRemovalSuggested = false;
+    const audioModeSuggestions: Array<"remove" | "encode"> = [];
+    let dvBaseLayer: VideoProcessingJobRoute["dvBaseLayer"];
     let streamCopyCompatible: boolean | undefined;
     let webCodecsCompatible: boolean | undefined;
     let hybridCompatible: boolean | undefined;
@@ -100,19 +100,13 @@ export async function preflightVideoProcessingRoutes(
       try {
         probe = await probeStreamCopyJob(job, jobTask.audioMode);
       } catch {
-        probe = { compatible: false as const, reasonCode: "NOT_ISO_BMFF" as const };
+        probe = { compatible: false as const, reasonCode: "NOT_ISO_BMFF" as const, cause: parserProbeCause("NOT_ISO_BMFF") };
       }
-      probeDetails.push({ operation: "stream-copy", audioMode: jobTask.audioMode === "remove" ? "remove" : "copy", reasonCode: probe.reasonCode });
+      probeDetails.push({ operation: "stream-copy", audioMode: jobTask.audioMode === "remove" ? "remove" : "copy", reasonCode: probe.reasonCode, cause: probe.cause });
       streamCopyCompatible = probe.compatible;
       routeInput.codec = probe.codec ?? routeInput.codec;
       if (!probe.compatible && jobTask.audioMode === "copy") {
-        try {
-          const withoutAudio = await probeStreamCopyJob(job, "remove");
-          probeDetails.push({ operation: "stream-copy", audioMode: "remove", reasonCode: withoutAudio.reasonCode });
-          audioRemovalSuggested = withoutAudio.compatible;
-        } catch {
-          audioRemovalSuggested = false;
-        }
+        if (probe.audioAlternatives?.remove?.compatible) audioModeSuggestions.push("remove");
       }
     }
     if (decision.reasonCode === "WEBCODECS_PENDING") {
@@ -120,19 +114,23 @@ export async function preflightVideoProcessingRoutes(
       try {
         probe = await probeWebCodecsJob(job, jobTask);
       } catch {
-        probe = { compatible: false as const, reasonCode: "INPUT_UNSUPPORTED" as const };
+        probe = { compatible: false as const, reasonCode: "INPUT_UNSUPPORTED" as const, cause: parserProbeCause("NOT_ISO_BMFF") };
       }
-      probeDetails.push({ operation: "webcodecs", reasonCode: probe.reasonCode });
+      probeDetails.push({ operation: "webcodecs", reasonCode: probe.reasonCode, cause: probe.cause });
       webCodecsCompatible = probe.compatible;
+      dvBaseLayer = probe.dvBaseLayer;
       estimatedOutputBytes = estimateVideoJobOutputBytes(job, jobTask, probe.sourceAudioBitratesBps);
-      if (!probe.compatible && jobTask.audioMode === "encode") {
-        try {
-          const hybridProbe = await probeHybridJob(job, jobTask);
-          hybridCompatible = hybridProbe.compatible;
-          probeDetails.push({ operation: "hybrid", reasonCode: hybridProbe.reasonCode });
-          estimatedOutputBytes = estimateVideoJobOutputBytes(job, jobTask, hybridProbe.sourceAudioBitratesBps);
-        } catch {
-          hybridCompatible = false;
+      if (!probe.compatible) {
+        const alternatives = resolveVideoAudioAlternatives(jobTask.audioMode, probe.audioAlternatives);
+        if (jobTask.audioMode === "encode") {
+          hybridCompatible = alternatives.hybridCompatible;
+          if (probe.audioAlternatives?.encode) probeDetails.push({
+            operation: "hybrid",
+            reasonCode: alternatives.hybridCompatible ? "READY" : hybridReasonCode(probe.audioAlternatives.encode.cause),
+            cause: probe.audioAlternatives.encode.cause,
+          });
+        } else if (jobTask.audioMode === "copy") {
+          audioModeSuggestions.push(...alternatives.suggestions);
         }
       }
     }
@@ -151,7 +149,8 @@ export async function preflightVideoProcessingRoutes(
       estimatedOutputBytes,
       decision,
       probeDetails,
-      audioRemovalSuggested,
+      audioModeSuggestions,
+      dvBaseLayer,
     });
   }
   return { jobs };
@@ -168,9 +167,11 @@ export async function runVideoProcessingTask(
   const routePlan = preflight?.jobs.length === request.jobs.length
     ? preflight
     : await preflightVideoProcessingRoutes(request);
+  const effectiveTasks = routePlan.jobs.map((routeJob) => taskForVideoJob(request.task, request.jobs[routeJob.jobIndex]));
   const progress = createVideoProcessingProgressController(onProgress, routePlan.jobs.map((job) => ({
     durationSeconds: job.durationSeconds,
     expectedOutputBytes: job.estimatedOutputBytes,
+    route: job.decision.route,
   })));
   const outputCounts: number[] = [];
   try {
@@ -301,10 +302,14 @@ export async function runVideoProcessingTask(
       outputCounts.push(result.outputCount);
       progress.reportJobOverall(routeJob.jobIndex, 100, featureMessage(language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: routeJob.jobIndex + 1, p1: routePlan.jobs.length }));
     }
-    return createVideoWorkerResult(outputCounts, request.task, (key, values) => featureMessage(language, key, values));
+    return createVideoWorkerResult(outputCounts, request.task, (key, values) => featureMessage(language, key, values), effectiveTasks);
   } finally {
     progress.terminate();
   }
+}
+
+function hybridReasonCode(cause: VideoProbeCause | undefined): VideoHybridReasonCode {
+  return cause?.causeKind === "capability" ? cause.reasonCode : "INPUT_UNSUPPORTED";
 }
 
 function videoBitrateMode(task: Extract<VideoTask, { kind: "encode" }>) {

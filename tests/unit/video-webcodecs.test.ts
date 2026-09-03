@@ -60,6 +60,7 @@ test("missing AudioEncoder and rejected selected video codec cause whole-job fal
   assert.deepEqual(await assessVideoWebCodecsSupport(request, api), {
     compatible: false,
     reasonCode: "AUDIO_ENCODER_UNAVAILABLE",
+    cause: { causeKind: "capability", reasonCode: "AUDIO_ENCODER_UNAVAILABLE" },
   });
   assert.deepEqual(await assessVideoWebCodecsSupport(request, {
     ...api,
@@ -68,6 +69,7 @@ test("missing AudioEncoder and rejected selected video codec cause whole-job fal
   }), {
     compatible: false,
     reasonCode: "VIDEO_ENCODER_UNSUPPORTED",
+    cause: { causeKind: "capability", reasonCode: "VIDEO_ENCODER_UNSUPPORTED" },
   });
   assert.deepEqual(await assessVideoWebCodecsSupport({ ...request, audioMode: "remove" }, api), {
     compatible: true,
@@ -76,6 +78,7 @@ test("missing AudioEncoder and rejected selected video codec cause whole-job fal
   assert.deepEqual(await assessVideoWebCodecsSupport({ ...request, audioMode: "copy", audioTracksCompatible: false }, api), {
     compatible: false,
     reasonCode: "AUDIO_TRACK_MISMATCH",
+    cause: { causeKind: "capability", reasonCode: "AUDIO_TRACK_MISMATCH" },
   });
   assert.deepEqual(await assessVideoWebCodecsSupport({
     ...request,
@@ -100,6 +103,7 @@ test("missing AudioEncoder and rejected selected video codec cause whole-job fal
   }, { ...api, audioEncoder: { isConfigSupported: supported } }), {
     compatible: false,
     reasonCode: "AUDIO_ENCODER_SUPPORTED",
+    cause: { causeKind: "capability", reasonCode: "AUDIO_ENCODER_SUPPORTED" },
   });
 });
 

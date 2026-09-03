@@ -721,13 +721,16 @@ button.sheet-name-chip:focus-visible { outline: 2px solid var(--green); outline-
 .operation-log::-webkit-scrollbar-track { background: transparent; }
 .operation-log::-webkit-scrollbar-thumb { min-height: 28px; border-radius: 999px; background: rgba(118,118,128,.38); }
 .operation-log::-webkit-scrollbar-thumb:hover { background: rgba(118,118,128,.56); }
-.operation-log li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 7px; color: var(--label-tertiary); font-size: 13px; line-height: 1.45; }
+.operation-log li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: start; gap: 7px; color: var(--label-tertiary); font-size: 13px; line-height: 1.45; }
 .operation-log li.current { color: var(--label-secondary); }
 .operation-log li.log-success { color: var(--success); }
 .operation-log li.log-error { color: #c9342d; }
 .operation-log li svg { margin-top: 1px; }
 .operation-log li span { overflow-wrap: anywhere; }
+.operation-log-progress { min-width: 32px; color: var(--label-secondary); font-variant-numeric: tabular-nums; text-align: right; }
 .operation-log time { color: var(--label-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.video-audio-suggestion-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.video-audio-suggestion-actions .primary-button, .video-audio-suggestion-actions .secondary-button { width: auto; min-height: 36px; padding: 8px 12px; }
 .operation-progress.compact { margin-top: 10px; padding: 12px; border-radius: 14px; box-shadow: none; }
 .operation-progress.compact .operation-current-message { height: auto; min-height: 22px; -webkit-line-clamp: 3; }
 .operation-progress.compact .operation-log { height: 150px; min-height: 150px; }

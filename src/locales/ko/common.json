@@ -103,6 +103,6 @@
     "loadingTool": "{{tool}} 준비 중…"
   },
   "progress": { "title":"작업 진행 상황", "running":"처리 중", "success":"완료", "needsAttention":"확인 필요", "logs":"처리 로그 {{count}}개", "seconds":"{{value}}초", "minutesSeconds":"{{minutes}}분 {{seconds}}초" },
-  "guide": { "faq":"자주 묻는 질문" },
+  "guide": { "eyebrow":"안내", "faq":"자주 묻는 질문" },
   "format": { "characters": "{{count}}자", "files": "{{count}}개 파일", "tools": "{{count}}개 도구" }
 }

@@ -47,7 +47,7 @@ try {
   }
 
   await page.goto(`${koBaseUrl}/tools`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .tool-card").length === 18);
+  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .tool-card").length === 19);
   const grid = await page.$eval(".all-tools-grid", (element) => ({ columns: getComputedStyle(element).gridTemplateColumns.split(" ").length, width: element.getBoundingClientRect().width }));
   if (grid.columns !== 4 || grid.width < 900) throw new Error(`Tool grid is not four columns: ${JSON.stringify(grid)}`);
   const categoryOverview = await page.evaluate(() => ({
@@ -288,7 +288,7 @@ try {
   }
   await page.goto(`${baseUrl}/en/tools/`, { waitUntil: "networkidle0" });
   const englishToolCount = await page.$$eval(".all-tools-grid .tool-card", (cards) => cards.length);
-  if (englishToolCount !== 17) throw new Error(`English tool catalog should hide HWP editor: ${englishToolCount}`);
+  if (englishToolCount !== 18) throw new Error(`English tool catalog should hide HWP editor: ${englishToolCount}`);
   await page.goto(`${baseUrl}/en/tools/hwp-editor`, { waitUntil: "networkidle0" });
   if (new URL(page.url()).pathname !== "/en/tools") throw new Error(`English HWP editor was not hidden: ${page.url()}`);
 

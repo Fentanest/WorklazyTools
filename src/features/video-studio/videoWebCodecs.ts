@@ -1,20 +1,16 @@
 import type { VideoTask, VideoWorkerInput } from "./types.ts";
 import { outputDimensionsForSource, resolveAudioSampleRate } from "./videoEncoding.ts";
+import {
+  capabilityProbeCause,
+  type VideoAudioAlternativeProbes,
+  type VideoCapabilityReasonCode,
+  type VideoProbeCause,
+} from "./videoProbe.ts";
 
 export type VideoWebCodecsReasonCode =
   | "READY"
-  | "CONCAT_FRAME_RATE_UNAVAILABLE"
-  | "OFFSCREEN_CANVAS_UNAVAILABLE"
-  | "VIDEO_DECODER_UNAVAILABLE"
-  | "VIDEO_DECODER_UNSUPPORTED"
-  | "VIDEO_ENCODER_UNAVAILABLE"
-  | "VIDEO_ENCODER_UNSUPPORTED"
-  | "AUDIO_TRACK_MISMATCH"
-  | "AUDIO_DECODER_UNAVAILABLE"
-  | "AUDIO_DECODER_UNSUPPORTED"
-  | "AUDIO_ENCODER_UNAVAILABLE"
-  | "AUDIO_ENCODER_UNSUPPORTED"
-  | "INPUT_UNSUPPORTED";
+  | "INPUT_UNSUPPORTED"
+  | Exclude<VideoCapabilityReasonCode, "AUDIO_TRACK_UNAVAILABLE" | "AUDIO_ENCODER_SUPPORTED">;
 
 export type VideoHybridReasonCode = VideoWebCodecsReasonCode
   | "AUDIO_TRACK_UNAVAILABLE"
@@ -23,7 +19,10 @@ export type VideoHybridReasonCode = VideoWebCodecsReasonCode
 export interface VideoWebCodecsProbeResult {
   compatible: boolean;
   reasonCode: VideoWebCodecsReasonCode;
+  cause?: VideoProbeCause;
+  audioAlternatives?: VideoAudioAlternativeProbes;
   sourceAudioBitratesBps?: Array<number | null | undefined>;
+  dvBaseLayer?: { compatIds: number[] };
 }
 
 export interface VideoHybridProbeResult extends Omit<VideoWebCodecsProbeResult, "reasonCode"> {
@@ -153,9 +152,19 @@ export async function assessVideoHybridSupport(
     audioTracksCompatible: true,
   }, api);
   if (!video.compatible) return video;
-  if (!request.hasAudio || !request.audioEncoderConfig) return { compatible: false, reasonCode: "AUDIO_TRACK_UNAVAILABLE" };
+  if (!request.hasAudio || !request.audioEncoderConfig) {
+    return {
+      compatible: false,
+      reasonCode: "AUDIO_TRACK_UNAVAILABLE",
+      cause: capabilityProbeCause("AUDIO_TRACK_UNAVAILABLE"),
+    };
+  }
   if (api.audioEncoder && await configSupported(request.audioEncoderConfig, api.audioEncoder)) {
-    return { compatible: false, reasonCode: "AUDIO_ENCODER_SUPPORTED" };
+    return {
+      compatible: false,
+      reasonCode: "AUDIO_ENCODER_SUPPORTED",
+      cause: capabilityProbeCause("AUDIO_ENCODER_SUPPORTED"),
+    };
   }
   return { compatible: true, reasonCode: "READY" };
 }
@@ -353,7 +362,9 @@ async function configSupported<Config, Support extends { supported?: boolean }>(
 }
 
 function unsupported(reasonCode: VideoWebCodecsReasonCode): VideoWebCodecsProbeResult {
-  return { compatible: false, reasonCode };
+  return reasonCode === "READY" || reasonCode === "INPUT_UNSUPPORTED"
+    ? { compatible: false, reasonCode }
+    : { compatible: false, reasonCode, cause: capabilityProbeCause(reasonCode) };
 }
 
 function parseVideoBitrate(value: string) {

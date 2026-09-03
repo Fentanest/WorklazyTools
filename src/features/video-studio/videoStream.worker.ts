@@ -20,7 +20,6 @@ import {
   type VideoStreamCopyProbeResult,
   type VideoStreamInputProfile,
   type VideoStreamSampleInfo,
-  type VideoStreamCopyReasonCode,
 } from "./videoStreamCopy.ts";
 import {
   assessVideoWebCodecsSupport,
@@ -45,8 +44,14 @@ import type {
 import type { VideoProgressStage } from "./videoProcessingProgress.ts";
 import type { VideoProcessingFailureStage } from "./videoRouting.ts";
 import type { VideoAudioMode, VideoTask } from "./types.ts";
+import { assessDolbyVisionBaseLayer, collectDolbyVisionBaseLayers } from "./videoDolbyVision.ts";
+import { capabilityProbeCause, parserProbeCause, type VideoParserReasonCode } from "./videoProbe.ts";
+import { createVideoProgressCoalescer } from "./videoProgressCoalescer.ts";
 
 const worker = self as DedicatedWorkerGlobalScope;
+const progressCoalescer = createVideoProgressCoalescer(({ stage, completedUnits, totalUnits, message }) => {
+  worker.postMessage({ type: "progress", stage, completedUnits, totalUnits, message });
+});
 const METADATA_CHUNK_BYTES = 1024 * 1024;
 const SAMPLE_READ_WINDOW_BYTES = 8 * 1024 * 1024;
 const OUTPUT_CHUNK_BYTES = 1024 * 1024;
@@ -56,6 +61,8 @@ interface SampleEntryLike {
   type?: string;
   avcC?: BoxLike;
   hvcC?: BoxLike;
+  dvcC?: BoxLike;
+  dvvC?: BoxLike;
   esds?: EsdsLike;
   wave?: { esds?: EsdsLike; esdss?: EsdsLike[] };
 }
@@ -98,7 +105,11 @@ interface ParsedInput {
   audio?: ParsedTrack;
   metadataBytesRead: number;
   sourceAudio?: { sampleRate: number; channelCount: number; bitrateBps: number | undefined };
+  audioReasonCode?: Extract<VideoParserReasonCode, "AUDIO_CODEC_UNSUPPORTED" | "AUDIO_CONFIGURATION_UNAVAILABLE">;
+  dvBaseLayerCompatId?: number;
 }
+
+type VideoParsePurpose = "stream-copy" | "encode" | "hybrid";
 
 interface HybridAudioPacket {
   data: Uint8Array;
@@ -197,7 +208,7 @@ async function handleStart(request: VideoStreamRunRequest, signal: AbortSignal) 
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
     throwIfAborted(signal);
-    const parsed = await parseInput(file, request.task.audioMode, (logicalPosition) => {
+    const parsed = await parseInput(file, "stream-copy", request.task.audioMode, (logicalPosition) => {
       reportProgress(
         "demux",
         metadataCompleted + logicalPosition,
@@ -271,21 +282,37 @@ async function inspectWebCodecsJob(
       return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" };
     }
     if (job.mode === "concat" && job.inputs.some((input) => !validDescriptorFrameRate(input.frameRate))) {
-      return { compatible: false, reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE" };
+      return {
+        compatible: false,
+        reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE",
+        cause: capabilityProbeCause("CONCAT_FRAME_RATE_UNAVAILABLE"),
+      };
     }
     const files = await requestJobFiles(job, false, signal);
     const inputs: ParsedInput[] = [];
     for (const file of files) {
       throwIfAborted(signal);
-      inputs.push(await parseInput(file, task.audioMode, undefined, signal));
+      inputs.push(await parseInput(file, "encode", task.audioMode, undefined, signal));
     }
+    const support = await assessParsedWebCodecsSupport(job, task, inputs);
+    const audioAlternatives = support.compatible ? undefined : {
+      remove: task.audioMode === "remove"
+        ? undefined
+        : probeAssessment(await assessParsedWebCodecsSupport(job, { ...task, audioMode: "remove" }, inputs)),
+      encode: task.audioMode === "remove"
+        ? undefined
+        : probeAssessment(await assessParsedHybridAlternativeSupport(job, task, inputs, task.audioMode === "encode" && !inputs.some((input) => input.audioReasonCode))),
+    };
     return {
-      ...await assessParsedWebCodecsSupport(job, task, inputs),
-      sourceAudioBitratesBps: inputs.map((input) => input.audio ? input.audio.bitrateBps : null),
+      ...support,
+      sourceAudioBitratesBps: inputs.map((input) => input.sourceAudio?.bitrateBps ?? (input.sourceAudio ? undefined : null)),
+      dvBaseLayer: collectedDolbyVisionBaseLayers(inputs),
+      audioAlternatives,
     };
   } catch (error) {
     if (isAbortError(error)) throw error;
-    return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" };
+    const reasonCode = isReasonError(error) ? error.reasonCode : "NOT_ISO_BMFF";
+    return { compatible: false, reasonCode: "INPUT_UNSUPPORTED", cause: parserProbeCause(reasonCode) };
   }
 }
 
@@ -299,11 +326,15 @@ async function inspectHybridJob(
       return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" } as const;
     }
     if (job.mode === "concat" && job.inputs.some((input) => !validDescriptorFrameRate(input.frameRate))) {
-      return { compatible: false, reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE" } as const;
+      return {
+        compatible: false,
+        reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE",
+        cause: capabilityProbeCause("CONCAT_FRAME_RATE_UNAVAILABLE"),
+      } as const;
     }
     const files = await requestJobFiles(job, false, signal);
     const inputs: ParsedInput[] = [];
-    for (const file of files) inputs.push(await parseInput(file, "hybrid", undefined, signal));
+    for (const file of files) inputs.push(await parseInput(file, "hybrid", "hybrid", undefined, signal));
     const baseDimensions = resolveVideoWebCodecsBaseDimensions(job, task);
     const frameRate = resolveVideoWebCodecsFrameRate(
       job,
@@ -323,10 +354,12 @@ async function inspectHybridJob(
     return {
       ...support,
       sourceAudioBitratesBps: inputs.map((input) => input.sourceAudio?.bitrateBps ?? (input.sourceAudio ? undefined : null)),
+      dvBaseLayer: collectedDolbyVisionBaseLayers(inputs),
     };
   } catch (error) {
     if (isAbortError(error)) throw error;
-    return { compatible: false, reasonCode: "INPUT_UNSUPPORTED" } as const;
+    const reasonCode = isReasonError(error) ? error.reasonCode : "NOT_ISO_BMFF";
+    return { compatible: false, reasonCode: "INPUT_UNSUPPORTED", cause: parserProbeCause(reasonCode) } as const;
   }
 }
 
@@ -335,6 +368,16 @@ async function assessParsedWebCodecsSupport(
   task: Extract<VideoTask, { kind: "encode" }>,
   inputs: readonly ParsedInput[],
 ) {
+  if (task.audioMode !== "remove") {
+    const audioReasonCode = inputs.find((input) => input.audioReasonCode)?.audioReasonCode;
+    if (audioReasonCode) {
+      return {
+        compatible: false,
+        reasonCode: "INPUT_UNSUPPORTED",
+        cause: parserProbeCause(audioReasonCode),
+      } as const;
+    }
+  }
   const baseDimensions = resolveVideoWebCodecsBaseDimensions(job, task);
   const measuredFrameRates = inputs.map((input) => parsedVideoTrackFrameRate(input.video.samples));
   const frameRate = resolveVideoWebCodecsFrameRate(job, measuredFrameRates.filter((value): value is number => value !== undefined));
@@ -357,6 +400,37 @@ async function assessParsedWebCodecsSupport(
       : [],
     audioEncoderConfig,
     audioTracksCompatible: task.audioMode === "remove" ? true : audioTracksCompatible,
+  });
+}
+
+async function assessParsedHybridAlternativeSupport(
+  job: VideoStreamJobDescriptor,
+  task: Extract<VideoTask, { kind: "encode" }>,
+  inputs: readonly ParsedInput[],
+  requireAudioEncoderUnsupported: boolean,
+) {
+  if (!requireAudioEncoderUnsupported) return inspectParsedHybridSupport(job, task, inputs);
+  const baseDimensions = resolveVideoWebCodecsBaseDimensions(job, task);
+  const frameRate = resolveVideoWebCodecsFrameRate(
+    job,
+    inputs.map((input) => parsedVideoTrackFrameRate(input.video.samples)).filter((value): value is number => value !== undefined),
+  );
+  const firstAudio = inputs[0]?.sourceAudio;
+  if (!baseDimensions || !frameRate) {
+    return {
+      compatible: false,
+      reasonCode: "CONCAT_FRAME_RATE_UNAVAILABLE",
+      cause: capabilityProbeCause("CONCAT_FRAME_RATE_UNAVAILABLE"),
+    } as const;
+  }
+  const [width, height] = resolveVideoWebCodecsOutputDimensions(baseDimensions, task.rotation);
+  return assessVideoHybridSupport({
+    videoDecoderConfigs: inputs.map(videoDecoderConfig),
+    videoEncoderConfig: createVideoWebCodecsEncoderConfig(task, width, height, frameRate),
+    audioEncoderConfig: firstAudio
+      ? createVideoWebCodecsAudioEncoderConfig(task, firstAudio.sampleRate, firstAudio.channelCount, job.mode === "concat")
+      : undefined,
+    hasAudio: inputs.every((input) => Boolean(input.sourceAudio)),
   });
 }
 
@@ -383,7 +457,11 @@ async function inspectParsedHybridSupport(
   if (!videoSupport.compatible) return videoSupport;
   return firstAudio && inputs.every((input) => Boolean(input.sourceAudio))
     ? { compatible: true, reasonCode: "READY" } as const
-    : { compatible: false, reasonCode: "AUDIO_TRACK_UNAVAILABLE" } as const;
+    : {
+        compatible: false,
+        reasonCode: "AUDIO_TRACK_UNAVAILABLE",
+        cause: capabilityProbeCause("AUDIO_TRACK_UNAVAILABLE"),
+      } as const;
 }
 
 async function handleWebCodecsStart(request: VideoStreamRunRequest, signal: AbortSignal) {
@@ -394,14 +472,20 @@ async function handleWebCodecsStart(request: VideoStreamRunRequest, signal: Abor
   const metadataTotal = Math.max(1, files.reduce((total, file) => total + file.size, 0));
   for (let index = 0; index < files.length; index += 1) {
     throwIfAborted(signal);
-    const parsed = await parseInput(files[index], request.operation === "hybrid" ? "hybrid" : request.task.audioMode, (logicalPosition) => {
+    const parsed = await parseInput(
+      files[index],
+      request.operation === "hybrid" ? "hybrid" : "encode",
+      request.operation === "hybrid" ? "hybrid" : request.task.audioMode,
+      (logicalPosition) => {
       reportProgress(
         "demux",
         metadataCompleted + logicalPosition,
         metadataTotal,
         workerMessage(request.language, "video.messages.video.checkingSourceForEncoding", { p0: index + 1, p1: files.length }),
       );
-    }, signal);
+      },
+      signal,
+    );
     parsedInputs.push(parsed);
     metadataCompleted += files[index].size;
   }
@@ -1105,9 +1189,24 @@ async function inspectJob(job: VideoStreamJobDescriptor, audioMode: VideoAudioMo
   try {
     const files = await requestJobFiles(job, false, signal);
     const inputs: ParsedInput[] = [];
-    for (const file of files) inputs.push(await parseInput(file, audioMode, undefined, signal));
+    for (const file of files) inputs.push(await parseInput(file, "stream-copy", audioMode, undefined, signal));
+    const removeCompatible = compareVideoStreamInputProfiles(inputs.map((input) => input.profile), false);
+    const audioReasonCode = audioMode === "copy" ? inputs.find((input) => input.audioReasonCode)?.audioReasonCode : undefined;
+    if (audioReasonCode) {
+      return {
+        compatible: false,
+        reasonCode: audioReasonCode,
+        cause: parserProbeCause(audioReasonCode),
+        audioAlternatives: { remove: { compatible: removeCompatible } },
+      };
+    }
     if (!compareVideoStreamInputProfiles(inputs.map((input) => input.profile), audioMode === "copy")) {
-      return { compatible: false, reasonCode: "CONCAT_TRACK_MISMATCH" };
+      return {
+        compatible: false,
+        reasonCode: "CONCAT_TRACK_MISMATCH",
+        cause: parserProbeCause("CONCAT_TRACK_MISMATCH"),
+        audioAlternatives: audioMode === "copy" ? { remove: { compatible: removeCompatible } } : undefined,
+      };
     }
     return {
       compatible: true,
@@ -1118,12 +1217,13 @@ async function inspectJob(job: VideoStreamJobDescriptor, audioMode: VideoAudioMo
   } catch (error) {
     if (isAbortError(error)) throw error;
     const reasonCode = isReasonError(error) ? error.reasonCode : "NOT_ISO_BMFF";
-    return { compatible: false, reasonCode };
+    return { compatible: false, reasonCode, cause: parserProbeCause(reasonCode) };
   }
 }
 
 async function parseInput(
   file: File,
+  purpose: VideoParsePurpose,
   audioMode: VideoAudioMode | "hybrid",
   onProgress?: (logicalPosition: number) => void,
   signal?: AbortSignal,
@@ -1163,50 +1263,80 @@ async function parseInput(
   const videoEntry = firstSampleEntry(videoTrack, parser);
   const codec = classifyVideoCodec(videoTrack.codec);
   if (!codec) throw reasonError("VIDEO_CODEC_UNSUPPORTED");
-  if ((codec === "h264" && videoEntry.type !== "avc1") || (codec === "hevc" && videoEntry.type !== "hvc1")) {
+  const isDolbyVision = codec === "hevc" && (videoEntry.type === "dvh1" || videoEntry.type === "dvhe");
+  if ((codec === "h264" && videoEntry.type !== "avc1") || (codec === "hevc" && videoEntry.type !== "hvc1" && !isDolbyVision)) {
     throw reasonError("VIDEO_SAMPLE_ENTRY_UNSUPPORTED");
   }
+  if (isDolbyVision && purpose === "stream-copy") throw reasonError("VIDEO_SAMPLE_ENTRY_UNSUPPORTED");
   const videoBox = codec === "h264" ? videoEntry.avcC : videoEntry.hvcC;
   if (!videoBox) throw reasonError("VIDEO_CONFIGURATION_UNAVAILABLE");
   const videoConfiguration = await readBoxPayload(file, videoBox, "VIDEO_CONFIGURATION_UNAVAILABLE");
+  let decoderCodecName = videoTrack.codec;
+  let dvBaseLayerCompatId: number | undefined;
+  if (isDolbyVision) {
+    const dvcC = videoEntry.dvcC
+      ? await readBoxPayload(file, videoEntry.dvcC, "DOLBY_VISION_CONFIGURATION_UNAVAILABLE")
+      : undefined;
+    const dvvC = videoEntry.dvvC
+      ? await readBoxPayload(file, videoEntry.dvvC, "DOLBY_VISION_CONFIGURATION_UNAVAILABLE")
+      : undefined;
+    const assessment = assessDolbyVisionBaseLayer({ dvcC, dvvC, hevcConfiguration: videoConfiguration });
+    if (!assessment.compatible) throw reasonError(assessment.reasonCode);
+    decoderCodecName = assessment.decoderCodec;
+    dvBaseLayerCompatId = assessment.compatibilityId;
+  }
 
   let audio: ParsedTrack | undefined;
   let audioProfile: VideoStreamInputProfile["audio"];
   let sourceAudio: ParsedInput["sourceAudio"];
-  if (audioMode === "hybrid" && info.audioTracks[0]) {
+  let audioReasonCode: ParsedInput["audioReasonCode"];
+  if (info.audioTracks[0]) {
     const audioTrack = info.audioTracks[0];
     sourceAudio = {
       sampleRate: audioTrack.audio?.sample_rate || 48_000,
       channelCount: audioTrack.audio?.channel_count || 2,
       bitrateBps: Number.isFinite(audioTrack.bitrate) && audioTrack.bitrate > 0 ? audioTrack.bitrate : undefined,
     };
-  } else if (audioMode !== "remove" && info.audioTracks[0]) {
-    const audioTrack = info.audioTracks[0];
-    if (!audioTrack.codec.startsWith("mp4a.40.")) throw reasonError("AUDIO_CODEC_UNSUPPORTED");
-    audio = parseTrack(parser, audioTrack);
-    const audioEntry = firstSampleEntry(audioTrack, parser);
-    if (audioEntry.type !== "mp4a") throw reasonError("AUDIO_CODEC_UNSUPPORTED");
-    const audioConfiguration = decoderSpecificInfo(audioEntry);
-    if (!audioConfiguration?.byteLength) throw reasonError("AUDIO_CONFIGURATION_UNAVAILABLE");
-    audioProfile = {
-      codecName: audioTrack.codec,
-      sampleEntry: audioEntry.type,
-      configuration: audioConfiguration.slice(),
-      channelCount: audioTrack.audio?.channel_count,
-      sampleRate: audioTrack.audio?.sample_rate,
-    };
+    if (audioMode !== "hybrid" && audioMode !== "remove") {
+      if (!audioTrack.codec.startsWith("mp4a.40.")) {
+        audioReasonCode = "AUDIO_CODEC_UNSUPPORTED";
+      } else {
+        audio = parseTrack(parser, audioTrack);
+        const audioEntry = firstSampleEntry(audioTrack, parser);
+        if (audioEntry.type !== "mp4a") {
+          audioReasonCode = "AUDIO_CODEC_UNSUPPORTED";
+          audio = undefined;
+        } else {
+          const audioConfiguration = decoderSpecificInfo(audioEntry);
+          if (!audioConfiguration?.byteLength) {
+            audioReasonCode = "AUDIO_CONFIGURATION_UNAVAILABLE";
+            audio = undefined;
+          } else {
+            audioProfile = {
+              codecName: audioTrack.codec,
+              sampleEntry: audioEntry.type,
+              configuration: audioConfiguration.slice(),
+              channelCount: audioTrack.audio?.channel_count,
+              sampleRate: audioTrack.audio?.sample_rate,
+            };
+          }
+        }
+      }
+    }
   }
 
   return {
     file,
     metadataBytesRead: bytesRead,
     sourceAudio,
+    audioReasonCode,
     video,
     audio,
+    dvBaseLayerCompatId,
     profile: {
       codec,
       video: {
-        codecName: videoTrack.codec,
+        codecName: decoderCodecName,
         sampleEntry: videoEntry.type,
         configuration: videoConfiguration,
         width: videoTrack.video?.width,
@@ -1411,10 +1541,10 @@ async function muxJob(request: VideoStreamRunRequest, inputs: ParsedInput[], tar
   }
   muxer.finalize();
   await target.flush();
-  reportProgress("mux", selectedBytes, Math.max(1, selectedBytes), workerMessage(request.language, "video.messages.video.finalizingCompletedVideo"));
+  reportProgress("mux", selectedBytes, Math.max(1, selectedBytes), workerMessage(request.language, "video.messages.video.finalizingCompletedVideo"), true);
   const outputName = createVideoOutputName(request.job.name, request.task, request.job.mode === "concat", request.fileLabels as VideoFileLabels);
   const output = await target.complete(outputName, "video/mp4");
-  reportProgress("write", output.size, output.size, workerMessage(request.language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: 1, p1: 1 }));
+  reportProgress("write", output.size, output.size, workerMessage(request.language, "video.messages.video.resultReadyCheckingTheNextJob", { p0: 1, p1: 1 }), true);
   return output;
 }
 
@@ -1496,7 +1626,7 @@ async function readSelectedRecords(
   }
 }
 
-async function readBoxPayload(file: File, box: BoxLike, reasonCode: VideoStreamCopyReasonCode) {
+async function readBoxPayload(file: File, box: BoxLike, reasonCode: VideoParserReasonCode) {
   const start = box.start;
   const size = box.size;
   const headerSize = box.hdr_size ?? 8;
@@ -1525,8 +1655,16 @@ function findDescriptor(root: DescriptorLike | undefined, tag: number): Descript
 
 function classifyVideoCodec(codecName: string) {
   if (codecName.startsWith("avc1.")) return "h264" as const;
-  if (codecName.startsWith("hvc1.")) return "hevc" as const;
+  if (codecName.startsWith("hvc1.") || codecName === "dvh1" || codecName.startsWith("dvh1.") || codecName === "dvhe" || codecName.startsWith("dvhe.")) return "hevc" as const;
   return undefined;
+}
+
+function collectedDolbyVisionBaseLayers(inputs: readonly ParsedInput[]) {
+  return collectDolbyVisionBaseLayers(inputs.map((input) => input.dvBaseLayerCompatId));
+}
+
+function probeAssessment(result: { compatible: boolean; cause?: import("./videoProbe.ts").VideoProbeCause }) {
+  return { compatible: result.compatible, cause: result.cause };
 }
 
 async function requestJobFiles(job: VideoStreamJobDescriptor, instrumentWholeReads = false, signal?: AbortSignal) {
@@ -1551,8 +1689,8 @@ function requestInputFile(fileId: string, fileName: string) {
   });
 }
 
-function reportProgress(stage: VideoProgressStage, completedUnits: number, totalUnits: number, message: string) {
-  worker.postMessage({ type: "progress", stage, completedUnits, totalUnits, message });
+function reportProgress(stage: VideoProgressStage, completedUnits: number, totalUnits: number, message: string, explicitCompletion = false) {
+  progressCoalescer.report(stage, completedUnits, totalUnits, message, explicitCompletion);
 }
 
 function closeWorker() {
@@ -1565,11 +1703,11 @@ function closeWorker() {
   worker.close();
 }
 
-function reasonError(reasonCode: VideoStreamCopyReasonCode) {
+function reasonError(reasonCode: VideoParserReasonCode) {
   return Object.assign(new Error(reasonCode), { reasonCode });
 }
 
-function isReasonError(error: unknown): error is Error & { reasonCode: VideoStreamCopyReasonCode } {
+function isReasonError(error: unknown): error is Error & { reasonCode: VideoParserReasonCode } {
   return error instanceof Error && "reasonCode" in error;
 }
 

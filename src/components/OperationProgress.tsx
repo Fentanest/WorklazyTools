@@ -11,6 +11,8 @@ export function OperationProgress({
   progress,
   message,
   logs,
+  activeLogId,
+  activeStageKey,
   accent,
   title,
   compact = false,
@@ -19,6 +21,8 @@ export function OperationProgress({
   progress: number;
   message: string;
   logs: OperationLogEntry[];
+  activeLogId?: number;
+  activeStageKey?: string;
   accent: ToolAccent;
   title?: string;
   compact?: boolean;
@@ -72,14 +76,15 @@ export function OperationProgress({
       </button>
 
       {expanded && (
-        <ol ref={logRef} className="operation-log" aria-live="polite" aria-relevant="additions">
-          {logs.map((entry, index) => {
-            const isCurrent = index === logs.length - 1;
+        <ol ref={logRef} className="operation-log" aria-live="polite" aria-relevant="additions text">
+          {logs.map((entry) => {
+            const isCurrent = entry.id === activeLogId || Boolean(entry.stageKey && entry.stageKey === activeStageKey);
             const Icon = entry.status === "success" ? CheckCircle2 : entry.status === "error" ? AlertCircle : isCurrent && status === "running" ? LoaderCircle : Circle;
             return (
               <li className={`log-${entry.status}${isCurrent ? " current" : ""}`} key={entry.id}>
                 <Icon className={isCurrent && status === "running" ? "spin" : ""} size={13} />
                 <span>{entry.message}</span>
+                <b className="operation-log-progress">{entry.progress}%</b>
                 <time>+{formatElapsed(entry.elapsedMs, t)}</time>
               </li>
             );

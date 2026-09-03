@@ -45,13 +45,15 @@ export function createVideoWorkerResult(
   outputCounts: number | readonly number[],
   task: VideoTask,
   message: VideoMessageFactory,
+  effectiveTasks: readonly VideoTask[] = [task],
 ): VideoWorkerResult {
   const outputCount = countVideoOutputs(outputCounts);
   const warnings = [message("video.messages.video.processedOutputJobsAccordingToGroupSettings", { p0: outputCount })];
-  if (task.kind === "encode" && task.bitrate === "copy") warnings.push(message("video.messages.video.passthroughTrimmingMayStartSlightlyEarlierAtA"));
-  if (task.kind === "encode" && task.audioMode === "copy") warnings.push(message("video.messages.video.theFirstAudioTrackWasPreservedWithoutRe"));
-  if (task.kind === "encode" && task.audioMode === "remove") warnings.push(message("video.messages.video.theAudioTrackWasRemovedFromTheOutput"));
-  if (task.kind === "encode" && task.codec === "hevc") warnings.push(message("video.messages.video.hevcMayNotPlayOnEveryDeviceOr"));
+  const videoTasks = effectiveTasks.filter((candidate): candidate is Extract<VideoTask, { kind: "encode" }> => candidate.kind === "encode");
+  if (videoTasks.some((candidate) => candidate.bitrate === "copy")) warnings.push(message("video.messages.video.passthroughTrimmingMayStartSlightlyEarlierAtA"));
+  if (videoTasks.some((candidate) => candidate.audioMode === "copy")) warnings.push(message("video.messages.video.theFirstAudioTrackWasPreservedWithoutRe"));
+  if (videoTasks.some((candidate) => candidate.audioMode === "remove")) warnings.push(message("video.messages.video.theAudioTrackWasRemovedFromTheOutput"));
+  if (videoTasks.some((candidate) => candidate.codec === "hevc")) warnings.push(message("video.messages.video.hevcMayNotPlayOnEveryDeviceOr"));
   return { outputCount, warnings };
 }
 

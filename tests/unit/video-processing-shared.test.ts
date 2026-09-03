@@ -60,6 +60,16 @@ test("shared result aggregation counts route batches and creates task warnings o
   assert.match(result.warnings[3], /hevcMayNotPlayOnEveryDeviceOr/);
 });
 
+test("shared warnings use each job's effective audio mode", () => {
+  const encodeTask = { ...copyTask, bitrate: "5M", audioMode: "encode" } as typeof copyTask;
+  const result = createVideoWorkerResult([1, 1], copyTask, message, [
+    { ...encodeTask, audioMode: "encode" },
+    { ...encodeTask, audioMode: "remove" },
+  ]);
+  assert.ok(result.warnings.some((warning) => warning.includes("theAudioTrackWasRemovedFromTheOutput")));
+  assert.equal(result.warnings.some((warning) => warning.includes("theFirstAudioTrackWasPreservedWithoutRe")), false);
+});
+
 test("shared error normalization classifies quota, memory, codec, and generic failures", () => {
   assert.equal(normalizeVideoProcessingError(new VideoResultQuotaError(), [], message).code, "RESULT_STORAGE_QUOTA");
   assert.equal(normalizeVideoProcessingError(new Error("failed"), ["Aborted(OOM)"], message).code, "OUT_OF_MEMORY");

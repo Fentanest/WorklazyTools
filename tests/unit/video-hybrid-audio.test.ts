@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createHybridAudioFfmpegArguments, estimateHybridAudioBytes } from "../../src/features/video-studio/videoHybridAudio.ts";
-import { estimateVideoJobOutputBytes, taskForVideoJob } from "../../src/features/video-studio/videoOutputEstimate.ts";
+import { estimateVideoJobOutputBytes, isTargetBitrateVideoEncodeTask, taskForVideoJob } from "../../src/features/video-studio/videoOutputEstimate.ts";
 import type { VideoOutputJob, VideoTask, VideoWorkerInput } from "../../src/features/video-studio/types.ts";
 
 const input = (duration = 60): VideoWorkerInput => ({
@@ -32,10 +32,22 @@ test("target output estimates use bits-per-second once and keep all audio modes 
   assert.equal(estimateVideoJobOutputBytes({ ...job, mode: "concat", inputs: [input(30), input(30)] }, { ...task, audioMode: "copy" }, [128_000, undefined]), ((8_000_000 + 320_000) / 8) * 60 * 1.1);
 });
 
-test("job-level audio removal selects the existing remove mode without changing sibling jobs", () => {
+test("job-level audio overrides preserve remove and encode modes without changing sibling jobs", () => {
   const overridden: VideoOutputJob = { name: "one", mode: "individual", inputs: [input()], audioModeOverride: "remove" };
   assert.equal((taskForVideoJob(task, overridden) as typeof task).audioMode, "remove");
+  const encoded = taskForVideoJob({ ...task, audioBitrate: "320k", audioSampleRate: 44_100 }, { ...overridden, audioModeOverride: "encode" }) as typeof task;
+  assert.equal(encoded.audioMode, "encode");
+  assert.equal(encoded.audioBitrate, "192k");
+  assert.equal(encoded.audioSampleRate, "source");
   assert.equal(task.audioMode, "encode");
+});
+
+test("the FFmpeg capacity guard is limited to target-bitrate video encoding", () => {
+  assert.equal(isTargetBitrateVideoEncodeTask(task), true);
+  assert.equal(isTargetBitrateVideoEncodeTask({ ...task, bitrate: "copy" }), false);
+  assert.equal(isTargetBitrateVideoEncodeTask({ ...task, bitrate: "0" }), false);
+  assert.equal(isTargetBitrateVideoEncodeTask({ kind: "gif", fps: 12, width: 480 }), false);
+  assert.equal(isTargetBitrateVideoEncodeTask({ kind: "audio", format: "mp3", bitrate: "192k", sampleRate: "source" }), false);
 });
 
 test("hybrid audio uses filter-based trim and normalized concat before AAC output", () => {
