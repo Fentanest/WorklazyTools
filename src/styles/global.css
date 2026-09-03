@@ -700,6 +700,8 @@ button.sheet-name-chip:focus-visible { outline: 2px solid var(--green); outline-
 .ios-switch span { position: absolute; width: 21px; height: 21px; left: 2px; top: 2px; border-radius: 50%; background: white; box-shadow: 0 2px 5px rgba(0,0,0,.2); transition: transform .22s cubic-bezier(.2,.8,.2,1); }
 .ios-switch.checked { background: #34c759; }
 .ios-switch.checked span { transform: translateX(18px); }
+.navigation-row { cursor: pointer; }
+.navigation-row > span { display: flex; align-items: center; gap: 2px; color: var(--label-tertiary); font-size: 14px; }
 .select-row > span { display: flex; flex-direction: column; }
 .select-row select { max-width: 190px; padding: 7px 28px 7px 9px; color: var(--label-secondary); background: var(--bg-muted); border: 0; border-radius: 9px; outline: 0; font-size: 13px; font-weight: 700; }
 .select-row select:disabled { opacity: .42; }
