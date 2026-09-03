@@ -1,8 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import { fileURLToPath } from "node:url";
 
 const configuredBase = process.env.VITE_BASE_PATH || "/";
 const base = `${configuredBase.startsWith("/") ? "" : "/"}${configuredBase.replace(/\/$/, "")}/`;
@@ -18,12 +16,7 @@ const browserNodePolyfills = () => nodePolyfills({
 
 export default defineConfig({
   base,
-  plugins: [react(), tailwindcss(), browserNodePolyfills()],
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
-  },
+  plugins: [react(), browserNodePolyfills()],
   worker: {
     plugins: () => [browserNodePolyfills()],
     rollupOptions: {
