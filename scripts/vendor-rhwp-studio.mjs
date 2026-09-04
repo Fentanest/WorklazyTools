@@ -18,14 +18,25 @@ if (!/^\d+\.\d+\.\d+$/.test(coreVersion) || coreVersion !== editorVersion) {
 const version = coreVersion;
 const tag = `v${version}`;
 const upstreamUrl = "https://github.com/edwardkim/rhwp.git";
+const withoutHwpCtrl = process.env.RHWP_WITHOUT_HWPCTRL !== "0";
 const suppliedSource = process.env.RHWP_SOURCE_DIR ? path.resolve(process.env.RHWP_SOURCE_DIR) : undefined;
 const temporaryRoot = suppliedSource ? undefined : await fs.mkdtemp(path.join(os.tmpdir(), `worklazy-rhwp-${version}-`));
 const sourceRoot = suppliedSource ?? path.join(temporaryRoot, "source");
 
 try {
+  const [installedCoreVersion, installedEditorVersion] = await Promise.all([
+    readInstalledPackageVersion("@rhwp/core"),
+    readInstalledPackageVersion("@rhwp/editor"),
+  ]);
+  if (installedCoreVersion !== version || installedEditorVersion !== version) {
+    throw new Error(`설치된 rhwp 패키지가 목표 버전과 다릅니다: core=${installedCoreVersion}, editor=${installedEditorVersion}, expected=${version}`);
+  }
+
   if (!suppliedSource) {
     await run("git", ["clone", "--filter=blob:none", "--depth", "1", "--branch", tag, "--sparse", upstreamUrl, sourceRoot]);
-    await run("git", ["-C", sourceRoot, "sparse-checkout", "set", "rhwp-studio", "assets/fonts", "assets/logo"]);
+    const sparsePaths = ["rhwp-studio", "assets/fonts", "assets/logo"];
+    if (!withoutHwpCtrl) sparsePaths.push("npm/hwpctrl-ocx");
+    await run("git", ["-C", sourceRoot, "sparse-checkout", "set", ...sparsePaths]);
   }
 
   const studioRoot = path.join(sourceRoot, "rhwp-studio");
@@ -53,7 +64,11 @@ try {
   }
   await run("npx", ["vite", "build", "--base=./"], {
     cwd: studioRoot,
-    env: { ...process.env, RHWP_DISABLE_EXTERNAL_WEBFONTS: "1" },
+    env: {
+      ...process.env,
+      RHWP_DISABLE_EXTERNAL_WEBFONTS: "1",
+      RHWP_WITHOUT_HWPCTRL: withoutHwpCtrl ? "1" : "0",
+    },
   });
 
   const outputRoot = path.join(projectRoot, "public", "vendor", "rhwp-studio", version);
@@ -61,8 +76,10 @@ try {
   await fs.mkdir(path.dirname(outputRoot), { recursive: true });
   await fs.cp(path.join(studioRoot, "dist"), outputRoot, { recursive: true, dereference: true });
 
-  for (const pwaFile of ["registerSW.js", "sw.js", "workbox-dcde9eb3.js", "manifest.webmanifest"]) {
-    await fs.rm(path.join(outputRoot, pwaFile), { force: true });
+  const removedPwaFiles = await removePwaArtifacts(outputRoot);
+  const remainingPwaFiles = await findPwaArtifacts(outputRoot);
+  if (remainingPwaFiles.length) {
+    throw new Error(`rhwp Studio PWA 파일이 남아 있습니다: ${remainingPwaFiles.join(", ")}`);
   }
 
   const contentSecurityPolicy = [
@@ -96,7 +113,7 @@ try {
   await fs.copyFile(path.join(sourceRoot, "LICENSE"), path.join(outputRoot, "LICENSE.rhwp.txt"));
   await fs.copyFile(path.join(sourceRoot, "THIRD_PARTY_LICENSES.md"), path.join(outputRoot, "THIRD_PARTY_LICENSES.md"));
 
-  const hashes = await hashFiles(outputRoot, new Set(["rhwp-vendor.json"]));
+  const files = await describeFiles(outputRoot, new Set(["rhwp-vendor.json"]));
   const manifest = {
     name: "rhwp-studio",
     version,
@@ -105,11 +122,14 @@ try {
     commit,
     packages: { "@rhwp/core": coreVersion, "@rhwp/editor": editorVersion },
     externalWebFonts: false,
+    withoutHwpCtrl,
     networkPolicy: "same-origin-only",
-    files: hashes,
+    files,
   };
   await fs.writeFile(path.join(outputRoot, "rhwp-vendor.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  const totalBytes = Object.values(files).reduce((sum, file) => sum + file.bytes, 0);
   console.log(`Vendored rhwp Studio ${version} (${commit.slice(0, 12)}) → ${path.relative(projectRoot, outputRoot)}`);
+  console.log(`Snapshot: ${Object.keys(files).length} files, ${totalBytes} bytes; removed ${removedPwaFiles.length} PWA files; withoutHwpCtrl=${withoutHwpCtrl}`);
 } finally {
   if (temporaryRoot) await fs.rm(temporaryRoot, { recursive: true, force: true });
 }
@@ -129,18 +149,57 @@ async function exists(filePath) {
   }
 }
 
-async function hashFiles(root, excludedNames) {
+async function readInstalledPackageVersion(packageName) {
+  const packagePath = path.join(projectRoot, "node_modules", ...packageName.split("/"), "package.json");
+  const installedPackage = JSON.parse(await fs.readFile(packagePath, "utf8"));
+  return installedPackage.version;
+}
+
+function isPwaArtifact(fileName) {
+  return fileName === "registerSW.js"
+    || fileName === "sw.js"
+    || fileName === "manifest.webmanifest"
+    || /^workbox-.*\.js$/.test(fileName);
+}
+
+async function findPwaArtifacts(root) {
+  const matches = [];
+  const visit = async (directory) => {
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) await visit(absolute);
+      if (entry.isFile() && isPwaArtifact(entry.name)) {
+        matches.push(path.relative(root, absolute).split(path.sep).join("/"));
+      }
+    }
+  };
+  await visit(root);
+  return matches.sort((left, right) => left.localeCompare(right));
+}
+
+async function removePwaArtifacts(root) {
+  const matches = await findPwaArtifacts(root);
+  await Promise.all(matches.map((relative) => fs.rm(path.join(root, relative), { force: true })));
+  return matches;
+}
+
+async function describeFiles(root, excludedNames) {
   const result = {};
   const visit = async (directory) => {
     const entries = await fs.readdir(directory, { withFileTypes: true });
     entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
-      if (excludedNames.has(entry.name)) continue;
       const absolute = path.join(directory, entry.name);
+      const relative = path.relative(root, absolute).split(path.sep).join("/");
+      if (excludedNames.has(relative)) continue;
       if (entry.isDirectory()) await visit(absolute);
       if (entry.isFile()) {
-        const relative = path.relative(root, absolute).split(path.sep).join("/");
-        result[relative] = createHash("sha256").update(await fs.readFile(absolute)).digest("hex");
+        const bytes = await fs.readFile(absolute);
+        result[relative] = {
+          bytes: bytes.byteLength,
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+        };
       }
     }
   };

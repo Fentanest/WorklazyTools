@@ -3,6 +3,10 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
+const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
+const rhwpCoreVersion = packageJson.dependencies?.["@rhwp/core"];
+const rhwpEditorVersion = packageJson.dependencies?.["@rhwp/editor"];
+if (!rhwpCoreVersion || rhwpCoreVersion !== rhwpEditorVersion) throw new Error("Pinned rhwp core/editor versions do not match.");
 const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/stickers.manifest.json", "utf8"));
 
 const routes = [
@@ -87,6 +91,56 @@ for (const route of routes) {
   }
   if (html.includes("#/")) throw new Error(`${filePath} still contains a hash route.`);
 }
+}
+
+{
+  const filePath = path.join("dist", "index.html");
+  const html = await fs.readFile(filePath, "utf8");
+  const expectedTitle = "무료 브라우저 업무 도구 · Free Work Tools | Worklazy Tools";
+  const expectedDescription = "설치 없이 엑셀·PDF·문서·이미지 작업하는 무료 도구. Free browser tools for everyday work.";
+  const expectedUrl = "https://worklazy.net/";
+  const expectedImage = "https://worklazy.net/social/worklazy-tools-share.png";
+  const expectedImageAlt = "Worklazy Tools — practical browser utilities with no file uploads";
+  const readMeta = (attribute, value) => [...html.matchAll(new RegExp(`<meta\\s+${attribute}="${value}"\\s+content="([^"]*)"\\s*\\/>`, "g"))];
+  const descriptionTags = readMeta("name", "description");
+  if (descriptionTags.length !== 1) throw new Error(`${filePath} must contain exactly one description meta tag.`);
+  const description = descriptionTags[0][1];
+  if (description !== expectedDescription) throw new Error(`${filePath} does not use the approved landing description.`);
+  if (Array.from(description).length > 80) throw new Error(`${filePath} description exceeds 80 code points.`);
+
+  const expectedOpenGraph = {
+    "og:locale": "en_US",
+    "og:locale:alternate": "ko_KR",
+    "og:type": "website",
+    "og:site_name": "Worklazy Tools",
+    "og:title": expectedTitle,
+    "og:description": expectedDescription,
+    "og:url": expectedUrl,
+    "og:image": expectedImage,
+    "og:image:secure_url": expectedImage,
+    "og:image:type": "image/png",
+    "og:image:width": "1200",
+    "og:image:height": "630",
+    "og:image:alt": expectedImageAlt,
+  };
+  for (const [property, content] of Object.entries(expectedOpenGraph)) {
+    const tags = readMeta("property", property);
+    if (tags.length !== 1) throw new Error(`${filePath} must contain exactly one ${property} meta tag.`);
+    if (tags[0][1] !== content) throw new Error(`${filePath} has an unexpected ${property} value.`);
+  }
+
+  const expectedTwitter = {
+    "twitter:card": "summary_large_image",
+    "twitter:title": expectedTitle,
+    "twitter:description": expectedDescription,
+    "twitter:image": expectedImage,
+    "twitter:image:alt": expectedImageAlt,
+  };
+  for (const [name, content] of Object.entries(expectedTwitter)) {
+    const tags = readMeta("name", name);
+    if (tags.length !== 1) throw new Error(`${filePath} must contain exactly one ${name} meta tag.`);
+    if (tags[0][1] !== content) throw new Error(`${filePath} has an unexpected ${name} value.`);
+  }
 }
 
 for (const language of ["ko", "en"]) {
@@ -264,7 +318,8 @@ const applicationJavaScript = (await Promise.all(
 if (!ads.includes("pub-8940087269746960")) throw new Error("ads.txt publisher ID is missing.");
 if (cname.trim() !== "worklazy.net") throw new Error("CNAME does not point to worklazy.net.");
 if (!worklazyLicense.includes("All rights reserved")) throw new Error("Worklazy proprietary license is missing.");
-if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker") || !thirdPartyLicenses.includes("@rhwp/core")
+if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker")
+  || !thirdPartyLicenses.includes(`@rhwp/core ${rhwpCoreVersion}`) || !thirdPartyLicenses.includes(`@rhwp/editor ${rhwpEditorVersion}`)
   || !thirdPartyLicenses.includes("ZetaOffice / LibreOffice") || !thirdPartyLicenses.includes("zetajs") || !thirdPartyLicenses.includes("JSDoc legacy Word reader")
   || !thirdPartyLicenses.includes("Twemoji graphics 17.0.3") || !thirdPartyLicenses.includes("Attribution 4.0 International")
   || !thirdPartyLicenses.includes("Noto Sans KR label font")) throw new Error("Third-party license bundle is incomplete.");
