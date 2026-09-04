@@ -272,26 +272,26 @@ try {
   }
 
   await page.goto(`${koBaseUrl}/tools/qr-studio`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => { const canvas = document.querySelector(".qr-preview canvas"); return canvas instanceof HTMLCanvasElement && canvas.width >= 600; });
-  const qrFixture = await page.$eval(".qr-preview canvas", (canvas) => canvas.toDataURL("image/png"));
-  await page.click(".mode-switch button:nth-child(3)");
-  await page.waitForSelector(".qr-camera-stage video[playsinline]");
-  const cameraCopy = await page.$eval(".qr-scan-layout", (element) => element.textContent);
+  await page.waitForFunction(() => { const canvas = document.querySelector("[data-testid=qr-preview] canvas"); return canvas instanceof HTMLCanvasElement && canvas.width >= 600; });
+  const qrFixture = await page.$eval("[data-testid=qr-preview] canvas", (canvas) => canvas.toDataURL("image/png"));
+  await page.click("[data-testid=qr-mode] button:nth-child(3)");
+  await page.waitForSelector('[data-testid="qr-camera-stage"] video[playsinline]');
+  const cameraCopy = await page.$eval("[data-testid=qr-scan-layout]", (element) => element.textContent);
   if (!cameraCopy?.includes("카메라로 스캔")) throw new Error("Live QR camera scanner is missing.");
   await page.setViewport({ width: 390, height: 844 });
   await page.evaluate(async (dataUrl) => {
     const blob = await (await fetch(dataUrl)).blob();
     const transfer = new DataTransfer();
     transfer.items.add(new File([blob], "qr-fixture.png", { type: "image/png" }));
-    const input = document.querySelector('.qr-camera-scan-card .qr-photo-picker input[type="file"]');
+    const input = document.querySelector('[data-testid=qr-photo-picker] input[type="file"]');
     Object.defineProperty(input, "files", { configurable: true, value: transfer.files });
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }, qrFixture);
-  await page.waitForFunction(() => document.querySelector(".qr-scan-result-slot .scan-result")?.textContent?.includes("worklazy.net"));
+  await page.waitForFunction(() => document.querySelector("[data-testid=qr-scan-result]")?.textContent?.includes("worklazy.net"));
   const mobileQrScanLayout = await page.evaluate(() => ({
-    resultTop: document.querySelector(".qr-scan-result-slot").getBoundingClientRect().top,
-    scannerBottom: document.querySelector(".qr-camera-scan-card").getBoundingClientRect().bottom,
-    photoPickerInsideScanner: Boolean(document.querySelector(".qr-camera-scan-card .qr-photo-picker")),
+    resultTop: document.querySelector("[data-testid=qr-scan-result-slot]").getBoundingClientRect().top,
+    scannerBottom: document.querySelector('[data-testid="qr-camera-scan-card"]').getBoundingClientRect().bottom,
+    photoPickerInsideScanner: Boolean(document.querySelector("[data-testid=qr-photo-picker]")),
   }));
   if (!mobileQrScanLayout.photoPickerInsideScanner || mobileQrScanLayout.resultTop < mobileQrScanLayout.scannerBottom) {
     throw new Error(`Mobile QR photo picker and result layout is incomplete: ${JSON.stringify(mobileQrScanLayout)}`);

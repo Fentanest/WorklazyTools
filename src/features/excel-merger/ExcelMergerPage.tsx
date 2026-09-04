@@ -25,16 +25,18 @@ import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { FileShareButton } from "../../components/FileShareButton";
 import { OperationProgress } from "../../components/OperationProgress";
 import { ToolGuide } from "../../components/ToolGuide";
+import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
 import {
   FileDropZone,
   formatBytes,
   PageHeader,
   PrimaryButton,
   ResultCard,
-  SectionCard,
   SegmentedControl,
   ToggleRow,
 } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { inspectExcelFiles, mergeExcelFiles } from "./excelWorkerClient";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { stripLanguagePrefix } from "../../i18n/languages";
@@ -467,15 +469,16 @@ export function ExcelMergerPage() {
   };
 
   return (
-    <div className="page tool-page page-enter accent-context-green">
+    <UtilityPage toolId="excel-merger">
+      <div className="contents" data-testid="excel-merger-page">
       <PageHeader eyebrow="SPREADSHEET TOOL" title={t("excel.title")} description={t("excel.description")}>
-        <div className="header-status ready"><span className="status-dot" /> {t("excel.ready")}</div>
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1.5 text-xs font-bold text-green-800 dark:text-green-300"><span className="size-2 rounded-full bg-green-600 dark:bg-green-300" /> {t("excel.ready")}</div>
       </PageHeader>
       <PrivacyBanner compact />
 
-      <div className="workflow-grid">
-        <div className="workflow-main">
-          <SectionCard step={1} title={t("excel.steps.files.title")} description={t("excel.steps.files.description")}>
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_280px] items-start gap-5 max-[900px]:grid-cols-1">
+        <div className="min-w-0">
+          <UtilitySectionCard step={1} title={t("excel.steps.files.title")} description={t("excel.steps.files.description")}>
             <FileDropZone
               accept=".xlsx,.xls,.xlsb,.xlsm,.csv"
               hint={t("excel.steps.files.hint")}
@@ -484,8 +487,8 @@ export function ExcelMergerPage() {
               onFiles={handleFiles}
               accent="green"
             />
-            <div className="inline-notice"><Info size={15} /><span>{t(preserveLegacyXls ? "excel.steps.files.preserveNotice" : "excel.steps.files.notice")}</span></div>
-            {fileNotice && <div className="inline-notice warning"><AlertCircle size={15} /><span>{fileNotice}</span></div>}
+            <UtilityNotice className="mt-3"><Info className="mt-0.5 shrink-0" size={15} /><span>{t(preserveLegacyXls ? "excel.steps.files.preserveNotice" : "excel.steps.files.notice")}</span></UtilityNotice>
+            {fileNotice && <UtilityNotice className="mt-2" role="status"><AlertCircle className="mt-0.5 shrink-0" size={15} /><span>{fileNotice}</span></UtilityNotice>}
             <ExcelFileList
               entries={entries}
               onRemove={removeFile}
@@ -494,10 +497,10 @@ export function ExcelMergerPage() {
               onPasswordInspect={inspectProtectedFile}
               t={t}
             />
-          </SectionCard>
+          </UtilitySectionCard>
 
-          <SectionCard step={2} title={t("excel.steps.sheets.title")} description={t("excel.steps.sheets.description")}>
-            <SegmentedControl
+          <UtilitySectionCard step={2} title={t("excel.steps.sheets.title")} description={t("excel.steps.sheets.description")}>
+            <div data-testid="excel-sheet-selection-mode"><SegmentedControl
               label={t("excel.sheetSelection.label")}
               value={sheetSelectionMode}
               onChange={(value) => { setSheetSelectionMode(value); clearResult(); }}
@@ -506,21 +509,21 @@ export function ExcelMergerPage() {
                 { value: "positions", label: t("excel.sheetSelection.positions") },
                 { value: "custom", label: t("excel.sheetSelection.custom") },
               ]}
-            />
+            /></div>
             {sheetSelectionMode === "positions" && (
-              <div className="sheet-position-input">
-                <label htmlFor="sheet-position-pattern">{t("excel.sheetSelection.positionLabel")}</label>
-                <input
+              <UtilityField className="mt-3" data-testid="excel-sheet-position-input">
+                <span>{t("excel.sheetSelection.positionLabel")}</span>
+                <UtilityInput
                   id="sheet-position-pattern"
                   value={sheetPositionPattern}
                   onChange={(event) => { setSheetPositionPattern(event.target.value); clearResult(); }}
                   placeholder={t("excel.sheetSelection.placeholder")}
                 />
-                <small>{t("excel.sheetSelection.help")}</small>
-              </div>
+                <small className="font-normal text-muted-foreground">{t("excel.sheetSelection.help")}</small>
+              </UtilityField>
             )}
             {entries.length > 0 && (
-              <div className="excel-mobile-sheet-summary" role="status">
+              <div className="hidden items-center gap-2 rounded-xl border border-green-700/30 bg-green-50 px-3 py-2 text-sm font-bold text-green-900 shadow-sm max-[620px]:sticky max-[620px]:top-[calc(72px+env(safe-area-inset-top))] max-[620px]:z-10 max-[620px]:mt-3 max-[620px]:flex dark:border-green-300/40 dark:bg-green-950/90 dark:text-green-200" data-testid="excel-mobile-sheet-summary" role="status">
                 <FileSpreadsheet size={16} aria-hidden="true" />
                 <span>{t("excel.sheetList.mobileSummary", { files: entries.length, sheets: selectedSheetCount })}</span>
               </div>
@@ -533,10 +536,10 @@ export function ExcelMergerPage() {
               onSetAll={setAllSheetsForFile}
               t={t}
             />
-            {entries.length > 0 && !inspecting && selectedSheetCount === 0 && <div className="inline-notice warning"><AlertCircle size={15} /><span>{t("excel.sheetSelection.required")}</span></div>}
-          </SectionCard>
+            {entries.length > 0 && !inspecting && selectedSheetCount === 0 && <UtilityNotice className="mt-2" data-testid="excel-sheet-required" role="status"><AlertCircle className="mt-0.5 shrink-0" size={15} /><span>{t("excel.sheetSelection.required")}</span></UtilityNotice>}
+          </UtilitySectionCard>
 
-          <SectionCard step={3} title={t("excel.steps.mode.title")} description={t("excel.steps.mode.description")}>
+          <UtilitySectionCard step={3} title={t("excel.steps.mode.title")} description={t("excel.steps.mode.description")}>
             <SegmentedControl
               label={t("excel.steps.mode.label")}
               value={mergeMode}
@@ -547,17 +550,17 @@ export function ExcelMergerPage() {
                 { value: "horizontal", label: t("excel.modes.horizontal") },
               ]}
             />
-            <div className="mode-explainer">
-              <Info size={17} />
+            <UtilityNotice className="mt-3" tone="success">
+              <Info className="mt-0.5 shrink-0" size={17} />
               <span>{t(`excel.modeHelp.${mergeMode}`)}</span>
-            </div>
-          </SectionCard>
+            </UtilityNotice>
+          </UtilitySectionCard>
 
-          <SectionCard step={4} title={t("excel.steps.output.title")} description={t("excel.steps.output.description")}>
-            <div className="settings-categories">
-              <section className="settings-category">
-                <h3>{t("excel.output.categories.xlsxInput")}</h3>
-                <div className="settings-list">
+          <UtilitySectionCard step={4} title={t("excel.steps.output.title")} description={t("excel.steps.output.description")}>
+            <div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1" data-testid="excel-settings-categories">
+              <Card as="section" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" data-testid="excel-settings-category">
+                <h3 className="mb-1 font-heading text-base font-medium">{t("excel.output.categories.xlsxInput")}</h3>
+                <div className="divide-y divide-border">
                   <ToggleRow
                     label={t("excel.output.xlsxFormulas")}
                     description={t(xlsxFormulas ? "excel.output.xlsxFormulasOn" : "excel.output.xlsxFormulasOff")}
@@ -571,11 +574,11 @@ export function ExcelMergerPage() {
                     onChange={(checked) => { setXlsxFormatting(checked); clearResult(); }}
                   />
                 </div>
-              </section>
+              </Card>
 
-              <section className="settings-category">
-                <h3>{t("excel.output.categories.xlsInput")}</h3>
-                <div className="settings-list">
+              <Card as="section" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" data-testid="excel-settings-category">
+                <h3 className="mb-1 font-heading text-base font-medium">{t("excel.output.categories.xlsInput")}</h3>
+                <div className="divide-y divide-border">
                   <ToggleRow
                     label={t("excel.xlsPreserve.formulasLabel")}
                     description={t(xlsFormulas ? "excel.xlsPreserve.formulasOn" : "excel.xlsPreserve.formulasOff")}
@@ -591,22 +594,17 @@ export function ExcelMergerPage() {
                     disabled={precisionPreparing || loading}
                   />
                 </div>
-                <div className="inline-notice warning"><Info size={15} /><span>{t("excel.xlsPreserve.reloadNotice")}</span></div>
-              </section>
+                <UtilityNotice className="mt-2"><Info className="mt-0.5 shrink-0" size={15} /><span>{t("excel.xlsPreserve.reloadNotice")}</span></UtilityNotice>
+              </Card>
 
-              <section className="settings-category">
-                <h3>{t("excel.output.categories.csvInput")}</h3>
-                <div className="settings-list">
-                  <label className="settings-row select-row">
-                    <span><strong>{t("excel.output.csvEncoding")}</strong><small>{t("excel.output.csvEncodingHelp")}</small></span>
-                    <select value={csvEncoding} onChange={(event) => { setCsvEncoding(event.target.value as "auto" | "utf-8" | "euc-kr"); clearResult(); }}><option value="auto">{t("excel.output.csvAuto")}</option><option value="utf-8">UTF-8</option><option value="euc-kr">CP949 / EUC-KR</option></select>
-                  </label>
-                </div>
-              </section>
+              <Card as="section" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" data-testid="excel-settings-category">
+                <h3 className="mb-3 font-heading text-base font-medium">{t("excel.output.categories.csvInput")}</h3>
+                <UtilityField><span>{t("excel.output.csvEncoding")}</span><small className="font-normal text-muted-foreground">{t("excel.output.csvEncodingHelp")}</small><UtilitySelect value={csvEncoding} onChange={(event) => { setCsvEncoding(event.target.value as "auto" | "utf-8" | "euc-kr"); clearResult(); }}><option value="auto">{t("excel.output.csvAuto")}</option><option value="utf-8">UTF-8</option><option value="euc-kr">CP949 / EUC-KR</option></UtilitySelect></UtilityField>
+              </Card>
 
-              <section className="settings-category">
-                <h3>{t("excel.output.categories.emptyAreas")}</h3>
-                <div className="settings-list">
+              <Card as="section" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" data-testid="excel-settings-category">
+                <h3 className="mb-1 font-heading text-base font-medium">{t("excel.output.categories.emptyAreas")}</h3>
+                <div className="divide-y divide-border">
                   <ToggleRow
                     label={t("excel.output.trimEdges")}
                     description={t("excel.output.trimEdgesHelp")}
@@ -625,10 +623,10 @@ export function ExcelMergerPage() {
                     checked={sheetTrimColumns}
                     onChange={(checked) => { setSheetTrimColumns(checked); clearResult(); }}
                   />
-                  <label className="settings-row select-row sheet-trim-threshold">
-                    <span><strong>{t("excel.output.trimThreshold")}</strong><small>{t("excel.output.trimThresholdHelp")}</small></span>
-                    <span className="number-input-with-unit">
-                      <input
+                  <UtilityField className="border-t border-border pt-2.5" data-testid="excel-sheet-trim-threshold">
+                    <span>{t("excel.output.trimThreshold")}</span><small className="font-normal text-muted-foreground">{t("excel.output.trimThresholdHelp")}</small>
+                    <span className="flex items-center gap-2">
+                      <UtilityInput
                         type="number"
                         min={1}
                         step={1}
@@ -642,39 +640,36 @@ export function ExcelMergerPage() {
                         }}
                         aria-label={t("excel.output.trimThresholdAria")}
                       />
-                      <small>{t("excel.output.orMore")}</small>
+                      <small className="shrink-0 font-normal text-muted-foreground">{t("excel.output.orMore")}</small>
                     </span>
-                  </label>
+                  </UtilityField>
                 </div>
-              </section>
+              </Card>
 
-              <section className="settings-category">
-                <h3>{t("excel.output.categories.mergeDetails")}</h3>
-                <div className="settings-list">
-                  <label className="settings-row select-row">
-                    <span><strong>{t("excel.output.skipHeaders")}</strong><small>{t("excel.output.skipHeadersHelp")}</small></span>
-                    <span className="number-input-with-unit"><input type="number" min={0} step={1} inputMode="numeric" value={skipHeaderRows} disabled={mergeMode !== "vertical"} onChange={(event) => { setSkipHeaderRows(Math.max(0, Math.floor(Number(event.target.value) || 0))); clearResult(); }} /><small>{t("excel.output.rows")}</small></span>
-                  </label>
-                  <label className="settings-row select-row">
-                    <span><strong>{t("excel.output.sheetNameRule")}</strong><small>{t("excel.output.sheetNameRuleHelp")}</small></span>
-                    <select value={sheetNameRule} disabled={mergeMode !== "sheets"} onChange={(event) => setSheetNameRule(event.target.value as SheetNameRule)}>
+              <Card as="section" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" data-testid="excel-settings-category">
+                <h3 className="mb-3 font-heading text-base font-medium">{t("excel.output.categories.mergeDetails")}</h3>
+                <div className="grid gap-3">
+                  <UtilityField>
+                    <span>{t("excel.output.skipHeaders")}</span><small className="font-normal text-muted-foreground">{t("excel.output.skipHeadersHelp")}</small>
+                    <span className="flex items-center gap-2"><UtilityInput type="number" min={0} step={1} inputMode="numeric" value={skipHeaderRows} disabled={mergeMode !== "vertical"} onChange={(event) => { setSkipHeaderRows(Math.max(0, Math.floor(Number(event.target.value) || 0))); clearResult(); }} /><small className="shrink-0 font-normal text-muted-foreground">{t("excel.output.rows")}</small></span>
+                  </UtilityField>
+                  <UtilityField>
+                    <span>{t("excel.output.sheetNameRule")}</span><small className="font-normal text-muted-foreground">{t("excel.output.sheetNameRuleHelp")}</small>
+                    <UtilitySelect value={sheetNameRule} disabled={mergeMode !== "sheets"} onChange={(event) => setSheetNameRule(event.target.value as SheetNameRule)}>
                       <option value="file-sheet">{t("excel.output.fileSheet")}</option>
                       <option value="sheet-file">{t("excel.output.sheetFile")}</option>
                       <option value="sheet">{t("excel.output.originalSheet")}</option>
-                    </select>
-                  </label>
+                    </UtilitySelect>
+                  </UtilityField>
                 </div>
-              </section>
+              </Card>
             </div>
 
-            <div className="output-name-field">
-              <label htmlFor="output-file-name">{t("excel.output.fileName")}</label>
-              <div><FileSpreadsheet size={17} /><input id="output-file-name" value={outputName} onChange={(event) => setOutputName(event.target.value)} /></div>
-            </div>
-          </SectionCard>
+            <UtilityField className="mt-3"><span>{t("excel.output.fileName")}</span><span className="flex h-10 items-center gap-2 rounded-xl border border-input bg-background px-3 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20"><FileSpreadsheet className="shrink-0 text-green-700 dark:text-green-300" size={17} /><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none max-[620px]:text-base" id="output-file-name" value={outputName} onChange={(event) => setOutputName(event.target.value)} /></span></UtilityField>
+          </UtilitySectionCard>
 
-          <SectionCard step={5} title={t("excel.steps.protect.title")} description={t("excel.steps.protect.description")}>
-            <div className="settings-list">
+          <UtilitySectionCard step={5} title={t("excel.steps.protect.title")} description={t("excel.steps.protect.description")}>
+            <div>
               <ToggleRow
                 label={t("excel.protect.label")}
                 description={t("excel.protect.help")}
@@ -690,20 +685,20 @@ export function ExcelMergerPage() {
               />
             </div>
             {protectOutput && (
-              <div className="password-form output-password-form">
+              <div className="mt-3 grid grid-cols-2 gap-3 max-[620px]:grid-cols-1" data-testid="excel-output-password-form">
                 <PasswordField label={t("excel.protect.password")} value={outputPassword} onChange={setOutputPassword} visible={showOutputPassword} onVisibilityChange={setShowOutputPassword} toggleLabel={t("excel.protect.toggle")} />
                 <PasswordField label={t("excel.protect.confirm")} value={outputPasswordConfirm} onChange={setOutputPasswordConfirm} visible={showOutputPassword} toggleLabel={t("excel.protect.toggle")} />
-                {outputPasswordConfirm && outputPasswordMismatch && <p className="field-error">{t("excel.protect.mismatch")}</p>}
-                <p className="field-help"><LockKeyhole size={13} /> {t("excel.protect.warning")}</p>
+                {outputPasswordConfirm && outputPasswordMismatch && <p className="col-span-full text-sm font-bold text-destructive">{t("excel.protect.mismatch")}</p>}
+                <p className="col-span-full flex items-start gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="mt-0.5 shrink-0" size={13} /> {t("excel.protect.warning")}</p>
               </div>
             )}
-          </SectionCard>
+          </UtilitySectionCard>
         </div>
 
-        <aside className="workflow-summary">
-          <div className="summary-card">
-            <div className="summary-title"><SlidersHorizontal size={19} /><h2>{t("excel.summary.title")}</h2></div>
-            <dl>
+        <aside className="sticky top-24 max-[900px]:static" data-testid="excel-merge-summary">
+          <Card className="gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-md">
+            <div className="flex items-center gap-2"><SlidersHorizontal className="text-green-700 dark:text-green-300" size={19} /><h2 className="font-heading text-lg font-medium">{t("excel.summary.title")}</h2></div>
+            <dl className="mt-3 divide-y divide-border text-sm [&>div]:flex [&>div]:items-start [&>div]:justify-between [&>div]:gap-3 [&>div]:py-2 [&_dd]:text-right [&_dd]:font-bold [&_dt]:text-muted-foreground">
               <div><dt>{t("excel.summary.files")}</dt><dd>{t("excel.summary.count", { count: entries.length })}</dd></div>
               <div><dt>{t("excel.summary.sheets")}</dt><dd>{t("excel.summary.count", { count: selectedSheetCount })}</dd></div>
               <div><dt>{t("excel.summary.encryptedInputs")}</dt><dd>{t("excel.summary.count", { count: encryptedCount })}</dd></div>
@@ -715,17 +710,17 @@ export function ExcelMergerPage() {
               <div><dt>{t("excel.summary.middleEmpty")}</dt><dd>{sheetTrimRows || sheetTrimColumns ? t("excel.summary.emptyEnabled", { axes: `${sheetTrimRows ? t("excel.summary.rows") : ""}${sheetTrimRows && sheetTrimColumns ? "·" : ""}${sheetTrimColumns ? t("excel.summary.columns") : ""}`, count: sheetTrimThreshold }) : t("excel.summary.disabled")}</dd></div>
               <div><dt>{t("excel.summary.format")}</dt><dd>{t(protectOutput ? "excel.summary.protected" : "excel.summary.unprotected")}</dd></div>
             </dl>
-            <PrimaryButton accent="green" disabled={!ready} loading={loading} onClick={() => void runMerge()}>
+            <div className="mt-3"><PrimaryButton accent="green" disabled={!ready} loading={loading} onClick={() => void runMerge()}>
               {loading ? t("excel.summary.processing", { progress: operation.progress }) : t("excel.summary.merge")}
-            </PrimaryButton>
-            {loading && <button type="button" className="secondary-button" onClick={() => mergeControllerRef.current?.abort()}>{t("excel.summary.cancel")}</button>}
-            {precisionPreparing && <button type="button" className="secondary-button" onClick={() => precisionControllerRef.current?.abort()}>{t("excel.xlsPreserve.cancel")}</button>}
-            {!loading && inspecting && <p className="prototype-note">{t("excel.summary.inspecting")}</p>}
-            {!loading && inspectionFailed && <p className="prototype-note error-text">{t("excel.summary.inspectionFailed")}</p>}
-            {!loading && !result && missingInputPassword && <p className="prototype-note error-text">{t("excel.summary.inputPassword")}</p>}
-            {!loading && entries.length > 0 && selectedSheetCount === 0 && <p className="prototype-note error-text">{t("excel.summary.selectSheet")}</p>}
-            {!loading && !result && outputPasswordMissing && <p className="prototype-note error-text">{t("excel.summary.outputPassword")}</p>}
-          </div>
+            </PrimaryButton></div>
+            {loading && <Button className="mt-2 w-full rounded-xl" type="button" variant="secondary" onClick={() => mergeControllerRef.current?.abort()}>{t("excel.summary.cancel")}</Button>}
+            {precisionPreparing && <Button className="mt-2 w-full rounded-xl" type="button" variant="secondary" onClick={() => precisionControllerRef.current?.abort()}>{t("excel.xlsPreserve.cancel")}</Button>}
+            {!loading && inspecting && <p className="mt-2 text-center text-xs text-muted-foreground">{t("excel.summary.inspecting")}</p>}
+            {!loading && inspectionFailed && <p className="mt-2 text-center text-xs font-bold text-destructive">{t("excel.summary.inspectionFailed")}</p>}
+            {!loading && !result && missingInputPassword && <p className="mt-2 text-center text-xs font-bold text-destructive">{t("excel.summary.inputPassword")}</p>}
+            {!loading && entries.length > 0 && selectedSheetCount === 0 && <p className="mt-2 text-center text-xs font-bold text-destructive">{t("excel.summary.selectSheet")}</p>}
+            {!loading && !result && outputPasswordMissing && <p className="mt-2 text-center text-xs font-bold text-destructive">{t("excel.summary.outputPassword")}</p>}
+          </Card>
           <OperationProgress
             status={operation.status}
             progress={operation.progress}
@@ -737,7 +732,7 @@ export function ExcelMergerPage() {
         </aside>
       </div>
 
-      {error && <div className="error-banner" role="alert"><AlertCircle size={19} /><div><strong>{t("excel.failed")}</strong><span>{error}</span></div></div>}
+      {error && <UtilityNotice className="mt-4" data-testid="excel-merge-error" tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div className="flex flex-col"><strong>{t("excel.failed")}</strong><span>{error}</span></div></UtilityNotice>}
 
       {result && (
         <ResultCard
@@ -745,9 +740,9 @@ export function ExcelMergerPage() {
           title={t("excel.result.title")}
           message={t("excel.result.message", { fileCount: result.fileCount, sheetCount: result.sheetCount, outputCount: result.outputSheetCount, encrypted: result.encrypted ? t("excel.result.encrypted") : "" })}
         >
-          <div className="result-file-actions"><a className="result-download" href={result.url} download={result.fileName}><Download size={17} /> {result.fileName}<small>{formatBytes(result.size)}</small></a><FileShareButton url={result.url} fileName={result.fileName} mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" /></div>
+          <div className="flex flex-wrap items-center gap-2" data-testid="excel-result-actions"><Button render={<a href={result.url} download={result.fileName} data-testid="excel-result-download" />} className="h-auto min-h-11 rounded-xl" variant="secondary"><Download size={17} /><span className="min-w-0 overflow-hidden text-ellipsis">{result.fileName}</span><small className="text-xs text-muted-foreground">{formatBytes(result.size)}</small></Button><FileShareButton url={result.url} fileName={result.fileName} mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" /></div>
           {result.warnings.length > 0 && (
-            <div className="result-warnings">{result.warnings.map((warning) => <p key={warning}><Info size={13} /> {warning}</p>)}</div>
+            <div className="mt-2 grid gap-1" data-testid="excel-result-warnings">{result.warnings.map((warning) => <p className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300" key={warning}><Info className="mt-0.5 shrink-0" size={13} /> {warning}</p>)}</div>
           )}
         </ResultCard>
       )}
@@ -758,8 +753,9 @@ export function ExcelMergerPage() {
         blocks={t("excel.guide.blocks", { returnObjects: true }) as Array<{ title: string; paragraphs: string[]; items?: string[] }>}
         faq={(t("excel.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map(({ q, a }) => ({ question: q, answer: a }))}
       />
-      {preserveLegacyXls && <canvas ref={converterCanvasRef} id="qtcanvas" className="excel-converter-canvas" aria-hidden="true" />}
-    </div>
+      {preserveLegacyXls && <canvas ref={converterCanvasRef} id="qtcanvas" className="pointer-events-none fixed size-px opacity-0" aria-hidden="true" />}
+      </div>
+    </UtilityPage>
   );
 }
 
@@ -785,50 +781,53 @@ function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll, t }: {
   onSetAll: (id: string, selected: boolean) => void;
   t: TFunction<"features">;
 }) {
-  if (!entries.length) return <div className="sheet-selector-empty">{t("excel.sheetList.empty")}</div>;
+  if (!entries.length) return <div className="mt-3 rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground" data-testid="excel-sheet-selector-empty">{t("excel.sheetList.empty")}</div>;
 
   return (
-    <div className="excel-sheet-selector">
+    <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] items-start gap-[9px] max-[900px]:grid-cols-1" data-testid="excel-sheet-selector">
       {entries.map((entry) => {
         const selectedNames = new Set(resolveSelectedSheetNames(entry, mode, pattern));
         const headingId = `sheet-file-heading-${entry.id}`;
         return (
-          <section className="sheet-file-group" key={entry.id} aria-labelledby={headingId}>
-            <div className="sheet-file-heading">
-              <span><h3 id={headingId} title={entry.file.name} aria-label={entry.file.name}>{entry.file.name}</h3><small>{entry.sheetNames.length ? t("excel.sheetList.included", { selected: selectedNames.size, total: entry.sheetNames.length }) : t("excel.sheetList.needsCheck")}</small></span>
+          <Card as="section" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" data-testid="excel-sheet-file-group" key={entry.id} aria-labelledby={headingId}>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2" data-testid="excel-sheet-file-heading">
+              <span className="min-w-0"><h3 className="overflow-hidden text-ellipsis whitespace-nowrap text-sm font-bold" id={headingId} title={entry.file.name} aria-label={entry.file.name}>{entry.file.name}</h3><small className="mt-0.5 block text-xs text-muted-foreground">{entry.sheetNames.length ? t("excel.sheetList.included", { selected: selectedNames.size, total: entry.sheetNames.length }) : t("excel.sheetList.needsCheck")}</small></span>
               {mode === "custom" && entry.sheetNames.length > 0 && (
-                <span className="sheet-select-actions">
-                  <button type="button" onClick={() => onSetAll(entry.id, true)}>{t("excel.sheetList.all")}</button>
-                  <button type="button" onClick={() => onSetAll(entry.id, false)}>{t("excel.sheetList.clear")}</button>
+                <span className="flex items-center gap-1" data-testid="excel-sheet-select-actions">
+                  <Button size="xs" variant="ghost" type="button" onClick={() => onSetAll(entry.id, true)}>{t("excel.sheetList.all")}</Button>
+                  <Button size="xs" variant="ghost" type="button" onClick={() => onSetAll(entry.id, false)}>{t("excel.sheetList.clear")}</Button>
                 </span>
               )}
             </div>
             {entry.inspection === "checking" ? (
-              <div className="sheet-loading"><LoaderCircle className="spin" size={14} /> {t("excel.sheetList.loading")}</div>
+              <div className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground"><LoaderCircle className="animate-spin" size={14} /> {t("excel.sheetList.loading")}</div>
             ) : entry.encrypted && !entry.sheetNames.length && !entry.error ? (
-              <div className="sheet-loading"><FileLock2 size={14} /> {t("excel.sheetList.password")}</div>
+              <div className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground"><FileLock2 size={14} /> {t("excel.sheetList.password")}</div>
             ) : entry.error ? (
-              <div className="sheet-loading error-text"><AlertCircle size={14} /> {entry.error}</div>
+              <div className="mt-3 flex items-center gap-1.5 text-sm font-bold text-destructive"><AlertCircle size={14} /> {entry.error}</div>
             ) : (
-              <ol className={`sheet-name-list mode-${mode}`}>
+              <ol className="mt-3 flex max-h-[204px] flex-wrap content-start gap-1.5 overflow-y-auto overscroll-contain rounded-xl bg-muted/35 p-2" data-testid="excel-sheet-name-list" data-mode={mode}>
                 {entry.sheetNames.map((sheetName, index) => {
                   const selected = selectedNames.has(sheetName);
                   return (
-                    <li className={selected ? "selected" : ""} key={sheetName} aria-label={mode === "custom" ? undefined : sheetName}>
+                    <li className="min-w-0 max-w-full" data-selected={selected || undefined} key={sheetName} aria-label={mode === "custom" ? undefined : sheetName}>
                       {mode === "custom" ? (
-                        <button
+                        <Button
                           type="button"
-                          className="sheet-name-chip"
+                          size="sm"
+                          variant="outline"
+                          className={`min-h-9 max-w-[180px] justify-start rounded-lg px-2 max-[620px]:min-h-11 ${selected ? "border-green-700 bg-green-500/10 dark:border-green-300" : "opacity-65"}`}
+                          data-testid="excel-sheet-name-chip"
                           aria-pressed={selected}
                           aria-label={sheetName}
                           title={sheetName}
                           onClick={() => onToggle(entry.id, sheetName)}
                         >
-                          <b aria-hidden="true">{index + 1}</b><span>{sheetName}</span>
-                        </button>
+                          <b className="grid size-5 shrink-0 place-items-center rounded bg-green-500/15 text-[11px]" aria-hidden="true">{index + 1}</b><span className="min-w-0 overflow-hidden text-ellipsis">{sheetName}</span>
+                        </Button>
                       ) : (
-                        <span className="sheet-name-chip" title={sheetName}>
-                          <b aria-hidden="true">{index + 1}</b><span>{sheetName}</span>{selected && <small>{t("excel.sheetList.include")}</small>}
+                        <span className={`inline-flex min-h-9 max-w-[180px] items-center gap-1.5 rounded-lg border px-2 text-xs max-[620px]:min-h-11 ${selected ? "border-green-700/50 bg-green-500/10" : "border-border opacity-55"}`} data-testid="excel-sheet-name-chip" title={sheetName}>
+                          <b className="grid size-5 shrink-0 place-items-center rounded bg-green-500/15 text-[11px]" aria-hidden="true">{index + 1}</b><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{sheetName}</span>{selected && <small className="shrink-0 font-bold text-green-800 dark:text-green-300">{t("excel.sheetList.include")}</small>}
                         </span>
                       )}
                     </li>
@@ -836,7 +835,7 @@ function ExcelSheetSelector({ entries, mode, pattern, onToggle, onSetAll, t }: {
                 })}
               </ol>
             )}
-          </section>
+          </Card>
         );
       })}
     </div>
@@ -862,15 +861,15 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
   });
 
   return (
-    <div className="excel-file-list">
+    <div className="mt-3 grid gap-2.5" data-testid="excel-file-list">
       {entries.map((entry, index) => (
-        <div className={`excel-file-item${entry.encrypted ? " encrypted" : ""}`} key={entry.id}>
-          <div className="file-row">
-            <span className="file-type accent-green">{entry.file.name.split(".").pop()?.slice(0, 4).toUpperCase()}</span>
-            <span className="file-meta"><strong>{entry.file.name}</strong><small>{formatBytes(entry.file.size)}</small></span>
-            <span className={`file-security-status ${entry.inspection}`}>
+        <Card className={`gap-0 overflow-visible rounded-2xl border p-3 shadow-sm ${entry.encrypted ? "border-amber-500/40" : "border-border"}`} data-testid="excel-file-item" data-inspection={entry.inspection} data-encrypted={entry.encrypted || undefined} key={entry.id}>
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-2 max-[620px]:grid-cols-[auto_minmax(0,1fr)_auto]">
+            <span className="grid h-8 min-w-10 place-items-center rounded-lg bg-green-500/15 px-1.5 text-[10px] font-extrabold text-green-800 dark:text-green-300">{entry.file.name.split(".").pop()?.slice(0, 4).toUpperCase()}</span>
+            <span className="min-w-0" data-testid="excel-file-meta"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{entry.file.name}</strong><small className="block text-xs text-muted-foreground">{formatBytes(entry.file.size)}</small></span>
+            <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground max-[620px]:col-span-2 max-[620px]:col-start-1" data-testid="excel-file-status" data-state={entry.inspection}>
               {entry.inspection === "checking"
-                ? <><LoaderCircle className="spin" size={14} /> {t("excel.fileList.checking")}</>
+                ? <><LoaderCircle className="animate-spin" size={14} /> {t("excel.fileList.checking")}</>
                 : entry.encrypted
                   ? <><FileLock2 size={14} /> {t("excel.fileList.encrypted")}</>
                   : entry.inspection === "error"
@@ -879,18 +878,18 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
                       ? <><AlertCircle size={14} /> {t("excel.fileList.degradedLegacy")}</>
                     : <><CheckCircle2 size={14} /> {t("excel.fileList.available")}</>}
             </span>
-            <span className="file-order-actions">
-              <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0} aria-label={t("excel.fileList.moveUp", { name: entry.file.name })}><ArrowUp size={15} /></button>
-              <button type="button" onClick={() => onMove(index, 1)} disabled={index === entries.length - 1} aria-label={t("excel.fileList.moveDown", { name: entry.file.name })}><ArrowDown size={15} /></button>
+            <span className="flex items-center gap-0.5 max-[620px]:col-start-3 max-[620px]:row-start-1">
+              <Button variant="ghost" size="icon-sm" className="rounded-lg" type="button" onClick={() => onMove(index, -1)} disabled={index === 0} aria-label={t("excel.fileList.moveUp", { name: entry.file.name })}><ArrowUp size={15} /></Button>
+              <Button variant="ghost" size="icon-sm" className="rounded-lg" type="button" onClick={() => onMove(index, 1)} disabled={index === entries.length - 1} aria-label={t("excel.fileList.moveDown", { name: entry.file.name })}><ArrowDown size={15} /></Button>
             </span>
-            <button className="remove-button" type="button" onClick={() => onRemove(entry.id)} aria-label={t("excel.fileList.remove", { name: entry.file.name })}><X size={17} /></button>
+            <Button className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive max-[620px]:col-start-3 max-[620px]:row-start-2" variant="ghost" size="icon-sm" type="button" onClick={() => onRemove(entry.id)} aria-label={t("excel.fileList.remove", { name: entry.file.name })}><X size={17} /></Button>
           </div>
           {entry.encrypted && (
-            <div className="input-password-row">
-              <LockKeyhole size={16} />
-              <label htmlFor={`password-${entry.id}`}>{t("excel.protect.password")}</label>
-              <div className="password-input compact">
-                <input
+            <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-xl bg-amber-500/10 p-2.5" data-testid="excel-input-password">
+              <LockKeyhole className="text-amber-800 dark:text-amber-300" size={16} />
+              <label className="text-xs font-bold text-muted-foreground" htmlFor={`password-${entry.id}`}>{t("excel.protect.password")}</label>
+              <div className="col-span-full flex h-10 items-center rounded-xl border border-input bg-background pl-3 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+                <input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none max-[620px]:text-base"
                   id={`password-${entry.id}`}
                   type={visiblePasswords.has(entry.id) ? "text" : "password"}
                   value={entry.password}
@@ -900,16 +899,16 @@ function ExcelFileList({ entries, onRemove, onMove, onPasswordChange, onPassword
                   placeholder={t("excel.fileList.passwordPlaceholder")}
                   autoComplete="off"
                 />
-                <button type="button" onClick={() => togglePassword(entry.id)} aria-label={t("excel.protect.toggle")}>
+                <Button className="rounded-xl" variant="ghost" size="icon-sm" type="button" onClick={() => togglePassword(entry.id)} aria-label={t("excel.protect.toggle")}>
                   {visiblePasswords.has(entry.id) ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                </Button>
               </div>
-              <small>{t("excel.fileList.passwordHelp")}</small>
+              <small className="col-span-full text-xs text-muted-foreground">{t("excel.fileList.passwordHelp")}</small>
             </div>
           )}
-          {entry.degradedLegacy && !entry.error && <p className="file-item-warning"><AlertCircle size={13} /> {t("excel.fileList.degradedLegacyHelp")}</p>}
-          {entry.error && <p className="file-item-error"><AlertCircle size={13} /> {entry.error}</p>}
-        </div>
+          {entry.degradedLegacy && !entry.error && <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300" data-testid="excel-file-warning"><AlertCircle className="mt-0.5 shrink-0" size={13} /> {t("excel.fileList.degradedLegacyHelp")}</p>}
+          {entry.error && <p className="mt-2 flex items-start gap-1.5 text-xs font-bold text-destructive" data-testid="excel-file-error"><AlertCircle className="mt-0.5 shrink-0" size={13} /> {entry.error}</p>}
+        </Card>
       ))}
     </div>
   );
@@ -924,12 +923,12 @@ function PasswordField({ label, value, onChange, visible, onVisibilityChange, to
   toggleLabel: string;
 }) {
   return (
-    <label className="password-field">
+    <label className="flex min-w-0 flex-col gap-1.5 text-xs font-bold text-muted-foreground">
       <span>{label}</span>
-      <div className="password-input">
-        {value ? <ShieldCheck size={17} /> : <LockOpen size={17} />}
-        <input type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} autoComplete="new-password" />
-        {onVisibilityChange && <button type="button" onClick={() => onVisibilityChange(!visible)} aria-label={toggleLabel}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button>}
+      <div className="flex h-10 items-center rounded-xl border border-input bg-background pl-3 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+        {value ? <ShieldCheck className="shrink-0 text-green-700 dark:text-green-300" size={17} /> : <LockOpen className="shrink-0" size={17} />}
+        <input className="min-w-0 flex-1 bg-transparent px-2 text-sm text-foreground outline-none max-[620px]:text-base" type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} autoComplete="new-password" />
+        {onVisibilityChange && <Button className="rounded-xl" variant="ghost" size="icon-sm" type="button" onClick={() => onVisibilityChange(!visible)} aria-label={toggleLabel}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</Button>}
       </div>
     </label>
   );

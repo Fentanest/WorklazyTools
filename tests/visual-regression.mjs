@@ -466,6 +466,26 @@ async function performScenarioActions(page, actions, fixture) {
       }, action.value);
     } else if (action.type === "upload") {
       await uploadScenarioFixture(page, action.selector, action.fixture ?? fixture, action.elementIndex ?? 0);
+    } else if (action.type === "scan-canvas-qr") {
+      const dataUrl = await page.$eval(action.sourceSelector, (canvas) => {
+        if (!(canvas instanceof HTMLCanvasElement) || canvas.width <= 1 || canvas.height <= 1) throw new Error("Generated QR canvas is not ready.");
+        return canvas.toDataURL("image/png");
+      });
+      await page.$eval(action.modeSelector, (root, optionIndex) => {
+        const option = root.querySelectorAll("button")[optionIndex];
+        if (!(option instanceof HTMLButtonElement)) throw new Error(`Option ${optionIndex} is missing.`);
+        option.click();
+      }, action.optionIndex);
+      await page.waitForSelector(action.inputSelector);
+      const bytes = Buffer.from(dataUrl.split(",")[1], "base64");
+      await page.$$eval(action.inputSelector, (inputs, payload) => {
+        const input = inputs[0];
+        if (!(input instanceof HTMLInputElement)) throw new Error("QR scan upload target is missing.");
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([new Uint8Array(payload.bytes)], payload.fileName, { type: "image/png" }));
+        Object.defineProperty(input, "files", { configurable: true, value: transfer.files });
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }, { bytes: [...bytes], fileName: action.fileName });
     } else if (action.type === "wait") {
       await page.waitForSelector(action.selector, { visible: true, timeout: action.timeoutMs });
     } else if (action.type === "wait-enabled") {

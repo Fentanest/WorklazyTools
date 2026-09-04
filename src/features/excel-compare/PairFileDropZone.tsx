@@ -3,6 +3,9 @@ import { type ChangeEvent, type DragEvent, useId, useRef, useState } from "react
 import { useTranslation } from "react-i18next";
 
 import { DropZoneHint } from "../../components/DropZoneHint";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { cn } from "../../lib/utils";
 
 export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled = false }: {
   label: string;
@@ -37,11 +40,16 @@ export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled
     await assignFiles(event.dataTransfer.files);
   };
 
-  return <div className="pair-file-drop-zone">
-    <label className="field-label" htmlFor={id}>{label}</label>
-    <input ref={inputRef} id={id} className="visually-hidden" type="file" accept={accept} multiple disabled={disabled} onChange={(event) => { void handleChange(event); }} />
-    <div
-      className={`drop-zone accent-blue pair-drop-zone${dragging ? " dragging" : ""}${disabled ? " disabled" : ""}`}
+  return <div className="mt-3">
+    <label className="mb-1.5 block text-xs font-bold text-muted-foreground" htmlFor={id}>{label}</label>
+    <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple disabled={disabled} onChange={(event) => { void handleChange(event); }} />
+    <Card
+      className={cn(
+        "relative min-h-32 cursor-pointer items-center justify-center gap-2 overflow-visible rounded-2xl border border-dashed border-green-700/45 bg-green-500/5 px-4 py-5 text-center shadow-none outline-none transition-[border-color,background-color,box-shadow] hover:border-green-700 hover:bg-green-500/10 focus-visible:border-green-700 focus-visible:ring-3 focus-visible:ring-green-700/25 dark:border-green-300/50 dark:hover:border-green-300",
+        dragging && "border-green-700 bg-green-500/15 ring-3 ring-green-700/20 dark:border-green-300",
+        disabled && "cursor-not-allowed opacity-50",
+      )}
+      data-testid="excel-pair-drop-zone"
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
@@ -69,10 +77,10 @@ export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled
       }}
       onDrop={(event) => { void handleDrop(event); }}
     >
-      <span className="drop-icon">{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
-      <div aria-live="polite"><strong>{files.length ? t("files.selected", { count: files.length }) : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
-      <button className="secondary-button small" type="button" disabled={disabled} onClick={() => inputRef.current?.click()}>{t("actions.selectFile")}</button>
-      {files.length > 0 && <em className="drop-added-status" key={files.length}><Check size={12} /> {t("files.added")}</em>}
-    </div>
+      <span className="grid size-11 place-items-center rounded-full bg-green-500/15 text-green-800 dark:text-green-300">{files.length ? <FilePlus2 size={24} /> : <UploadCloud size={24} />}</span>
+      <div className="grid gap-1" aria-live="polite"><strong className="text-sm">{files.length ? t("files.selected", { count: files.length }) : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
+      <Button className="min-h-11 rounded-xl" variant="secondary" type="button" disabled={disabled} onClick={() => inputRef.current?.click()}>{t("actions.selectFile")}</Button>
+      {files.length > 0 && <em className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-green-700 px-2 py-1 text-[11px] font-bold text-white not-italic" key={files.length}><Check size={12} /> {t("files.added")}</em>}
+    </Card>
   </div>;
 }

@@ -107,20 +107,20 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (rotationState.data !== "90" || !rotationState.transform.includes("rotate(90deg)")) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
   }
-  await page.waitForFunction(() => !document.querySelector(".summary-card :is(.primary-button, .ui-primary-button)")?.disabled);
+  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)")?.disabled);
   await clickPrimaryAction(page);
   const immediateFeedback = await page.$eval(".pdf-output-action-zone", (element) => ({
     running: Boolean(element.querySelector(".ui-operation-progress.ui-status-running")),
-    ready: Boolean(element.querySelector(".pdf-download-compact .result-download")),
+    ready: Boolean(element.querySelector(".pdf-download-compact :is(.result-download,[data-testid='excel-result-download'])")),
     buttonText: element.querySelector(":is(.primary-button, .ui-primary-button)")?.textContent || "",
   }));
   if (!immediateFeedback.running && !immediateFeedback.ready) throw new Error(`PDF export feedback was not shown beside the action: ${JSON.stringify(immediateFeedback)}`);
   if (immediateFeedback.running && !immediateFeedback.buttonText.includes("만드는 중")) throw new Error(`PDF export button did not announce its running state: ${JSON.stringify(immediateFeedback)}`);
   await waitForResult(page);
-  if (!await page.$eval(".pdf-download-compact .result-download", (link) => Boolean(link.closest(".pdf-output-action-zone")))) throw new Error("PDF download was not kept in the sticky output action zone.");
+  if (!await page.$eval(".pdf-download-compact :is(.result-download,[data-testid='excel-result-download'])", (link) => Boolean(link.closest(".pdf-output-action-zone")))) throw new Error("PDF download was not kept in the sticky output action zone.");
   await assertProgressLog(page, "PDF 페이지 편집");
   const rotatedPath = path.join(tempDir, "rotated.pdf");
-  await saveBlobLink(page, ".result-download", rotatedPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", rotatedPath);
   const rotated = await PDFDocument.load(await fs.readFile(rotatedPath));
   if (rotated.getPageCount() !== 2 || rotated.getPage(0).getRotation().angle !== 90) {
     throw new Error(`PDF output rotation was not persisted: pages=${rotated.getPageCount()}, rotation=${rotated.getPage(0).getRotation().angle}`);
@@ -147,7 +147,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const extractedPath = path.join(tempDir, "extracted.pdf");
-  await saveBlobLink(page, ".result-download", extractedPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", extractedPath);
   const extracted = await PDFDocument.load(await fs.readFile(extractedPath));
   if (extracted.getPageCount() !== 1 || Math.round(extracted.getPage(0).getWidth()) !== 600) throw new Error("PDF page-range extraction selected the wrong page.");
 
@@ -189,7 +189,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const rangeZipPath = path.join(tempDir, "range-pdfs.zip");
-  await saveBlobLink(page, ".result-download", rangeZipPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", rangeZipPath);
   const rangeZip = await JSZip.loadAsync(await fs.readFile(rangeZipPath));
   const rangePdfNames = Object.keys(rangeZip.files).filter((name) => name.endsWith(".pdf"));
   if (rangePdfNames.length !== 2) throw new Error(`Expected two range PDFs in ZIP, got ${rangePdfNames.length}.`);
@@ -206,14 +206,14 @@ async function testPdfTools(page, fixtures, tempDir) {
   groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[2], "분할-01");
   await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group.invalid").length === 2);
-  if (!await page.$eval(".summary-card :is(.primary-button, .ui-primary-button)", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
+  if (!await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
 
   await page.$eval('.pdf-output-mode-list button:nth-child(3)', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(3)')?.getAttribute("aria-checked") === "true");
   await clickPrimaryAction(page);
   await waitForResult(page);
   const separateZipPath = path.join(tempDir, "separate-pages.zip");
-  await saveBlobLink(page, ".result-download", separateZipPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", separateZipPath);
   const separateZip = await JSZip.loadAsync(await fs.readFile(separateZipPath));
   const separatePdfNames = Object.keys(separateZip.files).filter((name) => name.endsWith(".pdf"));
   if (separatePdfNames.length !== 1) throw new Error(`Expected one selected page PDF, got ${separatePdfNames.length}.`);
@@ -250,7 +250,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const imagePdfPath = path.join(tempDir, "image.pdf");
-  await saveBlobLink(page, ".result-download", imagePdfPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", imagePdfPath);
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
@@ -260,7 +260,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const imageZipPath = path.join(tempDir, "pdf-images.zip");
-  await saveBlobLink(page, ".result-download", imageZipPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", imageZipPath);
   const imageZip = await JSZip.loadAsync(await fs.readFile(imageZipPath));
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
@@ -274,7 +274,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const docxPath = path.join(tempDir, "pdf-converted.docx");
-  await saveBlobLink(page, ".result-download", docxPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", docxPath);
   const convertedDocx = await JSZip.loadAsync(await fs.readFile(docxPath));
   const documentXml = await convertedDocx.file("word/document.xml").async("string");
   if (!documentXml.includes("First PDF page") || !documentXml.includes("Second PDF page")) {
@@ -287,7 +287,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const xlsxPath = path.join(tempDir, "pdf-converted.xlsx");
-  await saveBlobLink(page, ".result-download", xlsxPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", xlsxPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(xlsxPath));
   if (workbook.worksheets.length !== 2 || !workbook.worksheets[0].getCell("A1").text.includes("First PDF page")) {
@@ -300,7 +300,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const txtPath = path.join(tempDir, "pdf-converted.txt");
-  await saveBlobLink(page, ".result-download", txtPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", txtPath);
   const text = await fs.readFile(txtPath, "utf8");
   if (!text.includes("First PDF page") || !text.includes("[페이지 2]")) throw new Error("PDF-to-TXT output is incomplete.");
 }
@@ -348,39 +348,39 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
     throw new Error(`XLSB/XLSM were not exposed as accepted inputs: ${acceptedFormats}`);
   }
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.xlsxOne, fixtures.csv, fixtures.xls]);
-  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 3);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 3);
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.xlsb, fixtures.xlsm, fixtures.encryptedXlsx]);
-  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 6);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 6);
   const excelAddButton = await page.$eval("[data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
   if (!excelAddButton.includes("더 추가")) throw new Error(`Excel merger does not expose incremental file addition: ${excelAddButton}`);
-  await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
+  await page.waitForFunction(() => !document.querySelector("[data-testid='excel-file-status'][data-state='checking']"));
   console.log(`  shared UI adapter keyboard contracts: ${JSON.stringify(uiAdapterKeyboard)}`);
 
-  const protectedInput = await page.$('.input-password-row input[type="password"]');
+  const protectedInput = await page.$("[data-testid='excel-input-password'] input[type='password']");
   if (!protectedInput) {
-    const statuses = await page.$$eval(".excel-file-item", (items) => items.map((item) => item.textContent));
+    const statuses = await page.$$eval("[data-testid='excel-file-item']", (items) => items.map((item) => item.textContent));
     const pageState = await page.evaluate(() => ({ path: location.pathname, root: document.querySelector("#root")?.textContent, body: document.body.innerText.slice(0, 2_000) }));
     throw new Error(`Encrypted input password field was not shown.\n${statuses.join("\n")}\n${JSON.stringify(pageState)}`);
   }
   await protectedInput.type("input-pass");
   await protectedInput.evaluate((input) => input.blur());
-  await page.waitForFunction(() => !document.querySelector(".file-security-status.checking")
-    && document.querySelectorAll(".sheet-file-group .sheet-name-list li").length >= 4);
+  await page.waitForFunction(() => !document.querySelector("[data-testid='excel-file-status'][data-state='checking']")
+    && document.querySelectorAll("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-list'] li").length >= 4);
 
   await clickSetting(page, "출력 파일에 암호 설정");
-  const outputPasswords = await page.$$(".output-password-form input");
+  const outputPasswords = await page.$$("[data-testid='excel-output-password-form'] input");
   await outputPasswords[0].type("output-pass");
   await outputPasswords[1].type("output-pass");
   await page.waitForFunction(() => {
-    const button = document.querySelector(".summary-card :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.$eval(".summary-card :is(.primary-button, .ui-primary-button)", (button) => button.click());
+  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)", (button) => button.click());
   await waitForResult(page);
   await assertProgressLog(page, "Excel 병합");
 
   const resultPath = path.join(tempDir, "encrypted-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const encryptedResult = await fs.readFile(resultPath);
   if (!officeCrypto.isEncrypted(encryptedResult)) throw new Error("Output XLSX was not encrypted.");
   const decrypted = await officeCrypto.decrypt(encryptedResult, { password: "output-pass" });
@@ -425,11 +425,11 @@ async function assertUiAdapterKeyboardContracts(page, filePath) {
   await page.keyboard.press("Enter");
   const chooser = await chooserPromise;
   await chooser.accept([filePath]);
-  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 1);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 1);
   await page.waitForFunction(() => document.querySelector('.ui-drop-zone-wrap input[type="file"]')?.value === "");
   const drop = await page.evaluate(() => ({
     activeRole: document.activeElement?.getAttribute("role"),
-    files: document.querySelectorAll(".excel-file-item").length,
+    files: document.querySelectorAll("[data-testid='excel-file-item']").length,
     inputReset: document.querySelector('.ui-drop-zone-wrap input[type="file"]')?.value === "",
   }));
 
@@ -465,12 +465,12 @@ async function testExcelThemeColors(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=theme-colors`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.themeXlsxOne, fixtures.themeXlsxTwo);
-  await page.waitForFunction(() => document.querySelectorAll(".file-security-status.ready").length === 2);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-status'][data-state='ready']").length === 2);
   await clickPrimaryAction(page);
   await waitForResult(page);
 
   const resultPath = path.join(tempDir, "theme-colors-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const [first, second] = workbook.worksheets;
@@ -504,8 +504,8 @@ async function testFormulaTranslation(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=formula`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.xlsxOne, fixtures.xlsxTwo);
-  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 2);
-  await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 2);
+  await page.waitForFunction(() => !document.querySelector("[data-testid='excel-file-status'][data-state='checking']"));
   const verticalButton = await findButtonByText(page, ".ui-segmented-control button", "세로");
   await verticalButton.click();
   await clickPrimaryAction(page);
@@ -513,7 +513,7 @@ async function testFormulaTranslation(page, fixtures, tempDir) {
   await assertProgressLog(page, "Excel 세로 병합");
 
   const resultPath = path.join(tempDir, "vertical-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const resultSheet = workbook.worksheets[0];
@@ -526,16 +526,16 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheets`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.sheetSelectionXlsx);
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 4);
-  const sheetNames = await page.$$eval(".sheet-file-group .sheet-name-chip > span", (items) => items.map((item) => item.textContent));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-list'] li").length === 4);
+  const sheetNames = await page.$$eval("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-chip'] > span", (items) => items.map((item) => item.textContent));
   if (sheetNames.join(",") !== "첫째,둘째,셋째,넷째") throw new Error(`Sheet names were not inspected in order: ${sheetNames.join(",")}`);
 
   const customButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "직접 선택");
   await customButton.click();
-  const sheetButtons = await page.$$(".sheet-name-list button[aria-pressed]");
+  const sheetButtons = await page.$$("[data-testid='excel-sheet-name-list'] button[aria-pressed]");
   await sheetButtons[0].click();
   await sheetButtons[2].click();
-  const customSelected = await page.$$(".sheet-name-list li.selected").then((items) => items.length);
+  const customSelected = await page.$$("[data-testid='excel-sheet-name-list'] li[data-selected='true']").then((items) => items.length);
   if (customSelected !== 2) throw new Error(`Direct sheet selection did not update: ${customSelected}`);
 
   const positionsButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "순번 선택");
@@ -546,18 +546,18 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   await page.keyboard.press("A");
   await page.keyboard.up("Control");
   await patternInput.type("2");
-  if (await page.$$(".sheet-name-list li.selected").then((items) => items.length) !== 1) throw new Error("N-th sheet selection failed.");
+  if (await page.$$("[data-testid='excel-sheet-name-list'] li[data-selected='true']").then((items) => items.length) !== 1) throw new Error("N-th sheet selection failed.");
   await patternInput.click();
   await page.keyboard.down("Control");
   await page.keyboard.press("A");
   await page.keyboard.up("Control");
   await patternInput.type("-2");
-  if (await page.$$(".sheet-name-list li.selected").then((items) => items.length) !== 2) throw new Error("Up-to-N sheet selection failed.");
+  if (await page.$$("[data-testid='excel-sheet-name-list'] li[data-selected='true']").then((items) => items.length) !== 2) throw new Error("Up-to-N sheet selection failed.");
 
   await clickPrimaryAction(page);
   await waitForResult(page);
   const resultPath = path.join(tempDir, "selected-sheets-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   if (workbook.worksheets.length !== 2 || !workbook.worksheets.every((sheet) => /첫째|둘째/.test(sheet.name))) {
@@ -570,24 +570,24 @@ async function testExcelSheetGridLayout(page, fixtures) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheet-grid`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(...fixtures.sheetGridXlsx);
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group").length === 6
-    && document.querySelectorAll(".sheet-name-list li").length === 39
-    && !document.querySelector(".file-security-status.checking"));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group']").length === 6
+    && document.querySelectorAll("[data-testid='excel-sheet-name-list'] li").length === 39
+    && !document.querySelector("[data-testid='excel-file-status'][data-state='checking']"));
 
   const desktopLayout = await page.evaluate(() => {
-    const selector = document.querySelector(".excel-sheet-selector");
-    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
+    const selector = document.querySelector("[data-testid='excel-sheet-selector']");
+    const cards = Array.from(document.querySelectorAll("[data-testid='excel-sheet-file-group']"));
     const selectorRect = selector?.getBoundingClientRect();
     const cardRects = cards.map((card) => card.getBoundingClientRect());
     const columnLefts = [...new Set(cardRects.map((rect) => Math.round(rect.left)))];
     const rowTops = [...new Set(cardRects.map((rect) => Math.round(rect.top)))];
     const rowGap = Number.parseFloat(selector ? getComputedStyle(selector).rowGap : "0") || 0;
     const stackedHeight = cardRects.reduce((sum, rect) => sum + rect.height, 0) + rowGap * Math.max(0, cardRects.length - 1);
-    const firstList = cards[0]?.querySelector(".sheet-name-list");
-    const firstHeading = cards[0]?.querySelector(".sheet-file-heading");
+    const firstList = cards[0]?.querySelector("[data-testid='excel-sheet-name-list']");
+    const firstHeading = cards[0]?.querySelector("[data-testid='excel-sheet-file-heading']");
     const headingId = cards[0]?.getAttribute("aria-labelledby") || "";
     const labelledHeading = headingId ? document.getElementById(headingId) : null;
-    const chip = firstList?.querySelector(".sheet-name-chip");
+    const chip = firstList?.querySelector("[data-testid='excel-sheet-name-chip']");
     const chipStyle = chip ? getComputedStyle(chip) : null;
     const listStyle = firstList ? getComputedStyle(firstList) : null;
     return {
@@ -605,11 +605,11 @@ async function testExcelSheetGridLayout(page, fixtures) {
       headingMatches: labelledHeading === firstHeading?.querySelector("h3"),
       headingTitle: labelledHeading?.getAttribute("title"),
       headingLabel: labelledHeading?.getAttribute("aria-label"),
-      allModeButtons: document.querySelectorAll(".sheet-name-list button").length,
-      allModeActions: document.querySelectorAll(".sheet-select-actions").length,
-      allModeSelected: document.querySelectorAll(".sheet-name-list li.selected").length,
+      allModeButtons: document.querySelectorAll("[data-testid='excel-sheet-name-list'] button").length,
+      allModeActions: document.querySelectorAll("[data-testid='excel-sheet-select-actions']").length,
+      allModeSelected: document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length,
       allChipStyle: chipStyle ? { display: chipStyle.display, minHeight: chipStyle.minHeight, borderRadius: chipStyle.borderRadius } : null,
-      mobileSummaryDisplay: getComputedStyle(document.querySelector(".excel-mobile-sheet-summary")).display,
+      mobileSummaryDisplay: getComputedStyle(document.querySelector("[data-testid='excel-mobile-sheet-summary']")).display,
     };
   });
   if (desktopLayout.columns !== 2 || desktopLayout.rows !== 3
@@ -635,16 +635,16 @@ async function testExcelSheetGridLayout(page, fixtures) {
 
   const customModeButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "직접 선택");
   await customModeButton.click();
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list button[aria-pressed]").length === 39);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] button[aria-pressed]").length === 39);
   const customContract = await page.evaluate((expectedStyle) => {
-    const buttons = Array.from(document.querySelectorAll(".sheet-name-list button[aria-pressed]"));
+    const buttons = Array.from(document.querySelectorAll("[data-testid='excel-sheet-name-list'] button[aria-pressed]"));
     const chipStyle = buttons[0] ? getComputedStyle(buttons[0]) : null;
     return {
       count: buttons.length,
       types: [...new Set(buttons.map((button) => button.getAttribute("type")))],
       states: [...new Set(buttons.map((button) => button.getAttribute("aria-pressed")))],
-      actions: document.querySelectorAll(".sheet-select-actions").length,
-      checkboxes: document.querySelectorAll('.sheet-name-list input[type="checkbox"]').length,
+      actions: document.querySelectorAll("[data-testid='excel-sheet-select-actions']").length,
+      checkboxes: document.querySelectorAll("[data-testid='excel-sheet-name-list'] input[type='checkbox']").length,
       appearance: chipStyle ? { display: chipStyle.display, minHeight: chipStyle.minHeight, borderRadius: chipStyle.borderRadius } : null,
       sameAppearance: Boolean(chipStyle && expectedStyle
         && chipStyle.display === expectedStyle.display
@@ -657,48 +657,49 @@ async function testExcelSheetGridLayout(page, fixtures) {
     throw new Error(`Custom sheet chips do not match the aria-pressed button contract: ${JSON.stringify(customContract)}`);
   }
 
-  await page.click(".sheet-file-group:first-child .sheet-select-actions button:last-child");
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group:first-child .sheet-name-list li.selected").length === 0);
-  await page.click(".sheet-file-group:first-child .sheet-select-actions button:first-child");
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group:first-child .sheet-name-list li.selected").length === 24);
-  await page.click(".sheet-file-group:first-child .sheet-name-list button");
-  await page.waitForFunction(() => document.querySelector(".sheet-file-group:first-child .sheet-name-list button")?.getAttribute("aria-pressed") === "false");
-  await page.click(".sheet-file-group:first-child .sheet-name-list button");
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-select-actions'] button:last-child");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 0);
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-select-actions'] button:first-child");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 24);
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button");
+  await page.waitForFunction(() => document.querySelector("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button")?.getAttribute("aria-pressed") === "false");
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button");
 
-  const headerTopBeforeKeyboard = await page.$eval(".sheet-file-group:first-child .sheet-file-heading", (heading) => heading.getBoundingClientRect().top);
-  await page.$eval(".sheet-file-group:first-child .sheet-name-list button", (button) => {
-    button.closest(".sheet-name-list").scrollTop = 0;
+  const headerTopBeforeKeyboard = await page.$eval("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-file-heading']", (heading) => heading.getBoundingClientRect().top);
+  await page.$eval("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button", (button) => {
+    button.closest("[data-testid='excel-sheet-name-list']").scrollTop = 0;
     button.focus();
   });
   for (let index = 1; index < 24; index += 1) await page.keyboard.press("Tab");
   const keyboardScroll = await page.evaluate(() => {
-    const card = document.querySelector(".sheet-file-group:first-child");
-    const list = card?.querySelector(".sheet-name-list");
-    const buttons = Array.from(card?.querySelectorAll(".sheet-name-list button") || []);
+    const card = document.querySelector("[data-testid='excel-sheet-file-group']:first-child");
+    const list = card?.querySelector("[data-testid='excel-sheet-name-list']");
+    const buttons = Array.from(card?.querySelectorAll("[data-testid='excel-sheet-name-list'] button") || []);
     const focusedStyle = document.activeElement instanceof HTMLElement ? getComputedStyle(document.activeElement) : null;
     return {
       focusedLast: document.activeElement === buttons.at(-1),
       scrollTop: list?.scrollTop ?? 0,
-      headerTop: card?.querySelector(".sheet-file-heading")?.getBoundingClientRect().top ?? 0,
+      headerTop: card?.querySelector("[data-testid='excel-sheet-file-heading']")?.getBoundingClientRect().top ?? 0,
       outlineStyle: focusedStyle?.outlineStyle,
       outlineWidth: focusedStyle?.outlineWidth,
+      boxShadow: focusedStyle?.boxShadow,
     };
   });
   if (!keyboardScroll.focusedLast || keyboardScroll.scrollTop <= 0
     || Math.abs(keyboardScroll.headerTop - headerTopBeforeKeyboard) > 1
-    || keyboardScroll.outlineStyle === "none" || keyboardScroll.outlineWidth === "0px") {
+    || ((keyboardScroll.outlineStyle === "none" || keyboardScroll.outlineWidth === "0px") && keyboardScroll.boxShadow === "none")) {
     throw new Error(`Keyboard focus did not scroll only the chip viewport with a visible focus ring: ${JSON.stringify(keyboardScroll)}`);
   }
 
   const positionsButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "순번 선택");
   await positionsButton.click();
   await replaceInputValue(page, await page.$("#sheet-position-pattern"), "2");
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 6);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 6);
   const positionsContract = await page.evaluate(() => ({
-    buttons: document.querySelectorAll(".sheet-name-list button").length,
-    actions: document.querySelectorAll(".sheet-select-actions").length,
-    selected: document.querySelectorAll(".sheet-name-list li.selected").length,
-    statusChips: document.querySelectorAll(".sheet-name-list li > span.sheet-name-chip").length,
+    buttons: document.querySelectorAll("[data-testid='excel-sheet-name-list'] button").length,
+    actions: document.querySelectorAll("[data-testid='excel-sheet-select-actions']").length,
+    selected: document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length,
+    statusChips: document.querySelectorAll("[data-testid='excel-sheet-name-list'] li > span[data-testid='excel-sheet-name-chip']").length,
   }));
   if (positionsContract.buttons !== 0 || positionsContract.actions !== 0
     || positionsContract.selected !== 6 || positionsContract.statusChips !== 39) {
@@ -707,19 +708,19 @@ async function testExcelSheetGridLayout(page, fixtures) {
 
   const allButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "모든 시트");
   await allButton.click();
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 39);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 39);
 
   await page.setViewport({ width: 821, height: 900, deviceScaleFactor: 1 });
   await new Promise((resolve) => setTimeout(resolve, 100));
   const narrowDesktop = await page.evaluate(() => {
-    const selector = document.querySelector(".excel-sheet-selector");
-    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
+    const selector = document.querySelector("[data-testid='excel-sheet-selector']");
+    const cards = Array.from(document.querySelectorAll("[data-testid='excel-sheet-file-group']"));
     const selectorRect = selector?.getBoundingClientRect();
     return {
       columns: new Set(cards.map((card) => Math.round(card.getBoundingClientRect().left))).size,
       overflow: selector ? selector.scrollWidth - selector.clientWidth : 1,
       cardsInside: Boolean(selectorRect) && cards.every((card) => card.getBoundingClientRect().right <= selectorRect.right + 1),
-      mobileSummaryDisplay: getComputedStyle(document.querySelector(".excel-mobile-sheet-summary")).display,
+      mobileSummaryDisplay: getComputedStyle(document.querySelector("[data-testid='excel-mobile-sheet-summary']")).display,
     };
   });
   if (narrowDesktop.columns !== 1 || narrowDesktop.overflow > 0 || !narrowDesktop.cardsInside
@@ -728,11 +729,11 @@ async function testExcelSheetGridLayout(page, fixtures) {
   }
 
   await customModeButton.click();
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list button[aria-pressed]").length === 39);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] button[aria-pressed]").length === 39);
   const longNames = await page.evaluate((longFileName, longSheetName) => {
-    const card = document.querySelector(".sheet-file-group:first-child");
-    const heading = card?.querySelector(".sheet-file-heading h3");
-    const chip = card?.querySelector(".sheet-name-list button.sheet-name-chip");
+    const card = document.querySelector("[data-testid='excel-sheet-file-group']:first-child");
+    const heading = card?.querySelector("[data-testid='excel-sheet-file-heading'] h3");
+    const chip = card?.querySelector("[data-testid='excel-sheet-name-list'] button[data-testid='excel-sheet-name-chip']");
     const chipText = chip?.querySelector("span");
     return {
       sectionLabelledBy: card?.getAttribute("aria-labelledby"),
@@ -761,16 +762,16 @@ async function testExcelSheetGridLayout(page, fixtures) {
   await new Promise((resolve) => setTimeout(resolve, 100));
   await page.evaluate(() => {
     document.documentElement.style.scrollBehavior = "auto";
-    const summary = document.querySelector(".excel-mobile-sheet-summary");
+    const summary = document.querySelector("[data-testid='excel-mobile-sheet-summary']");
     if (summary) window.scrollTo(0, window.scrollY + summary.getBoundingClientRect().top + 120);
   });
   await new Promise((resolve) => setTimeout(resolve, 100));
   const mobileLayout = await page.evaluate(() => {
-    const selector = document.querySelector(".excel-sheet-selector");
-    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
-    const summary = document.querySelector(".excel-mobile-sheet-summary");
-    const list = document.querySelector(".sheet-file-group:first-child .sheet-name-list");
-    const chip = document.querySelector(".sheet-file-group:first-child .sheet-name-chip");
+    const selector = document.querySelector("[data-testid='excel-sheet-selector']");
+    const cards = Array.from(document.querySelectorAll("[data-testid='excel-sheet-file-group']"));
+    const summary = document.querySelector("[data-testid='excel-mobile-sheet-summary']");
+    const list = document.querySelector("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list']");
+    const chip = document.querySelector("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-chip']");
     if (list) list.scrollTop = Math.min(80, list.scrollHeight - list.clientHeight);
     const summaryStyle = summary ? getComputedStyle(summary) : null;
     const selectorRect = selector?.getBoundingClientRect();
@@ -804,21 +805,21 @@ async function testExcelSheetGridLayout(page, fixtures) {
 async function testExcelSheetTrim(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheet-trim`);
   await (await page.$('input[type="file"]')).uploadFile(fixtures.sheetTrimXlsx);
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 3);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-list'] li").length === 3);
 
   const edgeTrimState = await page.$eval('button[aria-label="끝의 빈 행·열 정리"]', (button) => button.getAttribute("aria-checked"));
   if (edgeTrimState !== "true") throw new Error("The existing trailing-edge trim setting was not preserved.");
 
   await clickSetting(page, "중간의 연속 빈 행 삭제");
   await clickSetting(page, "중간의 연속 빈 열 삭제");
-  const thresholdInput = await page.$('.sheet-trim-threshold input[type="number"]');
+  const thresholdInput = await page.$("[data-testid='excel-sheet-trim-threshold'] input[type='number']");
   await replaceInputValue(page, thresholdInput, "3");
   await clickPrimaryAction(page);
   await waitForResult(page);
   await assertProgressLog(page, "연속 빈 행·열 정리");
 
   const resultPath = path.join(tempDir, "sheet-trim-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const sheet = workbook.worksheets[0];
@@ -842,7 +843,7 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
   if (referencedSheet?.getCell("A5").text !== "참조 유지" || !summaryFormula.replaceAll("'", "").includes(`${referencedSheet?.name}!A5`)) {
     throw new Error(`Middle-row trimming shifted a cell referenced by another worksheet: ${JSON.stringify({ sheets: workbook.worksheets.map((candidate) => candidate.name), referencedA5: referencedSheet?.getCell("A5").text, summaryFormula })}`);
   }
-  const warningText = await page.$eval(".result-warnings", (element) => element.textContent || "");
+  const warningText = await page.$eval("[data-testid=excel-result-warnings]", (element) => element.textContent || "");
   if (!warningText.includes("다른 시트 수식에서 참조")) throw new Error(`Incoming sheet-reference protection was not reported: ${warningText}`);
 }
 
@@ -1123,21 +1124,21 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
 
 async function waitForResult(page, timeout = 180_000) {
   await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
-    && (document.querySelector(".result-download") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(".error-banner") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
-  const error = await page.$(".error-banner") || await page.$("[data-tool-page='document-compare'] [role='alert']");
+    && (document.querySelector(":is(.result-download,[data-testid='excel-result-download'])") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'])") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
+  const error = await page.$(":is(.error-banner,[data-testid='excel-merge-error'])") || await page.$("[data-tool-page='document-compare'] [role='alert']");
   if (error) throw new Error(await error.evaluate((element) => element.textContent || "Unknown UI error"));
 }
 
 async function clickPrimaryAction(page) {
-  const previousHref = await page.$eval(".result-download", (link) => link.href).catch(() => "");
-  await page.$eval(".summary-card :is(.primary-button, .ui-primary-button)", (button) => {
+  const previousHref = await page.$eval(":is(.result-download,[data-testid='excel-result-download'])", (link) => link.href).catch(() => "");
+  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)", (button) => {
     if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error("The primary action is unavailable.");
     button.click();
   });
   await page.waitForFunction((href) => {
-    const result = document.querySelector(".result-download");
+    const result = document.querySelector(":is(.result-download,[data-testid='excel-result-download'])");
     return Boolean(document.querySelector(".ui-operation-progress.ui-status-running")
-      || document.querySelector(".error-banner")
+      || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'])")
       || !result
       || result.href !== href);
   }, {}, previousHref);

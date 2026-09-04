@@ -71,17 +71,19 @@ export function PageHeader({ eyebrow, title, description, children }: {
   );
 }
 
-export function SectionCard({ title, description, step, children, className = "" }: {
+export function SectionCard({ title, description, step, children, className = "", "data-testid": dataTestId }: {
   title: string;
   description?: string;
   step?: number;
   children: ReactNode;
   className?: string;
+  "data-testid"?: string;
 }) {
   return (
     <Card
       as="section"
       data-ui-component="section-card"
+      data-testid={dataTestId}
       className={cn(
         "ui-section-card gap-0 overflow-visible rounded-4xl p-6",
         className,

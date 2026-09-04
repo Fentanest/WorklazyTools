@@ -30,7 +30,7 @@ try {
   let detectedFailure;
   try {
     await assertMobileBottomLayout(page, {
-      bottomTargetSelector: ".excel-compare-page > :last-child",
+      bottomTargetSelector: "[data-testid='excel-compare-page'] > :last-child",
       scenarioId: "negative-control-reduced-padding",
     });
   } catch (error) {
@@ -42,7 +42,7 @@ try {
 
   await injectedStyle.evaluate((element) => element.remove());
   const restoredMetrics = await assertMobileBottomLayout(page, {
-    bottomTargetSelector: ".excel-compare-page > :last-child",
+    bottomTargetSelector: "[data-testid='excel-compare-page'] > :last-child",
     scenarioId: "negative-control-restored",
   });
   console.log(JSON.stringify({ detectedFailure, restoredMetrics }, null, 2));

@@ -69,8 +69,8 @@ export function UtilitySelect({ className, ...props }: SelectHTMLAttributes<HTML
   );
 }
 
-export function UtilityField({ children, className }: { children: ReactNode; className?: string }) {
-  return <label className={cn("flex min-w-0 flex-col gap-1.5 text-[13px] font-bold text-muted-foreground", className)}>{children}</label>;
+export function UtilityField({ children, className, ...props }: ComponentProps<"label">) {
+  return <label {...props} className={cn("flex min-w-0 flex-col gap-1.5 text-[13px] font-bold text-muted-foreground", className)}>{children}</label>;
 }
 
 export function UtilityNotice({ children, className, tone = "warning", role, ...props }: {

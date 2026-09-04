@@ -2,6 +2,29 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-05
+
+### P2 묶음 검수 판정 B1~B3 — 검수 입력 결함과 오탐 걸러내기 (Claude)
+
+「배포 전 로컬 시각 검수」 규칙으로 신설한 게이트를 세 묶음에 적용하면서, **검수 자체가 틀릴 수 있다**는 것이 이 단계의 가장 큰 교훈이었다. 판정 근거는 다음과 같다.
+
+- **B1 1차 검수는 무효로 판정했다 — 검수 입력 결함.** Gemini 가 "전 도구 모바일 하단 가림" 차단 결함 10건을 냈지만, 캡처 세트에 `bottom`(스크롤 최하단) 상태가 **0장**이었다(initial 48 + interaction 48 뿐 — Claude 실측). 첫 화면만 보고 하단 가림을 판정하는 것은 성립할 수 없다. **결함이 아니라 검수 입력이 틀린 것**으로 판정하고, 캡처 절차를 3상태(initial·bottom·interaction) 필수로 고쳐 공용 적용한 뒤 144장으로 재채집했다. 재검수는 차단 결함 0·[배포 가능].
+- **토글/탭 썸 이탈 지적은 오탐으로 확정했다.** 라이브 사고의 실제 증상과 같은 이름이라 그대로 믿기 쉬웠으나, Codex DOM 실측 4도구 **60 샘플 전부 이탈 0px·수직 중심 오차 0px**(썸이 트랙 안쪽 사방 2~4px 여유), legacy 클래스 방출 0건이었다. 「증거 없는 반박은 무게 0」 규칙의 화폐는 실행 출력이므로 육안 인상보다 기하 실측을 채택했다. 회귀는 `test:control-geometry`로 고정했다.
+- **B2**: Gemini 전수 108장(initial 36·bottom 36·interaction 36) 차단 결함 0·개선 권고 0·[배포 가능].
+- **B3(라이브 사고 지점)은 세 경로로 교차 확인했다.** 같은 화면을 두 번 망가뜨릴 수는 없으므로 단일 판정자를 두지 않았다. ① Codex DOM 실측 — 토글 32표본 이탈 0px·중심 오차 0px, 문서 쌍 텍스트 폭 747px·전부 `horizontal-tb`·세로 낙하 0건, 버튼 190×48px·`w-full` 충돌 0건 ② Gemini 전수 80장 — 사고 증상 3종 전부 **미관찰**, 차단 결함 0 ③ Claude 육안 — `document-compare-empty__interaction-toggle-on__ko__light__desktop.png`에서 토글 6개 썸이 모두 트랙 내부. **B4 착수 조건 충족으로 판정.**
+
+**남긴 규칙**: 검수 보고에 차단 결함이 실려 오면 수정에 착수하기 전에 **검수 입력이 그 판정을 뒷받침하는지 먼저 본다**. 상태 커버리지가 없는 캡처로 내려진 판정은 결함 보고가 아니라 하네스 버그 보고다.
+
+### P2 B4 Excel 병합·Excel 비교·QR Studio UI 전환 (Codx)
+
+- **개선 ② 채택 — Excel 비교 다크 선택 카드 경계 보강.** 선택 카드에는 공용 green 토큰의 다크 경계를 적용하고 배경·ring도 같은 계열 토큰으로 한정했다. Chrome 152 다크 렌더에서 선택 경계와 인접 비선택 카드 배경의 대비는 **14.29:1**로 비텍스트 경계 3:1 기준을 넘었다. 전역 토큰 변경이나 카드 레이아웃 재설계는 범위를 벗어나므로 기각했다.
+- **개선 ⑤ 채택 — Swap/Add 체급·affordance 보강.** Add는 **128.25×44px**, Swap은 **44×44px**로 측정됐고 두 버튼 모두 green 토큰 hover 계약과 키보드 `:focus-visible` **3px ring**을 가진다. headless Chrome은 `(hover: hover)`가 false라 hover 색의 렌더 실측은 할 수 없으므로 생성된 hover class 계약을 확인하고, focus-visible은 실제 box-shadow 변화로 교차 확인했다. 버튼을 전체 폭으로 늘리는 안과 파일 쌍 레이아웃 재설계는 기각했다.
+- 세 도구는 기존 shadcn Button/Card/SegmentedControl과 UtilitySurface를 재사용했으며 새 primitive add는 없다. 기능·ko/en 문구·SEO·정적 route·광고 격리·엔진 경계는 불변이다. Excel 병합의 시트 카드/내부 스크롤/44px 모바일 칩/sticky 요약, Excel 비교의 2파일 자동 좌우 분배·Swap, QR 생성·일괄 생성·사진 스캔 계약을 브라우저 스모크로 보존했다.
+- legacy manifest는 기준 155개에서 B4 종료 시 **82 removed·5 split·68 active**다. B3에서 보존한 `legacy-150`을 Excel Compare 소비 종료 뒤 제거했고, 이번 묶음에서 총 51개가 refcount 0으로 제거됐다. 혼합 selector는 해당 arm만 분리했으며 B4 소스와 전역 legacy token 교집합은 0이다. PostCSS 실측은 **1,394 rules·5,128 declarations**다.
+- `84e8091` 대비 gzip 예산 증분은 entry **+1.82KiB**, 영향 lazy route(Excel Compare·QR Studio; Excel 병합은 eager entry 귀속) 합 **+2.24KiB**, shared **−0.80KiB**, 전체 앱 JS **+3.00KiB**, 전체 CSS **−2.31KiB**로 다섯 상한을 모두 통과했다.
+- 검증은 build 2,829 modules·정적 61페이지, unit **190/190**, Excel browser·XLS 보존·XLS 최초 진입·Excel 비교·utilities·QR bulk, ui-migration, control geometry **92 samples/20 pages**, static, manifest, diff check를 통과했다. 일반 B4 시각 회귀는 **24/24**(25.22초·동시성 4/유효 3) 일치다.
+- 추적 제외 QA 입력은 `tests/visual-artifacts/p2-b4/`의 **96/96**이며 initial 24·bottom 24·interaction 48이다. interaction은 병합 시트 선택·비교 key 모드·비교 파일 쌍·QR bulk/create/scan이 각 8장이고, `stateId`를 파일명에 보존했다. 모바일 bottom 공용 6개 assertion, `captureBeyondViewport:false`, 외부 요청 0·tracking loader 0을 확인했다. 별도 Gemini 판정 전에는 B5a를 시작하지 않는다.
+
 ## 2026-09-04
 
 ### P2 B3 문서 비교·Excel 정리 UI 전환 · 라이브 사고 지점 판정 (Codx)

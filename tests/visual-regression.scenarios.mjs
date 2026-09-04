@@ -49,6 +49,9 @@ const migratedToolIds = new Set([
   "office-editor",
   "document-compare",
   "excel-cleaner",
+  "excel-merger",
+  "excel-compare",
+  "qr-studio",
 ]);
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
@@ -146,15 +149,38 @@ const bottomScenarioFor = (route) => {
 
 const interactionDefinitions = Object.freeze({
   "excel-merger": Object.freeze({
-    stateId: "interaction-sheet-positions",
-    actions: [{ type: "click-option", selector: "[data-ui-component='segmented-control']", optionIndex: 1 }],
-    assertSelector: "#sheet-position-pattern",
+    stateId: "interaction-sheet-selection",
+    fixture: { kind: "inline-file", fileName: "visual-merger.csv", mimeType: "text/csv", contents: "Name,Amount\nWorklazy,10\nTools,20" },
+    actions: [
+      { type: "upload", selector: "[data-tool-page='excel-merger'] input[type='file']" },
+      { type: "wait", selector: "[data-testid='excel-sheet-name-list']" },
+      { type: "click-option", selector: "[data-testid='excel-sheet-selection-mode'] [data-ui-component='segmented-control']", optionIndex: 2 },
+      { type: "click", selector: "[data-testid='excel-sheet-name-chip']" },
+      { type: "click", selector: "[data-testid='excel-sheet-name-chip']" },
+      { type: "scroll-into-view", selector: "[data-testid='excel-sheet-selector']", offset: -88 },
+    ],
+    assertSelector: "[data-testid='excel-sheet-name-chip'][aria-pressed='true']",
   }),
-  "excel-compare": Object.freeze({
-    stateId: "interaction-key-mode",
-    actions: [{ type: "click", selector: ".excel-compare-mode-grid button:nth-child(2)" }],
-    assertSelector: ".excel-compare-mode-grid button:nth-child(2)[aria-checked='true']",
-  }),
+  "excel-compare": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-key-mode",
+      actions: [
+        { type: "click", selector: "[data-testid='excel-compare-mode-grid'] button:nth-child(2)" },
+        { type: "scroll-into-view", selector: "[data-testid='excel-compare-mode-grid']", offset: -88 },
+      ],
+      assertSelector: "[data-testid='excel-compare-mode-grid'] button:nth-child(2)[aria-checked='true']",
+    }),
+    Object.freeze({
+      stateId: "interaction-pair",
+      actions: [
+        { type: "upload", selector: "[data-testid='excel-compare-page'] input[type='file']", fixture: { kind: "inline-file", fileName: "visual-left.csv", mimeType: "text/csv", contents: "ID,Value\n1,Left" } },
+        { type: "upload", selector: "[data-testid='excel-compare-page'] input[type='file']", fixture: { kind: "inline-file", fileName: "visual-right.csv", mimeType: "text/csv", contents: "ID,Value\n1,Right" } },
+        { type: "wait", selector: "[data-testid='excel-sheet-fields']" },
+        { type: "wait-enabled", selector: "[data-testid='excel-pair-swap']" },
+      ],
+      assertSelector: "[data-testid='excel-pair-files']",
+    }),
+  ]),
   "excel-cleaner": Object.freeze([
     Object.freeze({
       stateId: "interaction-rule",
@@ -294,11 +320,32 @@ const interactionDefinitions = Object.freeze({
     actions: [{ type: "wait", selector: "[data-testid='password-strength'][aria-valuenow='4']" }],
     assertSelector: "[data-testid='password-strength'][aria-valuenow='4']",
   }),
-  "qr-studio": Object.freeze({
-    stateId: "interaction-bulk-mode",
-    actions: [{ type: "click-option", selector: ".qr-page [data-ui-component='segmented-control']", optionIndex: 1 }],
-    assertSelector: "[data-testid='qr-bulk-page']",
-  }),
+  "qr-studio": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-bulk-mode",
+      actions: [{ type: "click-option", selector: "[data-testid='qr-mode'] [data-ui-component='segmented-control']", optionIndex: 1 }],
+      assertSelector: "[data-testid='qr-bulk-page']",
+    }),
+    Object.freeze({
+      stateId: "interaction-create",
+      actions: [
+        { type: "replace-text", selector: "[data-testid='qr-content']", value: "https://worklazy.net/visual-b4" },
+        { type: "wait", selector: "[data-testid='qr-preview'][data-ready='true']" },
+        { type: "scroll-into-view", selector: "[data-testid='qr-preview']", offset: -88 },
+      ],
+      assertSelector: "[data-testid='qr-preview'][data-ready='true']",
+    }),
+    Object.freeze({
+      stateId: "interaction-scan",
+      actions: [
+        { type: "wait", selector: "[data-testid='qr-preview'][data-ready='true']" },
+        { type: "scan-canvas-qr", sourceSelector: "[data-testid='qr-preview'] canvas", modeSelector: "[data-testid='qr-mode'] [data-ui-component='segmented-control']", optionIndex: 2, inputSelector: "[data-testid='qr-photo-picker'] input[type='file']", fileName: "visual-generated-qr.png" },
+        { type: "wait", selector: "[data-testid='qr-scan-result']", timeoutMs: 60_000 },
+        { type: "scroll-into-view", selector: "[data-testid='qr-scan-result-slot']", offset: -88 },
+      ],
+      assertSelector: "[data-testid='qr-scan-result']",
+    }),
+  ]),
   "data-converter": Object.freeze({
     stateId: "interaction-json-source",
     actions: [{ type: "select", selector: "[data-testid='converter-route'] select:first-of-type", value: "json" }],

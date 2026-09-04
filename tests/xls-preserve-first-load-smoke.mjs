@@ -150,8 +150,8 @@ try {
 
     await (await page.$('input[type="file"]')).uploadFile(...fixturePaths);
     await page.waitForFunction(() => {
-      const cards = [...document.querySelectorAll(".excel-file-item")];
-      return cards.length === 4 && cards.every((card) => !card.querySelector(".file-security-status.checking"));
+      const cards = [...document.querySelectorAll("[data-testid=excel-file-item]")];
+      return cards.length === 4 && cards.every((card) => !card.querySelector("[data-testid=excel-file-status][data-state=checking]"));
     });
     const firstAttempt = await inspectionState(page);
     let afterManualReload = null;
@@ -161,8 +161,8 @@ try {
       await page.waitForSelector('input[type="file"]');
       await (await page.$('input[type="file"]')).uploadFile(...fixturePaths);
       await page.waitForFunction(() => {
-        const cards = [...document.querySelectorAll(".excel-file-item")];
-        return cards.length === 4 && cards.every((card) => !card.querySelector(".file-security-status.checking"));
+        const cards = [...document.querySelectorAll("[data-testid=excel-file-item]")];
+        return cards.length === 4 && cards.every((card) => !card.querySelector("[data-testid=excel-file-status][data-state=checking]"));
       });
       afterManualReload = {
         browser: await browserState(page),
@@ -296,8 +296,8 @@ async function browserState(page) {
 
 async function inspectionState(page) {
   return page.evaluate(() => ({
-    ready: document.querySelectorAll(".excel-file-item .file-security-status.ready").length,
-    errors: [...document.querySelectorAll(".excel-file-item .file-item-error")].map((item) => item.textContent || ""),
-    banner: document.querySelector(".error-banner")?.textContent || "",
+    ready: document.querySelectorAll("[data-testid=excel-file-item] [data-testid=excel-file-status][data-state=ready]").length,
+    errors: [...document.querySelectorAll("[data-testid=excel-file-item] [data-testid=excel-file-error]")].map((item) => item.textContent || ""),
+    banner: document.querySelector(":is(.error-banner,[data-testid=excel-merge-error])")?.textContent || "",
   }));
 }

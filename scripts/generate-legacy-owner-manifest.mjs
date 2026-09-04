@@ -141,6 +141,19 @@ const compactContracts = new Map([
 const currentStateOverrides = new Map([
   [43, { currentState: "removed", removedIn: "pre-B1" }],
   [45, { currentState: "removed", removedIn: "pre-B1" }],
+  [24, {
+    currentState: "legacy-arm-removed",
+    removedIn: "B4",
+    currentSelector: ".ui-field-label",
+  }],
+  ...[
+    ...range(25, 42), 44, 46,
+    ...range(47, 64), 74, 75, 86, 128, 129, 135,
+    ...range(136, 139), 147, 148, 150,
+  ].map((index) => [index, {
+    currentState: "removed",
+    removedIn: "B4",
+  }]),
   ...[95, 96, 97, 106, 107, 108, 109, 122, 123, 124, 126, 142, 144].map((index) => [index, {
     currentState: "removed",
     removedIn: "B2",
@@ -161,10 +174,15 @@ const currentStateOverrides = new Map([
     removedIn: "B2",
     currentSelector: ".pdf-output-mode-list small, .pdf-range-group label > span, .pdf-range-group label small, .pdf-format-grid small",
   }],
-  [135, {
+  [133, {
     currentState: "legacy-arm-removed",
-    removedIn: "B1",
-    currentSelector: ".utility-editor-grid, .qr-layout, .qr-scan-layout",
+    removedIn: "B4",
+    currentSelector: ".pdf-drag-handle, .pdf-image-remove, .editor-history-actions button, .icon-tool-row button",
+  }],
+  [151, {
+    currentState: "legacy-arm-removed",
+    removedIn: "B4",
+    currentSelector: ".settings-row, .ui-settings-row, .sample-diff",
   }],
 ]);
 

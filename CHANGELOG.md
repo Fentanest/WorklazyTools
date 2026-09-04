@@ -2,6 +2,10 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-05
+
+- P2 B4의 Excel 병합·Excel 비교·QR Studio 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 병합 시트 선택·비교 모드/파일 쌍·QR 생성/스캔을 포함한 3상태 시각 시나리오와 다크 선택 경계·Swap/Add 접근성 회귀를 함께 고정했다. — Codx
+
 ## 2026-09-04
 
 - P2 B3의 문서 비교·Word 결과·Excel 정리 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 실제 DOCX·HWP 결과와 정리 규칙·결과를 포함한 3상태 시각 시나리오 및 사고 지점 기하 회귀를 함께 고정했다. — Codx

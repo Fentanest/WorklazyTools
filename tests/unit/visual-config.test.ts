@@ -34,6 +34,7 @@ test("visual regression scenario manifest covers every available tool and state 
     "click-option",
     "scroll-bottom",
     "scroll-into-view",
+    "scan-canvas-qr",
     "replace-text",
     "select",
     "select-index",
@@ -79,9 +80,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 159);
-  assert.equal(qaCaptureScenarios.length, 66);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 516);
+  assert.equal(names.length, 162);
+  assert.equal(qaCaptureScenarios.length, 69);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 540);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -102,6 +103,17 @@ test("visual regression scenario manifest covers every available tool and state 
   assert.deepEqual(new Set(b3QaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
     "interaction-toggle-on", "interaction-toggle-off", "interaction-docx-result", "interaction-hwp-result",
     "interaction-rule", "interaction-result",
+  ]));
+  const b4QaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["excel-merger", "excel-compare", "qr-studio"].includes(toolId));
+  assert.equal(b4QaScenarios.length, 12);
+  assert.equal(b4QaScenarios.flatMap(({ profiles }) => profiles).length, 96);
+  assert.deepEqual(Object.fromEntries(["initial", "bottom", "interaction"].map((stateType) => [
+    stateType,
+    b4QaScenarios.filter((scenario) => scenario.stateType === stateType).flatMap(({ profiles }) => profiles).length,
+  ])), { initial: 24, bottom: 24, interaction: 48 });
+  assert.deepEqual(new Set(b4QaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
+    "interaction-sheet-selection", "interaction-key-mode", "interaction-pair",
+    "interaction-bulk-mode", "interaction-create", "interaction-scan",
   ]));
   assert.equal(visualRegressionConfig.scenarios, visualRegressionScenarios);
   assert.equal(visualRegressionConfig.environment.maxCapturesPerBrowser, 12);
