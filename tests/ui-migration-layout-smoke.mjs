@@ -7,7 +7,7 @@ import puppeteer from "puppeteer-core";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
-const artifactDirectory = path.join(testDirectory, "visual-artifacts", "branch-qa-r1");
+const artifactDirectory = path.join(testDirectory, "visual-artifacts", "p2-b3", "diagnostics");
 const port = Number.parseInt(process.env.UI_MIGRATION_TEST_PORT || "4176", 10);
 const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
 const chromeExecutable = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
@@ -47,7 +47,7 @@ try {
 
   await page.goto(`${baseUrl}/ko/tools/document-compare`, { waitUntil: "networkidle0" });
   await page.waitForSelector('[data-ui-component="toggle-row"] [data-ui-part="toggle-switch"]', { visible: true });
-  await page.waitForSelector('.tool-action-bar [data-ui-component="primary-button"]', { visible: true });
+  await page.waitForSelector('[data-testid="document-action-bar"] [data-ui-component="primary-button"]', { visible: true });
   await page.addStyleTag({ content: "*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important;caret-color:transparent!important;scroll-behavior:auto!important}" });
   await page.evaluate(async () => {
     if (document.fonts?.ready) await document.fonts.ready;
@@ -83,13 +83,19 @@ try {
     }
   }
 
-  const switchPanel = await page.$(".word-options-grid");
+  const legacyMatches = await page.$$eval('[data-tool-page="document-compare"]', (roots) => {
+    const selectors = [".ios-switch", ".compare-file-grid", ".word-options-grid", ".compact-settings", ".tool-action-bar", ".comparison-prepare-note", ".word-batch-results"];
+    return selectors.filter((selector) => roots[0]?.querySelector(selector));
+  });
+  if (legacyMatches.length) throw new Error(`Document compare emitted legacy classes: ${legacyMatches.join(", ")}`);
+
+  const switchPanel = await page.$('[data-testid="document-options-grid"]');
   await switchPanel.screenshot({ path: path.join(artifactDirectory, "document-compare__ko__light__desktop-switches.png") });
 
-  await page.$eval(".tool-action-bar", (element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
-  const actionBar = await page.$eval(".tool-action-bar", (element) => {
+  await page.$eval('[data-testid="document-action-bar"]', (element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
+  const actionBar = await page.$eval('[data-testid="document-action-bar"]', (element) => {
     const button = element.querySelector('[data-ui-component="primary-button"]');
-    const copy = element.querySelector(":scope > div > span");
+    const copy = element.querySelector('[data-testid="document-action-copy"]');
     const strong = copy?.querySelector("strong");
     const small = copy?.querySelector("small");
     const buttonRect = button?.getBoundingClientRect();
@@ -115,7 +121,7 @@ try {
     throw new Error(`Document action copy collapsed into vertical text: ${JSON.stringify(actionBar)}`);
   }
 
-  const actionPanel = await page.$(".tool-action-bar");
+  const actionPanel = await page.$('[data-testid="document-action-bar"]');
   await actionPanel.screenshot({ path: path.join(artifactDirectory, "document-compare__ko__light__desktop-action-bar.png") });
 
   await new Promise((resolve) => setTimeout(resolve, 250));
@@ -134,11 +140,12 @@ try {
     viewport: { width: 1365, height: 900, deviceScaleFactor: 1 },
     switches,
     actionBar,
+    legacyMatches,
     tracking,
     externalRequests,
   };
   await fs.writeFile(path.join(artifactDirectory, "document-compare-computed-styles.json"), `${JSON.stringify(report, null, 2)}\n`);
-  console.log(`UI migration layout smoke passed: ${switches.length} switches contained, action button ${actionBar.button.width}px, horizontal action copy, tracking 0.`);
+  console.log(`UI migration layout smoke passed: ${switches.length} switches contained, action button ${actionBar.button.width}px, horizontal action copy, legacy matches 0, tracking 0.`);
   console.log(`Evidence: ${artifactDirectory}`);
 } finally {
   await browser?.close();

@@ -1,0 +1,3709 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 1
+  },
+  "profiles": [
+    {
+      "locale": "ko",
+      "theme": "light"
+    },
+    {
+      "locale": "ko",
+      "theme": "dark"
+    },
+    {
+      "locale": "en",
+      "theme": "light"
+    },
+    {
+      "locale": "en",
+      "theme": "dark"
+    }
+  ],
+  "legacySelectors": [
+    ".ios-switch",
+    ".mode-switch",
+    ".sub-segment",
+    ".formatter-toolbar",
+    ".toggle-card-grid",
+    ".compare-file-grid",
+    ".word-options-grid",
+    ".compact-settings",
+    ".tool-action-bar",
+    ".comparison-summary",
+    ".document-content-toggle",
+    ".document-page-view"
+  ],
+  "summaries": {
+    "security-tools": {
+      "samples": 20,
+      "trackSizes": [
+        "43x25"
+      ],
+      "indicatorSizes": [
+        "21x21"
+      ],
+      "maxOverflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "maxVerticalCenterErrorPx": 0,
+      "minInsetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 2
+      }
+    },
+    "work-calculator": {
+      "samples": 16,
+      "trackSizes": [
+        "316x52",
+        "358x52"
+      ],
+      "indicatorSizes": [
+        "152x44",
+        "173x44"
+      ],
+      "maxOverflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "maxVerticalCenterErrorPx": 0,
+      "minInsetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 4
+      }
+    },
+    "payroll-calculator": {
+      "samples": 12,
+      "trackSizes": [
+        "358x52"
+      ],
+      "indicatorSizes": [
+        "114x44"
+      ],
+      "maxOverflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "maxVerticalCenterErrorPx": 0,
+      "minInsetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 4
+      }
+    },
+    "text-formatter": {
+      "samples": 12,
+      "trackSizes": [
+        "316x52"
+      ],
+      "indicatorSizes": [
+        "100x44"
+      ],
+      "maxOverflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "maxVerticalCenterErrorPx": 0,
+      "minInsetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 4
+      }
+    },
+    "document-compare": {
+      "samples": 32,
+      "trackSizes": [
+        "43x25"
+      ],
+      "indicatorSizes": [
+        "21x21"
+      ],
+      "maxOverflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "maxVerticalCenterErrorPx": 0,
+      "minInsetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 2
+      }
+    }
+  },
+  "samples": [
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "영문 대문자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 464.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 466.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "영문 소문자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 519.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 521.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "숫자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 574.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 576.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "특수문자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 629.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 631.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "unchecked",
+      "label": "영문 대문자",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 464.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 298,
+        "y": 466.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "option": "영업일 계산",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 376.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 380.75,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 181
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "연차 계산",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 376.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 380.75,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 181,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "입사일 기준",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 674.156,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 678.156,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 160
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "회계연도 기준",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 674.156,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 678.156,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 160,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "주휴수당",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 416.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 420.75,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 240
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "실수령액",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 416.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 138,
+        "y": 420.75,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 122,
+        "right": 122
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "퇴직금",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 416.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 256,
+        "y": 420.75,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 240,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "JSON",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 382.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 386.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 212
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "SQL",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 382.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 145,
+        "y": 386.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 108,
+        "right": 108
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "XML",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 382.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 249,
+        "y": 386.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 212,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "웹 비교",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 962.922,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 964.922,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Excel 보고서",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1025.219,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1027.219,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Word 변경 추적 (DOCX 전용)",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1098.672,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1100.672,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "변경 내용 작성자 통일",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1207.406,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 299,
+        "y": 1209.406,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "서식 변경 포함",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1534.203,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1536.203,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "표 비교",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1579.203,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1581.203,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "기타 문서 영역",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1633.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1635.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "웹 비교",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 962.922,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 964.922,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "영문 대문자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 464.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 466.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "영문 소문자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 519.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 521.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "숫자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 574.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 576.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "특수문자",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 629.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 631.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "unchecked",
+      "label": "영문 대문자",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 464.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 298,
+        "y": 466.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "option": "영업일 계산",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 376.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 380.75,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 181
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "연차 계산",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 376.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 380.75,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 181,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "입사일 기준",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 674.156,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 678.156,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 160
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "회계연도 기준",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 674.156,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 678.156,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 160,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "주휴수당",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 416.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 420.75,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 240
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "실수령액",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 416.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 138,
+        "y": 420.75,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 122,
+        "right": 122
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "퇴직금",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 416.75,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 256,
+        "y": 420.75,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 240,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "JSON",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 382.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 386.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 212
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "SQL",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 382.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 145,
+        "y": 386.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 108,
+        "right": 108
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "XML",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 382.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 249,
+        "y": 386.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 212,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "웹 비교",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 962.922,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 964.922,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Excel 보고서",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1025.219,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1027.219,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Word 변경 추적 (DOCX 전용)",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1098.672,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1100.672,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "변경 내용 작성자 통일",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1207.406,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 299,
+        "y": 1209.406,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "서식 변경 포함",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1534.203,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1536.203,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "표 비교",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1579.203,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1581.203,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "기타 문서 영역",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1633.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1635.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "웹 비교",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 962.922,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 964.922,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Uppercase letters",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 486.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 488.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Lowercase letters",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 541.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 543.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Numbers",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 596.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 598.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Symbols",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 651.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 653.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "unchecked",
+      "label": "Uppercase letters",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 486.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 298,
+        "y": 488.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "option": "Business days",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 473.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 477.5,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 181
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "Annual leave",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 473.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 477.5,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 181,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "Hire-date basis",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 770.906,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 774.906,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 160
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "Fiscal-year basis",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 770.906,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 774.906,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 160,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "Weekly holiday pay",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 487.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 491.5,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 240
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "Take-home pay",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 487.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 138,
+        "y": 491.5,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 122,
+        "right": 122
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "Severance",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 487.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 256,
+        "y": 491.5,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 240,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "JSON",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 430.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 434.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 212
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "SQL",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 430.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 145,
+        "y": 434.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 108,
+        "right": 108
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "XML",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 430.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 249,
+        "y": 434.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 212,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Web comparison",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1022.766,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1024.766,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Excel report",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1105.359,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1107.359,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Tracked-changes Word file (DOCX only)",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1198.953,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1200.953,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "Use one revision author",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1317.688,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 299,
+        "y": 1319.688,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Include formatting changes",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1663.047,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1665.047,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Compare tables",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1708.047,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1710.047,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Other document areas",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1772.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1774.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "Web comparison",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1022.766,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 299,
+        "y": 1024.766,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Uppercase letters",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 486.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 488.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Lowercase letters",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 541.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 543.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Numbers",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 596.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 598.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "checked",
+      "label": "Symbols",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 651.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 316,
+        "y": 653.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "password-option",
+      "state": "unchecked",
+      "label": "Uppercase letters",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 296,
+        "y": 486.344,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 298,
+        "y": 488.344,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "option": "Business days",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 473.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 477.5,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 181
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "Annual leave",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 473.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 477.5,
+        "width": 173,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 181,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "work-mode"
+    },
+    {
+      "option": "Hire-date basis",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 770.906,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 774.906,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 160
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "Fiscal-year basis",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 770.906,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 197,
+        "y": 774.906,
+        "width": 152,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 160,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "leave-method"
+    },
+    {
+      "option": "Weekly holiday pay",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 487.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 20,
+        "y": 491.5,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 240
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "Take-home pay",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 487.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 138,
+        "y": 491.5,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 122,
+        "right": 122
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "Severance",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 16,
+        "y": 487.5,
+        "width": 358,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 256,
+        "y": 491.5,
+        "width": 114,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 240,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "payroll-mode"
+    },
+    {
+      "option": "JSON",
+      "optionIndex": 0,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 430.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 41,
+        "y": 434.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 4,
+        "right": 212
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "SQL",
+      "optionIndex": 1,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 430.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 145,
+        "y": 434.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 108,
+        "right": 108
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "option": "XML",
+      "optionIndex": 2,
+      "kind": "selected-segment",
+      "trackRect": {
+        "x": 37,
+        "y": 430.281,
+        "width": 316,
+        "height": 52
+      },
+      "indicatorRect": {
+        "x": 249,
+        "y": 434.281,
+        "width": 100,
+        "height": 44
+      },
+      "insetPx": {
+        "top": 4,
+        "bottom": 4,
+        "left": 212,
+        "right": 4
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0,
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "format-kind"
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Web comparison",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1022.766,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1024.766,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Excel report",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1105.359,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1107.359,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Tracked-changes Word file (DOCX only)",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1198.953,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1200.953,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "Use one revision author",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1317.688,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 299,
+        "y": 1319.688,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Include formatting changes",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1663.047,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1665.047,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Compare tables",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1708.047,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1710.047,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "checked",
+      "label": "Other document areas",
+      "checked": true,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1772.844,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 317,
+        "y": 1774.844,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 20,
+        "right": 2
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "control": "document-option",
+      "state": "unchecked",
+      "label": "Web comparison",
+      "checked": false,
+      "kind": "switch-thumb",
+      "trackRect": {
+        "x": 297,
+        "y": 1022.766,
+        "width": 43,
+        "height": 25
+      },
+      "indicatorRect": {
+        "x": 299,
+        "y": 1024.766,
+        "width": 21,
+        "height": 21
+      },
+      "insetPx": {
+        "top": 2,
+        "bottom": 2,
+        "left": 2,
+        "right": 20
+      },
+      "overflowPx": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "verticalCenterErrorPx": 0
+    }
+  ],
+  "pages": [
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "security-tools",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "work-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "payroll-calculator",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "text-formatter",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "document-compare",
+      "locale": "ko",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "light",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "security-tools",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "work-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "payroll-calculator",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "text-formatter",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    },
+    {
+      "tool": "document-compare",
+      "locale": "en",
+      "theme": "dark",
+      "viewport": "mobile",
+      "legacyMatches": [],
+      "tracking": {
+        "google": 0,
+        "naver": 0,
+        "adsense": 0
+      },
+      "externalRequests": [],
+      "pageErrors": []
+    }
+  ]
+}

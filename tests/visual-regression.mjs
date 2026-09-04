@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
+import JSZip from "jszip";
 
 import { assertMobileBottomLayout, assertScrollAtBottom } from "./mobile-bottom-assertion.mjs";
 import { qaCaptureScenarios, qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
@@ -293,12 +294,10 @@ async function captureAndCompare(capture, browser) {
       localStorage.setItem("worklazy_privacy_consent", consent);
       localStorage.setItem("worklazy_lang", locale);
     }, capture.locale, consentValue);
-    await page.setRequestInterception(true);
     page.on("request", (request) => {
       const url = new URL(request.url());
       const allowed = url.origin === new URL(baseUrl).origin || ["data:", "blob:"].includes(url.protocol);
       if (!allowed) externalRequests.push(request.url());
-      void (allowed ? request.continue() : request.abort("blockedbyclient"));
     });
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
@@ -388,10 +387,25 @@ async function captureAndCompare(capture, browser) {
     ]);
     return `${capture.name}: ${diffPixels} pixels differ (${(ratio * 100).toFixed(4)}% > ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}%).${bottomMetrics ? ` Bottom metrics: ${JSON.stringify(bottomMetrics)}.` : ""}`;
   } catch (error) {
+    let pageState;
+    if (!page.isClosed()) {
+      try {
+        pageState = await page.evaluate(() => ({
+          alerts: Array.from(document.querySelectorAll("[role='alert']"), (element) => element.textContent || ""),
+          fileNames: Array.from(document.querySelectorAll("[data-document-file-column] strong"), (element) => element.textContent || ""),
+          progress: document.querySelector(".ui-operation-progress")?.textContent || "",
+          resultCards: document.querySelectorAll("[data-testid='document-result-card']").length,
+          title: document.querySelector("h1")?.textContent || "",
+        }));
+      } catch {
+        pageState = undefined;
+      }
+    }
     const details = [
       `${capture.name}: ${error instanceof Error ? error.message : String(error)}`,
       pageErrors.length ? `Page errors: ${pageErrors.join(" | ")}` : null,
       externalRequests.length ? `External requests: ${externalRequests.join(" | ")}` : null,
+      pageState ? `Page state: ${JSON.stringify(pageState)}` : null,
       `URL: ${page.url()}`,
     ].filter(Boolean);
     throw new Error(details.join("\n"), { cause: error });
@@ -451,9 +465,9 @@ async function performScenarioActions(page, actions, fixture) {
         element.dispatchEvent(new Event("change", { bubbles: true }));
       }, action.value);
     } else if (action.type === "upload") {
-      await uploadScenarioFixture(page, action.selector, fixture);
+      await uploadScenarioFixture(page, action.selector, action.fixture ?? fixture, action.elementIndex ?? 0);
     } else if (action.type === "wait") {
-      await page.waitForSelector(action.selector, { visible: true });
+      await page.waitForSelector(action.selector, { visible: true, timeout: action.timeoutMs });
     } else if (action.type === "wait-enabled") {
       await page.waitForFunction((selector) => {
         const element = document.querySelector(selector);
@@ -488,10 +502,11 @@ async function performScenarioActions(page, actions, fixture) {
   }
 }
 
-async function uploadScenarioFixture(page, selector, fixture) {
+async function uploadScenarioFixture(page, selector, fixture, elementIndex = 0) {
   if (!fixture) throw new Error(`Upload action for ${selector} has no fixture.`);
   if (fixture.kind === "file") {
-    const input = await page.$(selector);
+    const inputs = await page.$$(selector);
+    const input = inputs[elementIndex];
     if (!input) throw new Error(`Upload input ${selector} is missing.`);
     await input.uploadFile(path.resolve(testDirectory, fixture.path));
     return;
@@ -501,8 +516,10 @@ async function uploadScenarioFixture(page, selector, fixture) {
   else if (fixture.kind === "inline-file") bytes = Buffer.from(fixture.contents, "utf8");
   else if (fixture.kind === "generated-wav") bytes = createVisualWav(fixture);
   else if (fixture.kind === "generated-png") bytes = createVisualPng(fixture);
+  else if (fixture.kind === "generated-docx") bytes = await createVisualDocx(fixture);
   else throw new Error(`Fixture kind ${fixture.kind} cannot be uploaded.`);
-  await page.$eval(selector, (input, payload) => {
+  await page.$$eval(selector, (inputs, payload) => {
+    const input = inputs[payload.elementIndex];
     if (!(input instanceof HTMLInputElement)) throw new Error("Visual fixture upload target is not an input.");
     const transfer = new DataTransfer();
     transfer.items.add(new File([new Uint8Array(payload.bytes)], payload.fileName, { type: payload.mimeType }));
@@ -510,9 +527,26 @@ async function uploadScenarioFixture(page, selector, fixture) {
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }, {
     bytes: [...bytes],
+    elementIndex,
     fileName: fixture.fileName,
-    mimeType: fixture.mimeType ?? (fixture.kind === "generated-png" ? "image/png" : "audio/wav"),
+    mimeType: fixture.mimeType ?? (fixture.kind === "generated-png"
+      ? "image/png"
+      : fixture.kind === "generated-docx"
+        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : "audio/wav"),
   });
+}
+
+async function createVisualDocx({ text }) {
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`);
+  return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+}
+
+function escapeXml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
 }
 
 function createVisualPng({ width, height }) {

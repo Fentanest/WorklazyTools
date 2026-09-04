@@ -47,6 +47,8 @@ const migratedToolIds = new Set([
   "text-merger",
   "hwp-editor",
   "office-editor",
+  "document-compare",
+  "excel-cleaner",
 ]);
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
@@ -153,21 +155,83 @@ const interactionDefinitions = Object.freeze({
     actions: [{ type: "click", selector: ".excel-compare-mode-grid button:nth-child(2)" }],
     assertSelector: ".excel-compare-mode-grid button:nth-child(2)[aria-checked='true']",
   }),
-  "excel-cleaner": Object.freeze({
-    stateId: "interaction-csv-output",
-    actions: [{ type: "click-option", selector: "[data-ui-component='segmented-control']", optionIndex: 1 }],
-    assertSelector: "[data-ui-component='segmented-control'] button:nth-child(2)[aria-pressed='true']",
-  }),
+  "excel-cleaner": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-rule",
+      fixture: { kind: "inline-file", fileName: "visual-cleaner.csv", mimeType: "text/csv", contents: "Name,Amount\n Worklazy ,10\n Tools ,20" },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='excel-cleaner'] input[type='file']" },
+        { type: "wait", selector: "[data-testid='excel-cleaner-sheets']" },
+        { type: "click", selector: "[data-testid='excel-cleaner-add-rule'] button" },
+        { type: "wait", selector: "[data-testid='excel-cleaner-rule']" },
+      ],
+      assertSelector: "[data-testid='excel-cleaner-rule']",
+    }),
+    Object.freeze({
+      stateId: "interaction-result",
+      fixture: { kind: "inline-file", fileName: "visual-cleaner.csv", mimeType: "text/csv", contents: "Name,Amount\n Worklazy ,10\n Tools ,20" },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='excel-cleaner'] input[type='file']" },
+        { type: "wait", selector: "[data-testid='excel-cleaner-sheets']" },
+        { type: "click", selector: "[data-testid='excel-cleaner-add-rule'] button" },
+        { type: "wait-enabled", selector: "[data-testid='excel-cleaner-actions'] [data-ui-component='primary-button']" },
+        { type: "click", selector: "[data-testid='excel-cleaner-actions'] [data-ui-component='primary-button']" },
+        { type: "wait", selector: "[data-testid='excel-cleaner-results']", timeoutMs: 240_000 },
+        { type: "scroll-into-view", selector: "[data-testid='excel-cleaner-results']", offset: -88 },
+      ],
+      assertSelector: "[data-testid='excel-cleaner-results']",
+    }),
+  ]),
   "pdf-editor": Object.freeze({
     stateId: "interaction-image-to-pdf",
     actions: [{ type: "click", selector: ".pdf-tool-navigation a:nth-child(2)" }],
     assertSelector: ".pdf-tool-page[data-pdf-mode='image-to-pdf']",
   }),
-  "document-compare": Object.freeze({
-    stateId: "interaction-web-output-off",
-    actions: [{ type: "click", selector: "[data-ui-component='toggle-row']:first-of-type [role='switch']" }],
-    assertSelector: "[data-ui-component='toggle-row']:first-of-type [role='switch'][aria-checked='false']",
-  }),
+  "document-compare": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-toggle-on",
+      actions: [
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 0 },
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 0 },
+      ],
+      assertSelector: "[data-testid='document-output-options'] [role='switch'][aria-checked='true']",
+    }),
+    Object.freeze({
+      stateId: "interaction-toggle-off",
+      actions: [{ type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 0 }],
+      assertSelector: "[data-testid='document-output-options'] [role='switch'][aria-checked='false']",
+    }),
+    Object.freeze({
+      stateId: "interaction-docx-result",
+      actions: [
+        { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 0, fixture: { kind: "generated-docx", fileName: "visual-before.docx", text: "Worklazy document before." } },
+        { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 1, fixture: { kind: "generated-docx", fileName: "visual-after.docx", text: "Worklazy document after with a change." } },
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 1 },
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 2 },
+        { type: "wait-enabled", selector: "[data-testid='document-action-bar'] [data-ui-component='primary-button']" },
+        { type: "click", selector: "[data-testid='document-action-bar'] [data-ui-component='primary-button']" },
+        { type: "wait", selector: "[data-testid='document-result-card']", timeoutMs: 240_000 },
+        { type: "click", selector: "[data-testid='document-view-result']" },
+        { type: "wait", selector: "[data-testid='document-result-view']", timeoutMs: 240_000 },
+      ],
+      assertSelector: "[data-testid='document-result-view']",
+    }),
+    Object.freeze({
+      stateId: "interaction-hwp-result",
+      actions: [
+        { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 0, fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-before.hwp", mimeType: "application/x-hwp" } },
+        { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 1, fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-after.hwp", mimeType: "application/x-hwp" } },
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 1 },
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 2 },
+        { type: "wait-enabled", selector: "[data-testid='document-action-bar'] [data-ui-component='primary-button']" },
+        { type: "click", selector: "[data-testid='document-action-bar'] [data-ui-component='primary-button']" },
+        { type: "wait", selector: "[data-testid='document-result-card']", timeoutMs: 240_000 },
+        { type: "click", selector: "[data-testid='document-view-result']" },
+        { type: "wait", selector: "[data-testid='document-result-view']", timeoutMs: 240_000 },
+      ],
+      assertSelector: "[data-testid='document-result-view']",
+    }),
+  ]),
   "video-studio": Object.freeze({
     stateId: "interaction-gif-output",
     fixture: { kind: "file", path: "fixtures/video-vp9-benchmark.mp4" },
@@ -278,12 +342,13 @@ const interactionDefinitions = Object.freeze({
   }),
 });
 
-const interactionScenarioFor = (route) => {
-  const definition = interactionDefinitions[route.toolId];
-  if (!definition) return null;
+const interactionScenariosFor = (route) => {
+  const configured = interactionDefinitions[route.toolId];
+  if (!configured) return [];
+  const definitions = Array.isArray(configured) ? configured : [configured];
   const koreanOnly = route.toolId === "hwp-editor";
   const migrated = migratedToolIds.has(route.toolId);
-  return scenario({
+  return definitions.map((definition) => scenario({
     scenarioId: `${route.id}--${definition.stateId}`,
     routeId: route.id,
     toolId: route.toolId,
@@ -300,12 +365,12 @@ const interactionScenarioFor = (route) => {
     readySelector: definition.readySelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
     assertSelector: definition.assertSelector,
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
-  });
+  }));
 };
 
 const toolScenarios = availableToolRoutes.flatMap((route) => {
-  const interaction = interactionScenarioFor(route);
-  return [initialScenarioFor(route), bottomScenarioFor(route), ...(interaction ? [interaction] : [])];
+  const interactions = interactionScenariosFor(route);
+  return [initialScenarioFor(route), bottomScenarioFor(route), ...interactions];
 });
 
 const hwpEnglishRedirectScenario = scenario({

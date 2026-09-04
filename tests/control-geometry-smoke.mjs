@@ -7,7 +7,7 @@ import puppeteer from "puppeteer-core";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
-const artifactDirectory = path.join(testDirectory, "visual-artifacts", "p2-b1");
+const artifactDirectory = path.join(testDirectory, "visual-artifacts", "p2-b3", "diagnostics");
 const reportPath = path.join(artifactDirectory, "control-geometry.json");
 const port = Number.parseInt(process.env.CONTROL_GEOMETRY_TEST_PORT || "4177", 10);
 const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
@@ -18,7 +18,11 @@ const profiles = [
   { locale: "en", theme: "light" },
   { locale: "en", theme: "dark" },
 ];
-const legacySelectors = [".ios-switch", ".mode-switch", ".sub-segment", ".formatter-toolbar", ".toggle-card-grid"];
+const legacySelectors = [
+  ".ios-switch", ".mode-switch", ".sub-segment", ".formatter-toolbar", ".toggle-card-grid",
+  ".compare-file-grid", ".word-options-grid", ".compact-settings", ".tool-action-bar",
+  ".comparison-summary", ".document-content-toggle", ".document-page-view",
+];
 let server;
 let browser;
 
@@ -34,7 +38,7 @@ try {
   const samples = [];
   const pageReports = [];
   for (const profile of profiles) {
-    for (const tool of ["security-tools", "work-calculator", "payroll-calculator", "text-formatter"]) {
+    for (const tool of ["security-tools", "work-calculator", "payroll-calculator", "text-formatter", "document-compare"]) {
       const page = await browser.newPage();
       const externalRequests = [];
       const pageErrors = [];
@@ -69,14 +73,14 @@ try {
 
         const sampleBase = { tool, locale: profile.locale, theme: profile.theme, viewport: "mobile" };
         if (tool === "security-tools") {
-          const checked = await measureSwitches(page);
+          const checked = await measureSwitches(page, "[data-testid='password-options'] [data-slot='switch']");
           if (checked.length !== 4 || checked.some(({ checked: value }) => !value)) {
             throw new Error(`Expected four checked security switches, received ${JSON.stringify(checked)}.`);
           }
           samples.push(...checked.map((sample) => ({ ...sampleBase, control: "password-option", state: "checked", ...sample })));
           await page.$eval("[data-testid='password-options'] [data-slot='switch']", (element) => element.click());
           await page.waitForFunction(() => document.querySelector("[data-testid='password-options'] [data-slot='switch']")?.getAttribute("aria-checked") === "false");
-          const unchecked = await measureSwitches(page);
+          const unchecked = await measureSwitches(page, "[data-testid='password-options'] [data-slot='switch']");
           samples.push({ ...sampleBase, control: "password-option", state: "unchecked", ...unchecked[0] });
         } else if (tool === "work-calculator") {
           samples.push(...await measureSegmentOptions(page, "[data-testid='work-mode'] [data-ui-component='segmented-control']", { ...sampleBase, control: "work-mode" }));
@@ -84,8 +88,17 @@ try {
           samples.push(...await measureSegmentOptions(page, "[data-testid='leave-method'] [data-ui-component='segmented-control']", { ...sampleBase, control: "leave-method" }));
         } else if (tool === "payroll-calculator") {
           samples.push(...await measureSegmentOptions(page, "[data-testid='payroll-mode'] [data-ui-component='segmented-control']", { ...sampleBase, control: "payroll-mode" }));
-        } else {
+        } else if (tool === "text-formatter") {
           samples.push(...await measureSegmentOptions(page, "[data-testid='formatter-settings'] [data-ui-component='segmented-control']", { ...sampleBase, control: "format-kind" }));
+        } else {
+          const selector = "[data-tool-page='document-compare'] [data-ui-part='toggle-switch']";
+          const initial = await measureSwitches(page, selector);
+          if (initial.length !== 7) throw new Error(`Expected seven document switches, received ${initial.length}.`);
+          samples.push(...initial.map((sample) => ({ ...sampleBase, control: "document-option", state: sample.checked ? "checked" : "unchecked", ...sample })));
+          await page.$$eval(selector, (tracks) => tracks[0]?.click());
+          await page.waitForFunction((trackSelector, previous) => document.querySelector(trackSelector)?.getAttribute("aria-checked") !== previous, {}, selector, String(initial[0].checked));
+          const toggled = await measureSwitches(page, selector);
+          samples.push({ ...sampleBase, control: "document-option", state: toggled[0].checked ? "checked" : "unchecked", ...toggled[0] });
         }
 
         const pageContract = await page.$eval(`[data-tool-page='${tool}']`, (root, selectors) => ({
@@ -113,7 +126,7 @@ try {
       throw new Error(`Control geometry escaped its track: ${JSON.stringify(sample)}.`);
     }
   }
-  const summaries = Object.fromEntries(["security-tools", "work-calculator", "payroll-calculator", "text-formatter"].map((tool) => {
+  const summaries = Object.fromEntries(["security-tools", "work-calculator", "payroll-calculator", "text-formatter", "document-compare"].map((tool) => {
     const toolSamples = samples.filter((sample) => sample.tool === tool);
     const maxOf = (selector) => Math.max(...toolSamples.map(selector));
     return [tool, {
@@ -152,8 +165,8 @@ try {
   if (server) await stopServer(server);
 }
 
-async function measureSwitches(page) {
-  return page.$$eval("[data-testid='password-options'] [data-slot='switch']", (tracks) => tracks.map((track) => {
+async function measureSwitches(page, selector) {
+  return page.$$eval(selector, (tracks) => tracks.map((track) => {
     const indicator = track.querySelector("[data-slot='switch-thumb']");
     if (!(indicator instanceof HTMLElement)) throw new Error("Switch thumb is missing.");
     return {

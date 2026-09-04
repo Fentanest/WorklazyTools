@@ -17,7 +17,7 @@
     "cross-shared": 31,
     "p2-shared": 21,
     "orphan": 2,
-    "excel-compare": 26,
+    "excel-compare": 27,
     "excel-merger": 17,
     "document-compare": 13,
     "image-studio": 7,
@@ -27,7 +27,7 @@
     "text-merger": 3,
     "hwp-editor": 2,
     "video-studio": 2,
-    "excel-cleaner": 2,
+    "excel-cleaner": 1,
     "qr-studio": 2,
     "timezone-calculator": 1,
     "security-tools": 1,
@@ -1198,8 +1198,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-071",
@@ -1215,8 +1215,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-072",
@@ -1233,8 +1233,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-073",
@@ -1251,8 +1251,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-074",
@@ -1512,8 +1512,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-088",
@@ -1529,8 +1529,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-089",
@@ -1546,8 +1546,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-090",
@@ -1563,8 +1563,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-091",
@@ -1580,8 +1580,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-092",
@@ -1597,8 +1597,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-093",
@@ -1614,8 +1614,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-094",
@@ -1632,8 +1632,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-095",
@@ -2254,8 +2254,9 @@
       ],
       "refCount": 6,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "legacy-arm-removed",
+      "removedIn": "B3",
+      "currentSelector": ".tool-page button:not([data-slot]), .tool-page a:is(.primary-button, .ui-primary-button), .tool-page a.secondary-button, .tool-page a.result-download"
     },
     {
       "id": "legacy-133",
@@ -2413,8 +2414,8 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-142",
@@ -2545,8 +2546,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B3",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B3"
     },
     {
       "id": "legacy-150",
@@ -2555,12 +2556,12 @@
       "legacyTokens": [
         "selected"
       ],
-      "category": "excel-cleaner",
+      "category": "excel-compare",
       "consumers": [
-        "tool:excel-cleaner"
+        "tool:excel-compare"
       ],
       "refCount": 1,
-      "lastRemovalBundle": "B3",
+      "lastRemovalBundle": "B4",
       "currentState": "active",
       "removedIn": null
     },

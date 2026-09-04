@@ -25,6 +25,7 @@ try {
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
     headless: true,
+    protocolTimeout: 300_000,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
 
@@ -849,8 +850,8 @@ async function testWordCompare(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.afterDocx], 1);
-  await page.waitForSelector(".pair-count-error");
-  const disabledForMismatch = await page.$eval(".tool-action-bar :is(.primary-button, .ui-primary-button)", (button) => button.disabled);
+  await page.waitForSelector("[data-tool-page='document-compare'] [role='alert']");
+  const disabledForMismatch = await page.$eval("[data-testid='document-action-bar'] [data-ui-component='primary-button']", (button) => button.disabled);
   if (!disabledForMismatch) throw new Error("Word comparison was not blocked for mismatched file counts.");
 
   await page.evaluate(() => {
@@ -858,65 +859,65 @@ async function testWordCompare(page, fixtures, tempDir) {
     if (!(button instanceof HTMLButtonElement)) throw new Error("Move-right button not found.");
     button.click();
   });
-  await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 1
-    && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 2);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 1
+    && document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 2);
   await page.evaluate(() => {
     const button = document.querySelector('button[aria-label="before-two.docx 수정 전 목록으로 이동"]');
     if (!(button instanceof HTMLButtonElement)) throw new Error("Move-left button not found.");
     button.click();
   });
-  await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 2
-    && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 1);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 2
+    && document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 1);
 
-  await dropFiles(page, ".sortable-word-files", [fixtures.afterDocxTwo], 1);
-  await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 2
-    && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 2
-    && !document.querySelector(".pair-count-error"));
-  const wordAddButtons = await page.$$eval(".word-file-column [data-ui-part=drop-target] [data-slot=button]", (buttons) => buttons.map((button) => button.textContent || ""));
+  await dropFiles(page, "[data-testid^='document-file-list-']", [fixtures.afterDocxTwo], 1);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 2
+    && document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 2
+    && !document.querySelector("[data-tool-page='document-compare'] [role='alert']"));
+  const wordAddButtons = await page.$$eval("[data-document-file-column] [data-ui-part=drop-target] [data-slot=button]", (buttons) => buttons.map((button) => button.textContent || ""));
   if (wordAddButtons.length !== 2 || wordAddButtons.some((label) => !label.includes("더 추가"))) throw new Error(`Word comparison does not expose incremental file addition: ${wordAddButtons.join(", ")}`);
-  const draggable = await page.$$eval(".sortable-word-files li", (items) => items.every((item) => item.draggable));
+  const draggable = await page.$$eval("[data-testid='document-file-item']", (items) => items.every((item) => item.draggable));
   if (!draggable) throw new Error("Word file order list is not draggable.");
   const crossColumnDrag = await page.evaluate(async () => {
-    const source = document.querySelectorAll(".sortable-word-files")[0]?.querySelector("li");
-    const target = document.querySelectorAll(".sortable-word-files")[1]?.querySelector("li");
+    const source = document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.querySelector("li");
+    const target = document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.querySelector("li");
     if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) throw new Error("Word drag fixtures are unavailable");
     const transfer = new DataTransfer();
     source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     target.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const state = { dropEffect: transfer.dropEffect, highlighted: target.classList.contains("drag-over") };
+    const state = { dropEffect: transfer.dropEffect, highlighted: target.hasAttribute("data-drag-over") };
     source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     return state;
   });
   if (crossColumnDrag.dropEffect !== "none" || crossColumnDrag.highlighted) throw new Error(`Cross-column reorder still appears available: ${JSON.stringify(crossColumnDrag)}`);
-  const moveTooltip = await page.$eval('.move-across-button', (button) => ({ label: button.getAttribute("aria-label"), title: button.getAttribute("title") }));
+  const moveTooltip = await page.$eval('[data-testid="document-file-item"] button[title]', (button) => ({ label: button.getAttribute("aria-label"), title: button.getAttribute("title") }));
   if (!moveTooltip.title || moveTooltip.title !== moveTooltip.label) throw new Error(`Move-across tooltip is missing: ${JSON.stringify(moveTooltip)}`);
-  if (await page.$eval(".pairing-preview ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");
+  if (await page.$eval("[data-testid='document-pairing-preview'] ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");
   const defaultAuthorOption = await page.evaluate(() => {
-    const label = Array.from(document.querySelectorAll(":is(.settings-row, .ui-settings-row) strong")).find((element) => element.textContent === "변경 내용 작성자 통일");
-    const toggle = label?.closest(":is(.settings-row, .ui-settings-row)")?.querySelector("button");
-    const input = document.querySelector(".revision-author-field input");
+    const label = Array.from(document.querySelectorAll("[data-ui-component='toggle-row'] strong")).find((element) => element.textContent === "변경 내용 작성자 통일");
+    const toggle = label?.closest("[data-ui-component='toggle-row']")?.querySelector("button");
+    const input = document.querySelector("[data-testid='document-revision-author'] input");
     return { checked: toggle?.getAttribute("aria-checked"), inputDisabled: input instanceof HTMLInputElement && input.disabled };
   });
   if (defaultAuthorOption.checked !== "false" || !defaultAuthorOption.inputDisabled) {
     throw new Error(`Revision-author rewrite was not disabled by default: ${JSON.stringify(defaultAuthorOption)}`);
   }
 
-  await page.click(".tool-action-bar :is(.primary-button, .ui-primary-button)");
+  await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
   await assertProgressLog(page, "문서 비교");
-  const resultCards = await page.$$(".word-pair-result-card");
+  const resultCards = await page.$$('[data-testid="document-result-card"]');
   if (resultCards.length !== 2) throw new Error(`Expected 2 Word pair results, got ${resultCards.length}.`);
-  if (await page.$$(".word-pair-result-card .blue-download").then((items) => items.length) !== 2) {
+  if (await page.$$('[data-testid="document-result-card"] [data-testid="document-excel-download"]').then((items) => items.length) !== 2) {
     throw new Error("Each Word pair did not receive its own Excel report.");
   }
-  if (await page.$$(".word-pair-result-card .tracked-download").then((items) => items.length) !== 2) {
+  if (await page.$$('[data-testid="document-result-card"] [data-testid="document-tracked-download"]').then((items) => items.length) !== 2) {
     throw new Error("Each Word pair did not receive its own tracked-change DOCX.");
   }
 
   const resultPath = path.join(tempDir, "word-report.xlsx");
-  await saveBlobLink(page, ".word-pair-result-card .blue-download", resultPath);
+  await saveBlobLink(page, '[data-testid="document-result-card"] [data-testid="document-excel-download"]', resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const changesSheet = workbook.getWorksheet("변경 내용");
@@ -961,23 +962,23 @@ async function testWordCompare(page, fixtures, tempDir) {
   }
 
   const trackedPath = path.join(tempDir, "word-tracked.docx");
-  await saveBlobLink(page, ".word-pair-result-card .tracked-download", trackedPath);
+  await saveBlobLink(page, '[data-testid="document-result-card"] [data-testid="document-tracked-download"]', trackedPath);
   await assertTrackedDocument(trackedPath, fixtures.beforeDocx, fixtures.afterDocx);
   const secondTrackedPath = path.join(tempDir, "word-tracked-two.docx");
-  await saveBlobLink(page, ".word-pair-result-card:nth-child(2) .tracked-download", secondTrackedPath);
+  await saveBlobLink(page, '[data-testid="document-result-card"]:nth-child(2) [data-testid="document-tracked-download"]', secondTrackedPath);
   await assertTrackedDocument(secondTrackedPath, fixtures.beforeDocxTwo, fixtures.afterDocxTwo, false);
 
-  await page.click(".word-pair-result-card .secondary-button");
+  await page.click('[data-testid="document-result-card"] [data-testid="document-view-result"]');
   await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1")
     && document.querySelector("h1")?.textContent?.includes("1번 문서 비교"));
   const detailHeading = await page.$eval("h1", (element) => element.textContent || "");
   if (!detailHeading.includes("1번 문서 비교")) throw new Error(`Pair result view did not open: ${detailHeading}`);
-  if (await page.$$(".document-page-column-heading").then((items) => items.length) !== 2) {
+  if (await page.$$('[data-testid="document-page-view"] [role="columnheader"]').then((items) => items.length) !== 2) {
     throw new Error("Full before/after document page columns were not rendered.");
   }
-  const documentFlow = await page.$$eval(".document-page-row", (items) => items.map((item) => ({
-    table: item.classList.contains("table-block"),
-    blockCount: item.querySelectorAll(".document-page-block").length,
+  const documentFlow = await page.$$eval('[data-testid="document-page-view"] [role="row"]', (items) => items.map((item) => ({
+    table: item.hasAttribute("data-table-block"),
+    blockCount: item.querySelectorAll("[role='cell']").length,
     height: Math.round(item.getBoundingClientRect().height),
   })));
   if (documentFlow.length !== 4 || !documentFlow.at(-1)?.table || documentFlow.some((item) => item.blockCount !== 2)) {
@@ -986,85 +987,85 @@ async function testWordCompare(page, fixtures, tempDir) {
   if ((documentFlow[2]?.height ?? 100) > 32) {
     throw new Error(`Continuous document paragraphs still have card-like vertical spacing: ${JSON.stringify(documentFlow)}`);
   }
-  const webTables = await page.$$(".word-document-table");
+  const webTables = await page.$$('[data-testid="document-table"]');
   if (webTables.length !== 2) throw new Error(`The document table was flattened instead of rendered on both pages: ${webTables.length}`);
-  const alignedTableShape = await page.$$eval(".word-document-table", (tables) => tables.map((table) => ({
+  const alignedTableShape = await page.$$eval('[data-testid="document-table"]', (tables) => tables.map((table) => ({
     rows: table.rows.length,
     cells: Array.from(table.rows).reduce((total, row) => total + row.cells.length, 0),
-    gaps: table.querySelectorAll("td.structural-gap").length,
+    gaps: table.querySelectorAll("td[aria-hidden='true']").length,
   })));
   if (alignedTableShape[0]?.rows !== 5 || alignedTableShape[0]?.cells !== 20 || alignedTableShape[0]?.gaps !== 8
     || alignedTableShape[1]?.rows !== 5 || alignedTableShape[1]?.cells !== 20 || alignedTableShape[1]?.gaps !== 0) {
     throw new Error(`Inserted table axes were not aligned in the web document view: ${JSON.stringify(alignedTableShape)}`);
   }
-  if (!await page.$(".page-diff-delete") || !await page.$(".page-diff-add")) {
+  if (!await page.$('[data-diff-kind="deleted"]') || !await page.$('[data-diff-kind="added"]')) {
     throw new Error("Inline deleted/inserted highlights were not rendered in the web comparison.");
   }
-  const firstComparedParagraph = await page.$eval(".document-page-row p", (element) => element.textContent || "");
+  const firstComparedParagraph = await page.$eval('[data-testid="document-page-view"] [role="row"] p', (element) => element.textContent || "");
   if (!firstComparedParagraph.startsWith("1. ")) throw new Error(`Word list label was not rendered in the web view: ${firstComparedParagraph}`);
-  const hasCommentTab = await page.$$eval(".document-toolbar .ui-segmented-control button", (buttons) => buttons.some((button) => button.textContent === "메모"));
+  const hasCommentTab = await page.$$eval('[data-testid="document-result-toolbar"] [data-ui-component="segmented-control"] button', (buttons) => buttons.some((button) => button.textContent === "메모"));
   if (hasCommentTab) throw new Error("The standalone comment tab was not removed.");
-  await page.waitForSelector(".document-page-row .inline-comment-card");
-  const commentParagraphLocations = await page.$$eval(".document-page-row:has(.inline-comment-card) .document-block-meta small", (items) => items.map((item) => item.textContent || ""));
+  await page.waitForSelector('[data-testid="document-page-view"] [role="row"] [data-comment-kind]');
+  const commentParagraphLocations = await page.$$eval('[data-testid="document-page-view"] [role="row"]:has([data-comment-kind]) [data-testid="document-block-meta"] small', (items) => items.map((item) => item.textContent || ""));
   if (!commentParagraphLocations.every((location) => location.startsWith("본문 2번째 문단"))) {
     throw new Error(`Comments were not shown at their anchored paragraph: ${commentParagraphLocations.join(", ")}`);
   }
 
-  const allContentRowCount = await page.$$(".document-page-row").then((items) => items.length);
-  const fullContentToggle = await page.$('.document-content-toggle button[aria-label="내용 전체"]');
+  const allContentRowCount = await page.$$('[data-testid="document-page-view"] [role="row"]').then((items) => items.length);
+  const fullContentToggle = await page.$('[data-testid="document-result-toolbar"] button[aria-label="내용 전체"]');
   if (!fullContentToggle) throw new Error("Full-content toggle was not rendered on the document tab.");
   await fullContentToggle.evaluate((button) => button.click());
-  await page.waitForFunction((previousCount) => document.querySelectorAll(".document-page-row").length < previousCount, {}, allContentRowCount);
-  const filteredKinds = await page.$$eval(".document-page-row", (items) => items.map((item) => item.className));
-  if (filteredKinds.some((className) => className.includes("unchanged"))) throw new Error("Unchanged paragraphs remained after disabling full content.");
-  if (!await page.$(".document-page-row .inline-comment-card")) throw new Error("A changed paragraph's comment was hidden by the change filter.");
-  if (!filteredKinds.some((className) => className.includes("table-block"))) throw new Error("The changed table was hidden by the change filter.");
-  const backHref = await page.$eval(".result-view-back a", (link) => link.getAttribute("href"));
-  await page.$eval(".result-view-back a", (link) => {
+  await page.waitForFunction((previousCount) => document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length < previousCount, {}, allContentRowCount);
+  const filteredKinds = await page.$$eval('[data-testid="document-page-view"] [role="row"]', (items) => items.map((item) => ({ kind: item.getAttribute("data-document-kind"), table: item.hasAttribute("data-table-block") })));
+  if (filteredKinds.some(({ kind }) => kind === "unchanged")) throw new Error("Unchanged paragraphs remained after disabling full content.");
+  if (!await page.$('[data-testid="document-page-view"] [role="row"] [data-comment-kind]')) throw new Error("A changed paragraph's comment was hidden by the change filter.");
+  if (!filteredKinds.some(({ table }) => table)) throw new Error("The changed table was hidden by the change filter.");
+  const backHref = await page.$eval('[data-testid="document-result-back"]', (link) => link.getAttribute("href"));
+  await page.$eval('[data-testid="document-result-back"]', (link) => {
     if (!(link instanceof HTMLAnchorElement)) throw new Error("Word result back link was not found.");
     link.click();
   });
   try {
     await page.waitForFunction(() => location.pathname.replace(/\/$/, "").endsWith("/tools/document-compare")
-      && document.querySelectorAll(".word-pair-result-card").length === 2, { timeout: 15_000 });
+      && document.querySelectorAll("[data-testid='document-result-card']").length === 2, { timeout: 15_000 });
   } catch (error) {
     const state = await page.evaluate(() => ({
       href: location.href,
       pathname: location.pathname,
-      cards: document.querySelectorAll(".word-pair-result-card").length,
+      cards: document.querySelectorAll("[data-testid='document-result-card']").length,
       title: document.querySelector("h1")?.textContent || "",
       body: document.body.innerText.slice(0, 1_000),
     }));
     throw new Error(`Word result back navigation failed (link=${backHref}): ${JSON.stringify(state)}\n${error.message || error}`);
   }
-  if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 2) throw new Error("Pair results were lost after returning from detail view.");
-  await page.$eval(".word-pair-result-card:nth-child(2) .secondary-button", (link) => {
+  if (await page.$$('[data-testid="document-result-card"]').then((items) => items.length) !== 2) throw new Error("Pair results were lost after returning from detail view.");
+  await page.$eval('[data-testid="document-result-card"]:nth-child(2) [data-testid="document-view-result"]', (link) => {
     if (!(link instanceof HTMLAnchorElement)) throw new Error("The second Word result link was not found.");
     link.click();
   });
   try {
     await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2")
       && document.querySelector("h1")?.textContent?.includes("2번 문서 비교")
-      && document.querySelectorAll(".document-page-row").length > 0, { timeout: 15_000 });
+      && document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length > 0, { timeout: 15_000 });
   } catch (error) {
     const state = await page.evaluate(() => ({
       href: location.href,
       pathname: location.pathname,
       title: document.querySelector("h1")?.textContent || "",
-      rows: document.querySelectorAll(".document-page-row").length,
-      cards: document.querySelectorAll(".word-pair-result-card").length,
-      buttons: Array.from(document.querySelectorAll(".word-pair-result-card .secondary-button"), (button) => ({ text: button.textContent || "", disabled: button.disabled })),
+      rows: document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length,
+      cards: document.querySelectorAll("[data-testid='document-result-card']").length,
+      buttons: Array.from(document.querySelectorAll("[data-testid='document-result-card'] [data-testid='document-view-result']"), (button) => ({ text: button.textContent || "", disabled: button.disabled })),
       body: document.body.innerText.slice(0, 1_000),
     }));
     throw new Error(`Second Word result navigation failed: ${JSON.stringify(state)}\n${error.message || error}`);
   }
   const splitParagraph = await page.evaluate(() => {
-    const row = Array.from(document.querySelectorAll(".document-page-row")).find((item) => item.textContent?.includes("제5항의 지급이 완료되면"));
+    const row = Array.from(document.querySelectorAll("[data-testid='document-page-view'] [role='row']")).find((item) => item.textContent?.includes("제5항의 지급이 완료되면"));
     if (!row) return null;
     return {
-      deleted: Array.from(row.querySelectorAll(".page-diff-delete"), (item) => item.textContent || ""),
-      added: Array.from(row.querySelectorAll(".page-diff-add"), (item) => item.textContent || ""),
-      blocks: row.querySelectorAll(".document-page-block").length,
+      deleted: Array.from(row.querySelectorAll("[data-diff-kind='deleted']"), (item) => item.textContent || ""),
+      added: Array.from(row.querySelectorAll("[data-diff-kind='added']"), (item) => item.textContent || ""),
+      blocks: row.querySelectorAll("[role='cell']").length,
     };
   });
   if (!splitParagraph || splitParagraph.blocks !== 2 || splitParagraph.deleted.length
@@ -1082,17 +1083,17 @@ async function testWordFormattingBoundaries(page, fixtures) {
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.boundaryAfterDocx, fixtures.formattingAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
   await clickSetting(page, "Word 변경 추적 (DOCX 전용)");
-  await page.click(".tool-action-bar :is(.primary-button, .ui-primary-button)");
+  await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
-    && (document.querySelector(".word-pair-result-card") || document.querySelector(".error-banner")), { timeout: 240_000 });
-  if (await page.$(".error-banner")) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Word boundary fixture failed."));
-  const cards = await page.$$eval(".word-pair-result-card", (items) => items.map((item) => item.textContent || ""));
+    && (document.querySelector("[data-testid='document-result-card']") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout: 240_000 });
+  if (await page.$("[data-tool-page='document-compare'] [role='alert']")) throw new Error(await page.$eval("[data-tool-page='document-compare'] [role='alert']", (element) => element.textContent || "Word boundary fixture failed."));
+  const cards = await page.$$eval("[data-testid='document-result-card']", (items) => items.map((item) => item.textContent || ""));
   if (cards.length !== 2 || !cards[0].includes("변경 없음") || !cards[1].includes("6개 변경 발견")) {
     throw new Error(`Boundary-aware formatting fixture produced unexpected results: ${JSON.stringify(cards)}`);
   }
-  await page.click(".word-pair-result-card:nth-child(2) .secondary-button");
-  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2") && document.querySelectorAll(".document-page-row").length > 0);
-  const formatRows = await page.$$eval(".document-page-row.format", (items) => items.map((item) => item.textContent || ""));
+  await page.click("[data-testid='document-result-card']:nth-child(2) [data-testid='document-view-result']");
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2") && document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length > 0);
+  const formatRows = await page.$$eval("[data-testid='document-page-view'] [role='row'][data-document-kind='format']", (items) => items.map((item) => item.textContent || ""));
   const expectedLabels = ["Bold change", "Color change", "Highlight change", "Size change", "Font change", "Table highlight"];
   if (formatRows.length !== expectedLabels.length || expectedLabels.some((label) => !formatRows.some((row) => row.includes(label)))) {
     throw new Error(`True formatting changes were not separated correctly: ${JSON.stringify(formatRows)}`);
@@ -1104,27 +1105,27 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsBeforeDocx], 0);
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
-  const input = await page.$(".revision-author-field input");
+  const input = await page.$("[data-testid='document-revision-author'] input");
   if (!input || !await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not rendered disabled while rewriting was off.");
   await clickSetting(page, "변경 내용 작성자 통일");
   if (await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input did not become enabled.");
   await replaceInputValue(page, input, "Unified Reviewer");
-  await page.click(".tool-action-bar :is(.primary-button, .ui-primary-button)");
+  await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
   const trackedPath = path.join(tempDir, "word-unified-author.docx");
-  await saveBlobLink(page, ".word-pair-result-card .tracked-download", trackedPath);
+  await saveBlobLink(page, "[data-testid='document-result-card'] [data-testid='document-tracked-download']", trackedPath);
   await assertUnifiedTrackedDocument(trackedPath, fixtures.revisionsBeforeDocx, fixtures.revisionsAfterDocx, fixtures.revisionOracle);
 
   await clickSetting(page, "변경 내용 작성자 통일");
-  await page.waitForFunction(() => !document.querySelector(".word-pair-result-card"));
+  await page.waitForFunction(() => !document.querySelector("[data-testid='document-result-card']"));
   if (!await input.evaluate((element) => element.disabled)) throw new Error("Changing the rewrite option did not disable its input and clear prior results.");
 }
 
 async function waitForResult(page, timeout = 180_000) {
   await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
-    && (document.querySelector(".result-download") || document.querySelector(".error-banner")), { timeout });
-  const error = await page.$(".error-banner");
-  if (error) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Unknown UI error"));
+    && (document.querySelector(".result-download") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(".error-banner") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
+  const error = await page.$(".error-banner") || await page.$("[data-tool-page='document-compare'] [role='alert']");
+  if (error) throw new Error(await error.evaluate((element) => element.textContent || "Unknown UI error"));
 }
 
 async function clickPrimaryAction(page) {

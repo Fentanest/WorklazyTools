@@ -41,6 +41,15 @@ const migratedB2ToolFiles = [
 
 const migratedB2RouteFiles = migratedB2ToolFiles.filter((relativePath) => relativePath.endsWith("Page.tsx") && !relativePath.endsWith("AppPage.tsx"));
 
+const migratedB3ToolFiles = [
+  "src/features/document-compare/DocumentComparePage.tsx",
+  "src/features/document-compare/DocumentFileColumn.tsx",
+  "src/features/document-compare/DocumentPairingPreview.tsx",
+  "src/features/document-compare/DocumentCompareResultPage.tsx",
+  "src/features/word-compare/WordCompareResultPage.tsx",
+  "src/features/excel-cleaner/ExcelCleanerPage.tsx",
+];
+
 // These are the component/state classes emitted before the shadcn migration.
 // Raw legacy-only pages may still use some of them; migrated adapters must not.
 const legacyClassTokens = [
@@ -98,7 +107,7 @@ test("all 12 migrated components isolate their DOM from legacy class selectors",
   context.diagnostic(`${migratedComponentFiles.length} source files / 12 migrated components checked against ${legacyClassTokens.length} legacy tokens and ${legacyDynamicPrefixes.length} dynamic prefixes`);
 });
 
-test("the complete legacy stylesheet is parsed and critical adapter collisions stay separated", (context) => {
+test("the complete legacy stylesheet is parsed and migrated adapter collisions stay removed", (context) => {
   const css = read("src/styles/global.css");
   const root = postcss.parse(css, { from: "src/styles/global.css" });
   const rules: postcss.Rule[] = [];
@@ -106,13 +115,11 @@ test("the complete legacy stylesheet is parsed and critical adapter collisions s
   root.walkRules((rule) => rules.push(rule));
   root.walkDecls((declaration) => declarations.push(declaration));
 
-  assert.ok(rules.length >= 1_800, `expected the full stylesheet after B2-owned cleanup, parsed only ${rules.length} rules`);
+  assert.ok(rules.length >= 1_600, `expected the full stylesheet after B3-owned cleanup, parsed only ${rules.length} rules`);
   assert.match(css, /button:where\(:not\(\[data-slot\]\)\)/);
 
-  const actionRule = rules.find((rule) => rule.selector.includes(".tool-action-bar") && rule.selector.includes(".ui-primary-button"));
-  assert.ok(actionRule, "migrated primary button is missing the tool action bar contract");
-  assert.equal(actionRule.nodes.find((node) => node.type === "decl" && node.prop === "width")?.value, "190px");
-  assert.equal(actionRule.nodes.find((node) => node.type === "decl" && node.prop === "flex")?.value, "0 0 auto");
+  const actionRules = rules.filter((rule) => rule.selector.includes(".tool-action-bar") && rule.selector.includes(".ui-primary-button"));
+  assert.deepEqual(actionRules, [], "the retired document action-bar selector still targets the migrated primary button");
 
   const adapterSource = read("src/components/ui.tsx");
   const primaryButtonBlock = adapterSource.match(/export function PrimaryButton[\s\S]*?export function ResultCard/)?.[0] ?? "";
@@ -152,6 +159,23 @@ test("the five migrated B2 tools emit no legacy or global.css-owned class token"
   context.diagnostic(`${migratedB2ToolFiles.length} B2 surface sources checked against ${legacyClassTokens.length} legacy tokens, ${legacyDynamicPrefixes.length} dynamic prefixes, and ${cssClassTokens.size} global.css class tokens`);
 });
 
+test("the reachable B3 document and Excel Cleaner surfaces emit no legacy or global.css-owned class token", (context) => {
+  const cssClassTokens = new Set([...read("src/styles/global.css").matchAll(/\.(-?[_a-zA-Z]+[_a-zA-Z0-9-]*)/g)].map((match) => match[1]));
+  const legacyMatches = migratedB3ToolFiles.flatMap((relativePath) => classNameTokens(relativePath)
+    .filter((token) => (
+      legacyClassTokens.includes(token as typeof legacyClassTokens[number])
+      || legacyDynamicPrefixes.some((prefix) => token.startsWith(prefix))
+      || cssClassTokens.has(token)
+    ))
+    .map((token) => `${relativePath}:${token}`));
+
+  assert.deepEqual(legacyMatches, []);
+  assert.match(read("src/features/document-compare/DocumentComparePage.tsx"), /<UtilityPage toolId="document-compare"/);
+  assert.match(read("src/features/word-compare/WordCompareResultPage.tsx"), /<UtilityPage toolId="document-compare-result"/);
+  assert.match(read("src/features/excel-cleaner/ExcelCleanerPage.tsx"), /<UtilityPage toolId="excel-cleaner"/);
+  context.diagnostic(`${migratedB3ToolFiles.length} B3 reachable surface sources checked against ${cssClassTokens.size} global.css class tokens`);
+});
+
 test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (context) => {
   const manifest = JSON.parse(read("docs/legacy-css-owner-manifest.json")) as {
     baseline: { legacyRuleCount: number; compactRuleCount: number; nonCompactRuleCount: number };
@@ -170,13 +194,19 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
   assert.equal(Object.values(manifest.categoryCounts).reduce((sum, count) => sum + count, 0), 155);
   assert.equal(new Set(manifest.entries.map(({ id }) => id)).size, 155);
   assert.ok(manifest.entries.every(({ consumers, refCount }) => consumers.length === refCount));
-  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 17);
-  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 2);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 31);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 3);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "pre-B1").map(({ id }) => id), ["legacy-043", "legacy-045"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B1").map(({ id }) => id), ["legacy-125", "legacy-127", "legacy-135"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B2").map(({ id }) => id), [
     "legacy-095", "legacy-096", "legacy-097", "legacy-106", "legacy-107", "legacy-108", "legacy-109",
     "legacy-121", "legacy-122", "legacy-123", "legacy-124", "legacy-126", "legacy-142", "legacy-144",
   ]);
-  context.diagnostic("155 rules / 18 ownership categories / 17 removals / two splits verified");
+  assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B3").map(({ id }) => id), [
+    "legacy-070", "legacy-071", "legacy-072", "legacy-073", "legacy-087", "legacy-088", "legacy-089",
+    "legacy-090", "legacy-091", "legacy-092", "legacy-093", "legacy-094", "legacy-132", "legacy-141", "legacy-149",
+  ]);
+  assert.equal(manifest.categoryCounts["excel-compare"], 27);
+  assert.equal(manifest.categoryCounts["excel-cleaner"], 1);
+  context.diagnostic("155 rules / 18 ownership categories / 31 removals / three splits verified");
 });

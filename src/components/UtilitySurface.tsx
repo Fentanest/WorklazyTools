@@ -73,16 +73,17 @@ export function UtilityField({ children, className }: { children: ReactNode; cla
   return <label className={cn("flex min-w-0 flex-col gap-1.5 text-[13px] font-bold text-muted-foreground", className)}>{children}</label>;
 }
 
-export function UtilityNotice({ children, className, tone = "warning", role }: {
+export function UtilityNotice({ children, className, tone = "warning", role, ...props }: {
   children: ReactNode;
   className?: string;
   tone?: "warning" | "error" | "success";
   role?: "alert" | "status";
-}) {
+} & Omit<ComponentProps<"div">, "children" | "className" | "role">) {
   return (
     <div
       data-slot="notice"
       role={role}
+      {...props}
       className={cn(
         "flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm leading-relaxed",
         tone === "warning" && "bg-amber-500/10 text-amber-800 dark:text-amber-300",

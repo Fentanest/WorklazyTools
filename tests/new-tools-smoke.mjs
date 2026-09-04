@@ -28,6 +28,7 @@ try {
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
     headless: true,
+    protocolTimeout: 300_000,
     args: ["--no-sandbox", "--disable-dev-shm-usage", "--autoplay-policy=no-user-gesture-required"],
   });
   try {
@@ -117,42 +118,42 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   if (!compareVersion.includes("rhwp 0.8.6") || !compareVersion.includes("공식 비교 파일")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
-  let compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  let compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
   await compareInputs[0].uploadFile(hwpPaths[0]);
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 1);
-  compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 1);
+  compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
   await compareInputs[1].uploadFile(wordDocx);
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[1]?.children.length === 1);
-  await page.$eval(".tool-action-bar :is(.primary-button, .ui-primary-button)", (button) => button.click());
-  await page.waitForFunction(() => document.querySelector(".error-banner")?.textContent?.includes("Word 문서와 HWP 문서는 서로 비교할 수 없습니다"));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 1);
+  await page.$eval("[data-testid='document-action-bar'] [data-ui-component='primary-button']", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector("[data-tool-page='document-compare'] [role='alert']")?.textContent?.includes("Word 문서와 HWP 문서는 서로 비교할 수 없습니다"));
   await page.evaluate(() => {
-    const lists = document.querySelectorAll(".hwp-sortable-files");
-    const remove = lists[1]?.querySelector(".sortable-file-actions button:last-child");
+    const lists = document.querySelectorAll("[data-testid^='document-file-list-']");
+    const remove = lists[1]?.querySelector("[data-testid='document-file-item'] button:last-child");
     if (!(remove instanceof HTMLButtonElement)) throw new Error("Cross-family test file remove button was not found.");
     remove.click();
   });
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files").length === 1);
-  compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']").length === 1);
+  compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
   await compareInputs[0].uploadFile(hwpPaths[1]);
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 2);
-  const hwpAddButton = await page.$eval(".hwp-compare-page [data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 2);
+  const hwpAddButton = await page.$eval("[data-tool-page='document-compare'] [data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
   if (!hwpAddButton.includes("더 추가")) throw new Error(`HWP comparison does not expose incremental file addition: ${hwpAddButton}`);
-  await page.$eval(".hwp-sortable-files .move-across-button", (button) => button.click());
+  await page.$eval("[data-testid='document-file-item'] button[title]", (button) => button.click());
   await page.waitForFunction(() => {
-    const lists = document.querySelectorAll(".hwp-sortable-files");
+    const lists = document.querySelectorAll("[data-testid^='document-file-list-']");
     return lists.length === 2 && lists[0].children.length === 1 && lists[1].children.length === 1;
   });
-  await page.$eval(".tool-action-bar :is(.primary-button, .ui-primary-button)", (button) => button.click());
-  await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success") || document.querySelector(".error-banner"), { timeout: 120_000 });
-  const compareError = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
+  await page.$eval("[data-testid='document-action-bar'] [data-ui-component='primary-button']", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success") || document.querySelector("[data-tool-page='document-compare'] [role='alert']"), { timeout: 120_000 });
+  const compareError = await page.$eval("[data-tool-page='document-compare'] [role='alert']", (element) => element.textContent || "").catch(() => "");
   if (compareError) throw new Error(`Unified HWP comparison failed: ${compareError}`);
-  if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 1
-    || await page.$$(".word-pair-result-card .blue-download").then((items) => items.length) !== 1
-    || await page.$$(".word-pair-result-card .tracked-download").then((items) => items.length) !== 0) {
+  if (await page.$$('[data-testid="document-result-card"]').then((items) => items.length) !== 1
+    || await page.$$('[data-testid="document-result-card"] [data-testid="document-excel-download"]').then((items) => items.length) !== 1
+    || await page.$$('[data-testid="document-result-card"] [data-testid="document-tracked-download"]').then((items) => items.length) !== 0) {
     throw new Error("Unified HWP comparison outputs do not match the selected formats.");
   }
-  await page.$eval(".word-pair-result-card .secondary-button", (button) => button.click());
-  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1") && document.querySelector(".comparison-summary"));
+  await page.$eval("[data-testid='document-result-card'] [data-testid='document-view-result']", (button) => button.click());
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1") && document.querySelector("[data-testid='document-result-summary']"));
 
   const forbiddenRhwpRequests = [];
   const recordRhwpRequest = (request) => {
