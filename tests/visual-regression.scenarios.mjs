@@ -1,0 +1,318 @@
+import { availableToolRoutes } from "./tool-registry-routes.mjs";
+
+const profile = (locale, theme, viewport) => Object.freeze({ locale, theme, viewport });
+
+const koLightDesktop = profile("ko", "light", "desktop");
+const koLightMobile = profile("ko", "light", "mobile");
+const koDarkDesktop = profile("ko", "dark", "desktop");
+const koDarkMobile = profile("ko", "dark", "mobile");
+const enLightDesktop = profile("en", "light", "desktop");
+const enLightMobile = profile("en", "light", "mobile");
+const enDarkDesktop = profile("en", "dark", "desktop");
+const enDarkMobile = profile("en", "dark", "mobile");
+
+const fullProfiles = Object.freeze([
+  koLightDesktop,
+  koLightMobile,
+  koDarkDesktop,
+  koDarkMobile,
+  enLightDesktop,
+  enLightMobile,
+  enDarkDesktop,
+  enDarkMobile,
+]);
+
+const representativeProfiles = Object.freeze([
+  koLightDesktop,
+  koDarkMobile,
+  enLightMobile,
+  enDarkDesktop,
+]);
+
+const mobileBottomProfiles = Object.freeze([koDarkMobile, enLightMobile]);
+const koreanOnlyProfiles = Object.freeze([koLightDesktop, koDarkMobile]);
+const koreanOnlyBottomProfiles = Object.freeze([koDarkMobile]);
+const englishRedirectProfiles = Object.freeze([enLightMobile, enDarkDesktop]);
+const interactionProfiles = Object.freeze([enDarkDesktop]);
+
+const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
+const DEFAULT_BOTTOM_TARGET_SELECTOR = ".tool-page > :last-child";
+const HWP_ENGLISH_NA_REASON = "The HWP editor is intentionally Korean-only; its English URL redirects to /en/tools and is recorded as a separate redirect scenario.";
+
+const scenario = (definition) => Object.freeze({
+  fixture: null,
+  actions: Object.freeze([]),
+  readySelector: DEFAULT_READY_SELECTOR,
+  assertSelector: DEFAULT_READY_SELECTOR,
+  bottomTargetSelector: null,
+  localeNotApplicableReason: null,
+  ...definition,
+  profiles: Object.freeze([...definition.profiles]),
+  actions: Object.freeze([...(definition.actions ?? [])].map((action) => Object.freeze(action))),
+});
+
+const indexScenarios = [
+  scenario({
+    scenarioId: "home-default--initial",
+    routeId: "home-default",
+    stateId: "initial",
+    stateType: "initial",
+    path: "/",
+    kind: "index",
+    profiles: fullProfiles,
+    profileReductionReason: "No reduction: the shared landing surface keeps the full locale, theme, and viewport product.",
+    readySelector: ".home-page .hero",
+    assertSelector: ".home-page .hero",
+  }),
+  scenario({
+    scenarioId: "tools-media-filter--initial",
+    routeId: "tools-media-filter",
+    stateId: "initial",
+    stateType: "initial",
+    path: "/tools?category=media",
+    kind: "index",
+    profiles: fullProfiles,
+    profileReductionReason: "No reduction: the shared tool index keeps the full locale, theme, and viewport product.",
+    readySelector: ".tools-index-page .tool-category-section .ui-tool-card",
+    assertSelector: ".tools-index-page .tool-category-section .ui-tool-card",
+  }),
+];
+
+const defaultFixtureFor = (toolId) => toolId === "security-tools"
+  ? Object.freeze({ kind: "deterministic-password", value: "Worklazy2!Safe#Tool9" })
+  : null;
+
+const initialScenarioFor = (route) => {
+  const koreanOnly = route.toolId === "hwp-editor";
+  return scenario({
+    scenarioId: `${route.id}--initial`,
+    routeId: route.id,
+    toolId: route.toolId,
+    stateId: "initial",
+    stateType: "initial",
+    path: route.path,
+    kind: "tool",
+    profiles: koreanOnly ? koreanOnlyProfiles : representativeProfiles,
+    profileReductionReason: koreanOnly
+      ? "English is product-level N/A. Korean keeps paired desktop/light and mobile/dark coverage; the redirect has its own scenario."
+      : "Representative pairwise coverage retains both locales, themes, and viewports without the eight-way full product.",
+    fixture: defaultFixtureFor(route.toolId),
+    localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
+  });
+};
+
+const bottomScenarioFor = (route) => {
+  const koreanOnly = route.toolId === "hwp-editor";
+  return scenario({
+    scenarioId: `${route.id}--bottom`,
+    routeId: route.id,
+    toolId: route.toolId,
+    stateId: "bottom",
+    stateType: "bottom",
+    path: route.path,
+    kind: "tool",
+    profiles: koreanOnly ? koreanOnlyBottomProfiles : mobileBottomProfiles,
+    profileReductionReason: koreanOnly
+      ? "The clearance contract is mobile-only and English is product-level N/A, so the Korean dark mobile profile is the sole applicable profile."
+      : "The clearance contract is mobile-only; KO/dark and EN/light retain both locales and themes while avoiding redundant desktop captures.",
+    fixture: defaultFixtureFor(route.toolId),
+    actions: [{ type: "scroll-bottom" }],
+    bottomTargetSelector: DEFAULT_BOTTOM_TARGET_SELECTOR,
+    localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
+  });
+};
+
+const interactionDefinitions = Object.freeze({
+  "excel-merger": Object.freeze({
+    stateId: "interaction-sheet-positions",
+    actions: [{ type: "click-option", selector: "[data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: "#sheet-position-pattern",
+  }),
+  "excel-compare": Object.freeze({
+    stateId: "interaction-key-mode",
+    actions: [{ type: "click", selector: ".excel-compare-mode-grid button:nth-child(2)" }],
+    assertSelector: ".excel-compare-mode-grid button:nth-child(2)[aria-checked='true']",
+  }),
+  "excel-cleaner": Object.freeze({
+    stateId: "interaction-csv-output",
+    actions: [{ type: "click-option", selector: "[data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: "[data-ui-component='segmented-control'] button:nth-child(2)[aria-pressed='true']",
+  }),
+  "pdf-editor": Object.freeze({
+    stateId: "interaction-image-to-pdf",
+    actions: [{ type: "click", selector: ".pdf-tool-navigation a:nth-child(2)" }],
+    assertSelector: ".pdf-tool-page[data-pdf-mode='image-to-pdf']",
+  }),
+  "document-compare": Object.freeze({
+    stateId: "interaction-web-output-off",
+    actions: [{ type: "click", selector: "[data-ui-component='toggle-row']:first-of-type [role='switch']" }],
+    assertSelector: "[data-ui-component='toggle-row']:first-of-type [role='switch'][aria-checked='false']",
+  }),
+  "video-studio": Object.freeze({
+    stateId: "interaction-gif-output",
+    fixture: { kind: "file", path: "fixtures/video-vp9-benchmark.mp4" },
+    actions: [
+      { type: "upload", selector: "input[type='file']" },
+      { type: "wait", selector: ".video-output-format-grid select" },
+      { type: "select", selector: ".video-output-format-grid select", value: "gif" },
+    ],
+    assertSelector: ".quick-tool-settings",
+  }),
+  "audio-studio": Object.freeze({
+    stateId: "interaction-loop-on",
+    fixture: { kind: "generated-wav", fileName: "visual-tone.wav", durationSeconds: 0.25, sampleRate: 8_000 },
+    actions: [
+      { type: "upload", selector: "input[type='file']" },
+      { type: "wait", selector: ".audio-loop-control [role='switch']" },
+      { type: "wait-shadow-canvas", selector: ".audio-waveform" },
+      { type: "wait", selector: ".ui-operation-progress.ui-status-success" },
+      { type: "click", selector: ".audio-loop-control [role='switch']" },
+    ],
+    assertSelector: ".audio-loop-control [role='switch'][aria-checked='true']",
+  }),
+  "image-studio": Object.freeze({
+    stateId: "interaction-batch-tab",
+    actions: [{ type: "click", selector: ".studio-tabs button:nth-child(2)" }],
+    assertSelector: ".studio-tabs button:nth-child(2).active",
+  }),
+  "text-merger": Object.freeze({
+    stateId: "interaction-comma-separator",
+    actions: [{ type: "select", selector: ".text-merger-page select", value: "comma" }],
+    assertSelector: ".text-merger-page select",
+  }),
+  "text-formatter": Object.freeze({
+    stateId: "interaction-sql-mode",
+    actions: [{ type: "click-option", selector: ".formatter-page [data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: ".formatter-toolbar select",
+  }),
+  "work-calculator": Object.freeze({
+    stateId: "interaction-leave-mode",
+    actions: [{ type: "click-option", selector: ".work-calculator-page > .mode-switch [data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: ".work-calculator-page .sub-segment",
+  }),
+  "timezone-calculator": Object.freeze({
+    stateId: "interaction-base-city",
+    actions: [{ type: "select-index", selector: ".timezone-page select", optionIndex: 1 }],
+    assertSelector: ".timezone-page select",
+  }),
+  "payroll-calculator": Object.freeze({
+    stateId: "interaction-net-mode",
+    actions: [{ type: "click-option", selector: ".payroll-page [data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: ".payroll-page [data-ui-component='segmented-control'] button:nth-child(2)[aria-pressed='true']",
+  }),
+  "security-tools": Object.freeze({
+    stateId: "interaction-symbols-off",
+    fixture: { kind: "deterministic-password", value: "Worklazy2!Safe#Tool9" },
+    actions: [{ type: "click", selector: ".toggle-card-grid [role='switch']", elementIndex: 3 }],
+    assertSelector: ".toggle-card-grid [role='switch'][aria-checked='false']",
+  }),
+  "qr-studio": Object.freeze({
+    stateId: "interaction-bulk-mode",
+    actions: [{ type: "click-option", selector: ".qr-page [data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: "[data-testid='qr-bulk-page']",
+  }),
+  "data-converter": Object.freeze({
+    stateId: "interaction-json-source",
+    actions: [{ type: "select", selector: ".converter-route select:first-of-type", value: "json" }],
+    assertSelector: ".converter-route select:first-of-type",
+  }),
+});
+
+const interactionScenarioFor = (route) => {
+  const definition = interactionDefinitions[route.toolId];
+  if (!definition) return null;
+  return scenario({
+    scenarioId: `${route.id}--${definition.stateId}`,
+    routeId: route.id,
+    toolId: route.toolId,
+    stateId: definition.stateId,
+    stateType: "interaction",
+    path: route.path,
+    kind: "tool",
+    profiles: interactionProfiles,
+    profileReductionReason: "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes.",
+    fixture: definition.fixture ?? defaultFixtureFor(route.toolId),
+    actions: definition.actions,
+    assertSelector: definition.assertSelector,
+    localeNotApplicableReason: null,
+  });
+};
+
+const toolScenarios = availableToolRoutes.flatMap((route) => {
+  const interaction = interactionScenarioFor(route);
+  return [initialScenarioFor(route), bottomScenarioFor(route), ...(interaction ? [interaction] : [])];
+});
+
+const hwpEnglishRedirectScenario = scenario({
+  scenarioId: "hwp-editor-empty--redirect-en-tools",
+  routeId: "hwp-editor-empty",
+  toolId: "hwp-editor",
+  stateId: "redirect-en-tools",
+  stateType: "redirect",
+  path: "/tools/hwp-editor",
+  kind: "redirect",
+  profiles: englishRedirectProfiles,
+  profileReductionReason: "Only English profiles apply to this product-level redirect; KO is covered by the tool's initial and bottom scenarios.",
+  actions: [{ type: "assert-path", pathname: "/en/tools" }],
+  readySelector: ".tools-index-page",
+  assertSelector: ".tools-index-page",
+  localeNotApplicableReason: "Korean is N/A for this redirect assertion because /ko/tools/hwp-editor is the supported tool route.",
+});
+
+export const visualRegressionScenarios = Object.freeze([
+  ...indexScenarios,
+  ...toolScenarios,
+  hwpEnglishRedirectScenario,
+]);
+
+export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDefinitions).sort());
+
+export const interactionNotApplicableReasons = Object.freeze({
+  "hwp-editor": "The landing screen has no product-owned toggle or selection control; the editor controls are supplied inside the vendored workspace after a document opens.",
+  "office-editor": "The landing screen exposes file/open actions, not a toggle or selection state; workspace interaction remains covered by the office smoke test.",
+  "text-tools": "The tool exposes direct transform actions and text inputs, not a persistent toggle or selection state.",
+  "image-privacy": "The tool exposes upload and remove actions, not a persistent toggle or selection state.",
+});
+
+const qrBulkBase = {
+  routeId: "qr-bulk-qa",
+  toolId: "qr-studio",
+  path: "/tools/qr-studio/bulk",
+  kind: "tool",
+  profiles: fullProfiles,
+  profileReductionReason: "No reduction: the dedicated U3 evidence set retains the full locale, theme, and viewport product.",
+  readySelector: "[data-testid='qr-bulk-page']",
+  bottomTargetSelector: null,
+  localeNotApplicableReason: null,
+};
+
+export const qrBulkQaScenarios = Object.freeze([
+  scenario({
+    ...qrBulkBase,
+    scenarioId: "qr-bulk-qa--initial",
+    stateId: "initial",
+    stateType: "initial",
+    assertSelector: "[data-testid='qr-bulk-page']",
+  }),
+  scenario({
+    ...qrBulkBase,
+    scenarioId: "qr-bulk-qa--result",
+    stateId: "result",
+    stateType: "interaction",
+    fixture: {
+      kind: "inline-file",
+      fileName: "qr-visual.csv",
+      mimeType: "text/csv",
+      contents: "Text,Name,Description\nhttps://worklazy.net/,샘플 QR,브라우저에서 생성한 결과",
+    },
+    actions: [
+      { type: "upload", selector: "[data-testid='qr-bulk-page'] input[type='file']" },
+      { type: "wait", selector: "[data-testid='qr-payload-type']" },
+      { type: "wait-enabled", selector: "[data-testid='qr-bulk-generate'] button" },
+      { type: "click", selector: "[data-testid='qr-bulk-generate'] button" },
+      { type: "wait", selector: "[data-testid='qr-bulk-results']" },
+      { type: "scroll-into-view", selector: "[data-testid='qr-bulk-results']", offset: -88 },
+    ],
+    assertSelector: "[data-testid='qr-bulk-results']",
+  }),
+]);

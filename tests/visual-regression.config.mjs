@@ -1,43 +1,7 @@
-import { availableToolRoutes } from "./tool-registry-routes.mjs";
-
-const fullProfiles = Object.freeze([
-  Object.freeze({ locale: "ko", theme: "light", viewport: "desktop" }),
-  Object.freeze({ locale: "ko", theme: "light", viewport: "mobile" }),
-  Object.freeze({ locale: "ko", theme: "dark", viewport: "desktop" }),
-  Object.freeze({ locale: "ko", theme: "dark", viewport: "mobile" }),
-  Object.freeze({ locale: "en", theme: "light", viewport: "desktop" }),
-  Object.freeze({ locale: "en", theme: "light", viewport: "mobile" }),
-  Object.freeze({ locale: "en", theme: "dark", viewport: "desktop" }),
-  Object.freeze({ locale: "en", theme: "dark", viewport: "mobile" }),
-]);
-
-const representativeProfiles = Object.freeze([
-  Object.freeze({ locale: "ko", theme: "light", viewport: "desktop" }),
-  Object.freeze({ locale: "ko", theme: "dark", viewport: "mobile" }),
-  Object.freeze({ locale: "en", theme: "light", viewport: "mobile" }),
-  Object.freeze({ locale: "en", theme: "dark", viewport: "desktop" }),
-]);
+import { qrBulkQaScenarios, visualRegressionScenarios } from "./visual-regression.scenarios.mjs";
 
 export const visualRegressionConfig = Object.freeze({
-  routes: Object.freeze([
-    Object.freeze({
-      id: "home-default",
-      path: "/",
-      kind: "index",
-      profiles: fullProfiles,
-      readySelector: ".home-page .hero",
-    }),
-    Object.freeze({
-      id: "tools-media-filter",
-      path: "/tools?category=media",
-      kind: "index",
-      profiles: fullProfiles,
-      readySelector: ".tools-index-page .tool-category-section .ui-tool-card",
-    }),
-    ...availableToolRoutes.map((route) => Object.freeze(route.toolId === "qr-studio"
-      ? { ...route, id: "qr-bulk-empty", path: "/tools/qr-studio/bulk", profiles: representativeProfiles, readySelector: '[data-testid="qr-bulk-page"]' }
-      : { ...route, profiles: representativeProfiles })),
-  ]),
+  scenarios: visualRegressionScenarios,
   viewports: Object.freeze([
     Object.freeze({ id: "desktop", width: 1365, height: 900, deviceScaleFactor: 1 }),
     Object.freeze({ id: "mobile", width: 390, height: 844, deviceScaleFactor: 1 }),
@@ -45,6 +9,17 @@ export const visualRegressionConfig = Object.freeze({
   animation: Object.freeze({
     css: "none",
     prefersReducedMotion: "reduce",
+  }),
+  environment: Object.freeze({
+    timezone: "UTC",
+    fontFamily: "Worklazy Visual Noto Sans KR",
+    fontUrl: "/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf",
+    maxCapturesPerBrowser: 12,
+    settleTimeMs: 200,
+    locales: Object.freeze({
+      ko: Object.freeze({ browserLocale: "ko-KR", acceptLanguage: "ko-KR,ko;q=0.9,en;q=0.8" }),
+      en: Object.freeze({ browserLocale: "en-US", acceptLanguage: "en-US,en;q=0.9" }),
+    }),
   }),
   diff: Object.freeze({
     perPixelThreshold: 0.1,
@@ -59,7 +34,4 @@ export const visualRegressionConfig = Object.freeze({
   ]),
 });
 
-export const qrBulkQaRoutes = Object.freeze([
-  Object.freeze({ id: "qr-bulk-empty", toolId: "qr-bulk", path: "/tools/qr-studio/bulk", kind: "tool", profiles: fullProfiles, readySelector: '[data-testid="qr-bulk-page"]' }),
-  Object.freeze({ id: "qr-bulk-result", toolId: "qr-bulk-result", path: "/tools/qr-studio/bulk", kind: "tool", profiles: fullProfiles, readySelector: '[data-testid="qr-bulk-page"]' }),
-]);
+export { qrBulkQaScenarios };

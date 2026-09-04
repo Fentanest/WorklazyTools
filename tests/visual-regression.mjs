@@ -8,7 +8,8 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 
-import { qrBulkQaRoutes, visualRegressionConfig as config } from "./visual-regression.config.mjs";
+import { assertMobileBottomLayout } from "./mobile-bottom-assertion.mjs";
+import { qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
@@ -33,18 +34,21 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 }
 
 if (qrBulkCaptureOnly && !captureDirectory) throw new Error("VISUAL_QR_BULK_CAPTURE_ONLY requires VISUAL_CAPTURE_DIR.");
-if (qrBulkCaptureOnly && updateBaselines) throw new Error("QR bulk QA captures cannot update the 96-image baseline set.");
+if (qrBulkCaptureOnly && updateBaselines) throw new Error("QR bulk QA captures cannot update the scenario baseline set.");
 if (qrBulkBaselinesOnly && !updateBaselines) throw new Error("VISUAL_QR_BULK_BASELINES_ONLY is available only while updating baselines.");
 if (qrBulkCaptureOnly && qrBulkBaselinesOnly) throw new Error("QR bulk capture-only and baseline-only modes cannot be combined.");
 
-const baselineNames = buildCaptureMatrix(config.routes).map(({ name }) => name);
-const captureRoutes = qrBulkCaptureOnly
-  ? qrBulkQaRoutes
-  : qrBulkBaselinesOnly ? config.routes.filter(({ id }) => id === "qr-bulk-empty") : config.routes;
-const captures = buildCaptureMatrix(captureRoutes);
+const baselineNames = buildCaptureMatrix(config.scenarios).map(({ name }) => name);
+const captureScenarios = qrBulkCaptureOnly
+  ? qrBulkQaScenarios
+  : qrBulkBaselinesOnly
+    ? config.scenarios.filter(({ toolId, stateType }) => toolId === "qr-studio" && stateType === "interaction")
+    : config.scenarios;
+const captures = buildCaptureMatrix(captureScenarios);
 const expectedNames = captures.map(({ name }) => name);
 let server;
-let browser;
+let serverOutput = [];
+const browsers = new Set();
 
 try {
   await fs.mkdir(baselineDirectory, { recursive: true });
@@ -60,26 +64,30 @@ try {
   if (updateBaselines) await removeUnexpectedBaselines(baselineNames);
   if (!externallyManagedBaseUrl) server = await startPreviewServer();
 
-  browser = await puppeteer.launch({
-    executablePath: chromeExecutable,
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-dev-shm-usage",
-      "--hide-scrollbars",
-      "--force-device-scale-factor=1",
-    ],
-  });
-
   const failures = [];
-  for (const [index, capture] of captures.entries()) {
-    const result = await captureAndCompare(capture);
-    if (result) failures.push(result);
-    console.log(`[${index + 1}/${captures.length}] ${capture.name}`);
+  let completed = 0;
+  let browserVersion = "unknown browser";
+  for (const locale of [...new Set(captures.map(({ locale: captureLocale }) => captureLocale))]) {
+    const localeCaptures = captures.filter(({ locale: captureLocale }) => captureLocale === locale);
+    for (let offset = 0; offset < localeCaptures.length; offset += config.environment.maxCapturesPerBrowser) {
+      const browser = await launchLocaleBrowser(locale);
+      browsers.add(browser);
+      browserVersion = await browser.version();
+      try {
+        for (const capture of localeCaptures.slice(offset, offset + config.environment.maxCapturesPerBrowser)) {
+          const result = await captureAndCompare(capture, browser);
+          if (result) failures.push(result);
+          completed += 1;
+          console.log(`[${completed}/${captures.length}] ${capture.name}`);
+        }
+      } finally {
+        browsers.delete(browser);
+        await browser.close();
+      }
+    }
   }
 
   if (!qrBulkCaptureOnly) await assertBaselineSet(baselineNames);
-  const browserVersion = await browser.version();
   const mode = updateBaselines ? "updated" : "matched";
   if (failures.length) {
     throw new Error(`Visual regression failed (${failures.length}/${expectedNames.length}):\n${failures.join("\n")}\nArtifacts: ${artifactDirectory}`);
@@ -89,35 +97,74 @@ try {
     : `Visual regression ${mode}: ${expectedNames.length} captures, ${browserVersion}.`);
   console.log(`Threshold: <= ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}% differing pixels at per-pixel threshold ${config.diff.perPixelThreshold}; antialiasing ignored.`);
   console.log(`Allowed regions: ${config.allowedRegions.map(({ selector }) => selector).join(", ")}.`);
+  console.log(`Environment: locale-specific browsers (${Object.values(config.environment.locales).map(({ browserLocale }) => browserLocale).join(", ")}), recycled every ${config.environment.maxCapturesPerBrowser} captures; Accept-Language and navigator locale fixed, timezone ${config.environment.timezone}, DPR 1, font ${config.environment.fontFamily}, ${config.environment.settleTimeMs} ms paint settle.`);
   if (captureDirectory) console.log(`Tool QA captures: ${expectedNames.filter((name) => !name.startsWith("home-default__") && !name.startsWith("tools-media-filter__")).length} in ${captureDirectory}.`);
+} catch (error) {
+  if (server?.exitCode !== null && server?.exitCode !== undefined) {
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nVite preview exited with code ${server.exitCode}.\n${serverOutput.join("").trim()}`);
+  }
+  throw error;
 } finally {
-  await browser?.close();
+  await Promise.all([...browsers].map((browser) => browser.close()));
   if (server) await stopServer(server);
 }
 
-function buildCaptureMatrix(routes) {
+function buildCaptureMatrix(scenarios) {
   const viewports = new Map(config.viewports.map((viewport) => [viewport.id, viewport]));
-  return routes.flatMap((route) => route.profiles.map((profile) => {
+  const matrix = scenarios.flatMap((scenarioDefinition) => scenarioDefinition.profiles.map((profile) => {
     const viewport = viewports.get(profile.viewport);
-    if (!viewport) throw new Error(`Unknown visual viewport ${profile.viewport} for ${route.id}.`);
+    if (!viewport) throw new Error(`Unknown visual viewport ${profile.viewport} for ${scenarioDefinition.scenarioId}.`);
     return {
-      route,
+      scenario: scenarioDefinition,
       locale: profile.locale,
       theme: profile.theme,
       viewport,
-      name: `${route.id}__${profile.locale}__${profile.theme}__${viewport.id}.png`,
+      name: `${scenarioDefinition.routeId}__${scenarioDefinition.stateId}__${profile.locale}__${profile.theme}__${viewport.id}.png`,
     };
   }));
+  const names = matrix.map(({ name }) => name);
+  if (new Set(names).size !== names.length) throw new Error("Visual scenario matrix produced duplicate capture names; stateId values must be unique per route.");
+  return matrix;
 }
 
-async function captureAndCompare(capture) {
+async function launchLocaleBrowser(locale) {
+  const localeEnvironment = config.environment.locales[locale];
+  if (!localeEnvironment) throw new Error(`No deterministic browser locale configuration exists for ${locale}.`);
+  return puppeteer.launch({
+    executablePath: chromeExecutable,
+    headless: true,
+    env: {
+      ...process.env,
+      LANG: "C.UTF-8",
+      LC_ALL: "C.UTF-8",
+      LANGUAGE: localeEnvironment.browserLocale,
+      TZ: config.environment.timezone,
+    },
+    args: [
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      "--hide-scrollbars",
+      "--force-device-scale-factor=1",
+      "--font-render-hinting=none",
+      "--disable-lcd-text",
+      `--lang=${localeEnvironment.browserLocale}`,
+    ],
+  });
+}
+
+async function captureAndCompare(capture, browser) {
   const page = await browser.newPage();
   const pageErrors = [];
   const externalRequests = [];
   try {
+    const localeEnvironment = config.environment.locales[capture.locale];
     page.setDefaultTimeout(60_000);
     await page.setBypassServiceWorker(true);
     await page.setViewport(capture.viewport);
+    await page.emulateTimezone(config.environment.timezone);
+    await page.setExtraHTTPHeaders({ "Accept-Language": localeEnvironment.acceptLanguage });
+    const client = await page.createCDPSession();
+    await client.send("Emulation.setLocaleOverride", { locale: localeEnvironment.browserLocale });
     await page.emulateMediaFeatures([
       { name: "prefers-color-scheme", value: capture.theme },
       { name: "prefers-reduced-motion", value: config.animation.prefersReducedMotion },
@@ -135,21 +182,49 @@ async function captureAndCompare(capture) {
     });
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
-    const captureUrl = new URL(`/${capture.locale}${capture.route.path}`, baseUrl);
+    const captureUrl = new URL(`/${capture.locale}${capture.scenario.path}`, baseUrl);
     await page.goto(captureUrl.href, { waitUntil: "networkidle0" });
-    await page.waitForSelector(capture.route.readySelector, { visible: true });
-    await stabilizeRepresentativeState(page, capture.route);
+    await page.waitForSelector(capture.scenario.readySelector, { visible: true });
+    await applyScenarioFixture(page, capture.scenario.fixture);
+    await performScenarioActions(page, capture.scenario.actions, capture.scenario.fixture);
+    await page.waitForSelector(capture.scenario.assertSelector, { visible: true });
     await page.addStyleTag({ content: buildStabilityCss() });
-    await page.evaluate(async (preserveScroll) => {
-      if (!preserveScroll) window.scrollTo(0, 0);
+    const environment = await page.evaluate(async (fontFamily) => {
+      const loadedFaces = document.fonts ? await document.fonts.load(`16px "${fontFamily}"`, "Worklazy 시각 기준") : [];
       if (document.fonts?.ready) await document.fonts.ready;
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    }, capture.route.toolId === "qr-bulk-result");
+      return {
+        language: navigator.language,
+        languages: navigator.languages,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        fontLoaded: loadedFaces.length > 0,
+      };
+    }, config.environment.fontFamily);
+    if (environment.language.toLowerCase() !== localeEnvironment.browserLocale.toLowerCase()) {
+      throw new Error(`navigator.language is ${environment.language}; expected ${localeEnvironment.browserLocale}.`);
+    }
+    if (environment.timezone !== config.environment.timezone) {
+      throw new Error(`Browser timezone is ${environment.timezone}; expected ${config.environment.timezone}.`);
+    }
+    if (!environment.fontLoaded) throw new Error(`Deterministic visual font ${config.environment.fontFamily} did not load.`);
+    await page.evaluate((settleTimeMs) => new Promise((resolve) => {
+      window.setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(resolve)), settleTimeMs);
+    }), config.environment.settleTimeMs);
+    let bottomMetrics;
+    if (capture.scenario.stateType === "bottom") {
+      if (capture.viewport.id !== "mobile") throw new Error(`${capture.scenario.scenarioId}: bottom scenarios must use a mobile viewport.`);
+      bottomMetrics = await assertMobileBottomLayout(page, {
+        bottomTargetSelector: capture.scenario.bottomTargetSelector,
+        scenarioId: capture.scenario.scenarioId,
+      });
+    } else if (!capture.scenario.actions.some(({ type }) => type === "scroll-into-view")) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
     if (pageErrors.length) throw new Error(`Page errors: ${pageErrors.join(" | ")}`);
     if (externalRequests.length) throw new Error(`External requests attempted: ${externalRequests.join(" | ")}`);
 
     const actualBuffer = await page.screenshot({ type: "png", captureBeyondViewport: false });
-    if (captureDirectory && capture.route.kind === "tool") {
+    if (captureDirectory && capture.scenario.kind === "tool") {
       await fs.writeFile(path.join(captureDirectory, capture.name), actualBuffer);
     }
     if (qrBulkCaptureOnly) return undefined;
@@ -186,42 +261,137 @@ async function captureAndCompare(capture) {
       fs.writeFile(path.join(artifactDirectory, `${stem}.actual.png`), actualBuffer),
       fs.writeFile(path.join(artifactDirectory, `${stem}.diff.png`), PNG.sync.write(diff)),
     ]);
-    return `${capture.name}: ${diffPixels} pixels differ (${(ratio * 100).toFixed(4)}% > ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}%).`;
+    return `${capture.name}: ${diffPixels} pixels differ (${(ratio * 100).toFixed(4)}% > ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}%).${bottomMetrics ? ` Bottom metrics: ${JSON.stringify(bottomMetrics)}.` : ""}`;
+  } catch (error) {
+    const details = [
+      `${capture.name}: ${error instanceof Error ? error.message : String(error)}`,
+      pageErrors.length ? `Page errors: ${pageErrors.join(" | ")}` : null,
+      externalRequests.length ? `External requests: ${externalRequests.join(" | ")}` : null,
+      `URL: ${page.url()}`,
+    ].filter(Boolean);
+    throw new Error(details.join("\n"), { cause: error });
   } finally {
     await page.close();
   }
 }
 
-async function stabilizeRepresentativeState(page, route) {
-  if (route.toolId === "security-tools") {
-    await page.$eval(".password-output input", (input) => {
+async function applyScenarioFixture(page, fixture) {
+  if (!fixture) return;
+  if (fixture.kind === "deterministic-password") {
+    await page.$eval(".password-output input", (input, value) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setter?.call(input, "Worklazy2!Safe#Tool9");
+      setter?.call(input, value);
       input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await page.waitForFunction(() => document.querySelector(".password-output input")?.value === "Worklazy2!Safe#Tool9");
+    }, fixture.value);
+    await page.waitForFunction((value) => document.querySelector(".password-output input")?.value === value, {}, fixture.value);
   }
-  if (route.toolId === "qr-bulk-result") {
-    await page.evaluate(() => {
-      const input = document.querySelector('[data-testid="qr-bulk-page"] input[type="file"]');
-      if (!(input instanceof HTMLInputElement)) throw new Error("Bulk QR spreadsheet input is missing.");
-      const transfer = new DataTransfer();
-      transfer.items.add(new File(["Text,Name,Description\nhttps://worklazy.net/,샘플 QR,브라우저에서 생성한 결과"], "qr-visual.csv", { type: "text/csv" }));
-      Object.defineProperty(input, "files", { configurable: true, value: transfer.files });
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    await page.waitForSelector('[data-testid="qr-payload-type"]');
-    await page.waitForFunction(() => {
-      const button = document.querySelector('[data-testid="qr-bulk-generate"] button');
-      return button instanceof HTMLButtonElement && !button.disabled;
-    });
-    await page.click('[data-testid="qr-bulk-generate"] button');
-    await page.waitForSelector('[data-testid="qr-bulk-results"]', { visible: true });
-    await page.$eval('[data-testid="qr-bulk-results"]', (element) => {
-      element.scrollIntoView({ block: "start" });
-      window.scrollBy(0, -88);
-    });
+}
+
+async function performScenarioActions(page, actions, fixture) {
+  for (const action of actions) {
+    if (action.type === "click") {
+      if (Number.isInteger(action.elementIndex)) {
+        await page.$$eval(action.selector, (elements, index) => {
+          const element = elements[index];
+          if (!(element instanceof HTMLElement)) throw new Error(`Clickable element ${index} is missing.`);
+          element.click();
+        }, action.elementIndex);
+      } else {
+        await page.click(action.selector);
+      }
+    } else if (action.type === "click-option") {
+      await page.$eval(action.selector, (root, optionIndex) => {
+        const option = root.querySelectorAll("button")[optionIndex];
+        if (!(option instanceof HTMLButtonElement)) throw new Error(`Option ${optionIndex} is missing.`);
+        option.click();
+      }, action.optionIndex);
+    } else if (action.type === "select") {
+      const selected = await page.select(action.selector, action.value);
+      if (!selected.includes(action.value)) throw new Error(`${action.selector} could not select ${action.value}.`);
+    } else if (action.type === "select-index") {
+      await page.$eval(action.selector, (select, optionIndex) => {
+        if (!(select instanceof HTMLSelectElement) || !select.options[optionIndex]) throw new Error(`Select option ${optionIndex} is missing.`);
+        select.value = select.options[optionIndex].value;
+        select.dispatchEvent(new Event("input", { bubbles: true }));
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }, action.optionIndex);
+    } else if (action.type === "upload") {
+      await uploadScenarioFixture(page, action.selector, fixture);
+    } else if (action.type === "wait") {
+      await page.waitForSelector(action.selector, { visible: true });
+    } else if (action.type === "wait-enabled") {
+      await page.waitForFunction((selector) => {
+        const element = document.querySelector(selector);
+        return element instanceof HTMLButtonElement && !element.disabled;
+      }, {}, action.selector);
+    } else if (action.type === "wait-shadow-canvas") {
+      await page.waitForFunction((selector) => {
+        const container = document.querySelector(selector);
+        const host = container?.firstElementChild;
+        const canvases = host?.shadowRoot ? [...host.shadowRoot.querySelectorAll("canvas")] : [];
+        return canvases.length > 0 && canvases.every((canvas) => canvas.width > 0 && canvas.height > 0);
+      }, {}, action.selector);
+    } else if (action.type === "scroll-into-view") {
+      await page.$eval(action.selector, (element, offset) => {
+        element.scrollIntoView({ block: "start" });
+        window.scrollBy(0, offset);
+      }, action.offset ?? 0);
+    } else if (action.type === "scroll-bottom") {
+      await page.evaluate(() => (document.scrollingElement ?? document.documentElement).scrollTo(0, (document.scrollingElement ?? document.documentElement).scrollHeight));
+    } else if (action.type === "assert-path") {
+      const actualPath = new URL(page.url()).pathname.replace(/\/$/, "");
+      if (actualPath !== action.pathname) throw new Error(`Expected redirect to ${action.pathname}, received ${actualPath}.`);
+    } else {
+      throw new Error(`Unsupported visual scenario action ${action.type}.`);
+    }
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   }
+}
+
+async function uploadScenarioFixture(page, selector, fixture) {
+  if (!fixture) throw new Error(`Upload action for ${selector} has no fixture.`);
+  if (fixture.kind === "file") {
+    const input = await page.$(selector);
+    if (!input) throw new Error(`Upload input ${selector} is missing.`);
+    await input.uploadFile(path.resolve(testDirectory, fixture.path));
+    return;
+  }
+  let bytes;
+  if (fixture.kind === "inline-file") bytes = Buffer.from(fixture.contents, "utf8");
+  else if (fixture.kind === "generated-wav") bytes = createVisualWav(fixture);
+  else throw new Error(`Fixture kind ${fixture.kind} cannot be uploaded.`);
+  await page.$eval(selector, (input, payload) => {
+    if (!(input instanceof HTMLInputElement)) throw new Error("Visual fixture upload target is not an input.");
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([new Uint8Array(payload.bytes)], payload.fileName, { type: payload.mimeType }));
+    Object.defineProperty(input, "files", { configurable: true, value: transfer.files });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, {
+    bytes: [...bytes],
+    fileName: fixture.fileName,
+    mimeType: fixture.mimeType ?? "audio/wav",
+  });
+}
+
+function createVisualWav({ durationSeconds, sampleRate }) {
+  const sampleCount = Math.round(durationSeconds * sampleRate);
+  const buffer = Buffer.alloc(44 + sampleCount * 2);
+  buffer.write("RIFF", 0);
+  buffer.writeUInt32LE(buffer.length - 8, 4);
+  buffer.write("WAVEfmt ", 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36);
+  buffer.writeUInt32LE(sampleCount * 2, 40);
+  for (let index = 0; index < sampleCount; index += 1) {
+    buffer.writeInt16LE(Math.round(Math.sin((index / sampleRate) * Math.PI * 2 * 440) * 8_000), 44 + index * 2);
+  }
+  return buffer;
 }
 
 async function removeUnexpectedBaselines(expected) {
@@ -235,6 +405,15 @@ async function removeUnexpectedBaselines(expected) {
 function buildStabilityCss() {
   const allowedSelectors = config.allowedRegions.map(({ selector }) => selector).join(",\n");
   return `
+    @font-face {
+      font-family: "${config.environment.fontFamily}";
+      src: url("${config.environment.fontUrl}") format("opentype");
+      font-display: block;
+      font-style: normal;
+      font-weight: 100 900;
+    }
+    :root { font-family: "${config.environment.fontFamily}", sans-serif !important; }
+    input[type="file"], input[type="file"]::file-selector-button { font-family: "${config.environment.fontFamily}", sans-serif !important; }
     *, *::before, *::after {
       animation-delay: 0s !important;
       animation-duration: 0s !important;
@@ -261,29 +440,34 @@ async function startPreviewServer() {
   const viteBin = path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js");
   const child = spawn(process.execPath, [viteBin, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none" },
+    env: { ...process.env, BROWSER: "none", TZ: config.environment.timezone },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const output = [];
-  child.stdout.on("data", (chunk) => output.push(chunk.toString()));
-  child.stderr.on("data", (chunk) => output.push(chunk.toString()));
+  serverOutput = [];
+  child.stdout.on("data", (chunk) => serverOutput.push(chunk.toString()));
+  child.stderr.on("data", (chunk) => serverOutput.push(chunk.toString()));
   child.unref();
   try {
     await waitForServer(child);
     return child;
   } catch (error) {
     await stopServer(child);
-    throw new Error(`${error.message}\n${output.join("").trim()}`);
+    throw new Error(`${error.message}\n${serverOutput.join("").trim()}`);
   }
 }
 
 async function waitForServer(child) {
   const deadline = Date.now() + 30_000;
+  const expectedServerAddress = `http://127.0.0.1:${port}/`;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Vite exited with code ${child.exitCode} before becoming ready.`);
+    if (!serverOutput.join("").includes(expectedServerAddress)) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      continue;
+    }
     try {
       const response = await fetch(baseUrl);
-      if (response.ok) return;
+      if (response.ok && child.exitCode === null) return;
     } catch {
       // The fixed local server is still starting.
     }

@@ -8,6 +8,8 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
 
+import { assertMobileBottomLayout } from "./mobile-bottom-assertion.mjs";
+
 const run = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-excel-compare-smoke-"));
@@ -158,17 +160,11 @@ try {
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
-    const mobile = await page.evaluate(async () => {
+    const mobileLayout = await page.evaluate(() => {
       const dropZone = document.querySelector(".excel-compare-page .drop-zone");
       const sectionCard = document.querySelector(".ui-section-card");
       const hint = dropZone?.querySelector('[data-ui-part="drop-hint"]');
       const protectedHintSegment = Array.from(hint?.querySelectorAll('[data-ui-part="drop-hint-segment"]') ?? []).find((segment) => segment.textContent?.includes("SpreadsheetML"));
-      const mainContent = document.querySelector(".main-content");
-      const bottomTabs = document.querySelector(".bottom-tabs");
-      document.documentElement.style.scrollBehavior = "auto";
-      window.scrollTo(0, document.documentElement.scrollHeight);
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      const footer = document.querySelector(".global-footer");
       return {
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         pairColumns: getComputedStyle(document.querySelector(".excel-pair-files")).gridTemplateColumns,
@@ -178,12 +174,13 @@ try {
         cardRadius: sectionCard ? getComputedStyle(sectionCard).borderRadius : "",
         hintText: hint?.textContent || "",
         protectedHintSegmentLines: protectedHintSegment?.getClientRects().length || 0,
-        contentBottomPadding: mainContent ? Number.parseFloat(getComputedStyle(mainContent).paddingBottom) : 0,
-        navigationHeight: bottomTabs?.getBoundingClientRect().height || 0,
-        footerBottom: footer?.getBoundingClientRect().bottom || 0,
-        navigationTop: bottomTabs?.getBoundingClientRect().top || 0,
       };
     });
+    const mobileBottom = await assertMobileBottomLayout(page, {
+      bottomTargetSelector: ".excel-compare-page > :last-child",
+      scenarioId: "excel-compare-smoke-mobile-bottom",
+    });
+    const mobile = { ...mobileLayout, ...mobileBottom };
     if (
       mobile.overflow > 1
       || mobile.pairColumns.split(" ").length !== 1
@@ -192,8 +189,6 @@ try {
       || mobile.dropRadius !== mobile.cardRadius
       || mobile.hintText !== "XLSX·XLSM·XLS·XLSB·SpreadsheetML .xls·CSV"
       || mobile.protectedHintSegmentLines !== 1
-      || mobile.contentBottomPadding < mobile.navigationHeight
-      || mobile.footerBottom > mobile.navigationTop + 1
     ) throw new Error(`Mobile layout, drop-zone polish, or navigation clearance failed: ${JSON.stringify(mobile)}`);
 
     const integrityFailures = [];
