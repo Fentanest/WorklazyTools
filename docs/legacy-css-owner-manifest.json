@@ -1,0 +1,2650 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "branch": "ui-migration",
+    "commit": "454d7c8964d1a2f301c8661a6c6cc00f6304b49f",
+    "stylesheet": "src/styles/global.css",
+    "legacyRuleCount": 155,
+    "compactRuleCount": 12,
+    "nonCompactRuleCount": 143
+  },
+  "ownershipSemantics": {
+    "refCount": "Number of named tool or shared-screen consumers for the legacy selector rule at the baseline commit.",
+    "lastRemovalBundle": "The final planned bundle that can remove the legacy rule or its legacy selector arm after its refCount reaches zero.",
+    "mixedSelectors": "A mixed legacy/ui selector keeps its non-legacy arm until that arm has its own zero refCount; currentState tracks the baseline legacy rule inventory."
+  },
+  "categoryCounts": {
+    "cross-shared": 31,
+    "p2-shared": 21,
+    "orphan": 2,
+    "excel-compare": 26,
+    "excel-merger": 17,
+    "document-compare": 13,
+    "image-studio": 7,
+    "pdf-editor": 5,
+    "office-editor": 4,
+    "audio-studio": 4,
+    "text-merger": 3,
+    "hwp-editor": 2,
+    "video-studio": 2,
+    "excel-cleaner": 2,
+    "qr-studio": 2,
+    "timezone-calculator": 1,
+    "security-tools": 1,
+    "compact": 12
+  },
+  "entries": [
+    {
+      "id": "legacy-001",
+      "baselineLine": 104,
+      "selector": ".visually-hidden",
+      "legacyTokens": [
+        "visually-hidden"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-compare",
+        "tool:hwp-editor",
+        "tool:image-studio",
+        "tool:pdf-editor",
+        "tool:qr-studio",
+        "tool:security-tools",
+        "tool:text-merger",
+        "tool:video-studio"
+      ],
+      "refCount": 8,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-002",
+      "baselineLine": 153,
+      "selector": ".language-landing-card > p:not(.eyebrow)",
+      "legacyTokens": [
+        "eyebrow"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-003",
+      "baselineLine": 192,
+      "selector": ".brand-mark.compact",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "shared:app-shell-brand"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-004",
+      "baselineLine": 260,
+      "selector": ".eyebrow, .ui-eyebrow",
+      "legacyTokens": [
+        "eyebrow"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:public-pages",
+        "tool:document-compare",
+        "tool:excel-cleaner",
+        "tool:excel-compare"
+      ],
+      "refCount": 4,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-005",
+      "baselineLine": 268,
+      "selector": ".eyebrow.success",
+      "legacyTokens": [
+        "eyebrow"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-banner-and-about",
+        "tool:document-compare"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-006",
+      "baselineLine": 416,
+      "selector": ".content-heading",
+      "legacyTokens": [
+        "content-heading"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:home",
+        "tool:document-compare",
+        "tool:excel-cleaner",
+        "tool:excel-compare"
+      ],
+      "refCount": 4,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-007",
+      "baselineLine": 417,
+      "selector": ".content-heading h2",
+      "legacyTokens": [
+        "content-heading"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:home",
+        "tool:document-compare",
+        "tool:excel-cleaner",
+        "tool:excel-compare"
+      ],
+      "refCount": 4,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-008",
+      "baselineLine": 418,
+      "selector": ".content-heading a",
+      "legacyTokens": [
+        "content-heading"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:home",
+        "tool:document-compare",
+        "tool:excel-cleaner",
+        "tool:excel-compare"
+      ],
+      "refCount": 4,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-009",
+      "baselineLine": 444,
+      "selector": ".tool-icon, .ui-tool-icon",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-010",
+      "baselineLine": 446,
+      "selector": ".tool-icon.small",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-011",
+      "baselineLine": 447,
+      "selector": ".tool-icon.accent-green",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-012",
+      "baselineLine": 448,
+      "selector": ".tool-icon.accent-blue",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-013",
+      "baselineLine": 449,
+      "selector": ".tool-icon.accent-violet",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-014",
+      "baselineLine": 450,
+      "selector": ".tool-icon.accent-orange",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-015",
+      "baselineLine": 451,
+      "selector": ".tool-icon.accent-pink",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-016",
+      "baselineLine": 452,
+      "selector": ".tool-icon.accent-sky",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-017",
+      "baselineLine": 500,
+      "selector": ".tool-category-filter button.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-018",
+      "baselineLine": 501,
+      "selector": ".tool-category-filter button.selected small",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-019",
+      "baselineLine": 502,
+      "selector": ".tool-category-filter button.accent-blue.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-020",
+      "baselineLine": 503,
+      "selector": ".tool-category-filter button.accent-pink.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-021",
+      "baselineLine": 504,
+      "selector": ".tool-category-filter button.accent-violet.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-022",
+      "baselineLine": 505,
+      "selector": ".tool-category-filter button.accent-green.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-023",
+      "baselineLine": 506,
+      "selector": ".tool-category-filter button.accent-orange.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-024",
+      "baselineLine": 557,
+      "selector": ".field-label, .ui-field-label",
+      "legacyTokens": [
+        "field-label"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-compare",
+        "shared:file-drop-zone-adapter"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-025",
+      "baselineLine": 559,
+      "selector": ".drop-zone",
+      "legacyTokens": [
+        "drop-zone"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-026",
+      "baselineLine": 572,
+      "selector": ".drop-zone.dragging",
+      "legacyTokens": [
+        "drop-zone",
+        "dragging"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-027",
+      "baselineLine": 573,
+      "selector": ".drop-zone.accent-green.dragging",
+      "legacyTokens": [
+        "drop-zone",
+        "dragging"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-028",
+      "baselineLine": 574,
+      "selector": ".drop-zone.accent-blue.dragging",
+      "legacyTokens": [
+        "drop-zone",
+        "dragging"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-029",
+      "baselineLine": 575,
+      "selector": ".drop-zone.accent-violet.dragging",
+      "legacyTokens": [
+        "drop-zone",
+        "dragging"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-030",
+      "baselineLine": 576,
+      "selector": ".drop-zone.accent-orange.dragging",
+      "legacyTokens": [
+        "drop-zone",
+        "dragging"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-031",
+      "baselineLine": 577,
+      "selector": ".drop-zone.accent-pink.dragging",
+      "legacyTokens": [
+        "drop-zone",
+        "dragging"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-032",
+      "baselineLine": 578,
+      "selector": ".drop-zone.accent-sky.dragging",
+      "legacyTokens": [
+        "drop-zone",
+        "dragging"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-033",
+      "baselineLine": 579,
+      "selector": ".drop-icon",
+      "legacyTokens": [
+        "drop-icon"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-034",
+      "baselineLine": 580,
+      "selector": ".drop-zone.accent-green .drop-icon",
+      "legacyTokens": [
+        "drop-zone",
+        "drop-icon"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-035",
+      "baselineLine": 581,
+      "selector": ".drop-zone.accent-blue .drop-icon",
+      "legacyTokens": [
+        "drop-zone",
+        "drop-icon"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-036",
+      "baselineLine": 582,
+      "selector": ".drop-zone.accent-violet .drop-icon",
+      "legacyTokens": [
+        "drop-zone",
+        "drop-icon"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-037",
+      "baselineLine": 583,
+      "selector": ".drop-zone.accent-orange .drop-icon",
+      "legacyTokens": [
+        "drop-zone",
+        "drop-icon"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-038",
+      "baselineLine": 584,
+      "selector": ".drop-zone.accent-pink .drop-icon",
+      "legacyTokens": [
+        "drop-zone",
+        "drop-icon"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-039",
+      "baselineLine": 585,
+      "selector": ".drop-zone.accent-sky .drop-icon",
+      "legacyTokens": [
+        "drop-zone",
+        "drop-icon"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-040",
+      "baselineLine": 586,
+      "selector": ".drop-zone > div",
+      "legacyTokens": [
+        "drop-zone"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-041",
+      "baselineLine": 587,
+      "selector": ".drop-zone strong",
+      "legacyTokens": [
+        "drop-zone"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-042",
+      "baselineLine": 588,
+      "selector": ".drop-zone > div > .drop-hint",
+      "legacyTokens": [
+        "drop-zone",
+        "drop-hint"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-043",
+      "baselineLine": 589,
+      "selector": ".drop-hint-segment",
+      "legacyTokens": [
+        "drop-hint-segment"
+      ],
+      "category": "orphan",
+      "consumers": [],
+      "refCount": 0,
+      "lastRemovalBundle": "pre-B1",
+      "currentState": "removed",
+      "removedIn": "pre-B1"
+    },
+    {
+      "id": "legacy-044",
+      "baselineLine": 590,
+      "selector": ".drop-added-status",
+      "legacyTokens": [
+        "drop-added-status"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-045",
+      "baselineLine": 609,
+      "selector": ".file-list",
+      "legacyTokens": [
+        "file-list"
+      ],
+      "category": "orphan",
+      "consumers": [],
+      "refCount": 0,
+      "lastRemovalBundle": "pre-B1",
+      "currentState": "removed",
+      "removedIn": "pre-B1"
+    },
+    {
+      "id": "legacy-046",
+      "baselineLine": 610,
+      "selector": ".drop-zone.disabled",
+      "legacyTokens": [
+        "drop-zone",
+        "disabled"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-047",
+      "baselineLine": 626,
+      "selector": ".file-row",
+      "legacyTokens": [
+        "file-row"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-048",
+      "baselineLine": 627,
+      "selector": ".file-row + .file-row",
+      "legacyTokens": [
+        "file-row"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-049",
+      "baselineLine": 628,
+      "selector": ".file-type",
+      "legacyTokens": [
+        "file-type"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-050",
+      "baselineLine": 629,
+      "selector": ".file-type.accent-green",
+      "legacyTokens": [
+        "file-type"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-051",
+      "baselineLine": 630,
+      "selector": ".file-type.accent-blue",
+      "legacyTokens": [
+        "file-type"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-052",
+      "baselineLine": 631,
+      "selector": ".file-type.accent-violet",
+      "legacyTokens": [
+        "file-type"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-053",
+      "baselineLine": 632,
+      "selector": ".file-type.accent-orange",
+      "legacyTokens": [
+        "file-type"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-054",
+      "baselineLine": 633,
+      "selector": ".file-type.accent-pink",
+      "legacyTokens": [
+        "file-type"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-055",
+      "baselineLine": 634,
+      "selector": ".file-type.accent-sky",
+      "legacyTokens": [
+        "file-type"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-056",
+      "baselineLine": 635,
+      "selector": ".file-meta",
+      "legacyTokens": [
+        "file-meta"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-057",
+      "baselineLine": 636,
+      "selector": ".file-meta strong, .file-meta small",
+      "legacyTokens": [
+        "file-meta"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-058",
+      "baselineLine": 637,
+      "selector": ".file-meta strong",
+      "legacyTokens": [
+        "file-meta"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-059",
+      "baselineLine": 638,
+      "selector": ".file-meta small",
+      "legacyTokens": [
+        "file-meta"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-060",
+      "baselineLine": 639,
+      "selector": ".remove-button",
+      "legacyTokens": [
+        "remove-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-cleaner",
+        "tool:excel-compare",
+        "tool:excel-merger"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-061",
+      "baselineLine": 640,
+      "selector": ".remove-button:hover",
+      "legacyTokens": [
+        "remove-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-cleaner",
+        "tool:excel-compare",
+        "tool:excel-merger"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-062",
+      "baselineLine": 650,
+      "selector": ".excel-file-item .file-row",
+      "legacyTokens": [
+        "file-row"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-063",
+      "baselineLine": 688,
+      "selector": ".sheet-name-list li.selected .sheet-name-chip",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-064",
+      "baselineLine": 690,
+      "selector": ".sheet-name-list li.selected .sheet-name-chip > b",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-065",
+      "baselineLine": 704,
+      "selector": ":is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor",
+        "shared:toggle-row-adapter"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-066",
+      "baselineLine": 705,
+      "selector": ":is(.settings-row, .ui-settings-row) + :is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor",
+        "shared:toggle-row-adapter"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-067",
+      "baselineLine": 706,
+      "selector": ":is(.settings-row, .ui-settings-row) > div",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor",
+        "shared:toggle-row-adapter"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-068",
+      "baselineLine": 707,
+      "selector": ":is(.settings-row, .ui-settings-row) strong",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor",
+        "shared:toggle-row-adapter"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-069",
+      "baselineLine": 708,
+      "selector": ":is(.settings-row, .ui-settings-row) small",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor",
+        "shared:toggle-row-adapter"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-070",
+      "baselineLine": 709,
+      "selector": ".ios-switch",
+      "legacyTokens": [
+        "ios-switch"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-071",
+      "baselineLine": 710,
+      "selector": ".ios-switch span",
+      "legacyTokens": [
+        "ios-switch"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-072",
+      "baselineLine": 711,
+      "selector": ".ios-switch.checked",
+      "legacyTokens": [
+        "ios-switch",
+        "checked"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-073",
+      "baselineLine": 712,
+      "selector": ".ios-switch.checked span",
+      "legacyTokens": [
+        "ios-switch",
+        "checked"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-074",
+      "baselineLine": 730,
+      "selector": ".password-input.compact",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-075",
+      "baselineLine": 731,
+      "selector": ".password-input.compact input",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-076",
+      "baselineLine": 779,
+      "selector": ".video-audio-suggestion-actions :is(.primary-button, .ui-primary-button), .video-audio-suggestion-actions .secondary-button",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "video-studio",
+      "consumers": [
+        "tool:video-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5b",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-077",
+      "baselineLine": 798,
+      "selector": ":is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-078",
+      "baselineLine": 813,
+      "selector": ":is(.primary-button.accent-green, .ui-primary-button.ui-accent-green)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-079",
+      "baselineLine": 814,
+      "selector": ":is(.primary-button.accent-blue, .ui-primary-button.ui-accent-blue)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-080",
+      "baselineLine": 815,
+      "selector": ":is(.primary-button.accent-violet, .ui-primary-button.ui-accent-violet)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-081",
+      "baselineLine": 816,
+      "selector": ":is(.primary-button.accent-orange, .ui-primary-button.ui-accent-orange)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-082",
+      "baselineLine": 817,
+      "selector": ":is(.primary-button.accent-pink, .ui-primary-button.ui-accent-pink)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-083",
+      "baselineLine": 818,
+      "selector": ":is(.primary-button.accent-sky, .ui-primary-button.ui-accent-sky)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-084",
+      "baselineLine": 819,
+      "selector": ":is(.primary-button, .ui-primary-button):not(:disabled):hover",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-085",
+      "baselineLine": 820,
+      "selector": ":is(.primary-button, .ui-primary-button):disabled",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:privacy-consent",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-086",
+      "baselineLine": 821,
+      "selector": ".spin",
+      "legacyTokens": [
+        "spin"
+      ],
+      "category": "excel-merger",
+      "consumers": [
+        "tool:excel-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-087",
+      "baselineLine": 845,
+      "selector": ".sortable-word-files > li.dragging",
+      "legacyTokens": [
+        "dragging"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-088",
+      "baselineLine": 884,
+      "selector": ".compact-settings :is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-089",
+      "baselineLine": 903,
+      "selector": ".tool-action-bar :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-090",
+      "baselineLine": 946,
+      "selector": ".word-batch-results .content-heading",
+      "legacyTokens": [
+        "content-heading"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-091",
+      "baselineLine": 947,
+      "selector": ".word-batch-results .content-heading p:last-child",
+      "legacyTokens": [
+        "content-heading"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-092",
+      "baselineLine": 972,
+      "selector": ".document-content-toggle .ios-switch",
+      "legacyTokens": [
+        "ios-switch"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-093",
+      "baselineLine": 973,
+      "selector": ".document-content-toggle .ios-switch span",
+      "legacyTokens": [
+        "ios-switch"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-094",
+      "baselineLine": 974,
+      "selector": ".document-content-toggle .ios-switch.checked span",
+      "legacyTokens": [
+        "ios-switch",
+        "checked"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-095",
+      "baselineLine": 1029,
+      "selector": ".office-start-panel :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "office-editor",
+      "consumers": [
+        "tool:office-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-096",
+      "baselineLine": 1035,
+      "selector": ".office-app-toolbar :is(.primary-button, .ui-primary-button), .office-app-toolbar .secondary-button",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "office-editor",
+      "consumers": [
+        "tool:office-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-097",
+      "baselineLine": 1041,
+      "selector": ".office-file-picker.disabled",
+      "legacyTokens": [
+        "disabled"
+      ],
+      "category": "office-editor",
+      "consumers": [
+        "tool:office-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-098",
+      "baselineLine": 1119,
+      "selector": ".contact-card p:not(.eyebrow)",
+      "legacyTokens": [
+        "eyebrow"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-099",
+      "baselineLine": 1224,
+      "selector": ".pdf-page-grid.compact",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:pdf-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-100",
+      "baselineLine": 1226,
+      "selector": ".pdf-page-card.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "pdf-editor",
+      "consumers": [
+        "tool:pdf-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-101",
+      "baselineLine": 1236,
+      "selector": ".pdf-page-select.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "pdf-editor",
+      "consumers": [
+        "tool:pdf-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-102",
+      "baselineLine": 1262,
+      "selector": ".pdf-split-after.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "pdf-editor",
+      "consumers": [
+        "tool:pdf-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-103",
+      "baselineLine": 1273,
+      "selector": ".pdf-output-mode-list > button.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "pdf-editor",
+      "consumers": [
+        "tool:pdf-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-104",
+      "baselineLine": 1333,
+      "selector": ".pdf-format-grid button.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "pdf-editor",
+      "consumers": [
+        "tool:pdf-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-105",
+      "baselineLine": 1339,
+      "selector": ".section-actions :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:hwp-editor",
+        "tool:qr-studio",
+        "tool:audio-studio",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-106",
+      "baselineLine": 1364,
+      "selector": ".rhwp-version-notice.compact",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:hwp-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-107",
+      "baselineLine": 1365,
+      "selector": ".rhwp-version-notice.compact strong",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:hwp-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-108",
+      "baselineLine": 1366,
+      "selector": ".rhwp-version-notice.compact small",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:hwp-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-109",
+      "baselineLine": 1390,
+      "selector": ".hwp-focus-actions :is(.primary-button, .ui-primary-button), .hwp-focus-actions .secondary-button",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "hwp-editor",
+      "consumers": [
+        "tool:hwp-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-110",
+      "baselineLine": 1473,
+      "selector": ".multi-video-grid article.dragging",
+      "legacyTokens": [
+        "dragging"
+      ],
+      "category": "video-studio",
+      "consumers": [
+        "tool:video-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5b",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-111",
+      "baselineLine": 1590,
+      "selector": ".audio-loop-control :is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "audio-studio",
+      "consumers": [
+        "tool:audio-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-112",
+      "baselineLine": 1591,
+      "selector": ".audio-loop-control :is(.settings-row, .ui-settings-row) strong",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "audio-studio",
+      "consumers": [
+        "tool:audio-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-113",
+      "baselineLine": 1614,
+      "selector": ".audio-voice-effect-actions :is(.primary-button, .ui-primary-button), .audio-voice-effect-actions .secondary-button",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "audio-studio",
+      "consumers": [
+        "tool:audio-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-114",
+      "baselineLine": 1688,
+      "selector": ".image-size-controls > section > :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "image-studio",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-115",
+      "baselineLine": 1694,
+      "selector": ".image-size-toggle :is(.settings-row, .ui-settings-row), .image-export-ratio-toggle :is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "image-studio",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-116",
+      "baselineLine": 1695,
+      "selector": ".image-size-toggle :is(.settings-row, .ui-settings-row) strong, .image-export-ratio-toggle :is(.settings-row, .ui-settings-row) strong",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "image-studio",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-117",
+      "baselineLine": 1696,
+      "selector": ".image-size-toggle :is(.settings-row, .ui-settings-row) small, .image-export-ratio-toggle :is(.settings-row, .ui-settings-row) small",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "image-studio",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-118",
+      "baselineLine": 1740,
+      "selector": ".region-effect-selection :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "image-studio",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-119",
+      "baselineLine": 1794,
+      "selector": ".image-background-options.compact",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-120",
+      "baselineLine": 1795,
+      "selector": ".image-background-options :is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "image-studio",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-121",
+      "baselineLine": 1877,
+      "selector": ".pdf-output-mode-list small, .pdf-range-group label > span, .pdf-range-group label small, .pdf-format-grid small, .rhwp-version-notice.compact small",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:hwp-editor",
+        "tool:pdf-editor"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-122",
+      "baselineLine": 1891,
+      "selector": ".text-merge-item.dragging",
+      "legacyTokens": [
+        "dragging"
+      ],
+      "category": "text-merger",
+      "consumers": [
+        "tool:text-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-123",
+      "baselineLine": 1924,
+      "selector": ".text-merge-toggles :is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "text-merger",
+      "consumers": [
+        "tool:text-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-124",
+      "baselineLine": 1925,
+      "selector": ".text-merger-page :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "text-merger",
+      "consumers": [
+        "tool:text-merger"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-125",
+      "baselineLine": 1967,
+      "selector": ".metric-grid.compact",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:security-tools"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B1",
+      "currentState": "removed",
+      "removedIn": "B1"
+    },
+    {
+      "id": "legacy-126",
+      "baselineLine": 2003,
+      "selector": ".world-map-legend i.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "timezone-calculator",
+      "consumers": [
+        "tool:timezone-calculator"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-127",
+      "baselineLine": 2081,
+      "selector": ".toggle-card-grid :is(.settings-row, .ui-settings-row)",
+      "legacyTokens": [
+        "settings-row"
+      ],
+      "category": "security-tools",
+      "consumers": [
+        "tool:security-tools"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B1",
+      "currentState": "removed",
+      "removedIn": "B1"
+    },
+    {
+      "id": "legacy-128",
+      "baselineLine": 2094,
+      "selector": ".qr-scan-actions > :is(.primary-button, .ui-primary-button), .qr-photo-picker",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "qr-studio",
+      "consumers": [
+        "tool:qr-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-129",
+      "baselineLine": 2096,
+      "selector": ".qr-photo-picker.disabled",
+      "legacyTokens": [
+        "disabled"
+      ],
+      "category": "qr-studio",
+      "consumers": [
+        "tool:qr-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-130",
+      "baselineLine": 2223,
+      "selector": ".summary-card :is(.primary-button, .ui-primary-button), .prototype-note",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-131",
+      "baselineLine": 2224,
+      "selector": ".summary-card :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-132",
+      "baselineLine": 2234,
+      "selector": ".tool-page button:not(.ios-switch):not([data-slot]), .tool-page a:is(.primary-button, .ui-primary-button), .tool-page a.secondary-button, .tool-page a.result-download",
+      "legacyTokens": [
+        "ios-switch",
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:document-compare",
+        "tool:hwp-editor",
+        "tool:office-editor",
+        "tool:video-studio",
+        "tool:image-studio",
+        "shared:legacy-tool-root"
+      ],
+      "refCount": 6,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-133",
+      "baselineLine": 2238,
+      "selector": ".remove-button, .file-order-actions button, .pdf-drag-handle, .pdf-image-remove, .editor-history-actions button, .icon-tool-row button",
+      "legacyTokens": [
+        "remove-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-cleaner",
+        "tool:excel-compare",
+        "tool:excel-merger",
+        "tool:pdf-editor",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-134",
+      "baselineLine": 2254,
+      "selector": ".content-heading h2",
+      "legacyTokens": [
+        "content-heading"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "shared:home",
+        "tool:document-compare",
+        "tool:excel-cleaner",
+        "tool:excel-compare"
+      ],
+      "refCount": 4,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-135",
+      "baselineLine": 2265,
+      "selector": ".utility-editor-grid, .finding-list, .metric-grid, .metric-grid.compact, .metadata-grid, .qr-layout, .qr-scan-layout",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:text-formatter",
+        "tool:text-tools",
+        "tool:work-calculator",
+        "tool:security-tools",
+        "tool:image-privacy",
+        "tool:data-converter",
+        "tool:qr-studio"
+      ],
+      "refCount": 7,
+      "lastRemovalBundle": "B4",
+      "currentState": "legacy-arm-removed",
+      "removedIn": "B1",
+      "currentSelector": ".utility-editor-grid, .qr-layout, .qr-scan-layout"
+    },
+    {
+      "id": "legacy-136",
+      "baselineLine": 2306,
+      "selector": ".drop-zone",
+      "legacyTokens": [
+        "drop-zone"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-137",
+      "baselineLine": 2307,
+      "selector": ".drop-zone > div",
+      "legacyTokens": [
+        "drop-zone"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-138",
+      "baselineLine": 2308,
+      "selector": ".drop-zone .secondary-button",
+      "legacyTokens": [
+        "drop-zone"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-139",
+      "baselineLine": 2309,
+      "selector": ".drop-added-status",
+      "legacyTokens": [
+        "drop-added-status"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-140",
+      "baselineLine": 2324,
+      "selector": ".pdf-page-grid.compact",
+      "legacyTokens": [
+        "compact"
+      ],
+      "category": "compact",
+      "consumers": [
+        "tool:pdf-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-141",
+      "baselineLine": 2352,
+      "selector": ".tool-action-bar :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "document-compare",
+      "consumers": [
+        "tool:document-compare",
+        "screen:word-compare-result"
+      ],
+      "refCount": 2,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-142",
+      "baselineLine": 2362,
+      "selector": ".office-start-panel :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "office-editor",
+      "consumers": [
+        "tool:office-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-143",
+      "baselineLine": 2417,
+      "selector": ".section-actions, .section-actions :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:hwp-editor",
+        "tool:qr-studio",
+        "tool:audio-studio",
+        "tool:video-studio",
+        "tool:image-studio"
+      ],
+      "refCount": 5,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-144",
+      "baselineLine": 2424,
+      "selector": ".hwp-focus-actions :is(.primary-button, .ui-primary-button), .hwp-focus-actions .secondary-button",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "hwp-editor",
+      "consumers": [
+        "tool:hwp-editor"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B2",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-145",
+      "baselineLine": 2439,
+      "selector": ".export-row :is(.primary-button, .ui-primary-button)",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "image-studio",
+      "consumers": [
+        "tool:image-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B6",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-146",
+      "baselineLine": 2478,
+      "selector": ".audio-voice-effect-actions :is(.primary-button, .ui-primary-button), .audio-voice-effect-actions .secondary-button",
+      "legacyTokens": [
+        "primary-button"
+      ],
+      "category": "audio-studio",
+      "consumers": [
+        "tool:audio-studio"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-147",
+      "baselineLine": 2507,
+      "selector": ".excel-compare-mode-grid button.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-148",
+      "baselineLine": 2516,
+      "selector": ".excel-column-picker button.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "excel-compare",
+      "consumers": [
+        "tool:excel-compare"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B4",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-149",
+      "baselineLine": 2535,
+      "selector": ".excel-cleaner-file .remove-button",
+      "legacyTokens": [
+        "remove-button"
+      ],
+      "category": "excel-cleaner",
+      "consumers": [
+        "tool:excel-cleaner"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-150",
+      "baselineLine": 2564,
+      "selector": ".excel-status-filters button:not(.selected)",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "excel-cleaner",
+      "consumers": [
+        "tool:excel-cleaner"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B3",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-151",
+      "baselineLine": 2664,
+      "selector": ".file-row, .settings-row, .ui-settings-row, .sample-diff",
+      "legacyTokens": [
+        "file-row",
+        "settings-row"
+      ],
+      "category": "cross-shared",
+      "consumers": [
+        "tool:excel-merger",
+        "tool:pdf-editor",
+        "shared:toggle-row-adapter"
+      ],
+      "refCount": 3,
+      "lastRemovalBundle": "B5a",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-152",
+      "baselineLine": 2666,
+      "selector": ".tool-icon.accent-green",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-153",
+      "baselineLine": 2667,
+      "selector": ".tool-icon.accent-blue",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-154",
+      "baselineLine": 2668,
+      "selector": ".tool-icon.accent-orange, .tool-icon.accent-pink, .tool-icon.accent-sky",
+      "legacyTokens": [
+        "tool-icon"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    },
+    {
+      "id": "legacy-155",
+      "baselineLine": 2672,
+      "selector": ".tool-category-filter button.selected",
+      "legacyTokens": [
+        "selected"
+      ],
+      "category": "p2-shared",
+      "consumers": [
+        "shared:app-shell-and-public-pages"
+      ],
+      "refCount": 1,
+      "lastRemovalBundle": "B-shared",
+      "currentState": "active",
+      "removedIn": null
+    }
+  ]
+}

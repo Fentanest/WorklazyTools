@@ -34,6 +34,14 @@ const koreanOnlyProfiles = Object.freeze([koLightDesktop, koDarkMobile]);
 const koreanOnlyBottomProfiles = Object.freeze([koDarkMobile]);
 const englishRedirectProfiles = Object.freeze([enLightMobile, enDarkDesktop]);
 const interactionProfiles = Object.freeze([enDarkDesktop]);
+const b1ToolIds = new Set([
+  "text-formatter",
+  "work-calculator",
+  "payroll-calculator",
+  "security-tools",
+  "image-privacy",
+  "text-tools",
+]);
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
 const DEFAULT_BOTTOM_TARGET_SELECTOR = ".tool-page > :last-child";
@@ -84,6 +92,7 @@ const defaultFixtureFor = (toolId) => toolId === "security-tools"
 
 const initialScenarioFor = (route) => {
   const koreanOnly = route.toolId === "hwp-editor";
+  const migratedB1 = b1ToolIds.has(route.toolId);
   return scenario({
     scenarioId: `${route.id}--initial`,
     routeId: route.id,
@@ -97,12 +106,15 @@ const initialScenarioFor = (route) => {
       ? "English is product-level N/A. Korean keeps paired desktop/light and mobile/dark coverage; the redirect has its own scenario."
       : "Representative pairwise coverage retains both locales, themes, and viewports without the eight-way full product.",
     fixture: defaultFixtureFor(route.toolId),
+    readySelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    assertSelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
   });
 };
 
 const bottomScenarioFor = (route) => {
   const koreanOnly = route.toolId === "hwp-editor";
+  const migratedB1 = b1ToolIds.has(route.toolId);
   return scenario({
     scenarioId: `${route.id}--bottom`,
     routeId: route.id,
@@ -117,7 +129,9 @@ const bottomScenarioFor = (route) => {
       : "The clearance contract is mobile-only; KO/dark and EN/light retain both locales and themes while avoiding redundant desktop captures.",
     fixture: defaultFixtureFor(route.toolId),
     actions: [{ type: "scroll-bottom" }],
-    bottomTargetSelector: DEFAULT_BOTTOM_TARGET_SELECTOR,
+    readySelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    assertSelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    bottomTargetSelector: migratedB1 ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR,
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
   });
 };
@@ -181,14 +195,18 @@ const interactionDefinitions = Object.freeze({
     assertSelector: ".text-merger-page select",
   }),
   "text-formatter": Object.freeze({
-    stateId: "interaction-sql-mode",
-    actions: [{ type: "click-option", selector: ".formatter-page [data-ui-component='segmented-control']", optionIndex: 1 }],
-    assertSelector: ".formatter-toolbar select",
+    stateId: "interaction-format-result",
+    actions: [
+      { type: "replace-text", selector: "[data-testid='formatter-input']", value: '{"name":"Worklazy","ok":true}' },
+      { type: "click", selector: "[data-testid='formatter-actions'] [data-ui-component='primary-button']", elementIndex: 0 },
+      { type: "wait-value-includes", selector: "[data-testid='formatter-output']", value: '  "name"' },
+    ],
+    assertSelector: "[data-testid='formatter-editors']",
   }),
   "work-calculator": Object.freeze({
-    stateId: "interaction-leave-mode",
-    actions: [{ type: "click-option", selector: ".work-calculator-page > .mode-switch [data-ui-component='segmented-control']", optionIndex: 1 }],
-    assertSelector: ".work-calculator-page .sub-segment",
+    stateId: "interaction-leave-result",
+    actions: [{ type: "click-option", selector: "[data-testid='work-mode'] [data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: "[data-testid='leave-result']",
   }),
   "timezone-calculator": Object.freeze({
     stateId: "interaction-base-city",
@@ -197,14 +215,14 @@ const interactionDefinitions = Object.freeze({
   }),
   "payroll-calculator": Object.freeze({
     stateId: "interaction-net-mode",
-    actions: [{ type: "click-option", selector: ".payroll-page [data-ui-component='segmented-control']", optionIndex: 1 }],
-    assertSelector: ".payroll-page [data-ui-component='segmented-control'] button:nth-child(2)[aria-pressed='true']",
+    actions: [{ type: "click-option", selector: "[data-testid='payroll-mode'] [data-ui-component='segmented-control']", optionIndex: 1 }],
+    assertSelector: "[data-testid='payroll-breakdown']",
   }),
   "security-tools": Object.freeze({
-    stateId: "interaction-symbols-off",
+    stateId: "interaction-password-strength",
     fixture: { kind: "deterministic-password", value: "Worklazy2!Safe#Tool9" },
-    actions: [{ type: "click", selector: ".toggle-card-grid [role='switch']", elementIndex: 3 }],
-    assertSelector: ".toggle-card-grid [role='switch'][aria-checked='false']",
+    actions: [{ type: "wait", selector: "[data-testid='password-strength'][aria-valuenow='4']" }],
+    assertSelector: "[data-testid='password-strength'][aria-valuenow='4']",
   }),
   "qr-studio": Object.freeze({
     stateId: "interaction-bulk-mode",
@@ -216,11 +234,32 @@ const interactionDefinitions = Object.freeze({
     actions: [{ type: "select", selector: ".converter-route select:first-of-type", value: "json" }],
     assertSelector: ".converter-route select:first-of-type",
   }),
+  "image-privacy": Object.freeze({
+    stateId: "interaction-clean-result",
+    fixture: { kind: "generated-png", fileName: "visual-privacy.png", width: 48, height: 32 },
+    actions: [
+      { type: "upload", selector: "[data-tool-page='image-privacy'] input[type='file']" },
+      { type: "wait-enabled", selector: "[data-tool-page='image-privacy'] [data-ui-component='primary-button']" },
+      { type: "click", selector: "[data-tool-page='image-privacy'] [data-ui-component='primary-button']", elementIndex: 0 },
+      { type: "wait", selector: "[data-testid='image-privacy-result']" },
+    ],
+    assertSelector: "[data-testid='image-privacy-result']",
+  }),
+  "text-tools": Object.freeze({
+    stateId: "interaction-text-cleanup",
+    actions: [
+      { type: "replace-text", selector: "[data-testid='text-tools-input']", value: "할수  있습니다\n할수  있습니다" },
+      { type: "click", selector: "[data-testid='text-actions'] button:nth-child(2)", elementIndex: 0 },
+      { type: "wait-value-includes", selector: "[data-testid='text-tools-output']", value: "할수 있습니다" },
+    ],
+    assertSelector: "[data-testid='text-tools-editors']",
+  }),
 });
 
 const interactionScenarioFor = (route) => {
   const definition = interactionDefinitions[route.toolId];
   if (!definition) return null;
+  const migratedB1 = b1ToolIds.has(route.toolId);
   return scenario({
     scenarioId: `${route.id}--${definition.stateId}`,
     routeId: route.id,
@@ -233,6 +272,7 @@ const interactionScenarioFor = (route) => {
     profileReductionReason: "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes.",
     fixture: definition.fixture ?? defaultFixtureFor(route.toolId),
     actions: definition.actions,
+    readySelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
     assertSelector: definition.assertSelector,
     localeNotApplicableReason: null,
   });
@@ -270,9 +310,15 @@ export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDe
 export const interactionNotApplicableReasons = Object.freeze({
   "hwp-editor": "The landing screen has no product-owned toggle or selection control; the editor controls are supplied inside the vendored workspace after a document opens.",
   "office-editor": "The landing screen exposes file/open actions, not a toggle or selection state; workspace interaction remains covered by the office smoke test.",
-  "text-tools": "The tool exposes direct transform actions and text inputs, not a persistent toggle or selection state.",
-  "image-privacy": "The tool exposes upload and remove actions, not a persistent toggle or selection state.",
 });
+
+export const b1QaScenarios = Object.freeze(visualRegressionScenarios
+  .filter(({ toolId, stateType }) => b1ToolIds.has(toolId) && (stateType === "initial" || stateType === "interaction"))
+  .map((definition) => scenario({
+    ...definition,
+    profiles: fullProfiles,
+    profileReductionReason: "No reduction: the P2 B1 review artifact retains the full locale, theme, and viewport product for both initial and interaction states.",
+  })));
 
 const qrBulkBase = {
   routeId: "qr-bulk-qa",

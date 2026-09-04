@@ -23,8 +23,8 @@ self.onmessage = async (event: MessageEvent<{ files: PrivacyInput[]; language?: 
     const buffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE", compressionOptions: { level: 6 }, streamFiles: true });
     const empty: Metadata = { make: "", model: "", software: "", dateTime: "", latitude: "", longitude: "", orientation: "", foundCount: cleaned.reduce((sum, item) => sum + item.metadata.foundCount, 0) };
     self.postMessage({ type: "result", items: cleaned.map(({ metadata, sourceName }) => ({ metadata, sourceName })), metadata: empty, buffer, mimeType: "application/zip", fileName: event.data.language === "en" ? "worklazy-metadata-removed.zip" : "worklazy-메타데이터제거.zip" }, [buffer]);
-  } catch (error) {
-    self.postMessage({ type: "error", message: error instanceof Error ? error.message : event.data.language === "en" ? "The photo metadata could not be processed." : "사진의 메타데이터를 처리하지 못했습니다." });
+  } catch {
+    self.postMessage({ type: "error", message: event.data.language === "en" ? "The photo metadata could not be processed." : "사진의 메타데이터를 처리하지 못했습니다." });
   }
 };
 

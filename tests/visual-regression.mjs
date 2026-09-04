@@ -9,7 +9,7 @@ import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 
 import { assertMobileBottomLayout } from "./mobile-bottom-assertion.mjs";
-import { qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
+import { b1QaScenarios, qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
 import {
   filterVisualScenarios,
   parseVisualOnly,
@@ -27,7 +27,9 @@ const captureDirectory = process.env.VISUAL_CAPTURE_DIR
   : undefined;
 const updateBaselines = process.env.UPDATE_VISUAL_BASELINES === "1";
 const qrBulkCaptureOnly = process.env.VISUAL_QR_BULK_CAPTURE_ONLY === "1";
+const b1CaptureOnly = process.env.VISUAL_B1_CAPTURE_ONLY === "1";
 const qrBulkBaselinesOnly = process.env.VISUAL_QR_BULK_BASELINES_ONLY === "1";
+const captureOnly = qrBulkCaptureOnly || b1CaptureOnly;
 const consentValue = process.env.VISUAL_CONSENT_GRANTED === "1" ? "granted" : "denied";
 const externallyManagedBaseUrl = process.env.TEST_BASE_URL;
 const port = Number.parseInt(process.env.VISUAL_TEST_PORT || "4174", 10);
@@ -41,14 +43,17 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`VISUAL_TEST_PORT must be a valid TCP port, received ${process.env.VISUAL_TEST_PORT}.`);
 }
 
-if (qrBulkCaptureOnly && !captureDirectory) throw new Error("VISUAL_QR_BULK_CAPTURE_ONLY requires VISUAL_CAPTURE_DIR.");
-if (qrBulkCaptureOnly && updateBaselines) throw new Error("QR bulk QA captures cannot update the scenario baseline set.");
+if (captureOnly && !captureDirectory) throw new Error("Visual capture-only mode requires VISUAL_CAPTURE_DIR.");
+if (captureOnly && updateBaselines) throw new Error("QA captures cannot update the scenario baseline set.");
 if (qrBulkBaselinesOnly && !updateBaselines) throw new Error("VISUAL_QR_BULK_BASELINES_ONLY is available only while updating baselines.");
-if (qrBulkCaptureOnly && qrBulkBaselinesOnly) throw new Error("QR bulk capture-only and baseline-only modes cannot be combined.");
+if (captureOnly && qrBulkBaselinesOnly) throw new Error("Capture-only and baseline-only modes cannot be combined.");
+if (qrBulkCaptureOnly && b1CaptureOnly) throw new Error("QR bulk and B1 capture-only modes cannot be combined.");
 
 const baselineNames = buildCaptureMatrix(config.scenarios).map(({ name }) => name);
 const availableCaptureScenarios = qrBulkCaptureOnly
   ? qrBulkQaScenarios
+  : b1CaptureOnly
+    ? b1QaScenarios
   : qrBulkBaselinesOnly
     ? config.scenarios.filter(({ toolId, stateType }) => toolId === "qr-studio" && stateType === "interaction")
     : config.scenarios;
@@ -119,15 +124,15 @@ try {
     }
   });
 
-  if (!qrBulkCaptureOnly) await assertBaselineSet(baselineNames);
   const mode = updateBaselines ? "updated" : "matched";
   if (failures.size || infrastructureFailures.length) {
     const orderedFailures = [...failures].sort(([left], [right]) => left - right).map(([, failure]) => failure);
     throw new Error(`Visual regression failed (${failures.size}/${expectedNames.length} captures, ${infrastructureFailures.length} infrastructure errors):\n${[...orderedFailures, ...infrastructureFailures].join("\n")}\nArtifacts: ${artifactDirectory}`);
   }
+  if (!captureOnly) await assertBaselineSet(baselineNames);
   const browserVersion = [...browserVersions].join(", ") || "unknown browser";
-  console.log(qrBulkCaptureOnly
-    ? `Bulk QR local QA captured: ${expectedNames.length} captures, ${browserVersion}.`
+  console.log(captureOnly
+    ? `${b1CaptureOnly ? "P2 B1" : "Bulk QR"} local QA captured: ${expectedNames.length} captures, ${browserVersion}.`
     : `Visual regression ${mode}: ${expectedNames.length} captures, ${browserVersion}.`);
   console.log(`Threshold: <= ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}% differing pixels at per-pixel threshold ${config.diff.perPixelThreshold}; antialiasing ignored.`);
   console.log(`Allowed regions: ${config.allowedRegions.map(({ selector }) => selector).join(", ")}.`);
@@ -329,7 +334,7 @@ async function captureAndCompare(capture, browser) {
     if (captureDirectory && capture.scenario.kind === "tool") {
       await fs.writeFile(path.join(captureDirectory, capture.name), actualBuffer);
     }
-    if (qrBulkCaptureOnly) return undefined;
+    if (captureOnly) return undefined;
     const baselinePath = path.join(baselineDirectory, capture.name);
     if (updateBaselines) {
       await fs.writeFile(baselinePath, actualBuffer);
@@ -380,12 +385,12 @@ async function captureAndCompare(capture, browser) {
 async function applyScenarioFixture(page, fixture) {
   if (!fixture) return;
   if (fixture.kind === "deterministic-password") {
-    await page.$eval(".password-output input", (input, value) => {
+    await page.$eval("[data-testid='password-output'] input", (input, value) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
       setter?.call(input, value);
       input.dispatchEvent(new Event("input", { bubbles: true }));
     }, fixture.value);
-    await page.waitForFunction((value) => document.querySelector(".password-output input")?.value === value, {}, fixture.value);
+    await page.waitForFunction((value) => document.querySelector("[data-testid='password-output'] input")?.value === value, {}, fixture.value);
   }
 }
 
@@ -417,6 +422,16 @@ async function performScenarioActions(page, actions, fixture) {
         select.dispatchEvent(new Event("input", { bubbles: true }));
         select.dispatchEvent(new Event("change", { bubbles: true }));
       }, action.optionIndex);
+    } else if (action.type === "replace-text") {
+      await page.$eval(action.selector, (element, value) => {
+        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) throw new Error("Text replacement target is not an input or textarea.");
+        const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+        if (!setter) throw new Error("Text replacement setter is unavailable.");
+        setter.call(element, value);
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+      }, action.value);
     } else if (action.type === "upload") {
       await uploadScenarioFixture(page, action.selector, fixture);
     } else if (action.type === "wait") {
@@ -426,6 +441,11 @@ async function performScenarioActions(page, actions, fixture) {
         const element = document.querySelector(selector);
         return element instanceof HTMLButtonElement && !element.disabled;
       }, {}, action.selector);
+    } else if (action.type === "wait-value-includes") {
+      await page.waitForFunction((selector, value) => {
+        const element = document.querySelector(selector);
+        return (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) && element.value.includes(value);
+      }, {}, action.selector, action.value);
     } else if (action.type === "wait-shadow-canvas") {
       await page.waitForFunction((selector) => {
         const container = document.querySelector(selector);
@@ -461,6 +481,7 @@ async function uploadScenarioFixture(page, selector, fixture) {
   let bytes;
   if (fixture.kind === "inline-file") bytes = Buffer.from(fixture.contents, "utf8");
   else if (fixture.kind === "generated-wav") bytes = createVisualWav(fixture);
+  else if (fixture.kind === "generated-png") bytes = createVisualPng(fixture);
   else throw new Error(`Fixture kind ${fixture.kind} cannot be uploaded.`);
   await page.$eval(selector, (input, payload) => {
     if (!(input instanceof HTMLInputElement)) throw new Error("Visual fixture upload target is not an input.");
@@ -471,8 +492,19 @@ async function uploadScenarioFixture(page, selector, fixture) {
   }, {
     bytes: [...bytes],
     fileName: fixture.fileName,
-    mimeType: fixture.mimeType ?? "audio/wav",
+    mimeType: fixture.mimeType ?? (fixture.kind === "generated-png" ? "image/png" : "audio/wav"),
   });
+}
+
+function createVisualPng({ width, height }) {
+  const png = new PNG({ width, height });
+  for (let offset = 0; offset < png.data.length; offset += 4) {
+    png.data[offset] = 21;
+    png.data[offset + 1] = 155;
+    png.data[offset + 2] = 215;
+    png.data[offset + 3] = 255;
+  }
+  return PNG.sync.write(png);
 }
 
 function createVisualWav({ durationSeconds, sampleRate }) {

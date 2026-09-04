@@ -2,14 +2,17 @@ import { Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "./ui/button";
+
 interface FileShareButtonProps {
   url: string;
   fileName: string;
   mimeType?: string;
   className?: string;
+  shadcn?: boolean;
 }
 
-export function FileShareButton({ url, fileName, mimeType, className = "secondary-button" }: FileShareButtonProps) {
+export function FileShareButton({ url, fileName, mimeType, className = "secondary-button", shadcn = false }: FileShareButtonProps) {
   const { t } = useTranslation("common");
   const blobRef = useRef<Blob | undefined>(undefined);
   const [supported] = useState(() => typeof navigator !== "undefined" && typeof navigator.share === "function");
@@ -41,6 +44,7 @@ export function FileShareButton({ url, fileName, mimeType, className = "secondar
     });
   };
 
+  if (shadcn) return <Button type="button" variant="secondary" size="lg" className={className} onClick={share}><Share2 size={16} /> {t("actions.share")}</Button>;
   return <button type="button" className={className} onClick={share}><Share2 size={16} /> {t("actions.share")}</button>;
 }
 

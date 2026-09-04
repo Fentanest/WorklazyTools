@@ -4,6 +4,7 @@
 
 ## 2026-09-04
 
+- P2 B1의 포맷터·영업일/연차·급여·비밀번호·사진 메타데이터·텍스트 도구 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS를 제거했다. 155개 잔여 규칙의 owner/refcount manifest와 고정 번들 예산 측정기, B1 초기·하단·상호작용 시각 시나리오 및 추적 제외 QA 캡처를 함께 추가했다. — Codx
 - 시각 회귀 캡처를 CPU 기반 로케일 전용 브라우저 작업자로 병렬화하고, scenario/route/tool 단위 `VISUAL_ONLY` 부분 실행과 소요 시간·캡처 수·동시성·필터 리포트를 추가했다. — Codx
 - 시각 회귀 하네스를 59개 scenario·151개 상태별 캡처로 확장하고, 브라우저 UI 로케일·언어 헤더·타임존·폰트·DPR·애니메이션을 고정했다. 전 도구 모바일 최하단 assertion과 음성 대조를 공용화하고 상태명 기준선을 전면 재생성했다. — Codx
 - QR Studio에 표 파일 기반 7종 QR 일괄 생성, 최종 PNG 재판독, OPFS·메모리 결과 보관, 증분 ZIP·manifest XLSX·한글 A4/Letter 라벨 PDF를 추가했다. 공용 QR 디코더와 안전 ZIP 경로, ko/en 안내·SEO·정적 페이지·소셜 이미지·브라우저 회귀도 함께 반영했다. — Codx

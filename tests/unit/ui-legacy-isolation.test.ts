@@ -19,6 +19,15 @@ const migratedComponentFiles = [
   "src/components/LanguageSwitcher.tsx",
 ];
 
+const migratedB1ToolFiles = [
+  "src/features/text-formatter/TextFormatterPage.tsx",
+  "src/features/work-calculator/WorkCalculatorPage.tsx",
+  "src/features/payroll-calculator/PayrollCalculatorPage.tsx",
+  "src/features/security-tools/SecurityToolsPage.tsx",
+  "src/features/image-privacy/ImagePrivacyPage.tsx",
+  "src/features/text-tools/TextToolsPage.tsx",
+];
+
 // These are the component/state classes emitted before the shadcn migration.
 // Raw legacy-only pages may still use some of them; migrated adapters must not.
 const legacyClassTokens = [
@@ -102,4 +111,40 @@ test("the complete legacy stylesheet is parsed and critical adapter collisions s
   assert.doesNotMatch(adapterSource, /className="ios-switch/);
 
   context.diagnostic(`${rules.length} CSS rules and ${declarations.length} declarations parsed; both measured collision contracts checked`);
+});
+
+test("the six migrated B1 tools emit no class token owned by global.css", (context) => {
+  const cssClassTokens = new Set([...read("src/styles/global.css").matchAll(/\.(-?[_a-zA-Z]+[_a-zA-Z0-9-]*)/g)].map((match) => match[1]));
+  const legacyMatches = migratedB1ToolFiles.flatMap((relativePath) => classNameTokens(relativePath)
+    .filter((token) => cssClassTokens.has(token))
+    .map((token) => `${relativePath}:${token}`));
+
+  assert.deepEqual(legacyMatches, []);
+  for (const relativePath of migratedB1ToolFiles) assert.match(read(relativePath), /<UtilityPage toolId=/);
+  context.diagnostic(`${migratedB1ToolFiles.length} B1 tool sources checked against ${cssClassTokens.size} global.css class tokens`);
+});
+
+test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (context) => {
+  const manifest = JSON.parse(read("docs/legacy-css-owner-manifest.json")) as {
+    baseline: { legacyRuleCount: number; compactRuleCount: number; nonCompactRuleCount: number };
+    categoryCounts: Record<string, number>;
+    entries: Array<{
+      id: string;
+      consumers: string[];
+      refCount: number;
+      currentState: "active" | "removed" | "legacy-arm-removed";
+      removedIn: string | null;
+    }>;
+  };
+  assert.equal(manifest.baseline.legacyRuleCount, 155);
+  assert.equal(manifest.baseline.nonCompactRuleCount, 143);
+  assert.equal(manifest.baseline.compactRuleCount, 12);
+  assert.equal(Object.values(manifest.categoryCounts).reduce((sum, count) => sum + count, 0), 155);
+  assert.equal(new Set(manifest.entries.map(({ id }) => id)).size, 155);
+  assert.ok(manifest.entries.every(({ consumers, refCount }) => consumers.length === refCount));
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 4);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 1);
+  assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "pre-B1").map(({ id }) => id), ["legacy-043", "legacy-045"]);
+  assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B1").map(({ id }) => id), ["legacy-125", "legacy-127", "legacy-135"]);
+  context.diagnostic("155 rules / 18 ownership categories / four removals / one split verified");
 });

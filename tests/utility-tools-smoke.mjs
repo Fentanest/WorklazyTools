@@ -220,22 +220,26 @@ try {
 
   await page.goto(`${koBaseUrl}/tools/text-tools`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "text-tools");
-  await page.type(".utility-editor-grid textarea", "할수  있습니다\n할수  있습니다");
-  await page.click(".utility-action-grid button:nth-child(2)");
-  await page.waitForFunction(() => document.querySelectorAll(".utility-editor-grid textarea")[1]?.value.includes("할수 있습니다"));
+  await page.type("[data-testid='text-tools-input']", "할수  있습니다\n할수  있습니다");
+  await page.click("[data-testid='text-actions'] button:nth-child(2)");
+  await page.waitForFunction(() => document.querySelector("[data-testid='text-tools-output']")?.value.includes("할수 있습니다"));
   await clickButton(page, "브라우저 내장 규칙 검사");
-  await page.waitForFunction(() => document.querySelector(".utility-summary")?.textContent?.includes("내장 규칙"));
+  await page.waitForFunction(() => document.querySelector("[data-testid='text-inspection-summary']")?.textContent?.includes("내장 규칙"));
 
   await page.goto(`${koBaseUrl}/tools/text-formatter`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "text-formatter");
-  await page.type(".utility-editor-grid textarea", '{"name":"Worklazy","ok":true}');
+  await page.type("[data-testid='formatter-input']", '{"name":"Worklazy","ok":true}');
   await clickButton(page, "들여쓰기 정돈");
-  await page.waitForFunction(() => document.querySelectorAll(".utility-editor-grid textarea")[1]?.value.includes('\n  "name"'));
+  await page.waitForFunction(() => document.querySelector("[data-testid='formatter-output']")?.value.includes('\n  "name"'));
 
   await page.goto(`${koBaseUrl}/tools/work-calculator`, { waitUntil: "networkidle0" });
-  await page.waitForSelector(".metric-grid article:nth-child(2)");
-  const businessDays = await page.$eval(".metric-grid article:nth-child(2) strong", (element) => element.textContent);
+  await page.waitForSelector("[data-testid='business-day-results'] article:nth-child(2)");
+  const businessDays = await page.$eval("[data-testid='business-day-results'] article:nth-child(2) strong", (element) => element.textContent);
   if (!businessDays?.includes("일")) throw new Error("Business-day result is missing.");
+  await page.$eval("[data-testid='work-mode'] [data-ui-component='segmented-control']", (root) => root.querySelectorAll("button")[1]?.click());
+  await page.waitForSelector("[data-testid='leave-result']");
+  const leaveDays = await page.$eval("[data-testid='leave-result'] strong", (element) => element.textContent);
+  if (!leaveDays?.includes("일")) throw new Error("Annual-leave mode result is missing after the mode change.");
 
   await page.goto(`${koBaseUrl}/tools/timezone-calculator`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.querySelectorAll(".world-map-pin").length === 44);
@@ -252,17 +256,17 @@ try {
   await page.waitForFunction(() => document.querySelector(".world-map-controls output")?.textContent === "150%");
 
   await page.goto(`${koBaseUrl}/tools/payroll-calculator`, { waitUntil: "networkidle0" });
-  await page.waitForSelector(".payroll-hero strong");
-  await page.click(".mode-switch button:nth-child(2)");
-  await page.waitForSelector(".payroll-breakdown");
-  const standard = await page.$eval(".payroll-page", (element) => element.textContent || "");
+  await page.waitForSelector("[data-testid='payroll-result'] strong");
+  await page.$eval("[data-testid='payroll-mode'] [data-ui-component='segmented-control']", (root) => root.querySelectorAll("button")[1]?.click());
+  await page.waitForSelector("[data-testid='payroll-breakdown']");
+  const standard = await page.$eval("[data-tool-page='payroll-calculator']", (element) => element.textContent || "");
   if (!standard.includes("2026-07-01") || !standard.includes("4.75")) throw new Error(`Payroll standard is incomplete: ${standard}`);
 
   await page.goto(`${koBaseUrl}/tools/security-tools`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelector(".password-output input")?.value.length === 20);
-  await page.click(":is(.primary-button, .ui-primary-button)");
-  await page.waitForSelector(".strength-meter");
-  const passwordStrengthCopy = await page.$eval(".security-page", (element) => element.textContent || "");
+  await page.waitForFunction(() => document.querySelector("[data-testid='password-output'] input")?.value.length === 20);
+  await page.click("[data-tool-page='security-tools'] [data-ui-component='primary-button']");
+  await page.waitForSelector("[data-testid='password-strength']");
+  const passwordStrengthCopy = await page.$eval("[data-tool-page='security-tools']", (element) => element.textContent || "");
   if (!passwordStrengthCopy.includes("예상 해독 시간") || !passwordStrengthCopy.includes("초당 100억 회") || passwordStrengthCopy.includes("오프라인 고속 공격") || passwordStrengthCopy.includes("centuries")) {
     throw new Error(`Password strength explanation is unclear: ${passwordStrengthCopy}`);
   }
@@ -301,18 +305,18 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".utility-editor-grid textarea")[1]?.value.includes('"alpha"'));
 
   await page.goto(`${koBaseUrl}/tools/image-privacy`, { waitUntil: "networkidle0" });
-  const privacyCompatibility = await page.$eval(".image-privacy-page .inline-notice", (element) => element.textContent);
+  const privacyCompatibility = await page.$eval("[data-tool-page='image-privacy'] [data-slot='notice']", (element) => element.textContent);
   if (!privacyCompatibility.includes("HEIC") || !privacyCompatibility.includes("iOS 16.3")) throw new Error("Image privacy mobile compatibility notice is incomplete.");
   await page.evaluate(async () => {
     const canvas = document.createElement("canvas"); canvas.width = 48; canvas.height = 32;
     const context = canvas.getContext("2d"); context.fillStyle = "#159bd7"; context.fillRect(0, 0, 48, 32);
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     const transfer = new DataTransfer(); transfer.items.add(new File([blob], "privacy.png", { type: "image/png" }));
-    const input = document.querySelector('.image-privacy-page input[type="file"]'); Object.defineProperty(input, "files", { configurable: true, value: transfer.files }); input.dispatchEvent(new Event("change", { bubbles: true }));
+    const input = document.querySelector('[data-tool-page="image-privacy"] input[type="file"]'); Object.defineProperty(input, "files", { configurable: true, value: transfer.files }); input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.waitForFunction(() => !document.querySelector(".image-privacy-page :is(.primary-button, .ui-primary-button)")?.disabled);
-  await page.click(".image-privacy-page :is(.primary-button, .ui-primary-button)");
-  await page.waitForSelector(".clean-result");
+  await page.waitForFunction(() => !document.querySelector("[data-tool-page='image-privacy'] [data-ui-component='primary-button']")?.disabled);
+  await page.click("[data-tool-page='image-privacy'] [data-ui-component='primary-button']");
+  await page.waitForSelector("[data-testid='image-privacy-result']");
 
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4);
@@ -386,8 +390,9 @@ try {
 async function clickButton(page, text) { const clicked = await page.evaluate((label) => { const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label)); if (!button) return false; button.click(); return true; }, text); if (!clicked) throw new Error(`Button not found: ${text}`); }
 
 async function assertPairedEditors(page, route) {
-  const sizes = await page.$eval(".utility-editor-grid", (grid) => ({
-    cards: Array.from(grid.querySelectorAll(":scope > .ui-section-card"), (element) => element.getBoundingClientRect().height),
+  const selector = route === "text-tools" ? "[data-testid='text-tools-editors']" : route === "text-formatter" ? "[data-testid='formatter-editors']" : ".utility-editor-grid";
+  const sizes = await page.$eval(selector, (grid) => ({
+    cards: Array.from(grid.querySelectorAll(":scope > [data-ui-component='section-card'], :scope > .ui-section-card"), (element) => element.getBoundingClientRect().height),
     textareas: Array.from(grid.querySelectorAll("textarea"), (element) => element.getBoundingClientRect().height),
   }));
   if (sizes.cards.length !== 2 || sizes.textareas.length !== 2 || Math.abs(sizes.cards[0] - sizes.cards[1]) > 1 || Math.abs(sizes.textareas[0] - sizes.textareas[1]) > 1) {

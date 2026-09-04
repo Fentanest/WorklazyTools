@@ -9,6 +9,8 @@
     "social:generate": "node scripts/generate-social-images.mjs",
     "bench:excel-compare": "node scripts/benchmark-excel-compare-alignment.mjs",
     "bench:excel-cleaner": "node scripts/benchmark-excel-cleaner-heap.mjs",
+    "bundle:measure": "node scripts/measure-bundle-budget.mjs",
+    "legacy:manifest": "node scripts/generate-legacy-owner-manifest.mjs",
     "vendor:rhwp": "node scripts/vendor-rhwp-studio.mjs",
     "vendor:qr-font": "node scripts/vendor-qr-label-font.mjs",
     "vendor:image-studio": "node scripts/vendor-image-studio-assets.mjs",
