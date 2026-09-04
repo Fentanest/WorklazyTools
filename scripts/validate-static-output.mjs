@@ -87,6 +87,56 @@ for (const route of routes) {
 }
 }
 
+{
+  const filePath = path.join("dist", "index.html");
+  const html = await fs.readFile(filePath, "utf8");
+  const expectedTitle = "Worklazy Tools — Choose Language · 언어 선택";
+  const expectedDescription = "Choose English or Korean. 무료 업무 도구의 언어를 선택하세요.";
+  const expectedUrl = "https://worklazy.net/";
+  const expectedImage = "https://worklazy.net/social/worklazy-tools-share.png";
+  const expectedImageAlt = "Worklazy Tools — practical browser utilities with no file uploads";
+  const readMeta = (attribute, value) => [...html.matchAll(new RegExp(`<meta\\s+${attribute}="${value}"\\s+content="([^"]*)"\\s*\\/>`, "g"))];
+  const descriptionTags = readMeta("name", "description");
+  if (descriptionTags.length !== 1) throw new Error(`${filePath} must contain exactly one description meta tag.`);
+  const description = descriptionTags[0][1];
+  if (description !== expectedDescription) throw new Error(`${filePath} does not use the approved landing description.`);
+  if (Array.from(description).length > 80) throw new Error(`${filePath} description exceeds 80 code points.`);
+
+  const expectedOpenGraph = {
+    "og:locale": "en_US",
+    "og:locale:alternate": "ko_KR",
+    "og:type": "website",
+    "og:site_name": "Worklazy Tools",
+    "og:title": expectedTitle,
+    "og:description": expectedDescription,
+    "og:url": expectedUrl,
+    "og:image": expectedImage,
+    "og:image:secure_url": expectedImage,
+    "og:image:type": "image/png",
+    "og:image:width": "1200",
+    "og:image:height": "630",
+    "og:image:alt": expectedImageAlt,
+  };
+  for (const [property, content] of Object.entries(expectedOpenGraph)) {
+    const tags = readMeta("property", property);
+    if (tags.length !== 1) throw new Error(`${filePath} must contain exactly one ${property} meta tag.`);
+    if (tags[0][1] !== content) throw new Error(`${filePath} has an unexpected ${property} value.`);
+  }
+
+  const expectedTwitter = {
+    "twitter:card": "summary_large_image",
+    "twitter:title": expectedTitle,
+    "twitter:description": expectedDescription,
+    "twitter:image": expectedImage,
+    "twitter:image:alt": expectedImageAlt,
+  };
+  for (const [name, content] of Object.entries(expectedTwitter)) {
+    const tags = readMeta("name", name);
+    if (tags.length !== 1) throw new Error(`${filePath} must contain exactly one ${name} meta tag.`);
+    if (tags[0][1] !== content) throw new Error(`${filePath} has an unexpected ${name} value.`);
+  }
+}
+
 for (const language of ["ko", "en"]) {
   const filePath = path.join("dist", language, "tools", "office-editor", "app", "index.html");
   const html = await fs.readFile(filePath, "utf8");

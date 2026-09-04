@@ -2,6 +2,15 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-04
+
+### 네이버 SEO — 루트 언어 선택 랜딩 메타 보강 (Codx)
+
+- **진단·문구 실측**: 배포 기준 루트 description은 85 code points·UTF-8 123B이고 Open Graph·Twitter 태그는 0개였다. 확정 문구 `Choose English or Korean. 무료 업무 도구의 언어를 선택하세요.`로 교체한 빌드 결과는 description 정확히 1개·46 code points·76B였다.
+- **소셜 메타 판정**: 기존 `getSocialImageDefinition("en", "/")`를 재사용해 기본 이미지 `https://worklazy.net/social/worklazy-tools-share.png`(1200×630 PNG·199,195B)를 절대 URL로 생성했다. 정본의 순서대로 canonical, ko/en/x-default, 나열된 Open Graph 전 항목과 Twitter 5종을 배치했다. “OG 12종” 표제와 달리 확정 목록은 `og:locale:alternate`와 `og:image:alt`를 포함해 실제 13태그이므로, 목록 우선 계약에 따라 13개 모두 각각 1개로 생성·검증했다.
+- **중복·범위 판정**: `dist/index.html`에서 title·canonical·hreflang 3종·Open Graph 13개·Twitter 5개는 모두 각각 1개였고 나열 순서는 단조 증가했다. 루트 `worklazy-route-jsonld`는 0개를 유지했으며 `src/app/seo.ts`, 언어/도구 페이지, 사이트맵, 광고·격리 경로는 수정하지 않았다. 메타 전용 변경이라 화면 배치와 ko/en 런타임 문구에는 영향이 없다.
+- **검증 실측**: `npm run build` exit 0(2,429 modules·Vite 57.48초·정적 59페이지), `npm run test:static` exit 0, `npm run test:unit` exit 0(158/158), `git diff --check` exit 0이었다.
+
 ## 2026-09-03
 
 ### shadcn 마이그레이션 라이브 UI 복구 — 6개 revert 판정 (Codx)
