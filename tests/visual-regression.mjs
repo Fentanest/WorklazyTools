@@ -10,6 +10,11 @@ import puppeteer from "puppeteer-core";
 
 import { assertMobileBottomLayout } from "./mobile-bottom-assertion.mjs";
 import { qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
+import {
+  filterVisualScenarios,
+  parseVisualOnly,
+  resolveVisualConcurrency,
+} from "./visual-regression-options.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
@@ -28,6 +33,9 @@ const externallyManagedBaseUrl = process.env.TEST_BASE_URL;
 const port = Number.parseInt(process.env.VISUAL_TEST_PORT || "4174", 10);
 const baseUrl = externallyManagedBaseUrl || `http://127.0.0.1:${port}`;
 const chromeExecutable = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
+const concurrency = resolveVisualConcurrency(process.env.VISUAL_CONCURRENCY, os.availableParallelism());
+const visualOnly = parseVisualOnly(process.env.VISUAL_ONLY);
+const runStartedAt = performance.now();
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`VISUAL_TEST_PORT must be a valid TCP port, received ${process.env.VISUAL_TEST_PORT}.`);
@@ -39,16 +47,22 @@ if (qrBulkBaselinesOnly && !updateBaselines) throw new Error("VISUAL_QR_BULK_BAS
 if (qrBulkCaptureOnly && qrBulkBaselinesOnly) throw new Error("QR bulk capture-only and baseline-only modes cannot be combined.");
 
 const baselineNames = buildCaptureMatrix(config.scenarios).map(({ name }) => name);
-const captureScenarios = qrBulkCaptureOnly
+const availableCaptureScenarios = qrBulkCaptureOnly
   ? qrBulkQaScenarios
   : qrBulkBaselinesOnly
     ? config.scenarios.filter(({ toolId, stateType }) => toolId === "qr-studio" && stateType === "interaction")
     : config.scenarios;
+const captureScenarios = filterVisualScenarios(availableCaptureScenarios, visualOnly);
 const captures = buildCaptureMatrix(captureScenarios);
 const expectedNames = captures.map(({ name }) => name);
+const captureBatches = buildCaptureBatches(captures, config.environment.maxCapturesPerBrowser);
+const effectiveConcurrency = Math.min(concurrency.value, captureBatches.length);
 let server;
 let serverOutput = [];
 const browsers = new Set();
+const completedIndexes = new Set();
+let completed = 0;
+let runError;
 
 try {
   await fs.mkdir(baselineDirectory, { recursive: true });
@@ -64,50 +78,92 @@ try {
   if (updateBaselines) await removeUnexpectedBaselines(baselineNames);
   if (!externallyManagedBaseUrl) server = await startPreviewServer();
 
-  const failures = [];
-  let completed = 0;
-  let browserVersion = "unknown browser";
-  for (const locale of [...new Set(captures.map(({ locale: captureLocale }) => captureLocale))]) {
-    const localeCaptures = captures.filter(({ locale: captureLocale }) => captureLocale === locale);
-    for (let offset = 0; offset < localeCaptures.length; offset += config.environment.maxCapturesPerBrowser) {
-      const browser = await launchLocaleBrowser(locale);
+  const failures = new Map();
+  const infrastructureFailures = [];
+  const browserVersions = new Set();
+  await runWithConcurrency(captureBatches, concurrency.value, async (batch) => {
+    let browser;
+    try {
+      browser = await launchLocaleBrowser(batch.locale);
       browsers.add(browser);
-      browserVersion = await browser.version();
-      try {
-        for (const capture of localeCaptures.slice(offset, offset + config.environment.maxCapturesPerBrowser)) {
+      browserVersions.add(await browser.version());
+      for (const { capture, index } of batch.entries) {
+        try {
           const result = await captureAndCompare(capture, browser);
-          if (result) failures.push(result);
-          completed += 1;
+          if (result) failures.set(index, result);
+        } catch (error) {
+          failures.set(index, error instanceof Error ? error.message : String(error));
+        } finally {
+          completedIndexes.add(index);
+          completed = completedIndexes.size;
           console.log(`[${completed}/${captures.length}] ${capture.name}`);
         }
-      } finally {
+      }
+    } catch (error) {
+      for (const { capture, index } of batch.entries) {
+        if (completedIndexes.has(index)) continue;
+        failures.set(index, `${capture.name}: locale browser failed: ${error instanceof Error ? error.message : String(error)}`);
+        completedIndexes.add(index);
+        completed = completedIndexes.size;
+        console.log(`[${completed}/${captures.length}] ${capture.name}`);
+      }
+    } finally {
+      if (browser) {
         browsers.delete(browser);
-        await browser.close();
+        try {
+          await browser.close();
+        } catch (error) {
+          infrastructureFailures.push(`Locale browser cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
     }
-  }
+  });
 
   if (!qrBulkCaptureOnly) await assertBaselineSet(baselineNames);
   const mode = updateBaselines ? "updated" : "matched";
-  if (failures.length) {
-    throw new Error(`Visual regression failed (${failures.length}/${expectedNames.length}):\n${failures.join("\n")}\nArtifacts: ${artifactDirectory}`);
+  if (failures.size || infrastructureFailures.length) {
+    const orderedFailures = [...failures].sort(([left], [right]) => left - right).map(([, failure]) => failure);
+    throw new Error(`Visual regression failed (${failures.size}/${expectedNames.length} captures, ${infrastructureFailures.length} infrastructure errors):\n${[...orderedFailures, ...infrastructureFailures].join("\n")}\nArtifacts: ${artifactDirectory}`);
   }
+  const browserVersion = [...browserVersions].join(", ") || "unknown browser";
   console.log(qrBulkCaptureOnly
     ? `Bulk QR local QA captured: ${expectedNames.length} captures, ${browserVersion}.`
     : `Visual regression ${mode}: ${expectedNames.length} captures, ${browserVersion}.`);
   console.log(`Threshold: <= ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}% differing pixels at per-pixel threshold ${config.diff.perPixelThreshold}; antialiasing ignored.`);
   console.log(`Allowed regions: ${config.allowedRegions.map(({ selector }) => selector).join(", ")}.`);
-  console.log(`Environment: locale-specific browsers (${Object.values(config.environment.locales).map(({ browserLocale }) => browserLocale).join(", ")}), recycled every ${config.environment.maxCapturesPerBrowser} captures; Accept-Language and navigator locale fixed, timezone ${config.environment.timezone}, DPR 1, font ${config.environment.fontFamily}, ${config.environment.settleTimeMs} ms paint settle.`);
+  console.log(`Environment: locale-specific browser workers (${Object.values(config.environment.locales).map(({ browserLocale }) => browserLocale).join(", ")}), recycled every ${config.environment.maxCapturesPerBrowser} captures; Accept-Language and navigator locale fixed, timezone ${config.environment.timezone}, DPR 1, font ${config.environment.fontFamily}, ${config.environment.settleTimeMs} ms paint settle.`);
   if (captureDirectory) console.log(`Tool QA captures: ${expectedNames.filter((name) => !name.startsWith("home-default__") && !name.startsWith("tools-media-filter__")).length} in ${captureDirectory}.`);
 } catch (error) {
   if (server?.exitCode !== null && server?.exitCode !== undefined) {
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\nVite preview exited with code ${server.exitCode}.\n${serverOutput.join("").trim()}`);
+    runError = new Error(`${error instanceof Error ? error.message : String(error)}\nVite preview exited with code ${server.exitCode}.\n${serverOutput.join("").trim()}`, { cause: error });
+  } else {
+    runError = error;
   }
-  throw error;
 } finally {
-  await Promise.all([...browsers].map((browser) => browser.close()));
-  if (server) await stopServer(server);
+  const cleanupResults = await Promise.allSettled([...browsers].map((browser) => browser.close()));
+  const cleanupFailure = cleanupResults.find(({ status }) => status === "rejected");
+  if (server) {
+    try {
+      await stopServer(server);
+    } catch (error) {
+      if (!runError) runError = error;
+    }
+  }
+  if (!runError && cleanupFailure?.status === "rejected") runError = cleanupFailure.reason;
 }
+
+if (runError) {
+  console.error(runError instanceof Error ? runError.stack : runError);
+  process.exitCode = 1;
+}
+console.log(buildRunReport({
+  completed,
+  concurrency,
+  durationMs: performance.now() - runStartedAt,
+  effectiveConcurrency,
+  filterTerms: visualOnly,
+  total: captures.length,
+}));
 
 function buildCaptureMatrix(scenarios) {
   const viewports = new Map(config.viewports.map((viewport) => [viewport.id, viewport]));
@@ -125,6 +181,52 @@ function buildCaptureMatrix(scenarios) {
   const names = matrix.map(({ name }) => name);
   if (new Set(names).size !== names.length) throw new Error("Visual scenario matrix produced duplicate capture names; stateId values must be unique per route.");
   return matrix;
+}
+
+function buildCaptureBatches(matrix, maxCapturesPerBrowser) {
+  const localeEntries = new Map();
+  matrix.forEach((capture, index) => {
+    if (!localeEntries.has(capture.locale)) localeEntries.set(capture.locale, []);
+    localeEntries.get(capture.locale).push({ capture, index });
+  });
+  const batchesByLocale = [...localeEntries].map(([locale, entries]) => {
+    const batches = [];
+    for (let offset = 0; offset < entries.length; offset += maxCapturesPerBrowser) {
+      batches.push({ locale, entries: entries.slice(offset, offset + maxCapturesPerBrowser) });
+    }
+    return batches;
+  });
+  const batches = [];
+  while (batchesByLocale.some((localeBatches) => localeBatches.length > 0)) {
+    for (const localeBatches of batchesByLocale) {
+      const batch = localeBatches.shift();
+      if (batch) batches.push(batch);
+    }
+  }
+  return batches;
+}
+
+async function runWithConcurrency(items, limit, task) {
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      await task(items[index]);
+    }
+  });
+  await Promise.all(workers);
+}
+
+function buildRunReport({ completed: completedCaptures, concurrency: resolvedConcurrency, durationMs, effectiveConcurrency: activeConcurrency, filterTerms, total }) {
+  const durationSeconds = durationMs / 1_000;
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = durationSeconds - minutes * 60;
+  const filter = filterTerms.length > 0 ? filterTerms.join(",") : "all";
+  const concurrencySource = resolvedConcurrency.source === "cpu-default"
+    ? `CPU default from ${resolvedConcurrency.availableCpuCount} cores`
+    : "VISUAL_CONCURRENCY";
+  return `Visual run report: duration=${minutes}m ${seconds.toFixed(2)}s; captures=${completedCaptures}/${total}; concurrency=${resolvedConcurrency.value} (${concurrencySource}, effective ${activeConcurrency}); filter=${filter}.`;
 }
 
 async function launchLocaleBrowser(locale) {

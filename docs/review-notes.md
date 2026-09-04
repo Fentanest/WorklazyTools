@@ -4,6 +4,15 @@
 
 ## 2026-09-04
 
+### P2 선행 — 시각 회귀 실행 비용 개선 판정 (Codx)
+
+- **게이트·병렬화 판정**: `ui-migration`의 `HEAD=origin/ui-migration=7b3222b7233401a9a48eeccc49f4b1def6b8f7c8`에서 시작했고 열린 계획서에 같은 하네스 표면의 상반된 지시는 없었다. 사용자 소유 미추적 파일 3개와 `/tmp/worklazytools-rhwp-0.8.6`은 건드리지 않았다. 가용 CPU의 절반을 최대 4로 제한하는 `min(4, floor(core/2))`를 기본값으로 채택해 16코어 호스트에서는 4이며, `VISUAL_CONCURRENCY=1..32`로 명시 조정할 수 있다. 캡처를 locale별·최대 12장 배치로 나눠 각 배치에 전용 Chrome과 순차 페이지를 주고 배치만 병렬 실행했다. 서로 다른 locale과 origin 저장소를 같은 브라우저 context에서 섞는 방식은 결정성 저하 위험 때문에 기각했다.
+- **재현 계약 유지**: 각 작업자는 기존 `--lang`, 중립 `LANG/LC_ALL`, `LANGUAGE`, `Accept-Language`, CDP locale override와 `navigator.language` 단언을 그대로 거치며 UTC, DPR 1, 저장소 Noto CJK font, animation/transition/caret/smooth-scroll 제거, 200ms+2 RAF paint settle도 변경하지 않았다. 완료 순서가 달라도 실패 보고는 원래 capture matrix 순서로 정렬하고 baseline/capture/artifact 파일은 고유 이름만 쓰게 했다. 브라우저 launch·페이지·cleanup 실패도 해당 실행을 실패시키되 남은 독립 배치는 끝까지 수집한다.
+- **부분 실행 계약·사용법**: `VISUAL_ONLY`는 쉼표로 구분한 정확한 `scenarioId`, `routeId`, 또는 묶음 사용용 `toolId`를 받는다. 예시는 `VISUAL_ONLY=excel-compare,document-compare VISUAL_TEST_PORT=4911 npm run test:visual`이며, 미지정/빈 값은 기존과 같이 전량, 알 수 없는 값은 무음 0건 통과 대신 즉시 실패한다. 부분 실행 중에도 전체 151장 baseline 집합의 누락·잉여 검사는 유지한다. 출력 마지막에는 총 소요, 완료/선택 캡처 수, 설정 출처와 실제 동시성, 필터를 고정 형식으로 남긴다.
+- **개선 전후 전체 실측**: 같은 호스트·Chrome 152에서 순차 구현의 직전 기록은 KO **151/151 5:16.32**, EN **151/151 5:14.96**였다. 병렬화 뒤 기본 동시성 4의 `LANG=ko_KR.UTF-8 VISUAL_TEST_PORT=4913 npm run test:visual`은 **151/151 1:33.35**, `LANG=en_US.UTF-8 VISUAL_TEST_PORT=4914 npm run test:visual`은 **151/151 1:35.84**로 모두 기준선과 일치했다. 두 실행 평균은 315.64초에서 94.60초로 **3.34배, 70.0% 단축**됐다. 별도 CPU 경합에서 보고된 개선 전 약 3시간 수치는 부하 조건이 달라 직접 배수 비교에는 쓰지 않았다.
+- **부분·플레이키 실측**: 개선 전에는 부분 필터 자체가 없어 부분 실행 시간은 N/A다. 개선 뒤 대표 두 도구 필터는 정확히 해당 6 scenario/**14 capture**만 실행해 **16.53초**, 즉시 같은 명령 재실행은 **16.05초**였고 둘 다 14/14·diff 0으로 같았다. 선택량이 locale별 한 배치씩이라 설정 4 중 실제 동시성은 2였다. 목표 20분 대비 약 1.4%로 묶음 검증 ≤20분 계약을 충족했다.
+- **완료 검증·제품 영향**: `npm run build` exit 0(2,827 modules·정적 61페이지), `npm run test:unit` **184/184**, `npm run test:static`, `node --check tests/visual-regression.mjs`, `git diff --check`가 통과했다. 기존 vm-browserify eval·500kB chunk 경고 외 신규 오류는 없다. 변경은 테스트 하네스·단위 테스트·기록뿐이라 사용자 ko/en 문구, SEO·정적 route, AdSense 격리, GitHub Pages 런타임은 불변이다.
+
 ### P2 선행 — 시각 하네스 재현성·scenario·모바일 하단 계약 (Codx)
 
 - **게이트·원인 확정**: `ui-migration`의 `HEAD=origin/ui-migration=62f9031ecc87fef37ca55b3d64f511cfc9b2b407`, `origin/main=311c59e310734e9206629b05752f4228e842dbf0`에서 시작했고 main에는 손대지 않았다. Claude 실측은 같은 HEAD에서 57건(en 48·ko 9, 5~7%) 실패와 영어 화면에 한국어 native file-input 문구가 찍힌 diff를 남겼다. 수정 전 소스의 `puppeteer.launch`에 `--lang`이 없음을 재확인했다. 이 호스트의 수정 전 독립 실행은 두 셸 모두 96/96로 Chrome이 같은 UI 언어를 골라 직접 실패를 재현하지 못했으나, 이는 환경 선택이 우연히 같았을 뿐 명시 계약이 없는 결함을 반박하지 않는다. 수정 후 실 PNG에서 KO는 `파일 선택/선택된 파일 없음`, EN은 `Choose File/No file chosen`으로 분리됨을 확인했다.
