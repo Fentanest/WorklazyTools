@@ -80,9 +80,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 162);
-  assert.equal(qaCaptureScenarios.length, 69);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 540);
+  assert.equal(names.length, 166);
+  assert.equal(qaCaptureScenarios.length, 73);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 572);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -114,6 +114,17 @@ test("visual regression scenario manifest covers every available tool and state 
   assert.deepEqual(new Set(b4QaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
     "interaction-sheet-selection", "interaction-key-mode", "interaction-pair",
     "interaction-bulk-mode", "interaction-create", "interaction-scan",
+  ]));
+  const b5aQaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["audio-studio", "pdf-editor"].includes(toolId));
+  assert.equal(b5aQaScenarios.length, 10);
+  assert.equal(b5aQaScenarios.flatMap(({ profiles }) => profiles).length, 80);
+  assert.deepEqual(Object.fromEntries(["initial", "bottom", "interaction"].map((stateType) => [
+    stateType,
+    b5aQaScenarios.filter((scenario) => scenario.stateType === stateType).flatMap(({ profiles }) => profiles).length,
+  ])), { initial: 16, bottom: 16, interaction: 48 });
+  assert.deepEqual(new Set(b5aQaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
+    "interaction-waveform", "interaction-effect-robot", "interaction-organize-thumbnails",
+    "interaction-image-to-pdf-thumbnails", "interaction-pdf-to-image-thumbnails", "interaction-convert-thumbnails",
   ]));
   assert.equal(visualRegressionConfig.scenarios, visualRegressionScenarios);
   assert.equal(visualRegressionConfig.environment.maxCapturesPerBrowser, 12);

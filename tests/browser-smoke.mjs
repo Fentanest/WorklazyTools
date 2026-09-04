@@ -107,20 +107,20 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (rotationState.data !== "90" || !rotationState.transform.includes("rotate(90deg)")) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
   }
-  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)")?.disabled);
+  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) :is(.primary-button, .ui-primary-button)")?.disabled);
   await clickPrimaryAction(page);
   const immediateFeedback = await page.$eval(".pdf-output-action-zone", (element) => ({
     running: Boolean(element.querySelector(".ui-operation-progress.ui-status-running")),
-    ready: Boolean(element.querySelector(".pdf-download-compact :is(.result-download,[data-testid='excel-result-download'])")),
+    ready: Boolean(element.querySelector(".pdf-download-compact [data-testid='pdf-download']")),
     buttonText: element.querySelector(":is(.primary-button, .ui-primary-button)")?.textContent || "",
   }));
   if (!immediateFeedback.running && !immediateFeedback.ready) throw new Error(`PDF export feedback was not shown beside the action: ${JSON.stringify(immediateFeedback)}`);
   if (immediateFeedback.running && !immediateFeedback.buttonText.includes("만드는 중")) throw new Error(`PDF export button did not announce its running state: ${JSON.stringify(immediateFeedback)}`);
   await waitForResult(page);
-  if (!await page.$eval(".pdf-download-compact :is(.result-download,[data-testid='excel-result-download'])", (link) => Boolean(link.closest(".pdf-output-action-zone")))) throw new Error("PDF download was not kept in the sticky output action zone.");
+  if (!await page.$eval(".pdf-download-compact [data-testid='pdf-download']", (link) => Boolean(link.closest(".pdf-output-action-zone")))) throw new Error("PDF download was not kept in the sticky output action zone.");
   await assertProgressLog(page, "PDF 페이지 편집");
   const rotatedPath = path.join(tempDir, "rotated.pdf");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", rotatedPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", rotatedPath);
   const rotated = await PDFDocument.load(await fs.readFile(rotatedPath));
   if (rotated.getPageCount() !== 2 || rotated.getPage(0).getRotation().angle !== 90) {
     throw new Error(`PDF output rotation was not persisted: pages=${rotated.getPageCount()}, rotation=${rotated.getPage(0).getRotation().angle}`);
@@ -133,7 +133,7 @@ async function testPdfTools(page, fixtures, tempDir) {
     const state = await page.evaluate(() => ({
       checked: document.querySelector('.pdf-page-card:first-child .pdf-page-select input')?.checked,
       range: document.querySelector("#pdf-selection-range")?.value,
-      selected: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => card.classList.contains("selected")),
+      selected: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => card.getAttribute("data-selected") === "true"),
     }));
     throw new Error(`PDF card selection did not synchronize with the range field: ${JSON.stringify(state)}\n${reason.message || reason}`);
   }
@@ -147,7 +147,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const extractedPath = path.join(tempDir, "extracted.pdf");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", extractedPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", extractedPath);
   const extracted = await PDFDocument.load(await fs.readFile(extractedPath));
   if (extracted.getPageCount() !== 1 || Math.round(extracted.getPage(0).getWidth()) !== 600) throw new Error("PDF page-range extraction selected the wrong page.");
 
@@ -167,7 +167,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (groupRows.length !== 1) throw new Error(`Expected one seeded PDF range row, got ${groupRows.length}.`);
   let groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[1], "1");
-  await page.$eval(".pdf-multi-range-actions .secondary-button:last-child", (button) => button.click());
+  await page.$eval(".pdf-multi-range-actions button:last-child", (button) => button.click());
   groupRows = await page.$$(".pdf-range-group");
   if (groupRows.length !== 2) throw new Error(`Expected a second PDF range row after adding one, got ${groupRows.length}.`);
   await page.$eval(".pdf-page-card:first-child .pdf-page-select input", (checkbox) => checkbox.click());
@@ -178,7 +178,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   } catch (reason) {
     const rangeState = await page.evaluate(() => ({
       ranges: Array.from(document.querySelectorAll(".pdf-range-group"), (row) => Array.from(row.querySelectorAll("input"), (input) => ({ value: input.value, checked: input.checked }))),
-      cards: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => ({ selected: card.classList.contains("selected"), checked: card.querySelector(".pdf-page-select input")?.checked })),
+      cards: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => ({ selected: card.getAttribute("data-selected") === "true", checked: card.querySelector(".pdf-page-select input")?.checked })),
     }));
     throw new Error(`Visual PDF range selection did not update the active range: ${JSON.stringify(rangeState)}\n${reason.message || reason}`);
   }
@@ -189,7 +189,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const rangeZipPath = path.join(tempDir, "range-pdfs.zip");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", rangeZipPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", rangeZipPath);
   const rangeZip = await JSZip.loadAsync(await fs.readFile(rangeZipPath));
   const rangePdfNames = Object.keys(rangeZip.files).filter((name) => name.endsWith(".pdf"));
   if (rangePdfNames.length !== 2) throw new Error(`Expected two range PDFs in ZIP, got ${rangePdfNames.length}.`);
@@ -197,28 +197,46 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (secondRangePdf.getPageCount() !== 2 || Math.round(secondRangePdf.getPage(0).getWidth()) !== 600 || secondRangePdf.getPage(1).getRotation().angle !== 90) {
     throw new Error("Range PDF did not preserve the entered page order and rotations.");
   }
-  await page.$eval(".pdf-multi-range-actions .secondary-button:first-child", (button) => button.click());
-  await page.waitForSelector(".pdf-range-selection-toolbar.quick-split");
+  await page.$eval(".pdf-multi-range-actions button:first-child", (button) => button.click());
+  await page.waitForSelector(".pdf-range-selection-toolbar[data-mode='quick-split']");
   await page.$eval(".pdf-page-card:first-child .pdf-split-after", (button) => button.click());
-  await page.waitForFunction(() => document.querySelector(".pdf-range-selection-toolbar.quick-split > b")?.textContent?.includes("2"));
-  await page.$eval(".pdf-range-selection-toolbar.quick-split .pdf-range-toolbar-actions .primary", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".pdf-range-selection-toolbar[data-mode='quick-split'] > b")?.textContent?.includes("2"));
+  await page.$eval(".pdf-range-selection-toolbar[data-mode='quick-split'] .pdf-range-toolbar-actions button:last-child", (button) => button.click());
   await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group").length === 2 && Array.from(document.querySelectorAll(".pdf-range-group"), (row) => row.querySelectorAll("input")[1]?.value).join(",") === "1,2");
   groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[2], "분할-01");
-  await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group.invalid").length === 2);
-  if (!await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
+  await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group[data-invalid='true']").length === 2);
+  if (!await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) :is(.primary-button, .ui-primary-button)", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
 
   await page.$eval('.pdf-output-mode-list button:nth-child(3)', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(3)')?.getAttribute("aria-checked") === "true");
   await clickPrimaryAction(page);
   await waitForResult(page);
   const separateZipPath = path.join(tempDir, "separate-pages.zip");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", separateZipPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", separateZipPath);
   const separateZip = await JSZip.loadAsync(await fs.readFile(separateZipPath));
   const separatePdfNames = Object.keys(separateZip.files).filter((name) => name.endsWith(".pdf"));
   if (separatePdfNames.length !== 1) throw new Error(`Expected one selected page PDF, got ${separatePdfNames.length}.`);
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-navigation-shell']")?.getAttribute("data-scroll-cue") === "right");
+  const navigationCueAtStart = await page.$eval(".pdf-tool-navigation", (navigation) => ({
+    clientWidth: navigation.clientWidth,
+    scrollWidth: navigation.scrollWidth,
+    scrollLeft: navigation.scrollLeft,
+    rightCue: Boolean(navigation.parentElement?.querySelector("[data-scroll-cue-side='right']")),
+  }));
+  await page.$eval(".pdf-tool-navigation", (navigation) => navigation.scrollTo({ left: navigation.scrollWidth, behavior: "instant" }));
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-navigation-shell']")?.getAttribute("data-scroll-cue") === "left");
+  const navigationCueAtEnd = await page.$eval(".pdf-tool-navigation", (navigation) => ({
+    remaining: navigation.scrollWidth - navigation.clientWidth - navigation.scrollLeft,
+    leftCue: Boolean(navigation.parentElement?.querySelector("[data-scroll-cue-side='left']")),
+    rightCue: Boolean(navigation.parentElement?.querySelector("[data-scroll-cue-side='right']")),
+  }));
+  if (navigationCueAtStart.scrollWidth <= navigationCueAtStart.clientWidth || navigationCueAtStart.scrollLeft > 1 || !navigationCueAtStart.rightCue
+    || navigationCueAtEnd.remaining > 2 || !navigationCueAtEnd.leftCue || navigationCueAtEnd.rightCue) {
+    throw new Error(`PDF mobile navigation scroll cue is incomplete: ${JSON.stringify({ navigationCueAtStart, navigationCueAtEnd })}`);
+  }
   await page.waitForSelector(".pdf-mobile-output-dock", { visible: true });
   const mobileDockLayout = await page.evaluate(() => {
     const dock = document.querySelector(".pdf-mobile-output-dock");
@@ -238,9 +256,9 @@ async function testPdfTools(page, fixtures, tempDir) {
     throw new Error(`PDF mobile output dock overlaps or overflows: ${JSON.stringify(mobileDockLayout)}`);
   }
   await page.click(".pdf-mobile-output-summary");
-  await page.waitForSelector(".pdf-output-sidebar-shell.mobile-open .pdf-output-workspace", { visible: true, timeout: 5_000 });
+  await page.waitForSelector(".pdf-output-sidebar-shell[data-open='true'] .pdf-output-workspace", { visible: true, timeout: 5_000 });
   await page.keyboard.press("Escape");
-  await page.waitForFunction(() => !document.querySelector(".pdf-output-sidebar-shell")?.classList.contains("mobile-open")
+  await page.waitForFunction(() => document.querySelector(".pdf-output-sidebar-shell")?.getAttribute("data-open") !== "true"
     && document.activeElement?.classList.contains("pdf-mobile-output-summary"));
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
 
@@ -250,7 +268,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const imagePdfPath = path.join(tempDir, "image.pdf");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", imagePdfPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", imagePdfPath);
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
@@ -260,7 +278,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const imageZipPath = path.join(tempDir, "pdf-images.zip");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", imageZipPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", imageZipPath);
   const imageZip = await JSZip.loadAsync(await fs.readFile(imageZipPath));
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
@@ -274,7 +292,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const docxPath = path.join(tempDir, "pdf-converted.docx");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", docxPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", docxPath);
   const convertedDocx = await JSZip.loadAsync(await fs.readFile(docxPath));
   const documentXml = await convertedDocx.file("word/document.xml").async("string");
   if (!documentXml.includes("First PDF page") || !documentXml.includes("Second PDF page")) {
@@ -287,7 +305,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const xlsxPath = path.join(tempDir, "pdf-converted.xlsx");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", xlsxPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", xlsxPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(xlsxPath));
   if (workbook.worksheets.length !== 2 || !workbook.worksheets[0].getCell("A1").text.includes("First PDF page")) {
@@ -300,7 +318,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const txtPath = path.join(tempDir, "pdf-converted.txt");
-  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", txtPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", txtPath);
   const text = await fs.readFile(txtPath, "utf8");
   if (!text.includes("First PDF page") || !text.includes("[페이지 2]")) throw new Error("PDF-to-TXT output is incomplete.");
 }
@@ -1124,21 +1142,21 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
 
 async function waitForResult(page, timeout = 180_000) {
   await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
-    && (document.querySelector(":is(.result-download,[data-testid='excel-result-download'])") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'])") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
-  const error = await page.$(":is(.error-banner,[data-testid='excel-merge-error'])") || await page.$("[data-tool-page='document-compare'] [role='alert']");
+    && (document.querySelector(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
+  const error = await page.$(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || await page.$("[data-tool-page='document-compare'] [role='alert']");
   if (error) throw new Error(await error.evaluate((element) => element.textContent || "Unknown UI error"));
 }
 
 async function clickPrimaryAction(page) {
-  const previousHref = await page.$eval(":is(.result-download,[data-testid='excel-result-download'])", (link) => link.href).catch(() => "");
-  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)", (button) => {
+  const previousHref = await page.$eval(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])", (link) => link.href).catch(() => "");
+  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) :is(.primary-button, .ui-primary-button)", (button) => {
     if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error("The primary action is unavailable.");
     button.click();
   });
   await page.waitForFunction((href) => {
-    const result = document.querySelector(":is(.result-download,[data-testid='excel-result-download'])");
+    const result = document.querySelector(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])");
     return Boolean(document.querySelector(".ui-operation-progress.ui-status-running")
-      || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'])")
+      || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])")
       || !result
       || result.href !== href);
   }, {}, previousHref);

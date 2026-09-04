@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import pixelmatch from "pixelmatch";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 import JSZip from "jszip";
@@ -537,6 +538,7 @@ async function uploadScenarioFixture(page, selector, fixture, elementIndex = 0) 
   else if (fixture.kind === "generated-wav") bytes = createVisualWav(fixture);
   else if (fixture.kind === "generated-png") bytes = createVisualPng(fixture);
   else if (fixture.kind === "generated-docx") bytes = await createVisualDocx(fixture);
+  else if (fixture.kind === "generated-pdf") bytes = await createVisualPdf(fixture);
   else throw new Error(`Fixture kind ${fixture.kind} cannot be uploaded.`);
   await page.$$eval(selector, (inputs, payload) => {
     const input = inputs[payload.elementIndex];
@@ -553,8 +555,21 @@ async function uploadScenarioFixture(page, selector, fixture, elementIndex = 0) 
       ? "image/png"
       : fixture.kind === "generated-docx"
         ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : fixture.kind === "generated-pdf"
+          ? "application/pdf"
         : "audio/wav"),
   });
+}
+
+async function createVisualPdf({ pageCount = 2 }) {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  for (let index = 0; index < pageCount; index += 1) {
+    const page = document.addPage(index % 2 ? [600, 760] : [595, 842]);
+    page.drawRectangle({ x: 42, y: page.getHeight() - 150, width: page.getWidth() - 84, height: 76, color: rgb(0.15, 0.48, 0.85), opacity: 0.18 });
+    page.drawText(`Worklazy visual PDF page ${index + 1}`, { x: 58, y: page.getHeight() - 118, size: 20, font, color: rgb(0.12, 0.2, 0.34) });
+  }
+  return Buffer.from(await document.save());
 }
 
 async function createVisualDocx({ text }) {

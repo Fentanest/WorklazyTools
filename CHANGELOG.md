@@ -4,6 +4,7 @@
 
 ## 2026-09-05
 
+- P2 B5a의 Audio Studio·PDF 도구 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 오디오 파형·효과와 PDF 4모드 썸네일 시각 시나리오, 모바일 PDF 탭 스크롤 페이드 단서를 함께 고정했다. — Codx
 - P2 B4의 Excel 병합·Excel 비교·QR Studio 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 병합 시트 선택·비교 모드/파일 쌍·QR 생성/스캔을 포함한 3상태 시각 시나리오와 다크 선택 경계·Swap/Add 접근성 회귀를 함께 고정했다. — Codx
 
 ## 2026-09-04

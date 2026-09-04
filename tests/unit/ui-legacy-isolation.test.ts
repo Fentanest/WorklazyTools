@@ -58,6 +58,17 @@ const migratedB4ToolFiles = [
   "src/features/qr-studio/QrBulkPanel.tsx",
 ];
 
+const migratedB5aToolFiles = [
+  "src/features/audio-studio/AudioStudioPage.tsx",
+  "src/features/audio-studio/AudioStudioPanels.tsx",
+  "src/features/pdf-editor/PdfEditorPage.tsx",
+  "src/features/pdf-editor/PdfOrganizePanel.tsx",
+  "src/features/pdf-editor/PdfImagePanel.tsx",
+  "src/features/pdf-editor/PdfConvertPanel.tsx",
+  "src/features/pdf-editor/PdfThumbnail.tsx",
+  "src/features/pdf-editor/pdfUi.tsx",
+];
+
 // These are the component/state classes emitted before the shadcn migration.
 // Raw legacy-only pages may still use some of them; migrated adapters must not.
 const legacyClassTokens = [
@@ -123,7 +134,7 @@ test("the complete legacy stylesheet is parsed and migrated adapter collisions s
   root.walkRules((rule) => rules.push(rule));
   root.walkDecls((declaration) => declarations.push(declaration));
 
-  assert.ok(rules.length >= 1_350, `expected the full stylesheet after B4-owned cleanup, parsed only ${rules.length} rules`);
+  assert.ok(rules.length >= 1_100, `expected the full stylesheet after B5a-owned cleanup, parsed only ${rules.length} rules`);
   assert.match(css, /button:where\(:not\(\[data-slot\]\)\)/);
 
   const actionRules = rules.filter((rule) => rule.selector.includes(".tool-action-bar") && rule.selector.includes(".ui-primary-button"));
@@ -201,6 +212,22 @@ test("the B4 Excel and QR surfaces emit no legacy or global.css-owned class toke
   context.diagnostic(`${migratedB4ToolFiles.length} B4 surface sources checked against ${cssClassTokens.size} global.css class tokens`);
 });
 
+test("the B5a audio and PDF surfaces emit no legacy or global.css-owned class token", (context) => {
+  const cssClassTokens = new Set([...read("src/styles/global.css").matchAll(/\.(-?[_a-zA-Z]+[_a-zA-Z0-9-]*)/g)].map((match) => match[1]));
+  const legacyMatches = migratedB5aToolFiles.flatMap((relativePath) => classNameTokens(relativePath)
+    .filter((token) => (
+      legacyClassTokens.includes(token as typeof legacyClassTokens[number])
+      || legacyDynamicPrefixes.some((prefix) => token.startsWith(prefix))
+      || cssClassTokens.has(token)
+    ))
+    .map((token) => `${relativePath}:${token}`));
+
+  assert.deepEqual(legacyMatches, []);
+  assert.match(read("src/features/audio-studio/AudioStudioPage.tsx"), /<UtilityPage toolId="audio-studio"/);
+  assert.match(read("src/features/pdf-editor/PdfEditorPage.tsx"), /<UtilityPage toolId="pdf-editor"/);
+  context.diagnostic(`${migratedB5aToolFiles.length} B5a surface sources checked against ${cssClassTokens.size} global.css class tokens`);
+});
+
 test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (context) => {
   const manifest = JSON.parse(read("docs/legacy-css-owner-manifest.json")) as {
     baseline: { legacyRuleCount: number; compactRuleCount: number; nonCompactRuleCount: number };
@@ -219,13 +246,13 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
   assert.equal(Object.values(manifest.categoryCounts).reduce((sum, count) => sum + count, 0), 155);
   assert.equal(new Set(manifest.entries.map(({ id }) => id)).size, 155);
   assert.ok(manifest.entries.every(({ consumers, refCount }) => consumers.length === refCount));
-  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 82);
-  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 5);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 96);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 9);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "pre-B1").map(({ id }) => id), ["legacy-043", "legacy-045"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B1").map(({ id }) => id), ["legacy-125", "legacy-127"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B2").map(({ id }) => id), [
     "legacy-095", "legacy-096", "legacy-097", "legacy-106", "legacy-107", "legacy-108", "legacy-109",
-    "legacy-121", "legacy-122", "legacy-123", "legacy-124", "legacy-126", "legacy-142", "legacy-144",
+    "legacy-122", "legacy-123", "legacy-124", "legacy-126", "legacy-142", "legacy-144",
   ]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B3").map(({ id }) => id), [
     "legacy-070", "legacy-071", "legacy-072", "legacy-073", "legacy-087", "legacy-088", "legacy-089",
@@ -241,7 +268,12 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
     "legacy-128", "legacy-129", "legacy-133", "legacy-135", "legacy-136", "legacy-137", "legacy-138",
     "legacy-139", "legacy-147", "legacy-148", "legacy-150", "legacy-151",
   ]);
+  assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B5a").map(({ id }) => id), [
+    "legacy-065", "legacy-066", "legacy-067", "legacy-068", "legacy-069", "legacy-099", "legacy-100",
+    "legacy-101", "legacy-102", "legacy-103", "legacy-104", "legacy-111", "legacy-112", "legacy-113",
+    "legacy-121", "legacy-130", "legacy-131", "legacy-140", "legacy-146",
+  ]);
   assert.equal(manifest.categoryCounts["excel-compare"], 27);
   assert.equal(manifest.categoryCounts["excel-cleaner"], 1);
-  context.diagnostic("155 rules / 18 ownership categories / 82 removals / five splits verified");
+  context.diagnostic("155 rules / 18 ownership categories / 96 removals / nine splits verified");
 });

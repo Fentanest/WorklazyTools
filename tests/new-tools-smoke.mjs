@@ -2989,7 +2989,7 @@ async function testAudioStudio(page, audioPath) {
   const durationBeforeEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
   await page.$eval(".audio-voice-presets button:nth-child(2)", (button) => button.click());
   await page.waitForFunction(() => document.querySelector(".audio-voice-presets button:nth-child(2)")?.getAttribute("aria-checked") === "true");
-  await page.click(".audio-voice-effect-actions .secondary-button");
+  await page.click(".audio-effect-preview-button");
   await waitForAudioSuccess(page, "미리 듣기 준비 완료", 120_000);
   const effectPreview = await page.$eval(".audio-effect-preview audio", async (audio) => {
     const context = new AudioContext();
@@ -3014,12 +3014,12 @@ async function testAudioStudio(page, audioPath) {
   if (durationAfterEffect !== durationBeforeEffect) throw new Error(`Pitch effect changed the document duration: ${durationBeforeEffect} -> ${durationAfterEffect}`);
   await page.$eval(".audio-voice-presets button:nth-child(4)", (button) => button.click());
   await page.waitForFunction(() => document.querySelector(".audio-voice-presets button:nth-child(4)")?.getAttribute("aria-checked") === "true");
-  await page.click(".audio-voice-effect-actions .secondary-button");
+  await page.click(".audio-effect-preview-button");
   await waitForAudioSuccess(page, "미리 듣기 준비 완료");
   if (!(await page.$eval(".audio-effect-preview audio", (audio) => audio.src.startsWith("blob:")))) throw new Error("Robot voice preview was not created.");
 
   await clickAudioAction(page, "복사");
-  await page.waitForFunction(() => document.querySelector(".audio-clipboard-status.has-clip")?.textContent?.includes("오디오 클립보드"));
+  await page.waitForFunction(() => document.querySelector(".audio-clipboard-status[data-has-clip='true']")?.textContent?.includes("오디오 클립보드"));
   await clickAudioAction(page, "구간 음소거");
   await waitForAudioSuccess(page, "음소거 중 완료");
   const undoEnabled = await page.$$eval(".audio-edit-toolbar button", (buttons) => {
@@ -3031,6 +3031,7 @@ async function testAudioStudio(page, audioPath) {
   await page.keyboard.press("z");
   await page.keyboard.up("Control");
   await waitForAudioSuccess(page, "실행 취소 완료");
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".audio-edit-toolbar button")).some((button) => button.textContent?.includes("다시 실행") && !button.disabled));
   await page.keyboard.down("Control");
   await page.keyboard.down("Shift");
   await page.keyboard.press("z");
@@ -3059,11 +3060,11 @@ async function testAudioStudio(page, audioPath) {
       return window.__audioOriginalAnchorClick.call(this);
     };
   });
-  await page.evaluate(() => document.querySelector(".audio-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes(".wav"), { timeout: 60_000 });
+  await page.evaluate(() => document.querySelector("[data-testid='audio-export-actions'] [data-ui-component='primary-button']")?.click());
+  await page.waitForFunction(() => document.querySelector("[data-testid='audio-result']")?.textContent?.includes(".wav"), { timeout: 60_000 });
   await page.evaluate(() => document.querySelector('.audio-export-settings .ui-segmented-control button:nth-child(2)')?.click());
-  await page.evaluate(() => document.querySelector(".audio-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes(".mp3"), { timeout: 120_000 });
+  await page.evaluate(() => document.querySelector("[data-testid='audio-export-actions'] [data-ui-component='primary-button']")?.click());
+  await page.waitForFunction(() => document.querySelector("[data-testid='audio-result']")?.textContent?.includes(".mp3"), { timeout: 120_000 });
   const downloads = await page.evaluate(() => {
     const captured = window.__audioDownloads;
     HTMLAnchorElement.prototype.click = window.__audioOriginalAnchorClick;

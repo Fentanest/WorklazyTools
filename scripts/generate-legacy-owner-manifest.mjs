@@ -162,6 +162,15 @@ const currentStateOverrides = new Map([
     currentState: "removed",
     removedIn: "B3",
   }]),
+  ...[99, 100, 101, 102, 103, 104, 111, 112, 113, 121, 130, 131, 140, 146].map((index) => [index, {
+    currentState: "removed",
+    removedIn: "B5a",
+  }]),
+  [65, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row" }],
+  [66, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row + .ui-settings-row" }],
+  [67, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row > div" }],
+  [68, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row strong" }],
+  [69, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row small" }],
   [125, { currentState: "removed", removedIn: "B1" }],
   [127, { currentState: "removed", removedIn: "B1" }],
   [132, {
@@ -169,20 +178,17 @@ const currentStateOverrides = new Map([
     removedIn: "B3",
     currentSelector: ".tool-page button:not([data-slot]), .tool-page a:is(.primary-button, .ui-primary-button), .tool-page a.secondary-button, .tool-page a.result-download",
   }],
-  [121, {
-    currentState: "legacy-arm-removed",
-    removedIn: "B2",
-    currentSelector: ".pdf-output-mode-list small, .pdf-range-group label > span, .pdf-range-group label small, .pdf-format-grid small",
-  }],
   [133, {
     currentState: "legacy-arm-removed",
     removedIn: "B4",
-    currentSelector: ".pdf-drag-handle, .pdf-image-remove, .editor-history-actions button, .icon-tool-row button",
+    currentSelector: ".editor-history-actions button, .icon-tool-row button",
+    lastUpdatedIn: "B5a",
   }],
   [151, {
     currentState: "legacy-arm-removed",
     removedIn: "B4",
-    currentSelector: ".settings-row, .ui-settings-row, .sample-diff",
+    currentSelector: ".ui-settings-row, .sample-diff",
+    lastUpdatedIn: "B5a",
   }],
 ]);
 

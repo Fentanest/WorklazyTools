@@ -15,6 +15,24 @@
 
 **남긴 규칙**: 검수 보고에 차단 결함이 실려 오면 수정에 착수하기 전에 **검수 입력이 그 판정을 뒷받침하는지 먼저 본다**. 상태 커버리지가 없는 캡처로 내려진 판정은 결함 보고가 아니라 하네스 버그 보고다.
 
+### P2 B4 검수 판정 · 이관 개선 2건 채택 (Claude)
+
+- **검수**: Gemini 전수 96장(initial 24·bottom 24·interaction 48 — 시트 선택·비교 쌍/키 모드·QR 생성/스캔/일괄) 차단 결함 0·[배포 가능], 사고 증상 3종 **미관찰**.
+- **이관 개선 ② excel-compare 다크 선택 카드 테두리 대비 — 채택.** Codex 실측 대비 **14.29:1**(WCAG AA 3:1 기준을 크게 상회), Gemini 판정 "충분".
+- **이관 개선 ⑤ Swap/Add 버튼 체급·affordance — 채택.** Codex 실측 Add `128.25×44px` · Swap `44×44px` · focus-visible ring 3px. 44px 은 터치 타깃 최소 권고를 만족한다. Claude 육안으로 사용자 원 요청(파일 2개 드래그 시 좌우 자동 분배 + `⇄` 아이콘으로 위치 교환)이 화면에서 실제 동작함을 `excel-compare-empty__interaction-pair__ko__{dark__desktop,light__mobile}.png` 로 확인했다.
+- **관찰(차단 아님)**: Swap 버튼이 비교 쌍 카드 **우상단 구석**에 있고 좌/우 파일 카드는 그 아래에 있어, 무엇을 교환하는지의 시각적 연결이 약간 멀다. 차단 결함이 아니고 Gemini 도 지적하지 않았으므로 이번 묶음에서 손대지 않는다. **B-shared 또는 P-QA 에서 배치 재검토 후보로만 남긴다** — 지금 옮기면 「명시 제외」의 레이아웃 재설계에 해당한다.
+- legacy manifest **82 removed·5 split·68 active**. **B5a 착수 조건 충족으로 판정.**
+
+### P2 B5a Audio Studio·PDF 도구 UI 전환 · 모바일 탭 단서 판정 (Codx)
+
+- **실행 게이트·범위**: `HEAD=origin/ui-migration=c60f221aa9d309025315d97b8f8378b0d0f66acd`와 지시 기준이 일치했고, fetch 뒤 `origin/ui-migration`도 같았다. 열린 U4 PDF 마무리 문서는 비정본 초안이며 최신 사용자 결정이 B5a 선행·순수 UI 전환으로 충돌을 해소했으므로 U4 기능·PDF/오디오 엔진·문구·route·SEO·정적 페이지·광고 격리 경계는 변경하지 않았다. 사용자 소유 DOCX 2개와 네이버 확인 파일, 선행 Claude의 B4 검수 기록은 보존했다.
+- **primitive 판정**: Audio Studio의 파형/선택/transport/편집/음성 효과/내보내기와 PDF 4모드의 탭/썸네일/출력 workspace를 기존 shadcn `Button`·`Card`·`Switch` 계열, 공용 `UtilitySurface`와 Tailwind로 옮겼다. 현행 primitive만으로 실제 소비처가 충족돼 `shadcn add`는 실행하지 않았다. 첫 오디오 effect 캡처에서 legacy `PrimaryButton` 폭 계약 때문에 미리 듣기 버튼이 왼쪽으로 넘친 현상을 발견해, 190px 소유 wrapper로 폭을 한정한 뒤 재채집에서 겹침·수평 overflow 0을 확인했다.
+- **이관 개선 ① 채택 — PDF 모바일 탭 가로 스크롤 단서**: 레이아웃이나 탭 수는 바꾸지 않고 실제 `scrollWidth/clientWidth/scrollLeft`를 관찰해 남은 방향에만 페이드 마스크를 표시했다. Chrome 152·390×844에서 navigation은 **500/366px**, 시작 `scrollLeft=0`에 오른쪽 페이드, 끝 `scrollLeft=134`·remaining **0px**에 왼쪽 페이드였고 페이지 수평 overflow는 **0px**였다. 항상 보이는 페이드나 탭 재배치는 끝에서도 더 있다는 거짓 단서·레이아웃 재설계가 되므로 기각했다. 키보드 link 탐색·현재 모드 `data-active`·focus-visible ring은 유지했다.
+- **legacy/refcount 판정**: B5a 소스 8개와 전역 CSS 394 class token의 교집합은 **0건**이다. `legacy-099`~`104`·`111`~`113`·`121`·`130`~`131`·`140`·`146` 14개를 refcount 0에서 완전 제거했고, `legacy-065`~`069`는 raw `.settings-row` arm만 제거해 `.ui-settings-row`를 보존했다. 기존 split `legacy-133`·`151`에서도 PDF/raw settings arm만 추가 제거했다. B2에서 HWP arm만 제거하고 PDF arm을 남겼던 `legacy-121`은 이번에 refcount 0이 되어 완전 제거됐다. 최종 manifest는 **96 removed·9 split·50 active**, PostCSS는 **1,106 rules·3,986 declarations**이며 `global.css`는 10줄 추가·322줄 삭제(순감 312줄)다.
+- **상태·로컬 QA**: 시각 scenario는 오디오 `interaction-waveform`·`interaction-effect-robot`, PDF `interaction-organize-thumbnails`·`interaction-image-to-pdf-thumbnails`·`interaction-pdf-to-image-thumbnails`·`interaction-convert-thumbnails`로 분리해 한 장으로 4모드를 대표하지 않았다. 일반 회귀는 **18/18, 25.80초**, 동시성 설정 4/실제 2, filter `audio-studio,pdf-editor`. QA는 **80/80, 47.87초**, 설정/실제 동시성 4/4이며 initial **16**·bottom **16**·interaction **48**(상호작용 stateId 각 8장)이다. 모바일 bottom 8장 모두 공용 6개 assertion을 통과했고 80장 전체 외부 요청 0, B5a 두 route의 Google/Naver/AdSense loader 각각 0을 별도 DOM 실측했다.
+- **예산**: `c60f221`→B5a gzip은 entry **296,941→296,955B(+14B)**, 영향 route 합 **196,090→201,758B(+5,668B)**(audio **28,321→29,965B**, PDF **167,769→171,793B**), shared **2,716,494→2,716,455B(−39B)**, 앱 JS **5,440,319→5,445,913B(+5,594B)**, CSS **45,803→43,663B(−2,140B)**로 5개 상한을 모두 통과했다.
+- **검증·실패 기록**: 표준 build(2,829 modules·정적 61페이지), unit **191/191**, PDF browser, Audio new-tools, UI migration, control geometry **92 samples/20 pages**, visual 18/18, static, manifest, bundle, diff check가 통과했다. 최초 PDF browser는 서버 미기동으로 `ERR_CONNECTION_REFUSED`, UI/control 최초 실행은 표준 빌드의 추적 로더 때문에 QA 전제에서 실패해 각각 서버 기동·`VITE_LOCAL_QA=1` 빌드 후 동일 명령을 통과했다. QA 첫 80장 시도는 IntersectionObserver 썸네일보다 이미지 selector를 먼저 기다린 3장이 실패했으며 카드→scroll→image 순으로 하네스를 고친 뒤 80장 전량 재채집했다. Audio 첫 production-preview 실행의 undo 직후 redo listener 갱신 경합은 redo 버튼 enabled 대기를 추가해 재실행 통과했다. 이는 제품 엔진 변경 없이 하네스 동기화를 정확히 한 판정이다.
+
 ### P2 B4 Excel 병합·Excel 비교·QR Studio UI 전환 (Codx)
 
 - **개선 ② 채택 — Excel 비교 다크 선택 카드 경계 보강.** 선택 카드에는 공용 green 토큰의 다크 경계를 적용하고 배경·ring도 같은 계열 토큰으로 한정했다. Chrome 152 다크 렌더에서 선택 경계와 인접 비선택 카드 배경의 대비는 **14.29:1**로 비텍스트 경계 3:1 기준을 넘었다. 전역 토큰 변경이나 카드 레이아웃 재설계는 범위를 벗어나므로 기각했다.

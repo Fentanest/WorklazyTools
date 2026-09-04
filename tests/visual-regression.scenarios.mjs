@@ -52,6 +52,8 @@ const migratedToolIds = new Set([
   "excel-merger",
   "excel-compare",
   "qr-studio",
+  "audio-studio",
+  "pdf-editor",
 ]);
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
@@ -208,11 +210,54 @@ const interactionDefinitions = Object.freeze({
       assertSelector: "[data-testid='excel-cleaner-results']",
     }),
   ]),
-  "pdf-editor": Object.freeze({
-    stateId: "interaction-image-to-pdf",
-    actions: [{ type: "click", selector: ".pdf-tool-navigation a:nth-child(2)" }],
-    assertSelector: ".pdf-tool-page[data-pdf-mode='image-to-pdf']",
-  }),
+  "pdf-editor": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-organize-thumbnails",
+      fixture: { kind: "generated-pdf", fileName: "visual-pages.pdf", pageCount: 2 },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
+        { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
+        { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
+        { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
+      ],
+      assertSelector: ".pdf-page-card .pdf-thumbnail-frame img",
+    }),
+    Object.freeze({
+      stateId: "interaction-image-to-pdf-thumbnails",
+      fixture: { kind: "generated-png", fileName: "visual-page.png", width: 320, height: 220 },
+      actions: [
+        { type: "click", selector: ".pdf-tool-navigation a:nth-child(2)" },
+        { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
+        { type: "wait", selector: ".pdf-image-card" },
+        { type: "scroll-into-view", selector: ".pdf-image-grid", offset: -88 },
+      ],
+      assertSelector: ".pdf-tool-page[data-pdf-mode='image-to-pdf'] .pdf-image-card",
+    }),
+    Object.freeze({
+      stateId: "interaction-pdf-to-image-thumbnails",
+      fixture: { kind: "generated-pdf", fileName: "visual-images.pdf", pageCount: 2 },
+      actions: [
+        { type: "click", selector: ".pdf-tool-navigation a:nth-child(3)" },
+        { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
+        { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
+        { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
+        { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
+      ],
+      assertSelector: ".pdf-tool-page[data-pdf-mode='pdf-to-image'] .pdf-page-card",
+    }),
+    Object.freeze({
+      stateId: "interaction-convert-thumbnails",
+      fixture: { kind: "generated-pdf", fileName: "visual-convert.pdf", pageCount: 2 },
+      actions: [
+        { type: "click", selector: ".pdf-tool-navigation a:nth-child(4)" },
+        { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
+        { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
+        { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
+        { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
+      ],
+      assertSelector: ".pdf-tool-page[data-pdf-mode='convert'] .pdf-page-card",
+    }),
+  ]),
   "document-compare": Object.freeze([
     Object.freeze({
       stateId: "interaction-toggle-on",
@@ -268,18 +313,31 @@ const interactionDefinitions = Object.freeze({
     ],
     assertSelector: ".quick-tool-settings",
   }),
-  "audio-studio": Object.freeze({
-    stateId: "interaction-loop-on",
-    fixture: { kind: "generated-wav", fileName: "visual-tone.wav", durationSeconds: 0.25, sampleRate: 8_000 },
-    actions: [
-      { type: "upload", selector: "input[type='file']" },
-      { type: "wait", selector: ".audio-loop-control [role='switch']" },
-      { type: "wait-shadow-canvas", selector: ".audio-waveform" },
-      { type: "wait", selector: ".ui-operation-progress.ui-status-success" },
-      { type: "click", selector: ".audio-loop-control [role='switch']" },
-    ],
-    assertSelector: ".audio-loop-control [role='switch'][aria-checked='true']",
-  }),
+  "audio-studio": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-waveform",
+      fixture: { kind: "generated-wav", fileName: "visual-tone.wav", durationSeconds: 0.25, sampleRate: 8_000 },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='audio-studio'] input[type='file']" },
+        { type: "wait-shadow-canvas", selector: ".audio-waveform" },
+        { type: "wait", selector: ".ui-operation-progress.ui-status-success" },
+        { type: "scroll-into-view", selector: ".audio-waveform-shell", offset: -88 },
+      ],
+      assertSelector: ".audio-waveform",
+    }),
+    Object.freeze({
+      stateId: "interaction-effect-robot",
+      fixture: { kind: "generated-wav", fileName: "visual-effect.wav", durationSeconds: 0.25, sampleRate: 8_000 },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='audio-studio'] input[type='file']" },
+        { type: "wait-shadow-canvas", selector: ".audio-waveform" },
+        { type: "wait", selector: ".ui-operation-progress.ui-status-success" },
+        { type: "click", selector: "[data-testid='audio-voice-presets'] button:nth-child(4)" },
+        { type: "scroll-into-view", selector: ".audio-voice-effect-panel", offset: -88 },
+      ],
+      assertSelector: "[data-testid='audio-voice-presets'] button:nth-child(4)[aria-checked='true']",
+    }),
+  ]),
   "image-studio": Object.freeze({
     stateId: "interaction-batch-tab",
     actions: [{ type: "click", selector: ".studio-tabs button:nth-child(2)" }],
