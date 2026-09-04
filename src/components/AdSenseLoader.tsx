@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { CONSENT_EVENT, getPrivacyConsent, type PrivacyConsent } from "./privacyConsent";
+import { isLocalQaBuild } from "./localQa";
 
 const ADSENSE_CLIENT = "ca-pub-8940087269746960";
 
@@ -12,7 +13,7 @@ export function AdSenseLoader() {
     return () => window.removeEventListener(CONSENT_EVENT, handleConsent);
   }, []);
   useEffect(() => {
-    if (!import.meta.env.PROD || consent !== "granted" || document.querySelector("script[data-worklazy-adsense]")) return;
+    if (!import.meta.env.PROD || isLocalQaBuild || consent !== "granted" || document.querySelector("script[data-worklazy-adsense]")) return;
     const script = document.createElement("script");
     script.async = true;
     script.crossOrigin = "anonymous";
