@@ -28,6 +28,18 @@
 - **콘솔 회귀·원인**: 0.8.4에는 없고 0.8.6에서만 재현돼 진짜 회귀다. 상류 `61baa678357f05a0a9c9d674255a1c06d58bf14f`(`#5617`)가 full Studio 시작의 `openBlankDocumentIfIdle()`와 파일 열기 전 `canvasView.showBlankPage()`를 추가했다. `showBlankPage()`는 `pages=[]`로 비우지만 VirtualScroll의 이전 page 0 치수를 남겨 전환 중 viewport 갱신이 stale page 0을 렌더한다. ready 후 1초 지연 대조에서도 1건이 남아 이 전환 결함을 확인했고, 즉시 열기에서는 시작 빈 문서 초기화까지 겹쳐 1~2건으로 변동했다.
 - **수정 방향·기각**: 상류에서 `showBlankPage()`/`reset()` 시 VirtualScroll page dimensions를 함께 비우거나 `updateVisiblePages()`가 `pages.length === 0`이면 렌더를 건너뛰고, RPC `ready()`가 시작 빈 문서 promise까지 기다리거나 문서 수명주기를 직렬화해야 한다. Worklazy에서 `?chrome=embed`를 붙이면 해당 경로를 우회하지만 파일 메뉴의 HTML·Word 내보내기·인쇄 등도 제거하므로 현 제품 계약의 수정안으로는 기각했다. 공식 벤더 스냅샷을 수기 패치하지 않는다.
 - **최종 판정**: 두 결함 중 콘솔 오류가 0.8.6 전용 회귀이므로 main 병합·push·Pages 배포·라이브 확인을 금지하고 `rhwp-0.8.6` worktree를 보존한다. 증거는 `/tmp/rhwp-ab-20260904/`, `/tmp/rhwp-ab-20260904-r2/`, `/tmp/rhwp-ab-20260904-delayed/`에 있다. 두 버전 QA 빌드는 각각 exit 0(0.8.4 2,429 modules, 0.8.6 2,431 modules)이었다.
+### 네이버 SEO — 루트 랜딩 가치 전달 문구 개선 (Codx)
+
+- **변경 사유·문구 판정**: 사용자 결정에 따라 언어 선택 안내에 그치던 루트 메타를 사이트가 제공하는 작업 가치를 드러내는 한·영 병기 제목과 설명으로 교체했다. 정적 호스팅에서는 방문자 언어별 메타 응답을 제공할 수 없어 한 문장 안에 두 언어를 병기했다.
+- **범위 판정**: 기본 소셜 이미지 `worklazy-tools-share.png`는 한·영 병기 자산이 없어 그대로 유지했다. Open Graph·Twitter 태그 구성과 순서, URL·locale, 화면의 `seo-static-fallback` 언어 선택 본문은 변경하지 않았다.
+- **산출물·검증 실측**: `dist/index.html`의 title·description·og:title·og:description·twitter:title·twitter:description은 각각 정확히 1개였고 확정 문구와 일치했다. 제목은 48 code points·UTF-8 69B, 설명은 69 code points·UTF-8 110B였다. `npm run build` exit 0(2,429 modules·Vite 56.93초·정적 59페이지), `npm run test:static` exit 0, `npm run test:unit` exit 0(158/158), `git diff --check` exit 0이었다.
+
+### 네이버 SEO — 루트 언어 선택 랜딩 메타 보강 (Codx)
+
+- **진단·문구 실측**: 배포 기준 루트 description은 85 code points·UTF-8 123B이고 Open Graph·Twitter 태그는 0개였다. 확정 문구 `Choose English or Korean. 무료 업무 도구의 언어를 선택하세요.`로 교체한 빌드 결과는 description 정확히 1개·46 code points·76B였다.
+- **소셜 메타 판정**: 기존 `getSocialImageDefinition("en", "/")`를 재사용해 기본 이미지 `https://worklazy.net/social/worklazy-tools-share.png`(1200×630 PNG·199,195B)를 절대 URL로 생성했다. 정본의 순서대로 canonical, ko/en/x-default, 나열된 Open Graph 전 항목과 Twitter 5종을 배치했다. “OG 12종” 표제와 달리 확정 목록은 `og:locale:alternate`와 `og:image:alt`를 포함해 실제 13태그이므로, 목록 우선 계약에 따라 13개 모두 각각 1개로 생성·검증했다.
+- **중복·범위 판정**: `dist/index.html`에서 title·canonical·hreflang 3종·Open Graph 13개·Twitter 5개는 모두 각각 1개였고 나열 순서는 단조 증가했다. 루트 `worklazy-route-jsonld`는 0개를 유지했으며 `src/app/seo.ts`, 언어/도구 페이지, 사이트맵, 광고·격리 경로는 수정하지 않았다. 메타 전용 변경이라 화면 배치와 ko/en 런타임 문구에는 영향이 없다.
+- **검증 실측**: `npm run build` exit 0(2,429 modules·Vite 57.48초·정적 59페이지), `npm run test:static` exit 0, `npm run test:unit` exit 0(158/158), `git diff --check` exit 0이었다.
 
 ## 2026-09-03
 

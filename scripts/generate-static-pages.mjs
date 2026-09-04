@@ -150,10 +150,35 @@ function renderPage(template, page, canonical) {
 }
 
 function renderLanding(template) {
-  const title = "Worklazy Tools — Choose Language · 언어 선택";
-  const description = "Choose English or Korean for free browser-based work tools. 무료 브라우저 업무 도구의 언어를 선택하세요.";
-  const head = `<link rel="canonical" href="${siteUrl}" /><link rel="alternate" hreflang="ko" href="${absolute("ko", "")}" /><link rel="alternate" hreflang="en" href="${absolute("en", "")}" /><link rel="alternate" hreflang="x-default" href="${absolute("en", "")}" />`;
-  return template.replace(/<html[^>]*>/, '<html lang="en">').replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${description}" />`).replace("</head>", `${head}</head>`).replace('<div id="root"></div>', '<div id="root"><main class="seo-static-fallback"><p class="eyebrow">WORKLAZY TOOLS</p><h1>Choose your language<br><span lang="ko">언어를 선택하세요</span></h1><p><a href="/en/">Continue in English</a> · <a href="/ko/">한국어로 계속</a></p></main></div>');
+  const title = "무료 브라우저 업무 도구 · Free Work Tools | Worklazy Tools";
+  const description = "설치 없이 엑셀·PDF·문서·이미지 작업하는 무료 도구. Free browser tools for everyday work.";
+  const socialImage = getSocialImageDefinition("en", "/");
+  const image = new URL(socialImage.path, siteUrl).href;
+  const head = [
+    `<link rel="canonical" href="${escapeHtml(siteUrl)}" />`,
+    `<link rel="alternate" hreflang="ko" href="${absolute("ko", "")}" />`,
+    `<link rel="alternate" hreflang="en" href="${absolute("en", "")}" />`,
+    `<link rel="alternate" hreflang="x-default" href="${absolute("en", "")}" />`,
+    `<meta property="og:locale" content="en_US" />`,
+    `<meta property="og:locale:alternate" content="ko_KR" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:site_name" content="Worklazy Tools" />`,
+    `<meta property="og:title" content="${escapeHtml(title)}" />`,
+    `<meta property="og:description" content="${escapeHtml(description)}" />`,
+    `<meta property="og:url" content="${escapeHtml(siteUrl)}" />`,
+    `<meta property="og:image" content="${escapeHtml(image)}" />`,
+    `<meta property="og:image:secure_url" content="${escapeHtml(image)}" />`,
+    `<meta property="og:image:type" content="${socialImage.type}" />`,
+    `<meta property="og:image:width" content="${socialImage.width}" />`,
+    `<meta property="og:image:height" content="${socialImage.height}" />`,
+    `<meta property="og:image:alt" content="${escapeHtml(socialImage.alt)}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(socialImage.alt)}" />`,
+  ].join("\n    ");
+  return template.replace(/<html[^>]*>/, '<html lang="en">').replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${escapeHtml(description)}" />`).replace("</head>", `    ${head}\n  </head>`).replace('<div id="root"></div>', '<div id="root"><main class="seo-static-fallback"><p class="eyebrow">WORKLAZY TOOLS</p><h1>Choose your language<br><span lang="ko">언어를 선택하세요</span></h1><p><a href="/en/">Continue in English</a> · <a href="/ko/">한국어로 계속</a></p></main></div>');
 }
 
 function renderOfficeApp(template, language) {
