@@ -989,7 +989,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-@rhwp/core 0.8.4
+@rhwp/core 0.8.6
 Declared license: MIT
 Homepage: https://edwardkim.github.io/rhwp/
 
@@ -1017,7 +1017,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-@rhwp/editor 0.8.4
+@rhwp/editor 0.8.6
 Declared license: MIT
 Homepage: https://edwardkim.github.io/rhwp/
 No top-level license/notice text was present in the installed package. Consult the package source and metadata above.

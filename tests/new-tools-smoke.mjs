@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -12,10 +13,18 @@ import { createFile as createMp4BoxFile } from "mp4box";
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
 const koBaseUrl = `${baseUrl}/ko`;
+const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
+const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
+const onlyImageSizing = process.env.TEST_ONLY_IMAGE_SIZING === "1";
+const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing;
+const onlyHwp = process.env.TEST_ONLY_HWP === "1";
+const HWP_ROUNDTRIP_SENTINEL = "WL_RHWP_086_SENTINEL";
+const HWP_FIXTURE_SHA256 = "35c590e316c18e7310bb7b2f954b87d32f1d45416179466aee2bebb99d7e706f";
+let rhwpInitialization;
 const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-new-tools-"));
 
 try {
-  const fixtures = await createFixtures(tempDirectory);
+  const fixtures = onlyHwp ? await createHwpFixtures(tempDirectory) : await createFixtures(tempDirectory);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
     headless: true,
@@ -37,11 +46,6 @@ try {
       console.error("[request failed]", request.url(), request.failure()?.errorText);
     });
 
-    const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
-    const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
-    const onlyImageSizing = process.env.TEST_ONLY_IMAGE_SIZING === "1";
-    const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing;
-    const onlyHwp = process.env.TEST_ONLY_HWP === "1";
     if (onlyHwp) {
       console.log("[1/1] HWP editor and comparison");
       await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
@@ -110,7 +114,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   await page.goto(`${koBaseUrl}/tools/document-compare`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".rhwp-version-notice");
   const compareVersion = await page.$eval(".rhwp-version-notice", (element) => element.textContent || "");
-  if (!compareVersion.includes("rhwp 0.8.4") || !compareVersion.includes("공식 비교 파일")) {
+  if (!compareVersion.includes("rhwp 0.8.6") || !compareVersion.includes("공식 비교 파일")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
   let compareInputs = await page.$$(".hwp-compare-page input[type=file]");
@@ -164,7 +168,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
     const version = iframe.contentDocument?.querySelector('meta[name="rhwp-version"]')?.getAttribute("content") || "";
     return { sameOrigin: url.origin === location.origin, path: url.pathname, csp, version };
   });
-  if (!runtime.sameOrigin || !runtime.path.includes("/vendor/rhwp-studio/0.8.4/") || runtime.version !== "0.8.4"
+  if (!runtime.sameOrigin || !runtime.path.includes("/vendor/rhwp-studio/0.8.6/") || runtime.version !== "0.8.6"
     || !runtime.csp.includes("connect-src 'self'") || !runtime.csp.includes("font-src 'self'")) {
     throw new Error(`HWP editor is not using the isolated self-hosted runtime: ${JSON.stringify(runtime)}`);
   }
@@ -187,9 +191,52 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const editorVersion = await page.$eval(".rhwp-version-notice.compact", (element) => element.textContent || "");
-  if (!editorVersion.includes("rhwp 0.8.4") || !editorVersion.includes("이 사이트에 포함")) {
+  if (!editorVersion.includes("rhwp 0.8.6") || !editorVersion.includes("이 사이트에 포함")) {
     throw new Error(`HWP editor version notice is incomplete: ${editorVersion}`);
   }
+
+  const sourceStructure = await inspectHwpBytes(await fs.readFile(hwpPaths[0]));
+  await page.evaluate(() => {
+    window.__worklazyOriginalCreateObjectURL = URL.createObjectURL.bind(URL);
+    window.__worklazyCapturedHwpBlob = undefined;
+    URL.createObjectURL = (value) => {
+      if (value instanceof Blob && value.type === "application/x-hwp") window.__worklazyCapturedHwpBlob = value;
+      return window.__worklazyOriginalCreateObjectURL(value);
+    };
+  });
+  const studioIframe = await page.$(".rhwp-editor-shell iframe");
+  const studioFrame = await studioIframe?.contentFrame();
+  if (!studioFrame) throw new Error("HWP Studio iframe was not available for round-trip editing.");
+  await studioFrame.waitForSelector(".document-page-canvas");
+  await studioFrame.click(".document-page-canvas", { offset: { x: 130, y: 130 } });
+  await page.keyboard.type(HWP_ROUNDTRIP_SENTINEL, { delay: 10 });
+  await page.click(".hwp-focus-actions .primary-button");
+  await page.waitForFunction(() => window.__worklazyCapturedHwpBlob instanceof Blob
+    && document.querySelector(".hwp-focus-actions .primary-button") instanceof HTMLButtonElement
+    && !document.querySelector(".hwp-focus-actions .primary-button").disabled);
+  const roundTripBytes = Uint8Array.from(await page.evaluate(async () => Array.from(
+    new Uint8Array(await window.__worklazyCapturedHwpBlob.arrayBuffer()),
+  )));
+  await page.evaluate(() => {
+    URL.createObjectURL = window.__worklazyOriginalCreateObjectURL;
+    delete window.__worklazyOriginalCreateObjectURL;
+    delete window.__worklazyCapturedHwpBlob;
+  });
+  const roundTripStructure = await inspectHwpBytes(roundTripBytes);
+  if (!roundTripStructure.text.includes(HWP_ROUNDTRIP_SENTINEL)
+    || roundTripStructure.pageCount !== sourceStructure.pageCount
+    || roundTripStructure.sectionCount !== sourceStructure.sectionCount
+    || roundTripStructure.paragraphCount < sourceStructure.paragraphCount) {
+    throw new Error(`HWP round-trip parse verification failed: ${JSON.stringify({ sourceStructure, roundTripStructure })}`);
+  }
+  const reopenedName = "rhwp-roundtrip-reopened.hwp";
+  const reopenedPath = path.join(path.dirname(hwpPaths[0]), reopenedName);
+  await fs.writeFile(reopenedPath, roundTripBytes);
+  await (await page.$(".hwp-focus-open input[type=file]")).uploadFile(reopenedPath);
+  await page.waitForFunction((expectedName) => document.querySelector(".hwp-focus-document strong")?.textContent === expectedName
+    && document.querySelector(".hwp-focus-document small")?.textContent?.includes("1페이지"), {}, reopenedName);
+  console.log(`  hwp: round-trip ${roundTripBytes.byteLength} bytes, ${roundTripStructure.pageCount} page, sentinel parsed and Studio reopened`);
+
   page.off("request", recordRhwpRequest);
   if (forbiddenRhwpRequests.length) throw new Error(`HWP editor requested external rhwp resources: ${forbiddenRhwpRequests.join(", ")}`);
 }
@@ -3910,20 +3957,7 @@ async function waitForTerminalStatus(page) {
 }
 
 async function createFixtures(directory) {
-  const wasm = await fs.readFile(new URL("../node_modules/@rhwp/core/rhwp_bg.wasm", import.meta.url));
-  globalThis.measureTextWidth = (_font, text) => Array.from(text).length * 8;
-  await initRhwp({ module_or_path: wasm });
-  const document = HwpDocument.createEmpty();
-  const blankHwp = path.join(directory, "blank.hwp");
-  const blankHwpTwo = path.join(directory, "blank-two.hwp");
-  const wordDocx = path.join(directory, "word-family.docx");
-  try {
-    const bytes = document.exportHwp();
-    await Promise.all([fs.writeFile(blankHwp, bytes), fs.writeFile(blankHwpTwo, bytes)]);
-  } finally {
-    document.free();
-  }
-  await fs.writeFile(wordDocx, await createMinimalDocx());
+  const hwpFixtures = await createHwpFixtures(directory);
 
   const imageOne = path.join(directory, "one.png");
   const imageTwo = path.join(directory, "two.png");
@@ -4023,8 +4057,7 @@ async function createFixtures(directory) {
     await largeHandle.close();
   }
   return {
-    hwpFiles: [blankHwp, blankHwpTwo],
-    wordDocx,
+    ...hwpFixtures,
     images: [imageOne, imageTwo],
     audio,
     videos: [video, videoTwo, ...videoCopies],
@@ -4035,6 +4068,51 @@ async function createFixtures(directory) {
     videoIncompatibleVideo,
     dolbyVisionVideo: dolbyVisionMatrix[0],
   };
+}
+
+async function createHwpFixtures(directory) {
+  const encoded = await fs.readFile(new URL("./fixtures/rhwp-roundtrip-empty.hwp.b64", import.meta.url), "utf8");
+  const bytes = Buffer.from(encoded.replace(/\s/g, ""), "base64");
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  if (sha256 !== HWP_FIXTURE_SHA256) throw new Error(`Pinned HWP fixture hash mismatch: ${sha256}`);
+  const blankHwp = path.join(directory, "rhwp-roundtrip-empty.hwp");
+  const blankHwpTwo = path.join(directory, "rhwp-roundtrip-empty-copy.hwp");
+  const wordDocx = path.join(directory, "word-family.docx");
+  await Promise.all([
+    fs.writeFile(blankHwp, bytes),
+    fs.writeFile(blankHwpTwo, bytes),
+    fs.writeFile(wordDocx, await createMinimalDocx()),
+  ]);
+  return { hwpFiles: [blankHwp, blankHwpTwo], wordDocx };
+}
+
+async function inspectHwpBytes(bytes) {
+  if (!rhwpInitialization) {
+    const wasm = await fs.readFile(new URL("../node_modules/@rhwp/core/rhwp_bg.wasm", import.meta.url));
+    globalThis.measureTextWidth = (_font, text) => Array.from(text).length * 8;
+    rhwpInitialization = initRhwp({ module_or_path: wasm });
+  }
+  await rhwpInitialization;
+  const document = new HwpDocument(new Uint8Array(bytes));
+  try {
+    const paragraphs = [];
+    let paragraphCount = 0;
+    for (let section = 0; section < document.getSectionCount(); section += 1) {
+      const sectionParagraphCount = document.getParagraphCount(section);
+      paragraphCount += sectionParagraphCount;
+      for (let paragraph = 0; paragraph < sectionParagraphCount; paragraph += 1) {
+        paragraphs.push(document.getTextRange(section, paragraph, 0, document.getParagraphLength(section, paragraph)));
+      }
+    }
+    return {
+      pageCount: document.pageCount(),
+      sectionCount: document.getSectionCount(),
+      paragraphCount,
+      text: paragraphs.join("\n"),
+    };
+  } finally {
+    document.free();
+  }
 }
 
 async function injectDolbyVisionConfiguration(source, target, { sampleEntry, configBox, compatibilityId }) {

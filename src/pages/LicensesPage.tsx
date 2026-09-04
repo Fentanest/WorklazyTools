@@ -5,7 +5,7 @@ import { PageHeader } from "../components/ui";
 import { useAppLanguage } from "../i18n/routing";
 
 const libraries = [
-  { name: "rhwp / @rhwp/core·@rhwp/editor 0.8.4", license: "MIT", url: "https://github.com/edwardkim/rhwp", purpose: "HWP·HWPX·HML 문서 해석, 편집기 UI와 파일 저장" },
+  { name: "rhwp / @rhwp/core·@rhwp/editor 0.8.6", license: "MIT", url: "https://github.com/edwardkim/rhwp", purpose: "HWP·HWPX·HML 문서 해석, 편집기 UI와 파일 저장" },
   { name: "ZetaOffice / LibreOffice browser build snapshot 2026-08-25", license: "MPL-2.0", url: "https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2", purpose: "Writer·Calc·Impress 브라우저 편집 화면" },
   { name: "ZetaJS 1.2.0", license: "MIT", url: "https://github.com/allotropia/zetajs", purpose: "LibreOffice UNO JavaScript 연결" },
   { name: "Nanum Gothic", license: "SIL OFL-1.1", url: "https://github.com/google/fonts/tree/main/ofl/nanumgothic", purpose: "브라우저 오피스 편집기의 한글 표시와 대체 글꼴" },

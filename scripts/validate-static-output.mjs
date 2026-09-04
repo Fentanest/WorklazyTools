@@ -3,6 +3,10 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
+const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
+const rhwpCoreVersion = packageJson.dependencies?.["@rhwp/core"];
+const rhwpEditorVersion = packageJson.dependencies?.["@rhwp/editor"];
+if (!rhwpCoreVersion || rhwpCoreVersion !== rhwpEditorVersion) throw new Error("Pinned rhwp core/editor versions do not match.");
 const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/stickers.manifest.json", "utf8"));
 
 const routes = [
@@ -251,7 +255,8 @@ const applicationJavaScript = (await Promise.all(
 if (!ads.includes("pub-8940087269746960")) throw new Error("ads.txt publisher ID is missing.");
 if (cname.trim() !== "worklazy.net") throw new Error("CNAME does not point to worklazy.net.");
 if (!worklazyLicense.includes("All rights reserved")) throw new Error("Worklazy proprietary license is missing.");
-if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker") || !thirdPartyLicenses.includes("@rhwp/core")
+if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker")
+  || !thirdPartyLicenses.includes(`@rhwp/core ${rhwpCoreVersion}`) || !thirdPartyLicenses.includes(`@rhwp/editor ${rhwpEditorVersion}`)
   || !thirdPartyLicenses.includes("ZetaOffice / LibreOffice") || !thirdPartyLicenses.includes("zetajs") || !thirdPartyLicenses.includes("JSDoc legacy Word reader")
   || !thirdPartyLicenses.includes("Twemoji graphics 17.0.3") || !thirdPartyLicenses.includes("Attribution 4.0 International")) throw new Error("Third-party license bundle is incomplete.");
 if (!favicon.includes("facet-4") || !logo.includes("Worklazy")) throw new Error("Worklazy favicon or logo is missing from the build.");

@@ -2,6 +2,18 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-04
+
+### RHWP 0.8.6 업그레이드 — 벤더 무결성·왕복 저장·로컬 QA 판정 (Codx)
+
+- **실행 게이트·설치 판정**: 다른 작업이 사용하는 기본 워킹트리는 건드리지 않고 `/tmp/worklazytools-rhwp-0.8.6`에 `8d91b6221b75d5326d90e2a5e5ccf1acfbd19f87` 기준 별도 `rhwp-0.8.6` 브랜치를 만들었다. `npm install` 뒤 package manifest·lock의 루트/설치 블록·실제 `node_modules`·`npm ls`에서 `@rhwp/core`와 `@rhwp/editor`가 모두 정확히 0.8.6임을 확인한 뒤에만 벤더링했다. `modern-tar` 0.8.4는 지시 범위 밖이라 그대로 유지했다.
+- **상류 소스·플래그 판정**: GitHub `v0.8.6` 태그와 clone HEAD가 모두 `f1f9c6ae58344ee9368996d3543f76b9345cf227`임을 확인했다. 같은 clone·의존성에서 `RHWP_WITHOUT_HWPCTRL=0`은 payload 78개·60,735,019B이고 54,385B `studio-plugin` chunk를 포함했다. `RHWP_WITHOUT_HWPCTRL=1`은 payload 77개·60,680,448B로 1개·54,571B 감소했고 Studio 단독 사용에 불필요한 플러그인 chunk가 사라져 채택했다. 외부 웹폰트 비활성 플래그는 유지했다.
+- **스냅샷·manifest 판정**: 최종 payload는 77개·60,680,448B, manifest 포함 전체는 78개·60,692,284B다. manifest는 11,836B, SHA-256 `a559f14562af337834843d3f9e207f93005faaa205a948e6110537f0acfc3440`이며 각 파일의 bytes와 SHA-256을 기록한다. validator는 실제 재귀 파일 집합과 manifest 집합의 완전 일치, 개별 bytes/hash, 설치 패키지 버전, 설정 플래그를 검사한다. 두 빌드 모두 생성된 PWA 파일 4개를 재귀 규칙으로 제거했고 최종 `workbox-*`·`registerSW.js`·`sw.js`·`manifest.webmanifest` 잔존은 0건이었다.
+- **생성·정리 판정**: root notices와 공개 라이선스 2종은 동일 생성기가 lock의 실제 버전을 읽어 재생성하며 정적 검사가 core/editor 0.8.6 표기를 각각 고정한다. 구 0.8.4 벤더 스냅샷은 현재 버전 보호와 명시 allowlist가 있는 전용 스크립트로만 제거했다. 생성기 첫 실행은 새 worktree에 ZetaOffice·Twemoji 선행 라이선스가 없어 실패했고 각 공식 벤더 스크립트를 실행한 뒤 독립 재실행과 prebuild 재실행이 통과했다. 기본 npm cache의 읽기 전용 `EROFS`는 `/tmp` cache 지정으로 해소했다.
+- **HWP 왕복 판정**: test-only 필터를 fixture 생성보다 앞으로 옮겨 HWP 단독 실행에서 미디어 fixture를 만들지 않게 했다. 고정 3,584B fixture(SHA-256 `35c590e316c18e7310bb7b2f954b87d32f1d45416179466aee2bebb99d7e706f`)를 Studio에서 열고 canvas에 sentinel을 편집한 뒤 제품의 `HWP 저장`으로 받은 Blob을 `@rhwp/core` 0.8.6으로 재파싱했다. sentinel·1페이지·section/paragraph 구조를 확인하고 같은 Blob을 Studio에 다시 열어 파일명과 1페이지를 확인했다. 0.8.6은 기존 load/export와 JSON 봉투 계약으로 통과해 제품 통합 API 변경은 불필요하다고 판정했다.
+- **검증 판정**: `npm run prebuild` exit 0(77개·60,680,448B), `npm run build` exit 0(2,431 modules·정적 59페이지), `npm run test:unit` 158/158, `TEST_ONLY_HWP=1 npm run test:new-tools` exit 0(3,584B·1페이지·sentinel 파싱·Studio 재개방), `npm run test:office` exit 0(96 download states·7 cached states·5,089B DOCX), `npm run test:static` exit 0, `npm run test:visual` 24/24(Chrome 152.0.7977.64·diff ≤0.100%)였다. 4173 포트가 다른 작업에 점유돼 제품 preview는 4175에서 기동하고 두 브라우저 스모크에만 `TEST_BASE_URL`을 지정했다. 구 snapshot 제거 뒤 최종 build와 validator도 재통과했고 구 벤더 URL 참조 grep 및 PWA 잔존은 각각 0건이었다.
+- **로컬 QA 판정**: UI migration 커밋을 가져오지 않고 `VITE_LOCAL_QA=1` 플래그와 Analytics·AdSense 두 로더 차단만 독립 변경으로 구현했다. 해당 환경의 production build는 2,431 modules·정적 59페이지로 통과했고 HWP 경로에서 동의 후 Google·Naver·AdSense script와 관련 네트워크 요청이 모두 0임을 확인했다. 이번 범위는 검수 준비까지이며 사람의 로컬 시각 판정은 후속 단계로 남긴다.
+
 ## 2026-09-03
 
 ### shadcn 마이그레이션 라이브 UI 복구 — 6개 revert 판정 (Codx)
