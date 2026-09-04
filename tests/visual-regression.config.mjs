@@ -1,4 +1,4 @@
-import { b1QaScenarios, qrBulkQaScenarios, visualRegressionScenarios } from "./visual-regression.scenarios.mjs";
+import { qaCaptureScenarios, qrBulkQaScenarios, visualRegressionScenarios } from "./visual-regression.scenarios.mjs";
 
 export const visualRegressionConfig = Object.freeze({
   scenarios: visualRegressionScenarios,
@@ -34,4 +34,4 @@ export const visualRegressionConfig = Object.freeze({
   ]),
 });
 
-export { b1QaScenarios, qrBulkQaScenarios };
+export { qaCaptureScenarios, qrBulkQaScenarios };

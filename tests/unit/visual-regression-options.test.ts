@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildVisualStateDistribution,
   filterVisualScenarios,
   parseVisualOnly,
   resolveVisualConcurrency,
@@ -32,4 +33,16 @@ test("VISUAL_ONLY accepts comma-separated scenario, route, and tool identifiers"
   assert.equal(filterVisualScenarios(scenarios, parseVisualOnly("excel-compare-empty")).length, 2);
   assert.equal(filterVisualScenarios(scenarios, parseVisualOnly(undefined)), scenarios);
   assert.throws(() => filterVisualScenarios(scenarios, ["missing-tool"]), /missing-tool/);
+});
+
+test("QA state distribution counts capture profiles by state type and exact state id", () => {
+  const distribution = buildVisualStateDistribution([
+    { stateType: "initial", stateId: "initial", profiles: [{}, {}] },
+    { stateType: "bottom", stateId: "bottom", profiles: [{}, {}] },
+    { stateType: "interaction", stateId: "interaction-result", profiles: [{}] },
+  ]);
+  assert.deepEqual(distribution, {
+    stateTypes: { bottom: 2, initial: 2, interaction: 1 },
+    stateIds: { bottom: 2, initial: 2, "interaction-result": 1 },
+  });
 });

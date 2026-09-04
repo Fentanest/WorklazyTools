@@ -312,12 +312,18 @@ export const interactionNotApplicableReasons = Object.freeze({
   "office-editor": "The landing screen exposes file/open actions, not a toggle or selection state; workspace interaction remains covered by the office smoke test.",
 });
 
-export const b1QaScenarios = Object.freeze(visualRegressionScenarios
-  .filter(({ toolId, stateType }) => b1ToolIds.has(toolId) && (stateType === "initial" || stateType === "interaction"))
+const QA_STATE_TYPES = new Set(["initial", "bottom", "interaction"]);
+
+export const qaCaptureScenarios = Object.freeze(visualRegressionScenarios
+  .filter(({ stateType }) => QA_STATE_TYPES.has(stateType))
   .map((definition) => scenario({
     ...definition,
-    profiles: fullProfiles,
-    profileReductionReason: "No reduction: the P2 B1 review artifact retains the full locale, theme, and viewport product for both initial and interaction states.",
+    profiles: definition.localeNotApplicableReason
+      ? fullProfiles.filter(({ locale }) => definition.profiles.some((profileDefinition) => profileDefinition.locale === locale))
+      : fullProfiles,
+    profileReductionReason: definition.localeNotApplicableReason
+      ? "QA capture keeps the full theme and viewport product for every product-applicable locale; the documented N/A locale remains excluded."
+      : "No reduction: bundle QA keeps the full locale, theme, and viewport product for initial, bottom, and interaction states.",
   })));
 
 const qrBulkBase = {

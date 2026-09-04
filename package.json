@@ -29,7 +29,9 @@
     "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
     "test:visual": "node tests/visual-regression.mjs",
+    "test:visual:qa": "VISUAL_QA_CAPTURE_ONLY=1 node tests/visual-regression.mjs",
     "test:visual-bottom-negative": "node tests/mobile-bottom-negative-control.mjs",
+    "test:control-geometry": "node tests/control-geometry-smoke.mjs",
     "test:ui-migration": "node tests/ui-migration-layout-smoke.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },

@@ -8,9 +8,10 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 
-import { assertMobileBottomLayout } from "./mobile-bottom-assertion.mjs";
-import { b1QaScenarios, qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
+import { assertMobileBottomLayout, assertScrollAtBottom } from "./mobile-bottom-assertion.mjs";
+import { qaCaptureScenarios, qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
 import {
+  buildVisualStateDistribution,
   filterVisualScenarios,
   parseVisualOnly,
   resolveVisualConcurrency,
@@ -27,9 +28,9 @@ const captureDirectory = process.env.VISUAL_CAPTURE_DIR
   : undefined;
 const updateBaselines = process.env.UPDATE_VISUAL_BASELINES === "1";
 const qrBulkCaptureOnly = process.env.VISUAL_QR_BULK_CAPTURE_ONLY === "1";
-const b1CaptureOnly = process.env.VISUAL_B1_CAPTURE_ONLY === "1";
+const qaCaptureOnly = process.env.VISUAL_QA_CAPTURE_ONLY === "1";
 const qrBulkBaselinesOnly = process.env.VISUAL_QR_BULK_BASELINES_ONLY === "1";
-const captureOnly = qrBulkCaptureOnly || b1CaptureOnly;
+const captureOnly = qrBulkCaptureOnly || qaCaptureOnly;
 const consentValue = process.env.VISUAL_CONSENT_GRANTED === "1" ? "granted" : "denied";
 const externallyManagedBaseUrl = process.env.TEST_BASE_URL;
 const port = Number.parseInt(process.env.VISUAL_TEST_PORT || "4174", 10);
@@ -47,17 +48,25 @@ if (captureOnly && !captureDirectory) throw new Error("Visual capture-only mode 
 if (captureOnly && updateBaselines) throw new Error("QA captures cannot update the scenario baseline set.");
 if (qrBulkBaselinesOnly && !updateBaselines) throw new Error("VISUAL_QR_BULK_BASELINES_ONLY is available only while updating baselines.");
 if (captureOnly && qrBulkBaselinesOnly) throw new Error("Capture-only and baseline-only modes cannot be combined.");
-if (qrBulkCaptureOnly && b1CaptureOnly) throw new Error("QR bulk and B1 capture-only modes cannot be combined.");
+if (qrBulkCaptureOnly && qaCaptureOnly) throw new Error("QR bulk and bundle QA capture-only modes cannot be combined.");
+if (qaCaptureOnly && visualOnly.length === 0) throw new Error("Bundle QA capture-only mode requires VISUAL_ONLY to identify the reviewed routes or tools.");
 
 const baselineNames = buildCaptureMatrix(config.scenarios).map(({ name }) => name);
 const availableCaptureScenarios = qrBulkCaptureOnly
   ? qrBulkQaScenarios
-  : b1CaptureOnly
-    ? b1QaScenarios
+  : qaCaptureOnly
+    ? qaCaptureScenarios
   : qrBulkBaselinesOnly
     ? config.scenarios.filter(({ toolId, stateType }) => toolId === "qr-studio" && stateType === "interaction")
     : config.scenarios;
 const captureScenarios = filterVisualScenarios(availableCaptureScenarios, visualOnly);
+const stateDistribution = buildVisualStateDistribution(captureScenarios);
+if (qaCaptureOnly) {
+  const missingStateTypes = ["initial", "bottom", "interaction"].filter((stateType) => !stateDistribution.stateTypes[stateType]);
+  if (missingStateTypes.length > 0) {
+    throw new Error(`Bundle QA capture selection is missing required state types: ${missingStateTypes.join(", ")}.`);
+  }
+}
 const captures = buildCaptureMatrix(captureScenarios);
 const expectedNames = captures.map(({ name }) => name);
 const captureBatches = buildCaptureBatches(captures, config.environment.maxCapturesPerBrowser);
@@ -132,12 +141,16 @@ try {
   if (!captureOnly) await assertBaselineSet(baselineNames);
   const browserVersion = [...browserVersions].join(", ") || "unknown browser";
   console.log(captureOnly
-    ? `${b1CaptureOnly ? "P2 B1" : "Bulk QR"} local QA captured: ${expectedNames.length} captures, ${browserVersion}.`
+    ? `${qaCaptureOnly ? "Bundle" : "Bulk QR"} local QA captured: ${expectedNames.length} captures, ${browserVersion}.`
     : `Visual regression ${mode}: ${expectedNames.length} captures, ${browserVersion}.`);
   console.log(`Threshold: <= ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}% differing pixels at per-pixel threshold ${config.diff.perPixelThreshold}; antialiasing ignored.`);
   console.log(`Allowed regions: ${config.allowedRegions.map(({ selector }) => selector).join(", ")}.`);
   console.log(`Environment: locale-specific browser workers (${Object.values(config.environment.locales).map(({ browserLocale }) => browserLocale).join(", ")}), recycled every ${config.environment.maxCapturesPerBrowser} captures; Accept-Language and navigator locale fixed, timezone ${config.environment.timezone}, DPR 1, font ${config.environment.fontFamily}, ${config.environment.settleTimeMs} ms paint settle.`);
-  if (captureDirectory) console.log(`Tool QA captures: ${expectedNames.filter((name) => !name.startsWith("home-default__") && !name.startsWith("tools-media-filter__")).length} in ${captureDirectory}.`);
+  if (qaCaptureOnly) {
+    console.log(`QA state distribution: ${Object.entries(stateDistribution.stateTypes).map(([state, count]) => `${state}=${count}`).join(", ")}.`);
+    console.log(`QA stateId distribution: ${Object.entries(stateDistribution.stateIds).map(([state, count]) => `${state}=${count}`).join(", ")}.`);
+  }
+  if (captureDirectory) console.log(`QA captures: ${expectedNames.length} in ${captureDirectory}.`);
 } catch (error) {
   if (server?.exitCode !== null && server?.exitCode !== undefined) {
     runError = new Error(`${error instanceof Error ? error.message : String(error)}\nVite preview exited with code ${server.exitCode}.\n${serverOutput.join("").trim()}`, { cause: error });
@@ -319,11 +332,16 @@ async function captureAndCompare(capture, browser) {
     }), config.environment.settleTimeMs);
     let bottomMetrics;
     if (capture.scenario.stateType === "bottom") {
-      if (capture.viewport.id !== "mobile") throw new Error(`${capture.scenario.scenarioId}: bottom scenarios must use a mobile viewport.`);
-      bottomMetrics = await assertMobileBottomLayout(page, {
-        bottomTargetSelector: capture.scenario.bottomTargetSelector,
-        scenarioId: capture.scenario.scenarioId,
-      });
+      bottomMetrics = await assertScrollAtBottom(page, { scenarioId: capture.scenario.scenarioId });
+      if (capture.viewport.id === "mobile") {
+        bottomMetrics = {
+          ...bottomMetrics,
+          mobileLayout: await assertMobileBottomLayout(page, {
+            bottomTargetSelector: capture.scenario.bottomTargetSelector,
+            scenarioId: capture.scenario.scenarioId,
+          }),
+        };
+      }
     } else if (!capture.scenario.actions.some(({ type }) => type === "scroll-into-view")) {
       await page.evaluate(() => window.scrollTo(0, 0));
     }
@@ -331,7 +349,7 @@ async function captureAndCompare(capture, browser) {
     if (externalRequests.length) throw new Error(`External requests attempted: ${externalRequests.join(" | ")}`);
 
     const actualBuffer = await page.screenshot({ type: "png", captureBeyondViewport: false });
-    if (captureDirectory && capture.scenario.kind === "tool") {
+    if (captureDirectory) {
       await fs.writeFile(path.join(captureDirectory, capture.name), actualBuffer);
     }
     if (captureOnly) return undefined;

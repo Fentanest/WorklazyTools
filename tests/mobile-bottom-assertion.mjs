@@ -1,3 +1,22 @@
+export async function assertScrollAtBottom(page, { scenarioId = "bottom" } = {}) {
+  const metrics = await page.evaluate(async () => {
+    const scrollingElement = document.scrollingElement ?? document.documentElement;
+    document.documentElement.style.scrollBehavior = "auto";
+    scrollingElement.scrollTo(0, scrollingElement.scrollHeight);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return {
+      scrollBottomDistance: Math.abs(scrollingElement.scrollHeight - scrollingElement.clientHeight - scrollingElement.scrollTop),
+      scrollHeight: scrollingElement.scrollHeight,
+      clientHeight: scrollingElement.clientHeight,
+      scrollTop: scrollingElement.scrollTop,
+    };
+  });
+  if (metrics.scrollBottomDistance > 1) {
+    throw new Error(`${scenarioId}: bottom distance ${metrics.scrollBottomDistance}px exceeds 1px. Metrics: ${JSON.stringify(metrics)}`);
+  }
+  return metrics;
+}
+
 export async function assertMobileBottomLayout(page, { bottomTargetSelector, scenarioId = "mobile-bottom" }) {
   if (!bottomTargetSelector) throw new Error(`${scenarioId}: bottomTargetSelector is required for a mobile bottom scenario.`);
 

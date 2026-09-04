@@ -4,9 +4,9 @@ import test from "node:test";
 import { availableToolRoutes } from "../tool-registry-routes.mjs";
 import { visualRegressionConfig } from "../visual-regression.config.mjs";
 import {
-  b1QaScenarios,
   interactionCoveredToolIds,
   interactionNotApplicableReasons,
+  qaCaptureScenarios,
   visualRegressionScenarios,
 } from "../visual-regression.scenarios.mjs";
 
@@ -80,11 +80,15 @@ test("visual regression scenario manifest covers every available tool and state 
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
   assert.equal(names.length, 153);
-  assert.equal(b1QaScenarios.length, 12);
-  assert.equal(b1QaScenarios.flatMap(({ profiles }) => profiles).length, 96);
-  assert.deepEqual(new Set(b1QaScenarios.map(({ toolId }) => toolId)), new Set([
+  assert.equal(qaCaptureScenarios.length, 60);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 472);
+  const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
-  ]));
+  ].includes(toolId));
+  assert.equal(b1QaScenarios.length, 18);
+  assert.equal(b1QaScenarios.flatMap(({ profiles }) => profiles).length, 144);
+  assert.deepEqual(new Set(b1QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
+  assert.ok(b1QaScenarios.every(({ profiles }) => profiles.length === 8));
   assert.equal(visualRegressionConfig.scenarios, visualRegressionScenarios);
   assert.equal(visualRegressionConfig.environment.maxCapturesPerBrowser, 12);
   assert.equal(visualRegressionConfig.environment.settleTimeMs, 200);

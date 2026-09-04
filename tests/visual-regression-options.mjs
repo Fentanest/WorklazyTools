@@ -39,3 +39,18 @@ export function filterVisualScenarios(scenarios, terms) {
     termSet.has(scenario.scenarioId) || termSet.has(scenario.routeId) || termSet.has(scenario.toolId)
   ));
 }
+
+export function buildVisualStateDistribution(scenarios) {
+  const stateTypes = new Map();
+  const stateIds = new Map();
+  for (const scenario of scenarios) {
+    const captures = scenario.profiles.length;
+    stateTypes.set(scenario.stateType, (stateTypes.get(scenario.stateType) ?? 0) + captures);
+    stateIds.set(scenario.stateId, (stateIds.get(scenario.stateId) ?? 0) + captures);
+  }
+  const sortedObject = (counts) => Object.fromEntries([...counts].sort(([left], [right]) => left.localeCompare(right)));
+  return Object.freeze({
+    stateTypes: Object.freeze(sortedObject(stateTypes)),
+    stateIds: Object.freeze(sortedObject(stateIds)),
+  });
+}
