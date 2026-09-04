@@ -15,6 +15,20 @@
 - **로컬 QA 판정**: UI migration 커밋을 가져오지 않고 `VITE_LOCAL_QA=1` 플래그와 Analytics·AdSense 두 로더 차단만 독립 변경으로 구현했다. 해당 환경의 production build는 2,431 modules·정적 59페이지로 통과했고 HWP 경로에서 동의 후 Google·Naver·AdSense script와 관련 네트워크 요청이 모두 0임을 확인했다. 이번 범위는 검수 준비까지이며 사람의 로컬 시각 판정은 후속 단계로 남긴다.
 - **Codex 브라우저 검수·병합 보류 판정**: `VITE_LOCAL_QA=1 npm run build` 후 4903 preview를 Chrome 152에서 1440×900·390×844로 직접 조작했다. 고정 3,584B fixture를 열어 `WL_CODEX_UI_QA_086`을 입력하고 제품 `HWP 저장`으로 3,584B 파일(SHA-256 `c2b44d74e7193db6860fb72976edd300147b668585f3cb537de59c184e4c3764`)을 실제 다운로드했으며 core 재파싱에서 sentinel·1페이지·1 section·1 paragraph를 확인했다. Studio 파일 메뉴의 HTML·Word 내보내기와 표 메뉴는 잘림 없이 렌더됐고, 모바일은 host/iframe 수평 overflow 0px·하단 네비게이션 비가림·최하단 쪽 맞춤 조작부 노출을 통과했다. 요청 23건은 local origin 17건과 data URL 6건뿐이라 GA·Naver·AdSense 요청은 0건이었다. 그러나 데스크톱 언어 전환기(z-index 45)가 HWPX 678.82px²와 HML 2,124.68px²를 덮어 HML 조작부가 사실상 가려졌고, fixture open 단계에서 Studio 콘솔 오류 `[CanvasView] 페이지 0 정보가 없습니다` 1건(경고·pageerror·request failure 0)이 재현됐다. 증거는 `/tmp/rhwp-qa-shots-codex/qa-result.json`, `console.json`, `network-requests.json`과 PNG 8장에 보존했다. 차단 결함 0 게이트를 충족하지 못해 main 병합·push·Pages·라이브 검증·worktree 정리를 모두 보류한다.
 
+### RHWP 0.8.4 ↔ 0.8.6 차단 결함 A/B 판정 (Codx)
+
+동일한 1440×900·DPR 1 Chrome 152, 고정 3,584B fixture(SHA-256 `35c590e316c18e7310bb7b2f954b87d32f1d45416179466aee2bebb99d7e706f`), `VITE_LOCAL_QA=1 npm run build`와 별도 preview(0.8.4 `4926`, 0.8.6 `4927`) 조건으로 두 차례 반복했다.
+
+| 비교군 | 언어 전환기 ↔ HWPX | 언어 전환기 ↔ HML | `[CanvasView] 페이지 0 정보가 없습니다` |
+|---|---:|---:|---|
+| main `6d08c97` · RHWP 0.8.4 | 678.73px² | 2,124.77px² | 미발생, 0건(2/2회) |
+| `rhwp-0.8.6` `9e2fa06` · RHWP 0.8.6 | 678.73px² | 2,124.77px² | 발생, fixture open에서 1~2건(2/2회; +263/+279ms, 반복 +300ms) |
+
+- **겹침 판정**: 언어 전환기 rect `(1321,22)–(1416,64)`, HWPX/HML 버튼 rect까지 양쪽 버전이 동일했다. 기존 host UI 결함이며 0.8.6에서 면적 악화가 없어 RHWP 회귀가 아니다.
+- **콘솔 회귀·원인**: 0.8.4에는 없고 0.8.6에서만 재현돼 진짜 회귀다. 상류 `61baa678357f05a0a9c9d674255a1c06d58bf14f`(`#5617`)가 full Studio 시작의 `openBlankDocumentIfIdle()`와 파일 열기 전 `canvasView.showBlankPage()`를 추가했다. `showBlankPage()`는 `pages=[]`로 비우지만 VirtualScroll의 이전 page 0 치수를 남겨 전환 중 viewport 갱신이 stale page 0을 렌더한다. ready 후 1초 지연 대조에서도 1건이 남아 이 전환 결함을 확인했고, 즉시 열기에서는 시작 빈 문서 초기화까지 겹쳐 1~2건으로 변동했다.
+- **수정 방향·기각**: 상류에서 `showBlankPage()`/`reset()` 시 VirtualScroll page dimensions를 함께 비우거나 `updateVisiblePages()`가 `pages.length === 0`이면 렌더를 건너뛰고, RPC `ready()`가 시작 빈 문서 promise까지 기다리거나 문서 수명주기를 직렬화해야 한다. Worklazy에서 `?chrome=embed`를 붙이면 해당 경로를 우회하지만 파일 메뉴의 HTML·Word 내보내기·인쇄 등도 제거하므로 현 제품 계약의 수정안으로는 기각했다. 공식 벤더 스냅샷을 수기 패치하지 않는다.
+- **최종 판정**: 두 결함 중 콘솔 오류가 0.8.6 전용 회귀이므로 main 병합·push·Pages 배포·라이브 확인을 금지하고 `rhwp-0.8.6` worktree를 보존한다. 증거는 `/tmp/rhwp-ab-20260904/`, `/tmp/rhwp-ab-20260904-r2/`, `/tmp/rhwp-ab-20260904-delayed/`에 있다. 두 버전 QA 빌드는 각각 exit 0(0.8.4 2,429 modules, 0.8.6 2,431 modules)이었다.
+
 ## 2026-09-03
 
 ### shadcn 마이그레이션 라이브 UI 복구 — 6개 revert 판정 (Codx)
