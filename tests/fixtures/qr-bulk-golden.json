@@ -1,0 +1,63 @@
+[
+  {
+    "type": "text",
+    "fields": {
+      "value": "한글 원문;,:\"\\ 그대로\n둘째 줄"
+    },
+    "expected": "한글 원문;,:\"\\ 그대로\n둘째 줄"
+  },
+  {
+    "type": "email",
+    "fields": {
+      "address": "team+qr@example.com",
+      "subject": "회의 & 점검",
+      "body": "한글 본문\n둘째 줄?"
+    },
+    "expected": "mailto:team+qr@example.com?subject=%ED%9A%8C%EC%9D%98%20%26%20%EC%A0%90%EA%B2%80&body=%ED%95%9C%EA%B8%80%20%EB%B3%B8%EB%AC%B8%0A%EB%91%98%EC%A7%B8%20%EC%A4%84%3F"
+  },
+  {
+    "type": "tel",
+    "fields": {
+      "number": "+82-10-1234-5678"
+    },
+    "expected": "tel:+82-10-1234-5678"
+  },
+  {
+    "type": "sms",
+    "fields": {
+      "number": "+821012345678",
+      "message": "한글:본문; 쉼표,\n둘째 줄"
+    },
+    "expected": "SMSTO:+821012345678:한글:본문; 쉼표,\n둘째 줄"
+  },
+  {
+    "type": "wifi",
+    "fields": {
+      "security": "WPA",
+      "ssid": "회사;망,구역: \"한글\"\\",
+      "password": "비밀;,:\"\\암호",
+      "hidden": true
+    },
+    "expected": "WIFI:T:WPA;S:회사\\;망\\,구역\\: \\\"한글\\\"\\\\;P:비밀\\;\\,\\:\\\"\\\\암호;H:true;;"
+  },
+  {
+    "type": "vcard",
+    "fields": {
+      "familyName": "김;개발",
+      "givenName": "한글,이름",
+      "formattedName": "김한글; QR,담당\\자\n팀",
+      "organization": "워크,레이지;도구",
+      "phone": "+82-10-1234-5678",
+      "email": "qr@example.com",
+      "url": "https://worklazy.net/"
+    },
+    "expected": "BEGIN:VCARD\r\nVERSION:3.0\r\nN:김\\;개발;한글\\,이름;;;\r\nFN:김한글\\; QR\\,담당\\\\자\\n팀\r\nORG:워크\\,레이지\\;도구\r\nTEL:+82-10-1234-5678\r\nEMAIL:qr@example.com\r\nURL:https://worklazy.net/\r\nEND:VCARD"
+  },
+  {
+    "type": "url",
+    "fields": {
+      "value": "https://worklazy.net/ko/tools/qr-studio/bulk?이름=한글"
+    },
+    "expected": "https://worklazy.net/ko/tools/qr-studio/bulk?이름=한글"
+  }
+]

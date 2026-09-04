@@ -20,12 +20,16 @@ const sections = [
   "ZetaOffice / LibreOffice browser build snapshot 2026-08-25 — MPL-2.0 — https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2",
   "LibreOffice source and license information — https://www.libreoffice.org/about-us/licenses/",
   "Nanum Gothic — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/nanumgothic",
+  "Noto Sans KR label font Sans2.004 — SIL Open Font License 1.1 — https://github.com/notofonts/noto-cjk/tree/Sans2.004/Sans/SubsetOTF/KR",
   "JSDoc legacy Word reader snapshot 821695a — 0BSD — https://github.com/Alpaq92/JSDoc",
   `Twemoji graphics ${stickerManifest.version} — CC BY 4.0 — https://github.com/jdecked/twemoji/tree/${stickerManifest.commit}/assets/svg`,
 ];
 
 const nanumLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "zetaoffice", "2026-08-26", "NanumGothic-OFL.txt"), "utf8");
 sections.push("", "=".repeat(78), "Nanum Gothic", "Declared license: SIL Open Font License 1.1", "", "--- LICENSE ---", nanumLicense.trim().replace(/[ \t]+$/gm, ""));
+
+const notoQrLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "qr-label-font", "noto-cjk-sans-2.004", "OFL.txt"), "utf8");
+sections.push("", "=".repeat(78), "Noto Sans KR label font", "Declared license: SIL Open Font License 1.1", "", "--- LICENSE ---", notoQrLicense.trim().replace(/[ \t]+$/gm, ""));
 
 const stickerLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "emoji", stickerManifest.version, stickerManifest.license.file), "utf8");
 sections.push("", "=".repeat(78), `Twemoji graphics ${stickerManifest.version}`, "Declared license: CC BY 4.0", "", `--- ${stickerManifest.license.sourcePath} ---`, stickerLicense.trim().replace(/[ \t]+$/gm, ""));

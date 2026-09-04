@@ -26,7 +26,7 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   const baseProgressSource = read("node_modules/@base-ui/react/progress/root/ProgressRoot.mjs");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
-  assert.equal(consumers.length, 14);
+  assert.equal(consumers.length, 15);
   assert.match(source, /entry\.id === activeLogId \|\| Boolean\(entry\.stageKey && entry\.stageKey === activeStageKey\)/);
   assert.match(source, /isCurrent && status === "running" \? LoaderCircle : Circle/);
   assert.match(source, /className=\{isCurrent && status === "running" \? "animate-spin" : ""\}/);

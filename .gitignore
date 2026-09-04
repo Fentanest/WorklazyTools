@@ -10,6 +10,7 @@ public/vendor/zetaoffice/
 .cache/zetaoffice/
 public/vendor/emoji/
 .cache/image-studio-assets/
+.cache/qr-label-font/
 /compareexample/
 /comparesample/
 __pycache__/

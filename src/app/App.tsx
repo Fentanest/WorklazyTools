@@ -14,6 +14,7 @@ import { TermsPage } from "../pages/TermsPage";
 import { ToolsPage } from "../pages/ToolsPage";
 import { LanguageLandingPage } from "../pages/LanguageLandingPage";
 import type { PdfToolMode } from "../features/pdf-editor/types";
+import type { QrMode } from "../features/qr-studio/QrStudioPage";
 import { InvalidLanguageRedirect, LocalizedNavigate, useAppLanguage } from "../i18n/routing";
 import { isAppLanguage } from "../i18n/languages";
 
@@ -76,7 +77,8 @@ export function App() {
           <Route path="tools/payroll-calculator" element={<LazyToolRoute label="Payroll Calculator"><PayrollCalculatorPage /></LazyToolRoute>} />
           <Route path="tools/image-privacy" element={<LazyToolRoute label="Photo Metadata Remover"><ImagePrivacyPage /></LazyToolRoute>} />
           <Route path="tools/security-tools" element={<LazyToolRoute label="Password Generator"><SecurityToolsPage /></LazyToolRoute>} />
-          <Route path="tools/qr-studio" element={<LazyToolRoute label="QR Studio"><QrStudioPage /></LazyToolRoute>} />
+          <Route path="tools/qr-studio" element={<QrRoute mode="create" />} />
+          <Route path="tools/qr-studio/bulk" element={<QrRoute mode="bulk" />} />
           <Route path="tools/data-converter" element={<LazyToolRoute label="Table Data Converter"><DataConverterPage /></LazyToolRoute>} />
           <Route path="hwp-editor" element={<LocalizedNavigate to="/tools/hwp-editor" />} />
           <Route path="video-studio" element={<LocalizedNavigate to="/tools/video-studio/" />} />
@@ -127,6 +129,11 @@ function KoreanOnlyRoute({ children }: { children: React.ReactNode }) {
 function PdfRoute({ mode }: { mode: PdfToolMode }) {
   const { t } = useTranslation("common");
   return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><PdfEditorPage mode={mode} /></Suspense>;
+}
+
+function QrRoute({ mode }: { mode: QrMode }) {
+  const { t } = useTranslation("common");
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "QR Studio" })}</div>}><QrStudioPage initialMode={mode} /></Suspense>;
 }
 
 function LazyToolRoute({ label, children }: { label: string; children: React.ReactNode }) {

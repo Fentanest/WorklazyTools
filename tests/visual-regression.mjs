@@ -8,7 +8,7 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 
-import { visualRegressionConfig as config } from "./visual-regression.config.mjs";
+import { qrBulkQaRoutes, visualRegressionConfig as config } from "./visual-regression.config.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
@@ -20,6 +20,9 @@ const captureDirectory = process.env.VISUAL_CAPTURE_DIR
   ? path.resolve(process.env.VISUAL_CAPTURE_DIR)
   : undefined;
 const updateBaselines = process.env.UPDATE_VISUAL_BASELINES === "1";
+const qrBulkCaptureOnly = process.env.VISUAL_QR_BULK_CAPTURE_ONLY === "1";
+const qrBulkBaselinesOnly = process.env.VISUAL_QR_BULK_BASELINES_ONLY === "1";
+const consentValue = process.env.VISUAL_CONSENT_GRANTED === "1" ? "granted" : "denied";
 const externallyManagedBaseUrl = process.env.TEST_BASE_URL;
 const port = Number.parseInt(process.env.VISUAL_TEST_PORT || "4174", 10);
 const baseUrl = externallyManagedBaseUrl || `http://127.0.0.1:${port}`;
@@ -29,7 +32,17 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`VISUAL_TEST_PORT must be a valid TCP port, received ${process.env.VISUAL_TEST_PORT}.`);
 }
 
-const expectedNames = buildCaptureMatrix().map(({ name }) => name);
+if (qrBulkCaptureOnly && !captureDirectory) throw new Error("VISUAL_QR_BULK_CAPTURE_ONLY requires VISUAL_CAPTURE_DIR.");
+if (qrBulkCaptureOnly && updateBaselines) throw new Error("QR bulk QA captures cannot update the 96-image baseline set.");
+if (qrBulkBaselinesOnly && !updateBaselines) throw new Error("VISUAL_QR_BULK_BASELINES_ONLY is available only while updating baselines.");
+if (qrBulkCaptureOnly && qrBulkBaselinesOnly) throw new Error("QR bulk capture-only and baseline-only modes cannot be combined.");
+
+const baselineNames = buildCaptureMatrix(config.routes).map(({ name }) => name);
+const captureRoutes = qrBulkCaptureOnly
+  ? qrBulkQaRoutes
+  : qrBulkBaselinesOnly ? config.routes.filter(({ id }) => id === "qr-bulk-empty") : config.routes;
+const captures = buildCaptureMatrix(captureRoutes);
+const expectedNames = captures.map(({ name }) => name);
 let server;
 let browser;
 
@@ -44,7 +57,7 @@ try {
     await fs.rm(captureDirectory, { recursive: true, force: true });
     await fs.mkdir(captureDirectory, { recursive: true });
   }
-  if (updateBaselines) await removeUnexpectedBaselines(expectedNames);
+  if (updateBaselines) await removeUnexpectedBaselines(baselineNames);
   if (!externallyManagedBaseUrl) server = await startPreviewServer();
 
   browser = await puppeteer.launch({
@@ -59,20 +72,21 @@ try {
   });
 
   const failures = [];
-  const captures = buildCaptureMatrix();
   for (const [index, capture] of captures.entries()) {
     const result = await captureAndCompare(capture);
     if (result) failures.push(result);
     console.log(`[${index + 1}/${captures.length}] ${capture.name}`);
   }
 
-  await assertBaselineSet(expectedNames);
+  if (!qrBulkCaptureOnly) await assertBaselineSet(baselineNames);
   const browserVersion = await browser.version();
   const mode = updateBaselines ? "updated" : "matched";
   if (failures.length) {
     throw new Error(`Visual regression failed (${failures.length}/${expectedNames.length}):\n${failures.join("\n")}\nArtifacts: ${artifactDirectory}`);
   }
-  console.log(`Visual regression ${mode}: ${expectedNames.length} captures, ${browserVersion}.`);
+  console.log(qrBulkCaptureOnly
+    ? `Bulk QR local QA captured: ${expectedNames.length} captures, ${browserVersion}.`
+    : `Visual regression ${mode}: ${expectedNames.length} captures, ${browserVersion}.`);
   console.log(`Threshold: <= ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}% differing pixels at per-pixel threshold ${config.diff.perPixelThreshold}; antialiasing ignored.`);
   console.log(`Allowed regions: ${config.allowedRegions.map(({ selector }) => selector).join(", ")}.`);
   if (captureDirectory) console.log(`Tool QA captures: ${expectedNames.filter((name) => !name.startsWith("home-default__") && !name.startsWith("tools-media-filter__")).length} in ${captureDirectory}.`);
@@ -81,9 +95,9 @@ try {
   if (server) await stopServer(server);
 }
 
-function buildCaptureMatrix() {
+function buildCaptureMatrix(routes) {
   const viewports = new Map(config.viewports.map((viewport) => [viewport.id, viewport]));
-  return config.routes.flatMap((route) => route.profiles.map((profile) => {
+  return routes.flatMap((route) => route.profiles.map((profile) => {
     const viewport = viewports.get(profile.viewport);
     if (!viewport) throw new Error(`Unknown visual viewport ${profile.viewport} for ${route.id}.`);
     return {
@@ -99,6 +113,7 @@ function buildCaptureMatrix() {
 async function captureAndCompare(capture) {
   const page = await browser.newPage();
   const pageErrors = [];
+  const externalRequests = [];
   try {
     page.setDefaultTimeout(60_000);
     await page.setBypassServiceWorker(true);
@@ -107,14 +122,15 @@ async function captureAndCompare(capture) {
       { name: "prefers-color-scheme", value: capture.theme },
       { name: "prefers-reduced-motion", value: config.animation.prefersReducedMotion },
     ]);
-    await page.evaluateOnNewDocument((locale) => {
-      localStorage.setItem("worklazy_privacy_consent", "denied");
+    await page.evaluateOnNewDocument((locale, consent) => {
+      localStorage.setItem("worklazy_privacy_consent", consent);
       localStorage.setItem("worklazy_lang", locale);
-    }, capture.locale);
+    }, capture.locale, consentValue);
     await page.setRequestInterception(true);
     page.on("request", (request) => {
       const url = new URL(request.url());
       const allowed = url.origin === new URL(baseUrl).origin || ["data:", "blob:"].includes(url.protocol);
+      if (!allowed) externalRequests.push(request.url());
       void (allowed ? request.continue() : request.abort("blockedbyclient"));
     });
     page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -124,17 +140,19 @@ async function captureAndCompare(capture) {
     await page.waitForSelector(capture.route.readySelector, { visible: true });
     await stabilizeRepresentativeState(page, capture.route);
     await page.addStyleTag({ content: buildStabilityCss() });
-    await page.evaluate(async () => {
-      window.scrollTo(0, 0);
+    await page.evaluate(async (preserveScroll) => {
+      if (!preserveScroll) window.scrollTo(0, 0);
       if (document.fonts?.ready) await document.fonts.ready;
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    });
+    }, capture.route.toolId === "qr-bulk-result");
     if (pageErrors.length) throw new Error(`Page errors: ${pageErrors.join(" | ")}`);
+    if (externalRequests.length) throw new Error(`External requests attempted: ${externalRequests.join(" | ")}`);
 
     const actualBuffer = await page.screenshot({ type: "png", captureBeyondViewport: false });
     if (captureDirectory && capture.route.kind === "tool") {
       await fs.writeFile(path.join(captureDirectory, capture.name), actualBuffer);
     }
+    if (qrBulkCaptureOnly) return undefined;
     const baselinePath = path.join(baselineDirectory, capture.name);
     if (updateBaselines) {
       await fs.writeFile(baselinePath, actualBuffer);
@@ -175,13 +193,35 @@ async function captureAndCompare(capture) {
 }
 
 async function stabilizeRepresentativeState(page, route) {
-  if (route.toolId !== "security-tools") return;
-  await page.$eval(".password-output input", (input) => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    setter?.call(input, "Worklazy2!Safe#Tool9");
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await page.waitForFunction(() => document.querySelector(".password-output input")?.value === "Worklazy2!Safe#Tool9");
+  if (route.toolId === "security-tools") {
+    await page.$eval(".password-output input", (input) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "Worklazy2!Safe#Tool9");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.waitForFunction(() => document.querySelector(".password-output input")?.value === "Worklazy2!Safe#Tool9");
+  }
+  if (route.toolId === "qr-bulk-result") {
+    await page.evaluate(() => {
+      const input = document.querySelector('[data-testid="qr-bulk-page"] input[type="file"]');
+      if (!(input instanceof HTMLInputElement)) throw new Error("Bulk QR spreadsheet input is missing.");
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["Text,Name,Description\nhttps://worklazy.net/,샘플 QR,브라우저에서 생성한 결과"], "qr-visual.csv", { type: "text/csv" }));
+      Object.defineProperty(input, "files", { configurable: true, value: transfer.files });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await page.waitForSelector('[data-testid="qr-payload-type"]');
+    await page.waitForFunction(() => {
+      const button = document.querySelector('[data-testid="qr-bulk-generate"] button');
+      return button instanceof HTMLButtonElement && !button.disabled;
+    });
+    await page.click('[data-testid="qr-bulk-generate"] button');
+    await page.waitForSelector('[data-testid="qr-bulk-results"]', { visible: true });
+    await page.$eval('[data-testid="qr-bulk-results"]', (element) => {
+      element.scrollIntoView({ block: "start" });
+      window.scrollBy(0, -88);
+    });
+  }
 }
 
 async function removeUnexpectedBaselines(expected) {

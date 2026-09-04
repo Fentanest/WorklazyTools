@@ -10,6 +10,7 @@ test("visual regression derives every available tool and four representative axi
 
   const toolRoutes = visualRegressionConfig.routes.filter(({ kind }) => kind === "tool");
   assert.equal(toolRoutes.length, 20);
+  assert.equal(toolRoutes.find(({ toolId }) => toolId === "qr-studio")?.path, "/tools/qr-studio/bulk");
   assert.ok(toolRoutes.every(({ profiles }) => profiles.length === 4));
   for (const route of toolRoutes) {
     assert.deepEqual(new Set(route.profiles.map(({ locale }) => locale)), new Set(["ko", "en"]));

@@ -4,6 +4,15 @@
 
 ## 2026-09-04
 
+### U3 QR 일괄 생성 — 구현 완료·3자 검수 대기 (Codx)
+
+- **게이트·범위**: fetch 뒤 `HEAD=origin/ui-migration=4a8405c7458ca72e454326e798592330478c67e4`, `main=origin/main=311c59e310734e9206629b05752f4228e842dbf0`, merge-base=`311c59e`, `origin/main...HEAD=0 9`를 확인하고 `ui-migration`에서만 작업했다. U3 신규 표면은 기존 shadcn adapter와 Tailwind만 사용해 legacy class 방출을 0으로 유지했다. 기존 adapter로 필요한 Button·Card·입력 표면을 모두 표현할 수 있어 사용하지 않을 새 shadcn component 추가는 기각했다. 기존 단일 생성·스캔 표면의 P2 전면 이관은 후속 B4 범위로 보존했다.
+- **QR·표·출력 경계**: jsQR 순수 디코더를 기존 스캔 worker와 bulk worker가 공유하고 래스터 경로는 `QRCode.create`+OffscreenCanvas로 분리했다. bulk는 4모듈 기본 여백, 로고 한 변 22%·H 강제·최소 2모듈, 투명 PNG 흰 배경 합성 뒤 최종 read-back을 적용한다. C1 전체 파싱 뒤 열 번호와 `displayValue`/`sourceRow`로 행별 처리하고 중복·미존재 템플릿 참조를 실행 전에 거부한다. C2에는 segment·NFC·case-fold 충돌을 막는 `SafeZipEntryPath`, C3에는 기존 배열 API를 보존한 add/close/discard 증분 writer를 병설했다.
+- **R4 실측·채택**: 저장소 `rhwp-studio` WOFF2는 **562,220B**, SHA-256 `d1bf8649914a4fe9477a8735bf056383e44e466141fb3d61897252e06d900c1a`였다. fontkit가 embed/save까지는 받아들였으나 Poppler가 embedded font invalid로 판정했고 subset/full 모두 동일한 빈 **1,247B PNG**가 되어 재사용을 기각했다. 고정 Noto CJK Sans 2.004 OTF(**4,644,748B**, SHA-256 `69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68`)와 OFL(**4,301B**, SHA-256 `6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2`)를 생성 스크립트로 공급한다. 같은 OTF의 `subset:true` PDF **37,116B**는 한글이 tofu/누락됐고 full PDF **3,833,195B**는 정상이라 subset 버그를 재현했으며 `subset:false`를 채택했다. 실브라우저 25라벨은 **2페이지·4,102,716B**로 정상 출력됐다.
+- **페이로드·예산 판정**: 텍스트 원문, mailto UTF-8 percent-encoding, tel, 개행·콜론 보존 SMSTO, 특수문자 escape WIFI, CRLF vCard 3.0, http/https URL의 7종을 실제 worker 생성→jsQR 재판독으로 대조했다. 한글·백슬래시·쉼표·세미콜론·콜론·따옴표·개행 표본은 고정 문자열 골든으로 두었다. 입력 50MB·선택 시트 200만 셀·행 5,000·라벨 2,400·예상 출력 200MB 경고/500MB 거부를 적용했고, 1,000행 초과에는 72ms/행 추정 시간을 표시한다. OPFS quota가 예상 출력보다 작으면 실행 전 거부하며 OPFS 미지원은 1,000행 memory Blob 경로로 제한한다.
+- **현지화·정적·개인정보**: `/tools/qr-studio/bulk`의 ko/en canonical·FAQ·정적 페이지·사이트맵·소셜 이미지를 추가하고 기존 QR 카드만 갱신했다. QR·표·결과는 브라우저 안에서 처리한다. `VITE_LOCAL_QA=1` 추적·광고 제외 빌드에서 동의를 granted로 둔 Chrome 152가 빈/결과 ko/en×light/dark×desktop/mobile **16장**을 캡처하는 동안 외부 요청 시도 **0**이었다. 증거는 `tests/visual-artifacts/qr-bulk-r1/`에 고정했다.
+- **번들·검증**: 일반 production entry는 **936,132B/293,472B gzip**으로 U3 직전 289,568B 대비 **+3,904B gzip**(P2 +20KB 이내), CSS는 **286,693B/49,294B gzip**으로 직전 49,015B 대비 **+279B gzip**(P2 +10KB 이내)이다. `npm run build`(2,827 modules·정적 61페이지), unit **182/182**, QR bulk 실브라우저(취소/정리/재실행·7종·투명/로고·ZIP 2개·manifest 2시트·25라벨/2페이지·외부 요청 0), visual **96/96**, static, utilities, Excel 비교, Excel 정리, UI migration(7 switches·190px·tracking 0)을 모두 통과했다.
+
 ### shadcn 브랜치 재적용·legacy 충돌 교정 — Gemini 검수 대기 (Codx)
 
 - **실행 게이트·브랜치 격리**: `main`과 `origin/main`이 모두 라이브 복구 기준 `311c59e310734e9206629b05752f4228e842dbf0`임을 확인하고 그 지점에서 신규 `ui-migration`을 만들었다. 열린 계획서의 배포 방식 정정과 충돌하는 지시는 없었다. 복구 대상은 P0a `c43e1a7` → P0b `df8e85c` → P1a `fdfb6c3` → P1b `d998afa` → polish `00bd3fd` → P1c `415e35b` 순서로 각각 revert-of-revert 커밋 `72632c9` → `932c5eb` → `4804a45` → `7ba78b0` → `c3b2acd` → `f866bed`로 재적용했다. `main`에는 커밋·push하지 않으며 사용자 MP4 3개와 DOCX 2개는 읽기·수정·스테이징에서 제외했다.

@@ -1,4 +1,5 @@
 export type SafeFileName = string & { readonly __safeFileName: unique symbol };
+export type SafeZipEntryPath = string & { readonly __safeZipEntryPath: unique symbol };
 
 export type FileNameSafetyReason =
   | "EMPTY"
@@ -35,6 +36,21 @@ export class SafeFileNameRegistry {
   }
 }
 
+export class SafeZipEntryPathRegistry {
+  private readonly paths = new Set<string>();
+
+  has(entryPath: string) {
+    return this.paths.has(collisionKey(entryPath));
+  }
+
+  add(entryPath: SafeZipEntryPath) {
+    const key = collisionKey(entryPath);
+    if (this.paths.has(key)) throw new UnsafeFileNameError("DUPLICATE");
+    this.paths.add(key);
+    return entryPath;
+  }
+}
+
 export function validateSafeFileName(value: string): SafeFileName {
   const normalized = String(value).normalize("NFC");
   if (!normalized || normalized.trim().length === 0 || normalized === "." || normalized === "..") {
@@ -51,16 +67,35 @@ export function validateSafeFileName(value: string): SafeFileName {
   return normalized as SafeFileName;
 }
 
+export function createSafeFileName(value: unknown, fallback = "result"): SafeFileName {
+  return validateSafeFileName(sanitizeFileName(String(value ?? "").normalize("NFC"), fallback));
+}
+
+export function validateSafeZipEntryPath(value: string): SafeZipEntryPath {
+  const normalized = String(value).normalize("NFC");
+  if (!normalized || normalized.startsWith("/") || normalized.endsWith("/") || normalized.includes("\\") || normalized.includes("//")) {
+    throw new UnsafeFileNameError("PATH");
+  }
+  const segments = normalized.split("/");
+  if (!segments.length) throw new UnsafeFileNameError("EMPTY");
+  segments.forEach((segment) => validateSafeFileName(segment));
+  return segments.join("/") as SafeZipEntryPath;
+}
+
+export function reserveSafeZipEntryPath(value: string, registry: SafeZipEntryPathRegistry) {
+  return registry.add(validateSafeZipEntryPath(value));
+}
+
 export function createUniqueSafeFileName(
   value: unknown,
   registry: SafeFileNameRegistry,
   fallback = "result",
 ): SafeFileName {
   const raw = String(value ?? "").normalize("NFC");
-  const sanitized = sanitizeFileName(raw, fallback);
+  const sanitized = createSafeFileName(raw, fallback);
   const { base, extension } = splitExtension(sanitized);
   let sequence = 1;
-  let candidate = validateSafeFileName(sanitized);
+  let candidate = sanitized;
   while (registry.has(candidate)) {
     sequence += 1;
     const suffix = `-${sequence}`;

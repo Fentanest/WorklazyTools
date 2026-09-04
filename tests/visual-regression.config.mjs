@@ -34,7 +34,9 @@ export const visualRegressionConfig = Object.freeze({
       profiles: fullProfiles,
       readySelector: ".tools-index-page .tool-category-section .ui-tool-card",
     }),
-    ...availableToolRoutes.map((route) => Object.freeze({ ...route, profiles: representativeProfiles })),
+    ...availableToolRoutes.map((route) => Object.freeze(route.toolId === "qr-studio"
+      ? { ...route, id: "qr-bulk-empty", path: "/tools/qr-studio/bulk", profiles: representativeProfiles, readySelector: '[data-testid="qr-bulk-page"]' }
+      : { ...route, profiles: representativeProfiles })),
   ]),
   viewports: Object.freeze([
     Object.freeze({ id: "desktop", width: 1365, height: 900, deviceScaleFactor: 1 }),
@@ -56,3 +58,8 @@ export const visualRegressionConfig = Object.freeze({
     }),
   ]),
 });
+
+export const qrBulkQaRoutes = Object.freeze([
+  Object.freeze({ id: "qr-bulk-empty", toolId: "qr-bulk", path: "/tools/qr-studio/bulk", kind: "tool", profiles: fullProfiles, readySelector: '[data-testid="qr-bulk-page"]' }),
+  Object.freeze({ id: "qr-bulk-result", toolId: "qr-bulk-result", path: "/tools/qr-studio/bulk", kind: "tool", profiles: fullProfiles, readySelector: '[data-testid="qr-bulk-page"]' }),
+]);

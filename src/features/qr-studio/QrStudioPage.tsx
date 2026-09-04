@@ -1,17 +1,19 @@
-import { AlertTriangle, Camera, CameraOff, Copy, Download, ExternalLink, ImagePlus, QrCode, ScanLine, Share2 } from "lucide-react";
+import { AlertTriangle, Camera, CameraOff, Copy, Download, ExternalLink, FileArchive, FileSpreadsheet, FileText, ImagePlus, QrCode, ScanLine, Share2, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
 import { ToolGuide } from "../../components/ToolGuide";
 import { resolveFeatureMessage } from "../../i18n/featureMessages";
 
-type QrMode = "create" | "scan";
+const QrBulkPanel = lazy(() => import("./QrBulkPanel").then((module) => ({ default: module.QrBulkPanel })));
 
-export function QrStudioPage() {
+export type QrMode = "create" | "scan" | "bulk";
+
+export function QrStudioPage({ initialMode = "create" }: { initialMode?: QrMode }) {
   const { t, i18n } = useTranslation("features");
-  const [mode, setMode] = useState<QrMode>("create");
+  const [mode, setMode] = useState<QrMode>(initialMode);
   const [text, setText] = useState("https://worklazy.net/");
   const [size, setSize] = useState(640);
   const [dark, setDark] = useState("#111118");
@@ -36,6 +38,10 @@ export function QrStudioPage() {
   const captureInFlightRef = useRef(false);
   const captureFrameRef = useRef<(() => void) | undefined>(undefined);
   const qrGenerationRef = useRef(0);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   const releaseCameraResources = useCallback(() => {
     window.clearTimeout(cameraTimerRef.current);
@@ -129,14 +135,14 @@ export function QrStudioPage() {
       };
       worker.onerror = (event) => {
         setBusy(false);
-        setError(event.message || t("qr.fileError"));
+        setError(t("qr.fileError"));
         worker.terminate();
         if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
       };
       worker.postMessage({ buffer, type: file.type }, [buffer]);
-    } catch (reason) {
+    } catch {
       setBusy(false);
-      setError(reason instanceof Error ? reason.message : t("qr.fileError"));
+      setError(t("qr.fileError"));
     }
   };
 
@@ -189,9 +195,9 @@ export function QrStudioPage() {
           const blob = await canvasToBlob(canvas, "image/jpeg", 0.86, t("qr.errors.image"));
           const buffer = await blob.arrayBuffer();
           if (cameraWorkerRef.current === worker) worker.postMessage({ buffer, type: blob.type }, [buffer]);
-        } catch (reason) {
+        } catch {
           captureInFlightRef.current = false;
-          setError(reason instanceof Error ? reason.message : t("qr.errors.scan"));
+          setError(t("qr.errors.scan"));
           stopCamera();
         }
       };
@@ -211,8 +217,8 @@ export function QrStudioPage() {
         }
         scheduleNext();
       };
-      worker.onerror = (event) => {
-        setError(event.message || t("qr.errors.scanner"));
+      worker.onerror = () => {
+        setError(t("qr.errors.scanner"));
         stopCamera();
       };
       setCameraActive(true);
@@ -238,7 +244,7 @@ export function QrStudioPage() {
   return (
     <div className="page tool-page page-enter utility-page qr-page">
       <PageHeader eyebrow="QR STUDIO" title={t("qr.title")} description={t("qr.description")} />
-      <div className="mode-switch"><SegmentedControl value={mode} onChange={changeMode} label={t("qr.modeLabel")} options={[{ value: "create", label: t("qr.create") }, { value: "scan", label: t("qr.scan") }]} /></div>
+      <div className="mode-switch"><SegmentedControl value={mode} onChange={changeMode} label={t("qr.modeLabel")} options={[{ value: "create", label: t("qr.create") }, { value: "bulk", label: t("qr.bulk.mode") }, { value: "scan", label: t("qr.scan") }]} /></div>
 
       {mode === "create" ? (
         <div className="qr-layout">
@@ -252,7 +258,7 @@ export function QrStudioPage() {
           </SectionCard>
           <SectionCard title={t("qr.preview")}><div className="qr-preview"><canvas ref={canvasRef} /></div>{error && <p className="utility-error" role="alert">{error}</p>}<div className="result-file-actions"><PrimaryButton accent="blue" disabled={!qrReady} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <button type="button" className="secondary-button" disabled={!qrReady} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</button>}</div></SectionCard>
         </div>
-      ) : (
+      ) : mode === "scan" ? (
         <>
           <div className="qr-scan-layout">
             <SectionCard className="qr-camera-scan-card" title={t("qr.scanTitle")} description={t("qr.scanHelp")}>
@@ -301,14 +307,21 @@ export function QrStudioPage() {
           </div>
           <div className="inline-notice warning qr-compatibility-notice"><AlertTriangle size={16} /><span>{t("qr.compatibility")}</span></div>
         </>
-      )}
+      ) : <QrBulkPanel />}
 
-      <div className="format-capabilities"><span><QrCode size={17} /> {t("qr.capabilities.recovery")}</span><span><ImagePlus size={17} /> {t("qr.capabilities.logo")}</span><span><Camera size={17} /> {t("qr.capabilities.camera")}</span><span><ScanLine size={17} /> {t("qr.capabilities.photo")}</span></div>
+      {mode === "bulk"
+        ? <div className="flex flex-wrap gap-2">{[
+          { Icon: FileSpreadsheet, label: t("qr.bulkCapabilities.table") },
+          { Icon: ShieldCheck, label: t("qr.bulkCapabilities.verify") },
+          { Icon: FileArchive, label: t("qr.bulkCapabilities.zip") },
+          { Icon: FileText, label: t("qr.bulkCapabilities.labels") },
+        ].map(({ Icon, label }) => <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground" key={label}><Icon size={17} />{label}</span>)}</div>
+        : <div className="format-capabilities"><span><QrCode size={17} /> {t("qr.capabilities.recovery")}</span><span><ImagePlus size={17} /> {t("qr.capabilities.logo")}</span><span><Camera size={17} /> {t("qr.capabilities.camera")}</span><span><ScanLine size={17} /> {t("qr.capabilities.photo")}</span></div>}
       <ToolGuide
-        title={t("qr.guide.title")}
-        description={t("qr.guide.description")}
-        blocks={(t("qr.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
-        faq={(t("qr.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
+        title={t(mode === "bulk" ? "qr.bulkGuide.title" : "qr.guide.title")}
+        description={t(mode === "bulk" ? "qr.bulkGuide.description" : "qr.guide.description")}
+        blocks={(t(mode === "bulk" ? "qr.bulkGuide.blocks" : "qr.guide.blocks", { returnObjects: true, Header: "{{Header}}" }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
+        faq={(t(mode === "bulk" ? "qr.bulkGuide.faq" : "qr.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
     </div>
   );
@@ -344,7 +357,7 @@ function clearCanvas(canvas: HTMLCanvasElement | null) {
 function qrGenerationError(reason: unknown, tooLong: string, fallback: string) {
   const message = reason instanceof Error ? reason.message : String(reason);
   if (/too big|amount of data|code length|overflow/i.test(message)) return tooLong;
-  return message || fallback;
+  return fallback;
 }
 
 function safeHttpUrl(value: string) {

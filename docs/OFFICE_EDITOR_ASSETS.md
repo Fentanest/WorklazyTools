@@ -28,6 +28,17 @@
 - 문서를 열 때 매크로 실행과 외부 문서 갱신을 차단한다. 저장 결과는 ZIP 또는 Compound File 컨테이너 서명을 확인한 뒤 다운로드한다.
 - 정확한 글꼴, 페이지 나눔, 수식, 매크로, 고급 Microsoft Office 개체 호환은 보장하지 않는다.
 
+## QR 라벨 PDF 한글 글꼴 스냅샷
+
+QR 일괄 생성의 라벨 PDF는 Noto CJK 저장소의 고정 태그 `Sans2.004`에 있는 한국어 subset Noto Sans KR Regular OTF를 사용한다. `scripts/vendor-qr-label-font.mjs`가 내려받은 응답의 크기와 SHA-256을 확인한 뒤 `public/vendor/qr-label-font/noto-cjk-sans-2.004/`를 생성한다. 라이선스는 SIL Open Font License 1.1이다.
+
+| 파일 | 바이트 | SHA-256 | 라이선스 |
+| --- | ---: | --- | --- |
+| `NotoSansKR-Regular.otf` | 4,644,748 | `69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68` | SIL OFL 1.1 |
+| `OFL.txt` | 4,301 | `6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2` | SIL OFL 1.1 |
+
+`@pdf-lib/fontkit`은 rhwp Studio의 `NotoSansKR-Regular.woff2`를 읽고 PDF 저장까지 했지만 Poppler가 임베드 글꼴을 invalid로 판정하고 렌더 결과가 비었다. 고정 OTF는 정상 렌더됐으나 subset 임베드에서 한글 대부분이 누락되는 현상이 재현되어 라벨 PDF는 `subset: false` 전체 임베드를 사용한다.
+
 ## 라이선스 원본
 
 - ZetaJS: MIT, <https://github.com/allotropia/zetajs>

@@ -270,7 +270,7 @@ try {
   await page.goto(`${koBaseUrl}/tools/qr-studio`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => { const canvas = document.querySelector(".qr-preview canvas"); return canvas instanceof HTMLCanvasElement && canvas.width >= 600; });
   const qrFixture = await page.$eval(".qr-preview canvas", (canvas) => canvas.toDataURL("image/png"));
-  await page.click(".mode-switch button:nth-child(2)");
+  await page.click(".mode-switch button:nth-child(3)");
   await page.waitForSelector(".qr-camera-stage video[playsinline]");
   const cameraCopy = await page.$eval(".qr-scan-layout", (element) => element.textContent);
   if (!cameraCopy?.includes("카메라로 스캔")) throw new Error("Live QR camera scanner is missing.");
