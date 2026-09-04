@@ -4,6 +4,12 @@
 
 ## 2026-09-04
 
+### 네이버 SEO — 루트 랜딩 가치 전달 문구 개선 (Codx)
+
+- **변경 사유·문구 판정**: 사용자 결정에 따라 언어 선택 안내에 그치던 루트 메타를 사이트가 제공하는 작업 가치를 드러내는 한·영 병기 제목과 설명으로 교체했다. 정적 호스팅에서는 방문자 언어별 메타 응답을 제공할 수 없어 한 문장 안에 두 언어를 병기했다.
+- **범위 판정**: 기본 소셜 이미지 `worklazy-tools-share.png`는 한·영 병기 자산이 없어 그대로 유지했다. Open Graph·Twitter 태그 구성과 순서, URL·locale, 화면의 `seo-static-fallback` 언어 선택 본문은 변경하지 않았다.
+- **산출물·검증 실측**: `dist/index.html`의 title·description·og:title·og:description·twitter:title·twitter:description은 각각 정확히 1개였고 확정 문구와 일치했다. 제목은 48 code points·UTF-8 69B, 설명은 69 code points·UTF-8 110B였다. `npm run build` exit 0(2,429 modules·Vite 56.93초·정적 59페이지), `npm run test:static` exit 0, `npm run test:unit` exit 0(158/158), `git diff --check` exit 0이었다.
+
 ### 네이버 SEO — 루트 언어 선택 랜딩 메타 보강 (Codx)
 
 - **진단·문구 실측**: 배포 기준 루트 description은 85 code points·UTF-8 123B이고 Open Graph·Twitter 태그는 0개였다. 확정 문구 `Choose English or Korean. 무료 업무 도구의 언어를 선택하세요.`로 교체한 빌드 결과는 description 정확히 1개·46 code points·76B였다.

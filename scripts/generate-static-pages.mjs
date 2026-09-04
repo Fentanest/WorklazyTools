@@ -150,8 +150,8 @@ function renderPage(template, page, canonical) {
 }
 
 function renderLanding(template) {
-  const title = "Worklazy Tools — Choose Language · 언어 선택";
-  const description = "Choose English or Korean. 무료 업무 도구의 언어를 선택하세요.";
+  const title = "무료 브라우저 업무 도구 · Free Work Tools | Worklazy Tools";
+  const description = "설치 없이 엑셀·PDF·문서·이미지 작업하는 무료 도구. Free browser tools for everyday work.";
   const socialImage = getSocialImageDefinition("en", "/");
   const image = new URL(socialImage.path, siteUrl).href;
   const head = [

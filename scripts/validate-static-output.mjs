@@ -90,8 +90,8 @@ for (const route of routes) {
 {
   const filePath = path.join("dist", "index.html");
   const html = await fs.readFile(filePath, "utf8");
-  const expectedTitle = "Worklazy Tools — Choose Language · 언어 선택";
-  const expectedDescription = "Choose English or Korean. 무료 업무 도구의 언어를 선택하세요.";
+  const expectedTitle = "무료 브라우저 업무 도구 · Free Work Tools | Worklazy Tools";
+  const expectedDescription = "설치 없이 엑셀·PDF·문서·이미지 작업하는 무료 도구. Free browser tools for everyday work.";
   const expectedUrl = "https://worklazy.net/";
   const expectedImage = "https://worklazy.net/social/worklazy-tools-share.png";
   const expectedImageAlt = "Worklazy Tools — practical browser utilities with no file uploads";
