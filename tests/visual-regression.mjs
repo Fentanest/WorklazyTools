@@ -497,7 +497,8 @@ async function uploadScenarioFixture(page, selector, fixture) {
     return;
   }
   let bytes;
-  if (fixture.kind === "inline-file") bytes = Buffer.from(fixture.contents, "utf8");
+  if (fixture.kind === "base64-file") bytes = Buffer.from((await fs.readFile(path.resolve(testDirectory, fixture.path), "utf8")).trim(), "base64");
+  else if (fixture.kind === "inline-file") bytes = Buffer.from(fixture.contents, "utf8");
   else if (fixture.kind === "generated-wav") bytes = createVisualWav(fixture);
   else if (fixture.kind === "generated-png") bytes = createVisualPng(fixture);
   else throw new Error(`Fixture kind ${fixture.kind} cannot be uploaded.`);

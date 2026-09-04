@@ -83,7 +83,7 @@ export function SectionCard({ title, description, step, children, className = ""
       as="section"
       data-ui-component="section-card"
       className={cn(
-        "ui-section-card gap-0 overflow-visible rounded-4xl p-6 [.hwp-editor-focus_&]:overflow-hidden [.hwp-editor-focus_&]:rounded-2xl [.hwp-editor-focus_&]:p-0 [.hwp-editor-focus_&]:ring-0",
+        "ui-section-card gap-0 overflow-visible rounded-4xl p-6",
         className,
       )}
     >

@@ -11,11 +11,15 @@ import { SectionCard } from "./ui";
 
 export const pairedEditorClassName = "h-80 min-h-80 max-h-80 flex-none resize-none";
 
-export function UtilityPage({ toolId, children }: { toolId: string; children: ReactNode }) {
+export function UtilityPage({ toolId, children, className, flush = false }: { toolId: string; children: ReactNode; className?: string; flush?: boolean }) {
   return (
     <div
       data-tool-page={toolId}
-      className="mx-auto w-full max-w-[1030px] pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(84px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]"
+      className={cn(
+        "mx-auto w-full max-w-[1030px]",
+        !flush && "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(84px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
+        className,
+      )}
     >
       {children}
     </div>

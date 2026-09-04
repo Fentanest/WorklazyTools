@@ -1,10 +1,14 @@
 import { FileEdit, FileSpreadsheet, MonitorUp, Presentation, ShieldCheck } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, formatBytes, PageHeader, SectionCard } from "../../components/ui";
+import { FileDropZone, formatBytes, PageHeader } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import { stagePendingOfficeFile } from "./pendingOfficeFile";
 import { OFFICE_DOWNLOAD_BYTES } from "./officeAssets";
@@ -36,31 +40,31 @@ export function OfficeEditorPage() {
       setHandoffError(L("브라우저에 파일을 임시 보관하지 못했습니다. 저장 공간을 허용한 뒤 다시 시도해 주세요.", "The file could not be held temporarily in this browser. Allow site storage and try again."));
     }
   };
-  return <div className="page tool-page page-enter accent-context-violet office-editor-landing">
+  return <UtilityPage toolId="office-editor">
     <PageHeader eyebrow="OFFICE TOOL" title={L("브라우저 오피스 편집기", "Browser Office Editor")} description={L("LibreOffice 기반 편집 화면에서 문서·스프레드시트·프레젠테이션을 열고 저장하세요.", "Open and save documents, spreadsheets, and presentations in a LibreOffice-based editor.")}>
-      <div className="header-status ready"><span className="status-dot" /> {L("파일 업로드 없이 편집", "Edit without file uploads")}</div>
+      <div className="inline-flex min-h-8 items-center gap-2 rounded-full bg-violet-500/10 px-3 text-xs font-bold text-violet-700 dark:text-violet-300"><span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,.12)]" /> {L("파일 업로드 없이 편집", "Edit without file uploads")}</div>
     </PageHeader>
     <PrivacyBanner compact />
 
-    <SectionCard title={L("데스크톱형 오피스 화면", "Desktop-style office workspace")} description={L(`편집할 파일을 선택한 뒤에만 대용량 자산을 내려받습니다. 첫 준비에는 약 ${downloadSize}의 저장 공간과 안정적인 인터넷 연결이 필요합니다.`, `Large assets download only after you choose a file to edit. Initial setup needs about ${downloadSize} of storage and a stable connection.`)}>
-      <div className="office-format-grid">
-        <div><FileEdit size={23} /><strong>Writer</strong><span>DOCX · DOC · ODT</span></div>
-        <div><FileSpreadsheet size={23} /><strong>Calc</strong><span>XLSX · XLS · ODS</span></div>
-        <div><Presentation size={23} /><strong>Impress</strong><span>PPTX · PPT · ODP</span></div>
+    <UtilitySectionCard title={L("데스크톱형 오피스 화면", "Desktop-style office workspace")} description={L(`편집할 파일을 선택한 뒤에만 대용량 자산을 내려받습니다. 첫 준비에는 약 ${downloadSize}의 저장 공간과 안정적인 인터넷 연결이 필요합니다.`, `Large assets download only after you choose a file to edit. Initial setup needs about ${downloadSize} of storage and a stable connection.`)}>
+      <div className="mt-4 grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1" data-testid="office-format-grid">
+        <FormatCard icon={<FileEdit size={23} />} name="Writer" extensions="DOCX · DOC · ODT" />
+        <FormatCard icon={<FileSpreadsheet size={23} />} name="Calc" extensions="XLSX · XLS · ODS" />
+        <FormatCard icon={<Presentation size={23} />} name="Impress" extensions="PPTX · PPT · ODP" />
       </div>
-      <div className="office-start-panel">
-        <MonitorUp size={25} />
-        <div><strong>{L("집중 편집용 별도 작업 화면에서 열립니다.", "The editor opens in a dedicated workspace for focused editing.")}</strong><small>{L("다운로드 바이트, 준비 단계와 경과 시간을 계속 표시합니다.", "Downloaded bytes, preparation stages, and elapsed time remain visible.")}</small></div>
-        <Link className="primary-button accent-violet" to={appPath}>{L("오피스 편집기 시작", "Start office editor")}</Link>
+      <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[13px] rounded-2xl border border-violet-500/20 bg-violet-500/10 px-4 py-[15px] max-[820px]:grid-cols-[auto_minmax(0,1fr)]" data-testid="office-start-panel">
+        <MonitorUp className="text-violet-600 dark:text-violet-300" size={25} />
+        <div className="flex min-w-0 flex-col"><strong className="text-sm">{L("집중 편집용 별도 작업 화면에서 열립니다.", "The editor opens in a dedicated workspace for focused editing.")}</strong><small className="mt-[3px] text-[13px] leading-[1.45] text-muted-foreground">{L("다운로드 바이트, 준비 단계와 경과 시간을 계속 표시합니다.", "Downloaded bytes, preparation stages, and elapsed time remain visible.")}</small></div>
+        <Button render={<Link to={appPath} />} size="lg" className="min-w-44 rounded-xl bg-violet-700 font-bold text-white hover:bg-violet-800 max-[820px]:col-span-full max-[820px]:w-full">{L("오피스 편집기 시작", "Start office editor")}</Button>
       </div>
-      <div className="office-landing-drop">
+      <div className="mt-3.5 grid gap-2" data-testid="office-landing-drop">
         <FileDropZone files={[]} onFiles={openDroppedFile} accept={OFFICE_ACCEPT} hint={L("파일을 놓으면 준비부터 문서 열기까지 자동으로 진행합니다.", "Drop a file to prepare the editor and open it automatically.")} accent="violet" disabled={handoffBusy} />
-        <small>{handoffBusy ? L("집중 편집 화면으로 이동하는 중…", "Opening the focused editor workspace…") : L("DOCX·DOC·ODT·XLSX·XLS·ODS·PPTX·PPT·ODP · 한 파일", "DOCX, DOC, ODT, XLSX, XLS, ODS, PPTX, PPT or ODP · one file")}</small>
-        {handoffError && <p className="field-error" role="alert">{handoffError}</p>}
+        <small className="text-center text-xs text-muted-foreground">{handoffBusy ? L("집중 편집 화면으로 이동하는 중…", "Opening the focused editor workspace…") : L("DOCX·DOC·ODT·XLSX·XLS·ODS·PPTX·PPT·ODP · 한 파일", "DOCX, DOC, ODT, XLSX, ODS, PPTX, PPT or ODP · one file")}</small>
+        {handoffError && <UtilityNotice className="justify-center text-center" tone="error" role="alert">{handoffError}</UtilityNotice>}
       </div>
-    </SectionCard>
+    </UtilitySectionCard>
 
-    <div className="comparison-prepare-note"><ShieldCheck size={16} /><span><strong>{L("문서는 현재 브라우저 안에서만 열고 저장합니다.", "Documents are opened and saved only in your current browser.")}</strong><small>{L("매크로 실행과 외부 문서 갱신은 열 때 차단합니다. 중요한 문서는 저장한 파일을 원래 프로그램에서도 확인하세요.", "Macro execution and external document updates are blocked on open. Verify important saved files in their original application.")}</small></span></div>
+    <Card className="flex items-start gap-2.5 rounded-2xl border-violet-500/20 bg-violet-500/10 p-3.5 text-violet-700 shadow-none dark:text-violet-300"><ShieldCheck className="mt-0.5 shrink-0" size={16} /><span className="flex flex-col gap-0.5"><strong className="text-[13px] text-foreground">{L("문서는 현재 브라우저 안에서만 열고 저장합니다.", "Documents are opened and saved only in your current browser.")}</strong><small className="text-xs leading-relaxed text-muted-foreground">{L("매크로 실행과 외부 문서 갱신은 열 때 차단합니다. 중요한 문서는 저장한 파일을 원래 프로그램에서도 확인하세요.", "Macro execution and external document updates are blocked on open. Verify important saved files in their original application.")}</small></span></Card>
 
     <ToolGuide
       title={L("브라우저 오피스 편집기 안내", "Browser office editor guide")}
@@ -90,5 +94,9 @@ export function OfficeEditorPage() {
         { question: "HWP도 여기서 편집할 수 있나요?", answer: "HWP/HWPX는 전용 HWP 편집기를 이용하세요. 이 편집기는 Writer·Calc·Impress 형식에 초점을 둡니다." },
       ]}
     />
-  </div>;
+  </UtilityPage>;
+}
+
+function FormatCard({ icon, name, extensions }: { icon: ReactNode; name: string; extensions: string }) {
+  return <Card className="flex min-h-28 flex-col items-start justify-center gap-1 rounded-[15px] bg-muted p-[17px] text-violet-700 shadow-none max-[620px]:min-h-21 dark:text-violet-300">{icon}<strong className="text-base text-foreground">{name}</strong><span className="text-[13px] text-muted-foreground">{extensions}</span></Card>;
 }

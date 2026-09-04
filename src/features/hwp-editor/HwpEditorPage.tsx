@@ -7,8 +7,11 @@ import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
 import { ToolGuide } from "../../components/ToolGuide";
 import { FileDropZone, FileList, PageHeader, PrimaryButton, SectionCard } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { UtilityPage } from "../../components/UtilitySurface";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { getRhwpStudioUrl } from "../../config/rhwp";
+import { cn } from "../../lib/utils";
 
 type ExportFormat = "hwp" | "hwpx" | "hml";
 
@@ -144,8 +147,18 @@ export function HwpEditorPage() {
     }
   };
 
+  const progressToneClass = progress.status === "error"
+    ? "text-destructive"
+    : progress.status === "running"
+      ? "text-orange-600 dark:text-orange-300"
+      : undefined;
+
   return (
-    <div className={`page tool-page page-enter hwp-tool-page${documentOpen ? " hwp-editor-focus" : ""}`}>
+    <UtilityPage
+      toolId="hwp-editor"
+      flush={documentOpen}
+      className={documentOpen ? "fixed inset-y-0 right-0 left-[280px] z-20 m-0 flex h-dvh w-auto max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[1020px]:left-[250px] max-[820px]:inset-0 max-[820px]:z-[60] max-[820px]:p-0" : undefined}
+    >
       {!documentOpen && <>
         <PageHeader eyebrow="HWP EDITOR" title="HWP·HWPX 문서 편집" description="공식 rhwp Studio의 메뉴·도구 모음·서식·표 편집 기능을 그대로 사용하고 다시 HWP·HWPX로 저장하세요.">
           <PrivacyBanner compact />
@@ -155,7 +168,7 @@ export function HwpEditorPage() {
           <FileDropZone files={files} onFiles={selectFiles} accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" hint="HWP·HWPX·HML · 선택 즉시 편집기에서 열기" accent="orange" />
           <FileList files={files} onRemove={() => setFiles([])} accent="orange" />
           {file && editorReady && (
-            <div className="section-actions">
+            <div className="mt-[11px] flex flex-wrap items-center gap-2 max-[620px]:[&>*]:w-full">
               <PrimaryButton accent="orange" loading={progress.status === "running"} onClick={() => void openDocument(file)}><RefreshCw size={18} /> 다시 열기</PrimaryButton>
             </div>
           )}
@@ -164,27 +177,27 @@ export function HwpEditorPage() {
         <OperationProgress {...progress} accent="orange" title="HWP 편집기 로그" />
       </>}
 
-      <SectionCard step={2} title="문서 편집기" description={documentOpen ? `${documentName || "문서"} · ${pageCount}페이지` : "편집기가 준비되면 파일을 선택하거나 편집기 안의 파일 → 열기를 이용하세요."} className="hwp-editor-section">
-        {documentOpen && <div className="hwp-focus-toolbar">
-          <div className="hwp-focus-document">
+      <SectionCard step={2} title="문서 편집기" description={documentOpen ? `${documentName || "문서"} · ${pageCount}페이지` : "편집기가 준비되면 파일을 선택하거나 편집기 안의 파일 → 열기를 이용하세요."} className={documentOpen ? "!m-0 flex h-full flex-col !gap-0 overflow-hidden !rounded-2xl !border-0 !bg-card !p-0 shadow-xl [backdrop-filter:none] [&>.ui-section-heading]:hidden max-[820px]:!rounded-none" : "!mt-0 mb-[15px]"}>
+        {documentOpen && <div className="flex min-h-[52px] items-center justify-between gap-3 bg-card py-[7px] pr-2.5 pl-[13px] max-[620px]:min-h-[94px] max-[620px]:flex-col max-[620px]:items-stretch max-[620px]:gap-1.5 max-[620px]:p-[7px]" data-testid="hwp-focus-toolbar">
+          <div className="flex min-w-0 items-center gap-[9px] text-orange-600 max-[620px]:min-h-[31px] max-[620px]:px-1 dark:text-orange-300" data-testid="hwp-focus-document">
             <FileText size={18} />
-            <span><strong>{documentName || "HWP 문서"}</strong><small aria-live="polite" className={`status-${progress.status}`}>{pageCount}페이지 · {progress.status === "running" || progress.status === "error" ? progress.message : "브라우저에서 편집 중"}</small></span>
+            <span className="flex min-w-0 flex-col gap-0.5"><strong className="max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground max-[620px]:max-w-60">{documentName || "HWP 문서"}</strong><small aria-live="polite" className={cn("text-xs tabular-nums text-muted-foreground", progressToneClass)}>{pageCount}페이지 · {progress.status === "running" || progress.status === "error" ? progress.message : "브라우저에서 편집 중"}</small></span>
           </div>
-          <div className="hwp-focus-actions">
-            <button className="secondary-button" type="button" onClick={() => setDocumentOpen(false)}><X size={16} /> 도구 화면</button>
-            <label className="secondary-button hwp-focus-open"><FolderOpen size={16} /> 다른 문서
-              <input className="visually-hidden" type="file" accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" onChange={(event) => { const next = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; selectFiles(next); }} />
+          <div className="flex shrink-0 items-center gap-1.5 max-[620px]:grid max-[620px]:grid-cols-5 max-[620px]:[&>*]:min-w-0 max-[620px]:[&>*]:w-full max-[620px]:[&>*]:px-1" data-testid="hwp-focus-actions">
+            <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" onClick={() => setDocumentOpen(false)}><X size={16} /> 도구 화면</Button>
+            <label className="relative inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-secondary px-[11px] text-[13px] font-bold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-muted"><FolderOpen size={16} /> 다른 문서
+              <input className="sr-only" data-testid="hwp-focus-open" type="file" accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" onChange={(event) => { const next = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; selectFiles(next); }} />
             </label>
-            <button className="primary-button accent-orange" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwp")}><Download size={16} /> {exporting === "hwp" ? "저장 중…" : "HWP 저장"}</button>
-            <button className="secondary-button" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwpx")}><Download size={16} /> HWPX</button>
-            <button className="secondary-button" type="button" disabled={Boolean(exporting) || hmlSaveState?.hmlSavable === false} onClick={() => void exportDocument("hml")}><Download size={16} /> HML</button>
+            <Button className="h-9 rounded-xl bg-orange-700 px-[11px] text-[13px] font-bold text-white shadow-md shadow-orange-700/20 hover:bg-orange-800" data-testid="hwp-save" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwp")}><Download size={16} /> {exporting === "hwp" ? "저장 중…" : "HWP 저장"}</Button>
+            <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwpx")}><Download size={16} /> HWPX</Button>
+            <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" disabled={Boolean(exporting) || hmlSaveState?.hmlSavable === false} onClick={() => void exportDocument("hml")}><Download size={16} /> HML</Button>
           </div>
         </div>}
-        {!documentOpen && <div className="hwp-editor-runtime-notice">
-          <FileCheck2 size={18} />
-          <span><strong>이 사이트에 포함된 공식 rhwp Studio</strong><small>버전이 고정된 편집기·WASM·글꼴을 Worklazy Tools의 정적 자산에서 불러오며, 선택한 파일은 브라우저 내부 MessageChannel로 전달됩니다.</small></span>
+        {!documentOpen && <div className="mb-[11px] flex items-start gap-[9px] rounded-xl bg-orange-500/10 px-3 py-2.5 text-orange-700 dark:text-orange-300">
+          <FileCheck2 className="mt-px shrink-0" size={18} />
+          <span className="flex flex-col gap-[3px]"><strong className="text-[13px] text-foreground">이 사이트에 포함된 공식 rhwp Studio</strong><small className="text-[13px] leading-5 text-muted-foreground">버전이 고정된 편집기·WASM·글꼴을 Worklazy Tools의 정적 자산에서 불러오며, 선택한 파일은 브라우저 내부 MessageChannel로 전달됩니다.</small></span>
         </div>}
-        <div ref={containerRef} className="rhwp-editor-shell" aria-label="HWP 문서 편집기" />
+        <div ref={containerRef} className={cn("h-[clamp(680px,78vh,980px)] w-full overflow-hidden rounded-2xl border border-border bg-[#f4f5f7] shadow-[0_16px_42px_rgba(30,35,50,.12)] empty:relative empty:bg-[linear-gradient(145deg,var(--muted),var(--card))] empty:after:absolute empty:after:inset-0 empty:after:grid empty:after:place-items-center empty:after:text-sm empty:after:font-bold empty:after:text-muted-foreground empty:after:content-['rhwp_편집기를_불러오는_중…'] [&>iframe]:block [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0 [&>iframe]:bg-white max-[620px]:h-[max(620px,78vh)] max-[620px]:rounded-lg dark:border-white/15 dark:shadow-[0_20px_50px_rgba(0,0,0,.38)]", documentOpen && "h-auto min-h-0 flex-1 rounded-none border-0 border-t border-border shadow-none max-[620px]:h-auto max-[620px]:rounded-none")} data-testid="hwp-editor-shell" aria-label="HWP 문서 편집기" />
         {documentOpen && <RhwpVersionNotice mode="editor" compact />}
       </SectionCard>
 
@@ -205,7 +218,7 @@ export function HwpEditorPage() {
         ]}
       />}
       {!documentOpen && <RhwpVersionNotice mode="editor" />}
-    </div>
+    </UtilityPage>
   );
 }
 

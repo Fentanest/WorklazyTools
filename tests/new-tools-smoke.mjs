@@ -112,8 +112,8 @@ try {
 
 async function testHwpEditor(page, hwpPaths, wordDocx) {
   await page.goto(`${koBaseUrl}/tools/document-compare`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".rhwp-version-notice");
-  const compareVersion = await page.$eval(".rhwp-version-notice", (element) => element.textContent || "");
+  await page.waitForSelector("[data-slot='rhwp-version-notice']");
+  const compareVersion = await page.$eval("[data-slot='rhwp-version-notice']", (element) => element.textContent || "");
   if (!compareVersion.includes("rhwp 0.8.6") || !compareVersion.includes("공식 비교 파일")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
@@ -160,9 +160,9 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   };
   page.on("request", recordRhwpRequest);
   await page.goto(`${koBaseUrl}/tools/hwp-editor`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".rhwp-editor-shell iframe");
+  await page.waitForSelector("[data-testid='hwp-editor-shell'] iframe");
   await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success")?.textContent?.includes("편집기를 사용할 수 있습니다"));
-  const runtime = await page.$eval(".rhwp-editor-shell iframe", (iframe) => {
+  const runtime = await page.$eval("[data-testid='hwp-editor-shell'] iframe", (iframe) => {
     const url = new URL(iframe.src);
     const csp = iframe.contentDocument?.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute("content") || "";
     const version = iframe.contentDocument?.querySelector('meta[name="rhwp-version"]')?.getAttribute("content") || "";
@@ -172,25 +172,25 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
     || !runtime.csp.includes("connect-src 'self'") || !runtime.csp.includes("font-src 'self'")) {
     throw new Error(`HWP editor is not using the isolated self-hosted runtime: ${JSON.stringify(runtime)}`);
   }
-  await page.waitForSelector(".hwp-tool-page input[type=file]");
-  await (await page.$(".hwp-tool-page input[type=file]")).uploadFile(hwpPaths[0]);
-  await page.waitForSelector(".hwp-tool-page.hwp-editor-focus");
-  const editorDescription = await page.$eval(".hwp-editor-section", (element) => element.textContent || "");
+  await page.waitForSelector("[data-tool-page='hwp-editor'] input[type=file]");
+  await (await page.$("[data-tool-page='hwp-editor'] input[type=file]")).uploadFile(hwpPaths[0]);
+  await page.waitForSelector("[data-testid='hwp-focus-toolbar']");
+  const editorDescription = await page.$eval("[data-ui-component='section-card']:has([data-testid='hwp-editor-shell'])", (element) => element.textContent || "");
   if (!editorDescription.includes("1페이지")) throw new Error(`HWP page count is incorrect: ${editorDescription}`);
   const focusLayout = await page.evaluate(() => {
-    const focus = document.querySelector(".hwp-editor-focus")?.getBoundingClientRect();
+    const focus = document.querySelector("[data-tool-page='hwp-editor']")?.getBoundingClientRect();
     const sidebar = document.querySelector(".sidebar")?.getBoundingClientRect();
-    const shell = document.querySelector(".rhwp-editor-shell")?.getBoundingClientRect();
-    return focus && sidebar && shell ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, hasPageHeader: Boolean(document.querySelector(".hwp-tool-page .ui-page-header")) } : null;
+    const shell = document.querySelector("[data-testid='hwp-editor-shell']")?.getBoundingClientRect();
+    return focus && sidebar && shell ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, hasPageHeader: Boolean(document.querySelector("[data-tool-page='hwp-editor'] .ui-page-header")) } : null;
   });
   if (!focusLayout || focusLayout.focus.left < focusLayout.sidebar.right || focusLayout.focus.right < 1435 || focusLayout.focus.top > 10 || focusLayout.focus.bottom < 895 || focusLayout.shellHeight < focusLayout.focus.bottom - focusLayout.focus.top - 130 || focusLayout.hasPageHeader) {
     throw new Error(`HWP focus layout did not fill the area outside the sidebar: ${JSON.stringify(focusLayout)}`);
   }
   await page.waitForFunction(() => {
-    const button = document.querySelector(".hwp-focus-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid='hwp-save']");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  const editorVersion = await page.$eval(".rhwp-version-notice.compact", (element) => element.textContent || "");
+  const editorVersion = await page.$eval("[data-slot='rhwp-version-notice'][data-compact='true']", (element) => element.textContent || "");
   if (!editorVersion.includes("rhwp 0.8.6") || !editorVersion.includes("이 사이트에 포함")) {
     throw new Error(`HWP editor version notice is incomplete: ${editorVersion}`);
   }
@@ -204,16 +204,16 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
       return window.__worklazyOriginalCreateObjectURL(value);
     };
   });
-  const studioIframe = await page.$(".rhwp-editor-shell iframe");
+  const studioIframe = await page.$("[data-testid='hwp-editor-shell'] iframe");
   const studioFrame = await studioIframe?.contentFrame();
   if (!studioFrame) throw new Error("HWP Studio iframe was not available for round-trip editing.");
   await studioFrame.waitForSelector(".document-page-canvas");
   await studioFrame.click(".document-page-canvas", { offset: { x: 130, y: 130 } });
   await page.keyboard.type(HWP_ROUNDTRIP_SENTINEL, { delay: 10 });
-  await page.click(".hwp-focus-actions .primary-button");
+  await page.click("[data-testid='hwp-save']");
   await page.waitForFunction(() => window.__worklazyCapturedHwpBlob instanceof Blob
-    && document.querySelector(".hwp-focus-actions .primary-button") instanceof HTMLButtonElement
-    && !document.querySelector(".hwp-focus-actions .primary-button").disabled);
+    && document.querySelector("[data-testid='hwp-save']") instanceof HTMLButtonElement
+    && !document.querySelector("[data-testid='hwp-save']").disabled);
   const roundTripBytes = Uint8Array.from(await page.evaluate(async () => Array.from(
     new Uint8Array(await window.__worklazyCapturedHwpBlob.arrayBuffer()),
   )));
@@ -232,9 +232,9 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   const reopenedName = "rhwp-roundtrip-reopened.hwp";
   const reopenedPath = path.join(path.dirname(hwpPaths[0]), reopenedName);
   await fs.writeFile(reopenedPath, roundTripBytes);
-  await (await page.$(".hwp-focus-open input[type=file]")).uploadFile(reopenedPath);
-  await page.waitForFunction((expectedName) => document.querySelector(".hwp-focus-document strong")?.textContent === expectedName
-    && document.querySelector(".hwp-focus-document small")?.textContent?.includes("1페이지"), {}, reopenedName);
+  await (await page.$("[data-testid='hwp-focus-open']")).uploadFile(reopenedPath);
+  await page.waitForFunction((expectedName) => document.querySelector("[data-testid='hwp-focus-document'] strong")?.textContent === expectedName
+    && document.querySelector("[data-testid='hwp-focus-document'] small")?.textContent?.includes("1페이지"), {}, reopenedName);
   console.log(`  hwp: round-trip ${roundTripBytes.byteLength} bytes, ${roundTripStructure.pageCount} page, sentinel parsed and Studio reopened`);
 
   page.off("request", recordRhwpRequest);

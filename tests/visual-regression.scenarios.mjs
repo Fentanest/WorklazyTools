@@ -34,13 +34,19 @@ const koreanOnlyProfiles = Object.freeze([koLightDesktop, koDarkMobile]);
 const koreanOnlyBottomProfiles = Object.freeze([koDarkMobile]);
 const englishRedirectProfiles = Object.freeze([enLightMobile, enDarkDesktop]);
 const interactionProfiles = Object.freeze([enDarkDesktop]);
-const b1ToolIds = new Set([
+const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
+const migratedToolIds = new Set([
   "text-formatter",
   "work-calculator",
   "payroll-calculator",
   "security-tools",
   "image-privacy",
   "text-tools",
+  "data-converter",
+  "timezone-calculator",
+  "text-merger",
+  "hwp-editor",
+  "office-editor",
 ]);
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
@@ -92,7 +98,7 @@ const defaultFixtureFor = (toolId) => toolId === "security-tools"
 
 const initialScenarioFor = (route) => {
   const koreanOnly = route.toolId === "hwp-editor";
-  const migratedB1 = b1ToolIds.has(route.toolId);
+  const migrated = migratedToolIds.has(route.toolId);
   return scenario({
     scenarioId: `${route.id}--initial`,
     routeId: route.id,
@@ -106,15 +112,15 @@ const initialScenarioFor = (route) => {
       ? "English is product-level N/A. Korean keeps paired desktop/light and mobile/dark coverage; the redirect has its own scenario."
       : "Representative pairwise coverage retains both locales, themes, and viewports without the eight-way full product.",
     fixture: defaultFixtureFor(route.toolId),
-    readySelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
-    assertSelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    readySelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    assertSelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
   });
 };
 
 const bottomScenarioFor = (route) => {
   const koreanOnly = route.toolId === "hwp-editor";
-  const migratedB1 = b1ToolIds.has(route.toolId);
+  const migrated = migratedToolIds.has(route.toolId);
   return scenario({
     scenarioId: `${route.id}--bottom`,
     routeId: route.id,
@@ -129,9 +135,9 @@ const bottomScenarioFor = (route) => {
       : "The clearance contract is mobile-only; KO/dark and EN/light retain both locales and themes while avoiding redundant desktop captures.",
     fixture: defaultFixtureFor(route.toolId),
     actions: [{ type: "scroll-bottom" }],
-    readySelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
-    assertSelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
-    bottomTargetSelector: migratedB1 ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR,
+    readySelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    assertSelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    bottomTargetSelector: migrated ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR,
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
   });
 };
@@ -191,8 +197,8 @@ const interactionDefinitions = Object.freeze({
   }),
   "text-merger": Object.freeze({
     stateId: "interaction-comma-separator",
-    actions: [{ type: "select", selector: ".text-merger-page select", value: "comma" }],
-    assertSelector: ".text-merger-page select",
+    actions: [{ type: "select", selector: "[data-testid='text-merger-separator']", value: "comma" }],
+    assertSelector: "[data-testid='text-merger-separator']",
   }),
   "text-formatter": Object.freeze({
     stateId: "interaction-format-result",
@@ -210,8 +216,8 @@ const interactionDefinitions = Object.freeze({
   }),
   "timezone-calculator": Object.freeze({
     stateId: "interaction-base-city",
-    actions: [{ type: "select-index", selector: ".timezone-page select", optionIndex: 1 }],
-    assertSelector: ".timezone-page select",
+    actions: [{ type: "select-index", selector: "[data-testid='timezone-base-city']", optionIndex: 1 }],
+    assertSelector: "[data-testid='timezone-base-city']",
   }),
   "payroll-calculator": Object.freeze({
     stateId: "interaction-net-mode",
@@ -231,8 +237,24 @@ const interactionDefinitions = Object.freeze({
   }),
   "data-converter": Object.freeze({
     stateId: "interaction-json-source",
-    actions: [{ type: "select", selector: ".converter-route select:first-of-type", value: "json" }],
-    assertSelector: ".converter-route select:first-of-type",
+    actions: [{ type: "select", selector: "[data-testid='converter-route'] select:first-of-type", value: "json" }],
+    assertSelector: "[data-testid='converter-route'] select:first-of-type",
+  }),
+  "hwp-editor": Object.freeze({
+    stateId: "interaction-document-loaded",
+    fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-hwp-document.hwp", mimeType: "application/x-hwp" },
+    actions: [
+      { type: "upload", selector: "[data-tool-page='hwp-editor'] input[type='file']" },
+      { type: "wait", selector: "[data-testid='hwp-focus-toolbar']" },
+    ],
+    assertSelector: "[data-testid='hwp-editor-shell'] iframe",
+  }),
+  "office-editor": Object.freeze({
+    stateId: "interaction-workspace",
+    path: "/tools/office-editor/app/",
+    actions: [{ type: "wait", selector: "[data-tool-page='office-editor-app']" }],
+    readySelector: "[data-tool-page='office-editor-app']",
+    assertSelector: "[data-testid='office-canvas-shell']",
   }),
   "image-privacy": Object.freeze({
     stateId: "interaction-clean-result",
@@ -259,22 +281,25 @@ const interactionDefinitions = Object.freeze({
 const interactionScenarioFor = (route) => {
   const definition = interactionDefinitions[route.toolId];
   if (!definition) return null;
-  const migratedB1 = b1ToolIds.has(route.toolId);
+  const koreanOnly = route.toolId === "hwp-editor";
+  const migrated = migratedToolIds.has(route.toolId);
   return scenario({
     scenarioId: `${route.id}--${definition.stateId}`,
     routeId: route.id,
     toolId: route.toolId,
     stateId: definition.stateId,
     stateType: "interaction",
-    path: route.path,
+    path: definition.path ?? route.path,
     kind: "tool",
-    profiles: interactionProfiles,
-    profileReductionReason: "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes.",
+    profiles: koreanOnly ? koreanInteractionProfiles : interactionProfiles,
+    profileReductionReason: koreanOnly
+      ? "The HWP editor is Korean-only; one Korean light desktop profile covers the loaded-document workspace while initial and bottom retain mobile and dark coverage."
+      : "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes.",
     fixture: definition.fixture ?? defaultFixtureFor(route.toolId),
     actions: definition.actions,
-    readySelector: migratedB1 ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    readySelector: definition.readySelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
     assertSelector: definition.assertSelector,
-    localeNotApplicableReason: null,
+    localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
   });
 };
 
@@ -307,10 +332,7 @@ export const visualRegressionScenarios = Object.freeze([
 
 export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDefinitions).sort());
 
-export const interactionNotApplicableReasons = Object.freeze({
-  "hwp-editor": "The landing screen has no product-owned toggle or selection control; the editor controls are supplied inside the vendored workspace after a document opens.",
-  "office-editor": "The landing screen exposes file/open actions, not a toggle or selection state; workspace interaction remains covered by the office smoke test.",
-});
+export const interactionNotApplicableReasons = Object.freeze({});
 
 const QA_STATE_TYPES = new Set(["initial", "bottom", "interaction"]);
 

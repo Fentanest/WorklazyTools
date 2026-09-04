@@ -79,9 +79,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 153);
-  assert.equal(qaCaptureScenarios.length, 60);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 472);
+  assert.equal(names.length, 155);
+  assert.equal(qaCaptureScenarios.length, 62);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 484);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -89,6 +89,12 @@ test("visual regression scenario manifest covers every available tool and state 
   assert.equal(b1QaScenarios.flatMap(({ profiles }) => profiles).length, 144);
   assert.deepEqual(new Set(b1QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
   assert.ok(b1QaScenarios.every(({ profiles }) => profiles.length === 8));
+  const b2QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
+    "data-converter", "timezone-calculator", "text-merger", "hwp-editor", "office-editor",
+  ].includes(toolId));
+  assert.equal(b2QaScenarios.length, 15);
+  assert.equal(b2QaScenarios.flatMap(({ profiles }) => profiles).length, 108);
+  assert.deepEqual(new Set(b2QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
   assert.equal(visualRegressionConfig.scenarios, visualRegressionScenarios);
   assert.equal(visualRegressionConfig.environment.maxCapturesPerBrowser, 12);
   assert.equal(visualRegressionConfig.environment.settleTimeMs, 200);

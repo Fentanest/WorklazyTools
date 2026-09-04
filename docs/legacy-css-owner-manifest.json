@@ -1648,8 +1648,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-096",
@@ -1664,8 +1664,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-097",
@@ -1680,8 +1680,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-098",
@@ -1828,8 +1828,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-107",
@@ -1844,8 +1844,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-108",
@@ -1860,8 +1860,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-109",
@@ -1876,8 +1876,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-110",
@@ -2069,8 +2069,9 @@
       ],
       "refCount": 2,
       "lastRemovalBundle": "B5a",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "legacy-arm-removed",
+      "removedIn": "B2",
+      "currentSelector": ".pdf-output-mode-list small, .pdf-range-group label > span, .pdf-range-group label small, .pdf-format-grid small"
     },
     {
       "id": "legacy-122",
@@ -2085,8 +2086,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-123",
@@ -2101,8 +2102,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-124",
@@ -2117,8 +2118,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-125",
@@ -2149,8 +2150,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-127",
@@ -2428,8 +2429,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-143",
@@ -2464,8 +2465,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B2",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B2"
     },
     {
       "id": "legacy-145",

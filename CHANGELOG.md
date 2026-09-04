@@ -4,6 +4,7 @@
 
 ## 2026-09-04
 
+- P2 B2의 데이터 변환·세계 시간·텍스트 합치기·HWP 편집·Office 편집 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 실제 HWP 문서 로드와 격리 Office workspace를 포함한 3상태 시각 시나리오·스모크·owner manifest를 함께 갱신했다. — Codx
 - P2 묶음 검수 캡처를 `VISUAL_ONLY` 기반 공용 QA 경로로 통합해 initial·bottom·interaction 3상태의 전체 로케일·테마·뷰포트를 수집하고 상태별 장수를 출력하도록 했다. B1 증거를 144장으로 다시 채집하고 모바일 컨트롤 기하 스모크를 추가했다. — Codx
 - P2 B1의 포맷터·영업일/연차·급여·비밀번호·사진 메타데이터·텍스트 도구 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS를 제거했다. 155개 잔여 규칙의 owner/refcount manifest와 고정 번들 예산 측정기, B1 초기·하단·상호작용 시각 시나리오 및 추적 제외 QA 캡처를 함께 추가했다. — Codx
 - 시각 회귀 캡처를 CPU 기반 로케일 전용 브라우저 작업자로 병렬화하고, scenario/route/tool 단위 `VISUAL_ONLY` 부분 실행과 소요 시간·캡처 수·동시성·필터 리포트를 추가했다. — Codx

@@ -30,15 +30,15 @@ try {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto(`${baseUrl}/ko/tools/office-editor`, { waitUntil: "networkidle0" });
-  await page.waitForSelector(".office-landing-drop [data-ui-part=drop-target]");
+  await page.waitForSelector("[data-testid='office-landing-drop'] [data-ui-part=drop-target]");
   const landingBoundary = await page.evaluate(() => ({
     ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
-    dropHint: document.querySelector(".office-landing-drop")?.textContent || "",
+    dropHint: document.querySelector("[data-testid='office-landing-drop']")?.textContent || "",
   }));
   if (!landingBoundary.dropHint.includes("자동")) throw new Error(`Office landing drop is incomplete: ${JSON.stringify(landingBoundary)}`);
-  await dropFile(page, ".office-landing-drop [data-ui-part=drop-target]", documentPath);
+  await dropFile(page, "[data-testid='office-landing-drop'] [data-ui-part=drop-target]", documentPath);
   await page.waitForFunction(() => location.pathname.endsWith("/tools/office-editor/app/"));
-  await page.waitForSelector(".office-editor-app");
+  await page.waitForSelector("[data-tool-page='office-editor-app']");
   const boundary = await page.evaluate(() => ({
     isolated: crossOriginIsolated,
     marker: Boolean(document.querySelector('meta[name="worklazy-office-isolation"]')),
@@ -61,16 +61,16 @@ try {
       if (message && !window.__officeProgressSamples.includes(sample)) window.__officeProgressSamples.push(sample);
     }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
   });
-  await page.waitForFunction(() => document.querySelector(".office-canvas-shell.active") || document.querySelector(".error-banner"));
-  const error = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
+  await page.waitForFunction(() => document.querySelector("[data-testid='office-canvas-shell'][data-active='true']") || document.querySelector("[data-slot='notice'][role='alert']"));
+  const error = await page.$eval("[data-slot='notice'][role='alert']", (element) => element.textContent || "").catch(() => "");
   if (error) throw new Error(`Office editor reported an error: ${error}`);
-  await page.waitForSelector(".office-canvas-shell.active");
+  await page.waitForSelector("[data-testid='office-canvas-shell'][data-active='true']");
   const progress = await page.evaluate(async () => ({
     samples: window.__officeProgressSamples,
     cacheEntries: (await caches.keys()).filter((name) => name.startsWith("worklazy-office-")).length,
-    saveEnabled: !document.querySelector('.office-app-toolbar button:has(svg.lucide-save)')?.disabled,
-    canvas: document.querySelector(".office-canvas")?.getBoundingClientRect().toJSON(),
-    focus: document.querySelector(".office-editor-focus")?.getBoundingClientRect().toJSON(),
+    saveEnabled: !document.querySelector("[data-testid='office-save']")?.disabled,
+    canvas: document.querySelector("[data-testid='office-canvas']")?.getBoundingClientRect().toJSON(),
+    focus: document.querySelector("[data-tool-page='office-editor-app'][data-focus-mode='true']")?.getBoundingClientRect().toJSON(),
     koreanFonts: ["NanumGothic-Regular.ttf"].map((name) => {
       try { return FS.stat(`/usr/share/fonts/${name}`).size; } catch { return 0; }
     }),
@@ -82,7 +82,7 @@ try {
   }
 
   const editMarker = " Browser edit verified";
-  await page.click(".office-canvas");
+  await page.click("[data-testid='office-canvas']");
   const scrollBefore = await page.evaluate(() => window.scrollY);
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowUp");
@@ -92,7 +92,7 @@ try {
   if (scrollAfter !== scrollBefore) throw new Error(`Office canvas navigation also scrolled the page: ${scrollBefore} -> ${scrollAfter}`);
   await page.keyboard.press("End");
   await page.keyboard.type(editMarker);
-  await page.$eval('.office-app-toolbar button:has(svg.lucide-save)', (button) => button.click());
+  await page.$eval("[data-testid='office-save']", (button) => button.click());
   const savedPath = await waitForDownload(downloadDirectory, "office-editor-check.docx");
   const saved = await fs.readFile(savedPath);
   if (saved.length < 512 || saved[0] !== 0x50 || saved[1] !== 0x4b) throw new Error("Saved DOCX did not pass the container check.");
@@ -101,7 +101,7 @@ try {
   if (!savedDocumentXml?.includes(editMarker.trim())) throw new Error("Keyboard editing was not persisted in the saved DOCX.");
 
   await page.reload({ waitUntil: "networkidle0" });
-  await page.waitForSelector(".office-editor-app");
+  await page.waitForSelector("[data-tool-page='office-editor-app']");
   await page.evaluate(() => {
     window.__officeProgressSamples = [];
     new MutationObserver(() => {
@@ -109,9 +109,9 @@ try {
       if (message && !window.__officeProgressSamples.includes(message)) window.__officeProgressSamples.push(message);
     }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
   });
-  await (await page.$('.office-file-picker input[type="file"]')).uploadFile(documentPath);
-  await page.waitForFunction(() => document.querySelector(".office-canvas-shell.active") || document.querySelector(".error-banner"));
-  const cachedError = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
+  await (await page.$("[data-testid='office-file-picker']")).uploadFile(documentPath);
+  await page.waitForFunction(() => document.querySelector("[data-testid='office-canvas-shell'][data-active='true']") || document.querySelector("[data-slot='notice'][role='alert']"));
+  const cachedError = await page.$eval("[data-slot='notice'][role='alert']", (element) => element.textContent || "").catch(() => "");
   if (cachedError) throw new Error(`Cached office editor start reported an error: ${cachedError}`);
   const cacheReuse = await page.evaluate(async () => {
     const messages = Array.from(document.querySelectorAll(".ui-operation-log li"), (item) => item.textContent || "");
@@ -123,11 +123,11 @@ try {
   if (cachedMessages.length < 6 || cacheReuse.assetCount !== 7) throw new Error(`Office assets were not reused from browser storage: ${JSON.stringify(cacheReuse)}`);
 
   page.once("dialog", (dialog) => dialog.accept());
-  await (await page.$('.office-file-picker input[type="file"]')).uploadFile(spreadsheetPath);
-  await page.waitForFunction(() => document.querySelector(".office-canvas-shell.active") && document.querySelector(".office-toolbar-document strong")?.textContent === "korean-calc.xlsx");
-  const calcError = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
+  await (await page.$("[data-testid='office-file-picker']")).uploadFile(spreadsheetPath);
+  await page.waitForFunction(() => document.querySelector("[data-testid='office-canvas-shell'][data-active='true']") && document.querySelector("[data-testid='office-toolbar-document'] strong")?.textContent === "korean-calc.xlsx");
+  const calcError = await page.$eval("[data-slot='notice'][role='alert']", (element) => element.textContent || "").catch(() => "");
   if (calcError) throw new Error(`Korean Calc document reported an error: ${calcError}`);
-  await page.click(".office-canvas");
+  await page.click("[data-testid='office-canvas']");
   await page.keyboard.down("Control");
   await page.keyboard.press("Home");
   await page.keyboard.up("Control");
@@ -141,7 +141,7 @@ try {
   await page.keyboard.press("PageUp");
   const calcScrollAfter = await page.evaluate(() => window.scrollY);
   if (calcScrollAfter !== calcScrollBefore) throw new Error(`Calc cell navigation also scrolled the page: ${calcScrollBefore} -> ${calcScrollAfter}`);
-  await page.$eval('.office-app-toolbar button:has(svg.lucide-save)', (button) => button.click());
+  await page.$eval("[data-testid='office-save']", (button) => button.click());
   const savedSpreadsheetPath = await waitForDownload(downloadDirectory, "korean-calc.xlsx");
   const savedSpreadsheet = new ExcelJS.Workbook();
   await savedSpreadsheet.xlsx.load(await fs.readFile(savedSpreadsheetPath));

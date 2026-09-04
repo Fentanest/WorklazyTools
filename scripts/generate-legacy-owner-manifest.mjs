@@ -141,8 +141,17 @@ const compactContracts = new Map([
 const currentStateOverrides = new Map([
   [43, { currentState: "removed", removedIn: "pre-B1" }],
   [45, { currentState: "removed", removedIn: "pre-B1" }],
+  ...[95, 96, 97, 106, 107, 108, 109, 122, 123, 124, 126, 142, 144].map((index) => [index, {
+    currentState: "removed",
+    removedIn: "B2",
+  }]),
   [125, { currentState: "removed", removedIn: "B1" }],
   [127, { currentState: "removed", removedIn: "B1" }],
+  [121, {
+    currentState: "legacy-arm-removed",
+    removedIn: "B2",
+    currentSelector: ".pdf-output-mode-list small, .pdf-range-group label > span, .pdf-range-group label small, .pdf-format-grid small",
+  }],
   [135, {
     currentState: "legacy-arm-removed",
     removedIn: "B1",

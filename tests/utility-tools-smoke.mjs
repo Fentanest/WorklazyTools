@@ -198,25 +198,25 @@ try {
     || toolGuide.articles.some((slot) => slot !== "card") || !toolGuide.faq.length || toolGuide.faq.some((valid) => !valid)) {
     throw new Error(`Tool guide structure or localization contract failed: ${JSON.stringify(toolGuide)}`);
   }
-  await page.type(".text-merge-editor textarea", "첫 번째");
+  await page.type("[data-testid='text-merger-editor'] textarea", "첫 번째");
   await page.evaluate(() => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(["파일 A"], "a.txt", { type: "text/plain" }));
     transfer.items.add(new File(["파일 B"], "b.txt", { type: "text/plain" }));
-    const input = document.querySelector('.text-merger-page input[type="file"]');
+    const input = document.querySelector("[data-tool-page='text-merger'] input[type='file']");
     Object.defineProperty(input, "files", { configurable: true, value: transfer.files });
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.waitForFunction(() => document.querySelectorAll(".text-merge-item").length === 3);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='text-merger-item']").length === 3);
   await clickButton(page, "직접 입력 추가");
-  await page.type(".text-merge-item:last-child textarea", "직접 입력 사이");
-  await page.$eval(".text-merge-item:last-child .text-merge-order-actions button:first-child", (button) => button.click());
-  await page.waitForFunction(() => document.querySelectorAll(".text-merge-source")[2]?.textContent?.includes("직접 입력"));
-  await page.$eval(".text-merge-item:nth-child(2) .text-merge-preview", (button) => button.click());
-  await page.$eval(".text-merge-item:nth-child(2) textarea", (textarea) => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(textarea, "파일 A 편집"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
-  await page.waitForFunction(() => document.querySelector(".text-merge-item:nth-child(2) .text-merge-meta b")?.textContent === "편집됨");
+  await page.type("[data-testid='text-merger-item']:last-child textarea", "직접 입력 사이");
+  await page.$eval("[data-testid='text-merger-item']:last-child [data-testid='text-merger-order-actions'] button:first-child", (button) => button.click());
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='text-merger-source']")[2]?.textContent?.includes("직접 입력"));
+  await page.$eval("[data-testid='text-merger-item']:nth-child(2) [data-testid='text-merger-preview']", (button) => button.click());
+  await page.$eval("[data-testid='text-merger-item']:nth-child(2) textarea", (textarea) => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(textarea, "파일 A 편집"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
+  await page.waitForFunction(() => document.querySelector("[data-testid='text-merger-item']:nth-child(2) [data-testid='text-merger-meta'] b")?.textContent === "편집됨");
   await clickButton(page, "텍스트 병합");
-  await page.waitForFunction(() => document.querySelector(".text-merge-result")?.value === "첫 번째\n파일 A 편집\n직접 입력 사이\n파일 B");
+  await page.waitForFunction(() => document.querySelector("[data-testid='text-merger-result']")?.value === "첫 번째\n파일 A 편집\n직접 입력 사이\n파일 B");
 
   await page.goto(`${koBaseUrl}/tools/text-tools`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "text-tools");
@@ -242,18 +242,18 @@ try {
   if (!leaveDays?.includes("일")) throw new Error("Annual-leave mode result is missing after the mode change.");
 
   await page.goto(`${koBaseUrl}/tools/timezone-calculator`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelectorAll(".world-map-pin").length === 44);
-  await page.waitForFunction(() => document.querySelectorAll(".world-clock-grid article").length === 4);
-  const timezoneMetaFont = await page.$eval(".world-clock-grid article > small", (element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='timezone-map-pin']").length === 44);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='timezone-world-clocks'] article").length === 4);
+  const timezoneMetaFont = await page.$eval("[data-testid='timezone-world-clocks'] article > small", (element) => Number.parseFloat(getComputedStyle(element).fontSize));
   if (timezoneMetaFont < 13) throw new Error(`Timezone comparison copy is too small: ${timezoneMetaFont}px`);
-  await page.$eval('.world-map-pin[aria-label^="두바이"]', (element) => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-  await page.waitForFunction(() => document.querySelectorAll(".world-clock-grid article").length === 5);
-  await page.type('.city-search-field input', "시드니");
-  await page.waitForSelector(".city-search-results button");
-  await page.click(".city-search-results button");
-  await page.waitForFunction(() => document.querySelectorAll(".world-clock-grid article").length === 6);
-  await page.click('.world-map-controls button[aria-label="지도 확대"]');
-  await page.waitForFunction(() => document.querySelector(".world-map-controls output")?.textContent === "150%");
+  await page.$eval('[data-testid="timezone-map-pin"][aria-label^="두바이"]', (element) => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='timezone-world-clocks'] article").length === 5);
+  await page.type("[data-testid='timezone-city-search'] input", "시드니");
+  await page.waitForSelector("[data-testid='timezone-search-results'] button");
+  await page.click("[data-testid='timezone-search-results'] button");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='timezone-world-clocks'] article").length === 6);
+  await page.click('[data-testid="timezone-map-controls"] button[aria-label="지도 확대"]');
+  await page.waitForFunction(() => document.querySelector("[data-testid='timezone-map-controls'] output")?.textContent === "150%");
 
   await page.goto(`${koBaseUrl}/tools/payroll-calculator`, { waitUntil: "networkidle0" });
   await page.waitForSelector("[data-testid='payroll-result'] strong");
@@ -300,9 +300,9 @@ try {
 
   await page.goto(`${koBaseUrl}/tools/data-converter`, { waitUntil: "networkidle0" });
   await assertPairedEditors(page, "data-converter");
-  await page.type(".utility-editor-grid textarea", "name,count\nalpha,2\nbeta,3");
+  await page.type("[data-testid='data-converter-input']", "name,count\nalpha,2\nbeta,3");
   await clickButton(page, "표 데이터 변환");
-  await page.waitForFunction(() => document.querySelectorAll(".utility-editor-grid textarea")[1]?.value.includes('"alpha"'));
+  await page.waitForFunction(() => document.querySelector("[data-testid='data-converter-output']")?.value.includes('"alpha"'));
 
   await page.goto(`${koBaseUrl}/tools/image-privacy`, { waitUntil: "networkidle0" });
   const privacyCompatibility = await page.$eval("[data-tool-page='image-privacy'] [data-slot='notice']", (element) => element.textContent);
@@ -390,7 +390,11 @@ try {
 async function clickButton(page, text) { const clicked = await page.evaluate((label) => { const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label)); if (!button) return false; button.click(); return true; }, text); if (!clicked) throw new Error(`Button not found: ${text}`); }
 
 async function assertPairedEditors(page, route) {
-  const selector = route === "text-tools" ? "[data-testid='text-tools-editors']" : route === "text-formatter" ? "[data-testid='formatter-editors']" : ".utility-editor-grid";
+  const selector = route === "text-tools"
+    ? "[data-testid='text-tools-editors']"
+    : route === "text-formatter"
+      ? "[data-testid='formatter-editors']"
+      : "[data-testid='data-converter-editors']";
   const sizes = await page.$eval(selector, (grid) => ({
     cards: Array.from(grid.querySelectorAll(":scope > [data-ui-component='section-card'], :scope > .ui-section-card"), (element) => element.getBoundingClientRect().height),
     textareas: Array.from(grid.querySelectorAll("textarea"), (element) => element.getBoundingClientRect().height),
