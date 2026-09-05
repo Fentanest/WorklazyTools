@@ -1,12 +1,16 @@
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow } from "../../components/ui";
+import { UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
+import { FileDropZone, PageHeader, PrimaryButton, SegmentedControl, ToggleRow } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { cn } from "../../lib/utils";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { BatchImagePanel, CollagePanel, GifPanel } from "./ImageProcessingPanels";
 import { ImageEditorContextMenu } from "./ImageEditorContextMenu";
@@ -58,18 +62,18 @@ export function ImageStudioPage() {
   useEffect(() => () => activeController.current?.abort(), []);
 
   return (
-    <div className="page tool-page page-enter image-studio-page">
+    <UtilityPage toolId="image-studio" className="image-studio-page">
       <PageHeader eyebrow="IMAGE STUDIO" title={t("image.title")} description={t("image.description")}>
         <PrivacyBanner compact />
       </PageHeader>
-      <nav className="studio-tabs" aria-label={t("image.tabs.label")}>
+      <Card as="nav" className="studio-tabs mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0 max-[620px]:grid-cols-2" aria-label={t("image.tabs.label")} data-testid="image-studio-tabs">
         {([
           ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],
-        ] as const).map(([value, label, Icon]) => <button type="button" className={tab === value ? "active" : ""} onClick={() => { activeController.current?.abort(); activeController.current = undefined; setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></button>)}
-      </nav>
+        ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} aria-pressed={tab === value} data-state={tab === value ? "active" : "inactive"} onClick={() => { activeController.current?.abort(); activeController.current = undefined; setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
+      </Card>
 
-      <div className="inline-notice warning image-format-notice"><AlertTriangle size={16} /><span>{t("image.heic")}</span></div>
-      {(tab === "batch" || tab === "collage" || tab === "gif") && <div className="inline-notice warning image-worker-notice"><AlertTriangle size={16} /><span>{t("image.offscreen")}</span></div>}
+      <UtilityNotice className="image-format-notice mb-2"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("image.heic")}</span></UtilityNotice>
+      {(tab === "batch" || tab === "collage" || tab === "gif") && <UtilityNotice className="image-worker-notice mb-2"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("image.offscreen")}</span></UtilityNotice>}
 
       {tab === "editor" && <ImageEditor />}
       {tab === "batch" && <BatchImagePanel progress={progress} controllerRef={activeController} />}
@@ -77,7 +81,7 @@ export function ImageStudioPage() {
       {tab === "gif" && <GifPanel progress={progress} controllerRef={activeController} />}
 
       <OperationProgress {...progress} accent="sky" title={t("image.log")} />
-      {progress.status === "running" && <div className="cancel-operation"><button className="secondary-button" type="button" onClick={() => activeController.current?.abort()}>{t("image.cancel")}</button></div>}
+      {progress.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" variant="secondary" type="button" onClick={() => activeController.current?.abort()}>{t("image.cancel")}</Button></div>}
 
       <ToolGuide
         title={t("image.guide.title")}
@@ -85,7 +89,7 @@ export function ImageStudioPage() {
         blocks={(t("image.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
         faq={(t("image.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
-    </div>
+    </UtilityPage>
   );
 }
 
@@ -272,9 +276,11 @@ function ImageEditor() {
         layerIdsRef.current.set(object, id);
       }
       layerObjectsRef.current.set(id, object);
+      const kind = getEditorLayerKind(object);
       return {
         id,
-        kind: getEditorLayerKind(object),
+        kind,
+        name: object instanceof IText && object.text.trim() ? object.text.trim() : undefined,
         visible: object.visible,
         isBase: object === baseImage.current || (object as EditorFabricObject).worklazyRole === "base",
         active: active.has(object),
@@ -477,6 +483,111 @@ function ImageEditor() {
     clearCropSelection();
     clearEffectSelection();
   }, [clearCropSelection, clearEffectSelection]);
+
+  const setKeyboardRegionSelection = useCallback((mode: "crop" | "effect", selection: RegionSelection) => {
+    const instance = canvas.current;
+    if (!instance) return;
+    const effectMode = mode === "effect";
+    const overlayRef = effectMode ? effectOverlay : cropOverlay;
+    let overlay = overlayRef.current;
+    if (!overlay) {
+      overlay = new Rect({
+        ...selection,
+        originX: "left",
+        originY: "top",
+        fill: effectMode ? "rgba(175,82,222,.14)" : "rgba(10,132,255,.14)",
+        stroke: effectMode ? "#af52de" : "#0a84ff",
+        strokeWidth: 2,
+        strokeDashArray: [9, 6],
+        strokeUniform: true,
+        selectable: !effectMode,
+        evented: !effectMode,
+        excludeFromExport: true,
+      });
+      if (!effectMode) {
+        (overlay as EditorFabricObject).worklazyRole = "crop-overlay";
+        configureCropOverlay(overlay, () => cropRatioRef.current);
+      }
+      overlayRef.current = overlay;
+      instance.add(overlay);
+    }
+    overlay.set({ ...selection, scaleX: 1, scaleY: 1 });
+    overlay.setCoords();
+    if (effectMode) {
+      effectSelectionRef.current = selection;
+      setEffectSelection(selection);
+    } else {
+      cropSelectionRef.current = selection;
+      setCropSelection(selection);
+      instance.setActiveObject(overlay);
+    }
+    instance.requestRenderAll();
+    window.requestAnimationFrame(updateRegionLabelPosition);
+  }, [updateRegionLabelPosition]);
+
+  const handleStageKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    const instance = canvas.current;
+    if (!instance) return;
+    const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    const mode = interactionModeRef.current;
+    if (isRegionMode(mode) && (event.key === "Enter" || arrows.includes(event.key))) {
+      event.preventDefault();
+      event.stopPropagation();
+      const canvasWidth = instance.getWidth();
+      const canvasHeight = instance.getHeight();
+      const ratio = mode === "crop" ? cropRatioRef.current : undefined;
+      const initialWidth = ratio ? Math.min(canvasWidth * 0.5, canvasHeight * 0.5 * ratio) : canvasWidth * 0.5;
+      const initialHeight = ratio ? initialWidth / ratio : canvasHeight * 0.5;
+      const initial: RegionSelection = {
+        left: (canvasWidth - initialWidth) / 2,
+        top: (canvasHeight - initialHeight) / 2,
+        width: Math.max(10, initialWidth),
+        height: Math.max(10, initialHeight),
+      };
+      const current = (mode === "crop" ? cropSelectionRef.current : effectSelectionRef.current) ?? initial;
+      if (event.key === "Enter") {
+        setKeyboardRegionSelection(mode, current);
+        return;
+      }
+      const step = event.altKey ? 1 : 10;
+      let next = { ...current };
+      if (event.shiftKey) {
+        const grow = event.key === "ArrowRight" || event.key === "ArrowDown" ? step : -step;
+        if (ratio) {
+          const proposedWidth = event.key === "ArrowLeft" || event.key === "ArrowRight"
+            ? current.width + grow
+            : (current.height + grow) * ratio;
+          next.width = Math.max(10, Math.min(canvasWidth - current.left, proposedWidth));
+          next.height = Math.max(10, Math.min(canvasHeight - current.top, next.width / ratio));
+          next.width = next.height * ratio;
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          next.width = Math.max(10, Math.min(canvasWidth - current.left, current.width + grow));
+        } else {
+          next.height = Math.max(10, Math.min(canvasHeight - current.top, current.height + grow));
+        }
+      } else {
+        if (event.key === "ArrowLeft") next.left -= step;
+        if (event.key === "ArrowRight") next.left += step;
+        if (event.key === "ArrowUp") next.top -= step;
+        if (event.key === "ArrowDown") next.top += step;
+        next.left = Math.max(0, Math.min(canvasWidth - next.width, next.left));
+        next.top = Math.max(0, Math.min(canvasHeight - next.height, next.top));
+      }
+      setKeyboardRegionSelection(mode, next);
+      return;
+    }
+    if (!arrows.includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = event.shiftKey ? 60 : event.altKey ? 1 : 20;
+    const viewport = [...instance.viewportTransform] as TMat2D;
+    if (event.key === "ArrowLeft") viewport[4] -= step;
+    if (event.key === "ArrowRight") viewport[4] += step;
+    if (event.key === "ArrowUp") viewport[5] -= step;
+    if (event.key === "ArrowDown") viewport[5] += step;
+    applyViewportTransform(instance, viewport);
+  }, [applyViewportTransform, setKeyboardRegionSelection]);
 
   useEffect(() => {
     if (!canvasElement.current) return;
@@ -1424,11 +1535,11 @@ function ImageEditor() {
   const floatingRegionSelection = interactionMode === "crop" ? cropSelection : interactionMode === "effect" ? effectSelection : undefined;
 
   return (
-    <SectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
+    <UtilitySectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
       <FileDropZone files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
-      {editorError && <p className="utility-error" role="alert">{editorError}</p>}
+      {editorError && <UtilityNotice tone="error" role="alert" className="mt-3">{editorError}</UtilityNotice>}
       <ClipboardHint mode="replace" />
-      <div className="editor-source-actions"><button type="button" className="secondary-button" onClick={newBlankCanvas}><ImageIcon size={16} /> {t("image.editor.blank")}</button>{file && <span>{t("image.editor.editing", { name: file.name })}</span>}</div>
+      <div className="editor-source-actions mt-2 flex items-center justify-between gap-2.5"><Button type="button" className="rounded-xl" variant="secondary" onClick={newBlankCanvas}><ImageIcon size={16} /> {t("image.editor.blank")}</Button>{file && <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground">{t("image.editor.editing", { name: file.name })}</span>}</div>
       <ImageEditorToolbar
         activePanel={activePanel}
         hasFile={Boolean(file)}
@@ -1444,7 +1555,7 @@ function ImageEditor() {
         onDelete={() => { removeSelectedLayers(); }}
         onPanelToggle={toggleEditorPanel}
       />
-      <div className={`image-editor-layout${effectivePanelCollapsed ? " is-panel-collapsed" : ""}`} data-testid="image-editor-workspace" data-panel-collapsed={effectivePanelCollapsed}>
+      <div className={cn("image-editor-layout mt-3.5 grid grid-cols-[minmax(0,1fr)_270px] items-start gap-3.5 max-[820px]:grid-cols-1", effectivePanelCollapsed && "is-panel-collapsed grid-cols-1 min-[821px]:[&_.image-editor-panel]:hidden")} data-testid="image-editor-workspace" data-panel-collapsed={effectivePanelCollapsed}>
         <div className="image-editor-canvas-column">
           <ImageEditorViewportControls
             zoom={viewZoom}
@@ -1456,9 +1567,13 @@ function ImageEditor() {
           />
           <div
             ref={stageElement}
-            className={`fabric-stage image-preview-drop${stageDragging ? " is-file-dragging" : ""}${interactionMode === "crop" ? " is-crop-mode" : interactionMode === "effect" ? " is-effect-mode" : ""}`}
+            className={cn("fabric-stage image-preview-drop relative min-w-0 overflow-auto rounded-2xl border border-border bg-[repeating-conic-gradient(#ececf0_0_25%,#f8f8fa_0_50%)] bg-[length:16px_16px] p-3 outline-none focus-visible:border-sky-700 focus-visible:ring-3 focus-visible:ring-sky-700/30 dark:bg-[repeating-conic-gradient(#242426_0_25%,#303033_0_50%)] max-[820px]:overflow-hidden max-[820px]:p-2", stageDragging && "is-file-dragging border-sky-600 shadow-[inset_0_0_0_2px_rgba(21,155,215,.18)]", interactionMode === "crop" ? "is-crop-mode" : interactionMode === "effect" ? "is-effect-mode" : "")}
+            role="region"
             aria-label={t("image.editor.canvasArea")}
+            aria-describedby="image-editor-canvas-keyboard-help"
+            tabIndex={0}
             data-testid="image-editor-canvas-stage"
+            onKeyDown={handleStageKeyDown}
             onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setStageDragging(true); } }}
             onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
             onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setStageDragging(false); }}
@@ -1507,8 +1622,9 @@ function ImageEditor() {
               data-selection-width={floatingRegionSelection.width}
               data-selection-height={floatingRegionSelection.height}
             >{t("image.editor.regionSize", { width: Math.round(floatingRegionSelection.width), height: Math.round(floatingRegionSelection.height) })}</span>}
-            {stageDragging && <span className="image-preview-drop-hint">{t("image.editor.drop")}</span>}
+            {stageDragging && <span className="image-preview-drop-hint absolute inset-2 z-20 grid place-items-center rounded-xl border-2 border-dashed border-sky-600/50 bg-sky-50/95 p-4 text-sm font-extrabold text-sky-700 backdrop-blur-sm dark:bg-sky-950/95 dark:text-sky-300">{t("image.editor.drop")}</span>}
           </div>
+          <p id="image-editor-canvas-keyboard-help" className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("image.editor.canvasKeyboardHelp")}</p>
         </div>
         <ImageEditorPanel
           activePanel={activePanel}
@@ -1572,10 +1688,10 @@ function ImageEditor() {
           onLayerReorder={reorderLayer}
         />
       </div>
-      <div className="export-row image-editor-export-row">
-        <div className="image-editor-export-settings">
-          <div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label={t("image.editor.format")} /><small>{t("image.editor.formatHelp")}</small></div>
-          <div className="image-export-size-control">
+      <div className="export-row image-editor-export-row mt-3.5 grid grid-cols-[minmax(260px,1fr)_minmax(230px,310px)] items-end gap-3 max-[620px]:grid-cols-1">
+        <div className="image-editor-export-settings grid min-w-0 gap-3">
+          <div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label={t("image.editor.format")} /><small className="mt-2 block text-[13px] leading-relaxed text-muted-foreground">{t("image.editor.formatHelp")}</small></div>
+          <Card className="image-export-size-control gap-0 rounded-2xl border border-border bg-muted p-3 py-3 shadow-none ring-0">
             <SegmentedControl
               value={exportMode}
               options={[{ value: "original", label: t("image.editor.exportOriginalQuality") }, { value: "custom", label: t("image.editor.exportCustomSize") }]}
@@ -1591,28 +1707,28 @@ function ImageEditor() {
                 widthLabel={t("image.editor.dimensionWidth")}
                 heightLabel={t("image.editor.dimensionHeight")}
               />
-              <div className="image-export-ratio-toggle"><ToggleRow label={t("image.editor.keepRatio")} description={t("image.editor.exportRatioHelp")} checked={exportRatioLocked} onChange={changeExportRatioLock} /></div>
+              <div className="image-export-ratio-toggle mt-2 overflow-hidden rounded-xl border border-border bg-card [&_[data-ui-component=toggle-row]]:min-h-[46px] [&_[data-ui-component=toggle-row]]:px-2.5 [&_[data-ui-component=toggle-row]]:py-2 [&_small]:text-xs [&_strong]:text-xs"><ToggleRow label={t("image.editor.keepRatio")} description={t("image.editor.exportRatioHelp")} checked={exportRatioLocked} onChange={changeExportRatioLock} /></div>
             </>}
             <p
-              className={originalExportPlan.reduced && exportMode === "original" ? "is-limited" : ""}
+              className={cn("m-0 mt-2 text-xs font-bold leading-relaxed text-muted-foreground", originalExportPlan.reduced && exportMode === "original" && "is-limited text-orange-700 dark:text-orange-300")}
               data-testid="image-editor-export-result"
               data-width={exportResultDimensions.width}
               data-height={exportResultDimensions.height}
               data-limited={originalExportPlan.reduced && exportMode === "original"}
             >{t("image.editor.exportResult", { width: exportResultDimensions.width, height: exportResultDimensions.height })}{originalExportPlan.reduced && exportMode === "original" ? ` ${t("image.editor.exportLimited", { max: EDITOR_EXPORT_MAX_DIMENSION })}` : ""}</p>
-          </div>
+          </Card>
         </div>
-        <PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> {t("image.editor.download")}</PrimaryButton>
+        <div className="w-full" data-testid="image-editor-export-action"><PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> {t("image.editor.download")}</PrimaryButton></div>
       </div>
-    </SectionCard>
+    </UtilitySectionCard>
   );
 }
 
 function ExportDimensionFields({ dimensions, max, testId, onChange, widthLabel, heightLabel }: { dimensions: EditorDimensions; max: number; testId: string; onChange: (axis: keyof EditorDimensions, value: number) => void; widthLabel: string; heightLabel: string }) {
-  return <div className="image-dimension-fields" data-testid={testId} data-width={dimensions.width} data-height={dimensions.height}>
-    <label><span>{widthLabel}</span><input type="number" min={1} max={max} step={1} value={dimensions.width} aria-label={`${widthLabel} (${max})`} data-testid={`${testId}-width`} onChange={(event) => onChange("width", Number(event.target.value))} /></label>
-    <span aria-hidden="true">×</span>
-    <label><span>{heightLabel}</span><input type="number" min={1} max={max} step={1} value={dimensions.height} aria-label={`${heightLabel} (${max})`} data-testid={`${testId}-height`} onChange={(event) => onChange("height", Number(event.target.value))} /></label>
+  return <div className="image-dimension-fields mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1.5" data-testid={testId} data-width={dimensions.width} data-height={dimensions.height}>
+    <label className="grid min-w-0 gap-1 text-[11px] font-bold text-muted-foreground"><span>{widthLabel}</span><UtilityInput className="h-9 px-2 text-[13px] tabular-nums" type="number" min={1} max={max} step={1} value={dimensions.width} aria-label={`${widthLabel} (${max})`} data-testid={`${testId}-width`} onChange={(event) => onChange("width", Number(event.target.value))} /></label>
+    <span className="pb-2 text-[13px] font-extrabold text-muted-foreground" aria-hidden="true">×</span>
+    <label className="grid min-w-0 gap-1 text-[11px] font-bold text-muted-foreground"><span>{heightLabel}</span><UtilityInput className="h-9 px-2 text-[13px] tabular-nums" type="number" min={1} max={max} step={1} value={dimensions.height} aria-label={`${heightLabel} (${max})`} data-testid={`${testId}-height`} onChange={(event) => onChange("height", Number(event.target.value))} /></label>
   </div>;
 }
 

@@ -2,10 +2,13 @@ import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ResultCard, formatBytes } from "../../components/ui";
+import { buttonVariants } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { FileShareButton } from "../../components/FileShareButton";
 import { useAppLanguage } from "../../i18n/routing";
 import type { PdfWorkerResult } from "./types";
 import { featureMessage } from "../../i18n/featureMessages";
+import { cn } from "../../lib/utils";
 
 export interface DownloadResult {
   url: string;
@@ -42,23 +45,23 @@ export function PdfDownloadCard({ result, title, compact = false }: { result: Do
   const displayTitle = title ?? featureMessage(language, "pdf.messages.pdfUi.yourFileIsReady");
   if (compact) {
     return (
-      <section className="pdf-download-compact" aria-live="polite">
-        <div><CheckCircle2 size={18} /><strong>{displayTitle}</strong></div>
-        <a className="result-download accent-violet" href={result.url} download={result.fileName}>
-          <Download size={16} /> <span>{result.fileName}</span><small>{formatBytes(result.size)}</small>
+      <Card as="section" className="pdf-download-compact mt-2.5 gap-0 overflow-visible rounded-2xl border border-violet-300/50 bg-violet-50/70 p-3 py-3 text-muted-foreground shadow-none ring-0 dark:border-violet-900 dark:bg-violet-950/35" aria-live="polite">
+        <div className="flex items-center gap-2 text-green-700 dark:text-green-300"><CheckCircle2 size={18} /><strong className="text-sm text-foreground">{displayTitle}</strong></div>
+        <a className={cn(buttonVariants({ size: "lg" }), "mt-2.5 min-w-0 justify-center rounded-xl bg-violet-700 px-3 font-bold text-white shadow-md shadow-violet-700/20 hover:bg-violet-800")} data-testid="pdf-download" href={result.url} download={result.fileName}>
+          <Download size={16} /> <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{result.fileName}</span><small className="border-l border-white/25 pl-2 text-xs text-white/75">{formatBytes(result.size)}</small>
         </a>
-        <FileShareButton url={result.url} fileName={result.fileName} className="secondary-button pdf-download-share" />
-        {!!result.warnings.length && <div className="result-warnings">{result.warnings.map((warning) => <p key={warning}><AlertTriangle size={13} /> {warning}</p>)}</div>}
-      </section>
+        <FileShareButton url={result.url} fileName={result.fileName} shadcn className="mt-2 min-h-10 w-full justify-center rounded-xl" />
+        {!!result.warnings.length && <div className="mt-3">{result.warnings.map((warning) => <p className="mt-1 flex items-start gap-1 text-[13px] text-amber-800 dark:text-amber-300" key={warning}><AlertTriangle className="mt-0.5 shrink-0" size={13} /> {warning}</p>)}</div>}
+      </Card>
     );
   }
   return (
     <ResultCard accent="violet" title={displayTitle} message={featureMessage(language, "pdf.messages.pdfUi.thisFileWasCreatedInYourBrowserDownload")}>
-      <a className="result-download accent-violet" href={result.url} download={result.fileName}>
-        <Download size={16} /> {result.fileName}<small>{formatBytes(result.size)}</small>
+      <a className={cn(buttonVariants({ size: "lg" }), "mt-3 w-fit max-w-full rounded-xl bg-violet-700 px-3 font-bold text-white shadow-md shadow-violet-700/20 hover:bg-violet-800")} data-testid="pdf-download" href={result.url} download={result.fileName}>
+        <Download size={16} /><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{result.fileName}</span><small className="border-l border-white/25 pl-2 text-xs text-white/75">{formatBytes(result.size)}</small>
       </a>
-      <FileShareButton url={result.url} fileName={result.fileName} />
-      {!!result.warnings.length && <div className="result-warnings">{result.warnings.map((warning) => <p key={warning}><AlertTriangle size={13} /> {warning}</p>)}</div>}
+      <FileShareButton url={result.url} fileName={result.fileName} shadcn className="mt-2 rounded-xl" />
+      {!!result.warnings.length && <div className="mt-3">{result.warnings.map((warning) => <p className="mt-1 flex items-start gap-1 text-[13px] text-amber-800 dark:text-amber-300" key={warning}><AlertTriangle className="mt-0.5 shrink-0" size={13} /> {warning}</p>)}</div>}
     </ResultCard>
   );
 }
@@ -66,7 +69,7 @@ export function PdfDownloadCard({ result, title, compact = false }: { result: Do
 export function PdfError({ message }: { message: string }) {
   const language = useAppLanguage();
   if (!message) return null;
-  return <div className="error-banner" role="alert"><AlertTriangle size={19} /><div><strong>{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span>{message}</span></div></div>;
+  return <div className="mt-4 flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-destructive" data-testid="pdf-error" role="alert"><AlertTriangle className="shrink-0" size={19} /><div className="flex flex-col"><strong className="text-sm">{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span className="mt-1 text-sm leading-relaxed text-muted-foreground">{message}</span></div></div>;
 }
 
 export function normalizeOutputName(value: string, fallback: string) {

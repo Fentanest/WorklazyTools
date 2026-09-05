@@ -8,6 +8,8 @@ import { feature } from "topojson-client";
 import type { Topology } from "topojson-specification";
 import worldAtlas from "world-atlas/countries-110m.json";
 
+import { Button } from "../../components/ui/button";
+import { cn } from "../../lib/utils";
 import { cityName, countryName, type WorldCity } from "./cities";
 
 const MAP_WIDTH = 960;
@@ -81,37 +83,37 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   const mapTransform = `translate(${MAP_WIDTH / 2 + pan.x} ${MAP_HEIGHT / 2 + pan.y}) scale(${zoom}) translate(${-MAP_WIDTH / 2} ${-MAP_HEIGHT / 2})`;
 
   return (
-    <div className="world-map-shell">
-      <div className="world-map-toolbar">
-        <div className="world-map-legend" role="group" aria-label={t("timezone.map.legend")}>
-          <span><i className="selected" /> {t("timezone.map.selected")}</span>
-          <span><i className="base" /> {t("timezone.map.base")}</span>
+    <div className="overflow-hidden rounded-[18px] border border-sky-600/15 bg-[linear-gradient(145deg,rgba(21,155,215,.08),rgba(0,122,255,.025))]" data-testid="timezone-world-map">
+      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-sky-600/15 py-2 pr-2.5 pl-[13px] max-[620px]:items-start">
+        <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-muted-foreground max-[620px]:gap-[7px]" role="group" aria-label={t("timezone.map.legend")}>
+          <span className="inline-flex items-center gap-1.5"><i className="block size-2 rounded-full bg-sky-600 shadow-[0_0_0_3px_rgba(21,155,215,.12)]" /> {t("timezone.map.selected")}</span>
+          <span className="inline-flex items-center gap-1.5"><i className="block size-2 rounded-full bg-orange-500 shadow-[0_0_0_3px_rgba(245,139,0,.12)]" /> {t("timezone.map.base")}</span>
         </div>
-        <div className="world-map-controls" role="group" aria-label={t("timezone.map.controls")}>
-          <button type="button" onClick={() => setZoomLevel(zoom - 0.5)} disabled={zoom <= MIN_ZOOM} aria-label={t("timezone.map.zoomOut")}><Minus size={16} /></button>
-          <output aria-label={t("timezone.map.zoom")}>{Math.round(zoom * 100)}%</output>
-          <button type="button" onClick={() => setZoomLevel(zoom + 0.5)} disabled={zoom >= MAX_ZOOM} aria-label={t("timezone.map.zoomIn")}><Plus size={16} /></button>
-          <button type="button" onClick={resetView} disabled={zoom === 1 && pan.x === 0 && pan.y === 0} aria-label={t("timezone.map.reset")}><RotateCcw size={15} /></button>
+        <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-background p-[3px]" data-testid="timezone-map-controls" role="group" aria-label={t("timezone.map.controls")}>
+          <Button className="size-[29px] rounded-lg text-sky-700 hover:bg-sky-500/10 dark:text-sky-300" size="icon-xs" variant="ghost" type="button" onClick={() => setZoomLevel(zoom - 0.5)} disabled={zoom <= MIN_ZOOM} aria-label={t("timezone.map.zoomOut")}><Minus size={16} /></Button>
+          <output className="min-w-[38px] text-center text-xs font-bold text-muted-foreground" aria-label={t("timezone.map.zoom")}>{Math.round(zoom * 100)}%</output>
+          <Button className="size-[29px] rounded-lg text-sky-700 hover:bg-sky-500/10 dark:text-sky-300" size="icon-xs" variant="ghost" type="button" onClick={() => setZoomLevel(zoom + 0.5)} disabled={zoom >= MAX_ZOOM} aria-label={t("timezone.map.zoomIn")}><Plus size={16} /></Button>
+          <Button className="size-[29px] rounded-lg text-sky-700 hover:bg-sky-500/10 dark:text-sky-300" size="icon-xs" variant="ghost" type="button" onClick={resetView} disabled={zoom === 1 && pan.x === 0 && pan.y === 0} aria-label={t("timezone.map.reset")}><RotateCcw size={15} /></Button>
         </div>
       </div>
 
-      <div className="world-map-canvas">
+      <div className="relative overflow-hidden">
         <svg
           viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
           role="img"
           aria-label={t("timezone.map.aria", { total: cities.length, selected: selectedIds.length, limit: selectionLimit })}
-          className={zoom > 1 ? "is-zoomed" : ""}
+          className={cn("block h-auto w-full touch-pan-y select-none", zoom > 1 && "cursor-grab touch-none active:cursor-grabbing")}
           onPointerDown={startDrag}
           onPointerMove={moveDrag}
           onPointerUp={stopDrag}
           onPointerCancel={stopDrag}
         >
           <defs><clipPath id="world-time-map-clip"><rect width={MAP_WIDTH} height={MAP_HEIGHT} rx="24" /></clipPath></defs>
-          <rect className="world-map-ocean" width={MAP_WIDTH} height={MAP_HEIGHT} rx="24" />
+          <rect className="fill-sky-500/5" width={MAP_WIDTH} height={MAP_HEIGHT} rx="24" />
           <g clipPath="url(#world-time-map-clip)">
-            <g transform={mapTransform} className="world-map-geography" aria-hidden="true">
-              <path className="world-map-graticule" d={graticulePath} />
-              {countryPaths.map((countryPath, index) => <path className="world-map-country" d={countryPath} key={index} />)}
+            <g transform={mapTransform} className="pointer-events-none" aria-hidden="true">
+              <path className="fill-none stroke-sky-600/15 [stroke-width:.8] [vector-effect:non-scaling-stroke]" d={graticulePath} />
+              {countryPaths.map((countryPath, index) => <path className="fill-card stroke-sky-600/25 transition-[fill] [stroke-width:.7] [vector-effect:non-scaling-stroke]" d={countryPath} key={index} />)}
             </g>
             {cities.map((city) => {
               const projected = projection([...city.coordinates]);
@@ -124,7 +126,8 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
               const label = `${cityName(city, language)}, ${countryName(city, language)} · ${local.isValid ? local.toFormat("HH:mm") : t("timezone.map.unavailable")}`;
               return (
                 <g
-                  className={`world-map-pin${isSelected ? " is-selected" : ""}${isBase ? " is-base" : ""}`}
+                  className={cn("group/map-pin cursor-pointer text-muted-foreground outline-none hover:text-sky-600 focus-visible:text-sky-600 dark:hover:text-sky-400 dark:focus-visible:text-sky-400", isSelected && "text-sky-600 dark:text-sky-400", isBase && "text-orange-500 dark:text-orange-300")}
+                  data-testid="timezone-map-pin"
                   transform={`translate(${x} ${y})`}
                   role="button"
                   tabIndex={0}
@@ -138,17 +141,17 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
                     onToggle(city.id);
                   }}
                 >
-                  <circle className="world-map-pin-hit" cy={-8} r={15} />
-                  <path className="world-map-pin-shape" d="M0 2C-1.5-1-7-5.5-7-11a7 7 0 1 1 14 0C7-5.5 1.5-1 0 2Z" />
-                  <circle className="world-map-pin-dot" cy={-11} r={2.4} />
-                  <text y={-22}>{cityName(city, language)} {local.isValid ? local.toFormat("HH:mm") : "--:--"}</text>
+                  <circle className="fill-transparent group-focus-visible/map-pin:fill-sky-500/15 group-focus-visible/map-pin:stroke-sky-600 [stroke-width:1.4]" cy={-8} r={15} />
+                  <path className="fill-current stroke-card [filter:drop-shadow(0_2px_3px_rgba(0,0,0,.18))] [stroke-width:1.6]" d="M0 2C-1.5-1-7-5.5-7-11a7 7 0 1 1 14 0C7-5.5 1.5-1 0 2Z" />
+                  <circle className="pointer-events-none fill-background" cy={-11} r={2.4} />
+                  <text className={cn("pointer-events-none fill-foreground stroke-background text-[13px] font-extrabold opacity-0 transition-opacity [paint-order:stroke] [stroke-width:4px] [text-anchor:middle] group-hover/map-pin:opacity-100 group-focus-visible/map-pin:opacity-100 max-[620px]:text-base", isSelected && "opacity-100")} y={-22}>{cityName(city, language)} {local.isValid ? local.toFormat("HH:mm") : "--:--"}</text>
                 </g>
               );
             })}
           </g>
         </svg>
       </div>
-      <p className="world-map-help">{t("timezone.map.help")}</p>
+      <p className="m-0 border-t border-sky-600/10 px-3 pt-2 pb-2.5 text-center text-xs text-muted-foreground">{t("timezone.map.help")}</p>
     </div>
   );
 }

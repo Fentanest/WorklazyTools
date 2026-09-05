@@ -16,7 +16,9 @@ const koBaseUrl = `${baseUrl}/ko`;
 const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
 const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
 const onlyImageSizing = process.env.TEST_ONLY_IMAGE_SIZING === "1";
-const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing;
+const onlyImageMobile = process.env.TEST_ONLY_IMAGE_MOBILE === "1";
+const onlyImageAccessibility = process.env.TEST_ONLY_IMAGE_ACCESSIBILITY === "1";
+const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing || onlyImageMobile || onlyImageAccessibility;
 const onlyHwp = process.env.TEST_ONLY_HWP === "1";
 const HWP_ROUNDTRIP_SENTINEL = "WL_RHWP_086_SENTINEL";
 const HWP_FIXTURE_SHA256 = "35c590e316c18e7310bb7b2f954b87d32f1d45416179466aee2bebb99d7e706f";
@@ -28,6 +30,7 @@ try {
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
     headless: true,
+    protocolTimeout: 300_000,
     args: ["--no-sandbox", "--disable-dev-shm-usage", "--autoplay-policy=no-user-gesture-required"],
   });
   try {
@@ -49,6 +52,13 @@ try {
     if (onlyHwp) {
       console.log("[1/1] HWP editor and comparison");
       await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
+    } else if (onlyImageMobile) {
+      console.log("[1/1] Image studio mobile interactions");
+      await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+      await testImageStudioMobile(page);
+    } else if (onlyImageAccessibility) {
+      console.log("[1/1] Image studio accessibility alternatives");
+      await testImageStudioAccessibility(page);
     } else if (onlyImageSizing) {
       console.log("[1/1] Image studio sizing and panel");
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
@@ -67,7 +77,10 @@ try {
     const cropMatrix = [];
     for (const transformed of [false, true]) {
       for (const zoom of [1, 2]) {
-        for (const erased of [false, true]) cropMatrix.push(await testImageStudioCropOverlayMatrix(page, { transformed, zoom, erased }));
+        for (const erased of [false, true]) {
+          console.log(`  image: probing P4 crop matrix transformed=${transformed} zoom=${zoom} erased=${erased}`);
+          cropMatrix.push(await testImageStudioCropOverlayMatrix(page, { transformed, zoom, erased }));
+        }
       }
     }
     console.log(`  image: P4 crop overlay matrix ${JSON.stringify(cropMatrix)}`);
@@ -112,47 +125,47 @@ try {
 
 async function testHwpEditor(page, hwpPaths, wordDocx) {
   await page.goto(`${koBaseUrl}/tools/document-compare`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".rhwp-version-notice");
-  const compareVersion = await page.$eval(".rhwp-version-notice", (element) => element.textContent || "");
+  await page.waitForSelector("[data-slot='rhwp-version-notice']");
+  const compareVersion = await page.$eval("[data-slot='rhwp-version-notice']", (element) => element.textContent || "");
   if (!compareVersion.includes("rhwp 0.8.6") || !compareVersion.includes("공식 비교 파일")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
-  let compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  let compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
   await compareInputs[0].uploadFile(hwpPaths[0]);
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 1);
-  compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 1);
+  compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
   await compareInputs[1].uploadFile(wordDocx);
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[1]?.children.length === 1);
-  await page.$eval(".tool-action-bar .primary-button", (button) => button.click());
-  await page.waitForFunction(() => document.querySelector(".error-banner")?.textContent?.includes("Word 문서와 HWP 문서는 서로 비교할 수 없습니다"));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 1);
+  await page.$eval("[data-testid='document-action-bar'] [data-ui-component='primary-button']", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector("[data-tool-page='document-compare'] [role='alert']")?.textContent?.includes("Word 문서와 HWP 문서는 서로 비교할 수 없습니다"));
   await page.evaluate(() => {
-    const lists = document.querySelectorAll(".hwp-sortable-files");
-    const remove = lists[1]?.querySelector(".sortable-file-actions button:last-child");
+    const lists = document.querySelectorAll("[data-testid^='document-file-list-']");
+    const remove = lists[1]?.querySelector("[data-testid='document-file-item'] button:last-child");
     if (!(remove instanceof HTMLButtonElement)) throw new Error("Cross-family test file remove button was not found.");
     remove.click();
   });
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files").length === 1);
-  compareInputs = await page.$$(".hwp-compare-page input[type=file]");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']").length === 1);
+  compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
   await compareInputs[0].uploadFile(hwpPaths[1]);
-  await page.waitForFunction(() => document.querySelectorAll(".hwp-sortable-files")[0]?.children.length === 2);
-  const hwpAddButton = await page.$eval(".hwp-compare-page .drop-zone .secondary-button", (button) => button.textContent || "");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 2);
+  const hwpAddButton = await page.$eval("[data-tool-page='document-compare'] [data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
   if (!hwpAddButton.includes("더 추가")) throw new Error(`HWP comparison does not expose incremental file addition: ${hwpAddButton}`);
-  await page.$eval(".hwp-sortable-files .move-across-button", (button) => button.click());
+  await page.$eval("[data-testid='document-file-item'] button[title]", (button) => button.click());
   await page.waitForFunction(() => {
-    const lists = document.querySelectorAll(".hwp-sortable-files");
+    const lists = document.querySelectorAll("[data-testid^='document-file-list-']");
     return lists.length === 2 && lists[0].children.length === 1 && lists[1].children.length === 1;
   });
-  await page.$eval(".tool-action-bar .primary-button", (button) => button.click());
-  await page.waitForFunction(() => document.querySelector(".operation-progress.status-success") || document.querySelector(".error-banner"), { timeout: 120_000 });
-  const compareError = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
+  await page.$eval("[data-testid='document-action-bar'] [data-ui-component='primary-button']", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success") || document.querySelector("[data-tool-page='document-compare'] [role='alert']"), { timeout: 120_000 });
+  const compareError = await page.$eval("[data-tool-page='document-compare'] [role='alert']", (element) => element.textContent || "").catch(() => "");
   if (compareError) throw new Error(`Unified HWP comparison failed: ${compareError}`);
-  if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 1
-    || await page.$$(".word-pair-result-card .blue-download").then((items) => items.length) !== 1
-    || await page.$$(".word-pair-result-card .tracked-download").then((items) => items.length) !== 0) {
+  if (await page.$$('[data-testid="document-result-card"]').then((items) => items.length) !== 1
+    || await page.$$('[data-testid="document-result-card"] [data-testid="document-excel-download"]').then((items) => items.length) !== 1
+    || await page.$$('[data-testid="document-result-card"] [data-testid="document-tracked-download"]').then((items) => items.length) !== 0) {
     throw new Error("Unified HWP comparison outputs do not match the selected formats.");
   }
-  await page.$eval(".word-pair-result-card .secondary-button", (button) => button.click());
-  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1") && document.querySelector(".comparison-summary"));
+  await page.$eval("[data-testid='document-result-card'] [data-testid='document-view-result']", (button) => button.click());
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1") && document.querySelector("[data-testid='document-result-summary']"));
 
   const forbiddenRhwpRequests = [];
   const recordRhwpRequest = (request) => {
@@ -160,9 +173,9 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   };
   page.on("request", recordRhwpRequest);
   await page.goto(`${koBaseUrl}/tools/hwp-editor`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".rhwp-editor-shell iframe");
-  await page.waitForFunction(() => document.querySelector(".operation-progress.status-success")?.textContent?.includes("편집기를 사용할 수 있습니다"));
-  const runtime = await page.$eval(".rhwp-editor-shell iframe", (iframe) => {
+  await page.waitForSelector("[data-testid='hwp-editor-shell'] iframe");
+  await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success")?.textContent?.includes("편집기를 사용할 수 있습니다"));
+  const runtime = await page.$eval("[data-testid='hwp-editor-shell'] iframe", (iframe) => {
     const url = new URL(iframe.src);
     const csp = iframe.contentDocument?.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute("content") || "";
     const version = iframe.contentDocument?.querySelector('meta[name="rhwp-version"]')?.getAttribute("content") || "";
@@ -172,25 +185,25 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
     || !runtime.csp.includes("connect-src 'self'") || !runtime.csp.includes("font-src 'self'")) {
     throw new Error(`HWP editor is not using the isolated self-hosted runtime: ${JSON.stringify(runtime)}`);
   }
-  await page.waitForSelector(".hwp-tool-page input[type=file]");
-  await (await page.$(".hwp-tool-page input[type=file]")).uploadFile(hwpPaths[0]);
-  await page.waitForSelector(".hwp-tool-page.hwp-editor-focus");
-  const editorDescription = await page.$eval(".hwp-editor-section", (element) => element.textContent || "");
+  await page.waitForSelector("[data-tool-page='hwp-editor'] input[type=file]");
+  await (await page.$("[data-tool-page='hwp-editor'] input[type=file]")).uploadFile(hwpPaths[0]);
+  await page.waitForSelector("[data-testid='hwp-focus-toolbar']");
+  const editorDescription = await page.$eval("[data-ui-component='section-card']:has([data-testid='hwp-editor-shell'])", (element) => element.textContent || "");
   if (!editorDescription.includes("1페이지")) throw new Error(`HWP page count is incorrect: ${editorDescription}`);
   const focusLayout = await page.evaluate(() => {
-    const focus = document.querySelector(".hwp-editor-focus")?.getBoundingClientRect();
+    const focus = document.querySelector("[data-tool-page='hwp-editor']")?.getBoundingClientRect();
     const sidebar = document.querySelector(".sidebar")?.getBoundingClientRect();
-    const shell = document.querySelector(".rhwp-editor-shell")?.getBoundingClientRect();
-    return focus && sidebar && shell ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, hasPageHeader: Boolean(document.querySelector(".hwp-tool-page .page-header")) } : null;
+    const shell = document.querySelector("[data-testid='hwp-editor-shell']")?.getBoundingClientRect();
+    return focus && sidebar && shell ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, hasPageHeader: Boolean(document.querySelector("[data-tool-page='hwp-editor'] .ui-page-header")) } : null;
   });
   if (!focusLayout || focusLayout.focus.left < focusLayout.sidebar.right || focusLayout.focus.right < 1435 || focusLayout.focus.top > 10 || focusLayout.focus.bottom < 895 || focusLayout.shellHeight < focusLayout.focus.bottom - focusLayout.focus.top - 130 || focusLayout.hasPageHeader) {
     throw new Error(`HWP focus layout did not fill the area outside the sidebar: ${JSON.stringify(focusLayout)}`);
   }
   await page.waitForFunction(() => {
-    const button = document.querySelector(".hwp-focus-actions .primary-button");
+    const button = document.querySelector("[data-testid='hwp-save']");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  const editorVersion = await page.$eval(".rhwp-version-notice.compact", (element) => element.textContent || "");
+  const editorVersion = await page.$eval("[data-slot='rhwp-version-notice'][data-compact='true']", (element) => element.textContent || "");
   if (!editorVersion.includes("rhwp 0.8.6") || !editorVersion.includes("이 사이트에 포함")) {
     throw new Error(`HWP editor version notice is incomplete: ${editorVersion}`);
   }
@@ -204,16 +217,16 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
       return window.__worklazyOriginalCreateObjectURL(value);
     };
   });
-  const studioIframe = await page.$(".rhwp-editor-shell iframe");
+  const studioIframe = await page.$("[data-testid='hwp-editor-shell'] iframe");
   const studioFrame = await studioIframe?.contentFrame();
   if (!studioFrame) throw new Error("HWP Studio iframe was not available for round-trip editing.");
   await studioFrame.waitForSelector(".document-page-canvas");
   await studioFrame.click(".document-page-canvas", { offset: { x: 130, y: 130 } });
   await page.keyboard.type(HWP_ROUNDTRIP_SENTINEL, { delay: 10 });
-  await page.click(".hwp-focus-actions .primary-button");
+  await page.click("[data-testid='hwp-save']");
   await page.waitForFunction(() => window.__worklazyCapturedHwpBlob instanceof Blob
-    && document.querySelector(".hwp-focus-actions .primary-button") instanceof HTMLButtonElement
-    && !document.querySelector(".hwp-focus-actions .primary-button").disabled);
+    && document.querySelector("[data-testid='hwp-save']") instanceof HTMLButtonElement
+    && !document.querySelector("[data-testid='hwp-save']").disabled);
   const roundTripBytes = Uint8Array.from(await page.evaluate(async () => Array.from(
     new Uint8Array(await window.__worklazyCapturedHwpBlob.arrayBuffer()),
   )));
@@ -232,9 +245,9 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   const reopenedName = "rhwp-roundtrip-reopened.hwp";
   const reopenedPath = path.join(path.dirname(hwpPaths[0]), reopenedName);
   await fs.writeFile(reopenedPath, roundTripBytes);
-  await (await page.$(".hwp-focus-open input[type=file]")).uploadFile(reopenedPath);
-  await page.waitForFunction((expectedName) => document.querySelector(".hwp-focus-document strong")?.textContent === expectedName
-    && document.querySelector(".hwp-focus-document small")?.textContent?.includes("1페이지"), {}, reopenedName);
+  await (await page.$("[data-testid='hwp-focus-open']")).uploadFile(reopenedPath);
+  await page.waitForFunction((expectedName) => document.querySelector("[data-testid='hwp-focus-document'] strong")?.textContent === expectedName
+    && document.querySelector("[data-testid='hwp-focus-document'] small")?.textContent?.includes("1페이지"), {}, reopenedName);
   console.log(`  hwp: round-trip ${roundTripBytes.byteLength} bytes, ${roundTripStructure.pageCount} page, sentinel parsed and Studio reopened`);
 
   page.off("request", recordRhwpRequest);
@@ -244,10 +257,12 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
 async function testImageStudio(page, imagePaths) {
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4 && document.querySelector(".studio-tabs button")?.textContent?.includes("이미지 편집"));
+  const tabStates = await page.$$eval(".studio-tabs button", (buttons) => buttons.map((button) => button.getAttribute("aria-pressed")));
+  if (tabStates.filter((state) => state === "true").length !== 1 || tabStates.filter((state) => state === "false").length !== 3) throw new Error(`Image Studio modes do not expose their current state: ${JSON.stringify(tabStates)}`);
   await page.waitForSelector(".fabric-stage");
   await dropCanvasImages(page, ".fabric-stage", ["#159bd7"]);
   await page.waitForSelector(".fabric-stage .canvas-container");
-  await page.waitForFunction(() => document.querySelector(".image-studio-page .drop-zone strong")?.textContent?.includes("1개 파일 선택됨"));
+  await page.waitForFunction(() => document.querySelector(".image-studio-page [data-ui-part=drop-target] strong")?.textContent?.includes("1개 파일 선택됨"));
   await page.waitForFunction(() => {
     const canvas = document.querySelector(".fabric-stage .lower-canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
@@ -264,7 +279,7 @@ async function testImageStudio(page, imagePaths) {
     throw new Error(`Unified editor controls are incomplete: ${JSON.stringify(editorControls)}`);
   }
   await page.click('[data-testid="image-editor-panel-canvas"]');
-  await page.click('.image-background-options.compact button[role="switch"]');
+  await page.click('[data-testid="image-editor-options-panel"][data-panel="canvas"] .image-background-options button[role="switch"]');
   await page.waitForFunction(() => {
     const canvas = document.querySelector(".fabric-stage .lower-canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
@@ -494,7 +509,7 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.move(effectBox.x + effectBox.width * 0.42, effectBox.y + effectBox.height * 0.36, { steps: 8 });
   await page.mouse.up();
   await page.waitForSelector('[data-testid="image-editor-effect-selection"]');
-  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-effect-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode") && !document.querySelector('[data-testid="image-editor-effect-selection"]'));
   if (disabledNativeCanvasBlur) {
     await page.evaluate(() => Object.defineProperty(window, "CanvasRenderingContext2D", window.__canvasContextConstructorDescriptor));
@@ -517,6 +532,7 @@ async function testImageStudio(page, imagePaths) {
   await page.click('[data-testid="image-editor-panel-effect"]');
   await page.click('button[aria-label="원본 사진 잠금"]');
   await page.click('[data-testid="image-editor-panel-select"]');
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const transformedBaseCanvas = await page.$(".fabric-stage .upper-canvas");
   const transformedBaseBox = await transformedBaseCanvas?.boundingBox();
   if (!transformedBaseBox) throw new Error("Base canvas is unavailable for transform history");
@@ -548,6 +564,7 @@ async function testImageStudio(page, imagePaths) {
   await page.click('[data-testid="image-editor-panel-effect"]');
   await page.click('button[aria-label="원본 사진 잠금"]');
   await page.click('[data-testid="image-editor-panel-select"]');
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const baseCanvas = await page.$(".fabric-stage .upper-canvas");
   const baseBox = await baseCanvas?.boundingBox();
   if (!baseBox) throw new Error("Image base canvas is unavailable for the layer-order test");
@@ -584,10 +601,10 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.move(overlayBox.x + overlayBox.width * 0.34, overlayBox.y + overlayBox.height * 0.32, { steps: 6 });
   await page.mouse.up();
   await page.waitForSelector('[data-testid="image-editor-effect-selection"]');
-  await page.click(".export-row .primary-button");
+  await page.click('[data-testid="image-editor-export-action"] button');
   const exportWithSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
-  await page.click('[data-testid="image-editor-effect-selection"] .secondary-button');
-  await page.click(".export-row .primary-button");
+  await page.click('[data-testid="image-editor-effect-selection-cancel"]');
+  await page.click('[data-testid="image-editor-export-action"] button');
   const exportWithoutSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
   if (!exportWithSelection || exportWithSelection !== exportWithoutSelection) throw new Error("The region-selection overlay contaminated the raster export");
   console.log("  image: region overlay export verified");
@@ -633,11 +650,11 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.move(cropBox.x + cropBox.width * 0.8, cropBox.y + cropBox.height * 0.8, { steps: 8 });
   await page.mouse.up();
   await page.waitForFunction(() => {
-    const button = document.querySelector('[data-testid="image-editor-crop-selection"] .primary-button');
+    const button = document.querySelector('[data-testid="image-editor-crop-selection-apply"]');
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const freeCropGeometry = await readImageEditorRegionGeometry(page, "crop");
-  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-crop-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-crop-selection"]'));
   if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "100%") throw new Error("Free crop did not reset the canvas view");
   const croppedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
@@ -675,7 +692,7 @@ async function testImageStudio(page, imagePaths) {
   });
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="image-editor-stickers"] button').length === 1
     && document.querySelector('[data-testid="image-editor-stickers"] button')?.getAttribute("data-codepoint") === "1f680");
-  await page.click('[data-testid="image-editor-stickers"] button[data-codepoint="1f680"]');
+  await page.$eval('[data-testid="image-editor-stickers"] button[data-codepoint="1f680"]', (button) => button.click());
   await page.waitForSelector('[data-testid="image-editor-minibar"]');
   const stickerInsert = await page.evaluate(() => ({
     panel: document.querySelector('[data-testid="image-editor-options-panel"]')?.getAttribute("data-panel"),
@@ -689,15 +706,21 @@ async function testImageStudio(page, imagePaths) {
   console.log("  image: categorized sticker search, SVG insertion, and export verified");
   await page.click(".studio-tabs button:nth-child(2)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
-  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 2);
-  await page.waitForFunction(() => !document.querySelector(".image-studio-page .section-actions .primary-button")?.disabled);
-  await page.$eval(".image-studio-page .section-actions .primary-button", (button) => button.scrollIntoView({ block: "center", behavior: "instant" }));
-  await page.click(".image-studio-page .section-actions .primary-button");
+  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page :is(.file-row, [data-ui-component=file-list] > li)").length === 2);
+  await page.waitForFunction(() => !document.querySelector("[data-testid='image-batch-action'] button")?.disabled);
+  await page.$eval("[data-testid='image-batch-action'] button", (button) => button.scrollIntoView({ block: "center", behavior: "instant" }));
+  const batchHitTarget = await page.$eval("[data-testid='image-batch-action'] button", (button) => {
+    const bounds = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+    return { inside: hit === button || Boolean(hit && button.contains(hit)), hit: hit?.outerHTML.slice(0, 240) || "", bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height } };
+  });
+  if (!batchHitTarget.inside) throw new Error(`Image batch action is covered: ${JSON.stringify(batchHitTarget)}`);
+  await page.click("[data-testid='image-batch-action'] button");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Image error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Image error"));
   await page.click(".studio-tabs button:nth-child(3)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
-  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 2);
+  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page :is(.file-row, [data-ui-component=file-list] > li)").length === 2);
   await page.evaluate(() => {
     const labels = Array.from(document.querySelectorAll(".image-settings-grid label"));
     const layout = labels.find((label) => label.querySelector("span")?.textContent === "배치")?.querySelector("select");
@@ -738,10 +761,17 @@ async function testImageStudio(page, imagePaths) {
     return alpha === 0;
   });
   await dropCanvasImages(page, ".collage-preview-stage", ["#34c759"]);
-  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page .file-row").length === 3);
+  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page :is(.file-row, [data-ui-component=file-list] > li)").length === 3);
   await page.click(".studio-tabs button:nth-child(4)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
   await page.waitForFunction(() => document.querySelectorAll(".gif-frame-row").length === 2 && document.querySelectorAll(".gif-frame-drag-handle").length === 2);
+  const gifActionLabels = await page.$$eval(".gif-frame-row", (rows) => rows.map((row) => ({
+    name: row.querySelector("span > span")?.textContent || "",
+    labels: Array.from(row.querySelectorAll("button"), (button) => button.getAttribute("aria-label") || ""),
+  })));
+  if (gifActionLabels.some(({ name, labels }, index) => !name || labels.some((label) => !label.includes(name) || !label.includes(String(index + 1))))) {
+    throw new Error(`GIF actions do not identify their target frame: ${JSON.stringify(gifActionLabels)}`);
+  }
   const initialFrameOrder = await page.$$eval(".gif-frame-row", (rows) => rows.map((row) => row.textContent || ""));
   const firstHandle = await page.$(".gif-frame-row:first-child .gif-frame-drag-handle");
   const secondRow = await page.$(".gif-frame-row:nth-child(2)");
@@ -767,7 +797,7 @@ async function testImageStudioLayersAndSelection(page) {
   // Use the public effect workflow so every layer-order assertion includes the fixed base+effect block.
   await page.click('[data-testid="image-editor-panel-effect"]');
   await dragImageEditorRegion(page, 1);
-  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-effect-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode"));
   await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.objects.some((object) => object.role === "region-effect"));
 
@@ -787,6 +817,24 @@ async function testImageStudioLayersAndSelection(page) {
     || state.layerRows.at(-1)?.movable || !state.layerRows.at(-1)?.deleteDisabled) {
     throw new Error(`Layer panel did not expose the fixed base block and top-to-bottom additional order: ${JSON.stringify(state)}`);
   }
+  const layerActionLabels = await page.$$eval(".image-editor-layer-row", (rows) => rows.map((row, index) => ({
+    index: index + 1,
+    labels: Array.from(row.querySelectorAll("button"), (button) => button.getAttribute("aria-label") || ""),
+  })));
+  if (layerActionLabels.some(({ index, labels }) => labels.some((label) => !label.includes(String(index))))) throw new Error(`Layer actions do not identify their target row: ${JSON.stringify(layerActionLabels)}`);
+
+  const firstMovableId = await page.$eval(".image-editor-layer-row.is-movable", (row) => row.getAttribute("data-layer-id"));
+  const rowOrderBeforeKeyboard = state.layerRows.map((row) => row.id).join(",");
+  await page.focus(`.image-editor-layer-row[data-layer-id="${firstMovableId}"] .image-editor-layer-select`);
+  await page.keyboard.down("Alt");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.up("Alt");
+  await page.waitForFunction((before) => Array.from(document.querySelectorAll(".image-editor-layer-row"), (row) => row.getAttribute("data-layer-id")).join(",") !== before, {}, rowOrderBeforeKeyboard);
+  await page.focus(`.image-editor-layer-row[data-layer-id="${firstMovableId}"] .image-editor-layer-select`);
+  await page.keyboard.down("Alt");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.up("Alt");
+  await page.waitForFunction((expected) => Array.from(document.querySelectorAll(".image-editor-layer-row"), (row) => row.getAttribute("data-layer-id")).join(",") === expected, {}, rowOrderBeforeKeyboard);
 
   // A panel row owns selection without forcing the tool sheet back to Select.
   await page.click('.image-editor-layer-row[data-layer-kind="text"] .image-editor-layer-select');
@@ -849,7 +897,7 @@ async function testImageStudioLayersAndSelection(page) {
   // Minibar and context menu share the same block-aware back clamp.
   await page.click('.image-editor-layer-row:first-child .image-editor-layer-select');
   await page.waitForSelector('[data-testid="image-editor-minibar-back"]');
-  await page.click('[data-testid="image-editor-minibar-back"]');
+  await page.$eval('[data-testid="image-editor-minibar-back"]', (button) => button.click());
   state = await readImageEditorP3State(page);
   if (!state.blockValid || state.additional[0]?.kind !== "triangle") throw new Error(`Minibar back crossed or missed the base block: ${JSON.stringify(state)}`);
   await assertImageEditorUndoRedoOrder(page, "triangle,text,rounded-rect", "text,rounded-rect,triangle", "minibar reorder");
@@ -925,7 +973,7 @@ async function testImageStudioLayersAndSelection(page) {
     await page.waitForFunction((expected) => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === `${expected * 100}%`, {}, zoom);
     for (const alignment of alignments) {
       await configureImageEditorP3Geometry(page, true, ["text", "rounded-rect", "triangle"]);
-      await page.click(`[data-testid="image-editor-align-${alignment}"]`);
+      await page.$eval(`[data-testid="image-editor-align-${alignment}"]`, (button) => button.click());
       state = await readImageEditorP3State(page);
       assertImageEditorAlignment(state.activeObjects, alignment, `zoom ${zoom * 100}%`);
     }
@@ -948,7 +996,7 @@ async function testImageStudioLayersAndSelection(page) {
   state = await readImageEditorP3State(page);
   const beforeCloneCount = state.additional.length;
   const beforeCloneKinds = state.activeKinds.join(",");
-  await page.click('[data-testid="image-editor-minibar-duplicate"]');
+  await page.$eval('[data-testid="image-editor-minibar-duplicate"]', (button) => button.click());
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count + 2), {}, beforeCloneCount);
   state = await readImageEditorP3State(page);
   if (!state.blockValid || state.additional.length !== beforeCloneCount + 2 || state.activeCount !== 2 || state.activeKinds.join(",") !== beforeCloneKinds) {
@@ -1095,13 +1143,13 @@ async function testImageStudioRegionInteractions(page) {
   await loadSyntheticImageEditor(page);
   await page.click('[data-testid="image-editor-panel-crop"]');
   const emptyCropState = await page.$eval('[data-testid="image-editor-crop-selection"]', (status) => {
-    const apply = status.querySelector(".primary-button");
+    const apply = status.querySelector('[data-testid="image-editor-crop-selection-apply"]');
     const reasonId = apply?.getAttribute("aria-describedby") || "";
     const reason = reasonId ? document.getElementById(reasonId) : null;
     return {
       applyExists: apply instanceof HTMLButtonElement,
       disabled: apply instanceof HTMLButtonElement ? apply.disabled : false,
-      accent: apply?.classList.contains("accent-sky"),
+      accent: apply?.getAttribute("data-tone") === "sky",
       reason: reason?.textContent || "",
       reasonVisible: reason instanceof HTMLElement && reason.getBoundingClientRect().height > 0,
     };
@@ -1119,24 +1167,25 @@ async function testImageStudioRegionInteractions(page) {
   await page.mouse.move(liveDrag.end.x, liveDrag.end.y, { steps: 4 });
   await page.waitForFunction((previous) => document.querySelector('[data-testid="image-editor-region-size-label"]')?.textContent !== previous, {}, firstSize);
   const liveCropState = await page.$eval('[data-testid="image-editor-crop-selection"]', (status) => {
-    const apply = status.querySelector(".primary-button");
-    const style = apply ? getComputedStyle(apply) : null;
-    return { text: status.querySelector("span")?.textContent || "", disabled: apply instanceof HTMLButtonElement ? apply.disabled : true, background: style?.backgroundImage || "" };
+    const apply = status.querySelector('[data-testid="image-editor-crop-selection-apply"]');
+    return { text: status.querySelector("span")?.textContent || "", disabled: apply instanceof HTMLButtonElement ? apply.disabled : true, tone: apply?.getAttribute("data-tone") || "" };
   });
-  if (liveCropState.disabled || !liveCropState.text.includes("×") || !liveCropState.background.includes("linear-gradient")) {
+  if (liveCropState.disabled || !liveCropState.text.includes("×") || liveCropState.tone !== "sky") {
     throw new Error(`Live crop size or active accent is missing: ${JSON.stringify(liveCropState)}`);
   }
   await page.mouse.up();
   const cropGeometry = await readImageEditorRegionGeometry(page, "crop");
   if (cropGeometry.error !== 0 || cropGeometry.originX !== "left" || cropGeometry.originY !== "top") throw new Error(`Crop overlay geometry is misaligned: ${JSON.stringify(cropGeometry)}`);
-  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
   await assertRegionModeRetained(page, "crop", "crop cancel");
 
   await dragImageEditorRegion(page, 1);
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
   await page.keyboard.press("Escape");
   await assertRegionModeRetained(page, "crop", "crop Escape");
 
   await dragImageEditorRegion(page, 1);
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
   await page.keyboard.press("Enter");
   await assertCropAppliedToSelect(page, "crop Enter");
 
@@ -1144,10 +1193,10 @@ async function testImageStudioRegionInteractions(page) {
   await page.click('[data-testid="image-editor-panel-crop"]');
   await dragImageEditorRegion(page, 1);
   await page.waitForFunction(() => {
-    const button = document.querySelector('[data-testid="image-editor-crop-selection"] .primary-button');
+    const button = document.querySelector('[data-testid="image-editor-crop-selection-apply"]');
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-crop-selection-apply"]');
   await assertCropAppliedToSelect(page, "crop button");
 
   await loadSyntheticImageEditor(page);
@@ -1167,7 +1216,7 @@ async function testImageStudioRegionInteractions(page) {
   }
   const effectLabelMode = await page.$eval('[data-testid="image-editor-region-size-label"]', (label) => label.getAttribute("data-region-mode"));
   if (effectLabelMode !== "effect") throw new Error(`Effect size label is not attached to the effect box: ${effectLabelMode}`);
-  await page.click('[data-testid="image-editor-effect-selection"] .secondary-button');
+  await page.click('[data-testid="image-editor-effect-selection-cancel"]');
   await assertRegionModeRetained(page, "effect", "effect cancel");
   await dragImageEditorRegion(page, 1);
   await page.keyboard.press("Escape");
@@ -1176,12 +1225,39 @@ async function testImageStudioRegionInteractions(page) {
   await page.goto(`${baseUrl}/en/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector('[data-testid="image-editor-panel-crop"]');
   await page.click('[data-testid="image-editor-panel-crop"]');
-  const englishReason = await page.$eval('[data-testid="image-editor-crop-selection"] .primary-button', (button) => {
+  const englishReason = await page.$eval('[data-testid="image-editor-crop-selection-apply"]', (button) => {
     const description = button.getAttribute("aria-describedby");
     return { disabled: button.disabled, reason: description ? document.getElementById(description)?.textContent || "" : "" };
   });
   if (!englishReason.disabled || englishReason.reason !== "Drag an area on the canvas first.") throw new Error(`English crop disabled reason is invalid: ${JSON.stringify(englishReason)}`);
   console.log(`  image: P4 crop/effect actions and live labels verified (crop error ${cropGeometry.error}px, effect error ${effectGeometry.error}px)`);
+}
+
+async function testImageStudioAccessibility(page) {
+  await loadSyntheticImageEditor(page);
+  const tabStates = await page.$$eval(".studio-tabs button", (buttons) => buttons.map((button) => button.getAttribute("aria-pressed")));
+  if (tabStates.filter((state) => state === "true").length !== 1 || tabStates.filter((state) => state === "false").length !== 3) throw new Error(`Image Studio modes do not expose their current state: ${JSON.stringify(tabStates)}`);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const stageSemantics = await page.$eval('[data-testid="image-editor-canvas-stage"]', (stage) => {
+    const describedBy = stage.getAttribute("aria-describedby") || "";
+    const help = describedBy ? document.getElementById(describedBy) : null;
+    return { role: stage.getAttribute("role"), tabIndex: stage.getAttribute("tabindex"), label: stage.getAttribute("aria-label"), help: help?.textContent || "", helpVisible: help instanceof HTMLElement && help.getBoundingClientRect().height > 0 };
+  });
+  if (stageSemantics.role !== "region" || stageSemantics.tabIndex !== "0" || !stageSemantics.label || !stageSemantics.helpVisible || !stageSemantics.help.includes("Enter")) throw new Error(`Canvas keyboard semantics are incomplete: ${JSON.stringify(stageSemantics)}`);
+  await page.focus('[data-testid="image-editor-canvas-stage"]');
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-region-size-label"][data-region-mode="crop"]'));
+  const keyboardRegionStart = await readImageEditorRegionGeometry(page, "crop");
+  await page.keyboard.press("ArrowRight");
+  const keyboardRegionMoved = await readImageEditorRegionGeometry(page, "crop");
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.up("Shift");
+  const keyboardRegionResized = await readImageEditorRegionGeometry(page, "crop");
+  if (keyboardRegionMoved.selection.left <= keyboardRegionStart.selection.left || keyboardRegionResized.selection.height <= keyboardRegionMoved.selection.height) throw new Error(`Crop keyboard alternative did not move and resize the region: ${JSON.stringify({ keyboardRegionStart, keyboardRegionMoved, keyboardRegionResized })}`);
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
+  await assertRegionModeRetained(page, "crop", "keyboard crop cancel");
+  console.log("  image: keyboard crop create, move, resize, and cancel verified");
 }
 
 async function testImageStudioCropBoxEditing(page) {
@@ -1219,7 +1295,7 @@ async function testImageStudioCropBoxEditing(page) {
     throw new Error(`Crop scale normalization or history isolation failed: ${JSON.stringify({ crop, transformCounts, beforeScale })}`);
   }
   const appliedSelection = crop.selection;
-  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-crop-selection-apply"]');
   const appliedDimensions = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
   const appliedPixels = await readImageRasterStats(page, await captureImageEditorExport(page, "PNG"));
   if (appliedDimensions.width !== Math.round(appliedSelection.width) || appliedDimensions.height !== Math.round(appliedSelection.height) || appliedPixels.control < 1_700) {
@@ -1282,7 +1358,7 @@ async function testImageStudioCropBoxEditing(page) {
   if (JSON.stringify(presetButtons) !== JSON.stringify(["1:1", "4:3", "3:4", "16:9", "9:16", "자유"])) throw new Error(`Crop ratio order is invalid: ${JSON.stringify(presetButtons)}`);
   const ratioCases = [["1:1", 1], ["4:3", 4 / 3], ["3:4", 3 / 4], ["16:9", 16 / 9], ["9:16", 9 / 16]];
   for (const [label, ratio] of ratioCases) {
-    const status = await page.$('[data-testid="image-editor-crop-selection"] .secondary-button');
+    const status = await page.$('[data-testid="image-editor-crop-selection-cancel"]');
     if (status && !(await status.evaluate((button) => button.disabled))) await status.click();
     await clickCropRatio(page, "자유");
     await dragImageEditorRegion(page, 1);
@@ -1307,12 +1383,12 @@ async function testImageStudioCropBoxEditing(page) {
   await clickCropRatio(page, "자유");
   crop = await readImageEditorCropDebug(page);
   if (crop.controls.join(",") !== "bl,br,mb,ml,mr,mt,tl,tr" || crop.activeRatio !== "자유") throw new Error(`Free crop did not restore eight handles: ${JSON.stringify(crop)}`);
-  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
   await clickCropRatio(page, "16:9");
   await dragImageEditorRegion(page, 1);
   crop = await readImageEditorCropDebug(page);
   if (Math.abs(crop.selection.width - crop.selection.height * 16 / 9) > 1) throw new Error(`A preset did not lock a new drag: ${JSON.stringify(crop)}`);
-  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-crop-selection-apply"]');
   await page.click('[data-testid="image-editor-panel-crop"]');
   const retainedRatio = await page.$eval('[data-testid="image-editor-crop-presets"] button.active', (button) => button.textContent?.trim() || "");
   if (retainedRatio !== "16:9") throw new Error(`Applied crop did not retain its ratio state: ${retainedRatio}`);
@@ -1322,7 +1398,7 @@ async function testImageStudioCropBoxEditing(page) {
   await clickCropRatio(page, "9:16");
   const edgeMapping = await getImageEditorSceneMapping(page, 1);
   const edgeStart = mapImageEditorScenePoint(edgeMapping, { x: 899, y: 599 });
-  const edgeEnd = mapImageEditorScenePoint(edgeMapping, { x: 898, y: 598 });
+  const edgeEnd = mapImageEditorScenePoint(edgeMapping, { x: 895, y: 591 });
   await page.mouse.move(edgeStart.x, edgeStart.y);
   await page.mouse.down();
   await page.mouse.move(edgeEnd.x, edgeEnd.y, { steps: 3 });
@@ -1335,14 +1411,14 @@ async function testImageStudioCropBoxEditing(page) {
   }
 
   await clickCropRatio(page, "자유");
-  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
   const squareStart = mapImageEditorScenePoint(edgeMapping, { x: 100, y: 100 });
   const squareEnd = mapImageEditorScenePoint(edgeMapping, { x: 110, y: 110 });
   await page.mouse.move(squareStart.x, squareStart.y);
   await page.mouse.down();
   await page.mouse.move(squareEnd.x, squareEnd.y, { steps: 3 });
   await page.mouse.up();
-  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-crop-selection-apply"]');
   await page.click('[data-testid="image-editor-panel-crop"]');
   const extremePreset = await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => {
     const preset = buttons.find((button) => button.textContent?.trim() === "9:16");
@@ -1363,9 +1439,10 @@ async function testImageStudioCropBoxEditing(page) {
   await page.keyboard.up("Shift");
   crop = await readImageEditorCropDebug(page);
   if (Math.abs(crop.selection.width - crop.selection.height) > 1) throw new Error(`Shift did not lock a free drag to 1:1: ${JSON.stringify(crop)}`);
-  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
-  const altStart = mapImageEditorScenePoint(modifierMapping, { x: 450, y: 300 });
-  const altEnd = mapImageEditorScenePoint(modifierMapping, { x: 560, y: 370 });
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
+  const altMapping = await getImageEditorSceneMapping(page, 1);
+  const altStart = mapImageEditorScenePoint(altMapping, { x: 450, y: 300 });
+  const altEnd = mapImageEditorScenePoint(altMapping, { x: 560, y: 370 });
   await page.keyboard.down("Alt");
   await page.mouse.move(altStart.x, altStart.y);
   await page.mouse.down();
@@ -1387,7 +1464,7 @@ async function testImageStudioCropBoxEditing(page) {
   if (Math.abs(handleCenterAfter.x - handleCenterBefore.x) > 1 || Math.abs(handleCenterAfter.y - handleCenterBefore.y) > 1) {
     throw new Error(`Alt crop handle did not preserve the center: ${JSON.stringify({ handleCenterBefore, handleCenterAfter, crop })}`);
   }
-  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
   await dragImageEditorRegion(page, 1);
   crop = await readImageEditorCropDebug(page);
   await page.keyboard.down("Shift");
@@ -1441,7 +1518,7 @@ async function testImageStudioCropBoxEditing(page) {
   await installImageEditorExportCapture(page);
   const exportWithCrop = await captureImageEditorExport(page, "PNG");
   const afterCropExport = await readImageEditorCropDebug(page);
-  await page.click('[data-testid="image-editor-crop-selection"] .secondary-button');
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
   const exportWithoutCrop = await captureImageEditorExport(page, "PNG");
   if (!exportWithCrop || exportWithCrop !== exportWithoutCrop || !afterCropExport || afterCropExport.count !== 1 || !afterCropExport.active) {
     throw new Error(`Crop overlay contaminated export or lost editability: ${JSON.stringify({ exportMatch: exportWithCrop === exportWithoutCrop, afterCropExport })}`);
@@ -1482,12 +1559,12 @@ async function testImageStudioSizingAndPanel(page) {
 
   await page.click('[data-testid="image-editor-panel-effect"]');
   await dragImageEditorRegion(page, 1);
-  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-effect-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-effect-selection"]'));
   await page.click('[data-testid="image-editor-panel-shapes"]');
   await page.click('[data-testid="image-editor-shape-rounded-rect"]');
   await page.click('[data-testid="image-editor-panel-select"]');
-  await page.click('button[aria-label="오른쪽으로 90도 회전"]');
+  await page.$eval('button[aria-label="오른쪽으로 90도 회전"]', (button) => button.click());
   await new Promise((resolve) => setTimeout(resolve, 180));
   const beforeResample = await readImageEditorSizingDebug(page);
   if (!beforeResample.base || !beforeResample.effect || !beforeResample.shape || beforeResample.shape.angle !== 90) {
@@ -1579,7 +1656,7 @@ async function testImageStudioSizingAndPanel(page) {
 
   await loadSyntheticImageEditor(page, { width: 1800, height: 1200 });
   await installImageEditorExportCapture(page);
-  await clickImageEditorOption(page, ".image-export-size-control .segmented-control", "크기 지정");
+  await clickImageEditorOption(page, ".image-export-size-control .ui-segmented-control", "크기 지정");
   await setImageEditorNumber(page, "image-editor-export-size-width", 600);
   let exportSize = await readDimensionFields(page, "image-editor-export-size");
   if (exportSize.width !== 600 || exportSize.height !== 400) throw new Error(`Locked custom export did not preserve ratio: ${JSON.stringify(exportSize)}`);
@@ -1636,7 +1713,7 @@ async function testImageStudioSizingAndPanel(page) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const before = await readImageEditorPanelLayout(page);
-    await page.click('[data-testid="image-editor-panel-toggle"]');
+    await page.$eval('[data-testid="image-editor-panel-toggle"]', (button) => button.click());
     await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "true");
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const after = await readImageEditorPanelLayout(page);
@@ -1645,14 +1722,14 @@ async function testImageStudioSizingAndPanel(page) {
       throw new Error(`Collapsible panel did not expand the ${width}px canvas workspace: ${JSON.stringify({ width, before, after })}`);
     }
     if (before.minibar && after.minibar && Math.hypot(after.minibar.left - before.minibar.left, after.minibar.top - before.minibar.top) > 5) minibarRecalculated = true;
-    await page.click('[data-testid="image-editor-panel-toggle"]');
+    await page.$eval('[data-testid="image-editor-panel-toggle"]', (button) => button.click());
     await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "false");
   }
   if (!minibarRecalculated) throw new Error("The floating minibar did not recalculate after the panel width changed");
 
   await page.setViewport({ width: 1020, height: 900, deviceScaleFactor: 1 });
   console.log("  image: probing collapsible panel session and mobile overrides");
-  await page.click('[data-testid="image-editor-panel-toggle"]');
+  await page.$eval('[data-testid="image-editor-panel-toggle"]', (button) => button.click());
   await page.waitForFunction(() => sessionStorage.getItem("worklazy:image-editor-panel-collapsed") === "1");
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "true");
@@ -1666,7 +1743,7 @@ async function testImageStudioSizingAndPanel(page) {
   if (mobilePanel.panelDisplay === "none" || !mobilePanel.toggleDisabled) throw new Error(`390px panel did not remain visible: ${JSON.stringify(mobilePanel)}`);
   await page.setViewport({ width: 821, height: 900, deviceScaleFactor: 1 });
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-workspace"]')?.getAttribute("data-panel-collapsed") === "true");
-  await page.click('[data-testid="image-editor-panel-toggle"]');
+  await page.$eval('[data-testid="image-editor-panel-toggle"]', (button) => button.click());
   await page.waitForFunction(() => sessionStorage.getItem("worklazy:image-editor-panel-collapsed") === "0");
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
   await page.goto(`${baseUrl}/en/tools/image-studio`, { waitUntil: "domcontentloaded" });
@@ -1694,15 +1771,16 @@ async function testImageStudioCropOverlayMatrix(page, { transformed, zoom, erase
   const before = await readImageRasterStats(page, await captureImageEditorExport(page, "PNG"));
   await page.click('[data-testid="image-editor-panel-crop"]');
   await dragImageEditorRegion(page, zoom);
+  await setImageEditorCropSelection(page, { left: 280, top: 180, width: 340, height: 240 });
   await page.waitForFunction(() => {
-    const button = document.querySelector('[data-testid="image-editor-crop-selection"] .primary-button');
+    const button = document.querySelector('[data-testid="image-editor-crop-selection-apply"]');
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const geometry = await readImageEditorRegionGeometry(page, "crop");
   if (geometry.error !== 0 || geometry.originX !== "left" || geometry.originY !== "top" || !geometry.inkInside) {
     throw new Error(`Crop matrix overlay does not match its stored region: ${JSON.stringify({ transformed, zoom, erased, geometry })}`);
   }
-  await page.click('[data-testid="image-editor-crop-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-crop-selection-apply"]');
   await assertCropAppliedToSelect(page, `matrix ${transformed}/${zoom}/${erased}`);
   const dimensions = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
   const savedError = Math.max(Math.abs(dimensions.width - Math.round(geometry.selection.width)), Math.abs(dimensions.height - Math.round(geometry.selection.height)));
@@ -1747,7 +1825,7 @@ async function loadSyntheticImageEditor(page, dimensions = { width: 600, height:
     canvas.width = 1;
     canvas.height = 1;
   }, dimensions);
-  await page.waitForFunction(() => document.querySelector(".image-studio-page .drop-zone strong")?.textContent?.includes("1개 파일 선택됨"));
+  await page.waitForFunction(() => document.querySelector(".image-studio-page [data-ui-part=drop-target] strong")?.textContent?.includes("1개 파일 선택됨"));
   await page.waitForFunction(() => {
     const canvas = document.querySelector(".fabric-stage .lower-canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
@@ -2270,7 +2348,7 @@ async function transformImageEditorBase(page) {
   await page.mouse.move(start.x + 30 * mapping.scaleX, start.y + 20 * mapping.scaleY, { steps: 5 });
   await page.mouse.up();
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"));
-  await page.click('button[aria-label="오른쪽으로 90도 회전"]');
+  await page.$eval('button[aria-label="오른쪽으로 90도 회전"]', (button) => button.click());
   await page.click('button[aria-label="좌우 반전"]');
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const transform = await page.evaluate(() => {
@@ -2301,9 +2379,11 @@ async function transformImageEditorBase(page) {
 
 async function getImageEditorSceneMapping(page, zoom) {
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
-  const canvas = await page.$(".fabric-stage .upper-canvas");
-  const bounds = await canvas?.boundingBox();
-  if (!bounds) throw new Error("Image editor canvas is unavailable");
+  const bounds = await page.$eval(".fabric-stage .upper-canvas", (canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+  });
+  if (bounds.width <= 0 || bounds.height <= 0) throw new Error("Image editor canvas is unavailable");
   const logical = await page.$eval(".fabric-stage .lower-canvas", (element) => ({ width: element.width / devicePixelRatio, height: element.height / devicePixelRatio }));
   return { bounds, logical, zoom, scaleX: bounds.width / logical.width, scaleY: bounds.height / logical.height };
 }
@@ -2332,6 +2412,20 @@ async function dragImageEditorRegion(page, zoom) {
   await page.waitForSelector('[data-testid="image-editor-region-size-label"]');
 }
 
+async function setImageEditorCropSelection(page, selection) {
+  await readImageEditorP3State(page);
+  await page.evaluate((nextSelection) => {
+    const canvas = window.__imageEditorFabricCanvas;
+    const overlay = canvas?.getObjects().find((object) => object.worklazyRole === "crop-overlay");
+    if (!canvas || !overlay) throw new Error("Crop overlay is unavailable for the exact pixel matrix");
+    overlay.set({ ...nextSelection, scaleX: 1, scaleY: 1 });
+    overlay.setCoords();
+    canvas.fire("object:modified", { target: overlay });
+    canvas.requestRenderAll();
+  }, selection);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
 async function assertRegionModeRetained(page, mode, action) {
   await page.waitForFunction((expectedMode) => {
     const panel = document.querySelector('[data-testid="image-editor-options-panel"]');
@@ -2339,7 +2433,7 @@ async function assertRegionModeRetained(page, mode, action) {
     const toolbar = document.querySelector(`[data-testid="image-editor-panel-${expectedMode}"]`);
     const selection = document.querySelector(`[data-testid="image-editor-${expectedMode === "crop" ? "crop" : "effect"}-selection"]`);
     const hasSelection = expectedMode === "crop"
-      ? selection?.querySelector(".primary-button") instanceof HTMLButtonElement && !selection.querySelector(".primary-button").disabled
+      ? selection?.querySelector('[data-testid="image-editor-crop-selection-apply"]') instanceof HTMLButtonElement && !selection.querySelector('[data-testid="image-editor-crop-selection-apply"]').disabled
       : Boolean(selection);
     return panel?.getAttribute("data-panel") === expectedMode && stage?.classList.contains(`is-${expectedMode}-mode`) && toolbar?.getAttribute("aria-pressed") === "true"
       && !hasSelection && !document.querySelector('[data-testid="image-editor-region-size-label"]');
@@ -2595,9 +2689,17 @@ async function captureImageEditorExport(page, format) {
     option.click();
   }, format);
   await page.evaluate(() => { window.__worklazyExportDataUrl = ""; });
-  await page.click(".export-row .primary-button");
+  await page.click('[data-testid="image-editor-export-action"] button');
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const dataUrl = await page.evaluate(() => window.__worklazyExportDataUrl);
-  if (!dataUrl) throw new Error(`${format} export was not captured`);
+  if (!dataUrl) {
+    const state = await page.evaluate(() => ({
+      error: document.querySelector('[role="alert"]')?.textContent || "",
+      button: document.querySelector('[data-testid="image-editor-export-action"] button')?.outerHTML || "",
+      format: Array.from(document.querySelectorAll(".image-format-control button"), (button) => ({ text: button.textContent?.trim(), pressed: button.getAttribute("aria-pressed") })),
+    }));
+    throw new Error(`${format} export was not captured: ${JSON.stringify(state)}`);
+  }
   return dataUrl;
 }
 
@@ -2623,7 +2725,7 @@ async function testImageStudioEffectStrength(page, deviceScaleFactor, zoom) {
     canvas.width = 1;
     canvas.height = 1;
   });
-  await page.waitForFunction(() => document.querySelector(".image-studio-page .drop-zone strong")?.textContent?.includes("1개 파일 선택됨"), { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelector(".image-studio-page [data-ui-part=drop-target] strong")?.textContent?.includes("1개 파일 선택됨"), { timeout: 15_000 });
   await page.evaluate(() => {
     window.__worklazyExportDataUrl = "";
     const originalClick = HTMLAnchorElement.prototype.click;
@@ -2654,7 +2756,7 @@ async function testImageStudioEffectStrength(page, deviceScaleFactor, zoom) {
   await page.mouse.move(bounds.x + bounds.width * rightRatio, bounds.y + bounds.height * 0.65, { steps: 8 });
   await page.mouse.up();
   await page.waitForSelector('[data-testid="image-editor-effect-selection"]', { timeout: 15_000 });
-  await page.click('[data-testid="image-editor-effect-selection"] .primary-button');
+  await page.click('[data-testid="image-editor-effect-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-effect-selection"]'));
   const dataUrl = await captureImageEditorExport(page, "PNG");
   const medianRun = await page.evaluate(async (source, matrixZoom) => {
@@ -2850,7 +2952,6 @@ async function testImageStudioMobile(page) {
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   touchCanvasBounds = await (await page.$(".fabric-stage .upper-canvas"))?.boundingBox();
   if (!touchCanvasBounds) throw new Error("Mobile canvas is unavailable for one-finger object movement");
-  const objectStart = { x: touchCanvasBounds.x + touchCanvasBounds.width * (230 / 900), y: touchCanvasBounds.y + touchCanvasBounds.height * (190 / 600), id: 3, radiusX: 6, radiusY: 6, force: 1 };
   const minibarBeforeSingleTouch = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
   const inspectBlueShape = (canvas) => {
     const context = canvas.getContext("2d");
@@ -2867,8 +2968,21 @@ async function testImageStudioMobile(page) {
     return { dataUrl: canvas.toDataURL(), width: canvas.width, height: canvas.height, bounds: { minX, minY, maxX, maxY } };
   };
   const canvasBeforeSingleTouch = await page.$eval(".fabric-stage .lower-canvas", inspectBlueShape);
+  const movementCandidateClients = [0.75, 0.5, 0.25].flatMap((yRatio) => [0.5, 0.25, 0.75].map((xRatio) => ({
+    x: touchCanvasBounds.x + (canvasBeforeSingleTouch.bounds.minX + (canvasBeforeSingleTouch.bounds.maxX - canvasBeforeSingleTouch.bounds.minX) * xRatio) / canvasBeforeSingleTouch.width * touchCanvasBounds.width,
+    y: touchCanvasBounds.y + (canvasBeforeSingleTouch.bounds.minY + (canvasBeforeSingleTouch.bounds.maxY - canvasBeforeSingleTouch.bounds.minY) * yRatio) / canvasBeforeSingleTouch.height * touchCanvasBounds.height,
+  })));
+  const movementStart = await page.evaluate((candidates) => candidates.find(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains("upper-canvas")), movementCandidateClients);
+  if (!movementStart) throw new Error(`Selected object has no unobscured canvas point for one-finger movement: ${JSON.stringify({ bounds: canvasBeforeSingleTouch.bounds, touchCanvasBounds })}`);
+  const objectStart = {
+    ...movementStart,
+    id: 3,
+    radiusX: 6,
+    radiusY: 6,
+    force: 1,
+  };
   await touchClient.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [objectStart] });
-  const objectMoved = { ...objectStart, x: objectStart.x + 10, y: objectStart.y + 80 };
+  const objectMoved = { ...objectStart, x: objectStart.x + 40 };
   await touchClient.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [objectMoved] });
   await touchClient.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -2880,9 +2994,22 @@ async function testImageStudioMobile(page) {
     throw new Error(`One-finger object movement was intercepted by stage gestures: ${JSON.stringify({ minibarBeforeSingleTouch, minibarAfterSingleTouch, canvasChanged: canvasBeforeSingleTouch.dataUrl !== canvasAfterSingleTouch.dataUrl, beforeBounds: canvasBeforeSingleTouch.bounds, afterBounds: canvasAfterSingleTouch.bounds, objectStart, touchCanvasBounds })}`);
   }
 
+  await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  touchCanvasBounds = await (await page.$(".fabric-stage .upper-canvas"))?.boundingBox();
+  if (!touchCanvasBounds) throw new Error("Mobile canvas is unavailable for object-to-pinch arbitration");
+  const blueBounds = canvasAfterSingleTouch.bounds;
+  const candidatePixels = [0.5, 0.25, 0.75].flatMap((yRatio) => [0.5, 0.25, 0.75].map((xRatio) => ({
+    x: blueBounds.minX + (blueBounds.maxX - blueBounds.minX) * xRatio,
+    y: blueBounds.minY + (blueBounds.maxY - blueBounds.minY) * yRatio,
+  })));
+  const candidateClients = candidatePixels.map((point) => ({
+    x: touchCanvasBounds.x + point.x / canvasAfterSingleTouch.width * touchCanvasBounds.width,
+    y: touchCanvasBounds.y + point.y / canvasAfterSingleTouch.height * touchCanvasBounds.height,
+  }));
+  const visibleObjectPoint = await page.evaluate((candidates) => candidates.find(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains("upper-canvas")), candidateClients);
+  if (!visibleObjectPoint) throw new Error(`Selected object has no visible canvas point for pinch arbitration: ${JSON.stringify({ blueBounds, touchCanvasBounds })}`);
   const transformStart = {
-    x: touchCanvasBounds.x + ((canvasAfterSingleTouch.bounds.minX + canvasAfterSingleTouch.bounds.maxX) / 2) / canvasAfterSingleTouch.width * touchCanvasBounds.width,
-    y: touchCanvasBounds.y + ((canvasAfterSingleTouch.bounds.minY + canvasAfterSingleTouch.bounds.maxY) / 2) / canvasAfterSingleTouch.height * touchCanvasBounds.height,
+    ...visibleObjectPoint,
     id: 4,
     radiusX: 6,
     radiusY: 6,
@@ -2898,7 +3025,7 @@ async function testImageStudioMobile(page) {
     touchPoints: [{ ...transformMove, x: transformMove.x - 30, y: transformMove.y - 12 }, { ...transformSecond, x: transformSecond.x + 44, y: transformSecond.y + 18 }],
   });
   await touchClient.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await page.waitForFunction(() => parseInt(document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent || "0", 10) > 150);
+  await page.waitForFunction(() => parseInt(document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent || "0", 10) > 150, { timeout: 15_000 });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.$eval('[data-testid="image-editor-fit"]', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
@@ -2961,7 +3088,7 @@ async function testAudioStudio(page, audioPath) {
   await page.goto(`${koBaseUrl}/tools/audio-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".audio-studio-page input[type=file]");
   await (await page.$(".audio-studio-page input[type=file]")).uploadFile(audioPath);
-  await page.waitForFunction(() => document.querySelector(".operation-progress.status-success")?.textContent?.includes("파형 준비 완료"), { timeout: 60_000 });
+  await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success")?.textContent?.includes("파형 준비 완료"), { timeout: 60_000 });
   await page.waitForFunction(() => {
     const host = document.querySelector(".audio-waveform");
     return Boolean(host?.firstElementChild?.shadowRoot?.querySelector("canvas"));
@@ -2988,7 +3115,7 @@ async function testAudioStudio(page, audioPath) {
   const durationBeforeEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
   await page.$eval(".audio-voice-presets button:nth-child(2)", (button) => button.click());
   await page.waitForFunction(() => document.querySelector(".audio-voice-presets button:nth-child(2)")?.getAttribute("aria-checked") === "true");
-  await page.click(".audio-voice-effect-actions .secondary-button");
+  await page.click(".audio-effect-preview-button");
   await waitForAudioSuccess(page, "미리 듣기 준비 완료", 120_000);
   const effectPreview = await page.$eval(".audio-effect-preview audio", async (audio) => {
     const context = new AudioContext();
@@ -3007,18 +3134,18 @@ async function testAudioStudio(page, audioPath) {
   if (!effectPreview.src.startsWith("blob:") || effectPreview.frequency < 620 || effectPreview.frequency > 700) {
     throw new Error(`Pitch preview was not shifted by about four semitones: ${JSON.stringify(effectPreview)}`);
   }
-  await page.click(".audio-voice-effect-actions .primary-button");
+  await page.click(".audio-voice-effect-actions [data-ui-component=primary-button]");
   await waitForAudioSuccess(page, "음성 효과 적용 완료", 120_000);
   const durationAfterEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
   if (durationAfterEffect !== durationBeforeEffect) throw new Error(`Pitch effect changed the document duration: ${durationBeforeEffect} -> ${durationAfterEffect}`);
   await page.$eval(".audio-voice-presets button:nth-child(4)", (button) => button.click());
   await page.waitForFunction(() => document.querySelector(".audio-voice-presets button:nth-child(4)")?.getAttribute("aria-checked") === "true");
-  await page.click(".audio-voice-effect-actions .secondary-button");
+  await page.click(".audio-effect-preview-button");
   await waitForAudioSuccess(page, "미리 듣기 준비 완료");
   if (!(await page.$eval(".audio-effect-preview audio", (audio) => audio.src.startsWith("blob:")))) throw new Error("Robot voice preview was not created.");
 
   await clickAudioAction(page, "복사");
-  await page.waitForFunction(() => document.querySelector(".audio-clipboard-status.has-clip")?.textContent?.includes("오디오 클립보드"));
+  await page.waitForFunction(() => document.querySelector(".audio-clipboard-status[data-has-clip='true']")?.textContent?.includes("오디오 클립보드"));
   await clickAudioAction(page, "구간 음소거");
   await waitForAudioSuccess(page, "음소거 중 완료");
   const undoEnabled = await page.$$eval(".audio-edit-toolbar button", (buttons) => {
@@ -3030,6 +3157,7 @@ async function testAudioStudio(page, audioPath) {
   await page.keyboard.press("z");
   await page.keyboard.up("Control");
   await waitForAudioSuccess(page, "실행 취소 완료");
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".audio-edit-toolbar button")).some((button) => button.textContent?.includes("다시 실행") && !button.disabled));
   await page.keyboard.down("Control");
   await page.keyboard.down("Shift");
   await page.keyboard.press("z");
@@ -3058,11 +3186,11 @@ async function testAudioStudio(page, audioPath) {
       return window.__audioOriginalAnchorClick.call(this);
     };
   });
-  await page.evaluate(() => document.querySelector(".audio-studio-page .section-actions .primary-button")?.click());
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes(".wav"), { timeout: 60_000 });
-  await page.evaluate(() => document.querySelector('.audio-export-settings .segmented-control button:nth-child(2)')?.click());
-  await page.evaluate(() => document.querySelector(".audio-studio-page .section-actions .primary-button")?.click());
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes(".mp3"), { timeout: 120_000 });
+  await page.evaluate(() => document.querySelector("[data-testid='audio-export-actions'] [data-ui-component='primary-button']")?.click());
+  await page.waitForFunction(() => document.querySelector("[data-testid='audio-result']")?.textContent?.includes(".wav"), { timeout: 60_000 });
+  await page.evaluate(() => document.querySelector('.audio-export-settings .ui-segmented-control button:nth-child(2)')?.click());
+  await page.evaluate(() => document.querySelector("[data-testid='audio-export-actions'] [data-ui-component='primary-button']")?.click());
+  await page.waitForFunction(() => document.querySelector("[data-testid='audio-result']")?.textContent?.includes(".mp3"), { timeout: 120_000 });
   const downloads = await page.evaluate(() => {
     const captured = window.__audioDownloads;
     HTMLAnchorElement.prototype.click = window.__audioOriginalAnchorClick;
@@ -3090,7 +3218,7 @@ async function clickAudioAction(page, label) {
 }
 
 async function waitForAudioSuccess(page, text, timeout = 60_000) {
-  await page.waitForFunction((expected) => document.querySelector(".operation-progress.status-success")?.textContent?.includes(expected), { timeout }, text);
+  await page.waitForFunction((expected) => document.querySelector(".ui-operation-progress.ui-status-success")?.textContent?.includes(expected), { timeout }, text);
 }
 
 async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroughPaths, largeAudioIncompatibleVideo, targetAudioIncompatibleVideo, videoIncompatibleVideo, dolbyVisionVideo) {
@@ -3116,8 +3244,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     googleAnalytics: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
     naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
     googlePageViewQueued: (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"),
-    engine: document.querySelector(".video-engine-status")?.textContent || "",
-    guideEyebrow: document.querySelector(".tool-guide .eyebrow")?.textContent || "",
+    engine: document.querySelector("[data-testid=video-runtime-status]")?.textContent || "",
+    guideEyebrow: document.querySelector("[data-ui-component=tool-guide] .ui-tool-guide-heading > div > p")?.textContent || "",
   }));
   if (!isolation.marker || isolation.ads || !isolation.googleAnalytics || !isolation.naverAnalytics || !isolation.googlePageViewQueued
     || !isolation.engine.includes("멀티스레드") || isolation.engine.includes("광고") || isolation.engine.includes("실행 문서")
@@ -3141,7 +3269,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[0]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 1);
   await page.waitForFunction(() => document.querySelector(".video-card-footer")?.textContent?.includes("FPS 확인 중"));
-  const exportDuringFpsProbe = await page.$eval(".video-studio-page .section-actions .primary-button", (button) => ({ disabled: button.disabled, text: button.textContent || "" }));
+  const exportDuringFpsProbe = await page.$eval("[data-testid=video-output-actions] [data-ui-component=primary-button]", (button) => ({ disabled: button.disabled, text: button.textContent || "" }));
   if (exportDuringFpsProbe.disabled) throw new Error(`Supplemental FPS probing still blocks export: ${JSON.stringify(exportDuringFpsProbe)}`);
   await page.waitForFunction(() => Array.from(document.querySelectorAll('.video-boundary-stepper button')).every((button) => button.getAttribute("aria-label")?.includes("1프레임")));
   page.off("request", delayVideoProbe);
@@ -3154,7 +3282,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     playableCount: Array.from(document.querySelectorAll(".multi-video-grid video")).filter((video) => video.readyState >= 1).length,
   }));
   if (previewState.fallbackCount || previewState.playableCount !== 2) throw new Error(`Browser video previews were covered after FFmpeg metadata probing: ${JSON.stringify(previewState)}`);
-  const addButton = await page.$eval(".video-studio-page .drop-zone .secondary-button", (button) => button.textContent || "");
+  const addButton = await page.$eval(".video-studio-page [data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
   if (!addButton.includes("더 추가")) throw new Error(`Video studio does not expose incremental file addition: ${addButton}`);
   const outputLimit = await page.$eval(".video-output-limit", (element) => element.textContent || "");
   if (!outputLimit.includes("1GB 이하") || !outputLimit.includes("1.5GB")) throw new Error(`Video output limit is not explicit: ${outputLimit}`);
@@ -3209,15 +3337,15 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForFunction((start) => Number(document.querySelector('.video-trim-lane [data-trim-boundary="start"] input[type="number"]')?.value) < start, {}, adjustedFineTrim.start);
   const rangeState = await page.$eval(".video-range-control", (element) => ({
     handles: element.querySelectorAll('input[type="range"]').length,
-    start: element.style.getPropertyValue("--range-start"),
-    end: element.style.getPropertyValue("--range-end"),
+    start: element.querySelector(".video-range-selection")?.style.left || "",
+    end: element.querySelector(".video-range-selection")?.style.right || "",
   }));
   if (rangeState.handles !== 2 || !rangeState.start || rangeState.start === "0%" || !rangeState.end) throw new Error(`Combined range track was not updated: ${JSON.stringify(rangeState)}`);
   const passthroughOption = await page.$eval('.video-bitrate-control select', (select) => ({ value: select.value, text: select.selectedOptions[0]?.textContent }));
   if (passthroughOption.value !== "copy" || !passthroughOption.text?.includes("패스스루")) throw new Error(`Pass-through trim was not selected: ${JSON.stringify(passthroughOption)}`);
   const encodingOptions = await page.evaluate(() => ({
     video: Array.from(document.querySelectorAll('.video-bitrate-control option')).map((option) => option.textContent),
-    audioModes: Array.from(document.querySelectorAll('.video-audio-settings .segmented-control button')).map((button) => button.textContent),
+    audioModes: Array.from(document.querySelectorAll('.video-audio-settings .ui-segmented-control button')).map((button) => button.textContent),
   }));
   if (!encodingOptions.video.some((label) => label?.includes("직접입력")) || encodingOptions.audioModes.join("|") !== "원본 음성 복사|음성 제거|호환 형식 변환") {
     throw new Error(`Video/audio encoding controls are incomplete: ${JSON.stringify(encodingOptions)}`);
@@ -3252,10 +3380,10 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     select.value = "copy";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".operation-progress.status-running");
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Video error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Video error"));
   const firstResultState = await page.$$eval(".video-result-item", (elements) => elements.map((element) => ({
     text: element.textContent || "",
     href: element.querySelector("a")?.getAttribute("href") || "",
@@ -3267,8 +3395,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (videoStreamWorkerRequests.length < 4) throw new Error(`The direct-copy worker was not loaded on demand for preflight and output: ${JSON.stringify(videoStreamWorkerRequests)}`);
   if (await page.$(".audio-handoff-button")) throw new Error("Audio studio handoff was shown for a video result.");
   const progressFontSizes = await page.evaluate(() => ({
-    message: Number.parseFloat(getComputedStyle(document.querySelector(".operation-current-message")).fontSize),
-    log: Number.parseFloat(getComputedStyle(document.querySelector(".operation-log li")).fontSize),
+    message: Number.parseFloat(getComputedStyle(document.querySelector(".ui-operation-current-message")).fontSize),
+    log: Number.parseFloat(getComputedStyle(document.querySelector(".ui-operation-log li")).fontSize),
   }));
   if (progressFontSizes.message < 10 || progressFontSizes.log < 9) {
     throw new Error(`Progress and error guidance fonts are still too small: ${JSON.stringify(progressFontSizes)}`);
@@ -3276,9 +3404,9 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
 
   const streamRequestsBeforeEncoding = videoStreamWorkerRequests.length;
   await page.evaluate(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
-    const audioRemove = document.querySelector(".video-audio-settings .segmented-control button:nth-child(2)");
-    const flip = document.querySelector(".encoding-grid button[role=switch]");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
+    const audioRemove = document.querySelector(".video-audio-settings .ui-segmented-control button:nth-child(2)");
+    const flip = document.querySelector("[data-testid=video-encoding-settings] button[role=switch]");
     if (!(selects[0] instanceof HTMLSelectElement) || !(selects[1] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement)
       || !(selects[4] instanceof HTMLSelectElement) || !(audioRemove instanceof HTMLButtonElement)
       || !(flip instanceof HTMLButtonElement)) throw new Error("Streaming encoding controls are unavailable");
@@ -3297,15 +3425,15 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     window.__videoProgressHistory = [];
     window.__videoProgressObserver?.disconnect();
     window.__videoProgressObserver = new MutationObserver(() => {
-      const value = Number(document.querySelector('.operation-progress [role="progressbar"]')?.getAttribute("aria-valuenow"));
+      const value = Number(document.querySelector('.ui-operation-progress [role="progressbar"]')?.getAttribute("aria-valuenow"));
       if (Number.isFinite(value) && window.__videoProgressHistory.at(-1) !== value) window.__videoProgressHistory.push(value);
     });
     window.__videoProgressObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-valuenow"] });
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".operation-progress.status-running");
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Streaming video encoding error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Streaming video encoding error"));
   const encodedVideoState = await page.evaluate(async () => {
     const anchors = Array.from(document.querySelectorAll(".video-result-item a"));
     const dimensions = [];
@@ -3322,12 +3450,12 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
       video.load();
     }
     window.__videoProgressObserver?.disconnect();
-    const progress = Array.from(document.querySelectorAll(".operation-log li"), (item) => Number((item.textContent || "").match(/(\d+)%/)?.[1])).filter(Number.isFinite);
+    const progress = Array.from(document.querySelectorAll(".ui-operation-log li"), (item) => Number((item.textContent || "").match(/(\d+)%/)?.[1])).filter(Number.isFinite);
     const history = window.__videoProgressHistory || [];
     return {
       count: anchors.length,
       dimensions,
-      finalProgress: document.querySelector('.operation-progress [role="progressbar"]')?.getAttribute("aria-valuenow"),
+      finalProgress: document.querySelector('.ui-operation-progress [role="progressbar"]')?.getAttribute("aria-valuenow"),
       progressRows: progress,
       progressHistory: history,
       progressMonotonic: history.length > 0 && history.every((value, index) => index === 0 || value >= history[index - 1]),
@@ -3342,7 +3470,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   }
   await page.evaluate(() => {
     const bitrate = document.querySelector(".video-bitrate-control select");
-    const audioCopy = document.querySelector(".video-audio-settings .segmented-control button:nth-child(1)");
+    const audioCopy = document.querySelector(".video-audio-settings .ui-segmented-control button:nth-child(1)");
     if (!(bitrate instanceof HTMLSelectElement) || !(audioCopy instanceof HTMLButtonElement)) throw new Error("Video reset controls are unavailable");
     bitrate.value = "copy";
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3355,9 +3483,9 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     output.value = "mp3";
     output.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.waitForSelector(".audio-encoding-fields");
+  await page.waitForSelector("[data-testid=video-audio-encoding-fields]");
   await page.evaluate(() => {
-    const selects = document.querySelectorAll(".audio-encoding-fields select");
+    const selects = document.querySelectorAll("[data-testid=video-audio-encoding-fields] select");
     const bitrate = selects[0];
     const sampleRate = selects[1];
     if (!(bitrate instanceof HTMLSelectElement) || !(sampleRate instanceof HTMLSelectElement)) throw new Error("Audio encoding selects are unavailable");
@@ -3372,13 +3500,13 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   const customAudioState = await page.evaluate(() => ({
     bitrate: document.querySelector('input[aria-label="오디오 비트레이트 직접입력"]')?.value,
     sampleRate: document.querySelector('input[aria-label="오디오 샘플레이트 직접입력"]')?.value,
-    disabled: document.querySelector(".video-studio-page .section-actions .primary-button")?.disabled,
+    disabled: document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.disabled,
   }));
   if (customAudioState.bitrate !== "160" || customAudioState.sampleRate !== "44100" || customAudioState.disabled) throw new Error(`Custom audio settings were not accepted: ${JSON.stringify(customAudioState)}`);
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".operation-progress.status-running");
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Audio extraction error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Audio extraction error"));
   const rawVideoMessages = await page.$$eval(".video-studio-page *", (elements) => elements
     .filter((element) => element.children.length === 0 && element.textContent?.includes("__worklazy_i18n__:"))
     .map((element) => element.textContent).slice(0, 5));
@@ -3400,8 +3528,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   const audioPage = await waitForNewPage(page.browser(), existingPages);
   audioPage.setDefaultTimeout(120_000);
   await audioPage.waitForSelector(".audio-studio-page");
-  await audioPage.waitForFunction(() => document.querySelector(".operation-progress.status-success, .operation-progress.status-error"));
-  if (await audioPage.$(".operation-progress.status-error")) throw new Error(await audioPage.$eval(".operation-current-message", (element) => element.textContent || "Audio handoff error"));
+  await audioPage.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success, .ui-operation-progress.ui-status-error"));
+  if (await audioPage.$(".ui-operation-progress.ui-status-error")) throw new Error(await audioPage.$eval(".ui-operation-current-message", (element) => element.textContent || "Audio handoff error"));
   const handoffState = await audioPage.evaluate(() => ({
     summary: document.querySelector(".audio-file-summary")?.textContent || "",
     search: location.search,
@@ -3418,13 +3546,13 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForSelector(".video-audio-settings");
   await page.evaluate(() => {
     const bitrate = document.querySelector('.video-bitrate-control select');
-    const reencode = document.querySelector('.video-audio-settings .segmented-control button:nth-child(3)');
+    const reencode = document.querySelector('.video-audio-settings .ui-segmented-control button:nth-child(3)');
     if (!(bitrate instanceof HTMLSelectElement) || !(reencode instanceof HTMLButtonElement)) throw new Error("Video audio re-encoding controls are unavailable");
     bitrate.value = "copy";
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
     reencode.click();
   });
-  await page.waitForSelector(".video-audio-settings .audio-encoding-fields");
+  await page.waitForSelector(".video-audio-settings [data-testid=video-audio-encoding-fields]");
   await page.evaluate(() => {
     const select = document.querySelectorAll(".video-group-select select")[1];
     if (!(select instanceof HTMLSelectElement)) throw new Error("Second video group selector is unavailable");
@@ -3432,11 +3560,11 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await page.waitForFunction(() => document.querySelectorAll(".video-sync-group").length === 2);
-  await page.evaluate(() => document.querySelectorAll('.video-group-output-mode .segmented-control button:nth-child(2)').forEach((button) => button.click()));
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".operation-progress.status-running");
+  await page.evaluate(() => document.querySelectorAll('.video-group-output-mode .ui-segmented-control button:nth-child(2)').forEach((button) => button.click()));
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Video concat error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Video concat error"));
   const groupedResults = await page.$$eval(".video-result-item", (elements) => elements.map((element) => element.textContent || ""));
   if (groupedResults.length !== 2) throw new Error(`Grouped concat did not expose two individual results: ${JSON.stringify(groupedResults)}`);
   const resultStorageState = await inspectVideoResultStorage(page);
@@ -3453,7 +3581,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     throw new Error(`Video ZIP worker loaded before ZIP creation: ${JSON.stringify(videoZipWorkerRequests)}`);
   }
   await page.evaluate(() => Array.from(document.querySelectorAll(".video-result-actions button")).find((button) => button.textContent?.includes("ZIP으로 묶기"))?.click());
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("worklazy-비디오-결과-2개.zip"), { timeout: 60_000 });
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("worklazy-비디오-결과-2개.zip"), { timeout: 60_000 });
   page.off("request", captureVideoRequests);
   if (videoZipWorkerRequests.length !== 1) {
     throw new Error(`Video ZIP worker request count is not one: ${JSON.stringify(videoZipWorkerRequests)}`);
@@ -3500,7 +3628,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     player.currentTime = player.duration * 0.2;
     player.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
   });
-  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1")?.querySelectorAll(".multi-video-grid article")[1]?.classList.contains("active"));
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1")?.querySelectorAll(".multi-video-grid article")[1]?.getAttribute("data-active") === "true");
   await page.waitForFunction(() => {
     const group = Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1");
     const player = group?.querySelectorAll("video")[1];
@@ -3549,11 +3677,11 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     const checkbox = group10?.querySelector("input");
     if (!(checkbox instanceof HTMLInputElement) || !checkbox.checked) throw new Error("Group 10 range target is unavailable");
     checkbox.click();
-    const apply = panel?.querySelector(".video-group-range-copy-actions .primary-button");
+    const apply = panel?.querySelector("[data-testid=video-apply-group-ranges]");
     if (!(apply instanceof HTMLButtonElement)) throw new Error("Apply ranges button is unavailable");
     const style = getComputedStyle(apply);
-    if (apply.disabled || !style.backgroundImage.includes("linear-gradient") || Number(style.opacity) < 0.9) {
-      throw new Error(`Apply ranges button does not look active: ${JSON.stringify({ disabled: apply.disabled, background: style.backgroundImage, opacity: style.opacity })}`);
+    if (apply.disabled || apply.dataset.slot !== "button" || style.backgroundColor === "rgba(0, 0, 0, 0)" || apply.getBoundingClientRect().height < 34 || Number(style.opacity) < 0.9) {
+      throw new Error(`Apply ranges button does not look active: ${JSON.stringify({ disabled: apply.disabled, slot: apply.dataset.slot, background: style.backgroundColor, height: apply.getBoundingClientRect().height, opacity: style.opacity })}`);
     }
     apply.click();
   });
@@ -3583,7 +3711,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-group-title strong")).some((element) => element.textContent === "그룹 10"));
 
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largeVideoPath);
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("메모리에 통째로 복사하지 않고 연결했습니다"));
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("메모리에 통째로 복사하지 않고 연결했습니다"));
   const largeReadState = await page.evaluate(() => window.__videoFileReadState);
   if (largeReadState.arrayBufferReads !== 0) throw new Error(`A 3824MB source triggered a contiguous ArrayBuffer read: ${JSON.stringify(largeReadState)}`);
 
@@ -3596,29 +3724,50 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largePassThroughPaths[1]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
+  await page.evaluate(() => {
+    window.__videoActiveStageEvidence = { spinner: false, nonFinalRow: false };
+    window.__videoActiveStageObserver?.disconnect();
+    window.__videoActiveStageObserver = new MutationObserver(() => {
+      const log = document.querySelector(".ui-operation-log");
+      const current = log?.querySelector("li.ui-current");
+      if (current?.querySelector("svg.animate-spin")) {
+        window.__videoActiveStageEvidence.spinner = true;
+        if (current !== log.lastElementChild) window.__videoActiveStageEvidence.nonFinalRow = true;
+      }
+    });
+    window.__videoActiveStageObserver.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
+  });
   page.once("dialog", (dialog) => void dialog.accept());
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".operation-progress.status-running");
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Large pass-through error"));
-  const largePassThroughState = await page.evaluate(() => ({
-    outputs: document.querySelectorAll(".video-result-item").length,
-    transfer: window.__videoWorkerTransferState,
-    logs: Array.from(document.querySelectorAll(".operation-log li")).map((item) => item.textContent || ""),
-  }));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Large pass-through error"));
+  const largePassThroughState = await page.evaluate(() => {
+    window.__videoActiveStageObserver?.disconnect();
+    return {
+      outputs: document.querySelectorAll(".video-result-item").length,
+      transfer: window.__videoWorkerTransferState,
+      logs: Array.from(document.querySelectorAll(".ui-operation-log li")).map((item) => item.textContent || ""),
+      activeStage: window.__videoActiveStageEvidence,
+      progressSlot: document.querySelector('.ui-operation-progress [role="progressbar"]')?.getAttribute("data-slot"),
+    };
+  });
   if (largePassThroughState.outputs !== 2
     || largePassThroughState.transfer.startContainsFile
     || largePassThroughState.transfer.inputFileSizes.length !== 4
+    || !largePassThroughState.activeStage?.spinner
+    || !largePassThroughState.activeStage?.nonFinalRow
+    || largePassThroughState.progressSlot !== "progress"
     || largePassThroughState.logs.length > 14
     || largePassThroughState.logs.some((message) => !/(?:^|\D)\d+%(?:\D|$)/.test(message))
     || !largePassThroughState.logs.some((message) => message.includes("원본 화질"))
     || !largePassThroughState.logs.some((message) => message.includes("호환됩니다"))) {
     throw new Error(`Large pass-through did not use incremental worker input: ${JSON.stringify(largePassThroughState)}`);
   }
-  console.log(`  video: 512MiB×2 total 1GiB sparse integration smoke, ${largePassThroughState.logs.length} bounded progress rows with percentages`);
+  console.log(`  video: 512MiB×2 total 1GiB sparse integration smoke, ${largePassThroughState.logs.length} bounded progress rows with percentages, active non-final stage spinner observed`);
 
   await testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAudioIncompatibleVideo, videoIncompatibleVideo);
   await testDolbyVisionGuidance(page, dolbyVisionVideo);
@@ -3629,18 +3778,18 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[0]);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const mobilePassthroughDefaults = await page.evaluate(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
     return {
       bitrate: document.querySelector(".video-bitrate-control select")?.value,
       resolution: selects[2]?.value,
       aspect: selects[3]?.value,
       rotation: selects[4]?.value,
-      actionDisabled: document.querySelector(".video-studio-page .section-actions .primary-button")?.disabled,
-      notice: Array.from(document.querySelectorAll(".video-studio-page .inline-notice"), (element) => element.textContent || "").find((text) => text.includes("모바일")) || "",
+      actionDisabled: document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.disabled,
+      notice: Array.from(document.querySelectorAll(".video-studio-page [data-slot=notice]"), (element) => element.textContent || "").find((text) => text.includes("모바일")) || "",
     };
   });
   if (mobilePassthroughDefaults.bitrate !== "copy" || mobilePassthroughDefaults.resolution !== "source" || mobilePassthroughDefaults.aspect !== "source"
@@ -3650,7 +3799,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     throw new Error(`Mobile pass-through defaults are invalid: ${JSON.stringify(mobilePassthroughDefaults)}`);
   }
   await page.evaluate(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
     const bitrate = document.querySelector(".video-bitrate-control select");
     if (!(bitrate instanceof HTMLSelectElement) || !(selects[2] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement) || !(selects[4] instanceof HTMLSelectElement)) throw new Error("Mobile encoding controls are unavailable");
     bitrate.value = "0";
@@ -3665,8 +3814,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await page.waitForFunction(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return selects[2]?.value === "source" && selects[3]?.value === "source" && selects[4]?.value === "0" && button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
@@ -3678,28 +3827,28 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largeAudioIncompatibleVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".video-audio-removal-suggestion", { timeout: 60_000 });
-  const suggestion = await page.$eval(".video-audio-removal-suggestion", (element) => element.textContent || "");
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".video-audio-mode-suggestion[data-removal-only=true]", { timeout: 60_000 });
+  const suggestion = await page.$eval(".video-audio-mode-suggestion[data-removal-only=true]", (element) => element.textContent || "");
   if (!suggestion.includes("음향 형식") || !suggestion.includes("음향 제외") || suggestion.includes("변환")) {
     throw new Error(`Audio-only copy guidance is incorrect: ${suggestion}`);
   }
-  await page.click(".video-audio-removal-suggestion button");
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 제외를 적용했습니다"));
+  await page.click(".video-audio-mode-suggestion[data-removal-only=true] [data-testid=video-audio-remove-suggestion]");
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("음향 제외를 적용했습니다"));
   page.once("dialog", (dialog) => void dialog.accept());
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".operation-progress.status-running");
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) {
-    throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Large audio-removal copy error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) {
+    throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Large audio-removal copy error"));
   }
   const audioRemovalResult = await page.evaluate(() => ({
     outputs: document.querySelectorAll(".video-result-item").length,
-    suggestion: Boolean(document.querySelector(".video-audio-removal-suggestion")),
-    log: Array.from(document.querySelectorAll(".operation-log li"), (item) => item.textContent || ""),
+    suggestion: Boolean(document.querySelector(".video-audio-mode-suggestion[data-removal-only=true]")),
+    log: Array.from(document.querySelectorAll(".ui-operation-log li"), (item) => item.textContent || ""),
   }));
   if (audioRemovalResult.outputs !== 1 || audioRemovalResult.suggestion
     || !audioRemovalResult.log.some((message) => message.includes("원본 화질"))) {
@@ -3712,27 +3861,27 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
     await page.waitForSelector(".video-studio-page input[type=file]");
     await (await page.$(".video-studio-page input[type=file]")).uploadFile(targetAudioIncompatibleVideo);
     await page.waitForFunction(() => {
-      const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+      const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
       return button instanceof HTMLButtonElement && !button.disabled;
     });
     await page.select(".video-bitrate-control select", "2M");
-    await page.click(".video-studio-page .section-actions .primary-button");
+    await page.click("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     await page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 });
     const targetSuggestion = await page.$eval(".video-audio-mode-suggestion", (element) => ({
       text: element.textContent || "",
-      primary: element.querySelector(".video-audio-encode-suggestion")?.textContent || "",
-      secondary: element.querySelector(".video-audio-suggestion-actions .secondary-button")?.textContent || "",
+      primary: element.querySelector("[data-testid=video-audio-encode-suggestion]")?.textContent || "",
+      secondary: element.querySelector("[data-testid=video-audio-remove-suggestion]")?.textContent || "",
     }));
     if (!targetSuggestion.text.includes("음향 형식") || !targetSuggestion.primary.includes("음향 변환") || !targetSuggestion.secondary.includes("음향 제외")) {
       throw new Error(`Target E-AC-3 CTA is incomplete: ${JSON.stringify(targetSuggestion)}`);
     }
-    await page.click(mode === "encode" ? ".video-audio-encode-suggestion" : ".video-audio-suggestion-actions .secondary-button");
-    await page.waitForFunction((expected) => document.querySelector(".inline-success")?.textContent?.includes(expected), {}, mode === "encode" ? "음향 변환을 적용했습니다" : "음향 제외를 적용했습니다");
-    await page.click(".video-studio-page .section-actions .primary-button");
-    await page.waitForSelector(".operation-progress.status-running");
+    await page.click(mode === "encode" ? "[data-testid=video-audio-encode-suggestion]" : "[data-testid=video-audio-remove-suggestion]");
+    await page.waitForFunction((expected) => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes(expected), {}, mode === "encode" ? "음향 변환을 적용했습니다" : "음향 제외를 적용했습니다");
+    await page.click("[data-testid=video-output-actions] [data-ui-component=primary-button]");
+    await page.waitForSelector(".ui-operation-progress.ui-status-running");
     await waitForTerminalStatus(page);
-    if (await page.$(".operation-progress.status-error")) {
-      throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Target E-AC-3 processing error"));
+    if (await page.$(".ui-operation-progress.ui-status-error")) {
+      throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Target E-AC-3 processing error"));
     }
     if (await page.$$eval(".video-result-item", (elements) => elements.length) !== 1) {
       throw new Error(`Target E-AC-3 ${mode} mode did not create one result`);
@@ -3744,7 +3893,7 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoIncompatibleVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.select(".video-bitrate-control select", "custom");
@@ -3755,10 +3904,10 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
-  await page.waitForSelector(".operation-progress.status-error", { timeout: 60_000 });
-  const videoGuidance = await page.$eval(".operation-current-message", (element) => element.textContent || "");
-  if (!videoGuidance.includes("원본 화면 형식") || !videoGuidance.includes("1.5GB") || await page.$(".video-audio-removal-suggestion")) {
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
+  await page.waitForSelector(".ui-operation-progress.ui-status-error", { timeout: 60_000 });
+  const videoGuidance = await page.$eval(".ui-operation-current-message", (element) => element.textContent || "");
+  if (!videoGuidance.includes("원본 화면 형식") || !videoGuidance.includes("1.5GB") || await page.$(".video-audio-mode-suggestion[data-removal-only=true]")) {
     throw new Error(`Video-codec copy guidance was not kept separate: ${videoGuidance}`);
   }
   console.log("  video: 2GB+ E-AC-3 remove-audio route and target-encode dvhe capacity guidance verified");
@@ -3770,13 +3919,13 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.click(".video-studio-page .section-actions .primary-button");
+  await page.click("[data-testid=video-output-actions] [data-ui-component=primary-button]");
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) {
-    throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision copy isolation error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) {
+    throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision copy isolation error"));
   }
   const copyIsolation = await page.evaluate(() => ({
     outputs: document.querySelectorAll(".video-result-item").length,
@@ -3792,13 +3941,13 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.evaluate(() => {
     const bitrate = document.querySelector(".video-bitrate-control select");
-    const codec = document.querySelectorAll(".encoding-grid select")[1];
-    const audioCopy = document.querySelector(".video-audio-settings .segmented-control button:nth-child(1)");
+    const codec = document.querySelectorAll("[data-testid=video-encoding-settings] select")[1];
+    const audioCopy = document.querySelector(".video-audio-settings .ui-segmented-control button:nth-child(1)");
     if (!(bitrate instanceof HTMLSelectElement) || !(codec instanceof HTMLSelectElement) || !(audioCopy instanceof HTMLButtonElement)) {
       throw new Error("Dolby Vision target controls are unavailable");
     }
@@ -3808,7 +3957,7 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
     codec.dispatchEvent(new Event("change", { bubbles: true }));
     audioCopy.click();
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   const firstOutcome = await Promise.race([
     page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 }).then(() => "suggestion"),
     waitForTerminalStatus(page).then(() => "terminal"),
@@ -3816,8 +3965,8 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   const suggestionAvailable = await page.$(".video-audio-mode-suggestion");
   if (firstOutcome === "terminal" && !suggestionAvailable) {
     await waitForTerminalStatus(page);
-    if (await page.$(".operation-progress.status-error")) {
-      throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision fallback error"));
+    if (await page.$(".ui-operation-progress.ui-status-error")) {
+      throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision fallback error"));
     }
     const notice = await page.$$eval(".video-route-guidance", (elements) => elements.map((element) => element.textContent || "").join(" "));
     const fallbackOutputs = await page.$$eval(".video-result-item", (elements) => elements.length);
@@ -3831,17 +3980,17 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 });
   const suggestion = await page.$eval(".video-audio-mode-suggestion", (element) => ({
     text: element.textContent || "",
-    primary: element.querySelector(".video-audio-encode-suggestion")?.textContent || "",
-    secondary: element.querySelector(".secondary-button")?.textContent || "",
+    primary: element.querySelector("[data-testid=video-audio-encode-suggestion]")?.textContent || "",
+    secondary: element.querySelector("[data-testid=video-audio-remove-suggestion]")?.textContent || "",
   }));
   if (!suggestion.text.includes("음향 형식") || !suggestion.primary.includes("음향 변환") || !suggestion.secondary.includes("음향 제외")) {
     throw new Error(`Dolby Vision E-AC-3 target CTA is incomplete: ${JSON.stringify(suggestion)}`);
   }
-  await page.click(".video-audio-encode-suggestion");
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 변환을 적용했습니다"));
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.click("[data-testid=video-audio-encode-suggestion]");
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("음향 변환을 적용했습니다"));
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision encode error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision encode error"));
   const encoded = await page.evaluate(() => ({
     outputs: document.querySelectorAll(".video-result-item").length,
     guidance: Array.from(document.querySelectorAll(".video-route-result-guidance"), (element) => element.textContent || "").join(" "),
@@ -3855,20 +4004,20 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions .primary-button");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.evaluate(() => {
     const bitrate = document.querySelector(".video-bitrate-control select");
-    const audioRemove = document.querySelector(".video-audio-settings .segmented-control button:nth-child(2)");
+    const audioRemove = document.querySelector(".video-audio-settings .ui-segmented-control button:nth-child(2)");
     if (!(bitrate instanceof HTMLSelectElement) || !(audioRemove instanceof HTMLButtonElement)) throw new Error("Dolby Vision remove controls are unavailable");
     bitrate.value = "2M";
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
     audioRemove.click();
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions .primary-button")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await waitForTerminalStatus(page);
-  if (await page.$(".operation-progress.status-error")) throw new Error(await page.$eval(".operation-current-message", (element) => element.textContent || "Dolby Vision remove error"));
+  if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision remove error"));
   console.log("  video: Dolby Vision base-layer target H.264 encode with E-AC-3 conversion CTA and remove mode verified");
 }
 
@@ -3942,13 +4091,13 @@ async function waitForNewPage(browser, existingPages) {
 
 async function waitForTerminalStatus(page) {
   try {
-    await page.waitForFunction(() => document.querySelector(".operation-progress.status-success, .operation-progress.status-error"), { timeout: 60_000 });
+    await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success, .ui-operation-progress.ui-status-error"), { timeout: 60_000 });
   } catch (error) {
     const state = await page.evaluate(() => ({
       url: location.href,
-      progressClass: document.querySelector(".operation-progress")?.className,
-      message: document.querySelector(".operation-current-message")?.textContent,
-      logs: Array.from(document.querySelectorAll(".operation-log li")).map((item) => item.textContent),
+      progressClass: document.querySelector(".ui-operation-progress")?.className,
+      message: document.querySelector(".ui-operation-current-message")?.textContent,
+      logs: Array.from(document.querySelectorAll(".ui-operation-log li")).map((item) => item.textContent),
       page: document.querySelector(".video-studio-page")?.textContent?.slice(0, 200),
       document: document.documentElement.outerHTML.slice(0, 500),
     }));

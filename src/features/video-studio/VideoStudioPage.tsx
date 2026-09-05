@@ -18,7 +18,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
+import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
+import { FileDropZone, PageHeader, PrimaryButton, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import type {
   GroupOutputMode,
@@ -641,30 +644,34 @@ export function VideoStudioPage() {
   };
 
   return (
-    <div className="page tool-page page-enter video-studio-page">
+    <UtilityPage toolId="video-studio" className="video-studio-page">
       <PageHeader eyebrow="VIDEO STUDIO" title={featureMessage(language, "video.messages.VideoStudioPage.videoStudio")} description={featureMessage(language, "video.messages.VideoStudioPage.keepAddingVideosWithoutAFileCountLimit")}>
         <PrivacyBanner compact />
       </PageHeader>
 
-      <div className={`video-engine-status${multiThreadReady ? " is-ready" : ""}`}>
+      <UtilityNotice
+        data-testid="video-runtime-status"
+        tone={multiThreadReady ? "success" : "warning"}
+        className="mb-[15px] border border-current/15 px-3.5 py-3"
+      >
         <Cpu size={19} />
-        <span>
-          <strong>{multiThreadReady ? featureMessage(language, "video.messages.VideoStudioPage.multiThreadEncodingReady") : featureMessage(language, "video.messages.VideoStudioPage.singleThreadCompatibilityMode")}</strong>
-          <small>{multiThreadReady
+        <span className="min-w-0">
+          <strong className="block text-[15px] text-foreground">{multiThreadReady ? featureMessage(language, "video.messages.VideoStudioPage.multiThreadEncodingReady") : featureMessage(language, "video.messages.VideoStudioPage.singleThreadCompatibilityMode")}</strong>
+          <small className="mt-1 block text-sm leading-relaxed text-muted-foreground">{multiThreadReady
             ? featureMessage(language, "video.messages.VideoStudioPage.aDedicatedVideoRuntimeUsesMultipleCpuCores")
             : featureMessage(language, "video.messages.VideoStudioPage.thisBrowserCannotMeetTheMultiThreadRequirements")}</small>
         </span>
-      </div>
+      </UtilityNotice>
 
-      <SectionCard step={1} title={featureMessage(language, "video.messages.VideoStudioPage.chooseVideos")} description={featureMessage(language, "video.messages.VideoStudioPage.addFilesInMultipleRoundsWithNoFile")}>
+      <UtilitySectionCard step={1} title={featureMessage(language, "video.messages.VideoStudioPage.chooseVideos")} description={featureMessage(language, "video.messages.VideoStudioPage.addFilesInMultipleRoundsWithNoFile")}>
         <FileDropZone files={files} onFiles={handleFiles} accept="video/*,.mkv,.avi" multiple hint={featureMessage(language, "video.messages.VideoStudioPage.mp4MovWebmMkvAviAddMoreAt")} accent="pink" />
-        <div className="inline-notice warning"><AlertTriangle size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mkvAndAviCompatibilityDependsOnTheirInternal")}</span></div>
-        {mobileDevice && <div className="inline-notice"><Gauge size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mobileDefaultsAre1080pAnd480PxGif")}</span></div>}
-      </SectionCard>
+        <UtilityNotice tone="warning" className="mt-3"><AlertTriangle size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mkvAndAviCompatibilityDependsOnTheirInternal")}</span></UtilityNotice>
+        {mobileDevice && <UtilityNotice tone="warning" className="mt-2"><Gauge size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mobileDefaultsAre1080pAnd480PxGif")}</span></UtilityNotice>}
+      </UtilitySectionCard>
 
       {items.length > 0 && (
-        <SectionCard step={2} title={featureMessage(language, "video.messages.VideoStudioPage.groupPreviewsAndTrimRanges")} description={featureMessage(language, "video.messages.VideoStudioPage.dragVideosToReorderThemWithinAGroup")}>
-          <div className="video-sync-groups">
+        <UtilitySectionCard step={2} title={featureMessage(language, "video.messages.VideoStudioPage.groupPreviewsAndTrimRanges")} description={featureMessage(language, "video.messages.VideoStudioPage.dragVideosToReorderThemWithinAGroup")}>
+          <div className="video-sync-groups grid gap-3">
             {usedGroups.map(({ group, items: groupItems }) => (
               <VideoGroupSection
                 key={group}
@@ -687,16 +694,16 @@ export function VideoStudioPage() {
               />
             ))}
           </div>
-        </SectionCard>
+        </UtilitySectionCard>
       )}
 
       {items.length > 0 && (
-        <SectionCard step={3} title={featureMessage(language, "video.messages.VideoStudioPage.outputSettings")} description={featureMessage(language, "video.messages.VideoStudioPage.theOutputFormatAutomaticallyDeterminesWhetherToCreate")}>
-          <div className="video-output-format-grid">
-            <label><span>{featureMessage(language, "video.messages.VideoStudioPage.outputFormat")}</span><select value={outputFormat} onChange={(event) => changeOutputFormat(event.target.value as VideoOutputFormat)}><option value="mp4">MP4 {featureMessage(language, "video.messages.VideoStudioPage.video")}</option><option value="mkv">MKV {featureMessage(language, "video.messages.VideoStudioPage.video")}</option><option value="webm">WebM {featureMessage(language, "video.messages.VideoStudioPage.video")}</option><option value="gif">GIF {featureMessage(language, "video.messages.VideoStudioPage.animation")}</option><option value="mp3">MP3 {featureMessage(language, "video.messages.VideoStudioPage.audio")}</option><option value="aac">AAC {featureMessage(language, "video.messages.VideoStudioPage.audio")}</option></select></label>
-            <div className="video-output-count"><ListVideo size={18} /><span><strong>{featureMessage(language, "video.messages.VideoStudioPage.outputFiles", { p0: outputCount })}</strong><small>{featureMessage(language, "video.messages.VideoStudioPage.completedFilesAppearInTheIndividualDownloadList")}</small></span></div>
+        <UtilitySectionCard step={3} title={featureMessage(language, "video.messages.VideoStudioPage.outputSettings")} description={featureMessage(language, "video.messages.VideoStudioPage.theOutputFormatAutomaticallyDeterminesWhetherToCreate")}>
+          <div className="video-output-format-grid mb-[13px] grid grid-cols-2 items-end gap-2.5 max-[620px]:grid-cols-1" data-testid="video-output-format">
+            <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.outputFormat")}</span><UtilitySelect value={outputFormat} onChange={(event) => changeOutputFormat(event.target.value as VideoOutputFormat)}><option value="mp4">MP4 {featureMessage(language, "video.messages.VideoStudioPage.video")}</option><option value="mkv">MKV {featureMessage(language, "video.messages.VideoStudioPage.video")}</option><option value="webm">WebM {featureMessage(language, "video.messages.VideoStudioPage.video")}</option><option value="gif">GIF {featureMessage(language, "video.messages.VideoStudioPage.animation")}</option><option value="mp3">MP3 {featureMessage(language, "video.messages.VideoStudioPage.audio")}</option><option value="aac">AAC {featureMessage(language, "video.messages.VideoStudioPage.audio")}</option></UtilitySelect></UtilityField>
+            <div className="video-output-count flex min-h-[51px] items-center gap-2.5 rounded-xl bg-pink-600/10 px-[11px] py-[9px] text-pink-700 dark:text-pink-300"><ListVideo size={18} /><span className="flex min-w-0 flex-col"><strong className="text-sm text-foreground">{featureMessage(language, "video.messages.VideoStudioPage.outputFiles", { p0: outputCount })}</strong><small className="mt-[3px] text-[13px] text-muted-foreground">{featureMessage(language, "video.messages.VideoStudioPage.completedFilesAppearInTheIndividualDownloadList")}</small></span></div>
           </div>
-          <div className="video-output-limit"><Gauge size={17} /><span><strong>{featureMessage(language, "video.messages.VideoStudioPage.browserRecommendationUnder1GbPerOutput")}</strong><small>{featureMessage(language, "video.messages.VideoStudioPage.theCurrentSafetyLimitIs15Gb")}</small></span></div>
+          <UtilityNotice tone="warning" className="video-output-limit mb-[13px] mt-[-2px]"><Gauge size={17} /><span className="min-w-0"><strong className="block text-sm text-foreground">{featureMessage(language, "video.messages.VideoStudioPage.browserRecommendationUnder1GbPerOutput")}</strong><small className="mt-[3px] block text-[13px] leading-relaxed text-muted-foreground">{featureMessage(language, "video.messages.VideoStudioPage.theCurrentSafetyLimitIs15Gb")}</small></span></UtilityNotice>
 
           {isVideoOutput && (
             <EncodingSettings
@@ -721,7 +728,7 @@ export function VideoStudioPage() {
             />
           )}
 
-          {outputFormat === "gif" && <div className="quick-tool-settings"><label><span>{featureMessage(language, "video.messages.VideoStudioPage.gifFrameRate")}</span><select value={gifFps} onChange={(event) => setGifFps(Number(event.target.value) as 10 | 12 | 15 | 20)}><option value={10}>10 fps · {featureMessage(language, "video.messages.VideoStudioPage.smaller")}</option><option value={12}>12 fps · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value={15}>15 fps</option><option value={20}>20 fps · {featureMessage(language, "video.messages.VideoStudioPage.smoother")}</option></select></label><label><span>{featureMessage(language, "video.messages.VideoStudioPage.maximumWidth")}</span><select value={gifWidth} onChange={(event) => setGifWidth(Number(event.target.value) as 480 | 720 | 1080)}><option value={480}>480px</option><option value={720}>720px · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value={1080}>1080px</option></select></label></div>}
+          {outputFormat === "gif" && <div className="mb-3 grid grid-cols-2 gap-3 max-[620px]:grid-cols-1" data-testid="video-gif-settings"><UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.gifFrameRate")}</span><UtilitySelect value={gifFps} onChange={(event) => setGifFps(Number(event.target.value) as 10 | 12 | 15 | 20)}><option value={10}>10 fps · {featureMessage(language, "video.messages.VideoStudioPage.smaller")}</option><option value={12}>12 fps · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value={15}>15 fps</option><option value={20}>20 fps · {featureMessage(language, "video.messages.VideoStudioPage.smoother")}</option></UtilitySelect></UtilityField><UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.maximumWidth")}</span><UtilitySelect value={gifWidth} onChange={(event) => setGifWidth(Number(event.target.value) as 480 | 720 | 1080)}><option value={480}>480px</option><option value={720}>720px · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value={1080}>1080px</option></UtilitySelect></UtilityField></div>}
           {isVideoOutput && (
             <AudioTrackSettings
               container={outputFormat}
@@ -753,71 +760,71 @@ export function VideoStudioPage() {
             />
           )}
 
-          <div className="video-global-output-toggle"><ToggleRow label={featureMessage(language, "video.messages.VideoStudioPage.concatenateAllGroupsIntoOneFile")} description={featureMessage(language, "video.messages.VideoStudioPage.connectGroupsByGroupNumberAndCardOrder")} checked={allGroupsOneFile} onChange={setAllGroupsOneFile} /></div>
+          <div className="video-global-output-toggle my-[13px] overflow-hidden rounded-[13px] border border-border"><ToggleRow label={featureMessage(language, "video.messages.VideoStudioPage.concatenateAllGroupsIntoOneFile")} description={featureMessage(language, "video.messages.VideoStudioPage.connectGroupsByGroupNumberAndCardOrder")} checked={allGroupsOneFile} onChange={setAllGroupsOneFile} /></div>
 
-          {isVideoOutput && bitrate === "copy" && outputFormat !== "webm" && !passthroughConflict && <div className="inline-warning"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.passthroughAvoidsReEncodingSoItIsFast")}</span></div>}
-          {outputFormat === "webm" && bitrate === "copy" && <div className="inline-warning error webm-passthrough-warning"><AlertTriangle size={17} /><span><strong>{featureMessage(language, "video.messages.VideoStudioPage.typicalMp4VideoAndAudioCannotBeCopied")}</strong> {featureMessage(language, "video.messages.VideoStudioPage.reEncodeH264VideoUsingCrfOr")}</span></div>}
-          {isVideoOutput && audioMode === "copy" && <div className="inline-warning"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.onlyTheFirstAudioTrackIsCopiedWithout")}</span></div>}
-          {isVideoOutput && audioMode === "remove" && <div className="video-output-note"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.audioWillBeRemovedFromTheOutputVideo")}</span></div>}
+          {isVideoOutput && bitrate === "copy" && outputFormat !== "webm" && !passthroughConflict && <UtilityNotice tone="warning" className="mt-[13px]"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.passthroughAvoidsReEncodingSoItIsFast")}</span></UtilityNotice>}
+          {outputFormat === "webm" && bitrate === "copy" && <UtilityNotice tone="error" role="alert" className="webm-passthrough-warning mt-[13px]"><AlertTriangle size={17} /><span><strong>{featureMessage(language, "video.messages.VideoStudioPage.typicalMp4VideoAndAudioCannotBeCopied")}</strong> {featureMessage(language, "video.messages.VideoStudioPage.reEncodeH264VideoUsingCrfOr")}</span></UtilityNotice>}
+          {isVideoOutput && audioMode === "copy" && <UtilityNotice tone="warning" className="mt-[13px]"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.onlyTheFirstAudioTrackIsCopiedWithout")}</span></UtilityNotice>}
+          {isVideoOutput && audioMode === "remove" && <UtilityNotice tone="warning" className="video-output-note mt-[13px]"><Volume2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.audioWillBeRemovedFromTheOutputVideo")}</span></UtilityNotice>}
           {audioModeSuggestions.map((suggestion) => (
-            <div className={`inline-warning error video-audio-mode-suggestion${suggestion.modes.length === 1 && suggestion.modes[0] === "remove" ? " video-audio-removal-suggestion" : ""}`} key={suggestion.jobKey}>
+            <UtilityNotice tone="error" role="alert" className="video-audio-mode-suggestion mt-[13px] flex-wrap" data-removal-only={suggestion.modes.length === 1 && suggestion.modes[0] === "remove" || undefined} key={suggestion.jobKey}>
               <AlertTriangle size={17} />
-              <span><strong>{suggestion.jobName}</strong> {suggestion.message}</span>
-              <span className="video-audio-suggestion-actions">
-                {suggestion.modes.includes("encode") && <button type="button" className="primary-button video-audio-encode-suggestion" onClick={() => acceptAudioModeSuggestion(suggestion, "encode")}>{featureMessage(language, "video.messages.VideoStudioPage.convertAndKeepAudio")}</button>}
-                {suggestion.modes.includes("remove") && <button type="button" className="secondary-button" onClick={() => acceptAudioModeSuggestion(suggestion, "remove")}>{featureMessage(language, "video.messages.VideoStudioPage.copyVideoWithoutAudio")}</button>}
+              <span className="min-w-0 flex-1"><strong>{suggestion.jobName}</strong> {suggestion.message}</span>
+              <span className="video-audio-suggestion-actions flex flex-wrap gap-[7px]" data-testid="video-audio-suggestion-actions">
+                {suggestion.modes.includes("encode") && <Button type="button" className="video-audio-encode-suggestion min-h-9 bg-pink-700 px-3 text-white hover:bg-pink-800 focus-visible:ring-pink-700/30" data-testid="video-audio-encode-suggestion" onClick={() => acceptAudioModeSuggestion(suggestion, "encode")}>{featureMessage(language, "video.messages.VideoStudioPage.convertAndKeepAudio")}</Button>}
+                {suggestion.modes.includes("remove") && <Button type="button" variant="secondary" className="min-h-9 px-3" data-testid="video-audio-remove-suggestion" onClick={() => acceptAudioModeSuggestion(suggestion, "remove")}>{featureMessage(language, "video.messages.VideoStudioPage.copyVideoWithoutAudio")}</Button>}
               </span>
-            </div>
+            </UtilityNotice>
           ))}
-          {routeNotices.map((notice) => <div className="inline-warning video-route-guidance" key={`${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></div>)}
-          {passthroughTransformConflict && <div className="inline-warning error"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.changingAspectRatioOrResolutionRequiresReEncoding")}</span></div>}
-          {!passthroughTransformConflict && passthroughConcatConflict && <div className="inline-warning error"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.videosWithDifferentDimensionsOrAspectRatiosCannot")}</span></div>}
-          {outputFormat === "gif" && <div className="video-output-note"><Sparkles size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.createsGifsFromEachGroupSSelectedRanges")}</span></div>}
-          {(outputFormat === "mp3" || outputFormat === "aac") && <div className="video-output-note"><Music2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.extractsOnlyAudioFromEachGroupSSelected")}</span></div>}
+          {routeNotices.map((notice) => <UtilityNotice tone="warning" className="video-route-guidance mt-[13px]" key={`${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></UtilityNotice>)}
+          {passthroughTransformConflict && <UtilityNotice tone="error" role="alert" className="mt-[13px]"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.changingAspectRatioOrResolutionRequiresReEncoding")}</span></UtilityNotice>}
+          {!passthroughTransformConflict && passthroughConcatConflict && <UtilityNotice tone="error" role="alert" className="mt-[13px]"><Gauge size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.videosWithDifferentDimensionsOrAspectRatiosCannot")}</span></UtilityNotice>}
+          {outputFormat === "gif" && <UtilityNotice tone="warning" className="video-output-note mt-[13px]"><Sparkles size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.createsGifsFromEachGroupSSelectedRanges")}</span></UtilityNotice>}
+          {(outputFormat === "mp3" || outputFormat === "aac") && <UtilityNotice tone="warning" className="video-output-note mt-[13px]"><Music2 size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.extractsOnlyAudioFromEachGroupSSelected")}</span></UtilityNotice>}
 
-          <div className="video-output-summary">
+          <div className="video-output-summary mt-[13px] overflow-hidden rounded-[13px] border border-border bg-muted/60 [&_p+_p]:border-t [&_p+_p]:border-border [&_p]:m-0 [&_p]:grid [&_p]:min-h-[42px] [&_p]:grid-cols-[72px_minmax(0,1fr)_auto] [&_p]:items-center [&_p]:gap-2.5 [&_p]:px-[11px] [&_p]:py-[7px] max-[620px]:[&_p]:grid-cols-[58px_minmax(0,1fr)_auto] [&_strong]:text-sm [&_span]:text-[13px] [&_span]:text-muted-foreground [&_b]:text-sm [&_b]:text-pink-700 dark:[&_b]:text-pink-300">
             {allGroupsOneFile
               ? <p><strong>{featureMessage(language, "video.messages.VideoStudioPage.allGroups")}</strong><span>{featureMessage(language, "video.messages.VideoStudioPage.concatenateByGroupNumberAndCardOrder")}</span><b>1</b></p>
               : usedGroups.map(({ group, items: groupItems }) => <p key={group}><strong>{featureMessage(language, "video.messages.VideoStudioPage.group")} {group}</strong><span>{groupSettings[group].outputMode === "concat" ? featureMessage(language, "video.messages.VideoStudioPage.concatenateVideosInOrder", { p0: groupItems.length }) : featureMessage(language, "video.messages.VideoStudioPage.exportVideosIndividually", { p0: groupItems.length })}</span><b>{groupSettings[group].outputMode === "concat" ? 1 : groupItems.length}</b></p>)}
           </div>
-          <div className="section-actions"><PrimaryButton accent="pink" disabled={!ready || passthroughConflict || outputSettingsInvalid} loading={progress.status === "running"} onClick={() => void outputAction()}><Download size={18} /> {featureMessage(language, "video.messages.VideoStudioPage.createResults", { p0: outputCount })}</PrimaryButton></div>
-          {!ready && <div className="inline-warning error"><AlertTriangle size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.exportIsBlockedBecauseMetadataIsUnavailableFor", { p0: metadataBlockedItems.map((item) => item.file.name).join(", ") })}</span></div>}
-        </SectionCard>
+          <div className="mt-4 flex justify-end max-[620px]:[&_[data-ui-component=primary-button]]:w-full" data-testid="video-output-actions"><PrimaryButton accent="pink" disabled={!ready || passthroughConflict || outputSettingsInvalid} loading={progress.status === "running"} onClick={() => void outputAction()}><Download size={18} /> {featureMessage(language, "video.messages.VideoStudioPage.createResults", { p0: outputCount })}</PrimaryButton></div>
+          {!ready && <UtilityNotice tone="error" role="alert" className="mt-[13px]"><AlertTriangle size={17} /><span>{featureMessage(language, "video.messages.VideoStudioPage.exportIsBlockedBecauseMetadataIsUnavailableFor", { p0: metadataBlockedItems.map((item) => item.file.name).join(", ") })}</span></UtilityNotice>}
+        </UtilitySectionCard>
       )}
 
       <OperationProgress {...progress} accent="pink" title={featureMessage(language, "video.messages.VideoStudioPage.videoProcessingLog")} />
-      {progress.status === "running" && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => activeController.current?.abort()}>{featureMessage(language, "video.messages.VideoStudioPage.cancel")}</button></div>}
-      {lastResult && <div className="inline-success"><Download size={18} /><span>{lastResult}</span></div>}
+      {progress.status === "running" && <div className="mt-2 flex justify-end"><Button type="button" variant="secondary" onClick={() => activeController.current?.abort()}>{featureMessage(language, "video.messages.VideoStudioPage.cancel")}</Button></div>}
+      {lastResult && <UtilityNotice tone="success" role="status" className="mt-[13px]" data-testid="video-result-status"><Download size={18} /><span>{lastResult}</span></UtilityNotice>}
 
       {videoOutputs.length > 0 && (
-        <SectionCard
-          className="video-results-card"
+        <UtilitySectionCard
+          className="video-results-card border-pink-600/20"
           title={featureMessage(language, "video.messages.VideoStudioPage.completedResults", { p0: videoOutputs.length })}
           description={featureMessage(language, "video.messages.VideoStudioPage.eachFileAppearsAsSoonAsItFinishes")}
         >
-          <div className="video-result-list" aria-live="polite">
+          <div className="video-result-list flex flex-col gap-2" aria-live="polite">
             {videoOutputs.map((output, index) => (
-              <article className="video-result-item" key={output.id}>
-                <span>{isAudioOutput(output) ? <Music2 size={18} /> : <Film size={18} />}<span><strong>{output.fileName}</strong><small>{formatBytes(output.blob.size)} · {featureMessage(language, "video.messages.VideoStudioPage.result")} {index + 1}</small></span></span>
-                <div className="video-result-item-actions">
-                  <a className="result-download" href={output.url} download={output.fileName}><Download size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.download")}</a>
-                  {isAudioOutput(output) && <button type="button" className="secondary-button audio-handoff-button" onClick={() => openInAudioStudio(output)}><Waves size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.continueInAudioStudio")}</button>}
+              <Card as="article" className="video-result-item min-h-[58px] flex-row items-center justify-between gap-3 overflow-visible rounded-xl border border-border bg-muted/60 p-2.5 shadow-none ring-0 max-[620px]:flex-col max-[620px]:items-stretch" key={output.id}>
+                <span className="flex min-w-0 items-center gap-2.5 text-pink-700 dark:text-pink-300">{isAudioOutput(output) ? <Music2 size={18} /> : <Film size={18} />}<span className="flex min-w-0 flex-col"><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground">{output.fileName}</strong><small className="mt-[3px] text-[13px] text-muted-foreground">{formatBytes(output.blob.size)} · {featureMessage(language, "video.messages.VideoStudioPage.result")} {index + 1}</small></span></span>
+                <div className="video-result-item-actions flex shrink-0 flex-wrap justify-end gap-[7px] max-[620px]:grid max-[620px]:grid-cols-1">
+                  <Button render={<a href={output.url} download={output.fileName} data-testid="video-result-download" />} className="min-h-[37px] bg-pink-700 text-white shadow-md shadow-pink-700/20 hover:bg-pink-800 focus-visible:ring-pink-700/30 max-[620px]:w-full"><Download size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.download")}</Button>
+                  {isAudioOutput(output) && <Button type="button" variant="secondary" className="audio-handoff-button min-h-[37px] px-3 text-violet-700 dark:text-violet-300 max-[620px]:w-full" onClick={() => openInAudioStudio(output)}><Waves size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.continueInAudioStudio")}</Button>}
                 </div>
-              </article>
+              </Card>
             ))}
           </div>
-          <div className="video-result-actions">
-            <button type="button" className="secondary-button" disabled={progress.status === "running"} onClick={downloadAllOutputs}><Download size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.downloadAllIndividually")}</button>
-            {directorySaveAvailable && <button type="button" className="secondary-button" disabled={progress.status === "running"} onClick={() => void saveOutputsToFolder()}><FolderDown size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.saveToFolder")}</button>}
-            <button type="button" className="secondary-button" disabled={progress.status === "running"} onClick={() => void createZipArchive()}><Archive size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.createZip")}</button>
-            <button type="button" className="secondary-button danger" disabled={progress.status === "running"} onClick={() => { clearVideoOutputs(); setLastResult(""); progress.reset(); }}><Trash2 size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.clearResults")}</button>
+          <div className="video-result-actions mt-3 flex flex-wrap gap-2 max-[620px]:grid max-[620px]:grid-cols-1" data-testid="video-result-actions">
+            <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={downloadAllOutputs}><Download size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.downloadAllIndividually")}</Button>
+            {directorySaveAvailable && <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => void saveOutputsToFolder()}><FolderDown size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.saveToFolder")}</Button>}
+            <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => void createZipArchive()}><Archive size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.createZip")}</Button>
+            <Button type="button" variant="destructive" className="ml-auto min-h-[39px] max-[620px]:ml-0 max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => { clearVideoOutputs(); setLastResult(""); progress.reset(); }}><Trash2 size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.clearResults")}</Button>
           </div>
-          <div className="video-download-guidance">
+          <UtilityNotice tone="warning" className="video-download-guidance mt-[11px]">
             <AlertTriangle size={16} />
             <span><strong>{videoPage.downloadGuidanceLabel}</strong>{videoPage.downloadGuidance}</span>
-          </div>
-          {routeNotices.map((notice) => <div className="inline-warning video-route-result-guidance" key={`result:${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></div>)}
-        </SectionCard>
+          </UtilityNotice>
+          {routeNotices.map((notice) => <UtilityNotice tone="warning" className="video-route-result-guidance mt-[13px]" key={`result:${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></UtilityNotice>)}
+        </UtilitySectionCard>
       )}
 
       <ToolGuide
@@ -826,7 +833,7 @@ export function VideoStudioPage() {
         blocks={videoPage.guide.blocks}
         faq={videoPage.guide.faq}
       />
-    </div>
+    </UtilityPage>
   );
 }
 
@@ -853,15 +860,15 @@ function EncodingSettings({ container, codec, resolution, aspect, crf, rotation,
   const passthrough = bitrate === "copy";
   const crfMode = bitrate === "0" || codec === "vp9";
   return (
-    <div className="encoding-grid">
-      <label className="video-bitrate-control"><span>{featureMessage(language, "video.messages.VideoStudioPage.videoProcessingSizeTarget")}</span><select value={bitrate} onChange={(event) => onBitrate(event.target.value as VideoBitrate)}><option value="copy">{featureMessage(language, "video.messages.VideoStudioPage.copySourcePassthrough")}</option><option value="0">{featureMessage(language, "video.messages.VideoStudioPage.qualityBasedSizeCrf")}</option><option value="2M">2 Mbps</option><option value="5M">5 Mbps</option><option value="8M">8 Mbps</option><option value="custom">{featureMessage(language, "video.messages.VideoStudioPage.custom")}</option></select></label>
-      <label><span>{featureMessage(language, "video.messages.VideoStudioPage.videoCodec")}</span><select value={codec} disabled={passthrough} onChange={(event) => onCodec(event.target.value as VideoCodec)}><option value="h264" disabled={container === "webm"}>H.264</option><option value="hevc" disabled={container === "webm"}>HEVC · {featureMessage(language, "video.messages.VideoStudioPage.whenSupported")}</option><option value="vp9">VP9</option></select></label>
-      <label><span>{featureMessage(language, "video.messages.VideoStudioPage.resizeAllVideos")}</span><select value={resolution} disabled={passthrough} onChange={(event) => onResolution(event.target.value as VideoResolution)}><option value="source">{featureMessage(language, "video.messages.VideoStudioPage.keepSource")}</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option></select></label>
-      <label><span>{featureMessage(language, "video.messages.VideoStudioPage.aspectRatio")}</span><select value={aspect} disabled={passthrough} onChange={(event) => onAspect(event.target.value as VideoAspect)}><option value="source">{featureMessage(language, "video.messages.VideoStudioPage.keepSourceRatio")}</option><option value="9:16">9:16 {featureMessage(language, "video.messages.VideoStudioPage.portrait")}</option><option value="1:1">1:1 {featureMessage(language, "video.messages.VideoStudioPage.square")}</option><option value="16:9">16:9 {featureMessage(language, "video.messages.VideoStudioPage.landscape")}</option></select></label>
-      <label><span>{featureMessage(language, "video.messages.VideoStudioPage.rotation")}</span><select value={rotation} disabled={passthrough} onChange={(event) => onRotation(Number(event.target.value) as VideoRotation)}><option value={0}>{featureMessage(language, "video.messages.VideoStudioPage.noRotation")}</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option></select></label>
+    <div className="grid grid-cols-3 gap-2.5 max-[820px]:grid-cols-2 max-[620px]:grid-cols-1" data-testid="video-encoding-settings">
+      <UtilityField className="video-bitrate-control"><span>{featureMessage(language, "video.messages.VideoStudioPage.videoProcessingSizeTarget")}</span><UtilitySelect value={bitrate} onChange={(event) => onBitrate(event.target.value as VideoBitrate)}><option value="copy">{featureMessage(language, "video.messages.VideoStudioPage.copySourcePassthrough")}</option><option value="0">{featureMessage(language, "video.messages.VideoStudioPage.qualityBasedSizeCrf")}</option><option value="2M">2 Mbps</option><option value="5M">5 Mbps</option><option value="8M">8 Mbps</option><option value="custom">{featureMessage(language, "video.messages.VideoStudioPage.custom")}</option></UtilitySelect></UtilityField>
+      <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.videoCodec")}</span><UtilitySelect value={codec} disabled={passthrough} onChange={(event) => onCodec(event.target.value as VideoCodec)}><option value="h264" disabled={container === "webm"}>H.264</option><option value="hevc" disabled={container === "webm"}>HEVC · {featureMessage(language, "video.messages.VideoStudioPage.whenSupported")}</option><option value="vp9">VP9</option></UtilitySelect></UtilityField>
+      <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.resizeAllVideos")}</span><UtilitySelect value={resolution} disabled={passthrough} onChange={(event) => onResolution(event.target.value as VideoResolution)}><option value="source">{featureMessage(language, "video.messages.VideoStudioPage.keepSource")}</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option></UtilitySelect></UtilityField>
+      <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.aspectRatio")}</span><UtilitySelect value={aspect} disabled={passthrough} onChange={(event) => onAspect(event.target.value as VideoAspect)}><option value="source">{featureMessage(language, "video.messages.VideoStudioPage.keepSourceRatio")}</option><option value="9:16">9:16 {featureMessage(language, "video.messages.VideoStudioPage.portrait")}</option><option value="1:1">1:1 {featureMessage(language, "video.messages.VideoStudioPage.square")}</option><option value="16:9">16:9 {featureMessage(language, "video.messages.VideoStudioPage.landscape")}</option></UtilitySelect></UtilityField>
+      <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.rotation")}</span><UtilitySelect value={rotation} disabled={passthrough} onChange={(event) => onRotation(Number(event.target.value) as VideoRotation)}><option value={0}>{featureMessage(language, "video.messages.VideoStudioPage.noRotation")}</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option></UtilitySelect></UtilityField>
       <ToggleRow label={featureMessage(language, "video.messages.VideoStudioPage.flipHorizontally")} checked={flipHorizontal} onChange={onFlipHorizontal} disabled={passthrough} />
-      {bitrate === "custom" && <label className={`custom-encoding-input${isNumberInRange(customBitrate, 0.1, 200) ? "" : " invalid"}`}><span>{featureMessage(language, "video.messages.VideoStudioPage.customVideoBitrate")}</span><span className="unit-input"><input aria-label={featureMessage(language, "video.messages.VideoStudioPage.customVideoBitrate")} type="number" min={0.1} max={200} step={0.1} inputMode="decimal" value={customBitrate} onChange={(event) => onCustomBitrate(event.target.value)} /><b>Mbps</b></span><small>0.1~200 Mbps</small></label>}
-      <label className="crf-control"><span>{featureMessage(language, "video.messages.VideoStudioPage.qualityCrf")} <b>{crf}</b></span><input type="range" min={18} max={32} value={crf} disabled={!crfMode} onChange={(event) => onCrf(Number(event.target.value))} /><small>{crfMode ? featureMessage(language, "video.messages.VideoStudioPage.lowerValuesAreSharperAndProduceLargerFiles") : featureMessage(language, "video.messages.VideoStudioPage.targetBitrateModeUsesTheSelectedBitrateInstead")}</small></label>
+      {bitrate === "custom" && <UnitNumberField label={featureMessage(language, "video.messages.VideoStudioPage.customVideoBitrate")} unit="Mbps" value={customBitrate} min={0.1} max={200} step={0.1} inputMode="decimal" valid={isNumberInRange(customBitrate, 0.1, 200)} help="0.1~200 Mbps" onChange={onCustomBitrate} />}
+      <label className="col-span-2 flex min-w-0 flex-col gap-1.5 rounded-xl bg-muted p-3 text-[13px] font-bold text-muted-foreground max-[620px]:col-auto"><span className="flex justify-between">{featureMessage(language, "video.messages.VideoStudioPage.qualityCrf")} <b className="text-foreground">{crf}</b></span><input className="w-full [accent-color:var(--color-pink-600)] disabled:cursor-not-allowed disabled:opacity-50" type="range" min={18} max={32} value={crf} disabled={!crfMode} onChange={(event) => onCrf(Number(event.target.value))} /><small className="text-xs font-medium leading-snug">{crfMode ? featureMessage(language, "video.messages.VideoStudioPage.lowerValuesAreSharperAndProduceLargerFiles") : featureMessage(language, "video.messages.VideoStudioPage.targetBitrateModeUsesTheSelectedBitrateInstead")}</small></label>
     </div>
   );
 }
@@ -880,9 +887,9 @@ function AudioTrackSettings(props: {
   onCustomSampleRate: (value: string) => void;
   language: AppLanguage;
 }) {
-    return (
-    <div className="video-audio-settings">
-      <div className="video-audio-settings-heading"><Volume2 size={17} /><span><strong>{featureMessage(props.language, "video.messages.VideoStudioPage.videoAudio")}</strong><small>{featureMessage(props.language, "video.messages.VideoStudioPage.onlyTheFirstAudioTrackIsProcessed")}</small></span></div>
+  return (
+    <div className="video-audio-settings my-[13px] rounded-[14px] border border-border bg-muted/60 p-3">
+      <div className="video-audio-settings-heading mb-2.5 flex items-start gap-2 text-pink-700 dark:text-pink-300"><Volume2 size={17} /><span className="flex flex-col"><strong className="text-sm text-foreground">{featureMessage(props.language, "video.messages.VideoStudioPage.videoAudio")}</strong><small className="mt-[3px] text-[13px] leading-relaxed text-muted-foreground">{featureMessage(props.language, "video.messages.VideoStudioPage.onlyTheFirstAudioTrackIsProcessed")}</small></span></div>
       <SegmentedControl
         value={props.mode}
         options={[
@@ -912,12 +919,37 @@ function AudioEncodingFields({ bitrate, customBitrate, sampleRate, customSampleR
 }) {
   const maximumSampleRate = codec === "aac" ? 96_000 : 48_000;
   return (
-    <div className="quick-tool-settings audio-encoding-fields">
-      <label><span>{featureMessage(language, "video.messages.VideoStudioPage.audioQualitySizeBitrate")}</span><select value={bitrate} onChange={(event) => onBitrate(event.target.value as VideoAudioBitrate)}><option value="128k">128 kbps</option><option value="192k">192 kbps · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value="256k">256 kbps</option><option value="320k">320 kbps</option><option value="custom">{featureMessage(language, "video.messages.VideoStudioPage.custom")}</option></select></label>
-      {bitrate === "custom" && <label className={isIntegerInRange(customBitrate, 32, 512) ? "" : "invalid"}><span>{featureMessage(language, "video.messages.VideoStudioPage.customAudioBitrate")}</span><span className="unit-input"><input aria-label={featureMessage(language, "video.messages.VideoStudioPage.customAudioBitrate")} type="number" min={32} max={512} step={1} inputMode="numeric" value={customBitrate} onChange={(event) => onCustomBitrate(event.target.value)} /><b>kbps</b></span><small>32~512 kbps</small></label>}
-      <label><span>{featureMessage(language, "video.messages.VideoStudioPage.audioSampleRate")}</span><select value={sampleRate} onChange={(event) => onSampleRate(event.target.value as VideoAudioSampleRate)}><option value="source">{featureMessage(language, "video.messages.VideoStudioPage.keepSource2")}</option>{codec !== "opus" && <option value="44100">44,100 Hz</option>}<option value="48000">48,000 Hz · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value="custom">{featureMessage(language, "video.messages.VideoStudioPage.custom")}</option></select></label>
-      {sampleRate === "custom" && <label className={isIntegerInRange(customSampleRate, 8_000, maximumSampleRate) ? "" : "invalid"}><span>{featureMessage(language, "video.messages.VideoStudioPage.customSampleRate")}</span><span className="unit-input"><input aria-label={featureMessage(language, "video.messages.VideoStudioPage.customSampleRate2")} type="number" min={8000} max={maximumSampleRate} step={100} inputMode="numeric" value={customSampleRate} onChange={(event) => onCustomSampleRate(event.target.value)} /><b>Hz</b></span><small>8,000~{maximumSampleRate.toLocaleString()} Hz{codec === "opus" ? featureMessage(language, "video.messages.VideoStudioPage.snappedToAnOpusSupportedRate") : ""}</small></label>}
+    <div className="mt-[11px] grid grid-cols-2 gap-3 max-[620px]:grid-cols-1" data-testid="video-audio-encoding-fields">
+      <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.audioQualitySizeBitrate")}</span><UtilitySelect value={bitrate} onChange={(event) => onBitrate(event.target.value as VideoAudioBitrate)}><option value="128k">128 kbps</option><option value="192k">192 kbps · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value="256k">256 kbps</option><option value="320k">320 kbps</option><option value="custom">{featureMessage(language, "video.messages.VideoStudioPage.custom")}</option></UtilitySelect></UtilityField>
+      {bitrate === "custom" && <UnitNumberField label={featureMessage(language, "video.messages.VideoStudioPage.customAudioBitrate")} unit="kbps" value={customBitrate} min={32} max={512} step={1} inputMode="numeric" valid={isIntegerInRange(customBitrate, 32, 512)} help="32~512 kbps" onChange={onCustomBitrate} />}
+      <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.audioSampleRate")}</span><UtilitySelect value={sampleRate} onChange={(event) => onSampleRate(event.target.value as VideoAudioSampleRate)}><option value="source">{featureMessage(language, "video.messages.VideoStudioPage.keepSource2")}</option>{codec !== "opus" && <option value="44100">44,100 Hz</option>}<option value="48000">48,000 Hz · {featureMessage(language, "video.messages.VideoStudioPage.recommended")}</option><option value="custom">{featureMessage(language, "video.messages.VideoStudioPage.custom")}</option></UtilitySelect></UtilityField>
+      {sampleRate === "custom" && <UnitNumberField label={featureMessage(language, "video.messages.VideoStudioPage.customSampleRate")} inputAriaLabel={featureMessage(language, "video.messages.VideoStudioPage.customSampleRate2")} unit="Hz" value={customSampleRate} min={8000} max={maximumSampleRate} step={100} inputMode="numeric" valid={isIntegerInRange(customSampleRate, 8_000, maximumSampleRate)} help={`8,000~${maximumSampleRate.toLocaleString()} Hz${codec === "opus" ? featureMessage(language, "video.messages.VideoStudioPage.snappedToAnOpusSupportedRate") : ""}`} onChange={onCustomSampleRate} />}
     </div>
+  );
+}
+
+function UnitNumberField({ label, inputAriaLabel = label, unit, value, min, max, step, inputMode, valid, help, onChange }: {
+  label: string;
+  inputAriaLabel?: string;
+  unit: string;
+  value: string;
+  min: number;
+  max: number;
+  step: number;
+  inputMode: "decimal" | "numeric";
+  valid: boolean;
+  help: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <UtilityField aria-invalid={!valid}>
+      <span>{label}</span>
+      <span aria-invalid={!valid} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden rounded-xl border border-input bg-background focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20 aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/20">
+        <UtilityInput className="rounded-none border-0 bg-transparent shadow-none focus-visible:border-0 focus-visible:ring-0" aria-label={inputAriaLabel} type="number" min={min} max={max} step={step} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} />
+        <b className="border-l border-border px-2.5 text-[13px] text-muted-foreground">{unit}</b>
+      </span>
+      <small className={valid ? "text-xs font-medium leading-snug text-muted-foreground" : "text-xs font-medium leading-snug text-destructive"}>{help}</small>
+    </UtilityField>
   );
 }
 

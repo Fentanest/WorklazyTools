@@ -1,0 +1,5 @@
+
+> worklazytools@0.1.0 test:static
+> node scripts/validate-static-output.mjs
+
+Static output validation passed: localized pages, hreflang metadata, self-hosted browser runtimes, ads.txt, robots.txt and sitemap.xml.

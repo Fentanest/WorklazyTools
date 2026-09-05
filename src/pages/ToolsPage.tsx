@@ -3,11 +3,12 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import { type ToolCategoryId } from "../app/toolRegistry";
+import { type ToolAccent, type ToolCategoryId } from "../app/toolRegistry";
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
 import { PageHeader } from "../components/ui";
 import { useToolCatalog } from "../i18n/useToolCatalog";
+import { cn } from "../lib/utils";
 
 type CategoryFilter = "all" | ToolCategoryId;
 
@@ -59,7 +60,7 @@ export function ToolsPage() {
       </div>
 
       <div className="tool-category-filter" aria-label={t("tools:index.categoryLabel")}>
-        <button type="button" className={activeCategory === "all" ? "selected" : ""} aria-pressed={activeCategory === "all"} onClick={() => selectCategory("all")}>
+        <button type="button" className={cn(activeCategory === "all" && "bg-foreground text-background shadow-lg [&_small]:bg-background/20 [&_small]:text-inherit")} aria-pressed={activeCategory === "all"} onClick={() => selectCategory("all")}>
           <LayoutGrid size={17} /><span>{t("tools:index.all")}</span><small>{tools.length}</small>
         </button>
         {toolCategories.map((category) => {
@@ -68,7 +69,7 @@ export function ToolsPage() {
           return (
             <button
               type="button"
-              className={`accent-${category.accent}${activeCategory === category.id ? " selected" : ""}`}
+              className={cn(activeCategory === category.id && [categoryActiveClasses[category.accent], "text-white shadow-lg [&_small]:bg-white/20 [&_small]:text-inherit"])}
               aria-label={`${category.label} ${t("common:format.tools", { count })}`}
               aria-pressed={activeCategory === category.id}
               key={category.id}
@@ -88,7 +89,7 @@ export function ToolsPage() {
           return (
             <section className="tool-category-section" key={category.id} aria-labelledby={`tool-category-${category.id}`}>
               <header className="tool-category-heading">
-                <span className={`tool-category-icon accent-${category.accent}`}><Icon size={20} /></span>
+                <span className={cn("grid size-[42px] place-items-center rounded-[13px]", categoryIconClasses[category.accent])}><Icon size={20} /></span>
                 <span><h2 id={`tool-category-${category.id}`}>{category.label}</h2><p>{category.description}</p></span>
                 <b>{t("common:format.tools", { count: categoryTools.length })}</b>
               </header>
@@ -104,6 +105,24 @@ export function ToolsPage() {
     </div>
   );
 }
+
+const categoryActiveClasses = {
+  green: "bg-green-700",
+  blue: "bg-blue-700",
+  violet: "bg-violet-700",
+  orange: "bg-orange-700",
+  pink: "bg-pink-700",
+  sky: "bg-sky-700",
+} satisfies Record<ToolAccent, string>;
+
+const categoryIconClasses = {
+  green: "bg-green-100 text-green-700 dark:bg-green-950/70 dark:text-green-300",
+  blue: "bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300",
+  violet: "bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-300",
+  orange: "bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300",
+  pink: "bg-pink-100 text-pink-700 dark:bg-pink-950/70 dark:text-pink-300",
+  sky: "bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
+} satisfies Record<ToolAccent, string>;
 
 function isToolCategory(value: string | null): value is ToolCategoryId {
   return ["documents", "media", "text-data", "work", "security-share"].includes(value ?? "");

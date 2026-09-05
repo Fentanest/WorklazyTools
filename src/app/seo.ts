@@ -58,6 +58,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     "/tools/video-studio": [
       { question: "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?", answer: "가능합니다. 대상 그룹을 고르면 카드 순서가 같은 영상끼리 시작·종료 시간을 복사합니다. 대상 영상이 복사한 종료 시각보다 짧으면 종료 지점을 영상 끝으로 맞추고, 시작 시각보다도 짧으면 해당 영상은 변경하지 않습니다." },
     ],
+    "/tools/qr-studio/bulk": [
+      { question: "어떤 표 파일에서 QR을 일괄 생성할 수 있나요?", answer: "XLSX, XLSM, XLS, XLSB, SpreadsheetML 형식의 XLS와 CSV를 읽고 선택한 시트의 각 데이터 행을 QR로 만듭니다." },
+      { question: "만든 QR이 실제로 읽히는지 확인하나요?", answer: "네. 로고와 투명 배경까지 적용한 최종 PNG를 다시 읽고 원래 데이터와 정확히 일치한 결과만 성공으로 처리합니다." },
+      { question: "표와 QR 결과가 서버로 전송되나요?", answer: "아니요. 표 읽기, QR 생성, ZIP·라벨 PDF·보고서 작성은 현재 브라우저에서 처리되며 원본 파일은 변경하지 않습니다." },
+    ],
   },
   en: {
     "/tools/excel-merger": [
@@ -98,6 +103,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
     "/tools/video-studio": [
       { question: "Can I apply one group's video ranges to other groups?", answer: "Yes. Choose the target groups to copy start and end times between videos in the same card positions. If a target ends before the copied end time, its end point is set to the end of that video; if it also ends before the copied start time, it is left unchanged." },
+    ],
+    "/tools/qr-studio/bulk": [
+      { question: "Which table files can create QR codes in bulk?", answer: "It reads XLSX, XLSM, XLS, XLSB, SpreadsheetML XLS and CSV files, then creates one QR code for every data row in the selected sheet." },
+      { question: "Are generated QR codes checked for readability?", answer: "Yes. The final PNG, including a logo or transparent background, is decoded again and accepted only when it exactly matches the original payload." },
+      { question: "Are tables or QR results uploaded to a server?", answer: "No. Table reading, QR creation, ZIP, label PDF and report generation happen in the current browser without modifying the source file." },
     ],
   },
 };
@@ -150,6 +160,7 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/image-privacy": "photo-metadata-remover",
   "/tools/security-tools": "password-generator",
   "/tools/qr-studio": "qr-studio",
+  "/tools/qr-studio/bulk": "qr-bulk",
   "/tools/data-converter": "table-data-converter",
 };
 
@@ -287,6 +298,11 @@ export const seoByPath: Record<string, SeoDefinition> = {
     description: "URL과 텍스트를 로고 포함 QR로 만들고 휴대폰 카메라 또는 업로드한 사진 속 QR 데이터를 브라우저에서 읽으세요.",
     application: { name: "QR Studio", featureList: ["URL QR 생성", "텍스트 QR 생성", "중앙 로고", "실시간 카메라 스캔", "사진 QR 스캔", "모바일 공유·저장"] },
   },
+  "/tools/qr-studio/bulk": {
+    title: "QR 일괄 생성 | Excel·CSV 행별 PNG·ZIP·라벨 PDF",
+    description: "Excel·CSV 표의 각 행을 텍스트, 이메일, 전화, 문자, Wi-Fi, vCard 또는 URL QR로 만들고 재판독한 PNG·ZIP·라벨 PDF와 보고서를 받으세요.",
+    application: { name: "QR 일괄 생성", featureList: ["Excel·CSV 행별 QR", "7종 표준 페이로드", "열 번호 매핑·머리글 템플릿", "로고·투명 PNG", "생성 후 재판독", "증분 ZIP", "A4·Letter 라벨 PDF", "XLSX 생성·실패 보고서"] },
+  },
   "/tools/data-converter": {
     title: "표 데이터 변환기 | CSV·JSON·HTML 상호 변환",
     description: "CSV, JSON 객체 배열과 HTML 표(table) 데이터를 브라우저에서 서로 변환하고 파일로 저장하세요.",
@@ -343,6 +359,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with separate formula and formatting controls for XLSX and XLS input.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "Independent XLSX formula and formatting preservation", "Independent XLS formula and formatting preservation", "Encrypted input and output"] } },
   "/tools/excel-compare": { title: "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files", description: "Compare pairs of Excel and CSV files by position, keys or reconciliation rules and download a nine-sheet XLSX report for every successful pair.", application: { name: "Excel Compare", featureList: ["XLSX, XLSM, XLS, XLSB, SpreadsheetML and CSV", "Position, key and reconciliation matching", "Duplicate-key policies", "Formula and cached-value comparison", "XLSX and XLSM formatting comparison", "Nine-sheet report per pair", "ZIP for multiple successful pairs"] } },
   "/tools/excel-cleaner": { title: "Excel Data Cleaner | Clean XLSX, XLS & CSV Files", description: "Apply 28 ordered structure, text, row-filter, and value-conversion rules to Excel and CSV files, then download cleaned XLSX, CSV, reports, and ZIP results.", application: { name: "Excel Data Cleaner", featureList: ["Multiple Excel and CSV files", "13 structure rules", "7 text rules", "3 row-filter rules", "5 value-conversion rules", "Formula-reference updates and safe fallback", "XLSX, CSV, and ZIP results"] } },
+  "/tools/qr-studio/bulk": { title: "Bulk QR Generator | Excel & CSV to PNG, ZIP and Label PDF", description: "Create text, email, telephone, SMS, Wi-Fi, vCard or web QR codes from Excel and CSV rows, verify every final PNG, and export ZIP, label PDF and XLSX reports.", application: { name: "Bulk QR Generator", featureList: ["Excel and CSV row mapping", "Seven standard payload types", "Header templates", "Logo and transparent PNG", "Read-back verification", "Incremental ZIP", "A4 and Letter label PDF", "XLSX manifest and failures"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
   "/tools/pdf-editor/convert": { title: "Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", description: "Convert selected PDF pages to DOCX, XLSX, TXT or searchable PDF using self-hosted English and Korean OCR in your browser.", application: { name: "PDF Document Conversion and OCR", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },

@@ -1,0 +1,5 @@
+
+> worklazytools@0.1.0 test:utilities
+> node tests/utility-tools-smoke.mjs
+
+Utility tool smoke tests passed: Korean and English routes, hreflang, categorized tools, paired editors, world map, utility tools, video compatibility and PDF page range.

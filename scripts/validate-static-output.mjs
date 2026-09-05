@@ -16,7 +16,7 @@ const routes = [
   "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
   "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
-  "tools/security-tools", "tools/qr-studio", "tools/data-converter",
+  "tools/security-tools", "tools/qr-studio", "tools/qr-studio/bulk", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
 ];
 const socialSlugByRoute = {
@@ -26,7 +26,7 @@ const socialSlugByRoute = {
   "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-merger": "text-merger", "tools/text-tools": "text-tools",
   "tools/text-formatter": "code-formatter", "tools/work-calculator": "workday-calculator", "tools/timezone-calculator": "world-time-planner",
   "tools/payroll-calculator": "payroll-calculator", "tools/image-privacy": "photo-metadata-remover", "tools/security-tools": "password-generator",
-  "tools/qr-studio": "qr-studio", "tools/data-converter": "table-data-converter",
+  "tools/qr-studio": "qr-studio", "tools/qr-studio/bulk": "qr-bulk", "tools/data-converter": "table-data-converter",
 };
 
 for (const language of ["ko", "en"]) {
@@ -69,7 +69,7 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger"].includes(route)) {
+  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
       ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/excel-compare"
@@ -82,6 +82,8 @@ for (const route of routes) {
           ? language === "ko" ? "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?" : "Can I apply one group's video ranges to other groups?"
         : route === "tools/text-merger"
           ? language === "ko" ? "직접 입력을 TXT 파일 사이에 놓을 수 있나요?" : "Can pasted text be placed between TXT files?"
+        : route === "tools/qr-studio/bulk"
+          ? language === "ko" ? "어떤 표 파일에서 QR을 일괄 생성할 수 있나요?" : "Which table files can create QR codes in bulk?"
           : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";
     if (!html.includes('"@type":"FAQPage"') || !html.includes(expectedQuestion)) {
       throw new Error(`${filePath} is missing its localized static FAQ and FAQPage metadata.`);
@@ -242,6 +244,17 @@ for (const [name, expectedSize, expectedHash] of officeAssets) {
     throw new Error(`Pinned office asset verification failed in static output: ${name}`);
   }
 }
+const qrLabelAssets = [
+  ["NotoSansKR-Regular.otf", 4644748, "69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68"],
+  ["OFL.txt", 4301, "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"],
+];
+for (const [name, expectedSize, expectedHash] of qrLabelAssets) {
+  const filePath = path.join("dist", "vendor", "qr-label-font", "noto-cjk-sans-2.004", name);
+  const bytes = await fs.readFile(filePath);
+  if (bytes.length !== expectedSize || createHash("sha256").update(bytes).digest("hex") !== expectedHash) {
+    throw new Error(`Pinned QR label font verification failed in static output: ${name}`);
+  }
+}
 if (stickerManifest.vendor !== "Twemoji" || stickerManifest.version !== "17.0.3" || stickerManifest.commit !== "b6b55fef1e8636b540a6d016a4729ca8cdf2e60b"
   || stickerManifest.curationLimit !== 120 || stickerManifest.assets.length !== 112 || stickerManifest.assets.length > stickerManifest.curationLimit) {
   throw new Error("The Image Studio sticker manifest version or curation limit is invalid.");
@@ -308,7 +321,8 @@ if (!worklazyLicense.includes("All rights reserved")) throw new Error("Worklazy 
 if (!thirdPartyLicenses.includes("@ffmpeg/core-mt") || !thirdPartyLicenses.includes("coi-serviceworker")
   || !thirdPartyLicenses.includes(`@rhwp/core ${rhwpCoreVersion}`) || !thirdPartyLicenses.includes(`@rhwp/editor ${rhwpEditorVersion}`)
   || !thirdPartyLicenses.includes("ZetaOffice / LibreOffice") || !thirdPartyLicenses.includes("zetajs") || !thirdPartyLicenses.includes("JSDoc legacy Word reader")
-  || !thirdPartyLicenses.includes("Twemoji graphics 17.0.3") || !thirdPartyLicenses.includes("Attribution 4.0 International")) throw new Error("Third-party license bundle is incomplete.");
+  || !thirdPartyLicenses.includes("Twemoji graphics 17.0.3") || !thirdPartyLicenses.includes("Attribution 4.0 International")
+  || !thirdPartyLicenses.includes("Noto Sans KR label font")) throw new Error("Third-party license bundle is incomplete.");
 if (!favicon.includes("facet-4") || !logo.includes("Worklazy")) throw new Error("Worklazy favicon or logo is missing from the build.");
 const manifest = JSON.parse(manifestText);
 if (manifest.display !== "standalone" || manifest.scope !== "./" || manifest.start_url !== "./"

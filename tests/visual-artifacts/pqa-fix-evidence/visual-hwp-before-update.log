@@ -1,0 +1,15 @@
+
+> worklazytools@0.1.0 test:visual
+> node tests/visual-regression.mjs
+
+[1/6] hwp-editor-empty__redirect-en-tools__en__light__mobile.png
+[2/6] hwp-editor-empty__initial__ko__light__desktop.png
+[3/6] hwp-editor-empty__initial__ko__dark__mobile.png
+[4/6] hwp-editor-empty__redirect-en-tools__en__dark__desktop.png
+[5/6] hwp-editor-empty__bottom__ko__dark__mobile.png
+[6/6] hwp-editor-empty__interaction-document-loaded__ko__light__desktop.png
+Error: Visual regression failed (1/6 captures, 0 infrastructure errors):
+hwp-editor-empty__interaction-document-loaded__ko__light__desktop.png: 37001 pixels differ (3.0119% > 0.100%).
+Artifacts: /tmp/worklazytools-pqa-fix/visual-hwp-before-update
+    at file:///home/better0101/projects/worklazytools/tests/visual-regression.mjs:141:11
+Visual run report: duration=0m 11.05s; captures=6/6; concurrency=4 (CPU default from 16 cores, effective 2); filter=hwp-editor.

@@ -3,9 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
-import { FileDropZone, PrimaryButton } from "../../components/ui";
+import { FileDropZone } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { UtilityNotice } from "../../components/UtilitySurface";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
+import { cn } from "../../lib/utils";
 import { prepareOfficeAssets } from "./officeAssetLoader";
 import { OFFICE_EDITOR_FONT_ASSETS } from "./officeAssets";
 import { launchOfficeRuntime, type OfficeRuntime } from "./officeRuntime";
@@ -183,38 +186,59 @@ export function OfficeEditorAppPage() {
   const busy = state === "downloading" || state === "preparing" || state === "opening" || state === "saving";
   const focusMode = Boolean(file);
   return <div
-    className={`page office-editor-app page-enter${focusMode ? " office-editor-focus" : ""}`}
+    data-tool-page="office-editor-app"
+    data-focus-mode={focusMode ? "true" : "false"}
+    className={cn(
+      "mx-auto w-full max-w-[1440px]",
+      focusMode
+        ? "fixed inset-y-0 right-0 left-[280px] z-20 m-0 flex h-dvh w-auto max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[1020px]:left-[250px] max-[820px]:inset-0 max-[820px]:z-[60] max-[820px]:p-0"
+        : "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(84px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
+    )}
     onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files") && !busy) { event.preventDefault(); setDragging(true); } }}
     onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = busy ? "none" : "copy"; } }}
     onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
     onDrop={(event) => {
-      if ((event.target as Element).closest(".drop-zone")) return;
+      if ((event.target as Element).closest('[data-ui-part="drop-target"]')) return;
       event.preventDefault();
       setDragging(false);
       if (!busy && event.dataTransfer.files[0]) chooseFile(event.dataTransfer.files[0]);
     }}
   >
-    <div className="office-app-toolbar">
-      <Link className="secondary-button" to={landingPath}>{L("편집기 안내", "Editor guide")}</Link>
-      {file && <span className="office-toolbar-document"><FileText size={17} /><span><strong>{file.name}</strong><small>{state === "editing" ? L("브라우저에서 편집 중", "Editing in this browser") : operation.message}</small></span></span>}
-      <label className={`secondary-button office-file-picker${busy ? " disabled" : ""}`}><FileUp size={15} /> {file ? L("다른 파일 열기", "Open another file") : L("파일 선택", "Choose file")}<input type="file" accept={OFFICE_ACCEPT} disabled={busy} onChange={(event) => { const selected = event.target.files?.[0]; event.currentTarget.value = ""; if (selected) chooseFile(selected); }} /></label>
-      {state === "error" && file ? <PrimaryButton accent="violet" loading={busy} onClick={() => { const runtime = runtimeRef.current; if (runtime) void openFile(file, runtime); else void start(file); }}>{L("다시 시도", "Try again")}</PrimaryButton> : null}
-      <button type="button" className="primary-button accent-violet" disabled={state !== "editing"} onClick={() => void save()}><Save size={15} /> {L("저장 및 다운로드", "Save and download")}</button>
-      {state === "downloading" && <button type="button" className="secondary-button" onClick={() => controllerRef.current?.abort()}>{L("취소", "Cancel")}</button>}
+    <div
+      className={cn(
+        "sticky top-2.5 z-[8] mb-[13px] flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card/95 p-[11px] shadow-lg backdrop-blur-lg max-[620px]:static max-[620px]:grid max-[620px]:grid-cols-2 max-[620px]:[&>*]:w-full max-[620px]:[&>*]:justify-center",
+        focusMode && "static mb-2 min-h-[54px] shrink-0 rounded-[14px] px-[9px] py-[7px] max-[820px]:rounded-none max-[820px]:border-x-0 max-[820px]:border-t-0",
+      )}
+      data-testid="office-app-toolbar"
+    >
+      <Button render={<Link to={landingPath} />} className="min-h-10 rounded-xl font-bold" variant="secondary">{L("편집기 안내", "Editor guide")}</Button>
+      {file && <span className="flex min-w-0 flex-1 items-center gap-2 text-violet-700 max-[620px]:col-span-full max-[620px]:justify-start dark:text-violet-300" data-testid="office-toolbar-document"><FileText className="shrink-0" size={17} /><span className="flex min-w-0 flex-col gap-0.5"><strong className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground">{file.name}</strong><small className="max-w-[520px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground">{state === "editing" ? L("브라우저에서 편집 중", "Editing in this browser") : operation.message}</small></span></span>}
+      <label className={cn("relative inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-secondary px-3 text-sm font-bold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-muted", busy && "cursor-not-allowed opacity-50")}><FileUp size={15} /> {file ? L("다른 파일 열기", "Open another file") : L("파일 선택", "Choose file")}<input className="sr-only" data-testid="office-file-picker" type="file" accept={OFFICE_ACCEPT} disabled={busy} onChange={(event) => { const selected = event.target.files?.[0]; event.currentTarget.value = ""; if (selected) chooseFile(selected); }} /></label>
+      {state === "error" && file ? <Button className="min-h-10 rounded-xl bg-violet-700 font-bold text-white hover:bg-violet-800" disabled={busy} onClick={() => { const runtime = runtimeRef.current; if (runtime) void openFile(file, runtime); else void start(file); }}>{L("다시 시도", "Try again")}</Button> : null}
+      <Button className="min-h-10 rounded-xl bg-violet-700 font-bold text-white hover:bg-violet-800" data-testid="office-save" type="button" disabled={state !== "editing"} onClick={() => void save()}><Save size={15} /> {L("저장 및 다운로드", "Save and download")}</Button>
+      {state === "downloading" && <Button className="min-h-10 rounded-xl font-bold" type="button" variant="secondary" onClick={() => controllerRef.current?.abort()}>{L("취소", "Cancel")}</Button>}
     </div>
 
-    <div className="office-progress-region" hidden={focusMode && state === "editing"}><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} accent="violet" title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
-    {error && <div className="error-banner" role="alert"><AlertCircle size={19} /><div><strong>{L("편집기를 준비하지 못했습니다.", "Could not prepare the editor.")}</strong><span>{error}</span></div></div>}
-    <div className={`office-canvas-shell${state === "editing" ? " active" : ""}`}>
-      {state !== "editing" && <div className="office-canvas-placeholder">
+    <div className={cn(focusMode && "mb-2 shrink-0")} hidden={focusMode && state === "editing"} data-testid="office-progress-region"><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} accent="violet" title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
+    {error && <UtilityNotice className={cn("mb-2 shrink-0", !focusMode && "mb-0")} tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div className="flex flex-col"><strong>{L("편집기를 준비하지 못했습니다.", "Could not prepare the editor.")}</strong><span>{error}</span></div></UtilityNotice>}
+    <div
+      className={cn(
+        "relative mt-[13px] min-h-[680px] overflow-hidden rounded-2xl border border-border bg-[#303035] shadow-lg max-[820px]:min-h-[max(560px,calc(100vh-260px))] max-[820px]:rounded-xl max-[620px]:min-h-[max(500px,calc(100vh-330px))]",
+        state === "editing" && "min-h-[max(680px,calc(100vh-230px))]",
+        focusMode && "mt-0 h-auto min-h-0 flex-1 rounded-[14px] max-[820px]:rounded-none",
+      )}
+      data-active={state === "editing" ? "true" : "false"}
+      data-testid="office-canvas-shell"
+    >
+      {state !== "editing" && <div className="absolute inset-0 z-[2] grid place-items-center content-center gap-2 bg-[radial-gradient(circle_at_50%_35%,#47474f,#29292e_68%)] p-6 text-center text-[#d7d7dc] [&_.ui-drop-zone-wrap]:w-[min(720px,100%)] [&_svg]:text-[#b496ff]">
         {state === "idle" || (state === "error" && !file) ? <>
           <FileDropZone files={[]} onFiles={(files) => { const selected = files.at(-1); if (selected) chooseFile(selected); }} accept={OFFICE_ACCEPT} hint={L("파일을 놓거나 선택하면 편집 준비와 문서 열기를 자동으로 시작합니다.", "Drop or choose a file to prepare the editor and open it automatically.")} accent="violet" disabled={busy} />
-          <span>{L("최초 실행에는 대용량 편집 파일과 한글 글꼴을 내려받습니다.", "The first run downloads the editor and a Korean font file.")}</span>
-        </> : <><Download size={30} /><strong>{file?.name}</strong><span>{state === "preparing" || state === "opening" ? L(`준비 중 · ${elapsed}초 경과`, `Preparing · ${elapsed}s elapsed`) : operation.message}</span></>}
+          <span className="text-[13px] text-[#aaaab3]">{L("최초 실행에는 대용량 편집 파일과 한글 글꼴을 내려받습니다.", "The first run downloads the editor and a Korean font file.")}</span>
+        </> : <><Download size={30} /><strong className="max-w-[620px] text-base [overflow-wrap:anywhere]">{file?.name}</strong><span className="text-[13px] text-[#aaaab3]">{state === "preparing" || state === "opening" ? L(`준비 중 · ${elapsed}초 경과`, `Preparing · ${elapsed}s elapsed`) : operation.message}</span></>}
       </div>}
-      <canvas ref={canvasRef} id="qtcanvas" contentEditable tabIndex={0} className="office-canvas" onPointerDown={(event) => event.currentTarget.focus()} onContextMenu={(event) => event.preventDefault()} />
+      <canvas ref={canvasRef} id="qtcanvas" contentEditable tabIndex={0} className="block h-full min-h-[inherit] w-full border-0 p-0 outline-0 focus-visible:ring-3 focus-visible:ring-violet-400/50" data-testid="office-canvas" onPointerDown={(event) => event.currentTarget.focus()} onContextMenu={(event) => event.preventDefault()} />
     </div>
-    {dragging && !busy && <div className="office-drop-overlay"><FileUp size={32} /><strong>{L("여기에 놓아 문서 열기", "Drop to open the document")}</strong></div>}
+    {dragging && !busy && <div className="pointer-events-none fixed inset-y-4 right-4 left-[296px] z-80 grid place-items-center content-center gap-2.5 rounded-[20px] border-[3px] border-dashed border-[#b496ff] bg-[rgba(54,37,82,.88)] text-white max-[1020px]:left-[266px] max-[820px]:inset-2 max-[820px]:rounded-[14px] [&_svg]:text-[#c8b3ff]" data-testid="office-drop-overlay"><FileUp size={32} /><strong>{L("여기에 놓아 문서 열기", "Drop to open the document")}</strong></div>}
   </div>;
 }
 

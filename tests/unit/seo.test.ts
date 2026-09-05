@@ -8,7 +8,7 @@ const toolRoutes = [
   "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
   "/tools/text-formatter", "/tools/work-calculator", "/tools/timezone-calculator", "/tools/payroll-calculator",
-  "/tools/image-privacy", "/tools/security-tools", "/tools/qr-studio", "/tools/data-converter",
+  "/tools/image-privacy", "/tools/security-tools", "/tools/qr-studio", "/tools/qr-studio/bulk", "/tools/data-converter",
 ];
 
 test("tool metadata keeps a distinct identity in Korean and English", () => {
@@ -19,6 +19,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/image-studio": "이미지 스튜디오 | 사진 편집·모자이크·콜라주·GIF",
       "/tools/image-privacy": "사진 메타데이터 제거 | EXIF·GPS 확인 및 삭제",
       "/tools/qr-studio": "QR 스튜디오 | QR 코드 만들기·카메라 스캔",
+      "/tools/qr-studio/bulk": "QR 일괄 생성 | Excel·CSV 행별 PNG·ZIP·라벨 PDF",
       "/tools/data-converter": "표 데이터 변환기 | CSV·JSON·HTML 상호 변환",
       "/tools/document-compare": "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
       "/tools/excel-compare": "Excel 파일 비교 - XLSX·XLSM·XLS·XLSB·CSV Diff",
@@ -32,6 +33,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/image-studio": "Image Studio | Edit Photos, Mosaic, Collage & GIF",
       "/tools/image-privacy": "Photo Metadata Remover | Inspect & Remove EXIF and GPS",
       "/tools/qr-studio": "QR Studio | Create & Scan QR Codes",
+      "/tools/qr-studio/bulk": "Bulk QR Generator | Excel & CSV to PNG, ZIP and Label PDF",
       "/tools/data-converter": "Table Data Converter | Convert CSV, JSON & HTML",
       "/tools/document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
       "/tools/excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
@@ -93,5 +95,8 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     assert.equal(videoFaq?.length, 1);
     assert.ok(videoFaq?.every((item) => item.question && item.answer));
     assert.ok(getSeoDefinition(language, "/tools/video-studio").application?.featureList.some((feature) => /구간 일괄|ranges across groups/i.test(feature)));
+    const qrBulkFaq = getSeoDefinition(language, "/tools/qr-studio/bulk").faq;
+    assert.equal(qrBulkFaq?.length, 3);
+    assert.ok(qrBulkFaq?.every((item) => item.question && item.answer));
   }
 });

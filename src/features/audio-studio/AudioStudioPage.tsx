@@ -29,7 +29,10 @@ import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
-import { FileDropZone, PageHeader, SectionCard, ToggleRow, formatBytes } from "../../components/ui";
+import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
+import { FileDropZone, PageHeader, ToggleRow, formatBytes } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { audioHistoryLimit, createAudioFileName, formatAudioTime } from "./audioHelpers";
 import { AudioExportPanel, VoiceEffectPanel, type AudioExportFormat, type VoicePreset } from "./AudioStudioPanels";
@@ -553,62 +556,63 @@ export function AudioStudioPage() {
   }, [busy, clipboard, redoHistory.length, undoHistory.length]);
 
   return (
-    <div className="page tool-page page-enter audio-studio-page">
+    <UtilityPage toolId="audio-studio">
+      <div className="audio-studio-page">
       <PageHeader eyebrow="AUDIO WAVEFORM STUDIO" title={t("audio.title")} description={t("audio.description")}>
         <PrivacyBanner compact />
       </PageHeader>
 
-      <SectionCard step={1} title={t("audio.select")} description={t("audio.selectHelp")}>
+      <UtilitySectionCard step={1} title={t("audio.select")} description={t("audio.selectHelp")} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
         <FileDropZone files={files} onFiles={handleFiles} accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hint={t("audio.hint")} accent="violet" />
-        <div className="inline-notice"><AlertTriangle size={16} /><span>{t("audio.compatibility")}</span></div>
+        <UtilityNotice className="mt-3 bg-violet-500/10 text-muted-foreground"><AlertTriangle className="mt-0.5 shrink-0 text-violet-700 dark:text-violet-300" size={16} /><span>{t("audio.compatibility")}</span></UtilityNotice>
         {document && (
-          <div className="audio-file-summary">
-            <FileAudio2 size={21} />
-            <span><strong>{document.sourceName}</strong><small>{formatAudioTime(document.duration)} · {t("audio.channels", { count: document.channels.length })} · {document.sampleRate.toLocaleString(i18n.language)}Hz · {t("audio.memory", { size: formatBytes(pcmSize) })}</small></span>
-          </div>
+          <Card className="audio-file-summary mt-3 min-w-0 flex-row items-center gap-2.5 overflow-visible rounded-2xl border border-violet-300/40 bg-violet-50/70 p-3 py-3 text-violet-700 shadow-none ring-0 dark:border-violet-900 dark:bg-violet-950/35 dark:text-violet-300">
+            <FileAudio2 className="shrink-0" size={21} />
+            <span className="flex min-w-0 flex-col"><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] text-foreground">{document.sourceName}</strong><small className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{formatAudioTime(document.duration)} · {t("audio.channels", { count: document.channels.length })} · {document.sampleRate.toLocaleString(i18n.language)}Hz · {t("audio.memory", { size: formatBytes(pcmSize) })}</small></span>
+          </Card>
         )}
-      </SectionCard>
+      </UtilitySectionCard>
 
       {document && (
-        <SectionCard step={2} title={t("audio.waveTitle")} description={t("audio.waveHelp")}>
-          <div className="audio-waveform-toolbar">
-            <span><Waves size={18} /><strong>{t("audio.highResolution")}</strong><small>{t("audio.pxSecond", { count: ZOOM_LEVELS[zoomIndex] })}</small></span>
-            <div>
-              <button type="button" aria-label={t("audio.zoomOut")} disabled={zoomIndex === 0} onClick={() => updateZoom(-1)}><ZoomOut size={18} /></button>
-              <button type="button" aria-label={t("audio.zoomIn")} disabled={zoomIndex === ZOOM_LEVELS.length - 1} onClick={() => updateZoom(1)}><ZoomIn size={18} /></button>
+        <UtilitySectionCard step={2} title={t("audio.waveTitle")} description={t("audio.waveHelp")} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
+          <div className="audio-waveform-toolbar mb-2 flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-2 text-violet-700 dark:text-violet-300"><Waves size={18} /><strong className="text-[15px] text-foreground">{t("audio.highResolution")}</strong><small className="text-[13px] text-muted-foreground">{t("audio.pxSecond", { count: ZOOM_LEVELS[zoomIndex] })}</small></span>
+            <div className="flex gap-1">
+              <Button className="size-9 rounded-xl bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300" variant="ghost" size="icon" type="button" aria-label={t("audio.zoomOut")} disabled={zoomIndex === 0} onClick={() => updateZoom(-1)}><ZoomOut size={18} /></Button>
+              <Button className="size-9 rounded-xl bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300" variant="ghost" size="icon" type="button" aria-label={t("audio.zoomIn")} disabled={zoomIndex === ZOOM_LEVELS.length - 1} onClick={() => updateZoom(1)}><ZoomIn size={18} /></Button>
             </div>
           </div>
-          <div className="audio-waveform-shell">
-            <div className="audio-waveform" ref={waveformContainerRef} />
+          <div className="audio-waveform-shell overflow-hidden rounded-2xl border border-border bg-muted p-[11px_11px_5px] shadow-inner">
+            <div className="audio-waveform min-h-[218px] max-[620px]:min-h-[190px] [&_::part(cursor)]:[filter:drop-shadow(0_0_3px_rgba(255,55,95,.4))] [&_::part(region)]:rounded-md [&_::part(region)]:border-x-2 [&_::part(region)]:border-violet-600/70 [&_::part(scroll)]:[scrollbar-color:rgba(139,92,246,.5)_transparent] [&_::part(scroll)]:[scrollbar-width:thin]" ref={waveformContainerRef} />
           </div>
 
-          <div className="audio-selection-panel">
-            <label><span>{t("audio.start")}</span><AudioSelectionInput value={selection?.start || 0} min={0} max={(selection?.end || document.duration) - MIN_SELECTION_SECONDS} onCommit={(value) => updateSelectionNumber("start", value)} /></label>
-            <div><small>{t("audio.duration")}</small><strong>{formatAudioTime(selectionDuration)}</strong></div>
-            <label><span>{t("audio.end")}</span><AudioSelectionInput value={selection?.end || 0} min={(selection?.start || 0) + MIN_SELECTION_SECONDS} max={document.duration} onCommit={(value) => updateSelectionNumber("end", value)} /></label>
+          <div className="audio-selection-panel mt-3 grid grid-cols-[minmax(160px,1fr)_minmax(180px,auto)_minmax(160px,1fr)] items-end gap-2.5 max-[620px]:grid-cols-2">
+            <UtilityField><span>{t("audio.start")}</span><AudioSelectionInput value={selection?.start || 0} min={0} max={(selection?.end || document.duration) - MIN_SELECTION_SECONDS} onCommit={(value) => updateSelectionNumber("start", value)} /></UtilityField>
+            <div className="flex min-h-[58px] flex-col items-center justify-center rounded-xl bg-violet-500/10 px-3 py-2 text-violet-700 max-[620px]:col-span-2 max-[620px]:row-start-1 max-[620px]:min-h-[50px] dark:text-violet-300"><small className="text-xs text-muted-foreground">{t("audio.duration")}</small><strong className="mt-1 text-[15px] text-foreground tabular-nums">{formatAudioTime(selectionDuration)}</strong></div>
+            <UtilityField><span>{t("audio.end")}</span><AudioSelectionInput value={selection?.end || 0} min={(selection?.start || 0) + MIN_SELECTION_SECONDS} max={document.duration} onCommit={(value) => updateSelectionNumber("end", value)} /></UtilityField>
           </div>
 
-          <div className="audio-transport">
-            <button type="button" aria-label={t("audio.rewind")} onClick={() => wavesurferRef.current?.setTime(0)}><SkipBack size={20} /></button>
-            <button type="button" className="audio-play-button" aria-label={isPlaying ? t("audio.pause") : t("audio.play")} aria-keyshortcuts="Space" onClick={() => void togglePlayback()}>{isPlaying ? <Pause size={22} /> : <Play size={22} />}</button>
-            <div className="audio-timecode"><strong>{formatAudioTime(currentTime)}</strong><span>/</span><small>{formatAudioTime(document.duration)}</small></div>
-            <div className="audio-loop-control"><Repeat2 size={17} /><ToggleRow label={t("audio.loop")} checked={loop} onChange={setLoop} /></div>
+          <div className="audio-transport mt-3 grid grid-cols-[42px_52px_minmax(260px,1fr)_minmax(230px,auto)] items-center gap-2 rounded-2xl border border-border bg-muted p-2 max-[620px]:grid-cols-[42px_52px_minmax(0,1fr)]">
+            <Button className="size-[42px] rounded-full border-border bg-card text-violet-700 dark:text-violet-300" variant="outline" size="icon-lg" type="button" aria-label={t("audio.rewind")} onClick={() => wavesurferRef.current?.setTime(0)}><SkipBack size={20} /></Button>
+            <Button className="audio-play-button size-[50px] rounded-full bg-gradient-to-b from-violet-500 to-violet-700 text-white shadow-lg shadow-violet-700/25 hover:from-violet-600 hover:to-violet-800" size="icon-lg" type="button" aria-label={isPlaying ? t("audio.pause") : t("audio.play")} aria-keyshortcuts="Space" onClick={() => void togglePlayback()}>{isPlaying ? <Pause size={22} /> : <Play size={22} />}</Button>
+            <div className="audio-timecode flex min-w-0 items-baseline justify-center gap-2 tabular-nums max-[620px]:flex-col max-[620px]:items-end max-[620px]:gap-0.5"><strong className="text-lg tracking-wide text-foreground max-[620px]:text-base">{formatAudioTime(currentTime)}</strong><span className="text-sm text-muted-foreground max-[620px]:hidden">/</span><small className="text-sm text-muted-foreground max-[620px]:text-xs">{formatAudioTime(document.duration)}</small></div>
+            <div className="audio-loop-control flex items-center gap-1 text-violet-700 max-[620px]:col-span-3 dark:text-violet-300"><Repeat2 className="shrink-0" size={17} /><ToggleRow label={t("audio.loop")} checked={loop} onChange={setLoop} /></div>
           </div>
 
-          <div className="audio-edit-toolbar" aria-label={t("audio.toolbar")}>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("MUTE")}><VolumeX size={18} /><span>{t("audio.mute")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("CUT")}><Scissors size={18} /><span>{t("audio.cut")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("COPY")}><Copy size={18} /><span>{t("audio.copy")}</span></button>
-            <button type="button" disabled={busy || !clipboard} onClick={() => void applyEdit("PASTE")}><ClipboardPaste size={18} /><span>{t("audio.paste")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("DELETE")}><Trash2 size={18} /><span>{t("audio.delete")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_IN")}><Waves size={18} /><span>{t("audio.edit.FADE_IN")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("FADE_OUT")}><Waves size={18} /><span>{t("audio.edit.FADE_OUT")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("NORMALIZE")}><SlidersHorizontal size={18} /><span>{t("audio.edit.NORMALIZE")}</span></button>
-            <button type="button" disabled={busy || !selection} onClick={() => void applyEdit("TRIM")}><Scissors size={18} /><span>{t("audio.edit.TRIM")}</span></button>
-            <button type="button" aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || !undoHistory.length} onClick={() => void restoreHistory("undo")}><Undo2 size={18} /><span>{t("audio.undo")}</span><small>{undoHistory.length}</small></button>
-            <button type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y" disabled={busy || !redoHistory.length} onClick={() => void restoreHistory("redo")}><Redo2 size={18} /><span>{t("audio.redo")}</span><small>{redoHistory.length}</small></button>
+          <div className="audio-edit-toolbar mt-3 grid grid-cols-4 gap-2 max-[620px]:grid-cols-2" aria-label={t("audio.toolbar")}>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("MUTE")}><VolumeX size={18} /><span>{t("audio.mute")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("CUT")}><Scissors size={18} /><span>{t("audio.cut")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("COPY")}><Copy size={18} /><span>{t("audio.copy")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !clipboard} onClick={() => void applyEdit("PASTE")}><ClipboardPaste size={18} /><span>{t("audio.paste")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("DELETE")}><Trash2 size={18} /><span>{t("audio.delete")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("FADE_IN")}><Waves size={18} /><span>{t("audio.edit.FADE_IN")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("FADE_OUT")}><Waves size={18} /><span>{t("audio.edit.FADE_OUT")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("NORMALIZE")}><SlidersHorizontal size={18} /><span>{t("audio.edit.NORMALIZE")}</span></AudioToolButton>
+            <AudioToolButton disabled={busy || !selection} onClick={() => void applyEdit("TRIM")}><Scissors size={18} /><span>{t("audio.edit.TRIM")}</span></AudioToolButton>
+            <AudioToolButton aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || !undoHistory.length} onClick={() => void restoreHistory("undo")}><Undo2 size={18} /><span>{t("audio.undo")}</span><small className="absolute top-1 right-2 grid size-[17px] place-items-center rounded-full bg-violet-700 text-[10px] text-white">{undoHistory.length}</small></AudioToolButton>
+            <AudioToolButton aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y" disabled={busy || !redoHistory.length} onClick={() => void restoreHistory("redo")}><Redo2 size={18} /><span>{t("audio.redo")}</span><small className="absolute top-1 right-2 grid size-[17px] place-items-center rounded-full bg-violet-700 text-[10px] text-white">{redoHistory.length}</small></AudioToolButton>
           </div>
-          <div className="audio-gain-control"><label><span>{t("audio.selectionGain")}</span><input type="range" min={0} max={2} step={0.05} value={gain} onChange={(event) => setGain(Number(event.target.value))} /><b>{gain.toFixed(2)}×</b></label><button type="button" className="secondary-button" disabled={busy || !selection} onClick={() => void applyEdit("GAIN")}>{t("audio.edit.GAIN")}</button></div>
+          <div className="audio-gain-control mt-3 flex items-center gap-3 rounded-xl bg-muted p-3 max-[620px]:flex-col max-[620px]:items-stretch"><label className="grid min-w-0 flex-1 grid-cols-[auto_minmax(100px,1fr)_46px] items-center gap-3 text-[13px] font-bold text-muted-foreground"><span>{t("audio.selectionGain")}</span><input className="w-full [accent-color:var(--color-violet-700)]" type="range" min={0} max={2} step={0.05} value={gain} onChange={(event) => setGain(Number(event.target.value))} /><b className="text-right text-violet-700 tabular-nums dark:text-violet-300">{gain.toFixed(2)}×</b></label><Button type="button" className="rounded-xl" variant="secondary" disabled={busy || !selection} onClick={() => void applyEdit("GAIN")}>{t("audio.edit.GAIN")}</Button></div>
 
           <VoiceEffectPanel
             busy={busy}
@@ -622,15 +626,15 @@ export function AudioStudioPage() {
             previewUrl={effectPreviewUrl}
             audioRef={effectPreviewAudioRef}
           />
-          <div className={`audio-clipboard-status${clipboard ? " has-clip" : ""}`}><ClipboardCopy size={17} /><span>{clipboard ? t("audio.clipboard", { duration: formatAudioTime(clipboard.duration), channels: clipboard.channels.length }) : t("audio.clipboardEmpty")}</span></div>
-        </SectionCard>
+          <div className={`audio-clipboard-status mt-2 flex items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] ${clipboard ? "bg-violet-500/10 text-violet-700 dark:text-violet-300" : "bg-muted text-muted-foreground"}`} data-has-clip={clipboard ? "true" : "false"}><ClipboardCopy size={17} /><span>{clipboard ? t("audio.clipboard", { duration: formatAudioTime(clipboard.duration), channels: clipboard.channels.length }) : t("audio.clipboardEmpty")}</span></div>
+        </UtilitySectionCard>
       )}
 
       {document && <AudioExportPanel format={exportFormat} bitrate={mp3Bitrate} busy={busy} selectionDuration={selection ? selectionDuration : undefined} exportSelection={exportSelection} onFormat={setExportFormat} onBitrate={setMp3Bitrate} onExportSelection={setExportSelection} onExport={() => void exportAudio()} />}
 
       <OperationProgress {...progress} accent="violet" title={t("audio.log")} />
-      {busy && <div className="cancel-operation"><button type="button" className="secondary-button" onClick={() => { cancelDecode(); activeControllerRef.current?.abort(); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</button></div>}
-      {lastResult && <div className="inline-success"><FileAudio2 size={18} /><span>{lastResult}</span></div>}
+      {busy && <div className="mt-2 flex justify-end"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => { cancelDecode(); activeControllerRef.current?.abort(); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</Button></div>}
+      {lastResult && <UtilityNotice className="mt-3" tone="success" role="status" data-testid="audio-result"><FileAudio2 className="mt-0.5 shrink-0" size={18} /><span>{lastResult}</span></UtilityNotice>}
 
       <ToolGuide
         title={t("audio.guide.title")}
@@ -638,7 +642,8 @@ export function AudioStudioPage() {
         blocks={(t("audio.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
         faq={(t("audio.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
-    </div>
+      </div>
+    </UtilityPage>
   );
 }
 
@@ -655,7 +660,11 @@ function AudioSelectionInput({ value, min, max, onCommit }: { value: number; min
     setDraft(next.toFixed(3));
     onCommit(next);
   };
-  return <input type="number" min={min} max={max} step="0.001" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") { setDraft(value.toFixed(3)); event.currentTarget.blur(); } }} />;
+  return <UtilityInput className="tabular-nums" type="number" min={min} max={max} step="0.001" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") { setDraft(value.toFixed(3)); event.currentTarget.blur(); } }} />;
+}
+
+function AudioToolButton({ children, ...props }: React.ComponentProps<typeof Button>) {
+  return <Button {...props} type="button" variant="outline" className="relative min-h-[58px] flex-col gap-1 rounded-xl border-violet-300/40 bg-violet-500/10 p-2 text-[13px] font-bold text-violet-700 hover:-translate-y-px hover:bg-violet-500/15 hover:shadow-md disabled:border-border disabled:bg-muted disabled:text-muted-foreground dark:border-violet-900 dark:text-violet-300">{children}</Button>;
 }
 
 function defaultSelection(duration: number): AudioSelection | undefined {

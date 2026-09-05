@@ -1,0 +1,145 @@
+{
+  "url": "http://127.0.0.1:4176/ko/tools/document-compare",
+  "viewport": {
+    "width": 1365,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "switches": [
+    {
+      "checked": "true",
+      "track": {
+        "width": 43,
+        "height": 25,
+        "radius": "3.35544e+07px"
+      },
+      "thumb": {
+        "width": 21,
+        "height": 21,
+        "leftInset": 20,
+        "rightInset": 2,
+        "verticalCenterDelta": 0
+      }
+    },
+    {
+      "checked": "true",
+      "track": {
+        "width": 43,
+        "height": 25,
+        "radius": "3.35544e+07px"
+      },
+      "thumb": {
+        "width": 21,
+        "height": 21,
+        "leftInset": 20,
+        "rightInset": 2,
+        "verticalCenterDelta": 0
+      }
+    },
+    {
+      "checked": "true",
+      "track": {
+        "width": 43,
+        "height": 25,
+        "radius": "3.35544e+07px"
+      },
+      "thumb": {
+        "width": 21,
+        "height": 21,
+        "leftInset": 20,
+        "rightInset": 2,
+        "verticalCenterDelta": 0
+      }
+    },
+    {
+      "checked": "false",
+      "track": {
+        "width": 43,
+        "height": 25,
+        "radius": "3.35544e+07px"
+      },
+      "thumb": {
+        "width": 21,
+        "height": 21,
+        "leftInset": 2,
+        "rightInset": 20,
+        "verticalCenterDelta": 0
+      }
+    },
+    {
+      "checked": "true",
+      "track": {
+        "width": 43,
+        "height": 25,
+        "radius": "3.35544e+07px"
+      },
+      "thumb": {
+        "width": 21,
+        "height": 21,
+        "leftInset": 20,
+        "rightInset": 2,
+        "verticalCenterDelta": 0
+      }
+    },
+    {
+      "checked": "true",
+      "track": {
+        "width": 43,
+        "height": 25,
+        "radius": "3.35544e+07px"
+      },
+      "thumb": {
+        "width": 21,
+        "height": 21,
+        "leftInset": 20,
+        "rightInset": 2,
+        "verticalCenterDelta": 0
+      }
+    },
+    {
+      "checked": "true",
+      "track": {
+        "width": 43,
+        "height": 25,
+        "radius": "3.35544e+07px"
+      },
+      "thumb": {
+        "width": 21,
+        "height": 21,
+        "leftInset": 20,
+        "rightInset": 2,
+        "verticalCenterDelta": 0
+      }
+    }
+  ],
+  "actionBar": {
+    "button": {
+      "width": 190,
+      "height": 48,
+      "className": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap transition-all outline-none select-none focus-visible:ring-3 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 ui-primary-button ui-accent-blue h-12 rounded-2xl text-[15px] font-bold bg-blue-700 text-white shadow-md shadow-blue-700/20 hover:bg-blue-800 focus-visible:border-blue-700 focus-visible:ring-blue-700/30"
+    },
+    "copy": {
+      "width": 747,
+      "height": 42.5625,
+      "writingMode": "horizontal-tb"
+    },
+    "strong": {
+      "width": 747,
+      "height": 20,
+      "writingMode": "horizontal-tb"
+    },
+    "small": {
+      "width": 747,
+      "height": 18.5625,
+      "writingMode": "horizontal-tb"
+    },
+    "pageOverflow": 0
+  },
+  "legacyMatches": [],
+  "tracking": {
+    "google": 0,
+    "naver": 0,
+    "adsense": 0
+  },
+  "externalRequests": []
+}

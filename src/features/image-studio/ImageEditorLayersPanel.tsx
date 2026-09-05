@@ -3,6 +3,9 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Sortable from "sortablejs";
 
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { cn } from "../../lib/utils";
 import type { EditorLayerItem, EditorLayerKind } from "./imageEditorTypes";
 
 interface ImageEditorLayersPanelProps {
@@ -16,6 +19,7 @@ interface ImageEditorLayersPanelProps {
 export function ImageEditorLayersPanel({ layers, onSelect, onVisibilityChange, onDelete, onReorder }: ImageEditorLayersPanelProps) {
   const { t } = useTranslation("features");
   const listRef = useRef<HTMLDivElement>(null);
+  const movableLayers = layers.filter((layer) => !layer.isBase);
 
   useEffect(() => {
     const list = listRef.current;
@@ -35,13 +39,17 @@ export function ImageEditorLayersPanel({ layers, onSelect, onVisibilityChange, o
     return () => sortable.destroy();
   }, [onReorder]);
 
-  return <div className="editor-tool-group image-editor-layers" data-testid="image-editor-layers">
+  return <Card className="editor-tool-group image-editor-layers gap-0 rounded-xl bg-muted py-2 shadow-none ring-0" data-testid="image-editor-layers">
     <p>{t("image.editor.layersHelp")}</p>
     <div ref={listRef} className="image-editor-layer-list" role="list" aria-label={t("image.editor.layersList")}>
       {layers.map((layer) => {
         const Icon = LAYER_ICONS[layer.kind];
-        return <div
-          className={`image-editor-layer-row${layer.isBase ? " is-base" : " is-movable"}${layer.active ? " is-active" : ""}`}
+        const layerKind = t(`image.editor.layerKind.${layer.kind}`);
+        const layerName = layer.name || layerKind;
+        const layerNumber = layers.indexOf(layer) + 1;
+        const movableIndex = movableLayers.findIndex((candidate) => candidate.id === layer.id);
+        return <Card
+          className={cn("image-editor-layer-row grid grid-cols-[minmax(0,1fr)_34px_34px] items-center gap-1 rounded-xl border border-border bg-card p-1 py-1 shadow-none ring-0 max-[820px]:grid-cols-[minmax(0,1fr)_44px_44px]", layer.isBase ? "is-base" : "is-movable", layer.active && "is-active border-sky-600 ring-2 ring-sky-500/10")}
           data-layer-id={layer.id}
           data-layer-kind={layer.kind}
           data-layer-visible={layer.visible}
@@ -49,18 +57,23 @@ export function ImageEditorLayersPanel({ layers, onSelect, onVisibilityChange, o
           role="listitem"
           key={layer.id}
         >
-          <button type="button" className="image-editor-layer-select" aria-pressed={layer.active} onClick={() => onSelect(layer.id)}>
-            {layer.isBase ? <Lock size={14} className="image-editor-layer-lock" aria-label={t("image.editor.layerLocked")} /> : <GripVertical size={15} className="image-editor-layer-drag" aria-hidden="true" />}
+          <Button type="button" variant="ghost" className="image-editor-layer-select h-[34px] min-w-0 justify-start gap-2 rounded-lg px-1.5 text-xs font-bold" aria-label={t("image.editor.layerSelect", { number: layerNumber, layer: layerName })} aria-pressed={layer.active} onKeyDown={(event) => {
+            if (!event.altKey || layer.isBase || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+            event.preventDefault();
+            const nextIndex = movableIndex + (event.key === "ArrowUp" ? -1 : 1);
+            if (nextIndex >= 0 && nextIndex < movableLayers.length) onReorder(layer.id, nextIndex);
+          }} onClick={() => onSelect(layer.id)}>
+            {layer.isBase ? <Lock size={14} className="image-editor-layer-lock" aria-label={t("image.editor.layerLocked")} /> : <span className="image-editor-layer-drag" aria-hidden="true"><GripVertical size={15} /></span>}
             <Icon size={17} />
-            <span>{t(`image.editor.layerKind.${layer.kind}`)}</span>
-          </button>
-          <button type="button" className="image-editor-layer-visibility" aria-label={t(layer.visible ? "image.editor.layerHide" : "image.editor.layerShow", { layer: t(`image.editor.layerKind.${layer.kind}`) })} onClick={() => onVisibilityChange(layer.id)}>{layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}</button>
-          <button type="button" className="image-editor-layer-delete" aria-label={t("image.editor.layerDelete", { layer: t(`image.editor.layerKind.${layer.kind}`) })} disabled={layer.isBase} onClick={() => onDelete(layer.id)}><Trash2 size={16} /></button>
-        </div>;
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{layerName}</span>
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="image-editor-layer-visibility size-[34px] rounded-lg text-sky-700 max-[820px]:size-11 dark:text-sky-300" aria-label={t(layer.visible ? "image.editor.layerHide" : "image.editor.layerShow", { number: layerNumber, layer: layerName })} onClick={() => onVisibilityChange(layer.id)}>{layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}</Button>
+          <Button type="button" variant="destructive" size="icon" className="image-editor-layer-delete size-[34px] rounded-lg max-[820px]:size-11" aria-label={t("image.editor.layerDelete", { number: layerNumber, layer: layerName })} disabled={layer.isBase} onClick={() => onDelete(layer.id)}><Trash2 size={16} /></Button>
+        </Card>;
       })}
       {!layers.length && <p className="image-editor-layers-empty">{t("image.editor.layersEmpty")}</p>}
     </div>
-  </div>;
+  </Card>;
 }
 
 const LAYER_ICONS = {

@@ -1,0 +1,5 @@
+
+> worklazytools@0.1.0 test:xls-preserve
+> node tests/xls-preserve-smoke.mjs
+
+Excel retention smoke passed: four XLSX states, three XLS preservation states, 10 progress states, and all three degradation branches.

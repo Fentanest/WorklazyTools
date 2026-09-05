@@ -1,0 +1,2758 @@
+[
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 390,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 41,
+          "top": 153.640625,
+          "right": 141,
+          "bottom": 197.640625,
+          "width": 100,
+          "height": 44
+        },
+        "textRects": [
+          {
+            "left": 71.671875,
+            "top": 165.640625,
+            "right": 110.3125,
+            "bottom": 185.640625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 100,
+        "clientWidth": 100
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 145,
+          "top": 153.640625,
+          "right": 245,
+          "bottom": 197.640625,
+          "width": 100,
+          "height": 44
+        },
+        "textRects": [
+          {
+            "left": 182.109375,
+            "top": 165.640625,
+            "right": 207.875,
+            "bottom": 185.640625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 100,
+        "clientWidth": 100
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 249,
+          "top": 153.640625,
+          "right": 349,
+          "bottom": 197.640625,
+          "width": 100,
+          "height": 44
+        },
+        "textRects": [
+          {
+            "left": 286.109375,
+            "top": 165.640625,
+            "right": 311.875,
+            "bottom": 185.640625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 100,
+        "clientWidth": 100
+      }
+    ],
+    "target": {
+      "left": 37,
+      "top": 149.640625,
+      "right": 353,
+      "bottom": 201.640625,
+      "width": 316,
+      "height": 52
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 1365,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 341,
+          "top": 154.40625,
+          "right": 559.328125,
+          "bottom": 190.40625,
+          "width": 218.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 430.84375,
+            "top": 162.40625,
+            "right": 469.484375,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 218,
+        "clientWidth": 218
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 563.328125,
+          "top": 154.40625,
+          "right": 781.65625,
+          "bottom": 190.40625,
+          "width": 218.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 659.609375,
+            "top": 162.40625,
+            "right": 685.375,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 218,
+        "clientWidth": 218
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 785.65625,
+          "top": 154.40625,
+          "right": 1003.984375,
+          "bottom": 190.40625,
+          "width": 218.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 881.9375,
+            "top": 162.40625,
+            "right": 907.703125,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 218,
+        "clientWidth": 218
+      }
+    ],
+    "target": {
+      "left": 337,
+      "top": 150.40625,
+      "right": 1008,
+      "bottom": 194.40625,
+      "width": 671,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 320,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 41,
+          "top": 154.078125,
+          "right": 117.65625,
+          "bottom": 198.078125,
+          "width": 76.65625,
+          "height": 44
+        },
+        "textRects": [
+          {
+            "left": 60,
+            "top": 166.078125,
+            "right": 98.640625,
+            "bottom": 186.078125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 77,
+        "clientWidth": 77
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 121.65625,
+          "top": 154.078125,
+          "right": 198.328125,
+          "bottom": 198.078125,
+          "width": 76.671875,
+          "height": 44
+        },
+        "textRects": [
+          {
+            "left": 147.109375,
+            "top": 166.078125,
+            "right": 172.875,
+            "bottom": 186.078125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 77,
+        "clientWidth": 77
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 202.328125,
+          "top": 154.078125,
+          "right": 278.984375,
+          "bottom": 198.078125,
+          "width": 76.65625,
+          "height": 44
+        },
+        "textRects": [
+          {
+            "left": 227.765625,
+            "top": 166.078125,
+            "right": 253.53125,
+            "bottom": 186.078125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 77,
+        "clientWidth": 77
+      }
+    ],
+    "target": {
+      "left": 37,
+      "top": 150.078125,
+      "right": 283,
+      "bottom": 202.078125,
+      "width": 246,
+      "height": 52
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 620,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 41,
+          "top": 154.09375,
+          "right": 217.65625,
+          "bottom": 190.09375,
+          "width": 176.65625,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 110,
+            "top": 162.09375,
+            "right": 148.640625,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 177,
+        "clientWidth": 177
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 221.65625,
+          "top": 154.09375,
+          "right": 398.328125,
+          "bottom": 190.09375,
+          "width": 176.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 297.109375,
+            "top": 162.09375,
+            "right": 322.875,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 177,
+        "clientWidth": 177
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 402.328125,
+          "top": 154.09375,
+          "right": 579,
+          "bottom": 190.09375,
+          "width": 176.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 477.78125,
+            "top": 162.09375,
+            "right": 503.546875,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 177,
+        "clientWidth": 177
+      }
+    ],
+    "target": {
+      "left": 37,
+      "top": 150.09375,
+      "right": 583,
+      "bottom": 194.09375,
+      "width": 546,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 621,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 45,
+          "top": 154.09375,
+          "right": 219.328125,
+          "bottom": 190.09375,
+          "width": 174.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 112.84375,
+            "top": 162.09375,
+            "right": 151.484375,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 174,
+        "clientWidth": 174
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 223.328125,
+          "top": 154.09375,
+          "right": 397.65625,
+          "bottom": 190.09375,
+          "width": 174.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 297.609375,
+            "top": 162.09375,
+            "right": 323.375,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 174,
+        "clientWidth": 174
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 401.65625,
+          "top": 154.09375,
+          "right": 575.984375,
+          "bottom": 190.09375,
+          "width": 174.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 475.9375,
+            "top": 162.09375,
+            "right": 501.703125,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 174,
+        "clientWidth": 174
+      }
+    ],
+    "target": {
+      "left": 41,
+      "top": 150.09375,
+      "right": 580,
+      "bottom": 194.09375,
+      "width": 539,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 820,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 45,
+          "top": 153.65625,
+          "right": 285.65625,
+          "bottom": 189.65625,
+          "width": 240.65625,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 146,
+            "top": 161.65625,
+            "right": 184.640625,
+            "bottom": 181.65625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 241,
+        "clientWidth": 241
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 289.65625,
+          "top": 153.65625,
+          "right": 530.328125,
+          "bottom": 189.65625,
+          "width": 240.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 397.109375,
+            "top": 161.65625,
+            "right": 422.875,
+            "bottom": 181.65625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 241,
+        "clientWidth": 241
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 534.328125,
+          "top": 153.65625,
+          "right": 775,
+          "bottom": 189.65625,
+          "width": 240.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 641.78125,
+            "top": 161.65625,
+            "right": 667.546875,
+            "bottom": 181.65625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 241,
+        "clientWidth": 241
+      }
+    ],
+    "target": {
+      "left": 41,
+      "top": 149.65625,
+      "right": 779,
+      "bottom": 193.65625,
+      "width": 738,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 821,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 303,
+          "top": 154.09375,
+          "right": 455.328125,
+          "bottom": 190.09375,
+          "width": 152.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 359.84375,
+            "top": 162.09375,
+            "right": 398.484375,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 152,
+        "clientWidth": 152
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 459.328125,
+          "top": 154.09375,
+          "right": 611.65625,
+          "bottom": 190.09375,
+          "width": 152.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 522.609375,
+            "top": 162.09375,
+            "right": 548.375,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 152,
+        "clientWidth": 152
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 615.65625,
+          "top": 154.09375,
+          "right": 767.984375,
+          "bottom": 190.09375,
+          "width": 152.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 678.9375,
+            "top": 162.09375,
+            "right": 704.703125,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 152,
+        "clientWidth": 152
+      }
+    ],
+    "target": {
+      "left": 299,
+      "top": 150.09375,
+      "right": 772,
+      "bottom": 194.09375,
+      "width": 473,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "ko",
+    "width": 1020,
+    "items": [
+      {
+        "text": "시트별",
+        "rect": {
+          "left": 303,
+          "top": 154.203125,
+          "right": 421.65625,
+          "bottom": 190.203125,
+          "width": 118.65625,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 343,
+            "top": 162.203125,
+            "right": 381.640625,
+            "bottom": 182.203125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 119,
+        "clientWidth": 119
+      },
+      {
+        "text": "세로",
+        "rect": {
+          "left": 425.65625,
+          "top": 154.203125,
+          "right": 544.328125,
+          "bottom": 190.203125,
+          "width": 118.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 472.109375,
+            "top": 162.203125,
+            "right": 497.875,
+            "bottom": 182.203125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 119,
+        "clientWidth": 119
+      },
+      {
+        "text": "가로",
+        "rect": {
+          "left": 548.328125,
+          "top": 154.203125,
+          "right": 666.984375,
+          "bottom": 190.203125,
+          "width": 118.65625,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 594.765625,
+            "top": 162.203125,
+            "right": 620.53125,
+            "bottom": 182.203125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 119,
+        "clientWidth": 119
+      }
+    ],
+    "target": {
+      "left": 299,
+      "top": 150.203125,
+      "right": 671,
+      "bottom": 194.203125,
+      "width": 372,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 390,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 41,
+          "top": 153.953125,
+          "right": 141,
+          "bottom": 209.953125,
+          "width": 100,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 62,
+            "top": 161.953125,
+            "right": 120,
+            "bottom": 181.953125
+          },
+          {
+            "left": 69.953125,
+            "top": 181.953125,
+            "right": 112.046875,
+            "bottom": 201.953125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 100,
+        "clientWidth": 100
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 145,
+          "top": 153.953125,
+          "right": 245,
+          "bottom": 209.953125,
+          "width": 100,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 177.15625,
+            "top": 161.953125,
+            "right": 212.828125,
+            "bottom": 181.953125
+          },
+          {
+            "left": 165.15625,
+            "top": 181.953125,
+            "right": 224.828125,
+            "bottom": 201.953125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 100,
+        "clientWidth": 100
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 249,
+          "top": 153.953125,
+          "right": 349,
+          "bottom": 209.953125,
+          "width": 100,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 284.8125,
+            "top": 161.953125,
+            "right": 313.1875,
+            "bottom": 181.953125
+          },
+          {
+            "left": 260.0625,
+            "top": 181.953125,
+            "right": 337.921875,
+            "bottom": 201.953125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 100,
+        "clientWidth": 100
+      }
+    ],
+    "target": {
+      "left": 37,
+      "top": 149.953125,
+      "right": 353,
+      "bottom": 213.953125,
+      "width": 316,
+      "height": 64
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 1365,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 341,
+          "top": 154.40625,
+          "right": 559.328125,
+          "bottom": 190.40625,
+          "width": 218.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 398.546875,
+            "top": 162.40625,
+            "right": 501.765625,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 218,
+        "clientWidth": 218
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 563.328125,
+          "top": 154.40625,
+          "right": 781.65625,
+          "bottom": 190.40625,
+          "width": 218.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 623.25,
+            "top": 162.40625,
+            "right": 721.71875,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 218,
+        "clientWidth": 218
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 785.65625,
+          "top": 154.40625,
+          "right": 1003.984375,
+          "bottom": 190.40625,
+          "width": 218.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 840.140625,
+            "top": 162.40625,
+            "right": 949.5,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 218,
+        "clientWidth": 218
+      }
+    ],
+    "target": {
+      "left": 337,
+      "top": 150.40625,
+      "right": 1008,
+      "bottom": 194.40625,
+      "width": 671,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 320,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 41,
+          "top": 163.515625,
+          "right": 117.65625,
+          "bottom": 219.515625,
+          "width": 76.65625,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 50.328125,
+            "top": 171.515625,
+            "right": 108.328125,
+            "bottom": 191.515625
+          },
+          {
+            "left": 58.28125,
+            "top": 191.515625,
+            "right": 100.375,
+            "bottom": 211.515625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 77,
+        "clientWidth": 77
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 121.65625,
+          "top": 163.515625,
+          "right": 198.328125,
+          "bottom": 219.515625,
+          "width": 76.671875,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 142.15625,
+            "top": 171.515625,
+            "right": 177.828125,
+            "bottom": 191.515625
+          },
+          {
+            "left": 130.15625,
+            "top": 191.515625,
+            "right": 189.828125,
+            "bottom": 211.515625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 77,
+        "clientWidth": 77
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 202.328125,
+          "top": 153.515625,
+          "right": 278.984375,
+          "bottom": 229.515625,
+          "width": 76.65625,
+          "height": 76
+        },
+        "textRects": [
+          {
+            "left": 226.46875,
+            "top": 161.515625,
+            "right": 254.84375,
+            "bottom": 181.515625
+          },
+          {
+            "left": 207.359375,
+            "top": 181.515625,
+            "right": 273.953125,
+            "bottom": 201.515625
+          },
+          {
+            "left": 235.015625,
+            "top": 201.515625,
+            "right": 246.296875,
+            "bottom": 221.515625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 77,
+        "clientWidth": 77
+      }
+    ],
+    "target": {
+      "left": 37,
+      "top": 149.515625,
+      "right": 283,
+      "bottom": 233.515625,
+      "width": 246,
+      "height": 84
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 620,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 41,
+          "top": 154.09375,
+          "right": 217.65625,
+          "bottom": 190.09375,
+          "width": 176.65625,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 77.71875,
+            "top": 162.09375,
+            "right": 180.9375,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 177,
+        "clientWidth": 177
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 221.65625,
+          "top": 154.09375,
+          "right": 398.328125,
+          "bottom": 190.09375,
+          "width": 176.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 260.75,
+            "top": 162.09375,
+            "right": 359.21875,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 177,
+        "clientWidth": 177
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 402.328125,
+          "top": 154.09375,
+          "right": 579,
+          "bottom": 190.09375,
+          "width": 176.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 435.984375,
+            "top": 162.09375,
+            "right": 545.34375,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 177,
+        "clientWidth": 177
+      }
+    ],
+    "target": {
+      "left": 37,
+      "top": 150.09375,
+      "right": 583,
+      "bottom": 194.09375,
+      "width": 546,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 621,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 45,
+          "top": 154.09375,
+          "right": 219.328125,
+          "bottom": 190.09375,
+          "width": 174.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 80.546875,
+            "top": 162.09375,
+            "right": 183.765625,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 174,
+        "clientWidth": 174
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 223.328125,
+          "top": 154.09375,
+          "right": 397.65625,
+          "bottom": 190.09375,
+          "width": 174.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 261.25,
+            "top": 162.09375,
+            "right": 359.71875,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 174,
+        "clientWidth": 174
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 401.65625,
+          "top": 154.09375,
+          "right": 575.984375,
+          "bottom": 190.09375,
+          "width": 174.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 434.140625,
+            "top": 162.09375,
+            "right": 543.5,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 174,
+        "clientWidth": 174
+      }
+    ],
+    "target": {
+      "left": 41,
+      "top": 150.09375,
+      "right": 580,
+      "bottom": 194.09375,
+      "width": 539,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 820,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 45,
+          "top": 154.40625,
+          "right": 285.65625,
+          "bottom": 190.40625,
+          "width": 240.65625,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 113.71875,
+            "top": 162.40625,
+            "right": 216.9375,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 241,
+        "clientWidth": 241
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 289.65625,
+          "top": 154.40625,
+          "right": 530.328125,
+          "bottom": 190.40625,
+          "width": 240.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 360.75,
+            "top": 162.40625,
+            "right": 459.21875,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 241,
+        "clientWidth": 241
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 534.328125,
+          "top": 154.40625,
+          "right": 775,
+          "bottom": 190.40625,
+          "width": 240.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 599.984375,
+            "top": 162.40625,
+            "right": 709.34375,
+            "bottom": 182.40625
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 241,
+        "clientWidth": 241
+      }
+    ],
+    "target": {
+      "left": 41,
+      "top": 150.40625,
+      "right": 779,
+      "bottom": 194.40625,
+      "width": 738,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 821,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 303,
+          "top": 154.09375,
+          "right": 455.328125,
+          "bottom": 190.09375,
+          "width": 152.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 327.546875,
+            "top": 162.09375,
+            "right": 430.765625,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 152,
+        "clientWidth": 152
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 459.328125,
+          "top": 154.09375,
+          "right": 611.65625,
+          "bottom": 190.09375,
+          "width": 152.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 486.25,
+            "top": 162.09375,
+            "right": 584.71875,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 152,
+        "clientWidth": 152
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 615.65625,
+          "top": 154.09375,
+          "right": 767.984375,
+          "bottom": 190.09375,
+          "width": 152.328125,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 637.140625,
+            "top": 162.09375,
+            "right": 746.5,
+            "bottom": 182.09375
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 152,
+        "clientWidth": 152
+      }
+    ],
+    "target": {
+      "left": 299,
+      "top": 150.09375,
+      "right": 772,
+      "bottom": 194.09375,
+      "width": 473,
+      "height": 44
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "excel-merger",
+    "locale": "en",
+    "width": 1020,
+    "items": [
+      {
+        "text": "Separate sheets",
+        "rect": {
+          "left": 303,
+          "top": 153.953125,
+          "right": 421.65625,
+          "bottom": 209.953125,
+          "width": 118.65625,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 333.328125,
+            "top": 161.953125,
+            "right": 391.328125,
+            "bottom": 181.953125
+          },
+          {
+            "left": 341.28125,
+            "top": 181.953125,
+            "right": 383.375,
+            "bottom": 201.953125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 119,
+        "clientWidth": 119
+      },
+      {
+        "text": "Stack vertically",
+        "rect": {
+          "left": 425.65625,
+          "top": 153.953125,
+          "right": 544.328125,
+          "bottom": 209.953125,
+          "width": 118.671875,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 467.15625,
+            "top": 161.953125,
+            "right": 502.828125,
+            "bottom": 181.953125
+          },
+          {
+            "left": 455.15625,
+            "top": 181.953125,
+            "right": 514.828125,
+            "bottom": 201.953125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 119,
+        "clientWidth": 119
+      },
+      {
+        "text": "Join horizontally",
+        "rect": {
+          "left": 548.328125,
+          "top": 153.953125,
+          "right": 666.984375,
+          "bottom": 209.953125,
+          "width": 118.65625,
+          "height": 56
+        },
+        "textRects": [
+          {
+            "left": 593.46875,
+            "top": 161.953125,
+            "right": 621.84375,
+            "bottom": 181.953125
+          },
+          {
+            "left": 568.71875,
+            "top": 181.953125,
+            "right": 646.578125,
+            "bottom": 201.953125
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 119,
+        "clientWidth": 119
+      }
+    ],
+    "target": {
+      "left": 299,
+      "top": 149.953125,
+      "right": 671,
+      "bottom": 213.953125,
+      "width": 372,
+      "height": 64
+    },
+    "toolbar": null,
+    "switcher": null,
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 390,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 7,
+          "top": 123,
+          "right": 104.484375,
+          "bottom": 159,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 41,
+            "top": 130.71875,
+            "right": 92.484375,
+            "bottom": 149.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 110.484375,
+          "top": 123,
+          "right": 205.96875,
+          "bottom": 159,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 143.484375,
+            "top": 130.71875,
+            "right": 194.96875,
+            "bottom": 149.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 211.96875,
+          "top": 123,
+          "right": 314.640625,
+          "bottom": 159,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 245.96875,
+            "top": 130.71875,
+            "right": 302.640625,
+            "bottom": 149.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 7,
+          "top": 165,
+          "right": 89.21875,
+          "bottom": 201,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 41,
+            "top": 172.71875,
+            "right": 77.21875,
+            "bottom": 191.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 95.21875,
+          "top": 165,
+          "right": 168.3125,
+          "bottom": 201,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 129.21875,
+            "top": 172.71875,
+            "right": 156.3125,
+            "bottom": 191.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 7,
+      "top": 123,
+      "right": 383,
+      "bottom": 201,
+      "width": 376,
+      "height": 78
+    },
+    "toolbar": {
+      "left": 0,
+      "top": 72,
+      "right": 390,
+      "bottom": 208,
+      "width": 390,
+      "height": 136
+    },
+    "switcher": {
+      "rect": {
+        "left": 279.5,
+        "top": 15,
+        "right": 371,
+        "bottom": 57,
+        "width": 91.5,
+        "height": 42
+      },
+      "position": "static",
+      "zIndex": "auto",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 1365,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 749.046875,
+          "top": 22,
+          "right": 846.53125,
+          "bottom": 58,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 783.046875,
+            "top": 29.71875,
+            "right": 834.53125,
+            "bottom": 48.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 852.53125,
+          "top": 22,
+          "right": 948.015625,
+          "bottom": 58,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 885.53125,
+            "top": 29.71875,
+            "right": 937.015625,
+            "bottom": 48.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 954.015625,
+          "top": 22,
+          "right": 1056.6875,
+          "bottom": 58,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 988.015625,
+            "top": 29.71875,
+            "right": 1044.6875,
+            "bottom": 48.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 1062.6875,
+          "top": 22,
+          "right": 1144.90625,
+          "bottom": 58,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 1096.6875,
+            "top": 29.71875,
+            "right": 1132.90625,
+            "bottom": 48.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 1150.90625,
+          "top": 22,
+          "right": 1224,
+          "bottom": 58,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 1184.90625,
+            "top": 29.71875,
+            "right": 1212,
+            "bottom": 48.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 749.046875,
+      "top": 22,
+      "right": 1224,
+      "bottom": 58,
+      "width": 474.953125,
+      "height": 36
+    },
+    "toolbar": {
+      "left": 288,
+      "top": 8,
+      "right": 1357,
+      "bottom": 72,
+      "width": 1069,
+      "height": 64
+    },
+    "switcher": {
+      "rect": {
+        "left": 1247.5,
+        "top": 22,
+        "right": 1341,
+        "bottom": 66,
+        "width": 93.5,
+        "height": 44
+      },
+      "position": "fixed",
+      "zIndex": "45",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 320,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 7,
+          "top": 123,
+          "right": 104.484375,
+          "bottom": 159,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 41,
+            "top": 130.71875,
+            "right": 92.484375,
+            "bottom": 149.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 110.484375,
+          "top": 123,
+          "right": 205.96875,
+          "bottom": 159,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 143.484375,
+            "top": 130.71875,
+            "right": 194.96875,
+            "bottom": 149.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 7,
+          "top": 165,
+          "right": 109.671875,
+          "bottom": 201,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 41,
+            "top": 172.71875,
+            "right": 97.671875,
+            "bottom": 191.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 115.671875,
+          "top": 165,
+          "right": 197.890625,
+          "bottom": 201,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 149.671875,
+            "top": 172.71875,
+            "right": 185.890625,
+            "bottom": 191.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 203.890625,
+          "top": 165,
+          "right": 276.984375,
+          "bottom": 201,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 237.890625,
+            "top": 172.71875,
+            "right": 264.984375,
+            "bottom": 191.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 7,
+      "top": 123,
+      "right": 313,
+      "bottom": 201,
+      "width": 306,
+      "height": 78
+    },
+    "toolbar": {
+      "left": 0,
+      "top": 72,
+      "right": 320,
+      "bottom": 208,
+      "width": 320,
+      "height": 136
+    },
+    "switcher": {
+      "rect": {
+        "left": 209.5,
+        "top": 15,
+        "right": 301,
+        "bottom": 57,
+        "width": 91.5,
+        "height": 42
+      },
+      "position": "static",
+      "zIndex": "auto",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 620,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 13,
+          "top": 129,
+          "right": 110.484375,
+          "bottom": 165,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 47,
+            "top": 136.71875,
+            "right": 98.484375,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 116.484375,
+          "top": 129,
+          "right": 211.96875,
+          "bottom": 165,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 149.484375,
+            "top": 136.71875,
+            "right": 200.96875,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 217.96875,
+          "top": 129,
+          "right": 320.640625,
+          "bottom": 165,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 251.96875,
+            "top": 136.71875,
+            "right": 308.640625,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 326.640625,
+          "top": 129,
+          "right": 408.859375,
+          "bottom": 165,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 360.640625,
+            "top": 136.71875,
+            "right": 396.859375,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 414.859375,
+          "top": 129,
+          "right": 487.953125,
+          "bottom": 165,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 448.859375,
+            "top": 136.71875,
+            "right": 475.953125,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 13,
+      "top": 129,
+      "right": 487.953125,
+      "bottom": 165,
+      "width": 474.953125,
+      "height": 36
+    },
+    "toolbar": {
+      "left": 0,
+      "top": 72,
+      "right": 620,
+      "bottom": 172,
+      "width": 620,
+      "height": 100
+    },
+    "switcher": {
+      "rect": {
+        "left": 509.5,
+        "top": 15,
+        "right": 601,
+        "bottom": 57,
+        "width": 91.5,
+        "height": 42
+      },
+      "position": "static",
+      "zIndex": "auto",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 621,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 13,
+          "top": 129,
+          "right": 110.484375,
+          "bottom": 165,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 47,
+            "top": 136.71875,
+            "right": 98.484375,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 116.484375,
+          "top": 129,
+          "right": 211.96875,
+          "bottom": 165,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 149.484375,
+            "top": 136.71875,
+            "right": 200.96875,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 217.96875,
+          "top": 129,
+          "right": 320.640625,
+          "bottom": 165,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 251.96875,
+            "top": 136.71875,
+            "right": 308.640625,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 326.640625,
+          "top": 129,
+          "right": 408.859375,
+          "bottom": 165,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 360.640625,
+            "top": 136.71875,
+            "right": 396.859375,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 414.859375,
+          "top": 129,
+          "right": 487.953125,
+          "bottom": 165,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 448.859375,
+            "top": 136.71875,
+            "right": 475.953125,
+            "bottom": 155.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 13,
+      "top": 129,
+      "right": 487.953125,
+      "bottom": 165,
+      "width": 474.953125,
+      "height": 36
+    },
+    "toolbar": {
+      "left": 0,
+      "top": 72,
+      "right": 621,
+      "bottom": 172,
+      "width": 621,
+      "height": 100
+    },
+    "switcher": {
+      "rect": {
+        "left": 510.5,
+        "top": 15,
+        "right": 602,
+        "bottom": 57,
+        "width": 91.5,
+        "height": 42
+      },
+      "position": "static",
+      "zIndex": "auto",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 820,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 271,
+          "top": 65,
+          "right": 368.484375,
+          "bottom": 101,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 305,
+            "top": 72.71875,
+            "right": 356.484375,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 374.484375,
+          "top": 65,
+          "right": 469.96875,
+          "bottom": 101,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 407.484375,
+            "top": 72.71875,
+            "right": 458.96875,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 475.96875,
+          "top": 65,
+          "right": 578.640625,
+          "bottom": 101,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 509.96875,
+            "top": 72.71875,
+            "right": 566.640625,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 584.640625,
+          "top": 65,
+          "right": 666.859375,
+          "bottom": 101,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 618.640625,
+            "top": 72.71875,
+            "right": 654.859375,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 672.859375,
+          "top": 65,
+          "right": 745.953125,
+          "bottom": 101,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 706.859375,
+            "top": 72.71875,
+            "right": 733.953125,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 271,
+      "top": 65,
+      "right": 745.953125,
+      "bottom": 101,
+      "width": 474.953125,
+      "height": 36
+    },
+    "toolbar": {
+      "left": 258,
+      "top": 8,
+      "right": 812,
+      "bottom": 108,
+      "width": 554,
+      "height": 100
+    },
+    "switcher": {
+      "rect": {
+        "left": 709.5,
+        "top": 15,
+        "right": 801,
+        "bottom": 57,
+        "width": 91.5,
+        "height": 42
+      },
+      "position": "static",
+      "zIndex": "auto",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 821,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 271,
+          "top": 65,
+          "right": 368.484375,
+          "bottom": 101,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 305,
+            "top": 72.71875,
+            "right": 356.484375,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 374.484375,
+          "top": 65,
+          "right": 469.96875,
+          "bottom": 101,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 407.484375,
+            "top": 72.71875,
+            "right": 458.96875,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 475.96875,
+          "top": 65,
+          "right": 578.640625,
+          "bottom": 101,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 509.96875,
+            "top": 72.71875,
+            "right": 566.640625,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 584.640625,
+          "top": 65,
+          "right": 666.859375,
+          "bottom": 101,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 618.640625,
+            "top": 72.71875,
+            "right": 654.859375,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 271,
+          "top": 107,
+          "right": 344.09375,
+          "bottom": 143,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 305,
+            "top": 114.71875,
+            "right": 332.09375,
+            "bottom": 133.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 271,
+      "top": 65,
+      "right": 680,
+      "bottom": 143,
+      "width": 409,
+      "height": 78
+    },
+    "toolbar": {
+      "left": 258,
+      "top": 8,
+      "right": 813,
+      "bottom": 150,
+      "width": 555,
+      "height": 142
+    },
+    "switcher": {
+      "rect": {
+        "left": 703.5,
+        "top": 22,
+        "right": 797,
+        "bottom": 66,
+        "width": 93.5,
+        "height": 44
+      },
+      "position": "fixed",
+      "zIndex": "45",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  },
+  {
+    "tool": "hwp-editor",
+    "locale": "ko",
+    "width": 1020,
+    "items": [
+      {
+        "text": "도구 화면",
+        "rect": {
+          "left": 301,
+          "top": 65,
+          "right": 398.484375,
+          "bottom": 101,
+          "width": 97.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 335,
+            "top": 72.71875,
+            "right": 386.484375,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "다른 문서",
+        "rect": {
+          "left": 404.484375,
+          "top": 65,
+          "right": 499.96875,
+          "bottom": 101,
+          "width": 95.484375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 437.484375,
+            "top": 72.71875,
+            "right": 488.96875,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 95,
+        "clientWidth": 95
+      },
+      {
+        "text": "HWP 저장",
+        "rect": {
+          "left": 505.96875,
+          "top": 65,
+          "right": 608.640625,
+          "bottom": 101,
+          "width": 102.671875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 539.96875,
+            "top": 72.71875,
+            "right": 596.640625,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 101,
+        "clientWidth": 101
+      },
+      {
+        "text": "HWPX",
+        "rect": {
+          "left": 614.640625,
+          "top": 65,
+          "right": 696.859375,
+          "bottom": 101,
+          "width": 82.21875,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 648.640625,
+            "top": 72.71875,
+            "right": 684.859375,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 80,
+        "clientWidth": 80
+      },
+      {
+        "text": "HML",
+        "rect": {
+          "left": 702.859375,
+          "top": 65,
+          "right": 775.953125,
+          "bottom": 101,
+          "width": 73.09375,
+          "height": 36
+        },
+        "textRects": [
+          {
+            "left": 736.859375,
+            "top": 72.71875,
+            "right": 763.953125,
+            "bottom": 91.71875
+          }
+        ],
+        "hit": true,
+        "scrollWidth": 71,
+        "clientWidth": 71
+      }
+    ],
+    "target": {
+      "left": 301,
+      "top": 65,
+      "right": 775.953125,
+      "bottom": 101,
+      "width": 474.953125,
+      "height": 36
+    },
+    "toolbar": {
+      "left": 288,
+      "top": 8,
+      "right": 1012,
+      "bottom": 108,
+      "width": 724,
+      "height": 100
+    },
+    "switcher": {
+      "rect": {
+        "left": 902.5,
+        "top": 22,
+        "right": 996,
+        "bottom": 66,
+        "width": 93.5,
+        "height": 44
+      },
+      "position": "fixed",
+      "zIndex": "45",
+      "hit": true,
+      "overlaps": [
+        {
+          "text": "도구 화면",
+          "area": 0
+        },
+        {
+          "text": "다른 문서",
+          "area": 0
+        },
+        {
+          "text": "HWP 저장",
+          "area": 0
+        },
+        {
+          "text": "HWPX",
+          "area": 0
+        },
+        {
+          "text": "HML",
+          "area": 0
+        }
+      ]
+    },
+    "issues": []
+  }
+]

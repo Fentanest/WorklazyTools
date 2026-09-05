@@ -27,6 +27,7 @@ const tools = [
   tool("photo-metadata-remover", "#d8468f", "사진 메타데이터", "사진 메타데이터 제거", "EXIF · GPS · 촬영 기기 · 촬영 시각", "Photo metadata", "Photo Metadata Remover", "EXIF · GPS · camera · capture time"),
   tool("password-generator", "#7554d8", "보안", "비밀번호 생성기", "보안 난수 · 강도 분석 · 해독 시간", "Security", "Password Generator", "Secure randomness · strength · crack time"),
   tool("qr-studio", "#0879d9", "보안·공유", "QR 스튜디오", "QR 코드 만들기 · 카메라·사진 스캔", "Privacy & sharing", "QR Studio", "Create QR codes · scan camera & images"),
+  tool("qr-bulk", "#0879d9", "보안·공유", "QR 일괄 생성", "Excel·CSV 행별 QR · PNG·ZIP·라벨 PDF", "Privacy & sharing", "Bulk QR Generator", "Excel & CSV rows · PNG · ZIP · label PDF"),
   tool("table-data-converter", "#22a65a", "텍스트·데이터", "표 데이터 변환기", "CSV · JSON · HTML 상호 변환", "Text & data", "Table Data Converter", "Convert CSV · JSON · HTML tables"),
 ];
 

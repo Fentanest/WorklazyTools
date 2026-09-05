@@ -29,7 +29,7 @@
     "payroll-calculator": { "title": "Payroll Calculator", "shortTitle": "급여 계산", "description": "주휴수당·월 실수령액·퇴직금을 최신 기준으로 브라우저에서 간이 계산합니다.", "eyebrow": "급여·노무", "highlights": ["주휴수당", "실수령액", "4대 보험", "퇴직금"] },
     "image-privacy": { "title": "Photo Metadata Remover", "shortTitle": "사진 메타데이터 제거", "description": "JPG·PNG·WebP에 숨은 GPS·촬영 기기·시각 정보(EXIF)를 확인하고 제거합니다.", "eyebrow": "사진 메타데이터", "highlights": ["숨은 정보 확인", "GPS 제거", "JPG·PNG·WebP", "브라우저 처리"] },
     "security-tools": { "title": "Password Generator", "shortTitle": "비밀번호 생성기", "description": "운영체제의 보안 난수로 비밀번호를 만들고 패턴 기반 추측 난이도를 확인합니다.", "eyebrow": "보안 도구", "highlights": ["보안 난수 생성", "강도 분석", "해독 시간 추정", "최대 64자"] },
-    "qr-studio": { "title": "QR Studio", "shortTitle": "QR 스튜디오", "description": "URL·텍스트 QR 코드를 만들고 휴대폰 카메라나 사진에서 QR 데이터를 읽습니다.", "eyebrow": "QR 생성·스캔", "highlights": ["QR 생성", "중앙 로고", "카메라·사진 스캔", "PNG 저장"] },
+    "qr-studio": { "title": "QR Studio", "shortTitle": "QR 스튜디오", "description": "URL·텍스트 QR을 만들거나 표 파일의 각 행을 PNG·ZIP·라벨 PDF로 일괄 생성하고 카메라·사진에서 코드를 읽습니다.", "eyebrow": "QR 생성·일괄·스캔", "highlights": ["QR 생성", "표 파일 일괄 생성", "카메라·사진 스캔", "PNG·ZIP·라벨 PDF"] },
     "data-converter": { "title": "Table Data Converter", "shortTitle": "표 데이터 변환기", "description": "CSV·JSON·HTML 표 데이터를 서로 변환하고 파일 또는 클립보드로 내보냅니다.", "eyebrow": "표 데이터 변환", "highlights": ["CSV", "JSON", "HTML 표", "브라우저 변환"] }
   }
 }

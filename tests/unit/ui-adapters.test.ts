@@ -1,0 +1,61 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const read = (relativePath: string) => fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8");
+const uiSource = read("src/components/ui.tsx");
+
+test("SegmentedControl keeps group and pressed semantics through the Base UI toggle group", () => {
+  const toggleGroupSource = read("node_modules/@base-ui/react/toggle-group/ToggleGroup.mjs");
+  const toggleSource = read("node_modules/@base-ui/react/toggle/Toggle.mjs");
+
+  assert.match(toggleGroupSource, /role: 'group'/);
+  assert.match(toggleSource, /'aria-pressed': pressed/);
+  assert.match(uiSource, /<ToggleGroup[\s\S]*?value=\{\[value\]\}[\s\S]*?aria-label=\{label\}/);
+  assert.match(uiSource, /if \(nextValue !== undefined\) onChange\(nextValue\)/);
+  assert.equal(fs.existsSync(path.join(repositoryRoot, "src/components/ui/tabs.tsx")), false);
+});
+
+test("ToggleRow keeps a labelled native button switch with described checked and disabled state", () => {
+  const switchSource = read("node_modules/@base-ui/react/switch/root/SwitchRoot.mjs");
+
+  assert.match(switchSource, /role: 'switch'/);
+  assert.match(switchSource, /'aria-checked': checked/);
+  assert.match(uiSource, /<label[\s\S]*?htmlFor=\{controlId\}[\s\S]*?<strong[^>]*>\{label\}<\/strong>[\s\S]*?<Switch/);
+  assert.match(uiSource, /<Switch[\s\S]*?id=\{controlId\}[\s\S]*?checked=\{checked\}[\s\S]*?onCheckedChange=[\s\S]*?aria-label=\{label\}[\s\S]*?aria-describedby=\{description \? descriptionId : undefined\}[\s\S]*?disabled=\{disabled\}[\s\S]*?nativeButton[\s\S]*?render=\{<button type="button" \/>\}/);
+  assert.match(uiSource, /data-ui-part="toggle-switch"/);
+  assert.doesNotMatch(uiSource, /<Switch[\s\S]*?className="ios-switch/);
+});
+
+test("FileDropZone keeps accumulation, async reset, labelled input/button, and drag contracts", () => {
+  assert.match(uiSource, /await onFiles\(multiple \? \[\.\.\.files, \.\.\.next\] : next\.slice\(0, 1\)\)/);
+  assert.match(uiSource, /try \{[\s\S]*?await appendFiles\(selectedFiles\)[\s\S]*?finally \{[\s\S]*?input\.value = ""/);
+  assert.match(uiSource, /<input[\s\S]*?aria-label=\{accessibleName\}/);
+  assert.match(uiSource, /<Button[\s\S]*?onClick=\{\(\) => inputRef\.current\?\.click\(\)\}/);
+  assert.match(uiSource, /onDragEnter=[\s\S]*?onDragOver=[\s\S]*?onDragLeave=\{handleDragLeave\}[\s\S]*?onDrop=/);
+  assert.doesNotMatch(uiSource, /data-ui-part="drop-target"[\s\S]{0,500}?role="button"/);
+});
+
+test("the eight adapters preserve their structural and live-region contracts", () => {
+  assert.match(uiSource, /export function PageHeader[\s\S]*?<header[\s\S]*?<h1/);
+  assert.match(uiSource, /export function SectionCard[\s\S]*?<Card[\s\S]*?as="section"[\s\S]*?data-ui-component="section-card"[\s\S]*?className=\{cn\([\s\S]*?"ui-section-card[\s\S]*?className,[\s\S]*?\)\}/);
+  assert.match(uiSource, /export function FileList[\s\S]*?<Card as="ul"[\s\S]*?data-ui-component="file-list"[\s\S]*?<li className="flex/);
+  assert.match(uiSource, /export function PrimaryButton[\s\S]*?disabled=\{disabled \|\| loading\}[\s\S]*?aria-busy=\{loading\}/);
+  assert.match(uiSource, /data-ui-component="primary-button"[\s\S]*?accentButtonClasses\[accent\]/);
+  assert.doesNotMatch(uiSource.match(/export function PrimaryButton[\s\S]*?export function ResultCard/)?.[0] ?? "", /\bw-full\b/);
+  assert.match(uiSource.match(/export function PrimaryButton[\s\S]*?export function ResultCard/)?.[0] ?? "", /w-\[100%\]/);
+  assert.match(uiSource, /export function ResultCard[\s\S]*?<Card as="section"[\s\S]*?aria-live="polite"/);
+  assert.doesNotMatch(uiSource, /export function NavigationRow/);
+});
+
+test("all accent adapters explicitly cover the six public ToolAccent values", () => {
+  const accents = ["green", "blue", "violet", "orange", "pink", "sky"];
+  for (const declaration of ["accentButtonClasses", "accentSoftClasses", "accentDraggingClasses", "accentResultClasses"]) {
+    const block = uiSource.match(new RegExp(`const ${declaration} = \\{([\\s\\S]*?)\\n\\} satisfies`))?.[1];
+    assert.ok(block, `${declaration} declaration is missing`);
+    for (const accent of accents) assert.match(block, new RegExp(`\\n  ${accent}:`));
+  }
+});

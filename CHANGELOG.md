@@ -2,8 +2,35 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-06
+
+- 시각 회귀에서 시차·근무·급여 계산기의 Date를 페이지 진입 전에 고정하고 런타임 검증·날짜/연도 변경 테스트를 추가했다. 고정 입력에 맞춰 시각 기준선 9장을 갱신했다. — Codx
+- P-QA 차단 2건: Excel 병합 방식의 긴 영어 라벨에 줄바꿈을 허용하고, HWP 문서 로드 후 액션 바의 데스크톱 언어 전환기 여백·모바일 헤더 공간·버튼 줄바꿈을 확보했다. 문제의 모바일 상태 3개를 시각 회귀에 추가했다. — Codx
+- 번들 측정 JSON에 청크별 gzip·분류·route/manifest 근거를 보존하고 예산 배수의 정수 검증을 강화해 P2 누적 예산 귀속을 재현 가능하게 했다. — Codx
+
+## 2026-09-05
+
+- P2 P-final에서 소비 0인 legacy 변수 5개와 63개 orphan class의 152개 selector arm을 제거하고, 저장소 전체 CSS orphan 감사·분기점 번들 비교를 재현 가능한 명령으로 고정했다. B-shared에서 승인됐으나 누락된 전 화면 시각 기준선과 stale 스모크 계약도 동기화했다. — Codx
+- P2 P-QA를 위해 5페이지 접근성 감사에 placeholder 대비 측정을 추가하고, 대표 3페이지의 LCP·CLS·long-task blocking 기준선 측정기를 추가했다. — Codx
+- P2 B-shared에서 공용 언어 전환기·드롭존·토글·사이드바와 홈·도구 목록 표면의 접근성/선택 상태를 보강하고, 공용 legacy CSS와 `--blue`·`--orange`·`--pink` 소비를 제거했다. axe 5페이지 감사와 3상태 QA·번들/기하 회귀를 함께 갱신했다. — Codx
+- Image Studio에 모드 상태, 캔버스 자르기·효과·pan 및 레이어 재정렬의 키보드 대안, 대상별 레이어/GIF 라벨을 추가했다. 실제 긴 텍스트 레이어 말줄임 시나리오와 전용 접근성 스모크를 고정했다. — Codx
+- P2 B6 재검수에서 Image Studio 모바일 도구 모음·뷰포트 컨트롤과 레이어 행·선택 미니바의 Card 방향 회귀를 복구했다. 실제 헤더 오프셋으로 시각 시나리오를 교정하고, 긴 파일명 말줄임·10개 레이어 스크롤을 단언하는 레이어 패널 상태와 64장 QA 세트를 추가했다. — Codx
+- P2 B6의 Image Studio 편집·일괄·콜라주·GIF 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 7개 상태 시각 시나리오, 모바일 편집 제스처·접이식 패널 회귀와 Playwright/axe 접근성 감사 명령을 함께 고정했다. — Codx
+- P2 B5b의 Video Studio 입력·그룹/트림·출력/진행·결과 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 그룹 편집·범위 선택 시각 시나리오와 모바일 트림 값 가독성, 기존 비디오 처리 회귀를 함께 고정했다. — Codx
+- P2 B5a의 Audio Studio·PDF 도구 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 오디오 파형·효과와 PDF 4모드 썸네일 시각 시나리오, 모바일 PDF 탭 스크롤 페이드 단서를 함께 고정했다. — Codx
+- P2 B4의 Excel 병합·Excel 비교·QR Studio 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 병합 시트 선택·비교 모드/파일 쌍·QR 생성/스캔을 포함한 3상태 시각 시나리오와 다크 선택 경계·Swap/Add 접근성 회귀를 함께 고정했다. — Codx
+
 ## 2026-09-04
 
+- P2 B3의 문서 비교·Word 결과·Excel 정리 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 실제 DOCX·HWP 결과와 정리 규칙·결과를 포함한 3상태 시각 시나리오 및 사고 지점 기하 회귀를 함께 고정했다. — Codx
+- P2 B2의 데이터 변환·세계 시간·텍스트 합치기·HWP 편집·Office 편집 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 실제 HWP 문서 로드와 격리 Office workspace를 포함한 3상태 시각 시나리오·스모크·owner manifest를 함께 갱신했다. — Codx
+- P2 묶음 검수 캡처를 `VISUAL_ONLY` 기반 공용 QA 경로로 통합해 initial·bottom·interaction 3상태의 전체 로케일·테마·뷰포트를 수집하고 상태별 장수를 출력하도록 했다. B1 증거를 144장으로 다시 채집하고 모바일 컨트롤 기하 스모크를 추가했다. — Codx
+- P2 B1의 포맷터·영업일/연차·급여·비밀번호·사진 메타데이터·텍스트 도구 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS를 제거했다. 155개 잔여 규칙의 owner/refcount manifest와 고정 번들 예산 측정기, B1 초기·하단·상호작용 시각 시나리오 및 추적 제외 QA 캡처를 함께 추가했다. — Codx
+- 시각 회귀 캡처를 CPU 기반 로케일 전용 브라우저 작업자로 병렬화하고, scenario/route/tool 단위 `VISUAL_ONLY` 부분 실행과 소요 시간·캡처 수·동시성·필터 리포트를 추가했다. — Codx
+- 시각 회귀 하네스를 59개 scenario·151개 상태별 캡처로 확장하고, 브라우저 UI 로케일·언어 헤더·타임존·폰트·DPR·애니메이션을 고정했다. 전 도구 모바일 최하단 assertion과 음성 대조를 공용화하고 상태명 기준선을 전면 재생성했다. — Codx
+- QR Studio에 표 파일 기반 7종 QR 일괄 생성, 최종 PNG 재판독, OPFS·메모리 결과 보관, 증분 ZIP·manifest XLSX·한글 A4/Letter 라벨 PDF를 추가했다. 공용 QR 디코더와 안전 ZIP 경로, ko/en 안내·SEO·정적 페이지·소셜 이미지·브라우저 회귀도 함께 반영했다. — Codx
+- `main`의 라이브 복구 기준에서 `ui-migration` 브랜치를 분기해 shadcn P0a~P1c 6개 단계를 순서대로 재적용하고, 전환된 공용 컴포넌트 12종의 legacy class 방출을 제거했다. 문서 비교 스위치와 작업 버튼 배치 계약, 추적 제외 로컬 QA 빌드, 전 도구 96화면 시각 기준선·회귀 검사를 추가했다. — Codx
+- UI 변경의 배포 전 조건으로 추적·광고 제외 로컬 빌드와 브라우저 육안 검수를 의무화하고, 정렬 붕괴와 컴포넌트 내부 오정렬을 파손 범위에 명시했다. — Codx
 - RHWP Studio와 `@rhwp/core`·`@rhwp/editor`를 0.8.6으로 올리고 파일 집합·크기·해시를 검증하는 벤더 manifest, 재귀 PWA 차단, 생성기 기반 구 스냅샷 정리를 추가했다. — Codx
 - 고정 HWP fixture의 편집·저장·core 재파싱·Studio 재개방 왕복 스모크와 RHWP 라이선스 생성·정적 버전 검사를 보강했다. — Codx
 - `VITE_LOCAL_QA=1` 빌드에서 분석·광고 로더를 비활성화해 추적 없는 로컬 시각 검수를 준비했다. — Codx
@@ -14,6 +41,12 @@
 ## 2026-09-03
 
 - 라이브 화면을 파손한 shadcn UI 마이그레이션 6개 커밋을 역순으로 되돌려 전환 이전 UI를 복구했다. Excel 비교·Excel 정리 도구와 P-V 시각 회귀 하네스는 유지했다. — Codx
+- AppShell의 모바일 바로가기를 shadcn Base UI Sheet로 전환해 모달·포커스 트랩·닫힘 후 포커스 복귀를 공용 primitive에 위임했다. SEO·분석/광고 로더와 영상·Office·XLS 격리 경계, 사이드바·하단 네비게이션을 보존하고 모바일 목록 스크롤·접근성·광고 격리 회귀를 보강했다. — Codx
+- 모바일 드롭존 확장자 안내를 구분자 단위로 안정적으로 줄바꿈하고, 점선 테두리를 large 카드 radius에 맞췄다. 공통 모바일 콘텐츠에 하단 네비게이션 높이 이상의 여백을 추가했다. — Codx
+- ToolGuide·OperationProgress·ToolCard·LanguageSwitcher를 shadcn Base UI 기반 공용 컴포넌트로 전환했다. 기존 section/article/link DOM, ko/en 안내·언어 토글 접근성, 6색 accent와 stage-key 진행 로그·활성 스피너·행별 퍼센트 계약을 보존하고 시각 기준선·스모크를 갱신했다. — Codx
+- 공용 UI 8종을 shadcn Base UI 기반 호환 어댑터로 전환하고 6색 accent·파일 누적/비동기·접근성·키보드 계약을 보존했다. 미사용 NavigationRow를 제거하고 전 화면 시각 기준선과 회귀 검증을 갱신했다. — Codx
+- Tailwind preflight를 전역 base layer로 활성화하고, 기존 화면의 heading·small text·목록 marker·폼 기본값·pseudo-element box model·line-height를 legacy layer에서 보정해 기존 시각 기준선을 유지했다. — Codx
+- shadcn 4.20.1의 Base UI `base-luma` preset 기반과 Tailwind CSS 4.3.3을 설치했다. preflight 없이 theme/base/legacy/components/utilities layer를 분리하고 현행 CSS를 legacy에 격리했으며, prefers-color-scheme용 토큰 브리지와 소유 소스만 스캔하는 구성을 추가했다. — Codx
 - Chrome 기반 시각 회귀 하네스를 추가해 홈·미디어 필터·Excel 비교 빈 상태를 ko/en·light/dark·desktop/mobile 24개 고정 화면으로 비교한다. 애니메이션 제거·허용 영역·픽셀 임계값을 명시하고 shadcn 도입 전 PNG 기준선을 함께 고정했다. — Codx
 - Excel 데이터 정리 도구를 추가해 다중 파일·시트에 28종 구조·텍스트·필터·값 변환 규칙을 순차 적용하고, 수식 참조 갱신·안전 강등·병합 선행 검사·명시 미리보기·규칙 watchdog을 제공한다. 정리 XLSX·시트별 CSV·4시트 보고서·다중 ZIP, ko/en 화면·가이드·SEO·정적 페이지·소셜 이미지와 합성 fixture·Chrome 스모크·heap 게이트를 함께 반영했다. — Codx
 - 스프레드시트 공용 어댑터에 OOXML 수식 종류·참조·defined name·table·원본 행/열 lineage와 수식 캐시 존재 상태를 추가하고, 기존 workbook에 충돌 없는 보고서 시트를 붙이는 XLSX helper를 추가했다. — Codx

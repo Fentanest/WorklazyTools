@@ -3,7 +3,10 @@ import Sortable from "sortablejs";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
+import { UtilityInput, UtilityNotice, UtilitySelect } from "../../components/UtilitySurface";
 import { FileDropZone, FileList, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage } from "../../i18n/routing";
 import type { AppLanguage } from "../../i18n/languages";
@@ -14,6 +17,7 @@ import { exportPdfGroups, imagesToPdf, mergePdfPages } from "./pdfWorkerClient";
 import { createLocalId, type PdfPageItem, type PdfSourceFile } from "./types";
 import { compactPdfPageRange, mapWithConcurrency, movePdfItem as moveItem, normalizePdfRotation as normalizeRotation, splitPdfPageRanges } from "./pdfShared";
 import { featureMessage } from "../../i18n/featureMessages";
+import { cn } from "../../lib/utils";
 
 type OutputMode = "merged" | "ranges" | "separate";
 
@@ -30,7 +34,7 @@ interface EvaluatedRangeRow extends RangeRow {
 
 export function PdfOrganizePanel() {
   const language = useAppLanguage();
-    const [sources, setSources] = useState<PdfSourceFile[]>([]);
+  const [sources, setSources] = useState<PdfSourceFile[]>([]);
   const [pages, setPages] = useState<PdfPageItem[]>([]);
   const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(new Set());
   const [selectionRange, setSelectionRange] = useState("");
@@ -438,32 +442,32 @@ export function PdfOrganizePanel() {
 
   return (
     <>
-      <div className="workflow-grid pdf-workflow-grid">
+      <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
-          <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPdfs")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.loadEveryPageFromMultiplePdfsIntoOne")} className="accent-context-violet">
+          <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPdfs")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.loadEveryPageFromMultiplePdfsIntoOne")} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
             <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} disabled={locked} accent="violet" hint={featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseMultiplePdfsAtOnceOrAddMore")} />
             <FileList files={sources.map((source) => source.file)} onRemove={removeSource} accent="violet" />
           </SectionCard>
 
           {!!pages.length && (
-            <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.editAndSelectPages")} description={outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.defineEachOutputRangeThenDragRotateOr") : featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseOutputPagesInTheCurrentOrderThen")} className="accent-context-violet pdf-page-section">
-              <div className="pdf-editor-note"><Info size={15} /><span>{outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.numberBadgesShowWhichOutputRangesIncludeA") : featureMessage(language, "pdf.messages.PdfOrganizePanel.deselectingExcludesAPageFromThisOutputDeleting")}</span></div>
+            <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.editAndSelectPages")} description={outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.defineEachOutputRangeThenDragRotateOr") : featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseOutputPagesInTheCurrentOrderThen")} className="overflow-visible [&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
+              <UtilityNotice className="mb-4 bg-violet-500/10 text-muted-foreground"><Info className="mt-0.5 shrink-0 text-violet-700 dark:text-violet-300" size={15} /><span>{outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.numberBadgesShowWhichOutputRangesIncludeA") : featureMessage(language, "pdf.messages.PdfOrganizePanel.deselectingExcludesAPageFromThisOutputDeleting")}</span></UtilityNotice>
               {outputMode !== "ranges" && (
-                <div className="pdf-selection-toolbar">
-                  <div>
-                    <button type="button" onClick={selectAllPages}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.selectAll")}</button>
-                    <button type="button" onClick={clearPageSelection}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.clearSelection")}</button>
-                    <strong>{selectedPages.length}/{pages.length} {featureMessage(language, "pdf.messages.PdfOrganizePanel.selected")}</strong>
+                <div className="pdf-selection-toolbar mb-3 flex items-center justify-between gap-2.5 rounded-xl bg-muted p-2 max-[620px]:flex-col max-[620px]:items-stretch">
+                  <div className="flex items-center gap-1 max-[620px]:justify-between">
+                    <Button className="min-h-[29px] rounded-lg px-2 text-xs font-bold text-violet-700 dark:text-violet-300" variant="ghost" size="sm" type="button" onClick={selectAllPages}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.selectAll")}</Button>
+                    <Button className="min-h-[29px] rounded-lg px-2 text-xs font-bold text-violet-700 dark:text-violet-300" variant="ghost" size="sm" type="button" onClick={clearPageSelection}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.clearSelection")}</Button>
+                    <strong className="ml-1 whitespace-nowrap text-xs text-muted-foreground">{selectedPages.length}/{pages.length} {featureMessage(language, "pdf.messages.PdfOrganizePanel.selected")}</strong>
                   </div>
-                  <form className="pdf-selection-range-form" onSubmit={applySelectionRange} noValidate>
-                    <label htmlFor="pdf-selection-range" className="visually-hidden">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageRangeToSelect")}</label>
-                    <input id="pdf-selection-range" value={selectionRange} onChange={(event) => { setSelectionRange(event.target.value); setSelectionError(""); }} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eG135")} aria-invalid={!!selectionError} aria-describedby={selectionError ? "pdf-selection-range-error" : undefined} />
-                    <button type="submit">{featureMessage(language, "pdf.messages.PdfOrganizePanel.selectRange")}</button>
-                    {selectionError && <em id="pdf-selection-range-error" role="alert">{selectionError}</em>}
+                  <form className="pdf-selection-range-form grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 max-[620px]:w-full" onSubmit={applySelectionRange} noValidate>
+                    <label htmlFor="pdf-selection-range" className="sr-only">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageRangeToSelect")}</label>
+                    <UtilityInput className="h-[31px] w-[120px] rounded-lg px-2 text-xs max-[620px]:w-full" id="pdf-selection-range" value={selectionRange} onChange={(event) => { setSelectionRange(event.target.value); setSelectionError(""); }} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eG135")} aria-invalid={!!selectionError} aria-describedby={selectionError ? "pdf-selection-range-error" : undefined} />
+                    <Button className="min-h-[29px] rounded-lg px-2 text-xs font-bold text-violet-700 dark:text-violet-300" variant="ghost" size="sm" type="submit">{featureMessage(language, "pdf.messages.PdfOrganizePanel.selectRange")}</Button>
+                    {selectionError && <em className="col-span-2 text-xs leading-relaxed text-destructive not-italic" id="pdf-selection-range-error" role="alert">{selectionError}</em>}
                   </form>
                 </div>
               )}
-              <div ref={gridRef} className="pdf-page-grid">
+              <div ref={gridRef} className="pdf-page-grid grid grid-cols-[repeat(auto-fill,minmax(166px,1fr))] gap-3 max-[620px]:grid-cols-2">
                 {pages.map((page, index) => {
                   const source = sources.find((candidate) => candidate.id === page.sourceId);
                   if (!source) return null;
@@ -475,101 +479,106 @@ export function PdfOrganizePanel() {
           )}
         </div>
 
-        <div className={`pdf-output-sidebar-shell${mobileWorkspaceOpen ? " mobile-open" : ""}`} onMouseDown={() => mobileWorkspace && closeMobileOutputWorkspace()}>
-          <aside ref={mobileWorkspaceRef} className="workflow-summary pdf-output-workspace" role={mobileWorkspace ? "dialog" : undefined} aria-modal={mobileWorkspace || undefined} aria-labelledby="pdf-output-workspace-title" onMouseDown={(event) => event.stopPropagation()}>
-            <section className="summary-card pdf-output-card">
-              <div className="pdf-output-mobile-header">
-                <span className="sheet-grabber" />
-                <button ref={mobileWorkspaceCloseRef} className="icon-button subtle" type="button" onClick={closeMobileOutputWorkspace} aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.closeOutputWorkspace")}><X size={20} /></button>
+        <div className={cn("pdf-output-sidebar-shell contents max-[820px]:fixed max-[820px]:inset-0 max-[820px]:z-80 max-[820px]:hidden max-[820px]:items-end max-[820px]:justify-center max-[820px]:bg-black/25 max-[820px]:p-2.5 max-[820px]:backdrop-blur-sm", mobileWorkspaceOpen && "max-[820px]:flex")} data-open={mobileWorkspaceOpen || undefined} onMouseDown={() => mobileWorkspace && closeMobileOutputWorkspace()}>
+          <aside ref={mobileWorkspaceRef} className="pdf-output-workspace sticky top-6 min-w-0 max-[820px]:static max-[820px]:max-h-[calc(100dvh-20px)] max-[820px]:w-[min(560px,100%)]" role={mobileWorkspace ? "dialog" : undefined} aria-modal={mobileWorkspace || undefined} aria-labelledby="pdf-output-workspace-title" onMouseDown={(event) => event.stopPropagation()}>
+            <Card as="section" data-testid="pdf-output-card" className="pdf-output-card max-h-[calc(100dvh-48px)] gap-0 overflow-hidden rounded-3xl border border-border py-0 shadow-sm ring-0 max-[820px]:max-h-[calc(100dvh-20px)] max-[820px]:rounded-[28px] max-[820px]:bg-card max-[820px]:shadow-2xl">
+              <div className="pdf-output-mobile-header relative hidden min-h-[45px] shrink-0 items-center justify-center px-3.5 pt-2 max-[820px]:flex">
+                <span className="h-[5px] w-9 rounded-full bg-muted-foreground/25" />
+                <Button ref={mobileWorkspaceCloseRef} className="absolute top-2 right-3 size-9 rounded-full" variant="ghost" size="icon" type="button" onClick={closeMobileOutputWorkspace} aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.closeOutputWorkspace")}><X size={20} /></Button>
               </div>
-              <div className="pdf-output-scroll">
-                <div className="summary-title"><Layers3 size={18} /><h2 id="pdf-output-workspace-title">{featureMessage(language, "pdf.messages.PdfOrganizePanel.editOutputSummary")}</h2></div>
-                <div className="pdf-output-mode-list" role="radiogroup" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.pdfOutputMode")}>
-                  <button type="button" role="radio" aria-checked={outputMode === "merged"} className={outputMode === "merged" ? "selected" : ""} disabled={locked} onClick={() => setMode("merged")}><FileCheck2 size={16} /><span><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.onePdf")}</strong><small>{featureMessage(language, "pdf.messages.PdfOrganizePanel.saveSelectedPagesInCurrentOrder")}</small></span></button>
-                  <button type="button" role="radio" aria-checked={outputMode === "ranges"} className={outputMode === "ranges" ? "selected" : ""} disabled={locked} onClick={() => setMode("ranges")}><FileArchive size={16} /><span><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.onePdfPerRange")}</strong><small>{featureMessage(language, "pdf.messages.PdfOrganizePanel.createEachRowAsAPdfInA")}</small></span></button>
-                  <button type="button" role="radio" aria-checked={outputMode === "separate"} className={outputMode === "separate" ? "selected" : ""} disabled={locked} onClick={() => setMode("separate")}><Layers3 size={16} /><span><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.onePdfPerPage")}</strong><small>{featureMessage(language, "pdf.messages.PdfOrganizePanel.splitSelectedPagesIntoAZip")}</small></span></button>
+              <div className="pdf-output-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-[18px] pt-5 pb-3 [overscroll-behavior:contain] [scrollbar-color:rgba(118,118,128,.38)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[820px]:pt-2">
+                <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300"><Layers3 size={18} /><h2 className="font-heading text-[15px] font-medium text-foreground" id="pdf-output-workspace-title">{featureMessage(language, "pdf.messages.PdfOrganizePanel.editOutputSummary")}</h2></div>
+                <div className="pdf-output-mode-list mt-4 grid gap-1.5" role="radiogroup" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.pdfOutputMode")}>
+                  {([
+                    ["merged", FileCheck2, featureMessage(language, "pdf.messages.PdfOrganizePanel.onePdf"), featureMessage(language, "pdf.messages.PdfOrganizePanel.saveSelectedPagesInCurrentOrder")],
+                    ["ranges", FileArchive, featureMessage(language, "pdf.messages.PdfOrganizePanel.onePdfPerRange"), featureMessage(language, "pdf.messages.PdfOrganizePanel.createEachRowAsAPdfInA")],
+                    ["separate", Layers3, featureMessage(language, "pdf.messages.PdfOrganizePanel.onePdfPerPage"), featureMessage(language, "pdf.messages.PdfOrganizePanel.splitSelectedPagesIntoAZip")],
+                  ] as const).map(([value, Icon, label, hint]) => { const selected = outputMode === value; return <Button key={value} type="button" role="radio" aria-checked={selected} data-selected={selected || undefined} variant="outline" className={cn("min-h-[54px] w-full grid-cols-[auto_minmax(0,1fr)] justify-start gap-2 rounded-xl border-transparent bg-muted px-2.5 py-2 text-left text-muted-foreground", selected && "border-violet-500/30 bg-violet-500/10 text-violet-700 hover:bg-violet-500/15 dark:text-violet-300")} disabled={locked} onClick={() => setMode(value)}><Icon size={16} /><span className="flex min-w-0 flex-col"><strong className="text-[13px] text-foreground">{label}</strong><small className="mt-1 whitespace-normal text-xs leading-snug text-muted-foreground">{hint}</small></span></Button>; })}
                 </div>
 
                 {outputMode === "ranges" && (
-                  <section className="pdf-multi-range-panel" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.outputRanges")}>
-                    <div className="pdf-multi-range-heading">
-                      <div><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputRanges")}</strong><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.eachRowCreatesOnePdfAndAPage")}</span></div>
-                      <div className="pdf-multi-range-actions">
-                        <button type="button" className="secondary-button" onClick={startQuickSplit} disabled={locked || quickSplitOpen}><Scissors size={15} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.quickContinuousSplit")}</button>
-                        <button type="button" className="secondary-button" onClick={addRange} disabled={locked || quickSplitOpen}><Plus size={15} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.addRange")}</button>
+                  <section className="pdf-multi-range-panel mx-[-7px] mt-4 mb-1 rounded-2xl border border-violet-500/20 bg-violet-500/10 p-2.5" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.outputRanges")}>
+                    <div className="pdf-multi-range-heading mb-2.5 flex flex-col items-stretch gap-2">
+                      <div className="flex min-w-0 flex-col"><strong className="text-sm text-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputRanges")}</strong><span className="mt-1 text-xs leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.eachRowCreatesOnePdfAndAPage")}</span></div>
+                      <div className="pdf-multi-range-actions grid grid-cols-2 gap-1.5">
+                        <Button type="button" className="min-w-0 rounded-xl px-1.5 text-xs" variant="secondary" onClick={startQuickSplit} disabled={locked || quickSplitOpen}><Scissors size={15} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.quickContinuousSplit")}</Button>
+                        <Button type="button" className="min-w-0 rounded-xl px-1.5 text-xs" variant="secondary" onClick={addRange} disabled={locked || quickSplitOpen}><Plus size={15} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.addRange")}</Button>
                       </div>
                     </div>
 
                     {quickSplitOpen ? (
-                      <div className="pdf-range-selection-toolbar quick-split" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.quickContinuousSplit")}>
-                        <Scissors size={17} />
-                        <div><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseWhereToSplit")}</strong><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.quickSplitReplacesCurrentRanges")}</span></div>
-                        <b>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputCount", { p0: splitAfterPageIds.size + 1 })}</b>
-                        <div className="pdf-range-toolbar-actions"><button type="button" onClick={cancelQuickSplit}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.cancel")}</button><button type="button" className="primary" onClick={applyQuickSplit}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.applyContinuousSplit")}</button></div>
+                      <div className="pdf-range-selection-toolbar grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-violet-500/25 bg-card p-2 text-xs text-muted-foreground" data-mode="quick-split" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.quickContinuousSplit")}>
+                        <div className="col-span-2 flex flex-col"><strong className="text-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseWhereToSplit")}</strong><span className="mt-0.5 leading-snug">{featureMessage(language, "pdf.messages.PdfOrganizePanel.quickSplitReplacesCurrentRanges")}</span></div>
+                        <b className="text-violet-700 dark:text-violet-300">{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputCount", { p0: splitAfterPageIds.size + 1 })}</b>
+                        <div className="pdf-range-toolbar-actions flex justify-end gap-1"><Button type="button" size="xs" variant="ghost" onClick={cancelQuickSplit}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.cancel")}</Button><Button type="button" size="xs" className="bg-violet-700 text-white hover:bg-violet-800" onClick={applyQuickSplit}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.applyContinuousSplit")}</Button></div>
                       </div>
                     ) : (
-                      <div className="pdf-range-selection-toolbar" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.visualRangeSelection")}>
-                        <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.editingRange")}</span><select value={activeRange?.id ?? ""} onChange={(event) => setActiveRangeId(event.target.value)}>{evaluatedRanges.map((row, index) => <option value={row.id} key={row.id}>{index + 1}. {row.name || featureMessage(language, "pdf.messages.PdfOrganizePanel.unnamedRange")}</option>)}</select></label>
-                        <strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.pagesChecked", { p0: activeRangeIndexes.size, p1: pages.length })}</strong>
-                        <span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.shiftClickSelectsBetween")}</span>
-                        <div className="pdf-range-toolbar-actions"><button type="button" onClick={() => setActiveRangePages(true)}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.selectAll")}</button><button type="button" onClick={() => setActiveRangePages(false)}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.clearSelection")}</button></div>
+                      <div className="pdf-range-selection-toolbar grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-violet-500/25 bg-card p-2 text-xs text-muted-foreground" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.visualRangeSelection")}>
+                        <label className="col-span-2 grid gap-1"><span className="font-bold">{featureMessage(language, "pdf.messages.PdfOrganizePanel.editingRange")}</span><UtilitySelect className="h-8 text-xs" value={activeRange?.id ?? ""} onChange={(event) => setActiveRangeId(event.target.value)}>{evaluatedRanges.map((row, index) => <option value={row.id} key={row.id}>{index + 1}. {row.name || featureMessage(language, "pdf.messages.PdfOrganizePanel.unnamedRange")}</option>)}</UtilitySelect></label>
+                        <strong className="text-violet-700 dark:text-violet-300">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pagesChecked", { p0: activeRangeIndexes.size, p1: pages.length })}</strong>
+                        <span className="col-span-2 leading-snug">{featureMessage(language, "pdf.messages.PdfOrganizePanel.shiftClickSelectsBetween")}</span>
+                        <div className="pdf-range-toolbar-actions col-start-2 row-start-2 flex justify-end gap-1"><Button type="button" size="xs" variant="ghost" onClick={() => setActiveRangePages(true)}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.selectAll")}</Button><Button type="button" size="xs" variant="ghost" onClick={() => setActiveRangePages(false)}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.clearSelection")}</Button></div>
                       </div>
                     )}
 
-                    <div className="pdf-range-groups">
-                      {evaluatedRanges.map((row, index) => <div className={`pdf-range-group${row.error ? " invalid" : ""}${row.id === activeRange?.id ? " active" : ""}`} key={row.id}>
-                        <button type="button" className="pdf-range-activate" onClick={() => setActiveRangeId(row.id)} aria-pressed={row.id === activeRange?.id} disabled={locked || quickSplitOpen}><b>{index + 1}</b><span>{featureMessage(language, row.id === activeRange?.id ? "pdf.messages.PdfOrganizePanel.editing" : "pdf.messages.PdfOrganizePanel.editWithChecks")}</span></button>
-                        <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName")}</span><input value={row.name} disabled={locked || quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`} /><small>.pdf</small></label>
-                        <label><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageRangeInCurrentOrder")}</span><input value={row.range} disabled={locked || quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "range", event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eG135")} /></label>
-                        <button type="button" onClick={() => removeRange(row.id)} disabled={locked || rangeRows.length === 1 || quickSplitOpen} aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.deleteRange", { p0: index + 1 })}><Trash2 size={16} /></button>
-                        {row.error && <em>{row.error}</em>}
-                      </div>)}
+                    <div className="pdf-range-groups grid max-h-[min(36dvh,330px)] gap-2 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable]">
+                      {evaluatedRanges.map((row, index) => { const active = row.id === activeRange?.id; return <div className={cn("pdf-range-group grid grid-cols-[minmax(0,1fr)_32px] items-center gap-2 rounded-xl border border-transparent bg-card p-2", active && "border-violet-500/45 ring-2 ring-violet-500/10", row.error && "border-destructive/30")} data-active={active || undefined} data-invalid={row.error ? "true" : undefined} key={row.id}>
+                        <Button type="button" className="pdf-range-activate col-start-1 row-start-1 w-fit justify-self-start rounded-lg p-1 text-[10px] font-bold text-muted-foreground" variant="ghost" size="sm" onClick={() => setActiveRangeId(row.id)} aria-pressed={active} disabled={locked || quickSplitOpen}><b className="grid size-[25px] place-items-center rounded-lg bg-violet-700 text-[13px] text-white">{index + 1}</b><span>{featureMessage(language, active ? "pdf.messages.PdfOrganizePanel.editing" : "pdf.messages.PdfOrganizePanel.editWithChecks")}</span></Button>
+                        <label className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-card px-2 py-1.5"><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName")}</span><UtilityInput className="h-7 border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0" value={row.name} disabled={locked || quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`} /><small className="text-xs text-muted-foreground">.pdf</small></label>
+                        <label className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-card px-2 py-1.5"><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageRangeInCurrentOrder")}</span><UtilityInput className="h-7 border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0" value={row.range} disabled={locked || quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "range", event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eG135")} /></label>
+                        <Button type="button" className="col-start-2 row-start-1 size-8 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20" variant="ghost" size="icon-sm" onClick={() => removeRange(row.id)} disabled={locked || rangeRows.length === 1 || quickSplitOpen} aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.deleteRange", { p0: index + 1 })}><Trash2 size={16} /></Button>
+                        {row.error && <em className="col-span-2 text-xs text-destructive not-italic">{row.error}</em>}
+                      </div>; })}
                     </div>
-                    <p className="pdf-range-help">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageNumbersFollowTheCurrentEditorOrderFor")} <code>5, 1-3</code>{featureMessage(language, "pdf.messages.PdfOrganizePanel.createsAPdfOrdered5123")}</p>
+                    <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageNumbersFollowTheCurrentEditorOrderFor")} <code className="rounded bg-violet-500/10 px-1 py-0.5 text-violet-700 dark:text-violet-300">5, 1-3</code>{featureMessage(language, "pdf.messages.PdfOrganizePanel.createsAPdfOrdered5123")}</p>
                   </section>
                 )}
 
-                <dl>
-                  <div><dt>{featureMessage(language, "pdf.messages.PdfOrganizePanel.sourceFiles")}</dt><dd>{sources.length}</dd></div>
-                  <div><dt>{outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.pagesInRanges") : featureMessage(language, "pdf.messages.PdfOrganizePanel.selectedPages")}</dt><dd>{includedPageCount}</dd></div>
-                  <div><dt>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputPdfs")}</dt><dd>{resultFileCount}</dd></div>
-                  <div><dt>{featureMessage(language, "pdf.messages.PdfOrganizePanel.rotatedPages")}</dt><dd>{pages.filter((page) => page.rotation).length}</dd></div>
+                <dl className="my-5">
+                  <SummaryRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.sourceFiles")} value={sources.length} />
+                  <SummaryRow label={outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.pagesInRanges") : featureMessage(language, "pdf.messages.PdfOrganizePanel.selectedPages")} value={includedPageCount} />
+                  <SummaryRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.outputPdfs")} value={resultFileCount} />
+                  <SummaryRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.rotatedPages")} value={pages.filter((page) => page.rotation).length} />
                 </dl>
-                <label className="pdf-output-field"><span>{outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName2") : featureMessage(language, "pdf.messages.PdfOrganizePanel.zipFileName")}</span><input value={outputName} disabled={locked} onChange={(event) => setOutputName(event.target.value)} /><small>.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
-                <label className="pdf-output-field"><span>{featureMessage(language, "pdf.messages.PdfOrganizePanel.watermarkTextOptional")}</span><input value={watermarkText} disabled={locked} maxLength={120} onChange={(event) => setWatermarkText(event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eGInternalReview")} /></label>
+                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-violet-700 dark:text-violet-300"><span className="col-span-2 text-xs font-bold text-muted-foreground">{outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName2") : featureMessage(language, "pdf.messages.PdfOrganizePanel.zipFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} disabled={locked} onChange={(event) => setOutputName(event.target.value)} /><small className="text-xs text-muted-foreground">.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
+                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-violet-700 dark:text-violet-300"><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.watermarkTextOptional")}</span><UtilityInput className="col-span-2 h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={watermarkText} disabled={locked} maxLength={120} onChange={(event) => setWatermarkText(event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eGInternalReview")} /></label>
                 <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPageNumbers")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.numberEachOutputPdfFrom1AtThe")} checked={pageNumbers} onChange={setPageNumbers} disabled={locked} />
                 <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.imageBasedCompression")} description={outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.redrawPagesAs144DpiJpegToReduce") : featureMessage(language, "pdf.messages.PdfOrganizePanel.availableOnlyWhenCreatingOnePdf")} checked={imageCompression && outputMode === "merged"} onChange={setImageCompression} disabled={locked || outputMode !== "merged"} />
               </div>
 
-              <div className="pdf-output-action-zone">
+              <div className="pdf-output-action-zone max-h-[min(58dvh,540px)] shrink-0 overflow-y-auto border-t border-border bg-violet-500/5 px-[18px] pt-3.5 pb-[18px] [scrollbar-gutter:stable] max-[820px]:pb-[calc(18px+env(safe-area-inset-bottom))]">
                 <PrimaryButton accent="violet" disabled={exportDisabled} loading={operation.status === "running"} onClick={exportPdf}>
                   {operation.status !== "running" && (outputMode === "merged" ? <FileCheck2 size={18} /> : <FileArchive size={18} />)}
                   {operation.status === "running" ? creatingLabel : operation.status === "error" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.retryOutput") : createLabel}
                 </PrimaryButton>
-                <p className="prototype-note">{featureMessage(language, "pdf.messages.PdfOrganizePanel.passwordProtectedPdfsRequireAnUnlockedCopy")}</p>
+                <p className="mx-0.5 mt-3 text-center text-sm leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.passwordProtectedPdfsRequireAnUnlockedCopy")}</p>
                 <OperationProgress {...operation} compact accent="violet" title={featureMessage(language, "pdf.messages.PdfOrganizePanel.pdfEditExtractLog")} />
                 <PdfError message={error} />
                 {download.result && <div ref={downloadResultRef}><PdfDownloadCard result={download.result} compact /></div>}
               </div>
-            </section>
+            </Card>
           </aside>
         </div>
       </div>
       {mobileWorkspace && (pages.length > 0 || operation.status === "running" || !!download.result) && (
-        <div className="pdf-mobile-output-dock" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspace")}>
-          <button ref={mobileWorkspaceTriggerRef} className="pdf-mobile-output-summary" type="button" aria-haspopup="dialog" aria-expanded={mobileWorkspaceOpen} onClick={openMobileOutputWorkspace}>
+        <div className="pdf-mobile-output-dock fixed right-3 bottom-[calc(82px+env(safe-area-inset-bottom))] left-3 z-50 grid min-h-[62px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[19px] border border-border bg-card/95 p-2 shadow-xl backdrop-blur-xl" role="region" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspace")}>
+          <Button ref={mobileWorkspaceTriggerRef} className="pdf-mobile-output-summary min-h-[47px] min-w-0 justify-start gap-2 rounded-xl px-2 text-left text-violet-700 dark:text-violet-300" variant="ghost" type="button" aria-haspopup="dialog" aria-expanded={mobileWorkspaceOpen} onClick={openMobileOutputWorkspace}>
             <Settings2 size={18} />
-            <span><strong>{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspace")}</strong><small aria-live="polite">{operation.status === "running" ? creatingLabel : featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspaceSummary", { p0: resultFileCount, p1: includedPageCount })}</small></span>
-          </button>
+            <span className="flex min-w-0 flex-col"><strong className="text-[13px] text-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspace")}</strong><small className="mt-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground" aria-live="polite">{operation.status === "running" ? creatingLabel : featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspaceSummary", { p0: resultFileCount, p1: includedPageCount })}</small></span>
+          </Button>
           {download.result && operation.status === "success" ? (
-            <a className="pdf-mobile-download" href={download.result.url} download={download.result.fileName}><Download size={17} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.downloadResult")}</a>
+            <a className="pdf-mobile-download inline-flex min-h-[46px] min-w-24 items-center justify-center gap-1 rounded-xl bg-violet-700 px-3 text-center text-xs font-bold leading-tight text-white shadow-md shadow-violet-700/20" href={download.result.url} download={download.result.fileName}><Download size={17} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.downloadResult")}</a>
           ) : (
-            <button className="pdf-mobile-create" type="button" disabled={exportDisabled} onClick={() => void exportPdf()}>{operation.status === "running" ? `${operation.progress}%` : operation.status === "error" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.retry") : createLabel}</button>
+            <Button className="pdf-mobile-create min-h-[46px] min-w-24 rounded-xl bg-violet-700 px-3 text-center text-xs font-bold leading-tight text-white shadow-md shadow-violet-700/20 hover:bg-violet-800" type="button" disabled={exportDisabled} onClick={() => void exportPdf()}>{operation.status === "running" ? `${operation.progress}%` : operation.status === "error" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.retry") : createLabel}</Button>
           )}
         </div>
       )}
     </>
   );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string | number }) {
+  return <div className="flex items-center justify-between border-b border-border py-2.5 text-sm"><dt className="text-muted-foreground">{label}</dt><dd className="m-0 font-bold text-foreground">{value}</dd></div>;
 }
 
 function createRangeRow(index: number, language: AppLanguage): RangeRow {

@@ -2,7 +2,435 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-06
+
+### P-QA 커밋·시각 하네스 시계 결정성 (Codx)
+
+- **실행 게이트·A 커밋**: `PROJECT_RULES.md`·`AGENTS.md` 전문 선독, `ui-migration`의 기준 `0663c7449f94f8d046e36c8ec16502582dd4f001` 일치, 열린 계획 14문서 충돌 검사 완료. 최신 지시로 이전 commit 금지만 무효화하고 모든 push 금지는 유지했다. Claude의 두 결함 해소 판정을 수용해 기존 수정을 보존했다. A=`380764486ebffdbcc5cc065c6cad0278146f503c`, **109파일**: 제품 2·scenario/test 2·기록 2·기준선 4(수정 1+신규 3)·증거 99(PNG 68). 증거는 기존 QA 추적 관례대로 4디렉터리 전부 포함했다. [포함 경로 전문](../tests/visual-artifacts/clock-fix-evidence/task-a-included.txt). 사용자 `before.docx`·`after.docx`·네이버 소유확인 HTML과 jobs는 제외했다.
+- **원인·채택**: 이전 KO/EN **174/175** 실패의 공통 원인인 `DateTime.now()`를 제품 기본값에서 제거하는 안은 기각했다. `tests/visual-regression-clock.mjs`가 navigation 전에 선택 도구의 `Date.now()`·무인자 `new Date()`·함수 호출 `Date()`를 **2026-09-05T03:00:00.000Z(서울 12:00)**로 고정한다. 명시 날짜 생성/복제·parse/UTC·prototype/subclass는 native 의미를 유지한다. 실제 캡처 직전 now/constructor 값을 단언하고 환경 로그에 시각·대상을 출력한다. `setTimeout`/`setInterval`/RAF/`performance.now()`와 Node runner의 timeout·실측 시간은 그대로 진행한다. 모든 도구의 시계/타이머를 무차별 동결하는 안은 Office 경과시간·저장소 TTL·벤더 준비를 보존하려고 기각했다. 날짜 mask 추가·0.1% 임계값 완화도 하지 않았다.
+- **전수 조사·발견 수**: 실행 확장자 JS/MJS/CJS/TS/TSX/JSX/HTML/Python을 repo-wide 재귀 검색해 직접 호출 **77행(앱 42·테스트/스크립트 35)**을 분류하고 `localIsoDate`·date-fns·Luxon/Temporal provider를 별도 추적했다. 캘린더 기본값 의존은 **3도구/9시나리오/일반 21캡처/QA 72캡처**다. 시차: 초기 날짜·시간 및 현재 시각 버튼, 근무: 영업일 시작·종료·연차 기준일·입사연도, 급여: 퇴직 기준일(현재 weekly/net 캡처에는 숨김) 모두 같은 시계로 고정했다. toolId별 사유를 가진 최소 명시 목록이 모든 상태/QA profile에 적용된다. 기존 공용 footer 연도 mask는 유지했다. 이미지 붙여넣기 날짜 파일명은 현재 scenario/QA에 paste가 없어 미실행, Office 경과시간은 idle workspace 시나리오에서 미실행이다. ID·파일 메타데이터·TTL·명시 날짜 파싱/복제·runner timeout은 캘린더 픽셀과 무관해 native로 둔다. [검색 원출력·예외 목적/소유자](../tests/visual-artifacts/clock-fix-evidence/README.md)에 vendor·generated·fixture를 분리 기록했다. PDF 후속 계획 10항의 config ISO/navigation 전 clock 계약과 방향이 같으며, 그 기능 구현 시 PDF를 이 목록에 연결할 수 있다.
+- **날짜·연도 변경 실증**: Node 단위 테스트로 host 날짜 3개·명시 인자·invalid date·Date subclass·native timer 보존을 검사했다. 별도 실브라우저 [probe](../tests/visual-artifacts/clock-fix-evidence/probe.mjs)는 원래 시계를 `2026-09-05T14:59:59.999Z`/`2026-09-06T15:00:00.000Z`/`2027-01-01T00:00:00.000Z`로 각각 바꾼 뒤 실제 하네스 함수를 적용했다. KO/EN **36상태**, 반복 **24비교 모두 0px**; 서울 12:00·근무일 2026-09-05·입사연도 2025·퇴직 기준 2026-09-05가 같았다. 현재 날짜 입력을 2000년으로 바꾼 뒤 “현재 시각 사용” 버튼으로 복원하는 경로도 통과했다. timer/RAF/performance는 실제 진행했다. 최초 probe의 `role=radio` 가정은 현행 segmented adapter에 맞지 않아 실패했고, 본 하네스와 같은 button selector로 probe만 교정했다. 실패 원출력도 보존한다.
+- **기준선 갱신 근거**: 시계 고정 직후 기존 baseline 비교는 **21/21**(28.48초)로 상한 이내였으나 과거 기준선의 서로 다른 채집 시각(예: EN timezone 2026-09-04 21:53)을 남겨두지 않고 고정 입력과 일치시켰다. 두 도구 14장만 생성해 **실제 변경 9장(시차 5·근무 4)**, 나머지 5장 byte-identical. 차이는 98~939px, 최대 **0.076435%**, 이전 실패 대상 EN mobile은 **291px/0.088407%**다. 날짜·세계 시각과 토요일 영업일 0/제외일 1 변화가 고정 입력과 일치함을 PNG에서 확인했다. [장별 실측](../tests/visual-artifacts/clock-fix-evidence/baseline-diffs.json).
+- **제품 계약·보존**: B의 `src/`·package/lock diff는 **0B**. 오늘 날짜 기본값·한국어/영어 문자열·SEO 메타/정적 route/사이트맵/FAQ·광고/분석 및 격리 경계·서버 전제·내부 구현 비노출은 제품 코드 변화가 없어 보존된다. 새 의존성·벤더 변경·번들 최적화 없음. 원본 P-QA **604/604 SHA-256**, 사용자 파일 **3/3 SHA-256** 동일, 기준선 집합 175장. 원격 추적 refs도 `origin/ui-migration=3588eba`, `origin/main=073da56`로 그대로이며 push하지 않았다.
+
+검증 원출력: [증거 인덱스](../tests/visual-artifacts/clock-fix-evidence/README.md). 일반 production 빌드에서 consent denied·외부 요청 0을 단언하는 시각 하네스를 실행했다. 아래 browser/utility/probe는 `TEST_BASE_URL=http://127.0.0.1:4296`, visual KO/EN은 각각 자체 preview 포트 4297/4298과 별도 artifact 경로를 썼다.
+
+| 실행 명령 | 실제 결과 |
+|---|---|
+| `npm run build` | exit 0, **2,830 modules**, 79초, **정적 61페이지**. 기존 eval·chunk 크기 경고 외 오류 없음. |
+| `npm run test:unit` | A **193/193**, B **195/195**, exit 0·fail 0. |
+| `npm run test:static` | exit 0, localized pages/hreflang·runtimes·ads/robots/sitemap 통과. |
+| `TEST_SCOPE=excel npm run test:browser` | exit 0, Excel·키보드 segmented/switch 계약 통과. 출력 공통 Word/PDF 문구는 실행 범위에 포함된다는 뜻이 아님. |
+| `TEST_ONLY_HWP=1 npm run test:new-tools` | exit 0, **3,584B·1페이지·sentinel 재파싱·Studio 재개방** 통과. 기존 CanvasView 로그 1건 유지. |
+| `npm run test:utilities` | exit 0, KO/EN 경로·세계 지도·유틸리티·격리 계약 통과. |
+| `VISUAL_ONLY=timezone-calculator,work-calculator,payroll-calculator npm run test:visual` | exit 0, 갱신 전 **21/21**, 28.48초. |
+| `UPDATE_VISUAL_BASELINES=1 VISUAL_ONLY=timezone-calculator,work-calculator npm run test:visual` | exit 0, **14/14**, 20.98초. 실제 9장 변경. |
+| `node tests/visual-artifacts/clock-fix-evidence/probe.mjs` | exit 0, **36상태·24 반복 비교 0px**, native timer/RAF 진행. |
+| `LANG=en_US.UTF-8 npm run test:visual` | exit 0, **175/175**, **134.10초**, Chrome 152.0.7977.64. |
+| `LANG=ko_KR.UTF-8 npm run test:visual` | 최종 단독 실행 **exit 0, 175/175, 113.34초**. 최초 동시 실행은 98/175 진행 뒤 **exit 143**, 자체 오류 설명 없이 중단됐으므로 통과로 세지 않고 원출력을 보존했다. |
+| `node --check` (clock helper·visual runner·probe) · `git diff --check` | exit 0. |
+
+### P-QA 차단 2건 — Excel 영어 분절·HWP 액션 바 충돌 수정 (Codx)
+
+> **2026-09-06 커밋 재개 정정 (Codx)**: 최신 사용자 지시로 이전 전달의 commit 금지는 무효다. 아래 미커밋·금지 서술은 이전 실행 당시 기록이며, 이번에는 두 수정·기준선 4장·증거 4디렉터리(99파일, PNG 68장)를 함께 커밋한다. Claude가 재캡처에서 두 결함 해소를 확인한 판정을 수용했다. 사용자 3파일과 원본 P-QA 604장의 SHA-256을 재확인했으며 모두 동일하다. 모든 push는 계속 금지한다. 시계 원인의 전체 회귀 실패는 별도 후속 커밋으로 해결한다.
+
+- **실행 게이트·정본**: `PROJECT_RULES.md` → HEAD/지시 전문 → `AGENTS.md`·P2 정본·열린 계획서·관련 기각 이력을 확인했다. `ui-migration`, `HEAD=0663c7449f94f8d046e36c8ec16502582dd4f001`로 사용자 기준과 일치했다. 지시 전문은 `/tmp/claude-1000/-home-better0101-projects-worklazytools/98c2890e-0b15-4fc5-a7f8-98e9d02d526e/scratchpad/pqa-fix-dispatch.md`다. 기존 RHWP 업그레이드·Excel 서식 작업은 기능 보존 계약이고 현재 두 레이아웃 수정과 상반 지시가 없다. 지시서의 커밋 요구보다 **최신 사용자의 모든 commit/push 금지**가 우선하며 워킹트리에만 남긴다.
+- **Excel 전→후**: `ExcelMergerPage.tsx`의 3단계 병합 방식에만 전용 wrapper를 두어 버튼의 `white-space: nowrap`·고정 높이를 해제하고 긴 단어의 비상 줄바꿈, 모바일 좌우 padding을 적용했다. 390px EN에서 각 분절 폭 100px에 `Separate sheets`·`Join horizontally`가 각각 1.61px·4.69px 벗어나던 상태가 **2줄·높이 56px·라벨 이탈 0px**가 됐다. KO 390px는 **100×44px·1줄**, EN 1365px는 **218.33×36px·1줄**을 보존했다. 공용 SegmentedControl이나 문구 축약은 다른 도구·번역 계약에 영향을 주므로 채택하지 않았다.
+- **HWP 증상 정정·전→후**: "HWP 저장이 다른 문서를 덮는다"는 원 지적을 채택하지 않았다. 현재 DOM에서 데스크톱 언어 전환기는 **fixed/z-index 45**, rect `(1247.5,22)–(1341,66)`이며 HWPX/HML을 각각 **612.19/2,012.81px²** 덮었다. `HwpEditorPage.tsx`에서 로드 후 toolbar에 133px 오른쪽 공간과 64px 최소 높이를 확보해 **두 겹침 모두 0px²**, HML 오른쪽 1224px→언어 전환기 왼쪽 1247.5px 사이 **23.5px 간격**을 얻었다. 390px의 5등분 grid에서는 `도구 화면`·`HWP 저장` 라벨이 1.55/4.14px 벗어났으며 모바일 헤더의 언어 전환기 자체도 focus layer 아래에 있었다. 모바일 편집 영역은 **top 72px, 높이 100dvh−72px**, 액션은 내용 폭을 유지하는 **3+2 flex wrap**으로 바꿨다. 5개 버튼과 언어 전환기 모두 이탈·가림 0이다. 숨겨져 있던 전역 푸터가 새 헤더 틈에 비치는 것을 막는 규칙은 **HWP 문서 로드 후 모바일의 형제 footer**에만 적용했다.
+- **보수적 범위·기능 상태**: desktop 언어 전환기 자체 위치/z-index·공용 헤더·다른 18도구·엔진/벤더는 수정하지 않았다. HML은 fixture의 기존 저장 가능 판정에 따라 비활성일 수 있으며, 가림 해소를 저장 기능 활성화로 해석하지 않았다. DOM hit 검사에서는 disabled의 `pointer-events:none`을 가림으로 오인하지 않도록 측정 순간에만 복원하고 즉시 원복했다.
+- **회귀·증거 설계**: 기존 일반 시각 회귀의 Excel interaction은 EN desktop 1장이라 실제 결함의 EN mobile을 검사하지 않았다. Excel EN dark mobile·KO dark mobile, HWP 로드 KO dark mobile **3장**을 추가해 일반 기준선을 172→175장으로 보강했다. 수정 전후 DOM/텍스트 Range/버튼 hit 검사·PNG는 `tests/visual-artifacts/pqa-fix-{before,after}-geometry/`, P-QA 동일 조건의 3상태·2테마 재캡처 36장은 `tests/visual-artifacts/pqa-fix-after/`다. 원본 `p2-final/` 604장은 별도 SHA-256 목록으로 보존 검증한다. 기존 HWP 로드 desktop 1장의 변경은 언어 전환기 공간·toolbar 높이 확보에 따른 의도된 변화(최초 비교 **37,001px/3.0119%**); 그 기준선과 새 모바일 3장만 갱신한다.
+- **현지화·SEO·AdSense·내부 비노출**: Excel ko/en 라벨은 동일 문자열을 유지하며 HWP의 한국어 전용 정책과 EN `/en/tools` redirect도 보존한다. 새 사용자 문구·요소 없이 레이아웃만 고쳐 번역·SEO 메타·FAQ·사이트맵·정적 route·광고 배치/제외 격리 경로·서버 전제 변경은 불필요하다. 새 내부 명칭·원시 예외를 노출하는 코드는 없다. 기존 HWP 안내의 내부 명칭은 이번 2표면 수리 범위 밖이므로 확대 수정하지 않았다. 시각 검증은 `VITE_LOCAL_QA=1` 빌드, static/analytics 포함 스모크는 일반 빌드로 분리한다.
+- **대조·보존 결과**: `p2-final` 대비 Excel KO dark mobile·EN dark desktop 픽셀 차이는 각각 **0**, HWP 로드 전 KO light desktop은 **41px/0.0034%**로 기존 0.1% 이내다. 기존 604장·사용자 DOCX 2개/네이버 확인 HTML의 SHA-256은 모두 그대로다. 최종 HEAD도 `0663c74`이며 commit·push·staging을 수행하지 않았다.
+
+검증 원출력과 전후 캡처 링크: [증거 인덱스](../tests/visual-artifacts/pqa-fix-evidence/README.md). 아래 browser/visual 명령에는 `TEST_BASE_URL=http://127.0.0.1:4291`을 지정했다(자체 서버를 띄우는 `test:xls-first-load`는 해당 설정을 사용하지 않는다). 시각 기준선 갱신은 `UPDATE_VISUAL_BASELINES=1 VISUAL_ONLY=excel-merger-empty--interaction-sheet-selection,hwp-editor-empty--interaction-document-loaded npm run test:visual`로 5/5를 생성했고 실제 변경은 HWP desktop 1장+신규 모바일 3장뿐이다.
+
+| 실행 명령 | 실제 결과 |
+|---|---|
+| `VITE_LOCAL_QA=1 npm run build` · `npm run build` | 둘 다 exit 0, 2,830 modules·정적 61페이지. 최종 dist는 일반 production 빌드. |
+| `npm run test:unit` | exit 0, **193/193**, fail 0. |
+| `npm run test:static` | exit 0, localized pages·hreflang·self-hosted runtimes·ads.txt·robots·sitemap 통과. |
+| `TEST_SCOPE=excel npm run test:browser` | exit 0, Excel 및 segmented Arrow/Space·공용 키보드 계약 통과. 출력 마지막의 Word/PDF 이름은 하네스 공통 문구이며 이번 실행 범위는 Excel이다. |
+| `TEST_ONLY_HWP=1 npm run test:new-tools` | exit 0, **3,584B·1페이지·sentinel 재파싱·Studio 재개방** 통과. 기존 CanvasView 콘솔 로그 2건은 재현됐으며 기존 RHWP 기각 이력대로 벤더 수정하지 않았다. |
+| `npm run test:utilities` | exit 0, ko/en 경로·HWP EN redirect·hreflang·유틸리티·광고/분석·격리 계약 통과. |
+| `npm run test:xls-preserve` | exit 0, XLSX 4상태·XLS 보존 3상태·진행 10상태·degradation 3분기 통과. |
+| `npm run test:xls-first-load` | exit 0, 전역 헤더 없는 정적 서버에서 합성 4파일 수동 reload 없이 검사. |
+| `VISUAL_ONLY=excel-merger npm run test:visual` | exit 0, **9/9**, 11.44초. |
+| `VISUAL_ONLY=hwp-editor npm run test:visual` | exit 0, **7/7**, 13.17초. |
+| `LANG=ko_KR.UTF-8 npm run test:visual` | **exit 1, 174/175**, 105.95초. 미수정 timezone initial EN light mobile **363px/0.1103%** 차이로 1장 실패. |
+| `LANG=en_US.UTF-8 npm run test:visual` | **exit 1, 174/175**, 108.61초. 같은 timezone 1장 **362px/0.1100%** 차이. |
+| `LANG=ko_KR.UTF-8 VISUAL_ONLY=timezone-calculator npm run test:visual` | **exit 1, 6/7**, 같은 363px/0.1103% 재현. |
+| `VISUAL_ONLY=excel-merger,hwp-editor VISUAL_CAPTURE_DIR=tests/visual-artifacts/pqa-fix-after VISUAL_CONSENT_GRANTED=1 npm run test:visual:qa` | exit 0, **36/36**·30.23초, initial/bottom/interaction 각 12장·외부 요청 0. |
+| `node /tmp/worklazytools-pqa-fix/probe.mjs after` | exit 0, **24표본**(320/390/620/621/820/821/1020/1365px × Excel ko/en·HWP ko), 라벨 이탈·버튼/언어 전환기 가림·충돌 모두 0. 재현용 사본을 증거 폴더에 보존. |
+| `git diff --check` · SHA-256 보존 검사 | exit 0, 기존 604장·사용자 3파일 변경 없음. |
+
+**전체 회귀 잔여 판정**: 날짜·시각 입력과 `WORLD TIME` eyebrow에 차이 픽셀이 남았다. `TimezoneCalculatorPage.tsx:29`는 `DateTime.now()`로 초기 값을 만들고 시각 하네스는 날짜/시각을 고정하지 않는다. timezone·공용 SegmentedControl/AppShell/LanguageSwitcher·전역 CSS·i18n의 diff는 **0B**다. 이번 두 결함 밖의 코드·기준선·차이 임계값을 바꿔 전체 통과로 만들지 않고 실패를 그대로 보고한다. 두 도구의 수리·재캡처 증거는 완료했으며 Claude의 후속 육안 교차 판정 입력으로 남긴다.
+
+### P2 P-final/P-QA 재개 — 미커밋 작업물 자체 감사 (Codx)
+
+- **무결성·완료 범위**: 시작 `HEAD=3588ebafab3dd876746e356ea652d923eda0f5e5`, `ui-migration`, `git status --porcelain` 58건. 추적 변경 diff는 인계 `pfinal-inflight.diff`와 **75,923B byte-identical**이었다. CSS/manifest/감사·측정기/하네스 수정, 시각 기준선 35장, CHANGELOG의 Codx 서명과 아래 P-final/P-QA 두 절이 실제 작업물과 일치한다. 구현과 캡처 채집은 완료됐고 커밋·4점 귀속 판정이 남은 상태였다. 상단 계획 진행표의 P-final/P-QA “대기”는 완료 실행 기록보다 낡았으며 Gemini 최종 육안 판정은 본 자체 감사로 대체하지 않는다.
+- **소스 감사**: 이전 HEAD CSS에 현행 orphan 측정기를 적용하면 **63 zero-reference classes / 152 selector arms, exit 1**이고 현재는 **238 tokens / 263 runtime sources / orphan 0, exit 0**이다. 삭제는 소비 0 class/selector arm·변수 5개이며 사용 중 legacy 6엔트리는 보존했다. `npm run legacy:manifest` 재생성 결과 **155 rules, 149 removed / 1 split / 5 active**이고 인계 manifest와 같다. 제품 TS/TSX·번역·route·SEO 생성기·광고 경계에는 이번 제품 변경이 없고 `tailwind.css`도 불변이다.
+- **캡처 감사·커밋 범위**: 시나리오 manifest로 이름을 다시 생성해 **77상태 / 604장, initial 156·bottom 156·interaction 292, 누락 0·잉여 0**을 확인했다. `git log -1 --stat -- tests/visual-artifacts/p2-b5a`의 **80 files changed** 등 B1~B5a 캡처 추적 관례에 따라 미추적 B5b 32·B6 64·B-shared 160·P-final 604, 총 **860 PNG**를 함께 보존한다. 선행 문서 `docs/agent-dispatch-runbook.md`도 위임 변경으로 포함한다. 사용자 `before.docx`·`after.docx`·루트 `naver05161fb06bc9701a23cfc09ad5773578.html` 3개는 수정·추적·삭제하지 않는다. 이 3개와 QA 860장 SHA-256을 시작 시 저장하고 커밋 전 동일함을 확인했다. jobs 원문·dist·vendor·측정 로그는 커밋하지 않는다.
+- **재검증 실행**: `npm run build` **exit 0, 2,830 modules, 정적 61페이지**, `npm run test:unit` **193/193**, `npm run test:static` **통과**, `npm run css:orphans` **orphan 0**, `npm run legacy:manifest` **통과**, `git diff --check` **통과**. 추가 `npm run test:ui-migration`은 일반 build에서 실행한 첫 시도에 `Local QA build emitted tracking`으로 **exit 1**이었다. 이는 호출자가 QA 전제를 빠뜨린 것이며 제품 수정 없이 `VITE_LOCAL_QA=1 npm run build` 후 `UI_MIGRATION_TEST_PORT=4291 npm run test:ui-migration` 재실행은 **exit 0, switches 7 contained / action 190px / legacy 0 / tracking 0**이었다. 스모크가 다시 쓴 B3 진단 PNG는 `/tmp`에 증거를 보관하고 재개 전 추적 내용으로 복원했다.
+- **접근성·visual 증거**: QA build에서 `A11Y_TEST_PORT=4292 A11Y_REPORT_PATH=/tmp/worklazytools-pfinal-resume-20260906/a11y.json npm run test:a11y` **exit 0, 5페이지 위반 0·외부 요청 0·placeholder 4.8871087704:1**. 이전 잡 원로그에서 마지막 PDF mode-ready 수정 뒤 PDF 부분 2회와 `LANG=ko_KR.UTF-8 VISUAL_TEST_PORT=4277 npm run test:visual`(13:22:45Z), `LANG=en_US.UTF-8 VISUAL_TEST_PORT=4278 npm run test:visual`(13:24:47Z)의 **exit 0**을 확인했다. 이후 제품/시각 변경이 없어 전체 visual 재실행은 생략했다. 재개 로그와 보호 파일 해시는 `/tmp/worklazytools-pfinal-resume-20260906/`에 보존한다.
+- **계보 전제 정정**: `5298c13^=454d7c8964d1a2f301c8661a6c6cc00f6304b49f`이며 RHWP/SEO main 변경은 B1 뒤 `26eb56ea5e2eff771f438d6c18d381da6af13474`에서 합류했다. 지시서의 “RHWP 등 기능 전부 포함·UI 전환 전 S2”는 실제 커밋으로 존재하지 않는다. 요청한 **B1 직전 S2**와 별도 **병합 전후 대조**를 실측해 이 혼입을 분리한다. 예산·기준점의 정본 계약을 바꾸는 결정은 하지 않는다. 이번 커밋과 후속 측정 기록 모두 **push 금지**다.
+
+### P2 P-final/P-QA 재개 — 누적 번들 예산 4점 귀속 분해 (Codx)
+
+**판정: P2 UI 전환은 5종 예산 모두 통과한다. 누적 route/app JS 실패는 U3 QR 일괄 생성만으로 이미 발생했다.** CJK 폰트 파일과 RHWP Studio vendor 자체는 이 JS 예산의 제외 대상이다. “RHWP 런타임도 이번 JS 초과의 주요 원인”이라는 추정은 채택하지 않는다. `4a8405c` 누적 게이트의 수치·기준점·상한은 바꾸지 않으며 이번 지시는 모든 push를 금지한다.
+
+**A 보존 커밋**은 `3f0cf3bc1fa84fc8554724ce8c3b2f6d906b464a` (`refactor: finalize P2 CSS cleanup and preserve QA evidence`), **911파일**이다. 변경 시각 기준선 35장과 미추적 QA 860장, 구현·하네스·문서 16파일을 포함하고 개인 파일 3개는 제외했다. B에서는 제품 코드 최적화를 수행하지 않았고 측정 JSON에 deduplicated 파일별 크기·분류·소유 route·manifest 근거만 추가했다. multiplier는 `6junk`·소수·0·음수·빈 값을 정수로 오인하지 않게 엄격히 검사한다.
+
+**계보 확정과 S2 전제 정정** — `git log --first-parent --oneline 4a8405c..3f0cf3b` 실측이다. U3 뒤 `7b3222b`(visual 결정성)·`454d7c8`(visual 병렬화), **B1 `5298c13`**, `4180f88`(QA 계약), **main 병합 `26eb56e`**, B2 `4ecda00` 순이다. `26eb56e`의 부모는 `4180f885678484ae51c2441e15c36a4d17b40e18`과 `073da56226f7bc1bdbef682a477e05ec28862074`다. 따라서 지시서의 “기능 전부 포함·B1 이전”에 해당하는 실제 커밋은 없다. 요청한 **B1 직전**이라는 정의를 그대로 사용하고, S1→S2를 기타 기능 구간으로 허위 표시하지 않는다.
+
+| 점 | 정확한 커밋 | 실제 상태 |
+| --- | ---: | ---: |
+| S0 | `4a8405c7458ca72e454326e798592330478c67e4` | 지시서 분기점 |
+| S1 | `62f9031ecc87fef37ca55b3d64f511cfc9b2b407` | U3 QR bulk 직후 |
+| S2 | `454d7c8964d1a2f301c8661a6c6cc00f6304b49f` | B1 직전 (RHWP·SEO 병합 전) |
+| S3 | `3f0cf3bc1fa84fc8554724ce8c3b2f6d906b464a` | 감사 후 P-final/P-QA 보존 커밋 |
+
+**동일 조건** — 기존 `/tmp/worklazytools-pfinal-budget.ZaWR4c` worktree 한 곳을 순차 checkout해 S0·S1·S2·S3·병합 전·병합 후를 모두 **새로 빌드**했고 끝에 원래 S0로 복원했다. 다른 기존 worktree는 사용하지 않았다. 여섯 점 모두 `/home/better0101/projects/worklazytools/node_modules` 동일 symlink·설치, Node **v22.17.1**, npm **10.9.2**, Vite **6.4.3**, Rollup **4.62.4**, Tailwind **4.3.3**, React **19.2.8**, Base UI **1.7.0**, fontkit **1.1.1**, pdf-lib **1.17.1**, RHWP core/editor **0.8.6**이다. 설치를 바꾸지 않았으며 `VITE_LOCAL_QA`·`VITE_BASE_PATH`·`BUNDLE_ROUTES`는 unset, `NODE_OPTIONS=--max-old-space-size=4096`, `BUNDLE_BUDGET_MULTIPLIER=6`을 고정했다. 기준 branch의 과거 lockfile을 각각 설치한 측정이 아니라 요청대로 **현재 동일 설치로 정규화한 비교**다. RHWP 패키지 0.8.4↔0.8.6 자체의 역사적 비용은 이 비교로 추정하지 않는다.
+
+- 측정기 SHA-256: `5789598e7c4539261f41fe555572bd0c0dde8f133329b9006283c43292f3931b`. 설치 `node_modules/.package-lock.json` SHA-256: `df730d9ec2838d43f1cd07c224b563406c05d022f1c89ccc8747f0bc2e9893ff`. 완료 시 두 fingerprint 불변을 확인했다.
+- 실제 실행은 `BUNDLE_SOURCE_ROOT=/tmp/worklazytools-pfinal-budget.ZaWR4c BUNDLE_MEASURE_OUTPUT=/tmp/worklazytools-pfinal-resume-20260906/<점>.json BUNDLE_BUDGET_MULTIPLIER=6 NODE_OPTIONS=--max-old-space-size=4096 node /home/better0101/projects/worklazytools/scripts/measure-bundle-budget.mjs`다. 내부 명령은 `vite build --manifest --outDir dist-measure`, 모든 실행 종료 시 측정 dist를 삭제한다. S1/S2/S3는 각각 S0/S1/S2 JSON을 `BUNDLE_BASELINE`으로 주었고, 병합 후는 병합 전 JSON으로 비교했다.
+- 포함·제외·gzip·route reachability 계약은 변경하지 않았다. 단일 소유 lazy 청크와 도구 경로 video worker는 route, 다중 route 또는 소유 경로 없는 worker는 shared, entry는 별도다. 따라서 QR bulk worker는 QR 기능 소유임에도 이 기존 측정 계약에서는 **shared**다. 19 lazy route 전체를 측정했고 eager Excel 병합은 entry에 포함된다. S0 **66 JS/1 CSS**, S1/S2/S3 **79 JS/1 CSS**, 네 점 모두 중복 해시 제거 건수 **0**이다.
+- 원본 JSON·각 빌드 stdout/stderr·계보·설치 fingerprint·실행 exit/시간·분석 스크립트는 `/tmp/worklazytools-pfinal-resume-20260906/`에 보존한다 (`S0.json`…`S3.json`, `Mpre.json`, `Mpost.json`, `point-runs.json`, `measurement-environment.json`, `analysis.json`, `analyze-bundles.py`, `run-points.py`). 각 점의 모든 파일을 재합산해 **5개 metric 전부 exact 일치**, entry+route+shared=app JS도 여섯 점 모두 일치함을 검사했다.
+
+**4점 실측 (각 파일 gzip 합, 단위 B)**
+
+| 측정점 | entry | route | shared | app JS | CSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| S0 | 289,574 | 1,507,461 | 2,615,772 | 4,412,807 | 49,015 |
+| S1 | 294,982 | 2,412,311 | 2,716,255 | 5,423,548 | 49,325 |
+| S2 | 294,982 | 2,412,311 | 2,716,255 | 5,423,548 | 49,325 |
+| S3 | 297,901 | 2,439,997 | 2,716,475 | 5,454,373 | 38,545 |
+
+**3구간 증분 (KiB = 1,024B, 반올림 전 B로 판정)**
+
+| 실제 구간 | entry | route | shared | app JS | CSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| S0→S1: U3 | +5.28 | +883.64 | +98.13 | +987.05 | +0.30 |
+| S1→S2: visual 하네스만 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| S2→S3: P2 + P-final + main 병합 | +2.85 | +27.04 | +0.21 | +30.10 | -10.53 |
+| S0→S3: 종전 누적 | +8.13 | +910.68 | +98.34 | +1017.15 | -10.22 |
+
+S0와 S3 재측정 5종은 이전 P-final 보고의 원시 B와 전부 일치한다. S1→S2는 제품 코드/설치 변화가 없고 다섯 지표도 **exact 0**이다. U3 증가만으로 route **+883.64 > +360KiB**, app JS **+987.05 > +480KiB**여서 S1 비교 명령은 의도대로 **exit 1**이었다. U3는 S0→S3 순증의 route **97.03%**, app JS **97.04%**를 설명한다.
+
+**실제 기능 합류 구간 보조 측정 (단위 B)** — 기준점을 대체하지 않고 혼입을 설명하기 위한 두 점이다.
+
+| 병합 전후 | entry | route | shared | app JS | CSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Mpre `4180f885678484ae51c2441e15c36a4d17b40e18` | 295,057 | 2,414,984 | 2,717,113 | 5,427,154 | 49,275 |
+| Mpost `26eb56ea5e2eff771f438d6c18d381da6af13474` | 295,065 | 2,414,981 | 2,717,095 | 5,427,141 | 49,275 |
+| Mpre→Mpost 증분 | +8 | -3 | -18 | -13 | 0 |
+
+병합은 동일 설치 조건에서 entry **+8B**, route **−3B**, shared **−18B**, app JS **−13B**, CSS **0B**다. 따라서 실제 UI 커밋 구간 합 `(S2→Mpre)+(Mpost→S3)`은 아래와 같다. 이것은 실제 이력의 증분 합이며 존재하지 않는 가상 “기능 완료 S2” 직접 측정값으로 표시하지 않는다.
+
+| 지표 | S2→S3 실측 B (KiB) | UI 구간 합 B (KiB) | 기존 상한 KiB | 판정 |
+| --- | ---: | ---: | ---: | ---: |
+| entry | +2,919 (+2.85) | +2,911 (+2.84) | +120 | 모두 통과 |
+| route | +27,686 (+27.04) | +27,689 (+27.04) | +360 | 모두 통과 |
+| shared | +220 (+0.21) | +238 (+0.23) | +180 | 모두 통과 |
+| app JS | +30,825 (+30.10) | +30,838 (+30.12) | +480 | 모두 통과 |
+| CSS | -10,780 (-10.53) | -10,780 (-10.53) | +60 | 모두 통과 |
+
+**chunk 증가 기여자** — content hash 접미사만 제거해 동명 출력을 대응했고 `index.html` entry, PDF helper index, `@zip.js` index는 manifest/owner로 구분했다. 점별 canonical chunk key 중복이 없음을 단언했다. 표는 **새 청크 전체 크기 또는 기존 청크의 순증**이며 route와 app JS 각 상위 10개다. 각 행의 세 구간 증분 합=누적 증분, 상위 10+기타=metric 증분을 exact B로 확인했다. 동일 개수의 청크라도 gzip에 영향을 주는 참조 hash 변화는 수 B 증감을 만들 수 있으므로 이를 라이브러리 기능 추가로 해석하지 않는다.
+
+**route 상위 10개 (단위 B)**
+
+| chunk | S0→S1 | S1→S2 | S2→S3 | 누적 증가 | 기능/구간 귀속 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `qrLabelPdf.js` | +508,018 | 0 | -1 | +508,017 (+496.11 KiB) | U3 PDF 생성; fontkit + PDF 생성 코드 |
+| `exceljs.min.js` | +271,024 | 0 | -1 | +271,023 (+264.67 KiB) | U3 스프레드시트 입력·실패 XLSX 출력 |
+| `inputAdapter.js` | +135,331 | 0 | 0 | +135,331 (+132.16 KiB) | U3 기존 공용 입력 파서의 앱 lazy 경로 |
+| `@zip.js/zip.js/index.js` | +17,477 | 0 | -1 | +17,476 (+17.07 KiB) | U3 ZIP 동적 진입점 |
+| `QrBulkPanel.js` | +9,709 | 0 | -1 | +9,708 (+9.48 KiB) | U3 일괄 생성 화면 |
+| `VideoStudioPage.js` | -4 | 0 | +3,780 | +3,776 (+3.69 KiB) | 기존 화면; P2 B5b UI |
+| `ImageStudioPage.js` | -6 | 0 | +3,737 | +3,731 (+3.64 KiB) | 기존 화면; P2 B6·B-shared UI |
+| `DocumentCompareResultPage.js` | -4 | 0 | +1,783 | +1,779 (+1.74 KiB) | 기존 결과 화면; P2 B3 UI |
+| `AudioStudioPage.js` | -4 | 0 | +1,648 | +1,644 (+1.61 KiB) | 기존 화면; P2 B5a UI |
+| `ExcelComparePage.js` | +58 | 0 | +1,400 | +1,458 (+1.42 KiB) | 기존 화면; U3 + P2 B4 UI |
+
+상위 10 합 **+953,943B** + 나머지(감소 포함) **-21,407B** = route 누적 **+932,536B**.
+
+**app JS 상위 10개 (단위 B)**
+
+| chunk | S0→S1 | S1→S2 | S2→S3 | 누적 증가 | 기능/구간 귀속 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `qrLabelPdf.js` | +508,018 | 0 | -1 | +508,017 (+496.11 KiB) | U3 PDF 생성; fontkit + PDF 생성 코드 |
+| `exceljs.min.js` | +271,024 | 0 | -1 | +271,023 (+264.67 KiB) | U3 스프레드시트 입력·실패 XLSX 출력 |
+| `inputAdapter.js` | +135,331 | 0 | 0 | +135,331 (+132.16 KiB) | U3 기존 공용 입력 파서의 앱 lazy 경로 |
+| `zip-fs-wasm.js` | +64,626 | 0 | -2 | +64,624 (+63.11 KiB) | U3 ZIP; shared로 분리 |
+| `qr-bulk.worker.js` | +56,905 | 0 | 0 | +56,905 (+55.57 KiB) | U3 raster worker; 계약상 shared |
+| `jszip.min.js` | +38,101 | 0 | 0 | +38,101 (+37.21 KiB) | U3 공용 ZIP 분리; 기존 PDF에서 이동 포함 |
+| `@zip.js/zip.js/index.js` | +17,477 | 0 | -1 | +17,476 (+17.07 KiB) | U3 ZIP 동적 진입점 |
+| `QrBulkPanel.js` | +9,709 | 0 | -1 | +9,708 (+9.48 KiB) | U3 일괄 생성 화면 |
+| `index.html (entry)` | +5,408 | 0 | +2,919 | +8,327 (+8.13 KiB) | 기존 entry; U3 + P2 공용 UI |
+| `VideoStudioPage.js` | -4 | 0 | +3,780 | +3,776 (+3.69 KiB) | 기존 화면; P2 B5b UI |
+
+상위 10 합 **+1,113,288B** + 나머지(감소 포함) **-71,722B** = app JS 누적 **+1,041,566B**.
+
+**재배치·제외·shadcn 귀속의 경계**
+
+- U3 시점의 `PdfEditorPage` **−38,226B**, `workerLifecycle` **−61,534B**는 양수 청크 증가를 상쇄한다. 누적에서는 각각 **−34,131B**, **−61,535B**다. 특히 JSZip·ZIP 공용 코드의 분리/재배치가 섞이므로 새 청크 크기를 전부 “새 라이브러리 비용”으로 더하지 않았다.
+- CJK `public/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf`는 U3에 들어온 **4,644,748B 원본 자산**, **route/app JS 기여 0B**다. `QrBulkPanel`의 PDF export 시 fetch하고 `qrLabelPdf`에 fontBytes로 전달한다. 위 약 **496.11KiB** JS 청크는 fontkit/PDF 생성 코드이며 OTF 바이트 자체가 아니다.
+- RHWP Studio는 `git ls-tree -rl` 기준 manifest 포함 78파일 원본 합 **56,208,787→60,692,284B (+4,483,497B)**지만 모두 `public/vendor/rhwp-studio/0.8.4→0.8.6`라 **JS/CSS 예산 기여 0B**다. prebuild 검증의 77파일 수치는 자기 manifest를 제외한 계약이므로 위 78파일과 단위가 다르다. 동일 설치의 core/editor는 모든 점에서 0.8.6이며 버전 교체 효과를 측정했다고 주장하지 않는다.
+- P2 구간은 Base UI/shadcn 신규 runtime dependency 추가가 없고 S2/S3 모두 **79개 JS chunk**다. UI 전환은 기존 화면/entry 청크에 반영됐다. S2→S3 app JS 증가 상위 10개는 다음과 같으며 전체 CSS는 **−10,780B (−10.53KiB)**다.
+
+| P2 구간 기존 chunk | 증가 B | KiB |
+| --- | ---: | ---: |
+| `PdfEditorPage.js` | +4,095 | +4.00 |
+| `VideoStudioPage.js` | +3,780 | +3.69 |
+| `ImageStudioPage.js` | +3,737 | +3.65 |
+| `index.html (entry)` | +2,919 | +2.85 |
+| `DocumentCompareResultPage.js` | +1,783 | +1.74 |
+| `AudioStudioPage.js` | +1,648 | +1.61 |
+| `DocumentComparePage.js` | +1,432 | +1.40 |
+| `ExcelComparePage.js` | +1,400 | +1.37 |
+| `TimezoneCalculatorPage.js` | +1,374 | +1.34 |
+| `OfficeEditorAppPage.js` | +1,217 | +1.19 |
+
+**실행 결과·최종 판정** — S0 빌드/측정 exit 0, S1 빌드 성공 후 누적 예산 **exit 1**, S1→S2·S2→S3 및 병합 전→병합 후 비교는 전부 **exit 0 / all five deltas within fixed limits**다. S1/S2/S3/Mpre/Mpost 새 빌드는 각각 **72.46/72.35/73.62/74.71/78.84초**, S0 Vite 보고는 **57.50초**다. 측정기 문법·`git diff --check`와 잘못된 multiplier 5종의 빌드 전 거부 검증을 통과했다. 제품 변경에 대한 build·unit·static·orphan·manifest·QA UI/a11y 재검증은 위 자체 감사 절의 실제 실행 결과를 따른다.
+
+**“P2 자체가 누적 예산을 초과했다”는 귀속은 기각하고, “U3 기능 추가만으로 누적 실패·P2 UI 자체는 5종 상한 이내”로 확정한다.** 원래 S0 누적 수치는 여전히 route/app 두 종 실패이며 예산 면제나 기준 변경을 승인한 것은 아니다. 사용자 지시대로 `origin/ui-migration`과 main 모두 push하지 않는다. 작업지시서의 기준점·예산 숫자는 수정하지 않았다.
+
+## 2026-09-05
+
+### P2 P-final — legacy 잔여·토큰 단일화·orphan·누적 예산 판정 (Codx)
+
+- **실행 게이트**: fetch 뒤 `HEAD=origin/ui-migration=3588ebafab3dd876746e356ea652d923eda0f5e5`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`로 지시 기준과 일치했다. B-shared 160장 전수 차단 결함 0·`[배포 가능]`과 열린 계획서 무충돌을 확인했다. U4 PDF는 비정본 초안, 네이버 랜딩은 별도 main worktree 소유라 P-final CSS/검증 표면과 상반되지 않는다. 사용자 DOCX 2개·네이버 확인 파일과 기존 QA 캡처는 제외했다.
+- **legacy 6엔트리 재대조**: manifest는 실제로 **149 removed·1 split·5 active**이며 인계된 `004·005·006·007·132·134` 6개가 전부 남아 있었다. `legacy-004`의 `.eyebrow`는 정적 SEO fallback 2곳과 명시 제외 `WordComparePage`·`HwpComparePage` 2곳, `005`의 `.eyebrow.success`와 `006/007/134`의 `.content-heading` 계열은 두 도달 불가 화면이 소비한다. `132`의 raw button/secondary/result arm도 같은 두 화면이 소비하므로 **refcount 0 엔트리는 0개**다. 소스 refcount 0인 `.ui-eyebrow`와 primary-link selector arm만 분리 제거했고 manifest의 current selector를 갱신했다. 도달 불가 컴포넌트 3종은 명시 제외대로 수정하지 않았다.
+- **토큰 단일화**: repo-wide `rg` 소비 집계에서 `--blue`·`--orange`·`--pink`·`--legacy-radius-sm`·`--legacy-radius-md`가 모두 `definitions=0 / consumers=0`이 되도록 라이트·다크 정의를 제거했다. 남은 legacy 변수는 AppShell·홈·도구 목록·공개 정책 화면과 도달 불가 비교 화면의 surface/text/accent 호환 CSS가 실제 소비한다: `--bg` 4, `--bg-elevated` 11, `--bg-muted` 18, `--bg-solid` 18, `--label` 34, `--label-secondary` 48, `--label-tertiary` 23, `--separator` 45, glass/shadow 1~7, soft/accent 2~12, radius 1~5회다. shadcn core는 `--background` 1·`--foreground` 3·`--primary` 6·`--primary-foreground` 2·`--radius` 7회 등 전부 소비가 있고 `src/styles/tailwind.css` diff는 **0**이라 안전한 `--primary` 팔레트는 건드리지 않았다.
+- **orphan 판정**: `npm run css:orphans`를 신설해 `.cjs/.html/.js/.jsx/.json/.mjs/.ts/.tsx`를 저장소 전체 재귀 탐색한다. 문서·테스트/fixture·빌드 산출·vendor·npm·Git metadata는 owner와 목적을 출력하는 8개 명시 예외로 분리하고, 정적 SEO markup 생성기 1개는 다시 포함한다. prefix wildcard 대신 AppShell/OperationProgress의 exact 동적 class 15개와 Fabric runtime class 2개만 허용했다. 최초 **63 zero-reference classes / 152 selector arms**를 확인하고 삭제했으며 `.drop-hint-segment`·`.file-list` legacy class도 0이다(동명 `data-ui-*` 속성은 CSS class 소비가 아님). 최종은 **238 class tokens / 263 owned runtime sources / orphan selector arm 0**, PostCSS **612 rules·2,126 declarations**다.
+- **시각 기준선 누락 판정**: 최초 전체 visual은 35/172가 기존 기준선과 달랐으나 `3588eba` 임시 worktree도 같은 **35/172**를 냈다. 양쪽 actual 35장 중 33장은 pixel-identical, 나머지도 0.0050%·0.0028%라 orphan 삭제 영향이 아니었다. B-shared에서 승인된 accent 변경이 부분 visual만 돌아 전 화면 기준선에 반영되지 않은 공백으로 확정하고 35장만 갱신했다. 이후 `ko_KR.UTF-8` **172/172·1m46.46s**, `en_US.UTF-8` **172/172·1m45.47s**가 같은 기준선으로 통과했다.
+- **스모크 하네스 교정**: 전체 실행이 처음 드러낸 세 stale/race를 제품 변경 없이 수정했다. utilities의 video route는 이전 문서의 `crossOriginIsolated`를 오인하지 않도록 path+격리 marker까지 기다리고, new-tools crop 단축키는 이전 form focus를 명시적으로 해제하며, Excel Compare는 B-shared가 의도적으로 제거한 nested interactive를 기대하지 않고 비상호작용 drop target+단일 버튼을 단언한다. 각각 동일 명령 재실행이 통과했다. Excel Cleaner 최초 route 대기 실패 1회는 재현되지 않아 코드 변경 없이 같은 전체 명령 통과로 환경성으로 판정했다.
+- **P-final 자체 증분**: B-shared 기록 대비 entry **+2B**, 전체 route **+7B**, shared **+3B**, app JS **+12B**, CSS **−2,446B**라 자체 변경은 5종 한도 안이다.
+- **누적 예산 — 차단**: 측정기를 임의 worktree에도 적용할 수 있게 `BUNDLE_SOURCE_ROOT`, 묶음 합산 한도를 재현할 `BUNDLE_BUDGET_MULTIPLIER`를 추가하고 같은 설치/도구로 `4a8405c`를 재빌드했다. 기준→P-final은 entry `289,574→297,901B`(**+8.13KiB / +120KiB 통과**), route `1,507,461→2,439,997B`(**+910.68KiB / +360KiB 실패**), shared `2,615,772→2,716,475B`(**+98.34KiB / +180KiB 통과**), app JS `4,412,807→5,454,373B`(**+1,017.15KiB / +480KiB 실패**), CSS `49,015→38,545B`(**−10.22KiB / +60KiB 통과**)다. 분기 직후 U3 QR bulk의 full CJK PDF/font·입력 경로까지 포함한 누적치지만 사용자 지시의 기준점은 `4a8405c`이므로 임의 제외하지 않았다. **누적 게이트 실패로 push 금지**다.
+
+### P2 P-QA — 20도구 전수 캡처·접근성·렌더링 기준선 (Codx)
+
+- **QA 환경·추적 차단**: `VITE_LOCAL_QA=1 npm run build`, Chrome 152, `VISUAL_TEST_PORT=4270`, consent granted로 `tests/visual-artifacts/p2-final/`에 채집했다. 캡처마다 외부 origin 요청을 실패 처리하는 계약에서 **외부 요청 0**이고, QA `dist`의 `data-worklazy-google-analytics`·`data-worklazy-naver-analytics`·`data-worklazy-adsense` 재귀 집계도 **0/0/0**이다.
+- **전수 매트릭스**: 20도구·77 scenario를 제품 적용 locale의 light/dark×desktop/mobile로 전개해 **604장**이다. 상태 합계는 initial **156**·bottom **156**·interaction **292**, 누락·잉여 0이다. PDF 4모드와 Image batch/collage/GIF는 각각 독립 상태로 포함했다. 최초 604장 중 PDF→이미지 KO/dark/desktop 1장이 썸네일 대기 race로 실패했으나 같은 PDF 48장 재채집에서 해당 장이 통과했고, 첫 세트에서 이미 통과한 반대 convert 장과 합쳐 최종 604장을 고정했다.
+
+| 도구 | initial | bottom | interaction | 합계 |
+|---|---:|---:|---:|---:|
+| excel-merger | 8 | 8 | 8 | 24 |
+| excel-compare | 8 | 8 | 16 | 32 |
+| excel-cleaner | 8 | 8 | 16 | 32 |
+| pdf-editor | 8 | 8 | 32 | 48 |
+| document-compare | 8 | 8 | 32 | 48 |
+| hwp-editor | 4 | 4 | 4 | 12 |
+| office-editor | 8 | 8 | 8 | 24 |
+| video-studio | 8 | 8 | 16 | 32 |
+| audio-studio | 8 | 8 | 16 | 32 |
+| image-studio | 8 | 8 | 48 | 64 |
+| text-merger | 8 | 8 | 8 | 24 |
+| text-tools | 8 | 8 | 8 | 24 |
+| text-formatter | 8 | 8 | 8 | 24 |
+| work-calculator | 8 | 8 | 8 | 24 |
+| timezone-calculator | 8 | 8 | 8 | 24 |
+| payroll-calculator | 8 | 8 | 8 | 24 |
+| image-privacy | 8 | 8 | 8 | 24 |
+| security-tools | 8 | 8 | 8 | 24 |
+| qr-studio | 8 | 8 | 24 | 40 |
+| data-converter | 8 | 8 | 8 | 24 |
+| **합계** | **156** | **156** | **292** | **604** |
+
+- **접근성 최종 게이트**: axe-core **4.13.0**·Playwright **1.63.0**·1280×800·light에서 홈 25/0, 문서 비교 41/0, 도구 목록 39/0, Excel 비교 46/0, PDF 도구 43/0으로 **violations 0(critical 0·serious 0·moderate 0)**이다. 라이브 기준 10(1·5·4) 대비 **−10**, 외부 요청 0이다. 문서 placeholder는 `rgb(105,105,111)` on `rgb(242,242,247)` = **4.8871:1**, 라이브 4.61 대비 +0.2771이다.
+- **렌더링 로컬 기준선**: `npm run test:rendering`은 QA production build·Chrome 152·1280×800 DPR1·light·ko-KR·cache off·service worker block·loopback 무스로틀·페이지별 cold context 3회 median·3초 settle을 고정한다. Lighthouse TBT 대신 FCP 이후 long task마다 `max(0,duration−50ms)`를 합산한 동등 blocking 지표를 썼다. 외부 요청은 0이다.
+
+| 페이지 | LCP | CLS | long-task blocking | FCP |
+|---|---:|---:|---:|---:|
+| 홈 | 91.34ms | 0.038332 | 146ms | 91.34ms |
+| 문서 비교 | 90.67ms | 0.114199 | 49ms | 90.67ms |
+| PDF 도구 | 512.32ms | 0.114199 | 52ms | 94.39ms |
+
+- **판정**: 캡처·접근성·렌더링 3종은 Gemini 최종 검수 입력으로 준비됐다. 누적 예산은 위 P-final 판정대로 route/app 두 지표가 실패했으므로 **`origin/ui-migration` push도 금지**, main 병합·배포는 물론 수행하지 않는다. 원격 상태는 `origin/ui-migration=3588eba`, `origin/main=073da56`으로 유지한다.
+
+### P2 B-shared — 접근성 기준선 교정·공용 legacy 종료·Image Studio 대안 조작 판정 (Codx)
+
+- **게이트와 0단계 표본 교정**: `HEAD=origin/ui-migration=556a8b169752a1496599655ab6ae071afbf16da5`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`에서 시작했고 B6 재검수 차단 결함 0·회귀 0을 확인했다. 기존 `test:a11y`가 “home”을 `/ko`로 열고 저장 언어까지 주입해 실제 `.recommended`가 있는 루트 언어 랜딩을 건너뛰는 결함을 찾았다. 루트 `/`로 교정한 브랜치 기준선은 **9건(critical 1·serious 4·moderate 4)**이다: 홈 20/1 color-contrast(2노드), 문서 비교 42/2 nested-interactive+region, 도구 목록 39/1 region, Excel 비교 47/2 nested-interactive+region, PDF 44/3 label+nested-interactive+region. 라이브 10건 중 PDF 활성 탭 대비 1건만 이미 해소됐고 9건 잔존·신규 0이었다.
+- **공용 접근성 판정**: desktop 언어 전환기를 이름 있는 `nav`에 귀속하고, 공용/Excel 전용 드롭존은 비상호작용 drop target과 단일 파일 선택 버튼으로 역할을 분리했다. 숨김 file input에도 접근 가능한 이름을 주었다. `ToggleRow`는 visible label↔button 연결과 설명 ID의 `aria-describedby`를 추가했으며 전 스코프 browser 스모크에서 Space·Enter·label click과 설명 연결을 모두 실동작 확인했다. 완료 axe는 홈 25/0·문서 41/0·도구 39/0·Excel 46/0·PDF 43/0, **총 0건·외부 요청 0**이다. 문서 placeholder는 `rgb(105,105,111)`/`rgb(242,242,247)` = **4.8871:1**로 라이브 4.61:1보다 개선됐다.
+- **개선 ③ 채택 — 카드 선택 상태**: PDF 선택 썸네일은 브랜치 재측정에서 선택/비선택 배경이 라이트·다크 모두 **1.00:1**로 테두리/링에만 의존했다. 약한 배경 틴트와 4px 좌측 인디케이터를 함께 채택했다. 최종 배경 대비는 light 1.09:1·dark 1.11:1이지만 인디케이터 대비가 각각 **6.27:1·9.81:1**로 완료 기준 3:1을 넘으므로 WCAG 1.4.1의 색 단독 의존을 해소했다. 배경만 과도하게 진하게 만드는 안은 정보 계층을 무너뜨려 기각했다.
+- **개선 ④ 채택 — 사이드바 활성 항목**: `NavLink` 상수 class 때문에 브랜치 직접 진입 `/ko`에서 active class와 `aria-current`가 모두 없고 light/dark **1.00:1**이던 회귀를 확인했다. 경로 정규화, `aria-current=page`, 현재색 3px 인디케이터를 적용했다. 최종 인디케이터 대비는 light **17.72:1**, dark **14.05:1**이며 `/ko`·`/ko/`·도구 하위 경로에서 활성 상태를 확인했다.
+- **개선 ⑥ 채택/기각 — legacy accent만 제거**: shadcn `--primary` 톤다운은 기존 8.09:1 실측을 근거로 **기각**하고 값도 바꾸지 않았다. `var(--blue)` 35·`var(--orange)` 16·`var(--pink)` 8 호출을 Tailwind/shadcn 토큰 소비로 옮겨 `src` 전체 **0/0/0**으로 만들었다. 흰 텍스트와 쓰이는 대체 색 대비는 blue-700 **6.70:1**, orange-700 **5.18:1**, pink-700 **6.29:1**이다.
+- **Image Studio 이관 6건**: 상위 4모드에 `aria-pressed`, 캔버스에 유효한 named region과 focus 표시를 부여하고 빈 선택 도움말의 부모 opacity를 제거해 별도 axe **41 passes/0 violations**를 얻었다. 화면 안내와 함께 Enter 영역 생성·방향키 이동·Shift+방향키 크기 조절, 일반 모드 방향키 pan, 레이어 이름의 Alt+↑/↓ 재정렬을 제공했다. 레이어 선택/표시/삭제와 GIF drag/위/아래/삭제 라벨은 번호와 실제 이름을 포함하며, 복제 라벨은 선택 종류/개수를 포함한다. 전용 스모크에서 키보드 영역 생성·이동·크기·취소와 레이어 ID 순서 왕복을 확인했다.
+- **B6 말줄임 공백 해소**: `interaction-layers-panel`이 긴 텍스트 레이어를 실제로 만들고 해당 레이어 이름에 `assert-truncated`를 수행한다. 모바일 실측은 **clientWidth 104px < scrollWidth 409px**, `overflow:hidden`·`text-overflow:ellipsis`·`white-space:nowrap`이며 시각/QA 8프로필에서 assertion이 통과했다.
+- **legacy/refcount와 P-final 인계**: B6의 45개 비제거 수치는 **37 active + 8 split**이라 차이는 중복/누락이 아니었다. B-shared 후 manifest는 **149 removed·1 split·5 active**다. P-final 인계는 6엔트리 `legacy-004`, `005`, `006`, `007`, `132`, `134`; 실제 소비는 명시 제외인 도달 불가 `WordComparePage`·`HwpComparePage`의 `.eyebrow(.success)`·`.content-heading`과 raw `.tool-page` arm이다. `.sample-diff`는 repo refcount 0을 확인해 B-shared에서 제거했다.
+- **예산·검증**: B6 `556a8b1`을 임시 worktree에서 같은 `bundle:measure`로 재생성한 기준은 entry 296,948B·영향 route 2,439,031B·shared 2,716,468B·앱 JS 5,452,447B·CSS 41,067B다. B-shared는 297,899B·2,439,990B·2,716,472B·5,454,361B·40,991B로 각각 **+951B·+959B·+4B·+1,914B·−76B**, 5종 상한 통과. 표준 build 2,830 modules·정적 61페이지, unit 193/193, utilities, browser 전 스코프, UI migration, control geometry 92표본/20페이지, static, 대표 시각 46/46을 통과했다. 추적 제외 QA는 `VISUAL_TEST_PORT=4252`, `tests/visual-artifacts/p2-bshared/` **160/160**(initial 40·bottom 24·interaction 96), 외부 요청 0이며 contact sheet와 대표 원본에서 차단 결함 0으로 판정했다.
+
+### P2 묶음 검수 판정 B1~B3 — 검수 입력 결함과 오탐 걸러내기 (Claude)
+
+「배포 전 로컬 시각 검수」 규칙으로 신설한 게이트를 세 묶음에 적용하면서, **검수 자체가 틀릴 수 있다**는 것이 이 단계의 가장 큰 교훈이었다. 판정 근거는 다음과 같다.
+
+- **B1 1차 검수는 무효로 판정했다 — 검수 입력 결함.** Gemini 가 "전 도구 모바일 하단 가림" 차단 결함 10건을 냈지만, 캡처 세트에 `bottom`(스크롤 최하단) 상태가 **0장**이었다(initial 48 + interaction 48 뿐 — Claude 실측). 첫 화면만 보고 하단 가림을 판정하는 것은 성립할 수 없다. **결함이 아니라 검수 입력이 틀린 것**으로 판정하고, 캡처 절차를 3상태(initial·bottom·interaction) 필수로 고쳐 공용 적용한 뒤 144장으로 재채집했다. 재검수는 차단 결함 0·[배포 가능].
+- **토글/탭 썸 이탈 지적은 오탐으로 확정했다.** 라이브 사고의 실제 증상과 같은 이름이라 그대로 믿기 쉬웠으나, Codex DOM 실측 4도구 **60 샘플 전부 이탈 0px·수직 중심 오차 0px**(썸이 트랙 안쪽 사방 2~4px 여유), legacy 클래스 방출 0건이었다. 「증거 없는 반박은 무게 0」 규칙의 화폐는 실행 출력이므로 육안 인상보다 기하 실측을 채택했다. 회귀는 `test:control-geometry`로 고정했다.
+- **B2**: Gemini 전수 108장(initial 36·bottom 36·interaction 36) 차단 결함 0·개선 권고 0·[배포 가능].
+- **B3(라이브 사고 지점)은 세 경로로 교차 확인했다.** 같은 화면을 두 번 망가뜨릴 수는 없으므로 단일 판정자를 두지 않았다. ① Codex DOM 실측 — 토글 32표본 이탈 0px·중심 오차 0px, 문서 쌍 텍스트 폭 747px·전부 `horizontal-tb`·세로 낙하 0건, 버튼 190×48px·`w-full` 충돌 0건 ② Gemini 전수 80장 — 사고 증상 3종 전부 **미관찰**, 차단 결함 0 ③ Claude 육안 — `document-compare-empty__interaction-toggle-on__ko__light__desktop.png`에서 토글 6개 썸이 모두 트랙 내부. **B4 착수 조건 충족으로 판정.**
+
+**남긴 규칙**: 검수 보고에 차단 결함이 실려 오면 수정에 착수하기 전에 **검수 입력이 그 판정을 뒷받침하는지 먼저 본다**. 상태 커버리지가 없는 캡처로 내려진 판정은 결함 보고가 아니라 하네스 버그 보고다.
+
+### P2 B6 1차 디스패치 무효 판정 · 위임 오염 2건 (Claude)
+
+**B6 1차 시도(`task-mtnvm1uy-5sk6c0`)를 무효로 판정하고 재디스패치했다.** 태스크가 `completed / Phase: done / Duration 56m 26s` 로 보고됐으나 **산출물이 0**이다(Claude 실측): `origin/ui-migration` = `2b1aabd`(B5b) 그대로 · `tests/visual-artifacts/p2-b6/` 부재 · 해당 job 의 `.log`/`.json` 파일 자체 부재 · `codex-companion status` 목록에서도 소실 · 워킹트리에 image-studio 변경 없음.
+
+**남긴 규칙**: **완료 보고를 읽기 전에 산출물로 먼저 확인한다**(`git log origin/<branch>` · 산출물 디렉터리 · `git status`). 이 확인 없이 검수를 디스패치했다면 존재하지 않는 캡처를 검수시키고 한 사이클을 더 버렸을 것이다. 감시 스크립트에도 "No job found" 를 정상 종료와 구별해 경고하는 분기를 추가했다.
+
+**위임 오염 — Gemini 가 저장소에 의존성을 설치했다.** 라이브 접근성 감사 위임 프롬프트에 "저장소 파일의 생성·수정·삭제 금지"를 명시했음에도, Gemini 가 측정 도구를 `npm i -D` 로 설치해 `@axe-core/playwright ^4.13.0`·`playwright ^1.63.0` 이 devDependencies 에, lock 에 54줄이 추가됐다. **"파일 수정 금지"가 npm install 을 막지 못한 Claude 의 지시 결함**이다 — 앞으로 npm 명령을 명시적으로 금지하고, 위임 결과 수거 시 `git status` 로 오염을 확인한다.
+**처리**: 되돌리지 않고 **Codex 판단으로 넘겼다.** 정본 「배포 계약」이 접근성 재측정(axe-core 4.13.0)을 배포 게이트로 박았으므로 도구가 저장소에 있는 편이 재현에 일관적이다. 다만 기존 하네스가 `puppeteer-core` 를 쓰므로 **브라우저 자동화 스택 이중화**가 쟁점이라, 유지 시 정식 커밋 + 고정 npm script, 기각 시 되돌리기 + 게이트 재현 대안을 요구했다(「코드 단일 작성자」 — Claude 는 package.json 을 직접 커밋하지 않는다).
+
+### P2 B6 Image Studio UI 전환 · 접근성/상태 분리 판정 (Codx)
+
+- **실행 게이트·범위**: fetch 뒤 `HEAD=origin/ui-migration=2b1aabdc840ea01458ddefef46241130a587dd9d`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`로 지시 기준과 일치했고 B5b 32장 전수 `[배포 가능]` 판정 및 열린 계획서 무충돌을 확인했다. 사용자 DOCX 2개·네이버 확인 파일·`p2-b5b` 캡처는 제외했다. Image Studio TSX 10개와 CSS/테스트만 바꿨고 `src/features/image-studio/*.ts` diff는 **0건**이라 이미지 처리·Fabric 좌표/렌더·리사이즈/모자이크/워터마크·GIF 인코딩·배치 오케스트레이션은 불변이다.
+- **의존성 판정 — Playwright 유지**: Gemini가 남긴 `@axe-core/playwright`·`playwright`는 정본이 같은 조합의 재측정을 요구하므로 되돌리지 않고 각각 **4.13.0/1.63.0 exact** devDependency로 고정했다. 기존 Puppeteer 스택과 이중화되지만 제품 하네스를 교체하지 않고 5페이지 접근성 감사만 담당한다. `npm run test:a11y`는 1280×800·light·ko-KR·Chrome에서 라이브 기준 한도(critical 1·serious 5·총 10)와 외부 요청 0을 기계적으로 검사한다. 추적 제외 브랜치 재측정은 **9건(critical 1·serious 3·moderate 5), 외부 요청 0**으로 통과했다. devDependency는 번들 예산 실측상 제품 청크에 편입되지 않았다.
+- **화면·primitive 판정**: 편집기 도구/viewport/미니바/컨텍스트/레이어/스티커와 batch/collage/GIF 폼·행·작업 버튼을 기존 `UtilityPage/SectionCard/Field/Input/Select/Notice`, shadcn `Button`·`Card`·기존 Switch/SegmentedControl로 옮겼다. 새 primitive 소비처가 없어 `shadcn add`는 실행하지 않았다. 모바일 스티커 카테고리가 36px로 줄고, 레이어 Sortable 핸들의 SVG가 Button의 pointer-events 계약과 충돌하고, 접힌 패널에 Card의 flex가 남는 세 회귀를 스모크에서 검출해 각각 44px·span 핸들·데스크톱 hidden으로 복구했다.
+- **legacy/refcount**: B6 소유/마지막 소비 12개(`legacy-001`, `105`, `114`~`120`, `133`, `143`, `145`)를 제거했다. 최종 manifest는 **110 removed·8 split·37 active**, PostCSS는 **795 rules·2,756 declarations**다. B6 화면 소스 10개와 legacy 52 token/동적 prefix 3종의 교집합은 **0건**이다. B-shared 인계는 **45개 비제거 규칙** — p2-shared 21개, cross-shared 23개(15 active·8 split), AppShell brand compact 1개다. 상세 selector/소유권은 `docs/legacy-css-owner-manifest.json`의 이 45개 entry를 정본으로 한다.
+- **상태·QA**: 일반 scenario를 initial·bottom·`interaction-canvas-loaded`·`interaction-size-panel`·`interaction-batch-mode`·`interaction-collage-mode`·`interaction-gif-mode`로 분리했다. 일반 profile은 interaction당 EN/dark/desktop 1개로 축약하고 initial/bottom이 나머지 locale/theme/viewport 축을 보완한다는 `profileReductionReason`을 기록했다. 일반 visual은 **11/11·18.12초·concurrency 4/실제 2**. 추적 제외 QA는 포트 **4246**에서 **56/56·32.94초·4/4**, initial 8·bottom 8·interaction 40(상호작용 5종 각 8)이며 모바일 bottom assertion 6종·외부 요청 0·tracking loader 0을 통과했다. 상태별 contact sheet와 모바일 원본을 직접 확인한 차단 결함은 0이다.
+- **접근성 실측 — 수정은 B-shared 판정으로 보류**: 충족 항목은 편집 toolbar의 `aria-pressed`, Switch `role=switch/aria-checked`, 단일 도구 아이콘 버튼의 접근 가능한 이름, GIF 순서 변경의 위/아래 버튼 대안, 모바일 44px 이상 타깃이다. 남은 공백은 ① 상위 4모드 버튼에 tab/pressed/selected 상태 없음 ② canvas stage의 generic `div`에 금지된 `aria-label`(axe serious) ③ 빈 선택 안내 대비(serious) ④ crop/effect 영역 생성과 pan이 drag 전용 ⑤ layer 재정렬이 drag 전용 ⑥ 같은 종류 레이어의 숨기기/삭제와 GIF 프레임 이동/삭제 라벨에 대상 이름·번호 없음이다. 공용 FileDropZone의 file input label(critical)·nested-interactive(serious), desktop language switcher region(moderate)도 함께 재현됐다. axe는 초기 5건→레이어 로드 뒤 공용 3건으로 줄었다. 지시대로 B6에서 이 공백을 고치지 않고 B-shared 입력으로 남겼다.
+- **예산·검증**: `2b1aabd` 대비 gzip은 entry **+9B**, image route **+2,697B**, shared **−7B**, 전체 앱 JS **+2,672B**, CSS **−887B**로 5종 상한을 통과했다. 표준 build **2,829 modules·정적 61페이지**, unit **193/193**, `TEST_ONLY_IMAGE=1 test:new-tools`, `TEST_ONLY_IMAGE_SIZING=1 test:new-tools`, static, manifest, bundle, diff check가 통과했다. 추적 제외 빌드에서 UI migration과 control geometry **92 samples/20 pages**가 통과했다. 일반 visual은 위 11/11이고 QA는 56/56이다. stale selector·sticky 스크롤 좌표·하단 패널 가림으로 드러난 하네스 실패는 data-testid, 정확 픽셀 행렬 선택, 실제 렌더 bounds 가시점으로 교정했으며 엔진 허용치와 제품 로직은 완화하지 않았다.
+
+### P2 B6 수정 — 모바일 캡처 좌표 판정·레이어 검증 표면 복구 (Codx)
+
+- **실행 게이트**: fetch 뒤 `HEAD=origin/ui-migration=a2d74ba64866ddb5db5fabbeb430c875d84c6acc`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`였고 열린 계획서에서 같은 Image Studio·시각 하네스 표면의 상반된 정본은 없었다. 사용자 DOCX 2개·네이버 확인 파일과 기존 `p2-b5b` 캡처는 제외했고 B-shared에는 착수하지 않았다.
+- **결함 1 판정 — 가설 B, 캡처 아티팩트**: Chrome 152·390×844에서 파일 선택 영역을 중앙에 둔 같은 실제 업로드 흐름은 전환 전/후 모두 헤더 겹침 0이고 도구 모음 전체가 보였다. 전환 전 `origin/main`은 헤더 `top 9 / bottom 63 / height 54px / position fixed / z-index 50`, 도구 모음 `top 655.97 / height 64px / position static / z-index auto`; 수정 전 브랜치는 도구 모음 `top 633.14 / height 100px`였다. 반면 문제의 `workspace scrollIntoView + offset -88`을 그대로 적용하면 전환 전도 workspace `top 87.97px`, 도구 모음 `top 9.97 / bottom 73.97px`, 헤더 겹침 **53.03px**, 비가림 노출 **10.97px**였고 브랜치는 workspace `top 88.14px`, 도구 모음 `top -34.86 / bottom 65.14px`, 겹침 **54px**, 비가림 노출 **11.14px**였다. 양쪽에 같은 방식으로 재현되므로 상단 잘림 자체는 전환 회귀가 아니라 워크스페이스만 헤더 아래로 당긴 시나리오 산물이다. 모바일 캔버스 열은 양쪽 모두 `position sticky / top 72px / z-index 8`이고 헤더보다 낮은 평면이다. 모바일 toolbar+canvas를 새로 고정하는 구조 변경은 기존 sticky 캔버스·AdSense 경계와 충돌하므로 기각하고, canvas 상태는 toolbar `offset -72`, size 상태는 panel `offset -72`로 실제 헤더 여백을 반영했다.
+- **캡처 교정 뒤 드러난 실제 B6 회귀 4건**: Card의 기본 `flex-column`이 원래 구조 속성을 이겨 도구 모음의 첫 도구들이 좌우로 잘리고, 뷰포트 컨트롤·레이어 행·선택 미니바가 세로로 늘어났다. 구조 재설계 없이 각 소유 컴포넌트에 toolbar `grid`, viewport/minibar `flex-row`, layer row 3열 `grid`를 명시했다. 최종 모바일 실측은 toolbar `top 72.14 / bottom 136.14 / height 64px / display grid`로 헤더 아래 여백 **9.14px**, 탭 rect `left 44 / right 190px`로 카드 내부, workspace `top 159.14px`; viewport는 **230.53×44px** 가로 flex다.
+- **결함 2 검증**: `interaction-layers-panel`을 추가해 충분히 긴 실제 fixture 이름을 업로드하고 별 9개를 더해 base 포함 10개 레이어를 만든다. 파일명은 `clientWidth 130 < scrollWidth 2,345px`, `overflow hidden / text-overflow ellipsis / nowrap`; 레이어 목록은 `clientHeight 420 < scrollHeight 596px`, `overflow-y auto`; 모바일 행은 `166/44/44px` 3열 grid·높이 54px, 미니바는 **298×58px** 가로 flex로 실측됐다. 하네스가 이 말줄임과 세로 overflow를 캡처 전에 직접 단언한다.
+- **시각·제품 영향**: 추적 제외 프로덕션 빌드에서 `tests/visual-artifacts/p2-b6/` **64/64**(initial 8·bottom 8·interaction 48; canvas/size/layers/batch/collage/GIF 각 8)를 41.93초에 채집했다. 16개 desktop/mobile contact sheet 전수와 모바일 원본을 확인해 헤더 겹침·수평 잘림·레이어 세로 확장·미니바 확장·하단 가림이 모두 0이었다. 기능·ko/en 문구·SEO/정적 route·광고 배치/격리·캔버스/worker/이미지 엔진은 불변이다.
+- **예산·검증**: `a2d74ba`→수정본 gzip은 entry `296,958→296,948B`(**−10B**), image route `131,818→131,846B`(**+28B**), shared `2,716,482→2,716,468B`(**−14B**), 앱 JS `5,452,437→5,452,447B`(**+10B**), CSS `41,043→41,067B`(**+24B**)로 5종 상한을 통과했다. 표준 build **2,829 modules·정적 61페이지**, unit **193/193**, 이미지 전체/크기 스모크, UI migration tracking 0, control geometry **92 samples/20 pages**, B6 visual **12/12**, static, bundle, diff check가 통과했다. 초기 unit의 신규 action allowlist 누락, 가로 미니바가 덮은 고정 터치 좌표, 표준 빌드에서 잘못 실행한 QA 전용 두 검사는 각각 manifest 수치/비가림 캔버스 좌표/추적 제외 빌드 전제로 교정한 뒤 같은 명령을 재실행해 통과했다.
+
+### 라이브 배포 검증 · UI 전환 배포 전 기준선 (Claude — Gemini 브라우저 점검 + Claude 실측)
+
+`073da56` 배포분(네이버 소유확인 파일 · 루트 소셜 메타 한/영 병기 · RHWP 0.8.6)을 **라이브에서 처음 확인**했다. 곧 P2 UI 전환 6묶음이 한꺼번에 배포되므로 **비교 기준선 확보**가 두 번째 목적이었다.
+
+- **네이버 서치어드바이저 권고 해소 확인**: `<meta name="description">` 는 **69자**(Claude 실측 — `[...d].length`. Gemini 보고의 64자는 오차이나 **둘 다 80자 이내라 판정은 동일**). OG 12종·Twitter 5종·canonical 모두 라이브에 존재. 한/영 병기 노출 정상.
+- 소유확인 파일 200·내용 정상. `/vendor/rhwp-studio/0.8.6/` **200**, 구버전 `0.8.4/` **404**(정리 확인). 오피스 편집기 화면 실제 렌더 확인.
+- **라이브 기준선**: 홈·도구 목록·문서 비교·Excel 비교·PDF 도구를 데스크톱(1280×800)·모바일(375×812)에서 육안 확인 — **전부 정상, 차단 결함 0**. 특히 **과거 파손 지점인 문서 비교에서 토글 썸이 트랙 내부·문서 쌍 텍스트 정렬 정상**을 재확인했다(revert 가 유효함을 라이브에서 증명).
+- **의심했다가 기각한 건 — 루트 `og:locale=en_US`**: 한국어 우선 사이트인데 en 이라 부정합으로 의심했으나, 실측하니 **루트는 의도된 언어 중립 게이트웨이**다(`generate-static-pages.mjs:181` — `<html lang="en">`, 본문이 "Choose your language / 언어를 선택하세요" 분기, `hreflang x-default → en`). 언어별 페이지는 `:125` 에서 조건부로 올바르게 갈린다. **설계와 정합하므로 변경 제안하지 않는다.** 코드를 읽지 않고 지시했다면 일관된 설계를 깨뜨릴 뻔했다.
+
+### P2 B5b Video Studio UI 전환 · 엔진 격리·그룹/트림 상태 판정 (Codx)
+
+- **실행 게이트·범위**: fetch 뒤 `HEAD=origin/ui-migration=9c2b38c35887f1defb7dfcfb01fd443ba724c1e9`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`로 지시 기준과 일치했다. 구현 완료된 두 비디오 후속 정본은 회귀 계약이고 상반 지시가 아니며, 그 밖의 열린 계획서에도 B5b UI 표면 충돌이 없었다. 사용자 소유 DOCX 2개·네이버 확인 파일과 병행 작성된 Claude의 라이브 검증 기록은 보존했다.
+- **화면·primitive 판정**: `VideoStudioPage`·`VideoGroupSection`·`VideoTrimLane`의 입력, 그룹/미리보기, 이중 range 트림, 출력 설정·호환 안내·진행, 결과/다운로드 표면을 기존 `UtilityPage`·`UtilitySectionCard`·`UtilityField/Input/Select/Notice`와 shadcn `Button`·`Card`·`Switch`, 기존 `SegmentedControl`로 옮겼다. 새 primitive가 필요하지 않아 `shadcn add`는 실행하지 않았다. 문구·기능·route·SEO·정적 페이지·광고 격리 계약은 변경하지 않았다.
+- **엔진 격리 증명**: `git diff --exit-code 9c2b38c -- src/features/video-studio/*.ts`는 exit 0이고 feature diff는 TSX 3개뿐이다. 인코딩·WebCodecs/FFmpeg 판정·concat·오디오 폴백·worker 오케스트레이션·진행률 산출 파일은 diff 0이며, 측정 빌드의 video-probe/videoHybridAudio/video/video-zip/videoStream worker 해시 파일명도 기준과 동일했다.
+- **legacy/refcount 판정**: B5b 소유 `legacy-076`·`legacy-110`을 refcount 0 도달 시 제거했고, 교차 공용 규칙에서는 `tool:video-studio` 소비자만 빼고 나머지 selector arm을 보존했다. manifest는 **98 removed·9 split·48 active**, PostCSS는 **873 rules·3,123 declarations**다. B5b TSX 3개와 전역 CSS 325 class token 및 legacy 52 token/동적 prefix 3종의 교집합은 0건이다.
+- **상태·시각 판정**: 일반 시각 회귀는 `VISUAL_ONLY=video-studio`, 포트 `4230`에서 **8/8·14.21초·concurrency 설정 4/실제 2**로 재현 일치했다. 상호작용 profile은 initial/bottom이 locale·theme·viewport 축을 보존하므로 EN/dark/desktop 1개로 축약했으며 이 `profileReductionReason`을 scenario에 기록했다. interaction은 **group-editing**(두 파일→그룹 이동→다른 그룹 범위 적용 패널)과 **trim-range**(시작 0.50초 선택)를 분리했다. 첫 QA 육안에서 모바일 숫자 입력이 과축소된 것을 찾아 2열 배치·64px 필드로 보정하고 기준선/QA를 전량 재생성했다.
+- **QA 입력·추적 제외**: `VITE_LOCAL_QA=1 npm run build` 뒤 `VISUAL_TEST_PORT=4231`, `VISUAL_ONLY=video-studio`, `VISUAL_CAPTURE_DIR=tests/visual-artifacts/p2-b5b`로 **32/32·34.98초·concurrency 4/4**를 채집했다. 분포는 initial **8**·bottom **8**·interaction **16**(group-editing 8·trim-range 8)이며 `stateId`가 파일명에 있다. 네 mobile bottom profile 모두 최하단 거리·main padding·footer/대체 target·수평 overflow·viewport 캡처의 공용 assertion 6종을 통과했다. ko/en 별도 DOM/네트워크 실측은 외부 요청 각 0, Google/Naver/AdSense loader 각 0이다. 32장 전수 육안에서 최종 차단 결함과 사고 증상 3종은 0이었다.
+- **예산**: `9c2b38c`→최종 gzip은 entry **296,955→296,949B(−6B)**, worker 포함 video route **173,198→176,982B(+3,784B)**, shared **2,716,455→2,716,489B(+34B)**, 전체 앱 JS **5,445,913→5,449,765B(+3,852B)**, CSS **43,663→41,930B(−1,733B)**로 5종 상한을 모두 통과했다. 도구 단독 묶음이라 네 화면 커밋의 합산을 기준선과 비교했다.
+- **검증·하네스 실패 기록**: 표준 build **2,829 modules·정적 61페이지**, unit **192/192**, `TEST_ONLY_VIDEO=1 test:new-tools`, `test:video-hybrid`(6초 단일·12초 concat의 재생/전체 decode/단조 DTS/동기 한계/잔재 0), UI migration(7 switches·action 190px·legacy/tracking 0), control geometry **92 samples/20 pages**, visual 8/8, static, manifest, bundle, diff check가 통과했다. 첫 비디오 스모크는 제거된 `.audio-encoding-fields` 대기 300초, 다음은 `.video-audio-removal-suggestion` 대기 60초에서 각각 종료됐고 제품/worker 오류가 아니라 전환 후 stale selector였다. `data-testid`/`data-removal-only`로 하네스를 교정한 뒤 같은 전체 명령이 연속 통과했다.
+- **커밋 분할 사유**: 단독 도구지만 feature 전체가 7,870줄이므로 입력 `5d7848e` → 그룹/트림 `27da026` → 출력/진행 `f932ddc` → 결과·manifest/scenario `aac3b2c` → 모바일 트림 QA 보정·기준선 `d0d0b89`로 화면 책임을 분리했다. 예산·기능 스모크는 최종 묶음 합산으로 판정했다.
+
+### P2 B4 검수 판정 · 이관 개선 2건 채택 (Claude)
+
+- **검수**: Gemini 전수 96장(initial 24·bottom 24·interaction 48 — 시트 선택·비교 쌍/키 모드·QR 생성/스캔/일괄) 차단 결함 0·[배포 가능], 사고 증상 3종 **미관찰**.
+- **이관 개선 ② excel-compare 다크 선택 카드 테두리 대비 — 채택.** Codex 실측 대비 **14.29:1**(WCAG AA 3:1 기준을 크게 상회), Gemini 판정 "충분".
+- **이관 개선 ⑤ Swap/Add 버튼 체급·affordance — 채택.** Codex 실측 Add `128.25×44px` · Swap `44×44px` · focus-visible ring 3px. 44px 은 터치 타깃 최소 권고를 만족한다. Claude 육안으로 사용자 원 요청(파일 2개 드래그 시 좌우 자동 분배 + `⇄` 아이콘으로 위치 교환)이 화면에서 실제 동작함을 `excel-compare-empty__interaction-pair__ko__{dark__desktop,light__mobile}.png` 로 확인했다.
+- **관찰(차단 아님)**: Swap 버튼이 비교 쌍 카드 **우상단 구석**에 있고 좌/우 파일 카드는 그 아래에 있어, 무엇을 교환하는지의 시각적 연결이 약간 멀다. 차단 결함이 아니고 Gemini 도 지적하지 않았으므로 이번 묶음에서 손대지 않는다. **B-shared 또는 P-QA 에서 배치 재검토 후보로만 남긴다** — 지금 옮기면 「명시 제외」의 레이아웃 재설계에 해당한다.
+- legacy manifest **82 removed·5 split·68 active**. **B5a 착수 조건 충족으로 판정.**
+
+### P2 B5a Audio Studio·PDF 도구 UI 전환 · 모바일 탭 단서 판정 (Codx)
+
+- **실행 게이트·범위**: `HEAD=origin/ui-migration=c60f221aa9d309025315d97b8f8378b0d0f66acd`와 지시 기준이 일치했고, fetch 뒤 `origin/ui-migration`도 같았다. 열린 U4 PDF 마무리 문서는 비정본 초안이며 최신 사용자 결정이 B5a 선행·순수 UI 전환으로 충돌을 해소했으므로 U4 기능·PDF/오디오 엔진·문구·route·SEO·정적 페이지·광고 격리 경계는 변경하지 않았다. 사용자 소유 DOCX 2개와 네이버 확인 파일, 선행 Claude의 B4 검수 기록은 보존했다.
+- **primitive 판정**: Audio Studio의 파형/선택/transport/편집/음성 효과/내보내기와 PDF 4모드의 탭/썸네일/출력 workspace를 기존 shadcn `Button`·`Card`·`Switch` 계열, 공용 `UtilitySurface`와 Tailwind로 옮겼다. 현행 primitive만으로 실제 소비처가 충족돼 `shadcn add`는 실행하지 않았다. 첫 오디오 effect 캡처에서 legacy `PrimaryButton` 폭 계약 때문에 미리 듣기 버튼이 왼쪽으로 넘친 현상을 발견해, 190px 소유 wrapper로 폭을 한정한 뒤 재채집에서 겹침·수평 overflow 0을 확인했다.
+- **이관 개선 ① 채택 — PDF 모바일 탭 가로 스크롤 단서**: 레이아웃이나 탭 수는 바꾸지 않고 실제 `scrollWidth/clientWidth/scrollLeft`를 관찰해 남은 방향에만 페이드 마스크를 표시했다. Chrome 152·390×844에서 navigation은 **500/366px**, 시작 `scrollLeft=0`에 오른쪽 페이드, 끝 `scrollLeft=134`·remaining **0px**에 왼쪽 페이드였고 페이지 수평 overflow는 **0px**였다. 항상 보이는 페이드나 탭 재배치는 끝에서도 더 있다는 거짓 단서·레이아웃 재설계가 되므로 기각했다. 키보드 link 탐색·현재 모드 `data-active`·focus-visible ring은 유지했다.
+- **legacy/refcount 판정**: B5a 소스 8개와 전역 CSS 394 class token의 교집합은 **0건**이다. `legacy-099`~`104`·`111`~`113`·`121`·`130`~`131`·`140`·`146` 14개를 refcount 0에서 완전 제거했고, `legacy-065`~`069`는 raw `.settings-row` arm만 제거해 `.ui-settings-row`를 보존했다. 기존 split `legacy-133`·`151`에서도 PDF/raw settings arm만 추가 제거했다. B2에서 HWP arm만 제거하고 PDF arm을 남겼던 `legacy-121`은 이번에 refcount 0이 되어 완전 제거됐다. 최종 manifest는 **96 removed·9 split·50 active**, PostCSS는 **1,106 rules·3,986 declarations**이며 `global.css`는 10줄 추가·322줄 삭제(순감 312줄)다.
+- **상태·로컬 QA**: 시각 scenario는 오디오 `interaction-waveform`·`interaction-effect-robot`, PDF `interaction-organize-thumbnails`·`interaction-image-to-pdf-thumbnails`·`interaction-pdf-to-image-thumbnails`·`interaction-convert-thumbnails`로 분리해 한 장으로 4모드를 대표하지 않았다. 일반 회귀는 **18/18, 25.80초**, 동시성 설정 4/실제 2, filter `audio-studio,pdf-editor`. QA는 **80/80, 47.87초**, 설정/실제 동시성 4/4이며 initial **16**·bottom **16**·interaction **48**(상호작용 stateId 각 8장)이다. 모바일 bottom 8장 모두 공용 6개 assertion을 통과했고 80장 전체 외부 요청 0, B5a 두 route의 Google/Naver/AdSense loader 각각 0을 별도 DOM 실측했다.
+- **예산**: `c60f221`→B5a gzip은 entry **296,941→296,955B(+14B)**, 영향 route 합 **196,090→201,758B(+5,668B)**(audio **28,321→29,965B**, PDF **167,769→171,793B**), shared **2,716,494→2,716,455B(−39B)**, 앱 JS **5,440,319→5,445,913B(+5,594B)**, CSS **45,803→43,663B(−2,140B)**로 5개 상한을 모두 통과했다.
+- **검증·실패 기록**: 표준 build(2,829 modules·정적 61페이지), unit **191/191**, PDF browser, Audio new-tools, UI migration, control geometry **92 samples/20 pages**, visual 18/18, static, manifest, bundle, diff check가 통과했다. 최초 PDF browser는 서버 미기동으로 `ERR_CONNECTION_REFUSED`, UI/control 최초 실행은 표준 빌드의 추적 로더 때문에 QA 전제에서 실패해 각각 서버 기동·`VITE_LOCAL_QA=1` 빌드 후 동일 명령을 통과했다. QA 첫 80장 시도는 IntersectionObserver 썸네일보다 이미지 selector를 먼저 기다린 3장이 실패했으며 카드→scroll→image 순으로 하네스를 고친 뒤 80장 전량 재채집했다. Audio 첫 production-preview 실행의 undo 직후 redo listener 갱신 경합은 redo 버튼 enabled 대기를 추가해 재실행 통과했다. 이는 제품 엔진 변경 없이 하네스 동기화를 정확히 한 판정이다.
+
+### P2 B4 Excel 병합·Excel 비교·QR Studio UI 전환 (Codx)
+
+- **개선 ② 채택 — Excel 비교 다크 선택 카드 경계 보강.** 선택 카드에는 공용 green 토큰의 다크 경계를 적용하고 배경·ring도 같은 계열 토큰으로 한정했다. Chrome 152 다크 렌더에서 선택 경계와 인접 비선택 카드 배경의 대비는 **14.29:1**로 비텍스트 경계 3:1 기준을 넘었다. 전역 토큰 변경이나 카드 레이아웃 재설계는 범위를 벗어나므로 기각했다.
+- **개선 ⑤ 채택 — Swap/Add 체급·affordance 보강.** Add는 **128.25×44px**, Swap은 **44×44px**로 측정됐고 두 버튼 모두 green 토큰 hover 계약과 키보드 `:focus-visible` **3px ring**을 가진다. headless Chrome은 `(hover: hover)`가 false라 hover 색의 렌더 실측은 할 수 없으므로 생성된 hover class 계약을 확인하고, focus-visible은 실제 box-shadow 변화로 교차 확인했다. 버튼을 전체 폭으로 늘리는 안과 파일 쌍 레이아웃 재설계는 기각했다.
+- 세 도구는 기존 shadcn Button/Card/SegmentedControl과 UtilitySurface를 재사용했으며 새 primitive add는 없다. 기능·ko/en 문구·SEO·정적 route·광고 격리·엔진 경계는 불변이다. Excel 병합의 시트 카드/내부 스크롤/44px 모바일 칩/sticky 요약, Excel 비교의 2파일 자동 좌우 분배·Swap, QR 생성·일괄 생성·사진 스캔 계약을 브라우저 스모크로 보존했다.
+- legacy manifest는 기준 155개에서 B4 종료 시 **82 removed·5 split·68 active**다. B3에서 보존한 `legacy-150`을 Excel Compare 소비 종료 뒤 제거했고, 이번 묶음에서 총 51개가 refcount 0으로 제거됐다. 혼합 selector는 해당 arm만 분리했으며 B4 소스와 전역 legacy token 교집합은 0이다. PostCSS 실측은 **1,394 rules·5,128 declarations**다.
+- `84e8091` 대비 gzip 예산 증분은 entry **+1.82KiB**, 영향 lazy route(Excel Compare·QR Studio; Excel 병합은 eager entry 귀속) 합 **+2.24KiB**, shared **−0.80KiB**, 전체 앱 JS **+3.00KiB**, 전체 CSS **−2.31KiB**로 다섯 상한을 모두 통과했다.
+- 검증은 build 2,829 modules·정적 61페이지, unit **190/190**, Excel browser·XLS 보존·XLS 최초 진입·Excel 비교·utilities·QR bulk, ui-migration, control geometry **92 samples/20 pages**, static, manifest, diff check를 통과했다. 일반 B4 시각 회귀는 **24/24**(25.22초·동시성 4/유효 3) 일치다.
+- 추적 제외 QA 입력은 `tests/visual-artifacts/p2-b4/`의 **96/96**이며 initial 24·bottom 24·interaction 48이다. interaction은 병합 시트 선택·비교 key 모드·비교 파일 쌍·QR bulk/create/scan이 각 8장이고, `stateId`를 파일명에 보존했다. 모바일 bottom 공용 6개 assertion, `captureBeyondViewport:false`, 외부 요청 0·tracking loader 0을 확인했다. 별도 Gemini 판정 전에는 B5a를 시작하지 않는다.
+
 ## 2026-09-04
+
+### P2 B3 문서 비교·Excel 정리 UI 전환 · 라이브 사고 지점 판정 (Codx)
+
+- **실행 게이트·범위**: `ui-migration`에서 `HEAD=origin/ui-migration=4ecda007163d41866f099a5a473962c262f02a06`을 확인하고 fetch 뒤 착수했다. B1·B2의 Gemini `[배포 가능]` 판정과 열린 계획서 무충돌을 확인했으며 `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`에는 checkout·commit·push하지 않았다. 도달 가능한 `DocumentComparePage`, `DocumentCompareResultPage`가 연결하는 `WordCompareResultPage`, 실제 Word/HWP 처리 경로, `ExcelCleanerPage`만 전환했고 도달 불가 `HwpComparePage`·`HwpCompareResultPage`·`WordComparePage`는 수정하지 않았다. 사용자 미추적 DOCX 2개와 네이버 확인 파일도 제외했다.
+- **전환·primitive 판정**: 문서 입력 쌍·페어링 미리보기·비교 옵션·작업 영역·Word 결과 표와 Excel 정리의 업로드·시트/규칙·미리보기·실행/결과를 기존 shadcn Button/Card/Switch 및 공용 UtilitySurface와 Tailwind로 옮겼다. 현재 primitive로 실소비가 모두 충족되어 `shadcn add`는 실행하지 않았다. role/aria·키보드 동작과 ko/en 문구·SEO/정적 route·AdSense 격리·GitHub Pages 경계 및 비교/정리 엔진은 유지했다.
+- **legacy 소유권·제거**: B3 전용 owner ID 14개(`legacy-070`~`073`, `087`~`094`, `141`, `149`)를 refcount 0에서 제거하고 혼합 `legacy-132`에서는 `.ios-switch` arm만 분리 제거했다. 조사 중 `legacy-150`은 Excel Cleaner가 아니라 B4 Excel Compare의 `.excel-status-filters button:not(.selected)` 소비임을 확인해 소유권을 Excel Compare로 바로잡고 유지했다. manifest 최종값은 전체 **155**, removed **31**, split **3**, active **121**이며 PostCSS는 B2의 1,807 rules/6,550 declarations에서 **1,634/5,973(-173/-577)**으로 줄었다. B3 소스 6개를 전역 legacy token 564개와 대조한 격리 검사는 방출 **0건**이었다.
+- **사고 증상 1 — 토글 썸**: `test:control-geometry`에 문서 비교 4개 프로필과 각 7개 토글의 초기/전환 표본을 넣어 **32 samples**를 측정했다. track **43×25px**, thumb **21×21px**, 상·하·좌·우 최대 이탈이 모두 **0px**, 최대 수직 중심 오차 **0px**, 최소 내부 inset은 네 방향 모두 **2px**였다. 따라서 썸의 트랙 이탈·수직 편심은 0이다.
+- **사고 증상 2 — 문서 쌍 텍스트**: 작업 문구 컨테이너/강조/보조문의 실측 폭은 모두 **747px**, 높이는 각각 **42.5625/20/18.5625px**, `writing-mode`는 모두 **horizontal-tb**였고 페이지 가로 overflow는 **0px**였다. 1~2자 폭으로 붕괴해 세로로 낙하하는 항목은 0이다.
+- **사고 증상 3 — 버튼 폭·legacy 충돌**: 문서 비교 작업 버튼은 **190×48px**이며 `.tool-action-bar`와 `w-full`의 동시 방출은 **0건**, 해당 화면의 legacy selector match도 **0건**이었다. Excel Cleaner에서 기존 `PrimaryButton`의 `.ui-primary-button { width:100% }`가 실행 버튼을 **1,016px**로 늘리고 미리보기 버튼을 sidebar 아래로 미는 실제 충돌을 재현해 순수 shadcn Button으로 교체했다. 최종 미리보기/실행 버튼은 **158.890625/142.265625px**, 부모 **1,016px**, 좌·우 이탈 **0px**, legacy primary class 방출 **false**다.
+- **시각 검수에서 발견한 보정**: 영문 모바일 Word 결과 탭이 겹치는 현상을 캡처로 발견해 3등분 `min-width:0`과 정상 줄바꿈으로 고쳤다. DOCX 결과가 18%에서 멈춘 최초 하네스는 Puppeteer 25.6.0의 request interception이 same-origin Web Worker 요청에서 null frame을 만드는 테스트 문제로 판정했다. 추적 코드는 `VITE_LOCAL_QA=1`로 빌드 제외한 채 interception만 제거하고 모든 외부 요청을 별도로 수집·0건 단언해 실제 DOCX 처리를 약 6초 안에 완료했다.
+- **5종 번들 예산**: 동일 명령·zlib 기준 baseline→최종은 entry JS **295,063→295,079B gzip(+16B, 한도 +20,480)**, 영향 route JS **24,264→28,567B(+4,303B, +61,440)**, shared JS **2,717,343→2,717,317B(-26B, +30,720)**, app JS **5,432,960→5,437,246B(+4,286B, +81,920)**, CSS **49,003→48,168B(-835B, +10,240)**로 모두 통과했다.
+- **3상태 캡처·검수 준비**: 추적 차단 빌드에서 `tests/visual-artifacts/p2-b3/`에 initial **16장**, bottom **16장**, interaction **48장**, 합계 **80장**을 채집했다. interaction은 toggle-on/off·DOCX 결과·HWP 결과·Cleaner 규칙/결과가 각 **8장**이고 도구별로 문서 비교 **48장**, Excel Cleaner **32장**이다. 최종 캡처는 외부 요청·tracking request 각각 0건이며 contact sheet와 대표 원본으로 데스크톱/모바일·한/영·명/암 화면의 최종 배치를 확인했다.
+- **완료 검증**: `npm run build` exit 0(2,829 modules·RHWP 77개/60,680,448B·정적 61페이지), `npm run test:unit` 189/189, `TEST_SCOPE=word npm run test:browser`, `TEST_ONLY_HWP=1 npm run test:new-tools`(3,584B fixture·1 page·sentinel 재파싱·Studio 재개방), `npm run test:ui-migration`, `npm run test:excel-cleaner`, `npm run test:static`, `npm run test:control-geometry`, `npm run legacy:manifest`, B3 `VISUAL_ONLY` 18/18 및 QA 80/80, `npm run bundle:measure`, `git diff --check`가 모두 통과했다. B3 Gemini 검수 판정은 아직 요청 전이며 다음 묶음은 착수하지 않았다.
+
+### P2 B2 도구 내부 UI 전환 · 문서 편집 focus 경계 판정 (Codx)
+
+- **실행 게이트·main 선행 병합**: 사용자 지정 `ui-migration`의 `HEAD=4180f88580a868bfe4270925ec1c2bb210b659a7`를 확인한 뒤 fetch했고, `origin/main=073da562968efbcc61ff45fd0a577a7b9b820d05`의 RHWP 0.8.6·루트 SEO 변경을 `ui-migration`에 병합했다. 충돌은 `CHANGELOG.md`·`docs/review-notes.md`·`package.json`·`package-lock.json` 네 파일이었다. 기록은 양쪽 항목을 모두 보존했고, package script는 B1의 `vendor:qr-font`와 main의 `vendor:rhwp:prune`을 함께 실행하며, 의존성은 shadcn/QR와 RHWP 0.8.6 양쪽 집합을 보존했다. `src/config/rhwp.ts`·`public/vendor/rhwp-studio/**`·`docs/OFFICE_EDITOR_ASSETS.md`·`tests/new-tools-smoke.mjs`에는 내용 충돌이 없었다. 기본 npm cache의 `EROFS`는 `/tmp/worklazytools-npm-cache`로 우회해 `npm install`을 완료했고 기존 audit 상태는 6 low/4 moderate였다. 병합 직후 build(2,829 modules·RHWP 77개/60,680,448B·정적 61페이지)와 unit 187/187을 통과한 뒤 별도 merge commit `26eb56e`로 고정했다. `main`에는 checkout·commit·push하지 않았고 `/tmp/worklazytools-rhwp-0.8.6` 및 사용자 미추적 파일 3개를 건드리지 않았다.
+- **B2 전환·primitive 판정**: data-converter는 형식 route·입출력 편집기·작업 버튼, timezone-calculator는 기준/추가 도시·지도·핀·세계 시계·회의 시간, text-merger는 소스 카드·순서 변경·미리보기·구분자·결과, hwp-editor는 진입 화면과 문서 로드 뒤 focus toolbar/shell, office-editor는 안내 landing과 격리 app toolbar/canvas/drop overlay를 기존 shadcn Button/Card와 공용 UtilitySurface·Tailwind로 옮겼다. 새 primitive로만 해결되는 소비처가 없어 `shadcn add`는 실행하지 않았다. ko/en 문구·SEO/정적 route·AdSense 격리·GitHub Pages 서버리스 경계와 HWP/Office 엔진 코드는 바꾸지 않았다.
+- **focus·격리 경계 판정**: HWP의 실제 3,584B fixture 로드 시 공용 UtilityPage의 진입 padding/animation이 focus fixed layout에 남아 viewport를 밀어내는 것을 캡처에서 발견했다. `flush` 상태가 진입 장식만 제거하도록 고쳐 sidebar 바깥 가용 viewport를 채웠고, 모바일은 기존 전체 화면 z-index 경계를 유지했다. Office의 `/tools/office-editor/app/` 직접 경로는 기존 엔진·자산 격리를 보존한 채 동일한 focus geometry를 명시했다. HWP iframe host와 Office canvas는 화면 소유 data attribute만 추가하고 런타임 통신·저장 의미는 변경하지 않았다.
+- **legacy refcount 판정**: B2 8개 화면 소스가 기준 52 exact token·3 dynamic prefix와 현재 전역 CSS의 643 class token을 방출하지 않는 AST 검사를 추가해 교집합 **0건**을 확인했다. manifest 기준 B2 전용 규칙 13개를 `removed`, PDF와 섞인 규칙 1개는 B2 arm만 제거해 `split`으로 전환했다. 결과는 155개 중 **17 removed·2 split·136 active**다. `global.css` diff는 **250줄 삭제·2줄 추가, 순감 248줄**이며 최종 PostCSS AST는 **1,807 rules/6,550 declarations**다. 살아 있는 PDF/공용 소비 arm은 보존했고 생성물·벤더 산출물은 직접 수정하지 않았다.
+- **상호작용·기능 보존**: `test:utilities`는 B2의 데이터 형식 전환·도시/지도·텍스트 병합과 HWP 영문 redirect를, `TEST_ONLY_HWP=1 test:new-tools`는 고정 fixture 열기→3,584B 저장→core sentinel/1페이지 파싱→Studio 재개방을 통과했다. `test:office`는 **95 download states·7 cached states·한국어 Calc 키보드 편집·5,089B DOCX 저장**을 통과했다. 스모크는 제거된 class selector 대신 안정적인 `data-tool-page`/`data-testid` 계약을 사용한다.
+- **시각 scenario·검수 입력**: B2 다섯 도구 모두 initial·bottom·interaction을 가지며 interaction은 JSON 원본 선택·기준 도시 변경·쉼표 구분자·실제 HWP 문서 로드·격리 Office workspace다. 일반 부분 회귀는 HWP 영문 redirect 2장을 포함해 Chrome 152에서 **34/34, 25.76초**로 통과했다. `VITE_LOCAL_QA=1` 추적 차단 build 뒤 `tests/visual-artifacts/p2-b2/`에 **108/108, 1분 6.20초**를 채집했고 외부 추적은 0이었다. 상태별로 initial **36**·bottom **36**·interaction **36**이며, 정확한 interaction state는 JSON 8·기준 도시 8·쉼표 8·HWP 로드 4(한국어 전용)·Office workspace 8장이다. 다섯 contact sheet를 직접 열어 ko/en·light/dark·desktop/mobile의 겹침·잘림·수평 overflow·다크 모드·하단 nav 가림을 확인했으며 차단 결함은 보이지 않았다. 이는 **Codx 로컬 육안 판정**이며 정본의 별도 Gemini 검수 판정을 대체하지 않는다; 다음 묶음 착수 전 외부 판정 입력으로 108장을 인계한다.
+- **고정 번들 예산**: main 병합 직후 기준→B2는 entry JS gzip **295,065→295,063B(−2B/−0.00KiB, 상한 +20KiB)**, 영향 route 합 **101,867→107,457B(+5,590B/+5.46KiB, +60KiB)**, shared **2,717,095→2,717,343B(+248B/+0.24KiB, +30KiB)**, 앱 JS **5,427,141→5,432,960B(+5,819B/+5.68KiB, +80KiB)**, CSS **49,275→49,003B(−272B/−0.27KiB, +10KiB)**로 5종 모두 통과했다. 다섯 도구가 공용 surface·전역 CSS와 두 focus layout을 같은 단위로 소비하므로 B2 묶음 합산을 채택했다.
+- **완료 검증·재시도**: 최종 일반 `npm run build`는 exit 0(2,829 modules·RHWP 77개/60,680,448B·정적 61페이지), `npm run test:unit` **188/188**, `npm run test:static`, `npm run legacy:manifest`, `npm run test:utilities`, `TEST_ONLY_HWP=1 npm run test:new-tools`, `npm run test:office`, `npx tsc -b`, `git diff --check`가 모두 통과했다. 추가 `test:control-geometry`도 60 samples/16페이지에서 overflow·중심 오차·tracking·legacy match 0으로 통과했다. 정적 검사의 첫 시도는 직전 `VITE_LOCAL_QA=1` 산출물에 분석 설정이 의도대로 compile-out되어 실패했고, 일반 production build로 `dist/`를 복원한 뒤 동일 검사가 통과했다. 기존 vm-browserify eval·500kB chunk 경고 외 신규 빌드 오류는 없다.
+
+### P2 B1 검수 입력 3상태 교정 · 모바일 컨트롤 정밀 판정 (Codx)
+
+- **실행 게이트·결함 확정**: 사용자 지정 메인 워킹트리 `/home/better0101/projects/worklazytools`의 `ui-migration`에서 `HEAD=origin/ui-migration=5298c13d4fd518204942474e6aa550373f33adbd`를 확인하고 시작했다. 추적 파일 변경은 없었으며 사용자 소유 미추적 `before.docx`·`after.docx`·네이버 확인 HTML과 다른 worktree는 건드리지 않았다. 기존 `p2-b1` PNG 파일명 분포는 initial **48** + interaction **48** + bottom **0**이었다. 원인은 B1 전용 QA scenario 파생 코드가 공용 manifest에서 `stateType === initial || interaction`만 선택해 bottom을 명시적으로 버린 것이며, 따라서 최초 검수의 모바일 하단 차단 판정은 필수 입력이 빠진 상태에서 내려진 것으로 확정했다.
+- **공용 QA 계약**: B1 전용 `VISUAL_B1_CAPTURE_ONLY` 경로를 제거하고 `npm run test:visual:qa`(`VISUAL_QA_CAPTURE_ONLY=1`)로 통합했다. 이 모드는 `VISUAL_ONLY` 묶음 식별자를 필수로 받고, 선택 결과에 initial·bottom·interaction 중 하나라도 없으면 캡처 전에 실패한다. 공용 manifest의 세 상태를 제품상 적용 가능한 locale에 대해 ko/en × light/dark × mobile/desktop 전체 프로필로 확장하므로 B2~B6와 B-shared 대표 도구도 같은 명령을 사용한다. locale N/A는 기존 명시 사유를 보존한다. 파일 저장 뒤 stateType과 정확한 stateId별 장수를 모두 출력해 검수 입력 누락을 자동으로 드러낸다.
+- **최하단 도달 판정·재채집**: bottom은 actions 이후 촬영 직전에 모든 viewport에서 `abs(scrollHeight-clientHeight-scrollTop) ≤ 1px`를 재단언한다. mobile은 이어 기존 공용 assertion의 main padding ≥ bottom-tabs 높이, footer 또는 마지막 조작부가 tabs 위, 수평 overflow ≤1px도 단언한다. `VITE_LOCAL_QA=1` build와 consent granted에서 B1 6도구를 재채집한 결과 Chrome 152로 **144/144, 1분 18.93초**, 외부 요청 시도 0이었다. 상태 분포는 initial **48** · bottom **48** · interaction **48**이고, 정확한 stateId는 initial 48 · bottom 48 · interaction-clean-result/format-result/leave-result/net-mode/password-strength/text-cleanup 각각 **8**이다. 48개 bottom은 모두 실제 최하단이며 그중 mobile **24**개는 하단 네비 assertion까지 통과했다. 파일명 독립 재집계도 같은 분포였고 대표 mobile bottom 6장을 직접 열어 footer·FAQ·법적 링크가 nav 위에서 끝남을 확인했다.
+- **컨트롤 DOM 실측 방식**: 추적 차단 build의 390×844 DPR 1에서 ko/en × light/dark **16페이지**를 열고 총 **60 samples**를 측정했다. Switch는 Base UI root를 track, 실제 `[data-slot=switch-thumb]`를 thumb로 checked/unchecked 양쪽에서 측정했다. 별도 thumb DOM이 없는 SegmentedControl은 group을 track, 각 옵션을 차례로 선택한 active button을 selection indicator로 측정했다. 이탈 수치는 `max(0, track edge - indicator edge)`의 상·하·좌·우, 수직 중심 오차는 두 rect 중심 Y의 절댓값이다.
+- **도구별 수치·판정**: `security-tools` 20 samples는 track **43×25px**, thumb **21×21px**, 최소 inset 상/하/좌/우 각 **2px**, 이탈 상/하/좌/우 각 **0px**, 최대 수직 중심 오차 **0px**였다. `work-calculator` 16 samples(주 모드+연차 기준)는 track **358×52px 또는 316×52px**, indicator **173×44px 또는 152×44px**, 최소 inset 사방 **4px**, 이탈 사방 **0px**, 중심 오차 **0px**였다. `payroll-calculator` 12 samples는 **358×52px / 114×44px**, 최소 inset 사방 **4px**, 이탈 사방 **0px**, 중심 오차 **0px**였다. `text-formatter` 12 samples는 **316×52px / 100×44px**, 최소 inset 사방 **4px**, 이탈 사방 **0px**, 중심 오차 **0px**였다. 네 도구 모두 실제 이탈이 없어 Gemini 2차 지적은 **오탐**으로 판정했고 제품 CSS는 수정하지 않았다. 상세 rect는 `tests/visual-artifacts/p2-b1/control-geometry.json`에 고정했다.
+- **legacy 충돌 확인**: P1a 사고 유형의 옛 B1 컨트롤 클래스 `.ios-switch`·`.mode-switch`·`.sub-segment`·`.formatter-toolbar`·`.toggle-card-grid`가 위 16페이지의 도구 root 아래에서 방출되는지 함께 검사한 결과 **0건**이었다. `.ui-segmented-control`은 공용 shadcn adapter의 의도된 selector이며 페이지 전용 legacy wrapper가 아니다. 실제 이탈도 legacy 교차도 없으므로 무근거 CSS 보정·공용 adapter 제거는 기각했다.
+- **검증·재시도**: 추적 차단 build와 일반 `npm run build`는 각각 exit 0(2,828 modules·정적 61페이지), 일반 build의 B1 `VISUAL_ONLY` `npm run test:visual`은 **42/42, 26.17초**로 기존 기준선과 일치했고 mobile bottom 12장을 재확인했다. 하단 음성 대조도 padding 0px에서 footer overlap을 검출하고 padding 80px 복원 뒤 통과했다. `npm run test:control-geometry`는 60/60 samples·tracking 0·legacy match 0, `npm run test:utilities`와 `npm run test:static`은 exit 0이었다. 최초 전체 unit은 새 기하 검증 파일의 광고 부재 검사 문자열을 repo-wide 명시 allowlist가 잡아 **186/187**로 실패했고, 검증 소유 파일로 최소 허용목록에 추가한 뒤 `npm run test:unit` **187/187**로 통과했다. 사용자 ko/en 문구·SEO/정적 입력·AdSense 제품 경로·GitHub Pages 런타임은 변경하지 않았다.
+
+### P2 선행 owner/refcount manifest · B1 도구 내부 UI 전환 (Codx)
+
+- **실행 게이트**: 사용자 지정 기준 `454d7c8964d1a2f301c8661a6c6cc00f6304b49f`에서 `HEAD=origin/ui-migration` 일치를 확인하고 시작했다. 열린 `docs/jobs/todo`에는 B1 또는 같은 CSS 표면을 상반되게 지시하는 계획이 없었다. `/tmp/worklazytools-rhwp-0.8.6`과 사용자 소유 미추적 파일 `before.docx`·`after.docx`·네이버 확인 HTML은 건드리지 않았고, `main`에는 checkout·commit·push를 하지 않았다.
+- **manifest 판정**: `docs/legacy-css-owner-manifest.json`을 검증 가능한 JSON으로 채택했다. 기준 selector·원래 줄·legacy token·소유 범주·소비 도구/공용 화면·`refCount`·`lastRemovalBundle`·현재 상태를 155개 모두 기록하고 생성기가 기준 커밋의 CSS를 직접 파싱해 143 non-compact + 12 compact 및 18개 범주 분포를 고정한다. orphan `.drop-hint-segment`·`.file-list`를 포함한 4개 규칙은 완전 제거, 모바일 혼합 selector 1개는 B1 arm만 제거해 현재 150 active/4 removed/1 split이다. 전체 CSS rule은 2,132→2,052로 80개 줄었으며 그중 orphan 2개를 제외한 78개가 B1 전용 규칙이다.
+- **B1 전환·primitive 판정**: 여섯 도구에 공통 `UtilitySurface` 래퍼와 설치돼 있던 shadcn Button/Card/ToggleGroup 어댑터를 실제 사용했다. 새 shadcn primitive 설치는 필요하지 않아 `add`를 실행하지 않았다. 포맷터는 설정·고정 높이 양쪽 편집기·작업 결과, 영업일/연차는 모드·입력·지표·상세 결과, 급여는 3모드·숫자 입력·결과/공제·공식 출처, 보안은 출력·옵션 toggle·강도 meter, 사진은 drop/result/metadata/download/share, 텍스트는 양쪽 편집기·8개 동작·검사 결과를 Tailwind/shadcn 표면으로 옮겼다. B1 소스가 현재 `global.css` class token을 직접 방출하지 않는 단위 검사를 추가했고, 원시 worker 오류 대신 현지화된 일반 오류를 유지했다.
+- **기능·제품 경계 판정**: `test:utilities`는 work-calculator의 기본 영업일 문자열뿐 아니라 연차 모드로 바꾼 뒤 결과까지 단언하도록 보강했다. ko/en 제품 문구와 SEO route·정적 페이지 입력은 변경하지 않았고, AdSense/분석 격리 경로도 불변이다. 추적 제외 빌드는 기존 `VITE_LOCAL_QA=1` 계약을 사용했으며 새 QA 캡처 96장 실행에서 외부 요청 시도 0으로 통과했다.
+- **scenario·하단 assertion**: B1 6개 모두 `data-tool-page` 기반 initial/bottom/interaction selector를 갖고, 실제 포맷 결과·연차 결과·급여 net 모드·고정 비밀번호 강도·생성 PNG 정리 결과·텍스트 공백 정돈을 실행한다. 전체 manifest는 153 capture로 늘었고 B1 부분 실행은 initial 24 + mobile bottom 12 + interaction 6 = **42/42, 26.15초**였다. bottom 12장은 최하단 거리·main padding·footer/대체 대상·수평 overflow의 공용 assertion을 모두 통과했다. 캡처 전용 12 scenario는 8 profile 완전 직곱으로 **96/96, 53.23초**에 완료했으며 경로는 `tests/visual-artifacts/p2-b1/`이다. 12장 대표 contact sheet로 레이아웃을 확인했고, 이 산출물은 Gemini 검수 입력이다. Gemini의 별도 판정 전에는 다음 묶음 B2를 시작하지 않는다.
+- **고정 번들 예산 실측**: `scripts/measure-bundle-budget.mjs`는 `vite build --manifest --outDir dist-measure` 후 전용 디렉터리를 삭제하고 SHA-256 중복 제거·manifest route graph·worker 경로 귀속을 적용한다. `454d7c8` 기준→B1은 entry JS gzip **294,993→295,057B(+64B/+0.06KiB, 상한 +20KiB)**, B1 route 합 **821,979→824,635B(+2,656B/+2.59KiB, +60KiB)**, shared **2,715,659→2,716,496B(+837B/+0.82KiB, +30KiB)**, 앱 JS **5,420,234→5,423,800B(+3,566B/+3.48KiB, +80KiB)**, CSS **49,308→49,275B(−33B/−0.03KiB, +10KiB)**로 5종 모두 통과했다. 여섯 도구가 한 공용 래퍼와 전역 CSS를 함께 소비하므로 기능적으로 일관된 B1 묶음 합산을 채택했고, 도구별 commit 측정은 해시 변경에 따른 shared 중복 변동이 판정을 흐려 기각했다.
+- **검증·재시도 기록**: `npm run build`는 2,828 modules/정적 61페이지, `npm run test:unit`은 **186/186**, `npm run test:static`, `npm run legacy:manifest`, `git diff --check`, `npx tsc -b --pretty false`, B1 `test:visual` 42/42와 `npm run test:utilities`가 통과했다. utilities 첫 실행의 4173 preview 부재 `ERR_CONNECTION_REFUSED`와 두 재시도의 B1 이후 외부 분석 요청 60초 대기는 환경/실행 순서 실패로 기록하며, 일반 빌드와 명시 preview를 사용한 최종 재실행은 전 경로를 완주했다. 시각 기준선 갱신 중 baseline-set 검사가 개별 오류를 먼저 가리던 순서도 고쳐 이후 실패 원인을 보존한다. 기존 vm-browserify `eval`·500kB chunk 경고 외 신규 빌드 오류는 없다.
+
+### P2 선행 — 시각 회귀 실행 비용 개선 판정 (Codx)
+
+- **게이트·병렬화 판정**: `ui-migration`의 `HEAD=origin/ui-migration=7b3222b7233401a9a48eeccc49f4b1def6b8f7c8`에서 시작했고 열린 계획서에 같은 하네스 표면의 상반된 지시는 없었다. 사용자 소유 미추적 파일 3개와 `/tmp/worklazytools-rhwp-0.8.6`은 건드리지 않았다. 가용 CPU의 절반을 최대 4로 제한하는 `min(4, floor(core/2))`를 기본값으로 채택해 16코어 호스트에서는 4이며, `VISUAL_CONCURRENCY=1..32`로 명시 조정할 수 있다. 캡처를 locale별·최대 12장 배치로 나눠 각 배치에 전용 Chrome과 순차 페이지를 주고 배치만 병렬 실행했다. 서로 다른 locale과 origin 저장소를 같은 브라우저 context에서 섞는 방식은 결정성 저하 위험 때문에 기각했다.
+- **재현 계약 유지**: 각 작업자는 기존 `--lang`, 중립 `LANG/LC_ALL`, `LANGUAGE`, `Accept-Language`, CDP locale override와 `navigator.language` 단언을 그대로 거치며 UTC, DPR 1, 저장소 Noto CJK font, animation/transition/caret/smooth-scroll 제거, 200ms+2 RAF paint settle도 변경하지 않았다. 완료 순서가 달라도 실패 보고는 원래 capture matrix 순서로 정렬하고 baseline/capture/artifact 파일은 고유 이름만 쓰게 했다. 브라우저 launch·페이지·cleanup 실패도 해당 실행을 실패시키되 남은 독립 배치는 끝까지 수집한다.
+- **부분 실행 계약·사용법**: `VISUAL_ONLY`는 쉼표로 구분한 정확한 `scenarioId`, `routeId`, 또는 묶음 사용용 `toolId`를 받는다. 예시는 `VISUAL_ONLY=excel-compare,document-compare VISUAL_TEST_PORT=4911 npm run test:visual`이며, 미지정/빈 값은 기존과 같이 전량, 알 수 없는 값은 무음 0건 통과 대신 즉시 실패한다. 부분 실행 중에도 전체 151장 baseline 집합의 누락·잉여 검사는 유지한다. 출력 마지막에는 총 소요, 완료/선택 캡처 수, 설정 출처와 실제 동시성, 필터를 고정 형식으로 남긴다.
+- **개선 전후 전체 실측**: 같은 호스트·Chrome 152에서 순차 구현의 직전 기록은 KO **151/151 5:16.32**, EN **151/151 5:14.96**였다. 병렬화 뒤 기본 동시성 4의 `LANG=ko_KR.UTF-8 VISUAL_TEST_PORT=4913 npm run test:visual`은 **151/151 1:33.35**, `LANG=en_US.UTF-8 VISUAL_TEST_PORT=4914 npm run test:visual`은 **151/151 1:35.84**로 모두 기준선과 일치했다. 두 실행 평균은 315.64초에서 94.60초로 **3.34배, 70.0% 단축**됐다. 별도 CPU 경합에서 보고된 개선 전 약 3시간 수치는 부하 조건이 달라 직접 배수 비교에는 쓰지 않았다.
+- **부분·플레이키 실측**: 개선 전에는 부분 필터 자체가 없어 부분 실행 시간은 N/A다. 개선 뒤 대표 두 도구 필터는 정확히 해당 6 scenario/**14 capture**만 실행해 **16.53초**, 즉시 같은 명령 재실행은 **16.05초**였고 둘 다 14/14·diff 0으로 같았다. 선택량이 locale별 한 배치씩이라 설정 4 중 실제 동시성은 2였다. 목표 20분 대비 약 1.4%로 묶음 검증 ≤20분 계약을 충족했다.
+- **완료 검증·제품 영향**: `npm run build` exit 0(2,827 modules·정적 61페이지), `npm run test:unit` **184/184**, `npm run test:static`, `node --check tests/visual-regression.mjs`, `git diff --check`가 통과했다. 기존 vm-browserify eval·500kB chunk 경고 외 신규 오류는 없다. 변경은 테스트 하네스·단위 테스트·기록뿐이라 사용자 ko/en 문구, SEO·정적 route, AdSense 격리, GitHub Pages 런타임은 불변이다.
+
+### P2 선행 — 시각 하네스 재현성·scenario·모바일 하단 계약 (Codx)
+
+- **게이트·원인 확정**: `ui-migration`의 `HEAD=origin/ui-migration=62f9031ecc87fef37ca55b3d64f511cfc9b2b407`, `origin/main=311c59e310734e9206629b05752f4228e842dbf0`에서 시작했고 main에는 손대지 않았다. Claude 실측은 같은 HEAD에서 57건(en 48·ko 9, 5~7%) 실패와 영어 화면에 한국어 native file-input 문구가 찍힌 diff를 남겼다. 수정 전 소스의 `puppeteer.launch`에 `--lang`이 없음을 재확인했다. 이 호스트의 수정 전 독립 실행은 두 셸 모두 96/96로 Chrome이 같은 UI 언어를 골라 직접 실패를 재현하지 못했으나, 이는 환경 선택이 우연히 같았을 뿐 명시 계약이 없는 결함을 반박하지 않는다. 수정 후 실 PNG에서 KO는 `파일 선택/선택된 파일 없음`, EN은 `Choose File/No file chosen`으로 분리됨을 확인했다.
+- **고정 방식·선택 근거**: 캡처를 manifest locale별로 묶고 각 묶음 전용 Chrome을 `--lang=ko-KR`/`--lang=en-US`로 실행한다. 자식 브라우저의 셸 locale은 `LANG=C.UTF-8`·`LC_ALL=C.UTF-8`로 중립화하고 `LANGUAGE`, HTTP `Accept-Language`, CDP `Emulation.setLocaleOverride`를 같은 locale로 일치시킨 뒤 `navigator.language`를 런타임 단언한다. 151장 장기 실행의 상태 누적을 제한하려고 같은 locale 안에서 12장마다 브라우저를 재생성하되 locale을 섞지 않는다. 이미 점유된 preview 포트를 다른 서버로 오인하는 경합은 자식 Vite가 자기 주소를 출력한 뒤에만 ready로 인정하도록 막았다.
+- **나머지 환경 계약**: timezone은 브라우저 env·Puppeteer emulation 모두 `UTC`로 고정하고 런타임 단언한다. DPR은 viewport와 Chrome flag 모두 1, font는 저장소 고정 Noto CJK Sans 2.004 OTF를 테스트 전용 `@font-face`로 강제하고 로드 완료를 단언하며 font hinting/LCD text 차이도 끈다. animation·transition·smooth scroll·caret를 끄고 font 완료 뒤 200ms+2 RAF paint settle을 둔다. 오디오 상호작용은 작업 성공 상태와 WaveSurfer shadow canvas의 유효 크기까지 기다려 비동기 paint 누락을 제거했다.
+- **scenario 규모·축약**: `visual-regression.scenarios.mjs`는 필수 필드와 축약 사유를 가진 **59 scenario/151 capture**다. 구성은 홈·도구 목록을 포함한 initial 22, 등록 도구 20개의 mobile bottom 20, toggle/select가 있는 도구 interaction 16, HWP English redirect 1이다. 상호작용 N/A 4개 도구에는 사유를 명시했다. 파일명은 `routeId__stateId__locale__theme__viewport.png`라 상태 간 덮어쓰기가 없다. HWP KO mobile bottom은 1개 도구 통과로 세고, English 2 profile의 `/en/tools` redirect는 별도 기록해 하단 통과에 포함하지 않는다.
+- **하단 공용 계약·음성 대조**: `assertMobileBottomLayout`으로 bottom distance ≤1px, main padding ≥ bottom-tabs 높이, footer 또는 명시 bottom target의 탭 상단+1px 이하, horizontal overflow ≤1px를 전 도구 bottom scenario와 Excel 비교 스모크에 공용 적용했고 모든 screenshot은 `captureBeyondViewport:false`다. 의도적으로 `.main-content` padding을 0으로 만든 음성 대조는 `0 < 62px`와 footer `844.34375 > 773px`를 함께 검출해 실패했다. style 제거 뒤 bottom distance 0, padding 80px, tabs 62px, footer 764.34375px ≤ tabs top 773px, overflow 0으로 통과했다.
+- **기준선·육안 검수**: locale·scenario·브라우저 수명주기·paint 완료 조건을 모두 적용한 Chrome 152.0.7977.64 기준선을 전면 재생성했다. **96장/16,635,920B → 151장/21,823,497B**, +55장/+5,187,577B(+31.18%)다. EN/KO data-converter native file label, 모바일 최하단 FAQ/footer와 tabs 간격, document toggle, audio waveform/loop, video GIF, QR bulk 등 대표 화면을 직접 열어 lazy 잔상·겹침·잘림이 없음을 확인했다.
+- **검증·제품 영향**: 최종 `LANG=ko_KR.UTF-8`는 **151/151**(5:16.32), `LANG=en_US.UTF-8`는 **151/151**(5:14.96)으로 같은 기준선과 일치했다. `npm run build` exit 0(2,827 modules·정적 61페이지), unit **182/182**, static, 공용 하단 음성 대조, Excel 비교 모바일 스모크, 문법 검사와 `git diff --check`가 통과했다. 빌드의 기존 vm-browserify eval·500kB chunk 경고 외 신규 오류는 없다. 변경은 테스트 하네스·기준선·기록에 한정돼 사용자 ko/en 문구·SEO/정적 route·AdSense 격리·GitHub Pages 런타임은 불변이다.
+
+### U3 QR 일괄 생성 — 구현 완료·3자 검수 대기 (Codx)
+
+- **게이트·범위**: fetch 뒤 `HEAD=origin/ui-migration=4a8405c7458ca72e454326e798592330478c67e4`, `main=origin/main=311c59e310734e9206629b05752f4228e842dbf0`, merge-base=`311c59e`, `origin/main...HEAD=0 9`를 확인하고 `ui-migration`에서만 작업했다. U3 신규 표면은 기존 shadcn adapter와 Tailwind만 사용해 legacy class 방출을 0으로 유지했다. 기존 adapter로 필요한 Button·Card·입력 표면을 모두 표현할 수 있어 사용하지 않을 새 shadcn component 추가는 기각했다. 기존 단일 생성·스캔 표면의 P2 전면 이관은 후속 B4 범위로 보존했다.
+- **QR·표·출력 경계**: jsQR 순수 디코더를 기존 스캔 worker와 bulk worker가 공유하고 래스터 경로는 `QRCode.create`+OffscreenCanvas로 분리했다. bulk는 4모듈 기본 여백, 로고 한 변 22%·H 강제·최소 2모듈, 투명 PNG 흰 배경 합성 뒤 최종 read-back을 적용한다. C1 전체 파싱 뒤 열 번호와 `displayValue`/`sourceRow`로 행별 처리하고 중복·미존재 템플릿 참조를 실행 전에 거부한다. C2에는 segment·NFC·case-fold 충돌을 막는 `SafeZipEntryPath`, C3에는 기존 배열 API를 보존한 add/close/discard 증분 writer를 병설했다.
+- **R4 실측·채택**: 저장소 `rhwp-studio` WOFF2는 **562,220B**, SHA-256 `d1bf8649914a4fe9477a8735bf056383e44e466141fb3d61897252e06d900c1a`였다. fontkit가 embed/save까지는 받아들였으나 Poppler가 embedded font invalid로 판정했고 subset/full 모두 동일한 빈 **1,247B PNG**가 되어 재사용을 기각했다. 고정 Noto CJK Sans 2.004 OTF(**4,644,748B**, SHA-256 `69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68`)와 OFL(**4,301B**, SHA-256 `6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2`)를 생성 스크립트로 공급한다. 같은 OTF의 `subset:true` PDF **37,116B**는 한글이 tofu/누락됐고 full PDF **3,833,195B**는 정상이라 subset 버그를 재현했으며 `subset:false`를 채택했다. 실브라우저 25라벨은 **2페이지·4,102,716B**로 정상 출력됐다.
+- **페이로드·예산 판정**: 텍스트 원문, mailto UTF-8 percent-encoding, tel, 개행·콜론 보존 SMSTO, 특수문자 escape WIFI, CRLF vCard 3.0, http/https URL의 7종을 실제 worker 생성→jsQR 재판독으로 대조했다. 한글·백슬래시·쉼표·세미콜론·콜론·따옴표·개행 표본은 고정 문자열 골든으로 두었다. 입력 50MB·선택 시트 200만 셀·행 5,000·라벨 2,400·예상 출력 200MB 경고/500MB 거부를 적용했고, 1,000행 초과에는 72ms/행 추정 시간을 표시한다. OPFS quota가 예상 출력보다 작으면 실행 전 거부하며 OPFS 미지원은 1,000행 memory Blob 경로로 제한한다.
+- **현지화·정적·개인정보**: `/tools/qr-studio/bulk`의 ko/en canonical·FAQ·정적 페이지·사이트맵·소셜 이미지를 추가하고 기존 QR 카드만 갱신했다. QR·표·결과는 브라우저 안에서 처리한다. `VITE_LOCAL_QA=1` 추적·광고 제외 빌드에서 동의를 granted로 둔 Chrome 152가 빈/결과 ko/en×light/dark×desktop/mobile **16장**을 캡처하는 동안 외부 요청 시도 **0**이었다. 증거는 `tests/visual-artifacts/qr-bulk-r1/`에 고정했다.
+- **번들·검증**: 일반 production entry는 **936,132B/293,472B gzip**으로 U3 직전 289,568B 대비 **+3,904B gzip**(P2 +20KB 이내), CSS는 **286,693B/49,294B gzip**으로 직전 49,015B 대비 **+279B gzip**(P2 +10KB 이내)이다. `npm run build`(2,827 modules·정적 61페이지), unit **182/182**, QR bulk 실브라우저(취소/정리/재실행·7종·투명/로고·ZIP 2개·manifest 2시트·25라벨/2페이지·외부 요청 0), visual **96/96**, static, utilities, Excel 비교, Excel 정리, UI migration(7 switches·190px·tracking 0)을 모두 통과했다.
+
+### shadcn 브랜치 재적용·legacy 충돌 교정 — Gemini 검수 대기 (Codx)
+
+- **실행 게이트·브랜치 격리**: `main`과 `origin/main`이 모두 라이브 복구 기준 `311c59e310734e9206629b05752f4228e842dbf0`임을 확인하고 그 지점에서 신규 `ui-migration`을 만들었다. 열린 계획서의 배포 방식 정정과 충돌하는 지시는 없었다. 복구 대상은 P0a `c43e1a7` → P0b `df8e85c` → P1a `fdfb6c3` → P1b `d998afa` → polish `00bd3fd` → P1c `415e35b` 순서로 각각 revert-of-revert 커밋 `72632c9` → `932c5eb` → `4804a45` → `7ba78b0` → `c3b2acd` → `f866bed`로 재적용했다. `main`에는 커밋·push하지 않으며 사용자 MP4 3개와 DOCX 2개는 읽기·수정·스테이징에서 제외했다.
+- **사고 기전·교정**: shadcn adapter가 구조와 Tailwind utility를 바꾼 뒤에도 legacy component class를 함께 내보내면서 두 규칙 체계가 한 DOM에 중첩된 것이 원인이었다. 특히 `.ios-switch`의 기존 track/thumb 규칙이 Base UI `Switch`를 다시 변형해 썸의 트랙 이탈·하단 처짐을 만들었고, `.tool-action-bar .primary-button { width:190px }`와 adapter의 `w-full` 조합이 버튼 팽창과 옆 설명의 세로 낙하를 만들었다. 전환 컴포넌트는 `ui-*`와 `data-ui-component`/`data-ui-part` 소유권으로 분리하고, PrimaryButton의 `w-full`을 제거해 action bar가 190px 계약을 단독 소유하게 했다. 전역 form reset은 최초 `button:not([data-slot])`가 specificity를 올려 raw Excel sheet chip radius를 덮는 반례가 있어 기각하고 `button:where(:not([data-slot]))`로 낮췄다.
+- **legacy 전수 범위**: TypeScript AST 검사가 PageHeader·SectionCard·SegmentedControl·ToggleRow·FileDropZone·FileList·PrimaryButton·ResultCard 8종과 ToolGuide·OperationProgress·ToolCard·LanguageSwitcher 4종, 총 12종의 6개 소스에서 52개 exact legacy token과 3개 동적 prefix를 검사하며 adapter DOM 교집합 **0건**을 단언한다. PostCSS AST 기준 CSS 전체는 재적용 직후 2,122 rules/7,766 declarations, 교정 후 2,132/7,788이다. 52개 legacy token이 들어간 unique selector rule은 **281→143, 138개 제거**됐고 남은 143개는 Word 비교 결과·pair drop zone 등 실제 raw legacy DOM 전용이다. 컴포넌트군별 재적용 직후 매칭 규칙 수는 PageHeader 9, SectionCard 21, SegmentedControl 36, ToggleRow 23, FileDropZone 34, FileList 20, PrimaryButton 29, ResultCard 18, ToolGuide 34, OperationProgress 45, ToolCard 35, LanguageSwitcher 41이며 복합 selector 중복 때문에 합은 unique 281과 다르다.
+- **문서 비교 증상 부재 단언**: 추적 제외 production QA build의 1365×900 실브라우저에서 7개 Switch 전부 track **43×25px**, thumb **21×21px**, 좌우 inset **2/20px**, 수직 중심 오차 **0px**로 측정되어 트랙 이탈·하단 처짐이 없다. action button은 **190×48px**, 옆 copy/strong/small은 모두 `writing-mode:horizontal-tb`, copy 폭 **316.375px**, page overflow **0px**라 버튼 팽창·텍스트 세로 낙하가 없다. 계산 스타일 JSON과 해당 영역 PNG를 함께 고정했다.
+- **배포 전 로컬 시각 검수**: `VITE_LOCAL_QA=1`에서 Google·Naver·AdSense script/event를 opt-in으로 차단하고 동의를 `granted`로 둔 브라우저에서도 각 추적 수와 외부 요청은 모두 **0**이었다. registry AST가 찾은 가용 도구 20개를 ko-light-desktop·ko-dark-mobile·en-light-mobile·en-dark-desktop 4조합으로 캡처한 80장과 home/tools의 ko/en×light/dark×desktop/mobile 16장, 총 **96개 기준선**을 Chrome 152로 전수 비교하고 4개 contact sheet와 문서 비교 전용 2장을 Codx가 직접 열어 보았다. 레이아웃 파손·정렬 쏠림·문구 잘림·수평 overflow·비정상 버튼 확장·스위치 내부 오정렬은 보이지 않았다. HWP editor의 English URL이 정책상 All Tools로 redirect되는 것은 기대 동작으로 판정했다. 최종 증거 `tests/visual-artifacts/branch-qa-r1/`은 전 도구 80장+문서 비교 전용 2장+계산 JSON, 총 **82 PNG/83파일**이다.
+- **결정성·시각 하네스 판정**: Security Tools의 무작위 비밀번호 때문에 동일 코드도 기준선이 달라지는 경로는 제품 동작 변경 없이 QA 페이지에 고정값을 주입해 안정화했다. 기준선 갱신은 명시 플래그에서만 가능하고 누락·잉여 baseline도 실패한다. 최종 `npm run test:visual`은 **96/96**, pixel threshold 0.100% 이내로 일치했다.
+- **번들 예산**: 최종 일반 production build의 CSS `index-GjN0JepF.css`는 284,837B/**49,015B gzip**, P1c 48,261B 대비 **+754B**(한도 +10KB)다. entry JS `index-DkLkJJ-v.js`는 919,989B/**289,568B gzip**, P1c 289,140B 대비 **+428B**(한도 +50KB)로 둘 다 통과했다. QA 빌드는 tracking compile-out 때문에 entry gzip 288,590B로 더 작으며 예산 판정에는 일반 build를 사용했다.
+- **완료 검증**: 최종 `npm run build` exit 0(2,630 modules·정적 59페이지), `npm run test:unit` **174/174**, `npm run test:static`, `npm run test:ui-migration`(Switch 7개·action 190px·horizontal copy·tracking 0), `npm run test:visual` **96/96**, production preview의 `test:browser`·`test:office`·`test:xls-preserve`·`test:xls-first-load`·`test:excel-compare`·`test:excel-cleaner`·`test:utilities`·`test:video-hybrid`·`test:new-tools`, `git diff --check`가 모두 exit 0이었다. 사용자 문구·ko/en 리소스·SEO/정적 route·AdSense 배치/격리·GitHub Pages 서버리스 계약은 변경하지 않았다. 구현·Codx 로컬 육안 검수는 완료됐으며 브랜치 상태는 **Gemini 전수 검수 대기**다.
 
 ### RHWP 0.8.6 업그레이드 — 벤더 무결성·왕복 저장·로컬 QA 판정 (Codx)
 
@@ -68,6 +496,57 @@
 - **문서 비교 실측**: production build 로컬 preview의 `/ko/tools/document-compare/`를 1440×1200에서 캡처한 `/tmp/worklazytools-live-recovery/document-compare-restored-ko-desktop.png`를 직접 확인했다. 스위치 7개는 모두 43×25px·`border-radius: 999px`의 캡슐형이며 21×21px 원형 노브가 정상 분리됐다. 수정 전/후 문서 영역은 각각 484px 너비로 나란히 놓였고 `writing-mode: horizontal-tb`·페이지 수평 overflow 0으로 텍스트 세로 낙하가 없었다.
 - **추적 제외 로컬 검수**: dev build에서 개인정보 동의를 `granted`로 고정하고 `/tmp/worklazytools-live-recovery/document-compare-restored-ko-dev-no-tracking.png`를 추가 캡처해 같은 정상 배치를 직접 확인했다. Google·Naver 분석 script 0, AdSense script/slot 0, 외부 요청 0으로 로컬 검수 중 추적·광고 로더가 비활성임을 확인했다.
 - **검증 판정**: `npm run build` exit 0(2,429 modules·정적 59페이지), `npm run test:unit` 158/158, `test:visual` 24/24, `test:excel-compare`, `test:excel-cleaner`, `test:utilities`, `test:static`, `test:office`, `test:xls-preserve`, `test:xls-first-load`, `test:new-tools`, `test:video-hybrid`가 모두 exit 0이었다. `test:browser`는 서버 미기동 1회와 Vite cold dependency optimize/reload(Excel·Word·PDF) 중단 뒤 모든 lazy dependency가 warm인 동일 전체 명령에서 Excel·Word·PDF 스모크가 exit 0으로 통과했다. 제품 URL·ko/en 문구·SEO·광고/격리·GitHub Pages 구조에는 전환 이전 상태 이외의 변경을 넣지 않았다.
+
+### shadcn 마이그레이션 P1c — AppShell 소유권·광고 격리 보존 판정 (Codx)
+
+- **실행 게이트·CLI 범위**: P1-polish push·fetch 뒤 `HEAD` = `origin/main` = `00bd3fd7223aea75fa4cefdec2cacd63ed3aa437`였고 열린 계획서에 P1c와 상반된 지시는 없었다. `npm_config_cache=/tmp/worklazytools-npm-cache npx --yes shadcn@4.20.1 add sheet --yes`만 실행해 `src/components/ui/sheet.tsx` 하나를 생성했으며, registry가 함께 확인한 `button.tsx`는 동일해 건너뛰었다. package manifest·lockfile과 다른 shadcn 컴포넌트에는 diff가 없다. 사용자 MP4 3개·DOCX 2개와 `dummyfortest/`·`.codex/`는 제외했다.
+- **AppShell·포커스 소유권 판정**: 기존 수동 `keydown`/ref 포커스 트랩을 Base UI Sheet의 modal·portal·trigger/close 계약으로 교체했다. 실제 390×844 스모크에서 마지막 링크→Tab→닫기→Shift+Tab→마지막 링크 순환, Escape 종료, 종료 뒤 `mobile-navigation-trigger` 포커스 복귀를 단언했다. route 변경 닫힘과 820px 초과 전환 닫힘, sidebar·mobile header·bottom nav·footer 및 ko/en 문구는 유지했다. 21개 바로가기 목록은 시트 안 전용 `overflow-y:auto` 영역(가시 699px, 전체 KO 1,478px/EN 1,407px)으로 만들어 종전 하단 정렬에서 상단 항목이 화면 밖으로 밀리던 문제를 해소했다.
+- **SEO·격리 redirect·로더 위치 판정**: source 계약 테스트가 `RouteSeo` → video/office/XLS 세 경계 → `AnalyticsLoader` → 조건부 `AdSenseLoader`의 렌더 순서를 고정하고, redirect 목적지 `/tools/video-studio/`·`/tools/office-editor/app/`·`/tools/excel-merger/xls-preserve/`를 단언한다. AdSense 조건은 active와 isolation-document 6상태를 모두 제외하는 기존 식 그대로다. `AdSenseLoader`는 계속 `null`을 반환하고 동의 뒤 async script를 `document.head`에만 붙이므로 AppShell layout node/광고 슬롯 이동은 없고 이번 변경의 loader 기인 CLS 영향은 0으로 판정했다.
+- **광고 격리 회귀 증명**: 12개 공식 테스트 중 Office·XLS·new-tools 스모크와 정적 검사가 격리 경계를 통과했다. 별도 `granted` 동의 실브라우저 양성/음성 매트릭스에서 일반 Excel Cleaner는 AdSense DOM **1**·pagead 요청 **1**, video/office/XLS 격리 문서는 각각 isolation marker **true**·공통 nav **true**·AdSense DOM **0**·pagead 요청 **0**이었다. video는 기존 계약대로 분석 로더 1개를 유지하고 office/XLS는 0개였다. 실행 가능한 저장소 파일 전체 스캔은 `public/vendor/` 생성 벤더만 명시 제외하고 광고 문자열 소유 파일을 고정 allowlist와 대조해 통과했다. 최초 보조 매트릭스가 일반 페이지의 `crossOriginIsolated=false`까지 양성 조건으로 가정한 것은 origin-wide service worker 아래에서 일반 페이지가 광고 DOM/요청을 가지면서도 true일 수 있어 기각했고, route marker와 실제 광고 DOM/요청으로 고친 매트릭스가 통과했다.
+- **시각·접근성 판정**: Chrome 152로 기존 24개 닫힌 상태 기준선을 재생성했으며 이전 PNG와 pixelmatch 차이는 전부 **0px**라 무의미한 인코딩 차이는 커밋하지 않았다. 열린 시트의 ko/en×light/dark before/after/diff 12장은 `tests/visual-artifacts/p1c/`에 고정했다. diff는 EN dark **31,325px/9.5166%**, EN light **33,825px/10.2762%**, KO dark **28,484px/8.6535%**, KO light **32,540px/9.8858%**다. 최초 light eyebrow 3.17:1은 AA 미달로 기각하고 보조 본문색으로 올렸다. 재측정 최소 대비는 light **5.45:1**, dark **5.62:1**, 시트 안정 rect는 좌우 10px·상하 약 10px, document/sheet 수평 overflow와 의도하지 않은 텍스트 잘림은 모두 **0**이었다. 일반 `test:visual`은 24/24(≤0.100%) 일치했다.
+- **번들 예산·완료 검증**: CSS `index-D1a-8v2B.css`는 280,255B/**48,261B gzip** = polish 47,225B 대비 **+1,036B**(한도 +10KB), entry JS `index-BL-4egRy.js`는 918,640B/**289,140B gzip** = polish 271,292B 대비 **+17,848B**(한도 +50KB)로 통과했다. `npm run build` exit 0(2,629 modules·정적 59페이지), `test:unit` 170/170, `test:static`, `test:visual` 24/24, `test:browser`·`test:office`·`test:xls-preserve`·`test:xls-first-load`·`test:excel-compare`·`test:excel-cleaner`·`test:new-tools`·`test:video-hybrid`·`test:utilities`가 모두 exit 0이었다. Excel 비교 모바일도 content padding **80px** ≥ nav **62px**, footer 763.64px < nav 상단 773px와 overflow 0을 재확인했다.
+### shadcn 마이그레이션 P1-polish — P1a 시각 검토 수용 3건 판정 (Codx)
+
+- **실행 게이트·범위**: 착수 시 `HEAD` = `origin/main` = `d998afab3c6774f765e59cf6604d11129e5d0398`로 사용자 지시 기준 `d998afa`와 일치했다. 열린 계획서에 상반 지시는 없었고, 미추적 MP4 3개·DOCX 2개와 `dummyfortest/`·`.codex/`는 제외했다.
+- **줄바꿈·radius 판정**: 지정 폭에서 `SpreadsheetML`/확장자를 쪼개던 `overflow-wrap:anywhere`는 실제 재현 시 단어 자체를 `Spread`/`sheetML`로 나누어 기각했다. 24자 이하의 짧은 구분 항목만 구분자를 앞 항목에 붙여 `wbr`로 나누고 항목 내부는 nowrap하는 공용 `DropZoneHint`를 채택했다. 화면·접근성 textContent는 기존 ko/en 문구와 동일하다. 점선 드롭존과 카드의 computed radius는 모두 **36.4px**로 일치했다.
+- **모바일 하단 격리 판정**: 820px 이하 공통 `.main-content`의 하단 padding을 `80px + safe-area`로 고정했다. 390×844 실측에서 콘텐츠 padding **80px** ≥ 하단 nav **62px**, 최하단 footer **763.64px** < nav 상단 **773px**로 겹침이 없었다. 공용 브라우저 스모크의 기존 100ms smooth-scroll 가정은 길이가 달라지면 sticky 위치를 애니메이션 중간에 읽어 불안정했으므로 즉시 스크롤 계약으로 보정했다.
+- **시각·번들 예산**: Chrome 152에서 24개 기준선을 갱신한 뒤 일반 `test:visual`이 24/24(≤0.100%) 일치했다. before/after/diff 12장은 `tests/visual-artifacts/p1-polish/`에 고정했다. 대표 diff는 KO light mobile **788px/0.2394%**, KO dark mobile **572px/0.1738%**, EN light desktop **478px/0.0389%**, EN dark desktop **12px/0.0010%**였다. CSS는 273,854B/**47,225B gzip** = P1b 47,198B 대비 **+27B**, entry JS는 863,742B/**271,292B gzip** = P1b 271,025B 대비 **+267B**로 P1 예산(+10KB/+50KB)을 통과했다.
+- **완료 검증·동반 영향**: `npm run build` exit 0(2,538 modules·정적 59페이지), `npm run test:unit` 167/167, production preview의 `test:excel-compare`(모바일 overflow 0·힌트 보호·radius·nav 여백 단언), `test:browser`, `test:static`, `test:visual` 24/24와 `git diff --check`가 통과했다. 공개 ko/en 문구·URL·SEO/정적 페이지·광고 배치/격리 경로·GitHub Pages 구조는 불변이다.
+### shadcn 마이그레이션 P1b — 공용 컴포넌트군 호환 판정 (Codx)
+
+- **실행 게이트·CLI 범위**: 착수 시 `git rev-parse HEAD` = `git rev-parse origin/main` = `fdfb6c389692272e6c49143be7a8fb04639116c1`로 지시 기준 `fdfb6c3`와 일치했다. 열린 계획서 검색에서 P1b와 충돌하는 지시는 없고, 비디오 W-D의 stage-key 계약과 U3의 P1 선행 의존만 일치하는 항목으로 확인했다. 실행한 add는 `npm_config_cache=/tmp/worklazytools-npm-cache npx --yes shadcn@4.20.1 add progress --yes` 하나뿐이며 `src/components/ui/progress.tsx`만 생성됐다. package manifest·lockfile·다른 shadcn 컴포넌트에는 diff가 없다. 사용자 MP4 3개와 DOCX 2개는 전 과정에서 제외했다.
+- **구현·DOM 판정**: ToolGuide는 Card 기반 `<section>`과 guide `<article>`로 바꾸되 `content-heading`→guide grid→FAQ `details/summary/p` 구조, `aria-labelledby`, `t("guide.eyebrow")`의 한국어 `안내`를 유지했다. OperationProgress는 Card·Button·Base UI Progress를 사용하되 root `<section>`, 제어형 값/label, 로그 `<ol>/<li>`, 접기 버튼과 상태 class를 보존하고 6색 indicator/state map을 명시했다. ToolCard는 Card에 polymorphic `as={Link}`를 허용해 실제 `<a>`·경로·analytics 호출과 카드/아이콘의 동일한 6색 accent를 유지했다. LanguageSwitcher는 ToggleGroup으로 전환해 `<div role="group">`, 현지화 label, KO/EN `aria-pressed`, roving focus와 ArrowRight+Space 전환을 보존했다.
+- **공개 API·사용처 판정**: 기준 해시와 현재 네 파일의 export interface·function parameter를 TypeScript AST로 비교해 모두 동일했다. U2 Excel Cleaner 추가 뒤 실제 feature 사용처는 지시서 작성 당시의 ToolGuide 21·OperationProgress 13이 아니라 각각 **22·14파일**이며, 호출부 수정 없이 중앙 컴포넌트로 전부 전환됐다. 전용 계약 단위 테스트 4건과 `npx tsc -b`가 통과했다.
+- **W-D 행동 회귀 증명**: 소스 계약은 `entry.id === activeLogId || (stageKey === activeStageKey)`의 current 판정, running current의 `LoaderCircle.spin`, `key={entry.id}`, `entry.progress%`를 그대로 유지했다. `npm run test:excel-compare`는 보고서 1쌍/다중쌍·취소·모바일 overflow 0을 포함해 exit 0이었다. `npm run test:new-tools`의 실제 512MiB×2=1GiB sparse 비디오 작업은 **14개로 제한된 진행 행 전부의 퍼센트**와 **마지막 행이 아닌 activeStageKey 행의 스피너**를 MutationObserver로 관측해 exit 0이었다. `test:browser`도 완료 상태마다 Card section·Base UI progress slot·`aria-valuenow=100`·모든 로그 행 퍼센트를 검사해 통과했다.
+- **시각·접근성 판정**: 의도한 Card/Progress/Toggle 외형을 반영해 Chrome 152.0.7977.64의 24개 기준선을 갱신했고 일반 `npm run test:visual`은 24/24, diff threshold ≤0.100%로 일치했다. 대표 before/after/diff는 `tests/visual-artifacts/p1b/`에 4화면×3장으로 고정했다. P1a before 대비 diff는 Excel 비교 모바일 963px/0.2926%, 홈 EN dark desktop 67,488px/5.4935%, 도구 목록 EN dark mobile 8,037px/2.4417%, KO light desktop 21,410px/1.7428%였다. ko/en×light/dark×desktop/mobile 실측은 document overflow 0·clipped text 0이고, 새 카드/언어/가이드 보조 텍스트 대비 최솟값은 light **4.89:1**, dark **6.04:1**로 WCAG AA를 통과했다. 최초 대비 검사에서 낮게 나온 guide/card eyebrow는 `text-muted-foreground`로 보정한 뒤 재측정·기준선 재생성했다.
+- **번들 예산**: 동일 `npm run build` 산출물을 zlib level 6으로 측정했다. 전체 CSS `index-BvxQVj6w.css`는 273,707B/**47,198B gzip**, P1a 46,844B 대비 **+354B**(한도 +10KB). entry `index-Dz4QDSyz.js`는 863,110B/**271,025B gzip**, P1a 268,432B 대비 **+2,593B**(한도 +50KB)로 통과했다.
+- **완료 검증**: `npm run build` exit 0(2,537 modules·정적 59페이지), `npm run test:unit` 167/167, `npm run test:browser`·`test:office`·`test:xls-preserve`·`test:xls-first-load`·`test:excel-compare`·`test:excel-cleaner`·`test:new-tools`·`test:video-hybrid`·`test:utilities`·`test:static` 모두 exit 0, `npm run test:visual` 24/24였다. 브라우저 스모크의 개발 서버 사전 실행은 Vite lazy dependency 최적화 reload 뒤 Word 비교 사용자 오류 1회와 unminified 처리의 CDP timeout 1회가 있었으나, 현재 production build를 표준 5173 포트에 둔 동일 전체 명령과 별도 Word 범위는 모두 통과해 제품 회귀가 아님을 교차 확인했다. 공개 ko/en 문구·번역 리소스·URL·SEO/정적 route·AdSense 배치/격리 경로·GitHub Pages 구조는 변경하지 않았다.
+### shadcn 마이그레이션 P1a — 공용 UI 8종 호환 adapter 판정 (Codx)
+
+- **CLI 선택·추가 범위**: `shadcn 4.20.1 view tabs`의 Base UI 생성물은 `tablist`/`tab`·`aria-selected`, `view toggle-group`과 설치된 Base UI 원문은 root `role="group"`·item `aria-pressed`를 제공했다. 기존 `SegmentedControl` 계약과 정확히 맞는 **toggle-group**을 선택하고 tabs는 기각했다. 실행한 add는 `button card switch toggle-group`뿐이며, registry 의존으로 `toggle.tsx`가 함께 생성됐다. 생성 파일은 button/card/switch/toggle/toggle-group 5개이고 tabs 파일은 없다.
+- **8종 adapter·호출부 불변**: PageHeader는 header/h1 계층, SectionCard는 Card 기반 `<section>`·step·className 병합, SegmentedControl은 제어형 단일 선택 group/pressed, ToggleRow는 제어형 native button switch/checked/disabled, FileDropZone은 Card+Button 내부 부품과 파일 누적·async 완료 후 input reset·Enter/Space·drag, FileList는 Card 기반 `<ul>`/`<li>`와 제거, PrimaryButton은 loading/disabled/`aria-busy`, ResultCard는 `<section>`/`aria-live="polite"`를 보존했다. `ToolAccent` green/blue/violet/orange/pink/sky는 네 variant map으로 전부 명시했다. 기준 해시의 8개 공개 prop type 텍스트와 현재 선언을 TypeScript AST로 대조해 동일했고, 현재 HEAD의 `ui.tsx` import 호출부는 지시서의 옛 39개가 아니라 U2 반영 후 **40개**였다. 호출부 40개 수정 0 상태로 `npx tsc -b`가 exit 0이었다.
+- **NavigationRow 제거**: TypeScript AST 기준 호출 0, 저장소 검색도 사용 0이므로 export·ChevronRight import·전용 CSS 2개를 제거했다.
+- **행동·레이아웃 회귀 판정**: production Chrome에서 FileDropZone Enter 업로드/async reset, SegmentedControl ArrowLeft/Right+Space, ToggleRow Space+Enter 복원을 실동작으로 확인했다. 첫 스모크에서 shadcn Card의 `overflow-hidden`이 Excel 모바일 sticky를 막고, 기본 padding이 HWP focus shell 높이를 736.5px로 줄이는 충돌을 발견했다. SectionCard는 일반 화면 `overflow-visible`, HWP focus 컨텍스트만 padding 0·overflow hidden으로 보정해 shell 784.5px/section 884px/focus 900px를 회복했다. XLS 보존 route 전환 직후 upload race는 input selector 대기를 추가해 안정화했다.
+- **시각 판정·증거**: P-V 기준선과 최초 비교에서는 의도한 preset 전환 때문에 24개 중 16개가 달랐고 최대 diff는 `excel-compare-empty__en__dark__desktop` **11.3402%**였다. 변경 route의 ko/en × light/dark × desktop/mobile 16행렬을 검사해 document overflow 0·adapter 경계 overflow 0·clipped text 0이었다. 대표 텍스트 최소 대비는 **4.73:1**, 흰색 대비 6색 primary는 green 4.95, blue 6.83, violet 7.30, orange 5.22, pink 5.91, sky 5.86으로 WCAG AA를 통과했다. 4개 대표 화면의 before/after/diff 12장은 `tests/visual-artifacts/p1a/`에 고정했고 새 기준선 24장은 Chrome 152.0.7977.64로 갱신했다. 갱신 후 일반 `test:visual`은 24/24가 임계값 ≤0.100%로 일치했다.
+- **번들 예산**: 동일 `npm run build` 산출물을 zlib level 6으로 측정했다. 전체 CSS `index-q6-lP6rN.css`는 271,697B/**46,844B gzip**, P0b 40,929B 대비 **+5,915B**(한도 +10KB). entry `index-C3yIRznh.js`는 859,382B/**268,432B gzip**, P0b 246,772B 대비 **+21,660B**(한도 +50KB)로 통과했다.
+- **완료 검증**: `npm run build` exit 0(2,522 modules·정적 59페이지), `npm run test:unit` 163/163, `test:browser`(공용 adapter 키보드 계약 포함)·`test:office`·`test:xls-preserve`·`test:xls-first-load`·`test:excel-compare`·`test:excel-cleaner`·`test:new-tools`·`test:video-hybrid`·`test:utilities`·`test:static` 모두 exit 0, `test:visual` 24/24였다. 사용자 ko/en 문구·번역 리소스·SEO/정적 route·소셜 이미지·AdSense 배치/격리 경로·GitHub Pages 구조는 변경하지 않았다.
+### shadcn 마이그레이션 P0b — 전역 preflight·legacy 보정 판정 (Codx)
+
+- **전역 적용 판정**: Tailwind 4.3.3 generated `preflight.css` 원문은 398줄·SHA-256 `ace8310eed6dc5568a56fc16e1d695cf58da7528d81d66d81649e93cce644df6`이며 `:host`·`::backdrop`·`::file-selector-button`·WebKit/Firefox 폼 pseudo-element·`[hidden]`을 함께 다룬다. 설치한 Base UI 1.7.0의 `FloatingPortal`은 container 미지정 시 `document.body`를 쓰고 number-field cursor도 body에 portal한다. `#root` scoped reset은 이 body portal과 host/browser pseudo 계약을 누락하므로 기각하고 `tailwindcss/preflight.css`를 전역 `layer(base)`로 확정했다. 브라우저에서 `#root` 밖 body 직속 임시 `<p>`가 `margin-block: 0px`·`border-style: solid`로 계산되어 실제 전역 적용도 확인했다.
+- **무보정 충돌과 보정 8개**: 전역 import만 둔 1차 실측은 P-V 24/24가 실패했고 diff는 2.3848%~12.2323%였다. legacy layer에 ① `::before`·`::after`·`::backdrop`·`::file-selector-button`의 기존 `content-box`, ② `h1`~`h6`의 UA font size/weight, ③ `small`의 `smaller`, ④ `.tool-guide-grid ul`·`.prose-card ul`의 disc marker, ⑤ `.prose-card ol`의 decimal marker, ⑥ button/input/select/optgroup/textarea/file-selector-button의 기존 margin·padding·border·radius·background·font·letter-spacing·color·opacity, ⑦ textarea의 양방향 resize 기본값, ⑧ `html`의 기존 normal line-height를 명시해 상쇄했다. 이후 실측은 hero/page heading `font-weight: 700`, prose ul `disc`, 동적 prose ol `decimal`, hero pseudo-element `content-box`였다.
+- **시각·예산 판정**: Chrome 152 production preview에서 ko/en × light/dark × desktop/mobile 24/24가 P-V 기준선과 임계값 ≤0.100%로 일치했다. 전체 CSS 단일 파일은 232,664B/40,929B gzip으로 P0a 39,730B 대비 **+1,199B**(한도 +10KB), entry JS는 793,774B/246,772B gzip으로 P0a 246,773B 대비 **-1B**(원시 크기 동일, 한도 +0KB)라 통과했다.
+- **불변 계약·제품 영향**: layer 선언은 `theme < base < legacy < components < utilities`, preflight 소유는 base, 기존 CSS 소유는 legacy로 유지했다. `prefers-color-scheme: dark` 토큰 브리지와 `.dark` 비사용 계약은 수정하지 않았다. 사용자 문구·ko/en 리소스·SEO/정적 route·광고 배치/격리 경로·GitHub Pages 구조·JS 동작은 변경하지 않았다.
+- **완료 검증**: `npm run build` exit 0(2,430 modules·정적 59페이지), `npm run test:unit` 158/158, production preview의 `test:visual` 24/24와 `test:browser`·`test:office`·`test:xls-preserve`·`test:excel-compare`·`test:excel-cleaner`·`test:new-tools`·`test:utilities`, 자체 서버의 `test:xls-first-load`, 단일/concat `test:video-hybrid`, `test:static`, `git diff --check`가 모두 exit 0이었다.
+
+### shadcn 마이그레이션 P0a — preflight 없는 기반 설치 판정 (Codx)
+
+- **CLI·preset 실측**: 최초 체크포인트 `npx shadcn@latest init --help`에서 `--template <next|start|vite|react-router|laravel|astro>`, `--base <base|radix|aria>`, `--preset [name]`을 확인했고 `--version`은 4.20.1이었다. `preset decode b1aK6UEDo --json`은 version `b`, style `luma`, baseColor `olive`, theme `indigo`, chartColor `blue`, iconLibrary `lucide`, font `noto-sans`, radius `large`, menuAccent `subtle`, menuColor `default`를 반환했다. 고정 명령 `npx shadcn@4.20.1 init --template vite --base base --preset b1aK6UEDo --yes` 적용 뒤 `shadcn info`가 `style=base-luma`, `base=base`, 같은 preset, Tailwind v4, alias `@`, 설치 component 0개를 확인했다.
+- **CLI 선행 조건·생성물 판정**: 첫 init은 Tailwind/alias 부재, 두 번째는 CLI 4.20.1이 모듈별 Tailwind import를 CSS 진입점으로 인정하지 않아 각각 변경 없이 중단됐다. 앱이 import하지 않는 임시 전체 import로 탐지만 통과시킨 세 번째 init은 `components.json`, `src/lib/utils.ts`, `src/components/ui/button.tsx`, preset CSS와 의존성을 생성했다. P0a component add 금지 때문에 자동 생성 button과 임시 CSS, element 대상 `@layer base` apply 규칙은 제거했고 최종 `shadcn info`의 Installed Components는 `No components installed`다. 최종 생성 파일은 `components.json`·`src/lib/utils.ts`·`src/styles/tailwind.css`, 변경 파일은 package/lock·라이선스 생성물·Vite/TS alias·main CSS import·`global.css`다.
+- **의존성 diff**: runtime/build 기반은 `@base-ui/react@1.7.0`, `@fontsource-variable/noto-sans@5.3.0`, `class-variance-authority@0.7.1`, `clsx@2.1.1`, exact `shadcn@4.20.1`, `tailwind-merge@3.6.0`, `tw-animate-css@1.4.0`; dev 기반은 exact `tailwindcss@4.3.3`·`@tailwindcss/vite@4.3.3`이다. `npm install` 보고의 기존 audit 상태는 6 low/4 moderate였고 자동 fix는 범위 밖이라 적용하지 않았다.
+- **preflight·layer·다크 판정**: `tailwindcss/theme.css`와 `tailwindcss/utilities.css`만 모듈 import하고 `preflight.css`와 전체 `@import "tailwindcss"`는 0건이다. 선언 순서는 `theme < base < legacy < components < utilities`; theme은 실제 `layer(theme)`이며 Tailwind가 custom property 초기화용 내부 `properties` layer를 별도로 만든다. 현행 2,648줄 CSS 본문은 `legacy`로 옮기고 충돌하던 radius 4개만 `--legacy-radius-*`로 이름을 분리했다. `.dark` variant는 0건이며 shadcn surface/text/border 토큰을 기존 변수에 연결하고 indigo/chart 값은 preset을 유지한 채 `prefers-color-scheme: dark` 안에서 다시 연결했다.
+- **scan 오염 기각**: 최초 성공 빌드에서 Tailwind 자동 scan이 `public/vendor/rhwp-studio`의 `[file:open]` 로그를 arbitrary property로 오인해 5개 경고를 냈다. repo-wide 자동 scan은 기각하고 utilities에 `source(none)`을 지정한 뒤 `@source "../"`로 소유 `src/`만 허용했다. 재빌드는 해당 경고 0건이고 산출 CSS의 `[file:open]` 0건, preflight `box-sizing:border-box;border:0 solid` 패턴 0건이었다.
+- **시각·예산 판정**: Chrome 152의 production preview에서 before 24장과 24/24 일치해 diff 비율이 모두 ≤0.100%였다. 정식 build 산출은 전체 CSS 단일 파일 228,206B/39,730B gzip으로 정본 37,148B 대비 **+2,582B**(한도 +20KB), entry JS 793,774B/246,773B gzip으로 정본 245,738B 대비 **+1,035B**(한도 +10KB)라 모두 통과했다.
+- **완료 검증·제품 영향**: `npm run build` exit 0(2,430 modules·정적 59페이지), `npm run test:unit` 158/158, production preview에서 `test:browser`·`test:office`·`test:xls-preserve`·`test:excel-compare`·`test:excel-cleaner`·`test:new-tools`·`test:utilities`, 자체 서버의 `test:xls-first-load`, 단일/concat `test:video-hybrid`, `test:static`, `test:visual` 24/24와 `git diff --check`가 모두 통과했다. 공개 문구·route·SEO 입력·광고 배치와 격리 경로·서버리스 구조는 불변이다.
 
 ### shadcn 마이그레이션 P-V — 시각 회귀 기준선 판정 (Codx)
 

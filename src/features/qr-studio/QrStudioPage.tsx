@@ -1,17 +1,22 @@
-import { AlertTriangle, Camera, CameraOff, Copy, Download, ExternalLink, ImagePlus, QrCode, ScanLine, Share2 } from "lucide-react";
+import { AlertTriangle, Camera, CameraOff, Copy, Download, ExternalLink, FileArchive, FileSpreadsheet, FileText, ImagePlus, QrCode, ScanLine, Share2, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { PageHeader, PrimaryButton, SectionCard, SegmentedControl } from "../../components/ui";
+import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect, UtilityTextarea } from "../../components/UtilitySurface";
+import { PageHeader, PrimaryButton, SegmentedControl } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { ToolGuide } from "../../components/ToolGuide";
 import { resolveFeatureMessage } from "../../i18n/featureMessages";
 
-type QrMode = "create" | "scan";
+const QrBulkPanel = lazy(() => import("./QrBulkPanel").then((module) => ({ default: module.QrBulkPanel })));
 
-export function QrStudioPage() {
+export type QrMode = "create" | "scan" | "bulk";
+
+export function QrStudioPage({ initialMode = "create" }: { initialMode?: QrMode }) {
   const { t, i18n } = useTranslation("features");
-  const [mode, setMode] = useState<QrMode>("create");
+  const [mode, setMode] = useState<QrMode>(initialMode);
   const [text, setText] = useState("https://worklazy.net/");
   const [size, setSize] = useState(640);
   const [dark, setDark] = useState("#111118");
@@ -36,6 +41,10 @@ export function QrStudioPage() {
   const captureInFlightRef = useRef(false);
   const captureFrameRef = useRef<(() => void) | undefined>(undefined);
   const qrGenerationRef = useRef(0);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   const releaseCameraResources = useCallback(() => {
     window.clearTimeout(cameraTimerRef.current);
@@ -129,14 +138,14 @@ export function QrStudioPage() {
       };
       worker.onerror = (event) => {
         setBusy(false);
-        setError(event.message || t("qr.fileError"));
+        setError(t("qr.fileError"));
         worker.terminate();
         if (fileWorkerRef.current === worker) fileWorkerRef.current = undefined;
       };
       worker.postMessage({ buffer, type: file.type }, [buffer]);
-    } catch (reason) {
+    } catch {
       setBusy(false);
-      setError(reason instanceof Error ? reason.message : t("qr.fileError"));
+      setError(t("qr.fileError"));
     }
   };
 
@@ -189,9 +198,9 @@ export function QrStudioPage() {
           const blob = await canvasToBlob(canvas, "image/jpeg", 0.86, t("qr.errors.image"));
           const buffer = await blob.arrayBuffer();
           if (cameraWorkerRef.current === worker) worker.postMessage({ buffer, type: blob.type }, [buffer]);
-        } catch (reason) {
+        } catch {
           captureInFlightRef.current = false;
-          setError(reason instanceof Error ? reason.message : t("qr.errors.scan"));
+          setError(t("qr.errors.scan"));
           stopCamera();
         }
       };
@@ -211,8 +220,8 @@ export function QrStudioPage() {
         }
         scheduleNext();
       };
-      worker.onerror = (event) => {
-        setError(event.message || t("qr.errors.scanner"));
+      worker.onerror = () => {
+        setError(t("qr.errors.scanner"));
         stopCamera();
       };
       setCameraActive(true);
@@ -236,40 +245,41 @@ export function QrStudioPage() {
   };
 
   return (
-    <div className="page tool-page page-enter utility-page qr-page">
+    <UtilityPage toolId="qr-studio">
+      <div className="contents" data-testid="qr-studio-page">
       <PageHeader eyebrow="QR STUDIO" title={t("qr.title")} description={t("qr.description")} />
-      <div className="mode-switch"><SegmentedControl value={mode} onChange={changeMode} label={t("qr.modeLabel")} options={[{ value: "create", label: t("qr.create") }, { value: "scan", label: t("qr.scan") }]} /></div>
+      <div className="mb-4" data-testid="qr-mode"><SegmentedControl value={mode} onChange={changeMode} label={t("qr.modeLabel")} options={[{ value: "create", label: t("qr.create") }, { value: "bulk", label: t("qr.bulk.mode") }, { value: "scan", label: t("qr.scan") }]} /></div>
 
       {mode === "create" ? (
-        <div className="qr-layout">
-          <SectionCard title={t("qr.contentStyle")}>
-            <label className="block-field"><span>{t("qr.content")}</span><textarea value={text} onChange={(event) => setText(event.target.value)} /></label>
-            <div className="utility-form-grid">
-              <label><span>{t("qr.size")}</span><select value={size} onChange={(event) => setSize(Number(event.target.value))}><option value={320}>320px</option><option value={640}>640px</option><option value={1024}>1024px</option></select></label>
-              <label><span>{t("qr.color")}</span><input type="color" value={dark} onChange={(event) => setDark(event.target.value)} /></label>
-              <label className="span-2 file-control"><span>{t("qr.logo")}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogo(event.target.files?.[0])} /></label>
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(300px,.8fr)] items-start gap-4 max-[820px]:grid-cols-1" data-testid="qr-create-layout">
+          <UtilitySectionCard title={t("qr.contentStyle")}>
+            <UtilityField><span>{t("qr.content")}</span><UtilityTextarea className="min-h-40 rounded-xl" data-testid="qr-content" value={text} onChange={(event) => setText(event.target.value)} /></UtilityField>
+            <div className="mt-3 grid grid-cols-2 gap-3 max-[620px]:grid-cols-1">
+              <UtilityField><span>{t("qr.size")}</span><UtilitySelect value={size} onChange={(event) => setSize(Number(event.target.value))}><option value={320}>320px</option><option value={640}>640px</option><option value={1024}>1024px</option></UtilitySelect></UtilityField>
+              <UtilityField><span>{t("qr.color")}</span><UtilityInput className="cursor-pointer p-1" type="color" value={dark} onChange={(event) => setDark(event.target.value)} /></UtilityField>
+              <UtilityField className="col-span-full"><span>{t("qr.logo")}</span><UtilityInput className="h-auto min-h-10 py-1.5 file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-bold" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogo(event.target.files?.[0])} /></UtilityField>
             </div>
-          </SectionCard>
-          <SectionCard title={t("qr.preview")}><div className="qr-preview"><canvas ref={canvasRef} /></div>{error && <p className="utility-error" role="alert">{error}</p>}<div className="result-file-actions"><PrimaryButton accent="blue" disabled={!qrReady} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <button type="button" className="secondary-button" disabled={!qrReady} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</button>}</div></SectionCard>
+          </UtilitySectionCard>
+          <UtilitySectionCard title={t("qr.preview")}><div className="grid min-h-[300px] place-items-center rounded-2xl border border-border bg-muted/45 p-4" data-testid="qr-preview" data-ready={qrReady}><canvas className="block h-auto max-h-[360px] max-w-full rounded-xl bg-white shadow-sm" ref={canvasRef} /></div>{error && <p className="mt-2 text-sm font-bold text-destructive" data-testid="qr-error" role="alert">{error}</p>}<div className="mt-3 flex flex-wrap gap-2"><PrimaryButton accent="blue" disabled={!qrReady} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <Button className="min-h-11 rounded-xl" type="button" variant="secondary" disabled={!qrReady} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</Button>}</div></UtilitySectionCard>
         </div>
-      ) : (
+      ) : mode === "scan" ? (
         <>
-          <div className="qr-scan-layout">
-            <SectionCard className="qr-camera-scan-card" title={t("qr.scanTitle")} description={t("qr.scanHelp")}>
-              <div className={`qr-camera-stage${cameraActive ? " active" : ""}`}>
-                <video ref={videoRef} autoPlay muted playsInline aria-label={t("qr.cameraLabel")} />
-                {!cameraActive && <div className="qr-camera-placeholder"><Camera size={30} /><strong>{t("qr.cameraOffTitle")}</strong><span>{t("qr.cameraPrivate")}</span></div>}
-                {cameraActive && <div className="qr-camera-guide" aria-hidden="true" />}
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(280px,.8fr)] items-start gap-4 max-[820px]:grid-cols-1" data-testid="qr-scan-layout">
+            <UtilitySectionCard className="overflow-visible" data-testid="qr-camera-scan-card" title={t("qr.scanTitle")} description={t("qr.scanHelp")}>
+              <div className="relative grid aspect-video min-h-[260px] place-items-center overflow-hidden rounded-2xl bg-slate-950 text-white max-[620px]:min-h-[220px]" data-testid="qr-camera-stage" data-active={cameraActive || undefined}>
+                <video className="absolute inset-0 size-full object-cover" ref={videoRef} autoPlay muted playsInline aria-label={t("qr.cameraLabel")} />
+                {!cameraActive && <div className="relative z-10 grid justify-items-center gap-2 px-4 text-center"><Camera size={30} /><strong className="text-sm">{t("qr.cameraOffTitle")}</strong><span className="text-xs text-slate-300">{t("qr.cameraPrivate")}</span></div>}
+                {cameraActive && <div className="pointer-events-none relative z-10 aspect-square h-[68%] rounded-2xl border-2 border-white/90 shadow-[0_0_0_999px_rgba(0,0,0,.28)]" aria-hidden="true" />}
               </div>
-              <canvas ref={captureCanvasRef} className="visually-hidden" aria-hidden="true" />
-              <div className="section-actions qr-scan-actions">
+              <canvas ref={captureCanvasRef} className="sr-only" aria-hidden="true" />
+              <div className="mt-3 flex flex-wrap gap-2" data-testid="qr-scan-actions">
                 {cameraActive
                   ? <PrimaryButton accent="blue" onClick={stopCamera}><CameraOff size={18} /> {t("qr.turnOff")}</PrimaryButton>
                   : <PrimaryButton accent="blue" loading={cameraStarting} onClick={() => void startCamera()}><Camera size={18} /> {t("qr.cameraScan")}</PrimaryButton>}
-                <label className={`secondary-button qr-photo-picker${busy ? " disabled" : ""}`} aria-disabled={busy}>
+                <label className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-secondary px-4 text-sm font-bold text-secondary-foreground outline-none transition-colors hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30 ${busy ? "pointer-events-none opacity-50" : ""}`} data-testid="qr-photo-picker" aria-disabled={busy}>
                   {busy ? <><ScanLine size={18} /> {t("qr.analyzing")}</> : <><ImagePlus size={18} /> {t("qr.choosePhoto")}</>}
                   <input
-                    className="visually-hidden"
+                    className="sr-only"
                     type="file"
                     accept="image/*"
                     disabled={busy}
@@ -283,34 +293,42 @@ export function QrStudioPage() {
                   />
                 </label>
               </div>
-              {scanFiles[0] && <p className="qr-selected-photo"><ImagePlus size={15} /><span>{scanFiles[0].name}</span><small>{t("qr.instant")}</small></p>}
-            </SectionCard>
+              {scanFiles[0] && <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm" data-testid="qr-selected-photo"><ImagePlus className="shrink-0" size={15} /><span className="overflow-hidden text-ellipsis whitespace-nowrap">{scanFiles[0].name}</span><small className="ml-auto shrink-0 text-xs text-muted-foreground">{t("qr.instant")}</small></p>}
+            </UtilitySectionCard>
             {(scanned || error) && (
-              <div className="qr-scan-result-slot" ref={scanResultRef} role="status" aria-live="polite">
-                <SectionCard title={t("qr.scanResult")}>
-                  <div className={`scan-result${error ? " error" : ""}`}>
-                    <QrCode size={21} />
-                    <p>{error || scanned}</p>
-                    {scanned && <button type="button" aria-label={t("qr.copyResult")} onClick={() => void navigator.clipboard.writeText(scanned).then(() => setCopyFeedback(t("qr.copied"))).catch(() => setCopyFeedback(t("qr.copyFailed")))}><Copy size={17} /></button>}
-                    {scanned && safeHttpUrl(scanned) && <a className="secondary-button" href={safeHttpUrl(scanned)} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} /> {t("qr.openLink")}</a>}
-                  </div>
-                  {copyFeedback && <small role="status">{copyFeedback}</small>}
-                </SectionCard>
+              <div ref={scanResultRef} role="status" aria-live="polite" data-testid="qr-scan-result-slot">
+                <UtilitySectionCard title={t("qr.scanResult")}>
+                  <Card className={`flex-row items-center gap-2 overflow-visible rounded-2xl border p-3 shadow-sm ${error ? "border-destructive/40 bg-destructive/5 text-destructive" : "border-green-700/30 bg-green-500/5"}`} data-testid="qr-scan-result" data-error={Boolean(error) || undefined}>
+                    <QrCode className="shrink-0" size={21} />
+                    <p className="min-w-0 flex-1 text-sm [overflow-wrap:anywhere]">{error || scanned}</p>
+                    {scanned && <Button variant="ghost" size="icon-sm" className="rounded-lg" type="button" aria-label={t("qr.copyResult")} onClick={() => void navigator.clipboard.writeText(scanned).then(() => setCopyFeedback(t("qr.copied"))).catch(() => setCopyFeedback(t("qr.copyFailed")))}><Copy size={17} /></Button>}
+                    {scanned && safeHttpUrl(scanned) && <Button render={<a href={safeHttpUrl(scanned)} target="_blank" rel="noopener noreferrer" />} className="rounded-xl" variant="secondary"><ExternalLink size={16} /> {t("qr.openLink")}</Button>}
+                  </Card>
+                  {copyFeedback && <small className="mt-2 block text-xs text-muted-foreground" role="status">{copyFeedback}</small>}
+                </UtilitySectionCard>
               </div>
             )}
           </div>
-          <div className="inline-notice warning qr-compatibility-notice"><AlertTriangle size={16} /><span>{t("qr.compatibility")}</span></div>
+          <UtilityNotice className="mt-3"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("qr.compatibility")}</span></UtilityNotice>
         </>
-      )}
+      ) : <QrBulkPanel />}
 
-      <div className="format-capabilities"><span><QrCode size={17} /> {t("qr.capabilities.recovery")}</span><span><ImagePlus size={17} /> {t("qr.capabilities.logo")}</span><span><Camera size={17} /> {t("qr.capabilities.camera")}</span><span><ScanLine size={17} /> {t("qr.capabilities.photo")}</span></div>
+      {mode === "bulk"
+        ? <div className="flex flex-wrap gap-2">{[
+          { Icon: FileSpreadsheet, label: t("qr.bulkCapabilities.table") },
+          { Icon: ShieldCheck, label: t("qr.bulkCapabilities.verify") },
+          { Icon: FileArchive, label: t("qr.bulkCapabilities.zip") },
+          { Icon: FileText, label: t("qr.bulkCapabilities.labels") },
+        ].map(({ Icon, label }) => <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground" key={label}><Icon size={17} />{label}</span>)}</div>
+        : <div className="mt-4 flex flex-wrap gap-2">{[{ Icon: QrCode, label: t("qr.capabilities.recovery") }, { Icon: ImagePlus, label: t("qr.capabilities.logo") }, { Icon: Camera, label: t("qr.capabilities.camera") }, { Icon: ScanLine, label: t("qr.capabilities.photo") }].map(({ Icon, label }) => <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground" key={label}><Icon size={17} />{label}</span>)}</div>}
       <ToolGuide
-        title={t("qr.guide.title")}
-        description={t("qr.guide.description")}
-        blocks={(t("qr.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
-        faq={(t("qr.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
+        title={t(mode === "bulk" ? "qr.bulkGuide.title" : "qr.guide.title")}
+        description={t(mode === "bulk" ? "qr.bulkGuide.description" : "qr.guide.description")}
+        blocks={(t(mode === "bulk" ? "qr.bulkGuide.blocks" : "qr.guide.blocks", { returnObjects: true, Header: "{{Header}}" }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
+        faq={(t(mode === "bulk" ? "qr.bulkGuide.faq" : "qr.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
-    </div>
+      </div>
+    </UtilityPage>
   );
 }
 
@@ -344,7 +362,7 @@ function clearCanvas(canvas: HTMLCanvasElement | null) {
 function qrGenerationError(reason: unknown, tooLong: string, fallback: string) {
   const message = reason instanceof Error ? reason.message : String(reason);
   if (/too big|amount of data|code length|overflow/i.test(message)) return tooLong;
-  return message || fallback;
+  return fallback;
 }
 
 function safeHttpUrl(value: string) {

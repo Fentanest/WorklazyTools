@@ -1,0 +1,16 @@
+
+> worklazytools@0.1.0 test:visual
+> node tests/visual-regression.mjs
+
+[1/7] timezone-calculator-empty__initial__en__light__mobile.png
+[2/7] timezone-calculator-empty__initial__ko__light__desktop.png
+[3/7] timezone-calculator-empty__initial__ko__dark__mobile.png
+[4/7] timezone-calculator-empty__initial__en__dark__desktop.png
+[5/7] timezone-calculator-empty__bottom__ko__dark__mobile.png
+[6/7] timezone-calculator-empty__bottom__en__light__mobile.png
+[7/7] timezone-calculator-empty__interaction-base-city__en__dark__desktop.png
+Error: Visual regression failed (1/7 captures, 0 infrastructure errors):
+timezone-calculator-empty__initial__en__light__mobile.png: 363 pixels differ (0.1103% > 0.100%).
+Artifacts: /tmp/worklazytools-pqa-fix/visual-timezone-recheck
+    at file:///home/better0101/projects/worklazytools/tests/visual-regression.mjs:141:11
+Visual run report: duration=0m 8.09s; captures=7/7; concurrency=4 (CPU default from 16 cores, effective 2); filter=timezone-calculator.

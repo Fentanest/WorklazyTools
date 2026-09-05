@@ -1,0 +1,24 @@
+
+> worklazytools@0.1.0 test:visual
+> node tests/visual-regression.mjs
+
+[1/14] work-calculator-empty__initial__en__light__mobile.png
+[2/14] work-calculator-empty__initial__ko__light__desktop.png
+[3/14] work-calculator-empty__initial__en__dark__desktop.png
+[4/14] work-calculator-empty__initial__ko__dark__mobile.png
+[5/14] work-calculator-empty__bottom__en__light__mobile.png
+[6/14] work-calculator-empty__bottom__ko__dark__mobile.png
+[7/14] work-calculator-empty__interaction-leave-result__en__dark__desktop.png
+[8/14] timezone-calculator-empty__initial__ko__light__desktop.png
+[9/14] timezone-calculator-empty__initial__en__light__mobile.png
+[10/14] timezone-calculator-empty__initial__ko__dark__mobile.png
+[11/14] timezone-calculator-empty__bottom__ko__dark__mobile.png
+[12/14] timezone-calculator-empty__initial__en__dark__desktop.png
+[13/14] timezone-calculator-empty__bottom__en__light__mobile.png
+[14/14] timezone-calculator-empty__interaction-base-city__en__dark__desktop.png
+Visual regression updated: 14 captures, Chrome/152.0.7977.64.
+Threshold: <= 0.100% differing pixels at per-pixel threshold 0.1; antialiasing ignored.
+Allowed regions: .global-footer > span:first-child.
+Environment: locale-specific browser workers (ko-KR, en-US), recycled every 12 captures; Accept-Language and navigator locale fixed, timezone UTC, DPR 1, font Worklazy Visual Noto Sans KR, 200 ms paint settle.
+Clock: Date fixed at 2026-09-05T03:00:00.000Z before navigation for timezone-calculator, work-calculator, payroll-calculator; native timers and performance.now() preserved; other tools use their native clock.
+Visual run report: duration=0m 20.98s; captures=14/14; concurrency=4 (CPU default from 16 cores, effective 2); filter=timezone-calculator,work-calculator.

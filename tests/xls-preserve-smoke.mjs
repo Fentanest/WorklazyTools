@@ -54,9 +54,9 @@ try {
     await page.goto(`${baseUrl}/ko/tools/excel-merger/`, { waitUntil: "networkidle0" });
     await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
     await page.reload({ waitUntil: "networkidle0" });
-    await page.waitForSelector('.ios-switch[aria-label="XLSX 수식 보존"]');
+    await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLSX 수식 보존"]');
     await page.waitForSelector("script[data-worklazy-adsense]");
-    const categories = await page.$$eval(".settings-category > h3", (items) => items.map((item) => item.textContent));
+    const categories = await page.$$eval('[data-testid="excel-settings-category"] > h3', (items) => items.map((item) => item.textContent));
     if (categories.join(",") !== "XLSX 입력,XLS 입력,CSV 입력,빈 영역 정리,병합 세부 설정") {
       throw new Error(`Excel settings were not categorized as expected: ${categories.join(",")}`);
     }
@@ -66,20 +66,20 @@ try {
     }
 
     await (await page.$('input[type="file"]')).uploadFile(sourceXlsx);
-    await page.waitForFunction(() => document.querySelector(".file-security-status.ready"));
+    await page.waitForFunction(() => document.querySelector("[data-testid=excel-file-status][data-state=ready]"));
     if (officeRequests.length) throw new Error("Office assets were requested for an XLSX-only selection.");
     assertRetention(await mergeAndInspect(page), { formula: true, formatting: true }, "XLSX formulas + formatting");
-    await page.click('.ios-switch[aria-label="XLSX 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLSX 서식 보존"]');
     assertRetention(await mergeAndInspect(page), { formula: true, formatting: false }, "XLSX formulas only");
-    await page.click('.ios-switch[aria-label="XLSX 수식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLSX 수식 보존"]');
     assertRetention(await mergeAndInspect(page), { formula: false, formatting: false }, "XLSX values only");
-    await page.click('.ios-switch[aria-label="XLSX 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLSX 서식 보존"]');
     assertRetention(await mergeAndInspect(page), { formula: false, formatting: true }, "XLSX formatting only");
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page.click('.ios-switch[aria-label="XLS 수식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/xls-preserve/"));
-    await page.waitForSelector('.ios-switch[aria-label="XLS 수식 보존"][aria-checked="true"]');
+    await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"][aria-checked="true"]');
     if (!new URL(page.url()).search.endsWith("formula=1&format=0")) throw new Error(`XLS formula-only route is incorrect: ${page.url()}`);
     const boundary = await page.evaluate(() => ({
       isolated: crossOriginIsolated,
@@ -97,12 +97,12 @@ try {
 
     await (await page.$('input[type="file"]')).uploadFile(sourceXlsx, spreadsheetMl);
     await page.waitForFunction(() => {
-      const cards = [...document.querySelectorAll(".excel-file-item")];
-      return cards.length === 2 && cards.every((card) => card.querySelector(".file-security-status.ready"));
+      const cards = [...document.querySelectorAll("[data-testid=excel-file-item]")];
+      return cards.length === 2 && cards.every((card) => card.querySelector("[data-testid=excel-file-status][data-state=ready]"));
     });
     const disguisedXmlBatch = await page.evaluate(() => ({
-      names: [...document.querySelectorAll(".excel-file-item .file-meta strong")].map((item) => item.textContent),
-      sheetNames: [...document.querySelectorAll(".sheet-name-chip > span")].map((item) => item.textContent),
+      names: [...document.querySelectorAll("[data-testid=excel-file-item] [data-testid=excel-file-meta] strong")].map((item) => item.textContent),
+      sheetNames: [...document.querySelectorAll("[data-testid=excel-sheet-name-chip] > span")].map((item) => item.textContent),
     }));
     if (!disguisedXmlBatch.names.includes("전각 ８５８ 한글 공백 SpreadsheetML.xls")
       || !disguisedXmlBatch.sheetNames.includes("XML 혼합 시트")
@@ -115,32 +115,32 @@ try {
     if (!convertedXmlSheet || convertedXmlSheet.fill || convertedXmlSheet.bold) {
       throw new Error(`SpreadsheetML CDATA content was not preserved in the merged workbook: ${JSON.stringify(disguisedXmlMerged.worksheets)}`);
     }
-    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.search.includes("formula=1") && location.search.includes("format=1"));
     const formattedSpreadsheetMl = await mergeAndInspect(page);
     const formattedXmlSheet = formattedSpreadsheetMl.worksheets.find((sheet) => sheet.a1 === "SpreadsheetML <CDATA> & merged");
     if (!formattedXmlSheet || formattedXmlSheet.fill !== "FFFFE699" || formattedXmlSheet.bold !== true) {
       throw new Error(`Converted SpreadsheetML formatting was not preserved: ${JSON.stringify(formattedSpreadsheetMl.worksheets)}`);
     }
-    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.search.includes("formula=1") && location.search.includes("format=0"));
     await page.reload({ waitUntil: "networkidle0" });
-    await page.waitForSelector('.ios-switch[aria-label="XLS 수식 보존"][aria-checked="true"]');
+    await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"][aria-checked="true"]');
 
     await page.evaluate(() => {
       window.__xlsProgressSamples = [];
       new MutationObserver(() => {
-        const progress = document.querySelector(".operation-progress-track")?.getAttribute("aria-valuenow") || "";
-        const message = document.querySelector(".operation-current-message")?.textContent || "";
+        const progress = document.querySelector(".ui-operation-progress-track")?.getAttribute("aria-valuenow") || "";
+        const message = document.querySelector(".ui-operation-current-message")?.textContent || "";
         const sample = `${progress}:${message}`;
         if (message && !window.__xlsProgressSamples.includes(sample)) window.__xlsProgressSamples.push(sample);
       }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
     });
     await (await page.$('input[type="file"]')).uploadFile(sourceXls);
-    await page.waitForFunction(() => document.querySelector(".operation-progress.status-success") || document.querySelector(".error-banner"));
-    const preparationError = await page.$eval(".error-banner", (element) => element.textContent || "").catch(() => "");
+    await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success") || document.querySelector(":is(.error-banner,[data-testid=excel-merge-error])"));
+    const preparationError = await page.$eval(":is(.error-banner,[data-testid=excel-merge-error])", (element) => element.textContent || "").catch(() => "");
     if (preparationError) throw new Error(`XLS preservation preparation failed: ${preparationError}`);
-    await page.waitForFunction(() => document.querySelector(".file-security-status.ready"));
+    await page.waitForFunction(() => document.querySelector("[data-testid=excel-file-status][data-state=ready]"));
     const preparation = await page.evaluate(async () => ({
       samples: window.__xlsProgressSamples,
       cacheNames: (await caches.keys()).filter((name) => name.startsWith("worklazy-office-")),
@@ -156,62 +156,63 @@ try {
 
     const formulaOnly = await mergeAndInspect(page);
     assertRetention(formulaOnly, { formula: true, formatting: false }, "XLS formulas only");
-    const warning = await page.$eval(".result-warnings", (element) => element.textContent || "");
+    const warning = await page.$eval("[data-testid=excel-result-warnings]", (element) => element.textContent || "");
     if (!warning.includes("선택한 수식·서식 보존 설정")) {
       throw new Error(`XLS preservation compatibility notice is missing: ${warning}`);
     }
 
-    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.search.includes("formula=1") && location.search.includes("format=1"));
-    if (await page.$$eval(".excel-file-item", (items) => items.length) !== 1) throw new Error("Switching between XLS preservation options cleared the selected file.");
+    if (await page.$$eval("[data-testid=excel-file-item]", (items) => items.length) !== 1) throw new Error("Switching between XLS preservation options cleared the selected file.");
     const formulasAndFormatting = await mergeAndInspect(page);
     assertRetention(formulasAndFormatting, { formula: true, formatting: true }, "XLS formulas + formatting");
 
-    await page.click('.ios-switch[aria-label="XLS 수식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"]');
     await page.waitForFunction(() => location.search.includes("formula=0") && location.search.includes("format=1"));
     assertRetention(await mergeAndInspect(page), { formula: false, formatting: true }, "XLS formatting only");
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/"));
-    await page.waitForSelector('.ios-switch[aria-label="XLS 수식 보존"][aria-checked="false"]');
+    await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"][aria-checked="false"]');
     const returned = await page.evaluate(() => ({
       marker: Boolean(document.querySelector('meta[name="worklazy-excel-preserve-isolation"]')),
       ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
       heading: document.querySelector("h1")?.textContent || "",
-      fileCount: document.querySelectorAll(".excel-file-item").length,
+      fileCount: document.querySelectorAll("[data-testid=excel-file-item]").length,
     }));
     if (returned.marker || !returned.ads || returned.heading !== "Excel 병합기" || returned.fileCount !== 0) {
       throw new Error(`Switching back did not restore the standard Excel screen safely: ${JSON.stringify(returned)}`);
     }
-    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/xls-preserve/") && location.search.includes("formula=0") && location.search.includes("format=1"));
+    await page.waitForSelector('input[type="file"]');
     await (await page.$('input[type="file"]')).uploadFile(sourceXlsx, brokenOleXls);
-    await page.waitForFunction(() => document.querySelector(".operation-current-message")?.textContent?.includes("개별 변환 실패.xls"));
+    await page.waitForFunction(() => document.querySelector(".ui-operation-current-message")?.textContent?.includes("개별 변환 실패.xls"));
     await page.evaluate(async () => {
       const port = await window.Module.uno_main;
-      for (let attempt = 0; attempt < 100 && document.querySelector(".file-security-status.checking"); attempt += 1) {
+      for (let attempt = 0; attempt < 100 && document.querySelector("[data-testid=excel-file-status][data-state=checking]"); attempt += 1) {
         port.onmessage?.({ data: { cmd: "convert-failed" } });
         await new Promise((resolve) => window.setTimeout(resolve, 20));
       }
     });
     await page.waitForFunction(() => {
-      const cards = [...document.querySelectorAll(".excel-file-item")];
-      return cards.length === 2 && cards.every((card) => !card.querySelector(".file-security-status.checking"));
+      const cards = [...document.querySelectorAll("[data-testid=excel-file-item]")];
+      return cards.length === 2 && cards.every((card) => !card.querySelector("[data-testid=excel-file-status][data-state=checking]"));
     });
     const isolatedFailure = await page.evaluate(() => ({
-      banner: document.querySelector(".error-banner")?.textContent || "",
-      cards: [...document.querySelectorAll(".excel-file-item")].map((card) => ({
-        name: card.querySelector(".file-meta strong")?.textContent || "",
-        state: card.querySelector(".file-security-status")?.className || "",
-        error: card.querySelector(".file-item-warning, .file-item-error")?.textContent || "",
+      banner: document.querySelector(":is(.error-banner,[data-testid=excel-merge-error])")?.textContent || "",
+      cards: [...document.querySelectorAll("[data-testid=excel-file-item]")].map((card) => ({
+        name: card.querySelector("[data-testid=excel-file-meta] strong")?.textContent || "",
+        state: card.querySelector("[data-testid=excel-file-status]")?.dataset.state || "",
+        error: card.querySelector("[data-testid=excel-file-warning], [data-testid=excel-file-error]")?.textContent || "",
       })),
     }));
     const readyXlsx = isolatedFailure.cards.find((card) => card.name === path.basename(sourceXlsx));
     const failedXls = isolatedFailure.cards.find((card) => card.name === path.basename(brokenOleXls));
     if (!readyXlsx?.state.includes("ready") || !failedXls?.state.includes("degradedLegacy")
       || !failedXls.error.includes("이 파일은 서식 없이 병합됩니다") || !failedXls.error.includes("수식은 보존되지 않습니다")
-      || isolatedFailure.banner || await page.$eval(".summary-card .primary-button", (button) => button.disabled)) {
+      || isolatedFailure.banner || await page.$eval(":is(.summary-card,[data-testid=excel-merge-summary]) [data-ui-component=primary-button]", (button) => button.disabled)) {
       throw new Error(`A failed legacy conversion contaminated its batch: ${JSON.stringify(isolatedFailure)}`);
     }
     const degradedMerged = await mergeAndInspect(page);
@@ -221,26 +222,26 @@ try {
     }
 
     await page.reload({ waitUntil: "networkidle0" });
-    await page.waitForSelector('.ios-switch[aria-label="XLS 서식 보존"][aria-checked="true"]');
+    await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"][aria-checked="true"]');
     await (await page.$('input[type="file"]')).uploadFile(sourceXlsx, sheetJsFailureXls);
-    await page.waitForFunction(() => document.querySelector(".operation-current-message")?.textContent?.includes("값 경로도 실패.xls"));
+    await page.waitForFunction(() => document.querySelector(".ui-operation-current-message")?.textContent?.includes("값 경로도 실패.xls"));
     await page.evaluate(async () => {
       const port = await window.Module.uno_main;
-      for (let attempt = 0; attempt < 100 && document.querySelector(".file-security-status.checking"); attempt += 1) {
+      for (let attempt = 0; attempt < 100 && document.querySelector("[data-testid=excel-file-status][data-state=checking]"); attempt += 1) {
         port.onmessage?.({ data: { cmd: "convert-failed" } });
         await new Promise((resolve) => window.setTimeout(resolve, 20));
       }
     });
     await page.waitForFunction(() => {
-      const cards = [...document.querySelectorAll(".excel-file-item")];
-      return cards.length === 2 && cards.every((card) => !card.querySelector(".file-security-status.checking"));
+      const cards = [...document.querySelectorAll("[data-testid=excel-file-item]")];
+      return cards.length === 2 && cards.every((card) => !card.querySelector("[data-testid=excel-file-status][data-state=checking]"));
     });
     const sheetJsFailure = await page.evaluate(() => ({
-      banner: document.querySelector(".error-banner")?.textContent || "",
-      cards: [...document.querySelectorAll(".excel-file-item")].map((card) => ({
-        name: card.querySelector(".file-meta strong")?.textContent || "",
-        state: card.querySelector(".file-security-status")?.className || "",
-        error: card.querySelector(".file-item-error")?.textContent || "",
+      banner: document.querySelector(":is(.error-banner,[data-testid=excel-merge-error])")?.textContent || "",
+      cards: [...document.querySelectorAll("[data-testid=excel-file-item]")].map((card) => ({
+        name: card.querySelector("[data-testid=excel-file-meta] strong")?.textContent || "",
+        state: card.querySelector("[data-testid=excel-file-status]")?.dataset.state || "",
+        error: card.querySelector("[data-testid=excel-file-error]")?.textContent || "",
       })),
     }));
     const failedValuePath = sheetJsFailure.cards.find((card) => card.name === path.basename(sheetJsFailureXls));
@@ -259,11 +260,11 @@ try {
       await runtimeFailurePage.goto(`${baseUrl}/ko/tools/excel-merger/xls-preserve/?formula=0&format=1`, { waitUntil: "networkidle0" });
       await runtimeFailurePage.waitForSelector('input[type="file"]');
       await (await runtimeFailurePage.$('input[type="file"]')).uploadFile(sourceXlsx, sourceXls);
-      await runtimeFailurePage.waitForFunction(() => document.querySelectorAll(".file-security-status.error").length === 2);
+      await runtimeFailurePage.waitForFunction(() => document.querySelectorAll("[data-testid=excel-file-status][data-state=error]").length === 2);
       const runtimeFailure = await runtimeFailurePage.evaluate(() => ({
-        errorCards: document.querySelectorAll(".file-security-status.error").length,
-        banner: document.querySelector(".error-banner")?.textContent || "",
-        degradedCards: document.querySelectorAll(".file-security-status.degradedLegacy").length,
+        errorCards: document.querySelectorAll("[data-testid=excel-file-status][data-state=error]").length,
+        banner: document.querySelector(":is(.error-banner,[data-testid=excel-merge-error])")?.textContent || "",
+        degradedCards: document.querySelectorAll("[data-testid=excel-file-status][data-state=degradedLegacy]").length,
       }));
       if (runtimeFailure.errorCards !== 2 || runtimeFailure.degradedCards !== 0 || !runtimeFailure.banner.includes("브라우저 환경")) {
         throw new Error(`Runtime startup failure did not stop the complete added batch: ${JSON.stringify(runtimeFailure)}`);
@@ -272,7 +273,7 @@ try {
       await runtimeFailureContext.close();
     }
     page.once("dialog", (dialog) => dialog.accept());
-    await page.click('.ios-switch[aria-label="XLS 서식 보존"]');
+    await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/") && !location.search);
     if (pageErrors.length) throw new Error(`XLS preservation browser errors:\n${pageErrors.join("\n")}`);
     console.log(`Excel retention smoke passed: four XLSX states, three XLS preservation states, ${preparation.samples.length} progress states, and all three degradation branches.`);
@@ -292,15 +293,15 @@ async function readRetentionToggles(page) {
   };
   return page.evaluate((toggleLabels) => Object.fromEntries(Object.entries(toggleLabels).map(([key, label]) => [
     key,
-    document.querySelector(`.ios-switch[aria-label="${label}"]`)?.getAttribute("aria-checked") === "true",
+    document.querySelector(`[data-ui-part="toggle-switch"][aria-label="${label}"]`)?.getAttribute("aria-checked") === "true",
   ])), labels);
 }
 
 async function mergeAndInspect(page) {
-  await page.waitForFunction(() => !document.querySelector(".summary-card .primary-button")?.disabled);
-  await page.click(".summary-card .primary-button");
-  await page.waitForSelector(".result-download");
-  const bytes = await page.$eval(".result-download", async (link) => {
+  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid=excel-merge-summary]) [data-ui-component=primary-button]")?.disabled);
+  await page.click(":is(.summary-card,[data-testid=excel-merge-summary]) [data-ui-component=primary-button]");
+  await page.waitForSelector(":is(.result-download,[data-testid=excel-result-download])");
+  const bytes = await page.$eval(":is(.result-download,[data-testid=excel-result-download])", async (link) => {
     const response = await fetch(link.href);
     return Array.from(new Uint8Array(await response.arrayBuffer()));
   });

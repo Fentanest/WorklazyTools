@@ -20,7 +20,7 @@ export function PrivacyBanner({ compact = false }: PrivacyBannerProps) {
     <section className="privacy-banner" aria-label={t("privacy.eyebrow")}>
       <div className="privacy-icon"><ServerOff size={25} /></div>
       <div className="privacy-copy">
-        <p className="eyebrow success">{t("privacy.eyebrow")}</p>
+        <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-green-700 dark:text-green-300">{t("privacy.eyebrow")}</p>
         <h2>{t("privacy.title")}</h2>
         <p>{t("privacy.description")}</p>
       </div>

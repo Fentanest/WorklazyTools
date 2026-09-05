@@ -8,6 +8,9 @@ import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
 import { ToolGuide } from "../../components/ToolGuide";
 import { PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import { createComparisonExcelReports, createComparisonReportArtifact } from "./comparisonResults";
@@ -113,9 +116,10 @@ export function DocumentComparePage() {
   };
 
   const passwordAccessory = (file: File) => isHwpName(file.name) ? (
-    <label className="hwp-file-password">
-      <LockKeyhole size={13} />
-      <input
+    <label className="col-span-2 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 text-orange-700 dark:text-orange-300">
+      <LockKeyhole className="shrink-0" size={13} />
+      <UtilityInput
+        className="h-[34px] rounded-lg text-[13px]"
         type="password"
         value={session.passwords[fileKey(file)] ?? ""}
         autoComplete="off"
@@ -127,14 +131,14 @@ export function DocumentComparePage() {
   ) : null;
 
   return (
-    <div className="page tool-page page-enter accent-context-blue hwp-compare-page">
+    <UtilityPage toolId="document-compare">
       <PageHeader eyebrow="DOCUMENT TOOL" title={L("문서 비교", "Document Compare")} description={L("DOCX·DOC 또는 HWP·HWPX 문서 쌍을 같은 메뉴에서 정확히 비교하세요.", "Compare DOCX/DOC or HWP/HWPX document pairs accurately from one tool.")}>
-        <div className="header-status ready"><span className="status-dot" /> {L("서버 전송 없이 비교", "Compare without server uploads")}</div>
+        <div className="mb-1 flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm font-bold text-green-700 shadow-sm dark:text-green-300"><span className="size-2 rounded-full bg-green-600 shadow-[0_0_0_3px_rgba(34,197,94,.13)]" /> {L("서버 전송 없이 비교", "Compare without server uploads")}</div>
       </PageHeader>
       <PrivacyBanner compact />
 
-      <SectionCard step={1} title={L("비교할 문서", "Documents to compare")} description={L("같은 번호의 파일끼리 비교합니다. Word와 HWP는 서로 짝지을 수 없습니다.", "Files at the same position are paired. Word and HWP documents cannot be paired together.")}>
-        <div className="compare-file-grid">
+      <UtilitySectionCard step={1} title={L("비교할 문서", "Documents to compare")} description={L("같은 번호의 파일끼리 비교합니다. Word와 HWP는 서로 짝지을 수 없습니다.", "Files at the same position are paired. Word and HWP documents cannot be paired together.")}>
+        <div className="grid grid-cols-2 gap-3.5 max-[720px]:grid-cols-1" data-testid="document-file-grid">
           <DocumentFileColumn
             files={session.beforeFiles}
             side="before"
@@ -142,7 +146,6 @@ export function DocumentComparePage() {
             hint={L("DOCX·DOC·HWP·HWPX", "DOCX, DOC, HWP, or HWPX")}
             accept=".docx,.doc,.hwp,.hwpx"
             accent="blue"
-            listClassName="hwp-sortable-files"
             onFiles={(files) => updateFiles(files, "before")}
             onRemove={(index) => pairFiles.removeFile("before", index)}
             onMove={(from, to) => pairFiles.moveFile("before", from, to)}
@@ -156,7 +159,6 @@ export function DocumentComparePage() {
             hint={L("같은 계열 문서끼리 짝지어 주세요", "Pair files from the same document family")}
             accept=".docx,.doc,.hwp,.hwpx"
             accent="blue"
-            listClassName="hwp-sortable-files"
             onFiles={(files) => updateFiles(files, "after")}
             onRemove={(index) => pairFiles.removeFile("after", index)}
             onMove={(from, to) => pairFiles.moveFile("after", from, to)}
@@ -164,19 +166,19 @@ export function DocumentComparePage() {
             renderAccessory={passwordAccessory}
           />
         </div>
-        {pairingError && <div className="pair-count-error" role="alert"><AlertCircle size={17} /><span><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small>{pairingError}</small></span></div>}
+        {pairingError && <UtilityNotice className="mt-3.5" tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={17} /><span className="flex min-w-0 flex-col"><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small className="mt-1 text-muted-foreground">{pairingError}</small></span></UtilityNotice>}
         {!pairingError && session.beforeFiles.length > 0 && <DocumentPairingPreview beforeFiles={session.beforeFiles} afterFiles={session.afterFiles} language={language} />}
-      </SectionCard>
+      </UtilitySectionCard>
 
-      <div className="word-options-grid">
-        <SectionCard step={2} title={L("결과 형식", "Output formats")}>
-          <div className="settings-list compact-settings output-selection-list">
+      <div className="mt-4 grid grid-cols-2 gap-4 max-[720px]:grid-cols-1" data-testid="document-options-grid">
+        <SectionCard className="!m-0" step={2} title={L("결과 형식", "Output formats")}>
+          <div className="divide-y divide-border [&_[data-ui-component=toggle-row]]:min-h-[45px]" data-testid="document-output-options">
             <ToggleRow label={L("웹 비교", "Web comparison")} description={L("좌우 화면에서 변경 내용을 확인합니다.", "Review changes in a side-by-side view.")} checked={session.webOutput} onChange={(checked) => { session.setWebOutput(checked); resetOutput(); }} />
             <ToggleRow label={L("Excel 보고서", "Excel report")} description={L("일반 변경과 표별 비교 시트를 만듭니다.", "Create worksheets for general changes and tables.")} checked={session.excelOutput} onChange={(checked) => { session.setExcelOutput(checked); resetOutput(); }} />
             <ToggleRow label={L("Word 변경 추적 (DOCX 전용)", "Tracked-changes Word file (DOCX only)")} description={L("두 파일 모두 DOCX인 비교 결과에만 적용됩니다.", "Applied only when both files in a pair are DOCX.")} checked={session.trackedOutput} onChange={(checked) => { session.setTrackedOutput(checked); resetOutput(); }} />
           </div>
           {session.trackedOutput && <>
-            <div className="settings-list compact-settings output-selection-list">
+            <div className="mt-2 border-t border-border pt-2 [&_[data-ui-component=toggle-row]]:min-h-[45px]">
               <ToggleRow
                 label={L("변경 내용 작성자 통일", "Use one revision author")}
                 description={L("기존 변경 내용을 먼저 수락하고 새 변경 기록의 작성자를 아래 이름으로 통일합니다.", "Accept existing revisions first, then use the name below for all new tracked changes.")}
@@ -184,12 +186,12 @@ export function DocumentComparePage() {
                 onChange={(checked) => { session.setRewriteRevisionAuthor(checked); resetOutput(); }}
               />
             </div>
-            <label className="revision-author-field"><span>{L("변경 내용 작성자", "Revision author")}</span><input type="text" value={session.revisionAuthor} maxLength={80} placeholder="Worklazy Tools" disabled={!session.rewriteRevisionAuthor} onChange={(event) => { session.setRevisionAuthor(event.target.value); resetOutput(); }} /></label>
+            <label className="mt-2.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-xl bg-muted p-2.5" data-testid="document-revision-author"><span className="whitespace-nowrap text-[13px] font-bold">{L("변경 내용 작성자", "Revision author")}</span><UtilityInput className="h-[34px] rounded-lg text-[13px]" type="text" value={session.revisionAuthor} maxLength={80} placeholder="Worklazy Tools" disabled={!session.rewriteRevisionAuthor} onChange={(event) => { session.setRevisionAuthor(event.target.value); resetOutput(); }} /></label>
           </>}
-          <div className="output-preview"><FileText size={20} /><span><strong>{hasOutput ? [session.webOutput && L("웹", "Web"), session.excelOutput && "Excel", session.trackedOutput && L("DOCX 변경 추적", "Tracked DOCX")].filter(Boolean).join(" · ") : L("결과 형식을 하나 이상 선택하세요.", "Select at least one output format.")}</strong><small>{L("지원되는 결과만 문서 쌍별로 제공합니다.", "Supported outputs are provided separately for each pair.")}</small></span></div>
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-blue-500/10 p-3 text-blue-700 dark:text-blue-300"><FileText className="shrink-0" size={20} /><span className="flex min-w-0 flex-col"><strong className="text-sm">{hasOutput ? [session.webOutput && L("웹", "Web"), session.excelOutput && "Excel", session.trackedOutput && L("DOCX 변경 추적", "Tracked DOCX")].filter(Boolean).join(" · ") : L("결과 형식을 하나 이상 선택하세요.", "Select at least one output format.")}</strong><small className="mt-1 text-[13px] text-muted-foreground">{L("지원되는 결과만 문서 쌍별로 제공합니다.", "Supported outputs are provided separately for each pair.")}</small></span></div>
         </SectionCard>
-        <SectionCard step={3} title={L("비교 범위", "Comparison scope")}>
-          <div className="settings-list compact-settings">
+        <SectionCard className="!m-0" step={3} title={L("비교 범위", "Comparison scope")}>
+          <div className="divide-y divide-border [&_[data-ui-component=toggle-row]]:min-h-[45px]" data-testid="document-scope-options">
             <ToggleRow label={L("서식 변경 포함", "Include formatting changes")} checked={session.formatting} onChange={(checked) => { session.setFormatting(checked); resetOutput(); }} />
             <ToggleRow label={L("표 비교", "Compare tables")} checked={session.tables} onChange={(checked) => { session.setTables(checked); resetOutput(); }} />
             <ToggleRow label={L("기타 문서 영역", "Other document areas")} description={L("머리말·꼬리말, 메모, 각주·미주", "Headers, footers, comments, footnotes, and endnotes")} checked={session.metadata} onChange={(checked) => { session.setMetadata(checked); resetOutput(); }} />
@@ -197,27 +199,28 @@ export function DocumentComparePage() {
         </SectionCard>
       </div>
 
-      <div className="comparison-prepare-note"><Info size={16} /><span><strong>{L("파일 형식에 맞는 비교 기능을 자동으로 준비합니다.", "The appropriate comparison support is prepared automatically.")}</strong><small>{L("처음 필요한 파일을 받는 동안에도 진행률과 현재 단계를 표시하며, 문서는 브라우저 안에서 처리합니다.", "Progress and the current step remain visible during the first download, and documents are processed in your browser.")}</small></span></div>
-      <div className="tool-action-bar">
-        <div><TextSearch size={20} /><span><strong>{ready ? L(`${session.beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.`, `${session.beforeFiles.length} document pairs are ready.`) : pairingError ? L("양쪽 파일 개수를 맞춰 주세요.", "Use the same number of files on both sides.") : !hasOutput ? L("결과 형식을 하나 이상 선택해 주세요.", "Select at least one output format.") : L("수정 전·후 문서를 선택해 주세요.", "Choose before and after documents.")}</strong><small>{L("HWP 암호는 해당 파일 아래 입력란에서만 사용됩니다.", "HWP passwords are used only for their selected files.")}</small></span></div>
-        <PrimaryButton accent="blue" disabled={!ready || Boolean(pairingError)} loading={loading} onClick={() => void runComparison()}>{loading ? L(`${operation.progress}% 비교 중`, `Comparing ${operation.progress}%`) : session.beforeFiles.length ? L(`${session.beforeFiles.length}개 문서 쌍 비교`, `Compare ${session.beforeFiles.length} document pairs`) : L("문서 쌍 비교", "Compare document pairs")}</PrimaryButton>
-        {loading && <button type="button" className="secondary-button" onClick={() => comparisonControllerRef.current?.abort()}>{L("비교 취소", "Cancel comparison")}</button>}
-      </div>
+      <UtilityNotice className="mt-4 border border-blue-500/10 bg-blue-500/10 text-blue-800 dark:text-blue-300"><Info className="mt-0.5 shrink-0" size={16} /><span className="flex min-w-0 flex-col"><strong>{L("파일 형식에 맞는 비교 기능을 자동으로 준비합니다.", "The appropriate comparison support is prepared automatically.")}</strong><small className="mt-1 text-[13px] text-muted-foreground">{L("처음 필요한 파일을 받는 동안에도 진행률과 현재 단계를 표시하며, 문서는 브라우저 안에서 처리합니다.", "Progress and the current step remain visible during the first download, and documents are processed in your browser.")}</small></span></UtilityNotice>
+      <Card className="mt-4 flex-row items-center justify-between gap-5 overflow-visible rounded-3xl border border-border p-4 shadow-md max-[620px]:flex-col max-[620px]:items-stretch" data-testid="document-action-bar">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5"><TextSearch className="shrink-0 text-blue-700 dark:text-blue-300" size={20} /><span className="flex min-w-0 flex-1 flex-col [writing-mode:horizontal-tb]" data-testid="document-action-copy"><strong className="text-sm [writing-mode:horizontal-tb]">{ready ? L(`${session.beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.`, `${session.beforeFiles.length} document pairs are ready.`) : pairingError ? L("양쪽 파일 개수를 맞춰 주세요.", "Use the same number of files on both sides.") : !hasOutput ? L("결과 형식을 하나 이상 선택해 주세요.", "Select at least one output format.") : L("수정 전·후 문서를 선택해 주세요.", "Choose before and after documents.")}</strong><small className="mt-1 text-[13px] text-muted-foreground [writing-mode:horizontal-tb]">{L("HWP 암호는 해당 파일 아래 입력란에서만 사용됩니다.", "HWP passwords are used only for their selected files.")}</small></span></div>
+        <div className="flex w-[190px] shrink-0 flex-col gap-2 [&_[data-ui-component=primary-button]]:w-full max-[620px]:w-full"><PrimaryButton accent="blue" disabled={!ready || Boolean(pairingError)} loading={loading} onClick={() => void runComparison()}>{loading ? L(`${operation.progress}% 비교 중`, `Comparing ${operation.progress}%`) : session.beforeFiles.length ? L(`${session.beforeFiles.length}개 문서 쌍 비교`, `Compare ${session.beforeFiles.length} document pairs`) : L("문서 쌍 비교", "Compare document pairs")}</PrimaryButton>
+          {loading && <Button type="button" variant="secondary" className="h-11 rounded-xl font-bold" onClick={() => comparisonControllerRef.current?.abort()}>{L("비교 취소", "Cancel comparison")}</Button>}
+        </div>
+      </Card>
       <OperationProgress status={operation.status} progress={operation.progress} message={operation.message} logs={operation.logs} accent="blue" title={L("문서 비교 진행 상황", "Document comparison progress")} />
-      {error && !pairingError && <div className="error-banner" role="alert"><AlertCircle size={19} /><div><strong>{L("비교하지 못했습니다.", "Comparison failed.")}</strong><span>{error}</span></div></div>}
+      {error && !pairingError && <UtilityNotice className="mt-3" tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><span className="flex flex-col"><strong>{L("비교하지 못했습니다.", "Comparison failed.")}</strong><span>{error}</span></span></UtilityNotice>}
 
-      {session.results.length > 0 && <section className="word-batch-results" aria-live="polite">
-        <div className="content-heading"><div><p className="eyebrow success">{L("작업 완료", "Complete")}</p><h2>{L(`${session.results.length}개 문서 쌍의 결과`, `Results for ${session.results.length} document pairs`)}</h2><p>{L("지원되는 결과를 문서 쌍별로 열 수 있습니다.", "Open the supported outputs for each document pair.")}</p></div></div>
-        <div className="word-pair-result-list">{session.results.map((item) => <article className="word-pair-result-card" key={item.pairNumber}>
-          <span className="pair-number">{item.pairNumber}</span>
-          <div className="pair-result-copy"><strong>{item.result.beforeName}</strong><span>→</span><strong>{item.result.afterName}</strong><small>{item.result.changes.length ? L(`${item.result.changes.length}개 변경 발견`, `${item.result.changes.length} changes found`) : L("변경 없음", "No changes")}</small></div>
-          <div className="pair-result-actions">
-            {session.webOutput && <Link className="secondary-button" to={`${resultBasePath}/${item.pairNumber}`}><TextSearch size={15} /> {L("웹 비교 보기", "View web comparison")}</Link>}
-            {item.reportUrl && <a className="result-download blue-download" href={item.reportUrl} download={item.reportFileName}><Download size={15} /> {L("Excel 보고서", "Excel report")}</a>}
+      {session.results.length > 0 && <section className="mt-6" data-testid="document-results" aria-live="polite">
+        <div className="mb-3"><p className="text-xs font-extrabold tracking-[.08em] text-green-700 uppercase dark:text-green-300">{L("작업 완료", "Complete")}</p><h2 className="mt-1 font-heading text-2xl font-medium">{L(`${session.results.length}개 문서 쌍의 결과`, `Results for ${session.results.length} document pairs`)}</h2><p className="mt-2 text-sm text-muted-foreground">{L("지원되는 결과를 문서 쌍별로 열 수 있습니다.", "Open the supported outputs for each document pair.")}</p></div>
+        <div className="flex flex-col gap-2.5">{session.results.map((item) => <Card as="article" className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 overflow-visible rounded-3xl border border-border p-4 shadow-sm max-[720px]:grid-cols-[auto_minmax(0,1fr)]" data-testid="document-result-card" key={item.pairNumber}>
+          <span className="grid size-9 place-items-center rounded-xl bg-blue-700 text-sm font-extrabold text-white">{item.pairNumber}</span>
+          <div className="grid min-w-0 grid-cols-[minmax(0,auto)_auto_minmax(0,auto)] items-center justify-start gap-2 max-[720px]:grid-cols-1 max-[720px]:gap-1"><strong className="max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.result.beforeName}</strong><span className="text-muted-foreground max-[720px]:hidden">→</span><strong className="max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.result.afterName}</strong><small className="col-span-full text-xs text-muted-foreground max-[720px]:col-span-1">{item.result.changes.length ? L(`${item.result.changes.length}개 변경 발견`, `${item.result.changes.length} changes found`) : L("변경 없음", "No changes")}</small></div>
+          <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:col-span-full max-[720px]:grid max-[720px]:grid-cols-2 [&>*]:min-h-9 [&>*]:justify-center">
+            {session.webOutput && <Button render={<Link to={`${resultBasePath}/${item.pairNumber}`} data-testid="document-view-result" />} variant="secondary" className="rounded-xl font-bold"><TextSearch size={15} /> {L("웹 비교 보기", "View web comparison")}</Button>}
+            {item.reportUrl && <Button render={<a href={item.reportUrl} download={item.reportFileName} data-testid="document-excel-download" />} className="rounded-xl bg-blue-700 font-bold text-white hover:bg-blue-800"><Download size={15} /> {L("Excel 보고서", "Excel report")}</Button>}
             {item.reportUrl && <FileShareButton url={item.reportUrl} fileName={item.reportFileName || L("문서-비교보고서.xlsx", "document-comparison-report.xlsx")} />}
-            {item.trackedUrl && <a className="result-download tracked-download" href={item.trackedUrl} download={item.trackedFileName}><Download size={15} /> {L("Word 변경 추적", "Tracked Word file")}</a>}
+            {item.trackedUrl && <Button render={<a href={item.trackedUrl} download={item.trackedFileName} data-testid="document-tracked-download" />} className="rounded-xl bg-violet-700 font-bold text-white hover:bg-violet-800"><Download size={15} /> {L("Word 변경 추적", "Tracked Word file")}</Button>}
           </div>
-        </article>)}</div>
+        </Card>)}</div>
       </section>}
 
       <ToolGuide
@@ -245,7 +248,7 @@ export function DocumentComparePage() {
         ]}
       />
       <RhwpVersionNotice mode="compare" />
-    </div>
+    </UtilityPage>
   );
 }
 

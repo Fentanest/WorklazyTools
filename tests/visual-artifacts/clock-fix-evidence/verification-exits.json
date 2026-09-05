@@ -1,0 +1,48 @@
+{
+  "build": 0,
+  "unitA": {
+    "exit": 0,
+    "passed": 193
+  },
+  "unitB": {
+    "exit": 0,
+    "passed": 195
+  },
+  "static": 0,
+  "excelSmoke": 0,
+  "hwpSmoke": 0,
+  "utilities": 0,
+  "clockSubset": {
+    "exit": 0,
+    "matched": 21
+  },
+  "baselineUpdate": {
+    "exit": 0,
+    "generated": 14,
+    "changed": 9
+  },
+  "rolloverProbeFirstAttempt": 1,
+  "rolloverProbe": {
+    "exit": 0,
+    "states": 36,
+    "repeatedComparisons": 24,
+    "differentPixels": 0
+  },
+  "visualEn": {
+    "exit": 0,
+    "matched": 175,
+    "total": 175,
+    "seconds": 134.1
+  },
+  "visualKoFirstAttempt": {
+    "exit": 143,
+    "completed": 98,
+    "total": 175
+  },
+  "visualKo": {
+    "exit": 0,
+    "matched": 175,
+    "total": 175,
+    "seconds": 113.34
+  }
+}

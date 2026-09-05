@@ -2,8 +2,10 @@ import { Copy, KeyRound, RefreshCw, Shield, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
+import { PageHeader, PrimaryButton, ToggleRow } from "../../components/ui";
+import { Button } from "../../components/ui/button";
 import { ToolGuide } from "../../components/ToolGuide";
+import { UtilityInput, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { generatePassword } from "./securityPassword";
 import { strengthChecker } from "./securityStrength";
 
@@ -42,10 +44,25 @@ export function SecurityToolsPage() {
     if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
     copyTimerRef.current = window.setTimeout(() => setCopied(false), 1_500);
   };
-  return <div className="page tool-page page-enter utility-page security-page">
+  const meterColors = ["bg-red-500", "bg-red-500", "bg-amber-500", "bg-green-600", "bg-blue-600"];
+  return <UtilityPage toolId="security-tools">
     <PageHeader eyebrow="PASSWORD GENERATOR" title={t("security.title")} description={t("security.description")} />
-    <SectionCard title={t("security.generateTitle")}><div className="password-output"><KeyRound size={22} /><input value={password} onChange={(event) => setPassword(event.target.value)} aria-label={t("security.passwordLabel")} /><button type="button" aria-label={t("security.copyLabel")} onClick={() => void copyPassword()}><Copy size={18} /></button></div><span className="visually-hidden" aria-live="polite">{copied ? t("security.copied") : ""}</span><label className="range-control"><span>{t("security.length", { count: length })}</span><input type="range" min={8} max={64} value={length} onChange={(event) => setLength(Number(event.target.value))} /></label><div className="toggle-card-grid"><ToggleRow label={t("security.upper")} checked={upper} onChange={setUpper} /><ToggleRow label={t("security.lower")} checked={lower} onChange={setLower} /><ToggleRow label={t("security.number")} checked={number} onChange={setNumber} /><ToggleRow label={t("security.symbol")} checked={symbol} onChange={setSymbol} /></div><PrimaryButton accent="blue" disabled={!charsetSize} onClick={regenerate}><RefreshCw size={18} /> {t("security.regenerate")}</PrimaryButton></SectionCard>
-    <SectionCard title={t("security.analysisTitle")} description={t("security.analysisDescription")}><div className={`strength-meter score-${strength.score}`} role="meter" aria-valuemin={0} aria-valuemax={4} aria-valuenow={strength.score} aria-valuetext={strengthLevels[strength.score]}><div>{[0, 1, 2, 3, 4].map((score) => <i className={score <= strength.score ? "filled" : ""} key={score} />)}</div><strong>{strengthLevels[strength.score]}</strong></div><div className="metric-grid compact"><article><Shield /><span>{t("security.guessDifficulty")}</span><strong>{guessBits.toFixed(1)} bit</strong><small>{t("security.guessHelp")}</small></article><article><ShieldCheck /><span>{t("security.crackTime")}</span><strong>{formatCrackTime(strength.crackTimes.offlineFastHashingXPerSecond.seconds)}</strong><small>{t("security.crackHelp")}</small></article></div>{strengthAdvice && <p className="legal-note">{strengthAdvice}</p>}</SectionCard>
+    <UtilitySectionCard title={t("security.generateTitle")}>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-2xl border border-input bg-muted p-2.5 text-violet-700 dark:text-violet-300" data-testid="password-output"><KeyRound size={22} /><UtilityInput className="border-0 bg-transparent px-2 font-mono text-base ring-0 focus-visible:ring-0" value={password} onChange={(event) => setPassword(event.target.value)} aria-label={t("security.passwordLabel")} /><Button variant="secondary" size="icon" className="rounded-xl text-violet-700 dark:text-violet-300" type="button" aria-label={t("security.copyLabel")} onClick={() => void copyPassword()}><Copy size={18} /></Button></div>
+      <span className="sr-only" aria-live="polite">{copied ? t("security.copied") : ""}</span>
+      <label className="my-[15px] flex flex-col gap-2 text-[13px] text-muted-foreground"><span>{t("security.length", { count: length })}</span><input className="accent-violet-700" type="range" min={8} max={64} value={length} onChange={(event) => setLength(Number(event.target.value))} /></label>
+      <div className="mb-3.5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border p-px max-[620px]:grid-cols-1" data-testid="password-options"><ToggleRow label={t("security.upper")} checked={upper} onChange={setUpper} /><ToggleRow label={t("security.lower")} checked={lower} onChange={setLower} /><ToggleRow label={t("security.number")} checked={number} onChange={setNumber} /><ToggleRow label={t("security.symbol")} checked={symbol} onChange={setSymbol} /></div>
+      <PrimaryButton accent="blue" disabled={!charsetSize} onClick={regenerate}><RefreshCw size={18} /> {t("security.regenerate")}</PrimaryButton>
+    </UtilitySectionCard>
+    <UtilitySectionCard title={t("security.analysisTitle")} description={t("security.analysisDescription")}>
+      <div className="flex items-center justify-between gap-3" role="meter" aria-valuemin={0} aria-valuemax={4} aria-valuenow={strength.score} aria-valuetext={strengthLevels[strength.score]} data-testid="password-strength"><div className="grid flex-1 grid-cols-5 gap-1.5">{[0, 1, 2, 3, 4].map((score) => <i className={`h-[7px] rounded-full ${score <= strength.score ? meterColors[strength.score] : "bg-muted"}`} key={score} />)}</div><strong className="min-w-[70px] text-right text-sm">{strengthLevels[strength.score]}</strong></div>
+      <div className="mt-3.5 grid grid-cols-2 gap-2.5 max-[620px]:grid-cols-1"><Metric icon={<Shield />} label={t("security.guessDifficulty")} value={`${guessBits.toFixed(1)} bit`} help={t("security.guessHelp")} /><Metric icon={<ShieldCheck />} label={t("security.crackTime")} value={formatCrackTime(strength.crackTimes.offlineFastHashingXPerSecond.seconds)} help={t("security.crackHelp")} /></div>
+      {strengthAdvice && <p className="mt-3 rounded-xl bg-amber-500/10 px-3.5 py-3 text-[13px] leading-relaxed text-amber-800 dark:text-amber-300">{strengthAdvice}</p>}
+    </UtilitySectionCard>
     <ToolGuide title={t("security.guide.title")} description={t("security.guide.description")} blocks={guideBlocks} faq={guideFaq} />
-  </div>;
+  </UtilityPage>;
+}
+
+function Metric({ icon, label, value, help }: { icon: React.ReactNode; label: string; value: string; help: string }) {
+  return <article className="min-w-0 rounded-2xl bg-blue-50 p-[15px] text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{icon}<span className="mt-3 block text-[13px] font-bold text-muted-foreground">{label}</span><strong className="mt-1 block [overflow-wrap:anywhere] text-xl tracking-[-.04em] text-foreground">{value}</strong><small className="mt-2 block text-xs font-medium leading-relaxed text-muted-foreground">{help}</small></article>;
 }

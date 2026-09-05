@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { localizedPath, storeLanguage, stripLanguagePrefix, type AppLanguage } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation("common");
@@ -21,18 +22,26 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   };
 
   return (
-    <div className={`language-switcher${compact ? " compact" : ""}`} role="group" aria-label={t("language.switchLabel")}>
+    <ToggleGroup
+      data-ui-component="language-switcher"
+      className={`ui-language-switcher${compact ? " ui-compact" : ""}`}
+      value={[language]}
+      onValueChange={(nextLanguages) => {
+        const nextLanguage = nextLanguages.at(-1) as AppLanguage | undefined;
+        if (nextLanguage !== undefined) selectLanguage(nextLanguage);
+      }}
+      aria-label={t("language.switchLabel")}
+      spacing={0}
+    >
       {(["ko", "en"] as const).map((item) => (
-        <button
-          type="button"
+        <ToggleGroupItem
           key={item}
-          className={language === item ? "selected" : ""}
-          aria-pressed={language === item}
-          onClick={() => selectLanguage(item)}
+          value={item}
+          className={language === item ? "ui-selected" : ""}
         >
           {item.toUpperCase()}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

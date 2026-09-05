@@ -3,8 +3,15 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { PageHeader, PrimaryButton, SectionCard } from "../../components/ui";
+import { PageHeader, PrimaryButton } from "../../components/ui";
+import { Button } from "../../components/ui/button";
 import { ToolGuide } from "../../components/ToolGuide";
+import {
+  pairedEditorClassName,
+  UtilityPage,
+  UtilitySectionCard,
+  UtilityTextarea,
+} from "../../components/UtilitySurface";
 
 type TextAction = "trim-lines" | "collapse-spaces" | "remove-linebreaks" | "dedupe-lines" | "camel" | "snake" | "kebab" | "title";
 interface Finding { id: string; label: string; before: string; after: string; count: number }
@@ -40,19 +47,19 @@ export function TextToolsPage() {
   };
 
   return (
-    <div className="page tool-page page-enter utility-page text-tools-page">
+    <UtilityPage toolId="text-tools">
       <PageHeader eyebrow="TEXT TOOLS" title={t("features:textTools.title")} description={t("features:textTools.description")}><PrivacyBanner compact /></PageHeader>
-      <div className="utility-editor-grid">
-        <SectionCard title={t("features:textTools.original")} description={t("features:textTools.originalDescription")}><textarea className="utility-textarea" value={input} onChange={(event) => setInput(event.target.value)} placeholder={t("features:textTools.inputPlaceholder")} /><div className="utility-inline-actions utility-inline-actions-spacer" aria-hidden="true" /></SectionCard>
-        <SectionCard title={t("features:textTools.result")} description={t("common:format.characters", { count: output.length })}><textarea className="utility-textarea" value={output} onChange={(event) => setOutput(event.target.value)} placeholder={t("features:textTools.resultPlaceholder")} /><div className="utility-inline-actions"><button className="secondary-button" type="button" disabled={!output} onClick={() => void navigator.clipboard.writeText(output)}><Copy size={16} /> {t("common:actions.copy")}</button><button className="secondary-button" type="button" onClick={() => { setInput(""); setOutput(""); setFindings([]); }}><Eraser size={16} /> {t("features:textTools.clear")}</button></div></SectionCard>
+      <div className="grid grid-cols-2 items-stretch gap-[15px] max-[620px]:grid-cols-1" data-testid="text-tools-editors">
+        <UtilitySectionCard title={t("features:textTools.original")} description={t("features:textTools.originalDescription")} className="flex min-w-0 flex-col"><UtilityTextarea data-testid="text-tools-input" className={pairedEditorClassName} aria-label={t("features:textTools.original")} value={input} onChange={(event) => setInput(event.target.value)} placeholder={t("features:textTools.inputPlaceholder")} /><div className="invisible mt-[11px] min-h-[38px]" aria-hidden="true" /></UtilitySectionCard>
+        <UtilitySectionCard title={t("features:textTools.result")} description={t("common:format.characters", { count: output.length })} className="flex min-w-0 flex-col"><UtilityTextarea data-testid="text-tools-output" className={pairedEditorClassName} aria-label={t("features:textTools.result")} value={output} onChange={(event) => setOutput(event.target.value)} placeholder={t("features:textTools.resultPlaceholder")} /><div className="mt-[11px] flex min-h-[38px] flex-wrap items-center gap-2"><Button variant="secondary" size="lg" className="rounded-xl font-bold" type="button" disabled={!output} onClick={() => void navigator.clipboard.writeText(output)}><Copy size={16} /> {t("common:actions.copy")}</Button><Button variant="secondary" size="lg" className="rounded-xl font-bold" type="button" onClick={() => { setInput(""); setOutput(""); setFindings([]); setRuleCount(0); }}><Eraser size={16} /> {t("features:textTools.clear")}</Button></div></UtilitySectionCard>
       </div>
-      <SectionCard title={t("features:textTools.actionsTitle")} description={t("features:textTools.actionsDescription")}><div className="utility-action-grid">{ACTIONS.map((action) => <button type="button" key={action} disabled={!input || busy} onClick={() => run({ type: "transform", text: input, action })}><LetterText size={17} /><span>{t(`features:textTools.actions.${action}` as never)}</span></button>)}</div><p className="term-note">{t("features:textTools.caseHelp")}</p></SectionCard>
-      <SectionCard title={t("features:textTools.koreanTitle")} description={t("features:textTools.koreanDescription")}>
+      <UtilitySectionCard title={t("features:textTools.actionsTitle")} description={t("features:textTools.actionsDescription")}><div className="grid grid-cols-4 gap-2 max-[620px]:grid-cols-2" data-testid="text-actions">{ACTIONS.map((action) => <Button variant="secondary" className="h-auto min-h-[58px] justify-start whitespace-normal rounded-xl p-2.5 text-left font-bold text-blue-700 hover:-translate-y-px dark:text-blue-300" type="button" key={action} disabled={!input || busy} onClick={() => run({ type: "transform", text: input, action })}><LetterText size={17} /><span>{t(`features:textTools.actions.${action}` as never)}</span></Button>)}</div><p className="mt-3 text-[13px] font-medium leading-relaxed text-muted-foreground">{t("features:textTools.caseHelp")}</p></UtilitySectionCard>
+      <UtilitySectionCard title={t("features:textTools.koreanTitle")} description={t("features:textTools.koreanDescription")}>
         <PrimaryButton accent="blue" disabled={!input} loading={busy} onClick={() => run({ type: "inspect", text: input })}><ScanText size={18} /> {t("features:textTools.inspect")}</PrimaryButton>
-        {ruleCount > 0 && <p className="utility-summary"><CheckCheck size={16} /> {t("features:textTools.summary", { rules: ruleCount, findings: findings.length })}</p>}
-        <div className="finding-list">{findings.map((finding) => <article key={finding.id}><div><strong>{finding.before}</strong><span>→</span><b>{finding.after}</b></div><p>{finding.label} · {t("features:textTools.places", { count: finding.count })}</p></article>)}{ruleCount > 0 && !findings.length && <p className="utility-empty">{t("features:textTools.empty")}</p>}</div>
-      </SectionCard>
+        {ruleCount > 0 && <p className="mt-3.5 flex items-center gap-2 text-sm font-bold text-green-700 dark:text-green-300" data-testid="text-inspection-summary"><CheckCheck size={16} /> {t("features:textTools.summary", { rules: ruleCount, findings: findings.length })}</p>}
+        <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="text-findings">{findings.map((finding) => <article className="rounded-xl border border-border bg-muted p-3" key={finding.id}><div className="flex items-center gap-2 text-sm"><strong className="text-red-700 line-through dark:text-red-300">{finding.before}</strong><span>→</span><b className="text-green-700 dark:text-green-300">{finding.after}</b></div><p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{finding.label} · {t("features:textTools.places", { count: finding.count })}</p></article>)}{ruleCount > 0 && !findings.length && <p className="col-span-full rounded-xl bg-muted p-5 text-center text-sm text-muted-foreground">{t("features:textTools.empty")}</p>}</div>
+      </UtilitySectionCard>
       <ToolGuide title={t("features:textTools.guide.title")} description={t("features:textTools.guide.description")} blocks={(t("features:textTools.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))} faq={(t("features:textTools.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))} />
-    </div>
+    </UtilityPage>
   );
 }

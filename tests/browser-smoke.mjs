@@ -25,6 +25,7 @@ try {
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
     headless: true,
+    protocolTimeout: 300_000,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
 
@@ -106,20 +107,20 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (rotationState.data !== "90" || !rotationState.transform.includes("rotate(90deg)")) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
   }
-  await page.waitForFunction(() => !document.querySelector(".summary-card .primary-button")?.disabled);
+  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) [data-ui-component=primary-button]")?.disabled);
   await clickPrimaryAction(page);
   const immediateFeedback = await page.$eval(".pdf-output-action-zone", (element) => ({
-    running: Boolean(element.querySelector(".operation-progress.status-running")),
-    ready: Boolean(element.querySelector(".pdf-download-compact .result-download")),
-    buttonText: element.querySelector(".primary-button")?.textContent || "",
+    running: Boolean(element.querySelector(".ui-operation-progress.ui-status-running")),
+    ready: Boolean(element.querySelector(".pdf-download-compact [data-testid='pdf-download']")),
+    buttonText: element.querySelector("[data-ui-component=primary-button]")?.textContent || "",
   }));
   if (!immediateFeedback.running && !immediateFeedback.ready) throw new Error(`PDF export feedback was not shown beside the action: ${JSON.stringify(immediateFeedback)}`);
   if (immediateFeedback.running && !immediateFeedback.buttonText.includes("만드는 중")) throw new Error(`PDF export button did not announce its running state: ${JSON.stringify(immediateFeedback)}`);
   await waitForResult(page);
-  if (!await page.$eval(".pdf-download-compact .result-download", (link) => Boolean(link.closest(".pdf-output-action-zone")))) throw new Error("PDF download was not kept in the sticky output action zone.");
+  if (!await page.$eval(".pdf-download-compact [data-testid='pdf-download']", (link) => Boolean(link.closest(".pdf-output-action-zone")))) throw new Error("PDF download was not kept in the sticky output action zone.");
   await assertProgressLog(page, "PDF 페이지 편집");
   const rotatedPath = path.join(tempDir, "rotated.pdf");
-  await saveBlobLink(page, ".result-download", rotatedPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", rotatedPath);
   const rotated = await PDFDocument.load(await fs.readFile(rotatedPath));
   if (rotated.getPageCount() !== 2 || rotated.getPage(0).getRotation().angle !== 90) {
     throw new Error(`PDF output rotation was not persisted: pages=${rotated.getPageCount()}, rotation=${rotated.getPage(0).getRotation().angle}`);
@@ -132,7 +133,7 @@ async function testPdfTools(page, fixtures, tempDir) {
     const state = await page.evaluate(() => ({
       checked: document.querySelector('.pdf-page-card:first-child .pdf-page-select input')?.checked,
       range: document.querySelector("#pdf-selection-range")?.value,
-      selected: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => card.classList.contains("selected")),
+      selected: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => card.getAttribute("data-selected") === "true"),
     }));
     throw new Error(`PDF card selection did not synchronize with the range field: ${JSON.stringify(state)}\n${reason.message || reason}`);
   }
@@ -146,7 +147,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const extractedPath = path.join(tempDir, "extracted.pdf");
-  await saveBlobLink(page, ".result-download", extractedPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", extractedPath);
   const extracted = await PDFDocument.load(await fs.readFile(extractedPath));
   if (extracted.getPageCount() !== 1 || Math.round(extracted.getPage(0).getWidth()) !== 600) throw new Error("PDF page-range extraction selected the wrong page.");
 
@@ -166,7 +167,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (groupRows.length !== 1) throw new Error(`Expected one seeded PDF range row, got ${groupRows.length}.`);
   let groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[1], "1");
-  await page.$eval(".pdf-multi-range-actions .secondary-button:last-child", (button) => button.click());
+  await page.$eval(".pdf-multi-range-actions button:last-child", (button) => button.click());
   groupRows = await page.$$(".pdf-range-group");
   if (groupRows.length !== 2) throw new Error(`Expected a second PDF range row after adding one, got ${groupRows.length}.`);
   await page.$eval(".pdf-page-card:first-child .pdf-page-select input", (checkbox) => checkbox.click());
@@ -177,7 +178,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   } catch (reason) {
     const rangeState = await page.evaluate(() => ({
       ranges: Array.from(document.querySelectorAll(".pdf-range-group"), (row) => Array.from(row.querySelectorAll("input"), (input) => ({ value: input.value, checked: input.checked }))),
-      cards: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => ({ selected: card.classList.contains("selected"), checked: card.querySelector(".pdf-page-select input")?.checked })),
+      cards: Array.from(document.querySelectorAll(".pdf-page-card"), (card) => ({ selected: card.getAttribute("data-selected") === "true", checked: card.querySelector(".pdf-page-select input")?.checked })),
     }));
     throw new Error(`Visual PDF range selection did not update the active range: ${JSON.stringify(rangeState)}\n${reason.message || reason}`);
   }
@@ -188,7 +189,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const rangeZipPath = path.join(tempDir, "range-pdfs.zip");
-  await saveBlobLink(page, ".result-download", rangeZipPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", rangeZipPath);
   const rangeZip = await JSZip.loadAsync(await fs.readFile(rangeZipPath));
   const rangePdfNames = Object.keys(rangeZip.files).filter((name) => name.endsWith(".pdf"));
   if (rangePdfNames.length !== 2) throw new Error(`Expected two range PDFs in ZIP, got ${rangePdfNames.length}.`);
@@ -196,28 +197,46 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (secondRangePdf.getPageCount() !== 2 || Math.round(secondRangePdf.getPage(0).getWidth()) !== 600 || secondRangePdf.getPage(1).getRotation().angle !== 90) {
     throw new Error("Range PDF did not preserve the entered page order and rotations.");
   }
-  await page.$eval(".pdf-multi-range-actions .secondary-button:first-child", (button) => button.click());
-  await page.waitForSelector(".pdf-range-selection-toolbar.quick-split");
+  await page.$eval(".pdf-multi-range-actions button:first-child", (button) => button.click());
+  await page.waitForSelector(".pdf-range-selection-toolbar[data-mode='quick-split']");
   await page.$eval(".pdf-page-card:first-child .pdf-split-after", (button) => button.click());
-  await page.waitForFunction(() => document.querySelector(".pdf-range-selection-toolbar.quick-split > b")?.textContent?.includes("2"));
-  await page.$eval(".pdf-range-selection-toolbar.quick-split .pdf-range-toolbar-actions .primary", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".pdf-range-selection-toolbar[data-mode='quick-split'] > b")?.textContent?.includes("2"));
+  await page.$eval(".pdf-range-selection-toolbar[data-mode='quick-split'] .pdf-range-toolbar-actions button:last-child", (button) => button.click());
   await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group").length === 2 && Array.from(document.querySelectorAll(".pdf-range-group"), (row) => row.querySelectorAll("input")[1]?.value).join(",") === "1,2");
   groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[2], "분할-01");
-  await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group.invalid").length === 2);
-  if (!await page.$eval(".summary-card .primary-button", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
+  await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group[data-invalid='true']").length === 2);
+  if (!await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) [data-ui-component=primary-button]", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
 
   await page.$eval('.pdf-output-mode-list button:nth-child(3)', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(3)')?.getAttribute("aria-checked") === "true");
   await clickPrimaryAction(page);
   await waitForResult(page);
   const separateZipPath = path.join(tempDir, "separate-pages.zip");
-  await saveBlobLink(page, ".result-download", separateZipPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", separateZipPath);
   const separateZip = await JSZip.loadAsync(await fs.readFile(separateZipPath));
   const separatePdfNames = Object.keys(separateZip.files).filter((name) => name.endsWith(".pdf"));
   if (separatePdfNames.length !== 1) throw new Error(`Expected one selected page PDF, got ${separatePdfNames.length}.`);
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-navigation-shell']")?.getAttribute("data-scroll-cue") === "right");
+  const navigationCueAtStart = await page.$eval(".pdf-tool-navigation", (navigation) => ({
+    clientWidth: navigation.clientWidth,
+    scrollWidth: navigation.scrollWidth,
+    scrollLeft: navigation.scrollLeft,
+    rightCue: Boolean(navigation.parentElement?.querySelector("[data-scroll-cue-side='right']")),
+  }));
+  await page.$eval(".pdf-tool-navigation", (navigation) => navigation.scrollTo({ left: navigation.scrollWidth, behavior: "instant" }));
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-navigation-shell']")?.getAttribute("data-scroll-cue") === "left");
+  const navigationCueAtEnd = await page.$eval(".pdf-tool-navigation", (navigation) => ({
+    remaining: navigation.scrollWidth - navigation.clientWidth - navigation.scrollLeft,
+    leftCue: Boolean(navigation.parentElement?.querySelector("[data-scroll-cue-side='left']")),
+    rightCue: Boolean(navigation.parentElement?.querySelector("[data-scroll-cue-side='right']")),
+  }));
+  if (navigationCueAtStart.scrollWidth <= navigationCueAtStart.clientWidth || navigationCueAtStart.scrollLeft > 1 || !navigationCueAtStart.rightCue
+    || navigationCueAtEnd.remaining > 2 || !navigationCueAtEnd.leftCue || navigationCueAtEnd.rightCue) {
+    throw new Error(`PDF mobile navigation scroll cue is incomplete: ${JSON.stringify({ navigationCueAtStart, navigationCueAtEnd })}`);
+  }
   await page.waitForSelector(".pdf-mobile-output-dock", { visible: true });
   const mobileDockLayout = await page.evaluate(() => {
     const dock = document.querySelector(".pdf-mobile-output-dock");
@@ -236,10 +255,10 @@ async function testPdfTools(page, fixtures, tempDir) {
     || mobileDockLayout.dockBottom > mobileDockLayout.tabsTop) {
     throw new Error(`PDF mobile output dock overlaps or overflows: ${JSON.stringify(mobileDockLayout)}`);
   }
-  await page.click(".pdf-mobile-output-summary");
-  await page.waitForSelector(".pdf-output-sidebar-shell.mobile-open .pdf-output-workspace", { visible: true, timeout: 5_000 });
+  await page.$eval(".pdf-mobile-output-summary", (button) => button.click());
+  await page.waitForSelector(".pdf-output-sidebar-shell[data-open='true'] .pdf-output-workspace", { visible: true, timeout: 5_000 });
   await page.keyboard.press("Escape");
-  await page.waitForFunction(() => !document.querySelector(".pdf-output-sidebar-shell")?.classList.contains("mobile-open")
+  await page.waitForFunction(() => document.querySelector(".pdf-output-sidebar-shell")?.getAttribute("data-open") !== "true"
     && document.activeElement?.classList.contains("pdf-mobile-output-summary"));
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
 
@@ -249,7 +268,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const imagePdfPath = path.join(tempDir, "image.pdf");
-  await saveBlobLink(page, ".result-download", imagePdfPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", imagePdfPath);
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
@@ -259,7 +278,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const imageZipPath = path.join(tempDir, "pdf-images.zip");
-  await saveBlobLink(page, ".result-download", imageZipPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", imageZipPath);
   const imageZip = await JSZip.loadAsync(await fs.readFile(imageZipPath));
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
@@ -268,12 +287,12 @@ async function testPdfTools(page, fixtures, tempDir) {
   const convertInput = await page.$('input[type="file"]');
   await convertInput.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
-  const noOcrButton = await findButtonByText(page, ".pdf-summary-control .segmented-control button", "사용 안 함");
+  const noOcrButton = await findButtonByText(page, ".pdf-summary-control .ui-segmented-control button", "사용 안 함");
   await noOcrButton.click();
   await clickPrimaryAction(page);
   await waitForResult(page);
   const docxPath = path.join(tempDir, "pdf-converted.docx");
-  await saveBlobLink(page, ".result-download", docxPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", docxPath);
   const convertedDocx = await JSZip.loadAsync(await fs.readFile(docxPath));
   const documentXml = await convertedDocx.file("word/document.xml").async("string");
   if (!documentXml.includes("First PDF page") || !documentXml.includes("Second PDF page")) {
@@ -286,7 +305,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const xlsxPath = path.join(tempDir, "pdf-converted.xlsx");
-  await saveBlobLink(page, ".result-download", xlsxPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", xlsxPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(xlsxPath));
   if (workbook.worksheets.length !== 2 || !workbook.worksheets[0].getCell("A1").text.includes("First PDF page")) {
@@ -299,7 +318,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   await clickPrimaryAction(page);
   await waitForResult(page);
   const txtPath = path.join(tempDir, "pdf-converted.txt");
-  await saveBlobLink(page, ".result-download", txtPath);
+  await saveBlobLink(page, "[data-testid='pdf-download']", txtPath);
   const text = await fs.readFile(txtPath, "utf8");
   if (!text.includes("First PDF page") || !text.includes("[페이지 2]")) throw new Error("PDF-to-TXT output is incomplete.");
 }
@@ -340,43 +359,46 @@ async function navigatePdfTab(page, index, pathname, mode, acceptedType) {
 
 async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/`);
+  const uiAdapterKeyboard = await assertUiAdapterKeyboardContracts(page, fixtures.xlsxOne);
+  await navigateTo(page, `${koBaseUrl}/tools/excel-merger/`);
   const acceptedFormats = await page.$eval('input[type="file"]', (input) => input.accept);
   if (!acceptedFormats.includes(".xlsb") || !acceptedFormats.includes(".xlsm")) {
     throw new Error(`XLSB/XLSM were not exposed as accepted inputs: ${acceptedFormats}`);
   }
-  await dropFiles(page, ".drop-zone", [fixtures.xlsxOne, fixtures.csv, fixtures.xls]);
-  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 3);
-  await dropFiles(page, ".drop-zone", [fixtures.xlsb, fixtures.xlsm, fixtures.encryptedXlsx]);
-  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 6);
-  const excelAddButton = await page.$eval(".drop-zone .secondary-button", (button) => button.textContent || "");
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.xlsxOne, fixtures.csv, fixtures.xls]);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 3);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.xlsb, fixtures.xlsm, fixtures.encryptedXlsx]);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 6);
+  const excelAddButton = await page.$eval("[data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
   if (!excelAddButton.includes("더 추가")) throw new Error(`Excel merger does not expose incremental file addition: ${excelAddButton}`);
-  await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
+  await page.waitForFunction(() => !document.querySelector("[data-testid='excel-file-status'][data-state='checking']"));
+  console.log(`  shared UI adapter keyboard contracts: ${JSON.stringify(uiAdapterKeyboard)}`);
 
-  const protectedInput = await page.$('.input-password-row input[type="password"]');
+  const protectedInput = await page.$("[data-testid='excel-input-password'] input[type='password']");
   if (!protectedInput) {
-    const statuses = await page.$$eval(".excel-file-item", (items) => items.map((item) => item.textContent));
+    const statuses = await page.$$eval("[data-testid='excel-file-item']", (items) => items.map((item) => item.textContent));
     const pageState = await page.evaluate(() => ({ path: location.pathname, root: document.querySelector("#root")?.textContent, body: document.body.innerText.slice(0, 2_000) }));
     throw new Error(`Encrypted input password field was not shown.\n${statuses.join("\n")}\n${JSON.stringify(pageState)}`);
   }
   await protectedInput.type("input-pass");
   await protectedInput.evaluate((input) => input.blur());
-  await page.waitForFunction(() => !document.querySelector(".file-security-status.checking")
-    && document.querySelectorAll(".sheet-file-group .sheet-name-list li").length >= 4);
+  await page.waitForFunction(() => !document.querySelector("[data-testid='excel-file-status'][data-state='checking']")
+    && document.querySelectorAll("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-list'] li").length >= 4);
 
   await clickSetting(page, "출력 파일에 암호 설정");
-  const outputPasswords = await page.$$(".output-password-form input");
+  const outputPasswords = await page.$$("[data-testid='excel-output-password-form'] input");
   await outputPasswords[0].type("output-pass");
   await outputPasswords[1].type("output-pass");
   await page.waitForFunction(() => {
-    const button = document.querySelector(".summary-card .primary-button");
+    const button = document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary']) [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.$eval(".summary-card .primary-button", (button) => button.click());
+  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) [data-ui-component=primary-button]", (button) => button.click());
   await waitForResult(page);
   await assertProgressLog(page, "Excel 병합");
 
   const resultPath = path.join(tempDir, "encrypted-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const encryptedResult = await fs.readFile(resultPath);
   if (!officeCrypto.isEncrypted(encryptedResult)) throw new Error("Output XLSX was not encrypted.");
   const decrypted = await officeCrypto.decrypt(encryptedResult, { password: "output-pass" });
@@ -391,22 +413,93 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
     return values;
   });
   if (!formulaCells.some((formula) => formula.includes("SUM(A1:A2)"))) throw new Error("Formula was not preserved.");
-  const warningText = await page.$eval(".result-card", (element) => element.textContent || "");
+  const warningText = await page.$eval(".ui-result-card", (element) => element.textContent || "");
   if (!warningText.includes("XLSM의 매크로") || !warningText.includes("XLS 수식 또는 서식을 정밀하게 유지")) {
     throw new Error(`Converted format limitations were not shown after merge: ${warningText}`);
   }
+}
+
+async function assertUiAdapterKeyboardContracts(page, filePath) {
+  const initial = await page.evaluate(() => {
+    const group = document.querySelector(".ui-segmented-control");
+    const options = Array.from(group?.querySelectorAll("button") || []);
+    return {
+      pageHeader: document.querySelector(".ui-page-header")?.tagName,
+      sectionCard: document.querySelector(".ui-section-card")?.tagName,
+      dropRole: document.querySelector("[data-ui-part=drop-target]")?.getAttribute("role"),
+      dropTabIndex: document.querySelector("[data-ui-part=drop-target]")?.getAttribute("tabindex"),
+      dropInputLabel: document.querySelector("[data-ui-component=file-drop-zone] input[type=file]")?.getAttribute("aria-label") || "",
+      dropButtonType: document.querySelector("[data-ui-part=drop-target] [data-slot=button]")?.getAttribute("type"),
+      groupRole: group?.getAttribute("role"),
+      groupLabel: group?.getAttribute("aria-label") || "",
+      pressedStates: options.map((option) => option.getAttribute("aria-pressed")),
+    };
+  });
+  if (initial.pageHeader !== "HEADER" || initial.sectionCard !== "SECTION" || initial.dropRole !== null || initial.dropTabIndex !== null || !initial.dropInputLabel || initial.dropButtonType !== "button"
+    || initial.groupRole !== "group" || !initial.groupLabel || !initial.pressedStates.includes("true") || !initial.pressedStates.includes("false")) {
+    throw new Error(`Shared UI semantic contract failed: ${JSON.stringify(initial)}`);
+  }
+
+  const chooserPromise = page.waitForFileChooser();
+  await page.focus("[data-ui-part=drop-target] [data-slot=button]");
+  await page.keyboard.press("Enter");
+  const chooser = await chooserPromise;
+  await chooser.accept([filePath]);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 1);
+  await page.waitForFunction(() => document.querySelector('.ui-drop-zone-wrap input[type="file"]')?.value === "");
+  const drop = await page.evaluate(() => ({
+    activeRole: document.activeElement?.getAttribute("role"),
+    files: document.querySelectorAll("[data-testid='excel-file-item']").length,
+    inputReset: document.querySelector('.ui-drop-zone-wrap input[type="file"]')?.value === "",
+  }));
+
+  const groupButtons = await page.$$(".ui-segmented-control button");
+  if (groupButtons.length < 2) throw new Error("SegmentedControl keyboard fixture has fewer than two options.");
+  await groupButtons[0].focus();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(() => document.activeElement === document.querySelector(".ui-segmented-control button:nth-child(2)"));
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.querySelector(".ui-segmented-control button:nth-child(2)")?.getAttribute("aria-pressed") === "true");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => document.querySelector(".ui-segmented-control button:first-child")?.getAttribute("aria-pressed") === "true");
+
+  const switchSelector = '[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])';
+  await page.waitForSelector(switchSelector);
+  const switchDescription = await page.$eval(switchSelector, (element) => {
+    const id = element.getAttribute("aria-describedby") || "";
+    return { id, text: id ? document.getElementById(id)?.textContent || "" : "" };
+  });
+  if (!switchDescription.id || !switchDescription.text) throw new Error(`ToggleRow description is not connected: ${JSON.stringify(switchDescription)}`);
+  const originalSwitchState = await page.$eval(switchSelector, (element) => element.getAttribute("aria-checked"));
+  await page.focus(switchSelector);
+  await page.keyboard.press("Space");
+  await page.waitForFunction((previous) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
+  await page.keyboard.press("Enter");
+  await page.waitForFunction((expected) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
+  await page.$eval(`${switchSelector}`, (element) => element.closest('[data-ui-component="toggle-row"]')?.querySelector("label")?.click());
+  await page.waitForFunction((previous) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
+  await page.$eval(`${switchSelector}`, (element) => element.closest('[data-ui-component="toggle-row"]')?.querySelector("label")?.click());
+  await page.waitForFunction((expected) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
+
+  return {
+    semanticRoles: "passed",
+    fileDropEnter: drop,
+    segmentedArrowAndSpace: "passed",
+    switchSpaceEnterLabelAndDescription: "passed",
+  };
 }
 
 async function testExcelThemeColors(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=theme-colors`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.themeXlsxOne, fixtures.themeXlsxTwo);
-  await page.waitForFunction(() => document.querySelectorAll(".file-security-status.ready").length === 2);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-status'][data-state='ready']").length === 2);
   await clickPrimaryAction(page);
   await waitForResult(page);
 
   const resultPath = path.join(tempDir, "theme-colors-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const [first, second] = workbook.worksheets;
@@ -440,16 +533,16 @@ async function testFormulaTranslation(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=formula`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.xlsxOne, fixtures.xlsxTwo);
-  await page.waitForFunction(() => document.querySelectorAll(".excel-file-item").length === 2);
-  await page.waitForFunction(() => !document.querySelector(".file-security-status.checking"));
-  const verticalButton = await findButtonByText(page, ".segmented-control button", "세로");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-file-item']").length === 2);
+  await page.waitForFunction(() => !document.querySelector("[data-testid='excel-file-status'][data-state='checking']"));
+  const verticalButton = await findButtonByText(page, ".ui-segmented-control button", "세로");
   await verticalButton.click();
   await clickPrimaryAction(page);
   await waitForResult(page);
   await assertProgressLog(page, "Excel 세로 병합");
 
   const resultPath = path.join(tempDir, "vertical-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const resultSheet = workbook.worksheets[0];
@@ -462,19 +555,19 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheets`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.sheetSelectionXlsx);
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 4);
-  const sheetNames = await page.$$eval(".sheet-file-group .sheet-name-chip > span", (items) => items.map((item) => item.textContent));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-list'] li").length === 4);
+  const sheetNames = await page.$$eval("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-chip'] > span", (items) => items.map((item) => item.textContent));
   if (sheetNames.join(",") !== "첫째,둘째,셋째,넷째") throw new Error(`Sheet names were not inspected in order: ${sheetNames.join(",")}`);
 
-  const customButton = await findButtonByText(page, ".section-card .segmented-control button", "직접 선택");
+  const customButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "직접 선택");
   await customButton.click();
-  const sheetButtons = await page.$$(".sheet-name-list button[aria-pressed]");
+  const sheetButtons = await page.$$("[data-testid='excel-sheet-name-list'] button[aria-pressed]");
   await sheetButtons[0].click();
   await sheetButtons[2].click();
-  const customSelected = await page.$$(".sheet-name-list li.selected").then((items) => items.length);
+  const customSelected = await page.$$("[data-testid='excel-sheet-name-list'] li[data-selected='true']").then((items) => items.length);
   if (customSelected !== 2) throw new Error(`Direct sheet selection did not update: ${customSelected}`);
 
-  const positionsButton = await findButtonByText(page, ".section-card .segmented-control button", "순번 선택");
+  const positionsButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "순번 선택");
   await positionsButton.click();
   const patternInput = await page.$("#sheet-position-pattern");
   await patternInput.click();
@@ -482,18 +575,18 @@ async function testExcelSheetSelection(page, fixtures, tempDir) {
   await page.keyboard.press("A");
   await page.keyboard.up("Control");
   await patternInput.type("2");
-  if (await page.$$(".sheet-name-list li.selected").then((items) => items.length) !== 1) throw new Error("N-th sheet selection failed.");
+  if (await page.$$("[data-testid='excel-sheet-name-list'] li[data-selected='true']").then((items) => items.length) !== 1) throw new Error("N-th sheet selection failed.");
   await patternInput.click();
   await page.keyboard.down("Control");
   await page.keyboard.press("A");
   await page.keyboard.up("Control");
   await patternInput.type("-2");
-  if (await page.$$(".sheet-name-list li.selected").then((items) => items.length) !== 2) throw new Error("Up-to-N sheet selection failed.");
+  if (await page.$$("[data-testid='excel-sheet-name-list'] li[data-selected='true']").then((items) => items.length) !== 2) throw new Error("Up-to-N sheet selection failed.");
 
   await clickPrimaryAction(page);
   await waitForResult(page);
   const resultPath = path.join(tempDir, "selected-sheets-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   if (workbook.worksheets.length !== 2 || !workbook.worksheets.every((sheet) => /첫째|둘째/.test(sheet.name))) {
@@ -506,24 +599,24 @@ async function testExcelSheetGridLayout(page, fixtures) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheet-grid`);
   const input = await page.$('input[type="file"]');
   await input.uploadFile(...fixtures.sheetGridXlsx);
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group").length === 6
-    && document.querySelectorAll(".sheet-name-list li").length === 39
-    && !document.querySelector(".file-security-status.checking"));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group']").length === 6
+    && document.querySelectorAll("[data-testid='excel-sheet-name-list'] li").length === 39
+    && !document.querySelector("[data-testid='excel-file-status'][data-state='checking']"));
 
   const desktopLayout = await page.evaluate(() => {
-    const selector = document.querySelector(".excel-sheet-selector");
-    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
+    const selector = document.querySelector("[data-testid='excel-sheet-selector']");
+    const cards = Array.from(document.querySelectorAll("[data-testid='excel-sheet-file-group']"));
     const selectorRect = selector?.getBoundingClientRect();
     const cardRects = cards.map((card) => card.getBoundingClientRect());
     const columnLefts = [...new Set(cardRects.map((rect) => Math.round(rect.left)))];
     const rowTops = [...new Set(cardRects.map((rect) => Math.round(rect.top)))];
     const rowGap = Number.parseFloat(selector ? getComputedStyle(selector).rowGap : "0") || 0;
     const stackedHeight = cardRects.reduce((sum, rect) => sum + rect.height, 0) + rowGap * Math.max(0, cardRects.length - 1);
-    const firstList = cards[0]?.querySelector(".sheet-name-list");
-    const firstHeading = cards[0]?.querySelector(".sheet-file-heading");
+    const firstList = cards[0]?.querySelector("[data-testid='excel-sheet-name-list']");
+    const firstHeading = cards[0]?.querySelector("[data-testid='excel-sheet-file-heading']");
     const headingId = cards[0]?.getAttribute("aria-labelledby") || "";
     const labelledHeading = headingId ? document.getElementById(headingId) : null;
-    const chip = firstList?.querySelector(".sheet-name-chip");
+    const chip = firstList?.querySelector("[data-testid='excel-sheet-name-chip']");
     const chipStyle = chip ? getComputedStyle(chip) : null;
     const listStyle = firstList ? getComputedStyle(firstList) : null;
     return {
@@ -541,11 +634,11 @@ async function testExcelSheetGridLayout(page, fixtures) {
       headingMatches: labelledHeading === firstHeading?.querySelector("h3"),
       headingTitle: labelledHeading?.getAttribute("title"),
       headingLabel: labelledHeading?.getAttribute("aria-label"),
-      allModeButtons: document.querySelectorAll(".sheet-name-list button").length,
-      allModeActions: document.querySelectorAll(".sheet-select-actions").length,
-      allModeSelected: document.querySelectorAll(".sheet-name-list li.selected").length,
+      allModeButtons: document.querySelectorAll("[data-testid='excel-sheet-name-list'] button").length,
+      allModeActions: document.querySelectorAll("[data-testid='excel-sheet-select-actions']").length,
+      allModeSelected: document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length,
       allChipStyle: chipStyle ? { display: chipStyle.display, minHeight: chipStyle.minHeight, borderRadius: chipStyle.borderRadius } : null,
-      mobileSummaryDisplay: getComputedStyle(document.querySelector(".excel-mobile-sheet-summary")).display,
+      mobileSummaryDisplay: getComputedStyle(document.querySelector("[data-testid='excel-mobile-sheet-summary']")).display,
     };
   });
   if (desktopLayout.columns !== 2 || desktopLayout.rows !== 3
@@ -569,18 +662,19 @@ async function testExcelSheetGridLayout(page, fixtures) {
     throw new Error(`All-sheets mode exposed controls or a desktop duplicate summary: ${JSON.stringify(desktopLayout)}`);
   }
 
-  const customModeButton = await findButtonByText(page, ".section-card .segmented-control button", "직접 선택");
+  const customModeButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "직접 선택");
   await customModeButton.click();
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list button[aria-pressed]").length === 39);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] button[aria-pressed]").length === 39);
   const customContract = await page.evaluate((expectedStyle) => {
-    const buttons = Array.from(document.querySelectorAll(".sheet-name-list button[aria-pressed]"));
+    const buttons = Array.from(document.querySelectorAll("[data-testid='excel-sheet-name-list'] button[aria-pressed]"));
     const chipStyle = buttons[0] ? getComputedStyle(buttons[0]) : null;
     return {
       count: buttons.length,
       types: [...new Set(buttons.map((button) => button.getAttribute("type")))],
       states: [...new Set(buttons.map((button) => button.getAttribute("aria-pressed")))],
-      actions: document.querySelectorAll(".sheet-select-actions").length,
-      checkboxes: document.querySelectorAll('.sheet-name-list input[type="checkbox"]').length,
+      actions: document.querySelectorAll("[data-testid='excel-sheet-select-actions']").length,
+      checkboxes: document.querySelectorAll("[data-testid='excel-sheet-name-list'] input[type='checkbox']").length,
+      appearance: chipStyle ? { display: chipStyle.display, minHeight: chipStyle.minHeight, borderRadius: chipStyle.borderRadius } : null,
       sameAppearance: Boolean(chipStyle && expectedStyle
         && chipStyle.display === expectedStyle.display
         && chipStyle.minHeight === expectedStyle.minHeight
@@ -592,69 +686,70 @@ async function testExcelSheetGridLayout(page, fixtures) {
     throw new Error(`Custom sheet chips do not match the aria-pressed button contract: ${JSON.stringify(customContract)}`);
   }
 
-  await page.click(".sheet-file-group:first-child .sheet-select-actions button:last-child");
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group:first-child .sheet-name-list li.selected").length === 0);
-  await page.click(".sheet-file-group:first-child .sheet-select-actions button:first-child");
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group:first-child .sheet-name-list li.selected").length === 24);
-  await page.click(".sheet-file-group:first-child .sheet-name-list button");
-  await page.waitForFunction(() => document.querySelector(".sheet-file-group:first-child .sheet-name-list button")?.getAttribute("aria-pressed") === "false");
-  await page.click(".sheet-file-group:first-child .sheet-name-list button");
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-select-actions'] button:last-child");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 0);
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-select-actions'] button:first-child");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 24);
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button");
+  await page.waitForFunction(() => document.querySelector("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button")?.getAttribute("aria-pressed") === "false");
+  await page.click("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button");
 
-  const headerTopBeforeKeyboard = await page.$eval(".sheet-file-group:first-child .sheet-file-heading", (heading) => heading.getBoundingClientRect().top);
-  await page.$eval(".sheet-file-group:first-child .sheet-name-list button", (button) => {
-    button.closest(".sheet-name-list").scrollTop = 0;
+  const headerTopBeforeKeyboard = await page.$eval("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-file-heading']", (heading) => heading.getBoundingClientRect().top);
+  await page.$eval("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list'] button", (button) => {
+    button.closest("[data-testid='excel-sheet-name-list']").scrollTop = 0;
     button.focus();
   });
   for (let index = 1; index < 24; index += 1) await page.keyboard.press("Tab");
   const keyboardScroll = await page.evaluate(() => {
-    const card = document.querySelector(".sheet-file-group:first-child");
-    const list = card?.querySelector(".sheet-name-list");
-    const buttons = Array.from(card?.querySelectorAll(".sheet-name-list button") || []);
+    const card = document.querySelector("[data-testid='excel-sheet-file-group']:first-child");
+    const list = card?.querySelector("[data-testid='excel-sheet-name-list']");
+    const buttons = Array.from(card?.querySelectorAll("[data-testid='excel-sheet-name-list'] button") || []);
     const focusedStyle = document.activeElement instanceof HTMLElement ? getComputedStyle(document.activeElement) : null;
     return {
       focusedLast: document.activeElement === buttons.at(-1),
       scrollTop: list?.scrollTop ?? 0,
-      headerTop: card?.querySelector(".sheet-file-heading")?.getBoundingClientRect().top ?? 0,
+      headerTop: card?.querySelector("[data-testid='excel-sheet-file-heading']")?.getBoundingClientRect().top ?? 0,
       outlineStyle: focusedStyle?.outlineStyle,
       outlineWidth: focusedStyle?.outlineWidth,
+      boxShadow: focusedStyle?.boxShadow,
     };
   });
   if (!keyboardScroll.focusedLast || keyboardScroll.scrollTop <= 0
     || Math.abs(keyboardScroll.headerTop - headerTopBeforeKeyboard) > 1
-    || keyboardScroll.outlineStyle === "none" || keyboardScroll.outlineWidth === "0px") {
+    || ((keyboardScroll.outlineStyle === "none" || keyboardScroll.outlineWidth === "0px") && keyboardScroll.boxShadow === "none")) {
     throw new Error(`Keyboard focus did not scroll only the chip viewport with a visible focus ring: ${JSON.stringify(keyboardScroll)}`);
   }
 
-  const positionsButton = await findButtonByText(page, ".section-card .segmented-control button", "순번 선택");
+  const positionsButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "순번 선택");
   await positionsButton.click();
   await replaceInputValue(page, await page.$("#sheet-position-pattern"), "2");
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 6);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 6);
   const positionsContract = await page.evaluate(() => ({
-    buttons: document.querySelectorAll(".sheet-name-list button").length,
-    actions: document.querySelectorAll(".sheet-select-actions").length,
-    selected: document.querySelectorAll(".sheet-name-list li.selected").length,
-    statusChips: document.querySelectorAll(".sheet-name-list li > span.sheet-name-chip").length,
+    buttons: document.querySelectorAll("[data-testid='excel-sheet-name-list'] button").length,
+    actions: document.querySelectorAll("[data-testid='excel-sheet-select-actions']").length,
+    selected: document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length,
+    statusChips: document.querySelectorAll("[data-testid='excel-sheet-name-list'] li > span[data-testid='excel-sheet-name-chip']").length,
   }));
   if (positionsContract.buttons !== 0 || positionsContract.actions !== 0
     || positionsContract.selected !== 6 || positionsContract.statusChips !== 39) {
     throw new Error(`Position mode did not preserve non-interactive status chips: ${JSON.stringify(positionsContract)}`);
   }
 
-  const allButton = await findButtonByText(page, ".section-card .segmented-control button", "모든 시트");
+  const allButton = await findButtonByText(page, ".ui-section-card .ui-segmented-control button", "모든 시트");
   await allButton.click();
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list li.selected").length === 39);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] li[data-selected='true']").length === 39);
 
   await page.setViewport({ width: 821, height: 900, deviceScaleFactor: 1 });
   await new Promise((resolve) => setTimeout(resolve, 100));
   const narrowDesktop = await page.evaluate(() => {
-    const selector = document.querySelector(".excel-sheet-selector");
-    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
+    const selector = document.querySelector("[data-testid='excel-sheet-selector']");
+    const cards = Array.from(document.querySelectorAll("[data-testid='excel-sheet-file-group']"));
     const selectorRect = selector?.getBoundingClientRect();
     return {
       columns: new Set(cards.map((card) => Math.round(card.getBoundingClientRect().left))).size,
       overflow: selector ? selector.scrollWidth - selector.clientWidth : 1,
       cardsInside: Boolean(selectorRect) && cards.every((card) => card.getBoundingClientRect().right <= selectorRect.right + 1),
-      mobileSummaryDisplay: getComputedStyle(document.querySelector(".excel-mobile-sheet-summary")).display,
+      mobileSummaryDisplay: getComputedStyle(document.querySelector("[data-testid='excel-mobile-sheet-summary']")).display,
     };
   });
   if (narrowDesktop.columns !== 1 || narrowDesktop.overflow > 0 || !narrowDesktop.cardsInside
@@ -663,11 +758,11 @@ async function testExcelSheetGridLayout(page, fixtures) {
   }
 
   await customModeButton.click();
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-name-list button[aria-pressed]").length === 39);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-name-list'] button[aria-pressed]").length === 39);
   const longNames = await page.evaluate((longFileName, longSheetName) => {
-    const card = document.querySelector(".sheet-file-group:first-child");
-    const heading = card?.querySelector(".sheet-file-heading h3");
-    const chip = card?.querySelector(".sheet-name-list button.sheet-name-chip");
+    const card = document.querySelector("[data-testid='excel-sheet-file-group']:first-child");
+    const heading = card?.querySelector("[data-testid='excel-sheet-file-heading'] h3");
+    const chip = card?.querySelector("[data-testid='excel-sheet-name-list'] button[data-testid='excel-sheet-name-chip']");
     const chipText = chip?.querySelector("span");
     return {
       sectionLabelledBy: card?.getAttribute("aria-labelledby"),
@@ -695,16 +790,17 @@ async function testExcelSheetGridLayout(page, fixtures) {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await new Promise((resolve) => setTimeout(resolve, 100));
   await page.evaluate(() => {
-    const summary = document.querySelector(".excel-mobile-sheet-summary");
+    document.documentElement.style.scrollBehavior = "auto";
+    const summary = document.querySelector("[data-testid='excel-mobile-sheet-summary']");
     if (summary) window.scrollTo(0, window.scrollY + summary.getBoundingClientRect().top + 120);
   });
   await new Promise((resolve) => setTimeout(resolve, 100));
   const mobileLayout = await page.evaluate(() => {
-    const selector = document.querySelector(".excel-sheet-selector");
-    const cards = Array.from(document.querySelectorAll(".sheet-file-group"));
-    const summary = document.querySelector(".excel-mobile-sheet-summary");
-    const list = document.querySelector(".sheet-file-group:first-child .sheet-name-list");
-    const chip = document.querySelector(".sheet-file-group:first-child .sheet-name-chip");
+    const selector = document.querySelector("[data-testid='excel-sheet-selector']");
+    const cards = Array.from(document.querySelectorAll("[data-testid='excel-sheet-file-group']"));
+    const summary = document.querySelector("[data-testid='excel-mobile-sheet-summary']");
+    const list = document.querySelector("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-list']");
+    const chip = document.querySelector("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-chip']");
     if (list) list.scrollTop = Math.min(80, list.scrollHeight - list.clientHeight);
     const summaryStyle = summary ? getComputedStyle(summary) : null;
     const selectorRect = selector?.getBoundingClientRect();
@@ -738,21 +834,21 @@ async function testExcelSheetGridLayout(page, fixtures) {
 async function testExcelSheetTrim(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/excel-merger/?run=sheet-trim`);
   await (await page.$('input[type="file"]')).uploadFile(fixtures.sheetTrimXlsx);
-  await page.waitForFunction(() => document.querySelectorAll(".sheet-file-group .sheet-name-list li").length === 3);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid='excel-sheet-file-group'] [data-testid='excel-sheet-name-list'] li").length === 3);
 
   const edgeTrimState = await page.$eval('button[aria-label="끝의 빈 행·열 정리"]', (button) => button.getAttribute("aria-checked"));
   if (edgeTrimState !== "true") throw new Error("The existing trailing-edge trim setting was not preserved.");
 
   await clickSetting(page, "중간의 연속 빈 행 삭제");
   await clickSetting(page, "중간의 연속 빈 열 삭제");
-  const thresholdInput = await page.$('.sheet-trim-threshold input[type="number"]');
+  const thresholdInput = await page.$("[data-testid='excel-sheet-trim-threshold'] input[type='number']");
   await replaceInputValue(page, thresholdInput, "3");
   await clickPrimaryAction(page);
   await waitForResult(page);
   await assertProgressLog(page, "연속 빈 행·열 정리");
 
   const resultPath = path.join(tempDir, "sheet-trim-result.xlsx");
-  await saveBlobLink(page, ".result-download", resultPath);
+  await saveBlobLink(page, ":is(.result-download,[data-testid='excel-result-download'])", resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const sheet = workbook.worksheets[0];
@@ -768,7 +864,7 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
     || actual.d5 !== "D 유지" || actual.e5 !== "H 이동" || actual.f5 !== "") {
     throw new Error(`SheetTrim did not preserve short gaps and delete long row/column blocks: ${JSON.stringify(actual)}`);
   }
-  const logText = await page.$eval(".operation-log", (element) => element.textContent || "");
+  const logText = await page.$eval(".ui-operation-log", (element) => element.textContent || "");
   if (!logText.includes("빈 행 3개, 빈 열 3개")) throw new Error(`SheetTrim counts were not logged: ${logText}`);
   const referencedSheet = workbook.worksheets.find((candidate) => candidate.name.includes("참조 대상"));
   const summarySheet = workbook.worksheets.find((candidate) => candidate.name.includes("참조 요약"));
@@ -776,16 +872,16 @@ async function testExcelSheetTrim(page, fixtures, tempDir) {
   if (referencedSheet?.getCell("A5").text !== "참조 유지" || !summaryFormula.replaceAll("'", "").includes(`${referencedSheet?.name}!A5`)) {
     throw new Error(`Middle-row trimming shifted a cell referenced by another worksheet: ${JSON.stringify({ sheets: workbook.worksheets.map((candidate) => candidate.name), referencedA5: referencedSheet?.getCell("A5").text, summaryFormula })}`);
   }
-  const warningText = await page.$eval(".result-warnings", (element) => element.textContent || "");
+  const warningText = await page.$eval("[data-testid=excel-result-warnings]", (element) => element.textContent || "");
   if (!warningText.includes("다른 시트 수식에서 참조")) throw new Error(`Incoming sheet-reference protection was not reported: ${warningText}`);
 }
 
 async function testWordCompare(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
-  await dropFiles(page, ".drop-zone", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
-  await dropFiles(page, ".drop-zone", [fixtures.afterDocx], 1);
-  await page.waitForSelector(".pair-count-error");
-  const disabledForMismatch = await page.$eval(".tool-action-bar .primary-button", (button) => button.disabled);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.beforeDocx, fixtures.beforeDocxTwo], 0);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.afterDocx], 1);
+  await page.waitForSelector("[data-tool-page='document-compare'] [role='alert']");
+  const disabledForMismatch = await page.$eval("[data-testid='document-action-bar'] [data-ui-component='primary-button']", (button) => button.disabled);
   if (!disabledForMismatch) throw new Error("Word comparison was not blocked for mismatched file counts.");
 
   await page.evaluate(() => {
@@ -793,65 +889,65 @@ async function testWordCompare(page, fixtures, tempDir) {
     if (!(button instanceof HTMLButtonElement)) throw new Error("Move-right button not found.");
     button.click();
   });
-  await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 1
-    && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 2);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 1
+    && document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 2);
   await page.evaluate(() => {
     const button = document.querySelector('button[aria-label="before-two.docx 수정 전 목록으로 이동"]');
     if (!(button instanceof HTMLButtonElement)) throw new Error("Move-left button not found.");
     button.click();
   });
-  await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 2
-    && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 1);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 2
+    && document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 1);
 
-  await dropFiles(page, ".sortable-word-files", [fixtures.afterDocxTwo], 1);
-  await page.waitForFunction(() => document.querySelectorAll(".sortable-word-files")[0]?.children.length === 2
-    && document.querySelectorAll(".sortable-word-files")[1]?.children.length === 2
-    && !document.querySelector(".pair-count-error"));
-  const wordAddButtons = await page.$$eval(".word-file-column .drop-zone .secondary-button", (buttons) => buttons.map((button) => button.textContent || ""));
+  await dropFiles(page, "[data-testid^='document-file-list-']", [fixtures.afterDocxTwo], 1);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 2
+    && document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 2
+    && !document.querySelector("[data-tool-page='document-compare'] [role='alert']"));
+  const wordAddButtons = await page.$$eval("[data-document-file-column] [data-ui-part=drop-target] [data-slot=button]", (buttons) => buttons.map((button) => button.textContent || ""));
   if (wordAddButtons.length !== 2 || wordAddButtons.some((label) => !label.includes("더 추가"))) throw new Error(`Word comparison does not expose incremental file addition: ${wordAddButtons.join(", ")}`);
-  const draggable = await page.$$eval(".sortable-word-files li", (items) => items.every((item) => item.draggable));
+  const draggable = await page.$$eval("[data-testid='document-file-item']", (items) => items.every((item) => item.draggable));
   if (!draggable) throw new Error("Word file order list is not draggable.");
   const crossColumnDrag = await page.evaluate(async () => {
-    const source = document.querySelectorAll(".sortable-word-files")[0]?.querySelector("li");
-    const target = document.querySelectorAll(".sortable-word-files")[1]?.querySelector("li");
+    const source = document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.querySelector("li");
+    const target = document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.querySelector("li");
     if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) throw new Error("Word drag fixtures are unavailable");
     const transfer = new DataTransfer();
     source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     target.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const state = { dropEffect: transfer.dropEffect, highlighted: target.classList.contains("drag-over") };
+    const state = { dropEffect: transfer.dropEffect, highlighted: target.hasAttribute("data-drag-over") };
     source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     return state;
   });
   if (crossColumnDrag.dropEffect !== "none" || crossColumnDrag.highlighted) throw new Error(`Cross-column reorder still appears available: ${JSON.stringify(crossColumnDrag)}`);
-  const moveTooltip = await page.$eval('.move-across-button', (button) => ({ label: button.getAttribute("aria-label"), title: button.getAttribute("title") }));
+  const moveTooltip = await page.$eval('[data-testid="document-file-item"] button[title]', (button) => ({ label: button.getAttribute("aria-label"), title: button.getAttribute("title") }));
   if (!moveTooltip.title || moveTooltip.title !== moveTooltip.label) throw new Error(`Move-across tooltip is missing: ${JSON.stringify(moveTooltip)}`);
-  if (await page.$eval(".pairing-preview ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");
+  if (await page.$eval("[data-testid='document-pairing-preview'] ol", (list) => list.children.length) !== 2) throw new Error("Word pairing preview is incomplete.");
   const defaultAuthorOption = await page.evaluate(() => {
-    const label = Array.from(document.querySelectorAll(".settings-row strong")).find((element) => element.textContent === "변경 내용 작성자 통일");
-    const toggle = label?.closest(".settings-row")?.querySelector("button");
-    const input = document.querySelector(".revision-author-field input");
+    const label = Array.from(document.querySelectorAll("[data-ui-component='toggle-row'] strong")).find((element) => element.textContent === "변경 내용 작성자 통일");
+    const toggle = label?.closest("[data-ui-component='toggle-row']")?.querySelector("button");
+    const input = document.querySelector("[data-testid='document-revision-author'] input");
     return { checked: toggle?.getAttribute("aria-checked"), inputDisabled: input instanceof HTMLInputElement && input.disabled };
   });
   if (defaultAuthorOption.checked !== "false" || !defaultAuthorOption.inputDisabled) {
     throw new Error(`Revision-author rewrite was not disabled by default: ${JSON.stringify(defaultAuthorOption)}`);
   }
 
-  await page.click(".tool-action-bar .primary-button");
+  await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
   await assertProgressLog(page, "문서 비교");
-  const resultCards = await page.$$(".word-pair-result-card");
+  const resultCards = await page.$$('[data-testid="document-result-card"]');
   if (resultCards.length !== 2) throw new Error(`Expected 2 Word pair results, got ${resultCards.length}.`);
-  if (await page.$$(".word-pair-result-card .blue-download").then((items) => items.length) !== 2) {
+  if (await page.$$('[data-testid="document-result-card"] [data-testid="document-excel-download"]').then((items) => items.length) !== 2) {
     throw new Error("Each Word pair did not receive its own Excel report.");
   }
-  if (await page.$$(".word-pair-result-card .tracked-download").then((items) => items.length) !== 2) {
+  if (await page.$$('[data-testid="document-result-card"] [data-testid="document-tracked-download"]').then((items) => items.length) !== 2) {
     throw new Error("Each Word pair did not receive its own tracked-change DOCX.");
   }
 
   const resultPath = path.join(tempDir, "word-report.xlsx");
-  await saveBlobLink(page, ".word-pair-result-card .blue-download", resultPath);
+  await saveBlobLink(page, '[data-testid="document-result-card"] [data-testid="document-excel-download"]', resultPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(resultPath));
   const changesSheet = workbook.getWorksheet("변경 내용");
@@ -896,23 +992,23 @@ async function testWordCompare(page, fixtures, tempDir) {
   }
 
   const trackedPath = path.join(tempDir, "word-tracked.docx");
-  await saveBlobLink(page, ".word-pair-result-card .tracked-download", trackedPath);
+  await saveBlobLink(page, '[data-testid="document-result-card"] [data-testid="document-tracked-download"]', trackedPath);
   await assertTrackedDocument(trackedPath, fixtures.beforeDocx, fixtures.afterDocx);
   const secondTrackedPath = path.join(tempDir, "word-tracked-two.docx");
-  await saveBlobLink(page, ".word-pair-result-card:nth-child(2) .tracked-download", secondTrackedPath);
+  await saveBlobLink(page, '[data-testid="document-result-card"]:nth-child(2) [data-testid="document-tracked-download"]', secondTrackedPath);
   await assertTrackedDocument(secondTrackedPath, fixtures.beforeDocxTwo, fixtures.afterDocxTwo, false);
 
-  await page.click(".word-pair-result-card .secondary-button");
+  await page.click('[data-testid="document-result-card"] [data-testid="document-view-result"]');
   await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1")
     && document.querySelector("h1")?.textContent?.includes("1번 문서 비교"));
   const detailHeading = await page.$eval("h1", (element) => element.textContent || "");
   if (!detailHeading.includes("1번 문서 비교")) throw new Error(`Pair result view did not open: ${detailHeading}`);
-  if (await page.$$(".document-page-column-heading").then((items) => items.length) !== 2) {
+  if (await page.$$('[data-testid="document-page-view"] [role="columnheader"]').then((items) => items.length) !== 2) {
     throw new Error("Full before/after document page columns were not rendered.");
   }
-  const documentFlow = await page.$$eval(".document-page-row", (items) => items.map((item) => ({
-    table: item.classList.contains("table-block"),
-    blockCount: item.querySelectorAll(".document-page-block").length,
+  const documentFlow = await page.$$eval('[data-testid="document-page-view"] [role="row"]', (items) => items.map((item) => ({
+    table: item.hasAttribute("data-table-block"),
+    blockCount: item.querySelectorAll("[role='cell']").length,
     height: Math.round(item.getBoundingClientRect().height),
   })));
   if (documentFlow.length !== 4 || !documentFlow.at(-1)?.table || documentFlow.some((item) => item.blockCount !== 2)) {
@@ -921,85 +1017,85 @@ async function testWordCompare(page, fixtures, tempDir) {
   if ((documentFlow[2]?.height ?? 100) > 32) {
     throw new Error(`Continuous document paragraphs still have card-like vertical spacing: ${JSON.stringify(documentFlow)}`);
   }
-  const webTables = await page.$$(".word-document-table");
+  const webTables = await page.$$('[data-testid="document-table"]');
   if (webTables.length !== 2) throw new Error(`The document table was flattened instead of rendered on both pages: ${webTables.length}`);
-  const alignedTableShape = await page.$$eval(".word-document-table", (tables) => tables.map((table) => ({
+  const alignedTableShape = await page.$$eval('[data-testid="document-table"]', (tables) => tables.map((table) => ({
     rows: table.rows.length,
     cells: Array.from(table.rows).reduce((total, row) => total + row.cells.length, 0),
-    gaps: table.querySelectorAll("td.structural-gap").length,
+    gaps: table.querySelectorAll("td[aria-hidden='true']").length,
   })));
   if (alignedTableShape[0]?.rows !== 5 || alignedTableShape[0]?.cells !== 20 || alignedTableShape[0]?.gaps !== 8
     || alignedTableShape[1]?.rows !== 5 || alignedTableShape[1]?.cells !== 20 || alignedTableShape[1]?.gaps !== 0) {
     throw new Error(`Inserted table axes were not aligned in the web document view: ${JSON.stringify(alignedTableShape)}`);
   }
-  if (!await page.$(".page-diff-delete") || !await page.$(".page-diff-add")) {
+  if (!await page.$('[data-diff-kind="deleted"]') || !await page.$('[data-diff-kind="added"]')) {
     throw new Error("Inline deleted/inserted highlights were not rendered in the web comparison.");
   }
-  const firstComparedParagraph = await page.$eval(".document-page-row p", (element) => element.textContent || "");
+  const firstComparedParagraph = await page.$eval('[data-testid="document-page-view"] [role="row"] p', (element) => element.textContent || "");
   if (!firstComparedParagraph.startsWith("1. ")) throw new Error(`Word list label was not rendered in the web view: ${firstComparedParagraph}`);
-  const hasCommentTab = await page.$$eval(".document-toolbar .segmented-control button", (buttons) => buttons.some((button) => button.textContent === "메모"));
+  const hasCommentTab = await page.$$eval('[data-testid="document-result-toolbar"] [data-ui-component="segmented-control"] button', (buttons) => buttons.some((button) => button.textContent === "메모"));
   if (hasCommentTab) throw new Error("The standalone comment tab was not removed.");
-  await page.waitForSelector(".document-page-row .inline-comment-card");
-  const commentParagraphLocations = await page.$$eval(".document-page-row:has(.inline-comment-card) .document-block-meta small", (items) => items.map((item) => item.textContent || ""));
+  await page.waitForSelector('[data-testid="document-page-view"] [role="row"] [data-comment-kind]');
+  const commentParagraphLocations = await page.$$eval('[data-testid="document-page-view"] [role="row"]:has([data-comment-kind]) [data-testid="document-block-meta"] small', (items) => items.map((item) => item.textContent || ""));
   if (!commentParagraphLocations.every((location) => location.startsWith("본문 2번째 문단"))) {
     throw new Error(`Comments were not shown at their anchored paragraph: ${commentParagraphLocations.join(", ")}`);
   }
 
-  const allContentRowCount = await page.$$(".document-page-row").then((items) => items.length);
-  const fullContentToggle = await page.$('.document-content-toggle button[aria-label="내용 전체"]');
+  const allContentRowCount = await page.$$('[data-testid="document-page-view"] [role="row"]').then((items) => items.length);
+  const fullContentToggle = await page.$('[data-testid="document-result-toolbar"] button[aria-label="내용 전체"]');
   if (!fullContentToggle) throw new Error("Full-content toggle was not rendered on the document tab.");
   await fullContentToggle.evaluate((button) => button.click());
-  await page.waitForFunction((previousCount) => document.querySelectorAll(".document-page-row").length < previousCount, {}, allContentRowCount);
-  const filteredKinds = await page.$$eval(".document-page-row", (items) => items.map((item) => item.className));
-  if (filteredKinds.some((className) => className.includes("unchanged"))) throw new Error("Unchanged paragraphs remained after disabling full content.");
-  if (!await page.$(".document-page-row .inline-comment-card")) throw new Error("A changed paragraph's comment was hidden by the change filter.");
-  if (!filteredKinds.some((className) => className.includes("table-block"))) throw new Error("The changed table was hidden by the change filter.");
-  const backHref = await page.$eval(".result-view-back a", (link) => link.getAttribute("href"));
-  await page.$eval(".result-view-back a", (link) => {
+  await page.waitForFunction((previousCount) => document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length < previousCount, {}, allContentRowCount);
+  const filteredKinds = await page.$$eval('[data-testid="document-page-view"] [role="row"]', (items) => items.map((item) => ({ kind: item.getAttribute("data-document-kind"), table: item.hasAttribute("data-table-block") })));
+  if (filteredKinds.some(({ kind }) => kind === "unchanged")) throw new Error("Unchanged paragraphs remained after disabling full content.");
+  if (!await page.$('[data-testid="document-page-view"] [role="row"] [data-comment-kind]')) throw new Error("A changed paragraph's comment was hidden by the change filter.");
+  if (!filteredKinds.some(({ table }) => table)) throw new Error("The changed table was hidden by the change filter.");
+  const backHref = await page.$eval('[data-testid="document-result-back"]', (link) => link.getAttribute("href"));
+  await page.$eval('[data-testid="document-result-back"]', (link) => {
     if (!(link instanceof HTMLAnchorElement)) throw new Error("Word result back link was not found.");
     link.click();
   });
   try {
     await page.waitForFunction(() => location.pathname.replace(/\/$/, "").endsWith("/tools/document-compare")
-      && document.querySelectorAll(".word-pair-result-card").length === 2, { timeout: 15_000 });
+      && document.querySelectorAll("[data-testid='document-result-card']").length === 2, { timeout: 15_000 });
   } catch (error) {
     const state = await page.evaluate(() => ({
       href: location.href,
       pathname: location.pathname,
-      cards: document.querySelectorAll(".word-pair-result-card").length,
+      cards: document.querySelectorAll("[data-testid='document-result-card']").length,
       title: document.querySelector("h1")?.textContent || "",
       body: document.body.innerText.slice(0, 1_000),
     }));
     throw new Error(`Word result back navigation failed (link=${backHref}): ${JSON.stringify(state)}\n${error.message || error}`);
   }
-  if (await page.$$(".word-pair-result-card").then((items) => items.length) !== 2) throw new Error("Pair results were lost after returning from detail view.");
-  await page.$eval(".word-pair-result-card:nth-child(2) .secondary-button", (link) => {
+  if (await page.$$('[data-testid="document-result-card"]').then((items) => items.length) !== 2) throw new Error("Pair results were lost after returning from detail view.");
+  await page.$eval('[data-testid="document-result-card"]:nth-child(2) [data-testid="document-view-result"]', (link) => {
     if (!(link instanceof HTMLAnchorElement)) throw new Error("The second Word result link was not found.");
     link.click();
   });
   try {
     await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2")
       && document.querySelector("h1")?.textContent?.includes("2번 문서 비교")
-      && document.querySelectorAll(".document-page-row").length > 0, { timeout: 15_000 });
+      && document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length > 0, { timeout: 15_000 });
   } catch (error) {
     const state = await page.evaluate(() => ({
       href: location.href,
       pathname: location.pathname,
       title: document.querySelector("h1")?.textContent || "",
-      rows: document.querySelectorAll(".document-page-row").length,
-      cards: document.querySelectorAll(".word-pair-result-card").length,
-      buttons: Array.from(document.querySelectorAll(".word-pair-result-card .secondary-button"), (button) => ({ text: button.textContent || "", disabled: button.disabled })),
+      rows: document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length,
+      cards: document.querySelectorAll("[data-testid='document-result-card']").length,
+      buttons: Array.from(document.querySelectorAll("[data-testid='document-result-card'] [data-testid='document-view-result']"), (button) => ({ text: button.textContent || "", disabled: button.disabled })),
       body: document.body.innerText.slice(0, 1_000),
     }));
     throw new Error(`Second Word result navigation failed: ${JSON.stringify(state)}\n${error.message || error}`);
   }
   const splitParagraph = await page.evaluate(() => {
-    const row = Array.from(document.querySelectorAll(".document-page-row")).find((item) => item.textContent?.includes("제5항의 지급이 완료되면"));
+    const row = Array.from(document.querySelectorAll("[data-testid='document-page-view'] [role='row']")).find((item) => item.textContent?.includes("제5항의 지급이 완료되면"));
     if (!row) return null;
     return {
-      deleted: Array.from(row.querySelectorAll(".page-diff-delete"), (item) => item.textContent || ""),
-      added: Array.from(row.querySelectorAll(".page-diff-add"), (item) => item.textContent || ""),
-      blocks: row.querySelectorAll(".document-page-block").length,
+      deleted: Array.from(row.querySelectorAll("[data-diff-kind='deleted']"), (item) => item.textContent || ""),
+      added: Array.from(row.querySelectorAll("[data-diff-kind='added']"), (item) => item.textContent || ""),
+      blocks: row.querySelectorAll("[role='cell']").length,
     };
   });
   if (!splitParagraph || splitParagraph.blocks !== 2 || splitParagraph.deleted.length
@@ -1013,21 +1109,21 @@ async function testWordCompare(page, fixtures, tempDir) {
 
 async function testWordFormattingBoundaries(page, fixtures) {
   await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
-  await dropFiles(page, ".drop-zone", [fixtures.boundaryBeforeDocx, fixtures.formattingBeforeDocx], 0);
-  await dropFiles(page, ".drop-zone", [fixtures.boundaryAfterDocx, fixtures.formattingAfterDocx], 1);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.boundaryBeforeDocx, fixtures.formattingBeforeDocx], 0);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.boundaryAfterDocx, fixtures.formattingAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
   await clickSetting(page, "Word 변경 추적 (DOCX 전용)");
-  await page.click(".tool-action-bar .primary-button");
-  await page.waitForFunction(() => !document.querySelector(".operation-progress.status-running")
-    && (document.querySelector(".word-pair-result-card") || document.querySelector(".error-banner")), { timeout: 240_000 });
-  if (await page.$(".error-banner")) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Word boundary fixture failed."));
-  const cards = await page.$$eval(".word-pair-result-card", (items) => items.map((item) => item.textContent || ""));
+  await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
+  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
+    && (document.querySelector("[data-testid='document-result-card']") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout: 240_000 });
+  if (await page.$("[data-tool-page='document-compare'] [role='alert']")) throw new Error(await page.$eval("[data-tool-page='document-compare'] [role='alert']", (element) => element.textContent || "Word boundary fixture failed."));
+  const cards = await page.$$eval("[data-testid='document-result-card']", (items) => items.map((item) => item.textContent || ""));
   if (cards.length !== 2 || !cards[0].includes("변경 없음") || !cards[1].includes("6개 변경 발견")) {
     throw new Error(`Boundary-aware formatting fixture produced unexpected results: ${JSON.stringify(cards)}`);
   }
-  await page.click(".word-pair-result-card:nth-child(2) .secondary-button");
-  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2") && document.querySelectorAll(".document-page-row").length > 0);
-  const formatRows = await page.$$eval(".document-page-row.format", (items) => items.map((item) => item.textContent || ""));
+  await page.click("[data-testid='document-result-card']:nth-child(2) [data-testid='document-view-result']");
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/2") && document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length > 0);
+  const formatRows = await page.$$eval("[data-testid='document-page-view'] [role='row'][data-document-kind='format']", (items) => items.map((item) => item.textContent || ""));
   const expectedLabels = ["Bold change", "Color change", "Highlight change", "Size change", "Font change", "Table highlight"];
   if (formatRows.length !== expectedLabels.length || expectedLabels.some((label) => !formatRows.some((row) => row.includes(label)))) {
     throw new Error(`True formatting changes were not separated correctly: ${JSON.stringify(formatRows)}`);
@@ -1036,58 +1132,62 @@ async function testWordFormattingBoundaries(page, fixtures) {
 
 async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
   await navigateTo(page, `${koBaseUrl}/tools/document-compare/`);
-  await dropFiles(page, ".drop-zone", [fixtures.revisionsBeforeDocx], 0);
-  await dropFiles(page, ".drop-zone", [fixtures.revisionsAfterDocx], 1);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsBeforeDocx], 0);
+  await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
-  const input = await page.$(".revision-author-field input");
+  const input = await page.$("[data-testid='document-revision-author'] input");
   if (!input || !await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not rendered disabled while rewriting was off.");
   await clickSetting(page, "변경 내용 작성자 통일");
   if (await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input did not become enabled.");
   await replaceInputValue(page, input, "Unified Reviewer");
-  await page.click(".tool-action-bar .primary-button");
+  await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
   const trackedPath = path.join(tempDir, "word-unified-author.docx");
-  await saveBlobLink(page, ".word-pair-result-card .tracked-download", trackedPath);
+  await saveBlobLink(page, "[data-testid='document-result-card'] [data-testid='document-tracked-download']", trackedPath);
   await assertUnifiedTrackedDocument(trackedPath, fixtures.revisionsBeforeDocx, fixtures.revisionsAfterDocx, fixtures.revisionOracle);
 
   await clickSetting(page, "변경 내용 작성자 통일");
-  await page.waitForFunction(() => !document.querySelector(".word-pair-result-card"));
+  await page.waitForFunction(() => !document.querySelector("[data-testid='document-result-card']"));
   if (!await input.evaluate((element) => element.disabled)) throw new Error("Changing the rewrite option did not disable its input and clear prior results.");
 }
 
 async function waitForResult(page, timeout = 180_000) {
-  await page.waitForFunction(() => !document.querySelector(".operation-progress.status-running")
-    && (document.querySelector(".result-download") || document.querySelector(".error-banner")), { timeout });
-  const error = await page.$(".error-banner");
-  if (error) throw new Error(await page.$eval(".error-banner", (element) => element.textContent || "Unknown UI error"));
+  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
+    && (document.querySelector(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
+  const error = await page.$(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || await page.$("[data-tool-page='document-compare'] [role='alert']");
+  if (error) throw new Error(await error.evaluate((element) => element.textContent || "Unknown UI error"));
 }
 
 async function clickPrimaryAction(page) {
-  const previousHref = await page.$eval(".result-download", (link) => link.href).catch(() => "");
-  await page.$eval(".summary-card .primary-button", (button) => {
+  const previousHref = await page.$eval(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])", (link) => link.href).catch(() => "");
+  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) [data-ui-component=primary-button]", (button) => {
     if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error("The primary action is unavailable.");
     button.click();
   });
   await page.waitForFunction((href) => {
-    const result = document.querySelector(".result-download");
-    return Boolean(document.querySelector(".operation-progress.status-running")
-      || document.querySelector(".error-banner")
+    const result = document.querySelector(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])");
+    return Boolean(document.querySelector(".ui-operation-progress.ui-status-running")
+      || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])")
       || !result
       || result.href !== href);
   }, {}, previousHref);
 }
 
 async function assertProgressLog(page, label) {
-  if (!await page.$(".operation-progress .operation-log")) {
-    await page.$eval(".operation-progress .operation-log-toggle", (button) => button.click());
-    await page.waitForSelector(".operation-progress .operation-log");
+  if (!await page.$(".ui-operation-progress .ui-operation-log")) {
+    await page.$eval(".ui-operation-progress .ui-operation-log-toggle", (button) => button.click());
+    await page.waitForSelector(".ui-operation-progress .ui-operation-log");
   }
-  const state = await page.$eval(".operation-progress", (element) => ({
+  const state = await page.$eval(".ui-operation-progress", (element) => ({
+    tagName: element.tagName,
+    cardSlot: element.getAttribute("data-slot"),
     className: element.className,
     progress: element.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
-    logs: element.querySelectorAll(".operation-log li").length,
+    progressSlot: element.querySelector('[role="progressbar"]')?.getAttribute("data-slot"),
+    logs: element.querySelectorAll(".ui-operation-log li").length,
+    logPercentages: Array.from(element.querySelectorAll(".ui-operation-log-progress"), (item) => item.textContent || ""),
     logViewport: (() => {
-      const log = element.querySelector(".operation-log");
+      const log = element.querySelector(".ui-operation-log");
       if (!(log instanceof HTMLOListElement)) return null;
       const style = getComputedStyle(log);
       return {
@@ -1098,7 +1198,9 @@ async function assertProgressLog(page, label) {
       };
     })(),
   }));
-  if (!state.className.includes("status-success") || state.progress !== "100" || state.logs < 4) {
+  if (state.tagName !== "SECTION" || state.cardSlot !== "card" || state.progressSlot !== "progress"
+    || !state.className.includes("status-success") || state.progress !== "100" || state.logs < 4
+    || state.logPercentages.length !== state.logs || state.logPercentages.some((value) => !/^\d+%$/.test(value))) {
     throw new Error(`${label} progress log is incomplete: ${JSON.stringify(state)}`);
   }
   if (!state.logViewport || state.logViewport.height < 150 || state.logViewport.overflowY !== "scroll"
@@ -1109,8 +1211,8 @@ async function assertProgressLog(page, label) {
 
 async function clickSetting(page, label) {
   await page.evaluate((text) => {
-    const strong = Array.from(document.querySelectorAll(".settings-row strong")).find((element) => element.textContent === text);
-    const button = strong?.closest(".settings-row")?.querySelector("button");
+    const strong = Array.from(document.querySelectorAll('[data-ui-component="toggle-row"] strong')).find((element) => element.textContent === text);
+    const button = strong?.closest('[data-ui-component="toggle-row"]')?.querySelector("button");
     if (!(button instanceof HTMLButtonElement)) throw new Error(`Setting not found: ${text}`);
     button.click();
   }, label);
