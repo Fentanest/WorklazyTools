@@ -4,6 +4,69 @@
 
 ## 2026-09-06
 
+### P2 main 병합·라이브 배포 후 검증 (Codx)
+
+**판정: 승인된 배포를 완료했고 배포 후 게이트 ⑥을 통과했다. 지정 7개 화면에서 레이아웃 파손·조작 불가·데이터 손실 가능성을 발견하지 않아 롤백하지 않았다.** CHANGELOG의 같은 날짜 P2 배포 항목에 대응한다. 제품 코드·번들 예산 상한/기준점·개인 파일 3개는 수정하지 않았다.
+
+- **실행 게이트**: `PROJECT_RULES.md` 전문, `AGENTS.md`, P2 정본의 배포 계약·사용자 결정·게이트 판정, `PUBLISHING_CHECKLIST.md` 4항과 관련 기각 이력을 선독했다. fetch 후 `HEAD=6fc458fa064e3e59c7e6d0cfaf9b0101d73139db`, `origin/ui-migration=3588ebafab3dd876746e356ea652d923eda0f5e5`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`가 지시와 일치했다. 추적 변경 0, 개인 미추적 `before.docx`·`after.docx`·네이버 확인 HTML만 존재했다. 열린 14문서에서 이번 배포와 상반된 최신 지시는 없었다. U4 PDF는 비정본 후속이며 이전 브랜치 push 금지는 2026-09-06 사용자 승인으로 해제됐다.
+- **계보·백업·병합**: `git push origin ui-migration` → `3588eba..6fc458f`, exit 0. `git switch main` 후 `git merge --no-ff ui-migration` → **`1ff9187e655575ea49bac327560861632bdf2815`**, 부모는 기존 main `073da56`과 검수 HEAD `6fc458f`다. `git diff --exit-code ui-migration HEAD` exit 0으로 병합 트리가 검수 브랜치와 동일함을 확인했다. 지시서의 30커밋은 `073da56..0663c74`에서 맞으며, 후속 충돌 수정 `3807644`·시계 수정 `6fc458f`를 포함한 실제 병합 이력은 **32커밋**이다. squash/rebase는 사용하지 않았다.
+- **push 전 검증·실배포**: main에서 `npm run build` exit 0, **2,830 modules·정적 61페이지**, Vite 74초. 기존 eval·500kB chunk 경고 외 오류 없음. `npm run test:static`도 exit 0. `git push origin main` → `073da56..1ff9187`, exit 0. [Pages 실행 33981007120](https://github.com/Fentanest/WorklazyTools/actions/runs/33981007120)은 **build·static·video hybrid smoke·deploy 모두 success**이고 `gh run watch 33981007120 --exit-status`도 exit 0이다. 승인된 게이트 ①~⑤의 unit 195/195·전 스코프·KO/EN visual 각 175/175는 요청대로 재실행하지 않았다.
+- **라이브 반영 확인·측정 전제 정정**: 라이브 진입 JS `index-BA1o-uV3.js`·CSS `index-DBcq71er.css`는 해당 성공 Actions의 업로드 목록과 일치한다. CSS 229,959B는 로컬과 byte-identical(SHA-256 `8c61ecc0a2c74349ac209964280df667179cae01af7c3ab31977fcefa26ff399`)이다. 최초 보조 검사에서 로컬 진입 JS 파일명 `index-BPo-f7fF.js`까지 같아야 한다는 가정은 실패했다. CI는 `VITE_SITE_URL`을 명시하고 로컬은 기본값을 쓰며 실제 번들도 950,503/950,468B로 달랐다. 로컬 파일명 동등성을 배포 성공으로 오인하지 않고 **성공한 CI 산출물 목록과 실제 라이브 참조**로 대조했다. 제품 수정은 하지 않았다.
+
+**라이브 접근성** — axe-core **4.13.0**·Playwright **1.63.0**·Chrome **152.0.7977.64**·1280×800·light·ko-KR·Asia/Seoul. 기존 감사 스크립트와 같은 전체 axe 규칙·동의 granted·폰트/paint 대기·애니메이션 제거 조건이다. 라이브 복사본에서 로컬 QA 전용 외부 요청 0 단언만 제거하고 실제 외부 요청 **69건**을 기록했다. 접근성 기준과 제품 DOM은 바꾸지 않았다.
+
+| 페이지 | 경로 | passes | 전환 전 → 배포 후 violations |
+| --- | --- | ---: | ---: |
+| 홈(언어 랜딩) | `/` | 25 | 1 → **0** |
+| 문서 비교 | `/ko/tools/document-compare/` | 41 | 2 → **0** |
+| 도구 목록 | `/ko/tools/` | 39 | 1 → **0** |
+| Excel 비교 | `/ko/tools/excel-compare/` | 46 | 2 → **0** |
+| PDF 도구 | `/ko/tools/pdf-editor/` | 43 | 4 → **0** |
+
+합계 **10 → 0(−10)**, critical/serious/moderate **0/0/0**. 문서 비교 placeholder는 `rgb(105,105,111)` on `rgb(242,242,247)`, **4.8871087704:1**로 4.5:1 이상이다.
+
+**육안·모바일·조작** — 위 5화면 + Excel 병합 EN mobile + HWP 문서 로드 후를 라이브에서 직접 열어 **13개 프로필**(1280×800 desktop·390×844 mobile, Excel EN은 mobile)을 채집했다. 원본 PNG를 직접 열어 정렬·토글 썸·줄바꿈·액션 가림을 대조했고 차단 증상은 없었다. 13프로필의 문서 가로 overflow **0px**, 동일 origin HTTP 오류와 pageerror **0건**이다. 모바일 일반 도구 5화면은 최하단 오차 **0px**, main padding **80px ≥ tabs 62px**, footer bottom **763.64~764.20px ≤ tabs top 773px**다. 루트 랜딩은 하단 탭이 없고, HWP 로드 상태는 전용 편집 화면으로 별도 확인했다.
+
+- 문서 비교 스위치 Space ON/OFF 복원과 Excel 비교 키 모드 선택, Excel EN 시트 선택 토글·병합 방식 3개 실제 클릭이 동작했다. Excel EN 병합 분절은 **100×56px·2줄**, text Range 이탈 0·버튼 hit 검사 통과다. 최초 캡처는 native `scrollIntoViewIfNeeded`가 고정 하단 탭을 고려하지 않아 관심 분절이 캡처 아래에 놓였으므로, 추가 스크롤로 같은 화면의 분절을 중앙에 배치해 `excel-merger-en-mobile-controls.png`로 검수했다. 스크롤로 도달 가능한 영역이며 제품 결함으로 판정하지 않았다.
+- HWP는 저장소의 합성 fixture를 로드하고 toolbar hit 검사를 통과했다. desktop 버튼 오른쪽 최대 **1139px**, 언어 전환기 앞에서 종료하며 mobile은 3+2행으로 모두 보인다. `P2_LIVE_DEPLOY_QA`를 입력해 **3,584B HWP 다운로드·core 재파싱(1페이지·문구 보존)·Studio 재개방**까지 확인했다. 개인 문서는 사용하지 않았다. HML 비활성은 해당 fixture의 기존 저장 가능 판정이며 가림이 아니다.
+- **404**: sitemap의 공개 경로와 ads/robots/sitemap/404 문서·격리 workspace를 포함한 **69 URL 모두 HTTP 200**, 진입 JS/CSS **2/2 HTTP 200**. 의도적으로 만든 `/p2-deployment-check-intentionally-missing-20260906`은 **HTTP 404**였다. 추가로 실제 UI 13프로필의 동일 origin 요청에서 HTTP 오류 0을 확인했다.
+
+**렌더링·Core Web Vitals 실측의 범위** — 기존 렌더링 측정기와 같은 Chrome 152·1280×800·light·ko-KR·cache off·SW block·무스로틀·cold **3회 중앙값**, networkidle 뒤 **3초** 대기다. 라이브 production은 HTTPS 네트워크 및 실제 동의 후 광고/추적을 포함해 외부 요청 **162건**이 발생했다. 따라서 광고 없는 로컬 loopback과의 차이를 순수 UI 성능 회귀로 단정하지 않는다. 측정 시각은 **2026-09-06 02:38 KST**다. 렌더링의 홈 표본은 기존 기준과 같은 `/ko`이며 접근성 홈 표본 `/`와 구별한다.
+
+| 페이지 | LCP ms: 로컬 → 라이브 (Δ) | CLS: 로컬 → 라이브 | blocking ms: 로컬 → 라이브 (Δ) |
+| --- | ---: | ---: | ---: |
+| 홈 `/ko` | 91.34 → **508** (+416.66) | 0.038332 → **0.038332** | 146 → **109** (−37) |
+| 문서 비교 | 90.67 → **732** (+641.33) | 0.114199 → **0.114199** | 49 → **85** (+36) |
+| PDF | 512.32 → **168** (−344.32) | 0.114199 → **0.114199** | 52 → **32** (−20) |
+
+blocking은 FCP 이후 관측창의 `sum(max(0,longTask.duration−50ms))`이며 정식 필드 INP가 아니다. 별도 실제 클릭의 Event Timing 최대 duration은 홈 **64ms(1회)**·문서 **64ms(5회)**·PDF **48ms(5회)**였다(16ms 이상 event 수집). 이 역시 **실험실 표본이며 실사용 INP·CrUX/Search Console의 28일 집계 판정이 아니다**. 실사용 집계는 이번 세션에서 측정하지 않았다. 문서/PDF의 CLS 0.114199는 기존 기준과 동일하며 이를 개선 완료 또는 모든 CWV 통과로 표시하지 않는다.
+
+**광고·추적** — consent granted, KO/EN 양쪽에서 일반 Excel Cleaner 양성 대조와 video/office/XLS 격리 경로를 각각 새 브라우저 context로 열어 검사했다.
+
+| 경로(각 KO/EN) | AdSense DOM / loader 요청 | 로더 응답·실행 | GA / Naver DOM | 격리 상태 |
+| --- | ---: | --- | ---: | --- |
+| `/tools/excel-cleaner/` | **1 / 1** | **HTTP 200, `adsbygoogle.loaded=true`**, 실패 0 | 1 / 1 | 일반 경로 |
+| `/tools/video-studio/` | **0 / 0** | 광고 로드 없음 | 1 / 1 | marker·crossOriginIsolated true |
+| `/tools/office-editor/app/` | **0 / 0** | 광고 로드 없음 | 0 / 0 | marker·crossOriginIsolated true |
+| `/tools/excel-merger/xls-preserve/` | **0 / 0** | 광고 로드 없음 | 0 / 0 | marker·crossOriginIsolated true |
+
+격리 경로 **6/6 광고 DOM·요청 0**, 일반 양성 대조 **2/2 로더 정상 실행**이다. 광고 지면의 실제 게재/계정 승인 상태까지 이 결과로 주장하지 않는다.
+
+**재현 명령·증거** — `/tmp/worklazytools-p2-deploy-20260906/`에 원본 JSON·PNG·실행 로그·배포 메타데이터·검증용 스크립트를 보존했다. 다음 명령은 전부 실제 **exit 0**이었다. `live-a11y.mjs`와 `live-rendering.mjs`는 기존 `tests/accessibility-audit.mjs`·`tests/rendering-baseline.mjs`의 라이브 전용 복사본이며 production 외부 요청을 기록·허용하고 보고서의 환경 설명만 바로잡았다. repo 제품·테스트 코드 변경은 없다.
+
+```sh
+npm run build
+npm run test:static
+gh run watch 33981007120 --exit-status --interval 15
+TEST_BASE_URL=https://worklazy.net A11Y_REPORT_PATH=/tmp/worklazytools-p2-deploy-20260906/live-a11y.json node /tmp/worklazytools-p2-deploy-20260906/live-a11y.mjs
+node /tmp/worklazytools-p2-deploy-20260906/live-ui.mjs
+node /tmp/worklazytools-p2-deploy-20260906/live-excel-controls.mjs
+python3 /tmp/worklazytools-p2-deploy-20260906/live-http.py
+node /tmp/worklazytools-p2-deploy-20260906/live-ads.mjs
+TEST_BASE_URL=https://worklazy.net RENDER_REPORT_PATH=/tmp/worklazytools-p2-deploy-20260906/live-rendering.json node /tmp/worklazytools-p2-deploy-20260906/live-rendering.mjs
+node /tmp/worklazytools-p2-deploy-20260906/live-interaction.mjs
+```
+
 ### P-QA 커밋·시각 하네스 시계 결정성 (Codx)
 
 - **실행 게이트·A 커밋**: `PROJECT_RULES.md`·`AGENTS.md` 전문 선독, `ui-migration`의 기준 `0663c7449f94f8d046e36c8ec16502582dd4f001` 일치, 열린 계획 14문서 충돌 검사 완료. 최신 지시로 이전 commit 금지만 무효화하고 모든 push 금지는 유지했다. Claude의 두 결함 해소 판정을 수용해 기존 수정을 보존했다. A=`380764486ebffdbcc5cc065c6cad0278146f503c`, **109파일**: 제품 2·scenario/test 2·기록 2·기준선 4(수정 1+신규 3)·증거 99(PNG 68). 증거는 기존 QA 추적 관례대로 4디렉터리 전부 포함했다. [포함 경로 전문](../tests/visual-artifacts/clock-fix-evidence/task-a-included.txt). 사용자 `before.docx`·`after.docx`·네이버 소유확인 HTML과 jobs는 제외했다.
