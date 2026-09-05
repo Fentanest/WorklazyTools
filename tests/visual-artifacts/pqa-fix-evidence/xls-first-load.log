@@ -1,0 +1,269 @@
+
+> worklazytools@0.1.0 test:xls-first-load
+> node tests/xls-preserve-first-load-smoke.mjs
+
+XLS first-load evidence: {
+  "fallbackProbe": {
+    "status": 404,
+    "body": "404.html",
+    "coep": "",
+    "coop": "",
+    "corp": ""
+  },
+  "firstEntry": {
+    "path": "/ko/tools/excel-merger/xls-preserve/",
+    "isolated": true,
+    "sharedArrayBuffer": true,
+    "controller": "http://127.0.0.1:46563/service-worker.js",
+    "marker": true,
+    "status": "noindex, nofollow"
+  },
+  "firstAttempt": {
+    "ready": 4,
+    "errors": [],
+    "banner": ""
+  },
+  "afterManualReload": null,
+  "videoCompatibility": {
+    "isolated": true,
+    "controller": "http://127.0.0.1:46563/service-worker.js",
+    "document": {
+      "url": "http://127.0.0.1:46563/ko/tools/video-studio/",
+      "resourceType": "document",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "credentialless",
+      "coop": "same-origin",
+      "corp": "cross-origin"
+    },
+    "worker": {
+      "url": "http://127.0.0.1:46563/ko/tools/video-studio/workers/video-probe.worker-BCRBBCdk.js",
+      "resourceType": "script",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "require-corp",
+      "coop": "same-origin",
+      "corp": "same-origin"
+    }
+  },
+  "directEntry": {
+    "browser": {
+      "path": "/en/tools/excel-merger/xls-preserve/",
+      "isolated": true,
+      "sharedArrayBuffer": true,
+      "controller": "http://127.0.0.1:46563/en/tools/excel-merger/xls-preserve/coi-serviceworker.js",
+      "marker": true,
+      "status": "noindex, nofollow"
+    },
+    "documentRequests": [
+      {
+        "method": "GET",
+        "pathname": "/en/tools/excel-merger/xls-preserve/",
+        "status": 200,
+        "fallback": false
+      },
+      {
+        "method": "GET",
+        "pathname": "/en/tools/excel-merger/xls-preserve/",
+        "status": 200,
+        "fallback": false
+      }
+    ]
+  },
+  "serverRequests": [
+    {
+      "method": "GET",
+      "pathname": "/ko/tools/excel-merger/xls-preserve/",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/ko/tools/excel-merger/xls-preserve/coi-serviceworker.js",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/assets/excel.worker-C1st3Zsx.js",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/ko/tools/video-studio/workers/video-probe.worker-BCRBBCdk.js",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/en/tools/excel-merger/xls-preserve/",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/en/tools/excel-merger/xls-preserve/coi-serviceworker.js",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/en/tools/excel-merger/xls-preserve/coi-serviceworker.js",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/en/tools/excel-merger/xls-preserve/",
+      "status": 200,
+      "fallback": false
+    },
+    {
+      "method": "GET",
+      "pathname": "/en/tools/excel-merger/xls-preserve/coi-serviceworker.js",
+      "status": 200,
+      "fallback": false
+    }
+  ],
+  "responseTrace": [
+    {
+      "url": "http://127.0.0.1:46563/ko/tools/excel-merger/",
+      "resourceType": "document",
+      "status": 200,
+      "fromServiceWorker": false,
+      "coep": "",
+      "coop": "",
+      "corp": ""
+    },
+    {
+      "url": "http://127.0.0.1:46563/ko/tools/excel-merger/xls-preserve/?formula=1&format=0",
+      "resourceType": "document",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "require-corp",
+      "coop": "same-origin",
+      "corp": "same-origin"
+    },
+    {
+      "url": "http://127.0.0.1:46563/ko/tools/excel-merger/xls-preserve/coi-serviceworker.js",
+      "resourceType": "script",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "require-corp",
+      "coop": "same-origin",
+      "corp": "same-origin"
+    },
+    {
+      "url": "http://127.0.0.1:46563/assets/excel.worker-C1st3Zsx.js",
+      "resourceType": "script",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "require-corp",
+      "coop": "same-origin",
+      "corp": "same-origin"
+    },
+    {
+      "url": "http://127.0.0.1:46563/ko/tools/video-studio/",
+      "resourceType": "document",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "credentialless",
+      "coop": "same-origin",
+      "corp": "cross-origin"
+    },
+    {
+      "url": "http://127.0.0.1:46563/ko/tools/video-studio/coi-serviceworker.js",
+      "resourceType": "script",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "credentialless",
+      "coop": "same-origin",
+      "corp": "cross-origin"
+    },
+    {
+      "url": "http://127.0.0.1:46563/ko/tools/video-studio/workers/video-probe.worker-BCRBBCdk.js",
+      "resourceType": "script",
+      "status": 200,
+      "fromServiceWorker": true,
+      "coep": "require-corp",
+      "coop": "same-origin",
+      "corp": "same-origin"
+    }
+  ],
+  "requestFailures": [],
+  "pageErrors": [],
+  "timeline": [
+    {
+      "event": "document-start",
+      "href": "http://127.0.0.1:46563/ko/tools/excel-merger/",
+      "isolated": false,
+      "controller": "",
+      "time": 1788627226172
+    },
+    {
+      "event": "dom-content-loaded",
+      "href": "http://127.0.0.1:46563/ko/tools/excel-merger/",
+      "isolated": false,
+      "controller": "",
+      "time": 1788627226328
+    },
+    {
+      "event": "load",
+      "href": "http://127.0.0.1:46563/ko/tools/excel-merger/",
+      "isolated": false,
+      "controller": "",
+      "time": 1788627226329
+    },
+    {
+      "event": "controller-change",
+      "href": "http://127.0.0.1:46563/ko/tools/excel-merger/",
+      "isolated": false,
+      "controller": "http://127.0.0.1:46563/service-worker.js",
+      "time": 1788627226503
+    },
+    {
+      "event": "document-start",
+      "href": "http://127.0.0.1:46563/ko/tools/excel-merger/xls-preserve/?formula=1&format=0",
+      "isolated": true,
+      "controller": "http://127.0.0.1:46563/service-worker.js",
+      "time": 1788627226792
+    },
+    {
+      "event": "dom-content-loaded",
+      "href": "http://127.0.0.1:46563/ko/tools/excel-merger/xls-preserve/?formula=1&format=0",
+      "isolated": true,
+      "controller": "http://127.0.0.1:46563/service-worker.js",
+      "time": 1788627226861
+    },
+    {
+      "event": "load",
+      "href": "http://127.0.0.1:46563/ko/tools/excel-merger/xls-preserve/?formula=1&format=0",
+      "isolated": true,
+      "controller": "http://127.0.0.1:46563/service-worker.js",
+      "time": 1788627226861
+    },
+    {
+      "event": "document-start",
+      "href": "http://127.0.0.1:46563/ko/tools/video-studio/",
+      "isolated": true,
+      "controller": "http://127.0.0.1:46563/service-worker.js",
+      "time": 1788627227625
+    },
+    {
+      "event": "dom-content-loaded",
+      "href": "http://127.0.0.1:46563/ko/tools/video-studio/",
+      "isolated": true,
+      "controller": "http://127.0.0.1:46563/service-worker.js",
+      "time": 1788627227663
+    },
+    {
+      "event": "load",
+      "href": "http://127.0.0.1:46563/ko/tools/video-studio/",
+      "isolated": true,
+      "controller": "http://127.0.0.1:46563/service-worker.js",
+      "time": 1788627227663
+    }
+  ]
+}
+XLS preservation first-load smoke passed: four synthetic workbooks inspected without a manual reload on a headerless static server.

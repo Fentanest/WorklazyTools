@@ -1,0 +1,48 @@
+[
+  {
+    "name": "build-production",
+    "command": "npm run build",
+    "env": {},
+    "exitCode": 0
+  },
+  {
+    "name": "static",
+    "command": "npm run test:static",
+    "env": {},
+    "exitCode": 0
+  },
+  {
+    "name": "excel-smoke",
+    "command": "npm run test:browser",
+    "env": {
+      "TEST_SCOPE": "excel"
+    },
+    "exitCode": 0
+  },
+  {
+    "name": "hwp-smoke",
+    "command": "npm run test:new-tools",
+    "env": {
+      "TEST_ONLY_HWP": "1"
+    },
+    "exitCode": 0
+  },
+  {
+    "name": "utilities",
+    "command": "npm run test:utilities",
+    "env": {},
+    "exitCode": 0
+  },
+  {
+    "name": "xls-preserve",
+    "command": "npm run test:xls-preserve",
+    "env": {},
+    "exitCode": 0
+  },
+  {
+    "name": "xls-first-load",
+    "command": "npm run test:xls-first-load",
+    "env": {},
+    "exitCode": 0
+  }
+]

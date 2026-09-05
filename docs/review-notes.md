@@ -4,6 +4,41 @@
 
 ## 2026-09-06
 
+### P-QA 차단 2건 — Excel 영어 분절·HWP 액션 바 충돌 수정 (Codx)
+
+> **2026-09-06 커밋 재개 정정 (Codx)**: 최신 사용자 지시로 이전 전달의 commit 금지는 무효다. 아래 미커밋·금지 서술은 이전 실행 당시 기록이며, 이번에는 두 수정·기준선 4장·증거 4디렉터리(99파일, PNG 68장)를 함께 커밋한다. Claude가 재캡처에서 두 결함 해소를 확인한 판정을 수용했다. 사용자 3파일과 원본 P-QA 604장의 SHA-256을 재확인했으며 모두 동일하다. 모든 push는 계속 금지한다. 시계 원인의 전체 회귀 실패는 별도 후속 커밋으로 해결한다.
+
+- **실행 게이트·정본**: `PROJECT_RULES.md` → HEAD/지시 전문 → `AGENTS.md`·P2 정본·열린 계획서·관련 기각 이력을 확인했다. `ui-migration`, `HEAD=0663c7449f94f8d046e36c8ec16502582dd4f001`로 사용자 기준과 일치했다. 지시 전문은 `/tmp/claude-1000/-home-better0101-projects-worklazytools/98c2890e-0b15-4fc5-a7f8-98e9d02d526e/scratchpad/pqa-fix-dispatch.md`다. 기존 RHWP 업그레이드·Excel 서식 작업은 기능 보존 계약이고 현재 두 레이아웃 수정과 상반 지시가 없다. 지시서의 커밋 요구보다 **최신 사용자의 모든 commit/push 금지**가 우선하며 워킹트리에만 남긴다.
+- **Excel 전→후**: `ExcelMergerPage.tsx`의 3단계 병합 방식에만 전용 wrapper를 두어 버튼의 `white-space: nowrap`·고정 높이를 해제하고 긴 단어의 비상 줄바꿈, 모바일 좌우 padding을 적용했다. 390px EN에서 각 분절 폭 100px에 `Separate sheets`·`Join horizontally`가 각각 1.61px·4.69px 벗어나던 상태가 **2줄·높이 56px·라벨 이탈 0px**가 됐다. KO 390px는 **100×44px·1줄**, EN 1365px는 **218.33×36px·1줄**을 보존했다. 공용 SegmentedControl이나 문구 축약은 다른 도구·번역 계약에 영향을 주므로 채택하지 않았다.
+- **HWP 증상 정정·전→후**: "HWP 저장이 다른 문서를 덮는다"는 원 지적을 채택하지 않았다. 현재 DOM에서 데스크톱 언어 전환기는 **fixed/z-index 45**, rect `(1247.5,22)–(1341,66)`이며 HWPX/HML을 각각 **612.19/2,012.81px²** 덮었다. `HwpEditorPage.tsx`에서 로드 후 toolbar에 133px 오른쪽 공간과 64px 최소 높이를 확보해 **두 겹침 모두 0px²**, HML 오른쪽 1224px→언어 전환기 왼쪽 1247.5px 사이 **23.5px 간격**을 얻었다. 390px의 5등분 grid에서는 `도구 화면`·`HWP 저장` 라벨이 1.55/4.14px 벗어났으며 모바일 헤더의 언어 전환기 자체도 focus layer 아래에 있었다. 모바일 편집 영역은 **top 72px, 높이 100dvh−72px**, 액션은 내용 폭을 유지하는 **3+2 flex wrap**으로 바꿨다. 5개 버튼과 언어 전환기 모두 이탈·가림 0이다. 숨겨져 있던 전역 푸터가 새 헤더 틈에 비치는 것을 막는 규칙은 **HWP 문서 로드 후 모바일의 형제 footer**에만 적용했다.
+- **보수적 범위·기능 상태**: desktop 언어 전환기 자체 위치/z-index·공용 헤더·다른 18도구·엔진/벤더는 수정하지 않았다. HML은 fixture의 기존 저장 가능 판정에 따라 비활성일 수 있으며, 가림 해소를 저장 기능 활성화로 해석하지 않았다. DOM hit 검사에서는 disabled의 `pointer-events:none`을 가림으로 오인하지 않도록 측정 순간에만 복원하고 즉시 원복했다.
+- **회귀·증거 설계**: 기존 일반 시각 회귀의 Excel interaction은 EN desktop 1장이라 실제 결함의 EN mobile을 검사하지 않았다. Excel EN dark mobile·KO dark mobile, HWP 로드 KO dark mobile **3장**을 추가해 일반 기준선을 172→175장으로 보강했다. 수정 전후 DOM/텍스트 Range/버튼 hit 검사·PNG는 `tests/visual-artifacts/pqa-fix-{before,after}-geometry/`, P-QA 동일 조건의 3상태·2테마 재캡처 36장은 `tests/visual-artifacts/pqa-fix-after/`다. 원본 `p2-final/` 604장은 별도 SHA-256 목록으로 보존 검증한다. 기존 HWP 로드 desktop 1장의 변경은 언어 전환기 공간·toolbar 높이 확보에 따른 의도된 변화(최초 비교 **37,001px/3.0119%**); 그 기준선과 새 모바일 3장만 갱신한다.
+- **현지화·SEO·AdSense·내부 비노출**: Excel ko/en 라벨은 동일 문자열을 유지하며 HWP의 한국어 전용 정책과 EN `/en/tools` redirect도 보존한다. 새 사용자 문구·요소 없이 레이아웃만 고쳐 번역·SEO 메타·FAQ·사이트맵·정적 route·광고 배치/제외 격리 경로·서버 전제 변경은 불필요하다. 새 내부 명칭·원시 예외를 노출하는 코드는 없다. 기존 HWP 안내의 내부 명칭은 이번 2표면 수리 범위 밖이므로 확대 수정하지 않았다. 시각 검증은 `VITE_LOCAL_QA=1` 빌드, static/analytics 포함 스모크는 일반 빌드로 분리한다.
+- **대조·보존 결과**: `p2-final` 대비 Excel KO dark mobile·EN dark desktop 픽셀 차이는 각각 **0**, HWP 로드 전 KO light desktop은 **41px/0.0034%**로 기존 0.1% 이내다. 기존 604장·사용자 DOCX 2개/네이버 확인 HTML의 SHA-256은 모두 그대로다. 최종 HEAD도 `0663c74`이며 commit·push·staging을 수행하지 않았다.
+
+검증 원출력과 전후 캡처 링크: [증거 인덱스](../tests/visual-artifacts/pqa-fix-evidence/README.md). 아래 browser/visual 명령에는 `TEST_BASE_URL=http://127.0.0.1:4291`을 지정했다(자체 서버를 띄우는 `test:xls-first-load`는 해당 설정을 사용하지 않는다). 시각 기준선 갱신은 `UPDATE_VISUAL_BASELINES=1 VISUAL_ONLY=excel-merger-empty--interaction-sheet-selection,hwp-editor-empty--interaction-document-loaded npm run test:visual`로 5/5를 생성했고 실제 변경은 HWP desktop 1장+신규 모바일 3장뿐이다.
+
+| 실행 명령 | 실제 결과 |
+|---|---|
+| `VITE_LOCAL_QA=1 npm run build` · `npm run build` | 둘 다 exit 0, 2,830 modules·정적 61페이지. 최종 dist는 일반 production 빌드. |
+| `npm run test:unit` | exit 0, **193/193**, fail 0. |
+| `npm run test:static` | exit 0, localized pages·hreflang·self-hosted runtimes·ads.txt·robots·sitemap 통과. |
+| `TEST_SCOPE=excel npm run test:browser` | exit 0, Excel 및 segmented Arrow/Space·공용 키보드 계약 통과. 출력 마지막의 Word/PDF 이름은 하네스 공통 문구이며 이번 실행 범위는 Excel이다. |
+| `TEST_ONLY_HWP=1 npm run test:new-tools` | exit 0, **3,584B·1페이지·sentinel 재파싱·Studio 재개방** 통과. 기존 CanvasView 콘솔 로그 2건은 재현됐으며 기존 RHWP 기각 이력대로 벤더 수정하지 않았다. |
+| `npm run test:utilities` | exit 0, ko/en 경로·HWP EN redirect·hreflang·유틸리티·광고/분석·격리 계약 통과. |
+| `npm run test:xls-preserve` | exit 0, XLSX 4상태·XLS 보존 3상태·진행 10상태·degradation 3분기 통과. |
+| `npm run test:xls-first-load` | exit 0, 전역 헤더 없는 정적 서버에서 합성 4파일 수동 reload 없이 검사. |
+| `VISUAL_ONLY=excel-merger npm run test:visual` | exit 0, **9/9**, 11.44초. |
+| `VISUAL_ONLY=hwp-editor npm run test:visual` | exit 0, **7/7**, 13.17초. |
+| `LANG=ko_KR.UTF-8 npm run test:visual` | **exit 1, 174/175**, 105.95초. 미수정 timezone initial EN light mobile **363px/0.1103%** 차이로 1장 실패. |
+| `LANG=en_US.UTF-8 npm run test:visual` | **exit 1, 174/175**, 108.61초. 같은 timezone 1장 **362px/0.1100%** 차이. |
+| `LANG=ko_KR.UTF-8 VISUAL_ONLY=timezone-calculator npm run test:visual` | **exit 1, 6/7**, 같은 363px/0.1103% 재현. |
+| `VISUAL_ONLY=excel-merger,hwp-editor VISUAL_CAPTURE_DIR=tests/visual-artifacts/pqa-fix-after VISUAL_CONSENT_GRANTED=1 npm run test:visual:qa` | exit 0, **36/36**·30.23초, initial/bottom/interaction 각 12장·외부 요청 0. |
+| `node /tmp/worklazytools-pqa-fix/probe.mjs after` | exit 0, **24표본**(320/390/620/621/820/821/1020/1365px × Excel ko/en·HWP ko), 라벨 이탈·버튼/언어 전환기 가림·충돌 모두 0. 재현용 사본을 증거 폴더에 보존. |
+| `git diff --check` · SHA-256 보존 검사 | exit 0, 기존 604장·사용자 3파일 변경 없음. |
+
+**전체 회귀 잔여 판정**: 날짜·시각 입력과 `WORLD TIME` eyebrow에 차이 픽셀이 남았다. `TimezoneCalculatorPage.tsx:29`는 `DateTime.now()`로 초기 값을 만들고 시각 하네스는 날짜/시각을 고정하지 않는다. timezone·공용 SegmentedControl/AppShell/LanguageSwitcher·전역 CSS·i18n의 diff는 **0B**다. 이번 두 결함 밖의 코드·기준선·차이 임계값을 바꿔 전체 통과로 만들지 않고 실패를 그대로 보고한다. 두 도구의 수리·재캡처 증거는 완료했으며 Claude의 후속 육안 교차 판정 입력으로 남긴다.
+
 ### P2 P-final/P-QA 재개 — 미커밋 작업물 자체 감사 (Codx)
 
 - **무결성·완료 범위**: 시작 `HEAD=3588ebafab3dd876746e356ea652d923eda0f5e5`, `ui-migration`, `git status --porcelain` 58건. 추적 변경 diff는 인계 `pfinal-inflight.diff`와 **75,923B byte-identical**이었다. CSS/manifest/감사·측정기/하네스 수정, 시각 기준선 35장, CHANGELOG의 Codx 서명과 아래 P-final/P-QA 두 절이 실제 작업물과 일치한다. 구현과 캡처 채집은 완료됐고 커밋·4점 귀속 판정이 남은 상태였다. 상단 계획 진행표의 P-final/P-QA “대기”는 완료 실행 기록보다 낡았으며 Gemini 최종 육안 판정은 본 자체 감사로 대체하지 않는다.

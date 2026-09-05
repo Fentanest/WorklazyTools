@@ -1,0 +1,1268 @@
+
+> worklazytools@0.1.0 test:unit
+> node --test --experimental-strip-types tests/unit/*.test.ts
+
+TAP version 13
+# (node:21) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: AppShell keeps SEO, analytics, ad isolation, navigation, and redirect ownership
+ok 1 - AppShell keeps SEO, analytics, ad isolation, navigation, and redirect ownership
+  ---
+  duration_ms: 15.6889
+  type: 'test'
+  ...
+# Subtest: AppShell delegates the mobile modal and focus trap to the shadcn Base UI sheet
+ok 2 - AppShell delegates the mobile modal and focus trap to the shadcn Base UI sheet
+  ---
+  duration_ms: 0.501061
+  type: 'test'
+  ...
+# Subtest: repo-wide executable ad references stay inside the explicit runtime and verification allowlist
+ok 3 - repo-wide executable ad references stay inside the explicit runtime and verification allowlist
+  ---
+  duration_ms: 78.109464
+  type: 'test'
+  ...
+# (node:22) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: sniffs the original WAV and MP3 sample rates before Web Audio decoding
+ok 4 - sniffs the original WAV and MP3 sample rates before Web Audio decoding
+  ---
+  duration_ms: 1.357475
+  type: 'test'
+  ...
+# Subtest: finds WAV fmt chunks after other chunks and MP3 frames after ID3 tags
+ok 5 - finds WAV fmt chunks after other chunks and MP3 frames after ID3 tags
+  ---
+  duration_ms: 0.340693
+  type: 'test'
+  ...
+# Subtest: history limit reserves one combined 256 MB undo/redo budget
+ok 6 - history limit reserves one combined 256 MB undo/redo budget
+  ---
+  duration_ms: 4.415833
+  type: 'test'
+  ...
+# (node:24) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Korean holidays use the Dangi calendar and emit one substitute for one overlap
+ok 7 - Korean holidays use the Dangi calendar and emit one substitute for one overlap
+  ---
+  duration_ms: 110.046647
+  type: 'test'
+  ...
+# Subtest: first-year leave requires completed months rather than calendar month boundaries
+ok 8 - first-year leave requires completed months rather than calendar month boundaries
+  ---
+  duration_ms: 1.265601
+  type: 'test'
+  ...
+# Subtest: custom holidays reject malformed or impossible calendar dates
+ok 9 - custom holidays reject malformed or impossible calendar dates
+  ---
+  duration_ms: 12.082511
+  type: 'test'
+  ...
+# Subtest: payroll formulas preserve statutory thresholds and tax credit structure
+ok 10 - payroll formulas preserve statutory thresholds and tax credit structure
+  ---
+  duration_ms: 1.333806
+  type: 'test'
+  ...
+# Subtest: monthly payroll keeps exact official-rate mapping outputs
+ok 11 - monthly payroll keeps exact official-rate mapping outputs
+  ---
+  duration_ms: 0.391825
+  type: 'test'
+  ...
+# Subtest: password generation includes every selected character group
+ok 12 - password generation includes every selected character group
+  ---
+  duration_ms: 2.963393
+  type: 'test'
+  ...
+# (node:29) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: empty paragraphs never become anchors or mass additions and deletions
+ok 13 - empty paragraphs never become anchors or mass additions and deletions
+  ---
+  duration_ms: 3.940944
+  type: 'test'
+  ...
+# Subtest: a rewritten paragraph split into two paragraphs remains one comparison group
+ok 14 - a rewritten paragraph split into two paragraphs remains one comparison group
+  ---
+  duration_ms: 1.584946
+  type: 'test'
+  ...
+# Subtest: a moved paragraph is paired once and marked independently from text changes
+ok 15 - a moved paragraph is paired once and marked independently from text changes
+  ---
+  duration_ms: 1.068854
+  type: 'test'
+  ...
+# Subtest: large documents with insertions do not fall back to cascading mismatches
+ok 16 - large documents with insertions do not fall back to cascading mismatches
+  ---
+  duration_ms: 193.927049
+  type: 'test'
+  ...
+# Subtest: summary and document view are generated from the same alignment manifest
+ok 17 - summary and document view are generated from the same alignment manifest
+  ---
+  duration_ms: 6.352234
+  type: 'test'
+  ...
+# Subtest: inserted table rows and columns do not turn preserved cells into replacements
+ok 18 - inserted table rows and columns do not turn preserved cells into replacements
+  ---
+  duration_ms: 3.142751
+  type: 'test'
+  ...
+# Subtest: document formats are detected from content instead of file extensions
+ok 19 - document formats are detected from content instead of file extensions
+  ---
+  duration_ms: 0.609485
+  type: 'test'
+  ...
+# Subtest: pair validation allows same-family mixes and blocks Word-to-HWP pairs
+ok 20 - pair validation allows same-family mixes and blocks Word-to-HWP pairs
+  ---
+  duration_ms: 0.664377
+  type: 'test'
+  ...
+# (node:35) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: synthetic cleaner fixtures cover formula kinds, caches, names, tables, merges, and both date systems
+ok 21 - synthetic cleaner fixtures cover formula kinds, caches, names, tables, merges, and both date systems
+  ---
+  duration_ms: 902.058837
+  type: 'test'
+  ...
+# Subtest: all 28 rule variants round-trip with fixed IDs, defaults, required keys, and unknown-key rejection
+ok 22 - all 28 rule variants round-trip with fixed IDs, defaults, required keys, and unknown-key rejection
+  ---
+  duration_ms: 6.409275
+  type: 'test'
+  ...
+# Subtest: column lineage persists generated IDs and rejects duplicates, deleted references, and incomplete reorder sets
+ok 23 - column lineage persists generated IDs and rejects duplicates, deleted references, and incomplete reorder sets
+  ---
+  duration_ms: 0.568183
+  type: 'test'
+  ...
+# Subtest: token-aware formula transforms cover row/column delete, insert, reorder, absolute ranges, and \#REF
+ok 24 - token-aware formula transforms cover row/column delete, insert, reorder, absolute ranges, and \#REF
+  ---
+  duration_ms: 1.269432
+  type: 'test'
+  ...
+# Subtest: preflight distinguishes missing caches and downgrade warnings and enforces unmerge-before-structure
+ok 25 - preflight distinguishes missing caches and downgrade warnings and enforces unmerge-before-structure
+  ---
+  duration_ms: 0.70212
+  type: 'test'
+  ...
+# Subtest: text, regex, filter, dedupe, fill, number, date, phone, and business rules preserve failures and stored formula values
+ok 26 - text, regex, filter, dedupe, fill, number, date, phone, and business rules preserve failures and stored formula values
+  ---
+  duration_ms: 3.026795
+  type: 'test'
+  ...
+# Subtest: structure kernels unmerge atomically, persist derived IDs, and downgrade only a noncontiguous formula cell
+ok 27 - structure kernels unmerge atomically, persist derived IDs, and downgrade only a noncontiguous formula cell
+  ---
+  duration_ms: 1.788474
+  type: 'test'
+  ...
+# Subtest: XLSX output appends four reports, reopens formulas, and CSV modes warn or prefix dangerous leading characters
+ok 28 - XLSX output appends four reports, reopens formulas, and CSV modes warn or prefix dangerous leading characters
+  ---
+  duration_ms: 93.524823
+  type: 'test'
+  ...
+# Subtest: worker watchdog reports the active rule while user cancellation remains AbortError
+ok 29 - worker watchdog reports the active rule while user cancellation remains AbortError
+  ---
+  duration_ms: 18.020195
+  type: 'test'
+  ...
+# (node:41) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: synthetic format fixtures preserve BIFF8/XLSB formulas, real XLSM VBA and 1900/1904 dates
+ok 30 - synthetic format fixtures preserve BIFF8/XLSB formulas, real XLSM VBA and 1900/1904 dates
+  ---
+  duration_ms: 922.499082
+  type: 'test'
+  ...
+# (node:47) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: assignPairFiles fills two empty slots from a two-file drop
+ok 31 - assignPairFiles fills two empty slots from a two-file drop
+  ---
+  duration_ms: 1.675549
+  type: 'test'
+  ...
+# Subtest: assignPairFiles fills the left slot from a one-file drop
+ok 32 - assignPairFiles fills the left slot from a one-file drop
+  ---
+  duration_ms: 0.170777
+  type: 'test'
+  ...
+# Subtest: assignPairFiles fills only the available slot without overwriting
+ok 33 - assignPairFiles fills only the available slot without overwriting
+  ---
+  duration_ms: 0.178018
+  type: 'test'
+  ...
+# Subtest: assignPairFiles reports overflow when one slot receives two files
+ok 34 - assignPairFiles reports overflow when one slot receives two files
+  ---
+  duration_ms: 0.228149
+  type: 'test'
+  ...
+# Subtest: assignPairFiles preserves two occupied slots and reports every incoming file
+ok 35 - assignPairFiles preserves two occupied slots and reports every incoming file
+  ---
+  duration_ms: 0.289781
+  type: 'test'
+  ...
+# Subtest: swapPairSides exchanges every side-owned field and preserves pair-wide fields
+ok 36 - swapPairSides exchanges every side-owned field and preserves pair-wide fields
+  ---
+  duration_ms: 0.743651
+  type: 'test'
+  ...
+# (node:53) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: report integrity checks keep worker, client, and page responsibilities distinct
+ok 37 - report integrity checks keep worker, client, and page responsibilities distinct
+  ---
+  duration_ms: 30.866738
+  type: 'test'
+  ...
+# Subtest: position comparison aligns columns before rows and keeps structural gaps distinct from blank-zero equality
+ok 38 - position comparison aligns columns before rows and keeps structural gaps distinct from blank-zero equality
+  ---
+  duration_ms: 15.643098
+  type: 'test'
+  ...
+# Subtest: position alignment reports its deterministic location fallback when the DP cell budget is exceeded
+ok 39 - position alignment reports its deterministic location fallback when the DP cell budget is exceeded
+  ---
+  duration_ms: 0.803403
+  type: 'test'
+  ...
+# Subtest: key comparison implements duplicate error, occurrence and secondary-key policies without first-row guessing
+ok 40 - key comparison implements duplicate error, occurrence and secondary-key policies without first-row guessing
+  ---
+  duration_ms: 4.607021
+  type: 'test'
+  ...
+# Subtest: normalization preserves leading-zero text and missing formula caches while honoring numeric opt-in elsewhere
+ok 41 - normalization preserves leading-zero text and missing formula caches while honoring numeric opt-in elsewhere
+  ---
+  duration_ms: 0.797393
+  type: 'test'
+  ...
+# Subtest: OOXML formatting equality compares baked style fields and excludes gradient fill details
+ok 42 - OOXML formatting equality compares baked style fields and excludes gradient fill details
+  ---
+  duration_ms: 39.445074
+  type: 'test'
+  ...
+# Subtest: reconciliation finds deterministic 1:N matches and never auto-confirms multiple satisfying combinations
+ok 43 - reconciliation finds deterministic 1:N matches and never auto-confirms multiple satisfying combinations
+  ---
+  duration_ms: 2.223313
+  type: 'test'
+  ...
+# Subtest: reconciliation excludes disabled date and partner criteria symmetrically
+ok 44 - reconciliation excludes disabled date and partner criteria symmetrically
+  ---
+  duration_ms: 0.534142
+  type: 'test'
+  ...
+# Subtest: amount-only reconciliation counts ambiguity once per unresolved left target
+ok 45 - amount-only reconciliation counts ambiguity once per unresolved left target
+  ---
+  duration_ms: 1.543154
+  type: 'test'
+  ...
+# Subtest: active reconciliation criteria report amount, date, and partner errors separately
+ok 46 - active reconciliation criteria report amount, date, and partner errors separately
+  ---
+  duration_ms: 0.663288
+  type: 'test'
+  ...
+# Subtest: reconciliation validator rejects one-sided optional mappings
+ok 47 - reconciliation validator rejects one-sided optional mappings
+  ---
+  duration_ms: 0.2618
+  type: 'test'
+  ...
+# Subtest: reverse grouped ambiguity is recorded once for every involved left target
+ok 48 - reverse grouped ambiguity is recorded once for every involved left target
+  ---
+  duration_ms: 0.422878
+  type: 'test'
+  ...
+# Subtest: candidate-limit overflow prevents exact auto-matching and matches Parameters
+ok 49 - candidate-limit overflow prevents exact auto-matching and matches Parameters
+  ---
+  duration_ms: 0.354445
+  type: 'test'
+  ...
+# Subtest: reconciliation records the pair-wide combination budget as RECON_SEARCH_LIMIT
+ok 50 - reconciliation records the pair-wide combination budget as RECON_SEARCH_LIMIT
+  ---
+  duration_ms: 222.97065
+  type: 'test'
+  ...
+# Subtest: pair report always has nine sheets and stores external values as primitive text
+ok 51 - pair report always has nine sheets and stores external values as primitive text
+  ---
+  duration_ms: 172.088695
+  type: 'test'
+  ...
+# (node:60) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: detects cross-sheet formulas before trimming referenced sheet edges
+ok 52 - detects cross-sheet formulas before trimming referenced sheet edges
+  ---
+  duration_ms: 4.36946
+  type: 'test'
+  ...
+# (node:66) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: parses the twelve ordered colors from theme1.xml and rejects incomplete themes
+ok 53 - parses the twelve ordered colors from theme1.xml and rejects incomplete themes
+  ---
+  duration_ms: 54.60361
+  type: 'test'
+  ...
+# Subtest: applies ECMA-376 HSL tint to six theme colors at three levels
+ok 54 - applies ECMA-376 HSL tint to six theme colors at three levels
+  ---
+  duration_ms: 0.828885
+  type: 'test'
+  ...
+# Subtest: bakes exposed solid-fill, font and border theme colors without changing excluded colors
+ok 55 - bakes exposed solid-fill, font and border theme colors without changing excluded colors
+  ---
+  duration_ms: 0.613036
+  type: 'test'
+  ...
+# (node:78) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: migrated feature locale namespaces have identical key shapes
+ok 56 - migrated feature locale namespaces have identical key shapes
+  ---
+  duration_ms: 29.766203
+  type: 'test'
+  ...
+# Subtest: migrated feature locale templates use the same interpolation slots
+ok 57 - migrated feature locale templates use the same interpolation slots
+  ---
+  duration_ms: 26.415994
+  type: 'test'
+  ...
+# Subtest: video messages in both languages hide internal processing names
+ok 58 - video messages in both languages hide internal processing names
+  ---
+  duration_ms: 9.904439
+  type: 'test'
+  ...
+# (node:90) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: base and effect layers form a fixed lowest block
+ok 59 - base and effect layers form a fixed lowest block
+  ---
+  duration_ms: 10.196952
+  type: 'test'
+  ...
+# Subtest: front, back and indexed layer moves all clamp above the base block
+ok 60 - front, back and indexed layer moves all clamp above the base block
+  ---
+  duration_ms: 1.295263
+  type: 'test'
+  ...
+# Subtest: six alignments use scene bounding boxes for rotated and scaled objects
+ok 61 - six alignments use scene bounding boxes for rotated and scaled objects
+  ---
+  duration_ms: 19.165093
+  type: 'test'
+  ...
+# (node:126) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: expanded editor shapes are single Fabric objects with serialized shape identity
+ok 62 - expanded editor shapes are single Fabric objects with serialized shape identity
+  ---
+  duration_ms: 8.139678
+  type: 'test'
+  ...
+# Subtest: shape style matrix applies supported values and ignores unsupported highlighter values
+ok 63 - shape style matrix applies supported values and ignores unsupported highlighter values
+  ---
+  duration_ms: 2.40324
+  type: 'test'
+  ...
+# Subtest: arrow border width never rewrites its fixed polygon geometry
+ok 64 - arrow border width never rewrites its fixed polygon geometry
+  ---
+  duration_ms: 2.693742
+  type: 'test'
+  ...
+# (node:131) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: region effects retain their source-image anchor through move, scale and rotation
+ok 65 - region effects retain their source-image anchor through move, scale and rotation
+  ---
+  duration_ms: 8.797464
+  type: 'test'
+  ...
+# Subtest: region effect strength follows object zoom but never display DPR
+ok 66 - region effect strength follows object zoom but never display DPR
+  ---
+  duration_ms: 0.26356
+  type: 'test'
+  ...
+# Subtest: region effect layers stay directly above the base image
+ok 67 - region effect layers stay directly above the base image
+  ---
+  duration_ms: 0.238089
+  type: 'test'
+  ...
+# Subtest: canvas selections map to source pixels across scale, rotation, flip and source edges
+ok 68 - canvas selections map to source pixels across scale, rotation, flip and source edges
+  ---
+  duration_ms: 8.359957
+  type: 'test'
+  ...
+# (node:140) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the opt-in local QA build blocks analytics, events, and AdSense without changing production defaults
+ok 69 - the opt-in local QA build blocks analytics, events, and AdSense without changing production defaults
+  ---
+  duration_ms: 1.279483
+  type: 'test'
+  ...
+# (node:186) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: CSV import preserves text that resembles typed spreadsheet values
+ok 70 - CSV import preserves text that resembles typed spreadsheet values
+  ---
+  duration_ms: 0.9683
+  type: 'test'
+  ...
+# Subtest: Excel CSV integration keeps text values through ExcelJS csv.read
+ok 71 - Excel CSV integration keeps text values through ExcelJS csv.read
+  ---
+  duration_ms: 12.987838
+  type: 'test'
+  ...
+# Subtest: XML formatting preserves tag values, CDATA, and mixed-content spacing
+ok 72 - XML formatting preserves tag values, CDATA, and mixed-content spacing
+  ---
+  duration_ms: 6.862194
+  type: 'test'
+  ...
+# Subtest: CSV streaming rejects fatal quote errors and returns no partial table
+ok 73 - CSV streaming rejects fatal quote errors and returns no partial table
+  ---
+  duration_ms: 3.329447
+  type: 'test'
+  ...
+# Subtest: SQL minification converts line comments without changing the query
+ok 74 - SQL minification converts line comments without changing the query
+  ---
+  duration_ms: 0.418716
+  type: 'test'
+  ...
+# Subtest: password strength uses common password dictionaries
+ok 75 - password strength uses common password dictionaries
+  ---
+  duration_ms: 17.116379
+  type: 'test'
+  ...
+# (node:192) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ToolGuide keeps its public structure and localized eyebrow through shadcn cards
+ok 76 - ToolGuide keeps its public structure and localized eyebrow through shadcn cards
+  ---
+  duration_ms: 4.08323
+  type: 'test'
+  ...
+# Subtest: OperationProgress keeps W-D stage rows, active spinner, percentages, and progress semantics
+ok 77 - OperationProgress keeps W-D stage rows, active spinner, percentages, and progress semantics
+  ---
+  duration_ms: 3.080647
+  type: 'test'
+  ...
+# Subtest: ToolCard keeps a link root, analytics behavior, and all six accent identities
+ok 78 - ToolCard keeps a link root, analytics behavior, and all six accent identities
+  ---
+  duration_ms: 0.48464
+  type: 'test'
+  ...
+# Subtest: LanguageSwitcher keeps its public prop and KO/EN group toggle accessibility
+ok 79 - LanguageSwitcher keeps its public prop and KO/EN group toggle accessibility
+  ---
+  duration_ms: 0.327843
+  type: 'test'
+  ...
+# (node:194) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: bounded PDF page rendering preserves order and concurrency
+ok 80 - bounded PDF page rendering preserves order and concurrency
+  ---
+  duration_ms: 7.840615
+  type: 'test'
+  ...
+# Subtest: PDF page ranges compact visual selection without losing custom order
+ok 81 - PDF page ranges compact visual selection without losing custom order
+  ---
+  duration_ms: 0.392257
+  type: 'test'
+  ...
+# Subtest: quick PDF splitting creates complete continuous page groups
+ok 82 - quick PDF splitting creates complete continuous page groups
+  ---
+  duration_ms: 0.476111
+  type: 'test'
+  ...
+# (node:205) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: all seven QR payload types match the Korean escape-heavy golden fixture
+ok 83 - all seven QR payload types match the Korean escape-heavy golden fixture
+  ---
+  duration_ms: 1.728152
+  type: 'test'
+  ...
+# Subtest: templates bind to stable column numbers and reject missing or duplicate referenced headers
+ok 84 - templates bind to stable column numbers and reject missing or duplicate referenced headers
+  ---
+  duration_ms: 1.533814
+  type: 'test'
+  ...
+# Subtest: spreadsheet row lookup prefers displayValue and keeps sourceRow/sourceColumn
+ok 85 - spreadsheet row lookup prefers displayValue and keeps sourceRow/sourceColumn
+  ---
+  duration_ms: 0.278462
+  type: 'test'
+  ...
+# Subtest: logo settings force H and at least two quiet-zone modules
+ok 86 - logo settings force H and at least two quiet-zone modules
+  ---
+  duration_ms: 0.209868
+  type: 'test'
+  ...
+# Subtest: output, row, input, cell, PDF and storage budgets are enforced
+ok 87 - output, row, input, cell, PDF and storage budgets are enforced
+  ---
+  duration_ms: 0.837714
+  type: 'test'
+  ...
+# Subtest: A4 and Letter label grids keep exact 3 by 8 boundaries
+ok 88 - A4 and Letter label grids keep exact 3 by 8 boundaries
+  ---
+  duration_ms: 0.293843
+  type: 'test'
+  ...
+# Subtest: safe ZIP entry paths validate every segment and collide by NFC and case
+ok 89 - safe ZIP entry paths validate every segment and collide by NFC and case
+  ---
+  duration_ms: 0.925238
+  type: 'test'
+  ...
+# Subtest: incremental ZIP writer accepts safe grouped paths and rejects path collisions
+ok 90 - incremental ZIP writer accepts safe grouped paths and rejects path collisions
+  ---
+  duration_ms: 82.588371
+  type: 'test'
+  ...
+# (node:210) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: tool metadata keeps a distinct identity in Korean and English
+ok 91 - tool metadata keeps a distinct identity in Korean and English
+  ---
+  duration_ms: 1.44733
+  type: 'test'
+  ...
+# Subtest: every tool route uses a localized tool-specific social image
+ok 92 - every tool route uses a localized tool-specific social image
+  ---
+  duration_ms: 1.745752
+  type: 'test'
+  ...
+# Subtest: English tool titles do not fall back to a generic browser-tool label
+ok 93 - English tool titles do not fall back to a generic browser-tool label
+  ---
+  duration_ms: 0.304512
+  type: 'test'
+  ...
+# Subtest: new document tools expose matching Korean and English static FAQs
+ok 94 - new document tools expose matching Korean and English static FAQs
+  ---
+  duration_ms: 0.574264
+  type: 'test'
+  ...
+# (node:234) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: spreadsheet adapter classifies OOXML from package contents and parses it only once into the common model
+ok 95 - spreadsheet adapter classifies OOXML from package contents and parses it only once into the common model
+  ---
+  duration_ms: 137.111247
+  type: 'test'
+  ...
+# Subtest: spreadsheet adapter uses SheetJS for BIFF8/XLSB and Papa Parse for CSV text
+ok 96 - spreadsheet adapter uses SheetJS for BIFF8/XLSB and Papa Parse for CSV text
+  ---
+  duration_ms: 58.740482
+  type: 'test'
+  ...
+# Subtest: OOXML editing metadata distinguishes formula kinds, cached values, names, tables, and source lineage
+ok 97 - OOXML editing metadata distinguishes formula kinds, cached values, names, tables, and source lineage
+  ---
+  duration_ms: 59.020203
+  type: 'test'
+  ...
+# Subtest: file-name safety blocks traversal, controls and reserved names and resolves normalized collisions
+ok 98 - file-name safety blocks traversal, controls and reserved names and resolves normalized collisions
+  ---
+  duration_ms: 1.435939
+  type: 'test'
+  ...
+# Subtest: writeUntrustedText stores every external value as text without formula coercion
+ok 99 - writeUntrustedText stores every external value as text without formula coercion
+  ---
+  duration_ms: 25.706164
+  type: 'test'
+  ...
+# Subtest: appendXlsxReportSheets preserves cleaned sheets and resolves report-name collisions deterministically
+ok 100 - appendXlsxReportSheets preserves cleaned sheets and resolves report-name collisions deterministically
+  ---
+  duration_ms: 0.815914
+  type: 'test'
+  ...
+# (node:248) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: text merger preserves content while excluding empty items
+ok 101 - text merger preserves content while excluding empty items
+  ---
+  duration_ms: 0.984851
+  type: 'test'
+  ...
+# Subtest: text merger trims item edges and applies a custom separator
+ok 102 - text merger trims item edges and applies a custom separator
+  ---
+  duration_ms: 0.276421
+  type: 'test'
+  ...
+# Subtest: empty items can remain in the separator sequence
+ok 103 - empty items can remain in the separator sequence
+  ---
+  duration_ms: 0.288732
+  type: 'test'
+  ...
+# Subtest: direct text and TXT items move through one immutable list
+ok 104 - direct text and TXT items move through one immutable list
+  ---
+  duration_ms: 0.953559
+  type: 'test'
+  ...
+# (node:259) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: SegmentedControl keeps group and pressed semantics through the Base UI toggle group
+ok 105 - SegmentedControl keeps group and pressed semantics through the Base UI toggle group
+  ---
+  duration_ms: 1.45295
+  type: 'test'
+  ...
+# Subtest: ToggleRow keeps a labelled native button switch with described checked and disabled state
+ok 106 - ToggleRow keeps a labelled native button switch with described checked and disabled state
+  ---
+  duration_ms: 0.510022
+  type: 'test'
+  ...
+# Subtest: FileDropZone keeps accumulation, async reset, labelled input/button, and drag contracts
+ok 107 - FileDropZone keeps accumulation, async reset, labelled input/button, and drag contracts
+  ---
+  duration_ms: 10.596329
+  type: 'test'
+  ...
+# Subtest: the eight adapters preserve their structural and live-region contracts
+ok 108 - the eight adapters preserve their structural and live-region contracts
+  ---
+  duration_ms: 0.749802
+  type: 'test'
+  ...
+# Subtest: all accent adapters explicitly cover the six public ToolAccent values
+ok 109 - all accent adapters explicitly cover the six public ToolAccent values
+  ---
+  duration_ms: 0.543113
+  type: 'test'
+  ...
+# (node:260) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: all 12 migrated components isolate their DOM from legacy class selectors
+ok 110 - all 12 migrated components isolate their DOM from legacy class selectors
+  ---
+  duration_ms: 63.706098
+  type: 'test'
+  ...
+# 6 source files / 12 migrated components checked against 52 legacy tokens and 3 dynamic prefixes
+# Subtest: the complete legacy stylesheet is parsed and migrated adapter collisions stay removed
+ok 111 - the complete legacy stylesheet is parsed and migrated adapter collisions stay removed
+  ---
+  duration_ms: 58.907748
+  type: 'test'
+  ...
+# 612 CSS rules and 2126 declarations parsed; both measured collision contracts checked
+# Subtest: the six migrated B1 tools emit no class token owned by global.css
+ok 112 - the six migrated B1 tools emit no class token owned by global.css
+  ---
+  duration_ms: 40.746557
+  type: 'test'
+  ...
+# 6 B1 tool sources checked against 238 global.css class tokens
+# Subtest: the five migrated B2 tools emit no legacy or global.css-owned class token
+ok 113 - the five migrated B2 tools emit no legacy or global.css-owned class token
+  ---
+  duration_ms: 51.68501
+  type: 'test'
+  ...
+# 8 B2 surface sources checked against 52 legacy tokens, 3 dynamic prefixes, and 238 global.css class tokens
+# Subtest: the reachable B3 document and Excel Cleaner surfaces emit no legacy or global.css-owned class token
+ok 114 - the reachable B3 document and Excel Cleaner surfaces emit no legacy or global.css-owned class token
+  ---
+  duration_ms: 38.855949
+  type: 'test'
+  ...
+# 6 B3 reachable surface sources checked against 238 global.css class tokens
+# Subtest: the B4 Excel and QR surfaces emit no legacy or global.css-owned class token
+ok 115 - the B4 Excel and QR surfaces emit no legacy or global.css-owned class token
+  ---
+  duration_ms: 85.608134
+  type: 'test'
+  ...
+# 5 B4 surface sources checked against 238 global.css class tokens
+# Subtest: the B5a audio and PDF surfaces emit no legacy or global.css-owned class token
+ok 116 - the B5a audio and PDF surfaces emit no legacy or global.css-owned class token
+  ---
+  duration_ms: 48.944006
+  type: 'test'
+  ...
+# 8 B5a surface sources checked against 238 global.css class tokens
+# Subtest: the B5b Video Studio surfaces emit no legacy or global.css-owned class token
+ok 117 - the B5b Video Studio surfaces emit no legacy or global.css-owned class token
+  ---
+  duration_ms: 30.343566
+  type: 'test'
+  ...
+# 3 B5b surface sources checked against 238 global.css class tokens
+# Subtest: the B6 Image Studio surfaces emit no legacy class token
+ok 118 - the B6 Image Studio surfaces emit no legacy class token
+  ---
+  duration_ms: 51.054184
+  type: 'test'
+  ...
+# 10 B6 surface sources checked against 52 legacy tokens and 3 dynamic prefixes
+# Subtest: the owner/refcount manifest accounts for all 155 baseline legacy rules
+ok 119 - the owner/refcount manifest accounts for all 155 baseline legacy rules
+  ---
+  duration_ms: 2.107247
+  type: 'test'
+  ...
+# 155 rules / 18 ownership categories / 149 removals / one split verified
+# (node:286) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: concat segments become Blobs and leave MEMFS immediately after each read
+ok 120 - concat segments become Blobs and leave MEMFS immediately after each read
+  ---
+  duration_ms: 2.109637
+  type: 'test'
+  ...
+# Subtest: concat segment WORKERFS ownership leaves zero residue after success
+ok 121 - concat segment WORKERFS ownership leaves zero residue after success
+  ---
+  duration_ms: 0.610756
+  type: 'test'
+  ...
+# Subtest: concat segment WORKERFS ownership leaves zero residue after failure
+ok 122 - concat segment WORKERFS ownership leaves zero residue after failure
+  ---
+  duration_ms: 0.7237
+  type: 'test'
+  ...
+# Subtest: concat segment WORKERFS ownership leaves zero residue after cancel
+ok 123 - concat segment WORKERFS ownership leaves zero residue after cancel
+  ---
+  duration_ms: 0.527243
+  type: 'test'
+  ...
+# (node:287) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Dolby Vision records expose the five-byte policy fields
+ok 124 - Dolby Vision records expose the five-byte policy fields
+  ---
+  duration_ms: 11.301848
+  type: 'test'
+  ...
+# Subtest: Dolby Vision base-layer policy accepts only version 1.0, profile 8, BL, and compat 1/2/4
+ok 125 - Dolby Vision base-layer policy accepts only version 1.0, profile 8, BL, and compat 1/2/4
+  ---
+  duration_ms: 0.902957
+  type: 'test'
+  ...
+# Subtest: Dolby Vision compat IDs propagate once in stable order for single and mixed jobs
+ok 126 - Dolby Vision compat IDs propagate once in stable order for single and mixed jobs
+  ---
+  duration_ms: 0.554813
+  type: 'test'
+  ...
+# Subtest: HEVC codec strings reverse compatibility bits as unsigned and retain ordered constraints
+ok 127 - HEVC codec strings reverse compatibility bits as unsigned and retain ordered constraints
+  ---
+  duration_ms: 6.395905
+  type: 'test'
+  ...
+# Subtest: the derived base-layer decoder configuration still passes the capability gate
+ok 128 - the derived base-layer decoder configuration still passes the capability gate
+  ---
+  duration_ms: 3.12701
+  type: 'test'
+  ...
+# (node:304) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: H.264 target bitrate does not also enable CRF
+ok 129 - H.264 target bitrate does not also enable CRF
+  ---
+  duration_ms: 1.747112
+  type: 'test'
+  ...
+# Subtest: H.264 automatic quality and VP9 retain their intended CRF modes
+ok 130 - H.264 automatic quality and VP9 retain their intended CRF modes
+  ---
+  duration_ms: 0.264292
+  type: 'test'
+  ...
+# Subtest: single-threaded video encoding preserves the existing one-to-four thread cap
+ok 131 - single-threaded video encoding preserves the existing one-to-four thread cap
+  ---
+  duration_ms: 0.198428
+  type: 'test'
+  ...
+# Subtest: multi-threaded video encoding retains the measured one-to-four thread cap
+ok 132 - multi-threaded video encoding retains the measured one-to-four thread cap
+  ---
+  duration_ms: 0.164036
+  type: 'test'
+  ...
+# Subtest: resolution uses the short edge and never upscales the source
+ok 133 - resolution uses the short edge and never upscales the source
+  ---
+  duration_ms: 0.367935
+  type: 'test'
+  ...
+# Subtest: audio sample rates respect encoder constraints
+ok 134 - audio sample rates respect encoder constraints
+  ---
+  duration_ms: 0.22799
+  type: 'test'
+  ...
+# Subtest: concatenated videos use the highest trustworthy rate or a shared compatibility fallback
+ok 135 - concatenated videos use the highest trustworthy rate or a shared compatibility fallback
+  ---
+  duration_ms: 0.392986
+  type: 'test'
+  ...
+# (node:314) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FFmpeg OOM diagnostics override a generic processing error
+ok 136 - FFmpeg OOM diagnostics override a generic processing error
+  ---
+  duration_ms: 2.951842
+  type: 'test'
+  ...
+# Subtest: common browser memory failures are classified without exposing raw diagnostics
+ok 137 - common browser memory failures are classified without exposing raw diagnostics
+  ---
+  duration_ms: 0.366115
+  type: 'test'
+  ...
+# Subtest: codec and generic processing failures remain distinct
+ok 138 - codec and generic processing failures remain distinct
+  ---
+  duration_ms: 0.318333
+  type: 'test'
+  ...
+# (node:326) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: target output estimates use bits-per-second once and keep all audio modes explicit
+ok 139 - target output estimates use bits-per-second once and keep all audio modes explicit
+  ---
+  duration_ms: 1.947411
+  type: 'test'
+  ...
+# Subtest: job-level audio overrides preserve remove and encode modes without changing sibling jobs
+ok 140 - job-level audio overrides preserve remove and encode modes without changing sibling jobs
+  ---
+  duration_ms: 0.331894
+  type: 'test'
+  ...
+# Subtest: the FFmpeg capacity guard is limited to target-bitrate video encoding
+ok 141 - the FFmpeg capacity guard is limited to target-bitrate video encoding
+  ---
+  duration_ms: 0.197538
+  type: 'test'
+  ...
+# Subtest: hybrid audio uses filter-based trim and normalized concat before AAC output
+ok 142 - hybrid audio uses filter-based trim and normalized concat before AAC output
+  ---
+  duration_ms: 0.587034
+  type: 'test'
+  ...
+# (node:341) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: video group memoization only ignores active changes outside its own group
+ok 143 - video group memoization only ignores active changes outside its own group
+  ---
+  duration_ms: 1.370397
+  type: 'test'
+  ...
+# Subtest: video group memoization invalidates available group changes
+ok 144 - video group memoization invalidates available group changes
+  ---
+  duration_ms: 0.168958
+  type: 'test'
+  ...
+# Subtest: video trim memoization invalidates synchronization behavior changes
+ok 145 - video trim memoization invalidates synchronization behavior changes
+  ---
+  duration_ms: 0.192057
+  type: 'test'
+  ...
+# Subtest: memo contracts deliberately ignore callback identity changes
+ok 146 - memo contracts deliberately ignore callback identity changes
+  ---
+  duration_ms: 0.21508
+  type: 'test'
+  ...
+# (node:353) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: supplemental FPS probing never blocks a valid browser video range
+ok 147 - supplemental FPS probing never blocks a valid browser video range
+  ---
+  duration_ms: 1.339875
+  type: 'test'
+  ...
+# Subtest: an unavailable FPS is probed only once
+ok 148 - an unavailable FPS is probed only once
+  ---
+  duration_ms: 0.299262
+  type: 'test'
+  ...
+# (node:364) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: combined audio alternatives prefer conversion and preserve the selected job mode
+ok 149 - combined audio alternatives prefer conversion and preserve the selected job mode
+  ---
+  duration_ms: 2.290255
+  type: 'test'
+  ...
+# Subtest: the FFmpeg guidance mapper covers every parser and capability cause
+ok 150 - the FFmpeg guidance mapper covers every parser and capability cause
+  ---
+  duration_ms: 0.4837
+  type: 'test'
+  ...
+# Subtest: probe guidance outranks quota routing while quota remains an explanatory decision reason
+ok 151 - probe guidance outranks quota routing while quota remains an explanatory decision reason
+  ---
+  duration_ms: 0.332064
+  type: 'test'
+  ...
+# Subtest: codec causes keep priority across the storage route matrix
+ok 152 - codec causes keep priority across the storage route matrix
+  ---
+  duration_ms: 0.623407
+  type: 'test'
+  ...
+# (node:385) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the video orchestrator keeps overall progress monotonic
+ok 153 - the video orchestrator keeps overall progress monotonic
+  ---
+  duration_ms: 16.749313
+  type: 'test'
+  ...
+# Subtest: the video orchestrator weights stages and blocks every event after termination
+ok 154 - the video orchestrator weights stages and blocks every event after termination
+  ---
+  duration_ms: 0.392317
+  type: 'test'
+  ...
+# Subtest: job stage aggregation uses duration for processing and bytes for result writes
+ok 155 - job stage aggregation uses duration for processing and bytes for result writes
+  ---
+  duration_ms: 0.718199
+  type: 'test'
+  ...
+# Subtest: stream-copy and webcodecs remove the inactive audio stage while hybrid retains it
+ok 156 - stream-copy and webcodecs remove the inactive audio stage while hybrid retains it
+  ---
+  duration_ms: 0.730861
+  type: 'test'
+  ...
+# Subtest: mixed-route batches apply active weights per job and finish without an 85-to-100 jump
+ok 157 - mixed-route batches apply active weights per job and finish without an 85-to-100 jump
+  ---
+  duration_ms: 1.412159
+  type: 'test'
+  ...
+# Subtest: worker stage coalescing bounds 50,000 raw reports and always preserves explicit completion
+ok 158 - worker stage coalescing bounds 50,000 raw reports and always preserves explicit completion
+  ---
+  duration_ms: 8.917259
+  type: 'test'
+  ...
+# Subtest: alternating stage reports update two rows in place and track a non-final active row
+ok 159 - alternating stage reports update two rows in place and track a non-final active row
+  ---
+  duration_ms: 0.788702
+  type: 'test'
+  ...
+# Subtest: operation progress normalization never moves backward or accepts non-finite values
+ok 160 - operation progress normalization never moves backward or accepts non-finite values
+  ---
+  duration_ms: 0.186257
+  type: 'test'
+  ...
+# (node:391) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: shared output naming sanitizes names and covers video, GIF, and audio results
+ok 161 - shared output naming sanitizes names and covers video, GIF, and audio results
+  ---
+  duration_ms: 4.219166
+  type: 'test'
+  ...
+# Subtest: shared MIME selection is case-insensitive and preserves all output families
+ok 162 - shared MIME selection is case-insensitive and preserves all output families
+  ---
+  duration_ms: 0.21101
+  type: 'test'
+  ...
+# Subtest: shared result aggregation counts route batches and creates task warnings once
+ok 163 - shared result aggregation counts route batches and creates task warnings once
+  ---
+  duration_ms: 0.532982
+  type: 'test'
+  ...
+# Subtest: shared warnings use each job's effective audio mode
+ok 164 - shared warnings use each job's effective audio mode
+  ---
+  duration_ms: 0.403557
+  type: 'test'
+  ...
+# Subtest: shared error normalization classifies quota, memory, codec, and generic failures
+ok 165 - shared error normalization classifies quota, memory, codec, and generic failures
+  ---
+  duration_ms: 5.605132
+  type: 'test'
+  ...
+# (node:392) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: video ranges stay valid when copied to shorter targets
+ok 166 - video ranges stay valid when copied to shorter targets
+  ---
+  duration_ms: 5.613092
+  type: 'test'
+  ...
+# Subtest: group ranges copy by card position and report duration and size differences
+ok 167 - group ranges copy by card position and report duration and size differences
+  ---
+  duration_ms: 1.085026
+  type: 'test'
+  ...
+# Subtest: applying one video range clamps viable targets and leaves too-short targets unchanged
+ok 168 - applying one video range clamps viable targets and leaves too-short targets unchanged
+  ---
+  duration_ms: 3.597349
+  type: 'test'
+  ...
+# (node:393) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: video result sessions fall back to memory when browser file storage is unavailable
+ok 169 - video result sessions fall back to memory when browser file storage is unavailable
+  ---
+  duration_ms: 1.335165
+  type: 'test'
+  ...
+# Subtest: video result session cleanup removes only expired owned directories
+ok 170 - video result session cleanup removes only expired owned directories
+  ---
+  duration_ms: 6.786681
+  type: 'test'
+  ...
+# Subtest: completed OPFS results resolve as Files and cancellation cleanup removes only partial files
+ok 171 - completed OPFS results resolve as Files and cancellation cleanup removes only partial files
+  ---
+  duration_ms: 210.518656
+  type: 'test'
+  ...
+# Subtest: canceling an active result write discards its partial file
+ok 172 - canceling an active result write discards its partial file
+  ---
+  duration_ms: 3.561938
+  type: 'test'
+  ...
+# Subtest: random-access result writes keep cumulative bytes monotonic while patching an earlier MP4 header
+ok 173 - random-access result writes keep cumulative bytes monotonic while patching an earlier MP4 header
+  ---
+  duration_ms: 2.817507
+  type: 'test'
+  ...
+# Subtest: quota shortage uses the bounded Blob fallback and rejects large temporary results
+ok 174 - quota shortage uses the bounded Blob fallback and rejects large temporary results
+  ---
+  duration_ms: 3.363349
+  type: 'test'
+  ...
+# Subtest: memory and File result variants preserve the common output contract
+ok 175 - memory and File result variants preserve the common output contract
+  ---
+  duration_ms: 0.291593
+  type: 'test'
+  ...
+# Subtest: an OPFS ownership or write failure preserves the legacy buffer fallback
+ok 176 - an OPFS ownership or write failure preserves the legacy buffer fallback
+  ---
+  duration_ms: 0.808995
+  type: 'test'
+  ...
+# Subtest: video output callbacks run serially and wait for async storage completion
+ok 177 - video output callbacks run serially and wait for async storage completion
+  ---
+  duration_ms: 0.646957
+  type: 'test'
+  ...
+# Subtest: a session can only be released by its owner
+ok 178 - a session can only be released by its owner
+  ---
+  duration_ms: 3.987685
+  type: 'test'
+  ...
+# (node:429) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the complete route table keeps copy candidates on FFmpeg until compatibility preflight succeeds
+ok 179 - the complete route table keeps copy candidates on FFmpeg until compatibility preflight succeeds
+  ---
+  duration_ms: 28.318922
+  type: 'test'
+  ...
+# Subtest: streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio, OPFS, and quota
+ok 180 - streaming eligibility requires MP4/MOV, H.264/HEVC, suitable bitrate/audio, OPFS, and quota
+  ---
+  duration_ms: 0.362715
+  type: 'test'
+  ...
+# Subtest: every stage in the fallback matrix only uses FFmpeg within the safety limit
+ok 181 - every stage in the fallback matrix only uses FFmpeg within the safety limit
+  ---
+  duration_ms: 0.253412
+  type: 'test'
+  ...
+# (node:451) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: concat direct copy requires identical codec names, sample entries, configurations, dimensions, and audio settings
+ok 182 - concat direct copy requires identical codec names, sample entries, configurations, dimensions, and audio settings
+  ---
+  duration_ms: 6.78861
+  type: 'test'
+  ...
+# Subtest: trim selection snaps to the nearest preceding keyframe and ends by decode timestamp
+ok 183 - trim selection snaps to the nearest preceding keyframe and ends by decode timestamp
+  ---
+  duration_ms: 1.131826
+  type: 'test'
+  ...
+# (node:462) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing AudioEncoder and rejected selected video codec cause whole-job fallback
+ok 184 - missing AudioEncoder and rejected selected video codec cause whole-job fallback
+  ---
+  duration_ms: 3.178261
+  type: 'test'
+  ...
+# Subtest: encoder configs preserve the selected codec and no-preference hardware policy
+ok 185 - encoder configs preserve the selected codec and no-preference hardware policy
+  ---
+  duration_ms: 0.347445
+  type: 'test'
+  ...
+# Subtest: concat requires every measured FPS and applies crop, normalization, rotation, and flip geometry
+ok 186 - concat requires every measured FPS and applies crop, normalization, rotation, and flip geometry
+  ---
+  duration_ms: 1.221991
+  type: 'test'
+  ...
+# (node:469) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: video ZIP streams inputs sequentially and emits a forced ZIP64 archive accepted by unzip
+ok 187 - video ZIP streams inputs sequentially and emits a forced ZIP64 archive accepted by unzip
+  ---
+  duration_ms: 461.921443
+  type: 'test'
+  ...
+# (node:479) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: visual regression scenario manifest covers every available tool and state contract
+ok 188 - visual regression scenario manifest covers every available tool and state contract
+  ---
+  duration_ms: 4.56708
+  type: 'test'
+  ...
+# (node:486) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: visual concurrency uses a bounded half-CPU default and supports an explicit override
+ok 189 - visual concurrency uses a bounded half-CPU default and supports an explicit override
+  ---
+  duration_ms: 4.967325
+  type: 'test'
+  ...
+# Subtest: VISUAL_ONLY accepts comma-separated scenario, route, and tool identifiers
+ok 190 - VISUAL_ONLY accepts comma-separated scenario, route, and tool identifiers
+  ---
+  duration_ms: 0.382076
+  type: 'test'
+  ...
+# Subtest: QA state distribution counts capture profiles by state type and exact state id
+ok 191 - QA state distribution counts capture profiles by state type and exact state id
+  ---
+  duration_ms: 10.923432
+  type: 'test'
+  ...
+# (node:487) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: XLS preservation routes OLE and SpreadsheetML signatures to legacy conversion
+ok 192 - XLS preservation routes OLE and SpreadsheetML signatures to legacy conversion
+  ---
+  duration_ms: 2.021174
+  type: 'test'
+  ...
+# Subtest: XLS conversion errors identify the original file in Korean and English
+ok 193 - XLS conversion errors identify the original file in Korean and English
+  ---
+  duration_ms: 0.365225
+  type: 'test'
+  ...
+1..193
+# tests 193
+# suites 0
+# pass 193
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2051.907768

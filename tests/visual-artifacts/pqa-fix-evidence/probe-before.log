@@ -1,0 +1,6 @@
+{"tool":"excel-merger","locale":"ko","width":390,"issues":[]}
+{"tool":"excel-merger","locale":"ko","width":1365,"issues":[]}
+{"tool":"excel-merger","locale":"en","width":390,"issues":["Separate sheets: label overflow","Join horizontally: label overflow"]}
+{"tool":"excel-merger","locale":"en","width":1365,"issues":[]}
+{"tool":"hwp-editor","locale":"ko","width":390,"issues":["도구 화면: label overflow","HWP 저장: label overflow","language switcher: occluded","language switcher: actions overlap"]}
+{"tool":"hwp-editor","locale":"ko","width":1365,"issues":["HWPX: occluded","HML: occluded","language switcher: actions overlap"]}

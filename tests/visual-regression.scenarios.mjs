@@ -154,6 +154,8 @@ const bottomScenarioFor = (route) => {
 const interactionDefinitions = Object.freeze({
   "excel-merger": Object.freeze({
     stateId: "interaction-sheet-selection",
+    profiles: Object.freeze([enDarkDesktop, enDarkMobile, koDarkMobile]),
+    profileReductionReason: "P-QA merge-label collision requires English mobile and desktop plus the Korean mobile layout control; initial and bottom retain light coverage.",
     fixture: { kind: "inline-file", fileName: "visual-merger.csv", mimeType: "text/csv", contents: "Name,Amount\nWorklazy,10\nTools,20" },
     actions: [
       { type: "upload", selector: "[data-tool-page='excel-merger'] input[type='file']" },
@@ -519,6 +521,8 @@ const interactionDefinitions = Object.freeze({
   }),
   "hwp-editor": Object.freeze({
     stateId: "interaction-document-loaded",
+    profiles: Object.freeze([koLightDesktop, koDarkMobile]),
+    profileReductionReason: "The Korean-only loaded workspace must retain desktop language-switcher and mobile action-bar coverage after the P-QA collision fix.",
     fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-hwp-document.hwp", mimeType: "application/x-hwp" },
     actions: [
       { type: "upload", selector: "[data-tool-page='hwp-editor'] input[type='file']" },
@@ -569,10 +573,10 @@ const interactionScenariosFor = (route) => {
     stateType: "interaction",
     path: definition.path ?? route.path,
     kind: "tool",
-    profiles: koreanOnly ? koreanInteractionProfiles : interactionProfiles,
-    profileReductionReason: koreanOnly
+    profiles: definition.profiles ?? (koreanOnly ? koreanInteractionProfiles : interactionProfiles),
+    profileReductionReason: definition.profileReductionReason ?? (koreanOnly
       ? "The HWP editor is Korean-only; one Korean light desktop profile covers the loaded-document workspace while initial and bottom retain mobile and dark coverage."
-      : "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes.",
+      : "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes."),
     fixture: definition.fixture ?? defaultFixtureFor(route.toolId),
     actions: definition.actions,
     readySelector: definition.readySelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),

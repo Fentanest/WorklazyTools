@@ -1,0 +1,16 @@
+
+> worklazytools@0.1.0 test:visual
+> node tests/visual-regression.mjs
+
+[1/7] hwp-editor-empty__initial__ko__light__desktop.png
+[2/7] hwp-editor-empty__redirect-en-tools__en__light__mobile.png
+[3/7] hwp-editor-empty__initial__ko__dark__mobile.png
+[4/7] hwp-editor-empty__redirect-en-tools__en__dark__desktop.png
+[5/7] hwp-editor-empty__bottom__ko__dark__mobile.png
+[6/7] hwp-editor-empty__interaction-document-loaded__ko__light__desktop.png
+[7/7] hwp-editor-empty__interaction-document-loaded__ko__dark__mobile.png
+Visual regression matched: 7 captures, Chrome/152.0.7977.64.
+Threshold: <= 0.100% differing pixels at per-pixel threshold 0.1; antialiasing ignored.
+Allowed regions: .global-footer > span:first-child.
+Environment: locale-specific browser workers (ko-KR, en-US), recycled every 12 captures; Accept-Language and navigator locale fixed, timezone UTC, DPR 1, font Worklazy Visual Noto Sans KR, 200 ms paint settle.
+Visual run report: duration=0m 13.17s; captures=7/7; concurrency=4 (CPU default from 16 cores, effective 2); filter=hwp-editor.

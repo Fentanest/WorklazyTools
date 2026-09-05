@@ -540,16 +540,18 @@ export function ExcelMergerPage() {
           </UtilitySectionCard>
 
           <UtilitySectionCard step={3} title={t("excel.steps.mode.title")} description={t("excel.steps.mode.description")}>
-            <SegmentedControl
-              label={t("excel.steps.mode.label")}
-              value={mergeMode}
-              onChange={(value) => { setMergeMode(value); clearResult(); }}
-              options={[
-                { value: "sheets", label: t("excel.modes.sheets") },
-                { value: "vertical", label: t("excel.modes.vertical") },
-                { value: "horizontal", label: t("excel.modes.horizontal") },
-              ]}
-            />
+            <div data-testid="excel-merge-mode" className="[&_[data-slot=toggle-group-item]]:h-auto [&_[data-slot=toggle-group-item]]:min-h-9 [&_[data-slot=toggle-group-item]]:py-2 [&_[data-slot=toggle-group-item]]:wrap-anywhere [&_[data-slot=toggle-group-item]]:whitespace-normal max-[620px]:[&_[data-slot=toggle-group-item]]:min-h-11 max-[620px]:[&_[data-slot=toggle-group-item]]:px-1">
+              <SegmentedControl
+                label={t("excel.steps.mode.label")}
+                value={mergeMode}
+                onChange={(value) => { setMergeMode(value); clearResult(); }}
+                options={[
+                  { value: "sheets", label: t("excel.modes.sheets") },
+                  { value: "vertical", label: t("excel.modes.vertical") },
+                  { value: "horizontal", label: t("excel.modes.horizontal") },
+                ]}
+              />
+            </div>
             <UtilityNotice className="mt-3" tone="success">
               <Info className="mt-0.5 shrink-0" size={17} />
               <span>{t(`excel.modeHelp.${mergeMode}`)}</span>

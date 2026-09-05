@@ -1,0 +1,48 @@
+
+> worklazytools@0.1.0 test:visual:qa
+> VISUAL_QA_CAPTURE_ONLY=1 node tests/visual-regression.mjs
+
+[1/36] excel-merger-empty__initial__en__light__desktop.png
+[2/36] excel-merger-empty__initial__ko__light__desktop.png
+[3/36] hwp-editor-empty__initial__ko__light__desktop.png
+[4/36] excel-merger-empty__initial__en__light__mobile.png
+[5/36] excel-merger-empty__initial__ko__light__mobile.png
+[6/36] hwp-editor-empty__initial__ko__light__mobile.png
+[7/36] excel-merger-empty__initial__en__dark__desktop.png
+[8/36] excel-merger-empty__initial__ko__dark__desktop.png
+[9/36] excel-merger-empty__initial__en__dark__mobile.png
+[10/36] hwp-editor-empty__initial__ko__dark__desktop.png
+[11/36] excel-merger-empty__initial__ko__dark__mobile.png
+[12/36] excel-merger-empty__bottom__en__light__desktop.png
+[13/36] excel-merger-empty__bottom__ko__light__desktop.png
+[14/36] hwp-editor-empty__initial__ko__dark__mobile.png
+[15/36] excel-merger-empty__bottom__en__light__mobile.png
+[16/36] excel-merger-empty__bottom__ko__light__mobile.png
+[17/36] hwp-editor-empty__bottom__ko__light__desktop.png
+[18/36] excel-merger-empty__bottom__en__dark__desktop.png
+[19/36] excel-merger-empty__bottom__ko__dark__desktop.png
+[20/36] excel-merger-empty__bottom__en__dark__mobile.png
+[21/36] hwp-editor-empty__bottom__ko__light__mobile.png
+[22/36] excel-merger-empty__bottom__ko__dark__mobile.png
+[23/36] excel-merger-empty__interaction-sheet-selection__en__light__desktop.png
+[24/36] hwp-editor-empty__bottom__ko__dark__desktop.png
+[25/36] excel-merger-empty__interaction-sheet-selection__ko__light__desktop.png
+[26/36] hwp-editor-empty__bottom__ko__dark__mobile.png
+[27/36] excel-merger-empty__interaction-sheet-selection__en__light__mobile.png
+[28/36] excel-merger-empty__interaction-sheet-selection__ko__light__mobile.png
+[29/36] hwp-editor-empty__interaction-document-loaded__ko__light__desktop.png
+[30/36] excel-merger-empty__interaction-sheet-selection__en__dark__desktop.png
+[31/36] excel-merger-empty__interaction-sheet-selection__ko__dark__desktop.png
+[32/36] excel-merger-empty__interaction-sheet-selection__en__dark__mobile.png
+[33/36] hwp-editor-empty__interaction-document-loaded__ko__light__mobile.png
+[34/36] excel-merger-empty__interaction-sheet-selection__ko__dark__mobile.png
+[35/36] hwp-editor-empty__interaction-document-loaded__ko__dark__desktop.png
+[36/36] hwp-editor-empty__interaction-document-loaded__ko__dark__mobile.png
+Bundle local QA captured: 36 captures, Chrome/152.0.7977.64.
+Threshold: <= 0.100% differing pixels at per-pixel threshold 0.1; antialiasing ignored.
+Allowed regions: .global-footer > span:first-child.
+Environment: locale-specific browser workers (ko-KR, en-US), recycled every 12 captures; Accept-Language and navigator locale fixed, timezone UTC, DPR 1, font Worklazy Visual Noto Sans KR, 200 ms paint settle.
+QA state distribution: bottom=12, initial=12, interaction=12.
+QA stateId distribution: bottom=12, initial=12, interaction-document-loaded=4, interaction-sheet-selection=8.
+QA captures: 36 in /home/better0101/projects/worklazytools/tests/visual-artifacts/pqa-fix-after.
+Visual run report: duration=0m 30.23s; captures=36/36; concurrency=4 (CPU default from 16 cores, effective 3); filter=excel-merger,hwp-editor.

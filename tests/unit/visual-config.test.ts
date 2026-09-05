@@ -83,7 +83,7 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 172);
+  assert.equal(names.length, 175);
   assert.equal(qaCaptureScenarios.length, 79);
   assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 620);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [

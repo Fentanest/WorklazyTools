@@ -1,0 +1,14 @@
+
+> worklazytools@0.1.0 test:visual
+> node tests/visual-regression.mjs
+
+[1/5] excel-merger-empty__interaction-sheet-selection__en__dark__desktop.png
+[2/5] excel-merger-empty__interaction-sheet-selection__ko__dark__mobile.png
+[3/5] excel-merger-empty__interaction-sheet-selection__en__dark__mobile.png
+[4/5] hwp-editor-empty__interaction-document-loaded__ko__light__desktop.png
+[5/5] hwp-editor-empty__interaction-document-loaded__ko__dark__mobile.png
+Visual regression updated: 5 captures, Chrome/152.0.7977.64.
+Threshold: <= 0.100% differing pixels at per-pixel threshold 0.1; antialiasing ignored.
+Allowed regions: .global-footer > span:first-child.
+Environment: locale-specific browser workers (ko-KR, en-US), recycled every 12 captures; Accept-Language and navigator locale fixed, timezone UTC, DPR 1, font Worklazy Visual Noto Sans KR, 200 ms paint settle.
+Visual run report: duration=0m 9.58s; captures=5/5; concurrency=4 (CPU default from 16 cores, effective 2); filter=excel-merger-empty--interaction-sheet-selection,hwp-editor-empty--interaction-document-loaded.

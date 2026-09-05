@@ -1,0 +1,6 @@
+
+> worklazytools@0.1.0 test:browser
+> node tests/browser-smoke.mjs
+
+  shared UI adapter keyboard contracts: {"semanticRoles":"passed","fileDropEnter":{"activeRole":null,"files":1,"inputReset":true},"segmentedArrowAndSpace":"passed","switchSpaceEnterLabelAndDescription":"passed"}
+Browser smoke tests passed: Excel, Word comparison, PDF edit/range split and PDF conversion.
