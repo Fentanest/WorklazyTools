@@ -3143,7 +3143,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[0]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 1);
   await page.waitForFunction(() => document.querySelector(".video-card-footer")?.textContent?.includes("FPS 확인 중"));
-  const exportDuringFpsProbe = await page.$eval(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)", (button) => ({ disabled: button.disabled, text: button.textContent || "" }));
+  const exportDuringFpsProbe = await page.$eval("[data-testid=video-output-actions] [data-ui-component=primary-button]", (button) => ({ disabled: button.disabled, text: button.textContent || "" }));
   if (exportDuringFpsProbe.disabled) throw new Error(`Supplemental FPS probing still blocks export: ${JSON.stringify(exportDuringFpsProbe)}`);
   await page.waitForFunction(() => Array.from(document.querySelectorAll('.video-boundary-stepper button')).every((button) => button.getAttribute("aria-label")?.includes("1프레임")));
   page.off("request", delayVideoProbe);
@@ -3254,7 +3254,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     select.value = "copy";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Video error"));
@@ -3278,9 +3278,9 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
 
   const streamRequestsBeforeEncoding = videoStreamWorkerRequests.length;
   await page.evaluate(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
     const audioRemove = document.querySelector(".video-audio-settings .ui-segmented-control button:nth-child(2)");
-    const flip = document.querySelector(".encoding-grid button[role=switch]");
+    const flip = document.querySelector("[data-testid=video-encoding-settings] button[role=switch]");
     if (!(selects[0] instanceof HTMLSelectElement) || !(selects[1] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement)
       || !(selects[4] instanceof HTMLSelectElement) || !(audioRemove instanceof HTMLButtonElement)
       || !(flip instanceof HTMLButtonElement)) throw new Error("Streaming encoding controls are unavailable");
@@ -3304,7 +3304,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     });
     window.__videoProgressObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-valuenow"] });
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Streaming video encoding error"));
@@ -3374,10 +3374,10 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   const customAudioState = await page.evaluate(() => ({
     bitrate: document.querySelector('input[aria-label="오디오 비트레이트 직접입력"]')?.value,
     sampleRate: document.querySelector('input[aria-label="오디오 샘플레이트 직접입력"]')?.value,
-    disabled: document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.disabled,
+    disabled: document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.disabled,
   }));
   if (customAudioState.bitrate !== "160" || customAudioState.sampleRate !== "44100" || customAudioState.disabled) throw new Error(`Custom audio settings were not accepted: ${JSON.stringify(customAudioState)}`);
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Audio extraction error"));
@@ -3435,7 +3435,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   });
   await page.waitForFunction(() => document.querySelectorAll(".video-sync-group").length === 2);
   await page.evaluate(() => document.querySelectorAll('.video-group-output-mode .ui-segmented-control button:nth-child(2)').forEach((button) => button.click()));
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Video concat error"));
@@ -3598,7 +3598,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largePassThroughPaths[1]);
   await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 2);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.evaluate(() => {
@@ -3615,7 +3615,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     window.__videoActiveStageObserver.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
   });
   page.once("dialog", (dialog) => void dialog.accept());
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Large pass-through error"));
@@ -3652,18 +3652,18 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoPaths[0]);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const mobilePassthroughDefaults = await page.evaluate(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
     return {
       bitrate: document.querySelector(".video-bitrate-control select")?.value,
       resolution: selects[2]?.value,
       aspect: selects[3]?.value,
       rotation: selects[4]?.value,
-      actionDisabled: document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.disabled,
-      notice: Array.from(document.querySelectorAll(".video-studio-page .inline-notice"), (element) => element.textContent || "").find((text) => text.includes("모바일")) || "",
+      actionDisabled: document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.disabled,
+      notice: Array.from(document.querySelectorAll(".video-studio-page [data-slot=notice]"), (element) => element.textContent || "").find((text) => text.includes("모바일")) || "",
     };
   });
   if (mobilePassthroughDefaults.bitrate !== "copy" || mobilePassthroughDefaults.resolution !== "source" || mobilePassthroughDefaults.aspect !== "source"
@@ -3673,7 +3673,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     throw new Error(`Mobile pass-through defaults are invalid: ${JSON.stringify(mobilePassthroughDefaults)}`);
   }
   await page.evaluate(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
     const bitrate = document.querySelector(".video-bitrate-control select");
     if (!(bitrate instanceof HTMLSelectElement) || !(selects[2] instanceof HTMLSelectElement) || !(selects[3] instanceof HTMLSelectElement) || !(selects[4] instanceof HTMLSelectElement)) throw new Error("Mobile encoding controls are unavailable");
     bitrate.value = "0";
@@ -3688,8 +3688,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await page.waitForFunction(() => {
-    const selects = document.querySelectorAll(".encoding-grid select");
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const selects = document.querySelectorAll("[data-testid=video-encoding-settings] select");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return selects[2]?.value === "source" && selects[3]?.value === "source" && selects[4]?.value === "0" && button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
@@ -3701,10 +3701,10 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largeAudioIncompatibleVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".video-audio-removal-suggestion", { timeout: 60_000 });
   const suggestion = await page.$eval(".video-audio-removal-suggestion", (element) => element.textContent || "");
   if (!suggestion.includes("음향 형식") || !suggestion.includes("음향 제외") || suggestion.includes("변환")) {
@@ -3713,7 +3713,7 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
   await page.click(".video-audio-removal-suggestion button");
   await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 제외를 적용했습니다"));
   page.once("dialog", (dialog) => void dialog.accept());
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-running");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) {
@@ -3735,23 +3735,23 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
     await page.waitForSelector(".video-studio-page input[type=file]");
     await (await page.$(".video-studio-page input[type=file]")).uploadFile(targetAudioIncompatibleVideo);
     await page.waitForFunction(() => {
-      const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+      const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
       return button instanceof HTMLButtonElement && !button.disabled;
     });
     await page.select(".video-bitrate-control select", "2M");
-    await page.click(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    await page.click("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     await page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 });
     const targetSuggestion = await page.$eval(".video-audio-mode-suggestion", (element) => ({
       text: element.textContent || "",
-      primary: element.querySelector(".video-audio-encode-suggestion")?.textContent || "",
-      secondary: element.querySelector(".video-audio-suggestion-actions .secondary-button")?.textContent || "",
+      primary: element.querySelector("[data-testid=video-audio-encode-suggestion]")?.textContent || "",
+      secondary: element.querySelector("[data-testid=video-audio-remove-suggestion]")?.textContent || "",
     }));
     if (!targetSuggestion.text.includes("음향 형식") || !targetSuggestion.primary.includes("음향 변환") || !targetSuggestion.secondary.includes("음향 제외")) {
       throw new Error(`Target E-AC-3 CTA is incomplete: ${JSON.stringify(targetSuggestion)}`);
     }
-    await page.click(mode === "encode" ? ".video-audio-encode-suggestion" : ".video-audio-suggestion-actions .secondary-button");
+    await page.click(mode === "encode" ? "[data-testid=video-audio-encode-suggestion]" : "[data-testid=video-audio-remove-suggestion]");
     await page.waitForFunction((expected) => document.querySelector(".inline-success")?.textContent?.includes(expected), {}, mode === "encode" ? "음향 변환을 적용했습니다" : "음향 제외를 적용했습니다");
-    await page.click(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    await page.click("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     await page.waitForSelector(".ui-operation-progress.ui-status-running");
     await waitForTerminalStatus(page);
     if (await page.$(".ui-operation-progress.ui-status-error")) {
@@ -3767,7 +3767,7 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoIncompatibleVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.select(".video-bitrate-control select", "custom");
@@ -3778,7 +3778,7 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-error", { timeout: 60_000 });
   const videoGuidance = await page.$eval(".ui-operation-current-message", (element) => element.textContent || "");
   if (!videoGuidance.includes("원본 화면 형식") || !videoGuidance.includes("1.5GB") || await page.$(".video-audio-removal-suggestion")) {
@@ -3793,10 +3793,10 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.click(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+  await page.click("[data-testid=video-output-actions] [data-ui-component=primary-button]");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) {
     throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision copy isolation error"));
@@ -3815,12 +3815,12 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.evaluate(() => {
     const bitrate = document.querySelector(".video-bitrate-control select");
-    const codec = document.querySelectorAll(".encoding-grid select")[1];
+    const codec = document.querySelectorAll("[data-testid=video-encoding-settings] select")[1];
     const audioCopy = document.querySelector(".video-audio-settings .ui-segmented-control button:nth-child(1)");
     if (!(bitrate instanceof HTMLSelectElement) || !(codec instanceof HTMLSelectElement) || !(audioCopy instanceof HTMLButtonElement)) {
       throw new Error("Dolby Vision target controls are unavailable");
@@ -3831,7 +3831,7 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
     codec.dispatchEvent(new Event("change", { bubbles: true }));
     audioCopy.click();
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   const firstOutcome = await Promise.race([
     page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 }).then(() => "suggestion"),
     waitForTerminalStatus(page).then(() => "terminal"),
@@ -3854,15 +3854,15 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-audio-mode-suggestion", { timeout: 60_000 });
   const suggestion = await page.$eval(".video-audio-mode-suggestion", (element) => ({
     text: element.textContent || "",
-    primary: element.querySelector(".video-audio-encode-suggestion")?.textContent || "",
-    secondary: element.querySelector(".secondary-button")?.textContent || "",
+    primary: element.querySelector("[data-testid=video-audio-encode-suggestion]")?.textContent || "",
+    secondary: element.querySelector("[data-testid=video-audio-remove-suggestion]")?.textContent || "",
   }));
   if (!suggestion.text.includes("음향 형식") || !suggestion.primary.includes("음향 변환") || !suggestion.secondary.includes("음향 제외")) {
     throw new Error(`Dolby Vision E-AC-3 target CTA is incomplete: ${JSON.stringify(suggestion)}`);
   }
-  await page.click(".video-audio-encode-suggestion");
+  await page.click("[data-testid=video-audio-encode-suggestion]");
   await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 변환을 적용했습니다"));
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision encode error"));
   const encoded = await page.evaluate(() => ({
@@ -3878,7 +3878,7 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
   await page.waitForSelector(".video-studio-page input[type=file]");
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(dolbyVisionVideo);
   await page.waitForFunction(() => {
-    const button = document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.evaluate(() => {
@@ -3889,7 +3889,7 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
     audioRemove.click();
   });
-  await page.evaluate(() => document.querySelector(".video-studio-page .section-actions :is(.primary-button, .ui-primary-button)")?.click());
+  await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision remove error"));
   console.log("  video: Dolby Vision base-layer target H.264 encode with E-AC-3 conversion CTA and remove mode verified");

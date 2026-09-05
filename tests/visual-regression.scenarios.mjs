@@ -311,7 +311,7 @@ const interactionDefinitions = Object.freeze({
       { type: "wait", selector: ".video-output-format-grid select" },
       { type: "select", selector: ".video-output-format-grid select", value: "gif" },
     ],
-    assertSelector: ".quick-tool-settings",
+    assertSelector: "[data-testid='video-gif-settings']",
   }),
   "audio-studio": Object.freeze([
     Object.freeze({
