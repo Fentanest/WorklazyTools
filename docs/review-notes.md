@@ -13,6 +13,126 @@
 - **접근성·visual 증거**: QA build에서 `A11Y_TEST_PORT=4292 A11Y_REPORT_PATH=/tmp/worklazytools-pfinal-resume-20260906/a11y.json npm run test:a11y` **exit 0, 5페이지 위반 0·외부 요청 0·placeholder 4.8871087704:1**. 이전 잡 원로그에서 마지막 PDF mode-ready 수정 뒤 PDF 부분 2회와 `LANG=ko_KR.UTF-8 VISUAL_TEST_PORT=4277 npm run test:visual`(13:22:45Z), `LANG=en_US.UTF-8 VISUAL_TEST_PORT=4278 npm run test:visual`(13:24:47Z)의 **exit 0**을 확인했다. 이후 제품/시각 변경이 없어 전체 visual 재실행은 생략했다. 재개 로그와 보호 파일 해시는 `/tmp/worklazytools-pfinal-resume-20260906/`에 보존한다.
 - **계보 전제 정정**: `5298c13^=454d7c8964d1a2f301c8661a6c6cc00f6304b49f`이며 RHWP/SEO main 변경은 B1 뒤 `26eb56ea5e2eff771f438d6c18d381da6af13474`에서 합류했다. 지시서의 “RHWP 등 기능 전부 포함·UI 전환 전 S2”는 실제 커밋으로 존재하지 않는다. 요청한 **B1 직전 S2**와 별도 **병합 전후 대조**를 실측해 이 혼입을 분리한다. 예산·기준점의 정본 계약을 바꾸는 결정은 하지 않는다. 이번 커밋과 후속 측정 기록 모두 **push 금지**다.
 
+### P2 P-final/P-QA 재개 — 누적 번들 예산 4점 귀속 분해 (Codx)
+
+**판정: P2 UI 전환은 5종 예산 모두 통과한다. 누적 route/app JS 실패는 U3 QR 일괄 생성만으로 이미 발생했다.** CJK 폰트 파일과 RHWP Studio vendor 자체는 이 JS 예산의 제외 대상이다. “RHWP 런타임도 이번 JS 초과의 주요 원인”이라는 추정은 채택하지 않는다. `4a8405c` 누적 게이트의 수치·기준점·상한은 바꾸지 않으며 이번 지시는 모든 push를 금지한다.
+
+**A 보존 커밋**은 `3f0cf3bc1fa84fc8554724ce8c3b2f6d906b464a` (`refactor: finalize P2 CSS cleanup and preserve QA evidence`), **911파일**이다. 변경 시각 기준선 35장과 미추적 QA 860장, 구현·하네스·문서 16파일을 포함하고 개인 파일 3개는 제외했다. B에서는 제품 코드 최적화를 수행하지 않았고 측정 JSON에 deduplicated 파일별 크기·분류·소유 route·manifest 근거만 추가했다. multiplier는 `6junk`·소수·0·음수·빈 값을 정수로 오인하지 않게 엄격히 검사한다.
+
+**계보 확정과 S2 전제 정정** — `git log --first-parent --oneline 4a8405c..3f0cf3b` 실측이다. U3 뒤 `7b3222b`(visual 결정성)·`454d7c8`(visual 병렬화), **B1 `5298c13`**, `4180f88`(QA 계약), **main 병합 `26eb56e`**, B2 `4ecda00` 순이다. `26eb56e`의 부모는 `4180f885678484ae51c2441e15c36a4d17b40e18`과 `073da56226f7bc1bdbef682a477e05ec28862074`다. 따라서 지시서의 “기능 전부 포함·B1 이전”에 해당하는 실제 커밋은 없다. 요청한 **B1 직전**이라는 정의를 그대로 사용하고, S1→S2를 기타 기능 구간으로 허위 표시하지 않는다.
+
+| 점 | 정확한 커밋 | 실제 상태 |
+| --- | ---: | ---: |
+| S0 | `4a8405c7458ca72e454326e798592330478c67e4` | 지시서 분기점 |
+| S1 | `62f9031ecc87fef37ca55b3d64f511cfc9b2b407` | U3 QR bulk 직후 |
+| S2 | `454d7c8964d1a2f301c8661a6c6cc00f6304b49f` | B1 직전 (RHWP·SEO 병합 전) |
+| S3 | `3f0cf3bc1fa84fc8554724ce8c3b2f6d906b464a` | 감사 후 P-final/P-QA 보존 커밋 |
+
+**동일 조건** — 기존 `/tmp/worklazytools-pfinal-budget.ZaWR4c` worktree 한 곳을 순차 checkout해 S0·S1·S2·S3·병합 전·병합 후를 모두 **새로 빌드**했고 끝에 원래 S0로 복원했다. 다른 기존 worktree는 사용하지 않았다. 여섯 점 모두 `/home/better0101/projects/worklazytools/node_modules` 동일 symlink·설치, Node **v22.17.1**, npm **10.9.2**, Vite **6.4.3**, Rollup **4.62.4**, Tailwind **4.3.3**, React **19.2.8**, Base UI **1.7.0**, fontkit **1.1.1**, pdf-lib **1.17.1**, RHWP core/editor **0.8.6**이다. 설치를 바꾸지 않았으며 `VITE_LOCAL_QA`·`VITE_BASE_PATH`·`BUNDLE_ROUTES`는 unset, `NODE_OPTIONS=--max-old-space-size=4096`, `BUNDLE_BUDGET_MULTIPLIER=6`을 고정했다. 기준 branch의 과거 lockfile을 각각 설치한 측정이 아니라 요청대로 **현재 동일 설치로 정규화한 비교**다. RHWP 패키지 0.8.4↔0.8.6 자체의 역사적 비용은 이 비교로 추정하지 않는다.
+
+- 측정기 SHA-256: `5789598e7c4539261f41fe555572bd0c0dde8f133329b9006283c43292f3931b`. 설치 `node_modules/.package-lock.json` SHA-256: `df730d9ec2838d43f1cd07c224b563406c05d022f1c89ccc8747f0bc2e9893ff`. 완료 시 두 fingerprint 불변을 확인했다.
+- 실제 실행은 `BUNDLE_SOURCE_ROOT=/tmp/worklazytools-pfinal-budget.ZaWR4c BUNDLE_MEASURE_OUTPUT=/tmp/worklazytools-pfinal-resume-20260906/<점>.json BUNDLE_BUDGET_MULTIPLIER=6 NODE_OPTIONS=--max-old-space-size=4096 node /home/better0101/projects/worklazytools/scripts/measure-bundle-budget.mjs`다. 내부 명령은 `vite build --manifest --outDir dist-measure`, 모든 실행 종료 시 측정 dist를 삭제한다. S1/S2/S3는 각각 S0/S1/S2 JSON을 `BUNDLE_BASELINE`으로 주었고, 병합 후는 병합 전 JSON으로 비교했다.
+- 포함·제외·gzip·route reachability 계약은 변경하지 않았다. 단일 소유 lazy 청크와 도구 경로 video worker는 route, 다중 route 또는 소유 경로 없는 worker는 shared, entry는 별도다. 따라서 QR bulk worker는 QR 기능 소유임에도 이 기존 측정 계약에서는 **shared**다. 19 lazy route 전체를 측정했고 eager Excel 병합은 entry에 포함된다. S0 **66 JS/1 CSS**, S1/S2/S3 **79 JS/1 CSS**, 네 점 모두 중복 해시 제거 건수 **0**이다.
+- 원본 JSON·각 빌드 stdout/stderr·계보·설치 fingerprint·실행 exit/시간·분석 스크립트는 `/tmp/worklazytools-pfinal-resume-20260906/`에 보존한다 (`S0.json`…`S3.json`, `Mpre.json`, `Mpost.json`, `point-runs.json`, `measurement-environment.json`, `analysis.json`, `analyze-bundles.py`, `run-points.py`). 각 점의 모든 파일을 재합산해 **5개 metric 전부 exact 일치**, entry+route+shared=app JS도 여섯 점 모두 일치함을 검사했다.
+
+**4점 실측 (각 파일 gzip 합, 단위 B)**
+
+| 측정점 | entry | route | shared | app JS | CSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| S0 | 289,574 | 1,507,461 | 2,615,772 | 4,412,807 | 49,015 |
+| S1 | 294,982 | 2,412,311 | 2,716,255 | 5,423,548 | 49,325 |
+| S2 | 294,982 | 2,412,311 | 2,716,255 | 5,423,548 | 49,325 |
+| S3 | 297,901 | 2,439,997 | 2,716,475 | 5,454,373 | 38,545 |
+
+**3구간 증분 (KiB = 1,024B, 반올림 전 B로 판정)**
+
+| 실제 구간 | entry | route | shared | app JS | CSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| S0→S1: U3 | +5.28 | +883.64 | +98.13 | +987.05 | +0.30 |
+| S1→S2: visual 하네스만 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| S2→S3: P2 + P-final + main 병합 | +2.85 | +27.04 | +0.21 | +30.10 | -10.53 |
+| S0→S3: 종전 누적 | +8.13 | +910.68 | +98.34 | +1017.15 | -10.22 |
+
+S0와 S3 재측정 5종은 이전 P-final 보고의 원시 B와 전부 일치한다. S1→S2는 제품 코드/설치 변화가 없고 다섯 지표도 **exact 0**이다. U3 증가만으로 route **+883.64 > +360KiB**, app JS **+987.05 > +480KiB**여서 S1 비교 명령은 의도대로 **exit 1**이었다. U3는 S0→S3 순증의 route **97.03%**, app JS **97.04%**를 설명한다.
+
+**실제 기능 합류 구간 보조 측정 (단위 B)** — 기준점을 대체하지 않고 혼입을 설명하기 위한 두 점이다.
+
+| 병합 전후 | entry | route | shared | app JS | CSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Mpre `4180f885678484ae51c2441e15c36a4d17b40e18` | 295,057 | 2,414,984 | 2,717,113 | 5,427,154 | 49,275 |
+| Mpost `26eb56ea5e2eff771f438d6c18d381da6af13474` | 295,065 | 2,414,981 | 2,717,095 | 5,427,141 | 49,275 |
+| Mpre→Mpost 증분 | +8 | -3 | -18 | -13 | 0 |
+
+병합은 동일 설치 조건에서 entry **+8B**, route **−3B**, shared **−18B**, app JS **−13B**, CSS **0B**다. 따라서 실제 UI 커밋 구간 합 `(S2→Mpre)+(Mpost→S3)`은 아래와 같다. 이것은 실제 이력의 증분 합이며 존재하지 않는 가상 “기능 완료 S2” 직접 측정값으로 표시하지 않는다.
+
+| 지표 | S2→S3 실측 B (KiB) | UI 구간 합 B (KiB) | 기존 상한 KiB | 판정 |
+| --- | ---: | ---: | ---: | ---: |
+| entry | +2,919 (+2.85) | +2,911 (+2.84) | +120 | 모두 통과 |
+| route | +27,686 (+27.04) | +27,689 (+27.04) | +360 | 모두 통과 |
+| shared | +220 (+0.21) | +238 (+0.23) | +180 | 모두 통과 |
+| app JS | +30,825 (+30.10) | +30,838 (+30.12) | +480 | 모두 통과 |
+| CSS | -10,780 (-10.53) | -10,780 (-10.53) | +60 | 모두 통과 |
+
+**chunk 증가 기여자** — content hash 접미사만 제거해 동명 출력을 대응했고 `index.html` entry, PDF helper index, `@zip.js` index는 manifest/owner로 구분했다. 점별 canonical chunk key 중복이 없음을 단언했다. 표는 **새 청크 전체 크기 또는 기존 청크의 순증**이며 route와 app JS 각 상위 10개다. 각 행의 세 구간 증분 합=누적 증분, 상위 10+기타=metric 증분을 exact B로 확인했다. 동일 개수의 청크라도 gzip에 영향을 주는 참조 hash 변화는 수 B 증감을 만들 수 있으므로 이를 라이브러리 기능 추가로 해석하지 않는다.
+
+**route 상위 10개 (단위 B)**
+
+| chunk | S0→S1 | S1→S2 | S2→S3 | 누적 증가 | 기능/구간 귀속 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `qrLabelPdf.js` | +508,018 | 0 | -1 | +508,017 (+496.11 KiB) | U3 PDF 생성; fontkit + PDF 생성 코드 |
+| `exceljs.min.js` | +271,024 | 0 | -1 | +271,023 (+264.67 KiB) | U3 스프레드시트 입력·실패 XLSX 출력 |
+| `inputAdapter.js` | +135,331 | 0 | 0 | +135,331 (+132.16 KiB) | U3 기존 공용 입력 파서의 앱 lazy 경로 |
+| `@zip.js/zip.js/index.js` | +17,477 | 0 | -1 | +17,476 (+17.07 KiB) | U3 ZIP 동적 진입점 |
+| `QrBulkPanel.js` | +9,709 | 0 | -1 | +9,708 (+9.48 KiB) | U3 일괄 생성 화면 |
+| `VideoStudioPage.js` | -4 | 0 | +3,780 | +3,776 (+3.69 KiB) | 기존 화면; P2 B5b UI |
+| `ImageStudioPage.js` | -6 | 0 | +3,737 | +3,731 (+3.64 KiB) | 기존 화면; P2 B6·B-shared UI |
+| `DocumentCompareResultPage.js` | -4 | 0 | +1,783 | +1,779 (+1.74 KiB) | 기존 결과 화면; P2 B3 UI |
+| `AudioStudioPage.js` | -4 | 0 | +1,648 | +1,644 (+1.61 KiB) | 기존 화면; P2 B5a UI |
+| `ExcelComparePage.js` | +58 | 0 | +1,400 | +1,458 (+1.42 KiB) | 기존 화면; U3 + P2 B4 UI |
+
+상위 10 합 **+953,943B** + 나머지(감소 포함) **-21,407B** = route 누적 **+932,536B**.
+
+**app JS 상위 10개 (단위 B)**
+
+| chunk | S0→S1 | S1→S2 | S2→S3 | 누적 증가 | 기능/구간 귀속 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `qrLabelPdf.js` | +508,018 | 0 | -1 | +508,017 (+496.11 KiB) | U3 PDF 생성; fontkit + PDF 생성 코드 |
+| `exceljs.min.js` | +271,024 | 0 | -1 | +271,023 (+264.67 KiB) | U3 스프레드시트 입력·실패 XLSX 출력 |
+| `inputAdapter.js` | +135,331 | 0 | 0 | +135,331 (+132.16 KiB) | U3 기존 공용 입력 파서의 앱 lazy 경로 |
+| `zip-fs-wasm.js` | +64,626 | 0 | -2 | +64,624 (+63.11 KiB) | U3 ZIP; shared로 분리 |
+| `qr-bulk.worker.js` | +56,905 | 0 | 0 | +56,905 (+55.57 KiB) | U3 raster worker; 계약상 shared |
+| `jszip.min.js` | +38,101 | 0 | 0 | +38,101 (+37.21 KiB) | U3 공용 ZIP 분리; 기존 PDF에서 이동 포함 |
+| `@zip.js/zip.js/index.js` | +17,477 | 0 | -1 | +17,476 (+17.07 KiB) | U3 ZIP 동적 진입점 |
+| `QrBulkPanel.js` | +9,709 | 0 | -1 | +9,708 (+9.48 KiB) | U3 일괄 생성 화면 |
+| `index.html (entry)` | +5,408 | 0 | +2,919 | +8,327 (+8.13 KiB) | 기존 entry; U3 + P2 공용 UI |
+| `VideoStudioPage.js` | -4 | 0 | +3,780 | +3,776 (+3.69 KiB) | 기존 화면; P2 B5b UI |
+
+상위 10 합 **+1,113,288B** + 나머지(감소 포함) **-71,722B** = app JS 누적 **+1,041,566B**.
+
+**재배치·제외·shadcn 귀속의 경계**
+
+- U3 시점의 `PdfEditorPage` **−38,226B**, `workerLifecycle` **−61,534B**는 양수 청크 증가를 상쇄한다. 누적에서는 각각 **−34,131B**, **−61,535B**다. 특히 JSZip·ZIP 공용 코드의 분리/재배치가 섞이므로 새 청크 크기를 전부 “새 라이브러리 비용”으로 더하지 않았다.
+- CJK `public/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf`는 U3에 들어온 **4,644,748B 원본 자산**, **route/app JS 기여 0B**다. `QrBulkPanel`의 PDF export 시 fetch하고 `qrLabelPdf`에 fontBytes로 전달한다. 위 약 **496.11KiB** JS 청크는 fontkit/PDF 생성 코드이며 OTF 바이트 자체가 아니다.
+- RHWP Studio는 `git ls-tree -rl` 기준 manifest 포함 78파일 원본 합 **56,208,787→60,692,284B (+4,483,497B)**지만 모두 `public/vendor/rhwp-studio/0.8.4→0.8.6`라 **JS/CSS 예산 기여 0B**다. prebuild 검증의 77파일 수치는 자기 manifest를 제외한 계약이므로 위 78파일과 단위가 다르다. 동일 설치의 core/editor는 모든 점에서 0.8.6이며 버전 교체 효과를 측정했다고 주장하지 않는다.
+- P2 구간은 Base UI/shadcn 신규 runtime dependency 추가가 없고 S2/S3 모두 **79개 JS chunk**다. UI 전환은 기존 화면/entry 청크에 반영됐다. S2→S3 app JS 증가 상위 10개는 다음과 같으며 전체 CSS는 **−10,780B (−10.53KiB)**다.
+
+| P2 구간 기존 chunk | 증가 B | KiB |
+| --- | ---: | ---: |
+| `PdfEditorPage.js` | +4,095 | +4.00 |
+| `VideoStudioPage.js` | +3,780 | +3.69 |
+| `ImageStudioPage.js` | +3,737 | +3.65 |
+| `index.html (entry)` | +2,919 | +2.85 |
+| `DocumentCompareResultPage.js` | +1,783 | +1.74 |
+| `AudioStudioPage.js` | +1,648 | +1.61 |
+| `DocumentComparePage.js` | +1,432 | +1.40 |
+| `ExcelComparePage.js` | +1,400 | +1.37 |
+| `TimezoneCalculatorPage.js` | +1,374 | +1.34 |
+| `OfficeEditorAppPage.js` | +1,217 | +1.19 |
+
+**실행 결과·최종 판정** — S0 빌드/측정 exit 0, S1 빌드 성공 후 누적 예산 **exit 1**, S1→S2·S2→S3 및 병합 전→병합 후 비교는 전부 **exit 0 / all five deltas within fixed limits**다. S1/S2/S3/Mpre/Mpost 새 빌드는 각각 **72.46/72.35/73.62/74.71/78.84초**, S0 Vite 보고는 **57.50초**다. 측정기 문법·`git diff --check`와 잘못된 multiplier 5종의 빌드 전 거부 검증을 통과했다. 제품 변경에 대한 build·unit·static·orphan·manifest·QA UI/a11y 재검증은 위 자체 감사 절의 실제 실행 결과를 따른다.
+
+**“P2 자체가 누적 예산을 초과했다”는 귀속은 기각하고, “U3 기능 추가만으로 누적 실패·P2 UI 자체는 5종 상한 이내”로 확정한다.** 원래 S0 누적 수치는 여전히 route/app 두 종 실패이며 예산 면제나 기준 변경을 승인한 것은 아니다. 사용자 지시대로 `origin/ui-migration`과 main 모두 push하지 않는다. 작업지시서의 기준점·예산 숫자는 수정하지 않았다.
+
 ## 2026-09-05
 
 ### P2 P-final — legacy 잔여·토큰 단일화·orphan·누적 예산 판정 (Codx)

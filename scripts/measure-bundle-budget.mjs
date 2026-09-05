@@ -14,7 +14,7 @@ const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
 const selectedRoutes = parseCsv(process.env.BUNDLE_ROUTES);
 const baselinePath = process.env.BUNDLE_BASELINE ? path.resolve(process.env.BUNDLE_BASELINE) : null;
 const reportPath = process.env.BUNDLE_MEASURE_OUTPUT ? path.resolve(process.env.BUNDLE_MEASURE_OUTPUT) : null;
-const budgetMultiplier = Number.parseInt(process.env.BUNDLE_BUDGET_MULTIPLIER || "1", 10);
+const budgetMultiplier = Number(process.env.BUNDLE_BUDGET_MULTIPLIER ?? "1");
 const budgetLimits = Object.freeze({
   entryJsGzip: 20 * 1024,
   affectedRouteJsGzip: 60 * 1024,
@@ -155,6 +155,22 @@ function measureOutput() {
     uniqueFiles: { js: jsRecords.length, css: cssRecords.length },
     deduplicatedCopies: includedFiles.length - uniqueRecords.length,
     classificationNotes,
+    // Preserve the exact, deduplicated contributions so comparisons can explain
+    // aggregate changes even when Vite renames a chunk's content hash.
+    files: uniqueRecords.map((record) => ({
+      hash: record.hash,
+      paths: record.paths,
+      type: record.type,
+      bytes: record.bytes,
+      gzipBytes: record.gzipBytes,
+      category: record.type === "css" ? "css"
+        : entryHashes.has(record.hash) ? "entry"
+          : record.routeOwners.size === 1 ? "route" : "shared",
+      routeOwners: [...record.routeOwners].sort(),
+      manifestSources: Object.entries(viteManifest)
+        .filter(([, item]) => record.paths.includes(item.file))
+        .map(([source, item]) => ({ source, name: item.name ?? null })),
+    })),
   };
 }
 

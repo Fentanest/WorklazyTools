@@ -2,6 +2,10 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-06
+
+- 번들 측정 JSON에 청크별 gzip·분류·route/manifest 근거를 보존하고 예산 배수의 정수 검증을 강화해 P2 누적 예산 귀속을 재현 가능하게 했다. — Codx
+
 ## 2026-09-05
 
 - P2 P-final에서 소비 0인 legacy 변수 5개와 63개 orphan class의 152개 selector arm을 제거하고, 저장소 전체 CSS orphan 감사·분기점 번들 비교를 재현 가능한 명령으로 고정했다. B-shared에서 승인됐으나 누락된 전 화면 시각 기준선과 stale 스모크 계약도 동기화했다. — Codx
