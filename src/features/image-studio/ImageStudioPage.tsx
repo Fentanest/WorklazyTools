@@ -1,6 +1,6 @@
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -69,7 +69,7 @@ export function ImageStudioPage() {
       <Card as="nav" className="studio-tabs mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0 max-[620px]:grid-cols-2" aria-label={t("image.tabs.label")} data-testid="image-studio-tabs">
         {([
           ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],
-        ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} data-state={tab === value ? "active" : "inactive"} onClick={() => { activeController.current?.abort(); activeController.current = undefined; setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
+        ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} aria-pressed={tab === value} data-state={tab === value ? "active" : "inactive"} onClick={() => { activeController.current?.abort(); activeController.current = undefined; setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
       </Card>
 
       <UtilityNotice className="image-format-notice mb-2"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("image.heic")}</span></UtilityNotice>
@@ -276,9 +276,11 @@ function ImageEditor() {
         layerIdsRef.current.set(object, id);
       }
       layerObjectsRef.current.set(id, object);
+      const kind = getEditorLayerKind(object);
       return {
         id,
-        kind: getEditorLayerKind(object),
+        kind,
+        name: object instanceof IText && object.text.trim() ? object.text.trim() : undefined,
         visible: object.visible,
         isBase: object === baseImage.current || (object as EditorFabricObject).worklazyRole === "base",
         active: active.has(object),
@@ -481,6 +483,111 @@ function ImageEditor() {
     clearCropSelection();
     clearEffectSelection();
   }, [clearCropSelection, clearEffectSelection]);
+
+  const setKeyboardRegionSelection = useCallback((mode: "crop" | "effect", selection: RegionSelection) => {
+    const instance = canvas.current;
+    if (!instance) return;
+    const effectMode = mode === "effect";
+    const overlayRef = effectMode ? effectOverlay : cropOverlay;
+    let overlay = overlayRef.current;
+    if (!overlay) {
+      overlay = new Rect({
+        ...selection,
+        originX: "left",
+        originY: "top",
+        fill: effectMode ? "rgba(175,82,222,.14)" : "rgba(10,132,255,.14)",
+        stroke: effectMode ? "#af52de" : "#0a84ff",
+        strokeWidth: 2,
+        strokeDashArray: [9, 6],
+        strokeUniform: true,
+        selectable: !effectMode,
+        evented: !effectMode,
+        excludeFromExport: true,
+      });
+      if (!effectMode) {
+        (overlay as EditorFabricObject).worklazyRole = "crop-overlay";
+        configureCropOverlay(overlay, () => cropRatioRef.current);
+      }
+      overlayRef.current = overlay;
+      instance.add(overlay);
+    }
+    overlay.set({ ...selection, scaleX: 1, scaleY: 1 });
+    overlay.setCoords();
+    if (effectMode) {
+      effectSelectionRef.current = selection;
+      setEffectSelection(selection);
+    } else {
+      cropSelectionRef.current = selection;
+      setCropSelection(selection);
+      instance.setActiveObject(overlay);
+    }
+    instance.requestRenderAll();
+    window.requestAnimationFrame(updateRegionLabelPosition);
+  }, [updateRegionLabelPosition]);
+
+  const handleStageKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    const instance = canvas.current;
+    if (!instance) return;
+    const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    const mode = interactionModeRef.current;
+    if (isRegionMode(mode) && (event.key === "Enter" || arrows.includes(event.key))) {
+      event.preventDefault();
+      event.stopPropagation();
+      const canvasWidth = instance.getWidth();
+      const canvasHeight = instance.getHeight();
+      const ratio = mode === "crop" ? cropRatioRef.current : undefined;
+      const initialWidth = ratio ? Math.min(canvasWidth * 0.5, canvasHeight * 0.5 * ratio) : canvasWidth * 0.5;
+      const initialHeight = ratio ? initialWidth / ratio : canvasHeight * 0.5;
+      const initial: RegionSelection = {
+        left: (canvasWidth - initialWidth) / 2,
+        top: (canvasHeight - initialHeight) / 2,
+        width: Math.max(10, initialWidth),
+        height: Math.max(10, initialHeight),
+      };
+      const current = (mode === "crop" ? cropSelectionRef.current : effectSelectionRef.current) ?? initial;
+      if (event.key === "Enter") {
+        setKeyboardRegionSelection(mode, current);
+        return;
+      }
+      const step = event.altKey ? 1 : 10;
+      let next = { ...current };
+      if (event.shiftKey) {
+        const grow = event.key === "ArrowRight" || event.key === "ArrowDown" ? step : -step;
+        if (ratio) {
+          const proposedWidth = event.key === "ArrowLeft" || event.key === "ArrowRight"
+            ? current.width + grow
+            : (current.height + grow) * ratio;
+          next.width = Math.max(10, Math.min(canvasWidth - current.left, proposedWidth));
+          next.height = Math.max(10, Math.min(canvasHeight - current.top, next.width / ratio));
+          next.width = next.height * ratio;
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          next.width = Math.max(10, Math.min(canvasWidth - current.left, current.width + grow));
+        } else {
+          next.height = Math.max(10, Math.min(canvasHeight - current.top, current.height + grow));
+        }
+      } else {
+        if (event.key === "ArrowLeft") next.left -= step;
+        if (event.key === "ArrowRight") next.left += step;
+        if (event.key === "ArrowUp") next.top -= step;
+        if (event.key === "ArrowDown") next.top += step;
+        next.left = Math.max(0, Math.min(canvasWidth - next.width, next.left));
+        next.top = Math.max(0, Math.min(canvasHeight - next.height, next.top));
+      }
+      setKeyboardRegionSelection(mode, next);
+      return;
+    }
+    if (!arrows.includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = event.shiftKey ? 60 : event.altKey ? 1 : 20;
+    const viewport = [...instance.viewportTransform] as TMat2D;
+    if (event.key === "ArrowLeft") viewport[4] -= step;
+    if (event.key === "ArrowRight") viewport[4] += step;
+    if (event.key === "ArrowUp") viewport[5] -= step;
+    if (event.key === "ArrowDown") viewport[5] += step;
+    applyViewportTransform(instance, viewport);
+  }, [applyViewportTransform, setKeyboardRegionSelection]);
 
   useEffect(() => {
     if (!canvasElement.current) return;
@@ -1460,9 +1567,13 @@ function ImageEditor() {
           />
           <div
             ref={stageElement}
-            className={cn("fabric-stage image-preview-drop relative min-w-0 overflow-auto rounded-2xl border border-border bg-[repeating-conic-gradient(#ececf0_0_25%,#f8f8fa_0_50%)] bg-[length:16px_16px] p-3 dark:bg-[repeating-conic-gradient(#242426_0_25%,#303033_0_50%)] max-[820px]:overflow-hidden max-[820px]:p-2", stageDragging && "is-file-dragging border-sky-600 shadow-[inset_0_0_0_2px_rgba(21,155,215,.18)]", interactionMode === "crop" ? "is-crop-mode" : interactionMode === "effect" ? "is-effect-mode" : "")}
+            className={cn("fabric-stage image-preview-drop relative min-w-0 overflow-auto rounded-2xl border border-border bg-[repeating-conic-gradient(#ececf0_0_25%,#f8f8fa_0_50%)] bg-[length:16px_16px] p-3 outline-none focus-visible:border-sky-700 focus-visible:ring-3 focus-visible:ring-sky-700/30 dark:bg-[repeating-conic-gradient(#242426_0_25%,#303033_0_50%)] max-[820px]:overflow-hidden max-[820px]:p-2", stageDragging && "is-file-dragging border-sky-600 shadow-[inset_0_0_0_2px_rgba(21,155,215,.18)]", interactionMode === "crop" ? "is-crop-mode" : interactionMode === "effect" ? "is-effect-mode" : "")}
+            role="region"
             aria-label={t("image.editor.canvasArea")}
+            aria-describedby="image-editor-canvas-keyboard-help"
+            tabIndex={0}
             data-testid="image-editor-canvas-stage"
+            onKeyDown={handleStageKeyDown}
             onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setStageDragging(true); } }}
             onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setStageDragging(true); } }}
             onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setStageDragging(false); }}
@@ -1513,6 +1624,7 @@ function ImageEditor() {
             >{t("image.editor.regionSize", { width: Math.round(floatingRegionSelection.width), height: Math.round(floatingRegionSelection.height) })}</span>}
             {stageDragging && <span className="image-preview-drop-hint absolute inset-2 z-20 grid place-items-center rounded-xl border-2 border-dashed border-sky-600/50 bg-sky-50/95 p-4 text-sm font-extrabold text-sky-700 backdrop-blur-sm dark:bg-sky-950/95 dark:text-sky-300">{t("image.editor.drop")}</span>}
           </div>
+          <p id="image-editor-canvas-keyboard-help" className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("image.editor.canvasKeyboardHelp")}</p>
         </div>
         <ImageEditorPanel
           activePanel={activePanel}

@@ -45,25 +45,11 @@ export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled
     <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple disabled={disabled} onChange={(event) => { void handleChange(event); }} />
     <Card
       className={cn(
-        "relative min-h-32 cursor-pointer items-center justify-center gap-2 overflow-visible rounded-2xl border border-dashed border-green-700/45 bg-green-500/5 px-4 py-5 text-center shadow-none outline-none transition-[border-color,background-color,box-shadow] hover:border-green-700 hover:bg-green-500/10 focus-visible:border-green-700 focus-visible:ring-3 focus-visible:ring-green-700/25 dark:border-green-300/50 dark:hover:border-green-300",
+        "relative min-h-32 items-center justify-center gap-2 overflow-visible rounded-2xl border border-dashed border-green-700/45 bg-green-500/5 px-4 py-5 text-center shadow-none transition-[border-color,background-color,box-shadow] dark:border-green-300/50",
         dragging && "border-green-700 bg-green-500/15 ring-3 ring-green-700/20 dark:border-green-300",
         disabled && "cursor-not-allowed opacity-50",
       )}
       data-testid="excel-pair-drop-zone"
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-disabled={disabled}
-      aria-label={label}
-      onClick={(event) => {
-        if (disabled || (event.target as Element).closest("button")) return;
-        inputRef.current?.click();
-      }}
-      onKeyDown={(event) => {
-        if (!disabled && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          inputRef.current?.click();
-        }
-      }}
       onDragEnter={(event) => { event.preventDefault(); if (!disabled) setDragging(true); }}
       onDragOver={(event) => {
         event.preventDefault();

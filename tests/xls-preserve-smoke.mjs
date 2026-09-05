@@ -212,7 +212,7 @@ try {
     const failedXls = isolatedFailure.cards.find((card) => card.name === path.basename(brokenOleXls));
     if (!readyXlsx?.state.includes("ready") || !failedXls?.state.includes("degradedLegacy")
       || !failedXls.error.includes("이 파일은 서식 없이 병합됩니다") || !failedXls.error.includes("수식은 보존되지 않습니다")
-      || isolatedFailure.banner || await page.$eval(":is(.summary-card,[data-testid=excel-merge-summary]) :is(.primary-button, .ui-primary-button)", (button) => button.disabled)) {
+      || isolatedFailure.banner || await page.$eval(":is(.summary-card,[data-testid=excel-merge-summary]) [data-ui-component=primary-button]", (button) => button.disabled)) {
       throw new Error(`A failed legacy conversion contaminated its batch: ${JSON.stringify(isolatedFailure)}`);
     }
     const degradedMerged = await mergeAndInspect(page);
@@ -298,8 +298,8 @@ async function readRetentionToggles(page) {
 }
 
 async function mergeAndInspect(page) {
-  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid=excel-merge-summary]) :is(.primary-button, .ui-primary-button)")?.disabled);
-  await page.click(":is(.summary-card,[data-testid=excel-merge-summary]) :is(.primary-button, .ui-primary-button)");
+  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid=excel-merge-summary]) [data-ui-component=primary-button]")?.disabled);
+  await page.click(":is(.summary-card,[data-testid=excel-merge-summary]) [data-ui-component=primary-button]");
   await page.waitForSelector(":is(.result-download,[data-testid=excel-result-download])");
   const bytes = await page.$eval(":is(.result-download,[data-testid=excel-result-download])", async (link) => {
     const response = await fetch(link.href);

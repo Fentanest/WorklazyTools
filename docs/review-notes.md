@@ -4,6 +4,18 @@
 
 ## 2026-09-05
 
+### P2 B-shared — 접근성 기준선 교정·공용 legacy 종료·Image Studio 대안 조작 판정 (Codx)
+
+- **게이트와 0단계 표본 교정**: `HEAD=origin/ui-migration=556a8b169752a1496599655ab6ae071afbf16da5`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`에서 시작했고 B6 재검수 차단 결함 0·회귀 0을 확인했다. 기존 `test:a11y`가 “home”을 `/ko`로 열고 저장 언어까지 주입해 실제 `.recommended`가 있는 루트 언어 랜딩을 건너뛰는 결함을 찾았다. 루트 `/`로 교정한 브랜치 기준선은 **9건(critical 1·serious 4·moderate 4)**이다: 홈 20/1 color-contrast(2노드), 문서 비교 42/2 nested-interactive+region, 도구 목록 39/1 region, Excel 비교 47/2 nested-interactive+region, PDF 44/3 label+nested-interactive+region. 라이브 10건 중 PDF 활성 탭 대비 1건만 이미 해소됐고 9건 잔존·신규 0이었다.
+- **공용 접근성 판정**: desktop 언어 전환기를 이름 있는 `nav`에 귀속하고, 공용/Excel 전용 드롭존은 비상호작용 drop target과 단일 파일 선택 버튼으로 역할을 분리했다. 숨김 file input에도 접근 가능한 이름을 주었다. `ToggleRow`는 visible label↔button 연결과 설명 ID의 `aria-describedby`를 추가했으며 전 스코프 browser 스모크에서 Space·Enter·label click과 설명 연결을 모두 실동작 확인했다. 완료 axe는 홈 25/0·문서 41/0·도구 39/0·Excel 46/0·PDF 43/0, **총 0건·외부 요청 0**이다. 문서 placeholder는 `rgb(105,105,111)`/`rgb(242,242,247)` = **4.8871:1**로 라이브 4.61:1보다 개선됐다.
+- **개선 ③ 채택 — 카드 선택 상태**: PDF 선택 썸네일은 브랜치 재측정에서 선택/비선택 배경이 라이트·다크 모두 **1.00:1**로 테두리/링에만 의존했다. 약한 배경 틴트와 4px 좌측 인디케이터를 함께 채택했다. 최종 배경 대비는 light 1.09:1·dark 1.11:1이지만 인디케이터 대비가 각각 **6.27:1·9.81:1**로 완료 기준 3:1을 넘으므로 WCAG 1.4.1의 색 단독 의존을 해소했다. 배경만 과도하게 진하게 만드는 안은 정보 계층을 무너뜨려 기각했다.
+- **개선 ④ 채택 — 사이드바 활성 항목**: `NavLink` 상수 class 때문에 브랜치 직접 진입 `/ko`에서 active class와 `aria-current`가 모두 없고 light/dark **1.00:1**이던 회귀를 확인했다. 경로 정규화, `aria-current=page`, 현재색 3px 인디케이터를 적용했다. 최종 인디케이터 대비는 light **17.72:1**, dark **14.05:1**이며 `/ko`·`/ko/`·도구 하위 경로에서 활성 상태를 확인했다.
+- **개선 ⑥ 채택/기각 — legacy accent만 제거**: shadcn `--primary` 톤다운은 기존 8.09:1 실측을 근거로 **기각**하고 값도 바꾸지 않았다. `var(--blue)` 35·`var(--orange)` 16·`var(--pink)` 8 호출을 Tailwind/shadcn 토큰 소비로 옮겨 `src` 전체 **0/0/0**으로 만들었다. 흰 텍스트와 쓰이는 대체 색 대비는 blue-700 **6.70:1**, orange-700 **5.18:1**, pink-700 **6.29:1**이다.
+- **Image Studio 이관 6건**: 상위 4모드에 `aria-pressed`, 캔버스에 유효한 named region과 focus 표시를 부여하고 빈 선택 도움말의 부모 opacity를 제거해 별도 axe **41 passes/0 violations**를 얻었다. 화면 안내와 함께 Enter 영역 생성·방향키 이동·Shift+방향키 크기 조절, 일반 모드 방향키 pan, 레이어 이름의 Alt+↑/↓ 재정렬을 제공했다. 레이어 선택/표시/삭제와 GIF drag/위/아래/삭제 라벨은 번호와 실제 이름을 포함하며, 복제 라벨은 선택 종류/개수를 포함한다. 전용 스모크에서 키보드 영역 생성·이동·크기·취소와 레이어 ID 순서 왕복을 확인했다.
+- **B6 말줄임 공백 해소**: `interaction-layers-panel`이 긴 텍스트 레이어를 실제로 만들고 해당 레이어 이름에 `assert-truncated`를 수행한다. 모바일 실측은 **clientWidth 104px < scrollWidth 409px**, `overflow:hidden`·`text-overflow:ellipsis`·`white-space:nowrap`이며 시각/QA 8프로필에서 assertion이 통과했다.
+- **legacy/refcount와 P-final 인계**: B6의 45개 비제거 수치는 **37 active + 8 split**이라 차이는 중복/누락이 아니었다. B-shared 후 manifest는 **149 removed·1 split·5 active**다. P-final 인계는 6엔트리 `legacy-004`, `005`, `006`, `007`, `132`, `134`; 실제 소비는 명시 제외인 도달 불가 `WordComparePage`·`HwpComparePage`의 `.eyebrow(.success)`·`.content-heading`과 raw `.tool-page` arm이다. `.sample-diff`는 repo refcount 0을 확인해 B-shared에서 제거했다.
+- **예산·검증**: B6 `556a8b1`을 임시 worktree에서 같은 `bundle:measure`로 재생성한 기준은 entry 296,948B·영향 route 2,439,031B·shared 2,716,468B·앱 JS 5,452,447B·CSS 41,067B다. B-shared는 297,899B·2,439,990B·2,716,472B·5,454,361B·40,991B로 각각 **+951B·+959B·+4B·+1,914B·−76B**, 5종 상한 통과. 표준 build 2,830 modules·정적 61페이지, unit 193/193, utilities, browser 전 스코프, UI migration, control geometry 92표본/20페이지, static, 대표 시각 46/46을 통과했다. 추적 제외 QA는 `VISUAL_TEST_PORT=4252`, `tests/visual-artifacts/p2-bshared/` **160/160**(initial 40·bottom 24·interaction 96), 외부 요청 0이며 contact sheet와 대표 원본에서 차단 결함 0으로 판정했다.
+
 ### P2 묶음 검수 판정 B1~B3 — 검수 입력 결함과 오탐 걸러내기 (Claude)
 
 「배포 전 로컬 시각 검수」 규칙으로 신설한 게이트를 세 묶음에 적용하면서, **검수 자체가 틀릴 수 있다**는 것이 이 단계의 가장 큰 교훈이었다. 판정 근거는 다음과 같다.

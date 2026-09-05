@@ -15,9 +15,9 @@ export function ContactPage() {
       <section className="contact-card">
         <div className="contact-icon"><Bug size={27} /></div>
         <div>
-          <p className="eyebrow">GITHUB</p>
+          <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">GITHUB</p>
           <h2>{t("contact.githubTitle")}</h2>
-          <p>{t("contact.githubDescription")}</p>
+          <p className="my-[9px] mb-3.5 max-w-[600px] text-sm leading-relaxed text-muted-foreground">{t("contact.githubDescription")}</p>
           <a className="secondary-button" href={GITHUB_ISSUES} target="_blank" rel="noreferrer">{t("contact.githubAction")} <ExternalLink size={15} /></a>
         </div>
       </section>

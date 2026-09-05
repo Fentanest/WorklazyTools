@@ -44,14 +44,16 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
 
 test("ToolCard keeps a link root, analytics behavior, and all six accent identities", () => {
   const source = read("src/components/ToolCard.tsx");
+  const accentStyles = read("src/components/toolAccentStyles.ts");
   const registry = read("src/app/toolRegistry.ts");
 
   assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{tool\.accent\}/);
   assert.match(source, /to=\{tool\.path\}/);
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
-  assert.match(source, /ui-tool-icon ui-accent-\$\{tool\.accent\}/);
+  assert.match(source, /toolIconAccentClasses\[tool\.accent\]/);
   for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) {
     assert.match(registry, new RegExp(`accent: "${accent}"`));
+    assert.match(accentStyles, new RegExp(`\\n  ${accent}:`));
   }
 });
 

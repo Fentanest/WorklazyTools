@@ -13,12 +13,12 @@ const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
 const chromeExecutable = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
 const reportPath = process.env.A11Y_REPORT_PATH || "/tmp/worklazytools-a11y-report.json";
 const limits = {
-  critical: readInteger("A11Y_MAX_CRITICAL", 1),
-  serious: readInteger("A11Y_MAX_SERIOUS", 5),
+  critical: readInteger("A11Y_MAX_CRITICAL", 0),
+  serious: readInteger("A11Y_MAX_SERIOUS", 0),
   total: readInteger("A11Y_MAX_TOTAL", 10),
 };
 const pages = [
-  { id: "home", path: "/ko" },
+  { id: "home", path: "/" },
   { id: "document-compare", path: "/ko/tools/document-compare" },
   { id: "tools", path: "/ko/tools" },
   { id: "excel-compare", path: "/ko/tools/excel-compare" },
@@ -45,7 +45,6 @@ try {
   });
   await context.addInitScript(() => {
     localStorage.setItem("worklazy_privacy_consent", "granted");
-    localStorage.setItem("worklazy_lang", "ko");
   });
 
   const results = [];

@@ -130,8 +130,8 @@ function SelectPanel(props: ImageEditorPanelProps) {
         <Button className="size-9 rounded-xl text-sky-700 max-[820px]:size-11 dark:text-sky-300" variant="secondary" size="icon" title={t("image.editor.flipH")} aria-label={t("image.editor.flipH")} type="button" disabled={!hasSelection} onClick={props.onFlipHorizontal}><FlipHorizontal2 size={18} /></Button>
         <Button className="size-9 rounded-xl text-sky-700 max-[820px]:size-11 dark:text-sky-300" variant="secondary" size="icon" title={t("image.editor.flipV")} aria-label={t("image.editor.flipV")} type="button" disabled={!hasSelection} onClick={props.onFlipVertical}><FlipVertical2 size={18} /></Button>
       </div>}
-      {!hasSelection && <small>{t("image.editor.selectObject")}</small>}
-      {props.selection.isBase && <small>{t("image.editor.baseStyleHint")}</small>}
+      {!hasSelection && <small className="text-muted-foreground">{t("image.editor.selectObject")}</small>}
+      {props.selection.isBase && <small className="text-muted-foreground">{t("image.editor.baseStyleHint")}</small>}
     </Card>
   );
 }

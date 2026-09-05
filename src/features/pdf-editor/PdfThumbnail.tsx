@@ -89,7 +89,7 @@ export function PdfThumbnail({
       ref={hostRef}
       className={cn(
         "pdf-page-card min-w-0 gap-0 overflow-hidden rounded-2xl border border-border bg-white/40 py-0 shadow-sm ring-0 transition-[border-color,box-shadow,transform] dark:bg-white/[.025] [&.sortable-ghost]:opacity-35 [&.sortable-chosen]:border-violet-600 [&.sortable-chosen]:shadow-lg [&.sortable-chosen]:shadow-violet-700/15",
-        selected && "border-violet-600 shadow-md shadow-violet-700/15 ring-2 ring-violet-600/20 dark:border-violet-400",
+        selected && "relative border-violet-600 bg-violet-100/70 shadow-md shadow-violet-700/15 ring-2 ring-violet-600/20 before:pointer-events-none before:absolute before:inset-y-2 before:left-1 before:z-10 before:w-1 before:rounded-full before:bg-violet-700 dark:border-violet-400 dark:bg-violet-950/60 dark:before:bg-violet-300",
       )}
       data-selected={selected || undefined}
       data-page-id={item.id}

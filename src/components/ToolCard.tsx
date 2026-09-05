@@ -5,6 +5,7 @@ import type { ToolDefinition } from "../app/toolRegistry";
 import { useAppLanguage } from "../i18n/routing";
 import { cn } from "../lib/utils";
 import { trackToolOpen } from "./AnalyticsLoader";
+import { toolIconAccentClasses } from "./toolAccentStyles";
 import { Card } from "./ui/card";
 
 interface ToolCardProps {
@@ -25,11 +26,11 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
       onClick={() => trackToolOpen(tool.id, featured ? "home_card" : "tools_card", language)}
     >
       <div className="ui-tool-card-top">
-        <span className={`ui-tool-icon ui-accent-${tool.accent}`}><Icon size={29} /></span>
+        <span className={cn("grid size-12 place-items-center rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,.65)]", toolIconAccentClasses[tool.accent])} data-accent={tool.accent}><Icon size={29} /></span>
         <span className="ui-card-arrow"><ArrowUpRight size={20} /></span>
       </div>
       <div className="ui-tool-card-copy">
-        <p className="ui-eyebrow text-muted-foreground">{tool.eyebrow}</p>
+        <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{tool.eyebrow}</p>
         <h2>{tool.title}</h2>
         <p>{tool.description}</p>
       </div>

@@ -21,6 +21,9 @@ export function ImageEditorMinibar({ position, selection, onColorChange, onWidth
   const { t } = useTranslation("features");
   if (!position || selection.kind === "none") return null;
   const multiple = selection.kind === "multiple";
+  const target = multiple
+    ? t("image.editor.selectedLayerCount", { count: selection.count ?? 0 })
+    : t(`image.editor.selectionKind.${selection.kind}`);
   return (
     <Card className={`image-editor-minibar flex-row items-center gap-1 rounded-xl border border-border bg-card p-1.5 py-1.5 shadow-xl ring-0${multiple ? " is-multiple" : ""}`} role="toolbar" aria-label={t("image.editor.minibar")} data-testid="image-editor-minibar" data-selection-kind={selection.kind} style={{ left: position.left, top: position.top }}>
       {multiple ? <>{ALIGNMENTS.map(([alignment, Icon]) => <Button className="size-[34px] rounded-lg max-[820px]:size-11" variant="secondary" size="icon" type="button" title={t(`image.editor.alignment.${alignment}`)} aria-label={t(`image.editor.alignment.${alignment}`)} data-testid={`image-editor-align-${alignment}`} onClick={() => onAlign(alignment)} key={alignment}><Icon size={17} /></Button>)}<span className="image-editor-minibar-divider" aria-hidden="true" /></> : <>
@@ -30,7 +33,7 @@ export function ImageEditorMinibar({ position, selection, onColorChange, onWidth
       <Button className="size-[34px] rounded-lg max-[820px]:size-11" variant="secondary" size="icon" type="button" title={t("image.editor.front")} aria-label={t("image.editor.front")} disabled={selection.isBase} data-testid="image-editor-minibar-front" onClick={onBringToFront}><ArrowUpToLine size={17} /></Button>
       <Button className="size-[34px] rounded-lg max-[820px]:size-11" variant="secondary" size="icon" type="button" title={t("image.editor.back")} aria-label={t("image.editor.back")} disabled={selection.isBase} data-testid="image-editor-minibar-back" onClick={onSendToBack}><ArrowDownToLine size={17} /></Button>
       </>}
-      <Button className="size-[34px] rounded-lg max-[820px]:size-11" variant="secondary" size="icon" type="button" title={t("image.editor.duplicate")} aria-label={t("image.editor.duplicate")} disabled={selection.isBase} data-testid="image-editor-minibar-duplicate" onClick={onDuplicate}><Copy size={17} /></Button>
+      <Button className="size-[34px] rounded-lg max-[820px]:size-11" variant="secondary" size="icon" type="button" title={t("image.editor.duplicate")} aria-label={t("image.editor.duplicateTarget", { target })} disabled={selection.isBase} data-testid="image-editor-minibar-duplicate" onClick={onDuplicate}><Copy size={17} /></Button>
       <Button className="size-[34px] rounded-lg max-[820px]:size-11" variant="destructive" size="icon" type="button" title={t("image.editor.delete")} aria-label={t("image.editor.delete")} disabled={selection.isBase} data-testid="image-editor-minibar-delete" onClick={onDelete}><Trash2 size={17} /></Button>
     </Card>
   );

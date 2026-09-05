@@ -107,12 +107,12 @@ async function testPdfTools(page, fixtures, tempDir) {
   if (rotationState.data !== "90" || !rotationState.transform.includes("rotate(90deg)")) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
   }
-  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) :is(.primary-button, .ui-primary-button)")?.disabled);
+  await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) [data-ui-component=primary-button]")?.disabled);
   await clickPrimaryAction(page);
   const immediateFeedback = await page.$eval(".pdf-output-action-zone", (element) => ({
     running: Boolean(element.querySelector(".ui-operation-progress.ui-status-running")),
     ready: Boolean(element.querySelector(".pdf-download-compact [data-testid='pdf-download']")),
-    buttonText: element.querySelector(":is(.primary-button, .ui-primary-button)")?.textContent || "",
+    buttonText: element.querySelector("[data-ui-component=primary-button]")?.textContent || "",
   }));
   if (!immediateFeedback.running && !immediateFeedback.ready) throw new Error(`PDF export feedback was not shown beside the action: ${JSON.stringify(immediateFeedback)}`);
   if (immediateFeedback.running && !immediateFeedback.buttonText.includes("만드는 중")) throw new Error(`PDF export button did not announce its running state: ${JSON.stringify(immediateFeedback)}`);
@@ -206,7 +206,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   groupInputs = await page.$$(".pdf-range-group input");
   await replaceInputValue(page, groupInputs[2], "분할-01");
   await page.waitForFunction(() => document.querySelectorAll(".pdf-range-group[data-invalid='true']").length === 2);
-  if (!await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) :is(.primary-button, .ui-primary-button)", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
+  if (!await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) [data-ui-component=primary-button]", (button) => button.disabled)) throw new Error("Duplicate range PDF names did not block export.");
 
   await page.$eval('.pdf-output-mode-list button:nth-child(3)', (button) => button.click());
   await page.waitForFunction(() => document.querySelector('.pdf-output-mode-list button:nth-child(3)')?.getAttribute("aria-checked") === "true");
@@ -255,7 +255,7 @@ async function testPdfTools(page, fixtures, tempDir) {
     || mobileDockLayout.dockBottom > mobileDockLayout.tabsTop) {
     throw new Error(`PDF mobile output dock overlaps or overflows: ${JSON.stringify(mobileDockLayout)}`);
   }
-  await page.click(".pdf-mobile-output-summary");
+  await page.$eval(".pdf-mobile-output-summary", (button) => button.click());
   await page.waitForSelector(".pdf-output-sidebar-shell[data-open='true'] .pdf-output-workspace", { visible: true, timeout: 5_000 });
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => document.querySelector(".pdf-output-sidebar-shell")?.getAttribute("data-open") !== "true"
@@ -390,10 +390,10 @@ async function testEncryptedExcelMerge(page, fixtures, tempDir) {
   await outputPasswords[0].type("output-pass");
   await outputPasswords[1].type("output-pass");
   await page.waitForFunction(() => {
-    const button = document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)");
+    const button = document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary']) [data-ui-component=primary-button]");
     return button instanceof HTMLButtonElement && !button.disabled;
   });
-  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) :is(.primary-button, .ui-primary-button)", (button) => button.click());
+  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary']) [data-ui-component=primary-button]", (button) => button.click());
   await waitForResult(page);
   await assertProgressLog(page, "Excel 병합");
 
@@ -428,18 +428,20 @@ async function assertUiAdapterKeyboardContracts(page, filePath) {
       sectionCard: document.querySelector(".ui-section-card")?.tagName,
       dropRole: document.querySelector("[data-ui-part=drop-target]")?.getAttribute("role"),
       dropTabIndex: document.querySelector("[data-ui-part=drop-target]")?.getAttribute("tabindex"),
+      dropInputLabel: document.querySelector("[data-ui-component=file-drop-zone] input[type=file]")?.getAttribute("aria-label") || "",
+      dropButtonType: document.querySelector("[data-ui-part=drop-target] [data-slot=button]")?.getAttribute("type"),
       groupRole: group?.getAttribute("role"),
       groupLabel: group?.getAttribute("aria-label") || "",
       pressedStates: options.map((option) => option.getAttribute("aria-pressed")),
     };
   });
-  if (initial.pageHeader !== "HEADER" || initial.sectionCard !== "SECTION" || initial.dropRole !== "button" || initial.dropTabIndex !== "0"
+  if (initial.pageHeader !== "HEADER" || initial.sectionCard !== "SECTION" || initial.dropRole !== null || initial.dropTabIndex !== null || !initial.dropInputLabel || initial.dropButtonType !== "button"
     || initial.groupRole !== "group" || !initial.groupLabel || !initial.pressedStates.includes("true") || !initial.pressedStates.includes("false")) {
     throw new Error(`Shared UI semantic contract failed: ${JSON.stringify(initial)}`);
   }
 
   const chooserPromise = page.waitForFileChooser();
-  await page.focus("[data-ui-part=drop-target]");
+  await page.focus("[data-ui-part=drop-target] [data-slot=button]");
   await page.keyboard.press("Enter");
   const chooser = await chooserPromise;
   await chooser.accept([filePath]);
@@ -462,20 +464,29 @@ async function assertUiAdapterKeyboardContracts(page, filePath) {
   await page.keyboard.press("Space");
   await page.waitForFunction(() => document.querySelector(".ui-segmented-control button:first-child")?.getAttribute("aria-pressed") === "true");
 
-  const switchSelector = ':is(.settings-row, .ui-settings-row) button[role="switch"]:not([disabled])';
+  const switchSelector = '[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])';
   await page.waitForSelector(switchSelector);
+  const switchDescription = await page.$eval(switchSelector, (element) => {
+    const id = element.getAttribute("aria-describedby") || "";
+    return { id, text: id ? document.getElementById(id)?.textContent || "" : "" };
+  });
+  if (!switchDescription.id || !switchDescription.text) throw new Error(`ToggleRow description is not connected: ${JSON.stringify(switchDescription)}`);
   const originalSwitchState = await page.$eval(switchSelector, (element) => element.getAttribute("aria-checked"));
   await page.focus(switchSelector);
   await page.keyboard.press("Space");
-  await page.waitForFunction((previous) => document.querySelector(':is(.settings-row, .ui-settings-row) button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
+  await page.waitForFunction((previous) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
   await page.keyboard.press("Enter");
-  await page.waitForFunction((expected) => document.querySelector(':is(.settings-row, .ui-settings-row) button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
+  await page.waitForFunction((expected) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
+  await page.$eval(`${switchSelector}`, (element) => element.closest('[data-ui-component="toggle-row"]')?.querySelector("label")?.click());
+  await page.waitForFunction((previous) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") !== previous, {}, originalSwitchState);
+  await page.$eval(`${switchSelector}`, (element) => element.closest('[data-ui-component="toggle-row"]')?.querySelector("label")?.click());
+  await page.waitForFunction((expected) => document.querySelector('[data-ui-component="toggle-row"] button[role="switch"]:not([disabled])')?.getAttribute("aria-checked") === expected, {}, originalSwitchState);
 
   return {
     semanticRoles: "passed",
     fileDropEnter: drop,
     segmentedArrowAndSpace: "passed",
-    switchSpaceAndEnter: "passed",
+    switchSpaceEnterLabelAndDescription: "passed",
   };
 }
 
@@ -1149,7 +1160,7 @@ async function waitForResult(page, timeout = 180_000) {
 
 async function clickPrimaryAction(page) {
   const previousHref = await page.$eval(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])", (link) => link.href).catch(() => "");
-  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) :is(.primary-button, .ui-primary-button)", (button) => {
+  await page.$eval(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) [data-ui-component=primary-button]", (button) => {
     if (!(button instanceof HTMLButtonElement) || button.disabled) throw new Error("The primary action is unavailable.");
     button.click();
   });
@@ -1200,8 +1211,8 @@ async function assertProgressLog(page, label) {
 
 async function clickSetting(page, label) {
   await page.evaluate((text) => {
-    const strong = Array.from(document.querySelectorAll(":is(.settings-row, .ui-settings-row) strong")).find((element) => element.textContent === text);
-    const button = strong?.closest(":is(.settings-row, .ui-settings-row)")?.querySelector("button");
+    const strong = Array.from(document.querySelectorAll('[data-ui-component="toggle-row"] strong')).find((element) => element.textContent === text);
+    const button = strong?.closest('[data-ui-component="toggle-row"]')?.querySelector("button");
     if (!(button instanceof HTMLButtonElement)) throw new Error(`Setting not found: ${text}`);
     button.click();
   }, label);

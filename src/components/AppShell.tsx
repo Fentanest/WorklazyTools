@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { GITHUB_ISSUES_URL } from "../constants/links";
 import { localizedPath, stripLanguagePrefix } from "../i18n/languages";
@@ -23,6 +23,7 @@ import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
 import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { toolIconAccentClasses } from "./toolAccentStyles";
 
 const primaryNavigation = [
   { to: "/", labelKey: "navigation.home", icon: Home, end: true },
@@ -84,7 +85,7 @@ export function AppShell() {
             {tools.map((tool) => {
               const Icon = tool.icon;
               return (
-                <NavLink className="sidebar-link" key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar", language)}>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`} key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar", language)}>
                   <span className={`nav-icon accent-${tool.accent}`}><Icon size={18} /></span>
                   <span>{tool.shortTitle}</span>
                 </NavLink>
@@ -122,7 +123,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className="desktop-language-switcher"><LanguageSwitcher /></div>
+      <nav className="desktop-language-switcher" aria-label={t("language.switchLabel")}><LanguageSwitcher /></nav>
 
       <main className="main-content" id="main-content">
         <Outlet />
@@ -168,7 +169,7 @@ export function AppShell() {
         <div className="sheet-grabber" />
         <div className="sheet-header">
           <div>
-            <p className="eyebrow text-[var(--label-secondary)]">{t("navigation.shortcuts")}</p>
+            <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{t("navigation.shortcuts")}</p>
             <SheetTitle className="text-[23px] font-bold tracking-[-0.045em]">{t("navigation.chooseTask")}</SheetTitle>
           </div>
           <SheetClose render={<button className="icon-button subtle" type="button" aria-label={t("navigation.close")} />}>
@@ -180,13 +181,13 @@ export function AppShell() {
             const Icon = tool.icon;
             return (
               <NavLink className="sheet-tool-item" to={tool.path} key={tool.id} onClick={() => trackToolOpen(tool.id, "mobile_sheet", language)}>
-                <span className={`tool-icon small accent-${tool.accent}`}><Icon size={22} /></span>
+                <span className={`grid size-[43px] shrink-0 place-items-center rounded-[13px] shadow-[inset_0_1px_1px_rgba(255,255,255,.65)] ${toolIconAccentClasses[tool.accent]}`}><Icon size={22} /></span>
                 <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
               </NavLink>
             );
           })}
           <a className="sheet-tool-item" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
-            <span className="tool-icon small accent-blue"><MessageSquarePlus size={22} /></span>
+            <span className={`grid size-[43px] shrink-0 place-items-center rounded-[13px] shadow-[inset_0_1px_1px_rgba(255,255,255,.65)] ${toolIconAccentClasses.blue}`}><MessageSquarePlus size={22} /></span>
             <span><strong>{t("footer.feedback")}</strong><small>{t("footer.feedbackDescription")}</small></span>
           </a>
         </div>
@@ -250,11 +251,14 @@ interface NavItemProps {
   language: "ko" | "en";
 }
 
-function NavItem({ to, label, icon: Icon, end, language }: NavItemProps) {
+function NavItem({ to, label, icon: Icon, language }: NavItemProps) {
+  const location = useLocation();
+  const currentPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
+  const active = currentPath === to;
   return (
-    <NavLink className="sidebar-link" to={localizedPath(language, to)} end={end}>
+    <Link className={`sidebar-link${active ? " active" : ""}`} aria-current={active ? "page" : undefined} to={localizedPath(language, to)}>
       <span className="nav-icon"><Icon size={18} /></span>
       <span>{label}</span>
-    </NavLink>
+    </Link>
   );
 }

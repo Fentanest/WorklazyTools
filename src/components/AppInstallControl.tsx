@@ -71,7 +71,7 @@ export function AppInstallControl() {
           <section className="mobile-sheet install-sheet" role="dialog" aria-modal="true" aria-labelledby="install-sheet-title" onMouseDown={(event) => event.stopPropagation()}>
             <div className="sheet-grabber" />
             <div className="sheet-header">
-              <div><p className="eyebrow">WORKLAZY TOOLS</p><h2 id="install-sheet-title">{t("install.title")}</h2></div>
+              <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">WORKLAZY TOOLS</p><h2 id="install-sheet-title">{t("install.title")}</h2></div>
               <button className="icon-button subtle" type="button" onClick={() => setInstructionsOpen(false)} aria-label={t("actions.close")}><X size={20} /></button>
             </div>
             <p>{isIosDevice() ? t("install.iosInstructions") : t("install.browserInstructions")}</p>

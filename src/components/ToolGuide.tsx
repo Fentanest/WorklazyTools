@@ -23,7 +23,7 @@ export function ToolGuide({ title, description, blocks, faq }: {
   return (
     <Card as="section" data-ui-component="tool-guide" className="ui-tool-guide gap-0 overflow-visible rounded-none bg-transparent py-0 shadow-none ring-0" aria-labelledby="tool-guide-title">
       <div className="ui-tool-guide-heading">
-        <div><p className="ui-eyebrow text-muted-foreground">{t("guide.eyebrow")}</p><h2 id="tool-guide-title">{title}</h2><p>{description}</p></div>
+        <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{t("guide.eyebrow")}</p><h2 id="tool-guide-title">{title}</h2><p>{description}</p></div>
       </div>
       <div className="ui-tool-guide-grid">
         {blocks.map((block) => (

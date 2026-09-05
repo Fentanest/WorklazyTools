@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CONSENT_EVENT, getPrivacyConsent, initializeGoogleConsentMode, setPrivacyConsent, type PrivacyConsent } from "./privacyConsent";
+import { Button } from "./ui/button";
 
 export function PrivacyConsentBanner() {
   const { t } = useTranslation("common");
@@ -24,8 +25,8 @@ export function PrivacyConsentBanner() {
         <p>{t("consent.description")}</p>
       </div>
       <div className="privacy-consent-actions">
-        <button type="button" className="secondary-button" onClick={() => setPrivacyConsent("denied")}>{t("consent.reject")}</button>
-        <button type="button" className="primary-button accent-blue" onClick={() => setPrivacyConsent("granted")}>{t("consent.accept")}</button>
+        <Button type="button" variant="outline" className="rounded-xl" onClick={() => setPrivacyConsent("denied")}>{t("consent.reject")}</Button>
+        <Button type="button" className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90" data-testid="privacy-consent-accept" onClick={() => setPrivacyConsent("granted")}>{t("consent.accept")}</Button>
       </div>
     </aside>
   );

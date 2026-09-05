@@ -187,11 +187,19 @@ const currentStateOverrides = new Map([
     currentSelector: ".tool-page button:not([data-slot]), .tool-page a:is(.primary-button, .ui-primary-button), .tool-page a.secondary-button, .tool-page a.result-download",
   }],
   [151, {
-    currentState: "legacy-arm-removed",
+    currentState: "removed",
     removedIn: "B4",
-    currentSelector: ".ui-settings-row, .sample-diff",
-    lastUpdatedIn: "B5a",
+    lastUpdatedIn: "B-shared",
   }],
+  ...[2, 3, ...range(8, 23), 77, 78, 79, 80, 81, 82, 83, 84, 85, 98, 152, 153, 154, 155].map((index) => [index, {
+    currentState: "removed",
+    removedIn: "B-shared",
+  }]),
+  ...[24, 65, 66, 67, 68, 69].map((index) => [index, {
+    currentState: "removed",
+    removedIn: index === 24 ? "B4" : "B5a",
+    lastUpdatedIn: "B-shared",
+  }]),
 ]);
 
 const categoryByIndex = new Map();

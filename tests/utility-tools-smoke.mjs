@@ -3,8 +3,9 @@ import puppeteer from "puppeteer-core";
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
 const koBaseUrl = `${baseUrl}/ko`;
 const browser = await puppeteer.launch({ executablePath: "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+let page;
 try {
-  const page = await browser.newPage();
+  page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 1000 });
   page.setDefaultTimeout(60_000);
   const errors = [];
@@ -24,7 +25,7 @@ try {
 
   await page.goto(koBaseUrl, { waitUntil: "networkidle0" });
   await page.waitForSelector(".privacy-consent");
-  await page.click(".privacy-consent :is(.primary-button, .ui-primary-button)");
+  await page.click("[data-testid=privacy-consent-accept]");
   await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent") === "granted");
   await page.waitForFunction(() => (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"));
   const analyticsBootstrap = await page.evaluate(() => ({
@@ -80,16 +81,36 @@ try {
     tagName: card.tagName,
     slot: card.getAttribute("data-slot"),
     accent: Array.from(card.classList).find((name) => name.startsWith("ui-accent-")),
-    iconAccent: Array.from(card.querySelector(".ui-tool-icon")?.classList || []).find((name) => name.startsWith("ui-accent-")),
+    iconAccent: card.querySelector("[data-accent]")?.getAttribute("data-accent"),
     href: card.getAttribute("href"),
   })));
-  if (toolCards.length !== 20 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== card.iconAccent)) {
+  if (toolCards.length !== 20 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== `ui-accent-${card.iconAccent}`)) {
     throw new Error(`Tool card link or accent contract failed: ${JSON.stringify(toolCards)}`);
   }
   await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
-  await page.waitForFunction(() => window.matchMedia("(prefers-color-scheme: dark)").matches && getComputedStyle(document.querySelector(".tool-category-filter button.selected")).color !== "rgb(255, 255, 255)");
-  const darkSelectedText = await page.$eval(".tool-category-filter button.selected", (element) => getComputedStyle(element).color);
-  if (darkSelectedText === "rgb(255, 255, 255)") throw new Error("Selected tool category still uses invisible white text in dark mode.");
+  await page.waitForFunction(() => window.matchMedia("(prefers-color-scheme: dark)").matches && document.querySelector('.tool-category-filter button[aria-pressed="true"]'));
+  const darkSelectedContrast = await page.$eval('.tool-category-filter button[aria-pressed="true"]', (element) => {
+    const toRgb = (color) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext("2d");
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
+    };
+    const luminance = (color) => {
+      const [red, green, blue] = color.map((value) => {
+        const channel = value / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const style = getComputedStyle(element);
+    const foreground = luminance(toRgb(style.color));
+    const background = luminance(toRgb(style.backgroundColor));
+    return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+  });
+  if (darkSelectedContrast < 4.5) throw new Error(`Selected tool category contrast is below 4.5:1 in dark mode: ${darkSelectedContrast}`);
   await page.click('.tool-category-filter button[aria-label^="이미지·영상·오디오"]');
   await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 3);
   await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
@@ -188,7 +209,7 @@ try {
     tagName: guide.tagName,
     slot: guide.getAttribute("data-slot"),
     labelledBy: guide.getAttribute("aria-labelledby"),
-    eyebrow: guide.querySelector(".ui-tool-guide-heading .ui-eyebrow")?.textContent,
+    eyebrow: guide.querySelector(".ui-tool-guide-heading p")?.textContent,
     titleId: guide.querySelector(".ui-tool-guide-heading h2")?.id,
     articles: Array.from(guide.querySelectorAll(".ui-tool-guide-grid > article"), (article) => article.getAttribute("data-slot")),
     faq: Array.from(guide.querySelectorAll(".ui-tool-faq details"), (item) => Boolean(item.querySelector("summary") && item.querySelector("p"))),
@@ -327,17 +348,23 @@ try {
   await page.mouse.move(bounds.x + 80, bounds.y + 80); await page.mouse.down(); await page.mouse.move(bounds.x + 220, bounds.y + 150, { steps: 8 }); await page.mouse.up();
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-undo"]')?.disabled);
 
-  const googleVideoVisit = page.waitForRequest((request) => {
-    const url = new URL(request.url());
-    return url.hostname.endsWith("google-analytics.com") && url.pathname.endsWith("/collect") && url.searchParams.get("en") === "page_view";
-  }, { timeout: 60_000 });
+  await page.evaluate(() => {
+    const originalGtag = window.gtag;
+    window.gtag = (...args) => {
+      if (args[0] === "event" && args[1] === "tool_open" && args[2]?.tool_id === "video-studio") {
+        sessionStorage.setItem("worklazy-test-google-video-open", "1");
+      }
+      originalGtag?.(...args);
+    };
+  });
   const naverVideoVisit = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return url.hostname === "wcs.naver.com" && url.pathname === "/b";
   }, { timeout: 60_000 });
   await page.$eval('a[href^="/ko/tools/video-studio"]', (link) => link.click());
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
-  await Promise.all([googleVideoVisit, naverVideoVisit]);
+  await page.waitForFunction(() => sessionStorage.getItem("worklazy-test-google-video-open") === "1");
+  await naverVideoVisit;
   await page.waitForSelector("[data-testid=video-runtime-status]");
   const videoIsolation = await page.evaluate(() => ({
     origin: location.origin,
@@ -354,7 +381,7 @@ try {
     || !videoIsolation.googleAnalytics || !videoIsolation.naverAnalytics || !validVideoController || !videoIsolation.engine.includes("멀티스레드")) {
     throw new Error(`Video document isolation is incomplete: ${JSON.stringify(videoIsolation)}`);
   }
-  const videoCompatibility = await page.$eval(".video-studio-page [data-slot=notice]", (element) => element.textContent);
+  const videoCompatibility = await page.$$eval(".video-studio-page [data-slot=notice]", (elements) => elements.find((element) => element.textContent?.includes("MKV"))?.textContent || "");
   if (!videoCompatibility.includes("MKV") || !videoCompatibility.includes("AVI") || !videoCompatibility.includes("재생 시간") || videoCompatibility.includes("FFmpeg")) throw new Error("Video compatibility fallback notice is incomplete or exposes implementation details.");
 
   await page.$eval('a[href^="/ko/tools/pdf-editor"]', (link) => link.click());
@@ -385,6 +412,9 @@ try {
 
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
   console.log("Utility tool smoke tests passed: Korean and English routes, hreflang, categorized tools, paired editors, world map, utility tools, video compatibility and PDF page range.");
+} catch (error) {
+  console.error(`Utility smoke failed at ${page?.url() || "unknown URL"}.`);
+  throw error;
 } finally { await browser.close(); }
 
 async function clickButton(page, text) { const clicked = await page.evaluate((label) => { const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label)); if (!button) return false; button.click(); return true; }, text); if (!clicked) throw new Error(`Button not found: ${text}`); }

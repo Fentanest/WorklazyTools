@@ -17,7 +17,8 @@ const onlyVideo = process.env.TEST_ONLY_VIDEO === "1";
 const onlyAudio = process.env.TEST_ONLY_AUDIO === "1";
 const onlyImageSizing = process.env.TEST_ONLY_IMAGE_SIZING === "1";
 const onlyImageMobile = process.env.TEST_ONLY_IMAGE_MOBILE === "1";
-const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing || onlyImageMobile;
+const onlyImageAccessibility = process.env.TEST_ONLY_IMAGE_ACCESSIBILITY === "1";
+const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing || onlyImageMobile || onlyImageAccessibility;
 const onlyHwp = process.env.TEST_ONLY_HWP === "1";
 const HWP_ROUNDTRIP_SENTINEL = "WL_RHWP_086_SENTINEL";
 const HWP_FIXTURE_SHA256 = "35c590e316c18e7310bb7b2f954b87d32f1d45416179466aee2bebb99d7e706f";
@@ -55,6 +56,9 @@ try {
       console.log("[1/1] Image studio mobile interactions");
       await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
       await testImageStudioMobile(page);
+    } else if (onlyImageAccessibility) {
+      console.log("[1/1] Image studio accessibility alternatives");
+      await testImageStudioAccessibility(page);
     } else if (onlyImageSizing) {
       console.log("[1/1] Image studio sizing and panel");
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
@@ -253,6 +257,8 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
 async function testImageStudio(page, imagePaths) {
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4 && document.querySelector(".studio-tabs button")?.textContent?.includes("이미지 편집"));
+  const tabStates = await page.$$eval(".studio-tabs button", (buttons) => buttons.map((button) => button.getAttribute("aria-pressed")));
+  if (tabStates.filter((state) => state === "true").length !== 1 || tabStates.filter((state) => state === "false").length !== 3) throw new Error(`Image Studio modes do not expose their current state: ${JSON.stringify(tabStates)}`);
   await page.waitForSelector(".fabric-stage");
   await dropCanvasImages(page, ".fabric-stage", ["#159bd7"]);
   await page.waitForSelector(".fabric-stage .canvas-container");
@@ -703,6 +709,12 @@ async function testImageStudio(page, imagePaths) {
   await page.waitForFunction(() => document.querySelectorAll(".image-studio-page :is(.file-row, [data-ui-component=file-list] > li)").length === 2);
   await page.waitForFunction(() => !document.querySelector("[data-testid='image-batch-action'] button")?.disabled);
   await page.$eval("[data-testid='image-batch-action'] button", (button) => button.scrollIntoView({ block: "center", behavior: "instant" }));
+  const batchHitTarget = await page.$eval("[data-testid='image-batch-action'] button", (button) => {
+    const bounds = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+    return { inside: hit === button || Boolean(hit && button.contains(hit)), hit: hit?.outerHTML.slice(0, 240) || "", bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height } };
+  });
+  if (!batchHitTarget.inside) throw new Error(`Image batch action is covered: ${JSON.stringify(batchHitTarget)}`);
   await page.click("[data-testid='image-batch-action'] button");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Image error"));
@@ -753,6 +765,13 @@ async function testImageStudio(page, imagePaths) {
   await page.click(".studio-tabs button:nth-child(4)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
   await page.waitForFunction(() => document.querySelectorAll(".gif-frame-row").length === 2 && document.querySelectorAll(".gif-frame-drag-handle").length === 2);
+  const gifActionLabels = await page.$$eval(".gif-frame-row", (rows) => rows.map((row) => ({
+    name: row.querySelector("span > span")?.textContent || "",
+    labels: Array.from(row.querySelectorAll("button"), (button) => button.getAttribute("aria-label") || ""),
+  })));
+  if (gifActionLabels.some(({ name, labels }, index) => !name || labels.some((label) => !label.includes(name) || !label.includes(String(index + 1))))) {
+    throw new Error(`GIF actions do not identify their target frame: ${JSON.stringify(gifActionLabels)}`);
+  }
   const initialFrameOrder = await page.$$eval(".gif-frame-row", (rows) => rows.map((row) => row.textContent || ""));
   const firstHandle = await page.$(".gif-frame-row:first-child .gif-frame-drag-handle");
   const secondRow = await page.$(".gif-frame-row:nth-child(2)");
@@ -798,6 +817,24 @@ async function testImageStudioLayersAndSelection(page) {
     || state.layerRows.at(-1)?.movable || !state.layerRows.at(-1)?.deleteDisabled) {
     throw new Error(`Layer panel did not expose the fixed base block and top-to-bottom additional order: ${JSON.stringify(state)}`);
   }
+  const layerActionLabels = await page.$$eval(".image-editor-layer-row", (rows) => rows.map((row, index) => ({
+    index: index + 1,
+    labels: Array.from(row.querySelectorAll("button"), (button) => button.getAttribute("aria-label") || ""),
+  })));
+  if (layerActionLabels.some(({ index, labels }) => labels.some((label) => !label.includes(String(index))))) throw new Error(`Layer actions do not identify their target row: ${JSON.stringify(layerActionLabels)}`);
+
+  const firstMovableId = await page.$eval(".image-editor-layer-row.is-movable", (row) => row.getAttribute("data-layer-id"));
+  const rowOrderBeforeKeyboard = state.layerRows.map((row) => row.id).join(",");
+  await page.focus(`.image-editor-layer-row[data-layer-id="${firstMovableId}"] .image-editor-layer-select`);
+  await page.keyboard.down("Alt");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.up("Alt");
+  await page.waitForFunction((before) => Array.from(document.querySelectorAll(".image-editor-layer-row"), (row) => row.getAttribute("data-layer-id")).join(",") !== before, {}, rowOrderBeforeKeyboard);
+  await page.focus(`.image-editor-layer-row[data-layer-id="${firstMovableId}"] .image-editor-layer-select`);
+  await page.keyboard.down("Alt");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.up("Alt");
+  await page.waitForFunction((expected) => Array.from(document.querySelectorAll(".image-editor-layer-row"), (row) => row.getAttribute("data-layer-id")).join(",") === expected, {}, rowOrderBeforeKeyboard);
 
   // A panel row owns selection without forcing the tool sheet back to Select.
   await page.click('.image-editor-layer-row[data-layer-kind="text"] .image-editor-layer-select');
@@ -1192,6 +1229,33 @@ async function testImageStudioRegionInteractions(page) {
   });
   if (!englishReason.disabled || englishReason.reason !== "Drag an area on the canvas first.") throw new Error(`English crop disabled reason is invalid: ${JSON.stringify(englishReason)}`);
   console.log(`  image: P4 crop/effect actions and live labels verified (crop error ${cropGeometry.error}px, effect error ${effectGeometry.error}px)`);
+}
+
+async function testImageStudioAccessibility(page) {
+  await loadSyntheticImageEditor(page);
+  const tabStates = await page.$$eval(".studio-tabs button", (buttons) => buttons.map((button) => button.getAttribute("aria-pressed")));
+  if (tabStates.filter((state) => state === "true").length !== 1 || tabStates.filter((state) => state === "false").length !== 3) throw new Error(`Image Studio modes do not expose their current state: ${JSON.stringify(tabStates)}`);
+  await page.click('[data-testid="image-editor-panel-crop"]');
+  const stageSemantics = await page.$eval('[data-testid="image-editor-canvas-stage"]', (stage) => {
+    const describedBy = stage.getAttribute("aria-describedby") || "";
+    const help = describedBy ? document.getElementById(describedBy) : null;
+    return { role: stage.getAttribute("role"), tabIndex: stage.getAttribute("tabindex"), label: stage.getAttribute("aria-label"), help: help?.textContent || "", helpVisible: help instanceof HTMLElement && help.getBoundingClientRect().height > 0 };
+  });
+  if (stageSemantics.role !== "region" || stageSemantics.tabIndex !== "0" || !stageSemantics.label || !stageSemantics.helpVisible || !stageSemantics.help.includes("Enter")) throw new Error(`Canvas keyboard semantics are incomplete: ${JSON.stringify(stageSemantics)}`);
+  await page.focus('[data-testid="image-editor-canvas-stage"]');
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-region-size-label"][data-region-mode="crop"]'));
+  const keyboardRegionStart = await readImageEditorRegionGeometry(page, "crop");
+  await page.keyboard.press("ArrowRight");
+  const keyboardRegionMoved = await readImageEditorRegionGeometry(page, "crop");
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.up("Shift");
+  const keyboardRegionResized = await readImageEditorRegionGeometry(page, "crop");
+  if (keyboardRegionMoved.selection.left <= keyboardRegionStart.selection.left || keyboardRegionResized.selection.height <= keyboardRegionMoved.selection.height) throw new Error(`Crop keyboard alternative did not move and resize the region: ${JSON.stringify({ keyboardRegionStart, keyboardRegionMoved, keyboardRegionResized })}`);
+  await page.click('[data-testid="image-editor-crop-selection-cancel"]');
+  await assertRegionModeRetained(page, "crop", "keyboard crop cancel");
+  console.log("  image: keyboard crop create, move, resize, and cancel verified");
 }
 
 async function testImageStudioCropBoxEditing(page) {
@@ -2624,8 +2688,16 @@ async function captureImageEditorExport(page, format) {
   }, format);
   await page.evaluate(() => { window.__worklazyExportDataUrl = ""; });
   await page.click('[data-testid="image-editor-export-action"] button');
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const dataUrl = await page.evaluate(() => window.__worklazyExportDataUrl);
-  if (!dataUrl) throw new Error(`${format} export was not captured`);
+  if (!dataUrl) {
+    const state = await page.evaluate(() => ({
+      error: document.querySelector('[role="alert"]')?.textContent || "",
+      button: document.querySelector('[data-testid="image-editor-export-action"] button')?.outerHTML || "",
+      format: Array.from(document.querySelectorAll(".image-format-control button"), (button) => ({ text: button.textContent?.trim(), pressed: button.getAttribute("aria-pressed") })),
+    }));
+    throw new Error(`${format} export was not captured: ${JSON.stringify(state)}`);
+  }
   return dataUrl;
 }
 
@@ -3060,7 +3132,7 @@ async function testAudioStudio(page, audioPath) {
   if (!effectPreview.src.startsWith("blob:") || effectPreview.frequency < 620 || effectPreview.frequency > 700) {
     throw new Error(`Pitch preview was not shifted by about four semitones: ${JSON.stringify(effectPreview)}`);
   }
-  await page.click(".audio-voice-effect-actions :is(.primary-button, .ui-primary-button)");
+  await page.click(".audio-voice-effect-actions [data-ui-component=primary-button]");
   await waitForAudioSuccess(page, "음성 효과 적용 완료", 120_000);
   const durationAfterEffect = await page.$eval(".audio-timecode small", (element) => element.textContent || "");
   if (durationAfterEffect !== durationBeforeEffect) throw new Error(`Pitch effect changed the document duration: ${durationBeforeEffect} -> ${durationAfterEffect}`);

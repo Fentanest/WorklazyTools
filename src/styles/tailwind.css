@@ -71,7 +71,7 @@
     --destructive: oklch(0.577 0.245 27.325);
     --border: var(--separator);
     --input: var(--separator);
-    --ring: var(--blue);
+    --ring: var(--primary);
     --chart-1: oklch(0.809 0.105 251.813);
     --chart-2: oklch(0.623 0.214 259.815);
     --chart-3: oklch(0.546 0.245 262.881);
@@ -85,7 +85,7 @@
     --sidebar-accent: var(--bg-muted);
     --sidebar-accent-foreground: var(--label);
     --sidebar-border: var(--separator);
-    --sidebar-ring: var(--blue);
+    --sidebar-ring: var(--primary);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -107,7 +107,7 @@
       --destructive: oklch(0.704 0.191 22.216);
       --border: var(--separator);
       --input: var(--separator);
-      --ring: var(--blue);
+      --ring: var(--primary);
       --chart-1: oklch(0.809 0.105 251.813);
       --chart-2: oklch(0.623 0.214 259.815);
       --chart-3: oklch(0.546 0.245 262.881);
@@ -120,7 +120,7 @@
       --sidebar-accent: var(--bg-muted);
       --sidebar-accent-foreground: var(--label);
       --sidebar-border: var(--separator);
-      --sidebar-ring: var(--blue);
+      --sidebar-ring: var(--primary);
     }
   }
 }

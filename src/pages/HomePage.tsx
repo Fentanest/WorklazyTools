@@ -33,9 +33,9 @@ export function HomePage() {
       </section>
 
       <section className="home-section">
-        <div className="content-heading">
-          <div><p className="eyebrow">TOOLS</p><h2>{t("home.availableTitle")}</h2></div>
-          <Link to={localizedPath(language, "/tools")}>{t("actions.viewAll")} <ArrowRight size={16} /></Link>
+        <div className="mb-[17px] flex items-end justify-between px-[5px]">
+          <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">TOOLS</p><h2 className="m-0 text-[25px] font-bold tracking-[-.045em]">{t("home.availableTitle")}</h2></div>
+          <Link className="flex items-center gap-1.5 text-[15px] font-bold text-primary" to={localizedPath(language, "/tools")}>{t("actions.viewAll")} <ArrowRight size={16} /></Link>
         </div>
         <div className="tool-grid">
           {tools.map((tool) => <ToolCard key={tool.id} tool={tool} featured />)}
@@ -45,7 +45,7 @@ export function HomePage() {
       <PrivacyBanner />
 
       <section className="home-how">
-        <div className="content-heading"><div><p className="eyebrow">HOW IT WORKS</p><h2>{t("home.howTitle")}</h2></div></div>
+        <div className="mb-[17px] flex items-end justify-between px-[5px]"><div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">HOW IT WORKS</p><h2 className="m-0 text-[25px] font-bold tracking-[-.045em]">{t("home.howTitle")}</h2></div></div>
         <div className="home-how-grid">
           <div><span><FileUp size={20} /></span><strong>{t("home.steps.selectTitle")}</strong><p>{t("home.steps.selectDescription")}</p></div>
           <div><span><ScanSearch size={20} /></span><strong>{t("home.steps.processTitle")}</strong><p>{t("home.steps.processDescription")}</p></div>

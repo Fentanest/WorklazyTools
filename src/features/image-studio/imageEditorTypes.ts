@@ -11,6 +11,7 @@ export type EditorAlignment = "left" | "center-horizontal" | "right" | "top" | "
 export interface EditorLayerItem {
   id: string;
   kind: EditorLayerKind;
+  name?: string;
   visible: boolean;
   isBase: boolean;
   active: boolean;

@@ -62,7 +62,7 @@ export function PageHeader({ eyebrow, title, description, children }: {
   return (
     <header data-ui-component="page-header" className="ui-page-header mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
       <div className="min-w-0">
-        <p className="ui-eyebrow">{eyebrow}</p>
+        <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{eyebrow}</p>
         <h1 className="font-heading text-4xl font-medium tracking-tight sm:text-5xl">{title}</h1>
         <p className="ui-page-description mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">{description}</p>
       </div>
@@ -136,14 +136,18 @@ export function ToggleRow({ label, description, checked, onChange, disabled = fa
   onChange: (checked: boolean) => void;
   disabled?: boolean;
 }) {
+  const controlId = useId();
+  const descriptionId = useId();
   return (
-    <div data-ui-component="toggle-row" className="ui-settings-row">
-      <div><strong>{label}</strong>{description && <small>{description}</small>}</div>
+    <div data-ui-component="toggle-row" className="flex min-h-[54px] w-full items-center justify-between gap-[15px] border-t border-border bg-white/30 px-[13px] py-[9px] text-left first:border-t-0 dark:bg-white/[.025]">
+      <label className="flex min-w-0 cursor-pointer flex-col" htmlFor={controlId}><strong className="text-sm">{label}</strong>{description && <small className="mt-[3px] text-sm leading-[1.45] text-muted-foreground" id={descriptionId}>{description}</small>}</label>
       <Switch
+        id={controlId}
         data-ui-part="toggle-switch"
         checked={checked}
         onCheckedChange={(nextChecked) => onChange(nextChecked)}
         aria-label={label}
+        aria-describedby={description ? descriptionId : undefined}
         disabled={disabled}
         nativeButton
         render={<button type="button" />}
@@ -168,6 +172,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const accessibleName = t("files.selectOrDrop", { label: label || t("files.generic"), action: multiple && files.length ? t("files.add") : t("files.select") });
 
   const appendFiles = async (incoming: FileList | null) => {
     if (!incoming || disabled) return;
@@ -201,29 +206,15 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
 
   return (
     <div data-ui-component="file-drop-zone" className="ui-drop-zone-wrap">
-      {label && <label className="ui-field-label" htmlFor={id}>{label}</label>}
-      <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple={multiple} disabled={disabled} onChange={handleChange} />
+      {label && <label className="mb-2 ml-0.5 block text-sm font-bold" htmlFor={id}>{label}</label>}
+      <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple={multiple} disabled={disabled} aria-label={accessibleName} onChange={handleChange} />
       <Card
         data-ui-part="drop-target"
         className={cn(
-          "relative min-h-28 cursor-pointer flex-row items-center gap-3 overflow-visible rounded-4xl border border-dashed border-border bg-muted/40 p-4 shadow-none ring-0 transition-[border-color,background-color,transform] max-[620px]:flex-wrap max-[620px]:items-start",
+          "relative min-h-28 flex-row items-center gap-3 overflow-visible rounded-4xl border border-dashed border-border bg-muted/40 p-4 shadow-none ring-0 transition-[border-color,background-color,transform] max-[620px]:flex-wrap max-[620px]:items-start",
           dragging && ["scale-[.995]", accentDraggingClasses[accent]],
           disabled && "cursor-not-allowed opacity-50",
         )}
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        aria-disabled={disabled}
-        aria-label={t("files.selectOrDrop", { label: label || t("files.generic"), action: multiple && files.length ? t("files.add") : t("files.select") })}
-        onClick={(event) => {
-          if (disabled || (event.target as Element).closest("button")) return;
-          inputRef.current?.click();
-        }}
-        onKeyDown={(event) => {
-          if (!disabled && (event.key === "Enter" || event.key === " ")) {
-            event.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
         onDragEnter={(event) => { event.preventDefault(); if (!disabled) setDragging(true); }}
         onDragOver={(event) => {
           event.preventDefault();
@@ -272,7 +263,7 @@ export function PrimaryButton({ children, disabled = false, loading = false, onC
   return (
     <Button
       data-ui-component="primary-button"
-      className={cn(`ui-primary-button ui-accent-${accent}`, "h-12 rounded-2xl text-[15px] font-bold", accentButtonClasses[accent])}
+      className={cn("h-12 w-[100%] rounded-2xl text-[15px] font-bold", accentButtonClasses[accent])}
       size="lg"
       disabled={disabled || loading}
       aria-busy={loading}
@@ -294,7 +285,7 @@ export function ResultCard({ title, message, accent = "blue", children }: {
   return (
     <Card as="section" data-ui-component="result-card" className={cn(`ui-result-card ui-accent-${accent}`, "grid grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-4xl border p-6 shadow-sm ring-0", accentResultClasses[accent])} aria-live="polite">
       <span className={cn("ui-result-icon rounded-2xl", accentButtonClasses[accent])}><Check size={24} /></span>
-      <div><p className="ui-eyebrow">{t("status.complete")}</p><h2 className="font-heading font-medium">{title}</h2><p>{message}</p>{children}</div>
+      <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{t("status.complete")}</p><h2 className="font-heading font-medium">{title}</h2><p>{message}</p>{children}</div>
     </Card>
   );
 }

@@ -12,7 +12,7 @@ export function AboutPage() {
       <div className="about-grid">
         <section className="about-hero-card">
           <span className="about-icon"><ShieldCheck size={32} /></span>
-          <div><p className="eyebrow success">LOCAL FIRST</p><h2>{t("about.localTitle")}</h2><p>{t("about.localDescription")}</p></div>
+          <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-green-300">LOCAL FIRST</p><h2>{t("about.localTitle")}</h2><p>{t("about.localDescription")}</p></div>
         </section>
         <SectionCard title={t("about.privacyTitle")}>
           <div className="about-list">
