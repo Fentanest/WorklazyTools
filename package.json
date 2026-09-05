@@ -10,6 +10,7 @@
     "bench:excel-compare": "node scripts/benchmark-excel-compare-alignment.mjs",
     "bench:excel-cleaner": "node scripts/benchmark-excel-cleaner-heap.mjs",
     "bundle:measure": "node scripts/measure-bundle-budget.mjs",
+    "css:orphans": "node scripts/audit-css-orphans.mjs",
     "legacy:manifest": "node scripts/generate-legacy-owner-manifest.mjs",
     "vendor:rhwp": "node scripts/vendor-rhwp-studio.mjs",
     "vendor:qr-font": "node scripts/vendor-qr-label-font.mjs",
@@ -35,6 +36,7 @@
     "test:control-geometry": "node tests/control-geometry-smoke.mjs",
     "test:ui-migration": "node tests/ui-migration-layout-smoke.mjs",
     "test:a11y": "node tests/accessibility-audit.mjs",
+    "test:rendering": "node tests/rendering-baseline.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },
   "dependencies": {

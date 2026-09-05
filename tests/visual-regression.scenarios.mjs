@@ -229,6 +229,7 @@ const interactionDefinitions = Object.freeze({
       fixture: { kind: "generated-png", fileName: "visual-page.png", width: 320, height: 220 },
       actions: [
         { type: "click", selector: ".pdf-tool-navigation a:nth-child(2)" },
+        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='image-to-pdf']" },
         { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
         { type: "wait", selector: ".pdf-image-card" },
         { type: "scroll-into-view", selector: ".pdf-image-grid", offset: -88 },
@@ -240,6 +241,7 @@ const interactionDefinitions = Object.freeze({
       fixture: { kind: "generated-pdf", fileName: "visual-images.pdf", pageCount: 2 },
       actions: [
         { type: "click", selector: ".pdf-tool-navigation a:nth-child(3)" },
+        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='pdf-to-image']" },
         { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
         { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
         { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
@@ -252,6 +254,7 @@ const interactionDefinitions = Object.freeze({
       fixture: { kind: "generated-pdf", fileName: "visual-convert.pdf", pageCount: 2 },
       actions: [
         { type: "click", selector: ".pdf-tool-navigation a:nth-child(4)" },
+        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='convert']" },
         { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
         { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
         { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },

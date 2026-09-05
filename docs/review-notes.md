@@ -2,7 +2,69 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-06
+
+### P2 P-final/P-QA 재개 — 미커밋 작업물 자체 감사 (Codx)
+
+- **무결성·완료 범위**: 시작 `HEAD=3588ebafab3dd876746e356ea652d923eda0f5e5`, `ui-migration`, `git status --porcelain` 58건. 추적 변경 diff는 인계 `pfinal-inflight.diff`와 **75,923B byte-identical**이었다. CSS/manifest/감사·측정기/하네스 수정, 시각 기준선 35장, CHANGELOG의 Codx 서명과 아래 P-final/P-QA 두 절이 실제 작업물과 일치한다. 구현과 캡처 채집은 완료됐고 커밋·4점 귀속 판정이 남은 상태였다. 상단 계획 진행표의 P-final/P-QA “대기”는 완료 실행 기록보다 낡았으며 Gemini 최종 육안 판정은 본 자체 감사로 대체하지 않는다.
+- **소스 감사**: 이전 HEAD CSS에 현행 orphan 측정기를 적용하면 **63 zero-reference classes / 152 selector arms, exit 1**이고 현재는 **238 tokens / 263 runtime sources / orphan 0, exit 0**이다. 삭제는 소비 0 class/selector arm·변수 5개이며 사용 중 legacy 6엔트리는 보존했다. `npm run legacy:manifest` 재생성 결과 **155 rules, 149 removed / 1 split / 5 active**이고 인계 manifest와 같다. 제품 TS/TSX·번역·route·SEO 생성기·광고 경계에는 이번 제품 변경이 없고 `tailwind.css`도 불변이다.
+- **캡처 감사·커밋 범위**: 시나리오 manifest로 이름을 다시 생성해 **77상태 / 604장, initial 156·bottom 156·interaction 292, 누락 0·잉여 0**을 확인했다. `git log -1 --stat -- tests/visual-artifacts/p2-b5a`의 **80 files changed** 등 B1~B5a 캡처 추적 관례에 따라 미추적 B5b 32·B6 64·B-shared 160·P-final 604, 총 **860 PNG**를 함께 보존한다. 선행 문서 `docs/agent-dispatch-runbook.md`도 위임 변경으로 포함한다. 사용자 `before.docx`·`after.docx`·루트 `naver05161fb06bc9701a23cfc09ad5773578.html` 3개는 수정·추적·삭제하지 않는다. 이 3개와 QA 860장 SHA-256을 시작 시 저장하고 커밋 전 동일함을 확인했다. jobs 원문·dist·vendor·측정 로그는 커밋하지 않는다.
+- **재검증 실행**: `npm run build` **exit 0, 2,830 modules, 정적 61페이지**, `npm run test:unit` **193/193**, `npm run test:static` **통과**, `npm run css:orphans` **orphan 0**, `npm run legacy:manifest` **통과**, `git diff --check` **통과**. 추가 `npm run test:ui-migration`은 일반 build에서 실행한 첫 시도에 `Local QA build emitted tracking`으로 **exit 1**이었다. 이는 호출자가 QA 전제를 빠뜨린 것이며 제품 수정 없이 `VITE_LOCAL_QA=1 npm run build` 후 `UI_MIGRATION_TEST_PORT=4291 npm run test:ui-migration` 재실행은 **exit 0, switches 7 contained / action 190px / legacy 0 / tracking 0**이었다. 스모크가 다시 쓴 B3 진단 PNG는 `/tmp`에 증거를 보관하고 재개 전 추적 내용으로 복원했다.
+- **접근성·visual 증거**: QA build에서 `A11Y_TEST_PORT=4292 A11Y_REPORT_PATH=/tmp/worklazytools-pfinal-resume-20260906/a11y.json npm run test:a11y` **exit 0, 5페이지 위반 0·외부 요청 0·placeholder 4.8871087704:1**. 이전 잡 원로그에서 마지막 PDF mode-ready 수정 뒤 PDF 부분 2회와 `LANG=ko_KR.UTF-8 VISUAL_TEST_PORT=4277 npm run test:visual`(13:22:45Z), `LANG=en_US.UTF-8 VISUAL_TEST_PORT=4278 npm run test:visual`(13:24:47Z)의 **exit 0**을 확인했다. 이후 제품/시각 변경이 없어 전체 visual 재실행은 생략했다. 재개 로그와 보호 파일 해시는 `/tmp/worklazytools-pfinal-resume-20260906/`에 보존한다.
+- **계보 전제 정정**: `5298c13^=454d7c8964d1a2f301c8661a6c6cc00f6304b49f`이며 RHWP/SEO main 변경은 B1 뒤 `26eb56ea5e2eff771f438d6c18d381da6af13474`에서 합류했다. 지시서의 “RHWP 등 기능 전부 포함·UI 전환 전 S2”는 실제 커밋으로 존재하지 않는다. 요청한 **B1 직전 S2**와 별도 **병합 전후 대조**를 실측해 이 혼입을 분리한다. 예산·기준점의 정본 계약을 바꾸는 결정은 하지 않는다. 이번 커밋과 후속 측정 기록 모두 **push 금지**다.
+
 ## 2026-09-05
+
+### P2 P-final — legacy 잔여·토큰 단일화·orphan·누적 예산 판정 (Codx)
+
+- **실행 게이트**: fetch 뒤 `HEAD=origin/ui-migration=3588ebafab3dd876746e356ea652d923eda0f5e5`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`로 지시 기준과 일치했다. B-shared 160장 전수 차단 결함 0·`[배포 가능]`과 열린 계획서 무충돌을 확인했다. U4 PDF는 비정본 초안, 네이버 랜딩은 별도 main worktree 소유라 P-final CSS/검증 표면과 상반되지 않는다. 사용자 DOCX 2개·네이버 확인 파일과 기존 QA 캡처는 제외했다.
+- **legacy 6엔트리 재대조**: manifest는 실제로 **149 removed·1 split·5 active**이며 인계된 `004·005·006·007·132·134` 6개가 전부 남아 있었다. `legacy-004`의 `.eyebrow`는 정적 SEO fallback 2곳과 명시 제외 `WordComparePage`·`HwpComparePage` 2곳, `005`의 `.eyebrow.success`와 `006/007/134`의 `.content-heading` 계열은 두 도달 불가 화면이 소비한다. `132`의 raw button/secondary/result arm도 같은 두 화면이 소비하므로 **refcount 0 엔트리는 0개**다. 소스 refcount 0인 `.ui-eyebrow`와 primary-link selector arm만 분리 제거했고 manifest의 current selector를 갱신했다. 도달 불가 컴포넌트 3종은 명시 제외대로 수정하지 않았다.
+- **토큰 단일화**: repo-wide `rg` 소비 집계에서 `--blue`·`--orange`·`--pink`·`--legacy-radius-sm`·`--legacy-radius-md`가 모두 `definitions=0 / consumers=0`이 되도록 라이트·다크 정의를 제거했다. 남은 legacy 변수는 AppShell·홈·도구 목록·공개 정책 화면과 도달 불가 비교 화면의 surface/text/accent 호환 CSS가 실제 소비한다: `--bg` 4, `--bg-elevated` 11, `--bg-muted` 18, `--bg-solid` 18, `--label` 34, `--label-secondary` 48, `--label-tertiary` 23, `--separator` 45, glass/shadow 1~7, soft/accent 2~12, radius 1~5회다. shadcn core는 `--background` 1·`--foreground` 3·`--primary` 6·`--primary-foreground` 2·`--radius` 7회 등 전부 소비가 있고 `src/styles/tailwind.css` diff는 **0**이라 안전한 `--primary` 팔레트는 건드리지 않았다.
+- **orphan 판정**: `npm run css:orphans`를 신설해 `.cjs/.html/.js/.jsx/.json/.mjs/.ts/.tsx`를 저장소 전체 재귀 탐색한다. 문서·테스트/fixture·빌드 산출·vendor·npm·Git metadata는 owner와 목적을 출력하는 8개 명시 예외로 분리하고, 정적 SEO markup 생성기 1개는 다시 포함한다. prefix wildcard 대신 AppShell/OperationProgress의 exact 동적 class 15개와 Fabric runtime class 2개만 허용했다. 최초 **63 zero-reference classes / 152 selector arms**를 확인하고 삭제했으며 `.drop-hint-segment`·`.file-list` legacy class도 0이다(동명 `data-ui-*` 속성은 CSS class 소비가 아님). 최종은 **238 class tokens / 263 owned runtime sources / orphan selector arm 0**, PostCSS **612 rules·2,126 declarations**다.
+- **시각 기준선 누락 판정**: 최초 전체 visual은 35/172가 기존 기준선과 달랐으나 `3588eba` 임시 worktree도 같은 **35/172**를 냈다. 양쪽 actual 35장 중 33장은 pixel-identical, 나머지도 0.0050%·0.0028%라 orphan 삭제 영향이 아니었다. B-shared에서 승인된 accent 변경이 부분 visual만 돌아 전 화면 기준선에 반영되지 않은 공백으로 확정하고 35장만 갱신했다. 이후 `ko_KR.UTF-8` **172/172·1m46.46s**, `en_US.UTF-8` **172/172·1m45.47s**가 같은 기준선으로 통과했다.
+- **스모크 하네스 교정**: 전체 실행이 처음 드러낸 세 stale/race를 제품 변경 없이 수정했다. utilities의 video route는 이전 문서의 `crossOriginIsolated`를 오인하지 않도록 path+격리 marker까지 기다리고, new-tools crop 단축키는 이전 form focus를 명시적으로 해제하며, Excel Compare는 B-shared가 의도적으로 제거한 nested interactive를 기대하지 않고 비상호작용 drop target+단일 버튼을 단언한다. 각각 동일 명령 재실행이 통과했다. Excel Cleaner 최초 route 대기 실패 1회는 재현되지 않아 코드 변경 없이 같은 전체 명령 통과로 환경성으로 판정했다.
+- **P-final 자체 증분**: B-shared 기록 대비 entry **+2B**, 전체 route **+7B**, shared **+3B**, app JS **+12B**, CSS **−2,446B**라 자체 변경은 5종 한도 안이다.
+- **누적 예산 — 차단**: 측정기를 임의 worktree에도 적용할 수 있게 `BUNDLE_SOURCE_ROOT`, 묶음 합산 한도를 재현할 `BUNDLE_BUDGET_MULTIPLIER`를 추가하고 같은 설치/도구로 `4a8405c`를 재빌드했다. 기준→P-final은 entry `289,574→297,901B`(**+8.13KiB / +120KiB 통과**), route `1,507,461→2,439,997B`(**+910.68KiB / +360KiB 실패**), shared `2,615,772→2,716,475B`(**+98.34KiB / +180KiB 통과**), app JS `4,412,807→5,454,373B`(**+1,017.15KiB / +480KiB 실패**), CSS `49,015→38,545B`(**−10.22KiB / +60KiB 통과**)다. 분기 직후 U3 QR bulk의 full CJK PDF/font·입력 경로까지 포함한 누적치지만 사용자 지시의 기준점은 `4a8405c`이므로 임의 제외하지 않았다. **누적 게이트 실패로 push 금지**다.
+
+### P2 P-QA — 20도구 전수 캡처·접근성·렌더링 기준선 (Codx)
+
+- **QA 환경·추적 차단**: `VITE_LOCAL_QA=1 npm run build`, Chrome 152, `VISUAL_TEST_PORT=4270`, consent granted로 `tests/visual-artifacts/p2-final/`에 채집했다. 캡처마다 외부 origin 요청을 실패 처리하는 계약에서 **외부 요청 0**이고, QA `dist`의 `data-worklazy-google-analytics`·`data-worklazy-naver-analytics`·`data-worklazy-adsense` 재귀 집계도 **0/0/0**이다.
+- **전수 매트릭스**: 20도구·77 scenario를 제품 적용 locale의 light/dark×desktop/mobile로 전개해 **604장**이다. 상태 합계는 initial **156**·bottom **156**·interaction **292**, 누락·잉여 0이다. PDF 4모드와 Image batch/collage/GIF는 각각 독립 상태로 포함했다. 최초 604장 중 PDF→이미지 KO/dark/desktop 1장이 썸네일 대기 race로 실패했으나 같은 PDF 48장 재채집에서 해당 장이 통과했고, 첫 세트에서 이미 통과한 반대 convert 장과 합쳐 최종 604장을 고정했다.
+
+| 도구 | initial | bottom | interaction | 합계 |
+|---|---:|---:|---:|---:|
+| excel-merger | 8 | 8 | 8 | 24 |
+| excel-compare | 8 | 8 | 16 | 32 |
+| excel-cleaner | 8 | 8 | 16 | 32 |
+| pdf-editor | 8 | 8 | 32 | 48 |
+| document-compare | 8 | 8 | 32 | 48 |
+| hwp-editor | 4 | 4 | 4 | 12 |
+| office-editor | 8 | 8 | 8 | 24 |
+| video-studio | 8 | 8 | 16 | 32 |
+| audio-studio | 8 | 8 | 16 | 32 |
+| image-studio | 8 | 8 | 48 | 64 |
+| text-merger | 8 | 8 | 8 | 24 |
+| text-tools | 8 | 8 | 8 | 24 |
+| text-formatter | 8 | 8 | 8 | 24 |
+| work-calculator | 8 | 8 | 8 | 24 |
+| timezone-calculator | 8 | 8 | 8 | 24 |
+| payroll-calculator | 8 | 8 | 8 | 24 |
+| image-privacy | 8 | 8 | 8 | 24 |
+| security-tools | 8 | 8 | 8 | 24 |
+| qr-studio | 8 | 8 | 24 | 40 |
+| data-converter | 8 | 8 | 8 | 24 |
+| **합계** | **156** | **156** | **292** | **604** |
+
+- **접근성 최종 게이트**: axe-core **4.13.0**·Playwright **1.63.0**·1280×800·light에서 홈 25/0, 문서 비교 41/0, 도구 목록 39/0, Excel 비교 46/0, PDF 도구 43/0으로 **violations 0(critical 0·serious 0·moderate 0)**이다. 라이브 기준 10(1·5·4) 대비 **−10**, 외부 요청 0이다. 문서 placeholder는 `rgb(105,105,111)` on `rgb(242,242,247)` = **4.8871:1**, 라이브 4.61 대비 +0.2771이다.
+- **렌더링 로컬 기준선**: `npm run test:rendering`은 QA production build·Chrome 152·1280×800 DPR1·light·ko-KR·cache off·service worker block·loopback 무스로틀·페이지별 cold context 3회 median·3초 settle을 고정한다. Lighthouse TBT 대신 FCP 이후 long task마다 `max(0,duration−50ms)`를 합산한 동등 blocking 지표를 썼다. 외부 요청은 0이다.
+
+| 페이지 | LCP | CLS | long-task blocking | FCP |
+|---|---:|---:|---:|---:|
+| 홈 | 91.34ms | 0.038332 | 146ms | 91.34ms |
+| 문서 비교 | 90.67ms | 0.114199 | 49ms | 90.67ms |
+| PDF 도구 | 512.32ms | 0.114199 | 52ms | 94.39ms |
+
+- **판정**: 캡처·접근성·렌더링 3종은 Gemini 최종 검수 입력으로 준비됐다. 누적 예산은 위 P-final 판정대로 route/app 두 지표가 실패했으므로 **`origin/ui-migration` push도 금지**, main 병합·배포는 물론 수행하지 않는다. 원격 상태는 `origin/ui-migration=3588eba`, `origin/main=073da56`으로 유지한다.
 
 ### P2 B-shared — 접근성 기준선 교정·공용 legacy 종료·Image Studio 대안 조작 판정 (Codx)
 

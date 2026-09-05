@@ -139,6 +139,12 @@ const compactContracts = new Map([
 ]);
 
 const currentStateOverrides = new Map([
+  [4, {
+    currentState: "active",
+    removedIn: null,
+    currentSelector: ".eyebrow",
+    lastUpdatedIn: "P-final",
+  }],
   [43, { currentState: "removed", removedIn: "pre-B1" }],
   [45, { currentState: "removed", removedIn: "pre-B1" }],
   [24, {
@@ -184,7 +190,8 @@ const currentStateOverrides = new Map([
   [132, {
     currentState: "legacy-arm-removed",
     removedIn: "B3",
-    currentSelector: ".tool-page button:not([data-slot]), .tool-page a:is(.primary-button, .ui-primary-button), .tool-page a.secondary-button, .tool-page a.result-download",
+    currentSelector: ".tool-page button:not([data-slot]), .tool-page a.secondary-button, .tool-page a.result-download",
+    lastUpdatedIn: "P-final",
   }],
   [151, {
     currentState: "removed",
@@ -261,7 +268,7 @@ const currentSelectors = [];
 postcss.parse(fs.readFileSync(stylesheetPath, "utf8"), { from: stylesheetPath }).walkRules((rule) => {
   currentSelectors.push(normalizeSelector(rule.selector));
 });
-const missingActive = entries.filter((entry) => entry.currentState === "active" && !currentSelectors.includes(entry.selector));
+const missingActive = entries.filter((entry) => entry.currentState === "active" && !currentSelectors.includes(entry.currentSelector ?? entry.selector));
 const presentRemoved = entries.filter((entry) => entry.currentState === "removed" && currentSelectors.includes(entry.selector));
 const invalidSplits = entries.filter((entry) => entry.currentState === "legacy-arm-removed" && (
   currentSelectors.includes(entry.selector) || !currentSelectors.includes(entry.currentSelector)

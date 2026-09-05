@@ -68,11 +68,15 @@ try {
       modes: document.querySelectorAll('[data-testid=excel-compare-mode-grid] button[role="radio"]').length,
       supportRows: document.querySelectorAll("[data-testid=excel-support-table] tbody tr").length,
       inputCount: document.querySelectorAll('[data-testid=excel-compare-page] input[type="file"]').length,
-      dragButtons: document.querySelectorAll('[data-testid=excel-compare-page] [data-testid=excel-pair-drop-zone][role="button"] [data-slot="button"]').length,
+      dropZones: Array.from(document.querySelectorAll('[data-testid=excel-compare-page] [data-testid=excel-pair-drop-zone]'), (zone) => ({
+        role: zone.getAttribute("role"),
+        fileButtons: zone.querySelectorAll('[data-slot="button"]').length,
+      })),
       ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
       isolated: Boolean(document.querySelector('meta[name="worklazy-video-isolation"], meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"]')),
     }));
-    if (initial.title !== "Excel 비교·대사" || initial.modes !== 3 || initial.supportRows !== 6 || initial.inputCount !== 1 || initial.dragButtons !== 1 || !initial.ads || initial.isolated) {
+    if (initial.title !== "Excel 비교·대사" || initial.modes !== 3 || initial.supportRows !== 6 || initial.inputCount !== 1
+      || initial.dropZones.length !== 1 || initial.dropZones.some(({ role, fileButtons }) => role !== null || fileButtons !== 1) || !initial.ads || initial.isolated) {
       throw new Error(`Initial Excel comparison UI or standard ad boundary is incomplete: ${JSON.stringify(initial)}`);
     }
 

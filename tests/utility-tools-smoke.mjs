@@ -362,7 +362,9 @@ try {
     return url.hostname === "wcs.naver.com" && url.pathname === "/b";
   }, { timeout: 60_000 });
   await page.$eval('a[href^="/ko/tools/video-studio"]', (link) => link.click());
-  await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
+  await page.waitForFunction(() => location.pathname === "/ko/tools/video-studio/"
+    && window.crossOriginIsolated === true
+    && Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')), { timeout: 60_000 });
   await page.waitForFunction(() => sessionStorage.getItem("worklazy-test-google-video-open") === "1");
   await naverVideoVisit;
   await page.waitForSelector("[data-testid=video-runtime-status]");

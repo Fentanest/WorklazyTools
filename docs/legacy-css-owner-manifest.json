@@ -105,7 +105,9 @@
       "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
-      "removedIn": null
+      "removedIn": null,
+      "currentSelector": ".eyebrow",
+      "lastUpdatedIn": "P-final"
     },
     {
       "id": "legacy-005",
@@ -2249,7 +2251,8 @@
       "lastRemovalBundle": "B6",
       "currentState": "legacy-arm-removed",
       "removedIn": "B3",
-      "currentSelector": ".tool-page button:not([data-slot]), .tool-page a:is(.primary-button, .ui-primary-button), .tool-page a.secondary-button, .tool-page a.result-download"
+      "currentSelector": ".tool-page button:not([data-slot]), .tool-page a.secondary-button, .tool-page a.result-download",
+      "lastUpdatedIn": "P-final"
     },
     {
       "id": "legacy-133",

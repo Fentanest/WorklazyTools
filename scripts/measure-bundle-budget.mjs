@@ -5,12 +5,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const scriptRepositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repositoryRoot = process.env.BUNDLE_SOURCE_ROOT
+  ? path.resolve(process.env.BUNDLE_SOURCE_ROOT)
+  : scriptRepositoryRoot;
 const outputDirectory = path.join(repositoryRoot, "dist-measure");
 const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
 const selectedRoutes = parseCsv(process.env.BUNDLE_ROUTES);
 const baselinePath = process.env.BUNDLE_BASELINE ? path.resolve(process.env.BUNDLE_BASELINE) : null;
 const reportPath = process.env.BUNDLE_MEASURE_OUTPUT ? path.resolve(process.env.BUNDLE_MEASURE_OUTPUT) : null;
+const budgetMultiplier = Number.parseInt(process.env.BUNDLE_BUDGET_MULTIPLIER || "1", 10);
 const budgetLimits = Object.freeze({
   entryJsGzip: 20 * 1024,
   affectedRouteJsGzip: 60 * 1024,
@@ -20,6 +24,9 @@ const budgetLimits = Object.freeze({
 });
 
 try {
+  if (!Number.isInteger(budgetMultiplier) || budgetMultiplier < 1) {
+    throw new Error(`BUNDLE_BUDGET_MULTIPLIER must be a positive integer, received ${process.env.BUNDLE_BUDGET_MULTIPLIER}.`);
+  }
   fs.rmSync(outputDirectory, { recursive: true, force: true });
   execFileSync(process.execPath, [
     path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js"),
@@ -83,8 +90,13 @@ function measureOutput() {
 
   for (const [routeId, sources] of routeSources) {
     const sourceEntries = sources.map((source) => {
-      if (!manifestBySource.has(source)) throw new Error(`Vite manifest is missing lazy route source ${source} for ${routeId}.`);
-      return source;
+      if (manifestBySource.has(source)) return source;
+      const moduleName = path.basename(source, path.extname(source));
+      const namedEntries = [...manifestBySource].filter(([, item]) => item.name === moduleName);
+      if (namedEntries.length !== 1) {
+        throw new Error(`Vite manifest is missing an unambiguous lazy route source ${source} for ${routeId} (named matches: ${namedEntries.length}).`);
+      }
+      return namedEntries[0][0];
     });
     routeSourceEntries.set(routeId, sourceEntries);
     const reachableSources = new Set(sourceEntries.flatMap((source) => [...walkManifestGraph(source, manifestBySource, sourceByOutput)]));
@@ -187,19 +199,20 @@ function compareWithBaseline(current, baseline) {
     metric,
     current.metrics[metric] - baseline.metrics[metric],
   ]));
-  const failures = Object.entries(deltas).filter(([metric, delta]) => delta > budgetLimits[metric]);
-  console.log("Bundle budget deltas against baseline:");
+  const failures = Object.entries(deltas).filter(([metric, delta]) => delta > budgetLimits[metric] * budgetMultiplier);
+  console.log(`Bundle budget deltas against baseline (limit multiplier ${budgetMultiplier}):`);
   for (const [metric, delta] of Object.entries(deltas)) {
-    console.log(`  ${metric}: ${formatBytes(delta)} (limit +${formatBytes(budgetLimits[metric])})`);
+    console.log(`  ${metric}: ${formatBytes(delta)} (limit +${formatBytes(budgetLimits[metric] * budgetMultiplier)})`);
   }
   if (failures.length) {
-    throw new Error(`Bundle budget exceeded: ${failures.map(([metric, delta]) => `${metric} ${formatBytes(delta)} > +${formatBytes(budgetLimits[metric])}`).join("; ")}.`);
+    throw new Error(`Bundle budget exceeded: ${failures.map(([metric, delta]) => `${metric} ${formatBytes(delta)} > +${formatBytes(budgetLimits[metric] * budgetMultiplier)}`).join("; ")}.`);
   }
   console.log("Bundle budget passed: all five deltas are within their fixed limits.");
 }
 
 function printReport(report) {
   console.log("Bundle measurement (gzip bytes, duplicate hashes counted once):");
+  console.log(`  source root: ${repositoryRoot}`);
   for (const [metric, value] of Object.entries(report.metrics)) console.log(`  ${metric}: ${value} (${formatBytes(value)})`);
   console.log(`  affected routes: ${report.affectedRoutes.join(", ")}`);
   console.log(`  unique files: ${report.uniqueFiles.js} JS / ${report.uniqueFiles.css} CSS; deduplicated copies: ${report.deduplicatedCopies}`);

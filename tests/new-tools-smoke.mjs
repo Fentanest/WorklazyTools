@@ -1180,10 +1180,12 @@ async function testImageStudioRegionInteractions(page) {
   await assertRegionModeRetained(page, "crop", "crop cancel");
 
   await dragImageEditorRegion(page, 1);
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
   await page.keyboard.press("Escape");
   await assertRegionModeRetained(page, "crop", "crop Escape");
 
   await dragImageEditorRegion(page, 1);
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
   await page.keyboard.press("Enter");
   await assertCropAppliedToSelect(page, "crop Enter");
 
@@ -3243,7 +3245,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
     googlePageViewQueued: (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"),
     engine: document.querySelector("[data-testid=video-runtime-status]")?.textContent || "",
-    guideEyebrow: document.querySelector(".ui-tool-guide .ui-eyebrow")?.textContent || "",
+    guideEyebrow: document.querySelector("[data-ui-component=tool-guide] .ui-tool-guide-heading > div > p")?.textContent || "",
   }));
   if (!isolation.marker || isolation.ads || !isolation.googleAnalytics || !isolation.naverAnalytics || !isolation.googlePageViewQueued
     || !isolation.engine.includes("멀티스레드") || isolation.engine.includes("광고") || isolation.engine.includes("실행 문서")

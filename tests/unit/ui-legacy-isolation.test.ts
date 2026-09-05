@@ -153,7 +153,7 @@ test("the complete legacy stylesheet is parsed and migrated adapter collisions s
   root.walkRules((rule) => rules.push(rule));
   root.walkDecls((declaration) => declarations.push(declaration));
 
-  assert.ok(rules.length >= 740, `expected the full stylesheet after B-shared cleanup, parsed only ${rules.length} rules`);
+  assert.ok(rules.length >= 600, `expected the full stylesheet after P-final orphan cleanup, parsed only ${rules.length} rules`);
   assert.match(css, /button:where\(:not\(\[data-slot\]\)\)/);
 
   const actionRules = rules.filter((rule) => rule.selector.includes(".tool-action-bar") && rule.selector.includes(".ui-primary-button"));

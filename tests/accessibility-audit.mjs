@@ -49,6 +49,7 @@ try {
 
   const results = [];
   const externalRequests = [];
+  let placeholderContrast;
   for (const target of pages) {
     const page = await context.newPage();
     page.on("request", (request) => {
@@ -65,6 +66,24 @@ try {
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     });
     const audit = await new AxeBuilder({ page }).analyze();
+    if (target.id === "document-compare") {
+      placeholderContrast = await page.locator('[data-testid="document-revision-author"] input[placeholder]').evaluate((input) => {
+        const parseRgb = (color) => {
+          const channels = color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+          if (!channels || channels.length !== 3) throw new Error(`Could not parse rendered color ${color}.`);
+          return channels;
+        };
+        const luminance = (color) => parseRgb(color).map((channel) => {
+          const normalized = channel / 255;
+          return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+        }).reduce((value, channel, index) => value + channel * [0.2126, 0.7152, 0.0722][index], 0);
+        const foreground = getComputedStyle(input, "::placeholder").color;
+        const background = getComputedStyle(input).backgroundColor;
+        const light = Math.max(luminance(foreground), luminance(background));
+        const dark = Math.min(luminance(foreground), luminance(background));
+        return { foreground, background, ratio: (light + 0.05) / (dark + 0.05) };
+      });
+    }
     results.push({
       id: target.id,
       path: target.path,
@@ -93,6 +112,7 @@ try {
     violations: results.reduce((total, result) => total + result.violations.length, 0),
     severityCounts,
     externalRequests: externalRequests.length,
+    placeholderContrast,
     limits,
   };
   const report = { summary, results, externalRequests };
@@ -103,9 +123,11 @@ try {
     console.log(`${result.id}: passes=${result.passes}; violations=${result.violations.length}; ${detail}`);
   }
   console.log(`Accessibility audit summary: ${JSON.stringify(summary)}`);
+  console.log(`Document placeholder contrast: ${placeholderContrast.ratio.toFixed(4)}:1 (${placeholderContrast.foreground} on ${placeholderContrast.background}).`);
   console.log(`Accessibility report: ${reportPath}`);
 
   if (externalRequests.length > 0) throw new Error(`Accessibility audit made ${externalRequests.length} external request(s).`);
+  if (!placeholderContrast || placeholderContrast.ratio < 4.5) throw new Error(`Document placeholder contrast is below 4.5:1: ${JSON.stringify(placeholderContrast)}.`);
   if ((severityCounts.critical || 0) > limits.critical
     || (severityCounts.serious || 0) > limits.serious
     || summary.violations > limits.total) {
