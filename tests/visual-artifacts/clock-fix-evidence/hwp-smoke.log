@@ -1,0 +1,8 @@
+
+> worklazytools@0.1.0 test:new-tools
+> node tests/new-tools-smoke.mjs
+
+[1/1] HWP editor and comparison
+[browser] [CanvasView] 페이지 0 정보가 없습니다
+  hwp: round-trip 3584 bytes, 1 page, sentinel parsed and Studio reopened
+HWP editor and unified document comparison smoke tests passed.

@@ -1,0 +1,86 @@
+[
+  {
+    "name": "timezone-calculator-empty__bottom__en__light__mobile.png",
+    "byteIdentical": true,
+    "diffPixels": 0,
+    "diffPercent": 0
+  },
+  {
+    "name": "timezone-calculator-empty__bottom__ko__dark__mobile.png",
+    "byteIdentical": true,
+    "diffPixels": 0,
+    "diffPercent": 0
+  },
+  {
+    "name": "timezone-calculator-empty__initial__en__dark__desktop.png",
+    "byteIdentical": false,
+    "diffPixels": 764,
+    "diffPercent": 0.06218966218966219
+  },
+  {
+    "name": "timezone-calculator-empty__initial__en__light__mobile.png",
+    "byteIdentical": false,
+    "diffPixels": 291,
+    "diffPercent": 0.08840685380969741
+  },
+  {
+    "name": "timezone-calculator-empty__initial__ko__dark__mobile.png",
+    "byteIdentical": false,
+    "diffPixels": 155,
+    "diffPercent": 0.04708956130757078
+  },
+  {
+    "name": "timezone-calculator-empty__initial__ko__light__desktop.png",
+    "byteIdentical": false,
+    "diffPixels": 939,
+    "diffPercent": 0.07643467643467644
+  },
+  {
+    "name": "timezone-calculator-empty__interaction-base-city__en__dark__desktop.png",
+    "byteIdentical": false,
+    "diffPixels": 764,
+    "diffPercent": 0.06218966218966219
+  },
+  {
+    "name": "work-calculator-empty__bottom__en__light__mobile.png",
+    "byteIdentical": true,
+    "diffPixels": 0,
+    "diffPercent": 0
+  },
+  {
+    "name": "work-calculator-empty__bottom__ko__dark__mobile.png",
+    "byteIdentical": true,
+    "diffPixels": 0,
+    "diffPercent": 0
+  },
+  {
+    "name": "work-calculator-empty__initial__en__dark__desktop.png",
+    "byteIdentical": false,
+    "diffPixels": 402,
+    "diffPercent": 0.032722832722832725
+  },
+  {
+    "name": "work-calculator-empty__initial__en__light__mobile.png",
+    "byteIdentical": true,
+    "diffPixels": 0,
+    "diffPercent": 0
+  },
+  {
+    "name": "work-calculator-empty__initial__ko__dark__mobile.png",
+    "byteIdentical": false,
+    "diffPixels": 98,
+    "diffPercent": 0.029772754891238304
+  },
+  {
+    "name": "work-calculator-empty__initial__ko__light__desktop.png",
+    "byteIdentical": false,
+    "diffPixels": 676,
+    "diffPercent": 0.05502645502645503
+  },
+  {
+    "name": "work-calculator-empty__interaction-leave-result__en__dark__desktop.png",
+    "byteIdentical": false,
+    "diffPixels": 269,
+    "diffPercent": 0.021896621896621896
+  }
+]

@@ -1,0 +1,77 @@
+./tests/visual-regression.mjs:712:  const deadline = Date.now() + 30_000;
+./tests/visual-regression.mjs:714:  while (Date.now() < deadline) {
+./tests/mobile-bottom-negative-control.mjs:67:    const deadline = Date.now() + 30_000;
+./tests/mobile-bottom-negative-control.mjs:68:    while (Date.now() < deadline) {
+./tests/unit/excel-compare-fixtures.test.ts:16:  const output = path.join(tmpdir(), `worklazy-excel-compare-${process.pid}-${Date.now()}`);
+./scripts/benchmark-video-concat-memory.mjs:224:    const startedAt = Date.now();
+./scripts/benchmark-video-concat-memory.mjs:237:      elapsedMs: Date.now() - startedAt,
+./tests/new-tools-smoke.mjs:4083:  const deadline = Date.now() + 30_000;
+./tests/new-tools-smoke.mjs:4084:  while (Date.now() < deadline) {
+./scripts/benchmark-video-hybrid.mjs:233:  const deadline = Date.now() + 120_000;
+./scripts/benchmark-video-hybrid.mjs:236:  while (Date.now() < deadline) {
+./scripts/benchmark-video-webcodecs.mjs:380:  const deadline = Date.now() + 120_000;
+./scripts/benchmark-video-webcodecs.mjs:383:  while (Date.now() < deadline) {
+./scripts/benchmark-excel-compare-alignment.mjs:65:    generatedAt: new Date().toISOString(),
+./scripts/measure-bundle-budget.mjs:141:    generatedAt: new Date().toISOString(),
+./tests/accessibility-audit.mjs:160:  const deadline = Date.now() + 30_000;
+./tests/accessibility-audit.mjs:161:  while (Date.now() < deadline) {
+./scripts/benchmark-excel-cleaner-heap.mjs:109:    generatedAt: new Date().toISOString(),
+./tests/rendering-baseline.mjs:105:    measuredAt: new Date().toISOString(),
+./tests/rendering-baseline.mjs:166:  const deadline = Date.now() + 30_000;
+./tests/rendering-baseline.mjs:167:  while (Date.now() < deadline) {
+./scripts/benchmark-video-stream-copy.mjs:213:  const started = Date.now();
+./scripts/benchmark-video-stream-copy.mjs:216:  while (Date.now() - started < timeout) {
+./scripts/generate-excel-cleaner-fixtures.mjs:33:  value.created = new Date("2026-09-03T00:00:00.000Z");
+./scripts/generate-excel-cleaner-fixtures.mjs:89:  sheet.addRow([new Date("2024-02-29T00:00:00.000Z"), date1904 ? 43889 : 45351]);
+./tests/ui-migration-layout-smoke.mjs:166:  const deadline = Date.now() + 30_000;
+./tests/ui-migration-layout-smoke.mjs:167:  while (Date.now() < deadline) {
+./tests/xls-preserve-first-load-smoke.mjs:104:          time: Date.now(),
+./tests/qr-bulk-smoke.mjs:187:  const deadline = Date.now() + timeout;
+./tests/qr-bulk-smoke.mjs:188:  while (Date.now() < deadline) {
+./tests/qr-bulk-smoke.mjs:203:  const deadline = Date.now() + 30_000;
+./tests/qr-bulk-smoke.mjs:204:  while (Date.now() < deadline) {
+./scripts/generate-excel-compare-fixtures.mjs:83:  const sheet = XLSX.utils.aoa_to_sheet([["Date", "DateTime"], [new Date("2024-02-29T00:00:00.000Z"), new Date("2024-02-29T12:34:56.000Z")]], { cellDates: true });
+./src/features/audio-studio/AudioStudioPage.tsx:294:      const lastModified = typeof event.data.lastModified === "number" ? event.data.lastModified : Date.now();
+./src/components/AppShell.tsx:131:          <span>© {new Date().getFullYear()} Worklazy Tools</span>
+./src/features/audio-studio/audioProcessorClient.ts:29:  const requestId = globalThis.crypto?.randomUUID?.() || `audio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+./tests/control-geometry-smoke.mjs:253:  const deadline = Date.now() + 30_000;
+./tests/control-geometry-smoke.mjs:254:  while (Date.now() < deadline) {
+./src/features/timezone-calculator/TimezoneCalculatorPage.tsx:29:  const initialNow = useMemo(() => DateTime.now().setZone("Asia/Seoul"), []);
+./src/features/timezone-calculator/TimezoneCalculatorPage.tsx:79:    const now = DateTime.now().setZone(baseCity.zone);
+./src/components/AnalyticsLoader.tsx:91:  window.gtag("js", new Date());
+./src/utils/xlsxReport.ts:28:  workbook.created = new Date();
+./src/utils/xlsxReport.ts:29:  workbook.modified = new Date();
+./src/features/image-studio/imageStudioShared.tsx:60:  return new File([source], `${prefix}-${new Date().toISOString().replace(/[:.]/g, "-")}-${index + 1}.${extension}`, { type: source.type, lastModified: Date.now() });
+./src/utils/date.ts:1:export function localIsoDate(date = new Date()) {
+./src/utils/date.ts:3:  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+./src/features/office-editor/OfficeEditorAppPage.tsx:39:    const started = Date.now();
+./src/features/office-editor/OfficeEditorAppPage.tsx:40:    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+./src/features/text-merger/TextMergerPage.tsx:278:  return globalThis.crypto?.randomUUID?.() ?? `text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+./src/features/office-editor/pendingOfficeFile.ts:14:    await transactionPromise(database, "readwrite", (store) => store.put({ file, createdAt: Date.now() } satisfies PendingOfficeFile, PENDING_KEY));
+./src/features/office-editor/pendingOfficeFile.ts:28:    if (!pending || !(pending.file instanceof File) || Date.now() - pending.createdAt > MAX_PENDING_AGE_MS) return undefined;
+./src/features/excel-merger/ExcelMergerPage.tsx:1016:  return `excel-file-${Date.now().toString(36)}-${fileIdSequence.toString(36)}`;
+./src/features/pdf-editor/types.ts:69:  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+./src/features/excel-merger/excel.worker.ts:204:  output.created = new Date();
+./src/features/excel-merger/excel.worker.ts:205:  output.modified = new Date();
+./src/features/excel-cleaner/model.ts:167:function cloneScalar<T>(value: T) { return value instanceof Date ? new Date(value) as T : value; }
+./src/features/spreadsheet-core/inputAdapter.ts:440:  if (value instanceof Date) return adjustDate1904 ? new Date(value.getTime() + 1_462 * 86_400_000) : value;
+./src/features/excel-cleaner/output.ts:30:  workbook.created = new Date();
+./src/features/excel-cleaner/output.ts:31:  workbook.modified = new Date();
+./src/features/work-calculator/workCalculator.ts:53:  const days = differenceInCalendarDays(new Date(Date.UTC(year + 1, 0, 1, 3)), new Date(first));
+./src/features/work-calculator/workCalculator.ts:55:    const date = new Date(first + index * 86_400_000);
+./src/features/work-calculator/workCalculator.ts:71:  return new Date(Date.UTC(year, month - 1, day + offset, 3)).toISOString().slice(0, 10);
+./src/features/work-calculator/workCalculator.ts:76:  return new Date(Date.UTC(year, month - 1, day, 3)).getUTCDay();
+./src/features/excel-cleaner/engine.ts:384:  if (value instanceof Date && hint !== "serial" && !Number.isNaN(value.getTime())) return new Date(value);
+./src/features/excel-cleaner/engine.ts:387:    const result = new Date(epoch + value * 86_400_000);
+./src/features/excel-cleaner/engine.ts:393:  const parsed = new Date(compact ? `${compact[1]}-${compact[2]}-${compact[3]}T00:00:00Z` : normalized);
+./src/features/excel-cleaner/engine.ts:463:function dateRank(value: SpreadsheetScalar | undefined) { const parsed = value instanceof Date ? value : new Date(scalarText(value)); return Number.isNaN(parsed.getTime()) ? Number.NEGATIVE_INFINITY : parsed.getTime(); }
+./src/features/excel-cleaner/engine.ts:465:function cloneCell(value: CleanerCell | undefined): CleanerCell { return value ? { ...value, value: value.value instanceof Date ? new Date(value.value) : value.value, cachedValue: value.cachedValue instanceof Date ? new Date(value.cachedValue) : value.cachedValue, style: value.style ? structuredClone(value.style) : undefined } : cell(null); }
+./src/features/work-calculator/WorkCalculatorPage.tsx:24:  const [hire, setHire] = useState(() => `${new Date().getFullYear() - 1}-01-01`); const [asOf, setAsOf] = useState(() => localIsoDate());
+./src/features/video-studio/video-zip.worker.ts:89:  const file = new File([blob], archiveName, { type: "application/zip", lastModified: Date.now() });
+./src/features/video-studio/VideoStudioPage.tsx:449:          lastModified: Date.now(),
+./src/features/video-studio/VideoStudioPage.tsx:1102:function createId() { return globalThis.crypto?.randomUUID?.() || `video-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+./src/features/video-studio/videoResultStorage.ts:45:  const now = options.now ?? Date.now();
+./src/features/video-studio/videoResultStorage.ts:80:export async function cleanupStaleVideoResultSessions(rootDirectory: FileSystemDirectoryHandle, now = Date.now()) {
+./src/features/video-studio/videoResultStorage.ts:103:export async function refreshVideoResultStorageSession(session: VideoResultStorageSession, now = Date.now()) {
+./src/features/video-studio/videoResultStorage.ts:115:    return new File([output.data.buffer], output.fileName, { type: output.mimeType, lastModified: Date.now() });
+./src/features/video-studio/videoResultStorage.ts:258:  return globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;

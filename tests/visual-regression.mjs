@@ -11,6 +11,7 @@ import puppeteer from "puppeteer-core";
 import JSZip from "jszip";
 
 import { assertMobileBottomLayout, assertScrollAtBottom } from "./mobile-bottom-assertion.mjs";
+import { configureVisualClock } from "./visual-regression-clock.mjs";
 import { qaCaptureScenarios, qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
 import {
   buildVisualStateDistribution,
@@ -148,6 +149,7 @@ try {
   console.log(`Threshold: <= ${(config.diff.maxDiffPixelRatio * 100).toFixed(3)}% differing pixels at per-pixel threshold ${config.diff.perPixelThreshold}; antialiasing ignored.`);
   console.log(`Allowed regions: ${config.allowedRegions.map(({ selector }) => selector).join(", ")}.`);
   console.log(`Environment: locale-specific browser workers (${Object.values(config.environment.locales).map(({ browserLocale }) => browserLocale).join(", ")}), recycled every ${config.environment.maxCapturesPerBrowser} captures; Accept-Language and navigator locale fixed, timezone ${config.environment.timezone}, DPR 1, font ${config.environment.fontFamily}, ${config.environment.settleTimeMs} ms paint settle.`);
+  console.log(`Clock: Date fixed at ${config.environment.clock.isoTime} before navigation for ${Object.keys(config.environment.clock.toolReasons).join(", ")}; native timers and performance.now() preserved; other tools use their native clock.`);
   if (qaCaptureOnly) {
     console.log(`QA state distribution: ${Object.entries(stateDistribution.stateTypes).map(([state, count]) => `${state}=${count}`).join(", ")}.`);
     console.log(`QA stateId distribution: ${Object.entries(stateDistribution.stateIds).map(([state, count]) => `${state}=${count}`).join(", ")}.`);
@@ -284,6 +286,7 @@ async function captureAndCompare(capture, browser) {
     await page.setBypassServiceWorker(true);
     await page.setViewport(capture.viewport);
     await page.emulateTimezone(config.environment.timezone);
+    const fixedTime = await configureVisualClock(page, capture.scenario, config.environment.clock);
     await page.setExtraHTTPHeaders({ "Accept-Language": localeEnvironment.acceptLanguage });
     const client = await page.createCDPSession();
     await client.send("Emulation.setLocaleOverride", { locale: localeEnvironment.browserLocale });
@@ -317,6 +320,8 @@ async function captureAndCompare(capture, browser) {
         language: navigator.language,
         languages: navigator.languages,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        dateNow: Date.now(),
+        constructedDate: new Date().getTime(),
         fontLoaded: loadedFaces.length > 0,
       };
     }, config.environment.fontFamily);
@@ -325,6 +330,9 @@ async function captureAndCompare(capture, browser) {
     }
     if (environment.timezone !== config.environment.timezone) {
       throw new Error(`Browser timezone is ${environment.timezone}; expected ${config.environment.timezone}.`);
+    }
+    if (fixedTime !== null && (environment.dateNow !== fixedTime || environment.constructedDate !== fixedTime)) {
+      throw new Error(`Browser clock is ${environment.dateNow}/${environment.constructedDate}; expected ${fixedTime}.`);
     }
     if (!environment.fontLoaded) throw new Error(`Deterministic visual font ${config.environment.fontFamily} did not load.`);
     await page.evaluate((settleTimeMs) => new Promise((resolve) => {

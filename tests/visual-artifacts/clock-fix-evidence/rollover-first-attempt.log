@@ -1,0 +1,17 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+Error [TypeError]: Cannot read properties of undefined (reading 'click')
+    at $$eval ($$eval at file:///home/better0101/projects/worklazytools/tests/visual-artifacts/clock-fix-evidence/probe.mjs:75:28, <anonymous>:0:36)
+    at #evaluate (file:///home/better0101/projects/worklazytools/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)
+    at async ExecutionContext.evaluate (file:///home/better0101/projects/worklazytools/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)
+    at async IsolatedWorld.evaluate (file:///home/better0101/projects/worklazytools/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)
+    at async CdpJSHandle.evaluate (file:///home/better0101/projects/worklazytools/node_modules/puppeteer-core/lib/puppeteer/api/JSHandle.js:154:20)
+    at async Promise.all (index 0)
+    at async CdpElementHandle.$$eval (file:///home/better0101/projects/worklazytools/node_modules/puppeteer-core/lib/puppeteer/api/ElementHandle.js:563:34)
+    at async CdpFrame.$$eval (file:///home/better0101/projects/worklazytools/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:509:20)
+    at async CdpPage.$$eval (file:///home/better0101/projects/worklazytools/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:534:20)
+    at async file:///home/better0101/projects/worklazytools/tests/visual-artifacts/clock-fix-evidence/probe.mjs:75:17
+
+Node.js v22.17.1

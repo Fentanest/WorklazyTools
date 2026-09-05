@@ -1,0 +1,524 @@
+[
+  {
+    "toolId": "timezone-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "interaction",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "ko",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "ko",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "2026-09-05"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "interaction",
+    "values": [
+      "2025-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "2026-09-05"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2025-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "ko",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "2026-09-05"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "ko",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2025-01-01",
+      "2026-09-05"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "initial",
+    "values": [],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "interaction",
+    "values": [
+      "2023-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "initial",
+    "values": [],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "ko",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2023-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "ko",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "initial",
+    "values": [],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "ko",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2023-01-01",
+      "2026-09-05"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "interaction",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "en",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "timezone-calculator",
+    "locale": "en",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2026-09-05",
+      "12:00"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "2026-09-05"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "interaction",
+    "values": [
+      "2025-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "2026-09-05"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2025-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "en",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "initial",
+    "values": [
+      "2026-09-05",
+      "2026-09-05"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "work-calculator",
+    "locale": "en",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2025-01-01",
+      "2026-09-05"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "initial",
+    "values": [],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-05T14:59:59.999Z",
+    "phase": "interaction",
+    "values": [
+      "2023-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788620399999,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "initial",
+    "values": [],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "en",
+    "hostTime": "2026-09-06T15:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2023-01-01",
+      "2026-09-05"
+    ],
+    "host": 1788706800000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "en",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "initial",
+    "values": [],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  },
+  {
+    "toolId": "payroll-calculator",
+    "locale": "en",
+    "hostTime": "2027-01-01T00:00:00.000Z",
+    "phase": "interaction",
+    "values": [
+      "2023-01-01",
+      "2026-09-05"
+    ],
+    "host": 1798761600000,
+    "now": 1788577200000,
+    "constructed": 1788577200000,
+    "timerAdvanced": true,
+    "diffPixels": 0
+  }
+]

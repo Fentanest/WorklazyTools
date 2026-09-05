@@ -12,6 +12,14 @@ export const visualRegressionConfig = Object.freeze({
   }),
   environment: Object.freeze({
     timezone: "UTC",
+    clock: Object.freeze({
+      isoTime: "2026-09-05T03:00:00.000Z",
+      toolReasons: Object.freeze({
+        "timezone-calculator": "Initial date/time, world clocks and current-time action use DateTime.now().",
+        "work-calculator": "Business dates, annual-leave reference date and hire year default to today.",
+        "payroll-calculator": "The retirement reference date defaults to today, including before its mode is selected.",
+      }),
+    }),
     fontFamily: "Worklazy Visual Noto Sans KR",
     fontUrl: "/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf",
     maxCapturesPerBrowser: 12,

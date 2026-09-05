@@ -4,6 +4,32 @@
 
 ## 2026-09-06
 
+### P-QA 커밋·시각 하네스 시계 결정성 (Codx)
+
+- **실행 게이트·A 커밋**: `PROJECT_RULES.md`·`AGENTS.md` 전문 선독, `ui-migration`의 기준 `0663c7449f94f8d046e36c8ec16502582dd4f001` 일치, 열린 계획 14문서 충돌 검사 완료. 최신 지시로 이전 commit 금지만 무효화하고 모든 push 금지는 유지했다. Claude의 두 결함 해소 판정을 수용해 기존 수정을 보존했다. A=`380764486ebffdbcc5cc065c6cad0278146f503c`, **109파일**: 제품 2·scenario/test 2·기록 2·기준선 4(수정 1+신규 3)·증거 99(PNG 68). 증거는 기존 QA 추적 관례대로 4디렉터리 전부 포함했다. [포함 경로 전문](../tests/visual-artifacts/clock-fix-evidence/task-a-included.txt). 사용자 `before.docx`·`after.docx`·네이버 소유확인 HTML과 jobs는 제외했다.
+- **원인·채택**: 이전 KO/EN **174/175** 실패의 공통 원인인 `DateTime.now()`를 제품 기본값에서 제거하는 안은 기각했다. `tests/visual-regression-clock.mjs`가 navigation 전에 선택 도구의 `Date.now()`·무인자 `new Date()`·함수 호출 `Date()`를 **2026-09-05T03:00:00.000Z(서울 12:00)**로 고정한다. 명시 날짜 생성/복제·parse/UTC·prototype/subclass는 native 의미를 유지한다. 실제 캡처 직전 now/constructor 값을 단언하고 환경 로그에 시각·대상을 출력한다. `setTimeout`/`setInterval`/RAF/`performance.now()`와 Node runner의 timeout·실측 시간은 그대로 진행한다. 모든 도구의 시계/타이머를 무차별 동결하는 안은 Office 경과시간·저장소 TTL·벤더 준비를 보존하려고 기각했다. 날짜 mask 추가·0.1% 임계값 완화도 하지 않았다.
+- **전수 조사·발견 수**: 실행 확장자 JS/MJS/CJS/TS/TSX/JSX/HTML/Python을 repo-wide 재귀 검색해 직접 호출 **77행(앱 42·테스트/스크립트 35)**을 분류하고 `localIsoDate`·date-fns·Luxon/Temporal provider를 별도 추적했다. 캘린더 기본값 의존은 **3도구/9시나리오/일반 21캡처/QA 72캡처**다. 시차: 초기 날짜·시간 및 현재 시각 버튼, 근무: 영업일 시작·종료·연차 기준일·입사연도, 급여: 퇴직 기준일(현재 weekly/net 캡처에는 숨김) 모두 같은 시계로 고정했다. toolId별 사유를 가진 최소 명시 목록이 모든 상태/QA profile에 적용된다. 기존 공용 footer 연도 mask는 유지했다. 이미지 붙여넣기 날짜 파일명은 현재 scenario/QA에 paste가 없어 미실행, Office 경과시간은 idle workspace 시나리오에서 미실행이다. ID·파일 메타데이터·TTL·명시 날짜 파싱/복제·runner timeout은 캘린더 픽셀과 무관해 native로 둔다. [검색 원출력·예외 목적/소유자](../tests/visual-artifacts/clock-fix-evidence/README.md)에 vendor·generated·fixture를 분리 기록했다. PDF 후속 계획 10항의 config ISO/navigation 전 clock 계약과 방향이 같으며, 그 기능 구현 시 PDF를 이 목록에 연결할 수 있다.
+- **날짜·연도 변경 실증**: Node 단위 테스트로 host 날짜 3개·명시 인자·invalid date·Date subclass·native timer 보존을 검사했다. 별도 실브라우저 [probe](../tests/visual-artifacts/clock-fix-evidence/probe.mjs)는 원래 시계를 `2026-09-05T14:59:59.999Z`/`2026-09-06T15:00:00.000Z`/`2027-01-01T00:00:00.000Z`로 각각 바꾼 뒤 실제 하네스 함수를 적용했다. KO/EN **36상태**, 반복 **24비교 모두 0px**; 서울 12:00·근무일 2026-09-05·입사연도 2025·퇴직 기준 2026-09-05가 같았다. 현재 날짜 입력을 2000년으로 바꾼 뒤 “현재 시각 사용” 버튼으로 복원하는 경로도 통과했다. timer/RAF/performance는 실제 진행했다. 최초 probe의 `role=radio` 가정은 현행 segmented adapter에 맞지 않아 실패했고, 본 하네스와 같은 button selector로 probe만 교정했다. 실패 원출력도 보존한다.
+- **기준선 갱신 근거**: 시계 고정 직후 기존 baseline 비교는 **21/21**(28.48초)로 상한 이내였으나 과거 기준선의 서로 다른 채집 시각(예: EN timezone 2026-09-04 21:53)을 남겨두지 않고 고정 입력과 일치시켰다. 두 도구 14장만 생성해 **실제 변경 9장(시차 5·근무 4)**, 나머지 5장 byte-identical. 차이는 98~939px, 최대 **0.076435%**, 이전 실패 대상 EN mobile은 **291px/0.088407%**다. 날짜·세계 시각과 토요일 영업일 0/제외일 1 변화가 고정 입력과 일치함을 PNG에서 확인했다. [장별 실측](../tests/visual-artifacts/clock-fix-evidence/baseline-diffs.json).
+- **제품 계약·보존**: B의 `src/`·package/lock diff는 **0B**. 오늘 날짜 기본값·한국어/영어 문자열·SEO 메타/정적 route/사이트맵/FAQ·광고/분석 및 격리 경계·서버 전제·내부 구현 비노출은 제품 코드 변화가 없어 보존된다. 새 의존성·벤더 변경·번들 최적화 없음. 원본 P-QA **604/604 SHA-256**, 사용자 파일 **3/3 SHA-256** 동일, 기준선 집합 175장. 원격 추적 refs도 `origin/ui-migration=3588eba`, `origin/main=073da56`로 그대로이며 push하지 않았다.
+
+검증 원출력: [증거 인덱스](../tests/visual-artifacts/clock-fix-evidence/README.md). 일반 production 빌드에서 consent denied·외부 요청 0을 단언하는 시각 하네스를 실행했다. 아래 browser/utility/probe는 `TEST_BASE_URL=http://127.0.0.1:4296`, visual KO/EN은 각각 자체 preview 포트 4297/4298과 별도 artifact 경로를 썼다.
+
+| 실행 명령 | 실제 결과 |
+|---|---|
+| `npm run build` | exit 0, **2,830 modules**, 79초, **정적 61페이지**. 기존 eval·chunk 크기 경고 외 오류 없음. |
+| `npm run test:unit` | A **193/193**, B **195/195**, exit 0·fail 0. |
+| `npm run test:static` | exit 0, localized pages/hreflang·runtimes·ads/robots/sitemap 통과. |
+| `TEST_SCOPE=excel npm run test:browser` | exit 0, Excel·키보드 segmented/switch 계약 통과. 출력 공통 Word/PDF 문구는 실행 범위에 포함된다는 뜻이 아님. |
+| `TEST_ONLY_HWP=1 npm run test:new-tools` | exit 0, **3,584B·1페이지·sentinel 재파싱·Studio 재개방** 통과. 기존 CanvasView 로그 1건 유지. |
+| `npm run test:utilities` | exit 0, KO/EN 경로·세계 지도·유틸리티·격리 계약 통과. |
+| `VISUAL_ONLY=timezone-calculator,work-calculator,payroll-calculator npm run test:visual` | exit 0, 갱신 전 **21/21**, 28.48초. |
+| `UPDATE_VISUAL_BASELINES=1 VISUAL_ONLY=timezone-calculator,work-calculator npm run test:visual` | exit 0, **14/14**, 20.98초. 실제 9장 변경. |
+| `node tests/visual-artifacts/clock-fix-evidence/probe.mjs` | exit 0, **36상태·24 반복 비교 0px**, native timer/RAF 진행. |
+| `LANG=en_US.UTF-8 npm run test:visual` | exit 0, **175/175**, **134.10초**, Chrome 152.0.7977.64. |
+| `LANG=ko_KR.UTF-8 npm run test:visual` | 최종 단독 실행 **exit 0, 175/175, 113.34초**. 최초 동시 실행은 98/175 진행 뒤 **exit 143**, 자체 오류 설명 없이 중단됐으므로 통과로 세지 않고 원출력을 보존했다. |
+| `node --check` (clock helper·visual runner·probe) · `git diff --check` | exit 0. |
+
 ### P-QA 차단 2건 — Excel 영어 분절·HWP 액션 바 충돌 수정 (Codx)
 
 > **2026-09-06 커밋 재개 정정 (Codx)**: 최신 사용자 지시로 이전 전달의 commit 금지는 무효다. 아래 미커밋·금지 서술은 이전 실행 당시 기록이며, 이번에는 두 수정·기준선 4장·증거 4디렉터리(99파일, PNG 68장)를 함께 커밋한다. Claude가 재캡처에서 두 결함 해소를 확인한 판정을 수용했다. 사용자 3파일과 원본 P-QA 604장의 SHA-256을 재확인했으며 모두 동일하다. 모든 push는 계속 금지한다. 시계 원인의 전체 회귀 실패는 별도 후속 커밋으로 해결한다.
