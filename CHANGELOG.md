@@ -4,6 +4,7 @@
 
 ## 2026-09-05
 
+- P2 B6 재검수에서 Image Studio 모바일 도구 모음·뷰포트 컨트롤과 레이어 행·선택 미니바의 Card 방향 회귀를 복구했다. 실제 헤더 오프셋으로 시각 시나리오를 교정하고, 긴 파일명 말줄임·10개 레이어 스크롤을 단언하는 레이어 패널 상태와 64장 QA 세트를 추가했다. — Codx
 - P2 B6의 Image Studio 편집·일괄·콜라주·GIF 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 7개 상태 시각 시나리오, 모바일 편집 제스처·접이식 패널 회귀와 Playwright/axe 접근성 감사 명령을 함께 고정했다. — Codx
 - P2 B5b의 Video Studio 입력·그룹/트림·출력/진행·결과 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 그룹 편집·범위 선택 시각 시나리오와 모바일 트림 값 가독성, 기존 비디오 처리 회귀를 함께 고정했다. — Codx
 - P2 B5a의 Audio Studio·PDF 도구 내부 화면을 shadcn/Tailwind 표면으로 전환하고 전용 legacy CSS와 class 방출을 제거했다. 오디오 파형·효과와 PDF 4모드 썸네일 시각 시나리오, 모바일 PDF 탭 스크롤 페이드 단서를 함께 고정했다. — Codx

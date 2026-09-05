@@ -30,6 +30,8 @@ test("visual regression scenario manifest covers every available tool and state 
   ];
   const supportedActionTypes = new Set([
     "assert-path",
+    "assert-scroll-overflow",
+    "assert-truncated",
     "click",
     "click-option",
     "scroll-bottom",
@@ -81,9 +83,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 171);
-  assert.equal(qaCaptureScenarios.length, 78);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 612);
+  assert.equal(names.length, 172);
+  assert.equal(qaCaptureScenarios.length, 79);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 620);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -91,13 +93,14 @@ test("visual regression scenario manifest covers every available tool and state 
   assert.equal(b1QaScenarios.flatMap(({ profiles }) => profiles).length, 144);
   assert.deepEqual(new Set(b1QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
   const b6QaScenarios = qaCaptureScenarios.filter(({ toolId }) => toolId === "image-studio");
-  assert.equal(b6QaScenarios.length, 7);
-  assert.equal(b6QaScenarios.flatMap(({ profiles }) => profiles).length, 56);
+  assert.equal(b6QaScenarios.length, 8);
+  assert.equal(b6QaScenarios.flatMap(({ profiles }) => profiles).length, 64);
   assert.deepEqual(new Set(b6QaScenarios.map(({ stateId }) => stateId)), new Set([
     "initial",
     "bottom",
     "interaction-canvas-loaded",
     "interaction-size-panel",
+    "interaction-layers-panel",
     "interaction-batch-mode",
     "interaction-collage-mode",
     "interaction-gif-mode",

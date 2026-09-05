@@ -511,6 +511,30 @@ async function performScenarioActions(page, actions, fixture) {
         const canvas = document.querySelector(selector);
         return canvas instanceof HTMLCanvasElement && canvas.width > 1 && canvas.height > 1;
       }, {}, action.selector);
+    } else if (action.type === "assert-truncated") {
+      const metrics = await page.$eval(action.selector, (element) => {
+        const style = getComputedStyle(element);
+        return {
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          overflowX: style.overflowX,
+          textOverflow: style.textOverflow,
+          whiteSpace: style.whiteSpace,
+        };
+      });
+      if (metrics.scrollWidth <= metrics.clientWidth + 1 || metrics.overflowX !== "hidden" || metrics.textOverflow !== "ellipsis" || metrics.whiteSpace !== "nowrap") {
+        throw new Error(`Expected ${action.selector} to visibly truncate with ellipsis, received ${JSON.stringify(metrics)}.`);
+      }
+    } else if (action.type === "assert-scroll-overflow") {
+      const metrics = await page.$eval(action.selector, (element, axis) => {
+        const style = getComputedStyle(element);
+        return axis === "x"
+          ? { clientSize: element.clientWidth, scrollSize: element.scrollWidth, overflow: style.overflowX }
+          : { clientSize: element.clientHeight, scrollSize: element.scrollHeight, overflow: style.overflowY };
+      }, action.axis ?? "y");
+      if (metrics.scrollSize <= metrics.clientSize + 1 || !["auto", "scroll"].includes(metrics.overflow)) {
+        throw new Error(`Expected ${action.selector} to have ${action.axis ?? "y"}-axis scroll overflow, received ${JSON.stringify(metrics)}.`);
+      }
     } else if (action.type === "scroll-into-view") {
       await page.$eval(action.selector, (element, offset) => {
         element.scrollIntoView({ block: "start" });

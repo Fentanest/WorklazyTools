@@ -44,7 +44,7 @@ export function ImageEditorLayersPanel({ layers, onSelect, onVisibilityChange, o
       {layers.map((layer) => {
         const Icon = LAYER_ICONS[layer.kind];
         return <Card
-          className={cn("image-editor-layer-row gap-1 rounded-xl border border-border bg-card p-1 py-1 shadow-none ring-0", layer.isBase ? "is-base" : "is-movable", layer.active && "is-active border-sky-600 ring-2 ring-sky-500/10")}
+          className={cn("image-editor-layer-row grid grid-cols-[minmax(0,1fr)_34px_34px] items-center gap-1 rounded-xl border border-border bg-card p-1 py-1 shadow-none ring-0 max-[820px]:grid-cols-[minmax(0,1fr)_44px_44px]", layer.isBase ? "is-base" : "is-movable", layer.active && "is-active border-sky-600 ring-2 ring-sky-500/10")}
           data-layer-id={layer.id}
           data-layer-kind={layer.kind}
           data-layer-visible={layer.visible}

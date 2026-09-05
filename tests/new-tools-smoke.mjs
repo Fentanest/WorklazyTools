@@ -2894,9 +2894,14 @@ async function testImageStudioMobile(page) {
     return { dataUrl: canvas.toDataURL(), width: canvas.width, height: canvas.height, bounds: { minX, minY, maxX, maxY } };
   };
   const canvasBeforeSingleTouch = await page.$eval(".fabric-stage .lower-canvas", inspectBlueShape);
+  const movementCandidateClients = [0.75, 0.5, 0.25].flatMap((yRatio) => [0.5, 0.25, 0.75].map((xRatio) => ({
+    x: touchCanvasBounds.x + (canvasBeforeSingleTouch.bounds.minX + (canvasBeforeSingleTouch.bounds.maxX - canvasBeforeSingleTouch.bounds.minX) * xRatio) / canvasBeforeSingleTouch.width * touchCanvasBounds.width,
+    y: touchCanvasBounds.y + (canvasBeforeSingleTouch.bounds.minY + (canvasBeforeSingleTouch.bounds.maxY - canvasBeforeSingleTouch.bounds.minY) * yRatio) / canvasBeforeSingleTouch.height * touchCanvasBounds.height,
+  })));
+  const movementStart = await page.evaluate((candidates) => candidates.find(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains("upper-canvas")), movementCandidateClients);
+  if (!movementStart) throw new Error(`Selected object has no unobscured canvas point for one-finger movement: ${JSON.stringify({ bounds: canvasBeforeSingleTouch.bounds, touchCanvasBounds })}`);
   const objectStart = {
-    x: touchCanvasBounds.x + ((canvasBeforeSingleTouch.bounds.minX + canvasBeforeSingleTouch.bounds.maxX) / 2) / canvasBeforeSingleTouch.width * touchCanvasBounds.width,
-    y: touchCanvasBounds.y + ((canvasBeforeSingleTouch.bounds.minY + canvasBeforeSingleTouch.bounds.maxY) / 2) / canvasBeforeSingleTouch.height * touchCanvasBounds.height,
+    ...movementStart,
     id: 3,
     radiusX: 6,
     radiusY: 6,

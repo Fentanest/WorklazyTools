@@ -16,7 +16,7 @@ interface ImageEditorViewportControlsProps {
 export function ImageEditorViewportControls({ zoom, minZoom, maxZoom, onFit, onZoomIn, onZoomOut }: ImageEditorViewportControlsProps) {
   const { t } = useTranslation("features");
   return (
-    <Card className="image-editor-viewport-controls gap-1 rounded-xl border border-border bg-muted p-1 py-1 shadow-none ring-0" role="toolbar" aria-label={t("image.editor.viewControls")} data-testid="image-editor-viewport-controls">
+    <Card className="image-editor-viewport-controls flex-row items-center justify-center gap-1 rounded-xl border border-border bg-muted p-1 py-1 shadow-none ring-0" role="toolbar" aria-label={t("image.editor.viewControls")} data-testid="image-editor-viewport-controls">
       <Button type="button" className="image-editor-fit-button h-[34px] rounded-lg px-2 text-xs font-bold" variant="outline" aria-label={t("image.editor.fit")} title={t("image.editor.fit")} data-testid="image-editor-fit" onClick={onFit}>
         <Maximize2 size={16} />
         <span>{t("image.editor.fit")}</span>

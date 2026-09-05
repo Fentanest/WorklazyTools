@@ -52,7 +52,7 @@ export function ImageEditorToolbar({
   ] as const;
 
   return (
-    <Card className="image-editor-toolbar gap-0 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0" data-testid="image-editor-toolbar">
+    <Card className="image-editor-toolbar grid grid-cols-[minmax(0,1fr)_auto] items-center gap-0 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0" data-testid="image-editor-toolbar">
       <div className="image-editor-panel-tabs" role="toolbar" aria-label={t("image.editor.tools")}>
         {panels.map(([panel, label, Icon]) => {
           const disabled = panel === "effect" && (!hasFile || effectBusy);
