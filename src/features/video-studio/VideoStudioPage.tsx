@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
+import { UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import type {
@@ -641,26 +642,30 @@ export function VideoStudioPage() {
   };
 
   return (
-    <div className="page tool-page page-enter video-studio-page">
+    <UtilityPage toolId="video-studio" className="video-studio-page">
       <PageHeader eyebrow="VIDEO STUDIO" title={featureMessage(language, "video.messages.VideoStudioPage.videoStudio")} description={featureMessage(language, "video.messages.VideoStudioPage.keepAddingVideosWithoutAFileCountLimit")}>
         <PrivacyBanner compact />
       </PageHeader>
 
-      <div className={`video-engine-status${multiThreadReady ? " is-ready" : ""}`}>
+      <UtilityNotice
+        data-testid="video-runtime-status"
+        tone={multiThreadReady ? "success" : "warning"}
+        className="mb-[15px] border border-current/15 px-3.5 py-3"
+      >
         <Cpu size={19} />
-        <span>
-          <strong>{multiThreadReady ? featureMessage(language, "video.messages.VideoStudioPage.multiThreadEncodingReady") : featureMessage(language, "video.messages.VideoStudioPage.singleThreadCompatibilityMode")}</strong>
-          <small>{multiThreadReady
+        <span className="min-w-0">
+          <strong className="block text-[15px] text-foreground">{multiThreadReady ? featureMessage(language, "video.messages.VideoStudioPage.multiThreadEncodingReady") : featureMessage(language, "video.messages.VideoStudioPage.singleThreadCompatibilityMode")}</strong>
+          <small className="mt-1 block text-sm leading-relaxed text-muted-foreground">{multiThreadReady
             ? featureMessage(language, "video.messages.VideoStudioPage.aDedicatedVideoRuntimeUsesMultipleCpuCores")
             : featureMessage(language, "video.messages.VideoStudioPage.thisBrowserCannotMeetTheMultiThreadRequirements")}</small>
         </span>
-      </div>
+      </UtilityNotice>
 
-      <SectionCard step={1} title={featureMessage(language, "video.messages.VideoStudioPage.chooseVideos")} description={featureMessage(language, "video.messages.VideoStudioPage.addFilesInMultipleRoundsWithNoFile")}>
+      <UtilitySectionCard step={1} title={featureMessage(language, "video.messages.VideoStudioPage.chooseVideos")} description={featureMessage(language, "video.messages.VideoStudioPage.addFilesInMultipleRoundsWithNoFile")}>
         <FileDropZone files={files} onFiles={handleFiles} accept="video/*,.mkv,.avi" multiple hint={featureMessage(language, "video.messages.VideoStudioPage.mp4MovWebmMkvAviAddMoreAt")} accent="pink" />
-        <div className="inline-notice warning"><AlertTriangle size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mkvAndAviCompatibilityDependsOnTheirInternal")}</span></div>
-        {mobileDevice && <div className="inline-notice"><Gauge size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mobileDefaultsAre1080pAnd480PxGif")}</span></div>}
-      </SectionCard>
+        <UtilityNotice tone="warning" className="mt-3"><AlertTriangle size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mkvAndAviCompatibilityDependsOnTheirInternal")}</span></UtilityNotice>
+        {mobileDevice && <UtilityNotice tone="warning" className="mt-2"><Gauge size={16} /><span>{featureMessage(language, "video.messages.VideoStudioPage.mobileDefaultsAre1080pAnd480PxGif")}</span></UtilityNotice>}
+      </UtilitySectionCard>
 
       {items.length > 0 && (
         <SectionCard step={2} title={featureMessage(language, "video.messages.VideoStudioPage.groupPreviewsAndTrimRanges")} description={featureMessage(language, "video.messages.VideoStudioPage.dragVideosToReorderThemWithinAGroup")}>
@@ -826,7 +831,7 @@ export function VideoStudioPage() {
         blocks={videoPage.guide.blocks}
         faq={videoPage.guide.faq}
       />
-    </div>
+    </UtilityPage>
   );
 }
 
