@@ -19,8 +19,9 @@ import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
-import { FileDropZone, PageHeader, PrimaryButton, SectionCard, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
+import { FileDropZone, PageHeader, PrimaryButton, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
 import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import type {
   GroupOutputMode,
@@ -793,37 +794,37 @@ export function VideoStudioPage() {
 
       <OperationProgress {...progress} accent="pink" title={featureMessage(language, "video.messages.VideoStudioPage.videoProcessingLog")} />
       {progress.status === "running" && <div className="mt-2 flex justify-end"><Button type="button" variant="secondary" onClick={() => activeController.current?.abort()}>{featureMessage(language, "video.messages.VideoStudioPage.cancel")}</Button></div>}
-      {lastResult && <UtilityNotice tone="success" role="status" className="mt-[13px]"><Download size={18} /><span>{lastResult}</span></UtilityNotice>}
+      {lastResult && <UtilityNotice tone="success" role="status" className="mt-[13px]" data-testid="video-result-status"><Download size={18} /><span>{lastResult}</span></UtilityNotice>}
 
       {videoOutputs.length > 0 && (
-        <SectionCard
-          className="video-results-card"
+        <UtilitySectionCard
+          className="video-results-card border-pink-600/20"
           title={featureMessage(language, "video.messages.VideoStudioPage.completedResults", { p0: videoOutputs.length })}
           description={featureMessage(language, "video.messages.VideoStudioPage.eachFileAppearsAsSoonAsItFinishes")}
         >
-          <div className="video-result-list" aria-live="polite">
+          <div className="video-result-list flex flex-col gap-2" aria-live="polite">
             {videoOutputs.map((output, index) => (
-              <article className="video-result-item" key={output.id}>
-                <span>{isAudioOutput(output) ? <Music2 size={18} /> : <Film size={18} />}<span><strong>{output.fileName}</strong><small>{formatBytes(output.blob.size)} · {featureMessage(language, "video.messages.VideoStudioPage.result")} {index + 1}</small></span></span>
-                <div className="video-result-item-actions">
-                  <a className="result-download" href={output.url} download={output.fileName}><Download size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.download")}</a>
-                  {isAudioOutput(output) && <button type="button" className="secondary-button audio-handoff-button" onClick={() => openInAudioStudio(output)}><Waves size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.continueInAudioStudio")}</button>}
+              <Card as="article" className="video-result-item min-h-[58px] flex-row items-center justify-between gap-3 overflow-visible rounded-xl border border-border bg-muted/60 p-2.5 shadow-none ring-0 max-[620px]:flex-col max-[620px]:items-stretch" key={output.id}>
+                <span className="flex min-w-0 items-center gap-2.5 text-pink-700 dark:text-pink-300">{isAudioOutput(output) ? <Music2 size={18} /> : <Film size={18} />}<span className="flex min-w-0 flex-col"><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground">{output.fileName}</strong><small className="mt-[3px] text-[13px] text-muted-foreground">{formatBytes(output.blob.size)} · {featureMessage(language, "video.messages.VideoStudioPage.result")} {index + 1}</small></span></span>
+                <div className="video-result-item-actions flex shrink-0 flex-wrap justify-end gap-[7px] max-[620px]:grid max-[620px]:grid-cols-1">
+                  <Button render={<a href={output.url} download={output.fileName} data-testid="video-result-download" />} className="min-h-[37px] bg-pink-700 text-white shadow-md shadow-pink-700/20 hover:bg-pink-800 focus-visible:ring-pink-700/30 max-[620px]:w-full"><Download size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.download")}</Button>
+                  {isAudioOutput(output) && <Button type="button" variant="secondary" className="audio-handoff-button min-h-[37px] px-3 text-violet-700 dark:text-violet-300 max-[620px]:w-full" onClick={() => openInAudioStudio(output)}><Waves size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.continueInAudioStudio")}</Button>}
                 </div>
-              </article>
+              </Card>
             ))}
           </div>
-          <div className="video-result-actions">
-            <button type="button" className="secondary-button" disabled={progress.status === "running"} onClick={downloadAllOutputs}><Download size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.downloadAllIndividually")}</button>
-            {directorySaveAvailable && <button type="button" className="secondary-button" disabled={progress.status === "running"} onClick={() => void saveOutputsToFolder()}><FolderDown size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.saveToFolder")}</button>}
-            <button type="button" className="secondary-button" disabled={progress.status === "running"} onClick={() => void createZipArchive()}><Archive size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.createZip")}</button>
-            <button type="button" className="secondary-button danger" disabled={progress.status === "running"} onClick={() => { clearVideoOutputs(); setLastResult(""); progress.reset(); }}><Trash2 size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.clearResults")}</button>
+          <div className="video-result-actions mt-3 flex flex-wrap gap-2 max-[620px]:grid max-[620px]:grid-cols-1" data-testid="video-result-actions">
+            <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={downloadAllOutputs}><Download size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.downloadAllIndividually")}</Button>
+            {directorySaveAvailable && <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => void saveOutputsToFolder()}><FolderDown size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.saveToFolder")}</Button>}
+            <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => void createZipArchive()}><Archive size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.createZip")}</Button>
+            <Button type="button" variant="destructive" className="ml-auto min-h-[39px] max-[620px]:ml-0 max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => { clearVideoOutputs(); setLastResult(""); progress.reset(); }}><Trash2 size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.clearResults")}</Button>
           </div>
-          <div className="video-download-guidance">
+          <UtilityNotice tone="warning" className="video-download-guidance mt-[11px]">
             <AlertTriangle size={16} />
             <span><strong>{videoPage.downloadGuidanceLabel}</strong>{videoPage.downloadGuidance}</span>
-          </div>
-          {routeNotices.map((notice) => <div className="inline-warning video-route-result-guidance" key={`result:${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></div>)}
-        </SectionCard>
+          </UtilityNotice>
+          {routeNotices.map((notice) => <UtilityNotice tone="warning" className="video-route-result-guidance mt-[13px]" key={`result:${notice.jobKey}:${notice.message}`}><Gauge size={17} /><span><strong>{notice.jobName}</strong> {notice.message}</span></UtilityNotice>)}
+        </UtilitySectionCard>
       )}
 
       <ToolGuide
@@ -867,7 +868,7 @@ function EncodingSettings({ container, codec, resolution, aspect, crf, rotation,
       <UtilityField><span>{featureMessage(language, "video.messages.VideoStudioPage.rotation")}</span><UtilitySelect value={rotation} disabled={passthrough} onChange={(event) => onRotation(Number(event.target.value) as VideoRotation)}><option value={0}>{featureMessage(language, "video.messages.VideoStudioPage.noRotation")}</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option></UtilitySelect></UtilityField>
       <ToggleRow label={featureMessage(language, "video.messages.VideoStudioPage.flipHorizontally")} checked={flipHorizontal} onChange={onFlipHorizontal} disabled={passthrough} />
       {bitrate === "custom" && <UnitNumberField label={featureMessage(language, "video.messages.VideoStudioPage.customVideoBitrate")} unit="Mbps" value={customBitrate} min={0.1} max={200} step={0.1} inputMode="decimal" valid={isNumberInRange(customBitrate, 0.1, 200)} help="0.1~200 Mbps" onChange={onCustomBitrate} />}
-      <label className="col-span-2 flex min-w-0 flex-col gap-1.5 rounded-xl bg-muted p-3 text-[13px] font-bold text-muted-foreground max-[620px]:col-auto"><span className="flex justify-between">{featureMessage(language, "video.messages.VideoStudioPage.qualityCrf")} <b className="text-foreground">{crf}</b></span><input className="w-full accent-pink-600 disabled:cursor-not-allowed disabled:opacity-50" type="range" min={18} max={32} value={crf} disabled={!crfMode} onChange={(event) => onCrf(Number(event.target.value))} /><small className="text-xs font-medium leading-snug">{crfMode ? featureMessage(language, "video.messages.VideoStudioPage.lowerValuesAreSharperAndProduceLargerFiles") : featureMessage(language, "video.messages.VideoStudioPage.targetBitrateModeUsesTheSelectedBitrateInstead")}</small></label>
+      <label className="col-span-2 flex min-w-0 flex-col gap-1.5 rounded-xl bg-muted p-3 text-[13px] font-bold text-muted-foreground max-[620px]:col-auto"><span className="flex justify-between">{featureMessage(language, "video.messages.VideoStudioPage.qualityCrf")} <b className="text-foreground">{crf}</b></span><input className="w-full [accent-color:var(--color-pink-600)] disabled:cursor-not-allowed disabled:opacity-50" type="range" min={18} max={32} value={crf} disabled={!crfMode} onChange={(event) => onCrf(Number(event.target.value))} /><small className="text-xs font-medium leading-snug">{crfMode ? featureMessage(language, "video.messages.VideoStudioPage.lowerValuesAreSharperAndProduceLargerFiles") : featureMessage(language, "video.messages.VideoStudioPage.targetBitrateModeUsesTheSelectedBitrateInstead")}</small></label>
     </div>
   );
 }

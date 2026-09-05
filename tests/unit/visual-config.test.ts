@@ -80,9 +80,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 166);
-  assert.equal(qaCaptureScenarios.length, 73);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 572);
+  assert.equal(names.length, 167);
+  assert.equal(qaCaptureScenarios.length, 74);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 580);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -125,6 +125,16 @@ test("visual regression scenario manifest covers every available tool and state 
   assert.deepEqual(new Set(b5aQaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
     "interaction-waveform", "interaction-effect-robot", "interaction-organize-thumbnails",
     "interaction-image-to-pdf-thumbnails", "interaction-pdf-to-image-thumbnails", "interaction-convert-thumbnails",
+  ]));
+  const b5bQaScenarios = qaCaptureScenarios.filter(({ toolId }) => toolId === "video-studio");
+  assert.equal(b5bQaScenarios.length, 4);
+  assert.equal(b5bQaScenarios.flatMap(({ profiles }) => profiles).length, 32);
+  assert.deepEqual(Object.fromEntries(["initial", "bottom", "interaction"].map((stateType) => [
+    stateType,
+    b5bQaScenarios.filter((scenario) => scenario.stateType === stateType).flatMap(({ profiles }) => profiles).length,
+  ])), { initial: 8, bottom: 8, interaction: 16 });
+  assert.deepEqual(new Set(b5bQaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
+    "interaction-group-editing", "interaction-trim-range",
   ]));
   assert.equal(visualRegressionConfig.scenarios, visualRegressionScenarios);
   assert.equal(visualRegressionConfig.environment.maxCapturesPerBrowser, 12);

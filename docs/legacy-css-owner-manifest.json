@@ -49,10 +49,9 @@
         "tool:pdf-editor",
         "tool:qr-studio",
         "tool:security-tools",
-        "tool:text-merger",
-        "tool:video-studio"
+        "tool:text-merger"
       ],
-      "refCount": 8,
+      "refCount": 7,
       "lastRemovalBundle": "B6",
       "currentState": "active",
       "removedIn": null
@@ -1305,8 +1304,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B5b",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B5b"
     },
     {
       "id": "legacy-077",
@@ -1320,10 +1319,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1340,10 +1338,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1360,10 +1357,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1380,10 +1376,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1400,10 +1395,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1420,10 +1414,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1440,10 +1433,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1460,10 +1452,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1480,10 +1471,9 @@
         "shared:privacy-consent",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B-shared",
       "currentState": "active",
       "removedIn": null
@@ -1813,10 +1803,9 @@
         "tool:hwp-editor",
         "tool:qr-studio",
         "tool:audio-studio",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B6",
       "currentState": "active",
       "removedIn": null
@@ -1898,8 +1887,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B5b",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B5b"
     },
     {
       "id": "legacy-111",
@@ -2253,11 +2242,10 @@
         "tool:document-compare",
         "tool:hwp-editor",
         "tool:office-editor",
-        "tool:video-studio",
         "tool:image-studio",
         "shared:legacy-tool-root"
       ],
-      "refCount": 6,
+      "refCount": 5,
       "lastRemovalBundle": "B6",
       "currentState": "legacy-arm-removed",
       "removedIn": "B3",
@@ -2451,10 +2439,9 @@
         "tool:hwp-editor",
         "tool:qr-studio",
         "tool:audio-studio",
-        "tool:video-studio",
         "tool:image-studio"
       ],
-      "refCount": 5,
+      "refCount": 4,
       "lastRemovalBundle": "B6",
       "currentState": "active",
       "removedIn": null

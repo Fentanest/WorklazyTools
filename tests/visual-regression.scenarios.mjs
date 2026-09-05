@@ -54,6 +54,7 @@ const migratedToolIds = new Set([
   "qr-studio",
   "audio-studio",
   "pdf-editor",
+  "video-studio",
 ]);
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
@@ -303,16 +304,34 @@ const interactionDefinitions = Object.freeze({
       assertSelector: "[data-testid='document-result-view']",
     }),
   ]),
-  "video-studio": Object.freeze({
-    stateId: "interaction-gif-output",
-    fixture: { kind: "file", path: "fixtures/video-vp9-benchmark.mp4" },
-    actions: [
-      { type: "upload", selector: "input[type='file']" },
-      { type: "wait", selector: ".video-output-format-grid select" },
-      { type: "select", selector: ".video-output-format-grid select", value: "gif" },
-    ],
-    assertSelector: "[data-testid='video-gif-settings']",
-  }),
+  "video-studio": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-group-editing",
+      actions: [
+        { type: "upload", selector: "[data-tool-page='video-studio'] input[type='file']", fixture: { kind: "file", path: "fixtures/video-vp9-benchmark.mp4", fileName: "visual-group-a.mp4", mimeType: "video/mp4" } },
+        { type: "upload", selector: "[data-tool-page='video-studio'] input[type='file']", fixture: { kind: "file", path: "fixtures/video-vp9-benchmark.mp4", fileName: "visual-group-b.mp4", mimeType: "video/mp4" } },
+        { type: "wait", selector: ".video-trim-lane + .video-trim-lane", timeoutMs: 60_000 },
+        { type: "click", selector: ".video-card-actions > button:nth-of-type(2)", elementIndex: 1 },
+        { type: "wait", selector: "[data-video-group='2']" },
+        { type: "click", selector: "[data-video-group='1'] [data-testid='video-copy-group-ranges']" },
+        { type: "wait", selector: "[data-video-group='1'] .video-group-range-copy" },
+        { type: "scroll-into-view", selector: "[data-video-group='1']", offset: -88 },
+      ],
+      assertSelector: "[data-video-group='1'] .video-group-range-copy",
+    }),
+    Object.freeze({
+      stateId: "interaction-trim-range",
+      fixture: { kind: "file", path: "fixtures/video-vp9-benchmark.mp4" },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='video-studio'] input[type='file']" },
+        { type: "wait", selector: ".video-trim-lane input[type='range']", timeoutMs: 60_000 },
+        { type: "replace-text", selector: ".video-trim-lane input[type='range']:first-of-type", value: "0.5" },
+        { type: "wait-value-includes", selector: ".video-trim-lane input[type='range']:first-of-type", value: "0.5" },
+        { type: "scroll-into-view", selector: ".video-trim-lane", offset: -88 },
+      ],
+      assertSelector: ".video-trim-lane[data-active='true'] .video-range-selection",
+    }),
+  ]),
   "audio-studio": Object.freeze([
     Object.freeze({
       stateId: "interaction-waveform",

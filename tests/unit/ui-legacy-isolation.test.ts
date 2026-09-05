@@ -69,6 +69,12 @@ const migratedB5aToolFiles = [
   "src/features/pdf-editor/pdfUi.tsx",
 ];
 
+const migratedB5bToolFiles = [
+  "src/features/video-studio/VideoStudioPage.tsx",
+  "src/features/video-studio/VideoGroupSection.tsx",
+  "src/features/video-studio/VideoTrimLane.tsx",
+];
+
 // These are the component/state classes emitted before the shadcn migration.
 // Raw legacy-only pages may still use some of them; migrated adapters must not.
 const legacyClassTokens = [
@@ -134,7 +140,7 @@ test("the complete legacy stylesheet is parsed and migrated adapter collisions s
   root.walkRules((rule) => rules.push(rule));
   root.walkDecls((declaration) => declarations.push(declaration));
 
-  assert.ok(rules.length >= 1_100, `expected the full stylesheet after B5a-owned cleanup, parsed only ${rules.length} rules`);
+  assert.ok(rules.length >= 870, `expected the full stylesheet after B5b-owned cleanup, parsed only ${rules.length} rules`);
   assert.match(css, /button:where\(:not\(\[data-slot\]\)\)/);
 
   const actionRules = rules.filter((rule) => rule.selector.includes(".tool-action-bar") && rule.selector.includes(".ui-primary-button"));
@@ -228,6 +234,21 @@ test("the B5a audio and PDF surfaces emit no legacy or global.css-owned class to
   context.diagnostic(`${migratedB5aToolFiles.length} B5a surface sources checked against ${cssClassTokens.size} global.css class tokens`);
 });
 
+test("the B5b Video Studio surfaces emit no legacy or global.css-owned class token", (context) => {
+  const cssClassTokens = new Set([...read("src/styles/global.css").matchAll(/\.(-?[_a-zA-Z]+[_a-zA-Z0-9-]*)/g)].map((match) => match[1]));
+  const legacyMatches = migratedB5bToolFiles.flatMap((relativePath) => classNameTokens(relativePath)
+    .filter((token) => (
+      legacyClassTokens.includes(token as typeof legacyClassTokens[number])
+      || legacyDynamicPrefixes.some((prefix) => token.startsWith(prefix))
+      || cssClassTokens.has(token)
+    ))
+    .map((token) => `${relativePath}:${token}`));
+
+  assert.deepEqual(legacyMatches, []);
+  assert.match(read("src/features/video-studio/VideoStudioPage.tsx"), /<UtilityPage toolId="video-studio"/);
+  context.diagnostic(`${migratedB5bToolFiles.length} B5b surface sources checked against ${cssClassTokens.size} global.css class tokens`);
+});
+
 test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (context) => {
   const manifest = JSON.parse(read("docs/legacy-css-owner-manifest.json")) as {
     baseline: { legacyRuleCount: number; compactRuleCount: number; nonCompactRuleCount: number };
@@ -246,7 +267,7 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
   assert.equal(Object.values(manifest.categoryCounts).reduce((sum, count) => sum + count, 0), 155);
   assert.equal(new Set(manifest.entries.map(({ id }) => id)).size, 155);
   assert.ok(manifest.entries.every(({ consumers, refCount }) => consumers.length === refCount));
-  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 96);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 98);
   assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 9);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "pre-B1").map(({ id }) => id), ["legacy-043", "legacy-045"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B1").map(({ id }) => id), ["legacy-125", "legacy-127"]);
@@ -273,7 +294,8 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
     "legacy-101", "legacy-102", "legacy-103", "legacy-104", "legacy-111", "legacy-112", "legacy-113",
     "legacy-121", "legacy-130", "legacy-131", "legacy-140", "legacy-146",
   ]);
+  assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B5b").map(({ id }) => id), ["legacy-076", "legacy-110"]);
   assert.equal(manifest.categoryCounts["excel-compare"], 27);
   assert.equal(manifest.categoryCounts["excel-cleaner"], 1);
-  context.diagnostic("155 rules / 18 ownership categories / 96 removals / nine splits verified");
+  context.diagnostic("155 rules / 18 ownership categories / 98 removals / nine splits verified");
 });

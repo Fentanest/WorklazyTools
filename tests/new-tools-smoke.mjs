@@ -3357,9 +3357,9 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     output.value = "mp3";
     output.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.waitForSelector(".audio-encoding-fields");
+  await page.waitForSelector("[data-testid=video-audio-encoding-fields]");
   await page.evaluate(() => {
-    const selects = document.querySelectorAll(".audio-encoding-fields select");
+    const selects = document.querySelectorAll("[data-testid=video-audio-encoding-fields] select");
     const bitrate = selects[0];
     const sampleRate = selects[1];
     if (!(bitrate instanceof HTMLSelectElement) || !(sampleRate instanceof HTMLSelectElement)) throw new Error("Audio encoding selects are unavailable");
@@ -3426,7 +3426,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     bitrate.dispatchEvent(new Event("change", { bubbles: true }));
     reencode.click();
   });
-  await page.waitForSelector(".video-audio-settings .audio-encoding-fields");
+  await page.waitForSelector(".video-audio-settings [data-testid=video-audio-encoding-fields]");
   await page.evaluate(() => {
     const select = document.querySelectorAll(".video-group-select select")[1];
     if (!(select instanceof HTMLSelectElement)) throw new Error("Second video group selector is unavailable");
@@ -3455,7 +3455,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     throw new Error(`Video ZIP worker loaded before ZIP creation: ${JSON.stringify(videoZipWorkerRequests)}`);
   }
   await page.evaluate(() => Array.from(document.querySelectorAll(".video-result-actions button")).find((button) => button.textContent?.includes("ZIP으로 묶기"))?.click());
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("worklazy-비디오-결과-2개.zip"), { timeout: 60_000 });
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("worklazy-비디오-결과-2개.zip"), { timeout: 60_000 });
   page.off("request", captureVideoRequests);
   if (videoZipWorkerRequests.length !== 1) {
     throw new Error(`Video ZIP worker request count is not one: ${JSON.stringify(videoZipWorkerRequests)}`);
@@ -3585,7 +3585,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-group-title strong")).some((element) => element.textContent === "그룹 10"));
 
   await (await page.$(".video-studio-page input[type=file]")).uploadFile(largeVideoPath);
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("메모리에 통째로 복사하지 않고 연결했습니다"));
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("메모리에 통째로 복사하지 않고 연결했습니다"));
   const largeReadState = await page.evaluate(() => window.__videoFileReadState);
   if (largeReadState.arrayBufferReads !== 0) throw new Error(`A 3824MB source triggered a contiguous ArrayBuffer read: ${JSON.stringify(largeReadState)}`);
 
@@ -3705,13 +3705,13 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
-  await page.waitForSelector(".video-audio-removal-suggestion", { timeout: 60_000 });
-  const suggestion = await page.$eval(".video-audio-removal-suggestion", (element) => element.textContent || "");
+  await page.waitForSelector(".video-audio-mode-suggestion[data-removal-only=true]", { timeout: 60_000 });
+  const suggestion = await page.$eval(".video-audio-mode-suggestion[data-removal-only=true]", (element) => element.textContent || "");
   if (!suggestion.includes("음향 형식") || !suggestion.includes("음향 제외") || suggestion.includes("변환")) {
     throw new Error(`Audio-only copy guidance is incorrect: ${suggestion}`);
   }
-  await page.click(".video-audio-removal-suggestion button");
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 제외를 적용했습니다"));
+  await page.click(".video-audio-mode-suggestion[data-removal-only=true] [data-testid=video-audio-remove-suggestion]");
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("음향 제외를 적용했습니다"));
   page.once("dialog", (dialog) => void dialog.accept());
   await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-running");
@@ -3721,7 +3721,7 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
   }
   const audioRemovalResult = await page.evaluate(() => ({
     outputs: document.querySelectorAll(".video-result-item").length,
-    suggestion: Boolean(document.querySelector(".video-audio-removal-suggestion")),
+    suggestion: Boolean(document.querySelector(".video-audio-mode-suggestion[data-removal-only=true]")),
     log: Array.from(document.querySelectorAll(".ui-operation-log li"), (item) => item.textContent || ""),
   }));
   if (audioRemovalResult.outputs !== 1 || audioRemovalResult.suggestion
@@ -3750,7 +3750,7 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
       throw new Error(`Target E-AC-3 CTA is incomplete: ${JSON.stringify(targetSuggestion)}`);
     }
     await page.click(mode === "encode" ? "[data-testid=video-audio-encode-suggestion]" : "[data-testid=video-audio-remove-suggestion]");
-    await page.waitForFunction((expected) => document.querySelector(".inline-success")?.textContent?.includes(expected), {}, mode === "encode" ? "음향 변환을 적용했습니다" : "음향 제외를 적용했습니다");
+    await page.waitForFunction((expected) => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes(expected), {}, mode === "encode" ? "음향 변환을 적용했습니다" : "음향 제외를 적용했습니다");
     await page.click("[data-testid=video-output-actions] [data-ui-component=primary-button]");
     await page.waitForSelector(".ui-operation-progress.ui-status-running");
     await waitForTerminalStatus(page);
@@ -3781,7 +3781,7 @@ async function testVideoCopyGuidance(page, largeAudioIncompatibleVideo, targetAu
   await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await page.waitForSelector(".ui-operation-progress.ui-status-error", { timeout: 60_000 });
   const videoGuidance = await page.$eval(".ui-operation-current-message", (element) => element.textContent || "");
-  if (!videoGuidance.includes("원본 화면 형식") || !videoGuidance.includes("1.5GB") || await page.$(".video-audio-removal-suggestion")) {
+  if (!videoGuidance.includes("원본 화면 형식") || !videoGuidance.includes("1.5GB") || await page.$(".video-audio-mode-suggestion[data-removal-only=true]")) {
     throw new Error(`Video-codec copy guidance was not kept separate: ${videoGuidance}`);
   }
   console.log("  video: 2GB+ E-AC-3 remove-audio route and target-encode dvhe capacity guidance verified");
@@ -3861,7 +3861,7 @@ async function testDolbyVisionGuidance(page, dolbyVisionVideo) {
     throw new Error(`Dolby Vision E-AC-3 target CTA is incomplete: ${JSON.stringify(suggestion)}`);
   }
   await page.click("[data-testid=video-audio-encode-suggestion]");
-  await page.waitForFunction(() => document.querySelector(".inline-success")?.textContent?.includes("음향 변환을 적용했습니다"));
+  await page.waitForFunction(() => document.querySelector("[data-testid=video-result-status]")?.textContent?.includes("음향 변환을 적용했습니다"));
   await page.evaluate(() => document.querySelector("[data-testid=video-output-actions] [data-ui-component=primary-button]")?.click());
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Dolby Vision encode error"));

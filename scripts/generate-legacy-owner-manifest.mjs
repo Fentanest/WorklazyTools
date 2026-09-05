@@ -93,7 +93,7 @@ const categoryContracts = Object.freeze({
 });
 
 const crossContracts = new Map([
-  [1, [["tool:excel-compare", "tool:hwp-editor", "tool:image-studio", "tool:pdf-editor", "tool:qr-studio", "tool:security-tools", "tool:text-merger", "tool:video-studio"], "B6"]],
+  [1, [["tool:excel-compare", "tool:hwp-editor", "tool:image-studio", "tool:pdf-editor", "tool:qr-studio", "tool:security-tools", "tool:text-merger"], "B6"]],
   [4, [["shared:public-pages", "tool:document-compare", "tool:excel-cleaner", "tool:excel-compare"], "B-shared"]],
   [5, [["shared:privacy-banner-and-about", "tool:document-compare"], "B-shared"]],
   [6, [["shared:home", "tool:document-compare", "tool:excel-cleaner", "tool:excel-compare"], "B-shared"]],
@@ -107,19 +107,19 @@ const crossContracts = new Map([
   [67, [["tool:excel-merger", "tool:pdf-editor", "shared:toggle-row-adapter"], "B5a"]],
   [68, [["tool:excel-merger", "tool:pdf-editor", "shared:toggle-row-adapter"], "B5a"]],
   [69, [["tool:excel-merger", "tool:pdf-editor", "shared:toggle-row-adapter"], "B5a"]],
-  [105, [["tool:hwp-editor", "tool:qr-studio", "tool:audio-studio", "tool:video-studio", "tool:image-studio"], "B6"]],
+  [105, [["tool:hwp-editor", "tool:qr-studio", "tool:audio-studio", "tool:image-studio"], "B6"]],
   [130, [["tool:excel-merger", "tool:pdf-editor"], "B5a"]],
   [131, [["tool:excel-merger", "tool:pdf-editor"], "B5a"]],
-  [132, [["tool:document-compare", "tool:hwp-editor", "tool:office-editor", "tool:video-studio", "tool:image-studio", "shared:legacy-tool-root"], "B6"]],
+  [132, [["tool:document-compare", "tool:hwp-editor", "tool:office-editor", "tool:image-studio", "shared:legacy-tool-root"], "B6"]],
   [133, [["tool:excel-cleaner", "tool:excel-compare", "tool:excel-merger", "tool:pdf-editor", "tool:image-studio"], "B6"]],
   [134, [["shared:home", "tool:document-compare", "tool:excel-cleaner", "tool:excel-compare"], "B-shared"]],
-  [143, [["tool:hwp-editor", "tool:qr-studio", "tool:audio-studio", "tool:video-studio", "tool:image-studio"], "B6"]],
+  [143, [["tool:hwp-editor", "tool:qr-studio", "tool:audio-studio", "tool:image-studio"], "B6"]],
   [151, [["tool:excel-merger", "tool:pdf-editor", "shared:toggle-row-adapter"], "B5a"]],
 ]);
 
 for (const index of range(77, 85)) {
   crossContracts.set(index, [[
-    "shared:privacy-consent", "tool:hwp-editor", "tool:office-editor", "tool:video-studio", "tool:image-studio",
+    "shared:privacy-consent", "tool:hwp-editor", "tool:office-editor", "tool:image-studio",
   ], "B-shared"]);
 }
 
@@ -165,6 +165,10 @@ const currentStateOverrides = new Map([
   ...[99, 100, 101, 102, 103, 104, 111, 112, 113, 121, 130, 131, 140, 146].map((index) => [index, {
     currentState: "removed",
     removedIn: "B5a",
+  }]),
+  ...[76, 110].map((index) => [index, {
+    currentState: "removed",
+    removedIn: "B5b",
   }]),
   [65, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row" }],
   [66, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row + .ui-settings-row" }],

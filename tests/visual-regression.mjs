@@ -525,7 +525,7 @@ async function performScenarioActions(page, actions, fixture) {
 
 async function uploadScenarioFixture(page, selector, fixture, elementIndex = 0) {
   if (!fixture) throw new Error(`Upload action for ${selector} has no fixture.`);
-  if (fixture.kind === "file") {
+  if (fixture.kind === "file" && !fixture.fileName) {
     const inputs = await page.$$(selector);
     const input = inputs[elementIndex];
     if (!input) throw new Error(`Upload input ${selector} is missing.`);
@@ -533,7 +533,8 @@ async function uploadScenarioFixture(page, selector, fixture, elementIndex = 0) 
     return;
   }
   let bytes;
-  if (fixture.kind === "base64-file") bytes = Buffer.from((await fs.readFile(path.resolve(testDirectory, fixture.path), "utf8")).trim(), "base64");
+  if (fixture.kind === "file") bytes = await fs.readFile(path.resolve(testDirectory, fixture.path));
+  else if (fixture.kind === "base64-file") bytes = Buffer.from((await fs.readFile(path.resolve(testDirectory, fixture.path), "utf8")).trim(), "base64");
   else if (fixture.kind === "inline-file") bytes = Buffer.from(fixture.contents, "utf8");
   else if (fixture.kind === "generated-wav") bytes = createVisualWav(fixture);
   else if (fixture.kind === "generated-png") bytes = createVisualPng(fixture);
