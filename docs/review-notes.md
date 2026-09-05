@@ -15,6 +15,27 @@
 
 **남긴 규칙**: 검수 보고에 차단 결함이 실려 오면 수정에 착수하기 전에 **검수 입력이 그 판정을 뒷받침하는지 먼저 본다**. 상태 커버리지가 없는 캡처로 내려진 판정은 결함 보고가 아니라 하네스 버그 보고다.
 
+### 라이브 배포 검증 · UI 전환 배포 전 기준선 (Claude — Gemini 브라우저 점검 + Claude 실측)
+
+`073da56` 배포분(네이버 소유확인 파일 · 루트 소셜 메타 한/영 병기 · RHWP 0.8.6)을 **라이브에서 처음 확인**했다. 곧 P2 UI 전환 6묶음이 한꺼번에 배포되므로 **비교 기준선 확보**가 두 번째 목적이었다.
+
+- **네이버 서치어드바이저 권고 해소 확인**: `<meta name="description">` 는 **69자**(Claude 실측 — `[...d].length`. Gemini 보고의 64자는 오차이나 **둘 다 80자 이내라 판정은 동일**). OG 12종·Twitter 5종·canonical 모두 라이브에 존재. 한/영 병기 노출 정상.
+- 소유확인 파일 200·내용 정상. `/vendor/rhwp-studio/0.8.6/` **200**, 구버전 `0.8.4/` **404**(정리 확인). 오피스 편집기 화면 실제 렌더 확인.
+- **라이브 기준선**: 홈·도구 목록·문서 비교·Excel 비교·PDF 도구를 데스크톱(1280×800)·모바일(375×812)에서 육안 확인 — **전부 정상, 차단 결함 0**. 특히 **과거 파손 지점인 문서 비교에서 토글 썸이 트랙 내부·문서 쌍 텍스트 정렬 정상**을 재확인했다(revert 가 유효함을 라이브에서 증명).
+- **의심했다가 기각한 건 — 루트 `og:locale=en_US`**: 한국어 우선 사이트인데 en 이라 부정합으로 의심했으나, 실측하니 **루트는 의도된 언어 중립 게이트웨이**다(`generate-static-pages.mjs:181` — `<html lang="en">`, 본문이 "Choose your language / 언어를 선택하세요" 분기, `hreflang x-default → en`). 언어별 페이지는 `:125` 에서 조건부로 올바르게 갈린다. **설계와 정합하므로 변경 제안하지 않는다.** 코드를 읽지 않고 지시했다면 일관된 설계를 깨뜨릴 뻔했다.
+
+### P2 B5b Video Studio UI 전환 · 엔진 격리·그룹/트림 상태 판정 (Codx)
+
+- **실행 게이트·범위**: fetch 뒤 `HEAD=origin/ui-migration=9c2b38c35887f1defb7dfcfb01fd443ba724c1e9`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`로 지시 기준과 일치했다. 구현 완료된 두 비디오 후속 정본은 회귀 계약이고 상반 지시가 아니며, 그 밖의 열린 계획서에도 B5b UI 표면 충돌이 없었다. 사용자 소유 DOCX 2개·네이버 확인 파일과 병행 작성된 Claude의 라이브 검증 기록은 보존했다.
+- **화면·primitive 판정**: `VideoStudioPage`·`VideoGroupSection`·`VideoTrimLane`의 입력, 그룹/미리보기, 이중 range 트림, 출력 설정·호환 안내·진행, 결과/다운로드 표면을 기존 `UtilityPage`·`UtilitySectionCard`·`UtilityField/Input/Select/Notice`와 shadcn `Button`·`Card`·`Switch`, 기존 `SegmentedControl`로 옮겼다. 새 primitive가 필요하지 않아 `shadcn add`는 실행하지 않았다. 문구·기능·route·SEO·정적 페이지·광고 격리 계약은 변경하지 않았다.
+- **엔진 격리 증명**: `git diff --exit-code 9c2b38c -- src/features/video-studio/*.ts`는 exit 0이고 feature diff는 TSX 3개뿐이다. 인코딩·WebCodecs/FFmpeg 판정·concat·오디오 폴백·worker 오케스트레이션·진행률 산출 파일은 diff 0이며, 측정 빌드의 video-probe/videoHybridAudio/video/video-zip/videoStream worker 해시 파일명도 기준과 동일했다.
+- **legacy/refcount 판정**: B5b 소유 `legacy-076`·`legacy-110`을 refcount 0 도달 시 제거했고, 교차 공용 규칙에서는 `tool:video-studio` 소비자만 빼고 나머지 selector arm을 보존했다. manifest는 **98 removed·9 split·48 active**, PostCSS는 **873 rules·3,123 declarations**다. B5b TSX 3개와 전역 CSS 325 class token 및 legacy 52 token/동적 prefix 3종의 교집합은 0건이다.
+- **상태·시각 판정**: 일반 시각 회귀는 `VISUAL_ONLY=video-studio`, 포트 `4230`에서 **8/8·14.21초·concurrency 설정 4/실제 2**로 재현 일치했다. 상호작용 profile은 initial/bottom이 locale·theme·viewport 축을 보존하므로 EN/dark/desktop 1개로 축약했으며 이 `profileReductionReason`을 scenario에 기록했다. interaction은 **group-editing**(두 파일→그룹 이동→다른 그룹 범위 적용 패널)과 **trim-range**(시작 0.50초 선택)를 분리했다. 첫 QA 육안에서 모바일 숫자 입력이 과축소된 것을 찾아 2열 배치·64px 필드로 보정하고 기준선/QA를 전량 재생성했다.
+- **QA 입력·추적 제외**: `VITE_LOCAL_QA=1 npm run build` 뒤 `VISUAL_TEST_PORT=4231`, `VISUAL_ONLY=video-studio`, `VISUAL_CAPTURE_DIR=tests/visual-artifacts/p2-b5b`로 **32/32·34.98초·concurrency 4/4**를 채집했다. 분포는 initial **8**·bottom **8**·interaction **16**(group-editing 8·trim-range 8)이며 `stateId`가 파일명에 있다. 네 mobile bottom profile 모두 최하단 거리·main padding·footer/대체 target·수평 overflow·viewport 캡처의 공용 assertion 6종을 통과했다. ko/en 별도 DOM/네트워크 실측은 외부 요청 각 0, Google/Naver/AdSense loader 각 0이다. 32장 전수 육안에서 최종 차단 결함과 사고 증상 3종은 0이었다.
+- **예산**: `9c2b38c`→최종 gzip은 entry **296,955→296,949B(−6B)**, worker 포함 video route **173,198→176,982B(+3,784B)**, shared **2,716,455→2,716,489B(+34B)**, 전체 앱 JS **5,445,913→5,449,765B(+3,852B)**, CSS **43,663→41,930B(−1,733B)**로 5종 상한을 모두 통과했다. 도구 단독 묶음이라 네 화면 커밋의 합산을 기준선과 비교했다.
+- **검증·하네스 실패 기록**: 표준 build **2,829 modules·정적 61페이지**, unit **192/192**, `TEST_ONLY_VIDEO=1 test:new-tools`, `test:video-hybrid`(6초 단일·12초 concat의 재생/전체 decode/단조 DTS/동기 한계/잔재 0), UI migration(7 switches·action 190px·legacy/tracking 0), control geometry **92 samples/20 pages**, visual 8/8, static, manifest, bundle, diff check가 통과했다. 첫 비디오 스모크는 제거된 `.audio-encoding-fields` 대기 300초, 다음은 `.video-audio-removal-suggestion` 대기 60초에서 각각 종료됐고 제품/worker 오류가 아니라 전환 후 stale selector였다. `data-testid`/`data-removal-only`로 하네스를 교정한 뒤 같은 전체 명령이 연속 통과했다.
+- **커밋 분할 사유**: 단독 도구지만 feature 전체가 7,870줄이므로 입력 `5d7848e` → 그룹/트림 `27da026` → 출력/진행 `f932ddc` → 결과·manifest/scenario `aac3b2c` → 모바일 트림 QA 보정·기준선 `d0d0b89`로 화면 책임을 분리했다. 예산·기능 스모크는 최종 묶음 합산으로 판정했다.
+
 ### P2 B4 검수 판정 · 이관 개선 2건 채택 (Claude)
 
 - **검수**: Gemini 전수 96장(initial 24·bottom 24·interaction 48 — 시트 선택·비교 쌍/키 모드·QR 생성/스캔/일괄) 차단 결함 0·[배포 가능], 사고 증상 3종 **미관찰**.
