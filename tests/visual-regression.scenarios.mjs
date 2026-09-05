@@ -55,6 +55,7 @@ const migratedToolIds = new Set([
   "audio-studio",
   "pdf-editor",
   "video-studio",
+  "image-studio",
 ]);
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
@@ -357,11 +358,62 @@ const interactionDefinitions = Object.freeze({
       assertSelector: "[data-testid='audio-voice-presets'] button:nth-child(4)[aria-checked='true']",
     }),
   ]),
-  "image-studio": Object.freeze({
-    stateId: "interaction-batch-tab",
-    actions: [{ type: "click", selector: ".studio-tabs button:nth-child(2)" }],
-    assertSelector: ".studio-tabs button:nth-child(2).active",
-  }),
+  "image-studio": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-canvas-loaded",
+      fixture: { kind: "generated-png", fileName: "visual-editor.png", width: 640, height: 420 },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']" },
+        { type: "wait-canvas", selector: "[data-testid='image-editor-canvas-stage'] .lower-canvas" },
+        { type: "scroll-into-view", selector: "[data-testid='image-editor-workspace']", offset: -88 },
+      ],
+      assertSelector: "[data-testid='image-editor-canvas-stage'] .lower-canvas",
+    }),
+    Object.freeze({
+      stateId: "interaction-size-panel",
+      fixture: { kind: "generated-png", fileName: "visual-panel.png", width: 640, height: 420 },
+      actions: [
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']" },
+        { type: "wait-canvas", selector: "[data-testid='image-editor-canvas-stage'] .lower-canvas" },
+        { type: "click", selector: "[data-testid='image-editor-panel-size']" },
+        { type: "scroll-into-view", selector: "[data-testid='image-editor-options-panel']", offset: -88 },
+      ],
+      assertSelector: "[data-testid='image-editor-options-panel'][data-panel='size']",
+    }),
+    Object.freeze({
+      stateId: "interaction-batch-mode",
+      actions: [
+        { type: "click", selector: "[data-testid='image-studio-tabs'] button:nth-child(2)" },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-batch-a.png", width: 320, height: 220 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-batch-b.png", width: 280, height: 240 } },
+        { type: "wait", selector: "[data-ui-component='file-list'] li:nth-child(2)" },
+        { type: "scroll-into-view", selector: ".image-settings-grid", offset: -88 },
+      ],
+      assertSelector: "[data-testid='image-studio-tabs'] button:nth-child(2).active",
+    }),
+    Object.freeze({
+      stateId: "interaction-collage-mode",
+      actions: [
+        { type: "click", selector: "[data-testid='image-studio-tabs'] button:nth-child(3)" },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-collage-a.png", width: 320, height: 220 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-collage-b.png", width: 280, height: 240 } },
+        { type: "wait-canvas", selector: ".collage-preview-stage canvas" },
+        { type: "scroll-into-view", selector: ".collage-preview-panel", offset: -88 },
+      ],
+      assertSelector: "[data-testid='image-studio-tabs'] button:nth-child(3).active",
+    }),
+    Object.freeze({
+      stateId: "interaction-gif-mode",
+      actions: [
+        { type: "click", selector: "[data-testid='image-studio-tabs'] button:nth-child(4)" },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-gif-a.png", width: 320, height: 220 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-gif-b.png", width: 280, height: 240 } },
+        { type: "wait", selector: ".gif-frame-row:nth-child(2)" },
+        { type: "scroll-into-view", selector: ".gif-frame-list", offset: -88 },
+      ],
+      assertSelector: "[data-testid='image-studio-tabs'] button:nth-child(4).active",
+    }),
+  ]),
   "text-merger": Object.freeze({
     stateId: "interaction-comma-separator",
     actions: [{ type: "select", selector: "[data-testid='text-merger-separator']", value: "comma" }],

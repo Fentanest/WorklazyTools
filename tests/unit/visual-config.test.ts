@@ -41,6 +41,7 @@ test("visual regression scenario manifest covers every available tool and state 
     "upload",
     "wait",
     "wait-enabled",
+    "wait-canvas",
     "wait-value-includes",
     "wait-shadow-canvas",
   ]);
@@ -80,15 +81,27 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 167);
-  assert.equal(qaCaptureScenarios.length, 74);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 580);
+  assert.equal(names.length, 171);
+  assert.equal(qaCaptureScenarios.length, 78);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 612);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
   assert.equal(b1QaScenarios.length, 18);
   assert.equal(b1QaScenarios.flatMap(({ profiles }) => profiles).length, 144);
   assert.deepEqual(new Set(b1QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
+  const b6QaScenarios = qaCaptureScenarios.filter(({ toolId }) => toolId === "image-studio");
+  assert.equal(b6QaScenarios.length, 7);
+  assert.equal(b6QaScenarios.flatMap(({ profiles }) => profiles).length, 56);
+  assert.deepEqual(new Set(b6QaScenarios.map(({ stateId }) => stateId)), new Set([
+    "initial",
+    "bottom",
+    "interaction-canvas-loaded",
+    "interaction-size-panel",
+    "interaction-batch-mode",
+    "interaction-collage-mode",
+    "interaction-gif-mode",
+  ]));
   assert.ok(b1QaScenarios.every(({ profiles }) => profiles.length === 8));
   const b2QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "data-converter", "timezone-calculator", "text-merger", "hwp-editor", "office-editor",

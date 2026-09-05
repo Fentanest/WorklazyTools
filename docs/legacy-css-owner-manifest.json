@@ -53,8 +53,8 @@
       ],
       "refCount": 7,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-002",
@@ -1807,8 +1807,8 @@
       ],
       "refCount": 4,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-106",
@@ -1951,8 +1951,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-115",
@@ -1967,8 +1967,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-116",
@@ -1983,8 +1983,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-117",
@@ -1999,8 +1999,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-118",
@@ -2015,8 +2015,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-119",
@@ -2031,8 +2031,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-120",
@@ -2047,8 +2047,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-121",
@@ -2268,10 +2268,8 @@
       ],
       "refCount": 5,
       "lastRemovalBundle": "B6",
-      "currentState": "legacy-arm-removed",
-      "removedIn": "B4",
-      "currentSelector": ".editor-history-actions button, .icon-tool-row button",
-      "lastUpdatedIn": "B5a"
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-134",
@@ -2443,8 +2441,8 @@
       ],
       "refCount": 4,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-144",
@@ -2475,8 +2473,8 @@
       ],
       "refCount": 1,
       "lastRemovalBundle": "B6",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "B6"
     },
     {
       "id": "legacy-146",

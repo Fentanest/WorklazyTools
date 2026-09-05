@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import { UtilityField, UtilityInput, UtilitySelect } from "../../components/UtilitySurface";
 import { ToggleRow } from "../../components/ui";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { CollageLayoutError } from "./collageLayout";
@@ -19,18 +20,18 @@ export async function runPanelTask(controllerRef: ProcessPanelProps["controllerR
   finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
 }
 
-export function NumberField({ label, value, onChange, disabled = false, min = 1 }: { label: string; value: number; onChange: (value: number) => void; disabled?: boolean; min?: number }) { return <label><span>{label}</span><input type="number" min={min} value={value} disabled={disabled} onChange={(event) => onChange(Math.max(min, Number(event.target.value)))} /></label>; }
-export function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) { return <label><span>{label} <b>{Math.round(value * 100)}%</b></span><input type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))} /></label>; }
-export function FormatField({ value, onChange }: { value: ImageOutputFormat; onChange: (value: ImageOutputFormat) => void }) { const { t } = useTranslation("features"); return <label><span>{t("image.common.output")}</span><select value={value} onChange={(event) => onChange(event.target.value as ImageOutputFormat)}><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select></label>; }
+export function NumberField({ label, value, onChange, disabled = false, min = 1 }: { label: string; value: number; onChange: (value: number) => void; disabled?: boolean; min?: number }) { return <UtilityField><span>{label}</span><UtilityInput type="number" min={min} value={value} disabled={disabled} onChange={(event) => onChange(Math.max(min, Number(event.target.value)))} /></UtilityField>; }
+export function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) { return <UtilityField><span>{label} <b className="text-sky-700 tabular-nums dark:text-sky-300">{Math.round(value * 100)}%</b></span><input className="h-10 w-full [accent-color:var(--color-sky-700)]" type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))} /></UtilityField>; }
+export function FormatField({ value, onChange }: { value: ImageOutputFormat; onChange: (value: ImageOutputFormat) => void }) { const { t } = useTranslation("features"); return <UtilityField><span>{t("image.common.output")}</span><UtilitySelect value={value} onChange={(event) => onChange(event.target.value as ImageOutputFormat)}><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></UtilitySelect></UtilityField>; }
 
 export function TransparencyControl({ checked, onChange, format }: { checked: boolean; onChange: (value: boolean) => void; format: ImageOutputFormat }) {
   const { t } = useTranslation("features");
-  return <div className="image-background-options"><ToggleRow label={t("image.common.transparent")} description={t("image.common.transparentHelp")} checked={checked} onChange={onChange} /><p>{format === "jpeg" ? t("image.common.jpeg") : t("image.common.alpha")}</p></div>;
+  return <div className="image-background-options mt-3 overflow-hidden rounded-2xl border border-border [&_[data-ui-component=toggle-row]]:min-h-[50px]"><ToggleRow label={t("image.common.transparent")} description={t("image.common.transparentHelp")} checked={checked} onChange={onChange} /><p className="m-0 border-t border-border bg-muted px-3 py-2 text-[13px] leading-relaxed text-muted-foreground">{format === "jpeg" ? t("image.common.jpeg") : t("image.common.alpha")}</p></div>;
 }
 
 export function ClipboardHint({ mode }: { mode: "replace" | "append" }) {
   const { t } = useTranslation("features");
-  return <div className="clipboard-image-hint"><ClipboardPaste size={15} /><span>{t("image.common.clipboard", { action: mode === "replace" ? t("image.common.replace") : t("image.common.append") })}</span></div>;
+  return <div className="clipboard-image-hint mt-2 flex items-center gap-2 text-[13px] leading-relaxed text-muted-foreground"><ClipboardPaste className="shrink-0 text-sky-700 dark:text-sky-300" size={15} /><span>{t("image.common.clipboard", { action: mode === "replace" ? t("image.common.replace") : t("image.common.append") })}</span></div>;
 }
 
 export function useClipboardImages(onImages: (files: File[]) => void) {

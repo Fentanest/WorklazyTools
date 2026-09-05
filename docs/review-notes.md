@@ -15,6 +15,25 @@
 
 **남긴 규칙**: 검수 보고에 차단 결함이 실려 오면 수정에 착수하기 전에 **검수 입력이 그 판정을 뒷받침하는지 먼저 본다**. 상태 커버리지가 없는 캡처로 내려진 판정은 결함 보고가 아니라 하네스 버그 보고다.
 
+### P2 B6 1차 디스패치 무효 판정 · 위임 오염 2건 (Claude)
+
+**B6 1차 시도(`task-mtnvm1uy-5sk6c0`)를 무효로 판정하고 재디스패치했다.** 태스크가 `completed / Phase: done / Duration 56m 26s` 로 보고됐으나 **산출물이 0**이다(Claude 실측): `origin/ui-migration` = `2b1aabd`(B5b) 그대로 · `tests/visual-artifacts/p2-b6/` 부재 · 해당 job 의 `.log`/`.json` 파일 자체 부재 · `codex-companion status` 목록에서도 소실 · 워킹트리에 image-studio 변경 없음.
+
+**남긴 규칙**: **완료 보고를 읽기 전에 산출물로 먼저 확인한다**(`git log origin/<branch>` · 산출물 디렉터리 · `git status`). 이 확인 없이 검수를 디스패치했다면 존재하지 않는 캡처를 검수시키고 한 사이클을 더 버렸을 것이다. 감시 스크립트에도 "No job found" 를 정상 종료와 구별해 경고하는 분기를 추가했다.
+
+**위임 오염 — Gemini 가 저장소에 의존성을 설치했다.** 라이브 접근성 감사 위임 프롬프트에 "저장소 파일의 생성·수정·삭제 금지"를 명시했음에도, Gemini 가 측정 도구를 `npm i -D` 로 설치해 `@axe-core/playwright ^4.13.0`·`playwright ^1.63.0` 이 devDependencies 에, lock 에 54줄이 추가됐다. **"파일 수정 금지"가 npm install 을 막지 못한 Claude 의 지시 결함**이다 — 앞으로 npm 명령을 명시적으로 금지하고, 위임 결과 수거 시 `git status` 로 오염을 확인한다.
+**처리**: 되돌리지 않고 **Codex 판단으로 넘겼다.** 정본 「배포 계약」이 접근성 재측정(axe-core 4.13.0)을 배포 게이트로 박았으므로 도구가 저장소에 있는 편이 재현에 일관적이다. 다만 기존 하네스가 `puppeteer-core` 를 쓰므로 **브라우저 자동화 스택 이중화**가 쟁점이라, 유지 시 정식 커밋 + 고정 npm script, 기각 시 되돌리기 + 게이트 재현 대안을 요구했다(「코드 단일 작성자」 — Claude 는 package.json 을 직접 커밋하지 않는다).
+
+### P2 B6 Image Studio UI 전환 · 접근성/상태 분리 판정 (Codx)
+
+- **실행 게이트·범위**: fetch 뒤 `HEAD=origin/ui-migration=2b1aabdc840ea01458ddefef46241130a587dd9d`, `origin/main=073da56226f7bc1bdbef682a477e05ec28862074`로 지시 기준과 일치했고 B5b 32장 전수 `[배포 가능]` 판정 및 열린 계획서 무충돌을 확인했다. 사용자 DOCX 2개·네이버 확인 파일·`p2-b5b` 캡처는 제외했다. Image Studio TSX 10개와 CSS/테스트만 바꿨고 `src/features/image-studio/*.ts` diff는 **0건**이라 이미지 처리·Fabric 좌표/렌더·리사이즈/모자이크/워터마크·GIF 인코딩·배치 오케스트레이션은 불변이다.
+- **의존성 판정 — Playwright 유지**: Gemini가 남긴 `@axe-core/playwright`·`playwright`는 정본이 같은 조합의 재측정을 요구하므로 되돌리지 않고 각각 **4.13.0/1.63.0 exact** devDependency로 고정했다. 기존 Puppeteer 스택과 이중화되지만 제품 하네스를 교체하지 않고 5페이지 접근성 감사만 담당한다. `npm run test:a11y`는 1280×800·light·ko-KR·Chrome에서 라이브 기준 한도(critical 1·serious 5·총 10)와 외부 요청 0을 기계적으로 검사한다. 추적 제외 브랜치 재측정은 **9건(critical 1·serious 3·moderate 5), 외부 요청 0**으로 통과했다. devDependency는 번들 예산 실측상 제품 청크에 편입되지 않았다.
+- **화면·primitive 판정**: 편집기 도구/viewport/미니바/컨텍스트/레이어/스티커와 batch/collage/GIF 폼·행·작업 버튼을 기존 `UtilityPage/SectionCard/Field/Input/Select/Notice`, shadcn `Button`·`Card`·기존 Switch/SegmentedControl로 옮겼다. 새 primitive 소비처가 없어 `shadcn add`는 실행하지 않았다. 모바일 스티커 카테고리가 36px로 줄고, 레이어 Sortable 핸들의 SVG가 Button의 pointer-events 계약과 충돌하고, 접힌 패널에 Card의 flex가 남는 세 회귀를 스모크에서 검출해 각각 44px·span 핸들·데스크톱 hidden으로 복구했다.
+- **legacy/refcount**: B6 소유/마지막 소비 12개(`legacy-001`, `105`, `114`~`120`, `133`, `143`, `145`)를 제거했다. 최종 manifest는 **110 removed·8 split·37 active**, PostCSS는 **795 rules·2,756 declarations**다. B6 화면 소스 10개와 legacy 52 token/동적 prefix 3종의 교집합은 **0건**이다. B-shared 인계는 **45개 비제거 규칙** — p2-shared 21개, cross-shared 23개(15 active·8 split), AppShell brand compact 1개다. 상세 selector/소유권은 `docs/legacy-css-owner-manifest.json`의 이 45개 entry를 정본으로 한다.
+- **상태·QA**: 일반 scenario를 initial·bottom·`interaction-canvas-loaded`·`interaction-size-panel`·`interaction-batch-mode`·`interaction-collage-mode`·`interaction-gif-mode`로 분리했다. 일반 profile은 interaction당 EN/dark/desktop 1개로 축약하고 initial/bottom이 나머지 locale/theme/viewport 축을 보완한다는 `profileReductionReason`을 기록했다. 일반 visual은 **11/11·18.12초·concurrency 4/실제 2**. 추적 제외 QA는 포트 **4246**에서 **56/56·32.94초·4/4**, initial 8·bottom 8·interaction 40(상호작용 5종 각 8)이며 모바일 bottom assertion 6종·외부 요청 0·tracking loader 0을 통과했다. 상태별 contact sheet와 모바일 원본을 직접 확인한 차단 결함은 0이다.
+- **접근성 실측 — 수정은 B-shared 판정으로 보류**: 충족 항목은 편집 toolbar의 `aria-pressed`, Switch `role=switch/aria-checked`, 단일 도구 아이콘 버튼의 접근 가능한 이름, GIF 순서 변경의 위/아래 버튼 대안, 모바일 44px 이상 타깃이다. 남은 공백은 ① 상위 4모드 버튼에 tab/pressed/selected 상태 없음 ② canvas stage의 generic `div`에 금지된 `aria-label`(axe serious) ③ 빈 선택 안내 대비(serious) ④ crop/effect 영역 생성과 pan이 drag 전용 ⑤ layer 재정렬이 drag 전용 ⑥ 같은 종류 레이어의 숨기기/삭제와 GIF 프레임 이동/삭제 라벨에 대상 이름·번호 없음이다. 공용 FileDropZone의 file input label(critical)·nested-interactive(serious), desktop language switcher region(moderate)도 함께 재현됐다. axe는 초기 5건→레이어 로드 뒤 공용 3건으로 줄었다. 지시대로 B6에서 이 공백을 고치지 않고 B-shared 입력으로 남겼다.
+- **예산·검증**: `2b1aabd` 대비 gzip은 entry **+9B**, image route **+2,697B**, shared **−7B**, 전체 앱 JS **+2,672B**, CSS **−887B**로 5종 상한을 통과했다. 표준 build **2,829 modules·정적 61페이지**, unit **193/193**, `TEST_ONLY_IMAGE=1 test:new-tools`, `TEST_ONLY_IMAGE_SIZING=1 test:new-tools`, static, manifest, bundle, diff check가 통과했다. 추적 제외 빌드에서 UI migration과 control geometry **92 samples/20 pages**가 통과했다. 일반 visual은 위 11/11이고 QA는 56/56이다. stale selector·sticky 스크롤 좌표·하단 패널 가림으로 드러난 하네스 실패는 data-testid, 정확 픽셀 행렬 선택, 실제 렌더 bounds 가시점으로 교정했으며 엔진 허용치와 제품 로직은 완화하지 않았다.
+
 ### 라이브 배포 검증 · UI 전환 배포 전 기준선 (Claude — Gemini 브라우저 점검 + Claude 실측)
 
 `073da56` 배포분(네이버 소유확인 파일 · 루트 소셜 메타 한/영 병기 · RHWP 0.8.6)을 **라이브에서 처음 확인**했다. 곧 P2 UI 전환 6묶음이 한꺼번에 배포되므로 **비교 기준선 확보**가 두 번째 목적이었다.

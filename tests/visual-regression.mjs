@@ -506,6 +506,11 @@ async function performScenarioActions(page, actions, fixture) {
         const canvases = host?.shadowRoot ? [...host.shadowRoot.querySelectorAll("canvas")] : [];
         return canvases.length > 0 && canvases.every((canvas) => canvas.width > 0 && canvas.height > 0);
       }, {}, action.selector);
+    } else if (action.type === "wait-canvas") {
+      await page.waitForFunction((selector) => {
+        const canvas = document.querySelector(selector);
+        return canvas instanceof HTMLCanvasElement && canvas.width > 1 && canvas.height > 1;
+      }, {}, action.selector);
     } else if (action.type === "scroll-into-view") {
       await page.$eval(action.selector, (element, offset) => {
         element.scrollIntoView({ block: "start" });

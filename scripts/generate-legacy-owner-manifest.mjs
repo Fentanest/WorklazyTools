@@ -170,6 +170,10 @@ const currentStateOverrides = new Map([
     currentState: "removed",
     removedIn: "B5b",
   }]),
+  ...[1, 105, 114, 115, 116, 117, 118, 119, 120, 133, 143, 145].map((index) => [index, {
+    currentState: "removed",
+    removedIn: "B6",
+  }]),
   [65, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row" }],
   [66, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row + .ui-settings-row" }],
   [67, { currentState: "legacy-arm-removed", removedIn: "B5a", currentSelector: ".ui-settings-row > div" }],
@@ -181,12 +185,6 @@ const currentStateOverrides = new Map([
     currentState: "legacy-arm-removed",
     removedIn: "B3",
     currentSelector: ".tool-page button:not([data-slot]), .tool-page a:is(.primary-button, .ui-primary-button), .tool-page a.secondary-button, .tool-page a.result-download",
-  }],
-  [133, {
-    currentState: "legacy-arm-removed",
-    removedIn: "B4",
-    currentSelector: ".editor-history-actions button, .icon-tool-row button",
-    lastUpdatedIn: "B5a",
   }],
   [151, {
     currentState: "legacy-arm-removed",

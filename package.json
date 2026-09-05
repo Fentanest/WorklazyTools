@@ -34,6 +34,7 @@
     "test:visual-bottom-negative": "node tests/mobile-bottom-negative-control.mjs",
     "test:control-geometry": "node tests/control-geometry-smoke.mjs",
     "test:ui-migration": "node tests/ui-migration-layout-smoke.mjs",
+    "test:a11y": "node tests/accessibility-audit.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },
   "dependencies": {
@@ -98,6 +99,7 @@
     "zetajs": "1.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/d3-geo": "^3.1.1",
     "@types/luxon": "^3.7.4",
@@ -110,6 +112,7 @@
     "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^4.3.4",
     "pixelmatch": "7.1.0",
+    "playwright": "1.63.0",
     "pngjs": "7.0.0",
     "postcss": "8.5.26",
     "puppeteer-core": "^25.6.0",
