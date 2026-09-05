@@ -338,7 +338,7 @@ try {
   await page.$eval('a[href^="/ko/tools/video-studio"]', (link) => link.click());
   await page.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 60_000 });
   await Promise.all([googleVideoVisit, naverVideoVisit]);
-  await page.waitForSelector(".video-engine-status");
+  await page.waitForSelector("[data-testid=video-runtime-status]");
   const videoIsolation = await page.evaluate(() => ({
     origin: location.origin,
     path: location.pathname,
@@ -347,14 +347,14 @@ try {
     googleAnalytics: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
     naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
     controller: navigator.serviceWorker.controller?.scriptURL || "",
-    engine: document.querySelector(".video-engine-status")?.textContent || "",
+    engine: document.querySelector("[data-testid=video-runtime-status]")?.textContent || "",
   }));
   const validVideoController = videoIsolation.controller.endsWith("/service-worker.js") || videoIsolation.controller.endsWith("/ko/tools/video-studio/coi-serviceworker.js");
   if (videoIsolation.origin !== new URL(baseUrl).origin || videoIsolation.path !== "/ko/tools/video-studio/" || !videoIsolation.marker || videoIsolation.ads
     || !videoIsolation.googleAnalytics || !videoIsolation.naverAnalytics || !validVideoController || !videoIsolation.engine.includes("멀티스레드")) {
     throw new Error(`Video document isolation is incomplete: ${JSON.stringify(videoIsolation)}`);
   }
-  const videoCompatibility = await page.$eval(".video-studio-page .inline-notice.warning", (element) => element.textContent);
+  const videoCompatibility = await page.$eval(".video-studio-page [data-slot=notice]", (element) => element.textContent);
   if (!videoCompatibility.includes("MKV") || !videoCompatibility.includes("AVI") || !videoCompatibility.includes("재생 시간") || videoCompatibility.includes("FFmpeg")) throw new Error("Video compatibility fallback notice is incomplete or exposes implementation details.");
 
   await page.$eval('a[href^="/ko/tools/pdf-editor"]', (link) => link.click());

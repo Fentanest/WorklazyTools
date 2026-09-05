@@ -668,8 +668,8 @@ export function VideoStudioPage() {
       </UtilitySectionCard>
 
       {items.length > 0 && (
-        <SectionCard step={2} title={featureMessage(language, "video.messages.VideoStudioPage.groupPreviewsAndTrimRanges")} description={featureMessage(language, "video.messages.VideoStudioPage.dragVideosToReorderThemWithinAGroup")}>
-          <div className="video-sync-groups">
+        <UtilitySectionCard step={2} title={featureMessage(language, "video.messages.VideoStudioPage.groupPreviewsAndTrimRanges")} description={featureMessage(language, "video.messages.VideoStudioPage.dragVideosToReorderThemWithinAGroup")}>
+          <div className="video-sync-groups grid gap-3">
             {usedGroups.map(({ group, items: groupItems }) => (
               <VideoGroupSection
                 key={group}
@@ -692,7 +692,7 @@ export function VideoStudioPage() {
               />
             ))}
           </div>
-        </SectionCard>
+        </UtilitySectionCard>
       )}
 
       {items.length > 0 && (

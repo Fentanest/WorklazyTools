@@ -3118,7 +3118,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     googleAnalytics: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
     naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
     googlePageViewQueued: (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"),
-    engine: document.querySelector(".video-engine-status")?.textContent || "",
+    engine: document.querySelector("[data-testid=video-runtime-status]")?.textContent || "",
     guideEyebrow: document.querySelector(".ui-tool-guide .ui-eyebrow")?.textContent || "",
   }));
   if (!isolation.marker || isolation.ads || !isolation.googleAnalytics || !isolation.naverAnalytics || !isolation.googlePageViewQueued
@@ -3211,8 +3211,8 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   await page.waitForFunction((start) => Number(document.querySelector('.video-trim-lane [data-trim-boundary="start"] input[type="number"]')?.value) < start, {}, adjustedFineTrim.start);
   const rangeState = await page.$eval(".video-range-control", (element) => ({
     handles: element.querySelectorAll('input[type="range"]').length,
-    start: element.style.getPropertyValue("--range-start"),
-    end: element.style.getPropertyValue("--range-end"),
+    start: element.querySelector(".video-range-selection")?.style.left || "",
+    end: element.querySelector(".video-range-selection")?.style.right || "",
   }));
   if (rangeState.handles !== 2 || !rangeState.start || rangeState.start === "0%" || !rangeState.end) throw new Error(`Combined range track was not updated: ${JSON.stringify(rangeState)}`);
   const passthroughOption = await page.$eval('.video-bitrate-control select', (select) => ({ value: select.value, text: select.selectedOptions[0]?.textContent }));
@@ -3502,7 +3502,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     player.currentTime = player.duration * 0.2;
     player.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
   });
-  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1")?.querySelectorAll(".multi-video-grid article")[1]?.classList.contains("active"));
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1")?.querySelectorAll(".multi-video-grid article")[1]?.getAttribute("data-active") === "true");
   await page.waitForFunction(() => {
     const group = Array.from(document.querySelectorAll(".video-sync-group")).find((section) => section.querySelector(".video-group-title strong")?.textContent === "그룹 1");
     const player = group?.querySelectorAll("video")[1];
@@ -3551,11 +3551,11 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
     const checkbox = group10?.querySelector("input");
     if (!(checkbox instanceof HTMLInputElement) || !checkbox.checked) throw new Error("Group 10 range target is unavailable");
     checkbox.click();
-    const apply = panel?.querySelector(".video-group-range-copy-actions :is(.primary-button, .ui-primary-button)");
+    const apply = panel?.querySelector("[data-testid=video-apply-group-ranges]");
     if (!(apply instanceof HTMLButtonElement)) throw new Error("Apply ranges button is unavailable");
     const style = getComputedStyle(apply);
-    if (apply.disabled || !style.backgroundImage.includes("linear-gradient") || Number(style.opacity) < 0.9) {
-      throw new Error(`Apply ranges button does not look active: ${JSON.stringify({ disabled: apply.disabled, background: style.backgroundImage, opacity: style.opacity })}`);
+    if (apply.disabled || apply.dataset.slot !== "button" || style.backgroundColor === "rgba(0, 0, 0, 0)" || apply.getBoundingClientRect().height < 34 || Number(style.opacity) < 0.9) {
+      throw new Error(`Apply ranges button does not look active: ${JSON.stringify({ disabled: apply.disabled, slot: apply.dataset.slot, background: style.backgroundColor, height: apply.getBoundingClientRect().height, opacity: style.opacity })}`);
     }
     apply.click();
   });
