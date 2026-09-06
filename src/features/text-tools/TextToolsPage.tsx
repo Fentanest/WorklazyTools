@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { ToolGuide } from "../../components/ToolGuide";
 import {
   pairedEditorClassName,
+  UtilityNotice,
   UtilityPage,
   UtilitySectionCard,
   UtilityTextarea,
@@ -24,31 +25,46 @@ export function TextToolsPage() {
   const [output, setOutput] = useState("");
   const [findings, setFindings] = useState<Finding[]>([]);
   const [ruleCount, setRuleCount] = useState(0);
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [initializationError, setInitializationError] = useState<unknown>();
   const workerRef = useRef<Worker | undefined>(undefined);
 
   useEffect(() => () => workerRef.current?.terminate(), []);
 
   const run = (message: object) => {
+    setError("");
     workerRef.current?.terminate();
-    const worker = new Worker(new URL("./text-tools.worker.ts", import.meta.url), { type: "module" });
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("./text-tools.worker.ts", import.meta.url), { type: "module" });
+    } catch (reason) {
+      setBusy(false);
+      setInitializationError(reason);
+      return;
+    }
     workerRef.current = worker;
     setBusy(true);
     worker.onmessage = (event) => {
       if (event.data.type === "result") setOutput(event.data.text);
       if (event.data.type === "inspection") { setFindings(event.data.findings); setRuleCount(event.data.ruleCount); }
-      if (event.data.type === "error") window.alert(event.data.message);
+      if (event.data.type === "error") setError(t("common:recovery.operationFailed"));
       setBusy(false);
       worker.terminate();
       if (workerRef.current === worker) workerRef.current = undefined;
     };
-    worker.onerror = () => { setBusy(false); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined; };
-    worker.postMessage({ ...message, language: i18n.language });
+    worker.onerror = worker.onmessageerror = () => { setError(t("common:recovery.operationFailed")); setBusy(false); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined; };
+    try { worker.postMessage({ ...message, language: i18n.language }); } catch (reason) {
+      worker.terminate(); workerRef.current = undefined; setBusy(false); setInitializationError(reason);
+    }
   };
+
+  if (initializationError !== undefined) throw initializationError;
 
   return (
     <UtilityPage toolId="text-tools">
       <PageHeader eyebrow="TEXT TOOLS" title={t("features:textTools.title")} description={t("features:textTools.description")}><PrivacyBanner compact /></PageHeader>
+      {error && <UtilityNotice tone="error" role="alert">{error}</UtilityNotice>}
       <div className="grid grid-cols-2 items-stretch gap-[15px] max-[620px]:grid-cols-1" data-testid="text-tools-editors">
         <UtilitySectionCard title={t("features:textTools.original")} description={t("features:textTools.originalDescription")} className="flex min-w-0 flex-col"><UtilityTextarea data-testid="text-tools-input" className={pairedEditorClassName} aria-label={t("features:textTools.original")} value={input} onChange={(event) => setInput(event.target.value)} placeholder={t("features:textTools.inputPlaceholder")} /><div className="invisible mt-[11px] min-h-[38px]" aria-hidden="true" /></UtilitySectionCard>
         <UtilitySectionCard title={t("features:textTools.result")} description={t("common:format.characters", { count: output.length })} className="flex min-w-0 flex-col"><UtilityTextarea data-testid="text-tools-output" className={pairedEditorClassName} aria-label={t("features:textTools.result")} value={output} onChange={(event) => setOutput(event.target.value)} placeholder={t("features:textTools.resultPlaceholder")} /><div className="mt-[11px] flex min-h-[38px] flex-wrap items-center gap-2"><Button variant="secondary" size="lg" className="rounded-xl font-bold" type="button" disabled={!output} onClick={() => void navigator.clipboard.writeText(output)}><Copy size={16} /> {t("common:actions.copy")}</Button><Button variant="secondary" size="lg" className="rounded-xl font-bold" type="button" onClick={() => { setInput(""); setOutput(""); setFindings([]); setRuleCount(0); }}><Eraser size={16} /> {t("features:textTools.clear")}</Button></div></UtilitySectionCard>

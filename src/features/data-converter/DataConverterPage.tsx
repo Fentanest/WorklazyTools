@@ -28,6 +28,7 @@ export function DataConverterPage() {
   const [summary, setSummary] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [initializationError, setInitializationError] = useState<unknown>();
   const workerRef = useRef<Worker | undefined>(undefined);
 
   useEffect(() => () => workerRef.current?.terminate(), []);
@@ -36,7 +37,14 @@ export function DataConverterPage() {
     workerRef.current?.terminate();
     setBusy(true);
     setError("");
-    const worker = new Worker(new URL("./data-converter.worker.ts", import.meta.url), { type: "module" });
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("./data-converter.worker.ts", import.meta.url), { type: "module" });
+    } catch (reason) {
+      setBusy(false);
+      setInitializationError(reason);
+      return;
+    }
     workerRef.current = worker;
     const finish = () => { setBusy(false); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined; };
     worker.onmessage = (event) => {
@@ -48,8 +56,10 @@ export function DataConverterPage() {
       }
       finish();
     };
-    worker.onerror = (event) => { setError(event.message || t("features:converter.workerError")); finish(); };
-    worker.postMessage({ source, target, text: input, language: i18n.language });
+    worker.onerror = worker.onmessageerror = () => { setError(t("common:recovery.operationFailed")); finish(); };
+    try { worker.postMessage({ source, target, text: input, language: i18n.language }); } catch (reason) {
+      worker.terminate(); workerRef.current = undefined; setBusy(false); setInitializationError(reason);
+    }
   };
 
   const loadFile = async (file: File) => {
@@ -66,6 +76,8 @@ export function DataConverterPage() {
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 15_000);
   };
+
+  if (initializationError !== undefined) throw initializationError;
 
   return <UtilityPage toolId="data-converter">
     <PageHeader eyebrow="DATA CONVERTER" title={t("features:converter.title")} description={t("features:converter.description")} />

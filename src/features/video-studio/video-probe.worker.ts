@@ -12,10 +12,11 @@ const wasmURL = new URL("single/ffmpeg-core.wasm", runtimeBaseURL).href;
 
 worker.onmessage = async (event: MessageEvent<{ file: File; language?: "ko" | "en" }>) => {
   const language = event.data.language === "en" ? "en" : "ko";
-  const ffmpeg = new FFmpeg();
+  let ffmpeg: FFmpeg | undefined;
   const lines: string[] = [];
   const mountPoint = "/worklazy-probe";
   try {
+    ffmpeg = new FFmpeg();
     const file = event.data.file;
     if (!(file instanceof File) || !file.size) throw new Error(featureMessage(language, "video.messages.videoProbe.unableToReadTheVideoFile"));
     ffmpeg.on("log", ({ message }) => lines.push(message));
@@ -38,9 +39,9 @@ worker.onmessage = async (event: MessageEvent<{ file: File; language?: "ko" | "e
         : featureMessage(language, "video.messages.videoWorkerClient.unableToReadVideoMetadata"),
     });
   } finally {
-    await ffmpeg.unmount(mountPoint).catch(() => undefined);
-    await ffmpeg.deleteDir(mountPoint).catch(() => undefined);
-    ffmpeg.terminate();
+    await ffmpeg?.unmount(mountPoint).catch(() => undefined);
+    await ffmpeg?.deleteDir(mountPoint).catch(() => undefined);
+    ffmpeg?.terminate();
     worker.close();
   }
 };

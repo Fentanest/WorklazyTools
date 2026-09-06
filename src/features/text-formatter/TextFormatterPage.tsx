@@ -29,20 +29,33 @@ export function TextFormatterPage() {
   const [warning, setWarning] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [initializationError, setInitializationError] = useState<unknown>();
   const workerRef = useRef<Worker | undefined>(undefined);
   useEffect(() => () => workerRef.current?.terminate(), []);
 
   const execute = (mode: "pretty" | "minify") => {
     workerRef.current?.terminate(); setBusy(true); setError(""); setWarning("");
-    const worker = new Worker(new URL("./text-formatter.worker.ts", import.meta.url), { type: "module" }); workerRef.current = worker;
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("./text-formatter.worker.ts", import.meta.url), { type: "module" });
+    } catch (reason) {
+      setBusy(false);
+      setInitializationError(reason);
+      return;
+    }
+    workerRef.current = worker;
     worker.onmessage = (event) => {
       if (event.data.type === "result") { setOutput(event.data.result); setWarning(event.data.warning || ""); }
       else setError(event.data.message);
       setBusy(false); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined;
     };
-    worker.onerror = () => { setBusy(false); setError(t("features:formatter.workerError")); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined; };
-    worker.postMessage({ kind, mode, text: input, indent, dialect, language: i18n.language });
+    worker.onerror = worker.onmessageerror = () => { setBusy(false); setError(t("common:recovery.operationFailed")); worker.terminate(); if (workerRef.current === worker) workerRef.current = undefined; };
+    try { worker.postMessage({ kind, mode, text: input, indent, dialect, language: i18n.language }); } catch (reason) {
+      worker.terminate(); workerRef.current = undefined; setBusy(false); setInitializationError(reason);
+    }
   };
+
+  if (initializationError !== undefined) throw initializationError;
 
   return (
     <UtilityPage toolId="text-formatter">
