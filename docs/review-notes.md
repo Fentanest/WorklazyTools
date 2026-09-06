@@ -102,6 +102,54 @@ F2는 same-origin scenario server가 정확한 subset OTF 경로만 HTTP 404로 
 
 **Gemini 로컬 시각 검수 소견 판정 (Claude, 2026-09-07 02:45)** — Gemini(agy `gemini-3.1-pro-high`, QA 빌드 4188) 는 QR 스튜디오 정상 렌더 9화면을 정상으로 보고하면서 "① `똠` 라벨에서 서브셋 폰트만 요청(깨짐) ② 영어 라벨 PDF 흐름 차단" 2건을 냈다. **둘 다 검수 입력 결함으로 판정, 제품 결함 아님.** ① Gemini 스크립트(`/tmp/worklazy-s2b/gemini-local/QA-fallback.mjs`)는 제목 템플릿(`[data-testid="qr-mapping-title-template"]`)을 `{{Label}}` 로 설정하지 않아 `똠` 이 CSV Label 열에만 있고 라벨 텍스트(커버리지 검사 대상)에는 들어가지 않았다 — payload 만으로는 full 선택 실험이 되지 않는다는 1차 반박 지적과 동일. ② 영어 버튼 실제 문구는 "Create row QR codes" 인데 "Generate" 를 찾아 타임아웃. Claude 재현(`/tmp/worklazy-s2b/claude-fallback-probe.mjs`, 템플릿 `{{Label}}` 설정): fallback ko(첫 Label `똠 라벨`) → **전체 OTF `noto-cjk-sans-2.004/NotoSansKR-Regular.otf` 200 4,644,748B 요청, PDF 4,076,547B** · normal ko/en → **서브셋 `…ksx1001-v1/NotoSansKR-Regular.ksx1001.otf` 200 931,704B, PDF 826,074/826,075B** · 오류 경계·정적 안내 노출 0. CLAUDE.md §5-3 "차단 결함이 오면 검수 입력이 그 판정을 뒷받침하는지 본다" 의 사례. — Claude
 
+> **S2b 게이트 ①~⑧ 판정 (Claude, 2026-09-07 03:15) — 통과.** astra 검수 4회(1차 F1·F2 회귀 테스트 누락 → 2차 F1-R → 3차 F2-R 스모크 flake → 4차 [검수 통과]) 를 거쳐 브랜치 `2f59a44`(커밋 7개, 제품 코드는 `0198036` 이후 불변) 를 승인한다. ① 시각 회귀 350/350·기준선 갱신 0 ② 접근성 8페이지 위반 0 ③ 번들 5종 상한 내(coverage JSON 은 QR route 에 포함해 측정) ④ CLS 0 ⑤ 광고 격리 영향 0·새 외부 요청 0 ⑥ 사용자 문구 변화 0·정적/사이트맵 불변 ⑦ build·tsc·unit 247·QR 스모크 3 scenario+OTF 404 폴백+청크 404 대조+취소·utilities·office·browser·new-tools·recovery·static ⑧ Gemini 로컬 검수 9화면 정상(소견 2건은 검수 입력 결함으로 판정 — 위 문단) + Claude DOM/PDF 재현(서브셋 931,704B / `똠` 폴백 전체 OTF 4,644,748B) + astra DOM·mutation 교차. 배포 승인은 2026-09-06 사용자 포괄 결정(로드맵 §결정 7). — Claude
+
+#### S2b 병합·production 배포·라이브 확인 — 사후 기록 (Codx)
+
+**병합·push** — 실행 게이트에서 `main=f29d249d5d57c5fa7b68b8d87b84a20b8af43e7e`, `s2b-qr-font=2f59a44737e87019fd90ca84f23e75c7d297ef97`, `origin/main=1a04f2571109495a76b8468af95b2f4edcd862cf`를 대조했고 추적 변경 0·사용자 미추적 파일 3개를 확인했다. 열린 계획서 16개에서 상반 지시가 없었고 QR bulk R4·U4 전체 OTF 경계는 S2b 정본의 명시 제외와 일치했다. `git pull --ff-only origin main`은 `Already up to date`; 지정 `--no-ff` 병합으로 **`6173125c3766a3c889db3b1086c1dc55076d3414`**(부모 `f29d249`·`2f59a44`)를 만들었다. push 원문은 `1a04f25..6173125  main -> main`이다.
+
+**push 전 main 검증** — production 빌드 2회와 그 사이 `VITE_LOCAL_QA=1` 빌드가 모두 2,834 modules·정적 61페이지로 통과했다. 세 prebuild 모두 `vendor-qr-label-font.mjs`를 실제 실행해 `QR fonts verified: full=4644748 subset=931704 coverage=3394`를 출력했다. 마지막 production entry는 `index-itbEJhl5.js`; 전개된 subset은 **931,704B**, SHA-256 **`b84d27a582d3f3e660db728e7913af3061d4e825e93cabdb6802f0ce23a252be`**다. `npx tsc -b` 진단 0, unit **247/247**, static(61페이지·startup 104문서), QR bulk(subset/full/corrupt/font404·취소·chunk404 대조), utilities, registry 20, CSS orphan 0, diff check, QA 접근성 8페이지 위반/외부 요청 0, 렌더링 3페이지×3회 CLS 최대 0을 통과했다. utilities 첫 실행은 preview 미기동으로 `ERR_CONNECTION_REFUSED`였고 같은 production dist를 4173에 기동한 뒤 재실행해 통과했다. 원문은 `/tmp/worklazy-s2b-deploy/logs/01-production-build.log`부터 `13-final-production-build.log`까지 보존했다.
+
+**Actions·CDN** — merge push의 GitHub Actions **run `34051975800`**은 SHA `6173125…`에서 success: build **6m10s**, deploy **18s**, 생성부터 완료까지 **6m37s**다. Node 20 deprecated action annotation 1건은 경고이며 모든 step은 success다. CDN 첫 확인에서 라이브 `/ko/` entry가 즉시 **`index-itbEJhl5.js`**로 로컬 production과 일치했고 `startup-help` 절이 유지됐다. subset URL은 HTTP 200·`content-length: 931704`, 실제 다운로드 931,704B; 기존 full URL도 HTTP 200·4,644,748B다. `/ads.txt` 200·59B(게시자 `pub-8940087269746960`), `/robots.txt` 200·66B, `/sitemap.xml` 200·21,596B도 확인했다.
+
+**라이브 QR 라벨 PDF** — Chrome 152·Playwright 1.63, 새 context·SW 차단·cache disabled에서 `/ko/tools/qr-studio/bulk/`에 header+데이터 25행 CSV를 업로드하고 제목 템플릿을 `{{Label}}`로 지정했다. 양쪽 모두 성공 25·실패 0, font 요청 정확히 1회, pageerror/requestfailed 0이다.
+
+| 시나리오 | 라이브 font 응답 | decoded bytes / SHA-256 | PDF |
+|---|---|---|---|
+| KS X 1001 범위 | subset 1회·HTTP 200·gzip 전송 560,628B | 931,704 / `b84d27a5…a252be` | 826,075B·`%PDF`·2p·embedded subset 1개 |
+| 첫 Label `똠 라벨` | full OTF 1회·HTTP 200·gzip 전송 3,731,894B | 4,644,748 / `69975a0a…148d68` | 4,076,547B·`%PDF`·2p·embedded full 1개 |
+
+첫 프로브는 결과 문구에서 timeout했고, 진단 실행에서 기존 `/tmp` CSV의 끝 LF가 빈 27행으로 파싱되어 `성공 25·실패 1`이 된 검수 입력 결함임을 확인했다. header+25행은 그대로 두고 끝 LF만 제거한 업로드 버퍼로 최종 실행을 통과했으며 제품 코드·CSV parser 계약은 바꾸지 않았다. 원문과 PDF는 `logs/19c-live-qr-font-final.log`, `live-qr-font.json`, `live-qr-{subset,full-tom}.pdf`에 있다.
+
+**라이브 접근성·빈 화면·광고·CLS·404** — 요청된 홈 ko/en·도구 목록 ko·HWP ko·오디오 ko/en을 포함해 desktop/mobile **12화면**을 직접 Playwright+axe 4.13.0으로 감사했다. HWP의 정본 upstream iframe 1개만 제외하고 위반 0, HTTP 200, pageerror·가로 overflow·오류 경계·startup-help 오노출 0이었다. 홈·문서 비교·PDF 각 3회와 별도 홈 1회의 CLS는 전부 **0**(`layoutShifts=[]`)으로 ≤0.1·≤0.114199를 모두 충족했다. `/ko/404-없는경로/`의 초기 응답은 HTTP **404**, title `Page not found | Worklazy Tools`, `noindex=true`; 앱 기동 뒤 홈으로 이동하는 기존 S0/S1 판정은 그대로이며 404 view 유지 성공을 주장하지 않는다. 비디오·Office app·XLS preserve ko/en 격리 **6/6**은 `crossOriginIsolated=true`, `googlesyndication|adsbygoogle` 요청 0·광고 DOM 0이었다. 일반 Excel cleaner ko/en 대조는 광고 loader DOM 1·loaded=true·`adsbygoogle.js` HTTP 200으로 정상이다.
+
+**20도구 ko/en 직접 진입** — 각 새 context에서 준비 DOM 뒤 `mainTextLength>0`, 오류 경계·startup-help 오노출·가로 overflow 0을 단언해 **40/40 양수·빈 화면 0**이다. 영어 HWP는 한국어 전용 기존 정책에 따라 최초 HTTP 404 뒤 `/en/tools`로 이동해 목록 본문 4,629자를 표시했다. 40장 contact sheet도 직접 확인해 빈 화면·정렬 붕괴·잘림을 관찰하지 않았다.
+
+| toolId | ko mainTextLength / HTTP | en mainTextLength / HTTP |
+|---|---:|---:|
+| excel-merger | 3,155 / 200 | 5,891 / 200 |
+| excel-compare | 1,835 / 200 | 3,585 / 200 |
+| excel-cleaner | 1,588 / 200 | 3,011 / 200 |
+| pdf-editor | 1,775 / 200 | 2,923 / 200 |
+| document-compare | 1,380 / 200 | 2,586 / 200 |
+| hwp-editor | 1,195 / 200 | 4,629 / 404→`/en/tools` |
+| office-editor | 1,213 / 200 | 2,182 / 200 |
+| video-studio | 1,933 / 200 | 3,343 / 200 |
+| audio-studio | 1,414 / 200 | 2,293 / 200 |
+| image-studio | 1,471 / 200 | 2,558 / 200 |
+| text-merger | 962 / 200 | 1,791 / 200 |
+| text-tools | 777 / 200 | 1,420 / 200 |
+| text-formatter | 491 / 200 | 911 / 200 |
+| work-calculator | 570 / 200 | 1,259 / 200 |
+| timezone-calculator | 1,986 / 200 | 3,290 / 200 |
+| payroll-calculator | 689 / 200 | 1,471 / 200 |
+| image-privacy | 826 / 200 | 1,405 / 200 |
+| security-tools | 724 / 200 | 1,442 / 200 |
+| qr-studio | 618 / 200 | 1,086 / 200 |
+| data-converter | 529 / 200 | 868 / 200 |
+
+전체 라이브 원문·JSON·65장 캡처·contact sheet는 `/tmp/worklazy-s2b-deploy/`에 보존했다. 위 항목으로 C-D ⑨를 통과했다. — Codx
+
 ### S2 하네스 확장 + 성능 묶음 1차 — 브랜치 구현·검증 (Codx)
 
 **착수 게이트** — `PROJECT_RULES.md` → `AGENTS.md` → 정본 `roadmap-completion-20260906.md`의 공통 계약·S2 전문·검증 총람·S0/S1·왕복 1~4차 기록 → backlog·관련 review-notes 순으로 확인했다. `HEAD=main=origin/main=15b31c1a38a6f39628046e988ae2b1ce92881fe9`, 추적 변경 0·사용자 미추적 파일 3개인 상태에서 `git checkout -b s2-harness-perf main`을 실행했다. 열린 계획서의 같은 표면에 상반 지시를 발견하지 않았다. 분기점 production `npm run build`와 기존 측정기를 실제 실행해 `/tmp/s2-bundle-baseline.json`을 저장했다. 정본 계획서는 수정하지 않았다. 이번 정지점은 **브랜치 커밋·전 검증·QA dist 보존까지**, main 병합·push·QR 감량 구현 없음이다.
