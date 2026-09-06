@@ -19,7 +19,7 @@
 Gemini 위임(조사·팬아웃 감사·검색·시각 검토)은 이 호스트에서 **`agy` CLI**(Antigravity, `~/.local/bin/agy`)로 호출한다. mytradingdesk 와 같은 방식이다.
 
 - 기본 호출: `agy -p "<지시>" --add-dir /home/better0101/projects/worklazytools --model <모델> --print-timeout <시간>`. **`--add-dir` 를 빼면 저장소가 워크스페이스에 잡히지 않아 파일을 못 본다**(2026-09-02 실측 — 없이 호출하면 "파일이 존재하지 않습니다"가 온다).
-- 모델: 조사·감사 기본은 `gemini-3.1-pro-high`, 가벼운 확인은 `gemini-3.7-flash-*`(`agy models`로 현행 목록 확인).
+- 모델: 조사·감사 기본은 `gemini-3.1-pro-high`, 가벼운 확인은 `gemini-3.8-flash-*`(2026-09-06 사용자 지시로 3.7→3.8)(`agy models`로 현행 목록 확인).
 - 기본 print-timeout 은 5분이다 — 무거운 위임은 상향하라. **값은 Go duration 형식**(`15m`, `10m30s`)이다 — 숫자만 주면(`900`) "missing unit" 파싱 오류 exit 2 로 즉사한다(2026-09-03 실측). 구조화 출력이 필요하면 `--output-format json --json-schema <스키마>` 로 강제하라. (mytradingdesk 27건 위임 실측: 타임아웃 10건 · 구조화 출력 누락 7건 · 권한 2건 — 이 세 플래그가 그 교훈이다.)
 - 읽기 전용 위임에는 `--sandbox` 를 붙인다. 쓰기가 필요해 보이는 위임은 범위를 재고하라 — 코드 수정은 「코드 단일 작성자」 규칙상 애초에 Gemini 소관이 아니다.
 - **`--sandbox` 함정(2026-09-02 실측)**: 헤드리스 `-p` 모드에서 도구가 "unsandboxed" 권한을 요구하면 프롬프트 불가로 자동 거부되어 **빈 출력**으로 끝난다(오류 메시지는 stderr의 jetski 한 줄뿐). 셸 판독이 필요한 분석 위임은 `--dangerously-skip-permissions` + 프롬프트에 "파일 생성·수정·삭제 절대 금지, 읽기만 허용" 가드를 명시해 보낸다. 출력이 비면 이 함정부터 의심하라.
@@ -48,7 +48,7 @@ Gemini 위임(조사·팬아웃 감사·검색·시각 검토)은 이 호스트�
 
 | 하고 싶은 것 | 명령 | 절대 하지 말 것 |
 |---|---|---|
-| Codex 에 작업 걸기 | `Agent(subagent_type="codex:codex-rescue", prompt="--background --fresh <지시>")` | `nohup codex … &`, 포그라운드 `codex exec` |
+| Codex 에 작업 걸기 | `Agent(subagent_type="codex:codex-rescue", prompt="--background --fresh --model <astra: 반박·검수 / sol: 코딩> <지시>")` | `nohup codex … &`, 포그라운드 `codex exec`, 모델 미지정 |
 | Codex 잡 상태·결과 | `node <companion> status\|result\|cancel <job-id>` | 서브에이전트 transcript 파일 tail |
 | Codex 잡 끝났는지 알기 | **`Monitor`(persistent)** 로 **잡 디렉터리** 감시 → 종료마다 알림 | 개별 job ID 폴링, 알림 없이 기다리기 |
 | Gemini 에 웹 조사 시키기 | `agy --effort high --print-timeout 50m --dangerously-skip-permissions --log-file …` | `gemini` CLI, `agy --mode plan` |
@@ -163,7 +163,9 @@ done
 | `gpt-reserve` · `gpt-daybreak-blue-latest` · `codex-auto-review` | 특수 |
 
 - **원본 런북의 "`gpt-6*` 는 400 으로 거부된다"는 낡았다** — 2026-09-05 22:21 캐시 갱신으로 `gpt-6-astra` 가 등록됐다.
-- 지정 방법: 디스패치 프롬프트에 `--model gpt-6-astra`. 기본은 미지정이지만 **이 저장소는 사용자 지시로 astra 를 명시**한다.
+- 지정 방법: 디스패치 프롬프트에 `--model <slug>`. **단계별 모델 배정(2026-09-06 사용자 지시 — `AGENTS.md` 「모델 역할 분담」과 동일)**: **반박 라운드(계획·감사) = `gpt-6-astra`** · **코딩(구현·수정·테스트, 병합·push 포함) = `gpt-5.6-sol`** · **코딩 완료 후 검수(읽기 전용) = `gpt-6-astra`**. 반박 지시서에는 "작업 중 발생·인지될 예외 상황과 구성의 흠결까지 sol 이 감당할 수 있을 만큼 고려해 반박"을 명시하고, 검수 지시서에는 "지시서·정본 대비 누락·왜곡·검증 미실행을 증거와 함께 판정"을 명시한다. 그 전(2026-09-05~06 S0~S2)은 전 단계 astra 로 진행했다.
+- **단계별 `--model` 한 줄 규칙(발주자용, 정본은 `AGENTS.md` 「모델 역할 분담」)**: 반박 라운드(계획·감사) `--model gpt-6-astra` · 코딩(구현·수정·테스트·병합·push) `--model gpt-5.6-sol` · 코딩 완료 후 검수 `--model gpt-6-astra`. 모델 미지정 디스패치 금지.
+- **검수·반박 잡은 "읽기 전용"이 아니라 "쓰기 허용 + 추적 파일 수정·커밋·push 금지"로 건다**(2026-09-06 mytradingdesk 실측 — 읽기 전용으로 걸면 fixture 생성·재빌드·로컬 소켓이 막혀 "재현 불가" 항목이 남았고 보고서 기록값으로 보완해야 했다; §5-6 과 같은 원인). 프롬프트에 "실험 작업(쓰기 모드 필요)" + 지시서에 "산출물은 `/tmp/...` · 시작·종료 `git status`·파일 SHA 로 저장소 불변 증명" 을 박는다. 순수 grep·문서 반박만 읽기 전용.
 - 없는 모델을 요청받으면 **불가 사유와 실측 목록을 함께 보고**하고 기본값으로 진행한다.
 
 ---
