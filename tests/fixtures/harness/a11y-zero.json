@@ -1,0 +1,80 @@
+{
+  "summary": {
+    "axeCore": "4.13.0",
+    "browserDriver": "playwright 1.63.0",
+    "pages": 5,
+    "violations": 0,
+    "severityCounts": {},
+    "measuredAt": "2026-09-06T11:19:05.374Z",
+    "colorScheme": "light",
+    "externalRequests": 0,
+    "placeholderContrast": {
+      "foreground": "rgb(105, 105, 111)",
+      "background": "rgb(242, 242, 247)",
+      "ratio": 4.8871087704111025
+    },
+    "limits": {
+      "critical": 0,
+      "serious": 0,
+      "total": 0
+    }
+  },
+  "results": [
+    {
+      "id": "home",
+      "path": "/",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "exceptions": [],
+      "passes": 25,
+      "violations": []
+    },
+    {
+      "id": "document-compare",
+      "path": "/ko/tools/document-compare",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "exceptions": [],
+      "passes": 41,
+      "violations": []
+    },
+    {
+      "id": "tools",
+      "path": "/ko/tools",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "exceptions": [],
+      "passes": 39,
+      "violations": []
+    },
+    {
+      "id": "excel-compare",
+      "path": "/ko/tools/excel-compare",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "exceptions": [],
+      "passes": 46,
+      "violations": []
+    },
+    {
+      "id": "pdf-editor",
+      "path": "/ko/tools/pdf-editor",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "exceptions": [],
+      "passes": 43,
+      "violations": []
+    }
+  ],
+  "externalRequests": []
+}

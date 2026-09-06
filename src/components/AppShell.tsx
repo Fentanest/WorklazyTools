@@ -70,7 +70,7 @@ export function AppShell() {
       {!videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand brand-image-link" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
-          <img className="brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
+          <img className="brand-logo" width={320} height={64} src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
         </NavLink>
 
         <nav className="sidebar-nav">

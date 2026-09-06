@@ -9,6 +9,7 @@
     "social:generate": "node scripts/generate-social-images.mjs",
     "bench:excel-compare": "node scripts/benchmark-excel-compare-alignment.mjs",
     "bench:excel-cleaner": "node scripts/benchmark-excel-cleaner-heap.mjs",
+    "measure:qr": "node tests/qr-stage-metrics.mjs",
     "bundle:measure": "node scripts/measure-bundle-budget.mjs",
     "css:orphans": "node scripts/audit-css-orphans.mjs",
     "legacy:manifest": "node scripts/generate-legacy-owner-manifest.mjs",

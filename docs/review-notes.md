@@ -4,6 +4,153 @@
 
 ## 2026-09-06
 
+### S2 하네스 확장 + 성능 묶음 1차 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트** — `PROJECT_RULES.md` → `AGENTS.md` → 정본 `roadmap-completion-20260906.md`의 공통 계약·S2 전문·검증 총람·S0/S1·왕복 1~4차 기록 → backlog·관련 review-notes 순으로 확인했다. `HEAD=main=origin/main=15b31c1a38a6f39628046e988ae2b1ce92881fe9`, 추적 변경 0·사용자 미추적 파일 3개인 상태에서 `git checkout -b s2-harness-perf main`을 실행했다. 열린 계획서의 같은 표면에 상반 지시를 발견하지 않았다. 분기점 production `npm run build`와 기존 측정기를 실제 실행해 `/tmp/s2-bundle-baseline.json`을 저장했다. 정본 계획서는 수정하지 않았다. 이번 정지점은 **브랜치 커밋·전 검증·QA dist 보존까지**, main 병합·push·QR 감량 구현 없음이다.
+
+**S2-H 양방향 unit** — 브라우저를 띄우는 진입점과 실제 판정 함수를 분리해 unit이 제품 측정 함수 자체를 import한다. 신규 S2-H 28건, ZIP 이름 1건, QR 전송량 2건이다.
+
+| 항목 | 통과 방향 | 실패 방향 / 내용 단언 | unit 수 |
+|---|---|---|---:|
+| 번들 5종 | 각 기본 상한 정확히 일치; 독립 override 7B | 각 +1B; baseline/current 각각 NaN·누락·Infinity·음수·소수·문자열; 잘못된 override | 15 |
+| 번들 신규 route·귀속 | 현재 존재하는 신규 lazy route 기준 기여 0; SHA 동일 청크 route→shared 40B는 app 증분 0 | 오타·eager route·기존 route 기준 수치 누락 거부; 다른 SHA를 이동으로 오인하지 않음; 실제 +9B 분리; 실제 작은 manifest/files 측정 | 3 |
+| 렌더링 | CLS 0.1·페이지별 3표본 | 0.100001·1·NaN·누락 실패(중앙값 통과여도 최대값 차단); 페이지/표본 누락·중복 실패; 실제 observer의 요소·전후 rect·recent input 제외 | 3 |
+| 접근성 | 현행 JSON total=0; 새 등록 8페이지 total=0 | summary를 0으로 놔둔 채 위반 1건 삽입해도 실패; 페이지 누락/중복 실패; 모바일 412px 2건·HWP·정확히 1개 예외의 소유자/사유 단언 | 4 |
+| 도구 목록 | 레지스트리와 독립된 기대 ID 20개 일치 | 1개 누락·같은 개수로 ID 중복 1개 치환 실패 | 3 |
+
+번들 override는 `BUNDLE_LIMIT_ENTRY_JS_GZIP`, `BUNDLE_LIMIT_AFFECTED_ROUTE_JS_GZIP`, `BUNDLE_LIMIT_SHARED_JS_GZIP`, `BUNDLE_LIMIT_APP_JS_GZIP`, `BUNDLE_LIMIT_CSS_GZIP`의 **바이트 정수**다. 지정한 지표만 최종 한도를 대체하고 나머지는 기존 multiplier를 적용한다. 사용 환경변수·수치·multiplier는 stdout 및 JSON budget에 남는다. 이번 실측은 override `{}`·multiplier 1이며 상한을 올리지 않았다. 기존의 파일 SHA 기록이 있어야 이동 판정이 가능하므로 누락된 측정 기록은 거부한다.
+
+**CLS 원인 확정** — QA production·Chrome 152·1280×800 DPR1·light·ko-KR·SW block·매 회 새 context·cache off·무스로틀·3초 settle. 원시 source/rect는 `/tmp/worklazy-s2/render-before.json`, 단일 원인 대조는 `cls-diagnose.json`/`logs/cls-diagnose.log`다.
+
+| sources | 수정 전 근거 | 기여 CLS | 수정 / 대조 결과 |
+|---|---|---:|---|
+| body | 정적 `.seo-static-fallback`의 `margin:48px auto`가 root/body로 collapse. rAF body/root y=48→0 | 0.037500000 | `#root { display: flow-root }`로 margin 전파 차단. 이것만 적용한 문서 비교 0.076699146 |
+| `.sidebar-nav` | 이미지 로드 전 로고 높이 0→43.59375px, nav y=86→95.59375px | 0.000831958 | 로고 SVG의 실제 viewBox 320×64를 img width/height에 명시. 독립 aspect-ratio 대조는 해당 기여만 제거(0.113367188) |
+| `.global-footer` | 문서/PDF 로딩 영역 55vh=440px 뒤 footer y=440, h=83 → 실제 페이지 로드 후 화면 밖(문서 y=2074.390625) | 0.075867188 | 세 Suspense fallback에 `min-h-screen` 예약. 예약 단독 대조 0.038331958 |
+
+세 원인의 합이 기존 문서·PDF의 0.1141991455와 일치했다. 폰트 스왑을 원인으로 채택하지 않았다. 실제 수정은 자연 비율을 유지하는 img 속성을 사용하므로 독립 실험의 CSS aspect-ratio를 그대로 제품에 넣지 않았다. S0 `RouteErrorBoundary`와 `startup-help`의 기존 55vh 안내 예약은 그대로이고, 정상 로딩 중에만 더 큰 공간을 예약한다.
+
+| 페이지 | 수정 전 CLS (1 / 2 / 3) | 수정 후 CLS (1 / 2 / 3) | 최댓값 ≤0.1 |
+|---|---|---|---|
+| home | 0.038331958 / 0.038331958 / 0.038331958 | 0 / 0 / 0 | 통과 |
+| document-compare | 0.114199146 / 0.114199146 / 0.114199146 | 0 / 0 / 0 | 통과 |
+| pdf-editor | 0.114199146 / 0.114199146 / 0.114199146 | 0 / 0 / 0 | 통과 |
+
+S2-H 직후에는 새 하네스가 문서·PDF 0.1141991455를 실제 **exit 1**로 차단했다(`logs/render-before.log`). 수정 후 9표본 모두 CLS 0, 외부 요청 0이다. 판정 전에 소수점 반올림하지 않으므로 0.100001 경계를 숨기지 않는다.
+
+**접근성 등록·예외·하단 탭** — 기존 `/` 언어 랜딩, 문서 비교, 도구 목록, Excel 비교, PDF 5페이지를 유지하고 HWP(1280×800), `/ko` 홈·`/ko/tools` 목록(Pixel 7 폭 **412×839**, touch/mobile)을 추가했다. 총 8페이지. 예외는 HWP의 `iframe[title="rhwp HWP 문서 편집기"]` **1항목**뿐이다. 목적은 상류 벤더 4노드 위반의 분리, 소유자는 **rhwp Studio 0.8.6 upstream**, 근거는 `docs/backlog.md`의 HWP iframe 항목이다. axe `exclude`는 이 셀렉터에만 적용하며 호스트 페이지는 감사하고, 실제 iframe 일치 수가 1이 아니면 실패한다.
+
+수정 전 새 측정은 모바일 홈 2노드·목록 1노드의 color-contrast **2 violations/serious 2**로 exit 1이었다. 이후 기본 total 상한도 10→0으로 바꾸고 `.bottom-tab`의 상속 색 토큰 **한 줄**을 `--label-tertiary`→`--label-secondary`로 변경했다. `#fbfbfd` 기준 `#909098` **3.065384:1** → `#69696f` **5.276560:1**. 활성 탭의 blue 색·별도 배경은 유지한다. canonical `/ko/`, `/en/` 홈과 `/ko/tools`, `/en/tools`의 활성/비활성 구분은 `qa/*-mobile.png`, 같은 화면의 이전 토큰 대조는 `qa/*-old-tab-color-control.png`에 보존했다.
+
+확장된 새 측정은 루트/문서/목록/Excel/PDF/HWP/모바일 홈/모바일 목록 모두 위반 **0**, 외부 요청 0, placeholder 대비 **4.887109:1**이다. HWP host의 43 passes를 포함한다. 기록 fixture `tests/fixtures/harness/a11y-zero.json`은 이번 수정 전 실제 측정의 기존 desktop 5페이지 부분을 판정 테스트 입력으로 보존한 것이다. 완료 브라우저 감사는 이 fixture를 재사용하지 않는다.
+
+**시각 기준선** — 최초 전체 175장 중 영문 light/mobile 38장이 0.1% 허용치를 초과했다. 실제 diff에서 하단 탭의 색 변경을 확인했고, 탭 위 영역의 차이는 최대 288px/0.087495%로 단독 허용치 이내였다. 레이아웃 예약은 초기 로딩에 적용되어 완료 화면의 재배치가 없다. 이 38장의 하네스 실제 캡처만 해당 baseline으로 갱신했다. 원본 diff/actual 경로는 `/tmp/worklazy-s2/visual-before-update/*.{diff,actual}.png`, 정확한 목록은 `visual-updated.json`이다. KO/EN 전체 재실행 각각 175/175 통과. 별도 QA 16화면(ko/en·홈/목록 모바일·문서/PDF/QR desktop/mobile)에서 수평 overflow·추적 DOM·외부 요청 0이고 Codx는 대표 홈/목록/문서/PDF/QR 이미지를 직접 확인했다. Gemini 최종 로컬 검수는 이 브랜치·QA dist를 넘긴 뒤 수행할 단계다.
+
+**QR 4단계 실측 (감량 구현 없음)** — `npm run measure:qr`, 새 context·SW 차단·page/worker CDP cache disabled·로컬 무스로틀·1365×900·한글 CSV 2행·PNG 2개·manifest 2시트/성공 시트 3행·한글 A4 PDF 1페이지를 단언했다. URL·요청 시작 단계·page/worker 구분·캐시 출처는 `/tmp/worklazy-s2/qr/metrics.json`, 전체 CDP events/NetLog는 `/tmp/worklazy-s2/qr/`에 있다. 각 단계 완료와 700ms 네트워크 정숙 후 다음 단계로 진행했다. 21요청 모두 network, cache/SW hit 0, 외부 요청·pageerror 0이다.
+
+Chromium은 worker 첫 스크립트의 공개 CDP 전송 완료에 **헤더 388B만** 줄 수 있었다. 이를 그대로 0/388B로 보고하는 안은 기각했다. Chrome NetLog의 `URL_REQUEST_JOB_BYTES_READ`(gzip 전송 본문), identity 응답에서는 `URL_REQUEST_JOB_FILTERED_BYTES_READ`, 실제 HTTP 헤더를 대조한다. 표의 전송 B는 **인코딩된 응답 본문+HTTP 헤더, HTTP chunk framing 제외**로 전 요청 동일하다. CDP 수치는 별도 보존하고 worker 본문 누락은 실패시킨다. worker 실제 gzip 본문 56,905B + 헤더 388B = **57,293B**다. JS gzip B는 별도로 제공된 dist JS에 `gzipSync`를 적용한 값이며 전송 B와 합산하지 않는다. page.route/context.route를 사용하지 않아 S0 캐시 보존 실험과도 혼동하지 않는다.
+
+| 단계 | 요청 수 | 전송 B | JS gzip B | 누적 전송 B | 누적 JS gzip B |
+|---|---:|---:|---:|---:|---:|
+| 진입 | 13 | 409,318 | 326,204 | 409,318 | 326,204 |
+| 파일 선택 완료 | 4 | 446,422 | 444,649 | 855,740 | 770,853 |
+| 생성·manifest 완료 | 2 | 58,483 | 57,657 | 914,223 | 828,510 |
+| PDF 완료 | 2 | 5,153,562 | 508,018 | 6,067,785 | 1,336,528 |
+
+| 상위 청크 | 단계 | 소유 | JS gzip B | 전송 B |
+|---|---|---|---:|---:|
+| `qrLabelPdf-SVT9ItGJ.js` | PDF 완료 | page | 508,018 | 508,459 |
+| `index-ChABvuMb.js` | 진입 | page | 298,298 | 298,738 |
+| `exceljs.min-C_nwFMmd.js` | 파일 선택 완료 | page | 271,024 | 271,464 |
+| `inputAdapter-bxwQu7f1.js` | 파일 선택 완료 | page | 135,332 | 135,772 |
+| `qr-bulk.worker-bbpyIOTx.js` | 생성·manifest 완료 | worker script | 56,905 | 57,293 |
+| `jszip.min-D2jz9vXL.js` | 파일 선택 완료 | page | 38,101 | 38,541 |
+| `QrStudioPage-ZbdLR02r.js` | 진입 | page | 15,664 | 16,103 |
+| `QrBulkPanel-CTq9sWyI.js` | 진입 | page | 9,711 | 10,150 |
+| `fileNameSafety-je7y36nX.js` | 진입 | page | 1,115 | 1,553 |
+| `xlsxReport-DktnDtmv.js` | 생성·manifest 완료 | page | 752 | 1,190 |
+
+PDF 단계의 `NotoSansKR-Regular.otf`는 **4,644,748B 본문 / 4,645,103B 전송(identity)**이며 JS gzip 밖이다. 진입 단계 Noto Sans Latin woff2는 **35,820B / 36,225B**다. **ExcelJS는 파일 선택 단계**에서 271,024B gzip, `inputAdapter.ts:2`의 정적 import가 근거다. manifest 생성 때 처음 받는다는 가정은 기각한다.
+
+감량 여지 후보는 세 가지까지 사실만 남긴다(목표 수치·실현 보장 없음): ① CSV도 `inputAdapter.ts`의 ExcelJS/SheetJS/JSZip 정적 import를 따라가 파일 선택 444,649B gzip을 받는다 — 입력 형식별 의존 경계 검토 대상. ② PDF 클릭 시 전체 OTF를 fetch하고 `qrLabelPdf.ts`가 `subset:false`로 embed한다 — 폰트 전송·출력 포함 범위 검토 대상(다운로드와 생성 PDF 크기는 서로 다른 지표). ③ PDF 단계 `qrLabelPdf` 청크 508,018B gzip에는 `@pdf-lib/fontkit`와 `pdf-lib` 정적 import가 있다 — PDF 의존 구성 검토 대상. 세 항목 모두 구현·목표 확정은 별도 디스패치다.
+
+**ZIP 소비 표** — 저장소 `src/**/*.{ts,tsx,js,mjs}`를 재귀 검색한 실제 소비자를 아래처럼 구분했다. PDF→이미지 외 JSZip 소비도 있으므로 패키지 제거는 하지 않는다. 한글 처리 열에서 이름의 입력/가공 경로는 소스 대조이며 모든 도구를 한글 fixture로 새로 시험했다는 뜻은 아니다.
+
+| 소비자 / 코드 표면 | 구현 | 한글 이름 경로 | ZIP64 출력 | 스트리밍/출력 수집 |
+|---|---|---|---|---|
+| Excel 비교 `ExcelComparePage` | 공용 C3 zip.js | safe 파일명 검사→UTF-8 명시 | 강제 true | 입력 순차 stream, 최종 BlobWriter |
+| Excel 정리 `ExcelCleanerPage` | 공용 C3 zip.js | safe 파일명 검사→UTF-8 명시 | 강제 true | 입력 순차 stream, 최종 BlobWriter |
+| QR `QrBulkPanel.downloadZip` | 공용 C3 zip.js (버튼 시 import) | safe ZIP 경로·하위 폴더→UTF-8 명시 | 강제 true | 결과별 순차 입력, 최종 BlobWriter |
+| Video `video-zip.worker`→`videoZipArchive` | 공용 C3 zip.js | safe 파일명→UTF-8 명시 | 강제 true | OPFS WritableStream; 조건부 BlobWriter 폴백 |
+| PDF→이미지 `pdfPreview` | JSZip | 원본 baseName + 페이지 번호 | 미설정; 대조 fixture는 classic ZIP | DEFLATE 6, generateAsync Blob 완성본 |
+| PDF 그룹 분리 `pdf.worker` | JSZip | sanitizeFileName + PDF 확장자 | 미설정 | DEFLATE 6, 전체 Uint8Array |
+| PDF 오피스 출력 `pdfOffice.worker` | JSZip (OOXML 패키지) | 내부 OOXML 항목명 | 미설정 | DEFLATE 6, 전체 Uint8Array; 단순 결과 ZIP과 다른 계약 |
+| 이미지 일괄 `image.worker` | JSZip | 순번 + sanitizeName + 출력 확장자 | 미설정 | DEFLATE 6, 전체 Uint8Array |
+| 사진 메타데이터 제거 `image-privacy.worker` | JSZip | 순번 + 결과 fileName | 미설정 | streamFiles:true이나 generateAsync ArrayBuffer 전체 수집 |
+| Excel 병합 `excel.worker`; 공용 `spreadsheet-core/inputAdapter` | JSZip 읽기 | OOXML 내부 항목 읽기 | 출력 해당 없음 | loadAsync 입력 파싱; QR·비교·정리에도 전이 |
+
+공통 동일 fixture(`한글 결과.txt`, `보고서/서울 매출.csv`, `검사-😀.txt`, 본문 총 78B)를 **실제 C3 writer**와 JSZip DEFLATE 6로 각각 만들었다. `unzip -l`와 Python `zipfile` 모두 3개 이름·본문·UTF-8 flag를 보존했다. zip.js **768B/ZIP64 EOCD 있음**, JSZip **629B/ZIP64 EOCD 없음**. 압축 옵션·메타데이터가 달라 크기를 라이브러리 성능 우열로 해석하지 않는다. `tests/zip-unicode-comparison.mjs`는 재현 스크립트이고 원본 ZIP/해제 출력은 `/tmp/worklazy-s2/zip/`, `logs/zip-comparison.log`다. 기존 video streaming unit도 전체 입력 arrayBuffer 0회·다중 구간·ZIP64·unzip roundtrip을 검사한다.
+
+판정 제안: **외부 결과 ZIP 출력**의 C3 이관은 별도 단위의 후보로 유지한다. 한글 이름 대조는 채택 근거지만 현재 fixture만으로 4GiB 이상 호환이나 도구별 회귀를 보장하지 않는다. 현 C3는 STORE(level 0), 기존 JSZip 출력은 DEFLATE 6이므로 통합 전 압축·메모리/취소·파일명 변경·UI 진행률·각 도구 ZIP 내용 회귀를 정해야 한다. OOXML 읽기/작성과 ExcelJS 전이 의존은 별도라 JSZip 패키지 제거 근거가 되지 않는다. 이번 제품 변경은 `useUnicodeFileNames:true` 명시뿐이다.
+
+**분기점 production 번들 5종** — 신규 route 없음·override 없음·배수 1, SHA-256 중복 제거 규칙 동일. QA 빌드와 비교하지 않았다.
+
+| 지표 | main 기준 gzip B | 브랜치 gzip B | delta B | 기본 상한 B | 판정 |
+|---|---:|---:|---:|---:|---|
+| entryJsGzip | 299,265 | 299,283 | +18 | 20,480 | 통과 |
+| affectedRouteJsGzip | 2,440,445 | 2,440,427 | -18 | 61,440 | 통과 |
+| sharedJsGzip | 2,716,493 | 2,716,489 | -4 | 30,720 | 통과 |
+| appJsGzip | 5,456,203 | 5,456,199 | -4 | 81,920 | 통과 |
+| cssGzip | 37,669 | 37,687 | +18 | 10,240 | 통과 |
+
+귀속 이동 `route→shared` **0B/0청크**, shared delta **−4B**, 이동 제외 shared delta **−4B**, 전체 app JS 순증분 **−4B**. 이는 QR 감량 결과가 아니다. 실제 청크 이동과 순증분이 다른 상황은 위 unit의 40B 이동/+9B 순증분으로 검증했다.
+
+**완료 기준 검증 명령·실제 출력** — 최종 판정에 쓴 실행은 아래 전부 exit 0이다. `logs/` 아래 각 명령 stdout/stderr 원문, `check-*.json`에 명령·종료 코드·실행 시간이 있다. 최종 측정 코드 HEAD는 `4f603bb`이며 뒤의 기록 커밋은 문서만 변경한다. QA 8페이지 감사는 새 브라우저로 다시 수행했다.
+
+| 명령 (실행 환경 포함) | exit | 실제 결과 | 원문 로그 |
+|---|---:|---|---|
+| `npm run build` | 0 | production·정적 61페이지 | `logs/build.log` |
+| `npx tsc -b` | 0 | TypeScript 진단 0 | `logs/tsc.log` |
+| `npm run test:unit` | 0 | 231/231 | `logs/unit-final.log` |
+| `npm run test:static` | 0 | 현지화·사이트맵·런타임·로더 검증 | `logs/static-production.log` |
+| `TEST_BASE_URL=http://127.0.0.1:4188 npm run test:browser` | 0 | Excel·Word 비교·PDF 전 scope | `logs/browser-final.log` |
+| `TEST_BASE_URL=http://127.0.0.1:4188 npm run test:new-tools` | 0 | HWP·이미지·오디오·비디오 | `logs/new-tools-production.log` |
+| `TEST_BASE_URL=http://127.0.0.1:4188 npm run test:utilities` | 0 | ko/en·도구·영상 격리 | `logs/utilities.log` |
+| `TEST_BASE_URL=http://127.0.0.1:4188 npm run test:office` | 0 | 편집·저장 DOCX 5,089B·캐시 | `logs/office.log` |
+| `npm run test:qr-bulk` | 0 | 7 payload·PNG ZIP·manifest·25라벨/2페이지 PDF | `logs/qr-bulk.log` |
+| `npm run test:recovery` | 0 | 147/147 (74 desktop·73 Android) | `logs/recovery.log` |
+| `node tests/tool-registry-routes.mjs` | 0 | 독립 기대 20·누락/중복 0 | `logs/registry.log` |
+| `LANG=ko_KR.UTF-8 VISUAL_ARTIFACT_DIR=/tmp/worklazy-s2/visual-ko npm run test:visual` | 0 | 175/175 | `logs/visual-ko.log` |
+| `LANG=en_US.UTF-8 VISUAL_ARTIFACT_DIR=/tmp/worklazy-s2/visual-en npm run test:visual` | 0 | 175/175 | `logs/visual-en.log` |
+| `VITE_LOCAL_QA=1 npm run build` | 0 | 최종 dist: QA, 추적 식별자 0 | `logs/build-qa-final.log` |
+| `A11Y_MAX_TOTAL=0 A11Y_REPORT_PATH=/tmp/worklazy-s2/a11y-after.json npm run test:a11y` | 0 | 8페이지·위반/외부 요청 0 | `logs/a11y-final.log` |
+| `RENDER_REPORT_PATH=/tmp/worklazy-s2/render-after.json npm run test:rendering` | 0 | 3페이지×3회 CLS 모두 0 | `logs/rendering-final.log` |
+| `BUNDLE_BASELINE=/tmp/s2-bundle-baseline.json BUNDLE_MEASURE_OUTPUT=/tmp/worklazy-s2/bundle-final.json npm run bundle:measure` | 0 | 5종 통과·이동 0B·app 순증분 −4B | `logs/bundle.log` |
+| `npm run css:orphans` | 0 | orphan 0 | `logs/css.log` |
+| `npm run legacy:manifest` | 0 | 153 removed / 0 split / 2 active | `logs/manifest.log` |
+| `git diff --check` | 0 | 공백 오류 0 | `logs/diff-check.log` |
+| `QR_METRICS_OUTPUT=/tmp/worklazy-s2/qr npm run measure:qr` | 0 | 4단계·21요청·worker/폰트 포함 | `logs/qr-metrics-final.log` |
+
+`ZIP_COMPARISON_OUTPUT=/tmp/worklazy-s2/zip node --experimental-strip-types tests/zip-unicode-comparison.mjs`도 exit 0이며 `logs/zip-comparison.log`에 두 해제 도구의 실제 이름·본문 대조를 기록했다.
+
+
+**제품 규칙·범위 점검** — 서버/API/SSR·의존 추가 없음. 사용자 문구 추가 0, 하단 탭 ko/en 공통; SEO 정의·경로·FAQ·사이트맵·소셜 입력 diff 0. 정적 본문 margin 처리는 CSS 입력에서 했고 산출 HTML/벤더를 직접 수정하지 않았다. 광고/애널리틱스 경계 코드는 불변이며 QA 캡처/감사/렌더링/QR 계측 외부 요청 0이다. production 전용 new-tools·utilities·office 스모크에서도 정상 로더와 격리 제외를 확인했다. CSS orphan 0, legacy manifest 153 removed·0 split·2 active 유지. 사용자 파일 3개는 SHA-256 보존, 작업지시서/jobs·dist·실행 로그는 커밋하지 않는다.
+
+| 제품 계약 | 판정 | 근거 |
+|---|---|---|
+| GitHub Pages 정적 스택 | 통과 | 변경은 클라이언트 CSS/속성/ZIP 옵션·로컬 하네스; 서버 런타임 추가 0 |
+| ko/en·내부 구현 비노출 | 통과 | 신규 사용자 문구 0; 탭 색 공통; 계측 데이터는 테스트 출력에만 기록 |
+| SEO·정적·사이트맵·FAQ | 통과 | 정의·생성기·route 추가 0; production test:static 통과, 61페이지 |
+| 광고·애널리틱스 격리 | 통과 | production new-tools/utilities/office 계약 통과; QA 16화면 외부/추적 0 |
+| 생성물·벤더 보호 | 통과 | dist는 생성 명령으로만 교체; public/vendor·정적 생성 페이지 직접 변경 0 |
+| 의존·사용자 파일·정지점 | 통과 | 새 의존 0; 개인 파일 SHA 일치; main/origin/main 기준 해시 유지 |
+
+**실행 중 실패와 판정** — 수정 전 새 CLS/a11y 게이트 실패는 의도한 음성 대조다. 최초 browser 실행은 기본 5173 서버가 없어 `ERR_CONNECTION_REFUSED`로 종료해 기존 preview를 `TEST_BASE_URL=http://127.0.0.1:4188`로 지정했다. `test:static`/new-tools의 영상 로더 검사는 production의 애널리틱스 존재를 요구해 QA 빌드에서는 실패했다. 게이트를 완화하거나 검사 코드를 바꾸지 않고 production 빌드에서 다시 실행했다. QR의 worker 전송 완료 누락/헤더만 집계는 NetLog 대조와 음성 unit으로 수정했다. 시각 38장 갱신 사유·diff 경로는 위에 명시했다. 복구 기본 명령은 desktop 74·Android 에뮬레이션 73, **147/147** 통과했다. `RECOVERY_STALE_NEW`를 주어 서로 다른 두 빌드를 비교하는 선택 사례 2건은 이번 명령에 포함되지 않아 S0 당시 149건과 다르다. 이번에 실행한 사례만 `recovery/executed-cases.json`과 함께 `/tmp/worklazy-s2/recovery/`로 보존했다. 신규 도구 스모크의 Dolby Vision base-layer 실기능 분기는 이 Chrome 호스트가 호환 경로를 제공하지 않아 기존 조건에 따라 생략됐고, capability unit·fallback 안내는 통과했다(`logs/new-tools-production.log`).
+
+**범위 밖 발견** — slash 없는 `/ko`·`/en`에서는 홈 탭의 `end` 링크(`/ko/`·`/en/`)와 URL이 달라 active가 없고, canonical 홈 URL에서는 정상이다. 기존 `localizedPath`/NavLink 코드를 대조했고 이번 색 변경과 무관하므로 수정하지 않았다. 기존 HWP 벤더 내부 4노드와 인앱 NotFound 부재는 backlog대로 이번 구현 밖이다. QR 목표·감량 구현, ZIP 통합/패키지 제거, main 병합/push는 수행하지 않았다.
+
+**검수 인계** — 최종 `dist/`는 `VITE_LOCAL_QA=1 npm run build` 산출물이다. 저장소 루트에서 `npm run preview -- --host 127.0.0.1 --port 4188 --strictPort`로 띄운다(기존 서버가 살아 있으면 재사용). 홈 `/ko/`, `/en/`와 목록 `/ko/tools`, `/en/tools`는 412px 모바일 하단 탭; 문서 비교 `/ko/tools/document-compare`, `/en/tools/document-compare`; PDF `/ko/tools/pdf-editor`, `/en/tools/pdf-editor`; QR `/ko/tools/qr-studio`, `/en/tools/qr-studio`, 일괄 `/ko/tools/qr-studio/bulk`, `/en/tools/qr-studio/bulk`를 검수한다. Codx 캡처는 `/tmp/worklazy-s2/qa/`에 16개 실제 화면 + 이전 탭색 대조 4장이다. 전체 보고·명령 원문·정지 상태는 `/tmp/worklazy-s2/REPORT.md`.
+
 ### S1 문서 비교 죽은 코드 제거 — 브랜치 구현·검증 (Codx)
 
 **판정: 지정 S1 구현과 브랜치 커밋 완료. redirect 4건 중 `/ko/word-compare/`는 기준 main부터 없는 경로라 1건 미통과이며, 완료 기준 전체 통과를 선언하지 않는다.** `CHANGELOG.md`의 S1 항목에 대응한다. 나머지 지정 검증은 통과했고, `s1-dead-code`에서 main 병합·push 없이 멈췄다. 전체 명령·exit·소요·출력·CSS 76규칙 목록·unit diff·종료 git 원문은 `/tmp/worklazy-s1/REPORT.md`, 원자료는 같은 디렉터리의 JSON·`logs/`에 있다. 정본 계획서 수정 0.
