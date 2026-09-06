@@ -10,6 +10,7 @@ import {
   MODULE_ATTRIBUTION_SCHEMA,
   assertMeasurementSchema,
   compareModuleAttribution,
+  moduleInventoryEntry,
   normalizeModuleChunks,
 } from "./bundle-module-attribution.mjs";
 
@@ -187,6 +188,8 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
     schemaVersion: BUNDLE_MEASUREMENT_SCHEMA_VERSION,
     moduleAttributionSchema: MODULE_ATTRIBUTION_SCHEMA,
     modules: normalizedModules,
+    moduleInventory: jsRecords.flatMap(({ paths }) => paths.map(moduleInventoryEntry))
+      .sort((left, right) => left.file < right.file ? -1 : left.file > right.file ? 1 : 0),
     generatedAt: new Date().toISOString(),
     buildCommand: "vite build --manifest --outDir dist-measure",
     includeRules: ["assets/**/*.js", "*.js", "tools/video-studio/workers/**/*.js", "assets/**/*.css", "**/*.css"],

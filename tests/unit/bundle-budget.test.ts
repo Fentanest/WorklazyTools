@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   budgetLimits, compareWithBaseline, measureOutput, resolveBudgetLimits, selectAffectedRoutes,
 } from "../../scripts/measure-bundle-budget.mjs";
@@ -10,8 +12,10 @@ import {
   BUNDLE_MEASUREMENT_SCHEMA_VERSION,
   MODULE_ATTRIBUTION_SCHEMA,
   allocateChunkGzip,
+  buildModuleContributions,
   canonicalModuleId,
   compareContributionRows,
+  moduleInventoryEntry,
 } from "../../scripts/bundle-module-attribution.mjs";
 
 const quiet = () => {};
@@ -37,6 +41,7 @@ function report() {
     perRouteJsGzip: { old: 100, unselected: 0 },
     files: [base.file],
     modules: [base.modules],
+    moduleInventory: [moduleInventoryEntry(base.file.paths[0])],
   };
 }
 
@@ -44,6 +49,7 @@ function addContribution(target: ReturnType<typeof report>, hash: string, bytes:
   const added = contributionFile(hash, bytes, category, routeOwners, `main:<root>/${hash}.ts`);
   target.files.push(added.file);
   target.modules.push(added.modules);
+  target.moduleInventory.push(moduleInventoryEntry(added.file.paths[0]));
   target.metrics.appJsGzip += bytes;
 }
 
@@ -111,6 +117,8 @@ test("same module moving from route to shared is not new application bytes even 
   const after = contributionFile("after-hash", 40, "shared", ["old", "unselected"], "main:<node_modules>/pdf-lib/index.js");
   baseline.files = [before.file]; baseline.modules = [before.modules];
   current.files = [after.file]; current.modules = [after.modules];
+  baseline.moduleInventory = [moduleInventoryEntry(before.file.paths[0])];
+  current.moduleInventory = [moduleInventoryEntry(after.file.paths[0])];
   baseline.metrics = { entryJsGzip: 0, affectedRouteJsGzip: 40, sharedJsGzip: 0, appJsGzip: 40, cssGzip: 0 };
   current.metrics = { entryJsGzip: 0, affectedRouteJsGzip: 0, sharedJsGzip: 40, appJsGzip: 40, cssGzip: 0 };
   baseline.perRouteJsGzip.old = 40; current.perRouteJsGzip.old = 0;
@@ -131,6 +139,45 @@ test("old bundle measurement schemas are rejected instead of using SHA fallback"
   assert.throws(() => compareWithBaseline(report(), old, budget, quiet), /unsupported bundle measurement schema/);
   const missing = report(); delete missing.modules;
   assert.throws(() => compareWithBaseline(report(), missing, budget, quiet), /unsupported bundle measurement schema/);
+  const missingInventory = report(); delete missingInventory.moduleInventory;
+  assert.throws(() => compareWithBaseline(report(), missingInventory, budget, quiet), /unsupported bundle measurement schema/);
+});
+
+test("schema v2 rejects empty or partial main metadata on both comparison sides", () => {
+  for (const side of ["baseline", "current"] as const) {
+    for (const mutation of [
+      (target: ReturnType<typeof report>) => { target.modules = []; },
+      (target: ReturnType<typeof report>) => { target.modules = target.modules.slice(1); },
+    ]) {
+      const current = report(); const baseline = report();
+      mutation(side === "current" ? current : baseline);
+      assert.throws(() => compareWithBaseline(current, baseline, budget, quiet), /missing main chunk metadata/);
+    }
+  }
+});
+
+test("only explicitly inventoried worker and public JavaScript use opaque attribution", () => {
+  const measured = report();
+  for (const [file, hash, bytes] of [
+    ["tools/video-studio/workers/video.worker-example.js", "worker", 7],
+    ["assets/pdf.worker-example.js", "asset-worker", 5],
+    ["assets/worker-example.js", "generic-worker", 3],
+    ["service-worker.js", "public", 11],
+  ] as const) {
+    measured.files.push({ hash, type: "js", category: "shared", gzipBytes: bytes, bytes, paths: [file], routeOwners: [] });
+    measured.moduleInventory.push(moduleInventoryEntry(file));
+    measured.metrics.appJsGzip += bytes;
+  }
+  const contributions = buildModuleContributions(measured);
+  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:worker" && bytes === 7));
+  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:asset-worker" && bytes === 5));
+  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:generic-worker" && bytes === 3));
+  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:public:sha256:public" && bytes === 11));
+  const invalid = structuredClone(measured);
+  invalid.files.push({ hash: "lost", type: "js", category: "shared", gzipBytes: 1, bytes: 1, paths: ["assets/lost.js"], routeOwners: [] });
+  invalid.moduleInventory.push(moduleInventoryEntry("assets/lost.js"));
+  invalid.metrics.appJsGzip += 1;
+  assert.throws(() => buildModuleContributions(invalid), /missing main chunk metadata/);
 });
 
 test("largest-remainder allocation is integer, deterministic, and conserves the chunk gzip size", () => {
@@ -140,6 +187,28 @@ test("largest-remainder allocation is integer, deterministic, and conserves the 
   assert.deepEqual(allocateChunkGzip(7, [{ id: "a", weight: 2 }, { id: "b", weight: 1 }]), [
     { id: "a", bytes: 5 }, { id: "b", bytes: 2 },
   ]);
+  assert.deepEqual(allocateChunkGzip(1, [{ id: "a.ts", weight: 1 }, { id: "Z.ts", weight: 1 }]), [
+    { id: "Z.ts", bytes: 1 }, { id: "a.ts", bytes: 0 },
+  ]);
+  assert.deepEqual(allocateChunkGzip(1, [{ id: "ä.ts", weight: 1 }, { id: "z.ts", weight: 1 }]), [
+    { id: "z.ts", bytes: 1 }, { id: "ä.ts", bytes: 0 },
+  ]);
+});
+
+test("largest-remainder tie order is identical in en-US and sv-SE processes", () => {
+  const moduleUrl = pathToFileURL(path.join(import.meta.dirname, "../../scripts/bundle-module-attribution.mjs")).href;
+  const expression = `import { allocateChunkGzip } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify({ ascii: allocateChunkGzip(1, [{ id: "a.ts", weight: 1 }, { id: "Z.ts", weight: 1 }]), nonAscii: allocateChunkGzip(1, [{ id: "ä.ts", weight: 1 }, { id: "z.ts", weight: 1 }]) }));`;
+  const results = ["en_US.UTF-8", "sv_SE.UTF-8"].map((locale) => {
+    const child = spawnSync(process.execPath, ["--input-type=module", "--eval", expression], {
+      encoding: "utf8",
+      env: { ...process.env, LANG: locale, LC_ALL: locale },
+    });
+    assert.equal(child.status, 0, child.stderr);
+    return JSON.parse(child.stdout);
+  });
+  assert.deepEqual(results[0], results[1]);
+  assert.deepEqual(results[0].ascii, [{ id: "Z.ts", bytes: 1 }, { id: "a.ts", bytes: 0 }]);
+  assert.deepEqual(results[0].nonAscii, [{ id: "z.ts", bytes: 1 }, { id: "ä.ts", bytes: 0 }]);
 });
 
 test("canonical module ids retain realm, virtual prefix, package path, and query", () => {
