@@ -2,6 +2,10 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-07
+
+- U4-0 PDF finish 선행 작업으로 번들 gzip을 청크 SHA 대신 모듈 기여·이동 기준으로 귀속하는 schema v2 측정기를 도입했다. Node 내장 모듈 기반 암호·손상·stream·위험·제거 fixture 생성기, OCG 87종 manifest와 Poppler/PDF.js 픽셀 oracle, main 기준 legacy-organize 구조·렌더·client oracle을 추가했다. — Codx
+
 ## 2026-09-06
 
 - QR 라벨 PDF에 해시 고정 KS X 1001 기반 빌드 타임 글꼴 subset과 원문+NFC coverage 선택·전체 폰트 폴백을 추가했다. Node-only 벤더 전개, ZIP/PDF 공용 export 수명주기, typed 폰트 초기화 경계와 3시나리오 전송 계측·Poppler/PDF.js 렌더 회귀를 함께 고정하고, 실제 handler mutation·폰트 404/S0·내보내기 취소 브라우저 회귀를 보강했다. — Codx
