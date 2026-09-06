@@ -53,6 +53,7 @@ export function createIncrementalZipArchiveWriter(
         level: 0,
         signal,
         zip64: true,
+        useUnicodeFileNames: true,
         onprogress: (loaded) => onProgress?.(loaded),
       });
     },
