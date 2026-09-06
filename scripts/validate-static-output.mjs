@@ -378,15 +378,19 @@ if (!koreanPages.includes("비디오 스튜디오, 오피스 편집 작업 화�
   throw new Error("The privacy policy does not describe the isolated workspace analytics and ad exclusions accurately.");
 }
 
-// Recurse through every output directory so future generated routes inherit the
-// entry-independent help. Non-app vendor documents belong to pinned vendors;
-// the exact Naver verification document belongs to the publishing integration.
+// Recurse through every output directory, with an explicit minimum exception
+// list. A future route or vendor HTML must not silently escape this contract.
+const recoveryDocumentExceptions = new Map([
+  ["vendor/rhwp-studio/0.8.6/index.html", "RHWP snapshot owner: upstream Studio entry, validated by validate-rhwp-vendor.mjs"],
+  ["vendor/rhwp-studio/0.8.6/print.html", "RHWP snapshot owner: upstream print document, validated by validate-rhwp-vendor.mjs"],
+  ["naver05161fb06bc9701a23cfc09ad5773578.html", "Publishing integration owner: exact Naver site verification payload"],
+]);
 let recoveryPages = 0;
 for (const item of await fs.readdir("dist", { recursive: true, withFileTypes: true })) {
   if (!item.isFile() || !item.name.endsWith(".html")) continue;
   const file = path.join(item.parentPath, item.name);
   const relative = path.relative("dist", file).replaceAll(path.sep, "/");
-  if (relative.startsWith("vendor/") || relative === "naver05161fb06bc9701a23cfc09ad5773578.html") continue;
+  if (recoveryDocumentExceptions.has(relative)) continue;
   const html = await fs.readFile(file, "utf8");
   const help = html.match(/<section id="startup-help"[\s\S]*?<\/section>/)?.[0];
   if (!help?.includes(" hidden ") || !help.includes("data-nosnippet") || !help.includes('lang="ko"') || !help.includes('lang="en"')
