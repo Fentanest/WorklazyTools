@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
+import ts from "typescript";
 
 import coverageInput from "../../scripts/assets/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/coverage.json" with { type: "json" };
 import {
@@ -14,6 +15,7 @@ import { createQrLabelPdf } from "../../src/features/qr-studio/qrLabelPdf.ts";
 import { QrLabelFontInitError } from "../../src/features/qr-studio/qrLabelFont.ts";
 
 const coverage = qrCoverageSet(coverageInput);
+const qrBulkPanelSource = fs.readFileSync(new URL("../../src/features/qr-studio/QrBulkPanel.tsx", import.meta.url), "utf8");
 
 test("QR font coverage schema is exact, sorted and includes the ellipsis", () => {
   assert.ok(coverage);
@@ -161,18 +163,301 @@ test("only font registration or embedding failures cross the typed font-init bou
   );
 });
 
-test("QR panel keeps one synchronous ZIP/PDF export lease and invalidates it at every stale-result boundary", () => {
-  const source = fs.readFileSync(new URL("../../src/features/qr-studio/QrBulkPanel.tsx", import.meta.url), "utf8");
-  assert.equal(source.match(/activeExportRef\.current\) return;/g)?.length, 2);
-  assert.match(source, /const active = beginExport\("zip"\);[\s\S]*?await Promise\.all/);
-  assert.match(source, /const active = beginExport\("pdf"\);[\s\S]*?const fontTask/);
-  assert.match(source, /disabled=\{busy \|\| !results\.length/);
-  assert.equal(source.match(/storageRef\.current = undefined;\n\s+await storage\.clear\(\);/g)?.length, 2);
-  assert.match(source, /function invalidateExport\(\)[\s\S]*?controller\.abort\(\)[\s\S]*?fontLoaderRef\.current\?\.dispose\(\)/);
-  assert.match(source, /selected\.kind !== "subset" \|\| !\(error instanceof QrLabelFontInitError\)/);
-  assert.match(source, /loader\.evict\("subset"\)[\s\S]*?loader\.load\("full"[\s\S]*?createQrLabelPdf\(entries/);
-  assert.match(source, /setTimeout\(resolve, 0\)[\s\S]*?assertExport\(active\);[\s\S]*?downloadBlob/);
+test("QR panel product handlers keep an old ZIP finally from releasing a newer PDF lease", async () => {
+  await assertQrExportOwnership(qrBulkPanelSource);
 });
+
+test("QR export lease regression detects removal of the product ownership guard", async () => {
+  const guard = "    if (!owned) return;";
+  assert.equal(qrBulkPanelSource.split(guard).length - 1, 1);
+  const mutant = qrBulkPanelSource.replace(guard, "    // Mutation control: ownership guard removed");
+  await assert.rejects(
+    assertQrExportOwnership(mutant),
+    (error) => error instanceof assert.AssertionError && error.actual === "" && error.expected === "pdf",
+  );
+});
+
+test("QR panel cancel executes product invalidation and prevents a stale PDF download", async () => {
+  const save = deferred<Blob>();
+  const { panel, deps, stats } = createQrPanelHarness(qrBulkPanelSource);
+  deps.pdfModule = async () => ({
+    createQrLabelPdf: async () => {
+      stats.pdfCalls += 1;
+      return save.promise;
+    },
+  });
+  const pending = panel.downloadPdf();
+  await waitForCondition(() => stats.pdfCalls === 1);
+  assert.equal(panel.state().exporting, "pdf");
+
+  panel.cancel();
+  assert.equal(panel.state().exporting, "");
+  assert.equal(panel.state().active, undefined);
+  assert.equal(stats.disposals, 1);
+  save.resolve(new Blob(["late pdf"]));
+  await pending;
+  assert.deepEqual(panel.events.filter(([type]) => type === "download" || type === "message"), []);
+});
+
+test("QR panel cleanup detaches old storage before awaiting clear and preserves replacement storage", async () => {
+  const save = deferred<Blob>();
+  const clear = deferred<void>();
+  const { panel, deps, stats } = createQrPanelHarness(qrBulkPanelSource);
+  const oldStorage = { read: async () => new Blob(["png"]), clear: () => clear.promise };
+  const replacementStorage = { read: async () => new Blob(["new png"]), clear: async () => undefined };
+  panel.setData(sampleQrResults(), oldStorage);
+  deps.pdfModule = async () => ({
+    createQrLabelPdf: async () => {
+      stats.pdfCalls += 1;
+      return save.promise;
+    },
+  });
+  const pendingExport = panel.downloadPdf();
+  await waitForCondition(() => stats.pdfCalls === 1);
+
+  const pendingCleanup = panel.cleanupResults();
+  assert.equal(panel.state().storage, undefined);
+  assert.equal(panel.state().active, undefined);
+  assert.equal(panel.state().exporting, "");
+  panel.setData(sampleQrResults("replacement"), replacementStorage);
+  clear.resolve();
+  await pendingCleanup;
+  assert.equal(panel.state().storage, replacementStorage);
+
+  save.resolve(new Blob(["late pdf"]));
+  await pendingExport;
+  assert.deepEqual(panel.events.filter(([type]) => type === "download" || type === "message"), []);
+});
+
+test("QR run abort and error product branches detach storage before clear and invalidate export", async () => {
+  for (const branch of ["abort", "error"] as const) {
+    const clear = deferred<void>();
+    const storage = { clear: () => clear.promise };
+    const replacementStorage = { clear: async () => undefined };
+    const run = createQrRunDiscardHarness(qrBulkPanelSource, branch, storage);
+    const pending = run.execute();
+    assert.equal(run.state().storage, undefined, branch);
+    assert.equal(run.state().active, undefined, branch);
+    assert.equal(run.state().exporting, "", branch);
+    assert.equal(run.state().controllerAborted, true, branch);
+    assert.equal(run.state().disposals, 1, branch);
+    run.setStorage(replacementStorage);
+    clear.resolve();
+    await pending;
+    assert.equal(run.state().storage, replacementStorage, branch);
+    assert.deepEqual(run.state().results, [], branch);
+  }
+});
+
+test("QR PDF button product expression disables export while generation is busy", () => {
+  const match = qrBulkPanelSource.match(/disabled=\{([^}]+)\} onClick=\{\(\) => void downloadPdf\(\)\}/);
+  assert.ok(match);
+  const evaluate = new Function("busy", "results", "exporting", "QR_BULK_LIMITS", `return ${match[1]}`);
+  assert.equal(Boolean(evaluate(true, [{}], "", { pdfRows: 2_400 })), true);
+  assert.equal(Boolean(evaluate(false, [{}], "", { pdfRows: 2_400 })), false);
+});
+
+type PanelEvent = [type: string, value: string];
+
+function sampleQrResults(storageKey = "stored") {
+  return [{ title: "한글", description: "", storageKey, zipPath: `${storageKey}.png` }];
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function waitForCondition(condition: () => boolean) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (condition()) return;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  throw new Error("Timed out waiting for QR handler checkpoint.");
+}
+
+async function assertQrExportOwnership(source: string) {
+  const oldZip = deferred<void>();
+  const pdfSave = deferred<Blob>();
+  const { panel, deps, stats } = createQrPanelHarness(source);
+  deps.zipModule = async () => {
+    await oldZip.promise;
+    throw new Error("delayed old ZIP failure");
+  };
+  deps.pdfModule = async () => ({
+    createQrLabelPdf: async () => {
+      stats.pdfCalls += 1;
+      return pdfSave.promise;
+    },
+  });
+
+  const oldExport = panel.downloadZip();
+  await panel.cleanupResults();
+  panel.setData(sampleQrResults("new"), { read: async () => new Blob(["png"]), clear: async () => undefined });
+  const newExport = panel.downloadPdf();
+  await waitForCondition(() => stats.pdfCalls === 1);
+  oldZip.resolve();
+  await oldExport;
+
+  const duringPdf = panel.state();
+  pdfSave.resolve(new Blob(["pdf"]));
+  await newExport;
+  assert.equal(duringPdf.exporting, "pdf");
+  assert.equal(duringPdf.active?.kind, "pdf");
+  assert.deepEqual(panel.events.filter(([type]) => type === "message"), []);
+  assert.deepEqual(panel.events.filter(([type]) => type === "download"), [["download", "worklazy-qr-labels-a4.pdf"]]);
+}
+
+function createQrPanelHarness(source: string) {
+  const handlerStart = source.indexOf("  const downloadZip = async");
+  const handlerEnd = source.indexOf('\n  return <div data-testid="qr-bulk-page"');
+  const cancelStart = source.indexOf("  const cancel = () =>");
+  const cancelEnd = source.indexOf("  const downloadResult = async");
+  const cleanupStart = source.indexOf("  async function cleanupResults()");
+  const cleanupEnd = source.indexOf("\n}\n\nfunction PayloadFields");
+  assert.ok([handlerStart, handlerEnd, cancelStart, cancelEnd, cleanupStart, cleanupEnd].every((index) => index >= 0));
+  let handlers = source.slice(handlerStart, handlerEnd)
+    + source.slice(cancelStart, cancelEnd)
+    + source.slice(cleanupStart, cleanupEnd);
+  handlers = handlers
+    .replaceAll('import("./qrLabelFont.ts")', "deps.fontModule()")
+    .replaceAll('import("./qrLabelPdf.ts")', "deps.pdfModule()")
+    .replaceAll('import("@zip.js/zip.js")', "deps.zipModule()")
+    .replaceAll('import("../../utils/zipArchive.ts")', "deps.writerModule()")
+    .replaceAll("import.meta.env.BASE_URL", '"/"')
+    .replaceAll("window.location.origin", '"https://example.test"');
+  const setup = `
+    const mountedRef = { current: true };
+    const exportSequenceRef = { current: 0 };
+    const activeExportRef = { current: undefined };
+    const fontLoaderRef = { current: undefined };
+    const canceledRef = { current: false };
+    const rasterRef = { current: undefined };
+    const storageRef = { current: undefined };
+    const QR_BULK_LIMITS = { pdfRows: 2400 };
+    const operation = { reset() {} };
+    const events = [];
+    let results = [];
+    let pdfPreset = "a4";
+    let exporting = "";
+    const t = (key) => key;
+    const setExporting = (value) => { exporting = value; events.push(["exporting", value]); };
+    const setMessage = (value) => events.push(["message", value]);
+    const downloadBlob = (_blob, name) => events.push(["download", name]);
+    const setResults = (value) => { results = value; };
+    const setFailures = () => {};
+    const setManifest = () => {};
+    const setResultPage = () => {};
+  `;
+  const returned = `
+    return {
+      downloadZip, downloadPdf, cleanupResults, cancel, events, activeExportRef,
+      setData(nextResults, storage) { results = nextResults; storageRef.current = storage; },
+      state() { return { active: activeExportRef.current, exporting, storage: storageRef.current }; },
+    };
+  `;
+  const compiled = ts.transpileModule(setup + handlers + returned, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText;
+  const stats = { pdfCalls: 0, disposals: 0, evictions: 0, fontLoads: [] as string[] };
+  const loader = {
+    async acquire(kind: string) {
+      stats.fontLoads.push(kind);
+      return { kind, bytes: new ArrayBuffer(1) };
+    },
+    async load(kind: string) {
+      stats.fontLoads.push(kind);
+      return { kind, bytes: new ArrayBuffer(1) };
+    },
+    evict() { stats.evictions += 1; },
+    dispose() { stats.disposals += 1; },
+  };
+  const deps = {
+    fontModule: async () => ({ selectQrLabelFont, QrLabelFontInitError, createQrLabelFontLoader: () => loader }),
+    pdfModule: async () => ({
+      createQrLabelPdf: async () => {
+        stats.pdfCalls += 1;
+        return new Blob(["pdf"]);
+      },
+    }),
+    zipModule: async () => ({
+      BlobWriter: class {
+        async getData() { return new Blob(["zip"]); }
+      },
+    }),
+    writerModule: async () => ({
+      createIncrementalZipArchiveWriter: () => ({
+        add: async () => undefined,
+        close: async () => undefined,
+        discard: async () => undefined,
+      }),
+    }),
+  };
+  const panel = new Function("deps", compiled)(deps) as {
+    downloadZip: () => Promise<void>;
+    downloadPdf: () => Promise<void>;
+    cleanupResults: () => Promise<void>;
+    cancel: () => void;
+    events: PanelEvent[];
+    setData: (results: ReturnType<typeof sampleQrResults>, storage: { read: () => Promise<Blob>; clear: () => Promise<void> }) => void;
+    state: () => { active?: { kind: "zip" | "pdf" }; exporting: string; storage?: unknown };
+  };
+  panel.setData(sampleQrResults(), { read: async () => new Blob(["png"]), clear: async () => undefined });
+  return { panel, deps, stats };
+}
+
+function createQrRunDiscardHarness(
+  source: string,
+  branch: "abort" | "error",
+  storage: { clear: () => Promise<void> },
+) {
+  const runStart = source.indexOf("  const run = async");
+  const runEnd = source.indexOf("  const cancel = () =>");
+  const runSource = source.slice(runStart, runEnd);
+  const branchMatch = runSource.match(/if \(error instanceof DOMException && error\.name === "AbortError"\) \{\n([\s\S]*?)\n      \} else \{\n([\s\S]*?)\n      \}\n    \} finally/);
+  assert.ok(branchMatch);
+  const invalidateStart = source.indexOf("  function invalidateExport()");
+  const invalidateEnd = source.indexOf('\n\n  return <div data-testid="qr-bulk-page"');
+  assert.ok(invalidateStart >= 0 && invalidateEnd > invalidateStart);
+  const invalidate = source.slice(invalidateStart, invalidateEnd);
+  const body = branch === "abort" ? branchMatch[1] : branchMatch[2];
+  const factorySource = `
+    const controller = new AbortController();
+    const activeExportRef = { current: { token: 1, controller, kind: "pdf" } };
+    const exportSequenceRef = { current: 1 };
+    const fontLoaderRef = { current: { dispose() { disposals += 1; } } };
+    const storageRef = { current: storage };
+    let exporting = "pdf", disposals = 0, results = [{}];
+    const setExporting = (value) => { exporting = value; };
+    const setResults = (value) => { results = value; };
+    const setFailures = () => {};
+    const setManifest = () => {};
+    const operation = { fail() {} };
+    const t = (key) => key;
+    const rasterError = () => "raster-error";
+    const translate = (key) => key;
+    ${invalidate}
+    async function execute() { const error = new DOMException("Aborted", "AbortError"); ${body} }
+    return {
+      execute,
+      setStorage(value) { storageRef.current = value; },
+      state() { return { storage: storageRef.current, active: activeExportRef.current, exporting, disposals, results, controllerAborted: controller.signal.aborted }; },
+    };
+  `;
+  const compiled = ts.transpileModule(factorySource, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText;
+  return new Function("storage", compiled)(storage) as {
+    execute: () => Promise<void>;
+    setStorage: (value: unknown) => void;
+    state: () => { storage?: unknown; active?: unknown; exporting: string; disposals: number; results: unknown[]; controllerAborted: boolean };
+  };
+}
 
 type Failure = "http" | "network" | "body" | "empty" | "truncated" | "html" | "sha";
 

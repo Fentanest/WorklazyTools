@@ -17,6 +17,10 @@ export const qrFontScenarios = {
   full: {font:'full',requests:['full']},
   corrupt: {font:'full',requests:['subset','full']},
 };
+export const qrFontBrowserScenarios = {
+  ...qrFontScenarios,
+  font404: {font:'full',requests:['subset','full']},
+};
 export function readQrFontScenario(args) {
   assert(args.length <= 1, 'Use exactly one optional --scenario=subset|full|corrupt');
   const scenario=args.length ? args[0].replace(/^--scenario=/,'') : 'subset';
@@ -25,7 +29,7 @@ export function readQrFontScenario(args) {
   return scenario;
 }
 export function qrFontFixture(scenario, count) {
-  assert(Object.hasOwn(qrFontScenarios,scenario));
+  assert(Object.hasOwn(qrFontBrowserScenarios,scenario));
   const rows=Array.from({length:count},(_,i)=>({
     payload: count===25 ? `한글 라벨 경계 ${i+1}` : `한글 라벨 ${i===0?'첫째':'둘째'}`,
     title:'한글 라벨 제목'+(scenario==='full' && i===0 ? '똠' : ''), description:'',
@@ -55,19 +59,42 @@ export function assertQrFontRequests(requests, scenario) {
 // Test-only same-origin reverse proxy. Ordinary responses retain upstream bytes
 // and encoding. Only the exact owned subset pathname can be corrupted.
 // Browser routing is never used; Chromium records actual HTTP bytes in NetLog.
-export async function createQrFontScenarioServer({upstream,subsetPath,scenario='subset'}) {
-  assert(Object.hasOwn(qrFontScenarios,scenario));
+export async function createQrFontScenarioServer({upstream,subsetPath,chunkPath,scenario='subset'}) {
+  const serverScenarios=new Set([...Object.keys(qrFontBrowserScenarios),'chunk404']);
+  assert(serverScenarios.has(scenario));
   const corrupt=Buffer.from(await fs.readFile(subsetPath));
   assert.equal(corrupt.length,pins.subset.size);
   assert.equal(createHash('sha256').update(corrupt).digest('hex'),pins.subset.sha256);
   corrupt[50]^=1;
   const injected=[];
+  const fontRequests=[];
+  let heldFont404;
   const server=http.createServer((request,response)=>{
     const target=new URL(request.url,upstream);
-    if (scenario==='corrupt' && target.pathname===fontPaths.subset) {
-      injected.push({scenario,path:target.pathname,bytes:corrupt.length});
+    const requestScenario=scenario;
+    if (Object.values(fontPaths).includes(target.pathname)) fontRequests.push({scenario:requestScenario,path:target.pathname});
+    if (requestScenario==='corrupt' && target.pathname===fontPaths.subset) {
+      injected.push({scenario:requestScenario,path:target.pathname,status:200,bytes:corrupt.length});
       response.writeHead(200,{'Content-Type':'font/otf','Content-Length':corrupt.length});
       response.end(corrupt); return;
+    }
+    if (requestScenario==='font404' && target.pathname===fontPaths.subset) {
+      injected.push({scenario:requestScenario,path:target.pathname,status:404,bytes:0});
+      const hold=heldFont404;
+      hold?.markRequested();
+      const respond=()=>{
+        if (response.destroyed) return;
+        response.writeHead(404,{'Content-Type':'text/plain','Content-Length':0});
+        response.end();
+      };
+      if (hold) void hold.gate.then(respond);
+      else respond();
+      return;
+    }
+    if (requestScenario==='chunk404' && chunkPath && target.pathname===chunkPath) {
+      injected.push({scenario:requestScenario,path:target.pathname,status:404,bytes:0});
+      response.writeHead(404,{'Content-Type':'text/plain','Content-Length':0});
+      response.end(); return;
     }
     const pending=http.request(target,{method:request.method,headers:{...request.headers,host:target.host}},incoming=>{
       response.writeHead(incoming.statusCode,incoming.headers); incoming.pipe(response);
@@ -76,8 +103,24 @@ export async function createQrFontScenarioServer({upstream,subsetPath,scenario='
     request.pipe(pending);
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  return {url:`http://127.0.0.1:${server.address().port}`,injected,
-    setScenario(value){assert(Object.hasOwn(qrFontScenarios,value));scenario=value},
-    async close(){server.closeAllConnections();await new Promise(r=>server.close(r))},
+  return {url:`http://127.0.0.1:${server.address().port}`,injected,fontRequests,
+    setScenario(value){assert(serverScenarios.has(value));scenario=value},
+    holdFont404(){
+      assert.equal(scenario,'font404');
+      assert.equal(heldFont404,undefined);
+      let releaseGate,markRequested;
+      const gate=new Promise(resolve=>{releaseGate=resolve});
+      const requested=new Promise(resolve=>{markRequested=resolve});
+      let released=false;
+      const hold={gate,requested,markRequested,release(){
+        if (released) return;
+        released=true;
+        heldFont404=undefined;
+        releaseGate();
+      }};
+      heldFont404=hold;
+      return {requested,release:hold.release};
+    },
+    async close(){heldFont404?.release();server.closeAllConnections();await new Promise(r=>server.close(r))},
   };
 }
