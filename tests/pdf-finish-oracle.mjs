@@ -8,6 +8,11 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { classifyOcgPreflight } from "./helpers/pdf-finish-ocg-preflight.mjs";
+import {
+  emptyFirstPageContent,
+  findOptionalContentResiduals,
+  flattenOptionalContent,
+} from "./helpers/pdf-finish-ocg-transform.mjs";
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, "..");
@@ -101,6 +106,27 @@ async function browserRender(page, bytes) {
       await task.destroy();
     }
   }, bytes.toString("base64"));
+}
+
+async function renderDocument(page, bytes, label, temporaryRoot) {
+  const directory = path.join(temporaryRoot, label.replaceAll(/[^a-zA-Z0-9_.-]/g, "-"));
+  await fs.mkdir(directory, { recursive: true });
+  const pdfPath = path.join(directory, "input.pdf");
+  await fs.writeFile(pdfPath, bytes);
+  popplerRender(pdfPath, directory);
+  return {
+    poppler: await readPopplerPages(directory),
+    pdfjs: await browserRender(page, bytes),
+  };
+}
+
+function mismatchDetected(left, right) {
+  try {
+    assert.deepEqual(left, right);
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 function normalizeExpectedAttempt(attempt) {
@@ -222,7 +248,7 @@ page.on("request", (request) => { if (!request.url().startsWith(origin)) externa
 const browserConsole = [];
 page.on("console", (message) => browserConsole.push({ type: message.type(), text: message.text() }));
 const result = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   environment: {
     node: process.version,
     platform: `${os.platform()} ${os.release()} ${os.arch()}`,
@@ -232,6 +258,7 @@ const result = {
     pixelFormat: "unpremultiplied RGBA, SHA-256, white canvas background, 72 dpi/scale 1",
   },
   ocg: [],
+  ordinary: [],
   fixtureContracts: undefined,
   externalRequests,
   browserConsole,
@@ -243,22 +270,77 @@ try {
     globalThis.pdfjsLib = await import("/pdf.mjs");
     globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.mjs";
   });
+  for (const fixture of manifest.fixtures.filter(({ category }) => category === "ordinary")) {
+    const bytes = await fs.readFile(path.join(fixtureRoot, fixture.file));
+    const classification = await classifyOcgPreflight(bytes);
+    assert.deepEqual({ allowed: classification.allowed, reason: classification.reason }, fixture.expectation.preflight, fixture.file);
+    const rendered = await renderDocument(page, bytes, `${fixture.file}-source`, temporaryRoot);
+    assert.deepEqual(rendered.poppler, fixture.expectation.pixelOracle.poppler, `${fixture.file}: Poppler pixel oracle`);
+    assert.deepEqual(rendered.pdfjs, fixture.expectation.pixelOracle.pdfjs, `${fixture.file}: PDF.js pixel oracle`);
+    result.ordinary.push({ file: fixture.file, preflight: fixture.expectation.preflight, ...rendered });
+  }
+
+  let transformAttempts = 0;
+  const transformCache = new Map();
   for (const fixture of manifest.ocg.files) {
     const bytes = await fs.readFile(path.join(fixtureRoot, fixture.file));
     const classification = await classifyOcgPreflight(bytes);
     assert.equal(classification.allowed, fixture.preflight.allowed, `${fixture.file}: ${classification.reason}`);
-    const row = { file: fixture.file, cohort: fixture.cohort, preflight: { allowed: classification.allowed, reason: classification.reason } };
+    const row = {
+      file: fixture.file,
+      cohort: fixture.cohort,
+      preflight: { allowed: classification.allowed, reason: classification.reason },
+      transformed: false,
+      residual: null,
+      shaMatch: null,
+    };
     if (fixture.pixelOracle) {
-      const popplerDirectory = path.join(temporaryRoot, path.basename(fixture.file, ".pdf"));
-      await fs.mkdir(popplerDirectory, { recursive: true });
-      popplerRender(path.join(fixtureRoot, fixture.file), popplerDirectory);
-      row.poppler = await readPopplerPages(popplerDirectory);
-      row.pdfjs = await browserRender(page, bytes);
+      const rendered = await renderDocument(page, bytes, `${fixture.file}-source`, temporaryRoot);
+      row.poppler = rendered.poppler;
+      row.pdfjs = rendered.pdfjs;
       assert.deepEqual(row.poppler, fixture.pixelOracle.poppler, `${fixture.file}: Poppler pixel oracle`);
       assert.deepEqual(row.pdfjs, fixture.pixelOracle.pdfjs, `${fixture.file}: PDF.js pixel oracle`);
     }
+    if (classification.allowed) {
+      transformAttempts += 1;
+      const transformedBytes = await flattenOptionalContent(bytes);
+      const transformedRender = await renderDocument(page, transformedBytes, `${fixture.file}-transformed`, temporaryRoot);
+      const residual = await findOptionalContentResiduals(transformedBytes);
+      const shaMatch = {
+        poppler: !mismatchDetected(transformedRender.poppler, row.poppler),
+        pdfjs: !mismatchDetected(transformedRender.pdfjs, row.pdfjs),
+      };
+      assert.deepEqual(shaMatch, { poppler: true, pdfjs: true }, `${fixture.file}: before/after renderer SHA`);
+      assert.deepEqual(residual, [], `${fixture.file}: deep optional-content residual`);
+      row.transformed = true;
+      row.transformedSha256 = sha256(transformedBytes);
+      row.transformedRender = transformedRender;
+      row.residual = residual;
+      row.shaMatch = shaMatch;
+      transformCache.set(fixture.file, { source: { poppler: row.poppler, pdfjs: row.pdfjs }, transformedBytes });
+    }
     result.ocg.push(row);
   }
+  assert.equal(transformAttempts, result.ocg.filter(({ preflight }) => preflight.allowed).length);
+  assert.equal(result.ocg.filter(({ preflight, transformed }) => !preflight.allowed && transformed).length, 0);
+
+  const controlFixture = "ocg/on.pdf";
+  const control = transformCache.get(controlFixture);
+  assert.ok(control, `${controlFixture}: missing transformed output for negative control`);
+  const brokenBytes = await emptyFirstPageContent(control.transformedBytes);
+  const brokenRender = await renderDocument(page, brokenBytes, `${controlFixture}-negative-control`, temporaryRoot);
+  result.negativeControl = {
+    file: controlFixture,
+    mutation: "empty transformed first-page Contents",
+    popplerCaught: mismatchDetected(brokenRender.poppler, control.source.poppler),
+    pdfjsCaught: mismatchDetected(brokenRender.pdfjs, control.source.pdfjs),
+  };
+  assert.deepEqual(result.negativeControl, {
+    file: controlFixture,
+    mutation: "empty transformed first-page Contents",
+    popplerCaught: true,
+    pdfjsCaught: true,
+  });
   result.fixtureContracts = await verifyFixtureContracts();
   assert.deepEqual(externalRequests, []);
   result.summary = {
@@ -267,6 +349,12 @@ try {
     preflightExcluded: result.ocg.filter(({ preflight }) => !preflight.allowed).length,
     pixelFixtures: result.ocg.filter(({ poppler }) => poppler).length,
     pixelPages: result.ocg.reduce((total, row) => total + (row.poppler?.length ?? 0), 0),
+    ordinaryFixtures: result.ordinary.length,
+    transformedAllowed: result.ocg.filter(({ transformed }) => transformed).length,
+    excludedTransformAttempts: result.ocg.filter(({ preflight, transformed }) => !preflight.allowed && transformed).length,
+    deepResidualZero: result.ocg.filter(({ transformed, residual }) => transformed && residual.length === 0).length,
+    shaMatchBothRenderers: result.ocg.filter(({ shaMatch }) => shaMatch?.poppler && shaMatch?.pdfjs).length,
+    negativeControl: result.negativeControl,
   };
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);
