@@ -129,15 +129,15 @@ function KoreanOnlyRoute({ children }: { children: React.ReactNode }) {
 
 function PdfRoute({ mode }: { mode: PdfToolMode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><ToolReady><PdfEditorPage mode={mode} /></ToolReady></Suspense>;
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><ToolReady><PdfEditorPage mode={mode} /></ToolReady></Suspense>;
 }
 
 function QrRoute({ mode }: { mode: QrMode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "QR Studio" })}</div>}><ToolReady><QrStudioPage initialMode={mode} /></ToolReady></Suspense>;
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: "QR Studio" })}</div>}><ToolReady><QrStudioPage initialMode={mode} /></ToolReady></Suspense>;
 }
 
 function LazyToolRoute({ label, children }: { label: string; children: React.ReactNode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: label })}</div>}><ToolReady>{children}</ToolReady></Suspense>;
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: label })}</div>}><ToolReady>{children}</ToolReady></Suspense>;
 }

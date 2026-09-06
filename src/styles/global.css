@@ -105,6 +105,9 @@ input:focus-visible {
   -webkit-backdrop-filter: blur(28px) saturate(175%);
 }
 
+/* Contain the static fallback margin before React replaces the root content. */
+#root { display: flow-root; }
+
 .app-shell { min-height: 100vh; }
 
 .desktop-language-switcher { position: fixed; z-index: 45; top: 22px; right: 24px; }
