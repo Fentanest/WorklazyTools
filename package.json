@@ -11,6 +11,8 @@
     "bench:excel-cleaner": "node scripts/benchmark-excel-cleaner-heap.mjs",
     "measure:qr": "node tests/qr-stage-metrics.mjs",
     "bundle:measure": "node scripts/measure-bundle-budget.mjs",
+    "fixtures:pdf-finish": "node scripts/generate-pdf-finish-fixtures.mjs",
+    "fixtures:pdf-legacy-oracle": "node tests/capture-pdf-legacy-oracle.mjs",
     "css:orphans": "node scripts/audit-css-orphans.mjs",
     "legacy:manifest": "node scripts/generate-legacy-owner-manifest.mjs",
     "vendor:rhwp": "node scripts/vendor-rhwp-studio.mjs",
@@ -40,6 +42,7 @@
     "test:ui-migration": "node tests/ui-migration-layout-smoke.mjs",
     "test:a11y": "node tests/accessibility-audit.mjs",
     "test:rendering": "node tests/rendering-baseline.mjs",
+    "test:pdf-finish-oracle": "node tests/pdf-finish-oracle.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },
   "dependencies": {

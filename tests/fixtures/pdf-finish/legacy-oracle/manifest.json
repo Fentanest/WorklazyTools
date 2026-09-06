@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "5bc6854175331bdd73b267784d9633cdccda8446",
+  "source": {
+    "client": {
+      "file": "src/features/pdf-editor/pdfWorkerClient.ts",
+      "sha256": "9ded172efa1d4eb2d730ffbd7bf3caf6788519106fc6bce6eb657c3399b71b47"
+    },
+    "worker": {
+      "file": "src/features/pdf-editor/pdf.worker.ts",
+      "sha256": "bfde32b1e29ba505c80b1f63797b9ed1dd57b6da304e8f08a5511374bffdc6a9"
+    }
+  },
+  "input": {
+    "file": "input.pdf",
+    "bytes": 1702,
+    "sha256": "138b7398c7e851de8258e47456bd797063dec00e825022d1a27af053d3a59d7b",
+    "rotations": [
+      0,
+      90,
+      180,
+      270
+    ],
+    "mixedMediaBoxes": true,
+    "nonZeroCropBoxes": true
+  },
+  "environment": {
+    "node": "v22.17.1",
+    "platform": "linux 7.0.0-30-generic x64",
+    "chrome": "152.0.7977.64",
+    "poppler": "pdftoppm version 24.02.0",
+    "pdfLib": "1.17.1",
+    "pdfjs": "6.2.108",
+    "systemUiFont": "Noto Sans|/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    "captureTime": "2026-09-05T03:00:00.000Z (fixed)",
+    "render": {
+      "popplerDpi": "default 150, overridden by -scale-to 650",
+      "pdfjsScale": 1,
+      "background": "white",
+      "pixelFormat": "unpremultiplied RGBA SHA-256"
+    }
+  },
+  "client": {
+    "contract": {
+      "width": {
+        "minimum": 420,
+        "maximum": 1800
+      },
+      "height": 92,
+      "fillAlpha": 0.82,
+      "utf16SliceUnits": 120
+    },
+    "records": [
+      {
+        "name": "short",
+        "file": "client/short.png",
+        "bytes": 6975,
+        "sha256": "480f0f9ec514b98b8bd25c5a3ccb06367ab24bde007864cdacc8318222395c65",
+        "width": 420,
+        "height": 92,
+        "maximumAlpha": 209,
+        "operations": [
+          {
+            "operation": "measureText",
+            "utf16Units": 11,
+            "text": "Legacy TEST",
+            "font": "600 46px system-ui, sans-serif"
+          },
+          {
+            "operation": "fillText",
+            "utf16Units": 11,
+            "text": "Legacy TEST",
+            "fillStyle": "rgba(30, 30, 34, 0.82)",
+            "font": "600 46px system-ui, sans-serif",
+            "x": 210,
+            "y": 46
+          }
+        ]
+      },
+      {
+        "name": "wide",
+        "file": "client/wide.png",
+        "bytes": 13097,
+        "sha256": "741931f95768d62d388d389149db581daf282e388d9dc7c54e4b215a7e13dd17",
+        "width": 1800,
+        "height": 92,
+        "maximumAlpha": 209,
+        "operations": [
+          {
+            "operation": "measureText",
+            "utf16Units": 200,
+            "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+            "font": "600 46px system-ui, sans-serif"
+          },
+          {
+            "operation": "fillText",
+            "utf16Units": 120,
+            "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+            "fillStyle": "rgba(30, 30, 34, 0.82)",
+            "font": "600 46px system-ui, sans-serif",
+            "x": 900,
+            "y": 46
+          }
+        ]
+      },
+      {
+        "name": "surrogate",
+        "file": "client/surrogate.png",
+        "bytes": 12997,
+        "sha256": "ed37b7e2cd536b9e3decb5d8fb95330569d85ed79e5b2a070831ea9addaeda1f",
+        "width": 1800,
+        "height": 92,
+        "maximumAlpha": 209,
+        "operations": [
+          {
+            "operation": "measureText",
+            "utf16Units": 122,
+            "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW😀Z",
+            "font": "600 46px system-ui, sans-serif"
+          },
+          {
+            "operation": "fillText",
+            "utf16Units": 120,
+            "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW\ud83d",
+            "fillStyle": "rgba(30, 30, 34, 0.82)",
+            "font": "600 46px system-ui, sans-serif",
+            "x": 900,
+            "y": 46
+          }
+        ]
+      }
+    ]
+  },
+  "modes": [
+    {
+      "mode": "none",
+      "options": {
+        "pageNumbers": false,
+        "watermark": false
+      },
+      "output": {
+        "file": "output/none.pdf",
+        "bytes": 1729,
+        "sha256": "f95081d4c456d4fedd2d4618649d54b8848d2d71e0421fcfbb1d2973118861ff",
+        "secondRunSha256": "f95081d4c456d4fedd2d4618649d54b8848d2d71e0421fcfbb1d2973118861ff",
+        "byteEqual": true
+      },
+      "structure": {
+        "file": "structure/none.json",
+        "sha256": "7cceda39eafac636893330acf6afe2742c97b3538087aa58e5f8bf2826d51171",
+        "secondRunEqual": true
+      },
+      "render": {
+        "poppler": {
+          "engine": "Poppler",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/poppler-none-1.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "7d72d840d8cff6a29b0155c325e528589f3628531c26af268bbdc5223fd79c16",
+              "pngSha256": "7686784ebfa743ffca9d18189182a04bf2db0a31af703b2be26cfe58bd740336"
+            },
+            {
+              "page": 2,
+              "file": "render/poppler-none-2.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "9e10ac370eb2817bb8879951020e8afecc20928478bb6353fc8882e7f32d6e97",
+              "pngSha256": "f677466e3a54a4392f1ff2f80d96629ea02c96a21841594d056848326d1e71c8"
+            },
+            {
+              "page": 3,
+              "file": "render/poppler-none-3.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "a719c7e9566f8b0849be61a59adeade26dd0a265a176e0d8a6a98163d2ba7781",
+              "pngSha256": "52f0cc7b0b7223984a202c9f37ae128f61bf2651010c448993638246dc663541"
+            },
+            {
+              "page": 4,
+              "file": "render/poppler-none-4.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "a9a780029b49953adf8c75df3bbf730b7418a24ddfa79da289cb4fbe020b2464",
+              "pngSha256": "1b4f7fe49b551ff15a4e21c82372afa88c8231a3caa001911ee39fae6ad43326"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "pdfjs": {
+          "engine": "PDF.js in Chrome",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/pdfjs-none-1.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "1ad035646aaed825d09cc743bae778dd9640e096fdfa570d1646b2d879f13a82",
+              "pngSha256": "4f75da453129109245349670ae8d2dbddebe97b522c713dd59774e3f17e93d95"
+            },
+            {
+              "page": 2,
+              "file": "render/pdfjs-none-2.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "03fa5bfc2f32134e564a9c60efbcac5d20eea1ae828500c106c49b4ed5194c22",
+              "pngSha256": "81f76ce234b8363c11990c2db20ab1656dd3f5142f8feb45bb7a6d0bba6d66bd"
+            },
+            {
+              "page": 3,
+              "file": "render/pdfjs-none-3.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "56a431c167add538696af796c7677a7b5de753c34b1f4878fd5f3fc338be99c9",
+              "pngSha256": "dc9899d41ac0a8e0558eb2b70f3460b6ebfc9c66f0d8981f7e99bfc4c83fab85"
+            },
+            {
+              "page": 4,
+              "file": "render/pdfjs-none-4.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "79e25bc9cd87f76107d1cf96127e970aa7c79f1fa87818b37a078e3af08c6b6b",
+              "pngSha256": "ebdec03de10bd4e7b8d60b4711605b031128ab0795d50e1b8bcaafc990dfa15c"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "mode": "numbers",
+      "options": {
+        "pageNumbers": true,
+        "watermark": false
+      },
+      "output": {
+        "file": "output/numbers.pdf",
+        "bytes": 2766,
+        "sha256": "ebc4d35a7505d6b392ab73eca29a5acec8045d163744df5908cb3266d032b4be",
+        "secondRunSha256": "ebc4d35a7505d6b392ab73eca29a5acec8045d163744df5908cb3266d032b4be",
+        "byteEqual": true
+      },
+      "structure": {
+        "file": "structure/numbers.json",
+        "sha256": "ea1cc1321e142592d8a43dd103a7fbfa0aba944e5a6baddc0e55bacfad046746",
+        "secondRunEqual": true
+      },
+      "render": {
+        "poppler": {
+          "engine": "Poppler",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/poppler-numbers-1.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "b084c0c511bb63693b226a6fa2685fb8e5c73774151c287a6fa674ef09f96aea",
+              "pngSha256": "aacd37a1af6f1df9d42d845600c66b488f81643ecbc7444fc6f04028af9b819e"
+            },
+            {
+              "page": 2,
+              "file": "render/poppler-numbers-2.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "e45d464a86d9fe59f86c8644ec8c6a74fbb0446d1c1f8257ec429479957a589e",
+              "pngSha256": "1f0ab810ce9b1af4f828001e8c76633ebf8c38925cbf5fc0d5b4757fa1657da0"
+            },
+            {
+              "page": 3,
+              "file": "render/poppler-numbers-3.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "be11c2dc1ce214847d31feebbd0b2e7b945ceb809ac4884deea8673de49605d9",
+              "pngSha256": "de4e9637bdcbca6c94c1b566dbf1bd93db3397bf9103ddf12c81b5e1fb967f03"
+            },
+            {
+              "page": 4,
+              "file": "render/poppler-numbers-4.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "444ea078359c48947229f8512de7819d138adf497e7e45d7d39b57331ea5d9f8",
+              "pngSha256": "e857c2bc392cd05c4269bbf2b584e9dd2feee19253f11b68f7dec167c95e4a65"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "pdfjs": {
+          "engine": "PDF.js in Chrome",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/pdfjs-numbers-1.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "1ad035646aaed825d09cc743bae778dd9640e096fdfa570d1646b2d879f13a82",
+              "pngSha256": "4f75da453129109245349670ae8d2dbddebe97b522c713dd59774e3f17e93d95"
+            },
+            {
+              "page": 2,
+              "file": "render/pdfjs-numbers-2.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "03fa5bfc2f32134e564a9c60efbcac5d20eea1ae828500c106c49b4ed5194c22",
+              "pngSha256": "81f76ce234b8363c11990c2db20ab1656dd3f5142f8feb45bb7a6d0bba6d66bd"
+            },
+            {
+              "page": 3,
+              "file": "render/pdfjs-numbers-3.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "56a431c167add538696af796c7677a7b5de753c34b1f4878fd5f3fc338be99c9",
+              "pngSha256": "dc9899d41ac0a8e0558eb2b70f3460b6ebfc9c66f0d8981f7e99bfc4c83fab85"
+            },
+            {
+              "page": 4,
+              "file": "render/pdfjs-numbers-4.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "79e25bc9cd87f76107d1cf96127e970aa7c79f1fa87818b37a078e3af08c6b6b",
+              "pngSha256": "ebdec03de10bd4e7b8d60b4711605b031128ab0795d50e1b8bcaafc990dfa15c"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "mode": "watermark",
+      "options": {
+        "pageNumbers": false,
+        "watermark": true
+      },
+      "output": {
+        "file": "output/watermark.pdf",
+        "bytes": 7590,
+        "sha256": "6c671eb4415e6097111e92ea127e09ffe879e1868567ab2df96e9c14e1339507",
+        "secondRunSha256": "6c671eb4415e6097111e92ea127e09ffe879e1868567ab2df96e9c14e1339507",
+        "byteEqual": true
+      },
+      "structure": {
+        "file": "structure/watermark.json",
+        "sha256": "2be1292f8eee862d020de1d2cb82cc2ed0c654ee1183f6b7ed17b489723ee33c",
+        "secondRunEqual": true
+      },
+      "render": {
+        "poppler": {
+          "engine": "Poppler",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/poppler-watermark-1.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "f2310e41a8a051b52699f2f0541c25a706bc6a76a3efac609ea8f0ae1c9b8ac0",
+              "pngSha256": "a7ecde3604a025393efc4e801ba9a8da68402d90f7a9d6599b6735e784460e3f"
+            },
+            {
+              "page": 2,
+              "file": "render/poppler-watermark-2.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "b58f5f78eaf17718b224b6e584b3d58ca53ecb422f1d0b1888697c775337e048",
+              "pngSha256": "f7fcc05b8827a3adc5681ea0de7667189fba27e165a7615fc4343b63a7c65ba3"
+            },
+            {
+              "page": 3,
+              "file": "render/poppler-watermark-3.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "53df59d1a46516e9bbdd77e38c7adf0901c7eef123bdc9b714390568297d8a78",
+              "pngSha256": "317a8f4bc6ad0b08790ce2ef88c6fdec319cc6feb591bb973c2ea202a1fc319a"
+            },
+            {
+              "page": 4,
+              "file": "render/poppler-watermark-4.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "157c751dcab97fe8ce91ac8999987a9d4a05a413ad560744a71754114d8a4170",
+              "pngSha256": "8a6707524c4ce2196732faf994bf5e522536ef6dd50ebe11ec0570eed266f8a0"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "pdfjs": {
+          "engine": "PDF.js in Chrome",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/pdfjs-watermark-1.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "ecc1fd8e18c3c42a093136ad51eb3bf2efeed2d2e01396b1864dbd6b4a1e596d",
+              "pngSha256": "f8f9a4ecd50af5325986b91fc18a0f77c3e794b654ebf15009761706dd1397ff"
+            },
+            {
+              "page": 2,
+              "file": "render/pdfjs-watermark-2.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "8d4d01af423cb0013cdf4680a946270c2d17ff2a121310f6dfd73df88a7a2832",
+              "pngSha256": "f79831a014d195a93a2a8c14cf9e1021da8c6cfe845793cf921f5d5c3f902b61"
+            },
+            {
+              "page": 3,
+              "file": "render/pdfjs-watermark-3.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "f573d766cb6bb40b63b3f5a250fd19dbf6017c618029ea635d35c531b03a8adb",
+              "pngSha256": "0ef6a18ab67c1e83d38a52d22562b2f43305a2b102a29d499d58ad1743ab3ab2"
+            },
+            {
+              "page": 4,
+              "file": "render/pdfjs-watermark-4.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "2c714bd74cc7576aab6e31ba3bd499a3ba884b536b97021fd6c0c301a1a26910",
+              "pngSha256": "8a139bb26aa747d432a89dc0f06f01498792cb04d299c3208c773f5b480eb82c"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "mode": "both",
+      "options": {
+        "pageNumbers": true,
+        "watermark": true
+      },
+      "output": {
+        "file": "output/both.pdf",
+        "bytes": 7990,
+        "sha256": "2089693bbb78e7fc4255a8debf1d7e15fb7c8dbf0ae2cc6c2fcc335191a0024f",
+        "secondRunSha256": "2089693bbb78e7fc4255a8debf1d7e15fb7c8dbf0ae2cc6c2fcc335191a0024f",
+        "byteEqual": true
+      },
+      "structure": {
+        "file": "structure/both.json",
+        "sha256": "ccb708d74ac7b878d76bf2584bfb9aa01a57fd4a590cde96db8db5354c9fb5aa",
+        "secondRunEqual": true
+      },
+      "render": {
+        "poppler": {
+          "engine": "Poppler",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/poppler-both-1.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "3715b2d6daaaa418688001534dee4e27ad5a5d0cf67add196564e58aea8508d2",
+              "pngSha256": "db2d49f43e71a5e55ec217d5c3903ec36179d0b71c91ae60f268901051941332"
+            },
+            {
+              "page": 2,
+              "file": "render/poppler-both-2.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "3271822dc12e2e3b0c09e57f61d0015dc99b4bcc6b16c6a0c3d89e74d40a16bd",
+              "pngSha256": "eab5ff6e1028c8d749ab501385b8fd5572439eb453878674ce245e90b560125f"
+            },
+            {
+              "page": 3,
+              "file": "render/poppler-both-3.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "a5c968c0636a5db7a64235c2cf9a1c1734e989ca7aa102a51d2aa16d3cd3d339",
+              "pngSha256": "d1e2f007d65891c567eabba6e557db599186b5ef7cc3a127f9c46a3522778486"
+            },
+            {
+              "page": 4,
+              "file": "render/poppler-both-4.png",
+              "width": 488,
+              "height": 650,
+              "rgbaSha256": "67b841f7e93421d688eacb5ede8482a4ec054f65eba692c029834f193e8ed472",
+              "pngSha256": "d34546f7baf8725b58ce37583c223ded0c0f2ee11e4c565ffe7aabbabb1691f4"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "pdfjs": {
+          "engine": "PDF.js in Chrome",
+          "pages": [
+            {
+              "page": 1,
+              "file": "render/pdfjs-both-1.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "ecc1fd8e18c3c42a093136ad51eb3bf2efeed2d2e01396b1864dbd6b4a1e596d",
+              "pngSha256": "f8f9a4ecd50af5325986b91fc18a0f77c3e794b654ebf15009761706dd1397ff"
+            },
+            {
+              "page": 2,
+              "file": "render/pdfjs-both-2.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "8d4d01af423cb0013cdf4680a946270c2d17ff2a121310f6dfd73df88a7a2832",
+              "pngSha256": "f79831a014d195a93a2a8c14cf9e1021da8c6cfe845793cf921f5d5c3f902b61"
+            },
+            {
+              "page": 3,
+              "file": "render/pdfjs-both-3.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "f573d766cb6bb40b63b3f5a250fd19dbf6017c618029ea635d35c531b03a8adb",
+              "pngSha256": "0ef6a18ab67c1e83d38a52d22562b2f43305a2b102a29d499d58ad1743ab3ab2"
+            },
+            {
+              "page": 4,
+              "file": "render/pdfjs-both-4.png",
+              "width": 400,
+              "height": 600,
+              "rgbaSha256": "2c714bd74cc7576aab6e31ba3bd499a3ba884b536b97021fd6c0c301a1a26910",
+              "pngSha256": "8a139bb26aa747d432a89dc0f06f01498792cb04d299c3208c773f5b480eb82c"
+            }
+          ],
+          "secondRunChangedPixels": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  ],
+  "externalRequests": [],
+  "determinism": {
+    "runs": 2,
+    "byteEqualModes": 4,
+    "structureEqualModes": 4,
+    "popplerPixelDiffs": 0,
+    "pdfjsPixelDiffs": 0
+  }
+}

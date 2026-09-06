@@ -1,0 +1,232 @@
+{
+  "pages": [
+    {
+      "rotation": 0,
+      "mediaBox": {
+        "x": 0,
+        "y": 0,
+        "width": 600,
+        "height": 800
+      },
+      "cropBox": {
+        "x": 50,
+        "y": 100,
+        "width": 400,
+        "height": 600
+      },
+      "resources": "<<\n/Font <<\n/Helvetica-7098480789 4 0 R\n>>\n/XObject <<\n/Image-7098480789 16 0 R\n>>\n/ExtGState <<\n/GS-9742682568 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>",
+      "contents": [
+        "q\n",
+        "q\n0.1 0.6 0.3 rg\n0 w\n[] 0 d\n1 0 0 1 70 140 cm\n1 0 0 1 0 0 cm\n1 0 0 1 0 0 cm\n0 0 m\n0 60 l\n150 60 l\n150 0 l\nh\nf\nQ\nq\nBT\n0 0 0 rg\n/Helvetica-7098480789 18 Tf\n24 TL\n1 0 0 1 80 170 Tm\n<4F726967696E616C2031> Tj\nT*\nET\nQ\n",
+        "Q\n",
+        "q\n/GS-9742682568 gs\n1 0 0 1 184.5 374.7 cm\n0.848048096156426 -0.5299192642332049 0.5299192642332049 0.848048096156426 0 0 cm\n231.00000000000003 0 0 50.60000000000001 0 0 cm\n1 0 0 1 0 0 cm\n/Image-7098480789 Do\nQ\n"
+      ]
+    },
+    {
+      "rotation": 90,
+      "mediaBox": {
+        "x": 0,
+        "y": 0,
+        "width": 800,
+        "height": 600
+      },
+      "cropBox": {
+        "x": 50,
+        "y": 100,
+        "width": 600,
+        "height": 400
+      },
+      "resources": "<<\n/Font <<\n/Helvetica-9742682568 7 0 R\n>>\n/XObject <<\n/Image-2000805986 16 0 R\n>>\n/ExtGState <<\n/GS-9750469207 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>",
+      "contents": [
+        "q\n",
+        "q\n0.1 0.6 0.3 rg\n0 w\n[] 0 d\n1 0 0 1 70 140 cm\n1 0 0 1 0 0 cm\n1 0 0 1 0 0 cm\n0 0 m\n0 60 l\n150 60 l\n150 0 l\nh\nf\nQ\nq\nBT\n0 0 0 rg\n/Helvetica-9742682568 18 Tf\n24 TL\n1 0 0 1 80 170 Tm\n<4F726967696E616C2032> Tj\nT*\nET\nQ\n",
+        "Q\n",
+        "q\n/GS-9750469207 gs\n1 0 0 1 284.5 274.7 cm\n0.848048096156426 -0.5299192642332049 0.5299192642332049 0.848048096156426 0 0 cm\n231.00000000000003 0 0 50.60000000000001 0 0 cm\n1 0 0 1 0 0 cm\n/Image-2000805986 Do\nQ\n"
+      ]
+    },
+    {
+      "rotation": 180,
+      "mediaBox": {
+        "x": 0,
+        "y": 0,
+        "width": 600,
+        "height": 800
+      },
+      "cropBox": {
+        "x": 50,
+        "y": 100,
+        "width": 400,
+        "height": 600
+      },
+      "resources": "<<\n/Font <<\n/Helvetica-2000805986 10 0 R\n>>\n/XObject <<\n/Image-7572533686 16 0 R\n>>\n/ExtGState <<\n/GS-8450180107 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>",
+      "contents": [
+        "q\n",
+        "q\n0.1 0.6 0.3 rg\n0 w\n[] 0 d\n1 0 0 1 70 140 cm\n1 0 0 1 0 0 cm\n1 0 0 1 0 0 cm\n0 0 m\n0 60 l\n150 60 l\n150 0 l\nh\nf\nQ\nq\nBT\n0 0 0 rg\n/Helvetica-2000805986 18 Tf\n24 TL\n1 0 0 1 80 170 Tm\n<4F726967696E616C2033> Tj\nT*\nET\nQ\n",
+        "Q\n",
+        "q\n/GS-8450180107 gs\n1 0 0 1 184.5 374.7 cm\n0.848048096156426 -0.5299192642332049 0.5299192642332049 0.848048096156426 0 0 cm\n231.00000000000003 0 0 50.60000000000001 0 0 cm\n1 0 0 1 0 0 cm\n/Image-7572533686 Do\nQ\n"
+      ]
+    },
+    {
+      "rotation": 270,
+      "mediaBox": {
+        "x": 0,
+        "y": 0,
+        "width": 800,
+        "height": 600
+      },
+      "cropBox": {
+        "x": 50,
+        "y": 100,
+        "width": 600,
+        "height": 400
+      },
+      "resources": "<<\n/Font <<\n/Helvetica-9750469207 13 0 R\n>>\n/XObject <<\n/Image-8659871878 16 0 R\n>>\n/ExtGState <<\n/GS-5824662338 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>",
+      "contents": [
+        "q\n",
+        "q\n0.1 0.6 0.3 rg\n0 w\n[] 0 d\n1 0 0 1 70 140 cm\n1 0 0 1 0 0 cm\n1 0 0 1 0 0 cm\n0 0 m\n0 60 l\n150 60 l\n150 0 l\nh\nf\nQ\nq\nBT\n0 0 0 rg\n/Helvetica-9750469207 18 Tf\n24 TL\n1 0 0 1 80 170 Tm\n<4F726967696E616C2034> Tj\nT*\nET\nQ\n",
+        "Q\n",
+        "q\n/GS-5824662338 gs\n1 0 0 1 284.5 274.7 cm\n0.848048096156426 -0.5299192642332049 0.5299192642332049 0.848048096156426 0 0 cm\n231.00000000000003 0 0 50.60000000000001 0 0 cm\n1 0 0 1 0 0 cm\n/Image-8659871878 Do\nQ\n"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "reference": "1 0 R",
+      "type": "PDFPageTree",
+      "dictionary": "<<\n/Type /Pages\n/Kids [ 6 0 R 9 0 R 12 0 R 15 0 R ]\n/Count 4\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "2 0 R",
+      "type": "PDFCatalog",
+      "dictionary": "<<\n/Type /Catalog\n/Pages 1 0 R\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "3 0 R",
+      "type": "PDFDict",
+      "dictionary": "<<\n/Producer <FEFF007000640066002D006C006900620020002800680074007400700073003A002F002F006700690074006800750062002E0063006F006D002F0048006F007000640069006E0067002F007000640066002D006C006900620029>\n/ModDate (D:20260905030000Z)\n/Creator <FEFF007000640066002D006C006900620020002800680074007400700073003A002F002F006700690074006800750062002E0063006F006D002F0048006F007000640069006E0067002F007000640066002D006C006900620029>\n/CreationDate (D:20260905030000Z)\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "4 0 R",
+      "type": "PDFDict",
+      "dictionary": "<<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n/Encoding /WinAnsiEncoding\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "5 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 150\n>>",
+      "decodedSha256": "7fed7bc08711fc47b73a04a803c8587b5184f37b7565082693daff129a455bb6"
+    },
+    {
+      "reference": "6 0 R",
+      "type": "PDFPageLeaf",
+      "dictionary": "<<\n/Type /Page\n/Resources <<\n/Font <<\n/Helvetica-7098480789 4 0 R\n>>\n/XObject <<\n/Image-7098480789 16 0 R\n>>\n/ExtGState <<\n/GS-9742682568 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>\n/MediaBox [ 0 0 600 800 ]\n/CropBox [ 50 100 450 700 ]\n/Rotate 0\n/Annots [ ]\n/Contents [ 17 0 R 5 0 R 18 0 R 19 0 R ]\n/Parent 1 0 R\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "7 0 R",
+      "type": "PDFDict",
+      "dictionary": "<<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n/Encoding /WinAnsiEncoding\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "8 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 150\n>>",
+      "decodedSha256": "97180286078610cd2e12c585a712db602e3ac8591b81925f760c55d7d4b81119"
+    },
+    {
+      "reference": "9 0 R",
+      "type": "PDFPageLeaf",
+      "dictionary": "<<\n/Type /Page\n/Resources <<\n/Font <<\n/Helvetica-9742682568 7 0 R\n>>\n/XObject <<\n/Image-2000805986 16 0 R\n>>\n/ExtGState <<\n/GS-9750469207 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>\n/MediaBox [ 0 0 800 600 ]\n/CropBox [ 50 100 650 500 ]\n/Rotate 90\n/Annots [ ]\n/Contents [ 17 0 R 8 0 R 18 0 R 20 0 R ]\n/Parent 1 0 R\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "10 0 R",
+      "type": "PDFDict",
+      "dictionary": "<<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n/Encoding /WinAnsiEncoding\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "11 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 150\n>>",
+      "decodedSha256": "62268c566edbb701bcc76499eb9e4b0249b44386494e84619487164af6307976"
+    },
+    {
+      "reference": "12 0 R",
+      "type": "PDFPageLeaf",
+      "dictionary": "<<\n/Type /Page\n/Resources <<\n/Font <<\n/Helvetica-2000805986 10 0 R\n>>\n/XObject <<\n/Image-7572533686 16 0 R\n>>\n/ExtGState <<\n/GS-8450180107 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>\n/MediaBox [ 0 0 600 800 ]\n/CropBox [ 50 100 450 700 ]\n/Rotate 180\n/Annots [ ]\n/Contents [ 17 0 R 11 0 R 18 0 R 21 0 R ]\n/Parent 1 0 R\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "13 0 R",
+      "type": "PDFDict",
+      "dictionary": "<<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n/Encoding /WinAnsiEncoding\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "14 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 150\n>>",
+      "decodedSha256": "dbab489efac08be4b39f4203965caefbd6f73f5f3c8763f6bfbd2884aed8edbc"
+    },
+    {
+      "reference": "15 0 R",
+      "type": "PDFPageLeaf",
+      "dictionary": "<<\n/Type /Page\n/Resources <<\n/Font <<\n/Helvetica-9750469207 13 0 R\n>>\n/XObject <<\n/Image-8659871878 16 0 R\n>>\n/ExtGState <<\n/GS-5824662338 <<\n/Type /ExtGState\n/ca 0.2\n>>\n>>\n>>\n/MediaBox [ 0 0 800 600 ]\n/CropBox [ 50 100 650 500 ]\n/Rotate 270\n/Annots [ ]\n/Contents [ 17 0 R 14 0 R 18 0 R 22 0 R ]\n/Parent 1 0 R\n>>",
+      "decodedSha256": null
+    },
+    {
+      "reference": "16 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Type /XObject\n/Subtype /Image\n/BitsPerComponent 8\n/Width 420\n/Height 92\n/ColorSpace /DeviceRGB\n/SMask 23 0 R\n/Filter /FlateDecode\n/Length 2336\n>>",
+      "decodedSha256": "68e584cb80ce96c5d8d8ea678217630f059b4d5e36b9753090f2860208fd6339"
+    },
+    {
+      "reference": "17 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 10\n>>",
+      "decodedSha256": "4adc33bd9fe74303c344be46e5916d65182fb218e248fe80452ab3f025b06c64"
+    },
+    {
+      "reference": "18 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 10\n>>",
+      "decodedSha256": "282f82a2d55dbfe663906eecf403ead5ecad4a750d37f8a09d16d99c2283cd61"
+    },
+    {
+      "reference": "19 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 127\n>>",
+      "decodedSha256": "175c546116985eb5fb73da91c9cba55bb9c004f746be33fc21f313dfa228304d"
+    },
+    {
+      "reference": "20 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 127\n>>",
+      "decodedSha256": "3745dcaf7c681ac31ef3cc3ac4922f95838ea3da92d633987e00f2482d44e3b7"
+    },
+    {
+      "reference": "21 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 126\n>>",
+      "decodedSha256": "ec7fb906e3dba2f55d562596e92adfd2cfdafb71e181196933f9eb9dd2956eb7"
+    },
+    {
+      "reference": "22 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Filter /FlateDecode\n/Length 126\n>>",
+      "decodedSha256": "751d8027a8f3bd8b5b446eabd1260c9db63a365ae052cbece341863c64d8e00e"
+    },
+    {
+      "reference": "23 0 R",
+      "type": "PDFRawStream",
+      "dictionary": "<<\n/Type /XObject\n/Subtype /Image\n/Height 92\n/Width 420\n/BitsPerComponent 8\n/ColorSpace /DeviceGray\n/Decode [ 0 1 ]\n/Filter /FlateDecode\n/Length 2067\n>>",
+      "decodedSha256": "6b89ac528abed9417539ec9088cc5c60d28c9da38e84b069d65cc915c813f839"
+    }
+  ]
+}

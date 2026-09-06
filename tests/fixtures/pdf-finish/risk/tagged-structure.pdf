@@ -1,0 +1,41 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /MarkInfo << /Marked true >> /StructTreeRoot 6 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /StructParents 0 >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 70 >>
+stream
+/P << /MCID 0 >> BDC BT /F1 18 Tf 30 100 Td (Tagged fixture) Tj ET EMC
+endstream
+endobj
+6 0 obj
+<< /Type /StructTreeRoot /K [7 0 R] /ParentTree << /Nums [0 [7 0 R]] >> /ParentTreeNextKey 1 >>
+endobj
+7 0 obj
+<< /Type /StructElem /S /P /P 6 0 R /Pg 3 0 R /K 0 >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000115 00000 n 
+0000000172 00000 n 
+0000000315 00000 n 
+0000000385 00000 n 
+0000000505 00000 n 
+0000000616 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+685
+%%EOF
