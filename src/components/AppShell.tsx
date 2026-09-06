@@ -22,6 +22,7 @@ import { LanguageSwitcher } from "./LanguageSwitcher";
 import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
 import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
+import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { toolIconAccentClasses } from "./toolAccentStyles";
 
@@ -126,7 +127,7 @@ export function AppShell() {
       <nav className="desktop-language-switcher" aria-label={t("language.switchLabel")}><LanguageSwitcher /></nav>
 
       <main className="main-content" id="main-content">
-        <Outlet />
+        <RouteErrorBoundary><Outlet /></RouteErrorBoundary>
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
           <nav aria-label={t("footer.policyLabel")}>

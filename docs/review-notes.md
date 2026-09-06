@@ -4,6 +4,68 @@
 
 ## 2026-09-06
 
+### S0 빈 페이지 — 오류 경계·초기화 실패·캐시 유지 자동 복구 (Codx)
+
+**판정: 지정 S0 구현과 브랜치 검증 완료. ② 자동 복구는 조건부이며, 지속 실패는 ① 안내로 종료한다.** `CHANGELOG.md`의 S0 항목에 대응한다. `s0-blank-page`에서만 커밋했고 main 병합·push는 하지 않았다. 전체 명령·소요·출력 원문·회차별 표·육안 검수 기동법은 `/tmp/worklazy-s0/REPORT.md`, 원자료는 같은 디렉터리의 `logs/`, `recovery-complete/`, `stale-final-r2/`에 있다. 측정 로그·jobs·사용자 파일은 커밋하지 않는다.
+
+- **실행 게이트:** main/HEAD `5485fadc43677902c51fbc2d13579e8c1a26db0e` 일치, 미추적 사용자 파일 3개만 존재. `PROJECT_RULES.md`·`AGENTS.md`·지정 디스패치·정본 공통 계약/S0·A/B 재현 문서·검토 이력을 읽고 열린 15개 계획서를 재검색했으며 충돌 0. 정본 파일은 변경하지 않았다. 인용 원본 라인은 모두 일치했고 Office 키 삭제는 이미 원본 63행에 있었다. 사전 production build 94.29초·bundle 73.87초 exit 0; 기준 JSON `/tmp/s0-bundle-baseline.json` 고정.
+- **경계·재시도:** AppShell Outlet 아래를 포괄하고 루트 언어 랜딩/InvalidLanguageRedirect는 범위 밖이다. 실제 reload 버튼·alert·포커스·55vh 예약, ko/en 안내를 적용했다. 가드는 `[정규화된 대상 route, 현재 경로+search]`로 구분하고 저장소 예외 시 reload를 생략한다. 성공 여부는 Suspense 안쪽 `ToolReady`의 정상 commit/도구 DOM으로 확인한다. 로딩 직후·pageshow·시간 경과로 지우지 않는다. Office/XLS/video 격리 meta가 있으면 청크 재시도 소유자는 reload하지 않는다.
+- **기각·수리:** 처음의 `key=pathname+search` 경계 remount는 문서 비교 상세 이동·도구 검색 상태를 지웠다. 전체 browser/new-tools/utilities의 실제 timeout(`browser-smoke.mjs:1002`, `new-tools-smoke.mjs:168`, `utility-tools-smoke.mjs:119`; 원출력은 동명 logs)으로 확인하고, 경계 실패 상태만 reset해 정상 subtree를 보존하도록 수정했다. 세 전체 스모크 재실행이 통과했다. Audio `progress.fail()`은 running 밖에서 무시되므로 파형/전달 실패는 별도 상태 안내로 바꿨다. Canvas 생성은 동기 React effect에 유지해 경계로 전달하며 불필요한 catch를 추가하지 않았다.
+
+**직접 보강 11곳의 귀결·검증** — 생성 지점 수의 가감은 없다. constructor 주입은 테스트 서버의 응답 변환 또는 addInitScript에서만 수행한다.
+
+| # | 생성 지점 | 실패 귀결 | 브라우저 검증 |
+|---|---|---|---|
+| 1–3 | Audio Regions·Timeline·WaveSurfer | 부분 생성물 정리 후 경계, 파형 비동기 실패는 지역화 안내 | 세 생성자 각각 throw, desktop/Android 통과 |
+| 4 | Audio BroadcastChannel | 전달 종료·수동 파일 열기 안내, 페이지 유지 | constructor throw 양 환경 통과 |
+| 5 | Image Canvas | React effect의 동기 예외 → route 경계 | getContext throw 양 환경 통과 |
+| 6–8 | DataConverter·TextTools·TextFormatter Worker | 생성/전송 동기 실패 → 다음 render에서 경계; error/messageerror → 도구 안내 | 도구별 세 실패 유형 양 환경 통과 |
+| 9–10 | Video probe/processor FFmpeg | 기존 try 안 생성·안전한 finally·오류 메시지 → 메인 상태 UI | 두 생성자 각각 throw 양 환경 + 실제 소스 VM 통과 |
+| 11 | Video BroadcastChannel | 안내·전달 버튼 비활성·다운로드 유지 | 실제 MP3 결과 생성 후 constructor throw 양 환경 통과 |
+
+**Office/XLS 재검토:** 기존 경로+search 억제와 `crossOriginIsolated && SharedArrayBuffer` 성공 시 삭제를 유지하고 get/set/remove 예외 처리를 추가했다. VM에서 동일 target 반복·search 변경·COI만 있고 SAB 없음·각 저장소 연산 예외를 검사했다. 브라우저 10케이스에서 정상 준비는 reload 1회와 격리 성공 후 삭제, 저장소 예외는 reload 0, Office lazy 실패는 COI 소유자만 1회 reload하고 경계 표시, 청크 가드 설정 0·광고/외부 요청 0. HWP/Audio 원인으로 귀속하지 않는다.
+
+**entry 안내:** inline capture listener가 module script의 실제 error 이벤트를 감지한다. 실패 응답 후 실측 **35/40/47/73ms**, 시험 상한 2초. 임의 mount 타이머는 사용하지 않고 entry를 15초 지연한 정상 진입 두 환경에서 표시 0을 확인했다. 앱 mount 시 제거, 문서 lang 기준 ko/en·루트 양어 병기, inline CSS/외부 요청 0, 초기 hidden/data-nosnippet. 일반·격리·redirect·404 앱 문서 104개에 생성되며 SEO 본문은 그대로 남는다. HTML 자체를 못 받는 완전 offline과 이미 캐시된 구 HTML 소급 삽입은 보장 밖이다.
+
+**stale-document — 결정 조건 그대로 실측:** `/tmp/worklazy-s0/s0-final`(`index-CEPz80MF.js`) → `s0-next`(`index-DE-wK_ZQ.js`), 두 빌드 모두 최종 S0 소스 포함. 후자에 무해한 DOM 식별 1줄만 추가했고 나머지 src 차이 0(`source-provenance.json`, `build-fingerprints.json`). 같은 origin/context에서 HTTP cache·SW·sessionStorage와 `max-age=600`을 유지했다. 캐시 삭제·hard reload·page.route/context.route·수동 reload 없이 홈 → 서버 교체 → 미수신 lazy 경로 진입 → 옛 청크 404를 관측했다. 새 entry 식별+해당 도구 DOM, guard remove 시 ready=true/loading=false를 단언했다.
+
+| 도구 | 언어 | 표본 | 결과 | reload | 소요 범위(초) |
+|---|---|---:|---|---:|---|
+| hwp-editor | ko | 5 | latest-tool-ready | 1 | 0.507–0.552 |
+| hwp-editor | en | 5 | expected-language-redirect | 0 | 0.077–0.119 |
+| audio-studio | ko | 5 | latest-tool-ready | 1 | 0.477–0.543 |
+| audio-studio | en | 5 | latest-tool-ready | 1 | 0.479–0.563 |
+| image-studio | ko | 3 | latest-tool-ready | 1 | 0.573–0.642 |
+| image-studio | en | 3 | latest-tool-ready | 1 | 0.544–0.581 |
+| data-converter | ko | 3 | latest-tool-ready | 1 | 0.533–0.560 |
+| data-converter | en | 3 | latest-tool-ready | 1 | 0.499–0.535 |
+| document-compare | ko | 3 | latest-tool-ready | 1 | 0.503–0.544 |
+| document-compare | en | 3 | latest-tool-ready | 1 | 0.500–0.523 |
+
+복구 대상 **33/33**, 빈 화면 **0**, **0.477–0.642초 < 600초**, 자동 reload **각 1회**. 영어 HWP 5회는 기존 한국어 전용 정책의 도구 목록 redirect이므로 복구 분모에 포함하지 않았다. HWP iframe Document를 reload로 세던 초기 계측을 최상위 frame 기준으로 교정했고 원자료를 보존했다. 요청별 status·Age·disk cache/SW flags·memory cache 이벤트·시각·최종 DOM·PNG가 있으며 최종 증거 검사에서 파일 누락 0이다.
+
+- 수정 전 `073da56`→`4d0bae9`, 역방향 각 5도구×ko/en×1: 영어 HWP redirect 1건을 제외하고 **각 9/9 root=0, 자동 reload 0**을 재현했다(`control-pre/`, `control-current/`). 기존 결함/fix-forward 판정을 유지한다.
+- S0 Audio 지속 404 ko/en 각1: **안내 2/2, reload 1**, guard 유지. 저장소 getter throw 각1: **안내 2/2, reload 0**(`negative-persistent/`, `negative-storage/`). 같은 해시의 404 자체가 600초 캐시되면 서버 응답을 정상으로 돌려도 reload는 disk-cached 404를 받는다. 따라서 **자동 복구를 무조건 성공으로 문서화하지 않는다**. 가드를 유지하는 경계 안내가 이 경우의 보장이다.
+- **Android 에뮬레이션(모바일 Chromium) — Samsung Internet 실측 아님.** Pixel 7 touch/mobile UA, Chrome 152.0.7977.64·Playwright 1.63.0. 최종 recovery 스모크 **149/149**: A12·B10·C34·정상80·격리10·crash1·offline2. 정상 진입은 20도구×ko/en×두 환경 **빈 화면 0/80**, HWP EN은 정상 redirect. 실패 주입·정상 진입·crash 복원 후의 판정 시점을 분리했다.
+- crash는 Page.crash 확인 → 기존 Puppeteer의 **명시적 page.reload()** → 정상 DOM으로 통과했다. Playwright 1.63은 복원 이후에도 내부 crashed 상태로 DOM 대기를 거절해(`crash-probe.log`) 동일 Chromium의 Puppeteer로 계측을 고정했다. 완전 offline reload는 미수신 HTML의 `ERR_INTERNET_DISCONNECTED`를 확인했고 앱 안내 보장을 주장하지 않았다. wasm 메모리 상한은 제외대로 시도하지 않았다.
+
+**공통 게이트:** production build·unit **200/200**·production static·전체 browser/new-tools/utilities/office·registry·orphan **0**·manifest·diff check 통과. 최종 전체 스모크 소요 browser **54.25초**, new-tools **137.28초**, utilities **108.52초**, office **25.53초**. 두 LANG의 전체 visual은 각 **175/175**, **107.45/106.13초**, 기준선 변경 0. VITE_LOCAL_QA build 뒤 a11y **5페이지/위반0/외부요청0**, rendering **3페이지×3회/외부요청0**, CLS home **0.038332**, 문서/PDF **0.114199**로 상한 비회귀를 실측 대조했다. 측정기 자체의 CLS 임계 차단은 S2-H 범위라 추가하지 않았다. QA build에 별도 시도한 static은 기존 production 분석코드 필수 단언에서 실패했다(`static-qa.log` 원문); 분석 제거를 되돌리거나 기준을 완화하지 않았고 최종 production static은 다시 통과했다. `dist/`에는 의도대로 QA 빌드를 남긴다.
+
+**제품 규칙/예산:** ko/en 동일키와 SEO unit 통과. 전후 HTML **107**, crawlable **61**, FAQPage **18**, sitemap SHA-256 동일(`51abcb369d6f5f715c74e0c411d0ada5386e4e84b0825d2542f1d58430c3ff9b`), 수 변화 0. 요청한 HTML `adsbygoogle|googlesyndication` 재귀 grep은 전후 모두0행, 파일 집합 diff0. 신규 안내 문자열에는 내부 명칭·원시 예외0; repo-wide 실행 확장자 재귀 검색 결과는 `repo-wide-implementation-terms.log`/`repo-wide-recovery-consumers.log`, 신규 경계/정적/common의 일치4행은 코드 식별자뿐이다. 테스트 sentinel의 정확 허용 파일은 신규 recovery 테스트3개+unit1개(Codx 소유·주입/비노출 검증 목적)이고 제품 DOM에서는 부재를 단언했다. 번들 gzip 증분: **entry +1,271B / route +433B / shared +7B / app JS +1,711B / CSS 0B**, 5종 고정 상한 모두 통과, 기준점/상한 변경 없음.
+
+**범위 밖 후보 — 고치지 않고 보고:** `videoWorkerClient.ts:59,214`는 error 처리만 있고 messageerror가 없다(메타데이터는60초 timeout, 처리 시작 후 복원 실패의 즉시 안내 미확인). `text-formatter.worker.ts:60`의 문법 오류 반환과 DataConverter 파일읽기 catch는 기존 원시 메시지를 반환한다. 이번 생성/전송 실패 안내에는 원문을 넣지 않았으며 별도 입력/문법 실패 표면은 지시서의 나머지20곳 수정 금지에 따라 그대로 두었다. 실제 Samsung Internet/사용자 신고 당시 원인 일치/배포 후 Gemini 검수도 이 결과로 주장하지 않는다.
+
+**육안 검수 인계:** `PORT=4188 node tests/recovery-server.mjs`로 남긴 QA dist의 정상 ko/en 영향 경로를 확인한다. `PORT=4189 RECOVERY_FAULT=404 RECOVERY_ASSET=AudioStudioPage- node tests/recovery-server.mjs`에서 양어 audio 경계, `PORT=4190 RECOVERY_FAULT=404 RECOVERY_ASSET=/assets/index- node tests/recovery-server.mjs`에서 entry 안내/루트 양어 안내를 재현한다. 전체 경로 목록·C 주입 기동법·원출력·최종 git 상태는 `/tmp/worklazy-s0/REPORT.md`. Codx는 desktop/mobile 경계·정적 안내 PNG를 열어 버튼·줄바꿈·가시성을 확인했으며 Claude/Gemini 판정을 대신했다고 표시하지 않는다. — Codx
+
+#### 육안 검수 소견 반영 (Codx)
+
+- **착수 게이트:** `s0-blank-page`/HEAD `ceb96ddba4adca6dc933c363279223348f5c5c78`, 미추적 사용자 파일 3개만 존재. 공통 규칙·역할·앞선 S0 보고·fix1 디스패치 선독 후 열린 15개 계획서에서 이번 버튼/포커스 표면의 상반 지시 0을 확인했다. 최신 지시대로 브랜치 커밋 1개만 추가하며 main 병합·push는 하지 않는다. 근거: `/tmp/worklazy-s0/fix1/gate.txt`, `open-plans-scan.txt`.
+- **양어 라벨:** 기존 B 사례에 루트 양어 검사가 이미 있었다. 루트 및 ko/en 사례에 버튼 `innerText`와 구분자 가시성 단언을 추가했다. entry 404의 desktop/Pixel 7 각 3경로 실측은 `/` **`새로고침 · Refresh`**, `/ko/tools/audio-studio/` **`새로고침`**, `/en/tools/audio-studio/` **`Refresh`**이며 단일 언어 구분자는 hidden이다. 정적 생성 입력 `index.html`에서만 고쳤고 별도 안내 문단은 유지했다. `entry-labels.json`, `{desktop,mobile}-entry-{root,ko,en}.png` 6장에 기록했으며 PNG를 직접 열어 문구·버튼 잘림이 없음을 확인했다. 모바일은 Chromium Android 에뮬레이션이며 실제 Samsung Internet 측정은 아니다.
+- **경계 실측·판정:** Chrome **152.0.7977.64**, Playwright **1.63.0**, desktop **1365×900**에서 홈 → 실제 `page.mouse.click` 사이드바 링크(`isTrusted=true`, 클릭 당시 `:focus-visible=false`) → Audio 청크 404 → 자동 reload → alert 포커스를 관측했다. ko/en 모두 최종 **`:focus-visible=true`, `outline:auto 1px rgb(16,16,16)`**였다(`before-focus-measurement.json`). 디스패치의 수정 조건에 해당해 경계는 테마 ring, 정적 안내는 `#555`의 **solid 2px·offset −2px**을 `:focus-visible`에만 적용했다. 자동 reload 뒤에도 매칭되므로 포커스 표시는 유지되며, 포인터 진입이라는 이유로 무조건 숨기지 않는다.
+- **수정 후 접근성:** 실제 마우스 및 Tab→Enter 사이드바 진입 × ko/en **4/4**, 최상위 성공 문서 응답은 홈+자동 reload 각 2개, 최종 경계 `:focus-visible=true`·solid 2px·offset −2px를 단언했다. 경계 4개와 정적 안내 6개 모두 `role=alert`, `tabIndex=-1`, 실제 activeElement 이동을 유지한다. Tab으로 재시도 버튼에 이동하면 포커스 표시가 있고(경계 버튼은 transition 종료 후 ring 3px), 안내 여백을 마우스로 누르면 **active=true·`:focus-visible=false`·`outline:none`**이다. 재현: `node /tmp/worklazy-s0/fix1/measure-focus.mjs`, `node /tmp/worklazy-s0/fix1/capture-entry.mjs`; 결과 `focus-measurement.json`·`entry-labels.json`.
+- **실패·교정 기록:** 최초 측정 선택자의 끝 슬래시 가정은 실제 sidebar href에 없어 30초 timeout → 실제 href로 수정했다(`logs/focus-measurement.log`). 첫 스타일의 `outline-none`은 Tailwind `--tw-outline-style:none`을 남겨 `focus-visible:outline-2`만으로는 **`none !== solid`** 단언에 실패했다(`logs/focus-after-production.log`) → `focus-visible:outline-solid`를 명시해 재빌드·실측 통과했다. 그 이전 전체 recovery 실행은 수정본 재빌드를 위해 exit **130**으로 중단했고 `recovery-initial-interrupted/`와 동명 log를 보존했다.
+- **최종 검증·인계:** production build **93.92초**, static **104 startup 문서/1.89초**, unit **200/200·2.76초**, recovery **149/149·279.50초**, 포커스 **4/4·8.27초**, entry 캡처 **6/6·4.97초**, 마지막 `VITE_LOCAL_QA=1 npm run build` **94.68초**, 모두 exit **0**. B-stale-html 추가 2사례에는 앞선 보존 빌드 `/tmp/worklazy-s0/s0-next`를 사용했다. sitemap SHA-256은 앞선 S0와 같고 entry 실패 외부 요청 0, ko/en·SEO·광고 격리 정적 검사 통과. QA entry `index-CqGahg57.js`에서 분석 식별자·추적/광고 로더 URL이 제거됐고 4188·4189·4190의 응답은 최종 QA `dist/index.html`과 byte-identical이다(`qa-dist.json`). 최초 보조 Node fetch는 4190을 `bad port`로 거절해 로컬 HTTP 모듈로 확인했고 서버는 변경하지 않았다(`logs/qa-check-fetch-failed.log`). 전체 명령·출력·검증표·캡처·종료 git 상태는 `/tmp/worklazy-s0/fix1/REPORT.md`와 `logs/`에 기록한다. — Codx
+
 ### P2 main 병합·라이브 배포 후 검증 (Codx)
 
 **판정: 승인된 배포를 완료했고 배포 후 게이트 ⑥을 통과했다. 지정 7개 화면에서 레이아웃 파손·조작 불가·데이터 손실 가능성을 발견하지 않아 롤백하지 않았다.** CHANGELOG의 같은 날짜 P2 배포 항목에 대응한다. 제품 코드·번들 예산 상한/기준점·개인 파일 3개는 수정하지 않았다.

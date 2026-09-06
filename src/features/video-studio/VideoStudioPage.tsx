@@ -170,6 +170,7 @@ export function VideoStudioPage() {
   const activeController = useRef<AbortController | undefined>(undefined);
   const probeControllers = useRef(new Map<string, AbortController>());
   const probeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const [handoffAvailable, setHandoffAvailable] = useState("BroadcastChannel" in window);
   const audioHandoffChannels = useRef(new Set<BroadcastChannel>());
 
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -431,23 +432,35 @@ export function VideoStudioPage() {
       return;
     }
     const handoffId = createId();
-    const channel = new BroadcastChannel(audioHandoffChannelName(handoffId));
+    let channel: BroadcastChannel;
+    try { channel = new BroadcastChannel(audioHandoffChannelName(handoffId)); }
+    catch {
+      setHandoffAvailable(false);
+      setLastResult(featureMessage(language, "video.messages.VideoStudioPage.thisBrowserCannotTransferFilesBetweenToolsIn"));
+      return;
+    }
     let transferred = false;
     audioHandoffChannels.current.add(channel);
     const closeChannel = () => {
       channel.close();
       audioHandoffChannels.current.delete(channel);
     };
+    const failHandoff = () => {
+      setHandoffAvailable(false);
+      closeChannel();
+      setLastResult(featureMessage(language, "video.messages.VideoStudioPage.thisBrowserCannotTransferFilesBetweenToolsIn"));
+    };
+    channel.onmessageerror = failHandoff;
     channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
       if (event.data?.type === "ready" && !transferred) {
         transferred = true;
-        channel.postMessage({
+        try { channel.postMessage({
           type: "audio-file",
           blob: output.blob,
           fileName: output.fileName,
           mimeType: output.mimeType,
           lastModified: Date.now(),
-        });
+        }); } catch { failHandoff(); }
       }
       if (event.data?.type === "received") {
         setLastResult(featureMessage(language, "video.messages.VideoStudioPage.sentToAudioStudioInANewTab", { p0: output.fileName }));
@@ -808,7 +821,7 @@ export function VideoStudioPage() {
                 <span className="flex min-w-0 items-center gap-2.5 text-pink-700 dark:text-pink-300">{isAudioOutput(output) ? <Music2 size={18} /> : <Film size={18} />}<span className="flex min-w-0 flex-col"><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground">{output.fileName}</strong><small className="mt-[3px] text-[13px] text-muted-foreground">{formatBytes(output.blob.size)} · {featureMessage(language, "video.messages.VideoStudioPage.result")} {index + 1}</small></span></span>
                 <div className="video-result-item-actions flex shrink-0 flex-wrap justify-end gap-[7px] max-[620px]:grid max-[620px]:grid-cols-1">
                   <Button render={<a href={output.url} download={output.fileName} data-testid="video-result-download" />} className="min-h-[37px] bg-pink-700 text-white shadow-md shadow-pink-700/20 hover:bg-pink-800 focus-visible:ring-pink-700/30 max-[620px]:w-full"><Download size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.download")}</Button>
-                  {isAudioOutput(output) && <Button type="button" variant="secondary" className="audio-handoff-button min-h-[37px] px-3 text-violet-700 dark:text-violet-300 max-[620px]:w-full" onClick={() => openInAudioStudio(output)}><Waves size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.continueInAudioStudio")}</Button>}
+                  {isAudioOutput(output) && <Button type="button" variant="secondary" className="audio-handoff-button min-h-[37px] px-3 text-violet-700 dark:text-violet-300 max-[620px]:w-full" disabled={!handoffAvailable} onClick={() => openInAudioStudio(output)}><Waves size={16} /> {featureMessage(language, "video.messages.VideoStudioPage.continueInAudioStudio")}</Button>}
                 </div>
               </Card>
             ))}

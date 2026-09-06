@@ -591,6 +591,7 @@ function ImageEditor() {
 
   useEffect(() => {
     if (!canvasElement.current) return;
+    // Keep construction in this React effect: synchronous failures reach RouteErrorBoundary.
     const instance = new Canvas(canvasElement.current, { width: 900, height: 600, backgroundColor: "#ffffff", preserveObjectStacking: true });
     canvas.current = instance;
     const disposeViewportGestures = installEditorViewportGestures({

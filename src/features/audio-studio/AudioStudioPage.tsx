@@ -73,8 +73,8 @@ export function AudioStudioPage() {
   const customPitchRef = useRef(0);
   const [effectPreviewUrl, setEffectPreviewUrl] = useState("");
   const [lastResult, setLastResult] = useState("");
+  const [audioFailure, setAudioFailure] = useState("");
   const progress = useOperationProgress();
-  const failProgress = progress.fail;
   const documentReady = Boolean(document);
 
   const waveformContainerRef = useRef<HTMLDivElement>(null);
@@ -128,31 +128,42 @@ export function AudioStudioPage() {
   useEffect(() => {
     const container = waveformContainerRef.current;
     if (!container) return;
-    const regions = RegionsPlugin.create();
-    const timeline = TimelinePlugin.create({
-      height: 28,
-      style: { color: "#777783", fontSize: "12px" },
-      formatTimeCallback: (seconds) => formatTimelineLabel(seconds),
-    });
-    const wavesurfer = WaveSurfer.create({
-      container,
-      height: 190,
-      waveColor: "#b7a5f8",
-      progressColor: "#7c4dff",
-      cursorColor: "#ff375f",
-      cursorWidth: 2,
-      barWidth: 2,
-      barGap: 1,
-      barRadius: 2,
-      minPxPerSec: ZOOM_LEVELS[zoomIndex],
-      normalize: true,
-      autoScroll: true,
-      autoCenter: true,
-      dragToSeek: true,
-      plugins: [regions, timeline],
-    });
+    let regions: RegionsPlugin | undefined;
+    let timeline: TimelinePlugin | undefined;
+    let wavesurfer: WaveSurfer;
+    try {
+      regions = RegionsPlugin.create();
+      timeline = TimelinePlugin.create({
+        height: 28,
+        style: { color: "#777783", fontSize: "12px" },
+        formatTimeCallback: (seconds) => formatTimelineLabel(seconds),
+      });
+      wavesurfer = WaveSurfer.create({
+        container,
+        height: 190,
+        waveColor: "#b7a5f8",
+        progressColor: "#7c4dff",
+        cursorColor: "#ff375f",
+        cursorWidth: 2,
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        minPxPerSec: ZOOM_LEVELS[zoomIndex],
+        normalize: true,
+        autoScroll: true,
+        autoCenter: true,
+        dragToSeek: true,
+        plugins: [regions, timeline],
+      });
+    } catch (error) {
+      // React catches effect errors at the route boundary. Release partial setup.
+      timeline?.destroy();
+      regions?.destroy();
+      throw error;
+    }
     wavesurferRef.current = wavesurfer;
     regionsRef.current = regions;
+    const activeRegions = regions;
     const disableDragSelection = regions.enableDragSelection({
       color: "rgba(139, 92, 246, 0.22)",
       drag: true,
@@ -160,7 +171,7 @@ export function AudioStudioPage() {
       minLength: MIN_SELECTION_SECONDS,
     }, 4);
     const unsubscribeCreated = regions.on("region-created", (region) => {
-      regions.getRegions().filter((candidate) => candidate.id !== region.id).forEach((candidate) => candidate.remove());
+      activeRegions.getRegions().filter((candidate) => candidate.id !== region.id).forEach((candidate) => candidate.remove());
       commitSelection(regionSelection(region));
     });
     const unsubscribeUpdated = regions.on("region-updated", (region) => commitSelection(regionSelection(region)));
@@ -179,11 +190,11 @@ export function AudioStudioPage() {
       setIsPlaying(false);
       if (!loopRef.current || selectionRef.current) return;
       wavesurfer.setTime(0);
-      void wavesurfer.play();
+      void wavesurfer.play().catch(() => setAudioFailure(t("audio.status.waveOpen")));
     });
     const unsubscribeError = wavesurfer.on("error", (error) => {
       if (isExpectedMediaAbort(error)) return;
-      failProgress(t("audio.status.waveOpen", { error: error.message }));
+      setAudioFailure(t("audio.status.waveOpen"));
     });
     return () => {
       disableDragSelection();
@@ -200,16 +211,16 @@ export function AudioStudioPage() {
       wavesurferRef.current = undefined;
       wavesurfer.destroy();
     };
-  }, [commitSelection, documentReady, failProgress, showSelectionRegion, t]);
+  }, [commitSelection, documentReady, showSelectionRegion, t]);
 
   useEffect(() => {
     const wavesurfer = wavesurferRef.current;
     if (!wavesurfer || !previewUrl) return;
     void wavesurfer.load(previewUrl).catch((error) => {
       if (isExpectedMediaAbort(error)) return;
-      failProgress(t("audio.status.waveDisplay", { error: error instanceof Error ? error.message : String(error) }));
+      setAudioFailure(t("audio.status.waveDisplay"));
     });
-  }, [failProgress, previewUrl, t]);
+  }, [previewUrl, t]);
 
   useEffect(() => () => {
     activeControllerRef.current?.abort();
@@ -233,6 +244,7 @@ export function AudioStudioPage() {
   };
 
   const handleFiles = async (nextFiles: File[]) => {
+    setAudioFailure("");
     const file = nextFiles.at(-1);
     if (!file) return;
     if (!isSupportedAudio(file)) {
@@ -280,11 +292,17 @@ export function AudioStudioPage() {
 
   useEffect(() => {
     const handoffId = new URLSearchParams(window.location.search).get("handoff");
-    if (!handoffId || !/^[a-zA-Z0-9-]{8,100}$/.test(handoffId) || !("BroadcastChannel" in window)) return;
-    const channel = new BroadcastChannel(`worklazy-audio-handoff-${handoffId}`);
+    if (!handoffId || !/^[a-zA-Z0-9-]{8,100}$/.test(handoffId)) return;
+    if (!("BroadcastChannel" in window)) { setAudioFailure(t("audio.status.handoffUnavailable")); return; }
+    let channel: BroadcastChannel;
+    try { channel = new BroadcastChannel(`worklazy-audio-handoff-${handoffId}`); }
+    catch { setAudioFailure(t("audio.status.handoffUnavailable")); return; }
     let received = false;
     const announceReady = () => {
-      if (!received) channel.postMessage({ type: "ready" });
+      if (!received) {
+        try { channel.postMessage({ type: "ready" }); }
+        catch { received = true; window.clearInterval(readyInterval); channel.close(); setAudioFailure(t("audio.status.handoffUnavailable")); }
+      }
     };
     channel.onmessage = async (event: MessageEvent<{ type?: string; blob?: unknown; fileName?: unknown; mimeType?: unknown; lastModified?: unknown }>) => {
       if (received || event.data?.type !== "audio-file" || !(event.data.blob instanceof Blob)) return;
@@ -294,11 +312,14 @@ export function AudioStudioPage() {
       const lastModified = typeof event.data.lastModified === "number" ? event.data.lastModified : Date.now();
       const file = new File([event.data.blob], fileName, { type: mimeType, lastModified });
       window.clearInterval(readyInterval);
-      await handleFilesRef.current?.([file]);
-      channel.postMessage({ type: "received" });
+      try {
+        await handleFilesRef.current?.([file]);
+        channel.postMessage({ type: "received" });
+      } catch { setAudioFailure(t("audio.status.handoffUnavailable")); }
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.hash}`);
       channel.close();
     };
+    channel.onmessageerror = () => { received = true; window.clearInterval(readyInterval); channel.close(); setAudioFailure(t("audio.status.handoffUnavailable")); };
     const readyInterval = window.setInterval(announceReady, 500);
     announceReady();
     return () => {
@@ -306,7 +327,7 @@ export function AudioStudioPage() {
       window.clearInterval(readyInterval);
       channel.close();
     };
-  }, []);
+  }, [t]);
 
   const applyEdit = async (command: AudioEditCommand) => {
     const currentDocument = documentRef.current;
@@ -562,6 +583,7 @@ export function AudioStudioPage() {
         <PrivacyBanner compact />
       </PageHeader>
 
+      {audioFailure && <UtilityNotice tone="error" role="alert">{audioFailure}</UtilityNotice>}
       <UtilitySectionCard step={1} title={t("audio.select")} description={t("audio.selectHelp")} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
         <FileDropZone files={files} onFiles={handleFiles} accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hint={t("audio.hint")} accent="violet" />
         <UtilityNotice className="mt-3 bg-violet-500/10 text-muted-foreground"><AlertTriangle className="mt-0.5 shrink-0 text-violet-700 dark:text-violet-300" size={16} /><span>{t("audio.compatibility")}</span></UtilityNotice>

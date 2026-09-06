@@ -89,7 +89,7 @@ worker.onmessage = (event: MessageEvent<VideoWorkerCommand>) => {
 worker.postMessage({ type: "ready" });
 
 async function processRequest(request: VideoWorkerStartRequest) {
-  let ffmpeg = new FFmpeg();
+  let ffmpeg: FFmpeg | undefined;
   const temporaryFiles = new Set<string>();
   const mountedDirectories = new Set<string>();
   let progressStage = createProgressStage(28, 90, 1, featureMessage(currentLanguage, "video.messages.video.processing"));
@@ -118,10 +118,10 @@ async function processRequest(request: VideoWorkerStartRequest) {
     ffmpegDiagnostics.push(message);
     if (ffmpegDiagnostics.length > 80) ffmpegDiagnostics.splice(0, ffmpegDiagnostics.length - 80);
   };
-  ffmpeg.on("progress", reportFfmpegProgress);
-  ffmpeg.on("log", collectFfmpegDiagnostic);
-
   try {
+    ffmpeg = new FFmpeg();
+    ffmpeg.on("progress", reportFfmpegProgress);
+    ffmpeg.on("log", collectFfmpegDiagnostic);
     validateRequest(request);
     progress(3, featureMessage(currentLanguage, "video.messages.video.loadingTheVideoEngineTheFirstRunMay"));
     const multiThreadCandidate = worker.crossOriginIsolated && typeof SharedArrayBuffer !== "undefined" && worker.navigator.hardwareConcurrency > 1;
@@ -188,12 +188,12 @@ async function processRequest(request: VideoWorkerStartRequest) {
   } finally {
     pendingInputFiles.forEach(({ reject }) => reject(new Error(featureMessage(currentLanguage, "video.messages.video.sourceFileAttachmentWasCanceledBecauseTheVideo"))));
     pendingInputFiles.clear();
-    for (const name of temporaryFiles) await ffmpeg.deleteFile(name).catch(() => undefined);
+    for (const name of temporaryFiles) await ffmpeg?.deleteFile(name).catch(() => undefined);
     for (const directory of mountedDirectories) {
-      await ffmpeg.unmount(directory).catch(() => undefined);
-      await ffmpeg.deleteDir(directory).catch(() => undefined);
+      await ffmpeg?.unmount(directory).catch(() => undefined);
+      await ffmpeg?.deleteDir(directory).catch(() => undefined);
     }
-    ffmpeg.terminate();
+    ffmpeg?.terminate();
     worker.close();
   }
 }

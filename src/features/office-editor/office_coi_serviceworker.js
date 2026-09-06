@@ -44,8 +44,13 @@ if (typeof window === 'undefined') {
   const reloadTarget = `${window.location.pathname}${window.location.search}`;
   const isolationReady = window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
   const reloadOnce = () => {
-    if (sessionStorage.getItem(reloadKey) === reloadTarget) return;
-    sessionStorage.setItem(reloadKey, reloadTarget);
+    try {
+      if (sessionStorage.getItem(reloadKey) === reloadTarget) return;
+      sessionStorage.setItem(reloadKey, reloadTarget);
+    } catch {
+      // An unavailable guard must never cause repeated document reloads.
+      return;
+    }
     configuration.doReload();
   };
   const reloadWhenActivated = (worker) => {
@@ -58,7 +63,9 @@ if (typeof window === 'undefined') {
       if (worker.state === 'activated') reloadOnce();
     });
   };
-  if (isolationReady) sessionStorage.removeItem(reloadKey);
+  if (isolationReady) {
+    try { sessionStorage.removeItem(reloadKey); } catch { /* Storage is optional after successful isolation. */ }
+  }
   if (!isolationReady && configuration.shouldRegister() && window.isSecureContext && navigator.serviceWorker) {
     navigator.serviceWorker.register(scriptUrl).then((registration) => {
       if (!configuration.quiet) console.log('Document preparation registered', registration.scope);

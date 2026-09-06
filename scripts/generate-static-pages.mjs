@@ -150,6 +150,7 @@ function renderPage(template, page, canonical) {
 }
 
 function renderLanding(template) {
+  template = template.replace('<body>', '<body data-worklazy-language-landing>');
   const title = "무료 브라우저 업무 도구 · Free Work Tools | Worklazy Tools";
   const description = "설치 없이 엑셀·PDF·문서·이미지 작업하는 무료 도구. Free browser tools for everyday work.";
   const socialImage = getSocialImageDefinition("en", "/");
