@@ -2,6 +2,7 @@ import { lazy, Suspense, useLayoutEffect } from "react";
 import { Outlet, Route, Routes, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import { ToolReady } from "../components/RouteErrorBoundary";
 import { AppShell } from "../components/AppShell";
 import { ExcelMergerPage } from "../features/excel-merger/ExcelMergerPage";
 import { DocumentCompareSessionProvider } from "../features/document-compare/documentCompareSession";
@@ -48,8 +49,8 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="tools" element={<ToolsPage />} />
-          <Route path="tools/excel-merger" element={<ExcelMergerPage />} />
-          <Route path="tools/excel-merger/xls-preserve" element={<ExcelMergerPage />} />
+          <Route path="tools/excel-merger" element={<ToolReady><ExcelMergerPage /></ToolReady>} />
+          <Route path="tools/excel-merger/xls-preserve" element={<ToolReady><ExcelMergerPage /></ToolReady>} />
           <Route path="tools/excel-compare" element={<LazyToolRoute label="Excel compare"><ExcelComparePage /></LazyToolRoute>} />
           <Route path="tools/excel-cleaner" element={<LazyToolRoute label="Excel data cleaner"><ExcelCleanerPage /></LazyToolRoute>} />
           <Route path="tools/pdf-editor" element={<PdfRoute mode="organize" />} />
@@ -128,15 +129,15 @@ function KoreanOnlyRoute({ children }: { children: React.ReactNode }) {
 
 function PdfRoute({ mode }: { mode: PdfToolMode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><PdfEditorPage mode={mode} /></Suspense>;
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><ToolReady><PdfEditorPage mode={mode} /></ToolReady></Suspense>;
 }
 
 function QrRoute({ mode }: { mode: QrMode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "QR Studio" })}</div>}><QrStudioPage initialMode={mode} /></Suspense>;
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: "QR Studio" })}</div>}><ToolReady><QrStudioPage initialMode={mode} /></ToolReady></Suspense>;
 }
 
 function LazyToolRoute({ label, children }: { label: string; children: React.ReactNode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: label })}</div>}>{children}</Suspense>;
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading" role="status">{t("status.loadingTool", { tool: label })}</div>}><ToolReady>{children}</ToolReady></Suspense>;
 }
