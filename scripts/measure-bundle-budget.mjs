@@ -10,12 +10,10 @@ const repositoryRoot = process.env.BUNDLE_SOURCE_ROOT
   ? path.resolve(process.env.BUNDLE_SOURCE_ROOT)
   : scriptRepositoryRoot;
 const outputDirectory = path.join(repositoryRoot, "dist-measure");
-const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
 const selectedRoutes = parseCsv(process.env.BUNDLE_ROUTES);
 const baselinePath = process.env.BUNDLE_BASELINE ? path.resolve(process.env.BUNDLE_BASELINE) : null;
 const reportPath = process.env.BUNDLE_MEASURE_OUTPUT ? path.resolve(process.env.BUNDLE_MEASURE_OUTPUT) : null;
-const budgetMultiplier = Number(process.env.BUNDLE_BUDGET_MULTIPLIER ?? "1");
-const budgetLimits = Object.freeze({
+export const budgetLimits = Object.freeze({
   entryJsGzip: 20 * 1024,
   affectedRouteJsGzip: 60 * 1024,
   sharedJsGzip: 30 * 1024,
@@ -23,28 +21,51 @@ const budgetLimits = Object.freeze({
   cssGzip: 10 * 1024,
 });
 
-try {
-  if (!Number.isInteger(budgetMultiplier) || budgetMultiplier < 1) {
-    throw new Error(`BUNDLE_BUDGET_MULTIPLIER must be a positive integer, received ${process.env.BUNDLE_BUDGET_MULTIPLIER}.`);
-  }
-  fs.rmSync(outputDirectory, { recursive: true, force: true });
-  execFileSync(process.execPath, [
-    path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js"),
-    "build",
-    "--manifest",
-    "--outDir",
-    "dist-measure",
-  ], { cwd: repositoryRoot, stdio: "inherit", env: process.env });
-
-  const report = measureOutput();
-  if (reportPath) fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  printReport(report);
-  if (baselinePath) compareWithBaseline(report, JSON.parse(fs.readFileSync(baselinePath, "utf8")));
-} finally {
-  fs.rmSync(outputDirectory, { recursive: true, force: true });
+export function resolveBudgetLimits(env = process.env) {
+  const multiplier = Number(env.BUNDLE_BUDGET_MULTIPLIER ?? "1");
+  if (!Number.isSafeInteger(multiplier) || multiplier < 1) throw new Error("BUNDLE_BUDGET_MULTIPLIER must be a positive integer.");
+  const overrides = {};
+  const limits = Object.fromEntries(Object.entries(budgetLimits).map(([metric, defaultLimit]) => {
+    const key = `BUNDLE_LIMIT_${metric.replace(/[A-Z]/g, (letter) => `_${letter}`).toUpperCase()}`;
+    const raw = env[key];
+    if (raw !== undefined && !/^\d+$/.test(raw)) throw new Error(`${key} must be a non-negative integer in bytes.`);
+    const value = raw === undefined ? defaultLimit * multiplier : Number(raw);
+    if (!Number.isSafeInteger(value)) throw new Error(`${key} must be a finite safe integer.`);
+    if (raw !== undefined) overrides[metric] = { environment: key, bytes: value };
+    return [metric, value];
+  }));
+  return { limits, overrides, multiplier };
 }
 
-function measureOutput() {
+export function runBundleMeasurement() {
+  const budget = resolveBudgetLimits();
+  try {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+    execFileSync(process.execPath, [
+      path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js"),
+      "build", "--manifest", "--outDir", "dist-measure",
+    ], { cwd: repositoryRoot, stdio: "inherit", env: process.env });
+    const report = measureOutput();
+    report.budget = budget;
+    printReport(report);
+    // Persist the measurements even when the comparison rejects the build.
+    if (reportPath) fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+    if (baselinePath) {
+      report.comparison = compareWithBaseline(report, JSON.parse(fs.readFileSync(baselinePath, "utf8")), budget);
+      if (reportPath) fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+    }
+    return report;
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runBundleMeasurement();
+
+export function measureOutput({ directory = outputDirectory, sourceRoot = repositoryRoot, routes = selectedRoutes } = {}) {
+  const outputDirectory = directory;
+  const manifestPath = path.join(directory, ".vite", "manifest.json");
+  const posixRelative = (filePath) => path.relative(directory, filePath).split(path.sep).join("/");
   const viteManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   const allFiles = walkFiles(outputDirectory);
   const includedFiles = allFiles.filter((filePath) => {
@@ -82,7 +103,7 @@ function measureOutput() {
   const entryManifest = viteManifest["index.html"];
   if (!entryManifest?.file) throw new Error("Vite manifest does not contain the index.html entry chunk.");
   const entryHashes = new Set([hashByOutputFile.get(entryManifest.file)].filter(Boolean));
-  const routeSources = deriveLazyRouteSources();
+  const routeSources = deriveLazyRouteSources(sourceRoot);
   const manifestBySource = new Map(Object.entries(viteManifest));
   const outputBySource = new Map(Object.entries(viteManifest).map(([source, item]) => [source, item.file]));
   const sourceByOutput = new Map(Object.entries(viteManifest).map(([source, item]) => [item.file, source]));
@@ -120,9 +141,7 @@ function measureOutput() {
   }
 
   const availableRoutes = [...routeSourceEntries.keys()].sort();
-  const affectedRoutes = selectedRoutes.length ? selectedRoutes : availableRoutes;
-  const unknownRoutes = affectedRoutes.filter((routeId) => !routeSourceEntries.has(routeId));
-  if (unknownRoutes.length) throw new Error(`BUNDLE_ROUTES contains unknown or non-lazy routes: ${unknownRoutes.join(", ")}.`);
+  const affectedRoutes = selectAffectedRoutes(availableRoutes, routes);
 
   const uniqueRecords = [...recordsByHash.values()];
   const jsRecords = uniqueRecords.filter(({ type }) => type === "js");
@@ -174,8 +193,8 @@ function measureOutput() {
   };
 }
 
-function deriveLazyRouteSources() {
-  const appSource = fs.readFileSync(path.join(repositoryRoot, "src", "app", "App.tsx"), "utf8");
+function deriveLazyRouteSources(sourceRoot) {
+  const appSource = fs.readFileSync(path.join(sourceRoot, "src", "app", "App.tsx"), "utf8");
   const routeSources = new Map();
   for (const match of appSource.matchAll(/lazy\(\(\) => import\("\.\.\/features\/([^/]+)\/([^".]+)"\)/g)) {
     const [, featureDirectory, moduleName] = match;
@@ -210,25 +229,71 @@ function walkManifestGraph(rootSource, manifestBySource, sourceByOutput) {
   return visited;
 }
 
-function compareWithBaseline(current, baseline) {
-  const deltas = Object.fromEntries(Object.keys(budgetLimits).map((metric) => [
-    metric,
-    current.metrics[metric] - baseline.metrics[metric],
+export function selectAffectedRoutes(availableRoutes, selected = []) {
+  const affected = selected.length ? [...new Set(selected)] : [...availableRoutes];
+  const unknown = affected.filter((route) => !availableRoutes.includes(route));
+  if (unknown.length) throw new Error(`BUNDLE_ROUTES contains unknown or non-lazy routes: ${unknown.join(", ")}.`);
+  return affected;
+}
+
+function assertBytes(value, label) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a finite non-negative integer (bytes).`);
+}
+
+export function compareWithBaseline(current, baseline, budget = resolveBudgetLimits(), log = console.log) {
+  for (const [label, report] of [["current", current], ["baseline", baseline]]) {
+    for (const metric of Object.keys(budgetLimits)) assertBytes(report.metrics?.[metric], `${label}.${metric}`);
+  }
+  const affected = selectAffectedRoutes(current.availableLazyRoutes, current.affectedRoutes);
+  const newRoutes = affected.filter((route) => !baseline.availableLazyRoutes.includes(route));
+  // A new current lazy route contributes zero at the baseline. Existing routes
+  // require a recorded value: missing data must never turn into a zero or NaN.
+  const baselineRouteBytes = affected.reduce((total, route) => {
+    if (newRoutes.includes(route)) return total;
+    const value = baseline.perRouteJsGzip?.[route];
+    assertBytes(value, `baseline.perRouteJsGzip.${route}`);
+    return total + value;
+  }, 0);
+  const deltas = Object.fromEntries(Object.keys(budgetLimits).map((metric) => [metric,
+    current.metrics[metric] - (metric === "affectedRouteJsGzip" ? baselineRouteBytes : baseline.metrics[metric]),
   ]));
-  const failures = Object.entries(deltas).filter(([metric, delta]) => delta > budgetLimits[metric] * budgetMultiplier);
-  console.log(`Bundle budget deltas against baseline (limit multiplier ${budgetMultiplier}):`);
-  for (const [metric, delta] of Object.entries(deltas)) {
-    console.log(`  ${metric}: ${formatBytes(delta)} (limit +${formatBytes(budgetLimits[metric] * budgetMultiplier)})`);
-  }
-  if (failures.length) {
-    throw new Error(`Bundle budget exceeded: ${failures.map(([metric, delta]) => `${metric} ${formatBytes(delta)} > +${formatBytes(budgetLimits[metric] * budgetMultiplier)}`).join("; ")}.`);
-  }
-  console.log("Bundle budget passed: all five deltas are within their fixed limits.");
+  for (const metric of Object.keys(budgetLimits)) assertBytes(budget.limits[metric], `limit.${metric}`);
+  const attribution = compareAttribution(current, baseline);
+  const comparison = { deltas, newRoutes, baselineRouteBytes, attribution, ...budget };
+  log(`Bundle budget overrides (bytes): ${JSON.stringify(budget.overrides)}; multiplier=${budget.multiplier}`);
+  log(`New current lazy routes (baseline contribution 0): ${newRoutes.join(", ") || "none"}`);
+  log("Bundle budget deltas against baseline:");
+  for (const [metric, delta] of Object.entries(deltas)) log(`  ${metric}: ${delta} B (${formatBytes(delta)}; limit +${budget.limits[metric]} B)`);
+  log(`Attribution movement vs net growth: ${JSON.stringify(attribution)}`);
+  const failures = Object.entries(deltas).filter(([metric, delta]) => delta > budget.limits[metric]);
+  if (failures.length) throw new Error(`Bundle budget exceeded: ${failures.map(([metric, delta]) => `${metric} ${delta} > +${budget.limits[metric]}`).join("; ")}.`);
+  log("Bundle budget passed: all five deltas are within their recorded limits.");
+  return comparison;
+}
+
+export function compareAttribution(current, baseline) {
+  if (!Array.isArray(current.files) || !Array.isArray(baseline.files)) throw new Error("Attribution comparison requires file records in both measurements.");
+  const previousByHash = new Map(baseline.files.map((file) => [file.hash, file]));
+  const movements = current.files.flatMap((file) => {
+    const previous = previousByHash.get(file.hash);
+    if (!previous || previous.category !== "route" || file.category !== "shared") return [];
+    assertBytes(file.gzipBytes, `file.${file.hash}.gzipBytes`);
+    return [{ hash: file.hash, paths: file.paths, gzipBytes: file.gzipBytes, fromRoutes: previous.routeOwners, toRoutes: file.routeOwners }];
+  });
+  const movedRouteToSharedGzip = sumGzip(movements);
+  return {
+    movements, movedRouteToSharedGzip,
+    sharedDeltaGzip: current.metrics.sharedJsGzip - baseline.metrics.sharedJsGzip,
+    sharedDeltaExcludingMovementGzip: current.metrics.sharedJsGzip - baseline.metrics.sharedJsGzip - movedRouteToSharedGzip,
+    // Byte-identical movement does not increase total application JS.
+    netAppJsGrowthGzip: current.metrics.appJsGzip - baseline.metrics.appJsGzip,
+  };
 }
 
 function printReport(report) {
   console.log("Bundle measurement (gzip bytes, duplicate hashes counted once):");
   console.log(`  source root: ${repositoryRoot}`);
+  if (report.budget) console.log(`  budget configuration (overrides in bytes): ${JSON.stringify(report.budget)}`);
   for (const [metric, value] of Object.entries(report.metrics)) console.log(`  ${metric}: ${value} (${formatBytes(value)})`);
   console.log(`  affected routes: ${report.affectedRoutes.join(", ")}`);
   console.log(`  unique files: ${report.uniqueFiles.js} JS / ${report.uniqueFiles.css} CSS; deduplicated copies: ${report.deduplicatedCopies}`);
@@ -240,10 +305,6 @@ function walkFiles(directory) {
     const filePath = path.join(directory, entry.name);
     return entry.isDirectory() ? walkFiles(filePath) : [filePath];
   });
-}
-
-function posixRelative(filePath) {
-  return path.relative(outputDirectory, filePath).split(path.sep).join("/");
 }
 
 function sumGzip(records) {
