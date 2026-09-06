@@ -10,6 +10,8 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { PdfTextCell, PdfTextDocument, PdfTextLine, PdfTextPage, WorkerProgress } from "./types";
 import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage } from "../../i18n/featureMessages";
+import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from "../../utils/cooperativeCancel.ts";
+import { waitForPdfRender } from "./pdfRenderLifecycle";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -135,8 +137,11 @@ function queueThumbnailRender<T>(task: () => Promise<T>) {
 }
 
 export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172, language: AppLanguage = "ko", signal?: AbortSignal) {
+  throwIfAborted(signal, "Thumbnail rendering cancelled");
   const pdfDocument = await getPdfDocument(file, language);
+  throwIfAborted(signal, "Thumbnail rendering cancelled");
   const page = await pdfDocument.getPage(pageIndex + 1);
+  throwIfAborted(signal, "Thumbnail rendering cancelled");
   const natural = page.getViewport({ scale: 1 });
   const cssScale = targetWidth / natural.width;
   const viewport = page.getViewport({ scale: cssScale });
@@ -155,13 +160,11 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
     transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
     background: "#ffffff",
   });
-  const abort = () => renderTask.cancel();
-  signal?.addEventListener("abort", abort, { once: true });
-  try { await renderTask.promise; }
+  try { await waitForPdfRender(renderTask, page, { signal, canceledMessage: "Thumbnail rendering cancelled" }); }
   catch (error) {
     if (signal?.aborted || (error instanceof Error && error.name === "RenderingCancelledException")) throw new DOMException("Thumbnail rendering cancelled", "AbortError");
     throw error;
-  } finally { signal?.removeEventListener("abort", abort); }
+  }
   if (signal?.aborted) throw new DOMException("Thumbnail rendering cancelled", "AbortError");
   canvas.width = width;
   canvas.height = height;
@@ -215,32 +218,43 @@ export async function pdfToImageArchive(
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
   selectedPageIndexes?: number[],
+  signal?: AbortSignal,
 ) {
+  throwIfAborted(signal);
   const document = await getPdfDocument(file, language);
+  throwIfAborted(signal);
   const zip = new JSZip();
   const scale = dpi / 72;
   const baseName = stripExtension(file.name);
   const pageNumbers = selectedPageIndexes?.length ? selectedPageIndexes.map((index) => index + 1) : Array.from({ length: document.numPages }, (_, index) => index + 1);
   for (let index = 0; index < pageNumbers.length; index += 1) {
+    throwIfAborted(signal);
     const pageNumber = pageNumbers[index];
     onProgress?.(5 + (index / pageNumbers.length) * 78, featureMessage(language, "pdf.messages.pdfPreview.renderingPageAs", { p0: index + 1, p1: pageNumbers.length, p2: pageNumber, p3: format.toUpperCase() }));
-    const canvas = await renderPageForExport(document, pageNumber, scale, language);
+    const canvas = await renderPageForExport(document, pageNumber, scale, language, signal);
     const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality, language);
+    throwIfAborted(signal);
     zip.file(`${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob);
     canvas.width = 1;
     canvas.height = 1;
-    await yieldToBrowser();
+    await yieldToEventLoop();
+    throwIfAborted(signal);
   }
+  throwIfAborted(signal);
   onProgress?.(88, featureMessage(language, "pdf.messages.pdfPreview.compressingConvertedImagesIntoAZipFile"));
   const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, (metadata) => {
     onProgress?.(88 + metadata.percent * 0.1, featureMessage(language, "pdf.messages.pdfPreview.compressingZip", { p0: Math.round(metadata.percent) }));
   });
+  if (signal) await yieldBeforeResultRegistration(signal);
   return { blob, fileName: `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip` };
 }
 
-export async function renderPdfPageAsJpeg(file: File, pageIndex: number, additionalRotation: number, language: AppLanguage = "ko") {
+export async function renderPdfPageAsJpeg(file: File, pageIndex: number, additionalRotation: number, language: AppLanguage = "ko", signal?: AbortSignal) {
+  throwIfAborted(signal);
   const pdfDocument = await getPdfDocument(file, language);
+  throwIfAborted(signal);
   const page = await pdfDocument.getPage(pageIndex + 1);
+  throwIfAborted(signal);
   const viewport = page.getViewport({ scale: 1.5, rotation: (page.rotate + additionalRotation) % 360 });
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.ceil(viewport.width));
@@ -249,8 +263,10 @@ export async function renderPdfPageAsJpeg(file: File, pageIndex: number, additio
   if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToCreateTheCompressedPdfPageImage"));
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvas, canvasContext: context, viewport }).promise;
+  const renderTask = page.render({ canvas, canvasContext: context, viewport });
+  await waitForPdfRender(renderTask, page, { signal });
   const blob = await canvasToBlob(canvas, "image/jpeg", 0.78, language);
+  throwIfAborted(signal);
   canvas.width = 1; canvas.height = 1;
   return new File([blob], `page-${String(pageIndex + 1).padStart(4, "0")}.jpg`, { type: "image/jpeg" });
 }
@@ -353,13 +369,16 @@ async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number, 
   return renderPageForExport(document, pageNumber, limitedScale, language);
 }
 
-async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number, language: AppLanguage) {
+async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number, language: AppLanguage, signal?: AbortSignal) {
+  throwIfAborted(signal);
   const page = await document.getPage(pageNumber);
+  throwIfAborted(signal);
   const viewport = page.getViewport({ scale });
   const canvas = documentCanvas(viewport.width, viewport.height);
   const context = canvas.getContext("2d", { alpha: false });
   if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToRenderThePdfPageImage"));
-  await page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" }).promise;
+  const renderTask = page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" });
+  await waitForPdfRender(renderTask, page, { signal });
   return canvas;
 }
 
@@ -440,7 +459,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number |
 }
 
 function yieldToBrowser() {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+  return yieldToEventLoop();
 }
 
 function stripExtension(name: string) {

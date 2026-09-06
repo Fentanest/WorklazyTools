@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -46,15 +47,21 @@ test("PDF finish fixtures are deterministic twice and match the tracked oracle t
   }
 });
 
-test("legacy PDF oracles remain tied to the exact main source and all three oracle types", async () => {
+test("legacy PDF oracles remain tied to the exact main blobs and all three oracle types", async () => {
   const legacyDirectory = path.join(trackedFixtureDirectory, "legacy-oracle");
   const manifest = JSON.parse(await fs.readFile(path.join(legacyDirectory, "manifest.json"), "utf8"));
   assert.equal(manifest.baseCommit, "5bc6854175331bdd73b267784d9633cdccda8446");
   assert.deepEqual(manifest.determinism, { runs: 2, byteEqualModes: 4, structureEqualModes: 4, popplerPixelDiffs: 0, pdfjsPixelDiffs: 0 });
   assert.equal(manifest.modes.length, 4);
   for (const source of Object.values(manifest.source) as Array<{ file: string; sha256: string }>) {
-    assert.equal(crypto.createHash("sha256").update(await fs.readFile(path.join(repositoryRoot, source.file))).digest("hex"), source.sha256, source.file);
+    const baseBlob = execFileSync("git", ["show", `${manifest.baseCommit}:${source.file}`], { cwd: repositoryRoot });
+    assert.equal(crypto.createHash("sha256").update(baseBlob).digest("hex"), source.sha256, source.file);
   }
+  assert.equal(
+    crypto.createHash("sha256").update(await fs.readFile(path.join(repositoryRoot, manifest.source.worker.file))).digest("hex"),
+    manifest.source.worker.sha256,
+    "The legacy PDF worker remains unchanged; the migrated client is checked by fixtures:pdf-legacy-oracle.",
+  );
   for (const mode of manifest.modes) {
     assert.equal(crypto.createHash("sha256").update(await fs.readFile(path.join(legacyDirectory, mode.output.file))).digest("hex"), mode.output.sha256, mode.mode);
     assert.equal(crypto.createHash("sha256").update(await fs.readFile(path.join(legacyDirectory, mode.structure.file))).digest("hex"), mode.structure.sha256, mode.mode);

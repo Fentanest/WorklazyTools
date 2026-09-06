@@ -4,6 +4,61 @@
 
 ## 2026-09-07
 
+### U4-2(F0b) PDF worker lifecycle facade·협력적 취소 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 확정 2·3·16·19와 D5·V3-4, round 3·5·6 증거 및 U4-0/U4-1 기록을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=f56dc68d4c53d58cad520fe41973cd2699a4f548`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 이번 표면의 충돌은 없었다. 로드맵 끝의 `브랜치 최종 3672fc7/main 5485fad` 문장은 바로 앞 U4-1 기록·실제 ref·최신 dispatch와 모순되는 낡은 문구라 이번 기준으로 쓰지 않았다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML은 건드리지 않았고 main 병합·push·배포도 하지 않는다.
+
+**facade 계약** — `pdfWorkerLifecycle.ts`가 공용 `runModuleWorker`를 직접 소비하고 PDF 고유 envelope만 adapter 하나에서 변환한다. progress의 `message`는 공용 `phase`, 중첩 `error.message/code`는 공용 flat error로 넘긴 뒤 기존 `resolveFeatureMessage` 현지화와 result `warnings` 현지화를 PDF 소유 경계에서 복원한다. request·transfer 배열과 각 transferable의 identity는 복제하지 않으며 terminal은 공용 helper가 한 번만 수락하고 worker도 한 번만 종료한다. 생성·post·error-event 실패는 ko/en의 안전한 시작 오류로 수렴해 원시 예외를 사용자 메시지에 노출하지 않는다. `pdfWorkerClient.ts`의 PDF worker와 PDF Office worker 호출을 모두 facade로 이관했고 아래 공개 함수의 `signal`은 마지막 optional 인자다. 기존 호출자는 수정하지 않았으므로 미전달 4모드의 요청·출력·progress·warnings·오류 code·transfer 계약은 그대로다.
+
+| 호출 | signal 위치 | 추가 취소 경계 |
+|---|---|---|
+| `mergePdfPages`·`exportPdfGroups` | output options 뒤 마지막 | 각 source `arrayBuffer()` 전후, watermark 직전·직후, worker lifecycle |
+| `imagesToPdf` | output options 뒤 마지막 | 각 normalize/read 전후와 파일 loop 사이, watermark, worker lifecycle |
+| `textDocumentToOffice`·`combineOcrPdfPages` | language 뒤 마지막 | worker lifecycle |
+| `pdfToImageArchive`·`renderPdfPageAsJpeg` | 기존 인자 뒤 마지막 | load/getPage/render/blob·페이지 loop와 결과 등록 직전 |
+
+**협력적 취소·PDF.js 소유권** — 정본의 위치 기본값에 따라 `src/utils/cooperativeCancel.ts`에 `setTimeout(0)` task 양보, abort 검사, 결과 등록 전 양보 후 재검사를 두었다. 같은 12단계·단계당 약 3ms 반례에서 `await Promise.resolve()`는 타이머 abort를 받지 못해 **12/12 완료·aborted false**, task 양보는 첫 단계 뒤 abort를 받아 **1/12 완료·aborted true**였다. 이는 동기 단위 한가운데의 즉시 중단을 보장하지 않고 명시 검사점 사이에서만 협력적으로 멈춘다. 결과 등록 시험은 이전 결과만 남기고 새 결과를 등록하지 않음을 단언한다.
+
+`pdfRenderLifecycle.ts`는 abort 시 `renderTask.cancel()` → `renderTask.promise` rejection 정착 → `page.cleanup()` → 소유 문서일 때만 `loadingTask.destroy()` 순서를 고정한다. `RenderingCancelledException`만 취소 정착으로 삼고 예상 밖 오류는 cleanup/destroy 뒤 다시 던진다. unit의 소유 문서 로그는 정확히 `cancel, settled, cleanup, destroy`, 공유 preview 문서는 `cancel, settled, cleanup`이며 destroy가 없었다. 현재 preview는 공유 문서만 사용하므로 ownership을 주장하지 않는다.
+
+**legacy·Excel 불변 증명** — U4-0 baseline을 덮어쓰는 대신 현재 source를 `/tmp`에 별도 재채취하는 driver를 추가했다. baseline capture 원본의 기본 동작·단언은 유지하고, 별도 output/current-source 환경은 `/tmp` 하위만 허용한다. 기존 unit의 “현재 client blob이 main과 동일” 단언은 필수 facade 이관과 양립할 수 없어 baseline manifest의 client·worker SHA가 실제 main blob과 일치함을 직접 검증하고, 현재 client 동작은 아래 byte oracle 비교가 맡도록 경계를 바로잡았다.
+
+| 불변 표면 | 실제 결과 |
+|---|---|
+| legacy client oracle | 3파일, diff **0** |
+| legacy structure oracle | 4파일, diff **0** |
+| legacy render oracle | 32파일, diff **0** |
+| legacy output/input oracle | 4파일/1파일, diff **0**; 총 diff **0** |
+| PDF 4모드 | `TEST_SCOPE=pdf npm run test:browser` 통과; 전체 browser의 Word·Excel·PDF와 shared UI도 통과 |
+| Excel 회귀 | cleaner의 취소·재실행·입력 불변, compare의 취소·보고서·모바일 모두 통과 |
+| 금지 파일 | `workerLifecycle.ts`·두 Excel client diff 0; blob SHA는 각각 `a6406c8…`, `48ccc95…`, `ae130ad…`로 착수 시와 동일 |
+
+**unit·번들·제품 영향** — facade V3-4는 ko/en 성공·progress·warning·result/transfer identity 2건, ko/en 중첩 error 현지화·code 2건, pre-abort, abort 뒤 늦은 result, timeout, post 예외, 중복 terminal, error event, 생성 예외의 **11개 lifecycle 시나리오**를 고정했다. file read 전/후, task 양보 반례, 결과 등록, PDF.js 소유/공유/AbortSignal을 더해 전용 파일은 **17/17**, 전체 unit은 **289/289**다. 테스트가 extensionless transitive TS import를 native strip만으로 해석하지 못한 것은 U4-1에 이미 기록된 Node 실행 경계이므로 제품 import나 검수 probe를 바꾸지 않고 테스트 전용 esbuild bundle로 실제 facade/client를 로드했다. 새 의존성은 없다.
+
+U4-0 production baseline 대비 `pdf-editor` 선택 route의 번들 5종은 entry **+18B**(20,480B 한도), affected route **+758B**(61,440B), shared **+37B**(30,720B), app **+867B**(81,920B), CSS **0B**(10,240B)로 모두 통과했다. UI·route·기존 ko/en 문구·SEO·정적 페이지·광고 배치/격리 경로는 바꾸지 않았고 취소 버튼도 추가하지 않았다. signal 미전달 화면의 변화가 없으므로 전체 시각 회귀 대신 지시된 rendering 3페이지를 사용했다.
+
+**완료 기준 검증** — 아래 명령을 실제 실행했다. 첫 production rendering은 CLS가 모두 0이었지만 production에 의도된 분석 요청 126건 때문에 외부 요청 게이트가 exit 1이었다. `VITE_LOCAL_QA=1` 직렬 빌드 후 같은 검사를 다시 실행해 3페이지×3회, 외부 요청 0, home/document-compare/pdf-editor CLS 모두 0으로 통과했다. 이는 제품 회귀가 아니라 추적 없는 QA 렌더링의 요구 환경 차이다.
+
+QA 뒤 production `dist` 복원 시 앞서 통과한 것과 같은 4GiB 명령을 두 번 더 실행했으나, host 가용 3.1~3.4GiB·swap 4GiB 소진 상태에서 transform/chunk rendering 중 OS가 각각 exit 137로 종료했다. `--optimize-for-size`를 `NODE_OPTIONS`에 넣는 시도는 Node가 허용하지 않아 빌드 시작 전 exit 9였다. 완료 기준의 4GiB production 성공을 이 실패로 대체하지 않고, 복원만 `GOMAXPROCS=1 NODE_OPTIONS=--max-old-space-size=3072 npm run build`로 실행해 2,837 modules·정적 61페이지를 통과시켰다. 복원 `dist`의 번들 보고 대상 **81파일 SHA가 앞서 성공한 production bundle 측정과 81/81 동일**했고 static startup recovery 104도 다시 통과했다.
+
+| 명령 | 실제 결과 |
+|---|---|
+| `npx tsc -b --pretty false` | exit 0, 진단 0 |
+| `npm run test:unit` | **289/289**, 실패·skip 0 |
+| `npm run fixtures:pdf-legacy-oracle` | client 3·structure 4·render 32·output 4·input 1, 총 diff **0** |
+| `NODE_OPTIONS=--max-old-space-size=4096 npm run build` | production 2,837 modules·정적 61페이지 통과 |
+| 최종 production 복원 build / 번들 SHA 대조 | 3GiB·esbuild 병렬도 1로 통과; production 측정 81파일과 mismatch 0 |
+| `npm run test:static` | 정적 61페이지·startup recovery 104 통과 |
+| `TEST_SCOPE=pdf npm run test:browser` / 전체 `test:browser` | PDF 4모드 / Excel·Word·PDF·shared UI 통과 |
+| `npm run test:excel-cleaner` / `npm run test:excel-compare` | 양쪽 모두 취소 경로 포함 통과 |
+| `npm run test:new-tools` | HWP·Image·Audio·Video 통과 |
+| QA `npm run test:rendering` | 3×3, 외부 요청 0, CLS max 0 |
+| `npm run bundle:measure` | U4-0 baseline 대비 5종 한도 내 통과 |
+| `npm run css:orphans` | 212 class tokens, zero-reference selector arm 0 |
+| `git diff --check` | 공백 오류 0 |
+
+**범위 밖 발견** — 정본이 허용한 기본 위치에 공용 취소 helper를 둔 결정, 필수 client refactor와 충돌하던 legacy fixture test의 책임 분리, test-only TS resolver 우회는 위에 근거와 함께 기록했다. stale 로드맵 ref 외에 새 정책 판단이나 미해결 범위 밖 제품 결함은 없었다. 명령·oracle·bundle·rendering 산출은 `/tmp/worklazy-u4-2/`와 `/tmp/worklazytools-rendering-baseline.json`에 보존한다. — Codx
+
 ### U4-1(F0a) PDF finish 순수 정책 모듈 — 브랜치 구현·검증 (Codx)
 
 **착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 확정 1·7·8·9·10·12·18·21·22·24 및 D2·D3·D7·D8·N1·N2·N3, round probe 원자료와 U4-0 기록을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=5ee9b1a4af1e5611cee8f86ba3f177801225dc97`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 같은 표면의 충돌은 없었다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML은 건드리지 않았다. 제품 변경은 `src/features/pdf-editor/finish/**`의 순수 TypeScript에 한정하고, U4-0 test helper는 그 제품 preflight를 import하는 단일 경계로 바꿨다. React·UI·route·locale·registry·worker·기존 4모드·pdf-lib 그리기 호출은 변경하지 않았으며 main 병합·push·배포도 하지 않는다.

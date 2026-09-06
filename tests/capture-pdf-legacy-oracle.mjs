@@ -10,7 +10,10 @@ import { fileURLToPath } from "node:url";
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, "..");
-const outputDirectory = path.join(testsDirectory, "fixtures", "pdf-finish", "legacy-oracle");
+const trackedOutputDirectory = path.join(testsDirectory, "fixtures", "pdf-finish", "legacy-oracle");
+const requestedOutputDirectory = process.env.PDF_LEGACY_ORACLE_OUTPUT;
+const outputDirectory = requestedOutputDirectory ? path.resolve(requestedOutputDirectory) : trackedOutputDirectory;
+const captureCurrentSource = process.env.PDF_LEGACY_ORACLE_SOURCE === "current";
 const baseCommit = "5bc6854175331bdd73b267784d9633cdccda8446";
 const require = createRequire(path.join(repositoryRoot, "package.json"));
 const { build, transform } = require("esbuild");
@@ -97,8 +100,15 @@ async function renderWithPdfjs(page, bytes) {
   }, bytes.toString("base64"));
 }
 
-for (const relativePath of ["src/features/pdf-editor/pdfWorkerClient.ts", "src/features/pdf-editor/pdf.worker.ts"]) {
-  assert.ok((await fs.readFile(path.join(repositoryRoot, relativePath))).equals(sourceAtBase(relativePath)), `${relativePath} differs from ${baseCommit}`);
+if (!captureCurrentSource) {
+  for (const relativePath of ["src/features/pdf-editor/pdfWorkerClient.ts", "src/features/pdf-editor/pdf.worker.ts"]) {
+    assert.ok((await fs.readFile(path.join(repositoryRoot, relativePath))).equals(sourceAtBase(relativePath)), `${relativePath} differs from ${baseCommit}`);
+  }
+}
+
+if (requestedOutputDirectory) {
+  const relativeToTemp = path.relative(path.resolve("/tmp"), outputDirectory);
+  assert.ok(relativeToTemp && !relativeToTemp.startsWith("..") && !path.isAbsolute(relativeToTemp), "PDF_LEGACY_ORACLE_OUTPUT must be a child of /tmp.");
 }
 
 await fs.rm(outputDirectory, { recursive: true, force: true });

@@ -12,7 +12,7 @@
     "measure:qr": "node tests/qr-stage-metrics.mjs",
     "bundle:measure": "node scripts/measure-bundle-budget.mjs",
     "fixtures:pdf-finish": "node scripts/generate-pdf-finish-fixtures.mjs",
-    "fixtures:pdf-legacy-oracle": "node tests/capture-pdf-legacy-oracle.mjs",
+    "fixtures:pdf-legacy-oracle": "node tests/compare-pdf-legacy-oracle.mjs",
     "css:orphans": "node scripts/audit-css-orphans.mjs",
     "legacy:manifest": "node scripts/generate-legacy-owner-manifest.mjs",
     "vendor:rhwp": "node scripts/vendor-rhwp-studio.mjs",
