@@ -4,6 +4,7 @@
 
 ## 2026-09-06
 
+- QR 라벨 PDF에 해시 고정 KS X 1001 기반 빌드 타임 글꼴 subset과 원문+NFC coverage 선택·전체 폰트 폴백을 추가했다. Node-only 벤더 전개, ZIP/PDF 공용 export 수명주기, typed 폰트 초기화 경계와 3시나리오 전송 계측·Poppler/PDF.js 렌더 회귀를 함께 고정하고, 실제 handler mutation·폰트 404/S0·내보내기 취소 브라우저 회귀를 보강했다. — Codx
 - S2-H: 번들 지표별 override·유한 정수 검사·신규 lazy route 기준점·귀속 이동 분리를 추가하고, CLS sources/상한 판정·접근성 등록/판정·독립 도구 기대 목록을 양방향 unit으로 고정했다. 접근성 감사에 모바일 홈/도구 목록과 HWP(상류 iframe 한정 예외)를 등록했다. — Codx
 - S2-P 1차: 정적 본문 margin 전파·로고 높이·lazy 로딩 공간을 예약하고 하단 탭 대비 토큰과 해당 시각 기준선을 수정했다. ZIP 유니코드 파일명 옵션·해제 도구 대조 fixture, QR 4단계 요청/worker/폰트 계측을 추가했다. QR 감량·ZIP 통합 구현은 포함하지 않았다. — Codx
 - S1 문서 비교의 도달 불가 Word/HWP 페이지·세션 5파일과 Word 결과 wrapper를 제거했다. 공유 결과 화면·변환 엔진·기존 redirect는 유지하고, orphan CSS 71규칙 삭제·5규칙 부분 정리와 legacy manifest(153 removed·0 split·2 active)·소비자 수 unit 갱신을 반영했다. — Codx

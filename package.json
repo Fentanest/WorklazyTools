@@ -28,6 +28,7 @@
     "test:excel-compare": "node tests/excel-compare-smoke.mjs",
     "test:excel-cleaner": "node tests/excel-cleaner-smoke.mjs",
     "test:qr-bulk": "node tests/qr-bulk-smoke.mjs",
+    "test:qr-font-render": "node --experimental-strip-types tests/qr-font-render-regression.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",

@@ -4,6 +4,104 @@
 
 ## 2026-09-06
 
+### S2b QR 라벨 PDF 한글 글꼴 감량 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·정지점** — `PROJECT_RULES.md` 전문을 첫 행동으로 읽고 디스패치, `AGENTS.md`, 정본 `qr-font-20260906.md`의 「v3 확정」·「정본화 보강」, 로드맵 결정 10·11, R3 보고서·고정 draft·관련 기각 이력을 확인했다. 시작 시 `HEAD=main=f29d249d5d57c5fa7b68b8d87b84a20b8af43e7e`, `origin/main=1a04f257…`였고 추적 변경은 `AGENTS.md` 하나, 사용자 미추적 파일은 `before.docx`·`after.docx`·네이버 확인 HTML이었다. 열린 작업계획서 16개와 상반 지시가 없음을 확인한 뒤 `s2b-qr-font`를 분기했다. 첫 커밋 `c680030`은 사용자 지시대로 기존 `AGENTS.md` 변경만 담았다. 정본 계획서는 수정하지 않았고 사용자 파일 세 개도 건드리지 않았다. 이번 정지점은 **브랜치 커밋·전체 검증·QA dist 보존까지**이며 main 병합·push·배포는 하지 않는다.
+
+**공급 경계·재현 레시피** — 원본 전체 OTF 경로와 `QR_LABEL_FONT_PATH` 의미는 유지했다. 저장소에는 raw subset OTF 대신 아래 5개 생성 입력, 합계 **606,249B**만 추적한다. 일반 prebuild의 Node 벤더는 로컬 gzip·coverage·provenance를 먼저 검증하고 bounded gunzip한 뒤 원본 OTF·OFL까지 모두 확인한다. 이후 staging에서 전체/서브셋 두 소유 snapshot만 교체하고 실패 시 rollback한다. public의 subset snapshot과 `dist`는 생성물이라 추적하지 않는다.
+
+| 추적 입력 | 바이트 | SHA-256 |
+|---|---:|---|
+| `unicodes-alias.txt` | 23,757 | `ac8fefb54a969022fc1b139a3a7a1937f711e71280fb992683eb0d4d43978b0c` |
+| `NotoSansKR-Regular.ksx1001.otf.gz` | 561,161 | `e1db3cdcbb8d76fc0546ec582bed773b3b7ef3da60867b6828493a6b342c7e66` |
+| `coverage.json` | 19,686 | `58f248442d4e8e5726559644a746740bd0066cebabf154956e0bb7e1458eafea` |
+| `coverage.schema.json` | 444 | `919d01b6713b3438f6cd36091d3244a04a28822b031a5cdd7ac135ff3d17e6b0` |
+| `provenance.json` | 1,201 | `30e10e1815835b8076a100ecdc9804c2613b115b555cbcc0b122150b92f77667` |
+
+명시 재생성만 `/tmp` venv에서 `fonttools==4.59.2` wheel SHA `738f31f2…9464e`를 `pip install --require-hashes -r scripts/requirements-fonts.txt`로 설치한 뒤 `scripts/build-qr-label-font-subset.py`를 실행한다. 옵션은 `--layout-features=* --name-IDs=* --name-languages=* --name-legacy --notdef-glyph --notdef-outline --no-recalc-timestamp --retain-gids`다. 스크립트는 원본·목록 SHA와 fontTools/GNU gzip 1.12를 고정하고, subset cmap exact equality 및 3,394 코드포인트의 GID·hmtx·RecordingPen outline 차이 0을 확인한다. `gzip -n -9 -c`까지 모든 고정 SHA가 맞은 뒤에만 같은 파일시스템 staging에서 추적 입력을 **파일별 `os.replace`**로 교체한다. 실제 재생성은 `cmap=3394 size=931704 gzip=561161 glyph-differences=0`으로 통과했다.
+
+최종 3,394 코드는 KS X 1001 현대 한글 2,350자와 ASCII·Latin-1·한글 자모·General Punctuation(U+2026 포함)·통화·CJK 구두점·호환 자모·전각 문자 중 원본 cmap에 있는 3,095코드, 그리고 layout closure가 보존한 원본 매핑 299코드다. 요청 목록에만 있고 원본에 없는 123코드는 넣지 않았다. raw OTF는 **4,644,748B → 931,704B(−79.94%)**, 고정 gzip은 **3,733,457B → 561,161B(−84.97%)**다.
+
+**런타임 선택·수명주기** — `qrLabelFont.ts`는 coverage schema·snapshot·개수·정렬·scalar·surrogate·U+2026을 런타임에도 엄격히 검사한다. 각 라벨의 실제 draw 문자열은 바꾸지 않고 공백 정리한 **원문과 NFC 양쪽**을 `for…of` 코드포인트로 검사한다. 둘 다 포함될 때만 subset, 범위 밖 문자·NFD 결합문자·이모지·한자·잘못된 coverage는 처음부터 full을 고른다. 8,192코드마다 8ms를 넘으면 task를 양보하고 AbortSignal을 확인한다.
+
+폰트 loader는 panel별 lazy factory이며 모듈 전역 cache가 없다. named asset 두 개만 size+SHA 검증 뒤 ArrayBuffer로 보관하고 404/503·network/body 오류·빈/HTML/잘린/동일 크기 손상 subset은 cache하지 않은 채 full을 한 번만 시도한다. PDF 클릭 뒤 coverage·폰트, PDF helper, 저장 PNG 읽기를 즉시 병렬 시작하되 클릭 전 prefetch는 하지 않는다. ZIP·PDF는 같은 동기 lease/token을 사용하고 파일 교체·재생성·취소·run 실패·unmount에서 Abort와 cache dispose를 함께 수행한다. `PDFDocument.create`와 PNG read/embed·draw·save는 typed catch 밖이며 `registerFontkit`/`embedFont`만 `QrLabelFontInitError`로 감싼다. 선택된 subset의 이 좁은 초기화 단계가 실패할 때만 PNG를 다시 읽지 않고 새 PDFDocument+full OTF로 한 번 재생성한다. 최종 Blob 뒤에도 task를 한 번 양보하고 token을 재검사한다.
+
+**3시나리오 실제 전송량** — QA production·Chrome 152·새 브라우저/context·SW 차단·cache off·무스로틀 로컬 preview·NetLog encoded body+HTTP header 기준이다. corrupt는 브라우저 route mock 없이 same-origin reverse proxy가 정확한 subset OTF 경로의 50번째 바이트만 바꾼다. 각 PDF의 embedded raw OTF stream은 정확히 1개이고 아래 expected size/SHA와 일치했다. 이전 S2의 같은 4단계 PDF 기준은 **5,153,562B / JS gzip 508,018B / 누적 6,067,785B**다.
+
+| 시나리오 | 요청 폰트 | PDF 단계 요청 / 전송 B | 기준 대비 | 누적 전송 B | 출력 PDF / embedded OTF |
+|---|---|---:|---:|---:|---:|
+| `subset` | subset 1회 | 3 / **1,450,793** | **−3,702,769B (−71.85%)** | 2,365,596 | 603,829B / 931,704B `b84d27a5…a252be` |
+| `full` | full 1회 (`똠` 1자) | 3 / **5,163,839** | +10,277B (+0.20%) | 6,078,642 | 3,854,300B / 4,644,748B `69975a0a…148d68` |
+| `corrupt` | 손상 subset → full | 4 / **6,095,694** | +942,132B (+18.28%) | 7,010,497 | 3,854,297B / 4,644,748B `69975a0a…148d68` |
+
+subset OTF 자체의 로컬 identity 전송은 932,057B, full은 4,645,103B다. corrupt proxy 응답은 931,855B이고 이어 full 4,645,103B를 받았다. 세 경우 모두 **QR 라벨 OTF 요청**은 PDF 완료 단계에서만 발생했고 cache/SW hit와 외부 요청은 0이었다. full은 지원 범위 밖 문자를 보존하는 정상 경로이고 corrupt는 무결성 방어 비용을 계측한 것이므로 두 값을 감량 실패로 해석하지 않는다.
+
+**렌더 oracle** — 전체 OTF와 subset OTF를 제품 helper에서 모두 `subset:false`로 임베드하고 Poppler `pdftoppm -r 144 -png`의 RGBA를 전 픽셀 대조했다. PDF.js extraction JSON은 두 폰트 결과끼리 비교했다.
+
+| fixture | preset / 라벨 / 페이지 | 전체 PDF B | subset PDF B | 비교 픽셀 | 변경 픽셀 | PDF.js |
+|---|---|---:|---:|---:|---:|---|
+| sample | A4 / 25 / 2 | 3,979,131 | 728,659 | 4,011,288 | **0** | 동일 |
+| inventory(원본 cmap 교집합 3,095) | A4 / 155 / 7 | 4,742,244 | 1,491,805 | 14,039,508 | **0** | 동일 |
+| expanded(최종 3,394) | Letter / 170 / 8 | 4,829,717 | 1,579,298 | 15,510,528 | **0** | 동일 |
+
+Poppler는 두 폰트를 시각적으로 동일하게 렌더했지만 descriptor가 `FontFile2`이고 스트림은 `OTTO`인 기존 pdf-lib 경계 때문에 `Mismatch between font type and embedded font file` 경고를 낸다. Ghostscript는 원본 전체 OTF PDF부터 한글 tofu를 내므로 S2b oracle에서 제외했다. PDF.js도 일부 공백→`堺`, shaping 숫자→한자처럼 **입력과 다른 기존 추출**이 있다. 따라서 이번 게이트는 "전체와 subset 동일"이며 "입력과 완전 동일"이 아니다. 두 결함은 `docs/backlog.md`의 U4 관련 후속으로 이관했고 이번 범위에서 수리했다고 주장하지 않는다.
+
+**B·C 판정** — Brotli는 기술적으로 전면 불가가 아니다. WHATWG/BCD에는 brotli stream이 있고 Safari 18.4·Firefox 147 지원 정보가 있으나 실측 Chrome 152는 지원하지 않으며, 원본 full OTF의 q11 감량은 14.85%로 빌드 타임 subset gzip 84.97%보다 작고 미지원 폴백 계약이 추가된다. 따라서 B는 **미채택**했다. C는 전송량을 줄이지 못하므로 클릭 후 자산·helper·PNG 읽기 병렬화만 보조 채택했고 클릭 전 prefetch는 기각했다. 런타임 `embedFont({subset:true})` 재시도도 기존 한글 누락 재현 때문에 계속 금지한다.
+
+**production 번들 5종** — 기준은 구현 전 `main=f29d249` production `/tmp/s2b-bundle-baseline.json`, 현재도 production이고 override 없음·multiplier 1·신규 route 없음·귀속 이동 0B다. coverage JSON과 selector helper는 JS 지표 안에 포함된다.
+
+| 지표 | main 기준 gzip B | 브랜치 gzip B | delta B | 상한 B | 판정 |
+|---|---:|---:|---:|---:|---|
+| entryJsGzip | 299,283 | 299,287 | +4 | 20,480 | 통과 |
+| affectedRouteJsGzip | 2,440,427 | 2,450,827 | +10,400 | 61,440 | 통과 |
+| sharedJsGzip | 2,716,489 | 2,716,473 | −16 | 30,720 | 통과 |
+| appJsGzip | 5,456,199 | 5,466,587 | +10,388 | 81,920 | 통과 |
+| cssGzip | 37,687 | 37,687 | 0 | 10,240 | 통과 |
+
+**clean copy** — detached `0198036` worktree에서 `/tmp` npm cache를 사용해 `npm ci`(775 packages)를 수행했다. 소유 외 snapshot sentinel을 추가한 뒤 `npm run vendor:qr-font`를 2회 실행해 전체/서브셋 8파일+sentinel, 합계 9파일 SHA 목록이 완전히 동일하고 sentinel이 보존됨을 확인했다. 이어 Python 실행 없이 `npm run build`가 61페이지까지 통과하고 `dist`에 subset OTF가 존재함을 확인했다. 원본 full/OFL cache가 없으면 고정 upstream을 받는 현재 계약은 유지하며 완전 offline full 공급을 주장하지 않는다.
+
+**완료 기준 검증** — 아래 최종 명령은 모두 exit 0이다. stdout/stderr 원문은 `/tmp/worklazy-s2b/logs/`, 구조화 결과는 `/tmp/worklazy-s2b/`에 보존했다. 마지막 `dist`는 `VITE_LOCAL_QA=1` 산출이다.
+
+| 명령 | 실제 결과 |
+|---|---|
+| `npm run build` | production·벤더 고정값·정적 61페이지 통과; clean copy도 별도 통과 |
+| `npx tsc -b --pretty false` | 진단 0 |
+| `npm run test:unit` | **241/241**(신규 QR font 10건 포함) |
+| `npm run test:qr-bulk` | cancel/cleanup/rerun·7 payload·ZIP 2 PNG·2-sheet manifest·subset/full/corrupt 3종 25라벨/2페이지/폰트 SHA·외부 요청 0 |
+| `npm run test:utilities` | ko/en·도구·video 호환·PDF 범위 통과 |
+| `npm run test:static` | 현지화·hreflang·런타임·ads/robots/sitemap·startup 104문서 통과 |
+| `npm run test:browser` | Excel·Word 비교·PDF edit/range/conversion 통과 |
+| `npm run test:new-tools` | HWP·Image·Audio·Video 통과; 호스트 미지원 DV 실기능 분기는 기존 조건대로 skip, capability/fallback 단언 통과 |
+| `npm run test:office` | 96 download·7 cache 상태·Calc 편집·DOCX 5,089B |
+| `npm run test:recovery` | desktop+Android **147/147** |
+| `LANG=ko_KR.UTF-8 … npm run test:visual` / `LANG=en_US.UTF-8 …` | 각각 **175/175**, 기준선 갱신 0 |
+| `VITE_LOCAL_QA=1 npm run build` | 최종 QA dist·61페이지 |
+| `A11Y_MAX_TOTAL=0 npm run test:a11y` | 8페이지·위반/외부 요청 0·placeholder 4.8871:1 |
+| `npm run test:rendering` | 3페이지×3회 CLS 최대 0·외부 요청 0 |
+| `BUNDLE_BASELINE=/tmp/s2b-bundle-baseline.json npm run bundle:measure` | 위 5종 상한 모두 통과 |
+| `npm run css:orphans` | orphan selector arm 0 |
+| `npm run legacy:manifest` | 153 removed / 0 split / 2 active |
+| `node tests/tool-registry-routes.mjs` | 기대 20·누락/예상 외/중복 0 |
+| `npm run measure:qr -- --scenario=subset|full|corrupt` | 위 3시나리오 전송·embedded SHA 통과 |
+| `npm run test:qr-font-render` | 3 fixture·17페이지·33,561,324픽셀 차이 0·PDF.js 전체 대비 동일 |
+| `git diff --check` | 공백 오류 0 |
+
+**실행 중 실패·판정** — 최초 재생성 스크립트는 `/tmp` staging에서 저장소로 `os.replace`해 `EXDEV`가 났고 추적 입력은 불변이었다. staging을 `scripts/assets/qr-label-font/`와 같은 파일시스템으로 옮긴 뒤 고정 SHA 재생성에 통과했다. 첫 QR 스모크는 생성 결과가 보이는 즉시 PDF를 눌러 새 `busy` 비활성 계약에 걸렸다. 제품 계약을 완화하지 않고 버튼 enabled를 기다리도록 스모크를 고쳤다. typed PNG 음성 unit은 pdf-lib가 `Error` 객체가 아닌 raw 값을 던지는 경우가 있어 `instanceof Error` 기대를 없애고 **typed font-init이 아님**만 단언했다. clean copy의 첫 `npm ci`는 홈 npm cache가 read-only라 `EROFS`로 중단됐고 `/tmp` cache 지정 후 통과했다. production preview 4188 포트가 기존 프로세스에 점유돼 검증 전용 4190으로 분리했다. 새 제품 결함으로 분류하거나 게이트를 낮춘 경우는 없다.
+
+**제품 규칙·범위** — 서버/API/SSR·새 npm runtime/devDependency·사용자 문구·route·SEO·사이트맵·광고/분석 경계 변경은 0이다. coverage·asset 오류와 내부 snapshot 명칭은 사용자에게 노출하지 않고 기존 ko/en PDF 오류로 귀결한다. public/vendor와 dist는 생성기로만 만들었다. CSV의 ExcelJS/JSZip 분리, `qrLabelPdf` 508KB 청크 감량, U4 공용 폰트 경계, jszip 제거, 기존 GS/PDF.js 결함 수리는 명시 제외를 유지한다. QA 감사·렌더링·QR 스모크/계측의 외부 요청은 0이다. 최종 브랜치만 남기며 main/origin/main은 이동시키지 않고 push하지 않는다.
+
+**검수 소견 반영(F1·F2)** — F1의 정적 문자열 기반 export 검사를 실제 `QrBulkPanel` handler 본문을 TypeScript로 추출·실행하는 회귀로 교체했다. 이전 ZIP의 지연 실패/finally와 새 PDF의 경합에서 공용 lease가 `pdf`로 유지되고 이전 오류 메시지는 0이며, cancel·cleanup·run abort/error가 active export와 font loader를 무효화하고 `storageRef`를 `clear()` await 전에 분리해 새 storage를 보존하는지 실행 결과로 단언한다. PDF 버튼의 실제 JSX 식도 `busy=true`에서 비활성, 정상 idle에서 활성으로 평가한다. QR 전용 unit은 **15/15**, 전체 unit은 **246/246**이다. 별도 `/tmp` 사본에서 `finishExport`의 `if (!owned) return` 한 줄을 제거하고 같은 unit을 실행한 음성 대조는 기대대로 **exit 1·13 pass/2 fail**이며 핵심 실패 원문은 **`'' !== 'pdf'`**다.
+
+F2는 same-origin scenario server가 정확한 subset OTF 경로만 HTTP 404로 응답하도록 확장했다. 브라우저 결과는 `font404`에서 **subset 404 1회 → full 1회**, 임베드 full OTF **4,644,748B / `69975a0a…148d68`**, 최상위 navigation reload **0**, `worklazy_tool_reload:` key **0**이다. 대조용 실제 빌드 `qrLabelPdf` lazy chunk 404는 reload **1**이었다. 같은 HTTP 경계를 지연시킨 채 결과 파일을 교체하면 font 요청은 subset 1회에서 중단되고 full 요청·stale PDF 다운로드는 **0**, 새 결과의 PDF export 버튼은 다시 활성화됐다. `page.route`/fetch mock은 사용하지 않았다. 기존 subset/full/corrupt 3시나리오와 PDF size/SHA 단언도 그대로 통과했다.
+
+최종 실행은 `npm run test:unit` 246/246, `npm run test:qr-bulk` exit 0, `npx --no-install tsc -b --pretty false` 진단 0, 보존된 동일 HEAD production 산출물 대상 `npm run test:static` exit 0(startup 104문서), production preview 대상 `npm run test:utilities` exit 0이다. 첫 브라우저 수정 실행은 교체 CSV에서 유지 중인 `{{Label}}` 열을 빠뜨려 90초 timeout이 났고 fixture를 보정했다. Utilities 첫 실행은 preview 미기동으로 `ERR_CONNECTION_REFUSED`였으며 별도 production preview로 재실행했다. 테스트·기록만 변경했고 제품 코드·사용자 문구·자산·QA `dist`는 바꾸거나 재빌드하지 않았다. 원자료와 구현 보고는 `/tmp/worklazy-s2b-fix1/`에 둔다. — Codx
+
+**재검수 F1-R 반영** — 실제 `QrBulkPanel` PDF handler가 완성 Blob을 받은 직후 큐에 든 cancel task를 마지막 양보에서 받아 다운로드·오류 메시지 없이 lease와 font loader를 해제하는 unit을 추가했다. QR 전용 unit은 **16/16**, 전체 unit은 **247/247**이며, 해당 양보 한 줄만 제거한 음성 대조는 **exit 1·15 pass/1 fail**, 핵심 실패 원문은 **`1 !== 0`**이다. — Codx
+
+**3차 검수 F2-R 반영** — 결과 교체 뒤 재생성은 성공 결과 1개 표시 후 기존 `waitForGenerateEnabled`의 `waitForFunction`으로 생성 버튼 활성화를 기다린 다음 PDF 버튼 활성 상태를 단언하도록 동기화했고, 고정 sleep 추가 없이 `npm run test:qr-bulk`를 연속 2회 실행해 모두 exit 0(기존 stale download 0·font 요청·reload·3시나리오 단언 유지)으로 통과했다. 원문은 `/tmp/worklazy-s2b-fix3/logs/qr-bulk-{1,2}.log`에 보존했다. — Codx
+
+**Gemini 로컬 시각 검수 소견 판정 (Claude, 2026-09-07 02:45)** — Gemini(agy `gemini-3.1-pro-high`, QA 빌드 4188) 는 QR 스튜디오 정상 렌더 9화면을 정상으로 보고하면서 "① `똠` 라벨에서 서브셋 폰트만 요청(깨짐) ② 영어 라벨 PDF 흐름 차단" 2건을 냈다. **둘 다 검수 입력 결함으로 판정, 제품 결함 아님.** ① Gemini 스크립트(`/tmp/worklazy-s2b/gemini-local/QA-fallback.mjs`)는 제목 템플릿(`[data-testid="qr-mapping-title-template"]`)을 `{{Label}}` 로 설정하지 않아 `똠` 이 CSV Label 열에만 있고 라벨 텍스트(커버리지 검사 대상)에는 들어가지 않았다 — payload 만으로는 full 선택 실험이 되지 않는다는 1차 반박 지적과 동일. ② 영어 버튼 실제 문구는 "Create row QR codes" 인데 "Generate" 를 찾아 타임아웃. Claude 재현(`/tmp/worklazy-s2b/claude-fallback-probe.mjs`, 템플릿 `{{Label}}` 설정): fallback ko(첫 Label `똠 라벨`) → **전체 OTF `noto-cjk-sans-2.004/NotoSansKR-Regular.otf` 200 4,644,748B 요청, PDF 4,076,547B** · normal ko/en → **서브셋 `…ksx1001-v1/NotoSansKR-Regular.ksx1001.otf` 200 931,704B, PDF 826,074/826,075B** · 오류 경계·정적 안내 노출 0. CLAUDE.md §5-3 "차단 결함이 오면 검수 입력이 그 판정을 뒷받침하는지 본다" 의 사례. — Claude
+
 ### S2 하네스 확장 + 성능 묶음 1차 — 브랜치 구현·검증 (Codx)
 
 **착수 게이트** — `PROJECT_RULES.md` → `AGENTS.md` → 정본 `roadmap-completion-20260906.md`의 공통 계약·S2 전문·검증 총람·S0/S1·왕복 1~4차 기록 → backlog·관련 review-notes 순으로 확인했다. `HEAD=main=origin/main=15b31c1a38a6f39628046e988ae2b1ce92881fe9`, 추적 변경 0·사용자 미추적 파일 3개인 상태에서 `git checkout -b s2-harness-perf main`을 실행했다. 열린 계획서의 같은 표면에 상반 지시를 발견하지 않았다. 분기점 production `npm run build`와 기존 측정기를 실제 실행해 `/tmp/s2-bundle-baseline.json`을 저장했다. 정본 계획서는 수정하지 않았다. 이번 정지점은 **브랜치 커밋·전 검증·QA dist 보존까지**, main 병합·push·QR 감량 구현 없음이다.

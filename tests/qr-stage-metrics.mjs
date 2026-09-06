@@ -5,14 +5,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
-import { PDFDocument } from "pdf-lib";
+import { assertPinnedQrPdf, assertQrFontRequests, createQrFontScenarioServer, qrFontFixture, qrFontScenarios, readQrFontScenario } from "./qr-font-scenarios.mjs";
 import ExcelJS from "exceljs";
 import { readNetLogResponses, attachTransferBytes } from "./qr-network-metrics.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
-const outputDirectory = process.env.QR_METRICS_OUTPUT || "/tmp/worklazy-qr-stage-metrics";
+const scenario = readQrFontScenario(process.argv.slice(2));
+const outputDirectory = path.join(process.env.QR_METRICS_OUTPUT || "/tmp/worklazy-qr-stage-metrics", scenario);
 const port = Number(process.env.QR_METRICS_PORT || 4180);
-const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
+let baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
 const stages = ["entry", "file-selected", "generated-manifest", "pdf-complete"];
 const rows = new Map();
 const networkEvents = [];
@@ -23,6 +24,7 @@ let stage = stages[0];
 let lastActivity = Date.now();
 let browser;
 let server;
+let fontServer;
 let commandId = 0;
 const commands = new Map();
 
@@ -80,6 +82,9 @@ try {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
+  fontServer = await createQrFontScenarioServer({ upstream: baseUrl,
+    subsetPath: path.join(repositoryRoot, "dist/vendor/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/NotoSansKR-Regular.ksx1001.otf"), scenario });
+  baseUrl = fontServer.url;
   browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", `--log-net-log=${path.resolve(outputDirectory, "netlog.json")}`, "--net-log-capture-mode=Default"] });
   const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, locale: "ko-KR", timezoneId: "Asia/Seoul", colorScheme: "light", serviceWorkers: "block", acceptDownloads: true });
   await context.addInitScript(() => {
@@ -149,11 +154,12 @@ try {
   await settle();
 
   stage = stages[1];
-  const csv = "Primary\n한글 라벨 첫째\n한글 라벨 둘째";
+  const fixture = qrFontFixture(scenario, 2);
+  const csv = fixture.csv;
   await page.locator('[data-ui-component="file-drop-zone"] input[type="file"]').setInputFiles({ name: "한글-QR.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
   await page.locator('[data-testid="qr-payload-type"]').waitFor();
   await page.waitForFunction(() => !document.querySelector('[data-testid="qr-bulk-generate"] button')?.disabled);
-  await page.locator('[data-testid="qr-mapping-title-template"]').fill("한글 라벨 제목");
+  await page.locator('[data-testid="qr-mapping-title-template"]').fill(fixture.titleTemplate);
   await settle();
 
   stage = stages[2];
@@ -174,7 +180,7 @@ try {
   const pdfDownload = await pdfPromise;
   const pdfPath = path.join(outputDirectory, pdfDownload.suggestedFilename());
   await pdfDownload.saveAs(pdfPath);
-  const pdf = await PDFDocument.load(await fs.readFile(pdfPath)); assert.equal(pdf.getPageCount(), 1);
+  const pdfResult = await assertPinnedQrPdf(await fs.readFile(pdfPath), qrFontScenarios[scenario].font, 1);
   await settle();
 
   await Promise.all(responseTasks);
@@ -206,13 +212,15 @@ try {
   }
   const topChunks = requests.filter(({ jsGzipBytes }) => jsGzipBytes > 0).sort((a, b) => b.jsGzipBytes - a.jsGzipBytes).slice(0, 10);
   const fontRequests = requests.filter(({ url }) => /\.(otf|ttf|woff2?)(\?|$)/.test(url));
-  const report = { measuredAt: new Date().toISOString(), conditions: {
+  assertQrFontRequests(requests, scenario);
+  assert.equal(fontServer.injected.length, scenario === "corrupt" ? 1 : 0);
+  const report = { scenario, pdfResult, fontInjection: fontServer.injected, measuredAt: new Date().toISOString(), conditions: {
     build: "VITE_LOCAL_QA=1 production", browser: browserVersion, viewport: { width: 1365, height: 900 },
     context: "fresh", serviceWorkers: "blocked", cache: "CDP disabled for page and each paused worker; no page.route interception",
-    throttling: "none; local preview", transferBytes: "NetLog encoded response body + HTTP headers for all requests; excludes HTTP chunk framing; CDP values retained separately (initial worker CDP can contain only headers)",
+    throttling: "none; local preview through test HTTP proxy; only corrupt subset response body changes", transferBytes: "NetLog encoded response body + HTTP headers for all requests; excludes HTTP chunk framing; CDP values retained separately (initial worker CDP can contain only headers)",
     jsGzipBytes: "gzipSync of served dist JS bytes, per request; separate from actual HTTP transfer",
     stageAttribution: "request start; every stage waits for completion + 700ms quiet before advancing",
-    input: { name: "한글-QR.csv", csv, rows: 2 },
+    input: { name: "한글-QR.csv", csv, rows: 2, titleTemplate: fixture.titleTemplate },
     excelJs: "inputAdapter.ts:2 static import; loaded during file selection, before generation/manifest",
   }, table, topChunks, fontRequests, workerTargets, requests, externalRequests, errors };
   await fs.writeFile(path.join(outputDirectory, "metrics.json"), `${JSON.stringify(report, null, 2)}\n`);
@@ -232,6 +240,7 @@ try {
 } finally {
   await fs.writeFile(path.join(outputDirectory, "network-events.json"), JSON.stringify({ workerTargets, rows: [...rows.values()], networkEvents }, null, 2));
   await browser?.close();
+  await fontServer?.close();
   if (server && server.exitCode === null) {
     server.kill("SIGTERM");
     await Promise.race([new Promise((resolve) => server.once("exit", resolve)), new Promise((resolve) => setTimeout(resolve, 5_000))]);

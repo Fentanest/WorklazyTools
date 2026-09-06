@@ -11,6 +11,7 @@ public/vendor/zetaoffice/
 public/vendor/emoji/
 .cache/image-studio-assets/
 .cache/qr-label-font/
+public/vendor/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/
 /compareexample/
 /comparesample/
 __pycache__/

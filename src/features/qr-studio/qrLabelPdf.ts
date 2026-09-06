@@ -2,6 +2,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { QR_LABEL_PRESETS, qrLabelCell } from "./qrBulk.ts";
+import { QrLabelFontInitError } from "./qrLabelFont.ts";
 
 export interface QrLabelEntry {
   png: Blob;
@@ -9,18 +10,35 @@ export interface QrLabelEntry {
   description: string;
 }
 
-export async function createQrLabelPdf(entries: QrLabelEntry[], preset: keyof typeof QR_LABEL_PRESETS, fontBytes: ArrayBuffer) {
+export async function createQrLabelPdf(entries: QrLabelEntry[], preset: keyof typeof QR_LABEL_PRESETS, fontBytes: ArrayBuffer, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const document = await PDFDocument.create();
-  document.registerFontkit(fontkit);
-  const font = await document.embedFont(fontBytes, { subset: false });
+  signal?.throwIfAborted();
+  let font: PDFFont;
+  try {
+    document.registerFontkit(fontkit);
+    font = await document.embedFont(fontBytes, { subset: false });
+  } catch (error) {
+    signal?.throwIfAborted();
+    throw new QrLabelFontInitError(error);
+  }
+  signal?.throwIfAborted();
   const dimensions = QR_LABEL_PRESETS[preset];
   const pages: PDFPage[] = [];
 
   for (let index = 0; index < entries.length; index += 1) {
+    signal?.throwIfAborted();
+    if (signal && index > 0 && index % 24 === 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      signal.throwIfAborted();
+    }
     const cell = qrLabelCell(index, preset);
     const page = pages[cell.page] ?? document.addPage([dimensions.width, dimensions.height]);
     pages[cell.page] = page;
-    const image = await document.embedPng(await entries[index].png.arrayBuffer());
+    const pngBytes = await entries[index].png.arrayBuffer();
+    signal?.throwIfAborted();
+    const image = await document.embedPng(pngBytes);
+    signal?.throwIfAborted();
     const padding = 5;
     const textHeight = 27;
     const imageSize = Math.min(cell.width - padding * 2, cell.height - textHeight - padding * 2);
@@ -29,7 +47,9 @@ export async function createQrLabelPdf(entries: QrLabelEntry[], preset: keyof ty
     page.drawImage(image, { x: imageX, y: imageY, width: imageSize, height: imageSize });
     drawLabelCopy(page, font, entries[index].title, entries[index].description, cell.x + padding, cell.y + padding, cell.width - padding * 2);
   }
-  return new Blob([await document.save()], { type: "application/pdf" });
+  const bytes = await document.save();
+  signal?.throwIfAborted();
+  return new Blob([bytes], { type: "application/pdf" });
 }
 
 function drawLabelCopy(page: PDFPage, font: PDFFont, title: string, description: string, x: number, y: number, maxWidth: number) {

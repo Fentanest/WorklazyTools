@@ -30,14 +30,23 @@
 
 ## QR 라벨 PDF 한글 글꼴 스냅샷
 
-QR 일괄 생성의 라벨 PDF는 Noto CJK 저장소의 고정 태그 `Sans2.004`에 있는 한국어 subset Noto Sans KR Regular OTF를 사용한다. `scripts/vendor-qr-label-font.mjs`가 내려받은 응답의 크기와 SHA-256을 확인한 뒤 `public/vendor/qr-label-font/noto-cjk-sans-2.004/`를 생성한다. 라이선스는 SIL Open Font License 1.1이다.
+QR 일괄 생성의 라벨 PDF는 Noto CJK 저장소의 고정 태그 `Sans2.004`에 있는 한국어 Noto Sans KR Regular OTF를 사용한다. 라벨 원문과 NFC 정규화 문자열이 고정 3,394 코드포인트 안에 모두 있으면 빌드 타임 서브셋을, 하나라도 범위 밖이면 기존 전체 OTF를 사용한다. 두 폰트 모두 `@pdf-lib/fontkit`에는 `subset: false`로 전달하며 런타임 서브셋은 사용하지 않는다. 라이선스는 SIL Open Font License 1.1이다.
 
-| 파일 | 바이트 | SHA-256 | 라이선스 |
-| --- | ---: | --- | --- |
-| `NotoSansKR-Regular.otf` | 4,644,748 | `69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68` | SIL OFL 1.1 |
-| `OFL.txt` | 4,301 | `6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2` | SIL OFL 1.1 |
+| 역할 / 파일 | 위치 | 바이트 | SHA-256 |
+| --- | --- | ---: | --- |
+| 전체 폴백 OTF · `NotoSansKR-Regular.otf` | `public/vendor/qr-label-font/noto-cjk-sans-2.004/` | 4,644,748 | `69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68` |
+| 공용 라이선스 · `OFL.txt` | 같은 전체 snapshot 및 생성된 subset snapshot | 4,301 | `6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2` |
+| 코드포인트 생성 입력 · `unicodes-alias.txt` | `scripts/assets/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/` | 23,757 | `ac8fefb54a969022fc1b139a3a7a1937f711e71280fb992683eb0d4d43978b0c` |
+| 추적 전개 입력 · `NotoSansKR-Regular.ksx1001.otf.gz` | 같은 생성 입력 폴더 | 561,161 | `e1db3cdcbb8d76fc0546ec582bed773b3b7ef3da60867b6828493a6b342c7e66` |
+| 브라우저 subset OTF · `NotoSansKR-Regular.ksx1001.otf` | 생성된 `public/vendor/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/` | 931,704 | `b84d27a582d3f3e660db728e7913af3061d4e825e93cabdb6802f0ce23a252be` |
+| 런타임 coverage · `coverage.json` | 생성 입력 폴더 및 생성된 subset snapshot | 19,686 | `58f248442d4e8e5726559644a746740bd0066cebabf154956e0bb7e1458eafea` |
+| coverage 명세 · `coverage.schema.json` | 생성 입력 폴더 | 444 | `919d01b6713b3438f6cd36091d3244a04a28822b031a5cdd7ac135ff3d17e6b0` |
+| 재현 기록 · `provenance.json` | 생성 입력 폴더 및 생성된 subset snapshot | 1,201 | `30e10e1815835b8076a100ecdc9804c2613b115b555cbcc0b122150b92f77667` |
+| 도구 lock · `fonttools==4.59.2` wheel | `scripts/requirements-fonts.txt` | — | `738f31f23e0339785fd67652a94bc69ea49e413dfdb14dcb8c8ff383d249464e` |
 
-`@pdf-lib/fontkit`은 rhwp Studio의 `NotoSansKR-Regular.woff2`를 읽고 PDF 저장까지 했지만 Poppler가 임베드 글꼴을 invalid로 판정하고 렌더 결과가 비었다. 고정 OTF는 정상 렌더됐으나 subset 임베드에서 한글 대부분이 누락되는 현상이 재현되어 라벨 PDF는 `subset: false` 전체 임베드를 사용한다.
+일반 `npm run vendor:qr-font`와 prebuild는 Python을 실행하지 않는다. 추적된 gzip·coverage·provenance를 먼저 검증하고 bounded gunzip한 뒤 원본 전체 OTF·OFL까지 확인해 두 소유 snapshot을 staging에서 교체한다. 서브셋을 의도적으로 갱신할 때만 `/tmp` 가상환경에 `scripts/requirements-fonts.txt`를 `--require-hashes`로 설치하고 `scripts/build-qr-label-font-subset.py`를 실행한다. 이 스크립트는 fontTools 4.59.2, GNU gzip 1.12, 입력·출력 SHA, cmap 3,394개, GID·hmtx·outline 불변을 모두 확인한 뒤 추적 입력만 원자적으로 교체한다.
+
+rhwp Studio WOFF2와 pdf-lib 런타임 subset은 Poppler에서 빈 글리프 또는 한글 누락을 일으켜 계속 기각한다. 현재 빌드 타임 subset은 GID를 보존하고 layout closure의 원본 cmap 매핑을 포함한다. 고정 회귀는 전체 OTF와 subset OTF를 각각 `subset: false`로 임베드해 sample·inventory·expanded 17페이지에서 Poppler 픽셀 차이 0과 PDF.js 추출 결과 동일을 요구한다.
 
 ## 라이선스 원본
 
