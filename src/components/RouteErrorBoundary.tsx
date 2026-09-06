@@ -26,7 +26,7 @@ function RouteFailure() {
   const notice = useRef<HTMLDivElement>(null);
   useEffect(() => { notice.current?.focus(); }, []);
   return (
-    <div className="page tool-page tool-route-loading" role="alert" tabIndex={-1} ref={notice} data-route-error>
+    <div className="page tool-page tool-route-loading outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" role="alert" tabIndex={-1} ref={notice} data-route-error>
       <div className="grid max-w-lg gap-4 px-4 text-center text-foreground">
         <p>{t("recovery.toolFailed")}</p>
         <Button type="button" onClick={() => window.location.reload()}>{t("recovery.retry")}</Button>

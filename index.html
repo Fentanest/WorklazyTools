@@ -20,7 +20,8 @@
     <title>무료 문서·PDF·비디오·이미지 업무 도구 | Worklazy Tools</title>
     <style>
       #startup-help[hidden], #startup-help [hidden] { display: none !important; }
-      #startup-help { box-sizing: border-box; max-width: 42rem; min-height: 55vh; margin: 0 auto; padding: 4rem 1.5rem; font: 1rem/1.7 system-ui, sans-serif; color: #222; background: #fff; }
+      #startup-help { box-sizing: border-box; max-width: 42rem; min-height: 55vh; margin: 0 auto; padding: 4rem 1.5rem; font: 1rem/1.7 system-ui, sans-serif; color: #222; background: #fff; outline: none; }
+      #startup-help:focus-visible { outline: 2px solid #555; outline-offset: -2px; }
       #startup-help button { padding: .75rem 1.25rem; border: 1px solid #555; border-radius: .5rem; color: #222; background: #fff; font: inherit; cursor: pointer; }
     </style>
     <script>
@@ -33,6 +34,7 @@
           var bilingual = document.body.hasAttribute("data-worklazy-language-landing");
           var language = document.documentElement.lang === "en" ? "en" : "ko";
           help.querySelectorAll("[lang]").forEach(function (item) { item.hidden = !bilingual && item.lang !== language; });
+          help.querySelector("[data-startup-separator]").hidden = !bilingual;
           help.hidden = false;
           help.querySelector("button").onclick = function () { location.reload(); };
           help.focus();
@@ -57,7 +59,7 @@
     <section id="startup-help" hidden data-nosnippet role="alert" tabindex="-1">
       <p lang="ko">페이지를 열지 못했습니다. 연결을 확인하고 새로고침해 주세요.</p>
       <p lang="en">This page could not be opened. Check your connection and refresh the page.</p>
-      <button type="button"><span lang="ko">새로고침</span><span lang="en">Refresh</span></button>
+      <button type="button"><span lang="ko">새로고침</span><span data-startup-separator hidden aria-hidden="true"> · </span><span lang="en">Refresh</span></button>
     </section>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

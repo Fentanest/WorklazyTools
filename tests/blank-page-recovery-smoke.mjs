@@ -158,6 +158,9 @@ try {
         assert.equal(record.external.length, 0);
         assert.equal(await page.locator(`#startup-help [lang="${language}"]:visible`).count(), 2);
         assert.equal(await page.locator(`#startup-help [lang="${language === "ko" ? "en" : "ko"}"]:visible`).count(), 0);
+        record.buttonLabel = await page.locator("#startup-help button").innerText();
+        assert.equal(record.buttonLabel, language === "ko" ? "새로고침" : "Refresh");
+        assert.equal(await page.locator("#startup-help [data-startup-separator]").isVisible(), false);
         record.detectionMs = record.helpShown[0]?.time - record.network.find((item) => item.status === 404)?.time;
         assert.ok(record.detectionMs >= 0 && record.detectionMs < 2000);
       });
@@ -174,6 +177,9 @@ try {
         await page.locator("#startup-help:not([hidden])").waitFor();
         assert.equal(await page.locator('#startup-help [lang="ko"]:visible').count(), 2);
         assert.equal(await page.locator('#startup-help [lang="en"]:visible').count(), 2);
+        record.buttonLabel = await page.locator("#startup-help button").innerText();
+        assert.equal(record.buttonLabel, "새로고침 · Refresh");
+        assert.equal(await page.locator("#startup-help [data-startup-separator]").isVisible(), true);
         assert.equal(record.external.length, 0);
       });
     }
