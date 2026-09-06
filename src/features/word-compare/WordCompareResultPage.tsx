@@ -18,7 +18,6 @@ import type {
   WordTableCell,
   WordTableComparison,
 } from "../excel-merger/types";
-import { useWordCompareSession } from "./wordCompareSession";
 import { useLocalizedPath } from "../../i18n/routing";
 import { useAppLanguage } from "../../i18n/routing";
 
@@ -42,12 +41,6 @@ interface DocumentCompareResultPageProps {
   trackedLabel?: string;
   showCommentLegend?: boolean;
   footer?: ReactNode;
-}
-
-export function WordCompareResultPage() {
-  const { results } = useWordCompareSession();
-  const language = useAppLanguage();
-  return <DocumentCompareResultPage results={results} basePath="/tools/word-compare" toolLabel={language === "en" ? "Word comparison" : "Word 비교"} eyebrow="WORD COMPARE" accentClass="accent-context-blue" trackedLabel={language === "en" ? "Tracked Word file" : "Word 변경 추적"} showCommentLegend />;
 }
 
 export function DocumentCompareResultPage({
