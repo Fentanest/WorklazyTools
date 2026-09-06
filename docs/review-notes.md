@@ -93,6 +93,88 @@ Manifest **149 removed / 1 split / 5 active → 153 / 0 / 2**. Active는 `legacy
 
 — Codx
 
+#### S1 병합·production 배포·라이브 확인 — 사후 기록 (Codx)
+
+**병합·main push·Actions 배포 성공. 라이브 확인은 전 항목 실행했으며, HWP iframe 접근성 2종과 앱 기동 후 404 화면 유지는 기존 결함으로 재현돼 미충족으로 남긴다.** 원래 5페이지 접근성 하네스도 라이브 외부 요청 제한에서 exit 1이므로 명령 전체 통과로 표시하지 않는다. 이번 디스패치의 완료 기준을 변경하거나 제품 코드를 덧붙이지 않았다. 원문 로그·JSON·57장 캡처·최종 커밋/push/status 보고는 `/tmp/worklazy-s1/deploy/REPORT.md`와 같은 디렉터리 `logs/`에 있다. 이 절은 C-A의 사후 기록 예외이며 위 S1 브랜치 구현 기록을 계승한다.
+
+**실행 게이트·병합:** `PROJECT_RULES.md` 전문을 첫 행동으로 읽고 지정 디스패치·AGENTS·정본 C-A/C-D·Publishing checklist·기각 이력을 확인했다. 열린 15문서에서 이번 표면의 상반 지시 0; 이전 P2 제외/브랜치 제한은 종결된 P2 범위다. Gemini/Claude 로컬 시각 검수 통과는 디스패치의 전제대로 확인했다. `main=37d4e69924d80120c3f34a38b0d20dd0e08d3f59`, `s1-dead-code=454d9fbbcc6b43a8203dd94596d0ce038c04f983` 실측 일치. `git checkout main`·`git pull --ff-only origin main`은 Already up to date. 지정 `git merge --no-ff s1-dead-code -m "Merge S1 document-compare dead code removal for live deployment"`으로 **`01be055af657eff7487f9c4a6784c7ee07afb20b`** 생성; 부모는 위 main/S1 두 해시다. 원문 `merge.txt`·`logs/gate.log`·`logs/pull.log`·`logs/merge.log`.
+
+**push 전 main 검증:** 병합 HEAD에서 아래 10개 명령 모두 실제 exit 0. 빌드는 `VITE_SITE_URL=https://worklazy.net/ VITE_BASE_PATH=/`, `VITE_LOCAL_QA` unset으로 Actions와 같은 production 조건이다. Word/HWP는 해당 dist의 `TEST_BASE_URL=http://127.0.0.1:4388` preview를 사용했다. unit **200/200**, startup 문서 **104**, orphan **0**, manifest **153 removed / 0 split / 2 active**, registry **20**. 전체 출력은 `logs/{build,tsc,unit,static,css-orphans,legacy-manifest,registry,diff-check,word,hwp}.log`. HWP 스모크는 3,584B·1페이지·sentinel round-trip/Studio 재열기 통과.
+
+| 명령 | 초 | exit |
+| --- | ---: | ---: |
+| `npm run build` | 103.26 | 0 |
+| `npx tsc -b` | 19.05 | 0 |
+| `npm run test:unit` | 3.05 | 0 |
+| `npm run test:static` | 1.15 | 0 |
+| `npm run css:orphans` | 0.66 | 0 |
+| `npm run legacy:manifest` | 0.34 | 0 |
+| `node tests/tool-registry-routes.mjs` | 0.53 | 0 |
+| `git diff --check` | 0.09 | 0 |
+| `TEST_BASE_URL=http://127.0.0.1:4388 TEST_SCOPE=word npm run test:browser` | 20.75 | 0 |
+| `TEST_BASE_URL=http://127.0.0.1:4388 TEST_ONLY_HWP=1 npm run test:new-tools` | 6.08 | 0 |
+
+**push·Actions 원문:** `git push origin main` exit 0, `To github.com:Fentanest/WorklazyTools.git` / `37d4e69..01be055  main -> main`. `gh run list --limit 1`로 확보한 **[34028521809](https://github.com/Fentanest/WorklazyTools/actions/runs/34028521809)**의 headSha가 병합 HEAD와 일치. `gh run watch 34028521809 --exit-status --interval 30` exit 0; **success, 총 316초**(2026-09-06 10:50:18→10:55:34 UTC), build/deploy 두 job 성공. Node action deprecation annotation은 경고로 보존했다(`actions-success.json`, `logs/actions-watch.log`).
+
+**production ↔ live:** Actions 성공 후 첫 CDN 확인에서 `curl -s https://worklazy.net/ko/ | grep -o 'index-[A-Za-z0-9_-]*\.js'` 원문은 **`index-4gXIk3iV.js`**. 로컬·라이브 entry **953,288B**, SHA-256 **`91b42eac5a255c1a75868a2eef10caf29ce99e2205824ed471eb1b25e2b25469`** 일치. 홈 ko/en·목록 ko·HWP ko·오디오 ko/en·문서 비교 ko/en **8/8 HTTP 200·entry 일치·startup-help 유지**. 지시서가 “5페이지”라 부른 괄호 목록은 실제 6 URL이라 나열된 6개 모두 측정했다. `ads.txt`·`robots.txt`·`sitemap.xml`도 200; 게시자 `pub-8940087269746960`, sitemap SHA `51abcb369d6f5f715c74e0c411d0ada5386e4e84b0825d2542f1d58430c3ff9b`. 원문 `logs/live-http.log`·`logs/live-entry-grep.log`·`live-http.json`.
+
+**redirect 3/3:** 각각 HTTP 200 뒤 document-compare 도착 DOM·h1·파일 입력 2개 확인. 앞선 잘못된 `/ko/word-compare/` 요구는 이번 디스패치에 없으며 추가하지 않았다.
+
+| 진입 | HTTP | 도착 경로 | 파일 입력 |
+| --- | ---: | --- | ---: |
+| `/ko/tools/word-compare/` | 200 | `/ko/tools/document-compare/` | 2 |
+| `/ko/tools/hwp-compare/` | 200 | `/ko/tools/document-compare/` | 2 |
+| `/en/tools/word-compare/` | 200 | `/en/tools/document-compare/` | 2 |
+
+**라이브 접근성·정상 DOM:** Playwright 1.63.0/Chrome 152.0.7977.64, axe 4.13.0, desktop 1280×800, light, consent granted, 폰트/paint 대기, 접근성/캡처용 애니메이션 비활성, 네트워크 차단 없음. 아래 8개 페이지 모두 본문 존재·가로 넘침 0·pageerror 0·오류 경계/정적 실패 안내 오노출 0. 홈 ko/en·목록 ko·HWP ko·오디오 ko/en·문서 비교 ko/en **8화면 9장**을 직접 열어 시각 확인했다(HWP viewport+전체; 문서 비교 ko/en 전체 포함). 글자 정렬 붕괴·문구 잘림·스위치 썸 이탈을 관찰하지 않았다. 전체 audit는 **HWP 때문에 exit 1**, 실패 원문 `2 !== 0`.
+
+| 페이지 | HTTP | mainTextLength | axe 위반 종류 |
+| --- | ---: | ---: | ---: |
+| `/ko/` | 200 | 2880 | 0 |
+| `/en/` | 200 | 4949 | 0 |
+| `/ko/tools/` | 200 | 2721 | 0 |
+| `/ko/tools/hwp-editor/` | 200 | 1227 | 2 |
+| `/ko/tools/audio-studio/` | 200 | 1414 | 0 |
+| `/en/tools/audio-studio/` | 200 | 2293 | 0 |
+| `/ko/tools/document-compare/` | 200 | 1380 | 0 |
+| `/en/tools/document-compare/` | 200 | 2586 | 0 |
+
+- **HWP 기존 결함 재현:** 벤더 iframe `#sb-message` 대비 **3.54:1**, `label-title-only` **5노드**(`#style-name`·`#font-lang`·`#font-name`·`#font-size`·`#linespacing-select`), 총 **2종/6노드**. 이전 `4d0bae9` 실측 원문 `baseline-findings-full.log`의 (규칙 ID, 최종 target) 집합과 이번 집합을 비교해 **동일**을 단언했다. App/HWP/정적 생성기/vendor/접근성 하네스의 S0→S1 diff도 0. 기존 S0 판정·backlog를 계승하며 위반을 없다고 기록하지 않는다. 증거 `logs/evidence.log`·`evidence-summary.json`·`live-audit.json`.
+- **기존 하네스 라이브 실행:** `TEST_BASE_URL=https://worklazy.net A11Y_MAX_TOTAL=0 A11Y_REPORT_PATH=/tmp/worklazy-s1/deploy/live-a11y-harness.json npm run test:a11y`는 **19.71초·exit 1**. 하네스의 기존 5대상(root·document·tools·excel-compare·pdf-editor)은 각각 **위반 0**, placeholder **4.8871:1**이나 `Error: Accessibility audit made 68 external request(s).`로 종료했다. 실제 production 광고·Google/Naver 분석 요청이며 로컬 QA의 외부 요청 0 계약과 구분한다. 하네스/요청 차단/임계 수정 0; 로그의 실패 exit를 보존했다.
+
+**404 — 미충족:** `/ko/404-없는경로/` 초기 **HTTP 404**, 제목 `Page not found | Worklazy Tools`, `noindex=true`. 앱 기동 후 **`https://worklazy.net/ko/` 홈**으로 이동, `mainTextLength=2880`, 404 본문 유지 단언 실패(`FAIL 404 page 404 view after app startup`). S0 이전 `baseline-404.log`와 동일 동작이며 기존 backlog/Claude 판정을 계승한다. HTTP 404 성공을 앱 404 화면 유지 성공으로 바꾸지 않았다. 원문 `live-contract.json`·`logs/live-contract.log`·`shots/404.png`; 해당 계약 스크립트 **107.39초·exit 1**.
+
+**광고 격리:** `/ko|en/tools/video-studio/`·`office-editor/app/`·`excel-merger/xls-preserve/` **6/6**, `crossOriginIsolated=true`, 명시 isolation meta 존재, `googlesyndication|adsbygoogle` **요청 0**, 광고 script DOM **0**. 각 새 context에서 동의 granted, app/격리 준비 후 3초 추가 관찰, 네트워크 차단 0. 일반 `/ko|en/tools/excel-cleaner/` **2/2**는 loader HTTP 200·script DOM 1·`adsbygoogle.loaded=true`. 전 경로 요청 배열은 `live-contract.json`의 `ads`에 있다.
+
+**홈 CLS 단일 실측:** **0.0383319580078125 ≤ 0.114199**, LCP **1004ms**, 관측 종료 **5446.20ms**. 새 desktop context·캐시 비활성·동의 granted, 요청 차단/DOM·style 수정 없이 networkidle 후 3초. CLS 표본은 **1회만**이며 다른 브라우저 감사 실행 전 측정했다. field CWV가 아닌 라이브 실험실 표본. layout-shift 2개의 source/rect 원문은 `live-contract.json`의 `cls`.
+
+**20도구 ko/en 직접 진입 — 빈 화면 0/40:** 매 경로 새 context·준비 DOM 확인 후 `mainTextLength>0`; 경계/정적 실패 안내 노출 0. 아래 HTTP는 최초 문서 응답이다. 영어 HWP는 기존 한국어 전용 정책대로 **404→`/en/tools/` 정상 목록 DOM**이며 영어 편집기 정상 동작으로 주장하지 않는다. 경로별 원문·h1·최종 URL은 `live-contract.json`과 `logs/live-contract.log`, PNG 40장과 distinct (언어,도구) 40행을 대조했다.
+
+| 도구 | ko HTTP | ko mainTextLength | en HTTP | en mainTextLength |
+| --- | ---: | ---: | ---: | ---: |
+| excel-merger | 200 | 3155 | 200 | 5891 |
+| excel-compare | 200 | 1835 | 200 | 3585 |
+| excel-cleaner | 200 | 1588 | 200 | 3011 |
+| pdf-editor | 200 | 1775 | 200 | 2923 |
+| document-compare | 200 | 1380 | 200 | 2586 |
+| hwp-editor | 200 | 1195 | 404 | 4629 |
+| office-editor | 200 | 1213 | 200 | 2182 |
+| video-studio | 200 | 1933 | 200 | 3343 |
+| audio-studio | 200 | 1414 | 200 | 2293 |
+| image-studio | 200 | 1471 | 200 | 2558 |
+| text-merger | 200 | 962 | 200 | 1791 |
+| text-tools | 200 | 777 | 200 | 1420 |
+| text-formatter | 200 | 491 | 200 | 911 |
+| work-calculator | 200 | 570 | 200 | 1259 |
+| timezone-calculator | 200 | 1992 | 200 | 3284 |
+| payroll-calculator | 200 | 689 | 200 | 1471 |
+| image-privacy | 200 | 826 | 200 | 1405 |
+| security-tools | 200 | 724 | 200 | 1442 |
+| qr-studio | 200 | 618 | 200 | 1086 |
+| data-converter | 200 | 529 | 200 | 868 |
+
+**기록 경계:** 이번 병합 작업의 직접 추적 변경은 이 사후 기록뿐; 제품/번역/SEO/광고 코드 추가 수정 0. 사용자 미추적 DOCX 2개·네이버 HTML은 보존하며 최종 SHA·status는 REPORT에서 검증한다. 기존 미충족 2항을 통과로 재분류하거나 별도 기능 수리 범위로 확대하지 않는다. — Codx
+
 ### S0 빈 페이지 — 오류 경계·초기화 실패·캐시 유지 자동 복구 (Codx)
 
 **판정: 지정 S0 구현과 브랜치 검증 완료. ② 자동 복구는 조건부이며, 지속 실패는 ① 안내로 종료한다.** `CHANGELOG.md`의 S0 항목에 대응한다. `s0-blank-page`에서만 커밋했고 main 병합·push는 하지 않았다. 전체 명령·소요·출력 원문·회차별 표·육안 검수 기동법은 `/tmp/worklazy-s0/REPORT.md`, 원자료는 같은 디렉터리의 `logs/`, `recovery-complete/`, `stale-final-r2/`에 있다. 측정 로그·jobs·사용자 파일은 커밋하지 않는다.
