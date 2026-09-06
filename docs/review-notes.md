@@ -4,6 +4,39 @@
 
 ## 2026-09-07
 
+### U4-1(F0a) PDF finish 순수 정책 모듈 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 확정 1·7·8·9·10·12·18·21·22·24 및 D2·D3·D7·D8·N1·N2·N3, round probe 원자료와 U4-0 기록을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=5ee9b1a4af1e5611cee8f86ba3f177801225dc97`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 같은 표면의 충돌은 없었다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML은 건드리지 않았다. 제품 변경은 `src/features/pdf-editor/finish/**`의 순수 TypeScript에 한정하고, U4-0 test helper는 그 제품 preflight를 import하는 단일 경계로 바꿨다. React·UI·route·locale·registry·worker·기존 4모드·pdf-lib 그리기 호출은 변경하지 않았으며 main 병합·push·배포도 하지 않는다.
+
+| 모듈 | export 계약·정본 대응 | 고정한 핵심 골든 |
+|---|---|---|
+| `geometry.ts` | PDF.js viewport transform 역변환, 상/하×좌/중/우 앵커, upright 회전; E5·확정 21 | 비영점 CropBox `[50,100]–[450,700]`의 0/90/180/270도 네 모서리 표와 각 6영역 |
+| `selection.ts` | 파일별 물리 exact set, range parse/canonical, parity, 하한·anchor·표시 번호·토글; 확정 7·9·24, D2, N1 | `2-8 + even`에서 3쪽 토글 → `{2,3,4,6,8}`·`2-4,6,8`; 4·6쪽 → 표시 5·7; 빈 set 실행 불가 |
+| `tokens.ts` | 1회 clock/locale 캡처, 단일 pass 토큰 치환, date whitelist parser; 확정 7·10·24, N3 v8 | date 허용 5·오류 4·보충 14 전수, ko/en 로컬 날짜, 치환된 파일명 속 토큰 재해석 0, unknown 리터럴+경고 |
+| `text.ts` | 토큰→개행→TAB→제어문자→LF 분리, 후보 전체 glyph coverage, 문서당 단일 폰트, scalar 위치, 6영역 overflow; 확정 1·21, D8, N3 | `A\tB\r\nC\rD`, NUL/VT/U+0085, Helvetica `Résumé €`, Noto `Русский`, U+03AE·U+1F642 누락, 12pt 말줄임과 2/0줄 경계 |
+| `tiles.ts` | gap·offset·rotation 배치와 할당 전 400 상한; N3 | 400 허용, 예상 420은 placement 생성 전 오류, gap 1은 361, 폭 0·음수 gap 오류 |
+| `canvasPolicy.ts` | A의 ceil·면적·RGBA·4096 한 변/면적 검사와 300→200→150 하향, B 지표만 산출, 계수 주입 경고, 200MiB 등록 전 검사; 확정 18, D3 v6~v9 | A4 200DPI `1654×2339=3,868,706px`, A4 150DPI 8쪽 `17,413,712px`는 누적 지표일 뿐 A 위반 아님, 메모리 표 4행·상한 바이트 경계 |
+| `stamp.ts` | CSS 상대 좌표→viewport→주입 `convertToPdfPoint`, `{cx,cy,rw,aspect}`, 균등 축소 후 중심 clamp; 확정 8·22, D7, N2 | DPR 1/2×CSS 1/0.5×회전 4의 16조합, 400×600→600×400에서 80×60→120×90, 100×10 clamp |
+| `plan.ts` | 부작용 없는 1-based 복합 실행 계획; 확정 12 | 구조/양식→background→원문→foreground→번호·머리말→도장→raster |
+| `preflight.ts` | U4-0 OCG classifier의 제품 단일 구현과 내부 사유 코드; D4 v13·U4-0 fixture | OCG 87종의 허용 56·제외 31, 허용 변환 56·제외 변환 시도 0·두 renderer SHA 일치 56 |
+
+**검증** — 원문 로그와 JSON은 `/tmp/worklazy-u4-1/`에 보존했다. production build와 bundle build는 직렬로 실행했고 `NODE_OPTIONS=--max-old-space-size=4096`를 적용했다.
+
+| 명령 | 실제 결과 |
+|---|---|
+| `npx tsc -b --pretty false` | 진단 0 |
+| `npm run test:unit` | 전체 **271/271** 통과; 신규 PDF finish 12건에 정본 골든·반복 결정성 포함 |
+| `NODE_OPTIONS=--max-old-space-size=4096 npm run build` | Vite 2,834 modules·정적 61페이지 통과 |
+| `npm run test:static` | 61페이지와 startup recovery 104문서 통과 |
+| `TEST_SCOPE=pdf npm run test:browser` | Excel·Word 비교, 기존 PDF edit/range split/conversion 통과 |
+| `BUNDLE_ROUTES=pdf-editor BUNDLE_BASELINE=/tmp/s3-bundle-baseline.json npm run bundle:measure` | entry 299,287B·PDF route 171,864B·shared 2,716,473B·app 5,466,587B·CSS 37,687B, **다섯 delta 모두 0B**; 미연결 순수 모듈 tree-shaking 확인 |
+| `npm run css:orphans` | selector arm 0 |
+| `node tests/tool-registry-routes.mjs` | 기대 20·누락/예상 외/중복 0 |
+| `git diff --check` | 공백 오류 0 |
+| PDF finish oracle 실제 분류 1회 | 87 checked·**56 allowed/31 excluded**, 허용 변환·deep residual 0·두 renderer SHA 일치 각 56, 음성 대조 양쪽 검출 |
+
+**범위 밖 발견** — 기존 `test:pdf-finish-oracle` 스크립트는 plain Node 22.17.1로 `.mjs` helper만 읽던 U4-0 계약이라, helper가 제품 `.ts`를 정적 import하자 첫 명령은 분류 전에 `ERR_UNKNOWN_FILE_EXTENSION`으로 종료됐다. 제품·`package.json`을 범위 밖으로 넓히지 않고 허용된 test helper가 해당 제품 파일 하나에만 Node의 strip-only loader를 등록한 뒤 동적 import하도록 고쳤다. 실제 fixture 분류 oracle은 그 뒤 `node --experimental-strip-types tests/pdf-finish-oracle.mjs`로 **한 번만** 실행해 위 56/31을 얻었고, helper의 plain Node import smoke와 전체 unit으로 두 로딩 경계를 확인했다. 초기 로더 실패도 `/tmp/worklazy-u4-1/oracle-bootstrap-failure.log`에 숨기지 않고 보존했다. 그 밖의 정본 미정의 정책·UI 연결·실행 엔진은 추가하지 않았다. — Codx
+
 ### U4-0(F-fix) PDF finish fixture·oracle·번들 귀속 — 브랜치 구현·검증 (Codx)
 
 **착수 게이트·범위** — `PROJECT_RULES.md`를 첫 행동으로 전문 확인한 뒤 디스패치, `AGENTS.md`, 정본 `docs/jobs/todo/pdf-finish-20260905.md`의 「정본화」 우선순위, 로드맵 C-A~C-D·결정 11, 관련 기각 이력을 읽었다. 시작점은 `HEAD=main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`, 추적 변경 0이었다. 열린 계획서와 충돌이 없고 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML 3개가 있음을 확인한 뒤 `s3-pdf-finish`를 새로 분기했다. 제품 `src/`·UI·문구·번역·SEO·광고 경로는 바꾸지 않았고 main 병합·push·배포는 하지 않는다.
