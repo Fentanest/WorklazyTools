@@ -13,7 +13,8 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
   const source = read("src/components/ToolGuide.tsx");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<ToolGuide"));
 
-  assert.equal(consumers.length, 22);
+  // S1 removes the unreachable Word/HWP pages from the 22 P1b consumers.
+  assert.equal(consumers.length, 20);
   assert.match(source, /<Card as="section"[\s\S]*?aria-labelledby="tool-guide-title"/);
   assert.match(source, /data-ui-component="tool-guide"[\s\S]*?className="ui-tool-guide-heading"[\s\S]*?t\("guide\.eyebrow"\)[\s\S]*?<h2 id="tool-guide-title"/);
   assert.match(source, /className="ui-tool-guide-grid"[\s\S]*?<Card as="article"[\s\S]*?block\.paragraphs[\s\S]*?block\.items/);
@@ -26,7 +27,8 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   const baseProgressSource = read("node_modules/@base-ui/react/progress/root/ProgressRoot.mjs");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
-  assert.equal(consumers.length, 15);
+  // S1 removes the same two pages from the 15 P1b progress consumers.
+  assert.equal(consumers.length, 13);
   assert.match(source, /entry\.id === activeLogId \|\| Boolean\(entry\.stageKey && entry\.stageKey === activeStageKey\)/);
   assert.match(source, /isCurrent && status === "running" \? LoaderCircle : Circle/);
   assert.match(source, /className=\{isCurrent && status === "running" \? "animate-spin" : ""\}/);

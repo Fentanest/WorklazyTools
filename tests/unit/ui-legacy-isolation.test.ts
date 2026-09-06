@@ -338,5 +338,5 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
   ]);
   assert.equal(manifest.categoryCounts["excel-compare"], 27);
   assert.equal(manifest.categoryCounts["excel-cleaner"], 1);
-  context.diagnostic("155 rules / 18 ownership categories / 149 removals / one split verified");
+  context.diagnostic("155 rules / 18 ownership categories / 153 removals / zero splits verified");
 });
