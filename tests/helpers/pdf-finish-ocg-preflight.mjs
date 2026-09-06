@@ -289,10 +289,17 @@ async function classifyMarkedContent(bytes) {
   const preflight = prepare(document);
   const pages = [];
   for (const page of document.getPages()) {
-    const properties = page.node.Resources().lookupMaybe(key("Properties"), PDFDict);
+    const properties = lookup(document, page.node.Resources(), "Properties");
+    const pageOperators = operators(pageContent(page));
     const visibility = {};
-    for (const [property, reference] of properties?.entries() ?? []) visibility[property.decodeText()] = preflight.visible(reference);
-    pages.push(classifyPage(operators(pageContent(page)), visibility));
+    for (const operator of pageOperators) {
+      if (operator.op !== "BDC" || decodeName(operator.args[0]?.raw) !== "/OC") continue;
+      const property = decodeName(operator.args[1]?.raw?.slice(1));
+      if (property && properties instanceof PDFDict && !Object.hasOwn(visibility, property)) {
+        visibility[property] = preflight.visible(properties.get(key(property)));
+      }
+    }
+    pages.push(classifyPage(pageOperators, visibility));
   }
   return { allowed: pages.every((page) => page.allowed), pages };
 }
@@ -368,7 +375,7 @@ async function literal(bytes) {
         const xobject = document.context.lookup(value);
         if (xobject instanceof PDFRawStream && ["Form", "Image"].includes(typeName(get(xobject.dict, "Subtype")))) owners.add(xobject.dict);
       }
-      for (const [resourceKey, value] of resources.entries()) if (!["XObject", "Properties"].includes(resourceKey.decodeText())) forbiddenRoots.push({ value, where: `page.Resources.${resourceKey.decodeText()}` });
+      if (resources instanceof PDFDict) for (const [resourceKey, value] of resources.entries()) if (!["XObject", "Properties"].includes(resourceKey.decodeText())) forbiddenRoots.push({ value, where: `page.Resources.${resourceKey.decodeText()}` });
       const annotations = get(page.node, "Annots");
       if (annotations) forbiddenRoots.push({ value: annotations, where: "page.Annots" });
       if (xobjects instanceof PDFDict) for (const [xobjectKey, value] of xobjects.entries()) {

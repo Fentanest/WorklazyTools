@@ -165,6 +165,25 @@ function createBackgroundFixtures() {
   ];
 }
 
+function createOrdinaryPropertiesPdf() {
+  return assemblePdf([
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Properties << /TextInfo 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Lang (en) /MCID 0 >>",
+    pdfStream("/Span /TextInfo BDC q 0 0 1 rg 20 20 80 80 re f Q EMC"),
+  ]);
+}
+
+function createNoResourcesPdf() {
+  return assemblePdf([
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>",
+    pdfStream(""),
+  ]);
+}
+
 function createTaggedPdf() {
   return assemblePdf([
     "<< /Type /Catalog /Pages 2 0 R /MarkInfo << /Marked true >> /StructTreeRoot 6 0 R >>",
@@ -255,7 +274,7 @@ function encryptedOracle(revision, variant, permissions) {
 export async function generatePdfFinishFixtures(outputDirectory = defaultOutputDirectory) {
   const resolvedOutput = path.resolve(outputDirectory);
   await fs.mkdir(resolvedOutput, { recursive: true });
-  for (const ownedPath of ["encrypted", "damage", "background", "risk", "removal", "ocg", "manifest.json"]) {
+  for (const ownedPath of ["encrypted", "damage", "background", "risk", "removal", "ordinary", "ocg", "manifest.json"]) {
     await fs.rm(path.join(resolvedOutput, ownedPath), { recursive: true, force: true });
   }
   const records = [];
@@ -297,6 +316,22 @@ export async function generatePdfFinishFixtures(outputDirectory = defaultOutputD
     linkKinds: ["URI", "direct-destination", "named-destination"],
     embeddedSentinel: "PDF finish embedded attachment sentinel",
     xmpSentinel: "<pdf:Keywords>remove-me</pdf:Keywords>",
+  });
+  await writeFixture("ordinary", "named-properties.pdf", createOrdinaryPropertiesPdf(), {
+    preflight: { allowed: true, reason: "allow" },
+    markedContent: "/Span /TextInfo BDC",
+    pixelOracle: {
+      poppler: [{ page: 1, width: 200, height: 200, sha256: "04ce6cfbce82aad25e57dc2c640efdad56a16de829925daa0fdbaf473c9a101b" }],
+      pdfjs: [{ page: 1, width: 200, height: 200, sha256: "04ce6cfbce82aad25e57dc2c640efdad56a16de829925daa0fdbaf473c9a101b" }],
+    },
+  });
+  await writeFixture("ordinary", "no-resources.pdf", createNoResourcesPdf(), {
+    preflight: { allowed: true, reason: "allow" },
+    resources: "omitted",
+    pixelOracle: {
+      poppler: [{ page: 1, width: 200, height: 200, sha256: "cdbf6c0880cfbeebfa8480444fef83685e70091bf1f23a5e8a71564d1f8be33a" }],
+      pdfjs: [{ page: 1, width: 200, height: 200, sha256: "cdbf6c0880cfbeebfa8480444fef83685e70091bf1f23a5e8a71564d1f8be33a" }],
+    },
   });
 
   const ocgSeed = JSON.parse(zlib.gunzipSync(await fs.readFile(ocgSeedPath)));

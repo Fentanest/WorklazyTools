@@ -34,8 +34,8 @@ test("PDF finish fixtures are deterministic twice and match the tracked oracle t
     const firstManifest = await generatePdfFinishFixtures(first);
     const secondManifest = await generatePdfFinishFixtures(second);
     assert.deepEqual(firstManifest.counts, {
-      total: 102,
-      byCategory: { encrypted: 4, damage: 3, background: 4, risk: 3, removal: 1, ocg: 87 },
+      total: 104,
+      byCategory: { encrypted: 4, damage: 3, background: 4, risk: 3, removal: 1, ordinary: 2, ocg: 87 },
       ocg: { allowed: 4, excluded: 31, directArrayRegression: 32, representatives: 20, pixelOracle: 56 },
     });
     assert.deepEqual(secondManifest, firstManifest);
@@ -91,6 +91,19 @@ test("PDF finish OCG manifest preserves canonical cohorts and exact SHA oracles"
   });
   assert.equal(manifest.ocg.exploration.round11.length, 72);
   assert.equal(manifest.ocg.exploration.round12.length, 50);
+});
+
+test("ordinary marked content and pages without Resources remain non-OC fixtures", async () => {
+  const manifest = JSON.parse(await fs.readFile(path.join(trackedFixtureDirectory, "manifest.json"), "utf8"));
+  const ordinary = manifest.fixtures.filter((fixture: { category: string }) => fixture.category === "ordinary");
+  assert.deepEqual(ordinary.map(({ file }: { file: string }) => file), [
+    "ordinary/named-properties.pdf",
+    "ordinary/no-resources.pdf",
+  ]);
+  for (const fixture of ordinary) {
+    assert.deepEqual(fixture.expectation.preflight, { allowed: true, reason: "allow" });
+    assert.deepEqual(fixture.expectation.pixelOracle.poppler, fixture.expectation.pixelOracle.pdfjs);
+  }
 });
 
 test("PDF finish fixture generator imports Node built-ins only", async () => {

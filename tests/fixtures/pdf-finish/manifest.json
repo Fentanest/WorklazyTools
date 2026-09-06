@@ -3,13 +3,14 @@
   "generator": "scripts/generate-pdf-finish-fixtures.mjs",
   "deterministicInputs": "fixed test-only keys, salts, strings, object ordering, and canonical OCG snapshot bytes",
   "counts": {
-    "total": 102,
+    "total": 104,
     "byCategory": {
       "encrypted": 4,
       "damage": 3,
       "background": 4,
       "risk": 3,
       "removal": 1,
+      "ordinary": 2,
       "ocg": 87
     },
     "ocg": {
@@ -2856,6 +2857,68 @@
         ],
         "embeddedSentinel": "PDF finish embedded attachment sentinel",
         "xmpSentinel": "<pdf:Keywords>remove-me</pdf:Keywords>"
+      }
+    },
+    {
+      "file": "ordinary/named-properties.pdf",
+      "category": "ordinary",
+      "bytes": 585,
+      "sha256": "44d5d5c09e1d24aa96076f2a07c03513d344b371f25d293b5f36fe1e13a7097d",
+      "expectation": {
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "markedContent": "/Span /TextInfo BDC",
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "04ce6cfbce82aad25e57dc2c640efdad56a16de829925daa0fdbaf473c9a101b"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "04ce6cfbce82aad25e57dc2c640efdad56a16de829925daa0fdbaf473c9a101b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ordinary/no-resources.pdf",
+      "category": "ordinary",
+      "bytes": 420,
+      "sha256": "c7eae4731a7115f819bef5cd7824987da71fef963c7d1b1f10d7c510a768a529",
+      "expectation": {
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "resources": "omitted",
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "cdbf6c0880cfbeebfa8480444fef83685e70091bf1f23a5e8a71564d1f8be33a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "cdbf6c0880cfbeebfa8480444fef83685e70091bf1f23a5e8a71564d1f8be33a"
+            }
+          ]
+        }
       }
     },
     {
