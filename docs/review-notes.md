@@ -66,6 +66,85 @@
 - **실패·교정 기록:** 최초 측정 선택자의 끝 슬래시 가정은 실제 sidebar href에 없어 30초 timeout → 실제 href로 수정했다(`logs/focus-measurement.log`). 첫 스타일의 `outline-none`은 Tailwind `--tw-outline-style:none`을 남겨 `focus-visible:outline-2`만으로는 **`none !== solid`** 단언에 실패했다(`logs/focus-after-production.log`) → `focus-visible:outline-solid`를 명시해 재빌드·실측 통과했다. 그 이전 전체 recovery 실행은 수정본 재빌드를 위해 exit **130**으로 중단했고 `recovery-initial-interrupted/`와 동명 log를 보존했다.
 - **최종 검증·인계:** production build **93.92초**, static **104 startup 문서/1.89초**, unit **200/200·2.76초**, recovery **149/149·279.50초**, 포커스 **4/4·8.27초**, entry 캡처 **6/6·4.97초**, 마지막 `VITE_LOCAL_QA=1 npm run build` **94.68초**, 모두 exit **0**. B-stale-html 추가 2사례에는 앞선 보존 빌드 `/tmp/worklazy-s0/s0-next`를 사용했다. sitemap SHA-256은 앞선 S0와 같고 entry 실패 외부 요청 0, ko/en·SEO·광고 격리 정적 검사 통과. QA entry `index-CqGahg57.js`에서 분석 식별자·추적/광고 로더 URL이 제거됐고 4188·4189·4190의 응답은 최종 QA `dist/index.html`과 byte-identical이다(`qa-dist.json`). 최초 보조 Node fetch는 4190을 `bad port`로 거절해 로컬 HTTP 모듈로 확인했고 서버는 변경하지 않았다(`logs/qa-check-fetch-failed.log`). 전체 명령·출력·검증표·캡처·종료 git 상태는 `/tmp/worklazy-s0/fix1/REPORT.md`와 `logs/`에 기록한다. — Codx
 
+#### 승인된 main 병합·배포 사후 확인 (Codx)
+
+**판정: 사용자 승인 S0 병합·배포는 완료했으나 라이브 게이트 ⑨는 미통과다. HWP 접근성 2종 및 없는 경로의 홈 이동을 실제 실패로 기록한다.** 2026-09-06 S0 병합 디스패치에 따라 실행했으며 위 브랜치 검증 기록 이후의 배포 결과다. 정본 C-A의 사후 기록 예외로 이 절을 병합 위 문서 커밋에 기록한다.
+
+- **게이트·병합:** 선독·열린 15개 계획서 충돌 검사 후 `main=5485fadc43677902c51fbc2d13579e8c1a26db0e`, `s0-blank-page=3672fc7af03f3fedd11fe36c8f238b474ce4c4e1` 일치를 확인했다. `git checkout main` → `git pull --ff-only origin main`은 Already up to date. `git merge --no-ff s0-blank-page -m "Merge S0 blank-page recovery for live deployment"` → **`b7e39772e7dc0e3bd09c178ae04b79e75e7b230d`**, 두 부모는 위 main/S0 해시다. 병합 트리는 검수된 S0와 동일(`git diff --exit-code s0-blank-page HEAD`, exit 0). 정본의 Gemini 로컬 60화면 검수·Claude 12장 재확인 통과를 승계했다. 4173·4183 preview 리스너가 없어 종료할 프로세스는 없었다.
+- **push 전 실측:** 아래 검증 모두 exit 0. unit **200/200**, recovery **149/149**(desktop 75·Android Chromium 74), static **104 startup 문서**, QA a11y **5페이지·위반 0·외부 요청 0**. 실제 Samsung Internet 측정은 아니다. QA → 최종 production 복원 후 entry JS와 `/ko/` HTML이 첫 production 빌드와 byte-identical이며 static도 재통과했다. 모든 production 빌드에 Actions와 같은 `VITE_SITE_URL=https://worklazy.net/`, `VITE_BASE_PATH=/`를 명시하고 `VITE_LOCAL_QA`를 unset했다. QA는 `VITE_LOCAL_QA=1`; a11y는 `A11Y_MAX_TOTAL=0`. 기존 eval·큰 청크 경고 외 오류 없음.
+
+| 검증 로그 이름 (아래 원자료의 command/출력과 대응) | exit | 초 |
+| --- | ---: | ---: |
+| `build-production` | 0 | 94.50 |
+| `unit` | 0 | 2.58 |
+| `static` | 0 | 0.86 |
+| `recovery` | 0 | 273.30 |
+| `registry` | 0 | 0.83 |
+| `diff-check` | 0 | 0.08 |
+| `build-qa` | 0 | 92.46 |
+| `a11y` | 0 | 18.51 |
+| `build-production-final` | 0 | 90.63 |
+| `static-final` | 0 | 0.74 |
+
+- **push·Actions:** `git push origin main` → `5485fad..b7e3977  main -> main`, exit 0. [Pages 실행 34024575857](https://github.com/Fentanest/WorklazyTools/actions/runs/34024575857)은 병합 SHA와 일치하고 **success**, 생성 `2026-09-06T09:24:48Z` → 완료 `2026-09-06T09:30:08Z`(**320초**). `gh run watch 34024575857 --exit-status --interval 15` exit 0, build/static/video hybrid smoke/deploy success.
+- **라이브 파일·HTTP:** `curl -s https://worklazy.net/ko/ | grep -o 'index-[A-Za-z0-9_-]*\.js'` → **`index-CqlI-bD5.js`**, 병합 커밋 production과 파일명·SHA-256 **`a6b111354eb6d6ec9f6b4efb78a49e3b04ca7fa50fa7b78a33f72e7d66330d8e`** 모두 일치. `startup-help`는 아래 모든 라이브 HTML **6/6**에 있고 정상 앱 화면에서는 보이지 않는다. 지시서의 “5페이지”에 열거된 URL은 ko/en을 풀면 6개이므로 모두 검사했다. `/ads.txt`·`/robots.txt`·`/sitemap.xml` HTTP 200, ads 게시자 일치. CDN은 **첫 확인부터 일치**했고, 원자료 정리 중 HTTP를 1회 재확인했다.
+
+**라이브 접근성·육안:** axe-core 4.13.0 / Playwright 1.63.0 / Chrome 152.0.7977.64; light·동의 granted·폰트/paint 대기·감사 시 애니메이션 제거. 전체 axe 규칙, 요청 차단 없이 실제 production에서 desktop 1280×800·mobile viewport 390×844를 각각 측정했다. **desktop 6페이지 중 5페이지 위반 0, HWP 2종(color-contrast·label-title-only)**으로 0 기준에 실패했다. 추가 mobile viewport 검사는 홈 ko 1종, HWP 3종(color-contrast·label-title-only·landmark-unique), 나머지 4페이지 0이다. 동일 origin HTTP 오류·pageerror 0, 문서 가로 overflow 0px. full-page/viewport 원본 각 12장(총 24장)을 저장했고 desktop full-page 6장·mobile viewport 6장을 Codx가 직접 열어 레이아웃·문구 잘림·버튼 정렬을 확인했다. 이번 라이브 검수는 Codx 실측이며 Gemini의 별도 라이브 판정으로 표시하지 않는다.
+
+| 라이브 경로 | HTTP | desktop axe passes | violations desktop / mobile |
+| --- | ---: | ---: | ---: |
+| `/ko/` | 200 | 35 | 0 / 1 |
+| `/en/` | 200 | 35 | 0 / 0 |
+| `/ko/tools/` | 200 | 39 | 0 / 0 |
+| `/ko/tools/hwp-editor/` | 200 | 51 | 2 / 3 |
+| `/ko/tools/audio-studio/` | 200 | 40 | 0 / 0 |
+| `/en/tools/audio-studio/` | 200 | 40 | 0 / 0 |
+
+- **404 — 실패:** `/ko/404-없는경로/` 최초 HTTP **404**지만 앱 기동 후 URL은 `https://worklazy.net/ko/`, 본문은 홈이다. 따라서 **404 페이지 유지 조건 미통과**다(`404.png`, `live-contract.json` 원문). 이전 `4d0bae9` 보존 빌드에서도 HTTP 404 → `/ko/` 홈을 재현했다(`baseline-404.json`, probe exit 0).
+- **광고 격리:** consent granted·새 context·요청 차단 없이 video/office app/XLS 보존 × ko/en **6/6**에서 `crossOriginIsolated=true`, 광고 script DOM **0**, `googlesyndication|adsbygoogle` 요청 **0**. 일반 Excel Cleaner ko/en 양성 대조 **2/2**는 loader HTTP 200·`adsbygoogle.loaded=true`로 확인했다. 계정 승인·광고 지면 게재 판정은 이 검사에 포함되지 않는다.
+- **홈 ko CLS:** 한 번의 라이브 desktop 표본 **0.038332 ≤ 0.114199**, LCP **996.00ms**, 관측 종료 **5526.30ms**. cache disabled·동의 granted·networkidle 후 3초, 요청 차단/스타일 변경 없이 기존 측정기의 `!hadRecentInput` layout-shift 합산으로 측정했다. 실험실 1회 표본이며 실사용 CWV 집계는 아니다.
+
+**실패의 기존 상태 대조:** 이전 A/B의 `4d0bae9` production 보존 빌드(`5485fad`까지 차이는 문서뿐)를 로컬에서 실행해 HWP desktop `color-contrast`·`label-title-only` **2종을 동일 재현**했다. 상태 문구 `#sb-message`는 **3.54:1**, `#style-name`·`#font-lang`·`#font-name`·`#font-size`·`#linespacing-select`는 title만 제공한다. 모바일 홈 하단 탭도 동일 **3.06:1**을 재현했고 S0 전후 `src/styles/global.css`·`tailwind.css` diff는 0이다. 근거 `baseline-findings.json`, `baseline-findings-full` exit 0·8.25초; 추적 동의 denied·외부 요청 0. **기존 문제임을 S0 회귀 아님으로 판정한 것이며, 라이브 위반 0 또는 404 게이트 통과를 뜻하지 않는다.** HWP iframe을 감사에서 제외하지 않았고 제품·벤더·라우팅을 이 배포 작업에서 추가 수정하지 않았다.
+
+최종 실패 원문:
+
+```text
+Desktop live accessibility contract: violations=2; limit=0
+AssertionError [ERR_ASSERTION]: Live desktop accessibility zero-violation contract failed
+2 !== 0
+40 direct routes: no blank pages; isolated ad requests: 0
+AssertionError [ERR_ASSERTION]: Live unknown route must retain a 404 page after app startup
+```
+
+**20도구 ko/en 직접 진입 — 빈 화면 0/40:** 실제 도구 준비 DOM 뒤 `main.innerText.trim().length > 0`, 오류 경계·startup 안내 표시 없음을 단언했다. 최초 HTTP는 **39건 200, HWP EN 1건 404**이며 HWP EN은 기존 정책대로 영어 도구 목록으로 이동하고 그 목적지 HTTP는 200이다. 없는 영어 HWP 정적 문서는 이전 빌드에도 없으며 동일 404 → 도구 목록을 재현했다.
+
+| 도구 | ko mainTextLength | en mainTextLength | 결과 |
+| --- | ---: | ---: | --- |
+| `excel-merger` | 3155 | 5891 | 정상 |
+| `excel-compare` | 1835 | 3585 | 정상 |
+| `excel-cleaner` | 1588 | 3011 | 정상 |
+| `pdf-editor` | 1775 | 2923 | 정상 |
+| `document-compare` | 1380 | 2586 | 정상 |
+| `hwp-editor` | 1195 | 4629 | EN 최초 HTTP 404 → `/en/tools` HTTP 200 (기존 정책) |
+| `office-editor` | 1213 | 2182 | 정상 |
+| `video-studio` | 1933 | 3343 | 정상 |
+| `audio-studio` | 1414 | 2293 | 정상 |
+| `image-studio` | 1471 | 2558 | 정상 |
+| `text-merger` | 962 | 1791 | 정상 |
+| `text-tools` | 777 | 1420 | 정상 |
+| `text-formatter` | 491 | 911 | 정상 |
+| `work-calculator` | 570 | 1259 | 정상 |
+| `timezone-calculator` | 1992 | 3284 | 정상 |
+| `payroll-calculator` | 689 | 1471 | 정상 |
+| `image-privacy` | 826 | 1405 | 정상 |
+| `security-tools` | 724 | 1442 | 정상 |
+| `qr-studio` | 618 | 1086 | 정상 |
+| `data-converter` | 529 | 868 | 정상 |
+
+**원자료·재현:** `/tmp/worklazy-s0/deploy/`의 `gate.txt`·`open-plan-surface-scan.txt`·`merge-provenance.json`, 각 명령 JSON의 command/exit/seconds와 `logs/*.log`, `production-fingerprint.json`·`qa-fingerprint.json`, `actions-run.json`, `live-http.json`·`cdn-polls.jsonl`, `live-audit.json`·PNG 24장, `live-contract.json`·`404.png`, `visual-review.txt`에 원출력을 보존했다. 라이브 재현 명령은 `python3 /tmp/worklazy-s0/deploy/live-http.py`, `node /tmp/worklazy-s0/deploy/live-audit.mjs`, `node /tmp/worklazy-s0/deploy/live-contract.mjs`이며 exit는 순서대로 **0 / 1 / 1**이다. 접근성·404 실패 기준을 제거하지 않고 마지막에 실패 종료하도록 전체 수집했다. 최초 보조 실행의 모바일 0 단언과 HWP EN 최초 HTTP 200 단언은 지정 범위를 넘긴 측정 가정이어서 원출력을 `initial-extra/`에 보존하고 교정했다. 실제 지정 조건의 실패 원문은 `desktop-failure/`·`notfound-failure/`·최종 logs에 보존했다. 사용자 파일 3개·jobs·측정 산출물은 커밋하지 않는다. 롤백이 필요하면 C-A대로 사후 기록을 보존하고 `revert -m 1 <merge>`의 문서 충돌을 수동 해결한 뒤 push·Actions 성공·라이브 확인까지 수행한다. — Codx
+
+**원자료 정리 보정:** 보조 실행기의 메타데이터 파일명과 최초 라이브 결과 JSON 이름이 겹쳐, CLS는 최초 `logs/live-contract.log`의 원본 JSON 행에서 `live-cls.json`으로 복원했다(추가 CLS 측정 0회). HTTP 결과는 별도 실행 이름으로 재확인했다. 복구한 CLS·진입 40행·광고 8행·최종 axe 12행을 각 원본 stdout과 전부 대조해 일치를 확인했다(`evidence-reconciliation.txt`). `live-contract.mjs` 최종 실행은 앞선 진입·CLS 수집 결과를 유지하고 광고 검사를 재개한 실행이며, 초기·중간·최종 소스/출력을 함께 보존했다. — Codx
+
 ### P2 main 병합·라이브 배포 후 검증 (Codx)
 
 **판정: 승인된 배포를 완료했고 배포 후 게이트 ⑥을 통과했다. 지정 7개 화면에서 레이아웃 파손·조작 불가·데이터 손실 가능성을 발견하지 않아 롤백하지 않았다.** CHANGELOG의 같은 날짜 P2 배포 항목에 대응한다. 제품 코드·번들 예산 상한/기준점·개인 파일 3개는 수정하지 않았다.
