@@ -32,15 +32,37 @@ export interface DpiPolicyResult {
   attempts: Array<{ dpi: 150 | 200 | 300; measurement: CanvasMeasurement }>;
 }
 
-export interface RawRgbaLedgerEntry {
+export interface RawRgbaResource {
+  /** Pixel count for one live canvas or bitmap resource. */
   pixels: number;
-  simultaneousCopies?: number;
+  /** Raw RGBA bytes for one live resource; this must equal pixels * 4. */
+  bytes: number;
+  /** Number of identical resources alive at this point in time. */
+  count: number;
+}
+
+/** One point in time, containing every canvas/bitmap resource still alive together. */
+export interface RawRgbaLedgerEntry {
+  resources: readonly RawRgbaResource[];
+}
+
+export interface RawRgbaLedgerTotal {
+  pixels: number;
+  bytes: number;
+  resourceCount: number;
 }
 
 export interface BatchResourceMetrics {
+  /** Work-volume metric only; it is not a peak-memory estimate or blocking gate. */
   cumulativePixels: number;
+  /** Work-volume metric only; it is not used to calculate the raw RGBA peak. */
   cumulativeRawRgbaBytes: number;
+  /** Per-time-point sums of the simultaneously live raw resources. */
+  rawRgbaLedger: RawRgbaLedgerTotal[];
+  /** Maximum of each time point's summed bytes, never the maximum individual resource. */
   peakRawRgbaBytes: number;
+  /** Maximum of each time point's summed live-resource count. */
+  peakRawResourceCount: number;
 }
 
 export type RasterOutputFormat = "png" | "jpeg";
@@ -98,19 +120,38 @@ export function chooseCanvasDpi(input: {
 
 export function measureBatchResources(
   pages: readonly CanvasMeasurement[],
-  rawLedger: readonly RawRgbaLedgerEntry[] = pages,
+  rawLedger: readonly RawRgbaLedgerEntry[] = pages.map((page) => ({
+    resources: [{ pixels: page.pixels, bytes: page.rgbaBytes, count: 1 }],
+  })),
 ): BatchResourceMetrics {
   const cumulativePixels = pages.reduce((sum, page) => sum + page.pixels, 0);
-  const ledgers = rawLedger.map(({ pixels, simultaneousCopies = 1 }) => {
-    if (!Number.isSafeInteger(pixels) || pixels < 0 || !Number.isSafeInteger(simultaneousCopies) || simultaneousCopies < 0) {
-      throw new RangeError("invalid-raw-ledger");
+  const ledgerTotals = rawLedger.map(({ resources }) => resources.reduce<RawRgbaLedgerTotal>((total, resource) => {
+    if (!Number.isSafeInteger(resource.pixels)
+        || resource.pixels < 0
+        || !Number.isSafeInteger(resource.bytes)
+        || resource.bytes < 0
+        || resource.bytes !== resource.pixels * 4
+        || !Number.isSafeInteger(resource.count)
+        || resource.count < 1) {
+      throw new RangeError("invalid-raw-ledger-resource");
     }
-    return pixels * simultaneousCopies * 4;
-  });
+    const pixels = resource.pixels * resource.count;
+    const bytes = resource.bytes * resource.count;
+    if (!Number.isSafeInteger(pixels) || !Number.isSafeInteger(bytes)) throw new RangeError("raw-ledger-overflow");
+    const next = {
+      pixels: total.pixels + pixels,
+      bytes: total.bytes + bytes,
+      resourceCount: total.resourceCount + resource.count,
+    };
+    if (![next.pixels, next.bytes, next.resourceCount].every(Number.isSafeInteger)) throw new RangeError("raw-ledger-overflow");
+    return next;
+  }, { pixels: 0, bytes: 0, resourceCount: 0 }));
   return {
     cumulativePixels,
     cumulativeRawRgbaBytes: pages.reduce((sum, page) => sum + page.rgbaBytes, 0),
-    peakRawRgbaBytes: ledgers.length ? Math.max(...ledgers) : 0,
+    rawRgbaLedger: ledgerTotals,
+    peakRawRgbaBytes: ledgerTotals.length ? Math.max(...ledgerTotals.map(({ bytes }) => bytes)) : 0,
+    peakRawResourceCount: ledgerTotals.length ? Math.max(...ledgerTotals.map(({ resourceCount }) => resourceCount)) : 0,
   };
 }
 

@@ -178,13 +178,13 @@ export function layoutTextLines(input: {
   const lineHeight = size * 1.2;
   const ellipsisWidth = font.widthOfTextAtSize("…", size);
   if (!Number.isFinite(ellipsisWidth) || ellipsisWidth <= 0) return { ok: false, error: "invalid-layout" };
+  if (region.width < ellipsisWidth) return { ok: false, error: "narrow-region", ellipsisWidth };
   const warnings = new Set<LayoutWarning>();
   const measured: Array<{ text: string; width: number; sourceLine: number }> = [];
   for (const [index, line] of lines.entries()) {
     let text = line;
     let width = font.widthOfTextAtSize(text, size);
     if (width > region.width) {
-      if (ellipsisWidth > region.width) return { ok: false, error: "narrow-region", ellipsisWidth };
       text = fitWithEllipsis(text, region.width, font, size);
       width = font.widthOfTextAtSize(text, size);
       warnings.add("horizontal-overflow");

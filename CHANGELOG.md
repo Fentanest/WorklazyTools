@@ -4,7 +4,7 @@
 
 ## 2026-09-07
 
-- U4-1 PDF finish의 회전·선택·토큰·텍스트·타일·캔버스·도장·실행 순서 순수 정책 모듈과 골든 unit을 추가하고, OCG preflight 단일 구현을 제품 모듈로 이관했다. — Codx
+- U4-1 PDF finish 순수 정책 모듈과 골든 unit을 추가했다. 검수 후 타일 400 고정 상한, 좁은 텍스트 영역 선검사, 시점별 raw ledger 합산, OCG preflight 정적 re-export와 실제 PDF.js 골든을 보강했다. — Codx
 - U4-0 검수 후 bundle schema v2의 main metadata 완전성·로케일 비의존 배분을 고정하고, 일반 PDF Properties·빈 Resources fixture와 허용 OCG 구조 제거 전후 두 렌더러·잔여 구조·음성 대조 oracle을 보강했다. — Codx
 - U4-0 PDF finish 선행 작업으로 번들 gzip을 청크 SHA 대신 모듈 기여·이동 기준으로 귀속하는 schema v2 측정기를 도입했다. Node 내장 모듈 기반 암호·손상·stream·위험·제거 fixture 생성기, OCG 87종 manifest와 Poppler/PDF.js 픽셀 oracle, main 기준 legacy-organize 구조·렌더·client oracle을 추가했다. — Codx
 

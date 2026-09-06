@@ -42,7 +42,7 @@
     "test:ui-migration": "node tests/ui-migration-layout-smoke.mjs",
     "test:a11y": "node tests/accessibility-audit.mjs",
     "test:rendering": "node tests/rendering-baseline.mjs",
-    "test:pdf-finish-oracle": "node tests/pdf-finish-oracle.mjs",
+    "test:pdf-finish-oracle": "node --experimental-strip-types tests/pdf-finish-oracle.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },
   "dependencies": {

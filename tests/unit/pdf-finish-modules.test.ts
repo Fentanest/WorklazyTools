@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
 import {
   FINISH_EXECUTION_ORDER,
   MEMORY_RESULT_LIMIT_BYTES,
@@ -42,6 +42,7 @@ import {
   type CapturedTokenValues,
   type PdfViewportGeometry,
   type TextFontProbe,
+  type TileLayoutInput,
 } from "../../src/features/pdf-editor/finish/index.ts";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../..");
@@ -75,6 +76,69 @@ test("finish geometry preserves the E5 non-zero CropBox corners and upright rota
     assert.deepEqual(Object.values(anchors[2].pdf), expectedCorners[index][1]);
     assert.deepEqual(Object.values(anchors[3].pdf), expectedCorners[index][2]);
     assert.deepEqual(Object.values(anchors[5].pdf), expectedCorners[index][3]);
+  }
+});
+
+test("finish geometry matches literal E5 anchors with margins across four actual mixed-size PDF.js viewports", async () => {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const source = await PDFDocument.create({ updateMetadata: false });
+  const pageInputs = [
+    { width: 400, height: 600, rotation: 0 },
+    { width: 300, height: 500, rotation: 90 },
+    { width: 700, height: 200, rotation: 180 },
+    { width: 400, height: 400, rotation: 270 },
+  ] as const;
+  for (const input of pageInputs) {
+    const page = source.addPage([input.width + 100, input.height + 200]);
+    page.setCropBox(50, 100, input.width, input.height);
+    page.setRotation(degrees(input.rotation));
+  }
+  const expected = [
+    {
+      visual: [400, 600], rotation: 0,
+      anchors: [[90, 690], [260, 690], [430, 690], [90, 130], [260, 130], [430, 130]],
+    },
+    {
+      visual: [500, 300], rotation: 90,
+      anchors: [[60, 140], [60, 360], [60, 580], [320, 140], [320, 360], [320, 580]],
+    },
+    {
+      visual: [700, 200], rotation: 180,
+      anchors: [[710, 110], [390, 110], [70, 110], [710, 270], [390, 270], [70, 270]],
+    },
+    {
+      visual: [400, 400], rotation: 270,
+      anchors: [[440, 460], [440, 290], [440, 120], [80, 460], [80, 290], [80, 120]],
+    },
+  ] as const;
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await source.save()) });
+  try {
+    const document = await loadingTask.promise;
+    const visualSizes = new Set<string>();
+    for (const [index, golden] of expected.entries()) {
+      const page = await document.getPage(index + 1);
+      const viewport = page.getViewport({ scale: 1 });
+      assert.deepEqual([viewport.width, viewport.height, viewport.rotation], [...golden.visual, golden.rotation]);
+      visualSizes.add(`${viewport.width}x${viewport.height}`);
+      const geometry: PdfViewportGeometry = {
+        width: viewport.width,
+        height: viewport.height,
+        rotation: golden.rotation,
+        transform: viewport.transform,
+      };
+      const anchors = createFinishAnchors(geometry, { top: 10, right: 20, bottom: 30, left: 40 });
+      assert.deepEqual(anchors.map(({ pdf }) => [pdf.x, pdf.y]), golden.anchors);
+      assert.deepEqual(anchors.map(({ region }) => region), [
+        "top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right",
+      ]);
+      assert.ok(anchors.every(({ textRotation }) => textRotation === golden.rotation));
+      for (const anchor of anchors) {
+        assert.deepEqual(viewport.convertToPdfPoint(anchor.viewport.x, anchor.viewport.y), [anchor.pdf.x, anchor.pdf.y]);
+      }
+    }
+    assert.equal(visualSizes.size, 4);
+  } finally {
+    await loadingTask.destroy();
   }
 });
 
@@ -156,17 +220,45 @@ test("text preprocessing, whole-candidate coverage and document-wide font select
     date: new Date(2026, 8, 6, 12),
     locale: "en-US",
   };
-  assert.deepEqual(preprocessText("A\tB\r\nC\rD", values).lines, ["A    B", "C", "D"]);
-  assert.deepEqual(preprocessText("{filename} {page}/{pages} {date} {date:YYYY-MM-DD}", values).lines, ["file{page}    name 5/10 9/6/2026 2026-09-06"]);
-  for (const [character, codePoint] of [["\0", 0], ["\v", 11], ["\u0085", 133]] as const) {
-    const prepared = preprocessText(`A${character}B`, values);
-    assert.deepEqual(prepared.errors.at(-1), { code: "control-character", line: 1, column: 2, codePoint });
-  }
   const document = await PDFDocument.create({ updateMetadata: false });
   document.registerFontkit(fontkit);
   const helvetica = await document.embedFont(StandardFonts.Helvetica);
   const notoBytes = await fs.readFile(path.join(repositoryRoot, "public/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf"));
   const noto = await document.embedFont(notoBytes, { subset: false });
+  const preprocessingGoldens = [
+    { input: "A\tB\r\nC\rD", lines: ["A    B", "C", "D"], warnings: [], errors: [], font: "helvetica", blocked: false, missing: [] },
+    { input: "가\r나", lines: ["가", "나"], warnings: [], errors: [], font: "noto", blocked: false, missing: [] },
+    { input: "A\0B", lines: ["A\0B"], warnings: [], errors: [{ code: "control-character", line: 1, column: 2, codePoint: 0 }], blocked: true },
+    { input: "A\vB", lines: ["A\vB"], warnings: [], errors: [{ code: "control-character", line: 1, column: 2, codePoint: 11 }], blocked: true },
+    { input: "A\u0085B", lines: ["A\u0085B"], warnings: [], errors: [{ code: "control-character", line: 1, column: 2, codePoint: 133 }], blocked: true },
+    {
+      input: "{filename} {page}/{pages} {date} {date:YYYY-MM-DD}",
+      lines: ["file{page}    name 5/10 9/6/2026 2026-09-06"], warnings: [], errors: [], font: "helvetica", blocked: false, missing: [],
+    },
+    {
+      input: "{foo}", lines: ["{foo}"],
+      warnings: [{ code: "unknown-token", token: "{foo}", offset: 0 }], errors: [], font: "helvetica", blocked: false, missing: [],
+    },
+    {
+      input: "{date:foo}", lines: ["{date:foo}"], warnings: [],
+      errors: [{ code: "date-format", offset: 0, token: "{date:foo}" }], blocked: true,
+    },
+    { input: "\n\n", lines: ["", "", ""], warnings: [], errors: [], font: "helvetica", blocked: false, missing: [] },
+    {
+      input: `${"A".repeat(80)}🙂`, lines: [`${"A".repeat(80)}🙂`], warnings: [], errors: [], font: "noto", blocked: true,
+      missing: [{ field: "probe", line: 1, column: 81, codePoint: 0x1f642 }],
+    },
+  ] as const;
+  for (const golden of preprocessingGoldens) {
+    const prepared = preprocessText(golden.input, values);
+    assert.deepEqual(prepared.lines, golden.lines, golden.input);
+    assert.deepEqual(prepared.warnings, golden.warnings, golden.input);
+    assert.deepEqual(prepared.errors, golden.errors, golden.input);
+    const decision = decideDocumentFont([{ field: "probe", prepared }], helvetica, noto);
+    assert.equal(decision.blocked, golden.blocked, golden.input);
+    if ("font" in golden) assert.equal(decision.font, golden.font, golden.input);
+    if ("missing" in golden) assert.deepEqual(decision.missing, golden.missing, golden.input);
+  }
   const resume = decideDocumentFont([{ field: "header", prepared: preprocessText("Résumé €", values) }], helvetica, noto);
   assert.deepEqual(resume, { font: "helvetica", blocked: false, missing: [] });
   const russian = decideDocumentFont([{ field: "header", prepared: preprocessText("Русский", values) }], helvetica, noto);
@@ -195,8 +287,10 @@ test("text preprocessing, whole-candidate coverage and document-wide font select
 test("six-region text layout uses identical measured/drawn runs and reports horizontal, vertical and margin overflow", async () => {
   const document = await PDFDocument.create({ updateMetadata: false });
   const font = await document.embedFont(StandardFonts.Helvetica);
-  const narrow = layoutTextLines({ lines: ["A"], size: 12, region: { x: 0, y: 0, width: 5, height: 100 }, alignment: "left", vertical: "top", font });
-  assert.deepEqual(narrow, { ok: false, error: "narrow-region", ellipsisWidth: 12 });
+  for (const line of ["A".repeat(80), "i", ""]) {
+    const narrow = layoutTextLines({ lines: [line], size: 12, region: { x: 0, y: 0, width: 5, height: 100 }, alignment: "left", vertical: "top", font });
+    assert.deepEqual(narrow, { ok: false, error: "narrow-region", ellipsisWidth: 12 }, JSON.stringify(line));
+  }
   const ellipsisOnly = layoutTextLines({ lines: ["AAAA", "B", "C"], size: 12, region: { x: 0, y: 0, width: 12, height: 100 }, alignment: "left", vertical: "top", font });
   assert.ok(ellipsisOnly.ok);
   assert.equal(ellipsisOnly.runs[0].text, "…");
@@ -205,8 +299,7 @@ test("six-region text layout uses identical measured/drawn runs and reports hori
   const twoLines = layoutTextLines({ lines: ["A".repeat(80), "B", "C"], size: 12, region: { x: 0, y: 0, width: 50, height: 28.8 }, alignment: "center", vertical: "top", font });
   assert.ok(twoLines.ok);
   assert.equal(twoLines.runs.length, 2);
-  assert.ok(twoLines.warnings.includes("horizontal-overflow"));
-  assert.ok(twoLines.warnings.includes("vertical-overflow"));
+  assert.deepEqual(twoLines.warnings, ["horizontal-overflow", "vertical-overflow"]);
   assert.equal(twoLines.runs[0].text, "AAAA…");
   const zeroLines = layoutTextLines({ lines: ["A"], size: 12, region: { x: 0, y: 0, width: 50, height: 10 }, alignment: "right", vertical: "bottom", font });
   assert.ok(zeroLines.ok);
@@ -235,26 +328,95 @@ test("six-region text layout uses identical measured/drawn runs and reports hori
 });
 
 test("tile policy permits 400, rejects the projected 420 before allocation and keeps offset/rotation", () => {
-  const allowed = createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: 0, rotation: -32 });
+  type TileInputHasNoLimitOverride = "maximumTiles" extends keyof TileLayoutInput ? false : true;
+  const tileInputHasNoLimitOverride: TileInputHasNoLimitOverride = true;
+  assert.equal(tileInputHasNoLimitOverride, true);
+  const measurePlacementCreation = (input: TileLayoutInput & Record<string, unknown>) => {
+    const originalPush = Array.prototype.push;
+    let generated = 0;
+    Array.prototype.push = function (...values) {
+      generated += values.filter((value) => value && typeof value === "object" && "rotation" in value && "x" in value && "y" in value).length;
+      return originalPush.apply(this, values);
+    };
+    try {
+      return { result: createTilePlacements(input), generated };
+    } finally {
+      Array.prototype.push = originalPush;
+    }
+  };
+  const { result: allowed, generated: allowedGenerated } = measurePlacementCreation({ pageWidth: 200, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: 0, rotation: -32 });
   assert.ok(allowed.ok);
   assert.equal(allowed.count, 400);
   assert.equal(allowed.placements.length, 400);
+  assert.equal(allowedGenerated, 400);
   assert.equal(allowed.placements[0].rotation, -32);
-  assert.deepEqual(createTilePlacements({ pageWidth: 201, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: 0 }), { ok: false, error: "tile-limit", count: 420, maximumTiles: 400 });
-  const spaced = createTilePlacements({ pageWidth: 201, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: 1, offsetX: 0, offsetY: 0 });
+  const projected420 = { pageWidth: 201, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: 0 };
+  const rejected = measurePlacementCreation(projected420);
+  assert.deepEqual(rejected, {
+    result: { ok: false, error: "tile-limit", count: 420, maximumTiles: 400 },
+    generated: 0,
+  });
+  const attemptedOverride = measurePlacementCreation({ ...projected420, maximumTiles: 1_000 });
+  assert.deepEqual(attemptedOverride, {
+    result: { ok: false, error: "tile-limit", count: 420, maximumTiles: 400 },
+    generated: 0,
+  });
+  const { result: spaced, generated: spacedGenerated } = measurePlacementCreation({ pageWidth: 201, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: 1, offsetX: 0, offsetY: 0 });
   assert.ok(spaced.ok);
   assert.equal(spaced.count, 361);
+  assert.equal(spacedGenerated, 361);
   assert.equal(createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 0, tileHeight: 10, gap: 0 }).ok, false);
   assert.equal(createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: -1 }).ok, false);
 });
 
-test("canvas A policy, DPI fallback, B-only metrics, warning expression and 200MiB pre-registration guard match goldens", () => {
+test("canvas A policy, DPI fallback, B-only metrics, warning expression and 200MiB pre-registration guard match goldens", async () => {
   const a4 = measureCanvas({ width: 595.28 * 200 / 72, height: 841.89 * 200 / 72 });
   assert.deepEqual({ width: a4.width, height: a4.height, pixels: a4.pixels }, { width: 1654, height: 2339, pixels: 3_868_706 });
   const a4At150 = measureCanvas({ width: 595.28 * 150 / 72, height: 841.89 * 150 / 72 });
   const metrics = measureBatchResources(Array.from({ length: 8 }, () => a4At150));
   assert.equal(metrics.cumulativePixels, 17_413_712);
   assert.equal(a4At150.allowed, true);
+
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const viewportSource = await PDFDocument.create({ updateMetadata: false });
+  const sourcePage = viewportSource.addPage([600, 800]);
+  sourcePage.setCropBox(50, 100, 400, 600);
+  sourcePage.node.set(PDFName.of("UserUnit"), viewportSource.context.obj(2));
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await viewportSource.save()) });
+  try {
+    const viewportDocument = await loadingTask.promise;
+    const page = await viewportDocument.getPage(1);
+    const viewportGoldens = [
+      [0, 150, 1667, 2500, 4_167_500, 16_670_000, true],
+      [0, 200, 2223, 3334, 7_411_482, 29_645_928, true],
+      [0, 300, 3334, 5000, 16_670_000, 66_680_000, false],
+      [90, 150, 2500, 1667, 4_167_500, 16_670_000, true],
+      [90, 200, 3334, 2223, 7_411_482, 29_645_928, true],
+      [90, 300, 5000, 3334, 16_670_000, 66_680_000, false],
+      [180, 150, 1667, 2500, 4_167_500, 16_670_000, true],
+      [180, 200, 2223, 3334, 7_411_482, 29_645_928, true],
+      [180, 300, 3334, 5000, 16_670_000, 66_680_000, false],
+      [270, 150, 2500, 1667, 4_167_500, 16_670_000, true],
+      [270, 200, 3334, 2223, 7_411_482, 29_645_928, true],
+      [270, 300, 5000, 3334, 16_670_000, 66_680_000, false],
+    ] as const;
+    for (const [rotation, dpi, width, height, pixels, rgbaBytes, allowed] of viewportGoldens) {
+      const measured = measureCanvas(page.getViewport({ scale: dpi / 72, rotation }));
+      assert.deepEqual(
+        { width: measured.width, height: measured.height, pixels: measured.pixels, rgbaBytes: measured.rgbaBytes, allowed: measured.allowed },
+        { width, height, pixels, rgbaBytes, allowed },
+        `rotation=${rotation},dpi=${dpi}`,
+      );
+    }
+    const actualViewportFallback = chooseCanvasDpi({
+      requestedDpi: 300,
+      viewportAtDpi: (dpi) => page.getViewport({ scale: dpi / 72, rotation: 90 }),
+    });
+    assert.equal(actualViewportFallback.appliedDpi, 200);
+    assert.deepEqual(actualViewportFallback.attempts.map(({ dpi }) => dpi), [300, 200]);
+  } finally {
+    await loadingTask.destroy();
+  }
 
   const downgraded = chooseCanvasDpi({ requestedDpi: 300, viewportAtDpi: (dpi) => ({ width: 1_200 * dpi / 72, height: 1_200 * dpi / 72 }) });
   assert.equal(downgraded.appliedDpi, 200);
@@ -263,6 +425,28 @@ test("canvas A policy, DPI fallback, B-only metrics, warning expression and 200M
   assert.equal(unsupported.appliedDpi, null);
   assert.equal(unsupported.decision, "unsupported-reduce-range");
   assert.deepEqual(unsupported.attempts.map(({ dpi }) => dpi), [300, 200, 150]);
+
+  const rawLedgerMetrics = measureBatchResources(
+    [measureCanvas({ width: 100, height: 100 }), measureCanvas({ width: 100, height: 200 })],
+    [
+      { resources: [{ pixels: 100, bytes: 400, count: 1 }, { pixels: 200, bytes: 800, count: 1 }] },
+      { resources: [{ pixels: 100, bytes: 400, count: 2 }] },
+      { resources: [{ pixels: 50, bytes: 200, count: 1 }] },
+    ],
+  );
+  assert.deepEqual(rawLedgerMetrics, {
+    cumulativePixels: 30_000,
+    cumulativeRawRgbaBytes: 120_000,
+    rawRgbaLedger: [
+      { pixels: 300, bytes: 1_200, resourceCount: 2 },
+      { pixels: 200, bytes: 800, resourceCount: 2 },
+      { pixels: 50, bytes: 200, resourceCount: 1 },
+    ],
+    peakRawRgbaBytes: 1_200,
+    peakRawResourceCount: 2,
+  });
+  assert.equal("allowed" in rawLedgerMetrics, false);
+  assert.equal("decision" in rawLedgerMetrics, false);
 
   assert.deepEqual(estimateOutputWarning({ selectedPixels: 1_000, bytesPerPixel: 1, inputBytes: 100 }), { estimatedBytes: 1_000, thresholdBytes: 1_000, warn: false });
   assert.deepEqual(estimateOutputWarning({ selectedPixels: 1_001, bytesPerPixel: 1, inputBytes: 100 }), { estimatedBytes: 1_001, thresholdBytes: 1_000, warn: true });
@@ -299,28 +483,54 @@ test("canvas A policy, DPI fallback, B-only metrics, warning expression and 200M
   assert.equal(checkMemoryResultRegistration(MEMORY_RESULT_LIMIT_BYTES, 1).register, false);
 });
 
-test("stamp coordinates ignore DPR, preserve center-relative width/aspect, scale uniformly and clamp", () => {
-  for (const viewport of geometryFixtures) {
-    for (const dpr of [1, 2]) {
-      for (const shrink of [1, 0.5]) {
-        const rect = { left: 17, top: 23, width: viewport.width * shrink, height: viewport.height * shrink };
-        const point = cssPointToPdf({
-          clientX: rect.left + rect.width * 0.3,
-          clientY: rect.top + rect.height * 0.4,
-          rect,
-          viewport: {
-            width: viewport.width,
-            height: viewport.height,
-            convertToPdfPoint: (x, y) => {
-              const pdf = viewportPointToPdf(viewport.transform, x, y);
-              return [pdf.x, pdf.y];
+test("stamp coordinates ignore DPR, preserve center-relative width/aspect, scale uniformly and clamp", async () => {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const fixture = await fs.readFile(path.join(repositoryRoot, "tests/fixtures/pdf-finish/legacy-oracle/input.pdf"));
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(fixture) });
+  try {
+    const document = await loadingTask.promise;
+    const page = await document.getPage(1);
+    const expectedByRotation = [
+      [170, 460],
+      [210, 280],
+      [330, 340],
+      [290, 520],
+    ] as const;
+    let combinations = 0;
+    for (const [rotationIndex, rotation] of [0, 90, 180, 270].entries()) {
+      for (const dpr of [1, 2]) {
+        for (const shrink of [1, 0.5]) {
+          const viewport = page.getViewport({ scale: 0.5, rotation });
+          const rect = { left: 17, top: 23, width: viewport.width * shrink, height: viewport.height * shrink };
+          let conversionCalls = 0;
+          const point = cssPointToPdf({
+            clientX: rect.left + rect.width * 0.3,
+            clientY: rect.top + rect.height * 0.4,
+            rect,
+            viewport: {
+              width: viewport.width,
+              height: viewport.height,
+              convertToPdfPoint: (x, y) => {
+                conversionCalls += 1;
+                return viewport.convertToPdfPoint(x, y);
+              },
             },
-          },
-        });
-        const expected = viewportPointToPdf(viewport.transform, viewport.width * 0.3, viewport.height * 0.4);
-        assert.deepEqual(point.pdf, expected, `rotation=${viewport.rotation},dpr=${dpr},shrink=${shrink}`);
+          });
+          assert.deepEqual([point.pdf.x, point.pdf.y], expectedByRotation[rotationIndex], `CSS rotation=${rotation},dpr=${dpr},shrink=${shrink}`);
+          assert.equal(conversionCalls, 1);
+          const bitmapViewport = page.getViewport({ scale: 0.5 * dpr, rotation });
+          assert.deepEqual(
+            bitmapViewport.convertToPdfPoint(viewport.width * 0.3 * dpr, viewport.height * 0.4 * dpr),
+            expectedByRotation[rotationIndex],
+            `bitmap rotation=${rotation},dpr=${dpr},shrink=${shrink}`,
+          );
+          combinations += 1;
+        }
       }
     }
+    assert.equal(combinations, 16);
+  } finally {
+    await loadingTask.destroy();
   }
 
   const model = createNormalizedStamp({ x: 320, y: 510, width: 80, height: 60, viewportWidth: 400, viewportHeight: 600, aspect: 4 / 3 });
