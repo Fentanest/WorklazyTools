@@ -199,6 +199,31 @@ test("QR panel cancel executes product invalidation and prevents a stale PDF dow
   assert.deepEqual(panel.events.filter(([type]) => type === "download" || type === "message"), []);
 });
 
+test("QR panel final task yield lets queued cancellation block a completed PDF Blob", async () => {
+  const cancellation = deferred<void>();
+  const { panel, deps, stats } = createQrPanelHarness(qrBulkPanelSource);
+  deps.pdfModule = async () => ({
+    createQrLabelPdf: async () => {
+      stats.pdfCalls += 1;
+      setTimeout(() => {
+        panel.cancel();
+        cancellation.resolve();
+      }, 0);
+      return new Blob(["completed pdf"]);
+    },
+  });
+
+  const pending = panel.downloadPdf();
+  await Promise.all([pending, cancellation.promise]);
+
+  assert.equal(stats.pdfCalls, 1);
+  assert.equal(panel.events.filter(([type]) => type === "download").length, 0);
+  assert.equal(panel.events.filter(([type]) => type === "message").length, 0);
+  assert.equal(panel.state().exporting, "");
+  assert.equal(panel.state().active, undefined);
+  assert.equal(stats.disposals, 1);
+});
+
 test("QR panel cleanup detaches old storage before awaiting clear and preserves replacement storage", async () => {
   const save = deferred<Blob>();
   const clear = deferred<void>();
