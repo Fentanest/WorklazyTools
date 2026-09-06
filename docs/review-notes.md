@@ -4,6 +4,95 @@
 
 ## 2026-09-06
 
+### S1 문서 비교 죽은 코드 제거 — 브랜치 구현·검증 (Codx)
+
+**판정: 지정 S1 구현과 브랜치 커밋 완료. redirect 4건 중 `/ko/word-compare/`는 기준 main부터 없는 경로라 1건 미통과이며, 완료 기준 전체 통과를 선언하지 않는다.** `CHANGELOG.md`의 S1 항목에 대응한다. 나머지 지정 검증은 통과했고, `s1-dead-code`에서 main 병합·push 없이 멈췄다. 전체 명령·exit·소요·출력·CSS 76규칙 목록·unit diff·종료 git 원문은 `/tmp/worklazy-s1/REPORT.md`, 원자료는 같은 디렉터리의 JSON·`logs/`에 있다. 정본 계획서 수정 0.
+
+- **착수 게이트:** `PROJECT_RULES.md`→`AGENTS.md`→정본 C-A~C-G/S1/검증 총람→backlog·관련 기각 이력 선독. `HEAD=main=origin/main=37d4e69924d80120c3f34a38b0d20dd0e08d3f59`. 열린 15문서 검색에서 상반 지시 0(P2 문서 비교 제외는 종결된 P2 범위, PDF 초안은 별도 표면). 최신 착수 지시가 S0 이후 기준점을 지정한다. 원문 `gate.txt`·`open-plan-scan.txt`.
+- **Claude 문서 원문 보존:** `git checkout -b s1-dead-code main` 후 첫 커밋 **`4b2d810`**에 backlog·review-notes 2파일만 지정 메시지로 커밋했다. 원본 `claude-docs.patch`와 커밋 diff가 byte-identical임을 확인했다. 사용자 DOCX 2개·네이버 확인 HTML은 수정·추적·삭제하지 않았다.
+- **제거·보존:** Word/HWP 입력 페이지 2개·HWP 결과 페이지·세션 2개(739줄), Word 결과 wrapper 6줄과 import 1줄을 제거했다. 파일마다 삭제 직후 `grep -rnE ... src/ --include=*.ts --include=*.tsx` 재실행(`grep-after-*.txt`). 공유 `DocumentCompareResultPage` export·docModel·worker 2개·client 2개·Word Python 4파일·기존 App redirect 2행 보존. `source-preservation.json`에서 조사한 39파일 중 삭제 5·지정 wrapper/CSS 변경 2·불변 32를 확인했다.
+
+**사용처 전후** — `grep -rn <검색어> src/ --include=*.ts --include=*.tsx`, 자기 선언 포함 일치 행 수. 최종 `WordCompareResultPage` 1행은 살아 있는 공유 모듈 import 경로다. 원문 `grep-before-*.txt`·`grep-final-*.txt`.
+
+| 검색어 (자기 선언 포함 행 수) | 삭제 전 | 삭제 후 |
+| --- | --- | --- |
+| WordComparePage | 1 | 0 |
+| HwpComparePage | 1 | 0 |
+| HwpCompareResultPage | 1 | 0 |
+| hwpCompareSession | 2 | 0 |
+| wordCompareSession | 2 | 0 |
+| WordCompareResultPage | 3 | 1 |
+| docModel | 1 | 1 |
+| wordWorkerClient | 3 | 2 |
+| hwpWorkerClient | 4 | 3 |
+| word.worker | 1 | 1 |
+| hwp-compare.worker | 1 | 1 |
+
+**CSS·manifest:** orphan은 착수 **0** → 페이지 삭제 후 **25 class / 81 arm(exit 1)** → 수동 정리 후 **0(exit 0)**. PostCSS **612→541 rules**, **71개 전체 삭제 + 5개 부분 변경**. 부분 변경은 원본 762행(collage 설명 2arm), 768행(policy/content/about/sheet 설명 4arm), 847행(tool-page button·secondary link), 885행(about-grid), 993행(카드·guide·prose 테두리)의 살아 있는 selector·선언을 보존했다. 전체 삭제/부분 변경 selector 목록은 `css-rule-changes.json`·REPORT, 감사 허용목록 변경 0.
+
+Manifest **149 removed / 1 split / 5 active → 153 / 0 / 2**. Active는 `legacy-004·005`; `006·007·134`는 removedIn/lastUpdatedIn=S1. `132`는 **currentState=removed·removedIn=B3·lastUpdatedIn=S1**로 B3 기대 목록을 유지했다. 생성기를 수정하고 JSON은 `npm run legacy:manifest`로 재생성했다.
+
+**unit 갱신·실패 수리:** `ui-legacy-isolation` 하한 **600→541**은 실측 612−71 및 부분 규칙 5개 유지에 근거하며 관련 **10/10** 통과. removed/split **153/0**, active/S1 제거 ID 단언·진단 문구도 갱신했다. 전체 첫 실행은 **198/200**, `p1b-components`에서 **20 !== 22**, **13 !== 15**로 실패했다. main `git grep -l`과 현재 `rg -l` 소비 집합의 차이는 삭제한 두 페이지뿐(`consumer-counts.json`)이므로 ToolGuide **22→20**, OperationProgress **15→13** 기대값을 갱신해 전체 재실행 **200/200** 통과. 실패 원문 `logs/unit.log`, 최종 `logs/unit-final.log`, diff `unit-update.diff`·`unit-followup.diff`.
+
+**최종 지정 검증** — 다음 명령은 모두 exit 0. browser/new-tools/utilities/office는 `TEST_BASE_URL=http://127.0.0.1:4288`; 시각·접근성·렌더링은 기존 하네스의 자체 preview. 전체 명령 환경변수·로그는 REPORT 검증표에 기록했다.
+
+| 명령 | 초 | 결과 |
+| --- | ---: | --- |
+| `npm run build` | 101.73 | production |
+| `npx tsc -b` | 20.25 | 진단 0 |
+| `npm run test:unit` | 3.10 | 200/200 |
+| `TEST_SCOPE=word npm run test:browser` | 23.28 | 통과 |
+| `TEST_ONLY_HWP=1 npm run test:new-tools` | 7.24 | 통과 |
+| `npm run test:browser` | 64.00 | 전체 통과 |
+| `npm run test:new-tools` | 140.88 | 전체 통과 |
+| `npm run test:utilities` | 111.21 | 전체 통과 |
+| `npm run test:office` | 28.87 | 통과 |
+| `npm run test:static` | 0.91 | startup 문서 104 |
+| `npm run css:orphans` | 0.68 | orphan 0 |
+| `npm run legacy:manifest` | 0.38 | 153/0/2 |
+| `node tests/tool-registry-routes.mjs` | 1.17 | 통과 |
+| `npm run test:recovery` | 284.86 | 147/147 |
+| `LANG=ko_KR.UTF-8 npm run test:visual` | 115.21 | 175/175 |
+| `LANG=en_US.UTF-8 npm run test:visual` | 116.16 | 175/175 |
+| `VITE_LOCAL_QA=1 npm run build` | 94.29 | 최종 dist |
+| `A11Y_MAX_TOTAL=0 npm run test:a11y` | 19.02 | 5페이지·위반 0·외부 요청 0 |
+| `npm run test:rendering` | 43.51 | 3페이지×3회·외부 요청 0 |
+| `BUNDLE_BASELINE=/tmp/s1-bundle-baseline.json npm run bundle:measure` | 83.53 | 5종 통과 |
+| `git diff --check` | 0.01 | 추적 워킹트리 공백 오류 0 |
+
+- 시각 첫 ko/en 실행은 `/tmp` 캡처 경로가 하네스의 `tests/visual-artifacts` 하위 경로 계약에 어긋나 **0/175에서 종료**했다(`logs/visual-ko.log`·`visual-en.log`). 지원 경로로 수정한 최종 전체 2회는 각 175/175·기준선 diff 0. 캡처는 종료 후 `/tmp/worklazy-s1/captures-ko·captures-en`으로 옮겼다(각 PNG 175장). 범위·임계·제품 코드 변경 0.
+- Recovery는 필터 없는 기본 명령 **147/147(desktop 74·Android 에뮬레이션 73)**. S0의 149건은 `RECOVERY_STALE_NEW` 지정 시 B-stale-html 2건이 추가된 수치이며 이번 기본 명령에는 해당 선택 변수가 없다. JSON 결과 147행·개별 JSON 147개·PNG 153장 대조. 실제 Samsung Internet 검증은 아니다.
+- Rendering CLS median은 **home 0.038332·document/PDF 0.114199**. 9 sample과 3 median을 별도 `python3 /tmp/worklazy-s1/cls-gate.py`로 **유한수·≤0.114199** 단언해 exit 0. 측정기 자체의 절대 0.1 차단은 S2-H 범위라 추가하지 않았다.
+
+**번들 5종 — gzip bytes:** 착수 main production 빌드 **93.65초**·baseline 측정 **72.04초**, `/tmp/s1-bundle-baseline.json` 고정. 최종 비교도 `VITE_LOCAL_QA` unset, 전체 route 집합·상한·측정기 불변. JS는 이미 도달 불가 코드의 tree-shaking 영향으로 소폭 변화했다.
+
+| gzip metric | main B | S1 B | delta B | 상한 B |
+| --- | --- | --- | --- | --- |
+| entryJsGzip | 299264 | 299265 | 1 | +20480 |
+| affectedRouteJsGzip | 2440457 | 2440445 | -12 | +61440 |
+| sharedJsGzip | 2716511 | 2716493 | -18 | +30720 |
+| appJsGzip | 5456232 | 5456203 | -29 | +81920 |
+| cssGzip | 38757 | 37669 | -1088 | +10240 |
+
+**redirect 4건 — 3건 통과 / 1건 미통과:** 목적지 DOM·h1·drop target 수·pageerror를 실제 브라우저로 검사했다.
+
+| 지정 경로 | 초기 HTTP (Vite) | 도착 경로 | 비교 DOM / drop targets |
+| --- | --- | --- | --- |
+| /ko/tools/word-compare/ | 200 | /ko/tools/document-compare/ | True / 2 |
+| /ko/tools/hwp-compare/ | 200 | /ko/tools/document-compare/ | True / 2 |
+| /en/tools/word-compare/ | 200 | /en/tools/document-compare/ | True / 2 |
+| /ko/word-compare/ | 200 | /ko/ | False / 0 |
+
+`/ko/word-compare/`는 **기준 main production HTML 목록에도 없고**, S1에도 없다(`static-before.json`·`static-after.json`). main 생성기의 retiredCompareRoutes는 `["tools/word-compare", "tools/hwp-compare"]`; App/생성기 전후 diff 0(`redirect-main-evidence.txt`). Vite는 부재 URL에 SPA index HTTP 200을 반환하고 앱이 `/ko/` 홈을 렌더했다. 최초 timeout 원문 `logs/redirects.log`; 네 결과와 PNG 4장을 수집한 최종 실행도 **exit 1·3 !== 4**(`logs/redirects-complete.log`·`redirect-results.json`·`redirect-shots/`). 요구 URL을 다른 경로로 바꿔 통과 처리하지 않았다. 정적·SEO 변화 0 및 범위 밖 수정 금지 계약대로 경로 추가 0이며, 이 지시서/기준 상태 불일치를 판정 대상으로 남긴다.
+
+**제품 규칙:** 삭제 페이지 문구는 inline ko/en 분기라 별도 전용 로케일 키 없음. `documentCompare` 키는 `DocumentFileColumn`이 소비하므로 보존했으며 locales diff 0·feature-locales 포함 unit 통과. 신규 사용자 문구 없음 → 내부 구현 비노출은 해당 없음. 전후 HTML **107**, crawlable **61**, FAQPage **18**, sitemap SHA-256 **`51abcb369d6f5f715c74e0c411d0ada5386e4e84b0825d2542f1d58430c3ff9b` 동일**; 자산 해시 경로를 정규화한 HTML·소셜 자산 SHA·페이지 집합 차이 0. 광고 HTML 매칭 집합은 전후 0, 격리 meta **7파일** 집합 동일. repo-wide 실행 확장자의 `git grep -l -E 'worklazy-.*isolation|googlesyndication|adsbygoogle'`은 main/HEAD **13파일** 집합 동일(`ad-isolation-grep-*.txt`). 서버 전제 코드 추가 0, dist/vendor 직접 수정 0.
+
+**추가 검사·범위 밖 발견:** `git diff --check main..s1-dead-code`는 **exit 2**, `docs/backlog.md:40: new blank line at EOF.`. 첫 Claude 문서 원문에 있던 공백이며 **내용 수정 금지**대로 보존했다. 지시된 `git diff --check`의 통과와 이 추가 검사 실패를 구분한다. new-tools의 Dolby Vision base-layer는 이 Chrome에 호환 경로가 없어 하네스 자체가 해당 경로를 skip했으며 deterministic unit·fallback 안내는 통과했다. 기존 eval·큰 청크 경고 외 새 제품 결함은 관찰하지 않았다.
+
+**검수 인계:** 마지막 QA `dist/` entry는 **`index-C8iYsFND.js`**, Google/Naver 식별자·추적/광고 로더 URL 부재 및 4288 preview의 HTML byte 일치 확인(`qa-fingerprint-report.json`). 기동 명령 `npx vite preview --host 127.0.0.1 --port 4288 --strictPort`. 검수: `/ko/tools/document-compare/`·`/en/tools/document-compare/` DOCX 입력→비교→결과 상세, ko HWP 입력→결과, 위 redirect 4건, `/ko/`·`/en/`·`/ko/tools/`·`/en/tools/`. Gemini 육안/Claude 판정은 후속 단계이며 이번에 완료했다고 표시하지 않는다. main 병합·push 없음.
+
+— Codx
+
 ### S0 빈 페이지 — 오류 경계·초기화 실패·캐시 유지 자동 복구 (Codx)
 
 **판정: 지정 S0 구현과 브랜치 검증 완료. ② 자동 복구는 조건부이며, 지속 실패는 ① 안내로 종료한다.** `CHANGELOG.md`의 S0 항목에 대응한다. `s0-blank-page`에서만 커밋했고 main 병합·push는 하지 않았다. 전체 명령·소요·출력 원문·회차별 표·육안 검수 기동법은 `/tmp/worklazy-s0/REPORT.md`, 원자료는 같은 디렉터리의 `logs/`, `recovery-complete/`, `stale-final-r2/`에 있다. 측정 로그·jobs·사용자 파일은 커밋하지 않는다.
