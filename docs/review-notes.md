@@ -66,6 +66,17 @@
 - **실패·교정 기록:** 최초 측정 선택자의 끝 슬래시 가정은 실제 sidebar href에 없어 30초 timeout → 실제 href로 수정했다(`logs/focus-measurement.log`). 첫 스타일의 `outline-none`은 Tailwind `--tw-outline-style:none`을 남겨 `focus-visible:outline-2`만으로는 **`none !== solid`** 단언에 실패했다(`logs/focus-after-production.log`) → `focus-visible:outline-solid`를 명시해 재빌드·실측 통과했다. 그 이전 전체 recovery 실행은 수정본 재빌드를 위해 exit **130**으로 중단했고 `recovery-initial-interrupted/`와 동명 log를 보존했다.
 - **최종 검증·인계:** production build **93.92초**, static **104 startup 문서/1.89초**, unit **200/200·2.76초**, recovery **149/149·279.50초**, 포커스 **4/4·8.27초**, entry 캡처 **6/6·4.97초**, 마지막 `VITE_LOCAL_QA=1 npm run build` **94.68초**, 모두 exit **0**. B-stale-html 추가 2사례에는 앞선 보존 빌드 `/tmp/worklazy-s0/s0-next`를 사용했다. sitemap SHA-256은 앞선 S0와 같고 entry 실패 외부 요청 0, ko/en·SEO·광고 격리 정적 검사 통과. QA entry `index-CqGahg57.js`에서 분석 식별자·추적/광고 로더 URL이 제거됐고 4188·4189·4190의 응답은 최종 QA `dist/index.html`과 byte-identical이다(`qa-dist.json`). 최초 보조 Node fetch는 4190을 `bad port`로 거절해 로컬 HTTP 모듈로 확인했고 서버는 변경하지 않았다(`logs/qa-check-fetch-failed.log`). 전체 명령·출력·검증표·캡처·종료 git 상태는 `/tmp/worklazy-s0/fix1/REPORT.md`와 `logs/`에 기록한다. — Codx
 
+#### S0 게이트 ⑨ 판정 — 라이브 "미통과" 2건은 기존 결함, S0 배포 유효 (Claude)
+
+**판정: S0 배포 게이트 ⑨ 통과. Codx 가 실패로 기록한 2건은 S0 회귀가 아니라 배포 이전부터 있던 결함이며 `docs/backlog.md` 로 이관한다. 롤백 사유 없음.** 근거는 Codx 사후 확인 원자료(`/tmp/worklazy-s0/deploy/logs/`)를 Claude 가 직접 대조한 것이다.
+
+- **HWP 편집 접근성(desktop)**: 위반 노드가 전부 벤더 rhwp Studio **iframe 내부**(`#sb-message` 대비 3.54 · `#style-name`·`#font-lang`·`#font-name` `label-title-only`)다. `baseline-findings-full.log`(S0 이전 `4d0bae9` dist)에서 동일 노드 검출 → 기존 결함. 「생성물 직접 수정 금지」 대상(`public/vendor/**`)이라 저장소에서 고칠 표면이 아니다. 접근성 게이트 하네스(`tests/accessibility-audit.mjs`)는 5페이지·desktop 1280 만 측정하며 HWP·iframe 을 포함하지 않으므로 이번 배포 게이트 ②(위반 0)와 모순되지 않는다 — 하네스 범위 확장 여부는 S2-H ③ 에서 결정.
+- **모바일 하단 탭 라벨 대비 3.06**(`#909098`/`#fbfbfd`, 12px bold): P2 셸 스타일이며 S0 diff 에 하단 탭 CSS 변경 0(Codx `git diff 5485fad HEAD -- src/styles/global.css` 실측). 기존 결함 → backlog(수정은 1줄 색 토큰 조정 수준, 시각 기준선 갱신 수반).
+- **없는 경로 → HTTP 404 후 앱이 홈 렌더**: `renderNotFound()` 가 `noindex`·404 제목의 `404.html` 을 생성하고 GitHub Pages 가 HTTP 404 로 서빙하는 것까지는 설계대로다(P2 배포 계약이 확인한 범위). 앱 기동 후 React Router 에 catch-all NotFound 뷰가 없어 홈으로 떨어지는 것은 `4d0bae9` 에서도 동일(`baseline-404.log`). Codx 의 "앱 기동 후에도 404 화면 유지" 단언은 이번 디스패치가 새로 세운 기준이며 기존 계약이 아니다 → 제품 결정 사항으로 backlog(인앱 NotFound 뷰 신설 여부).
+- 라이브에서 S0 계약 자체는 전부 성립: entry `index-CqlI-bD5.js` 로컬 production 과 SHA 일치 · `startup-help` 존재 · 20도구 ko/en 진입 빈 화면 0/40 · 격리 6/6 광고 요청 0 · 일반 광고 로더 정상 · 홈 CLS 0.038332. Gemini 라이브 재검수(agy `gemini-3.1-pro-high`, 배포 후): 20도구 × ko/en × desktop/Pixel 7 = **80 화면 전부 정상**. 산출물 대조(CLAUDE.md §5-7): `results.jsonl` 80엔트리(+광고 격리 확인 2) · `shots/` 80장 · distinct route 40 — 표의 80행과 일치. 빈 화면 0 · 오류 경계 노출 0 · 정적 안내 오노출 0. 산출물 `/tmp/worklazy-s0/gemini-live/`.
+
+— Claude
+
 #### 승인된 main 병합·배포 사후 확인 (Codx)
 
 **판정: 사용자 승인 S0 병합·배포는 완료했으나 라이브 게이트 ⑨는 미통과다. HWP 접근성 2종 및 없는 경로의 홈 이동을 실제 실패로 기록한다.** 2026-09-06 S0 병합 디스패치에 따라 실행했으며 위 브랜치 검증 기록 이후의 배포 결과다. 정본 C-A의 사후 기록 예외로 이 절을 병합 위 문서 커밋에 기록한다.
