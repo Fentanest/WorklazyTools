@@ -4,6 +4,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import os from "node:os";
+import {
+  BUNDLE_MEASUREMENT_SCHEMA_VERSION,
+  MODULE_ATTRIBUTION_SCHEMA,
+  assertMeasurementSchema,
+  compareModuleAttribution,
+  normalizeModuleChunks,
+} from "./bundle-module-attribution.mjs";
 
 const scriptRepositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = process.env.BUNDLE_SOURCE_ROOT
@@ -39,13 +47,20 @@ export function resolveBudgetLimits(env = process.env) {
 
 export function runBundleMeasurement() {
   const budget = resolveBudgetLimits();
+  const metadataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "worklazy-bundle-modules-"));
+  const metadataPath = path.join(metadataDirectory, "main.json");
   try {
     fs.rmSync(outputDirectory, { recursive: true, force: true });
     execFileSync(process.execPath, [
       path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js"),
       "build", "--manifest", "--outDir", "dist-measure",
-    ], { cwd: repositoryRoot, stdio: "inherit", env: process.env });
-    const report = measureOutput();
+    ], {
+      cwd: repositoryRoot,
+      stdio: "inherit",
+      env: { ...process.env, BUNDLE_MODULE_ATTRIBUTION_OUTPUT: metadataPath },
+    });
+    const moduleChunks = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
+    const report = measureOutput({ moduleChunks });
     report.budget = budget;
     printReport(report);
     // Persist the measurements even when the comparison rejects the build.
@@ -57,12 +72,13 @@ export function runBundleMeasurement() {
     return report;
   } finally {
     fs.rmSync(outputDirectory, { recursive: true, force: true });
+    fs.rmSync(metadataDirectory, { recursive: true, force: true });
   }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runBundleMeasurement();
 
-export function measureOutput({ directory = outputDirectory, sourceRoot = repositoryRoot, routes = selectedRoutes } = {}) {
+export function measureOutput({ directory = outputDirectory, sourceRoot = repositoryRoot, routes = selectedRoutes, moduleChunks } = {}) {
   const outputDirectory = directory;
   const manifestPath = path.join(directory, ".vite", "manifest.json");
   const posixRelative = (filePath) => path.relative(directory, filePath).split(path.sep).join("/");
@@ -142,6 +158,18 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
 
   const availableRoutes = [...routeSourceEntries.keys()].sort();
   const affectedRoutes = selectAffectedRoutes(availableRoutes, routes);
+  const normalizedModules = normalizeModuleChunks(moduleChunks, {
+    sourceRoot,
+    nodeModulesRoot: path.join(sourceRoot, "node_modules"),
+    realm: "main",
+  });
+  const measuredMainFiles = new Set(normalizedModules.map(({ file }) => file));
+  const missingManifestChunks = [...new Set(Object.values(viteManifest)
+    .map(({ file }) => file)
+    .filter((file) => file?.endsWith(".js") && hashByOutputFile.has(file) && !measuredMainFiles.has(file)))];
+  if (missingManifestChunks.length) {
+    throw new Error(`Module attribution metadata is missing Vite main chunks: ${missingManifestChunks.join(", ")}.`);
+  }
 
   const uniqueRecords = [...recordsByHash.values()];
   const jsRecords = uniqueRecords.filter(({ type }) => type === "js");
@@ -156,7 +184,9 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
   ))) ]));
 
   return {
-    schemaVersion: 1,
+    schemaVersion: BUNDLE_MEASUREMENT_SCHEMA_VERSION,
+    moduleAttributionSchema: MODULE_ATTRIBUTION_SCHEMA,
+    modules: normalizedModules,
     generatedAt: new Date().toISOString(),
     buildCommand: "vite build --manifest --outDir dist-measure",
     includeRules: ["assets/**/*.js", "*.js", "tools/video-studio/workers/**/*.js", "assets/**/*.css", "**/*.css"],
@@ -241,6 +271,8 @@ function assertBytes(value, label) {
 }
 
 export function compareWithBaseline(current, baseline, budget = resolveBudgetLimits(), log = console.log) {
+  assertMeasurementSchema(current, "current");
+  assertMeasurementSchema(baseline, "baseline");
   for (const [label, report] of [["current", current], ["baseline", baseline]]) {
     for (const metric of Object.keys(budgetLimits)) assertBytes(report.metrics?.[metric], `${label}.${metric}`);
   }
@@ -258,8 +290,11 @@ export function compareWithBaseline(current, baseline, budget = resolveBudgetLim
     current.metrics[metric] - (metric === "affectedRouteJsGzip" ? baselineRouteBytes : baseline.metrics[metric]),
   ]));
   for (const metric of Object.keys(budgetLimits)) assertBytes(budget.limits[metric], `limit.${metric}`);
+  const grossDeltas = { ...deltas };
   const attribution = compareAttribution(current, baseline);
-  const comparison = { deltas, newRoutes, baselineRouteBytes, attribution, ...budget };
+  deltas.sharedJsGzip = attribution.categoryDeltas.shared?.net ?? 0;
+  deltas.appJsGzip = attribution.appNet;
+  const comparison = { grossDeltas, deltas, newRoutes, baselineRouteBytes, attribution, ...budget };
   log(`Bundle budget overrides (bytes): ${JSON.stringify(budget.overrides)}; multiplier=${budget.multiplier}`);
   log(`New current lazy routes (baseline contribution 0): ${newRoutes.join(", ") || "none"}`);
   log("Bundle budget deltas against baseline:");
@@ -272,21 +307,16 @@ export function compareWithBaseline(current, baseline, budget = resolveBudgetLim
 }
 
 export function compareAttribution(current, baseline) {
-  if (!Array.isArray(current.files) || !Array.isArray(baseline.files)) throw new Error("Attribution comparison requires file records in both measurements.");
-  const previousByHash = new Map(baseline.files.map((file) => [file.hash, file]));
-  const movements = current.files.flatMap((file) => {
-    const previous = previousByHash.get(file.hash);
-    if (!previous || previous.category !== "route" || file.category !== "shared") return [];
-    assertBytes(file.gzipBytes, `file.${file.hash}.gzipBytes`);
-    return [{ hash: file.hash, paths: file.paths, gzipBytes: file.gzipBytes, fromRoutes: previous.routeOwners, toRoutes: file.routeOwners }];
-  });
-  const movedRouteToSharedGzip = sumGzip(movements);
+  const result = compareModuleAttribution(current, baseline);
+  const movedRouteToSharedGzip = result.movements
+    .filter(({ from, to }) => from.startsWith("route:") && to === "shared")
+    .reduce((total, { bytes }) => total + bytes, 0);
   return {
-    movements, movedRouteToSharedGzip,
+    ...result,
+    movedRouteToSharedGzip,
     sharedDeltaGzip: current.metrics.sharedJsGzip - baseline.metrics.sharedJsGzip,
-    sharedDeltaExcludingMovementGzip: current.metrics.sharedJsGzip - baseline.metrics.sharedJsGzip - movedRouteToSharedGzip,
-    // Byte-identical movement does not increase total application JS.
-    netAppJsGrowthGzip: current.metrics.appJsGzip - baseline.metrics.appJsGzip,
+    sharedDeltaExcludingMovementGzip: result.categoryDeltas.shared?.net ?? 0,
+    netAppJsGrowthGzip: result.appNet,
   };
 }
 
