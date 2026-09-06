@@ -8,7 +8,7 @@
 
 **착수 게이트·범위** — `PROJECT_RULES.md`를 첫 행동으로 전문 확인한 뒤 디스패치, `AGENTS.md`, 정본 `docs/jobs/todo/pdf-finish-20260905.md`의 「정본화」 우선순위, 로드맵 C-A~C-D·결정 11, 관련 기각 이력을 읽었다. 시작점은 `HEAD=main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`, 추적 변경 0이었다. 열린 계획서와 충돌이 없고 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML 3개가 있음을 확인한 뒤 `s3-pdf-finish`를 새로 분기했다. 제품 `src/`·UI·문구·번역·SEO·광고 경로는 바꾸지 않았고 main 병합·push·배포는 하지 않는다.
 
-**번들 모듈 귀속 schema v2** — 측정 전용 Vite 플러그인이 main 청크의 `chunk.modules[id].code`를 수집해 각 모듈의 독립 rendered gzip을 가중치로 삼는다. 청크 실제 gzip `G_c`를 `floor(G_c×w_i/Σw)`로 먼저 배분하고, 남은 1B는 나머지 내림차순·canonical id 사전순으로 주어 `Σ contribution=G_c`를 보장한다. canonical id는 `main`/worker realm, `<node_modules>` 패키지 경로, virtual NUL prefix, query를 보존한다. 이전 기여는 같은 category 잔존분부터 대응하고 나머지는 `min(previousRemaining,currentNeed)`만 이동으로 1회 대응한다. category net은 `gross-movedIn+movedOut`, 모든 category net 합은 실제 app delta다. shared·app은 net, entry·선택 route·CSS는 gross로 게이트한다. worker/public JS는 SHA 기반 opaque 기여로 두었고, 구 schema·누락 metadata는 SHA 폴백 없이 오류로 만들었다. 기존 5종 상한·multiplier·override는 바꾸지 않았다.
+**번들 모듈 귀속 schema v2** — 측정 전용 Vite 플러그인이 main 청크의 `chunk.modules[id].code`를 수집해 각 모듈의 독립 rendered gzip을 가중치로 삼는다. 청크 실제 gzip `G_c`를 `floor(G_c×w_i/Σw)`로 먼저 배분하고, 남은 1B는 나머지 내림차순·canonical id의 로케일 비의존 코드포인트 순으로 주어 `Σ contribution=G_c`를 보장한다. canonical id는 `main`/worker realm, `<node_modules>` 패키지 경로, virtual NUL prefix, query를 보존한다. 이전 기여는 같은 category 잔존분부터 대응하고 나머지는 `min(previousRemaining,currentNeed)`만 이동으로 1회 대응한다. category net은 `gross-movedIn+movedOut`, 모든 category net 합은 실제 app delta다. shared·app은 net, entry·선택 route·CSS는 gross로 게이트한다. 전체 JS inventory와 realm을 보고서에 따로 보존하고 main 58청크는 전부 modules metadata·중복 없음·양의 가중치를 요구한다. worker 21개와 public 1개만 각각 후속 worker 계측·Rollup main graph 부재를 근거로 SHA opaque를 허용한다. 구 schema, inventory 부재, main metadata 빈 배열·부분 누락은 SHA 폴백 없이 양쪽 보고서에서 오류다. 기존 5종 상한·multiplier·override는 바꾸지 않았다.
 
 | 지표 | main production baseline | 최종 측정 | delta | 고정 상한 |
 |---|---:|---:|---:|---:|
@@ -18,9 +18,9 @@
 | app JS gzip(net gate) | 5,466,587B | 5,466,587B | 0B | +81,920B |
 | CSS gzip | 37,687B | 37,687B | 0B | +10,240B |
 
-기준선은 정본 경로 `/tmp/s3-bundle-baseline.json`, 최종 보고는 `/tmp/worklazy-u4-0/bundle-meter-final.json`이다. 둘 다 `schemaVersion=2`, `moduleAttributionSchema=independent-rendered-gzip-largest-remainder-v1-main-opaque-workers`, module chunk 58개·module record 1,012개다. 기준 production `dist`의 포함 JS 80개·CSS 1개는 분기 전 main 산출물과 파일별 SHA가 전부 같았다. 최종 movement는 빈 배열, 모든 category gross/net과 app net은 0이다. unit은 현행 통과, 이동만 있는 합성 입력의 shared net 0, 5개 상한 각각 limit 통과/+1B 실패, 구 schema 거부를 단언한다.
+기준선은 같은 제품 `src`에서 inventory를 포함해 재생성한 `/tmp/s3-bundle-baseline.json`, 최종 보고는 `/tmp/worklazy-u4-0-fix1/bundle-current.json`이다. 둘 다 `schemaVersion=2`, `moduleAttributionSchema=independent-rendered-gzip-largest-remainder-v1-main-opaque-workers`, module chunk 58개·module record 1,012개·inventory main 58/worker 21/public 1이다. 기준 production `dist`의 포함 JS 80개·CSS 1개는 분기 전 main 산출물과 파일별 SHA가 전부 같았다. 최종 movement는 빈 배열, 모든 category gross/net과 app net은 0이다. unit은 이동만 있는 합성 입력의 shared net 0, 5개 상한 각각 limit 통과/+1B 실패, 구 schema와 main metadata 빈/부분 누락 양쪽 거부, en-US/sv-SE 동률 배분 동일을 단언한다.
 
-**결정적 fixture 생성기** — `scripts/generate-pdf-finish-fixtures.mjs`는 외부 패키지를 import하지 않고 Node `crypto`·`fs`·`path`·`url`·`zlib`만 사용한다. R2/RC4와 AES-256/R6는 고정 test key/salt로 직접 생성하고, raw PDF writer로 손상 3종·Contents 4종·위험 3종·제거 검증 1종을 만든다. exact-SHA가 계약인 OCG 87종은 r10~r12 원본을 SHA 대조해 만든 압축 snapshot seed에서 전개하며 전개 때 다시 검증한다. 별도 두 출력 트리의 전체 digest는 모두 `9ef6a229e6b3be3e8827b106985fb0391fe84895d57a57c01bff2b0e9df89060`이었다. unit은 두 생성 결과와 tracked tree를 파일별로 대조한다. 전체 102개 fixture의 이름·SHA·기대값 정본은 `tests/fixtures/pdf-finish/manifest.json`, 보고용 전개표는 `/tmp/worklazy-u4-0/fixture-table.json`이다.
+**결정적 fixture 생성기** — `scripts/generate-pdf-finish-fixtures.mjs`는 외부 패키지를 import하지 않고 Node `crypto`·`fs`·`path`·`url`·`zlib`만 사용한다. R2/RC4와 AES-256/R6는 고정 test key/salt로 직접 생성하고, raw PDF writer로 손상 3종·Contents 4종·위험 3종·제거 검증 1종·일반 Properties 2종을 만든다. exact-SHA가 계약인 OCG 87종은 r10~r12 원본을 SHA 대조해 만든 압축 snapshot seed에서 전개하며 전개 때 다시 검증한다. 두 독립 출력의 PDF 104개+manifest 1개 SHA 목록은 동일했고 그 목록 파일 SHA는 `ab261326…a207`이다. unit은 두 생성 결과와 tracked tree를 파일별로 대조한다. 전체 104개 fixture의 이름·SHA·기대값 정본은 `tests/fixtures/pdf-finish/manifest.json`, fixture 104행+legacy 7행 보고용 전개표는 `/tmp/worklazy-u4-0-fix1/fixture-table.json`(111행, SHA `73fb78da…58fb`)이다.
 
 | 암호 fixture | bytes · SHA-256 | 무암호/빈값 | 오답 | 정답·owner / permissions | finish 기대 |
 |---|---|---|---|---|---|
@@ -35,6 +35,7 @@
 | 배경 stream | empty `4ead6f4d…f034`; single `39f68ee0…b13`; multiple `6a1ddd28…eb3f`; non-stream `a044d620…ffad` | 빈 배열 0 stream; 단일 ref 1; ref 배열 2; 비stream ref 0, 모두 PDF.js open |
 | 위험 | q/Q `35e86b59…fd30`; tagged `27d2a6ae…2730`; active action `fbde441c…642` | q 2/Q 1; MarkInfo+StructTreeRoot; OpenAction+Names.JavaScript+Launch |
 | 제거 검증 | 1종 5,202B `85ee6887…3136` | 첨부 sentinel·XMP, form/Widget, Outlines, Names(Dests·EmbeddedFiles·JavaScript), 구식 Dests, PageLabels, ViewerPreferences, URI/direct/named Link와 15개 subtype·Popup/IRT 관계 존재 |
+| 일반 Properties | named 585B `44d5d5c0…7097`; Resources 없음 420B `c7eae473…a529` | `/Span /TextInfo BDC`와 빈 페이지 모두 비-OC로 허용; 두 렌더러 SHA 각각 `04ce6cfb…101b`·`cdbf6c08…e33a` |
 | OCG | 허용 4·제외 31·직접 배열 32·대표 20 = 87 | exact input SHA; 전부 v13 preflight 기대, 허용 56개만 두 렌더러 픽셀 oracle |
 
 OCG 허용 4종은 `on=35cda479…83d90`, `xobject-off=06d11215…689a`, `xobject-on=9f495db7…1ed3`, `balanced-state=1b518232…cde9`다. 직접 배열은 위치 2(marked-content/form-xobject) × 정책 4 × 2그룹 상태 4 = 32, 대표는 duplicate/inheritance/image/indirect-name/escaped-name 축 20종이다. round 11 탐색 72개와 round 12 탐색 50개 축도 manifest에 보존했다. 제외 31개는 파일명/SHA allowlist가 아닌 OCProperties·OCMD 원시 문법, OFF block 상태, 금지 객체 경로, 도달 가능한 Type3 객체 그래프를 검사하는 test preflight로 전수 판정했으며 실제 허용 56/제외 31·불일치 0이다.
@@ -47,10 +48,11 @@ OCG 허용 4종은 `on=35cda479…83d90`, `xobject-off=06d11215…689a`, `xobjec
 | Outlines·Names/Dests·구식 Dests·PageLabels·ViewerPreferences | 새 page ref로 보존; removal fixture에 모두 존재 |
 | Info+XMP Metadata | 제거 선택 시 둘 다 제거, 미선택 보존; Info/XMP sentinel 포함 |
 | AcroForm·Widget | 미선택 보존, 제거/flatten 배타; form·Widget AP 포함, XFA·서명·AP 없음은 후속 지원 제외 |
-| EmbeddedFiles·EmbeddedFile·Filespec·AF·FileAttachment | 제거 선택 시 복사 전 필터, payload sentinel 부재까지 검사; fixture에 catalog/page AF와 attachment 포함 |
+| EmbeddedFiles·EmbeddedFile·Filespec·AF·FileAttachment | 제거 선택 시 복사 전 필터, payload sentinel 부재까지 검사; fixture에는 catalog AF와 attachment가 있고 두 page에는 AF가 없음 |
 | Link URI·직접 Dest·이름 Dest | 보존·새 page map; 세 종류 모두 포함 |
 | Text·FreeText·Highlight·Ink·Stamp·Square/Circle·Line·Polygon·Caret·Popup·Redact 등 | 주석 제거 시 subtype별 제거, Popup/IRT/Parent 정리; 임의 annotation flatten은 지원하지 않음 |
-| OCProperties/OCG/OCMD·StructTreeRoot/ParentTree/MarkInfo | 지원 제외 고지 후 진행 시 구조 제거; OCG 87종과 tagged fixture로 분리 고정 |
+| OCProperties/OCG/OCMD | preflight 허용 OCG만 기본 표시를 고정해 구조 제거; 제외 OCG는 구조 제거 옵션을 비활성화하되 장식/raster는 허용 |
+| StructTreeRoot/ParentTree/MarkInfo | tagged 정보 제거는 OCG 지원 판정과 분리해 별도 손실 고지; tagged fixture로 고정 |
 | Sound/Movie/Screen/RichMedia/3D·알 수 없는 subtype·기타 Names | unsupported 사전 표시 후 제거; 조용한 삭제 금지 |
 | 최종 raster | 픽셀 보존 범위와 검색/태그/양식/링크 손실 명시, Link 재부착 없음 |
 
@@ -58,9 +60,11 @@ OCG 허용 4종은 `on=35cda479…83d90`, `xobject-off=06d11215…689a`, `xobjec
 
 환경은 Linux 7.0.0-30-generic x64, Node 22.17.1, Chrome 152.0.7977.64, Poppler 24.02.0, pdf-lib 1.17.1, PDF.js 6.2.108, `system-ui=Noto Sans (/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf)`다. Poppler legacy baseline은 기본 150DPI에 `-scale-to 650`, PDF.js는 scale 1, 두 렌더 모두 흰 배경·unpremultiplied RGBA SHA-256이다.
 
-**두 렌더러 oracle·검증** — `npm run test:pdf-finish-oracle`은 OCG 87종 preflight 후 허용 56종 57쪽을 Poppler 72DPI와 Chrome PDF.js scale 1로 각각 렌더해 width/height/RGBA SHA를 대조했다. 56/56 fixture·57/57 page가 두 엔진에서 모두 일치했고 외부 요청 0이다. 같은 실행이 암호 20개 시나리오, 손상 기대표, Contents/위험 open, 제거 fixture의 catalog/attachment/outline/page label/annotation도 실제 API로 확인한다.
+**두 렌더러 oracle·검증** — `npm run test:pdf-finish-oracle`은 먼저 OCG 87종 preflight와 허용 56종 57쪽의 원본 snapshot을 Poppler 72DPI·Chrome PDF.js scale 1로 각각 검증한다. 이어 허용 56개에만 12차 test 변환기를 실행해 각 renderer 안에서 원본=변환 결과 width/height/RGBA SHA 56/56, deep OC residual 0을 단언하고 제외 31개는 변환 시도 0을 단언한다. `on.pdf`의 변환 결과 Contents만 비운 음성 대조는 두 renderer 모두 차이를 검출했다. 일반 Properties·Resources 없음 2종도 비-OC 허용과 두 renderer SHA 동일을 확인한다. 같은 실행이 암호 20개 시나리오, 손상 기대표, Contents/위험 open, 제거 fixture의 catalog/attachment/outline/page label/annotation을 실제 API로 확인하며 외부 요청은 0이다.
 
-최종 실행은 production `npm run build`, `npm run test:static`, 명시 `npx tsc -b`, 전체 unit **255/255**, schema v2 `npm run bundle:measure` 5종 PASS, tool registry **20**, CSS orphan **0**, legacy owner **155(153 removed·0 split·2 active)**, `TEST_SCOPE=pdf npm run test:browser`, fixture 독립 생성 2회, PDF finish oracle, QA build 뒤 rendering **3페이지×3회·CLS max 0·외부 요청 0**, `git diff --check`를 통과했다. 첫 browser 실행은 5173 서버 미기동으로 connection refused, dev 서버 첫 재실행은 Vite dependency optimize hot reload 뒤 convert 결과 대기 180초 timeout이었다. 이미 최적화된 동일 서버 재실행은 15.6초에 통과했다. 첫 rendering은 production 분석/광고 요청 126건 때문에 실패했고, `VITE_LOCAL_QA=1` build 뒤 요구 조건대로 0건으로 통과했다. QA 산출물이 남은 상태에서 처음 다시 실행한 static 검사는 의도대로 분석 설정 부재를 감지해 실패했으며, production build 복원 뒤 같은 검사는 startup recovery 104개를 포함해 통과했다. 이 세 건은 제품 회귀 판정으로 세지 않는다. 원출력·JSON·fixture 전개표는 `/tmp/worklazy-u4-0/`에 보존한다. — Codx
+최초 U4-0 실행은 production `npm run build`, `npm run test:static`, 명시 `npx tsc -b`, 전체 unit **255/255**, schema v2 `npm run bundle:measure` 5종 PASS, tool registry **20**, CSS orphan **0**, legacy owner **155(153 removed·0 split·2 active)**, `TEST_SCOPE=pdf npm run test:browser`, fixture 독립 생성 2회, PDF finish 원본 oracle, QA build 뒤 rendering **3페이지×3회·CLS max 0·외부 요청 0**, `git diff --check`를 통과했다. 첫 browser 실행은 5173 서버 미기동으로 connection refused, dev 서버 첫 재실행은 Vite dependency optimize hot reload 뒤 convert 결과 대기 180초 timeout이었다. 이미 최적화된 동일 서버 재실행은 15.6초에 통과했다. 첫 rendering은 production 분석/광고 요청 126건을 검출했고 요구된 QA build로 재실행해 0건으로 통과했다. QA build 뒤 static은 분석 설정 부재를 감지했고 production build 복원 뒤 startup recovery 104개를 포함해 통과했다. 이 세 건은 제품 회귀 판정으로 세지 않는다.
+
+astra F1~F5 수정 후에는 `npx tsc -b`, 전체 unit **259/259**, fixture 2회 결정성, 확장 PDF oracle, schema v2 기준/현재 직렬 측정 5종 delta 0, 4차 E6 `shared +80B/app +13,264B`, production build, static startup recovery 104, 477입력 분류 불변, `src/` diff 0, `git diff --check`를 다시 통과했다. 수정 전/후 probe·원출력·JSON은 `/tmp/worklazy-u4-0-fix1/`에 보존한다. — Codx
 
 ## 2026-09-06
 
