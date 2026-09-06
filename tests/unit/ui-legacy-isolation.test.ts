@@ -153,7 +153,8 @@ test("the complete legacy stylesheet is parsed and migrated adapter collisions s
   root.walkRules((rule) => rules.push(rule));
   root.walkDecls((declaration) => declarations.push(declaration));
 
-  assert.ok(rules.length >= 600, `expected the full stylesheet after P-final orphan cleanup, parsed only ${rules.length} rules`);
+  // S1 measures 612 - 71 removed rules = 541; five mixed rules retain live arms.
+  assert.ok(rules.length >= 541, `expected the full stylesheet after S1 orphan cleanup, parsed only ${rules.length} rules`);
   assert.match(css, /button:where\(:not\(\[data-slot\]\)\)/);
 
   const actionRules = rules.filter((rule) => rule.selector.includes(".tool-action-bar") && rule.selector.includes(".ui-primary-button"));
@@ -294,8 +295,10 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
   assert.equal(Object.values(manifest.categoryCounts).reduce((sum, count) => sum + count, 0), 155);
   assert.equal(new Set(manifest.entries.map(({ id }) => id)).size, 155);
   assert.ok(manifest.entries.every(({ consumers, refCount }) => consumers.length === refCount));
-  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 149);
-  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 1);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "removed").length, 153);
+  assert.equal(manifest.entries.filter(({ currentState }) => currentState === "legacy-arm-removed").length, 0);
+  assert.deepEqual(manifest.entries.filter(({ currentState }) => currentState === "active").map(({ id }) => id), ["legacy-004", "legacy-005"]);
+  assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "S1").map(({ id }) => id), ["legacy-006", "legacy-007", "legacy-134"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "pre-B1").map(({ id }) => id), ["legacy-043", "legacy-045"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B1").map(({ id }) => id), ["legacy-125", "legacy-127"]);
   assert.deepEqual(manifest.entries.filter(({ removedIn }) => removedIn === "B2").map(({ id }) => id), [
@@ -335,5 +338,5 @@ test("the owner/refcount manifest accounts for all 155 baseline legacy rules", (
   ]);
   assert.equal(manifest.categoryCounts["excel-compare"], 27);
   assert.equal(manifest.categoryCounts["excel-cleaner"], 1);
-  context.diagnostic("155 rules / 18 ownership categories / 149 removals / one split verified");
+  context.diagnostic("155 rules / 18 ownership categories / 153 removals / zero splits verified");
 });

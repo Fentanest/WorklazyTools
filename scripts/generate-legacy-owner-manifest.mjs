@@ -188,10 +188,9 @@ const currentStateOverrides = new Map([
   [125, { currentState: "removed", removedIn: "B1" }],
   [127, { currentState: "removed", removedIn: "B1" }],
   [132, {
-    currentState: "legacy-arm-removed",
+    currentState: "removed",
     removedIn: "B3",
-    currentSelector: ".tool-page button:not([data-slot]), .tool-page a.secondary-button, .tool-page a.result-download",
-    lastUpdatedIn: "P-final",
+    lastUpdatedIn: "S1",
   }],
   [151, {
     currentState: "removed",
@@ -206,6 +205,11 @@ const currentStateOverrides = new Map([
     currentState: "removed",
     removedIn: index === 24 ? "B4" : "B5a",
     lastUpdatedIn: "B-shared",
+  }]),
+  ...[6, 7, 134].map((index) => [index, {
+    currentState: "removed",
+    removedIn: "S1",
+    lastUpdatedIn: "S1",
   }]),
 ]);
 

@@ -142,8 +142,9 @@
       ],
       "refCount": 4,
       "lastRemovalBundle": "B-shared",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "S1",
+      "lastUpdatedIn": "S1"
     },
     {
       "id": "legacy-007",
@@ -161,8 +162,9 @@
       ],
       "refCount": 4,
       "lastRemovalBundle": "B-shared",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "S1",
+      "lastUpdatedIn": "S1"
     },
     {
       "id": "legacy-008",
@@ -2249,10 +2251,9 @@
       ],
       "refCount": 5,
       "lastRemovalBundle": "B6",
-      "currentState": "legacy-arm-removed",
+      "currentState": "removed",
       "removedIn": "B3",
-      "currentSelector": ".tool-page button:not([data-slot]), .tool-page a.secondary-button, .tool-page a.result-download",
-      "lastUpdatedIn": "P-final"
+      "lastUpdatedIn": "S1"
     },
     {
       "id": "legacy-133",
@@ -2290,8 +2291,9 @@
       ],
       "refCount": 4,
       "lastRemovalBundle": "B-shared",
-      "currentState": "active",
-      "removedIn": null
+      "currentState": "removed",
+      "removedIn": "S1",
+      "lastUpdatedIn": "S1"
     },
     {
       "id": "legacy-135",
