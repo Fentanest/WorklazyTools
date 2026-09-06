@@ -5,15 +5,16 @@ import path from "node:path";
 
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
-import { PDFDocument } from "pdf-lib";
+import { assertPinnedQrPdf, createQrFontScenarioServer, qrFontFixture, qrFontScenarios } from "./qr-font-scenarios.mjs";
 import puppeteer from "puppeteer-core";
 
 const repositoryRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const port = Number.parseInt(process.env.QR_BULK_TEST_PORT || "4176", 10);
 const externalBaseUrl = process.env.TEST_BASE_URL;
-const baseUrl = externalBaseUrl || `http://127.0.0.1:${port}`;
+let baseUrl = externalBaseUrl || `http://127.0.0.1:${port}`;
 const downloadDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-qr-bulk-"));
 let server;
+let fontServer;
 let browser;
 
 const fixtures = [
@@ -28,6 +29,9 @@ const fixtures = [
 
 try {
   if (!externalBaseUrl) server = await startServer();
+  fontServer = await createQrFontScenarioServer({ upstream: baseUrl,
+    subsetPath: path.join(repositoryRoot, "dist/vendor/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/NotoSansKR-Regular.ksx1001.otf") });
+  baseUrl = fontServer.url;
   browser = await puppeteer.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   const page = await browser.newPage();
   page.setDefaultTimeout(90_000);
@@ -109,28 +113,41 @@ try {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(path.join(downloadDirectory, "worklazy-qr-manifest.xlsx")));
   if (workbook.worksheets.length !== 2 || workbook.worksheets[0].rowCount !== 3 || workbook.worksheets[1].rowCount !== 1) throw new Error("QR manifest or failed-row sheet is inconsistent.");
-  await page.goto(`${baseUrl}/ko/tools/qr-studio/bulk`, { waitUntil: "networkidle0" });
-  await page.waitForSelector('[data-testid="qr-bulk-page"]');
-  const boundaryCsv = `Primary\n${Array.from({ length: 25 }, (_, index) => `한글 라벨 경계 ${index + 1}`).join("\n")}`;
-  await uploadCsv(page, boundaryCsv, "label-boundary.csv");
-  await page.waitForSelector('[data-testid="qr-payload-type"]');
-  await page.waitForFunction(() => {
-    const button = document.querySelector('[data-testid="qr-bulk-generate"] button');
-    return button instanceof HTMLButtonElement && !button.disabled;
-  });
-  await setInput(page, '[data-testid="qr-mapping-title-template"]', "한글 라벨 제목");
-  await page.click('[data-testid="qr-bulk-generate"] button');
-  await page.waitForFunction(() => document.querySelector('[data-testid="qr-bulk-results"]')?.textContent?.includes("성공 25개 · 실패 0개"));
-  await clickButtonByText(page, "라벨 PDF 다운로드");
-  await waitForDownload("worklazy-qr-labels-a4.pdf", 120_000);
-  const pdf = await fs.readFile(path.join(downloadDirectory, "worklazy-qr-labels-a4.pdf"));
-  const pdfDocument = await PDFDocument.load(pdf);
-  if (pdf.subarray(0, 4).toString() !== "%PDF" || pdf.length < 1_000_000 || pdfDocument.getPageCount() !== 2) throw new Error(`Korean label PDF boundary is incomplete: ${pdf.length} bytes, ${pdfDocument.getPageCount()} pages.`);
+  // Each navigation creates a fresh panel loader; disabled HTTP cache also
+  // guarantees the corrupt case reaches the test server after the subset case.
+  await page.setCacheEnabled(false);
+  const fontReports = [];
+  for (const scenario of Object.keys(qrFontScenarios)) {
+    fontServer.setScenario(scenario);
+    await page.goto(`${baseUrl}/ko/tools/qr-studio/bulk`, { waitUntil: "networkidle0" });
+    await page.waitForSelector('[data-testid="qr-bulk-page"]');
+    const fixture = qrFontFixture(scenario, 25);
+    await uploadCsv(page, fixture.csv, `label-boundary-${scenario}.csv`);
+    await page.waitForSelector('[data-testid="qr-payload-type"]');
+    await page.waitForFunction(() => !document.querySelector('[data-testid="qr-bulk-generate"] button')?.disabled);
+    await setInput(page, '[data-testid="qr-mapping-title-template"]', fixture.titleTemplate);
+    await page.click('[data-testid="qr-bulk-generate"] button');
+    await page.waitForFunction(() => document.querySelector('[data-testid="qr-bulk-results"]')?.textContent?.includes("성공 25개 · 실패 0개"));
+    await page.waitForFunction(() => {
+      const button = Array.from(document.querySelectorAll("button"))
+        .find((candidate) => candidate.textContent?.includes("라벨 PDF 다운로드"));
+      return button instanceof HTMLButtonElement && !button.disabled;
+    });
+    const pdfPath = path.join(downloadDirectory, "worklazy-qr-labels-a4.pdf");
+    // Never mistake the previous scenario's same filename for this download.
+    await fs.rm(pdfPath, { force: true });
+    await clickButtonByText(page, "라벨 PDF 다운로드");
+    await waitForDownload("worklazy-qr-labels-a4.pdf", 120_000);
+    const result = await assertPinnedQrPdf(await fs.readFile(pdfPath), qrFontScenarios[scenario].font, 2);
+    fontReports.push({ scenario, ...result });
+  }
+  if (fontServer.injected.length !== 1) throw new Error("Expected exactly one corrupt subset HTTP response.");
   if (pageErrors.length) throw new Error(`QR bulk browser errors: ${pageErrors.join(" | ")}`);
   if (externalRequests.length) throw new Error(`QR bulk made external requests: ${externalRequests.join(" | ")}`);
-  console.log(`QR bulk smoke passed: cancel/cleanup/rerun, 7 payload types, transparent/logo read-back, 2 PNG ZIP entries, 2-sheet manifest, 25-label/2-page ${pdf.length}-byte Korean PDF, external requests 0.`);
+  console.log(`QR bulk smoke passed: cancel/cleanup/rerun, 7 payload types, transparent/logo read-back, 2 PNG ZIP entries, 2-sheet manifest, 25-label/2-page ${JSON.stringify(fontReports)} Korean PDFs, external requests 0.`);
 } finally {
   await browser?.close();
+  await fontServer?.close();
   if (server) await stopServer(server);
   await fs.rm(downloadDirectory, { recursive: true, force: true });
 }

@@ -13,7 +13,6 @@ import { createQrBulkRasterClient, QrBulkRasterError } from "./qrBulkClient.ts";
 import { createQrBulkResultStorage, inspectQrBulkStorage, type QrBulkResultStorage } from "./qrBulkStorage.ts";
 import {
   QR_BULK_LIMITS,
-  QR_LABEL_FONT_PATH,
   buildQrPayload,
   compileQrTemplate,
   createSpreadsheetDisplayLookup,
@@ -67,6 +66,10 @@ export function QrBulkPanel() {
   const storageRef = useRef<QrBulkResultStorage | undefined>(undefined);
   const rasterRef = useRef<Awaited<ReturnType<typeof createQrBulkRasterClient>> | undefined>(undefined);
   const canceledRef = useRef(false);
+  const mountedRef = useRef(false);
+  const exportSequenceRef = useRef(0);
+  const activeExportRef = useRef<{ token: number; controller: AbortController; kind: "zip" | "pdf" } | undefined>(undefined);
+  const fontLoaderRef = useRef<ReturnType<typeof import("./qrLabelFont.ts").createQrLabelFontLoader> | undefined>(undefined);
   const [file, setFile] = useState<File>();
   const [book, setBook] = useState<SpreadsheetBookData>();
   const [parsing, setParsing] = useState(false);
@@ -93,10 +96,17 @@ export function QrBulkPanel() {
   const [resultPage, setResultPage] = useState(0);
   const [exporting, setExporting] = useState<"zip" | "pdf" | "">("");
 
-  useEffect(() => () => {
-    canceledRef.current = true;
-    rasterRef.current?.stop();
-    void storageRef.current?.clear();
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      invalidateExport();
+      canceledRef.current = true;
+      rasterRef.current?.stop();
+      const storage = storageRef.current;
+      storageRef.current = undefined;
+      void storage?.clear();
+    };
   }, []);
 
   const selectedSheet = book?.sheets.find((sheet) => sheet.name === sheetName);
@@ -228,15 +238,19 @@ export function QrBulkPanel() {
       operation.succeed(t("features:qr.bulk.progress.complete", { success: completed.length, failed: failed.length }));
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        await storage.clear();
+        invalidateExport();
+        setExporting("");
         storageRef.current = undefined;
+        await storage.clear();
         setResults([]);
         setFailures([]);
         setManifest(undefined);
         operation.fail(t("features:qr.bulk.progress.canceled"));
       } else {
-        await storage.clear();
+        invalidateExport();
+        setExporting("");
         storageRef.current = undefined;
+        await storage.clear();
         setResults([]);
         setManifest(undefined);
         operation.fail(rasterError(error, translate));
@@ -248,6 +262,8 @@ export function QrBulkPanel() {
   };
 
   const cancel = () => {
+    invalidateExport();
+    setExporting("");
     canceledRef.current = true;
     rasterRef.current?.stop();
   };
@@ -257,44 +273,136 @@ export function QrBulkPanel() {
     if (blob) downloadBlob(blob, result.fileName);
   };
 
+  // ZIP and PDF share the same exporting state, so both hold the same lease.
   const downloadZip = async () => {
-    if (!storageRef.current || !results.length || exporting) return;
-    setExporting("zip");
+    const storage = storageRef.current;
+    if (!storage || !results.length || exporting || activeExportRef.current) return;
+    const currentResults = [...results];
+    const active = beginExport("zip");
     let writer: IncrementalZipArchiveWriter | undefined;
     try {
       const [{ BlobWriter }, { createIncrementalZipArchiveWriter }] = await Promise.all([
-        import("@zip.js/zip.js"),
-        import("../../utils/zipArchive.ts"),
+        import("@zip.js/zip.js"), import("../../utils/zipArchive.ts"),
       ]);
+      assertExport(active);
       const output = new BlobWriter("application/zip");
       writer = createIncrementalZipArchiveWriter(output);
-      for (const result of results) await writer.add(result.zipPath, await storageRef.current.read(result.storageKey));
+      for (const result of currentResults) {
+        const blob = await storage.read(result.storageKey);
+        assertExport(active);
+        await writer.add(result.zipPath, blob);
+        assertExport(active);
+      }
       await writer.close();
-      downloadBlob(await output.getData(), "worklazy-qr-bulk.zip");
-    } catch {
-      await writer?.discard();
-      setMessage(t("features:qr.bulk.errors.zip"));
-    } finally { setExporting(""); }
+      assertExport(active);
+      const blob = await output.getData();
+      assertExport(active);
+      downloadBlob(blob, "worklazy-qr-bulk.zip");
+    } catch (error) {
+      await writer?.discard().catch(() => undefined);
+      if (isCurrentExport(active) && !isAbort(error)) setMessage(t("features:qr.bulk.errors.zip"));
+    } finally {
+      finishExport(active);
+    }
   };
 
   const downloadPdf = async () => {
-    if (!storageRef.current || !results.length || exporting) return;
+    const storage = storageRef.current;
+    if (!storage || !results.length || exporting || activeExportRef.current) return;
     if (results.length > QR_BULK_LIMITS.pdfRows) {
       setMessage(t("features:qr.bulk.errors.pdfLimit"));
       return;
     }
-    setExporting("pdf");
+    const currentResults = [...results];
+    const preset = pdfPreset;
+    const active = beginExport("pdf");
+    const signal = active.controller.signal;
     try {
-      const entries = [];
-      for (const result of results) entries.push({ png: await storageRef.current.read(result.storageKey), title: result.title, description: result.description });
-      const fontResponse = await fetch(new URL(`${import.meta.env.BASE_URL}${QR_LABEL_FONT_PATH}`, window.location.origin));
-      if (!fontResponse.ok) throw new Error("FONT");
-      const { createQrLabelPdf } = await import("./qrLabelPdf.ts");
-      downloadBlob(await createQrLabelPdf(entries, pdfPreset, await fontResponse.arrayBuffer()), `worklazy-qr-labels-${pdfPreset}.pdf`);
-    } catch {
-      setMessage(t("features:qr.bulk.errors.pdf"));
-    } finally { setExporting(""); }
+      // Promise.all attaches rejection handlers to all three branches immediately.
+      // Only the font loader's acquire() performs acquisition fallback.
+      const fontTask = import("./qrLabelFont.ts").then(async (module) => {
+        assertExport(active);
+        const loader = fontLoaderRef.current
+          ?? module.createQrLabelFontLoader(import.meta.env.BASE_URL, window.location.origin);
+        fontLoaderRef.current = loader;
+        const kind = await module.selectQrLabelFont(currentResults, signal);
+        assertExport(active);
+        const selected = await loader.acquire(kind, signal);
+        assertExport(active);
+        return { loader, selected, QrLabelFontInitError: module.QrLabelFontInitError };
+      });
+      const entriesTask = (async () => {
+        const entries = [];
+        for (const result of currentResults) {
+          const png = await storage.read(result.storageKey);
+          assertExport(active);
+          entries.push({ png, title: result.title, description: result.description });
+        }
+        return entries;
+      })();
+      const [{ loader, selected, QrLabelFontInitError }, { createQrLabelPdf }, entries] = await Promise.all([
+        fontTask, import("./qrLabelPdf.ts"), entriesTask,
+      ]);
+      assertExport(active);
+      let blob: Blob;
+      try {
+        blob = await createQrLabelPdf(entries, preset, selected.bytes, signal);
+        assertExport(active);
+      } catch (error) {
+        assertExport(active);
+        if (selected.kind !== "subset" || !(error instanceof QrLabelFontInitError)) throw error;
+        loader.evict("subset");
+        const full = await loader.load("full", signal);
+        assertExport(active);
+        blob = await createQrLabelPdf(entries, preset, full.bytes, signal);
+        assertExport(active);
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      assertExport(active);
+      downloadBlob(blob, `worklazy-qr-labels-${preset}.pdf`);
+    } catch (error) {
+      if (isCurrentExport(active) && !isAbort(error)) setMessage(t("features:qr.bulk.errors.pdf"));
+    } finally {
+      finishExport(active);
+    }
   };
+
+  function beginExport(kind: "zip" | "pdf") {
+    const active = { token: ++exportSequenceRef.current, controller: new AbortController(), kind };
+    activeExportRef.current = active;
+    setExporting(kind);
+    return active;
+  }
+
+  function isCurrentExport(active: NonNullable<typeof activeExportRef.current>) {
+    return mountedRef.current
+      && activeExportRef.current?.token === active.token
+      && !active.controller.signal.aborted;
+  }
+
+  function assertExport(active: NonNullable<typeof activeExportRef.current>) {
+    if (!isCurrentExport(active)) throw new DOMException("Aborted", "AbortError");
+  }
+
+  function isAbort(error: unknown) {
+    return error instanceof Error && error.name === "AbortError";
+  }
+
+  function finishExport(active: NonNullable<typeof activeExportRef.current>) {
+    const owned = activeExportRef.current?.token === active.token;
+    active.controller.abort();
+    if (!owned) return;
+    activeExportRef.current = undefined;
+    if (mountedRef.current) setExporting("");
+  }
+
+  function invalidateExport() {
+    activeExportRef.current?.controller.abort();
+    activeExportRef.current = undefined;
+    ++exportSequenceRef.current;
+    fontLoaderRef.current?.dispose();
+    fontLoaderRef.current = undefined;
+  }
 
   return <div data-testid="qr-bulk-page" className="grid gap-6">
     <SectionCard step={1} title={t("features:qr.bulk.file.title")} description={t("features:qr.bulk.file.description")}>
@@ -358,7 +466,7 @@ export function QrBulkPanel() {
       <div className="flex flex-wrap gap-3">
         {results.length > 1 && <Button type="button" variant="outline" className="min-h-11" disabled={Boolean(exporting)} onClick={() => void downloadZip()}><FileArchive size={17} />{exporting === "zip" ? t("features:qr.bulk.results.preparing") : t("features:qr.bulk.results.zip")}</Button>}
         <label className={`${labelClass} min-w-36`}><span className="sr-only">{t("features:qr.bulk.results.pdfPreset")}</span><select className={fieldClass} value={pdfPreset} onChange={(event) => setPdfPreset(event.target.value as "a4" | "letter")}><option value="a4">A4</option><option value="letter">Letter</option></select></label>
-        <Button type="button" variant="outline" className="min-h-11" disabled={!results.length || Boolean(exporting) || results.length > QR_BULK_LIMITS.pdfRows} onClick={() => void downloadPdf()}><FileText size={17} />{exporting === "pdf" ? t("features:qr.bulk.results.preparing") : t("features:qr.bulk.results.pdf")}</Button>
+        <Button type="button" variant="outline" className="min-h-11" disabled={busy || !results.length || Boolean(exporting) || results.length > QR_BULK_LIMITS.pdfRows} onClick={() => void downloadPdf()}><FileText size={17} />{exporting === "pdf" ? t("features:qr.bulk.results.preparing") : t("features:qr.bulk.results.pdf")}</Button>
         {manifest && <Button type="button" variant="outline" className="min-h-11" onClick={() => downloadBlob(manifest, "worklazy-qr-manifest.xlsx")}><FileSpreadsheet size={17} />{t("features:qr.bulk.results.manifest")}</Button>}
       </div>
       {results.length > 0 && <div className="mt-5 grid gap-2" role="list">{visibleResults.map((result) => <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border p-3" role="listitem" key={`${result.sourceRow}:${result.fileName}`}>
@@ -371,16 +479,19 @@ export function QrBulkPanel() {
   </div>;
 
   async function cleanupResults() {
+    invalidateExport();
+    setExporting("");
     canceledRef.current = true;
     rasterRef.current?.stop();
     rasterRef.current = undefined;
-    await storageRef.current?.clear();
+    const storage = storageRef.current;
     storageRef.current = undefined;
     setResults([]);
     setFailures([]);
     setManifest(undefined);
     setResultPage(0);
     operation.reset();
+    await storage?.clear();
   }
 }
 
