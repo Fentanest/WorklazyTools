@@ -98,6 +98,8 @@ F2는 same-origin scenario server가 정확한 subset OTF 경로만 HTTP 404로 
 
 **재검수 F1-R 반영** — 실제 `QrBulkPanel` PDF handler가 완성 Blob을 받은 직후 큐에 든 cancel task를 마지막 양보에서 받아 다운로드·오류 메시지 없이 lease와 font loader를 해제하는 unit을 추가했다. QR 전용 unit은 **16/16**, 전체 unit은 **247/247**이며, 해당 양보 한 줄만 제거한 음성 대조는 **exit 1·15 pass/1 fail**, 핵심 실패 원문은 **`1 !== 0`**이다. — Codx
 
+**3차 검수 F2-R 반영** — 결과 교체 뒤 재생성은 성공 결과 1개 표시 후 기존 `waitForGenerateEnabled`의 `waitForFunction`으로 생성 버튼 활성화를 기다린 다음 PDF 버튼 활성 상태를 단언하도록 동기화했고, 고정 sleep 추가 없이 `npm run test:qr-bulk`를 연속 2회 실행해 모두 exit 0(기존 stale download 0·font 요청·reload·3시나리오 단언 유지)으로 통과했다. 원문은 `/tmp/worklazy-s2b-fix3/logs/qr-bulk-{1,2}.log`에 보존했다. — Codx
+
 **Gemini 로컬 시각 검수 소견 판정 (Claude, 2026-09-07 02:45)** — Gemini(agy `gemini-3.1-pro-high`, QA 빌드 4188) 는 QR 스튜디오 정상 렌더 9화면을 정상으로 보고하면서 "① `똠` 라벨에서 서브셋 폰트만 요청(깨짐) ② 영어 라벨 PDF 흐름 차단" 2건을 냈다. **둘 다 검수 입력 결함으로 판정, 제품 결함 아님.** ① Gemini 스크립트(`/tmp/worklazy-s2b/gemini-local/QA-fallback.mjs`)는 제목 템플릿(`[data-testid="qr-mapping-title-template"]`)을 `{{Label}}` 로 설정하지 않아 `똠` 이 CSV Label 열에만 있고 라벨 텍스트(커버리지 검사 대상)에는 들어가지 않았다 — payload 만으로는 full 선택 실험이 되지 않는다는 1차 반박 지적과 동일. ② 영어 버튼 실제 문구는 "Create row QR codes" 인데 "Generate" 를 찾아 타임아웃. Claude 재현(`/tmp/worklazy-s2b/claude-fallback-probe.mjs`, 템플릿 `{{Label}}` 설정): fallback ko(첫 Label `똠 라벨`) → **전체 OTF `noto-cjk-sans-2.004/NotoSansKR-Regular.otf` 200 4,644,748B 요청, PDF 4,076,547B** · normal ko/en → **서브셋 `…ksx1001-v1/NotoSansKR-Regular.ksx1001.otf` 200 931,704B, PDF 826,074/826,075B** · 오류 경계·정적 안내 노출 0. CLAUDE.md §5-3 "차단 결함이 오면 검수 입력이 그 판정을 뒷받침하는지 본다" 의 사례. — Claude
 
 ### S2 하네스 확장 + 성능 묶음 1차 — 브랜치 구현·검증 (Codx)

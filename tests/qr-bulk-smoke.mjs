@@ -210,6 +210,7 @@ try {
   });
   await page.click('[data-testid="qr-bulk-generate"] button');
   await page.waitForFunction(() => document.querySelector('[data-testid="qr-bulk-results"]')?.textContent?.includes("성공 1개 · 실패 0개"));
+  await waitForGenerateEnabled(page);
   const releasedState = await page.evaluate(() => {
     const button = Array.from(document.querySelectorAll("button"))
       .find((candidate) => candidate.textContent?.includes("라벨 PDF 다운로드"));
