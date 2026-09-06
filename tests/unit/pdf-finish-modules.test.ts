@@ -152,6 +152,21 @@ test("selection keeps a file-local physical exact set, canonical ranges, lower b
   assert.equal(isThumbnailDisabled(1, 10, { startPage: 1, excludeCover: true }), true);
   assert.equal(isThumbnailDisabled(2, 10, { startPage: 1, excludeCover: true }), false);
 
+  const lowerBoundOptions = { startPage: 4, excludeCover: true };
+  const lowerBoundSelection = createPageSelection(10, "1-8", "even", lowerBoundOptions);
+  assert.ok(!("error" in lowerBoundSelection));
+  assert.deepEqual(lowerBoundSelection.exactPages, [4, 6, 8]);
+  assert.equal(isThumbnailDisabled(2, 10, lowerBoundOptions), true);
+  assert.equal(isThumbnailDisabled(3, 10, lowerBoundOptions), true);
+  assert.strictEqual(toggleThumbnailPage(lowerBoundSelection, 3, lowerBoundOptions), lowerBoundSelection);
+  assert.deepEqual(createPageSelection(1, "1", "all", { startPage: 1, excludeCover: true }), {
+    totalPages: 1,
+    exactPages: [],
+    parity: "all",
+    rangeText: "1",
+    canExecute: false,
+  });
+
   const initial = createPageSelection(10, "2-8", "even", { startPage: 1, excludeCover: false });
   assert.ok(!("error" in initial));
   assert.deepEqual(initial.exactPages, [2, 4, 6, 8]);
@@ -274,6 +289,27 @@ test("text preprocessing, whole-candidate coverage and document-wide font select
     { field: "footer", prepared: preprocessText("Русский", values) },
   ], helvetica, noto);
   assert.equal(mixed.font, "noto");
+  const coverageTrace: string[] = [];
+  const traced = decideDocumentFont(
+    ["Русский", "ASCII"].map((text) => ({ field: text, prepared: preprocessText(text, values) })),
+    {
+      widthOfTextAtSize: () => 1,
+      encodeText: (text) => {
+        coverageTrace.push(`H:${text}`);
+        if (text === "Русский") throw new Error("unsupported");
+      },
+    },
+    {
+      widthOfTextAtSize: () => 1,
+      encodeText: () => undefined,
+      getCharacterSet: () => {
+        coverageTrace.push("N");
+        return [..."РусскийASCII"].map((character) => character.codePointAt(0) ?? 0);
+      },
+    },
+  );
+  assert.deepEqual(coverageTrace, ["H:Русский", "H:ASCII", "N"]);
+  assert.deepEqual(traced, { font: "noto", blocked: false, missing: [] });
   let notoCoverageCalls = 0;
   const noFallback = decideDocumentFont(
     [{ field: "header", prepared: preprocessText("ASCII", values) }],
@@ -298,24 +334,32 @@ test("six-region text layout uses identical measured/drawn runs and reports hori
   assert.ok(ellipsisOnly.warnings.includes("horizontal-overflow"));
   const twoLines = layoutTextLines({ lines: ["A".repeat(80), "B", "C"], size: 12, region: { x: 0, y: 0, width: 50, height: 28.8 }, alignment: "center", vertical: "top", font });
   assert.ok(twoLines.ok);
-  assert.equal(twoLines.runs.length, 2);
+  assert.deepEqual(twoLines.runs.map(({ text, width, y }) => ({ text, width, y })), [
+    { text: "AAAA…", width: 44.016, y: 16.8 },
+    { text: "B", width: 8.004, y: 2.400000000000002 },
+  ]);
   assert.deepEqual(twoLines.warnings, ["horizontal-overflow", "vertical-overflow"]);
-  assert.equal(twoLines.runs[0].text, "AAAA…");
-  const zeroLines = layoutTextLines({ lines: ["A"], size: 12, region: { x: 0, y: 0, width: 50, height: 10 }, alignment: "right", vertical: "bottom", font });
+  const zeroLines = layoutTextLines({ lines: ["A".repeat(80), "B", "C"], size: 12, region: { x: 0, y: 0, width: 50, height: 10 }, alignment: "right", vertical: "bottom", font });
   assert.ok(zeroLines.ok);
-  assert.equal(zeroLines.runs.length, 0);
-  assert.deepEqual(zeroLines.warnings, ["vertical-overflow"]);
+  assert.deepEqual(zeroLines.runs, []);
+  assert.deepEqual(zeroLines.warnings, ["horizontal-overflow", "vertical-overflow"]);
 
   const regions = createSixTextRegions(600, 800, { top: 20, right: 30, bottom: 40, left: 30 });
   assert.deepEqual(regions.map(({ region }) => region), ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"]);
-  for (const region of regions) {
-    const result = layoutTextLines({ lines: ["AB"], size: 12, region: region.box, alignment: region.alignment, vertical: region.vertical, font });
+  const sixRegionRuns = regions.map((region) => {
+    const result = layoutTextLines({ lines: ["AB", "CD"], size: 12, region: region.box, alignment: region.alignment, vertical: region.vertical, font });
     assert.ok(result.ok);
-    const run = result.runs[0];
-    if (region.alignment === "left") assert.equal(run.x, region.box.x);
-    if (region.alignment === "center") assert.equal(run.x, region.box.x + (region.box.width - run.width) / 2);
-    if (region.alignment === "right") assert.equal(run.x, region.box.x + region.box.width - run.width);
-  }
+    assert.equal(result.lineHeight, 14.399999999999999);
+    return result.runs.map(({ text, width, x, y }) => ({ text, width, x, y }));
+  });
+  assert.deepEqual(sixRegionRuns, [
+    [{ text: "AB", width: 16.008, x: 30, y: 768 }, { text: "CD", width: 17.328, x: 30, y: 753.6 }],
+    [{ text: "AB", width: 16.008, x: 291.996, y: 768 }, { text: "CD", width: 17.328, x: 291.336, y: 753.6 }],
+    [{ text: "AB", width: 16.008, x: 553.992, y: 768 }, { text: "CD", width: 17.328, x: 552.672, y: 753.6 }],
+    [{ text: "AB", width: 16.008, x: 30, y: 54.4 }, { text: "CD", width: 17.328, x: 30, y: 40 }],
+    [{ text: "AB", width: 16.008, x: 291.996, y: 54.4 }, { text: "CD", width: 17.328, x: 291.336, y: 40 }],
+    [{ text: "AB", width: 16.008, x: 553.992, y: 54.4 }, { text: "CD", width: 17.328, x: 552.672, y: 40 }],
+  ]);
   assert.throws(() => createSixTextRegions(100, 100, { top: 50, bottom: 50, left: 0, right: 0 }), /margin-exhausts-page/);
   assert.throws(() => createSixTextRegions(100, 100, { top: 0, bottom: 0, left: 50, right: 50 }), /margin-exhausts-page/);
 
@@ -365,6 +409,17 @@ test("tile policy permits 400, rejects the projected 420 before allocation and k
   assert.ok(spaced.ok);
   assert.equal(spaced.count, 361);
   assert.equal(spacedGenerated, 361);
+  const offset = createTilePlacements({ pageWidth: 20, pageHeight: 20, tileWidth: 10, tileHeight: 10, gap: 0, offsetX: 5, offsetY: 5, rotation: 30 });
+  assert.deepEqual(offset, {
+    ok: true,
+    count: 4,
+    placements: [
+      { x: 5, y: 5, rotation: 30 },
+      { x: 15, y: 5, rotation: 30 },
+      { x: 5, y: 15, rotation: 30 },
+      { x: 15, y: 15, rotation: 30 },
+    ],
+  });
   assert.equal(createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 0, tileHeight: 10, gap: 0 }).ok, false);
   assert.equal(createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: -1 }).ok, false);
 });
@@ -421,10 +476,49 @@ test("canvas A policy, DPI fallback, B-only metrics, warning expression and 200M
   const downgraded = chooseCanvasDpi({ requestedDpi: 300, viewportAtDpi: (dpi) => ({ width: 1_200 * dpi / 72, height: 1_200 * dpi / 72 }) });
   assert.equal(downgraded.appliedDpi, 200);
   assert.equal(downgraded.decision, "use-lower-dpi");
+  const downgradedTo150 = chooseCanvasDpi({ requestedDpi: 300, viewportAtDpi: (dpi) => ({ width: 1_600 * dpi / 72, height: 1_000 * dpi / 72 }) });
+  assert.deepEqual({
+    attempts: downgradedTo150.attempts.map(({ dpi }) => dpi),
+    appliedDpi: downgradedTo150.appliedDpi,
+    supported: downgradedTo150.supported,
+    decision: downgradedTo150.decision,
+  }, {
+    attempts: [300, 200, 150],
+    appliedDpi: 150,
+    supported: true,
+    decision: "use-lower-dpi",
+  });
   const unsupported = chooseCanvasDpi({ requestedDpi: 300, viewportAtDpi: (dpi) => ({ width: 3_000 * dpi / 72, height: 3_000 * dpi / 72 }) });
   assert.equal(unsupported.appliedDpi, null);
   assert.equal(unsupported.decision, "unsupported-reduce-range");
   assert.deepEqual(unsupported.attempts.map(({ dpi }) => dpi), [300, 200, 150]);
+  assert.deepEqual(measureCanvas({ width: 100, height: 100 }, { maxSide: 4_096, maxArea: 9_999 }), {
+    width: 100,
+    height: 100,
+    pixels: 10_000,
+    rgbaBytes: 40_000,
+    maxSideExceeded: false,
+    maxAreaExceeded: true,
+    allowed: false,
+  });
+  assert.deepEqual(measureCanvas({ width: 4_096, height: 4_096 }), {
+    width: 4_096,
+    height: 4_096,
+    pixels: 16_777_216,
+    rgbaBytes: 67_108_864,
+    maxSideExceeded: false,
+    maxAreaExceeded: false,
+    allowed: true,
+  });
+  assert.deepEqual(measureCanvas({ width: 4_096.01, height: 1 }), {
+    width: 4_097,
+    height: 1,
+    pixels: 4_097,
+    rgbaBytes: 16_388,
+    maxSideExceeded: true,
+    maxAreaExceeded: false,
+    allowed: false,
+  });
 
   const rawLedgerMetrics = measureBatchResources(
     [measureCanvas({ width: 100, height: 100 }), measureCanvas({ width: 100, height: 200 })],
@@ -544,6 +638,13 @@ test("stamp coordinates ignore DPR, preserve center-relative width/aspect, scale
   assert.equal(narrow.cy, 5);
   const corners = stampPdfCorners(narrow, { width: 100, height: 10, convertToPdfPoint: (x, y) => [x + 1, y + 2] });
   assert.equal(corners.length, 4);
+  assert.deepEqual(
+    stampPdfCorners(
+      { x: 10, y: 20, width: 30, height: 40, cx: 25, cy: 40 },
+      { width: 100, height: 100, convertToPdfPoint: (x, y) => [x + 1, y + 2] },
+    ),
+    [{ x: 11, y: 22 }, { x: 41, y: 22 }, { x: 11, y: 62 }, { x: 41, y: 62 }],
+  );
 });
 
 test("finish plan emits the canonical composite order as a pure 1-based plan", () => {

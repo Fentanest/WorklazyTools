@@ -10,36 +10,36 @@
 
 **astra fix-1 착수 게이트** — 검수 기준 `s3-pdf-finish` `HEAD=fd37ceab057ced2941fb752b2511124dbeaafda4`, `main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`와 dispatch가 일치했고 추적 변경은 없었다. 로드맵 진행 기록 끝의 `브랜치 최종 3672fc7/main 5485fad` 문장은 바로 앞 U4-1 진행 기록·실제 ref·최신 사용자 지시와 모순되는 낡은 문구라 최신 fix dispatch의 기준으로 대체했다. 열린 계획서에서 같은 finish 순수 모듈 표면의 상반 지시는 없었고 사용자 미추적 3파일을 계속 제외했다. UI·route·ko/en 문구·SEO·정적 페이지·광고 배치/격리 경로 영향은 없으며 test 실행 스크립트 한 줄만 명시 범위로 수정했다.
 
+**astra fix-2 착수 게이트** — 재검수 기준 `s3-pdf-finish` `HEAD=ba762b4b1cf38b13bef3013aa465e59e33eb9146`와 dispatch가 정확히 일치했다. 열린 계획서는 이번 unit·기록 보강과 충돌하지 않았고 기존 사용자 미추적 3파일을 계속 보존했다. 재검수 `/tmp/worklazy-u4-1-review2/`의 `REPORT.md`·`UNIT-MAPPING.md`·7개 변이와 독립 probe를 대조해, 정상 제품 계산이 아니라 커밋된 회귀 단언만 보강했다. 변경은 `tests/unit/pdf-finish-modules.test.ts`와 이 기록뿐이며 `src/`·UI·route·ko/en·SEO·정적 페이지·광고 경로·의존성 영향은 0이다.
+
 | 모듈 | export 계약·정본 대응 | 고정한 핵심 골든 |
 |---|---|---|
 | `geometry.ts` | PDF.js viewport transform 역변환, 상/하×좌/중/우 앵커, upright 회전; E5·확정 21 | 비영점 CropBox의 회전 4종과 실제 PDF.js 혼합 visual 크기 4쪽에서 여백 포함 중앙 앵커까지 24좌표 리터럴 |
-| `selection.ts` | 파일별 물리 exact set, range parse/canonical, parity, 하한·anchor·표시 번호·토글; 확정 7·9·24, D2, N1 | `2-8 + even`에서 3쪽 토글 → `{2,3,4,6,8}`·`2-4,6,8`; 4·6쪽 → 표시 5·7; 빈 set 실행 불가 |
+| `selection.ts` | 파일별 물리 exact set, range parse/canonical, parity, 하한·anchor·표시 번호·토글; 확정 7·9·24, D2, N1 | `2-8 + even`에서 3쪽 토글 → `{2,3,4,6,8}`·`2-4,6,8`; startPage 4+표지 제외에서 2·3쪽 disabled·`[4,6,8]`·disabled 토글 객체 동일; 표지 제외 빈 set 실행 불가 |
 | `tokens.ts` | 1회 clock/locale 캡처, 단일 pass 토큰 치환, date whitelist parser; 확정 7·10·24, N3 v8 | date 허용 5·오류 4·보충 14 전수, ko/en 로컬 날짜, 치환된 파일명 속 토큰 재해석 0, unknown 리터럴+경고 |
-| `text.ts` | 토큰→개행→TAB→제어문자→LF 분리, 후보 전체 glyph coverage, 문서당 단일 폰트, scalar 위치, 6영역 overflow; 확정 1·21, D8, N3 | E6-2 전처리·coverage 10입력 전수, 폭 5에서 긴 줄·`i`·빈 줄 모두 선차단, 폭 12 말줄임만·50×28.8 2줄·높이 10 0줄 리터럴 |
-| `tiles.ts` | gap·offset·rotation 배치와 생성 전 불변 400 상한; N3 | 공개 `maximumTiles` 타입 키 0, 400 생성 400회, 420과 완화 시도 모두 생성 0회, gap 1은 361회 |
-| `canvasPolicy.ts` | A의 ceil·면적·RGBA·4096 한 변/면적 검사와 300→200→150 하향, B 지표만 산출, 계수 주입 경고, 200MiB 등록 전 검사; 확정 18, D3 v6~v9 | 실제 PDF.js rotation/UserUnit 12행, 150 성공, 동시 100px+200px=`1,200B/2장`, 동일 자원 2장=`800B/2장`, 해제 뒤 다음 시점 `200B/1장`; 누적량은 peak·차단에 미사용 |
-| `stamp.ts` | CSS 상대 좌표→viewport→주입 `convertToPdfPoint`, `{cx,cy,rw,aspect}`, 균등 축소 후 중심 clamp; 확정 8·22, D7, N2 | 실제 legacy PDF.js fixture에서 DPR 1/2×CSS 1/0.5×회전 4의 독립 16조합과 리터럴 좌표 4개, 혼합 크기·clamp |
+| `text.ts` | 토큰→개행→TAB→제어문자→LF 분리, 후보 전체 glyph coverage, 문서당 단일 폰트, scalar 위치, 6영역 overflow; 확정 1·21, D8, N3 | E6-2 전처리·coverage 10입력 전수, `H:Русский→H:ASCII→N` 호출 순서, 6영역 두 줄 x/y·14.4pt 간격, `80A/B/C`의 50×10 0줄+두 경고와 50×28.8 두 run text/width/y 리터럴 |
+| `tiles.ts` | gap·offset·rotation 배치와 생성 전 불변 400 상한; N3 | 공개 `maximumTiles` 타입 키 0, 400 생성 400회, 420과 완화 시도 모두 생성 0회, gap 1은 361회; 20×20에서 offset 5/5·rotation 30의 네 좌표 리터럴 |
+| `canvasPolicy.ts` | A의 ceil·면적·RGBA·4096 한 변/면적 검사와 300→200→150 하향, B 지표만 산출, 계수 주입 경고, 200MiB 등록 전 검사; 확정 18, D3 v6~v9 | 실제 PDF.js rotation/UserUnit 12행, 요청 300의 attempts `[300,200,150]`·applied 150, 100×100의 독립 maxArea 초과, 4096² 허용·4096.01 한 변 거부; 동시 raw ledger 1,200B/2장 peak |
+| `stamp.ts` | CSS 상대 좌표→viewport→주입 `convertToPdfPoint`, `{cx,cy,rw,aspect}`, 균등 축소 후 중심 clamp; 확정 8·22, D7, N2 | 실제 legacy PDF.js fixture에서 DPR 1/2×CSS 1/0.5×회전 4의 독립 16조합과 리터럴 좌표 4개, 혼합 크기·clamp; (10,20,30,40) 주입 변환의 네 PDF corner 좌표 |
 | `plan.ts` | 부작용 없는 1-based 복합 실행 계획; 확정 12 | 구조/양식→background→원문→foreground→번호·머리말→도장→raster |
 | `preflight.ts` | U4-0 OCG classifier의 제품 단일 구현과 내부 사유 코드; D4 v13·U4-0 fixture | helper는 정적 re-export 한 줄, native strip에서 제품 export identity, OCG 87종 허용 56·제외 31과 두 renderer SHA 56 |
 
-**검증** — 원문 로그와 JSON은 `/tmp/worklazy-u4-1/`에 보존했다. production build와 bundle build는 직렬로 실행했고 `NODE_OPTIONS=--max-old-space-size=4096`를 적용했다.
+**검증 출처 정합** — 세 실행을 구분한다. 원구현 `fd37ceab`의 `/tmp/worklazy-u4-1/unit.log`는 **271/271, finish 12/12**이며 같은 경로에 원출력이 있다. fix-1 `ba762b4b`는 `/tmp/worklazy-u4-1-fix1/REPORT.md`에 **272/272, finish 13/13**으로 보고됐지만 그 디렉터리에는 `REPORT.md`·`bundle.json`만 있어 당시 unit 원로그는 보존됐다고 주장하지 않는다. 대신 astra가 같은 `ba762b4b` 사본을 `/tmp/worklazy-u4-1-review2/unit.log`에서 **272/272, finish 13/13**으로 독립 재현했다. 이번 fix-2는 아래 명령의 cwd·환경·exit를 `/tmp/worklazy-u4-1-fix2/commands.json`, 원출력을 `/tmp/worklazy-u4-1-fix2/logs/`, 변이별 unit/probe를 `/tmp/worklazy-u4-1-fix2/mutants/`에 보존했다.
 
 | 명령 | 실제 결과 |
 |---|---|
-| `npx tsc -b --pretty false` | 진단 0 |
-| `npm run test:unit` | 전체 **272/272** 통과; PDF finish 13건에서 E5 혼합 4쪽·E6-2 10입력·D7 실제 16조합·canvas A/B·타일 생성 횟수 포함 |
-| `NODE_OPTIONS=--max-old-space-size=4096 npm run build` | Vite 2,834 modules·정적 61페이지 통과 |
-| `npm run test:static` | 61페이지와 startup recovery 104문서 통과 |
-| `TEST_SCOPE=pdf npm run test:browser` | production preview에서 기존 PDF edit/range split/conversion 경로 exit 0. 고정 성공 메시지의 Excel·Word 문구는 해당 제품군 실행 증거로 사용하지 않음 |
-| `BUNDLE_ROUTES=pdf-editor BUNDLE_BASELINE=/tmp/s3-bundle-baseline.json npm run bundle:measure` | entry 299,287B·PDF route 171,864B·shared 2,716,473B·app 5,466,587B·CSS 37,687B, **다섯 delta 모두 0B**; 미연결 순수 모듈 tree-shaking 확인 |
-| `npm run css:orphans` | selector arm 0 |
-| `node tests/tool-registry-routes.mjs` | 기대 20·누락/예상 외/중복 0 |
-| `git diff --check` | 공백 오류 0 |
-| `npm run test:pdf-finish-oracle` | 스크립트 자체 `node --experimental-strip-types` 적용 사실 확인. 87 checked·**56 allowed/31 excluded**, 허용 변환·deep residual 0·두 renderer SHA 일치 각 56, 음성 대조 양쪽 검출 |
+| `NODE_OPTIONS=--max-old-space-size=4096 TMPDIR=/tmp/worklazy-u4-1-fix2/tmp npx tsc -b --pretty false` | exit 0, 진단 0 |
+| 같은 환경의 `npm run test:unit` | exit 0, 전체 **272/272**, finish **13/13**, 실패·skip 0 |
+| `python3 /tmp/worklazy-u4-1-fix2/mutation-audit.py` | wrapper exit 0; 7변이 각각 unit **exit 1, 12 pass/1 fail**, 정상/변이 독립 probe는 각각 exit 0/1 |
+| `git diff --stat ba762b4b1cf38b13bef3013aa465e59e33eb9146` · `git diff --name-only … -- src` · `git diff --check` | 변경은 unit·이 기록 2파일뿐, `src/` diff 0, 공백 오류 0 |
 
-**astra F1~F5 판정·수정** — F1 공개 `maximumTiles`는 정본에 없는 상한 완화 정책이었으므로 “정본 미정의 정책 없음”이라는 앞선 문구를 철회하고 입력 타입·런타임 경로에서 제거했다. F2는 ellipsis 유효 폭 계산 직후 줄 길이와 무관하게 영역 폭을 검사한다. F3은 raw ledger entry를 “한 시점의 동시 생존 자원 목록”으로 고정하고 각 자원의 pixels·RGBA bytes·장수를 합산한 시점 합계의 최대만 peak로 삼는다. 문서 누적 pixels/raw bytes는 작업량 지표이며 peak나 차단 판정에 쓰지 않는다. F4는 전용 `register` loader를 제거해 helper를 정적 re-export 한 줄로 만들고 package script에서 native strip을 소유하게 했다. F5는 astra `UNIT-MAPPING.md`의 빠진 골든을 같은 함수 재계산이 아닌 probe 리터럴·실제 PDF.js fixture로 추가했다.
+제품 코드 diff가 0인 회귀 단언·기록 전용 수정이므로 build·bundle·oracle·브라우저 스모크는 생략했다. fix-1 제품 코드에 대한 해당 검증 결과는 위 astra 재검수 `/tmp/worklazy-u4-1-review2/`에 보존돼 있으며, 이번 변경은 그 실행 결과를 제품 검증으로 재귀속하지 않는다.
 
-감사 명령 `node --experimental-strip-types /tmp/worklazy-u4-1-review/defects.mjs`는 스크립트가 현재 저장소가 아니라 자체 고정 사본 `/tmp/worklazy-u4-1-review/head`(`fd37cea`)을 import하므로 수정 뒤에도 옛 결함 4개와 `REPRODUCED`를 그대로 출력했다. 감사 사본을 훼손하지 않고 현재 워킹트리를 직접 import한 동치 probe를 별도로 실행해 420 입력 생성 0회·고정 상한 400, 긴/짧은/빈 줄 `narrow-region`, raw ledger `1,200B/2장`, helper/product export identity를 모두 확인했다. 원 loader를 손수 parser로 보는 우려는 Node 공식 API였다는 astra 기각을 유지하되, transitive `.ts` 의존을 놓치는 구성 결함 때문에 제거했다. 이 수정에서 새 정본 미정의 정책·UI 연결·실행 엔진은 추가하지 않았다. 원문 명령 출력과 현재-source probe 결과·최종 검증 요약은 `/tmp/worklazy-u4-1-fix1/REPORT.md`에 보존한다. — Codx
+**astra F1~F5 판정·fix-1** — F1 공개 `maximumTiles`는 정본에 없는 상한 완화 정책이었으므로 “정본 미정의 정책 없음”이라는 앞선 문구를 철회하고 입력 타입·런타임 경로에서 제거했다. F2는 ellipsis 유효 폭 계산 직후 줄 길이와 무관하게 영역 폭을 검사한다. F3은 raw ledger entry를 “한 시점의 동시 생존 자원 목록”으로 고정하고 각 자원의 pixels·RGBA bytes·장수를 합산한 시점 합계의 최대만 peak로 삼는다. 문서 누적 pixels/raw bytes는 작업량 지표이며 peak나 차단 판정에 쓰지 않는다. F4는 전용 `register` loader를 제거해 helper를 정적 re-export 한 줄로 만들고 package script에서 native strip을 소유하게 했다. F5는 `UNIT-MAPPING.md` 누락 중 실제 PDF.js fixture·전처리 표·ledger·타일 생성 계측 등을 보강했으나, 재검수 변이 7종이 당시 13/13을 통과해 회귀 단언 전체 보강이라는 기록은 철회한다.
+
+**astra F5-R·fix-2** — 150DPI 성공 거부·maxArea 무시·startPage disabled 무시·비영점 타일 offset 무시·text y=0·stamp corner=0·Noto coverage 조기 호출의 7개 한 식 변이를 각각 실패시키는 독립 리터럴 단언을 추가했다. 조정한 mutation audit는 입력 `head`를 고정 검수 사본에서 현재 워킹트리로 바꾸고, 과거 “7개 생존(exit 0)” 기대를 “7개 모두 unit exit 비영(0 아님)”으로 뒤집었으며 제품 변경 식과 독립 probe는 그대로 유지했다. 7개 모두 12 pass/1 fail이어서 F5-R을 해소했고 정상 unit은 13/13이다.
+
+감사 명령 `node --experimental-strip-types /tmp/worklazy-u4-1-review/defects.mjs`는 스크립트가 현재 저장소가 아니라 자체 고정 사본 `/tmp/worklazy-u4-1-review/head`(`fd37cea`)을 import하므로 수정 뒤에도 옛 결함 4개와 `REPRODUCED`를 그대로 출력했다. 감사 사본을 훼손하지 않고 현재 워킹트리를 직접 import한 동치 probe를 별도로 실행해 420 입력 생성 0회·고정 상한 400, 긴/짧은/빈 줄 `narrow-region`, raw ledger `1,200B/2장`, helper/product export identity를 모두 확인했다. 원 loader를 손수 parser로 보는 우려는 Node 공식 API였다는 astra 기각을 유지하되, transitive `.ts` 의존을 놓치는 구성 결함 때문에 제거했다. 이 수정에서 새 정본 미정의 정책·UI 연결·실행 엔진은 추가하지 않았다. fix-1의 요약은 `/tmp/worklazy-u4-1-fix1/REPORT.md`, fix-2의 명령 원출력과 변이 결과는 `/tmp/worklazy-u4-1-fix2/`에 보존한다. — Codx
 
 ### U4-0(F-fix) PDF finish fixture·oracle·번들 귀속 — 브랜치 구현·검증 (Codx)
 
