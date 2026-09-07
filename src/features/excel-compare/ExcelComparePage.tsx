@@ -58,8 +58,9 @@ const STATUS_DOT_CLASSES: Record<ExcelCompareStatus, string> = {
 const ACCEPT = ".xlsx,.xlsm,.xls,.xlsb,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv";
 const DUPLICATE_LIST_PAGE_SIZE = 50;
 const VALUE_PREVIEW_CODE_POINT_LIMIT = 160;
-const MOBILE_SHELL_QUERY = "(max-width: 820px)";
 const FOCUS_VISIBILITY_GAP = 4;
+const FOCUS_SCROLL_TOLERANCE = 1;
+let pendingResultFocusVisibility: AbortController | undefined;
 type LooseT = (key: string, options?: Record<string, unknown>) => string;
 
 export function ExcelComparePage() {
@@ -96,6 +97,12 @@ export function ExcelComparePage() {
     controllerRef.current?.abort();
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
+  }, []);
+
+  useEffect(() => {
+    const keepFocusedResultVisible = () => scheduleResultFocusVisibility(document.activeElement);
+    window.addEventListener("resize", keepFocusedResultVisible);
+    return () => window.removeEventListener("resize", keepFocusedResultVisible);
   }, []);
 
   const updatePair = (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => {
@@ -406,38 +413,81 @@ function DuplicateValue({ value, row, side, sideLabel, t }: {
 
 function scheduleResultFocusVisibility(target: EventTarget | null) {
   if (!(target instanceof HTMLElement) || !target.matches("[data-excel-result-focus]")) return;
-  const keepVisible = () => {
-    if (target.isConnected && document.activeElement === target) keepResultFocusVisible(target);
+  pendingResultFocusVisibility?.abort();
+  pendingResultFocusVisibility = undefined;
+  if (!target.matches(":focus-visible")) return;
+
+  const controller = new AbortController();
+  pendingResultFocusVisibility = controller;
+  const stop = () => {
+    controller.abort();
+    if (pendingResultFocusVisibility === controller) pendingResultFocusVisibility = undefined;
   };
-  keepVisible();
+  const stopForScrollKey = (event: KeyboardEvent) => {
+    if (["ArrowDown", "ArrowUp", "End", "Home", "PageDown", "PageUp", " "].includes(event.key)) stop();
+  };
+  window.addEventListener("pointerdown", stop, { passive: true, signal: controller.signal });
+  window.addEventListener("touchmove", stop, { passive: true, signal: controller.signal });
+  window.addEventListener("wheel", stop, { passive: true, signal: controller.signal });
+  window.addEventListener("keydown", stopForScrollKey, { signal: controller.signal });
+
+  const keepVisible = () => {
+    if (controller.signal.aborted || !target.isConnected || document.activeElement !== target || !target.matches(":focus-visible")) {
+      stop();
+      return false;
+    }
+    keepResultFocusVisible(target);
+    return true;
+  };
+  if (!keepVisible()) return;
   requestAnimationFrame(() => {
-    keepVisible();
-    requestAnimationFrame(keepVisible);
+    if (!keepVisible()) return;
+    requestAnimationFrame(() => {
+      keepVisible();
+      stop();
+    });
   });
 }
 
 function keepResultFocusVisible(target: HTMLElement) {
-  if (!window.matchMedia(MOBILE_SHELL_QUERY).matches) return;
-
   const scrollRegion = target.closest<HTMLElement>('[data-testid="excel-result-scroll-region"]');
   if (scrollRegion) {
     const targetRect = target.getBoundingClientRect();
     const regionRect = scrollRegion.getBoundingClientRect();
     const visibleLeft = regionRect.left + scrollRegion.clientLeft + FOCUS_VISIBILITY_GAP;
     const visibleRight = visibleLeft + scrollRegion.clientWidth - FOCUS_VISIBILITY_GAP * 2;
-    if (targetRect.left < visibleLeft) scrollRegion.scrollBy({ left: targetRect.left - visibleLeft, behavior: "instant" });
-    else if (targetRect.right > visibleRight) scrollRegion.scrollBy({ left: targetRect.right - visibleRight, behavior: "instant" });
+    const availableWidth = Math.max(0, visibleRight - visibleLeft);
+    const horizontalDelta = targetRect.width > availableWidth
+      ? targetRect.left - visibleLeft
+      : targetRect.left < visibleLeft
+        ? targetRect.left - visibleLeft
+        : targetRect.right > visibleRight ? targetRect.right - visibleRight : 0;
+    if (Math.abs(horizontalDelta) >= FOCUS_SCROLL_TOLERANCE) {
+      scrollRegion.scrollBy({ left: horizontalDelta, behavior: "instant" });
+    }
   }
 
-  const headerBottom = document.querySelector<HTMLElement>(".mobile-header")?.getBoundingClientRect().bottom ?? 0;
-  const tabsTop = document.querySelector<HTMLElement>(".bottom-tabs")?.getBoundingClientRect().top ?? window.innerHeight;
-  const visibleTop = Math.max(0, headerBottom) + FOCUS_VISIBILITY_GAP;
-  const visibleBottom = Math.min(window.innerHeight, tabsTop) - FOCUS_VISIBILITY_GAP;
+  const headerBottom = fixedChromeBoundary(".mobile-header", "bottom");
+  const tabsTop = fixedChromeBoundary(".bottom-tabs", "top");
   const targetRect = target.getBoundingClientRect();
-  const verticalDelta = targetRect.top < visibleTop
-    ? targetRect.top - visibleTop
-    : targetRect.bottom > visibleBottom ? targetRect.bottom - visibleBottom : 0;
-  if (verticalDelta) window.scrollBy({ top: verticalDelta, behavior: "instant" });
+  const verticalDelta = headerBottom !== undefined && targetRect.top < headerBottom + FOCUS_VISIBILITY_GAP
+    ? targetRect.top - headerBottom - FOCUS_VISIBILITY_GAP
+    : tabsTop !== undefined && targetRect.bottom > tabsTop - FOCUS_VISIBILITY_GAP
+      ? targetRect.bottom - tabsTop + FOCUS_VISIBILITY_GAP
+      : 0;
+  if (Math.abs(verticalDelta) >= FOCUS_SCROLL_TOLERANCE) {
+    window.scrollBy({ top: verticalDelta, behavior: "instant" });
+  }
+}
+
+function fixedChromeBoundary(selector: string, edge: "bottom" | "top") {
+  const element = document.querySelector<HTMLElement>(selector);
+  if (!element) return undefined;
+  const style = window.getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  if (style.position !== "fixed" || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0
+    || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.top >= window.innerHeight) return undefined;
+  return rect[edge];
 }
 
 function recordSearchText(record: ExcelCompareRecord, language: string) {

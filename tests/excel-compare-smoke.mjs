@@ -29,6 +29,14 @@ try {
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-right-b.csv"), "Key,Value\nB,right", "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"), `Key\n${"k".repeat(32_768)}\n${"k".repeat(32_768)}`, "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"), "Key\nother", "utf8");
+  const focusLeft = ["Key,Value"];
+  const focusRight = ["Key,Value"];
+  for (let index = 0; index < 151; index += 1) {
+    focusLeft.push(`A,left ${index} ${"long-value ".repeat(20)}`);
+    focusRight.push(`A,right ${index} ${"long-value ".repeat(20)}`);
+  }
+  await fs.writeFile(path.join(temporaryDirectory, "focus-left.csv"), `${focusLeft.join("\n")}\n`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "focus-right.csv"), `${focusRight.join("\n")}\n`, "utf8");
   await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-left.xlsx"), "before");
   await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-right.xlsx"), "after");
   const groupedUiLeft = ["Key,Value"];
@@ -234,6 +242,10 @@ try {
       left: path.join(temporaryDirectory, "duplicate-ui-left.csv"),
       right: path.join(temporaryDirectory, "duplicate-ui-right.csv"),
     });
+    const focusCorrections = await assertFocusCorrectionPaths(browser, {
+      left: path.join(temporaryDirectory, "focus-left.csv"),
+      right: path.join(temporaryDirectory, "focus-right.csv"),
+    });
     const standardKeyDisplay = await assertStandardKeyDisplay(browser, {
       left: path.join(temporaryDirectory, "typed-key-left.xlsx"),
       right: path.join(temporaryDirectory, "typed-key-right.xlsx"),
@@ -266,6 +278,7 @@ try {
       optionalReconciliation,
       groupedDuplicates,
       groupedDuplicateUi,
+      focusCorrections,
       standardKeyDisplay,
       duplicateKeyTooLong,
       isolatedFailure,
@@ -774,6 +787,188 @@ async function assertGroupedDuplicateUi(browser, files) {
   }
 }
 
+async function assertFocusCorrectionPaths(browser, files) {
+  const pointer = [];
+  for (const mode of ["mouse", "touch"]) {
+    const page = await openDuplicateFocusPage(browser, files, "en", { width: 390, height: 844, isMobile: true, hasTouch: true });
+    try {
+      const toggle = '[data-testid="excel-duplicate-toggle"][data-side="left"]';
+      const showMore = '[data-testid="excel-duplicate-show-more"][data-side="left"]';
+      await placeResultControl(page, toggle, 350);
+      const open = await pointerResultAction(page, toggle, mode, () => page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-duplicate-list"][data-side="left"] li').length === 50));
+      await placeResultControl(page, showMore, 350);
+      const loadMore = await pointerResultAction(page, showMore, mode, () => page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-duplicate-list"][data-side="left"] li').length === 100));
+      const loaded = await page.evaluate(() => {
+        const items = [...document.querySelectorAll('[data-testid="excel-duplicate-list"][data-side="left"] li')];
+        const firstNew = items[50];
+        const rect = firstNew.getBoundingClientRect();
+        return {
+          count: items.length,
+          firstNewText: firstNew.textContent || "",
+          firstNewVisible: rect.top < window.innerHeight && rect.bottom > 0,
+        };
+      });
+      await placeResultControl(page, toggle, 350);
+      const close = await pointerResultAction(page, toggle, mode, () => page.waitForFunction(() => !document.querySelector('[data-testid="excel-duplicate-list"][data-side="left"]')));
+      if ([open, loadMore, close].some((result) => Math.abs(result.deltaY) > 1 || result.focusVisible || result.calls.length)
+        || loaded.count !== 100 || !loaded.firstNewText.includes("Source row 52") || !loaded.firstNewVisible) {
+        throw new Error(`Pointer result controls moved the reading position or hid the first newly loaded row: ${JSON.stringify({ mode, open, loadMore, close, loaded })}`);
+      }
+      pointer.push({ mode, open, loadMore, close, loaded });
+    } finally {
+      await page.close();
+    }
+  }
+
+  const page = await openDuplicateFocusPage(browser, files, "en", { width: 821, height: 844 });
+  try {
+    await page.$eval('[data-testid="excel-result-search"] input', (input) => input.focus());
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const width821Collapsed = await focusedResultGeometry(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const width821Expanded = await focusedResultGeometry(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    await page.setViewport({ width: 820, height: 844, deviceScaleFactor: 1 });
+    await settleFocusScroll(page);
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const width820Right = await focusedResultGeometry(page, "excel-duplicate-toggle", "right");
+    await clearFocusScrollCalls(page);
+    await page.setViewport({ width: 821, height: 844, deviceScaleFactor: 1 });
+    await settleFocusScroll(page);
+    const width821AfterResize = await focusedResultGeometry(page, "excel-duplicate-toggle", "right");
+    const resizeCalls = await readFocusScrollCalls(page);
+    if (resizeCalls.filter((call) => call.scope === "element").length !== 1 || resizeCalls.some((call) => call.scope === "window")) {
+      throw new Error(`The active 820-to-821 focus resize did not use one horizontal-only correction: ${JSON.stringify(resizeCalls)}`);
+    }
+
+    await page.setViewport({ width: 320, height: 844, deviceScaleFactor: 1 });
+    await settleFocusScroll(page);
+    await page.keyboard.down("Shift");
+    await page.keyboard.press("Tab");
+    await page.keyboard.up("Shift");
+    await settleFocusScroll(page);
+    await clearFocusScrollCalls(page);
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const width320 = await focusedResultGeometry(page, "excel-duplicate-toggle", "left");
+    const width320Calls = await readFocusScrollCalls(page);
+    const horizontalDeltas = width320Calls.filter((call) => call.scope === "element").map((call) => call.value);
+    if (width320.rect.width <= width320.availableWidth || width320.startGap < 3 || !width320.centerVisible
+      || horizontalDeltas.length !== 1 || horizontalDeltas.some((delta) => delta >= 0) || width320Calls.some((call) => call.scope === "window")) {
+      throw new Error(`The oversized 320px control did not settle at its start edge in one direction: ${JSON.stringify({ width320, width320Calls })}`);
+    }
+    return { pointer, width821Collapsed, width821Expanded, width820Right, width821AfterResize, resizeCalls, width320, width320Calls };
+  } finally {
+    await page.close();
+  }
+}
+
+async function openDuplicateFocusPage(browser, files, language, viewport) {
+  const page = await browser.newPage();
+  page.setDefaultTimeout(180_000);
+  await page.setViewport({ deviceScaleFactor: 1, ...viewport });
+  await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await page.goto(`${baseUrl}/${language}/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-testid="excel-compare-page"]');
+  const input = await page.$('[data-testid="excel-compare-page"] input[type="file"]');
+  await input.uploadFile(files.left, files.right);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+  await page.click('[data-testid="excel-compare-mode-grid"] button:nth-child(2)');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="excel-compare-actions"] [data-ui-component="primary-button"]')?.disabled);
+  await page.click('[data-testid="excel-compare-actions"] [data-ui-component="primary-button"]');
+  await page.waitForSelector(".ui-operation-progress.ui-status-success");
+  await page.$$eval('[data-testid="excel-status-filters"] button:not([data-status="duplicate"])', (buttons) => buttons.forEach((button) => button.click()));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 1);
+  await page.evaluate(() => {
+    globalThis.__excelFocusScrollCalls = [];
+    const windowScrollBy = window.scrollBy.bind(window);
+    window.scrollBy = (...args) => {
+      globalThis.__excelFocusScrollCalls.push({ scope: "window", value: typeof args[0] === "object" ? args[0].top : args[1] });
+      return windowScrollBy(...args);
+    };
+    const elementScrollBy = Element.prototype.scrollBy;
+    Element.prototype.scrollBy = function (...args) {
+      globalThis.__excelFocusScrollCalls.push({ scope: "element", value: typeof args[0] === "object" ? args[0].left : args[0] });
+      return elementScrollBy.apply(this, args);
+    };
+  });
+  return page;
+}
+
+async function pointerResultAction(page, selector, mode, waitForResult) {
+  await clearFocusScrollCalls(page);
+  const beforeY = await page.evaluate(() => window.scrollY);
+  const box = await page.$eval(selector, (element) => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
+  if (mode === "touch") await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await waitForResult();
+  await settleFocusScroll(page);
+  const after = await page.evaluate(() => ({
+    scrollY: window.scrollY,
+    focusVisible: document.activeElement?.matches(":focus-visible") ?? false,
+  }));
+  return { deltaY: after.scrollY - beforeY, focusVisible: after.focusVisible, calls: await readFocusScrollCalls(page) };
+}
+
+async function placeResultControl(page, selector, y) {
+  await page.$eval(selector, (element, targetY) => {
+    document.activeElement?.blur();
+    const rect = element.getBoundingClientRect();
+    const region = element.closest('[data-testid="excel-result-scroll-region"]');
+    if (region) {
+      const regionRect = region.getBoundingClientRect();
+      region.scrollTo({ left: region.scrollLeft + rect.x - regionRect.x - 24, behavior: "instant" });
+    }
+    window.scrollTo({ top: window.scrollY + rect.y - targetY, behavior: "instant" });
+  }, y);
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+}
+
+async function focusedResultGeometry(page, testId, side) {
+  const geometry = await page.evaluate(() => {
+    const element = document.activeElement;
+    const region = element.closest('[data-testid="excel-result-scroll-region"]');
+    const rect = element.getBoundingClientRect();
+    const regionRect = region.getBoundingClientRect();
+    const clientLeft = regionRect.left + region.clientLeft;
+    const clientRight = clientLeft + region.clientWidth;
+    const center = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return {
+      testId: element.dataset.testid,
+      side: element.dataset.side,
+      rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+      availableWidth: region.clientWidth - 8,
+      startGap: rect.left - clientLeft,
+      endGap: clientRight - rect.right,
+      centerVisible: center === element || element.contains(center),
+      focusVisible: element.matches(":focus-visible"),
+    };
+  });
+  const fits = geometry.rect.width > geometry.availableWidth
+    ? geometry.startGap >= 3
+    : geometry.startGap >= 3 && geometry.endGap >= 3;
+  if (geometry.testId !== testId || geometry.side !== side || !geometry.centerVisible || !geometry.focusVisible || !fits || geometry.rect.height < 44) {
+    throw new Error(`Keyboard result focus is outside the named region: ${JSON.stringify({ expected: { testId, side }, geometry })}`);
+  }
+  return geometry;
+}
+
+async function clearFocusScrollCalls(page) {
+  await page.evaluate(() => { globalThis.__excelFocusScrollCalls = []; });
+}
+
+async function readFocusScrollCalls(page) {
+  return page.evaluate(() => globalThis.__excelFocusScrollCalls.splice(0));
+}
+
 async function assertStandardKeyDisplay(browser, files, root) {
   const page = await browser.newPage();
   try {
@@ -849,6 +1044,7 @@ async function setResultSearch(page, value) {
 
 async function settleFocusScroll(page) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 650)));
 }
 
 async function focusedResultVisibility(page, testId, side) {
