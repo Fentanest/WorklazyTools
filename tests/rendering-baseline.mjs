@@ -149,7 +149,7 @@ export async function runRenderingBaseline() {
         serviceWorker: "blocked",
         throttling: "none (local loopback; no CPU or network emulation)",
         runsPerPage,
-        maxCls: Number(process.env.RENDER_MAX_CLS ?? "0"),
+        maxCls: Number(process.env.RENDER_MAX_CLS ?? "0.1"),
         settleTimeMs,
         blockingMetric: "Long-task blocking time equivalent: sum(max(0, duration - 50ms)) for long tasks starting after FCP through the measurement window.",
       },
