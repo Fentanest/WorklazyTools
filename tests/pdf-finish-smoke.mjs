@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { createCanvas } from "@napi-rs/canvas";
 import { chromium } from "playwright";
-import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
 import { PNG } from "pngjs";
 
 const execFileAsync = promisify(execFile);
@@ -24,6 +24,7 @@ let browser;
 try {
   await fs.mkdir(shots, { recursive: true });
   const fixture = await createFixture();
+  const inlineImageFixture = await createInlineImageFixture();
   const boundaryCropFixture = await createBoundaryCropFixture();
   const smallFixture = await createSmallFixture();
   if (!process.env.TEST_BASE_URL) server = await startPreview();
@@ -72,7 +73,7 @@ try {
   await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
-  await testWatermarkWorkflow(browser, fixture);
+  await testWatermarkWorkflow(browser, fixture, inlineImageFixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks();
   console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, watermark text/image/tile/risk confirmation, four-rotation boundary CropBox pixels, output, cancel and retry.`);
@@ -132,11 +133,28 @@ async function testNavigation(browserInstance) {
         labelsFit: [...navigation.querySelectorAll("[data-pdf-nav-mode]")].every((link) => link.scrollWidth <= link.clientWidth + 1),
       };
     });
+    const finishTabs = await page.locator("[data-testid='pdf-finish-ready'] [role='tablist']").evaluate((tablist) => {
+      const listRect = tablist.getBoundingClientRect();
+      const tabs = [...tablist.querySelectorAll("[role='tab']")];
+      const rects = tabs.map((tab) => tab.getBoundingClientRect());
+      return {
+        inside: rects.every((rect) => rect.left >= listRect.left - 1 && rect.right <= listRect.right + 1),
+        separated: rects.every((rect, index) => index === 0 || rect.left >= rects[index - 1].right - 1),
+        contentFits: tabs.every((tab) => {
+          const content = tab.querySelector("[data-finish-tab-content]");
+          if (!(content instanceof HTMLElement)) return false;
+          const tabRect = tab.getBoundingClientRect();
+          const contentRect = content.getBoundingClientRect();
+          return contentRect.left >= tabRect.left - 1 && contentRect.right <= tabRect.right + 1;
+        }),
+      };
+    });
     assert.equal(metrics.count, 5);
     assert.ok(metrics.activeVisible, `active finish navigation is clipped at ${width}px`);
     if (width <= 390) {
       assert.equal(metrics.overflow, true);
       assert.notEqual(metrics.cue, "none");
+      assert.deepEqual(finishTabs, { inside: true, separated: true, contentFits: true }, `finish tabs overlap at ${width}px`);
     }
     if (width === 821) {
       assert.equal(metrics.overflow, true, "the 821px shell must keep scrolling when the sidebar reduces available width");
@@ -197,6 +215,13 @@ async function testPreviewGeometry(browserInstance, fixture) {
       const page = await context.newPage();
       await page.goto(`${baseUrl}/${language}/tools/pdf-editor/header-footer/`, { waitUntil: "networkidle" });
       await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles({ name: "preview-geometry.pdf", mimeType: "application/pdf", buffer: fixture });
+      await page.locator("[data-testid='pdf-finish-template']").fill("first line\ngypqj");
+      const multiline = await page.locator("[data-testid='pdf-finish-overlay']").evaluate((overlay) => {
+        const style = getComputedStyle(overlay);
+        return { whiteSpace: style.whiteSpace, lineHeight: Number.parseFloat(style.lineHeight), height: overlay.getBoundingClientRect().height };
+      });
+      assert.equal(multiline.whiteSpace, "pre-wrap");
+      assert.ok(multiline.height >= multiline.lineHeight * 1.9, `${language}/${colorScheme} collapsed the F1 multiline preview: ${JSON.stringify(multiline)}`);
       const range = page.locator("[data-testid='pdf-finish-range']");
       for (const [rangeValue, landscape] of [["1", false], ["2", true]]) {
         await range.fill(rangeValue);
@@ -605,7 +630,7 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await context.close();
 }
 
-async function testWatermarkWorkflow(browserInstance, fixture) {
+async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
   await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
   const page = await context.newPage();
@@ -617,6 +642,25 @@ async function testWatermarkWorkflow(browserInstance, fixture) {
   await page.locator("[data-testid='pdf-watermark-pattern']").selectOption("tile");
   await page.locator("[data-testid='pdf-watermark-layer']").selectOption("background");
   await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-overlay']")?.getAttribute("data-watermark-pattern") === "tile");
+  await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+  const initialTiles = await page.locator("[data-testid='pdf-finish-overlay']").evaluate((overlay) => ({ count: Number(overlay.getAttribute("data-placement-count")), width: overlay.querySelector("[data-watermark-placement]")?.getBoundingClientRect().width ?? 0 }));
+  await page.locator("[data-testid='pdf-watermark-size']").fill("30");
+  await page.waitForFunction((previous) => {
+    const overlay = document.querySelector("[data-testid='pdf-finish-overlay']");
+    const placement = overlay?.querySelector("[data-watermark-placement]");
+    return Number(overlay?.getAttribute("data-placement-count")) !== previous.count && placement instanceof HTMLElement && Math.abs(placement.getBoundingClientRect().width - previous.width) > 2;
+  }, initialTiles);
+  const resizedTiles = await page.locator("[data-testid='pdf-finish-overlay']").evaluate((overlay) => ({ count: Number(overlay.getAttribute("data-placement-count")), width: overlay.querySelector("[data-watermark-placement]")?.getBoundingClientRect().width ?? 0 }));
+  assert.notEqual(resizedTiles.count, 18, "tile preview must not use the former fixed 18-item grid");
+  assert.ok(resizedTiles.width < initialTiles.width, `tile size did not change the preview geometry: ${JSON.stringify({ initialTiles, resizedTiles })}`);
+
+  await page.locator("[data-testid='pdf-watermark-offset-x']").fill("2000");
+  const emptyPlacement = page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='empty-placement']");
+  await emptyPlacement.waitFor();
+  assert.match(await emptyPlacement.innerText(), /No watermark would appear/iu);
+  const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+  assert.equal(await action.isDisabled(), true, "zero watermark placements must block result creation");
+  await page.locator("[data-testid='pdf-watermark-offset-x']").fill("24");
   await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
 
   const png = new PNG({ width: 32, height: 16 });
@@ -631,10 +675,32 @@ async function testWatermarkWorkflow(browserInstance, fixture) {
   const ratio = await image.evaluate((node) => node.naturalWidth / node.naturalHeight);
   assert.ok(Math.abs(ratio - 2) < 0.1, `watermark preview did not preserve the image ratio: ${ratio}`);
 
-  const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
   await action.click();
   await page.locator("[data-testid='pdf-download']").waitFor();
   assert.equal(await page.locator("[data-route-error]").count(), 0);
+
+  await page.locator("[data-testid='pdf-watermark-content-text']").click();
+  await pdfInput.setInputFiles({ name: "valid-inline-image.pdf", mimeType: "application/pdf", buffer: inlineImageFixture });
+  await page.locator("[data-testid='pdf-watermark-layer']").selectOption("foreground");
+  await page.locator("[data-testid='pdf-finish-font-size']").fill("6");
+  await page.locator("[data-testid='pdf-watermark-size']").fill("10");
+  await page.locator("[data-testid='pdf-watermark-gap']").fill("10");
+  await page.locator("[data-testid='pdf-watermark-offset-x']").fill("0");
+  await page.locator("[data-testid='pdf-watermark-offset-y']").fill("0");
+  await page.waitForFunction(() => {
+    const panel = document.querySelector("[data-testid='pdf-finish-ready']");
+    const button = panel?.querySelector("[data-ui-component='primary-button']");
+    return panel?.getAttribute("data-preflight-status") === "ready" && button instanceof HTMLButtonElement && !button.disabled;
+  });
+  assert.equal(await page.locator("[data-warning-code='risky-graphics-state']").count(), 0, "a normal inline image must not be blanket-warned as risky");
+  await action.click();
+  const cancel = page.locator("[data-testid='pdf-finish-cancel']");
+  await cancel.waitFor();
+  await cancel.click();
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-error']")?.textContent?.match(/cancel/i));
+  assert.equal(await page.locator("[data-testid='pdf-download']").count(), 0, "cancelled inline-image work exposed a result");
+  await action.click();
+  await page.locator("[data-testid='pdf-download']").waitFor();
 
   await pdfInput.setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/risk/graphics-state-imbalance.pdf"));
   await page.locator("[data-testid='pdf-watermark-risk-confirmation']").waitFor();
@@ -726,6 +792,13 @@ async function createBoundaryCropFixture() {
 async function createSmallFixture() {
   const document = await PDFDocument.create({ updateMetadata: false });
   document.addPage([200, 200]);
+  return Buffer.from(await document.save());
+}
+
+async function createInlineImageFixture() {
+  const document = await PDFDocument.create({ updateMetadata: false });
+  const page = document.addPage([200, 200]);
+  page.node.set(PDFName.of("Contents"), document.context.register(document.context.flateStream("q\n80 0 0 80 60 60 cm\nBI /W 1 /H 1 /BPC 8 /CS /G ID\n)\nEI\nQ")));
   return Buffer.from(await document.save());
 }
 

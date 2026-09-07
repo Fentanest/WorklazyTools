@@ -25,7 +25,7 @@ import {
 import { isThumbnailDisabled, createPageSelection, displayNumber, toggleThumbnailPage, type PageParity, type PageSelectionState } from "./finish/selection.ts";
 import { expandTokens } from "./finish/tokens.ts";
 import type { FinishRegion } from "./finish/geometry.ts";
-import type { PdfWatermarkSettings, WatermarkContentKind, WatermarkLayer, WatermarkPattern, WatermarkRegion } from "./finish/watermark.ts";
+import { createWatermarkPlacements, type PdfWatermarkSettings, type WatermarkContentKind, type WatermarkLayer, type WatermarkPattern, type WatermarkRegion } from "./finish/watermark.ts";
 import { createLocalId, type PdfFinishPreset, type PdfFinishTab, type PdfPageItem } from "./types";
 
 type ImplementedFinishTab = Extract<PdfFinishTab, "page-numbers" | "header-footer" | "watermark">;
@@ -339,11 +339,11 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     template: watermarkActive && watermark.content === "image" ? "" : !form.template ? copy.fieldErrors.template : form.template.length > 300 ? copy.fieldErrors.templateLength : "",
     image: watermarkActive && watermark.content === "image" && !watermark.image ? copy.fieldErrors.image : "",
     rotation: watermarkActive && (!Number.isFinite(watermarkRotation) || watermarkRotation < -180 || watermarkRotation > 180) ? copy.fieldErrors.rotation : "",
-    opacity: watermarkActive && (!Number.isFinite(watermarkOpacity) || watermarkOpacity < 0.05 || watermarkOpacity > 1) ? copy.fieldErrors.opacity : "",
-    sizePercent: watermarkActive && (!Number.isFinite(watermarkSize) || watermarkSize < 5 || watermarkSize > 100) ? copy.fieldErrors.size : "",
-    gap: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkGap) || watermarkGap < 0 || watermarkGap > 300) ? copy.fieldErrors.gap : "",
-    offsetX: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkOffsetX) || watermarkOffsetX < 0 || watermarkOffsetX > 300) ? copy.fieldErrors.offset : "",
-    offsetY: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkOffsetY) || watermarkOffsetY < 0 || watermarkOffsetY > 300) ? copy.fieldErrors.offset : "",
+    opacity: watermarkActive && (!Number.isFinite(watermarkOpacity) || watermarkOpacity < 0.01 || watermarkOpacity > 1) ? copy.fieldErrors.opacity : "",
+    sizePercent: watermarkActive && (!Number.isFinite(watermarkSize) || watermarkSize < 1 || watermarkSize > 100) ? copy.fieldErrors.size : "",
+    gap: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkGap) || watermarkGap < 0 || watermarkGap > 2_000) ? copy.fieldErrors.gap : "",
+    offsetX: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkOffsetX) || watermarkOffsetX < -2_000 || watermarkOffsetX > 2_000) ? copy.fieldErrors.offset : "",
+    offsetY: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkOffsetY) || watermarkOffsetY < -2_000 || watermarkOffsetY > 2_000) ? copy.fieldErrors.offset : "",
   }), [copy.fieldErrors, fontSize, form.template, margin, startingNumber, validLowerBound, watermark.content, watermark.image, watermark.pattern, watermarkActive, watermarkGap, watermarkOffsetX, watermarkOffsetY, watermarkOpacity, watermarkRotation, watermarkSize]);
   const baseFieldError = Object.values(baseFieldErrors).find(Boolean) ?? "";
 
@@ -437,7 +437,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         {(["page-numbers", "header-footer", "watermark"] as const).map((tab) => {
           const selected = activeTab === tab;
           const Icon = tab === "page-numbers" ? Hash : tab === "header-footer" ? PanelTop : Stamp;
-          return <Button key={tab} id={`${tabPanelId}-${tab}`} className={cn("min-h-11 rounded-xl text-muted-foreground", selected && "bg-card text-violet-700 shadow-sm dark:text-violet-300")} variant="ghost" type="button" role="tab" aria-selected={selected} aria-controls={tabPanelId} data-finish-tab={tab} onClick={() => selectTab(tab)}><Icon size={17} />{copy.tabs[tab]}</Button>;
+          return <Button key={tab} id={`${tabPanelId}-${tab}`} className={cn("h-auto min-h-14 min-w-0 rounded-xl bg-card px-1 text-foreground sm:min-h-11 sm:px-3", selected && "text-violet-700 shadow-sm dark:text-violet-300")} variant="ghost" type="button" role="tab" aria-selected={selected} aria-controls={tabPanelId} data-finish-tab={tab} data-pdf-watermark-owned={tab === "watermark" || undefined} onClick={() => selectTab(tab)}><span className="flex min-w-0 flex-col items-center justify-center gap-1 sm:flex-row sm:gap-1.5" data-finish-tab-content><Icon size={17} /><span className="min-w-0 whitespace-normal text-center text-[11px] leading-tight sm:text-sm">{copy.tabs[tab]}</span></span></Button>;
         })}
       </div>
 
@@ -452,7 +452,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)] items-start gap-4 max-[820px]:grid-cols-1">
             <div className="min-w-0">
               <SectionCard step={2} title={copy.settingsTitle} description={copy.settingsDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
-                {watermarkActive && <div className="grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">
+                {watermarkActive && <div className="grid grid-cols-3 gap-3 max-[620px]:grid-cols-1" data-pdf-watermark-owned>
                   <UtilityField>{copy.watermark.contentType}<div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={copy.watermark.contentType}><Button type="button" variant="outline" role="radio" aria-checked={watermark.content === "text"} data-testid="pdf-watermark-content-text" className={cn("min-h-11 rounded-xl", watermark.content === "text" && "border-violet-600 bg-violet-500/10 text-violet-700 dark:text-violet-300")} disabled={locked} onClick={() => updateWatermark("content", "text")}><Type size={16} />{copy.watermark.text}</Button><Button type="button" variant="outline" role="radio" aria-checked={watermark.content === "image"} data-testid="pdf-watermark-content-image" className={cn("min-h-11 rounded-xl", watermark.content === "image" && "border-violet-600 bg-violet-500/10 text-violet-700 dark:text-violet-300")} disabled={locked} onClick={() => updateWatermark("content", "image")}><ImageIcon size={16} />{copy.watermark.image}</Button></div></UtilityField>
                   <UtilityField>{copy.watermark.layer}<UtilitySelect data-testid="pdf-watermark-layer" value={watermark.layer} disabled={locked} onChange={(event) => updateWatermark("layer", event.target.value as WatermarkLayer)}><option value="background">{copy.watermark.background}</option><option value="foreground">{copy.watermark.foreground}</option></UtilitySelect></UtilityField>
                   <UtilityField>{copy.watermark.pattern}<UtilitySelect data-testid="pdf-watermark-pattern" value={watermark.pattern} disabled={locked} onChange={(event) => updateWatermark("pattern", event.target.value as WatermarkPattern)}><option value="single">{copy.watermark.single}</option><option value="tile">{copy.watermark.tile}</option></UtilitySelect></UtilityField>
@@ -467,15 +467,15 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                   <UtilityField>{copy.margin}<UtilityInput data-testid="pdf-finish-margin" type="number" min={0} max={144} step={1} value={form.margin} disabled={locked} aria-invalid={!!fieldErrors.margin || undefined} aria-describedby={fieldErrors.margin ? `${tabPanelId}-margin-error` : undefined} onChange={(event) => updateForm("margin", event.target.value)} />{fieldErrors.margin && <span id={`${tabPanelId}-margin-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.margin}</span>}</UtilityField>
                   {(!watermarkActive || watermark.content === "text") && <UtilityField>{copy.color}<UtilityInput data-testid="pdf-finish-color" className="p-1" type="color" value={form.color} disabled={locked} onChange={(event) => updateForm("color", event.target.value)} /></UtilityField>}
                 </div>
-                {watermarkActive && <div className="mt-5 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">
+                {watermarkActive && <div className="mt-5 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1" data-pdf-watermark-owned>
                   <UtilityField>{copy.watermark.rotation}<UtilityInput data-testid="pdf-watermark-rotation" type="number" min={-180} max={180} step={1} value={watermark.rotation} disabled={locked} aria-invalid={!!fieldErrors.rotation || undefined} onChange={(event) => updateWatermark("rotation", event.target.value)} />{fieldErrors.rotation && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.rotation}</span>}</UtilityField>
-                  <UtilityField>{copy.watermark.opacity}<UtilityInput data-testid="pdf-watermark-opacity" type="number" min={0.05} max={1} step={0.05} value={watermark.opacity} disabled={locked} aria-invalid={!!fieldErrors.opacity || undefined} onChange={(event) => updateWatermark("opacity", event.target.value)} />{fieldErrors.opacity && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.opacity}</span>}</UtilityField>
-                  <UtilityField>{copy.watermark.size}<UtilityInput data-testid="pdf-watermark-size" type="number" min={5} max={100} step={1} value={watermark.sizePercent} disabled={locked} aria-invalid={!!fieldErrors.sizePercent || undefined} onChange={(event) => updateWatermark("sizePercent", event.target.value)} />{fieldErrors.sizePercent && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.sizePercent}</span>}</UtilityField>
+                  <UtilityField>{copy.watermark.opacity}<UtilityInput data-testid="pdf-watermark-opacity" type="number" min={0.01} max={1} step={0.01} value={watermark.opacity} disabled={locked} aria-invalid={!!fieldErrors.opacity || undefined} onChange={(event) => updateWatermark("opacity", event.target.value)} />{fieldErrors.opacity && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.opacity}</span>}</UtilityField>
+                  <UtilityField>{copy.watermark.size}<UtilityInput data-testid="pdf-watermark-size" type="number" min={1} max={100} step={1} value={watermark.sizePercent} disabled={locked} aria-invalid={!!fieldErrors.sizePercent || undefined} onChange={(event) => updateWatermark("sizePercent", event.target.value)} />{fieldErrors.sizePercent && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.sizePercent}</span>}</UtilityField>
                 </div>}
-                {watermarkActive && watermark.pattern === "tile" && <div className="mt-3 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">
-                  <UtilityField>{copy.watermark.gap}<UtilityInput data-testid="pdf-watermark-gap" type="number" min={0} max={300} step={1} value={watermark.gap} disabled={locked} aria-invalid={!!fieldErrors.gap || undefined} onChange={(event) => updateWatermark("gap", event.target.value)} />{fieldErrors.gap && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.gap}</span>}</UtilityField>
-                  <UtilityField>{copy.watermark.offsetX}<UtilityInput data-testid="pdf-watermark-offset-x" type="number" min={0} max={300} step={1} value={watermark.offsetX} disabled={locked} aria-invalid={!!fieldErrors.offsetX || undefined} onChange={(event) => updateWatermark("offsetX", event.target.value)} />{fieldErrors.offsetX && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.offsetX}</span>}</UtilityField>
-                  <UtilityField>{copy.watermark.offsetY}<UtilityInput data-testid="pdf-watermark-offset-y" type="number" min={0} max={300} step={1} value={watermark.offsetY} disabled={locked} aria-invalid={!!fieldErrors.offsetY || undefined} onChange={(event) => updateWatermark("offsetY", event.target.value)} />{fieldErrors.offsetY && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.offsetY}</span>}</UtilityField>
+                {watermarkActive && watermark.pattern === "tile" && <div className="mt-3 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1" data-pdf-watermark-owned>
+                  <UtilityField>{copy.watermark.gap}<UtilityInput data-testid="pdf-watermark-gap" type="number" min={0} max={2000} step={1} value={watermark.gap} disabled={locked} aria-invalid={!!fieldErrors.gap || undefined} onChange={(event) => updateWatermark("gap", event.target.value)} />{fieldErrors.gap && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.gap}</span>}</UtilityField>
+                  <UtilityField>{copy.watermark.offsetX}<UtilityInput data-testid="pdf-watermark-offset-x" type="number" min={-2000} max={2000} step={1} value={watermark.offsetX} disabled={locked} aria-invalid={!!fieldErrors.offsetX || undefined} onChange={(event) => updateWatermark("offsetX", event.target.value)} />{fieldErrors.offsetX && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.offsetX}</span>}</UtilityField>
+                  <UtilityField>{copy.watermark.offsetY}<UtilityInput data-testid="pdf-watermark-offset-y" type="number" min={-2000} max={2000} step={1} value={watermark.offsetY} disabled={locked} aria-invalid={!!fieldErrors.offsetY || undefined} onChange={(event) => updateWatermark("offsetY", event.target.value)} />{fieldErrors.offsetY && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.offsetY}</span>}</UtilityField>
                 </div>}
                 <h3 className="mt-6 mb-3 font-heading text-base font-medium">{copy.numberingTitle}</h3>
                 <div className="grid grid-cols-2 gap-3 max-[620px]:grid-cols-1">
@@ -541,8 +541,9 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [rendering, setRendering] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number; sourceWidth: number; sourceHeight: number } | null>(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -568,12 +569,24 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
   useEffect(() => {
     if (!watermark?.image) {
       setImageUrl("");
+      setImageDimensions(null);
       return;
     }
     const nextUrl = URL.createObjectURL(watermark.image);
     setImageUrl(nextUrl);
     return () => URL.revokeObjectURL(nextUrl);
   }, [watermark?.image]);
+  useEffect(() => {
+    if (!imageUrl) return;
+    const image = new Image();
+    image.onload = () => setImageDimensions({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = () => setImageDimensions(null);
+    image.src = imageUrl;
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [imageUrl]);
 
   const physicalPage = pageIndex + 1;
   let page = physicalPage;
@@ -587,17 +600,7 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
   }).text;
   const [vertical, horizontal] = form.region === "center" ? ["center", "center"] as const : form.region.split("-") as ["top" | "bottom", "left" | "center" | "right"];
   const inset = `${Math.min(22, Math.max(3, form.margin / 4))}px`;
-  const positionStyle = watermark ? {
-    ...(vertical === "center" ? { top: "50%" } : { [vertical]: inset }),
-    ...(horizontal === "center" ? { left: "50%" } : { [horizontal]: inset }),
-    transform: `${horizontal === "center" ? "translateX(-50%) " : ""}${vertical === "center" ? "translateY(-50%) " : ""}rotate(${Number.isFinite(watermark.rotation) ? watermark.rotation : 0}deg)`,
-    color: form.color,
-    fontSize: `${Math.min(24, Math.max(8, form.fontSize))}px`,
-    textAlign: horizontal,
-    opacity: Number.isFinite(watermark.opacity) ? watermark.opacity : 0.2,
-    width: `${Number.isFinite(watermark.sizePercent) ? Math.min(100, Math.max(5, watermark.sizePercent)) : 60}%`,
-    transformOrigin: "center",
-  } as const : {
+  const positionStyle = {
     [vertical]: inset,
     ...(horizontal === "center" ? { left: "50%" } : { [horizontal]: inset }),
     transform: horizontal === "center" ? "translateX(-50%)" : undefined,
@@ -605,15 +608,52 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
     fontSize: `${Math.min(24, Math.max(8, form.fontSize))}px`,
     textAlign: horizontal,
   } as const;
-  const watermarkContent = watermark?.content === "image"
-    ? imageUrl ? <img src={imageUrl} alt="" className="block h-auto w-full object-contain" /> : null
-    : <span className="block whitespace-pre-wrap break-words text-center font-semibold leading-[1.2]">{overlay}</span>;
+  let watermarkPlan: ReturnType<typeof createWatermarkPlacements> | null = null;
+  if (watermark && dimensions) {
+    const { sourceWidth, sourceHeight } = dimensions;
+    const sizePercent = Number.isFinite(watermark.sizePercent) ? Math.min(100, Math.max(1, watermark.sizePercent)) : 60;
+    let objectWidth = Math.max(0, sourceWidth - form.margin * 2) * sizePercent / 100;
+    let objectHeight = 0;
+    if (watermark.content === "image") {
+      if (imageDimensions) {
+        const scale = Math.min(
+          sourceWidth * sizePercent / 100 / imageDimensions.width,
+          sourceHeight * sizePercent / 100 / imageDimensions.height,
+        );
+        objectWidth = imageDimensions.width * scale;
+        objectHeight = imageDimensions.height * scale;
+      }
+    } else {
+      const lineHeight = form.fontSize * 1.2;
+      const regionHeight = form.region === "center" ? sourceHeight - form.margin * 2 : (sourceHeight - form.margin * 2) / 2;
+      const visibleLineCount = Math.min(overlay.split("\n").length, Math.max(0, Math.floor(regionHeight / lineHeight)));
+      if (form.region !== "center") objectWidth = Math.min(objectWidth, Math.max(0, sourceWidth - form.margin * 2) / 3);
+      if (visibleLineCount > 0) objectHeight = Math.max(lineHeight, (visibleLineCount - 1) * lineHeight + form.fontSize);
+    }
+    if (objectWidth > 0 && objectHeight > 0) {
+      watermarkPlan = createWatermarkPlacements({
+        viewport: { width: sourceWidth, height: sourceHeight, rotation: 0, transform: [1, 0, 0, -1, 0, sourceHeight] },
+        width: objectWidth,
+        height: objectHeight,
+        settings: {
+          ...watermark,
+          region: form.region,
+          rotation: Number.isFinite(watermark.rotation) ? watermark.rotation : 0,
+          gap: Number.isFinite(watermark.gap) ? watermark.gap : 72,
+          offsetX: Number.isFinite(watermark.offsetX) ? watermark.offsetX : 24,
+          offsetY: Number.isFinite(watermark.offsetY) ? watermark.offsetY : 24,
+        },
+        margin: form.margin,
+      });
+    }
+  }
+  const previewPlacements = watermarkPlan?.ok ? watermarkPlan.placements : [];
   return <div className="relative min-h-72 overflow-hidden rounded-2xl bg-[#e9e9ed] p-2 dark:bg-[#202023]" data-testid="pdf-finish-preview">
     {(rendering || failed) && <span className="absolute inset-0 grid place-items-center p-4 text-center text-sm font-bold text-muted-foreground">{failed ? copy.previewFailed : copy.previewWaiting}</span>}
-    <div className={cn("relative mx-auto max-w-full", rendering && "invisible")} data-testid="pdf-finish-canvas-area" style={dimensions ? { width: `${dimensions.width}px`, aspectRatio: `${dimensions.width} / ${dimensions.height}` } : undefined}>
+    <div className={cn("relative mx-auto max-w-full", rendering && "invisible")} data-testid="pdf-finish-canvas-area" style={dimensions ? { width: `${dimensions.width}px`, aspectRatio: `${dimensions.width} / ${dimensions.height}`, containerType: "inline-size" } : undefined}>
       <canvas ref={canvasRef} className="block h-auto w-full bg-white shadow-md" style={{ width: "100%", height: "auto" }} />
-      {!failed && !rendering && watermark?.pattern === "tile" && watermarkContent && <div className="pointer-events-none absolute inset-0 grid grid-cols-3 content-around overflow-hidden" data-testid="pdf-finish-overlay" data-watermark-pattern="tile" data-watermark-layer={watermark.layer} aria-hidden="true" style={{ gap: `${Math.min(80, Math.max(0, (Number.isFinite(watermark.gap) ? watermark.gap : 72) / 4))}px`, padding: `${inset} 0`, transform: `translate(${(Number.isFinite(watermark.offsetX) ? watermark.offsetX : 0) / 4}px, ${(Number.isFinite(watermark.offsetY) ? watermark.offsetY : 0) / 4}px)` }}>{Array.from({ length: 18 }, (_, index) => <div key={index} className="mx-auto w-[82%]" style={{ color: form.color, fontSize: `${Math.min(18, Math.max(7, form.fontSize / 1.4))}px`, opacity: Number.isFinite(watermark.opacity) ? watermark.opacity : 0.2, transform: `rotate(${Number.isFinite(watermark.rotation) ? watermark.rotation : 0}deg)`, transformOrigin: "center" }}>{watermarkContent}</div>)}</div>}
-      {!failed && !rendering && watermark?.pattern !== "tile" && <div className="pointer-events-none absolute max-w-[94%]" data-testid="pdf-finish-overlay" data-watermark-pattern={watermark?.pattern} data-watermark-layer={watermark?.layer} aria-hidden="true" style={positionStyle}>{watermark ? watermarkContent : overlay}</div>}
+      {!failed && !rendering && watermark && <div className="pointer-events-none absolute inset-0 overflow-hidden" data-testid="pdf-finish-overlay" data-watermark-pattern={watermark.pattern} data-watermark-layer={watermark.layer} data-placement-count={previewPlacements.length} aria-hidden="true">{dimensions && previewPlacements.map((placement, index) => <div key={`${placement.centerX}-${placement.centerY}-${index}`} className="absolute flex items-end overflow-hidden" data-watermark-placement style={{ left: `${placement.centerX / dimensions.sourceWidth * 100}%`, top: `${placement.centerY / dimensions.sourceHeight * 100}%`, width: `${placement.width / dimensions.sourceWidth * 100}%`, height: `${placement.height / dimensions.sourceHeight * 100}%`, color: form.color, fontSize: `${form.fontSize / dimensions.sourceWidth * 100}cqw`, opacity: Number.isFinite(watermark.opacity) ? watermark.opacity : 0.2, textAlign: horizontal, transform: `translate(-50%, -50%) rotate(${placement.rotation}deg)`, transformOrigin: "center" }}>{watermark.content === "image" ? imageUrl && <img src={imageUrl} alt="" className="block h-full w-full object-contain" /> : <span className="block w-full whitespace-pre-wrap break-words font-semibold leading-[1.2]">{overlay}</span>}</div>)}</div>}
+      {!failed && !rendering && !watermark && <span className="pointer-events-none absolute max-w-[60%] whitespace-pre-wrap break-words font-medium leading-[1.2] opacity-90" data-testid="pdf-finish-overlay" aria-hidden="true" style={positionStyle}>{overlay}</span>}
     </div>
   </div>;
 }

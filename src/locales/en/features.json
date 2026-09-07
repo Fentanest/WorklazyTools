@@ -927,11 +927,11 @@
         "single": "Single",
         "tile": "Repeated tiles",
         "rotation": "Rotation (-180–180°)",
-        "opacity": "Opacity (0.05–1)",
-        "size": "Page-relative size (5–100%)",
-        "gap": "Tile gap (0–300 pt)",
-        "offsetX": "Horizontal start offset (0–300 pt)",
-        "offsetY": "Vertical start offset (0–300 pt)",
+        "opacity": "Opacity (0.01–1)",
+        "size": "Page-relative size (1–100%)",
+        "gap": "Tile gap (0–2000 pt)",
+        "offsetX": "Horizontal offset (-2000–2000 pt)",
+        "offsetY": "Vertical offset (-2000–2000 pt)",
         "riskTitle": "A complex document structure was detected",
         "riskConsent": "I understand the risk and want to continue",
         "riskConsentDescription": "PDFs with complex layers, tags, or graphics state may look or behave differently after watermarking. Check the result carefully."
@@ -954,7 +954,7 @@
       "selectedPages": "{{count}} of {{total}} pages selected",
       "previewTitle": "Overlay preview",
       "previewDescription": "Check the content and position on the first selected page.",
-      "previewDisclaimer": "This preview is an on-screen approximation. Text or images are drawn directly into the finished PDF, so spacing and placement may differ slightly.",
+      "previewDisclaimer": "This preview follows rotation, the visible page area, and PDF.js-style UserUnit viewport coordinates. Text or image rendering may still differ slightly between PDF viewers.",
       "previewWaiting": "Rendering the page preview…",
       "previewFailed": "The preview could not be displayed. You can check the settings and retry PDF creation.",
       "preflightChecking": "Checking the content and page layout before creation…",
@@ -966,8 +966,9 @@
         "invalid-margin": "The margin uses all of the display area on page {{page}}. Reduce the margin.",
         "invalid-layout": "The content cannot be placed on page {{page}}. Adjust the margin or font size.",
         "image-format": "Choose a PNG or JPEG watermark image.",
+        "empty-placement": "No watermark would appear on page {{page}} with these tile offsets. Move the watermark onto the page.",
         "tile-limit": "Page {{page}} would contain too many repeated watermarks. Increase the size or tile gap.",
-        "background-placement": "A watermark stream cannot be added safely to the internal structure of page {{page}}. Try another PDF copy."
+        "background-placement": "A background watermark could not be added safely to page {{page}}. Try the foreground option or another PDF copy."
       },
       "create": "Create finished PDF",
       "creating": "Finishing the PDF…",
@@ -992,10 +993,10 @@
         "templateLength": "Keep the content within 300 characters. Some of the attempted input was not applied because it exceeded the 300-character limit.",
         "image": "Choose a PNG or JPEG watermark image.",
         "rotation": "Enter a rotation from -180 to 180.",
-        "opacity": "Enter an opacity from 0.05 to 1.",
-        "size": "Enter a size from 5 to 100.",
-        "gap": "Enter a tile gap from 0 to 300.",
-        "offset": "Enter a start offset from 0 to 300."
+        "opacity": "Enter an opacity from 0.01 to 1.",
+        "size": "Enter a size from 1 to 100.",
+        "gap": "Enter a tile gap from 0 to 2000.",
+        "offset": "Enter an offset from -2000 to 2000."
       },
       "rangeErrors": {
         "empty-range": "Enter a page range to apply.",
@@ -1016,8 +1017,9 @@
         "invalid-layout": "The content does not fit this page size and margin. Reduce the margin or font size.",
         "font-asset": "The Korean font could not be prepared. Check your connection and try again.",
         "image-format": "Choose a PNG or JPEG watermark image.",
+        "empty-placement": "The current tile offsets place every watermark outside the page. Adjust the offsets and try again.",
         "tile-limit": "There are too many repeated watermarks. Increase the size or tile gap.",
-        "background-placement": "A watermark cannot be added safely to this PDF's internal structure. Try another PDF copy.",
+        "background-placement": "A background watermark could not be added safely. Try the foreground option or another PDF copy.",
         "risk-confirmation-required": "Review the document structure warning and consent before continuing.",
         "output-validation": "A problem was found while checking the finished PDF. The source file was not changed."
       },

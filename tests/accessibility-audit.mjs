@@ -40,21 +40,41 @@ export const accessibilityExceptions = Object.freeze([
     reason: "Vendor iframe: four upstream accessibility nodes; docs/backlog.md — HWP 편집기 iframe 접근성 위반 4노드" }),
 ]);
 
+export const f2OwnedSelector = "[data-pdf-watermark-owned]";
+
 export function summarizeAccessibility(results, registeredPages = pages) {
   const ids = results.map(({ id }) => id);
   if (new Set(ids).size !== ids.length || ids.length !== registeredPages.length
     || registeredPages.some(({ id }) => !ids.includes(id))) throw new Error("Accessibility page registration mismatch (missing, duplicate or unexpected result).");
   const severityCounts = {};
   let violations = 0;
+  let incompleteRules = 0;
+  let incompleteNodes = 0;
+  let f2IncompleteNodes = 0;
+  let inheritedIncompleteNodes = 0;
   for (const result of results) {
     if (!Array.isArray(result.violations)) throw new Error(`Missing accessibility violations: ${result.id}.`);
+    if (!Array.isArray(result.incomplete)) throw new Error(`Missing accessibility incomplete results: ${result.id}.`);
     for (const violation of result.violations) {
       const severity = violation.impact || "unknown";
       severityCounts[severity] = (severityCounts[severity] || 0) + 1;
       violations += 1;
     }
+    for (const incomplete of result.incomplete) {
+      if (!Array.isArray(incomplete.nodes)) throw new Error(`Missing accessibility incomplete nodes: ${result.id}/${incomplete.id}.`);
+      incompleteRules += 1;
+      incompleteNodes += incomplete.nodes.length;
+      for (const node of incomplete.nodes) {
+        if (!Array.isArray(node.target) || !node.target.length || !Array.isArray(node.reasons) || !node.reasons.length) {
+          throw new Error(`Incomplete accessibility target or reason was discarded: ${result.id}/${incomplete.id}.`);
+        }
+        if (node.owner === "f2-watermark") f2IncompleteNodes += 1;
+        else if (node.owner === "shared-existing") inheritedIncompleteNodes += 1;
+        else throw new Error(`Unknown accessibility incomplete owner: ${result.id}/${incomplete.id}.`);
+      }
+    }
   }
-  return { pages: results.length, violations, severityCounts };
+  return { pages: results.length, violations, severityCounts, incompleteRules, incompleteNodes, f2IncompleteNodes, inheritedIncompleteNodes };
 }
 
 export function assertAccessibilityResults(report, { registeredPages = pages, limits = { critical: 0, serious: 0, total: 0 } } = {}) {
@@ -65,6 +85,7 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
   if (!Number.isFinite(contrast) || contrast < 4.5) throw new Error("Document placeholder contrast is below 4.5:1 or missing.");
   if ((summary.severityCounts.critical || 0) > limits.critical || (summary.severityCounts.serious || 0) > limits.serious
     || summary.violations > limits.total) throw new Error(`Accessibility limits exceeded: ${JSON.stringify({ ...summary, limits })}`);
+  if (summary.f2IncompleteNodes > 0) throw new Error(`F2 accessibility incomplete nodes must be resolved: ${JSON.stringify(summary)}`);
   return summary;
 }
 
@@ -95,7 +116,7 @@ export async function runAccessibilityAudit() {
         timezoneId: "Asia/Seoul",
       });
       await context.addInitScript(() => {
-        localStorage.setItem("worklazy_privacy_consent", "granted");
+        localStorage.setItem("worklazy_privacy_consent", "denied");
       });
 
       const page = await context.newPage();
@@ -120,6 +141,25 @@ export async function runAccessibilityAudit() {
         builder.exclude(exception.selector);
       }
       const audit = await builder.analyze();
+      const incomplete = [];
+      for (const rule of audit.incomplete) {
+        const nodes = [];
+        for (const node of rule.nodes) {
+          const firstTarget = node.target.flat(Infinity).find((value) => typeof value === "string");
+          const owned = typeof firstTarget === "string" && await page.evaluate(({ target, selector }) => {
+            try { return Boolean(document.querySelector(target)?.closest(selector)); }
+            catch { return false; }
+          }, { target: firstTarget, selector: f2OwnedSelector });
+          const reasons = [...node.any, ...node.all, ...node.none].map(({ message }) => message).filter(Boolean);
+          nodes.push({
+            target: node.target,
+            failureSummary: node.failureSummary,
+            reasons: reasons.length ? reasons : [node.failureSummary || rule.help || rule.id],
+            owner: owned ? "f2-watermark" : "shared-existing",
+          });
+        }
+        incomplete.push({ id: rule.id, impact: rule.impact, help: rule.help, helpUrl: rule.helpUrl, nodes });
+      }
       if (target.id === "document-compare") {
         placeholderContrast = await page.locator('[data-testid="document-revision-author"] input[placeholder]').evaluate((input) => {
           const parseRgb = (color) => {
@@ -150,6 +190,7 @@ export async function runAccessibilityAudit() {
           nodes: violation.nodes.length,
           targets: violation.nodes.map((node) => node.target),
         })),
+        incomplete,
       });
       await context.close();
     }
@@ -170,7 +211,8 @@ export async function runAccessibilityAudit() {
 
     for (const result of results) {
       const detail = result.violations.map((violation) => `${violation.id}:${violation.impact}:${violation.nodes}`).join(", ") || "none";
-      console.log(`${result.id}: passes=${result.passes}; violations=${result.violations.length}; ${detail}`);
+      const incompleteDetail = result.incomplete.map((rule) => `${rule.id}:${rule.nodes.length}`).join(", ") || "none";
+      console.log(`${result.id}: passes=${result.passes}; violations=${result.violations.length}; ${detail}; incomplete=${incompleteDetail}`);
     }
     console.log(`Accessibility audit summary: ${JSON.stringify(summary)}`);
     console.log(`Document placeholder contrast: ${placeholderContrast.ratio.toFixed(4)}:1 (${placeholderContrast.foreground} on ${placeholderContrast.background}).`);

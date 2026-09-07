@@ -15,6 +15,7 @@ import {
   PdfFinishEngineError,
 } from "../../src/features/pdf-editor/finish/engine.ts";
 import { createPageSelection } from "../../src/features/pdf-editor/finish/selection.ts";
+import { validateWatermarkResult } from "../../src/features/pdf-editor/finish/watermark.ts";
 import { finishOutputName } from "../../src/features/pdf-editor/outputName.ts";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -349,6 +350,137 @@ test("watermark warns about risky structures and proceeds only with explicit con
     assert.equal(outputs.length, 1);
     assert.ok(outputs[0].warnings.includes(warning));
   }
+});
+
+test("watermark risk scanning advances across inline image bytes and balances logical content streams", async () => {
+  const cases = [
+    { name: "inline.pdf", streams: ["q\nBI /W 1 /H 1 /BPC 8 /CS /G ID\n)\nEI\nQ"], risky: false },
+    { name: "lexical.pdf", streams: ["q\n% Q ) q\n(escaped \\( q Q \\)) Tj\n<712951> Tj\nQ"], risky: false },
+    { name: "split.pdf", streams: ["q", "Q"], risky: false },
+    { name: "closing-paren.pdf", streams: ["q\n)\nQ"], risky: true },
+  ];
+  for (const testCase of cases) {
+    const document = await PDFDocument.create({ updateMetadata: false });
+    const page = document.addPage([200, 200]);
+    const references = testCase.streams.map((content) => document.context.register(document.context.flateStream(content)));
+    page.node.set(PDFName.of("Contents"), references.length === 1 ? references[0] : document.context.obj(references));
+    const file = new File([await document.save()], testCase.name, { type: "application/pdf" });
+    const input = {
+      files: [{ key: testCase.name, file, selection: selection(1, "1") }],
+      options: watermarkOptions(),
+      locale: "en-US",
+    };
+    const preflight = await preflightPdfFiles(input);
+    assert.equal(preflight.warnings.includes("risky-graphics-state"), testCase.risky, testCase.name);
+    if (!testCase.risky) assert.equal((await finishPdfFiles(input)).length, 1);
+  }
+});
+
+test("watermark tile preflight rejects zero placements and canonical numeric boundaries remain aligned", async () => {
+  const document = await PDFDocument.create({ updateMetadata: false });
+  document.addPage([200, 200]);
+  const file = new File([await document.save()], "tile-boundaries.pdf", { type: "application/pdf" });
+  const emptyInput = {
+    files: [{ key: "empty", file, selection: selection(1, "1") }],
+    options: watermarkOptions({ margin: 0, watermark: { ...watermarkOptions().watermark, pattern: "tile" as const, rotation: 0, gap: 0, offsetX: 300, offsetY: 0 } }),
+    locale: "en-US",
+  };
+  assert.equal((await preflightPdfFiles(emptyInput)).errors[0]?.code, "empty-placement");
+  await assert.rejects(finishPdfFiles(emptyInput), (error: unknown) => error instanceof PdfFinishEngineError && error.code === "empty-placement");
+
+  const boundaryInput = {
+    files: [{ key: "boundary", file, selection: selection(1, "1") }],
+    options: watermarkOptions({ watermark: { ...watermarkOptions().watermark, opacity: 0.01, sizePercent: 100, gap: 2_000, offsetX: -2_000, offsetY: 2_000 } }),
+    locale: "en-US",
+  };
+  assert.deepEqual((await preflightPdfFiles(boundaryInput)).errors, []);
+  await assert.rejects(
+    preflightPdfFiles({ ...boundaryInput, options: watermarkOptions({ watermark: { ...watermarkOptions().watermark, opacity: 0.009 } }) }),
+    (error: unknown) => error instanceof PdfFinishEngineError && error.code === "invalid-field",
+  );
+});
+
+test("watermark text forms reserve descenders and use the six-region width contract outside center", async () => {
+  const file = await fixture("text-contract.pdf");
+  const [output] = await finishPdfFiles({
+    files: [{ key: "text-contract", file, selection: selection(3, "1") }],
+    options: watermarkOptions({ template: "gypqj\nsecond line", margin: 20, watermark: { ...watermarkOptions().watermark, region: "top-left" as const, rotation: 0, sizePercent: 100 } }),
+    locale: "en-US",
+  });
+  assert.ok(output.warnings.includes("horizontal-overflow"));
+  const document = await PDFDocument.load(output.buffer, { updateMetadata: false });
+  const form = document.context.enumerateIndirectObjects().map(([, object]) => object).find((object): object is PDFRawStream => object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Form"));
+  assert.ok(form);
+  const box = form.dict.lookup(PDFName.of("BBox"), PDFArray).asArray().map((entry) => (entry as PDFNumber).asNumber());
+  assert.equal(box[0], 0);
+  assert.equal(box[1], 0);
+  assert.ok(Math.abs(box[2] - 120) < 0.001, `unexpected six-region width: ${box[2]}`);
+  assert.ok(box[3] > 28 * 1.2, `descender/multiline height was not reserved: ${box[3]}`);
+  const content = Buffer.from(decodePDFRawStream(form).decode()).toString("latin1");
+  const baselines = [...content.matchAll(/1 0 0 1 [^ ]+ ([^ ]+) Tm/gu)].map((match) => Number(match[1]));
+  assert.ok(baselines.length >= 1 && baselines.every((baseline) => baseline > 0), `expected positive text baselines: ${baselines.join(",")}`);
+});
+
+test("watermark output validation rejects marker-only, missing XObject, and inherited empty clipping results", async () => {
+  const source = await fixture("validation.pdf");
+  const input = {
+    files: [{ key: "validation", file: source, selection: selection(3, "1") }],
+    options: watermarkOptions(),
+    locale: "en-US",
+  };
+  const corrupt = async (kind: "marker" | "resource", bytes: Uint8Array, pageCount: number, selected: readonly number[], layer: "background" | "foreground") => {
+    const document = await PDFDocument.load(bytes, { updateMetadata: false });
+    const page = document.getPage(0);
+    if (kind === "marker") {
+      const contents = page.node.Contents();
+      assert.ok(contents instanceof PDFArray);
+      const references = contents.asArray();
+      references[references.length - 1] = document.context.register(document.context.flateStream("q\n/Artifact BMC\nEMC\nQ"));
+      page.node.set(PDFName.of("Contents"), document.context.obj(references));
+    } else {
+      const xObjects = page.node.Resources()?.lookup(PDFName.of("XObject"), PDFDict);
+      assert.ok(xObjects);
+      for (const key of xObjects.keys()) xObjects.delete(key);
+    }
+    return validateWatermarkResult(await document.save(), pageCount, selected, layer);
+  };
+  for (const kind of ["marker", "resource"] as const) {
+    await assert.rejects(
+      finishPdfFiles({ ...input, validateWatermarkOutput: (bytes, pageCount, selected, layer) => corrupt(kind, bytes, pageCount, selected, layer) }),
+      (error: unknown) => error instanceof PdfFinishEngineError && error.code === "output-validation",
+    );
+  }
+
+  for (const [name, content] of [["zero-rectangle", "Q\n0 0 0 0 re W n"], ["empty-path", "Q\nW n"]]) {
+    const clipped = await PDFDocument.create({ updateMetadata: false });
+    const page = clipped.addPage([200, 200]);
+    page.node.set(PDFName.of("Contents"), clipped.context.register(clipped.context.flateStream(content)));
+    const clippedFile = new File([await clipped.save()], `${name}.pdf`, { type: "application/pdf" });
+    await assert.rejects(
+      finishPdfFiles({
+        files: [{ key: name, file: clippedFile, selection: selection(1, "1") }],
+        options: watermarkOptions(),
+        locale: "en-US",
+        allowRiskyDocuments: true,
+      }),
+      (error: unknown) => error instanceof PdfFinishEngineError && error.code === "output-validation",
+    );
+  }
+});
+
+test("watermark tile cancellation interrupts placement generation and a retry succeeds", async () => {
+  const source = await fixture("cancel-retry.pdf");
+  const controller = new AbortController();
+  const input = {
+    files: [{ key: "cancel-retry", file: source, selection: selection(3, "1") }],
+    options: watermarkOptions({ template: "A", fontSize: 6, margin: 0, watermark: { ...watermarkOptions().watermark, pattern: "tile" as const, rotation: 0, sizePercent: 10, gap: 10, offsetX: 0, offsetY: 0 } }),
+    locale: "en-US",
+  };
+  await assert.rejects(
+    finishPdfFiles({ ...input, signal: controller.signal, onProgress: (progress) => { if (progress.phase === "decorating") setTimeout(() => controller.abort(), 0); } }),
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  assert.equal((await finishPdfFiles(input)).length, 1);
 });
 
 test("watermark does not expose a result when reopen validation finds damage", async () => {

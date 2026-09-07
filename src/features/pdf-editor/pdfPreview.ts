@@ -24,6 +24,8 @@ export interface CachedPdfThumbnail {
   url: string;
   width: number;
   height: number;
+  sourceWidth: number;
+  sourceHeight: number;
 }
 
 interface PdfThumbnailCacheEntry {
@@ -177,7 +179,7 @@ export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: 
   context.drawImage(renderCanvas, 0, 0);
   renderCanvas.width = 1;
   renderCanvas.height = 1;
-  return { width: viewport.width, height: viewport.height };
+  return { width: viewport.width, height: viewport.height, sourceWidth: natural.width, sourceHeight: natural.height };
 }
 
 export function parsePageRange(value: string, pageCount: number, language: AppLanguage = "ko") {

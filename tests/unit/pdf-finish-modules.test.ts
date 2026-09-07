@@ -371,7 +371,7 @@ test("six-region text layout uses identical measured/drawn runs and reports hori
   assert.deepEqual(runs.runs.map(({ text, width }) => width === font.widthOfTextAtSize(text, 12)), [true, true, true]);
 });
 
-test("tile policy permits 400, rejects the projected 420 before allocation and keeps offset/rotation", () => {
+test("tile policy permits 400, rejects empty and projected layouts before allocation, and keeps signed offsets/rotation", () => {
   type TileInputHasNoLimitOverride = "maximumTiles" extends keyof TileLayoutInput ? false : true;
   const tileInputHasNoLimitOverride: TileInputHasNoLimitOverride = true;
   assert.equal(tileInputHasNoLimitOverride, true);
@@ -419,6 +419,21 @@ test("tile policy permits 400, rejects the projected 420 before allocation and k
       { x: 5, y: 15, rotation: 30 },
       { x: 15, y: 15, rotation: 30 },
     ],
+  });
+  assert.deepEqual(createTilePlacements({ pageWidth: 20, pageHeight: 20, tileWidth: 10, tileHeight: 10, gap: 0, offsetX: -5, offsetY: -5 }), {
+    ok: true,
+    count: 9,
+    placements: [
+      { x: -5, y: -5, rotation: 0 }, { x: 5, y: -5, rotation: 0 }, { x: 15, y: -5, rotation: 0 },
+      { x: -5, y: 5, rotation: 0 }, { x: 5, y: 5, rotation: 0 }, { x: 15, y: 5, rotation: 0 },
+      { x: -5, y: 15, rotation: 0 }, { x: 5, y: 15, rotation: 0 }, { x: 15, y: 15, rotation: 0 },
+    ],
+  });
+  assert.deepEqual(createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: 0, offsetX: 300 }), {
+    ok: false,
+    error: "empty-placement",
+    count: 0,
+    maximumTiles: 400,
   });
   assert.equal(createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 0, tileHeight: 10, gap: 0 }).ok, false);
   assert.equal(createTilePlacements({ pageWidth: 200, pageHeight: 200, tileWidth: 10, tileHeight: 10, gap: -1 }).ok, false);

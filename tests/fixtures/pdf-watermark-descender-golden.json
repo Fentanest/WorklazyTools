@@ -1,0 +1,186 @@
+{
+  "descender-lowercase-single": {
+    "pdfjs": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 684
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 684
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 684
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 684
+      }
+    ],
+    "poppler": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 741
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 741
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 741
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 741
+      }
+    ]
+  },
+  "descender-lowercase-tile": {
+    "pdfjs": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2647
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 2754
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2647
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 2754
+      }
+    ],
+    "poppler": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2909
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 3045
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2909
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 3045
+      }
+    ]
+  },
+  "descender-multiline-noto-single": {
+    "pdfjs": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 1040
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 943
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 1040
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 943
+      }
+    ],
+    "poppler": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 1030
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 928
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 1030
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 928
+      }
+    ]
+  },
+  "descender-multiline-noto-tile": {
+    "pdfjs": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2163
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 2309
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2163
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 2309
+      }
+    ],
+    "poppler": [
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2177
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 2319
+      },
+      {
+        "width": 200,
+        "height": 180,
+        "red": 2177
+      },
+      {
+        "width": 180,
+        "height": 200,
+        "red": 2319
+      }
+    ]
+  }
+}

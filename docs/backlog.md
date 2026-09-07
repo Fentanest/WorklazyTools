@@ -37,6 +37,11 @@
 - **색 수 6→4**: `toolRegistry.ts` 카테고리 accent(documents·media·text-data 등)를 도구가 상속. **blue 계열은 인디고 primary 와 겹쳐 교체**(회색 계열 또는 teal 후보).
 - 완료 기준 후보: 시각 회귀 2로케일 기준선 갱신 사유 기록 · a11y `A11Y_MAX_TOTAL=0` · 카드/사이드바 색 매핑 unit · Gemini 로컬 시각 검수.
 
+## 공용 UI 접근성 대비·ARIA — UI 전면 재설계 게이트
+
+- **U4-4(F2) 접근성 감사에서 분리된 기존 결함** — 2026-09-07 1차 수동 판정은 color-contrast incomplete **930노드** 중 기준 이상 743·미달 183·미확정 4, aria-prohibited-attr incomplete **3노드**였다. 미달은 home 0, document-compare 15, tools 28, excel-compare 11, pdf-editor 16, pdf-finish-ko/en/watermark 각 18, pdf-finish-mobile 12, hwp-editor 14, home-mobile 9, tools-mobile 24였다. 대표 원인은 footer 정책 링크·광고 설정·copyright **2.839:1**, sidebar caption **2.954~2.991:1**, 로컬 처리 안내 약 **2.899~3.110:1**, 검색 placeholder **2.524:1**, 도구 수 **2.341:1**이며 공용 AppShell/global CSS/ToolsPage/HWP host 소유다. F2 blob 변경 전부터 존재하므로 워터마크 단계에서 전역 팔레트를 임의 수정하지 않는다.
+- **귀속과 완료 조건** — `docs/jobs/todo/ui-theme-redesign-20260907.md`가 채택한 WCAG 보정 팔레트·대비 게이트에서 위 노드와 역할 없는 `div aria-label` 3건을 처리한다. U4-4 fix-1 하네스는 incomplete의 target·reason을 삭제하지 않고 F2/공용 소유를 분리하며, 현행 QA 실측은 **공용 상속 925·F2 신규 0**이다. 925를 pass로 바꾸거나 광역 예외 처리하지 않는다. UI 계획 완료 시 표시/스크롤 상태를 포함해 다시 측정하고 미확정 4건도 판정한다. — Codx
+
 ## 배포 후 라이브 감사에서 나온 기존 결함 (S0 배포 2026-09-06 — S0 회귀 아님)
 
 - **HWP 편집기 iframe 접근성 위반 4노드** — 벤더 rhwp Studio 내부(`#sb-message` 대비 3.54 · `#style-name`·`#font-lang`·`#font-name` 는 title 만으로 라벨). `4d0bae9` 에서도 동일 검출(`/tmp/worklazy-s0/deploy/logs/baseline-findings-full.log`). `public/vendor/**` 라 저장소에서 수정 불가 — 선택지: ① 상류(rhwp) 이슈 제기 ② 접근성 게이트에서 벤더 iframe 을 목적·소유자 명시 예외로 분리(광역 wildcard 금지). S2-H ③ 에서 결정. — Claude

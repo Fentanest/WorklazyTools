@@ -5,7 +5,7 @@ import { pages, accessibilityExceptions, assertAccessibilityResults } from "../a
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
-    results: pages.map(({ id }) => ({ id, violations: [] })) };
+    results: pages.map(({ id }) => ({ id, violations: [], incomplete: [] })) };
 }
 
 test("a11y zero passes; one violation fails even if stored summary still says zero", () => {
@@ -42,4 +42,21 @@ test("recorded desktop zero-result JSON passes and an injected violation fails",
   assert.equal(assertAccessibilityResults(measured, { registeredPages }).violations, 0);
   measured.results[0].violations.push({ id: "color-contrast", impact: "moderate", nodes: 1 });
   assert.throws(() => assertAccessibilityResults(measured, { registeredPages }), /limits exceeded/);
+});
+
+test("a11y incomplete targets and reasons remain visible while only F2-owned nodes fail the gate", () => {
+  const inherited = report();
+  inherited.results[0].incomplete.push({ id: "color-contrast", nodes: [{ target: [".shared"], reasons: ["Needs manual review"], owner: "shared-existing" }] });
+  const summary = assertAccessibilityResults(inherited);
+  assert.equal(summary.incompleteNodes, 1);
+  assert.equal(summary.inheritedIncompleteNodes, 1);
+  assert.equal(summary.f2IncompleteNodes, 0);
+
+  const f2 = report();
+  f2.results.find(({ id }) => id === "pdf-watermark-ko")?.incomplete.push({ id: "color-contrast", nodes: [{ target: ["[data-pdf-watermark-owned]"], reasons: ["Needs manual review"], owner: "f2-watermark" }] });
+  assert.throws(() => assertAccessibilityResults(f2), /F2 accessibility incomplete nodes/);
+
+  const discarded = report();
+  discarded.results[0].incomplete.push({ id: "color-contrast", nodes: [{ target: [], reasons: [], owner: "shared-existing" }] });
+  assert.throws(() => assertAccessibilityResults(discarded), /target or reason was discarded/);
 });

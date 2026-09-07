@@ -16,9 +16,11 @@ import {
   type PDFImage,
   type PDFOperator,
   type PDFPage,
+  type PDFFont,
   type PDFRef,
 } from "pdf-lib";
 
+import { throwIfAborted, yieldToEventLoop } from "../../../utils/cooperativeCancel.ts";
 import type { FinishRegion, PdfViewportGeometry } from "./geometry.ts";
 import { createTilePlacements } from "./tiles.ts";
 
@@ -52,7 +54,7 @@ export interface WatermarkPlacement {
 
 export type WatermarkPlacementResult =
   | { ok: true; placements: WatermarkPlacement[] }
-  | { ok: false; error: "invalid-layout" | "tile-limit" };
+  | { ok: false; error: "invalid-layout" | "empty-placement" | "tile-limit" };
 
 function dictionaryHas(dictionary: PDFDict, name: string) {
   return dictionary.has(PDFName.of(name));
@@ -68,12 +70,31 @@ function decodedStreamText(stream: PDFRawStream) {
   return text;
 }
 
-function graphicsStateLooksUnbalanced(source: string) {
-  let depth = 0;
+interface ContentScan {
+  tokens: string[];
+  uncertain: boolean;
+}
+
+function isWhitespace(character: string | undefined) {
+  return character === undefined || /[\x00\t\n\f\r ]/u.test(character);
+}
+
+function isDelimiter(character: string | undefined) {
+  return character === undefined || "()<>[]{}/%".includes(character);
+}
+
+function scanContent(source: string): ContentScan {
+  const tokens: string[] = [];
+  let uncertain = false;
   let index = 0;
-  const whitespace = (character: string | undefined) => !character || /[\x00\t\n\f\r ]/u.test(character);
+  let inlineDictionary = false;
   while (index < source.length) {
     const character = source[index];
+    const iterationStart = index;
+    if (isWhitespace(character)) {
+      index += 1;
+      continue;
+    }
     if (character === "%") {
       while (index < source.length && !/[\r\n]/u.test(source[index])) index += 1;
       continue;
@@ -89,22 +110,88 @@ function graphicsStateLooksUnbalanced(source: string) {
           index += 1;
         }
       }
-      if (nesting > 0) return true;
+      if (nesting > 0) uncertain = true;
       continue;
     }
     if (character === "<" && source[index + 1] !== "<") {
       index += 1;
       while (index < source.length && source[index] !== ">") index += 1;
+      if (index < source.length) index += 1;
+      else uncertain = true;
+      continue;
+    }
+    if ((character === "<" && source[index + 1] === "<") || (character === ">" && source[index + 1] === ">")) {
+      tokens.push(source.slice(index, index + 2));
+      index += 2;
+      continue;
+    }
+    if (character === "/") {
+      const start = index;
+      index += 1;
+      while (index < source.length && !isWhitespace(source[index]) && !isDelimiter(source[index])) index += 1;
+      tokens.push(source.slice(start, index));
+      continue;
+    }
+    if ("[]{}".includes(character)) {
+      tokens.push(character);
       index += 1;
       continue;
     }
-    if (whitespace(character) || "[]<>{}/".includes(character)) {
+    if (character === ")" || character === ">") {
+      uncertain = true;
       index += 1;
       continue;
     }
     const start = index;
-    while (index < source.length && !whitespace(source[index]) && !"[]<>{}/()%".includes(source[index])) index += 1;
+    while (index < source.length && !isWhitespace(source[index]) && !isDelimiter(source[index])) index += 1;
+    if (index === start) {
+      uncertain = true;
+      index += 1;
+      continue;
+    }
     const token = source.slice(start, index);
+    tokens.push(token);
+    if (!inlineDictionary && token === "BI") inlineDictionary = true;
+    else if (inlineDictionary && token === "ID") {
+      if (!isWhitespace(source[index])) {
+        uncertain = true;
+        inlineDictionary = false;
+        continue;
+      }
+      if (source[index] === "\r" && source[index + 1] === "\n") index += 2;
+      else index += 1;
+      let end = -1;
+      for (let cursor = index; cursor + 1 < source.length; cursor += 1) {
+        if (source[cursor] === "E" && source[cursor + 1] === "I"
+            && isWhitespace(source[cursor - 1])
+            && (isWhitespace(source[cursor + 2]) || isDelimiter(source[cursor + 2]))) {
+          end = cursor;
+          break;
+        }
+      }
+      if (end < 0) {
+        uncertain = true;
+        index = source.length;
+      } else {
+        index = end + 2;
+        tokens.push("EI");
+      }
+      inlineDictionary = false;
+    }
+    if (index <= iterationStart) {
+      uncertain = true;
+      index = iterationStart + 1;
+    }
+  }
+  if (inlineDictionary) uncertain = true;
+  return { tokens, uncertain };
+}
+
+function graphicsStateLooksUnbalanced(source: string) {
+  const scan = scanContent(source);
+  if (scan.uncertain) return true;
+  let depth = 0;
+  for (const token of scan.tokens) {
     if (token === "q") depth += 1;
     if (token === "Q") {
       if (depth === 0) return true;
@@ -132,7 +219,8 @@ export function inspectWatermarkRisks(document: PDFDocument): WatermarkRiskCode[
   if (dictionaryHas(document.catalog, "StructTreeRoot") || dictionaryHas(document.catalog, "MarkInfo")) risks.add("risky-tagged-document");
   for (const page of document.getPages()) {
     try {
-      if (pageContentStreams(page).some((stream) => graphicsStateLooksUnbalanced(decodedStreamText(stream)))) {
+      const logicalContent = pageContentStreams(page).map(decodedStreamText).join("\n");
+      if (graphicsStateLooksUnbalanced(logicalContent)) {
         risks.add("risky-graphics-state");
       }
     } catch {
@@ -202,7 +290,10 @@ export function createWatermarkPlacements(input: {
     offsetY: settings.offsetY,
     rotation: settings.rotation,
   });
-  if (!tiled.ok) return { ok: false, error: tiled.error === "tile-limit" ? "tile-limit" : "invalid-layout" };
+  if (!tiled.ok) {
+    if (tiled.error === "tile-limit" || tiled.error === "empty-placement") return { ok: false, error: tiled.error };
+    return { ok: false, error: "invalid-layout" };
+  }
   return {
     ok: true,
     placements: tiled.placements.map((placement) => ({
@@ -251,9 +342,12 @@ function placementTransform(viewport: PdfViewportGeometry, placement: WatermarkP
   ] as const;
 }
 
-function watermarkOperators(name: PDFName, graphicsState: PDFName, viewport: PdfViewportGeometry, placements: readonly WatermarkPlacement[], objectWidth: number, objectHeight: number) {
+async function watermarkOperators(name: PDFName, graphicsState: PDFName, viewport: PdfViewportGeometry, placements: readonly WatermarkPlacement[], objectWidth: number, objectHeight: number, signal?: AbortSignal) {
   const operators: PDFOperator[] = [pushGraphicsState(), beginMarkedContent("Artifact")];
   for (const placement of placements) {
+    throwIfAborted(signal);
+    await yieldToEventLoop();
+    throwIfAborted(signal);
     operators.push(pushGraphicsState(), setGraphicsState(graphicsState), concatTransformationMatrix(...placementTransform(viewport, placement, objectWidth, objectHeight)), drawObject(name), popGraphicsState());
   }
   operators.push(endMarkedContent(), popGraphicsState());
@@ -290,19 +384,88 @@ export function createTextWatermarkXObject(document: PDFDocument, fontRef: PDFRe
   return { reference: document.context.register(form), fontName };
 }
 
-export function addWatermarkXObject(page: PDFPage, reference: PDFRef, objectWidth: number, objectHeight: number, viewport: PdfViewportGeometry, placements: readonly WatermarkPlacement[], opacity: number, layer: WatermarkLayer) {
-  const name = page.node.newXObject("Watermark", reference);
-  const graphicsState = page.node.newExtGState("WatermarkGS", page.doc.context.obj({ Type: "ExtGState", ca: opacity, CA: opacity }));
-  return addIndependentContentStream(page, watermarkOperators(name, graphicsState, viewport, placements, objectWidth, objectHeight), layer);
+export function measureTextWatermarkBox(font: PDFFont, size: number, lineHeight: number, lineCount: number) {
+  const fullHeight = font.heightAtSize(size);
+  const ascenderHeight = font.heightAtSize(size, { descender: false });
+  const baselineOffset = Math.max(0, fullHeight - ascenderHeight);
+  const glyphBlockHeight = Math.max(0, lineCount - 1) * lineHeight + fullHeight;
+  return { baselineOffset, height: Math.max(lineHeight, glyphBlockHeight) };
 }
 
-export async function embedWatermarkImage(document: PDFDocument, file: File): Promise<PDFImage> {
+export async function addWatermarkXObject(page: PDFPage, reference: PDFRef, objectWidth: number, objectHeight: number, viewport: PdfViewportGeometry, placements: readonly WatermarkPlacement[], opacity: number, layer: WatermarkLayer, signal?: AbortSignal) {
+  const name = page.node.newXObject("Watermark", reference);
+  const graphicsState = page.node.newExtGState("WatermarkGS", page.doc.context.obj({ Type: "ExtGState", ca: opacity, CA: opacity }));
+  return addIndependentContentStream(page, await watermarkOperators(name, graphicsState, viewport, placements, objectWidth, objectHeight, signal), layer);
+}
+
+export async function embedWatermarkImage(document: PDFDocument, file: File, signal?: AbortSignal): Promise<PDFImage> {
+  throwIfAborted(signal);
   const bytes = await file.arrayBuffer();
+  throwIfAborted(signal);
   const type = file.type.toLowerCase();
   const name = file.name.toLowerCase();
   if (type === "image/png" || name.endsWith(".png")) return document.embedPng(bytes);
   if (type === "image/jpeg" || name.endsWith(".jpg") || name.endsWith(".jpeg")) return document.embedJpg(bytes);
   throw new Error("unsupported-image-format");
+}
+
+function streamDrawnXObjects(page: PDFPage, stream: PDFRawStream) {
+  const tokens = scanContent(decodedStreamText(stream)).tokens;
+  const names: string[] = [];
+  for (let index = 1; index < tokens.length; index += 1) {
+    if (tokens[index] === "Do" && tokens[index - 1].startsWith("/")) names.push(tokens[index - 1].slice(1));
+  }
+  if (names.length === 0) throw new Error("watermark-placement-missing");
+  const resources = page.node.Resources();
+  const rawXObjects = resources?.get(PDFName.of("XObject"));
+  const xObjects = rawXObjects ? page.doc.context.lookup(rawXObjects) : undefined;
+  if (!(xObjects instanceof PDFDict)) throw new Error("watermark-resource-missing");
+  for (const name of names) {
+    const raw = xObjects.get(PDFName.of(name));
+    if (!raw || !(page.doc.context.lookup(raw) instanceof PDFStream)) throw new Error("watermark-resource-missing");
+  }
+}
+
+function contentLeavesEmptyClip(streams: readonly PDFRawStream[]) {
+  const { tokens } = scanContent(streams.map(decodedStreamText).join("\n"));
+  const clipStack: boolean[] = [];
+  let clipEmpty = false;
+  let pathSeen = false;
+  let pathMayHaveArea = false;
+  let pendingClip = false;
+  let operands: string[] = [];
+  const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u;
+  const finishPath = () => {
+    if (pendingClip && (!pathSeen || !pathMayHaveArea)) clipEmpty = true;
+    pathSeen = false;
+    pathMayHaveArea = false;
+    pendingClip = false;
+  };
+  for (const token of tokens) {
+    if (numeric.test(token)) {
+      operands.push(token);
+      continue;
+    }
+    if (token.startsWith("/") || ["[", "]", "<<", ">>"].includes(token)) {
+      operands.push(token);
+      continue;
+    }
+    if (token === "q") clipStack.push(clipEmpty);
+    else if (token === "Q") {
+      const restored = clipStack.pop();
+      if (restored !== undefined) clipEmpty = restored;
+    } else if (token === "re") {
+      const rectangle = operands.slice(-4).map(Number);
+      pathSeen = true;
+      if (rectangle.length !== 4 || rectangle.some((value) => !Number.isFinite(value)) || (rectangle[2] !== 0 && rectangle[3] !== 0)) pathMayHaveArea = true;
+    } else if (["m", "l", "c", "v", "y", "h"].includes(token)) {
+      pathSeen = true;
+      pathMayHaveArea = true;
+    } else if (token === "W" || token === "W*") pendingClip = true;
+    else if (["S", "s", "f", "F", "f*", "B", "B*", "b", "b*", "n"].includes(token)) finishPath();
+    operands = [];
+  }
+  return clipEmpty;
 }
 
 export async function validateWatermarkResult(bytes: Uint8Array, pageCount: number, selectedPages: readonly number[], layer: WatermarkLayer) {
@@ -314,5 +477,7 @@ export async function validateWatermarkResult(bytes: Uint8Array, pageCount: numb
     const stream = streams[layer === "background" ? 0 : streams.length - 1];
     const content = decodedStreamText(stream).trim();
     if (!content.startsWith("q\n/Artifact BMC") || !content.endsWith("EMC\nQ")) throw new Error("watermark-stream-invalid");
+    streamDrawnXObjects(document.getPage(physicalPage - 1), stream);
+    if (layer === "foreground" && contentLeavesEmptyClip(streams.slice(0, -1))) throw new Error("watermark-clipped");
   }
 }

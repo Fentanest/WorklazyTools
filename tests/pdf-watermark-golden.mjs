@@ -59,6 +59,7 @@ const options = (layer, pattern) => ({
 
 await verifyContentStreamFixtures();
 await verifyContentStreamPixelMatrix();
+await verifyTextDescenderMatrix();
 const cropFixture = await createRotatedCropFixture();
 const metrics = {};
 for (const layer of ["background", "foreground"]) {
@@ -105,7 +106,7 @@ const stableMetrics = Object.fromEntries(Object.entries(metrics).map(([id, rende
 const expectedMetrics = JSON.parse(await fs.readFile(path.join(repositoryRoot, "tests/fixtures/pdf-watermark-golden.json"), "utf8"));
 assert.deepEqual(stableMetrics, expectedMetrics, "PDF.js or Poppler watermark pixels changed from the reviewed golden metrics");
 await fs.writeFile(path.join(artifactDirectory, "metrics.json"), `${JSON.stringify(stableMetrics, null, 2)}\n`);
-console.log(`PDF watermark golden passed: 4 /Contents fixtures and 128 PDF.js/Poppler layer, tile, CropBox, and rotation renders. Artifacts: ${artifactDirectory}`);
+console.log(`PDF watermark golden passed: 4 /Contents fixtures, 128 image watermark renders, and 32 lowercase/multiline/Noto descender renders across PDF.js and Poppler. Artifacts: ${artifactDirectory}`);
 
 async function verifyContentStreamFixtures() {
   const directory = path.join(repositoryRoot, "tests/fixtures/pdf-finish/background");
@@ -164,6 +165,58 @@ async function verifyContentStreamPixelMatrix() {
       }
     }
   }
+}
+
+async function verifyTextDescenderMatrix() {
+  const fontBytes = await fs.readFile(path.join(repositoryRoot, "public/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf"));
+  const fontAsset = () => fontBytes.buffer.slice(fontBytes.byteOffset, fontBytes.byteOffset + fontBytes.byteLength);
+  const stable = {};
+  for (const [textId, template] of [["lowercase", "gypqj"], ["multiline-noto", "보안\nРусский gypqj"]]) {
+    const source = await PDFDocument.create({ updateMetadata: false });
+    for (const rotation of [0, 90, 180, 270]) {
+      const page = source.addPage([240, 220]);
+      page.setCropBox(20, 20, 200, 180);
+      page.setRotation(degrees(rotation));
+    }
+    const file = new File([await source.save()], `${textId}.pdf`, { type: "application/pdf" });
+    for (const pattern of ["single", "tile"]) {
+      const id = `descender-${textId}-${pattern}`;
+      const [output] = await finishPdfFiles({
+        files: [{ key: id, file, selection: selection(4) }],
+        options: {
+          template,
+          region: "center",
+          fontSize: 36,
+          color: "#d2192d",
+          margin: 0,
+          startNumber: 1,
+          startPage: 1,
+          excludeCover: false,
+          watermark: { content: "text", layer: "foreground", pattern, region: "center", rotation: 0, opacity: 1, sizePercent: 60, gap: 24, offsetX: 8, offsetY: 8 },
+        },
+        locale: "en-US",
+        loadFontAsset: async () => fontAsset(),
+      });
+      const pdfPath = path.join(artifactDirectory, `${id}.pdf`);
+      await fs.writeFile(pdfPath, Buffer.from(output.buffer));
+      stable[id] = {
+        pdfjs: (await renderPdfJs(output.buffer, id)).map(({ width, height, red }) => ({ width, height, red })),
+        poppler: (await renderPoppler(pdfPath, id)).map(({ width, height, red }) => ({ width, height, red })),
+      };
+      for (const renderer of ["pdfjs", "poppler"]) {
+        assert.equal(stable[id][renderer].length, 4);
+        for (const [page, metrics] of stable[id][renderer].entries()) {
+          assert.ok(metrics.red > 0, `${id}/${renderer}/rotation-${page * 90} clipped every text pixel`);
+        }
+      }
+    }
+  }
+  const expectedPath = path.join(repositoryRoot, "tests/fixtures/pdf-watermark-descender-golden.json");
+  if (process.env.UPDATE_PDF_WATERMARK_DESCENDER_GOLDEN === "1") {
+    await fs.writeFile(expectedPath, `${JSON.stringify(stable, null, 2)}\n`);
+  }
+  const expected = JSON.parse(await fs.readFile(expectedPath, "utf8"));
+  assert.deepEqual(stable, expected, "PDF.js or Poppler lowercase/multiline/Noto descender pixels changed from the reviewed golden metrics");
 }
 
 async function createRotatedCropFixture() {

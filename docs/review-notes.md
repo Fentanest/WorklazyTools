@@ -4,6 +4,52 @@
 
 ## 2026-09-07
 
+### U4-4 fix-1 — 1차 검수 R1~R9 수리·접근성 귀속 분리 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`를 첫 행동으로 전문 확인하고 `AGENTS.md`, fix-1 dispatch, PDF finish 정본과 U4-4 착수 지시서, 저장소에 보존된 1차 검수 보고·시각 판정을 대조했다. 시작 branch/HEAD는 `s3-pdf-finish`/`5767f135443f113e655fbb0801a01e4d3c11de23`으로 지시와 일치했고 열린 실행 계획과 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`와 금지된 다른 worktree·검수 산출물에는 접근하지 않았고 main 동기화·병합·push·배포도 하지 않는다.
+
+| 결함 | 원인과 수리·고정 회귀 |
+|---|---|
+| R1 inline image 멈춤 | content scanner가 연산자 밖의 `)`에서 index를 전진시키지 않았다. 모든 분기에 전진 보장을 두고 literal string·주석·hex·name과 `BI…ID…EI`의 원시 image data를 분리했다. 정상 `0x29` data, 닫는 괄호, 문자열/주석/hex, 여러 stream의 논리적 `q/Q` 균형 및 실제 업로드·취소·재시도를 고정했다. 불확실한 구문은 `risky-graphics-state` 경고이며 일괄 거부하지 않는다. |
+| R2 descender | 마지막 baseline 0과 Form `BBox=[0,0,w,h]`가 하단 glyph를 잘랐다. font의 descender 포함 높이와 ascender 차이로 baseline offset을 만들고 모든 줄과 BBox 높이에 동일 적용했다. 글자 크기는 유지한다. `gypqj`, 다중 줄 마지막 `gypqj`, Noto, 4회전, single/tile을 PDF.js·Poppler **32렌더** 고정 수치로 추가했고 기존 이미지 **128렌더**도 유지했다. |
+| R3 0개 배치 성공 | offset 뒤 행·열 수가 0이어도 성공으로 반환했고 validator는 marker만 확인했다. 회전 bounds와 signed offset의 실제 교차 타일부터 계산해 0개를 `empty-placement` 사전 필드 오류로 막고 ko/en 행동 안내를 추가했다. validator는 `Do≥1`, 참조 XObject 존재, 전경 앞의 `Q + zero-area/empty clip`을 확인해 marker-only·삭제 resource·비가시 결과를 거부한다. clamp·축소·전경 폴백은 하지 않는다. |
+| R4 모바일 탭 | 공용 Button의 nowrap 상태에서 icon+label 폭이 3등분 버튼보다 컸다. 320/390px에서 icon/label을 세로 배치하고 label 줄바꿈과 `min-width:0`을 줘 자기 bbox와 인접 경계를 지키게 했다. 상위 5칸 navigation 계약은 유지했다. |
+| R5 F1 미리보기 | F2 공용화 중 기존 F1 wrapper의 `white-space`, line-height, weight, opacity가 빠졌다. F1은 `whitespace-pre-wrap`, `leading-[1.2]`, `font-medium`, `opacity-90`, 최대 폭 60%를 복원했고 실제 두 줄 높이를 브라우저에서 단언한다. |
+| R6 타일 미리보기 | 3열·18개·82% 폭 DOM을 고정해 size/gap/offset 변화가 없었다. PDF.js scale-1 viewport 치수와 제품 `createWatermarkPlacements`를 공유해 text/image object 비율과 배치 수·중심·크기·회전을 %로 표시한다. 픽셀 동일성은 주장하지 않지만 유효 size 변경의 폭·개수 반응을 검사한다. |
+| R7 레이아웃·범위·취소 | 중앙 single은 전체 유효폭을 유지하고 나머지 6영역은 N3의 3열×2행 폭·높이에 같은 말줄임·수직 생략 경고를 적용했다. 확정 범위는 opacity **0.01~1(step .01)**, size **1~100%**, gap **0~2000pt**, offset **−2000~2000pt**이며 타일 상한 **400**은 유지한다. 각 tile operator 전에 abort 검사·event-loop 양보·재검사를 수행한다. 지원 설명은 **회전/CropBox 및 PDF.js 방식 UserUnit viewport 좌표 처리**로 한정하며 renderer 간 픽셀·치수 동일성을 뜻하지 않는다. |
+| R8 접근성 | 하네스가 axe `incomplete`를 버려 passes/violations만 저장했다. 이제 rule·impact·help URL과 노드 target·failure summary·검사 사유를 보존하고, 노드를 `f2-watermark`/`shared-existing`으로 분리한다. QA 실측은 violations **0**, 외부 요청 **0**, incomplete **925 inherited / F2 신규 0**이다. 기존 공용 대비·ARIA는 이 작업의 통과로 세지 않고 `docs/backlog.md`의 UI 전면 재설계 게이트로 이관했다. |
+| R9 내부 명칭 | ko/en의 “내부 구조/stream”을 “배경 워터마크를 안전하게 넣지 못함 → 전경 또는 다른 사본 시도”라는 행동·결과 문구로 교체했다. 원시 예외 미노출 경계는 그대로다. |
+
+**1차 기록 정정** — 기존 U4-4 기록의 글꼴 분기는 “ASCII/Latin-1 대 나머지”가 아니라 **각 후보 전체의 Helvetica encode 가능 여부와 Noto glyph coverage** 기준이다. 최초 구현에서 수정된 시각 기준선 20장은 모두 세 번째 탭 때문이 아니며 **16장은 안내문+F1 glyph 스타일·하단 흐름, 4장은 내부 3탭**이다. 당시 bundle 귀속 이동 **509,794B**는 **QR 509,380B + image-studio 414B**이고 전부 QR로 적지 않는다. UserUnit 지원은 위 PDF.js식 viewport 좌표 범위로 제한한다.
+
+fix-1에서는 공식 생성기로 필터 36장을 재생성했고 실제 변경은 **28장**이다: page-number 8·header/footer 8은 지원 안내와 F1 wrapper, watermark 8은 지원 안내와 새 배치 미리보기, active finish navigation 4는 모바일 내부 탭이다. start/end navigation 8장은 변경되지 않았다. 실제/diff 이미지를 확인한 뒤 갱신했으며 같은 필터 재실행 **36/36**이 기준에 일치했다.
+
+**접근성 귀속 재측정** — local-QA 12페이지에서 자동 위반은 0, 외부 요청은 0이다. 하네스가 보존한 incomplete은 rule 15건·node 925개이며 F2 소유 target 목록은 정확히 `[]`(0개), 공용 상속은 925개다. 페이지별 공용 상속 node는 home 5·document-compare 43·tools 199·excel-compare 64·pdf-editor 47·pdf-finish-ko 47·pdf-finish-mobile-ko 31·pdf-finish-en 47·pdf-watermark-ko 47·hwp-editor 44·home-mobile-ko 171·tools-mobile-ko 180이다. target을 찾지 못하거나 target/reason을 버린 결과는 하네스 오류로 처리한다. 공용 925개는 `docs/backlog.md`의 "공용 UI 접근성 incomplete 정리"와 `docs/jobs/todo/ui-theme-redesign-20260907.md` 게이트에 귀속했다.
+
+| 번들 지표(gzip) | 고정 S3 기준 대비 fix-1 누적 순증분 | 상한 | 잔여 |
+|---|---:|---:|---:|
+| entry JS | +7,128B | +20,480B | 13,352B |
+| affected PDF route JS | +20,415B | +61,440B | 41,025B |
+| shared JS(귀속 이동 제외 net) | +2,171B | +30,720B | 28,549B |
+| app JS | +30,494B | +81,920B | 51,426B |
+| CSS | +235B | +10,240B | 10,005B |
+
+고정 기준 SHA-256은 `2605437e04a5d77ed41c2dbfac4fae864a6a9c8b5e56941e696a80b7f76ac692`, override `{}`·multiplier 1이다. scoped 비교는 5지표 모두 통과했다. 전체 route 원실행은 기준의 `perRouteJsGzip`에 audio가 없어 fail-closed 했고 이를 성공으로 세지 않았다. 기준 `files[].routeOwners/gzipBytes`를 변경 없이 재집계해 기록된 PDF **171,864B**와 일치함을 먼저 단언한 뒤 19개 전체 route를 비교했으며, 기준 **2,450,827B**→현재 **1,962,228B**, 증분 **−488,599B**다. QR→shared 509,380B와 image-studio→shared 414B의 귀속 이동은 순증분에서 분리했다.
+
+| 검증 | fix-1 최종 결과 |
+|---|---|
+| TypeScript · unit · production build · static | 진단 0; **312/312**, fail·skip 0; **2,847 modules**, 정적 69페이지·startup recovery 116 통과 |
+| PDF finish · watermark golden | inline image `0x29`, split stream, 0배치·resource/clip 음성 대조, 실제 업로드·취소·재시도 통과; 기존 128 + descender 32 = **160/160** 렌더 |
+| PDF 범위/전체 browser · new-tools · utilities · Office | 전부 통과; 기존 host capability skip은 결정적 fallback 검증 통과 |
+| QR bulk · font · recovery · legacy oracle | 전부 통과; recovery **147 cases**, legacy client/structure/render/output/input 총 diff **0** |
+| Excel Cleaner · Compare | 취소·재실행·보고서·모바일 포함 통과 |
+| 전체 visual ko/en | **211/211**, 위 28개만 공식 생성기로 변경 |
+| local-QA a11y · rendering | 위반 0·F2 incomplete 0·공용 incomplete 925 보존·외부 요청 0; 7대상×3회, watermark CLS max **0.0001480366** |
+| bundle scoped/전체 · CSS · legacy · registry | scoped 5상한 통과·전체 −488,599B; orphan 0; 155/153/0/2; 도구 20 |
+| 공백·포트 | `git diff --check` 통과; 모든 명시 Vite 포트는 4280~4287 `--strictPort` |
+
+검수 probe 원본은 허용된 저장소·dispatch 경로에 없고 금지된 `/tmp/worklazy-u4-4-review1` 및 4270 하드코딩을 가리켜, "무수정 실행"과 이번 잡의 접근 금지·4280~4289 제약을 동시에 만족할 수 없었다. 금지 경로를 읽거나 probe를 고치지 않았고, 같은 R1/R2/R3/R6 계약은 제품 unit·브라우저·PDF.js/Poppler 골든에서 직접 재현했다. 최초 inline 브라우저 재현은 이전 ready locator를 재사용한 동기화 오류와 200pt/10%의 의도된 6영역 overflow를 각각 검출했으며, 제품 완화 없이 새 파일의 실행 버튼 활성 대기와 유효 6pt fixture로 교정한 뒤 최종 명령을 통과했다. 원출력과 JSON·캡처·PDF/PNG는 `/tmp/worklazy-u4-4-fix1/`에 보존한다. — Codx
+
 ### U4-4(F2) PDF 벡터 워터마크·배경 stream — 브랜치 구현·검증 (Codx)
 
 **실행 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 현행 실측 1~3·확정 1/3/4/21/25/26·U4-4·H5 C-D·H6 및 관련 검토 이력을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=31529570059efe2478fb0326baf7740bc4861783`으로 지시와 일치했고 추적 변경과 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`를 열거나 stage하지 않았으며 금지된 다른 worktree·검수 산출물도 접근하지 않았다. main 동기화·병합·push·배포는 수행하지 않는다.
