@@ -89,6 +89,56 @@
     "expectedStoryParts": 13,
     "expectedStructuralRevisions": 5
   },
+  "preservedPackageParts": [
+    "word/comments.xml",
+    "word/commentsExtended.xml",
+    "word/commentsIds.xml",
+    "word/people.xml"
+  ],
+  "packagePartNegativeControls": [
+    {
+      "mutation": "remove-comments-part",
+      "category": "part-removal",
+      "pairId": "comments-multipara",
+      "part": "word/comments.xml",
+      "action": "remove"
+    },
+    {
+      "mutation": "corrupt-comments-bytes",
+      "category": "bytes-corruption",
+      "pairId": "comments-multipara",
+      "part": "word/comments.xml",
+      "action": "corrupt"
+    },
+    {
+      "mutation": "add-output-only-comments-part",
+      "category": "output-only-addition",
+      "pairId": "exact",
+      "part": "word/comments.xml",
+      "action": "add"
+    },
+    {
+      "mutation": "remove-comments-extended-part",
+      "category": "related-part-removal",
+      "pairId": "revisions",
+      "part": "word/commentsExtended.xml",
+      "action": "remove"
+    },
+    {
+      "mutation": "remove-comments-ids-part",
+      "category": "related-part-removal",
+      "pairId": "revisions",
+      "part": "word/commentsIds.xml",
+      "action": "remove"
+    },
+    {
+      "mutation": "remove-people-part",
+      "category": "related-part-removal",
+      "pairId": "revisions",
+      "part": "word/people.xml",
+      "action": "remove"
+    }
+  ],
   "commentFixture": {
     "fixtureId": "comments-multipara:comments-preserved",
     "pairId": "comments-multipara",

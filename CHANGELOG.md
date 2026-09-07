@@ -4,6 +4,7 @@
 
 ## 2026-09-07
 
+- 문서 비교 동치 oracle이 메모 관련 패키지 part의 존재·부재와 bytes를 after DOCX와 양방향 대조하도록 보강했다. — Codx
 - 문서 비교 동치 oracle에 독립 구조 키 대조와 최종 DOCX 거부 복원을 추가하고, 메모 보존·다문단 셀 예외를 실제 fixture로 고정했다. — Codx
 - 문서 비교의 단어 단위 `diffText`를 Word 변경 추적 DOCX 생성기에도 연결하고, 코드포인트 offset 검증·97쌍 골든·DOCX 동치 oracle을 추가했다. 추출 전용 Python 경로는 보존하면서 도달 불가 비교 정의 31개를 제거했다. — Codx
 - 실제 텍스트 변경 HWP fixture와 한·영 검토 메모·변경 추적 안내 회귀를 추가하고, 문구 변화가 반영된 HWP 결과 시각 기준선 한 장을 갱신했다. — Codx

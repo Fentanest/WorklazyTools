@@ -17,6 +17,7 @@ const fixtureRoot = path.join(testRoot, "fixtures/document-compare");
 const contract = JSON.parse(fs.readFileSync(path.join(fixtureRoot, "equivalence-contract.json"), "utf8"));
 const sidecarContract = JSON.parse(fs.readFileSync(path.join(fixtureRoot, "equivalence-sidecars.json"), "utf8"));
 const mutation = process.env.DOCUMENT_DIFF_MUTATION ?? "";
+const packagePartMutation = contract.packagePartNegativeControls.find((control) => control.mutation === mutation) ?? null;
 const activeExceptionFixturePairs = mutation === "remove-e6-fixture" ? [] : contract.exceptionFixturePairs;
 const pairSpecs = [...contract.fixturePairs, contract.exactPackagePair, ...activeExceptionFixturePairs];
 
@@ -25,6 +26,24 @@ assert.equal(contract.offsetUnit, "unicode-code-point");
 assert.equal(contract.fixturePairs.length, 5);
 assert.equal(contract.exceptionFixturePairs.length, 1);
 assert.deepEqual(contract.packageReject.fixturePairIds, contract.fixturePairs.map((pair) => pair.pairId));
+assert.deepEqual(contract.preservedPackageParts, [
+  "word/comments.xml",
+  "word/commentsExtended.xml",
+  "word/commentsIds.xml",
+  "word/people.xml",
+]);
+assert.equal(contract.packagePartNegativeControls.length, 6);
+assert.deepEqual(
+  [...new Set(contract.packagePartNegativeControls.map((control) => control.category))].sort(),
+  ["bytes-corruption", "output-only-addition", "part-removal", "related-part-removal"],
+);
+assert.equal(new Set(contract.packagePartNegativeControls.map((control) => control.mutation)).size, 6);
+assert(contract.packagePartNegativeControls.every((control) => contract.preservedPackageParts.includes(control.part)));
+assert(contract.packagePartNegativeControls.every((control) => pairSpecs.some((pair) => pair.pairId === control.pairId)));
+assert(contract.packagePartNegativeControls.every((control) => ["remove", "corrupt", "add"].includes(control.action)));
+if (/^(?:remove|corrupt|add)-/.test(mutation) && mutation !== "remove-e6-fixture") {
+  assert(packagePartMutation, `Unknown oracle mutation: ${mutation}`);
+}
 assert.equal(sidecarContract.schemaVersion, 1);
 assert.deepEqual(sidecarContract.fields, [
   "pairId",
@@ -72,6 +91,8 @@ for (const pair of pairSpecs) {
 pyodide.globals.set("PAIR_SPECS_JSON", JSON.stringify(pairSpecs));
 pyodide.globals.set("ORACLE_MUTATION", mutation);
 pyodide.globals.set("PACKAGE_REJECT_AUTHOR", contract.packageReject.targetAuthor);
+pyodide.globals.set("PRESERVED_PACKAGE_PARTS_JSON", JSON.stringify(contract.preservedPackageParts));
+pyodide.globals.set("PACKAGE_PART_MUTATION_JSON", JSON.stringify(packagePartMutation));
 for (const relativePath of [
   "src/features/word-compare/alignment.py",
   "src/features/word-compare/compare.py",
@@ -113,6 +134,9 @@ for (const [index, row] of sidecarContract.expectations.entries()) {
 const observedSidecars = new Set();
 let matchingSidecars = 0;
 let allowedSidecarMismatches = 0;
+let preservedPackagePartChecks = 0;
+let presentPackagePartChecks = 0;
+let absentPackagePartChecks = 0;
 
 for (const report of result.pairs) {
   assert(report.observations.length > 0, `${report.id} produced no paragraph sidecars`);
@@ -157,6 +181,32 @@ for (const report of result.pairs) {
   }
 }
 assert.equal(observedSidecars.size, expectedSidecars.size, "Expected sidecar key is missing");
+
+for (const pair of pairSpecs) {
+  const report = reports.get(pair.pairId);
+  assert(report, `Missing package report for ${pair.pairId}`);
+  assert.deepEqual(
+    report.preservedPackageParts.map((row) => row.part),
+    contract.preservedPackageParts,
+    `${pair.pairId} preserved package part coverage differs`,
+  );
+  for (const row of report.preservedPackageParts) {
+    assert.equal(
+      row.matchesAfter,
+      true,
+      `${pair.pairId} preserved package part differs from after; commentsPreserved=${report.commentsPreserved}; ${JSON.stringify(row)}`,
+    );
+    preservedPackagePartChecks += 1;
+    if (row.afterPresent) presentPackagePartChecks += 1;
+    else absentPackagePartChecks += 1;
+  }
+  assert.equal(report.commentsPreserved, true, `${pair.pairId} preserved package parts differ from after`);
+}
+for (const control of contract.packagePartNegativeControls) {
+  const row = reports.get(control.pairId)?.preservedPackageParts.find((item) => item.part === control.part);
+  assert(row, `${control.mutation} has no package part coverage`);
+  assert.equal(row.afterPresent, control.action !== "add", `${control.mutation} has the wrong after-part precondition`);
+}
 
 for (const pair of contract.fixturePairs) {
   const report = reports.get(pair.pairId);
@@ -300,6 +350,9 @@ console.log(JSON.stringify({
   packageRejectPairs: contract.fixturePairs.length,
   packageRejectStoryParts,
   packageRejectStructuralRevisions,
+  preservedPackagePartChecks,
+  presentPackagePartChecks,
+  absentPackagePartChecks,
   exactPackageKeys: exactReport.packageRows.length,
   multiParagraphCellFixtures: multiparaReport.inputCellParagraphs.before.filter((paragraphs) => paragraphs.length > 1).length,
   commentFixturePreservedFrom: commentSpec.preservedFrom,

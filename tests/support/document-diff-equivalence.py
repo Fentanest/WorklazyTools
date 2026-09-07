@@ -195,6 +195,56 @@ def _corrupt_first_generated_deletion(package_bytes, target_author):
     return result.getvalue(), corrupted
 
 
+def _mutate_package_part(package_bytes, pair_id, mutation):
+    if not mutation or mutation["pairId"] != pair_id:
+        return package_bytes, []
+    action = mutation["action"]
+    part = mutation["part"]
+    found = False
+    result = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(package_bytes)) as source, zipfile.ZipFile(result, "w") as target:
+        for info in source.infolist():
+            data = source.read(info.filename)
+            if info.filename == part:
+                found = True
+                if action == "remove":
+                    continue
+                if action == "corrupt":
+                    data += b"\n"
+            target.writestr(info, data)
+        if action == "add":
+            assert not found
+            target.writestr(
+                part,
+                ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                 '<w:comments xmlns:w="' + WORD_NS + '"/>').encode("utf-8"),
+            )
+    assert found == (action != "add")
+    return result.getvalue(), [{"part": part, "action": action}]
+
+
+def _preserved_package_part_rows(package_bytes, after_path, package_parts):
+    rows = []
+    with zipfile.ZipFile(io.BytesIO(package_bytes)) as output, zipfile.ZipFile(after_path) as after:
+        output_parts = set(output.namelist())
+        after_parts = set(after.namelist())
+        for part in package_parts:
+            output_present = part in output_parts
+            after_present = part in after_parts
+            bytes_equal = output.read(part) == after.read(part) if output_present and after_present else None
+            rows.append({
+                "part": part,
+                "afterPresent": after_present,
+                "outputPresent": output_present,
+                "bytesEqual": bytes_equal,
+                "matchesAfter": (
+                    after_present == output_present
+                    and (not after_present or bytes_equal)
+                ),
+            })
+    return rows
+
+
 _real_parse_xml = _parse_xml
 _node_paths = {}
 _part_by_hash = {}
@@ -314,6 +364,12 @@ def _run_pair(pair_spec, before_path, after_path):
             package_bytes,
             target_author,
         )
+    package_part_mutation = json.loads(globals().get("PACKAGE_PART_MUTATION_JSON", "null"))
+    package_bytes, mutated_package_parts = _mutate_package_part(
+        package_bytes,
+        pair_id,
+        package_part_mutation,
+    )
     elapsed_ms = (time.perf_counter() - started) * 1000
     tracked_path = f"/fixtures/{pair_id}-tracked.docx"
     accepted_path = f"/fixtures/{pair_id}-accepted.docx"
@@ -329,10 +385,12 @@ def _run_pair(pair_spec, before_path, after_path):
 
     with zipfile.ZipFile(io.BytesIO(package_bytes)) as archive:
         parts = sorted(archive.namelist())
-        comments_preserved = (
-            "word/comments.xml" not in parts
-            or archive.read("word/comments.xml") == zipfile.ZipFile(after_path).read("word/comments.xml")
+        preserved_package_parts = _preserved_package_part_rows(
+            package_bytes,
+            after_path,
+            json.loads(PRESERVED_PACKAGE_PARTS_JSON),
         )
+        comments_preserved = all(row["matchesAfter"] for row in preserved_package_parts)
         package_rows = []
         if pair_id == "exact":
             document_root = ET.fromstring(archive.read("word/document.xml"))
@@ -349,7 +407,9 @@ def _run_pair(pair_spec, before_path, after_path):
         "elapsedMs": elapsed_ms,
         "observations": list(_observations),
         "packageParts": parts,
+        "preservedPackageParts": preserved_package_parts,
         "commentsPreserved": comments_preserved,
+        "mutatedPackageParts": mutated_package_parts,
         "acceptedMatchesAfter": accepted_model == after_model,
         "acceptedMatchesAcceptedAfter": accepted_model == accepted_after_model,
         "acceptedTextMatchesAcceptedAfter": _model_text(accepted_model) == _model_text(accepted_after_model),
