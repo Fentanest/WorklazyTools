@@ -196,9 +196,19 @@ test("finish cancellation preserves registered outputs and blocks the next file 
 });
 
 test("finish output names are localized, sanitized, deduplicated, and have one extension", () => {
-  assert.equal(finishOutputName("quarterly.pdf", "en-US"), "quarterly-finished.pdf");
+  const cases = [
+    { source: "  report.pdf  ", base: "report" },
+    { source: " .pdf ", base: "" },
+    { source: "report.pdf.pdf", base: "report" },
+    { source: ".pdf", base: "" },
+    { source: "report.pdf", base: "report" },
+    { source: "report", base: "report" },
+    { source: "\u2003report.pdf\u00a0", base: "report" },
+    { source: "quarterly-finished.pdf", base: "quarterly" },
+  ];
+  for (const { source, base } of cases) {
+    assert.equal(finishOutputName(source, "ko-KR"), base ? `${base}-마무리.pdf` : "Worklazy-PDF-마무리.pdf");
+    assert.equal(finishOutputName(source, "en-US"), base ? `${base}-finished.pdf` : "Worklazy-PDF-finished.pdf");
+  }
   assert.equal(finishOutputName("보고서:1.pdf.pdf", "ko-KR"), "보고서-1-마무리.pdf");
-  assert.equal(finishOutputName("quarterly-finished.pdf", "en-US"), "quarterly-finished.pdf");
-  assert.equal(finishOutputName(".pdf", "ko-KR"), "Worklazy-PDF-마무리.pdf");
-  assert.equal(finishOutputName(".pdf", "en-US"), "Worklazy-PDF-finished.pdf");
 });

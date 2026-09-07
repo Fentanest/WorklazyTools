@@ -190,12 +190,27 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   })) : [], [file, fileKey, pageCount]);
 
   const updateForm = <K extends keyof FinishFormState>(field: K, value: FinishFormState[K]) => {
+    if (Object.is(forms[activeTab][field], value)) return;
     setForms((current) => ({ ...current, [activeTab]: { ...current[activeTab], [field]: value } }));
     setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
     if (field === "template" && typeof value === "string" && value.length < 300) {
       setTemplateLimitNotices((current) => ({ ...current, [activeTab]: false }));
     }
     download.clearResult();
+  };
+
+  const updatePreflightInput = <T,>(currentValue: T, nextValue: T, setValue: (value: T) => void) => {
+    if (Object.is(currentValue, nextValue)) return;
+    setValue(nextValue);
+    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    download.clearResult();
+  };
+
+  const selectTab = (tab: ImplementedFinishTab) => {
+    if (activeTab === tab) return;
+    setActiveTab(tab);
+    setError("");
+    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
   };
 
   const noteTemplateLimitAttempt = (currentValue: string, selectionStart: number | null, selectionEnd: number | null, inserted: string) => {
@@ -342,7 +357,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         {(["page-numbers", "header-footer"] as const).map((tab) => {
           const selected = activeTab === tab;
           const Icon = tab === "page-numbers" ? Hash : PanelTop;
-          return <Button key={tab} id={`${tabPanelId}-${tab}`} className={cn("min-h-11 rounded-xl text-muted-foreground", selected && "bg-card text-violet-700 shadow-sm dark:text-violet-300")} variant="ghost" type="button" role="tab" aria-selected={selected} aria-controls={tabPanelId} data-finish-tab={tab} onClick={() => { setActiveTab(tab); setError(""); setPreflight({ status: "idle", errors: [], warnings: [], failure: "" }); }}><Icon size={17} />{copy.tabs[tab]}</Button>;
+          return <Button key={tab} id={`${tabPanelId}-${tab}`} className={cn("min-h-11 rounded-xl text-muted-foreground", selected && "bg-card text-violet-700 shadow-sm dark:text-violet-300")} variant="ghost" type="button" role="tab" aria-selected={selected} aria-controls={tabPanelId} data-finish-tab={tab} onClick={() => selectTab(tab)}><Icon size={17} />{copy.tabs[tab]}</Button>;
         })}
       </div>
 
@@ -367,16 +382,16 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                 </div>
                 <h3 className="mt-6 mb-3 font-heading text-base font-medium">{copy.numberingTitle}</h3>
                 <div className="grid grid-cols-2 gap-3 max-[620px]:grid-cols-1">
-                  <UtilityField>{copy.startNumber}<UtilityInput data-testid="pdf-finish-start-number" type="number" step={1} value={startNumber} disabled={locked} aria-invalid={!!fieldErrors.startNumber || undefined} aria-describedby={fieldErrors.startNumber ? `${tabPanelId}-start-number-error` : undefined} onChange={(event) => { setStartNumber(event.target.value); setPreflight({ status: "idle", errors: [], warnings: [], failure: "" }); download.clearResult(); }} />{fieldErrors.startNumber && <span id={`${tabPanelId}-start-number-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.startNumber}</span>}</UtilityField>
-                  <UtilityField>{copy.startPage}<UtilityInput data-testid="pdf-finish-start-page" type="number" min={1} max={pageCount} step={1} value={startPage} disabled={locked} aria-invalid={!!fieldErrors.startPage || undefined} aria-describedby={fieldErrors.startPage ? `${tabPanelId}-start-page-error` : undefined} onChange={(event) => { setStartPage(event.target.value); setPreflight({ status: "idle", errors: [], warnings: [], failure: "" }); download.clearResult(); }} />{fieldErrors.startPage && <span id={`${tabPanelId}-start-page-error`} className="text-xs leading-relaxed text-destructive" data-testid="pdf-finish-start-page-error" role="alert">{fieldErrors.startPage}</span>}</UtilityField>
+                  <UtilityField>{copy.startNumber}<UtilityInput data-testid="pdf-finish-start-number" type="number" step={1} value={startNumber} disabled={locked} aria-invalid={!!fieldErrors.startNumber || undefined} aria-describedby={fieldErrors.startNumber ? `${tabPanelId}-start-number-error` : undefined} onChange={(event) => updatePreflightInput(startNumber, event.target.value, setStartNumber)} />{fieldErrors.startNumber && <span id={`${tabPanelId}-start-number-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.startNumber}</span>}</UtilityField>
+                  <UtilityField>{copy.startPage}<UtilityInput data-testid="pdf-finish-start-page" type="number" min={1} max={pageCount} step={1} value={startPage} disabled={locked} aria-invalid={!!fieldErrors.startPage || undefined} aria-describedby={fieldErrors.startPage ? `${tabPanelId}-start-page-error` : undefined} onChange={(event) => updatePreflightInput(startPage, event.target.value, setStartPage)} />{fieldErrors.startPage && <span id={`${tabPanelId}-start-page-error`} className="text-xs leading-relaxed text-destructive" data-testid="pdf-finish-start-page-error" role="alert">{fieldErrors.startPage}</span>}</UtilityField>
                 </div>
-                <div className="mt-4 overflow-hidden rounded-2xl border border-border"><ToggleRow label={copy.excludeCover} description={copy.excludeCoverDescription} checked={excludeCover} onChange={(checked) => { setExcludeCover(checked); setPreflight({ status: "idle", errors: [], warnings: [], failure: "" }); download.clearResult(); }} disabled={locked} /></div>
+                <div className="mt-4 overflow-hidden rounded-2xl border border-border"><ToggleRow label={copy.excludeCover} description={copy.excludeCoverDescription} checked={excludeCover} onChange={(checked) => updatePreflightInput(excludeCover, checked, setExcludeCover)} disabled={locked} /></div>
               </SectionCard>
 
               <SectionCard step={3} title={copy.pagesTitle} description={copy.pagesDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
                 <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-3 max-[620px]:grid-cols-1">
-                  <UtilityField>{copy.pageRange}<UtilityInput data-testid="pdf-finish-range" value={rangeText} disabled={locked} placeholder={copy.pageRangeExample} aria-invalid={!!selectionEvaluation.error || undefined} onChange={(event) => { setRangeText(event.target.value); setPreflight({ status: "idle", errors: [], warnings: [], failure: "" }); download.clearResult(); }} onBlur={() => { if (selection.canExecute) setRangeText(selection.rangeText); }} /></UtilityField>
-                  <UtilityField>{copy.parity}<UtilitySelect data-testid="pdf-finish-parity" value={parity} disabled={locked} onChange={(event) => { setParity(event.target.value as PageParity); setPreflight({ status: "idle", errors: [], warnings: [], failure: "" }); download.clearResult(); }}>{(["all", "odd", "even"] as const).map((value) => <option key={value} value={value}>{copy.parityOptions[value]}</option>)}</UtilitySelect></UtilityField>
+                  <UtilityField>{copy.pageRange}<UtilityInput data-testid="pdf-finish-range" value={rangeText} disabled={locked} placeholder={copy.pageRangeExample} aria-invalid={!!selectionEvaluation.error || undefined} onChange={(event) => updatePreflightInput(rangeText, event.target.value, setRangeText)} onBlur={() => { if (selection.canExecute) setRangeText(selection.rangeText); }} /></UtilityField>
+                  <UtilityField>{copy.parity}<UtilitySelect data-testid="pdf-finish-parity" value={parity} disabled={locked} onChange={(event) => updatePreflightInput(parity, event.target.value as PageParity, setParity)}>{(["all", "odd", "even"] as const).map((value) => <option key={value} value={value}>{copy.parityOptions[value]}</option>)}</UtilitySelect></UtilityField>
                 </div>
                 {selectionEvaluation.error && <UtilityNotice className="mt-3" tone="error" role="alert">{copy.rangeErrors[selectionEvaluation.error]}</UtilityNotice>}
                 <p className="mt-3 text-sm font-bold text-violet-700 dark:text-violet-300" aria-live="polite">{copy.selectedPages.replace("{{count}}", `${selection.exactPages.length}`).replace("{{total}}", `${pageCount}`)}</p>

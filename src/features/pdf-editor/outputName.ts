@@ -12,7 +12,8 @@ export function finishOutputName(
     .replace(/(?:\.pdf)+$/iu, "");
   const fallback = normalizeOutputName(copy?.fallback ?? (korean ? "Worklazy-PDF-마무리" : "Worklazy-PDF-finished"), "Worklazy-PDF")
     .replace(/(?:\.pdf)+$/iu, "");
-  const base = normalizeOutputName(sourceName.replace(/(?:\.pdf)+$/iu, ""), "")
+  const base = normalizeOutputName(sourceName, "")
+    .replace(/(?:\.pdf)+$/iu, "")
     .replace(/(?:-(?:finished|마무리))+$/iu, "");
   return `${base ? `${base}-${suffix}` : fallback}.pdf`;
 }

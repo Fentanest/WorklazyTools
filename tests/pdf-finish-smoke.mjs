@@ -68,10 +68,12 @@ try {
   await testUploadErrors(browser);
   await testPreviewGeometry(browser, fixture);
   await testPreflightGuidance(browser, fixture, smallFixture);
+  await testPreflightReselection(browser, fixture);
+  await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks();
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 48 preview placements, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 4 localized edge-name downloads, 48 preview placements, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -296,6 +298,106 @@ async function testPreflightGuidance(browserInstance, fixture, smallFixture) {
   await page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='invalid-margin']").waitFor();
   assert.equal(await action.isDisabled(), true);
   await context.close();
+}
+
+async function testPreflightReselection(browserInstance, fixture) {
+  let combinations = 0;
+  for (const language of ["ko", "en"]) {
+    const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    const page = await context.newPage();
+    page.setDefaultTimeout(120_000);
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
+    await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles({ name: "reselection.pdf", mimeType: "application/pdf", buffer: fixture });
+    await page.locator("[data-testid='pdf-finish-template']").fill("short");
+    await waitForReadyPreflight(page);
+    const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+
+    await page.locator("[data-finish-tab='page-numbers']").click();
+    await page.waitForTimeout(1_500);
+    await assertReadyPreflight(page, action, `${language}/same-tab`);
+    combinations += 1;
+
+    await page.locator("[data-finish-region='bottom-center']").click();
+    await page.waitForTimeout(1_500);
+    await assertReadyPreflight(page, action, `${language}/same-region`);
+    combinations += 1;
+
+    const transition = page.evaluate(() => new Promise((resolve, reject) => {
+      const panel = document.querySelector("[data-testid='pdf-finish-ready']");
+      if (!(panel instanceof HTMLElement)) {
+        reject(new Error("finish panel is unavailable"));
+        return;
+      }
+      let sawIdle = panel.dataset.preflightStatus === "idle";
+      const timeout = window.setTimeout(() => {
+        observer.disconnect();
+        reject(new Error("changed input did not schedule preflight"));
+      }, 5_000);
+      const observer = new MutationObserver(() => {
+        const status = panel.dataset.preflightStatus;
+        if (status === "idle") sawIdle = true;
+        if (status === "checking") {
+          window.clearTimeout(timeout);
+          observer.disconnect();
+          resolve({ sawIdle, status });
+        }
+      });
+      observer.observe(panel, { attributes: true, attributeFilter: ["data-preflight-status"] });
+    }));
+    await page.locator("[data-finish-region='top-left']").click();
+    assert.deepEqual(await transition, { sawIdle: true, status: "checking" }, `${language}/changed-region must leave idle by scheduling a new preflight`);
+    await waitForReadyPreflight(page);
+    await assertReadyPreflight(page, action, `${language}/changed-region`);
+    combinations += 1;
+
+    await action.click();
+    await page.locator("[data-testid='pdf-download']").waitFor();
+    assert.equal(await page.locator("[data-route-error]").count(), 0);
+    await context.close();
+  }
+  assert.equal(combinations, 6);
+}
+
+async function testOutputNameDownloads(browserInstance, fixture) {
+  const cases = [
+    { language: "ko", source: "  report.pdf  ", expected: "report-마무리.pdf" },
+    { language: "ko", source: " .pdf ", expected: "Worklazy-PDF-마무리.pdf" },
+    { language: "en", source: "  report.pdf  ", expected: "report-finished.pdf" },
+    { language: "en", source: " .pdf ", expected: "Worklazy-PDF-finished.pdf" },
+  ];
+  for (const { language, source, expected } of cases) {
+    const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block", acceptDownloads: false });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    const page = await context.newPage();
+    page.setDefaultTimeout(120_000);
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
+    await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles({ name: source, mimeType: "application/pdf", buffer: fixture });
+    await waitForReadyPreflight(page);
+    const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+    assert.equal(await action.isEnabled(), true, `${language}/${JSON.stringify(source)} must be executable`);
+    await action.click();
+    const download = page.locator("[data-testid='pdf-download']");
+    await download.waitFor();
+    assert.equal(await download.getAttribute("download"), expected);
+    await context.close();
+  }
+}
+
+async function waitForReadyPreflight(page) {
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready" && !document.querySelector("[data-testid='pdf-finish-preflight-error']"));
+}
+
+async function assertReadyPreflight(page, action, label) {
+  const snapshot = await page.locator("[data-testid='pdf-finish-ready']").evaluate((panel) => ({
+    status: panel.getAttribute("data-preflight-status"),
+    alerts: [...panel.querySelectorAll("[role='alert']")].map((element) => element.textContent?.trim()).filter(Boolean),
+    routeErrors: document.querySelectorAll("[data-route-error]").length,
+  }));
+  assert.equal(snapshot.status, "ready", `${label} left preflight without a scheduled result`);
+  assert.equal(await action.isEnabled(), true, `${label} left the create action disabled`);
+  assert.deepEqual(snapshot.alerts, [], `${label} exposed an unexpected alert`);
+  assert.equal(snapshot.routeErrors, 0, `${label} escaped the finish route`);
 }
 
 async function testFinishWorkflow(browserInstance, fixture) {
