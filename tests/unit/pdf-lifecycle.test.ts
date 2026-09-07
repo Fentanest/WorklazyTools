@@ -115,6 +115,57 @@ test("PDF worker facade discards a late result after cancellation", async () => 
   assert.equal(controller.listenerCount(), 0);
 });
 
+test("PDF worker facade keeps the abort error when a late worker error arrives in the same turn", async () => {
+  const { error, worker, controller } = await runTerminalRace("abort");
+  assert.equal(error.name, "AbortError");
+  assert.equal(error.message, pdfWorkerCanceledMessage("en"));
+  assert.equal(error.code, new DOMException("", "AbortError").code);
+  assert.equal(worker.terminated, 1);
+  assert.equal(controller.listenerCount(), 0);
+});
+
+test("PDF worker facade keeps the first worker error when a late worker error arrives in the same turn", async () => {
+  const { error, worker, controller } = await runTerminalRace("error");
+  assert.equal(error.name, "Error");
+  assert.equal(error.message, "FIRST");
+  assert.equal(error.code, "FIRST_CODE");
+  assert.equal(worker.terminated, 1);
+  assert.equal(controller.listenerCount(), 0);
+});
+
+test("PDF worker facade keeps the start error after an error event and a late worker error", async () => {
+  const { error, worker, controller } = await runTerminalRace("error-event");
+  assert.equal(error.name, "Error");
+  assert.equal(error.message, featureMessage("en", "pdf.messages.pdfWorkerClient.unableToStartThePdfOperation"));
+  assert.equal(error.code, undefined);
+  assert.equal(worker.terminated, 1);
+  assert.equal(controller.listenerCount(), 0);
+});
+
+test("PDF worker facade keeps the start error after postMessage throws and a late worker error", async () => {
+  const { error, worker, controller } = await runTerminalRace("post-throw");
+  assert.equal(error.name, "Error");
+  assert.equal(error.message, featureMessage("en", "pdf.messages.pdfWorkerClient.unableToStartThePdfOperation"));
+  assert.equal(error.code, undefined);
+  assert.equal(worker.terminated, 1);
+  assert.equal(controller.listenerCount(), 0);
+});
+
+test("PDF worker facade keeps the abort error when a worker error arrives in the next task", async () => {
+  const controller = countedAbortController();
+  const worker = fakeWorker([]);
+  const pendingError = rejectedError(runPdfWorker(() => worker as unknown as Worker, {}, [], undefined, "en", controller.signal));
+  controller.abort();
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  worker.emit({ type: "error", error: { message: "LATE", code: "LATE_CODE" } });
+  const error = await pendingError;
+  assert.equal(error.name, "AbortError");
+  assert.equal(error.message, pdfWorkerCanceledMessage("en"));
+  assert.equal(error.code, new DOMException("", "AbortError").code);
+  assert.equal(worker.terminated, 1);
+  assert.equal(controller.listenerCount(), 0);
+});
+
 test("shared lifecycle timeout terminates a stalled worker once", async () => {
   const worker = fakeWorker([]);
   await assert.rejects(
@@ -326,6 +377,28 @@ function countedAbortController() {
     return remove(...args);
   }) as AbortSignal["removeEventListener"];
   return Object.assign(controller, { listenerCount: () => listeners });
+}
+
+async function runTerminalRace(first: "abort" | "error" | "error-event" | "post-throw") {
+  const controller = countedAbortController();
+  const worker = fakeWorker([], { throwPost: first === "post-throw" });
+  const pending = runPdfWorker(() => worker as unknown as Worker, {}, [], undefined, "en", controller.signal);
+  if (first === "abort") controller.abort();
+  if (first === "error") worker.emit({ type: "error", error: { message: "FIRST", code: "FIRST_CODE" } });
+  if (first === "error-event") assert.equal(worker.emitError("raw worker exception").defaultPrevented, true);
+  worker.emit({ type: "error", error: { message: "LATE", code: "LATE_CODE" } });
+  return { error: await rejectedError(pending), worker, controller };
+}
+
+async function rejectedError(promise: Promise<unknown>) {
+  let rejection: unknown;
+  try {
+    await promise;
+  } catch (error) {
+    rejection = error;
+  }
+  assert.ok(rejection instanceof Error);
+  return rejection as Error & { code?: string | number };
 }
 
 function cancelingRenderTask(log: string[]) {

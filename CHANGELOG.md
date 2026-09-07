@@ -4,6 +4,7 @@
 
 ## 2026-09-07
 
+- PDF worker lifecycle adapter가 종료 상태를 먼저 잠그고 원 Worker 콜백을 차단해 취소·오류 확정 뒤 같은 턴의 늦은 오류가 최초 name·message·code를 덮어쓰지 못하도록 수정하고 terminal 경합 회귀를 보강했다. — Codx
 - U4-2 PDF worker 호출을 PDF 소유 lifecycle facade로 이관하고 마지막 optional AbortSignal, task 양보·결과 등록 전 재검사 helper, PDF.js 렌더 취소의 정착·cleanup·소유 문서 destroy 순서를 추가했다. legacy oracle·Excel 무변경·worker 수명주기 회귀도 함께 고정했다. — Codx
 - U4-1 PDF finish 순수 정책 모듈과 골든 unit을 추가했다. 검수 후 타일 400 고정 상한, 좁은 텍스트 영역 선검사, 시점별 raw ledger 합산, OCG preflight 정적 re-export와 실제 PDF.js 골든을 보강했다. — Codx
 - U4-0 검수 후 bundle schema v2의 main metadata 완전성·로케일 비의존 배분을 고정하고, 일반 PDF Properties·빈 Resources fixture와 허용 OCG 구조 제거 전후 두 렌더러·잔여 구조·음성 대조 oracle을 보강했다. — Codx

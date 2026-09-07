@@ -38,7 +38,9 @@ export function runPdfWorker<TRequest, TResult>(
   const resultErrorMessage = featureMessage(language, "pdf.messages.pdfWorkerClient.anErrorOccurredWhileProcessingThePdf");
 
   return runModuleWorker<TRequest, TResult>(
-    () => createPdfEnvelopeAdapter(createWorker, (error) => { envelopeError = error; }),
+    () => createPdfEnvelopeAdapter(createWorker, (error) => {
+      envelopeError = error ? { message: error.message, code: error.code } : undefined;
+    }),
     request,
     {
       transfer,
@@ -74,6 +76,7 @@ function createPdfEnvelopeAdapter(
   captureError: (error: PdfWorkerErrorPayload | undefined) => void,
 ): Worker {
   const worker = createWorker();
+  let terminated = false;
   const adapter = {
     onmessage: null as Worker["onmessage"],
     onerror: null as Worker["onerror"],
@@ -81,11 +84,16 @@ function createPdfEnvelopeAdapter(
       worker.postMessage(message, transfer);
     },
     terminate() {
+      if (terminated) return;
+      terminated = true;
+      worker.onmessage = null;
+      worker.onerror = null;
       worker.terminate();
     },
   };
 
   worker.onmessage = (event: MessageEvent<PdfWorkerEnvelope<unknown>>) => {
+    if (terminated) return;
     const data = event.data;
     if (data.type === "error") captureError(data.error);
     const lifecycleData = data.type === "progress"
@@ -95,7 +103,10 @@ function createPdfEnvelopeAdapter(
         : { type: "result", result: data.result };
     adapter.onmessage?.call(adapter as unknown as Worker, { data: lifecycleData } as MessageEvent);
   };
-  worker.onerror = (event) => adapter.onerror?.call(adapter as unknown as AbstractWorker, event);
+  worker.onerror = (event) => {
+    if (terminated) return;
+    adapter.onerror?.call(adapter as unknown as AbstractWorker, event);
+  };
   return adapter as unknown as Worker;
 }
 

@@ -4,6 +4,28 @@
 
 ## 2026-09-07
 
+### U4-2 fix-1 — terminal 확정 오류 불변 (Codx)
+
+**F1 원인·수리** — astra의 같은-turn 반례 4개를 수용했다. 공용 `runModuleWorker`는 terminal을 한 번만 수락했지만 PDF facade가 그 guard 밖의 `envelopeError`를 무조건 갱신해 promise rejection handler가 실행되기 전 늦은 error의 `LATE/LATE_CODE`를 읽을 수 있었다. PDF 소유 adapter의 `terminate()`가 자체 종료 상태를 원 Worker 종료보다 먼저 확정하고 원 `message`/`error` callback을 해제하며, 이후 callback은 외부 상태 갱신과 lifecycle 전달을 모두 거부하도록 고쳤다. 최초 수락한 PDF error envelope는 message/code 값만 복사해 고정하므로 abort와 시작 실패는 다른 envelope로 새 Error가 되지 않는다. 공용 `src/utils/workerLifecycle.ts`, Excel 두 기능, 기존 4모드 UI·문구는 바꾸지 않았다.
+
+**회귀 경계** — unit에 다음 같은-turn 반례 4개를 각각 추가해 최초 오류의 name·message·code, terminate 1회, abort listener 0을 단언했다: `abort → late error`, `error → late error`, `error event → late error`, `postMessage throw → late error`. 기존 `result → late error`를 보존했고, 다음 task에서 늦은 error가 오는 abort 대조군도 추가했다. 전용 unit은 기존 17개에서 **22/22**, 전체 unit은 기존 289개에서 **294/294**다. astra 원본 `/tmp/worklazy-u4-2-review/probes/lifecycle.mjs`는 수정하지 않고 고정 `current` 사본의 제품 source만 현행 워킹트리로 갱신해 실행했으며 **49 PASS/0 FAIL**이었다. E3의 11개 lifecycle 검사 중 timeout 1개는 facade가 timeout 인자를 공개해서가 아니라 변경하지 않은 **공용 helper**를 직접 검사한 것이다.
+
+**생성물·번들 문안 정정** — U4-2 검수에서 current와 main/previous의 production SHA가 달랐던 파일 158개 중 156개는 PDF preload가 기존 `workerLifecycle` 청크를 새로 참조하면서 자산명이 정적 페이지까지 전파된 참조 해시 변경이었다. 나머지는 PDF 본체와 entry preload이며, 이를 “PDF 청크 외 SHA 동일”로 확대하지 않는다. fix-1의 47c0f22 대비 5종 변화는 entry **−18B**, PDF route **+46B**, shared **−17B**, app **+7B**, CSS **0B**다. main 기준 delta는 각각 **0B/+804B/+20B/+874B/0B**로 고정 상한 안이다.
+
+| 검증 | 실제 결과 |
+|---|---|
+| `npx tsc -b` | exit 0, 진단 0 |
+| `npm run test:unit` | **294/294**, fail·skip 0 |
+| astra 원본 `probes/lifecycle.mjs` | **49/49**, 네 terminal 반례와 다음-task 대조군 PASS |
+| 4GiB 직렬 `npm run build` · `npm run test:static` | 2,837 modules·정적 61페이지; startup recovery 104, 모두 exit 0 |
+| `TEST_SCOPE=pdf npm run test:browser` | 기존 PDF edit/range split/conversion 통과 |
+| `npm run test:excel-cleaner` · `npm run test:excel-compare` | cancellation/re-run 및 cancellation 포함 모두 통과 |
+| `npm run fixtures:pdf-legacy-oracle` | client 3·structure 4·render 32·output 4·input 1, **총 diff 0** |
+| `npm run bundle:measure` | 5종 전부 한도 내 |
+| 금지 표면·공백 | 공용 helper·Excel diff 0; `git diff --check` exit 0 |
+
+첫 전용 unit의 다음-task 대조군은 rejection 관찰을 타이머 뒤에 붙여 Node의 unhandled-rejection 감시에 1회 실패했고, 관찰을 즉시 등록하도록 테스트 순서만 바로잡은 뒤 22/22를 얻었다. 첫 PDF 브라우저 스모크도 preview 미기동으로 `ERR_CONNECTION_REFUSED`였으며 production preview를 명시적으로 띄운 같은 명령은 통과했다. 두 실패 원로그와 최종 로그, bundle JSON, legacy oracle은 `/tmp/worklazy-u4-2-fix1/`에 함께 보존한다. UI·번역·SEO·정적 페이지 내용·광고 격리 경로에는 변경이 없다. — Codx
+
 ### U4-2(F0b) PDF worker lifecycle facade·협력적 취소 — 브랜치 구현·검증 (Codx)
 
 **착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 확정 2·3·16·19와 D5·V3-4, round 3·5·6 증거 및 U4-0/U4-1 기록을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=f56dc68d4c53d58cad520fe41973cd2699a4f548`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 이번 표면의 충돌은 없었다. 로드맵 끝의 `브랜치 최종 3672fc7/main 5485fad` 문장은 바로 앞 U4-1 기록·실제 ref·최신 dispatch와 모순되는 낡은 문구라 이번 기준으로 쓰지 않았다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML은 건드리지 않았고 main 병합·push·배포도 하지 않는다.
