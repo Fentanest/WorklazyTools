@@ -7,7 +7,7 @@ import { FileDropZone, FileList, PrimaryButton, SectionCard, ToggleRow } from ".
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
-import { featureResource } from "../../i18n/featureMessages";
+import { featureMessage, featureResource } from "../../i18n/featureMessages";
 import type { AppLanguage } from "../../i18n/languages";
 import { useAppLanguage } from "../../i18n/routing";
 import { cn } from "../../lib/utils";
@@ -95,6 +95,16 @@ function emptySelection(): PageSelectionState {
   return { totalPages: 0, exactPages: [], parity: "all", rangeText: "", canExecute: false };
 }
 
+function inspectionErrorMessage(reason: unknown, language: AppLanguage, copy: FinishCopy) {
+  const message = reason instanceof Error ? reason.message : "";
+  const localizedOpenErrors = [
+    "pdf.messages.pdfPreview.encryptedOrPermissionRestrictedPdfsCannotBeEdited",
+    "pdf.messages.pdfPreview.thisPdfIsPasswordProtectedTryAgainWith",
+    "pdf.messages.pdfPreview.unableToOpenThePdfFile",
+  ].map((key) => featureMessage(language, key));
+  return localizedOpenErrors.includes(message) ? message : copy.errors["unreadable-document"];
+}
+
 export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const language = useAppLanguage();
   const copy = featureResource<FinishCopy>(language, "pdf.finish");
@@ -169,7 +179,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       setRangeText(`1-${inspected.pageCount}`);
       setParity("all");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : copy.errors["unreadable-document"]);
+      setError(inspectionErrorMessage(reason, language, copy));
       await releasePdf(next);
     } finally {
       setInspecting(false);
