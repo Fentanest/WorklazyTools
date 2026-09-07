@@ -2,6 +2,7 @@ import hashlib
 import inspect
 import io
 import json
+import re
 import time
 import zipfile
 
@@ -68,6 +69,130 @@ def _paragraph(text):
     paragraph = ET.Element(W + "p")
     paragraph.append(_token_run(text, None))
     return paragraph
+
+
+def _revision_author(element):
+    return element.attrib.get(W + "author")
+
+
+def _has_target_marker(container, properties_tag, marker_tags, target_author):
+    properties = container.find(W + properties_tag)
+    return properties is not None and any(
+        target_author is not None
+        and marker.tag in marker_tags
+        and _revision_author(marker) == target_author
+        for marker in properties.iter()
+    )
+
+
+def _text_after_rejecting_author(node, target_author):
+    if node.tag == W + "tr" and _has_target_marker(node, "trPr", {W + "ins"}, target_author):
+        return ""
+    if node.tag == W + "tc" and _has_target_marker(node, "tcPr", {W + "cellIns"}, target_author):
+        return ""
+    if target_author is not None and node.tag in INSERTED_CONTENT_TAGS and _revision_author(node) == target_author:
+        return ""
+    if node.tag in (W + "t", W + "delText"):
+        return node.text or ""
+    if node.tag == W + "tab":
+        return "\t"
+    if node.tag in (W + "br", W + "cr"):
+        return "\n"
+    return "".join(_text_after_rejecting_author(child, target_author) for child in node)
+
+
+def _xml_text(data):
+    return _text_after_rejecting_author(_parse_xml(data), None)
+
+
+def _story_part_names(archive):
+    return sorted(
+        name for name in archive.namelist()
+        if name == "word/document.xml"
+        or name in ("word/footnotes.xml", "word/endnotes.xml")
+        or re.fullmatch(r"word/(?:header|footer)\d+\.xml", name)
+    )
+
+
+def _target_structural_revision_count(root, target_author):
+    count = 0
+    for row in root.iter(W + "tr"):
+        properties = row.find(W + "trPr")
+        if properties is not None:
+            count += sum(
+                marker.tag in (W + "ins", W + "del") and _revision_author(marker) == target_author
+                for marker in properties.iter()
+            )
+    for cell in root.iter(W + "tc"):
+        properties = cell.find(W + "tcPr")
+        if properties is not None:
+            count += sum(
+                marker.tag in (W + "cellIns", W + "cellDel", W + "cellMerge")
+                and _revision_author(marker) == target_author
+                for marker in properties.iter()
+            )
+    return count
+
+
+def _package_reject_rows(tracked_bytes, before_path, exceptions, target_author):
+    exception_by_part = {item["storyPart"]: item for item in exceptions}
+    rows = []
+    with zipfile.ZipFile(io.BytesIO(tracked_bytes)) as tracked, zipfile.ZipFile(before_path) as before:
+        tracked_parts = set(_story_part_names(tracked))
+        before_parts = set(_story_part_names(before))
+        for part in sorted(tracked_parts | before_parts):
+            actual_root = _parse_xml(tracked.read(part)) if part in tracked_parts else None
+            actual = _text_after_rejecting_author(actual_root, target_author) if actual_root is not None else ""
+            expected = _xml_text(before.read(part)) if part in before_parts else ""
+            exception = exception_by_part.get(part)
+            if exception:
+                for replacement in exception["replacements"]:
+                    old = replacement["before"]
+                    assert expected.count(old) == replacement.get("count", 1)
+                    expected = expected.replace(old, replacement["after"], replacement.get("count", 1))
+            rows.append({
+                "storyPart": part,
+                "actual": actual,
+                "expected": expected,
+                "match": actual == expected,
+                "exceptionReasonId": exception["reasonId"] if exception else None,
+                "targetStructuralRevisions": _target_structural_revision_count(actual_root, target_author)
+                if actual_root is not None else 0,
+            })
+    return rows
+
+
+def _cell_paragraph_inputs(package_path):
+    with zipfile.ZipFile(package_path) as archive:
+        if "word/document.xml" not in archive.namelist():
+            return []
+        root = _parse_xml(archive.read("word/document.xml"))
+    return [
+        ["".join(token["text"] for token in _styled_tokens(paragraph)) for paragraph in cell.findall(W + "p")]
+        for cell in root.iter(W + "tc")
+    ]
+
+
+def _corrupt_first_generated_deletion(package_bytes, target_author):
+    corrupted = 0
+    result = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(package_bytes)) as source, zipfile.ZipFile(result, "w") as target:
+        for info in source.infolist():
+            data = source.read(info.filename)
+            if not corrupted and info.filename == "word/document.xml":
+                root = _parse_xml(data)
+                for deletion in root.iter(W + "del"):
+                    if _revision_author(deletion) != target_author:
+                        continue
+                    deleted_text = next(deletion.iter(W + "delText"), None)
+                    if deleted_text is not None:
+                        deleted_text.text = "CORRUPTED_DELETED_TEXT"
+                        corrupted = 1
+                        data = _serialize_xml(root)
+                        break
+            target.writestr(info, data)
+    assert corrupted == 1
+    return result.getvalue(), corrupted
 
 
 _real_parse_xml = _parse_xml
@@ -156,8 +281,9 @@ def _paragraph_revision(before, after, include_formatting, writer):
     return result
 
 
-def _run_pair(pair_id, before_path, after_path):
+def _run_pair(pair_spec, before_path, after_path):
     global _observations, _part_by_hash, _pair_id, _node_paths, _synthetic_sources
+    pair_id = pair_spec["pairId"]
     _pair_id = pair_id
     _node_paths = {}
     _synthetic_sources = {}
@@ -171,21 +297,29 @@ def _run_pair(pair_id, before_path, after_path):
     _observations = []
     output = io.BytesIO()
     started = time.perf_counter()
+    target_author = globals().get("PACKAGE_REJECT_AUTHOR", "Worklazy Oracle")
     revision_count = generate_tracked_document(
         before_path,
         after_path,
         output,
-        "Worklazy Oracle",
+        target_author,
         True,
         True,
         True,
     )
+    package_bytes = output.getvalue()
+    corrupted_deleted_texts = 0
+    if globals().get("ORACLE_MUTATION") == "deleted-text" and pair_id == "base":
+        package_bytes, corrupted_deleted_texts = _corrupt_first_generated_deletion(
+            package_bytes,
+            target_author,
+        )
     elapsed_ms = (time.perf_counter() - started) * 1000
     tracked_path = f"/fixtures/{pair_id}-tracked.docx"
     accepted_path = f"/fixtures/{pair_id}-accepted.docx"
     accepted_after_path = f"/fixtures/{pair_id}-after-accepted.docx"
     with open(tracked_path, "wb") as target:
-        target.write(output.getvalue())
+        target.write(package_bytes)
     accept_tracked_document(tracked_path, accepted_path)
     accept_tracked_document(after_path, accepted_after_path)
     accepted_model = json.loads(extract_document_model(open(accepted_path, "rb").read(), True, True, "ko"))
@@ -193,7 +327,7 @@ def _run_pair(pair_id, before_path, after_path):
     after_model = json.loads(extract_document_model(open(after_path, "rb").read(), True, True, "ko"))
     before_model = json.loads(extract_document_model(open(before_path, "rb").read(), True, True, "ko"))
 
-    with zipfile.ZipFile(output) as archive:
+    with zipfile.ZipFile(io.BytesIO(package_bytes)) as archive:
         parts = sorted(archive.namelist())
         comments_preserved = (
             "word/comments.xml" not in parts
@@ -219,6 +353,17 @@ def _run_pair(pair_id, before_path, after_path):
         "acceptedMatchesAfter": accepted_model == after_model,
         "acceptedMatchesAcceptedAfter": accepted_model == accepted_after_model,
         "acceptedTextMatchesAcceptedAfter": _model_text(accepted_model) == _model_text(accepted_after_model),
+        "packageRejectRows": _package_reject_rows(
+            package_bytes,
+            before_path,
+            pair_spec.get("rejectTextExceptions", []),
+            target_author,
+        ),
+        "inputCellParagraphs": {
+            "before": _cell_paragraph_inputs(before_path),
+            "after": _cell_paragraph_inputs(after_path),
+        },
+        "corruptedDeletedTexts": corrupted_deleted_texts,
         "packageRows": package_rows,
     }, before_model, after_model)
 
@@ -249,7 +394,7 @@ for pair_spec in pair_specs:
     pair_id = pair_spec["pairId"]
     before_path = "/fixtures/" + pair_spec["before"]
     after_path = "/fixtures/" + pair_spec["after"]
-    report, before_model, after_model = _run_pair(pair_id, before_path, after_path)
+    report, before_model, after_model = _run_pair(pair_spec, before_path, after_path)
     reports.append(report)
     models.append({"id": pair_id, "before": before_model, "after": after_model})
 

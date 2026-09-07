@@ -2,24 +2,129 @@
   "schemaVersion": 1,
   "offsetUnit": "unicode-code-point",
   "fixturePairs": [
-    { "pairId": "base", "before": "oracle/base-before.docx", "after": "oracle/base-after.docx" },
-    { "pairId": "split", "before": "oracle/split-before.docx", "after": "oracle/split-after.docx" },
+    {
+      "pairId": "base",
+      "before": "oracle/base-before.docx",
+      "after": "oracle/base-after.docx",
+      "rejectTextExceptions": [
+        {
+          "storyPart": "word/document.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "메모가 연결된 이전 문단입니다.", "after": "메모가 연결된 문단입니다." }
+          ]
+        }
+      ]
+    },
+    {
+      "pairId": "split",
+      "before": "oracle/split-before.docx",
+      "after": "oracle/split-after.docx",
+      "rejectTextExceptions": [
+        {
+          "storyPart": "word/document.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "메모가 연결된 이전 문단입니다.", "after": "메모가 연결된 문단입니다." }
+          ]
+        }
+      ]
+    },
     { "pairId": "boundary", "before": "oracle/boundary-before.docx", "after": "oracle/boundary-after.docx" },
     { "pairId": "formatting", "before": "oracle/formatting-before.docx", "after": "oracle/formatting-after.docx" },
-    { "pairId": "revisions", "before": "oracle/revisions-before.docx", "after": "oracle/revisions-after.docx" }
+    {
+      "pairId": "revisions",
+      "before": "oracle/revisions-before.docx",
+      "after": "oracle/revisions-after.docx",
+      "rejectTextExceptions": [
+        {
+          "storyPart": "word/document.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before accepted", "after": "After accepted" }
+          ]
+        },
+        {
+          "storyPart": "word/header1.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before header", "after": "After header" }
+          ]
+        },
+        {
+          "storyPart": "word/footer1.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before footer", "after": "After footer" }
+          ]
+        },
+        {
+          "storyPart": "word/footnotes.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before footnote", "after": "After footnote" }
+          ]
+        },
+        {
+          "storyPart": "word/endnotes.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before endnote", "after": "After endnote" }
+          ]
+        }
+      ]
+    }
   ],
   "exactPackagePair": { "pairId": "exact", "before": "oracle/exact-before.docx", "after": "oracle/exact-after.docx" },
-  "allowedSidecarMismatches": [
-    "base:paragraph-call:1",
-    "split:paragraph-call:2",
-    "boundary:paragraph-call:2",
-    "revisions:paragraph-call:0",
-    "revisions:paragraph-call:8",
-    "revisions:paragraph-call:12",
-    "revisions:paragraph-call:13",
-    "revisions:paragraph-call:14",
-    "revisions:paragraph-call:15"
+  "exceptionFixturePairs": [
+    {
+      "pairId": "comments-multipara",
+      "before": "oracle/comments-multipara-before.docx.b64",
+      "after": "oracle/comments-multipara-after.docx.b64"
+    }
   ],
+  "packageReject": {
+    "targetAuthor": "Worklazy Oracle",
+    "fixturePairIds": ["base", "split", "boundary", "formatting", "revisions"],
+    "expectedStoryParts": 13,
+    "expectedStructuralRevisions": 5
+  },
+  "commentFixture": {
+    "fixtureId": "comments-multipara:comments-preserved",
+    "pairId": "comments-multipara",
+    "preservedPackagePart": "word/comments.xml",
+    "preservedFrom": "after",
+    "before": { "author": "Before Reviewer", "text": "Before comment body" },
+    "after": { "author": "After Reviewer", "text": "After comment body" }
+  },
+  "multiParagraphCellFixture": {
+    "fixtureId": "comments-multipara:joined-cell-input",
+    "pairId": "comments-multipara",
+    "beforeParagraphs": ["Alpha ", "Beta"],
+    "afterParagraphs": ["Alpha", "Beta"],
+    "webInput": { "before": "Alpha \nBeta", "after": "Alpha\nBeta" },
+    "webChanges": [
+      { "type": "deleted", "text": " \n", "beforeOffset": 5, "afterOffset": 5 },
+      { "type": "added", "text": "\n", "beforeOffset": 7, "afterOffset": 5 }
+    ],
+    "generatorInputs": [
+      {
+        "beforePath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[0]",
+        "afterPath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[0]",
+        "before": "Alpha ",
+        "after": "Alpha"
+      },
+      {
+        "beforePath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[1]",
+        "afterPath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[1]",
+        "before": "Beta",
+        "after": "Beta"
+      }
+    ],
+    "generatorChanges": [
+      { "type": "deleted", "text": " ", "beforeOffset": 5, "afterOffset": 5 }
+    ]
+  },
   "exceptions": [
     {
       "reasonId": "E1",

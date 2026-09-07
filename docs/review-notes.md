@@ -4,6 +4,16 @@
 
 ## 2026-09-07
 
+### 문서 비교 동치 oracle fix-1 — 구조 키·패키지 거부·E6 fixture 정정 (Codx)
+
+**원인과 수리** — 최초 oracle은 sidecar 구조 키의 존재·타입만 확인하고 실제 대조와 E1 허용 판정은 호출 순번 문자열로 했으므로 경로·인덱스·분할 slice를 바꿔도 통과했다. 또한 저장 전 sidecar를 거부 문자열처럼 재구성했을 뿐 최종 ZIP을 거부한 결과는 검사하지 않았고, E4/E6은 등록되지 않은 `comments-multipara` pair 이름만 가리켰다. 이를 독립 정적 fixture의 **62개 구조 키·기대 결과**와 실제 observation을 일대일 대응하도록 바꾸고, 누락·중복·예상 밖 키와 `pairId`·`storyPart`·양쪽 index/path·선택적 `[start,end)` `sourceSlice` 오염을 모두 실패시켰다. E1 9건은 각 구조 키가 `E1` 사유에 연결될 때만 허용하며 호출 순번은 식별에 사용하지 않는다.
+
+**최종 패키지 검사 범위** — 기존 5쌍의 생성 완료 ZIP에서 본문·활성 머리말/꼬리말·각주/미주의 총 13개 story part를 다시 읽고, `Worklazy Oracle` 작성자의 삽입 text/행/셀만 제거하고 삭제 text/행/셀은 복원하는 거부 결과를 before와 대조한다. 기존 after 문서의 다른 작성자 revision은 그대로 두고 E1의 구조 키·사유에 대응하는 본문 3건과 머리말/꼬리말/각주/미주 4건만 명시 치환한다. `comments.xml`은 거부 대상이 아니라 정본 확정 2-a대로 after bytes 정확 보존을 별도로 검사한다. 정상 실행에서 구조 revision 5개가 실제 거부 경로를 통과하며, 저장 직전 생성 삭제 텍스트를 훼손하면 sidecar·수락 결과와 무관하게 최종 패키지 거부 대조가 실패한다.
+
+**E4/E6 실행 fixture와 음성 대조** — `comments-multipara` 실제 DOCX pair는 before/after 메모 작성자·본문을 다르게 두고 after `comments.xml` bytes 보존을 검사한다. 같은 pair의 셀은 `['Alpha ', 'Beta']→['Alpha', 'Beta']` 두 문단을 실제 XML에 담는다. 웹 입력 `Alpha ␠\nBeta→Alpha\nBeta`는 삭제 `␠\n` `(5,5)`·삽입 `\n` `(7,5)`, 생성기 문단 입력은 첫 문단 삭제 `␠` `(5,5)`와 둘째 문단 무변경임을 각각 단언하며 **이 fixture ID만 E6**으로 둔다. 구조 키 오염·최종 ZIP 삭제 텍스트 훼손·E6 실행 pair 제거의 세 음성 대조는 모두 exit 1로 실패한다. 따라서 이전 기록의 “E1~E6 통과”는 이름 존재 검사가 아니라 위 실제 실행 범위로 정정한다. `diffText`·문단 정렬·UI·한영 문구·SEO/정적 페이지·광고 격리 경로는 변경하지 않았다.
+
+**완료 검증** — 전용 `TMPDIR`·npm cache와 `NODE_OPTIONS=--max-old-space-size=4096`를 사용해 `npx tsc -b` 진단 0, `test:unit` **345/345**, production build 2,834 modules·정적 61페이지, `test:static`, 정상 oracle(기존 5쌍/55 sidecar·전체 구조 키 62·E1 허용 9·package reject 5쌍/13 story part/구조 revision 5·exact 4키·E6 1 fixture), `bundle:measure` 5종, `css:orphans` 0, route registry 20개를 통과시켰다. 4290 `--strictPort` production preview에서 Word·HWP·Office·Excel cleaner·Excel compare 스모크가 모두 통과했고 서버 종료 뒤 4290~4299 listening socket은 0이었다. 시각 회귀는 제품/UI/HWP 안내 문구 변경 없이 oracle·fixture만 바꾼 작업이므로 지시서 조건에 따라 생략했다. 원출력은 `/tmp/worklazy-dc-fix1/logs/`에 보존했다.
+
 ### 문서 비교 diff 코어 통일 — 분리 checkout 구현·검증 (Codx)
 
 **착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 디스패치와 정본 `document-compare-granularity-20260907.md`의 「정본화 (2026-09-07 11:55, v3)」, 1·2차 반박 보고서·수정안, 관련 기각 이력을 확인했다. `main`이 지정 기준 **`5bc6854175331bdd73b267784d9633cdccda8446`**와 정확히 같고 열린 계획서와 충돌하지 않음을 확인한 뒤 `/tmp/worklazy-dc-impl`의 `document-compare-engine-20260907` 브랜치에서만 작업했다. 기존 `s3-pdf-finish` checkout은 전환·수정하지 않았다. 문서 결과 폭·이동 rail·모바일 toolbar·ARIA와 결과 상태 a11y/rendering 등록은 `ui-theme-redesign-20260907.md` 이관을 따랐으며 이번 변경에 넣지 않았다.
