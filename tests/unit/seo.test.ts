@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts";
+import { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts";
 
 const toolRoutes = [
   "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
   "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
+  "/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
   "/tools/text-formatter", "/tools/work-calculator", "/tools/timezone-calculator", "/tools/payroll-calculator",
   "/tools/image-privacy", "/tools/security-tools", "/tools/qr-studio", "/tools/qr-studio/bulk", "/tools/data-converter",
@@ -64,6 +65,17 @@ test("English tool titles do not fall back to a generic browser-tool label", () 
   for (const route of toolRoutes) {
     assert.doesNotMatch(getSeoDefinition("en", route).title, /Free Browser Tool/);
   }
+});
+
+test("PDF finish aliases retain distinct metadata and canonicalize to the finish guide", () => {
+  for (const language of ["ko", "en"] as const) {
+    const routes = ["/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer"];
+    assert.equal(new Set(routes.map((route) => getSeoDefinition(language, route).title)).size, 3);
+    assert.ok(routes.every((route) => getSeoDefinition(language, route).faq?.length === 2));
+  }
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/finish"), "/tools/pdf-editor/finish");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/page-numbers"), "/tools/pdf-editor/finish");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/header-footer/"), "/tools/pdf-editor/finish");
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {
