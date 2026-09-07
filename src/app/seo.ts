@@ -50,6 +50,10 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "머리글과 바닥글에 어떤 정보를 넣을 수 있나요?", answer: "페이지 번호, 전체 페이지 수, 파일명, 작업 시작 날짜 토큰과 직접 입력한 문구를 함께 사용할 수 있습니다." },
       { question: "한국어 머리글도 표시되나요?", answer: "네. 한국어가 있으면 전체 Noto 글꼴을 PDF에 포함하며, 결과 파일 크기가 늘어날 수 있음을 작업 결과에서 안내합니다." },
     ],
+    "/tools/pdf-editor/watermark": [
+      { question: "PDF에 텍스트와 이미지 워터마크를 모두 넣을 수 있나요?", answer: "네. 텍스트 또는 PNG·JPEG 이미지를 골라 한 번 배치하거나 페이지 전체에 반복할 수 있습니다." },
+      { question: "워터마크를 문서 내용 뒤에 넣을 수 있나요?", answer: "네. 내용 뒤 또는 앞을 선택할 수 있습니다. 복잡한 레이어·태그·그래픽 상태가 감지되면 먼저 위험을 알리고 확인 후 진행합니다." },
+    ],
     "/tools/text-merger": [
       { question: "직접 입력을 TXT 파일 사이에 놓을 수 있나요?", answer: "가능합니다. 직접 입력과 TXT 파일은 같은 카드 목록에 추가되며 드래그하거나 위·아래 버튼으로 자유롭게 순서를 바꿀 수 있습니다." },
       { question: "붙여넣은 글이나 TXT 파일이 서버로 전송되나요?", answer: "아니요. 내용은 현재 브라우저에서만 읽고 병합하며 서버나 브라우저 저장소에 보관하지 않습니다." },
@@ -107,6 +111,10 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     "/tools/pdf-editor/header-footer": [
       { question: "What can I put in a header or footer?", answer: "Combine custom text with tokens for the page number, total pages, filename, and the date captured when the batch starts." },
       { question: "Can headers contain Korean text?", answer: "Yes. The full Noto font is embedded when Korean is present, and the result warns that this can increase the file size." },
+    ],
+    "/tools/pdf-editor/watermark": [
+      { question: "Can I add both text and image watermarks to a PDF?", answer: "Yes. Choose text or a PNG or JPEG image, then place it once or repeat it across each selected page." },
+      { question: "Can a watermark appear behind the document content?", answer: "Yes. Choose a background or foreground layer. Complex layers, tags, or graphics state trigger a warning and require confirmation before continuing." },
     ],
     "/tools/text-merger": [
       { question: "Can pasted text be placed between TXT files?", answer: "Yes. Pasted text and TXT files share one card list and can be reordered freely by dragging or with the up and down buttons." },
@@ -173,6 +181,7 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/pdf-editor/finish": "pdf-finish",
   "/tools/pdf-editor/page-numbers": "pdf-page-numbers",
   "/tools/pdf-editor/header-footer": "pdf-header-footer",
+  "/tools/pdf-editor/watermark": "pdf-watermark",
   "/tools/hwp-editor": "hwp-editor",
   "/tools/office-editor": "office-editor",
   "/tools/video-studio": "video-studio",
@@ -269,6 +278,11 @@ export const seoByPath: Record<string, SeoDefinition> = {
     title: "PDF 머리글·바닥글 넣기 - 파일명·날짜 토큰",
     description: "PDF 머리글이나 바닥글에 파일명, 날짜, 페이지 번호와 직접 입력한 문구를 원하는 위치와 색상으로 넣으세요.",
     application: { name: "PDF 머리글·바닥글", featureList: ["파일명 토큰", "작업 시작 날짜", "페이지 번호", "6개 표시 위치", "글자 크기·색상", "오버레이 미리보기"] },
+  },
+  "/tools/pdf-editor/watermark": {
+    title: "PDF 워터마크 넣기 - 텍스트·이미지 반복 배치",
+    description: "PDF에 텍스트 또는 PNG·JPEG 워터마크를 내용 앞이나 뒤에 넣고 회전·불투명도·크기와 반복 간격을 조절하세요.",
+    application: { name: "PDF 워터마크", featureList: ["벡터 텍스트", "PNG·JPEG 이미지", "앞·뒤 레이어", "단일·반복 배치", "회전·불투명도", "오버레이 미리보기"] },
   },
   "/tools/hwp-editor": {
     title: "HWP·HWPX 문서 편집기 - 무료 온라인 HWP 편집",
@@ -408,6 +422,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/pdf-editor/finish": { title: "Add PDF Page Numbers, Headers & Footers | Worklazy Tools", description: "Add page numbers, filenames, dates, headers, and footers to selected PDF pages in six positions with an overlay preview.", application: { name: "PDF Finish", featureList: ["Page numbers", "Headers and footers", "Six positions", "Range and parity selection", "Filename and date tokens", "Korean font embedding"] } },
   "/tools/pdf-editor/page-numbers": { title: "Add Page Numbers to PDF | Worklazy Tools", description: "Add page numbers to an exact PDF page range with starting-page, starting-number, cover-exclusion, and parity controls.", application: { name: "PDF Page Numbers", featureList: ["Starting number", "Starting page", "Cover exclusion", "Page ranges", "Parity filter", "Thumbnail selection"] } },
   "/tools/pdf-editor/header-footer": { title: "Add PDF Headers & Footers | Worklazy Tools", description: "Add custom headers and footers with filename, date, page-number tokens, position, size, and color controls.", application: { name: "PDF Headers and Footers", featureList: ["Filename token", "Batch-start date", "Page-number tokens", "Six positions", "Size and color", "Overlay preview"] } },
+  "/tools/pdf-editor/watermark": { title: "Add Text or Image Watermarks to PDF | Worklazy Tools", description: "Add text, PNG, or JPEG watermarks in front of or behind PDF content with rotation, opacity, sizing, and repeated tile controls.", application: { name: "PDF Watermark", featureList: ["Vector text", "PNG and JPEG images", "Background and foreground layers", "Single and repeated placement", "Rotation and opacity", "Overlay preview"] } },
   "/about": { title: "About | Worklazy Tools", description: "Learn how Worklazy Tools processes documents and media in the browser and where each tool's compatibility boundaries apply." },
   "/privacy": { title: "Privacy Policy | Worklazy Tools", description: "Read how local file processing, Google and Naver Analytics, advertising and cookies are handled by Worklazy Tools." },
   "/terms": { title: "Terms of Use | Worklazy Tools", description: "Review the conditions, supported scope, user responsibilities and limitations for Worklazy Tools browser utilities." },

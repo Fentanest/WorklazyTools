@@ -883,7 +883,8 @@
       "tabsLabel": "PDF finishing type",
       "tabs": {
         "page-numbers": "Page numbers",
-        "header-footer": "Header & footer"
+        "header-footer": "Header & footer",
+        "watermark": "Watermark"
       },
       "uploadTitle": "Choose a PDF",
       "uploadDescription": "Add one PDF that needs page numbers or document details.",
@@ -897,13 +898,15 @@
       "templateCount": "{{count}} / 300 characters",
       "templatePlaceholder": {
         "page-numbers": "Example: {page} / {pages}",
-        "header-footer": "Example: {filename} · {date}"
+        "header-footer": "Example: {filename} · {date}",
+        "watermark": "Example: CONFIDENTIAL"
       },
       "position": "Position",
       "regions": {
         "top-left": "Top left",
         "top-center": "Top center",
         "top-right": "Top right",
+        "center": "Center",
         "bottom-left": "Bottom left",
         "bottom-center": "Bottom center",
         "bottom-right": "Bottom right"
@@ -911,6 +914,28 @@
       "fontSize": "Font size (6–72 pt)",
       "color": "Text color",
       "margin": "Page margin (0–144 pt)",
+      "watermark": {
+        "contentType": "Watermark type",
+        "text": "Text",
+        "image": "Image",
+        "imageFile": "Watermark image",
+        "imageHint": "Choose a PNG or JPEG image. Its original aspect ratio is preserved.",
+        "layer": "Layer",
+        "background": "Behind content",
+        "foreground": "In front of content",
+        "pattern": "Pattern",
+        "single": "Single",
+        "tile": "Repeated tiles",
+        "rotation": "Rotation (-180–180°)",
+        "opacity": "Opacity (0.05–1)",
+        "size": "Page-relative size (5–100%)",
+        "gap": "Tile gap (0–300 pt)",
+        "offsetX": "Horizontal start offset (0–300 pt)",
+        "offsetY": "Vertical start offset (0–300 pt)",
+        "riskTitle": "A complex document structure was detected",
+        "riskConsent": "I understand the risk and want to continue",
+        "riskConsentDescription": "PDFs with complex layers, tags, or graphics state may look or behave differently after watermarking. Check the result carefully."
+      },
       "numberingTitle": "Numbering start",
       "startNumber": "Starting number",
       "startPage": "Starting page",
@@ -929,7 +954,7 @@
       "selectedPages": "{{count}} of {{total}} pages selected",
       "previewTitle": "Overlay preview",
       "previewDescription": "Check the content and position on the first selected page.",
-      "previewDisclaimer": "This preview is an on-screen approximation. Text spacing and placement in the finished PDF may differ slightly.",
+      "previewDisclaimer": "This preview is an on-screen approximation. Text or images are drawn directly into the finished PDF, so spacing and placement may differ slightly.",
       "previewWaiting": "Rendering the page preview…",
       "previewFailed": "The preview could not be displayed. You can check the settings and retry PDF creation.",
       "preflightChecking": "Checking the content and page layout before creation…",
@@ -939,7 +964,10 @@
         "missing-glyph": "The character at line {{line}}, column {{column}} cannot be displayed with the available font.",
         "narrow-region": "The display area on page {{page}} is too narrow for text. Reduce the margin or font size.",
         "invalid-margin": "The margin uses all of the display area on page {{page}}. Reduce the margin.",
-        "invalid-layout": "The content cannot be placed on page {{page}}. Adjust the margin or font size."
+        "invalid-layout": "The content cannot be placed on page {{page}}. Adjust the margin or font size.",
+        "image-format": "Choose a PNG or JPEG watermark image.",
+        "tile-limit": "Page {{page}} would contain too many repeated watermarks. Increase the size or tile gap.",
+        "background-placement": "A watermark stream cannot be added safely to the internal structure of page {{page}}. Try another PDF copy."
       },
       "create": "Create finished PDF",
       "creating": "Finishing the PDF…",
@@ -961,7 +989,13 @@
         "startNumber": "Enter the starting number as an integer.",
         "startPage": "Enter the starting page as an integer of 1 or more.",
         "template": "Enter the content to display.",
-        "templateLength": "Keep the content within 300 characters. Some of the attempted input was not applied because it exceeded the 300-character limit."
+        "templateLength": "Keep the content within 300 characters. Some of the attempted input was not applied because it exceeded the 300-character limit.",
+        "image": "Choose a PNG or JPEG watermark image.",
+        "rotation": "Enter a rotation from -180 to 180.",
+        "opacity": "Enter an opacity from 0.05 to 1.",
+        "size": "Enter a size from 5 to 100.",
+        "gap": "Enter a tile gap from 0 to 300.",
+        "offset": "Enter a start offset from 0 to 300."
       },
       "rangeErrors": {
         "empty-range": "Enter a page range to apply.",
@@ -980,13 +1014,21 @@
         "narrow-region": "The display area is too narrow. Reduce the margin or font size.",
         "invalid-margin": "The margin uses all of the page display area. Reduce the margin.",
         "invalid-layout": "The content does not fit this page size and margin. Reduce the margin or font size.",
-        "font-asset": "The Korean font could not be prepared. Check your connection and try again."
+        "font-asset": "The Korean font could not be prepared. Check your connection and try again.",
+        "image-format": "Choose a PNG or JPEG watermark image.",
+        "tile-limit": "There are too many repeated watermarks. Increase the size or tile gap.",
+        "background-placement": "A watermark cannot be added safely to this PDF's internal structure. Try another PDF copy.",
+        "risk-confirmation-required": "Review the document structure warning and consent before continuing.",
+        "output-validation": "A problem was found while checking the finished PDF. The source file was not changed."
       },
       "warnings": {
         "unknown-token": "Unknown tokens were kept as entered.",
         "horizontal-overflow": "Some long lines were shortened with an ellipsis.",
         "vertical-overflow": "Some lines outside the available region were omitted.",
-        "embedded-font": "Embedding the full font for Korean and extended characters may add about 3.8 MB to the output file."
+        "embedded-font": "Embedding the full font for Korean and extended characters may add about 3.8 MB to the output file.",
+        "risky-graphics-state": "Some pages have unbalanced saved and restored graphics state. Their appearance may change after watermarking.",
+        "risky-optional-content": "This document contains optional layers. Layer behavior may change after watermarking.",
+        "risky-tagged-document": "This document contains accessibility tags. The tag structure may change after watermarking."
       },
       "outputFileName": {
         "suffix": "finished",

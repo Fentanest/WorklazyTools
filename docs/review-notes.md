@@ -4,6 +4,56 @@
 
 ## 2026-09-07
 
+### U4-4(F2) PDF 벡터 워터마크·배경 stream — 브랜치 구현·검증 (Codx)
+
+**실행 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 현행 실측 1~3·확정 1/3/4/21/25/26·U4-4·H5 C-D·H6 및 관련 검토 이력을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=31529570059efe2478fb0326baf7740bc4861783`으로 지시와 일치했고 추적 변경과 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`를 열거나 stage하지 않았으며 금지된 다른 worktree·검수 산출물도 접근하지 않았다. main 동기화·병합·push·배포는 수행하지 않는다.
+
+**엔진·배경 stream 계약** — 텍스트는 페이지별 확장·줄바꿈 결과를 PDF Form XObject의 벡터 glyph로 만들고, 문서별 폰트 resource 하나를 각 form이 참조한다. ASCII/Latin-1은 Helvetica, 그 밖은 기존 고정 Noto asset의 glyph coverage·hash 검증과 배치당 1회 fetch를 그대로 공유한다. PNG/JPEG는 문서당 XObject 하나만 임베드하며 단일·타일 배치는 같은 reference를 반복 호출한다. 단일 7영역과 최대 400개 반복 타일은 회전된 bounds, 간격·x/y offset, CropBox∩MediaBox·UserUnit·0/90/180/270도 viewport 역변환을 적용한다.
+
+각 워터마크는 원본과 분리된 content stream 하나로 `q` → `/Artifact BMC` → 배치별 `q`/ExtGState/CTM/XObject/`Q` → `EMC` → `Q`를 닫는다. 전경은 `/Contents` 마지막, 배경은 먼저 새 stream을 등록해 정규화된 배열 끝에 붙인 뒤 그 정확한 reference를 제거하고 **index 0에 삽입**한다. 없음·단일 stream·다중 배열은 이 절차로 각각 `[watermark]`·`[watermark, original]`·`[watermark, ...originals]`가 됐고 원본 순서는 유지됐다. 비정상 entry는 생성 전 거부해 부분 결과가 없으며 조용한 전경 폴백은 배경 선택의 의미를 바꾸므로 기각했다. 저장 뒤 문서를 다시 열어 페이지 수와 선택 페이지의 첫/마지막 marker stream을 검사하고 실패하면 결과를 제공하지 않는다.
+
+**위험 문서·화면 표면** — 원본 stream의 `q/Q` 불균형, catalog의 optional content, tagged structure를 사전 검사 경고로 올린다. 위험 문서는 파일·설정을 유지한 채 명시 동의 전 실행만 막고, 동의 뒤에는 선택한 배경/전경 계약 그대로 실행한다. `/tools/pdf-editor/watermark`는 직접 진입 시 워터마크 탭을 열며 text/image, 배경/전경, 단일/타일, 영역·회전·불투명도·크기·여백·타일 간격/offset을 제공한다. 기존 exact page range와 썸네일 선택은 양방향 동기화되며 첫 선택 페이지 PDF.js canvas 위에 텍스트/이미지 단일·타일 overlay와 근사 안내를 표시한다. object URL은 교체·unmount 때 회수한다. ko/en 제목·설명·FAQ·canonical·정적 페이지·sitemap·소셜 PNG를 동반 등록했고 이 route는 격리 경로가 아니므로 기존 일반 광고 loader를 그대로 상속한다.
+
+**구조·픽셀·resource 증거** — `/Contents` fixture 4종은 빈 Contents·단일 stream·다중 stream·비정상 entry다. 앞의 3종은 배경/전경×단일/타일×4회전×PDF.js/Poppler **96렌더**, 별도 비영점 CropBox 4쪽 고정 색상 문서는 같은 32렌더를 만들어 총 **128/128**을 통과했고, 비정상 fixture는 결과 0으로 차단됐다. 고정 문서의 원시 분류 픽셀 범위는 아래와 같으며 배경에서는 파란 원본이 빨간 워터마크 위를 덮고 전경에서는 반대임을 두 renderer에서 단언했다. 전체 원수치는 `/tmp/worklazy-u4-4/golden/metrics.json`에 있다.
+
+| layer/pattern | PDF.js red / blue | Poppler red / blue |
+|---|---:|---:|
+| background single | 250~444 / 15,600 | 288~496 / 15,600 |
+| background tile | 2,850~5,417 / 15,600 | 3,012~5,597 / 15,600 |
+| foreground single | 7,852~9,722 / 6,256~7,923 | 8,054~9,926 / 6,170~7,834 |
+| foreground tile | 11,116~12,649 / 7,264~8,298 | 11,421~12,991 / 7,191~8,206 |
+
+이미지 타일 unit은 결과의 `/Subtype /Image`가 정확히 **1개**이고 워터마크 `Do`가 여러 개인 것을 함께 검사한다. 같은 116B PNG의 단일 결과는 **1,175B**, 타일 결과는 **1,270B**로 차이는 배치 연산자 **95B**뿐이었다. 텍스트 form도 font resource 정확히 1개와 vector text 추출을 확인했다. 첫 골든 실행에서 이미지 XObject의 고유 너비/높이를 다시 scale해 그림이 보이지 않던 결함을 검출했고, 이미지 자체가 단위 사각형을 그린다는 계약에 맞춰 object 크기를 1×1로 고친 뒤 전 렌더를 통과했다. 브라우저 이미지 비율 검사는 회전된 화면 bounds가 아니라 원본 `naturalWidth/naturalHeight`를 비교하도록 잘못된 하네스 판정을 교정했다.
+
+**시각 판정** — 워터마크 full profile ko/en×light/dark×desktop/mobile **8장**을 새로 추가했다. 세 번째 구현 탭 추가로 실제로 바뀐 기존 page-number/header-footer 16장과 active navigation 4장만 생성기로 갱신해 기준선 diff는 **신규 8 + 수정 20 = 28장**이다. 첫 전체 실행의 기존 finish 20장 실패는 모두 새 탭 폭/문구 변화였고 diff를 육안 확인한 뒤 해당 파일만 갱신했다. 최종 전체는 **211/211, 2분 15.11초**, threshold 0.1·상이 픽셀 0.1% 이하·AA 무시 조건으로 통과했다. ko/en 390px 직접 경로와 320px navigation은 별도 baseline 및 브라우저 스모크에 포함된다.
+
+| 번들 지표(gzip) | U4-0 고정 기준 대비 누적 순증분 | 고정 상한 | 잔여 | 판정 |
+|---|---:|---:|---:|---|
+| entry JS | +6,950B | +20,480B | 13,530B | 통과 |
+| affected PDF route JS | +18,881B | +61,440B | 42,559B | 통과 |
+| shared JS | +2,161B | +30,720B | 28,559B | 통과 |
+| app JS | +28,748B | +81,920B | 53,172B | 통과 |
+| CSS | +218B | +10,240B | 10,022B | 통과 |
+
+기준은 schema v2 `/tmp/s3-bundle-baseline.json`, 현재 실측은 `/tmp/worklazy-u4-4/bundle-u4-4.json`이며 override `{}`·multiplier 1이다. QR route에서 shared로 이동한 **509,794B**는 모듈 귀속 이동으로 분리했다. 첫 비교는 `BUNDLE_ROUTES`를 생략해 PDF-only 기준과 전체 route 집합을 잘못 대조했고 baseline의 audio route 부재를 정확히 거부했다. 이를 통과로 취급하지 않고 `BUNDLE_ROUTES=pdf-editor`로 재실행했다. 결과 검증의 불필요한 동적 import도 제거해 production `PdfFinishPanel`을 **54.56kB / gzip 17.21kB**로 줄인 뒤 위 최종 수치를 다시 측정했다.
+
+| 검증 | 최종 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **306/306**, fail·skip 0 |
+| production build · static | **2,847 modules**, 정적 **69페이지**, startup recovery **116**, 통과 |
+| PDF finish smoke · watermark golden | 16 직접 진입, text/image/tile/risk/4회전 CropBox/출력/취소/재시도; 4 Contents fixture·**128/128** 렌더 통과 |
+| PDF scope browser · 전체 browser | 기존 PDF 4모드와 Excel·Word·shared UI 통과 |
+| new-tools · utilities · office | HWP·Image·Audio·Video, ko/en 유틸리티, Office 통과 |
+| QR bulk · font render | 4 font scenario·취소·404 통과; 기존 fixture 픽셀·텍스트 oracle 통과 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff **0** |
+| Excel Cleaner · Compare | 취소·재실행·보고서·모바일 포함 통과 |
+| 전체 visual | ko/en 포함 **211/211**; 위 28개 기준선 변경 |
+| 최종 local-QA build · a11y · rendering | 정적 69; 12페이지 axe 위반 **0**; 7대상×3회 외부 요청 0, watermark CLS max **0.0001480366** < 0.1 |
+| bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 **20** 불변 |
+| 공백·포트 | `git diff --check` 통과; 4280~4289 `--strictPort` 범위 사용 |
+
+반복된 Node PDF.js `standardFontDataUrl`과 QR Poppler font-type 문구는 기존 환경 경고이며 PDF.js/Poppler 픽셀·텍스트 oracle은 통과했다. 원출력, bundle/a11y/rendering JSON, 직접 경로 캡처와 골든 PDF/PNG는 `/tmp/worklazy-u4-4/`에 보존한다. 범위 밖 F3 도장·F4 정리/래스터·다중 결과 ZIP은 구현하지 않았다. — Codx
+
 ### U4-3 fix-3 — 원시 숫자·탭 사전 검사와 Office 스모크 동기화 (Codx)
 
 **실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-3 dispatch, astra 3차·2차 보고와 fix-2 지시서를 전문 대조했다. 시작점은 `s3-pdf-finish` `HEAD=37470534a28b1bf1752a6d659820240fc3bc1b2a`로 지시와 일치했고 추적 변경은 없었다. 열린 계획의 문서 비교·Excel·UI 작업은 별도 작업 트리 또는 다른 제품 표면이며 이번 panel·스모크와 상반된 지시는 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`를 열거나 stage하지 않았고, 금지된 `/tmp/worklazy-xr`·`/tmp/worklazy-dc-impl`도 접근하지 않았다. main `cdb4007` 병합·push·배포는 하지 않는다.

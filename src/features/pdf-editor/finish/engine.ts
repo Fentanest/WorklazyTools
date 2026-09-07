@@ -1,5 +1,5 @@
 import { Encodings } from "@pdf-lib/standard-fonts";
-import { PDFName, PDFNumber, type PDFPage } from "pdf-lib";
+import { PDFName, PDFNumber, degrees as pdfDegrees, drawText as drawTextOperator, rgb as pdfRgb, type PDFImage, type PDFPage } from "pdf-lib";
 
 import { QR_LABEL_FONT_PATH } from "../../qr-studio/qrBulk.ts";
 import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from "../../../utils/cooperativeCancel.ts";
@@ -27,6 +27,19 @@ import {
   type TextFontProbe,
 } from "./text.ts";
 import {
+  addWatermarkXObject,
+  assertBackgroundPlacementSupported,
+  createTextWatermarkXObject,
+  createWatermarkPlacements,
+  embedWatermarkImage,
+  inspectWatermarkRisks,
+  textWatermarkFontName,
+  validateWatermarkResult,
+  type PdfWatermarkSettings,
+  type WatermarkPlacement,
+  type WatermarkRiskCode,
+} from "./watermark.ts";
+import {
   degrees,
   embedCustomPdfFont,
   embedHelvetica,
@@ -51,7 +64,12 @@ export type PdfFinishEngineErrorCode =
   | "narrow-region"
   | "invalid-margin"
   | "invalid-layout"
-  | "font-asset";
+  | "font-asset"
+  | "image-format"
+  | "tile-limit"
+  | "background-placement"
+  | "risk-confirmation-required"
+  | "output-validation";
 
 export class PdfFinishEngineError extends Error {
   readonly code: PdfFinishEngineErrorCode;
@@ -65,7 +83,12 @@ export class PdfFinishEngineError extends Error {
   }
 }
 
-export type PdfFinishWarningCode = "unknown-token" | "horizontal-overflow" | "vertical-overflow" | "embedded-font";
+export type PdfFinishWarningCode =
+  | "unknown-token"
+  | "horizontal-overflow"
+  | "vertical-overflow"
+  | "embedded-font"
+  | WatermarkRiskCode;
 
 export type PdfFinishPreflightErrorCode =
   | "control-character"
@@ -73,11 +96,14 @@ export type PdfFinishPreflightErrorCode =
   | "missing-glyph"
   | "narrow-region"
   | "invalid-margin"
-  | "invalid-layout";
+  | "invalid-layout"
+  | "image-format"
+  | "tile-limit"
+  | "background-placement";
 
 export interface PdfFinishPreflightError {
   code: PdfFinishPreflightErrorCode;
-  field: "template" | "fontSize" | "margin";
+  field: "template" | "fontSize" | "margin" | "watermark" | "image";
   fileKey: string;
   physicalPage: number;
   line?: number;
@@ -93,7 +119,7 @@ export interface PdfFinishPreflightResult {
 
 export interface PdfFinishDecorationOptions {
   template: string;
-  region: FinishRegion;
+  region: FinishRegion | "center";
   fontSize: number;
   color: string;
   margin: number;
@@ -101,6 +127,7 @@ export interface PdfFinishDecorationOptions {
   startPage: number;
   excludeCover: boolean;
   opacity?: number;
+  watermark?: PdfWatermarkSettings;
 }
 
 export interface PdfFinishInputFile {
@@ -132,6 +159,8 @@ export interface PdfFinishEngineInput {
   onProgress?: (progress: PdfFinishProgress) => void;
   loadFontAsset?: (signal?: AbortSignal) => Promise<ArrayBuffer>;
   outputName?: { suffix: string; fallback: string };
+  allowRiskyDocuments?: boolean;
+  validateWatermarkOutput?: typeof validateWatermarkResult;
 }
 
 export class PdfFinishCanceledError extends DOMException {
@@ -149,13 +178,28 @@ interface PreparedPage {
 }
 
 interface PageDecorationPlan extends PreparedPage {
+  kind: "text-decoration" | "watermark-text";
   page: PDFPage;
   font: PDFFont;
   runs: LayoutRun[];
   warnings: PdfFinishWarningCode[];
   textRotation: PdfPageRotation;
   viewport: PdfViewportGeometry;
+  watermarkPlacements?: WatermarkPlacement[];
+  watermarkWidth?: number;
+  watermarkHeight?: number;
 }
+
+interface ImageWatermarkPlan {
+  kind: "watermark-image";
+  physicalPage: number;
+  page: PDFPage;
+  image: PDFImage;
+  viewport: PdfViewportGeometry;
+  watermarkPlacements: WatermarkPlacement[];
+}
+
+type DecorationPlan = PageDecorationPlan | ImageWatermarkPlan;
 
 interface BatchFontResources {
   getFontAsset: () => Promise<ArrayBuffer>;
@@ -175,6 +219,23 @@ function validateOptions(options: PdfFinishDecorationOptions) {
   if (options.opacity !== undefined && (!Number.isFinite(options.opacity) || options.opacity < 0 || options.opacity > 1)) {
     throw new PdfFinishEngineError("invalid-field", { field: "opacity" });
   }
+  const watermark = options.watermark;
+  if (!watermark) return;
+  if (!(["text", "image"] as const).includes(watermark.content)
+      || !(["background", "foreground"] as const).includes(watermark.layer)
+      || !(["single", "tile"] as const).includes(watermark.pattern)
+      || !(["top-left", "top-center", "top-right", "center", "bottom-left", "bottom-center", "bottom-right"] as const).includes(watermark.region)) {
+    throw new PdfFinishEngineError("invalid-field", { field: "watermark" });
+  }
+  if (!Number.isFinite(watermark.rotation) || watermark.rotation < -180 || watermark.rotation > 180
+      || !Number.isFinite(watermark.opacity) || watermark.opacity < 0.05 || watermark.opacity > 1
+      || !Number.isFinite(watermark.sizePercent) || watermark.sizePercent < 5 || watermark.sizePercent > 100
+      || !Number.isFinite(watermark.gap) || watermark.gap < 0 || watermark.gap > 300
+      || !Number.isFinite(watermark.offsetX) || watermark.offsetX < 0 || watermark.offsetX > 300
+      || !Number.isFinite(watermark.offsetY) || watermark.offsetY < 0 || watermark.offsetY > 300) {
+    throw new PdfFinishEngineError("invalid-field", { field: "watermark" });
+  }
+  if (watermark.content === "image" && !watermark.image) throw new PdfFinishEngineError("image-format", { field: "image" });
 }
 
 function colorComponents(value: string) {
@@ -379,6 +440,59 @@ function createPageDecorationPlan(
   if (!page) throw new PdfFinishEngineError("invalid-field", { field: "selection" });
   const viewport = pdfPageViewport(page);
   const margins = { top: options.margin, right: options.margin, bottom: options.margin, left: options.margin };
+  if (options.watermark) {
+    const availableWidth = viewport.width - options.margin * 2;
+    const availableHeight = viewport.height - options.margin * 2;
+    const width = availableWidth * options.watermark.sizePercent / 100;
+    if (availableWidth <= 0 || availableHeight <= 0 || width <= 0) {
+      return { code: "invalid-margin", field: "margin", fileKey: source.key, physicalPage };
+    }
+    const alignment = options.watermark.region === "center" ? "center" : options.watermark.region.split("-")[1] as "left" | "center" | "right";
+    const layout = layoutTextLines({
+      lines: prepared.lines,
+      size: options.fontSize,
+      region: { x: 0, y: 0, width, height: availableHeight },
+      alignment,
+      vertical: "bottom",
+      font,
+    });
+    if (!layout.ok) {
+      return {
+        code: layout.error === "narrow-region" ? "narrow-region" : "invalid-layout",
+        field: "fontSize",
+        fileKey: source.key,
+        physicalPage,
+      };
+    }
+    const height = Math.max(layout.lineHeight, layout.runs.length * layout.lineHeight);
+    const placement = createWatermarkPlacements({ viewport, width, height, settings: options.watermark, margin: options.margin });
+    if (!placement.ok) {
+      return {
+        code: placement.error,
+        field: "watermark",
+        fileKey: source.key,
+        physicalPage,
+      };
+    }
+    try {
+      if (options.watermark.layer === "background") assertBackgroundPlacementSupported(page);
+    } catch {
+      return { code: "background-placement", field: "watermark", fileKey: source.key, physicalPage };
+    }
+    return {
+      ...preparedPage,
+      kind: "watermark-text",
+      page,
+      font,
+      runs: layout.runs,
+      warnings: layout.warnings,
+      textRotation: 0,
+      viewport,
+      watermarkPlacements: placement.placements,
+      watermarkWidth: width,
+      watermarkHeight: height,
+    };
+  }
   let regions;
   let anchor;
   try {
@@ -405,7 +519,56 @@ function createPageDecorationPlan(
       physicalPage,
     };
   }
-  return { ...preparedPage, page, font, runs: layout.runs, warnings: layout.warnings, textRotation: anchor.textRotation, viewport };
+  return { ...preparedPage, kind: "text-decoration", page, font, runs: layout.runs, warnings: layout.warnings, textRotation: anchor.textRotation, viewport };
+}
+
+function imageWatermarkError(source: PdfFinishInputFile, physicalPage: number, code: "image-format" | "tile-limit" | "invalid-layout" | "background-placement"): PdfFinishPreflightError {
+  return { code, field: code === "image-format" ? "image" : "watermark", fileKey: source.key, physicalPage };
+}
+
+async function analyzeImageWatermark(
+  input: PdfFinishEngineInput,
+  source: PdfFinishInputFile,
+  document: PDFDocument,
+  warnings: Set<PdfFinishWarningCode>,
+): Promise<{ document: PDFDocument; plans: ImageWatermarkPlan[]; warnings: Set<PdfFinishWarningCode>; errors: PdfFinishPreflightError[] }> {
+  const settings = input.options.watermark;
+  if (!settings?.image) return { document, plans: [], warnings, errors: [imageWatermarkError(source, source.selection.exactPages[0] ?? 1, "image-format")] };
+  let image: PDFImage;
+  try {
+    image = await embedWatermarkImage(document, settings.image);
+  } catch {
+    return { document, plans: [], warnings, errors: [imageWatermarkError(source, source.selection.exactPages[0] ?? 1, "image-format")] };
+  }
+  const plans: ImageWatermarkPlan[] = [];
+  const errors: PdfFinishPreflightError[] = [];
+  for (const physicalPage of source.selection.exactPages) {
+    throwIfAborted(input.signal);
+    await yieldToEventLoop();
+    throwIfAborted(input.signal);
+    const page = document.getPages()[physicalPage - 1];
+    if (!page) throw new PdfFinishEngineError("invalid-field", { field: "selection" });
+    const viewport = pdfPageViewport(page);
+    const scale = Math.min(
+      viewport.width * settings.sizePercent / 100 / image.width,
+      viewport.height * settings.sizePercent / 100 / image.height,
+    );
+    const width = image.width * scale;
+    const height = image.height * scale;
+    const placement = createWatermarkPlacements({ viewport, width, height, settings, margin: input.options.margin });
+    if (!placement.ok) {
+      errors.push(imageWatermarkError(source, physicalPage, placement.error));
+      continue;
+    }
+    try {
+      if (settings.layer === "background") assertBackgroundPlacementSupported(page);
+    } catch {
+      errors.push(imageWatermarkError(source, physicalPage, "background-placement"));
+      continue;
+    }
+    plans.push({ kind: "watermark-image", physicalPage, page, image, viewport, watermarkPlacements: placement.placements });
+  }
+  return { document, plans, warnings, errors };
 }
 
 async function analyzeDocument(
@@ -414,14 +577,18 @@ async function analyzeDocument(
   batchDate: Date,
   resources: BatchFontResources,
   fileIndex: number,
-): Promise<{ document?: PDFDocument; plans: PageDecorationPlan[]; warnings: Set<PdfFinishWarningCode>; errors: PdfFinishPreflightError[] }> {
+): Promise<{ document?: PDFDocument; plans: DecorationPlan[]; warnings: Set<PdfFinishWarningCode>; errors: PdfFinishPreflightError[] }> {
   const preparedPages = preparePages(source, input.options, input.locale, new Date(batchDate.getTime()));
   const warnings = new Set<PdfFinishWarningCode>();
   addTextWarnings(warnings, preparedPages);
-  const textErrors = preparedTextErrors(source, input.options, preparedPages);
+  const textErrors = input.options.watermark?.content === "image" ? [] : preparedTextErrors(source, input.options, preparedPages);
   if (textErrors.length > 0) return { plans: [], warnings, errors: textErrors };
 
   const document = await loadDocument(source.file, input.signal);
+  if (input.options.watermark) {
+    for (const warning of inspectWatermarkRisks(document)) warnings.add(warning);
+  }
+  if (input.options.watermark?.content === "image") return analyzeImageWatermark(input, source, document, warnings);
   const needsNoto = fontNeedsNoto(preparedPages);
   let characterSet: number[] = [];
   if (needsNoto) {
@@ -449,7 +616,7 @@ async function analyzeDocument(
   throwIfAborted(input.signal);
   if (decision.font === "noto") warnings.add("embedded-font");
 
-  const plans: PageDecorationPlan[] = [];
+  const plans: DecorationPlan[] = [];
   const errors: PdfFinishPreflightError[] = [];
   for (const preparedPage of preparedPages) {
     throwIfAborted(input.signal);
@@ -482,24 +649,55 @@ function engineErrorForPreflight(errors: readonly PdfFinishPreflightError[]) {
   return new PdfFinishEngineError(first.code, { ...first, errors });
 }
 
-async function decorateDocument(input: PdfFinishEngineInput, plans: readonly PageDecorationPlan[], warnings: Set<PdfFinishWarningCode>, completed: { value: number }, total: number) {
+function watermarkTextOperators(plan: PageDecorationPlan, input: PdfFinishEngineInput) {
+  const color = colorComponents(input.options.color);
+  const fontName = textWatermarkFontName();
+  return plan.runs.flatMap((run) => drawTextOperator(plan.font.encodeText(run.text), {
+    x: run.x,
+    y: run.y,
+    size: input.options.fontSize,
+    font: fontName,
+    color: pdfRgb(...color),
+    rotate: pdfDegrees(0),
+    xSkew: pdfDegrees(0),
+    ySkew: pdfDegrees(0),
+  }));
+}
+
+async function decorateDocument(input: PdfFinishEngineInput, plans: readonly DecorationPlan[], warnings: Set<PdfFinishWarningCode>, completed: { value: number }, total: number) {
   const color = colorComponents(input.options.color);
   for (const plan of plans) {
     throwIfAborted(input.signal);
     await yieldToEventLoop();
     throwIfAborted(input.signal);
-    const unit = pageUserUnit(plan.page);
-    for (const run of plan.runs) {
-      const point = viewportPointToPdf(plan.viewport.transform, run.x, plan.viewport.height - run.y);
-      plan.page.drawText(run.text, {
-        x: point.x,
-        y: point.y,
-        size: input.options.fontSize / unit,
-        font: plan.font,
-        color: rgb(...color),
-        rotate: degrees(plan.textRotation),
-        opacity: input.options.opacity ?? PDF_FINISH_OUTPUT_OPACITY,
-      });
+    const watermark = input.options.watermark;
+    if (plan.kind === "watermark-image") {
+      if (!watermark) throw new PdfFinishEngineError("invalid-layout");
+      addWatermarkXObject(plan.page, plan.image.ref, 1, 1, plan.viewport, plan.watermarkPlacements, watermark.opacity, watermark.layer);
+    } else if (plan.kind === "watermark-text") {
+      if (!watermark || !plan.watermarkPlacements || !plan.watermarkWidth || !plan.watermarkHeight) throw new PdfFinishEngineError("invalid-layout");
+      const form = createTextWatermarkXObject(
+        plan.page.doc,
+        plan.font.ref,
+        watermarkTextOperators(plan, input),
+        plan.watermarkWidth,
+        plan.watermarkHeight,
+      );
+      addWatermarkXObject(plan.page, form.reference, plan.watermarkWidth, plan.watermarkHeight, plan.viewport, plan.watermarkPlacements, watermark.opacity, watermark.layer);
+    } else {
+      const unit = pageUserUnit(plan.page);
+      for (const run of plan.runs) {
+        const point = viewportPointToPdf(plan.viewport.transform, run.x, plan.viewport.height - run.y);
+        plan.page.drawText(run.text, {
+          x: point.x,
+          y: point.y,
+          size: input.options.fontSize / unit,
+          font: plan.font,
+          color: rgb(...color),
+          rotate: degrees(plan.textRotation),
+          opacity: input.options.opacity ?? PDF_FINISH_OUTPUT_OPACITY,
+        });
+      }
     }
     completed.value += 1;
     report(input, "decorating", completed.value, total);
@@ -547,6 +745,9 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       throwIfAborted(input.signal);
       const analyzed = await analyzeDocument(input, source, batchDate, resources, fileIndex);
       if (analyzed.errors.length > 0) throw engineErrorForPreflight(analyzed.errors);
+      if (input.options.watermark && [...analyzed.warnings].some((warning) => warning.startsWith("risky-")) && !input.allowRiskyDocuments) {
+        throw new PdfFinishEngineError("risk-confirmation-required");
+      }
       const document = analyzed.document;
       if (!document) throw new PdfFinishEngineError("invalid-layout");
       await decorateDocument(input, analyzed.plans, analyzed.warnings, completed, total);
@@ -555,6 +756,14 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       throwIfAborted(input.signal);
       const bytes = await document.save();
       throwIfAborted(input.signal);
+      if (input.options.watermark) {
+        try {
+          await (input.validateWatermarkOutput ?? validateWatermarkResult)(bytes, source.selection.totalPages, source.selection.exactPages, input.options.watermark.layer);
+        } catch (error) {
+          throw new PdfFinishEngineError("output-validation", {}, error);
+        }
+        throwIfAborted(input.signal);
+      }
       await yieldBeforeResultRegistration(input.signal);
       outputs.push({
         key: source.key,

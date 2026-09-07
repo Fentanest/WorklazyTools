@@ -43,7 +43,7 @@
     "test:a11y": "node tests/accessibility-audit.mjs",
     "test:rendering": "node tests/rendering-baseline.mjs",
     "test:pdf-finish-oracle": "node --experimental-strip-types tests/pdf-finish-oracle.mjs",
-    "test:pdf-finish": "node tests/pdf-finish-smoke.mjs",
+    "test:pdf-finish": "node tests/pdf-finish-smoke.mjs && node --experimental-strip-types tests/pdf-watermark-golden.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },
   "dependencies": {

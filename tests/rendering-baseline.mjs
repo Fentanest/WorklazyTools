@@ -20,6 +20,7 @@ export const targets = Object.freeze([
   { id: "pdf-finish", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']" },
   { id: "pdf-page-numbers", path: "/ko/tools/pdf-editor/page-numbers", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='page-numbers']" },
   { id: "pdf-header-footer", path: "/ko/tools/pdf-editor/header-footer", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='header-footer']" },
+  { id: "pdf-watermark", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']" },
 ]);
 
 // Self-contained so the browser runs exactly the observer exercised by unit tests.

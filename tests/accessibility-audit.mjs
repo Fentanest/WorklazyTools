@@ -26,6 +26,7 @@ export const pages = Object.freeze([
   { id: "pdf-finish-ko", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']" },
   { id: "pdf-finish-mobile-ko", path: "/ko/tools/pdf-editor/finish", viewport: { width: 412, height: 839 }, readySelector: "[data-testid='pdf-finish-ready']" },
   { id: "pdf-finish-en", path: "/en/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']" },
+  { id: "pdf-watermark-ko", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']" },
   { id: "hwp-editor", path: "/ko/tools/hwp-editor", readySelector: 'iframe[title="rhwp HWP 문서 편집기"]' },
   { id: "home-mobile-ko", path: "/ko", viewport: { width: 412, height: 839 } },
   { id: "tools-mobile-ko", path: "/ko/tools", viewport: { width: 412, height: 839 } },

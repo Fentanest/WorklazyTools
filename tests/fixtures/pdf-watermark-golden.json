@@ -1,0 +1,58 @@
+{
+  "background-single": {
+    "pdfjs": [
+      { "width": 200, "height": 180, "red": 444, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 250, "blue": 15600 },
+      { "width": 200, "height": 180, "red": 444, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 250, "blue": 15600 }
+    ],
+    "poppler": [
+      { "width": 200, "height": 180, "red": 496, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 288, "blue": 15600 },
+      { "width": 200, "height": 180, "red": 496, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 288, "blue": 15600 }
+    ]
+  },
+  "background-tile": {
+    "pdfjs": [
+      { "width": 200, "height": 180, "red": 2850, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 5417, "blue": 15600 },
+      { "width": 200, "height": 180, "red": 2850, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 5417, "blue": 15600 }
+    ],
+    "poppler": [
+      { "width": 200, "height": 180, "red": 3012, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 5597, "blue": 15600 },
+      { "width": 200, "height": 180, "red": 3012, "blue": 15600 },
+      { "width": 180, "height": 200, "red": 5597, "blue": 15600 }
+    ]
+  },
+  "foreground-single": {
+    "pdfjs": [
+      { "width": 200, "height": 180, "red": 9722, "blue": 6256 },
+      { "width": 180, "height": 200, "red": 7852, "blue": 7923 },
+      { "width": 200, "height": 180, "red": 9722, "blue": 6256 },
+      { "width": 180, "height": 200, "red": 7852, "blue": 7923 }
+    ],
+    "poppler": [
+      { "width": 200, "height": 180, "red": 9926, "blue": 6170 },
+      { "width": 180, "height": 200, "red": 8054, "blue": 7834 },
+      { "width": 200, "height": 180, "red": 9926, "blue": 6170 },
+      { "width": 180, "height": 200, "red": 8054, "blue": 7834 }
+    ]
+  },
+  "foreground-tile": {
+    "pdfjs": [
+      { "width": 200, "height": 180, "red": 11116, "blue": 7264 },
+      { "width": 180, "height": 200, "red": 12649, "blue": 8298 },
+      { "width": 200, "height": 180, "red": 11116, "blue": 7264 },
+      { "width": 180, "height": 200, "red": 12649, "blue": 8298 }
+    ],
+    "poppler": [
+      { "width": 200, "height": 180, "red": 11421, "blue": 7191 },
+      { "width": 180, "height": 200, "red": 12991, "blue": 8206 },
+      { "width": 200, "height": 180, "red": 11421, "blue": 7191 },
+      { "width": 180, "height": 200, "red": 12991, "blue": 8206 }
+    ]
+  }
+}

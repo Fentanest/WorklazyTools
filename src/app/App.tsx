@@ -61,6 +61,7 @@ export function App() {
           <Route path="tools/pdf-editor/finish" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
           <Route path="tools/pdf-editor/page-numbers" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
           <Route path="tools/pdf-editor/header-footer" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "header-footer" }} />} />
+          <Route path="tools/pdf-editor/watermark" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "watermark" }} />} />
           <Route path="tools/document-compare" element={<DocumentCompareSessionProvider />}>
             <Route index element={<LazyToolRoute label="Document compare"><DocumentComparePage /></LazyToolRoute>} />
             <Route path="results/:pairNumber" element={<LazyToolRoute label="Document comparison results"><DocumentCompareResultPage /></LazyToolRoute>} />

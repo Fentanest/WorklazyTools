@@ -12,7 +12,7 @@ const toolRoutes = [
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
 ];
-const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer"];
+const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark"];
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
 const localizedRoutes = ["", "tools", ...toolRoutes.map((slug) => `tools/${slug}`), ...pdfRoutes.map((slug) => `tools/${slug}`), ...pageRoutes];
 const videoRoute = "tools/video-studio";

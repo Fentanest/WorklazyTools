@@ -4,13 +4,15 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { PDFDict, PDFDocument, PDFName, PDFNumber, degrees } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, decodePDFRawStream, degrees } from "pdf-lib";
+import { PNG } from "pngjs";
 
 import {
   finishPdfFiles,
   pdfPageViewport,
   preflightPdfFiles,
   PdfFinishCanceledError,
+  PdfFinishEngineError,
 } from "../../src/features/pdf-editor/finish/engine.ts";
 import { createPageSelection } from "../../src/features/pdf-editor/finish/selection.ts";
 import { finishOutputName } from "../../src/features/pdf-editor/outputName.ts";
@@ -31,6 +33,43 @@ function selection(totalPages: number, range: string) {
   const result = createPageSelection(totalPages, range, "all", { startPage: 1, excludeCover: false });
   assert.ok(!("error" in result));
   return result;
+}
+
+const watermarkOptions = (overrides: Record<string, unknown> = {}) => ({
+  template: "CONFIDENTIAL",
+  region: "center" as const,
+  fontSize: 28,
+  color: "#c02038",
+  margin: 18,
+  startNumber: 1,
+  startPage: 1,
+  excludeCover: false,
+  watermark: {
+    content: "text" as const,
+    layer: "foreground" as const,
+    pattern: "single" as const,
+    region: "center" as const,
+    rotation: -32,
+    opacity: 0.35,
+    sizePercent: 60,
+    gap: 54,
+    offsetX: 12,
+    offsetY: 18,
+  },
+  ...overrides,
+});
+
+function decodedPageStreams(document: PDFDocument, pageIndex = 0) {
+  const page = document.getPage(pageIndex);
+  const raw = page.node.get(PDFName.of("Contents"));
+  assert.ok(raw);
+  const resolved = document.context.lookup(raw);
+  const entries = resolved instanceof PDFArray ? resolved.asArray() : [raw];
+  return entries.map((entry) => {
+    const stream = document.context.lookup(entry);
+    assert.ok(stream instanceof PDFRawStream);
+    return Buffer.from(decodePDFRawStream(stream).decode()).toString("latin1");
+  });
 }
 
 test("finish engine decorates the exact page set with one batch clock and rotated crop geometry", async () => {
@@ -211,4 +250,117 @@ test("finish output names are localized, sanitized, deduplicated, and have one e
     assert.equal(finishOutputName(source, "en-US"), base ? `${base}-finished.pdf` : "Worklazy-PDF-finished.pdf");
   }
   assert.equal(finishOutputName("보고서:1.pdf.pdf", "ko-KR"), "보고서-1-마무리.pdf");
+});
+
+test("watermark text uses an independent isolated stream in the requested layer", async () => {
+  for (const fixtureName of ["empty-contents.pdf", "single-stream.pdf", "multiple-streams.pdf"]) {
+    const bytes = await fs.readFile(path.join(repositoryRoot, "tests/fixtures/pdf-finish/background", fixtureName));
+    for (const layer of ["background", "foreground"] as const) {
+      const file = new File([bytes], fixtureName, { type: "application/pdf" });
+      const [output] = await finishPdfFiles({
+        files: [{ key: `${fixtureName}-${layer}`, file, selection: selection(1, "1") }],
+        options: watermarkOptions({ watermark: { ...watermarkOptions().watermark, layer } }),
+        locale: "en-US",
+      });
+      const result = await PDFDocument.load(output.buffer, { updateMetadata: false });
+      const streams = decodedPageStreams(result);
+      const watermarkIndex = layer === "background" ? 0 : streams.length - 1;
+      assert.match(streams[watermarkIndex], /^q\n\/Artifact BMC/u, `${fixtureName}/${layer} did not isolate the watermark stream`);
+      assert.match(streams[watermarkIndex], /EMC\nQ\n?$/u, `${fixtureName}/${layer} did not restore graphics state`);
+      assert.equal(streams.filter((stream) => stream.includes("/Artifact BMC")).length, 1);
+      if (fixtureName === "single-stream.pdf" && layer === "foreground") {
+        const watermarkForms = result.context.enumerateIndirectObjects().map(([, object]) => object).filter((object): object is PDFRawStream => object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Form"));
+        assert.equal(watermarkForms.length, 1);
+        const formFonts = watermarkForms[0].dict.lookup(PDFName.of("Resources"), PDFDict).lookup(PDFName.of("Font"), PDFDict);
+        assert.equal(formFonts.keys().length, 1, "the vector text watermark form must expose one shared font resource");
+        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+        const task = pdfjs.getDocument({ data: new Uint8Array(output.buffer) });
+        try {
+          const content = await (await (await task.promise).getPage(1)).getTextContent();
+          assert.match(content.items.map((item: any) => item.str ?? "").join(" "), /CON/u);
+        } finally {
+          await task.destroy();
+        }
+      }
+    }
+  }
+});
+
+test("watermark rejects malformed content placement without returning a partial result", async () => {
+  const bytes = await fs.readFile(path.join(repositoryRoot, "tests/fixtures/pdf-finish/background/malformed-contents-type.pdf"));
+  const file = new File([bytes], "malformed-contents-type.pdf", { type: "application/pdf" });
+  const input = {
+    files: [{ key: "malformed", file, selection: selection(1, "1") }],
+    options: watermarkOptions({ watermark: { ...watermarkOptions().watermark, layer: "background" as const } }),
+    locale: "en-US",
+  };
+  const preflight = await preflightPdfFiles(input);
+  assert.equal(preflight.errors[0]?.code, "background-placement");
+  await assert.rejects(finishPdfFiles(input), (error: unknown) => error instanceof PdfFinishEngineError && error.code === "background-placement");
+});
+
+test("watermark image tiles preserve one embedded image resource and repeated references", async (context) => {
+  const source = await fixture("image-watermark.pdf");
+  const png = new PNG({ width: 40, height: 20 });
+  for (let index = 0; index < png.data.length; index += 4) {
+    png.data[index] = 210; png.data[index + 1] = 20; png.data[index + 2] = 50; png.data[index + 3] = 255;
+  }
+  const image = new File([PNG.sync.write(png)], "mark.png", { type: "image/png" });
+  const baseOptions = watermarkOptions({ watermark: { ...watermarkOptions().watermark, content: "image" as const, image, sizePercent: 24 } });
+  const [singleOutput] = await finishPdfFiles({
+    files: [{ key: "image-single", file: source, selection: selection(3, "1") }],
+    options: baseOptions,
+    locale: "en-US",
+  });
+  const [tileOutput] = await finishPdfFiles({
+    files: [{ key: "image", file: source, selection: selection(3, "1") }],
+    options: watermarkOptions({ watermark: { ...baseOptions.watermark, pattern: "tile" as const } }),
+    locale: "en-US",
+  });
+  const result = await PDFDocument.load(tileOutput.buffer, { updateMetadata: false });
+  const imageObjects = result.context.enumerateIndirectObjects().filter(([, object]) => object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Image"));
+  assert.equal(imageObjects.length, 1, "tile placement must embed the source image only once per document");
+  const watermarkStream = decodedPageStreams(result).at(-1) ?? "";
+  assert.ok((watermarkStream.match(/\/Watermark[^ ]* Do/gu) ?? []).length > 1, "tile placement must reference the shared image repeatedly");
+  assert.ok(
+    tileOutput.buffer.byteLength - singleOutput.buffer.byteLength < image.size * 2 + 4_096,
+    "tile output growth must be limited to placement operators rather than duplicated image payloads",
+  );
+  context.diagnostic(`image watermark output bytes: single=${singleOutput.buffer.byteLength}; tile=${tileOutput.buffer.byteLength}; delta=${tileOutput.buffer.byteLength - singleOutput.buffer.byteLength}; source=${image.size}`);
+});
+
+test("watermark warns about risky structures and proceeds only with explicit consent", async () => {
+  for (const [name, warning] of [
+    ["risk/graphics-state-imbalance.pdf", "risky-graphics-state"],
+    ["risk/tagged-structure.pdf", "risky-tagged-document"],
+    ["ocg/on.pdf", "risky-optional-content"],
+  ] as const) {
+    const bytes = await fs.readFile(path.join(repositoryRoot, "tests/fixtures/pdf-finish", name));
+    const file = new File([bytes], path.basename(name), { type: "application/pdf" });
+    const input = {
+      files: [{ key: warning, file, selection: selection(1, "1") }],
+      options: watermarkOptions(),
+      locale: "en-US",
+    };
+    const preflight = await preflightPdfFiles(input);
+    assert.ok(preflight.warnings.includes(warning), `${name} did not report ${warning}`);
+    await assert.rejects(finishPdfFiles(input), (error: unknown) => error instanceof PdfFinishEngineError && error.code === "risk-confirmation-required");
+    const outputs = await finishPdfFiles({ ...input, allowRiskyDocuments: true });
+    assert.equal(outputs.length, 1);
+    assert.ok(outputs[0].warnings.includes(warning));
+  }
+});
+
+test("watermark does not expose a result when reopen validation finds damage", async () => {
+  let validations = 0;
+  await assert.rejects(
+    finishPdfFiles({
+      files: [{ key: "invalid-result", file: await fixture("invalid-result.pdf"), selection: selection(3, "1") }],
+      options: watermarkOptions(),
+      locale: "en-US",
+      validateWatermarkOutput: async () => { validations += 1; throw new Error("test-only-reopen-failure"); },
+    }),
+    (error: unknown) => error instanceof PdfFinishEngineError && error.code === "output-validation",
+  );
+  assert.equal(validations, 1);
 });

@@ -6,7 +6,7 @@ import { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } from "..
 const toolRoutes = [
   "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
   "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
-  "/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer",
+  "/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
   "/tools/text-formatter", "/tools/work-calculator", "/tools/timezone-calculator", "/tools/payroll-calculator",
   "/tools/image-privacy", "/tools/security-tools", "/tools/qr-studio", "/tools/qr-studio/bulk", "/tools/data-converter",
@@ -76,6 +76,7 @@ test("PDF finish aliases retain distinct metadata and canonicalize to the finish
   assert.equal(canonicalSeoPath("/tools/pdf-editor/finish"), "/tools/pdf-editor/finish");
   assert.equal(canonicalSeoPath("/tools/pdf-editor/page-numbers"), "/tools/pdf-editor/finish");
   assert.equal(canonicalSeoPath("/tools/pdf-editor/header-footer/"), "/tools/pdf-editor/finish");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/watermark/"), "/tools/pdf-editor/watermark");
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {

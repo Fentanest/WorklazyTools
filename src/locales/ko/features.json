@@ -883,7 +883,8 @@
       "tabsLabel": "PDF 마무리 종류",
       "tabs": {
         "page-numbers": "페이지 번호",
-        "header-footer": "머리글·바닥글"
+        "header-footer": "머리글·바닥글",
+        "watermark": "워터마크"
       },
       "uploadTitle": "PDF 선택",
       "uploadDescription": "페이지 번호나 문서 정보를 넣을 PDF 하나를 추가하세요.",
@@ -897,13 +898,15 @@
       "templateCount": "{{count}} / 300자",
       "templatePlaceholder": {
         "page-numbers": "예: {page} / {pages}",
-        "header-footer": "예: {filename} · {date}"
+        "header-footer": "예: {filename} · {date}",
+        "watermark": "예: 대외비"
       },
       "position": "표시 위치",
       "regions": {
         "top-left": "위 왼쪽",
         "top-center": "위 가운데",
         "top-right": "위 오른쪽",
+        "center": "가운데",
         "bottom-left": "아래 왼쪽",
         "bottom-center": "아래 가운데",
         "bottom-right": "아래 오른쪽"
@@ -911,6 +914,28 @@
       "fontSize": "글자 크기 (6–72 pt)",
       "color": "글자 색상",
       "margin": "페이지 여백 (0–144 pt)",
+      "watermark": {
+        "contentType": "워터마크 종류",
+        "text": "텍스트",
+        "image": "이미지",
+        "imageFile": "워터마크 이미지",
+        "imageHint": "PNG 또는 JPEG 이미지를 선택하세요. 원본 비율을 유지합니다.",
+        "layer": "배치 레이어",
+        "background": "내용 뒤",
+        "foreground": "내용 앞",
+        "pattern": "배치 방식",
+        "single": "한 번",
+        "tile": "반복 타일",
+        "rotation": "회전 (-180–180°)",
+        "opacity": "불투명도 (0.05–1)",
+        "size": "페이지 대비 크기 (5–100%)",
+        "gap": "타일 간격 (0–300 pt)",
+        "offsetX": "가로 시작 간격 (0–300 pt)",
+        "offsetY": "세로 시작 간격 (0–300 pt)",
+        "riskTitle": "복잡한 문서 구조가 감지되었습니다",
+        "riskConsent": "위험을 이해하고 계속하기",
+        "riskConsentDescription": "레이어·태그·그래픽 상태가 복잡한 PDF는 워터마크 적용 뒤 화면 구성이나 접근성 구조가 달라질 수 있습니다. 결과를 꼭 확인하세요."
+      },
       "numberingTitle": "번호 시작 기준",
       "startNumber": "시작 번호",
       "startPage": "시작 페이지",
@@ -929,7 +954,7 @@
       "selectedPages": "{{count}} / {{total}}페이지 선택",
       "previewTitle": "오버레이 미리보기",
       "previewDescription": "선택된 첫 페이지에서 위치와 내용을 확인하세요.",
-      "previewDisclaimer": "미리보기는 화면 확인용 근사치입니다. 실제 PDF의 글자 간격과 위치는 조금 다를 수 있습니다.",
+      "previewDisclaimer": "미리보기는 화면 확인용 근사치입니다. 완성 PDF에는 텍스트나 이미지가 직접 그려지므로 글자 간격과 위치가 조금 다를 수 있습니다.",
       "previewWaiting": "페이지 미리보기를 만드는 중…",
       "previewFailed": "미리보기를 표시하지 못했습니다. 설정을 확인한 뒤 PDF 생성은 다시 시도할 수 있습니다.",
       "preflightChecking": "표시할 내용과 페이지 배치를 미리 확인하는 중…",
@@ -939,7 +964,10 @@
         "missing-glyph": "표시할 내용 {{line}}행 {{column}}열의 문자는 현재 글꼴로 표시할 수 없습니다.",
         "narrow-region": "{{page}}페이지의 표시 영역이 글자를 넣기에 너무 좁습니다. 여백이나 글자 크기를 줄여 주세요.",
         "invalid-margin": "{{page}}페이지에서 여백이 표시 영역을 모두 차지합니다. 여백을 줄여 주세요.",
-        "invalid-layout": "{{page}}페이지에 내용을 배치할 수 없습니다. 여백이나 글자 크기를 조정해 주세요."
+        "invalid-layout": "{{page}}페이지에 내용을 배치할 수 없습니다. 여백이나 글자 크기를 조정해 주세요.",
+        "image-format": "PNG 또는 JPEG 워터마크 이미지를 선택해 주세요.",
+        "tile-limit": "{{page}}페이지에 반복할 워터마크가 너무 많습니다. 크기나 타일 간격을 늘려 주세요.",
+        "background-placement": "{{page}}페이지의 내부 구조에는 안전하게 워터마크 스트림을 추가할 수 없습니다. 다른 PDF 사본으로 시도해 주세요."
       },
       "create": "마무리 PDF 만들기",
       "creating": "PDF를 마무리하는 중…",
@@ -961,7 +989,13 @@
         "startNumber": "시작 번호는 정수로 입력하세요.",
         "startPage": "시작 페이지는 1 이상의 정수로 입력하세요.",
         "template": "표시할 내용을 입력하세요.",
-        "templateLength": "표시할 내용은 300자 이내로 입력하세요. 입력한 내용이 300자 한도를 넘어 일부만 반영되었습니다."
+        "templateLength": "표시할 내용은 300자 이내로 입력하세요. 입력한 내용이 300자 한도를 넘어 일부만 반영되었습니다.",
+        "image": "PNG 또는 JPEG 워터마크 이미지를 선택하세요.",
+        "rotation": "회전 각도는 -180~180 사이의 숫자로 입력하세요.",
+        "opacity": "불투명도는 0.05~1 사이의 숫자로 입력하세요.",
+        "size": "크기는 5~100 사이의 숫자로 입력하세요.",
+        "gap": "타일 간격은 0~300 사이의 숫자로 입력하세요.",
+        "offset": "시작 간격은 0~300 사이의 숫자로 입력하세요."
       },
       "rangeErrors": {
         "empty-range": "적용할 페이지 범위를 입력하세요.",
@@ -980,13 +1014,21 @@
         "narrow-region": "표시 영역이 너무 좁습니다. 여백이나 글자 크기를 줄여 주세요.",
         "invalid-margin": "여백이 페이지의 표시 영역을 모두 차지합니다. 여백을 줄여 주세요.",
         "invalid-layout": "현재 페이지 크기와 여백에는 내용을 배치할 수 없습니다. 여백이나 글자 크기를 줄여 주세요.",
-        "font-asset": "한국어 글꼴을 준비하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요."
+        "font-asset": "한국어 글꼴을 준비하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+        "image-format": "PNG 또는 JPEG 워터마크 이미지를 선택해 주세요.",
+        "tile-limit": "반복할 워터마크가 너무 많습니다. 크기나 타일 간격을 늘려 주세요.",
+        "background-placement": "이 PDF의 내부 구조에는 안전하게 워터마크를 추가할 수 없습니다. 다른 PDF 사본으로 시도해 주세요.",
+        "risk-confirmation-required": "문서 구조 위험 경고를 확인한 뒤 계속하기에 동의해 주세요.",
+        "output-validation": "완성된 PDF를 다시 확인하는 과정에서 문제가 발견되었습니다. 원본은 변경되지 않았습니다."
       },
       "warnings": {
         "unknown-token": "알 수 없는 토큰은 입력한 그대로 표시했습니다.",
         "horizontal-overflow": "일부 긴 줄을 말줄임표로 줄였습니다.",
         "vertical-overflow": "표시 영역을 벗어나는 일부 줄을 생략했습니다.",
-        "embedded-font": "한국어와 확장 문자를 위해 전체 글꼴이 포함되면 출력 파일이 약 3.8MB 커질 수 있습니다."
+        "embedded-font": "한국어와 확장 문자를 위해 전체 글꼴이 포함되면 출력 파일이 약 3.8MB 커질 수 있습니다.",
+        "risky-graphics-state": "일부 페이지의 그래픽 저장·복원 상태가 맞지 않습니다. 적용 뒤 화면 구성이 달라질 수 있습니다.",
+        "risky-optional-content": "선택적으로 표시되는 레이어가 있는 문서입니다. 워터마크 적용 뒤 레이어 동작이 달라질 수 있습니다.",
+        "risky-tagged-document": "접근성 태그가 있는 문서입니다. 워터마크 적용 뒤 태그 구조가 달라질 수 있습니다."
       },
       "outputFileName": {
         "suffix": "마무리",

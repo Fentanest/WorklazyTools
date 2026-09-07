@@ -23,6 +23,7 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.deepEqual(pages.filter(({ viewport }) => viewport).map(({ path, viewport }) => [path, viewport.width]), [["/ko/tools/pdf-editor/finish", 412], ["/ko", 412], ["/ko/tools", 412]]);
   assert.ok(pages.some(({ id }) => id === "hwp-editor"));
   assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-finish")).map(({ id }) => id), ["pdf-finish-ko", "pdf-finish-mobile-ko", "pdf-finish-en"]);
+  assert.ok(pages.some(({ id }) => id === "pdf-watermark-ko"));
 });
 
 test("a11y exception is exactly one upstream iframe with explicit owner and reason", () => {

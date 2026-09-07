@@ -34,7 +34,7 @@ try {
   });
   const directEntries = [];
   for (const language of ["ko", "en"]) {
-    for (const route of ["finish", "page-numbers", "header-footer"]) {
+    for (const route of ["finish", "page-numbers", "header-footer", "watermark"]) {
       for (const viewport of [{ id: "desktop", width: 1365, height: 900 }, { id: "mobile", width: 390, height: 844 }]) {
         const context = await browser.newContext({ viewport, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
         await context.addInitScript(() => {
@@ -48,7 +48,7 @@ try {
         const documentNavigations = [];
         page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) documentNavigations.push(frame.url()); });
         await page.goto(`${baseUrl}/${language}/tools/pdf-editor/${route}/`, { waitUntil: "networkidle" });
-        const expectedTab = route === "header-footer" ? "header-footer" : "page-numbers";
+        const expectedTab = route === "header-footer" ? "header-footer" : route === "watermark" ? "watermark" : "page-numbers";
         await page.locator(`[data-testid='pdf-finish-ready'][data-pdf-finish-tab='${expectedTab}']`).waitFor();
         await page.waitForFunction(() => !document.querySelector(".tool-route-loading") && !Object.keys(sessionStorage).some((key) => key.startsWith("worklazy_tool_reload:")));
         assert.equal(await page.locator(".pdf-tool-navigation [data-pdf-nav-mode]").count(), 5);
@@ -61,7 +61,7 @@ try {
       }
     }
   }
-  assert.equal(directEntries.length, 12);
+  assert.equal(directEntries.length, 16);
 
   await testChunkRecovery(browser);
   await testNavigation(browser);
@@ -72,9 +72,10 @@ try {
   await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
+  await testWatermarkWorkflow(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks();
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, watermark text/image/tile/risk confirmation, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -601,6 +602,45 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await action.click();
   await page.locator("[data-testid='pdf-download']").waitFor({ timeout: 120_000 });
   assert.equal(await page.locator("[data-route-error]").count(), 0);
+  await context.close();
+}
+
+async function testWatermarkWorkflow(browserInstance, fixture) {
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  const page = await context.newPage();
+  page.setDefaultTimeout(120_000);
+  await page.goto(`${baseUrl}/en/tools/pdf-editor/watermark/`, { waitUntil: "networkidle" });
+  const pdfInput = page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']");
+  await pdfInput.setInputFiles({ name: "watermark-browser.pdf", mimeType: "application/pdf", buffer: fixture });
+  await page.locator("[data-testid='pdf-finish-overlay']").waitFor();
+  await page.locator("[data-testid='pdf-watermark-pattern']").selectOption("tile");
+  await page.locator("[data-testid='pdf-watermark-layer']").selectOption("background");
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-overlay']")?.getAttribute("data-watermark-pattern") === "tile");
+  await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+
+  const png = new PNG({ width: 32, height: 16 });
+  for (let index = 0; index < png.data.length; index += 4) {
+    png.data[index] = 190; png.data[index + 1] = 30; png.data[index + 2] = 55; png.data[index + 3] = 255;
+  }
+  await page.locator("[data-testid='pdf-watermark-content-image']").click();
+  await page.locator("[data-testid='pdf-watermark-image']").setInputFiles({ name: "mark.png", mimeType: "image/png", buffer: PNG.sync.write(png) });
+  await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+  const image = page.locator("[data-testid='pdf-finish-overlay'] img").first();
+  await image.waitFor();
+  const ratio = await image.evaluate((node) => node.naturalWidth / node.naturalHeight);
+  assert.ok(Math.abs(ratio - 2) < 0.1, `watermark preview did not preserve the image ratio: ${ratio}`);
+
+  const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+  await action.click();
+  await page.locator("[data-testid='pdf-download']").waitFor();
+  assert.equal(await page.locator("[data-route-error]").count(), 0);
+
+  await pdfInput.setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/risk/graphics-state-imbalance.pdf"));
+  await page.locator("[data-testid='pdf-watermark-risk-confirmation']").waitFor();
+  assert.equal(await action.isDisabled(), true, "a risky document must wait for explicit consent");
+  await page.locator("[data-testid='pdf-watermark-risk-confirmation'] button[role='switch']").click();
+  assert.equal(await action.isEnabled(), true, "risk consent must allow the warned operation");
   await context.close();
 }
 

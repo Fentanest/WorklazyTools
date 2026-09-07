@@ -7,3 +7,4 @@ export * from "./stamp.ts";
 export * from "./text.ts";
 export * from "./tiles.ts";
 export * from "./tokens.ts";
+export * from "./watermark.ts";
