@@ -306,7 +306,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [baseFieldError, excludeCover, file, fileKey, fontSize, form.color, form.region, form.template, language, lowerBound, margin, selection, selectionEvaluation.error, startingNumber, startingPage]);
+  }, [activeTab, baseFieldError, excludeCover, file, fileKey, fontSize, form.color, form.fontSize, form.margin, form.region, form.template, language, lowerBound, margin, selection, selectionEvaluation.error, startNumber, startPage, startingNumber, startingPage]);
 
   const firstPreflightError = preflight.errors[0];
   const preflightErrorText = firstPreflightError ? formatPreflightError(copy, firstPreflightError) : "";

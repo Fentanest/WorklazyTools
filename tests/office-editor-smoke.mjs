@@ -131,10 +131,13 @@ try {
   await page.keyboard.down("Control");
   await page.keyboard.press("Home");
   await page.keyboard.up("Control");
+  await waitForCalcState(page, "Ctrl+Home to select A1", (state) => state.range.row === 0 && state.range.column === 0 && state.cells.a1 === "한글 셀 표시 확인");
   const calcScrollBefore = await page.evaluate(() => window.scrollY);
   await page.keyboard.press("ArrowDown");
+  await waitForCalcState(page, "ArrowDown to select A2", (state) => state.range.row === 1 && state.range.column === 0 && state.cells.a2 === "이동 전");
   await page.keyboard.type("Arrow navigation verified");
   await page.keyboard.press("Enter");
+  await waitForCalcState(page, "A2 keyboard edit to be applied", (state) => state.cells.a1 === "한글 셀 표시 확인" && state.cells.a2.includes("Arrow navigation verified"));
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("PageDown");
@@ -179,6 +182,37 @@ async function dropFile(page, selector, filePath) {
       element.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: transfer }));
     }
   }, { name, base64: bytes.toString("base64") });
+}
+
+async function waitForCalcState(page, label, predicate) {
+  let lastState = null;
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    lastState = await readCalcState(page);
+    if (lastState && predicate(lastState)) return lastState;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Calc did not complete ${label}: ${JSON.stringify(lastState)}`);
+}
+
+async function readCalcState(page) {
+  for (const worker of page.workers()) {
+    const state = await worker.evaluate(() => {
+      if (typeof documentModel === "undefined" || !documentModel) return null;
+      try {
+        const controller = documentModel.getCurrentController();
+        const address = controller.getSelection().getRangeAddress();
+        const sheet = documentModel.getSheets().getByIndex(0);
+        return {
+          range: { row: address.StartRow, column: address.StartColumn, endRow: address.EndRow, endColumn: address.EndColumn },
+          cells: { a1: sheet.getCellByPosition(0, 0).getString(), a2: sheet.getCellByPosition(0, 1).getString() },
+        };
+      } catch {
+        return null;
+      }
+    }).catch(() => null);
+    if (state) return state;
+  }
+  return null;
 }
 
 async function createDocx() {

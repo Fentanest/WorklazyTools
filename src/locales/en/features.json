@@ -961,7 +961,7 @@
         "startNumber": "Enter the starting number as an integer.",
         "startPage": "Enter the starting page as an integer of 1 or more.",
         "template": "Enter the content to display.",
-        "templateLength": "Keep the content within 300 characters. The current count exceeds the limit."
+        "templateLength": "Keep the content within 300 characters. Some of the attempted input was not applied because it exceeded the 300-character limit."
       },
       "rangeErrors": {
         "empty-range": "Enter a page range to apply.",

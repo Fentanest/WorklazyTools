@@ -4,6 +4,34 @@
 
 ## 2026-09-07
 
+### U4-3 fix-3 — 원시 숫자·탭 사전 검사와 Office 스모크 동기화 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-3 dispatch, astra 3차·2차 보고와 fix-2 지시서를 전문 대조했다. 시작점은 `s3-pdf-finish` `HEAD=37470534a28b1bf1752a6d659820240fc3bc1b2a`로 지시와 일치했고 추적 변경은 없었다. 열린 계획의 문서 비교·Excel·UI 작업은 별도 작업 트리 또는 다른 제품 표면이며 이번 panel·스모크와 상반된 지시는 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`를 열거나 stage하지 않았고, 금지된 `/tmp/worklazy-xr`·`/tmp/worklazy-dc-impl`도 접근하지 않았다. main `cdb4007` 병합·push·배포는 하지 않는다.
+
+**R1 잔여 원인·수리** — fix-2의 동일 탭·위치 무시 가드는 유지됐다. 다만 `updateForm`과 공용 입력 helper는 원시 문자열의 실제 변화(`"10"→"10.0"`, `"1"→"01"`)를 보고 preflight를 `idle`로 지우는 반면, effect는 변환된 숫자만 의존해 값이 같으면 다시 실행되지 않았다. 실제 탭 전환도 `idle`을 만들지만 두 탭의 검사 설정이 같으면 effect 의존값이 바뀌지 않았다. 검사 effect가 `form.fontSize`·`form.margin`·`startNumber`·`startPage`·`activeTab`을 함께 의존하도록 초기화와 예약의 동일성을 맞췄다. 파일 없음·무효 입력은 계속 정상 `idle`이고 상태 은닉이나 버튼 강제 활성화는 없다.
+
+전용 단언 `testPreflightRawInputAndTabChanges`는 ko/en 각각 글자 크기 `10→10.0`, 여백 `24→24.0`, 시작 번호 `1→01`, 시작 쪽 `1→01`과 두 탭의 template·region·raw numeric·색을 같게 만든 뒤 탭 전환을 검사한다. 각 10건에서 원시 입력 보존, `idle→checking`, `ready`, alert 0, route error 0, 실행 활성과 새 PDF 결과를 모두 확인해 **숫자 표기 8/8·탭 전환 2/2·실제 PDF 생성 10/10**으로 통과했다. 기존 동일 탭/위치 재클릭과 실제 위치 변경 **6/6**, 무효→유효 복귀, 취소·재시도 단언도 같은 전용 스모크에서 유지됐다.
+
+**Office 플래키 수리** — 제품의 Office 저장·변환 코드는 바꾸지 않았다. `tests/office-editor-smoke.mjs`가 키 입력 API 반환을 셀 이동 완료로 간주하지 않고 실제 Office worker의 문서 controller와 첫 시트 값을 조건 대기한다. Ctrl+Home 뒤 A1(row 0, col 0)과 원래 한글 값, ArrowDown 뒤 A2(row 1, col 0)와 `이동 전`, Enter 뒤 A1 보존과 A2의 `Arrow navigation verified` 반영을 각각 확인한 뒤 다음 navigation과 저장을 수행한다. production preview 4250 `--strictPort`에서 원명령을 연속 **20/20, 실패 0**으로 실행했고 완료 기준의 별도 1회도 통과했다. 고정 sleep이나 기대값 완화는 추가하지 않았다.
+
+**기록 정정 4건** — (1) 위 숫자 표기 8건·동일 설정 탭 전환 2건의 새 반례와 수리·재검증을 기존 fix-2의 6개 표본과 구분해 기록했다. (2) fix-2 표의 번들 수치는 `ff0452b3` 대비가 아니라 SHA `2605437e…`인 고정 S3 `/tmp/s3-bundle-baseline.json` 대비였으므로 아래 기존 문장을 정정했다. fix-3 재측정은 같은 기준·override `{}`·multiplier 1에서 entry **+4,860B**, PDF route **+13,801B**, shared net **+2,051B**, app **+21,152B**, CSS **+118B**로 모두 상한 안이다. (3) 시각 결과는 정확한 픽셀 동일을 뜻하지 않으므로 기존 “변경 픽셀 0”을 **기준선 파일 변경 0**으로 정정했다. 실제 회귀는 ko/en 각각 **203/203**이고 threshold 0.1·상이 픽셀 비율 0.1% 이하·AA 무시 조건이다. (4) native `maxLength=300` 뒤 현재 값은 300/300이므로 “현재 개수 초과”가 아니라 **입력 시도가 300자 한도를 넘어 일부만 반영됨**을 설명하도록 ko/en catalog를 고쳤다.
+
+| 검증 | 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **301/301**, fail·skip 0 |
+| production build · static | **2,845 modules**, 정적 **67페이지**, startup recovery **113**, 통과 |
+| PDF finish smoke | 기존 F1~F9·재클릭/변경 6 유지, 새 R1 **10/10**, 해당 새 PDF **10/10**, 48 preview·4회전 boundary·취소/재시도 통과 |
+| PDF scope browser · 전체 browser · new-tools · utilities | 통과; 기존 Dolby Vision host capability skip과 결정적 fallback 결과를 원로그에 보존 |
+| Office | A1/A2/편집 반영 조건 대기 적용 후 연속 **20/20 실패 0**, 별도 완료 기준 1회 통과 |
+| QR bulk · font render | 4 scenario·취소·404 통과; 3 fixture Poppler changed pixels 0·PDF.js 추출 동일 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff 0 |
+| Excel Cleaner · Compare | 취소·재실행·보고서·모바일 포함 통과 |
+| 두 `LANG` 전체 visual | 각각 **203/203**, 7분 28.31초·7분 25.36초; **기준선 파일 변경 0** |
+| local-QA build · a11y · rendering | 정적 67; 11페이지 위반 0; 6대상×3회 외부 요청 0, finish 최대 CLS **0.0001480366** < 0.1 |
+| bundle · CSS · legacy · registry | 고정 S3 기준 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 20 불변 |
+
+제품 영향은 PDF finish 상태 예약과 ko/en 제한 안내뿐이다. route·SEO·정적 페이지 집합·광고 격리·기존 4모드·Office 제품 코드·의존성은 바꾸지 않았다. 원출력과 JSON은 `/tmp/worklazy-u4-3-fix3/` 및 ignored state report에 보존한다. — Codx
+
 ### U4-3 fix-2 — 사전 검사 재선택·출력명 끝 공백 수리 (Codx)
 
 **실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-2 dispatch, astra 재검수 보고서와 앞선 fix 지시·보고서, U4-3 정본 및 열린 계획서를 읽었다. 시작점은 `s3-pdf-finish` `HEAD=ff0452b3ad171bfba920f41ec0789612e5ec2001`로 지시와 일치했다. `main`이 `cdb4007`로 갱신된 사실은 확인했지만 이번 작업에는 병합하지 않았고 열린 계획 충돌도 없었다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았으며, 금지된 `/tmp/worklazy-xr`·`/tmp/worklazy-dc-impl`도 건드리지 않았다. main 병합·push·배포는 수행하지 않는다.
@@ -12,7 +40,7 @@
 
 **R2 원인·수리** — 출력명은 원본에서 `.pdf`를 먼저 제거하고 나중에 trim·정규화해 끝 공백 앞 확장자를 놓쳤다. 이제 원본을 trim·정규화한 뒤 반복 `.pdf`와 기존 현지화 접미사를 제거한다. 단위 회귀는 `"  report.pdf  "`, `" .pdf "`, 반복 확장자, 확장자만 있는 이름, 확장자 없는 이름, Unicode 앞뒤 공백, 기존 `-finished` 접미사를 ko/en 각각 검사해 **16/16** 통과했고 기존 한글 금지 문자 정리도 보존했다. 실제 Chrome 다운로드 속성은 문제의 두 이름×ko/en **4/4**에서 `report-마무리.pdf`·`Worklazy-PDF-마무리.pdf`와 `report-finished.pdf`·`Worklazy-PDF-finished.pdf`로 확인했다. 따라서 빈 basename은 F9 fallback으로 수렴하고 확장자는 하나만 남는다.
 
-**F1~F9 보존·시각 판정** — 제품 코드는 위 두 원인에 필요한 panel 상태 전이와 출력명 순서만 바꿨고 route·engine·geometry·폰트·QR·navigation·번역·SEO·정적 페이지·광고 격리 계약은 바꾸지 않았다. 전체 PDF·공용 도구·QR·복구·legacy·Excel 회귀를 재실행했다. 시각 기준선은 갱신하지 않았으며 ko/en 각각 **203/203**, 변경 픽셀 0으로 통과했다.
+**F1~F9 보존·시각 판정** — 제품 코드는 위 두 원인에 필요한 panel 상태 전이와 출력명 순서만 바꿨고 route·engine·geometry·폰트·QR·navigation·번역·SEO·정적 페이지·광고 격리 계약은 바꾸지 않았다. 전체 PDF·공용 도구·QR·복구·legacy·Excel 회귀를 재실행했다. 시각 기준선은 갱신하지 않았으며 ko/en 각각 **203/203**, 기준선 파일 변경 0으로 통과했다.
 
 | 검증 | 결과 |
 |---|---|
@@ -28,7 +56,7 @@
 | local-QA build · a11y · rendering | 정적 67; 11페이지 axe 위반 0; 6대상×3회 외부 요청 0, finish 최대 CLS **0.00014804** < 0.1 |
 | bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 20 불변 |
 
-기준 `ff0452b3` 대비 번들 순증분은 entry **4,834B**, affected PDF route **13,791B**, shared **2,062B**, app **21,143B**, CSS **118B**로 다섯 고정 상한 안이며 override `{}`·multiplier 1이다. QR→shared 이동 **509,380B**는 순증분과 분리했다. raw 로그·JSON·보고서는 `/tmp/worklazy-u4-3-fix2/`와 ignored state report에 보존한다. — Codx
+고정 S3 `/tmp/s3-bundle-baseline.json` 대비 번들 순증분은 entry **4,834B**, affected PDF route **13,791B**, shared **2,062B**, app **21,143B**, CSS **118B**로 다섯 고정 상한 안이며 override `{}`·multiplier 1이다. QR→shared 이동 **509,380B**는 순증분과 분리했다. raw 로그·JSON·보고서는 `/tmp/worklazy-u4-3-fix2/`와 ignored state report에 보존한다. — Codx
 
 ### U4-3 fix-1 — astra F1~F9 수리·계약 확정 (Codx)
 

@@ -69,11 +69,12 @@ try {
   await testPreviewGeometry(browser, fixture);
   await testPreflightGuidance(browser, fixture, smallFixture);
   await testPreflightReselection(browser, fixture);
+  await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks();
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 4 localized edge-name downloads, 48 preview placements, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -357,6 +358,104 @@ async function testPreflightReselection(browserInstance, fixture) {
     await context.close();
   }
   assert.equal(combinations, 6);
+}
+
+async function testPreflightRawInputAndTabChanges(browserInstance, fixture) {
+  let numericCases = 0;
+  let tabCases = 0;
+  let generatedOutputs = 0;
+  for (const language of ["ko", "en"]) {
+    const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block", acceptDownloads: false });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    const page = await context.newPage();
+    page.setDefaultTimeout(120_000);
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
+    await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles({ name: "raw-preflight.pdf", mimeType: "application/pdf", buffer: fixture });
+    await page.locator("[data-testid='pdf-finish-template']").fill("same settings");
+    await waitForReadyPreflight(page);
+    const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+
+    for (const { testId, value, id } of [
+      { testId: "pdf-finish-font-size", value: "10.0", id: "font-size-10.0" },
+      { testId: "pdf-finish-margin", value: "24.0", id: "margin-24.0" },
+      { testId: "pdf-finish-start-number", value: "01", id: "start-number-01" },
+      { testId: "pdf-finish-start-page", value: "01", id: "start-page-01" },
+    ]) {
+      const label = `${language}/${id}`;
+      const transition = observeScheduledPreflight(page);
+      const input = page.locator(`[data-testid='${testId}']`);
+      await input.fill(value);
+      assert.equal(await input.inputValue(), value, `${label} did not preserve the raw numeric representation`);
+      assert.deepEqual(await transition, { sawIdle: true, status: "checking" }, `${label} did not schedule a new preflight after entering idle`);
+      await waitForReadyPreflight(page);
+      await assertReadyPreflight(page, action, label);
+      generatedOutputs += await createFreshPdfResult(page, action, label);
+      console.log(`[preflight raw] PASS ${label}: idle -> checking -> ready; create enabled; fresh PDF generated`);
+      numericCases += 1;
+    }
+
+    const template = page.locator("[data-testid='pdf-finish-template']");
+    await template.fill("A".repeat(300));
+    await template.press("End");
+    await template.press("A");
+    const limitAlert = template.locator("xpath=following-sibling::*[@role='alert'][1]");
+    await limitAlert.waitFor();
+    assert.equal((await template.inputValue()).length, 300, `${language}/template-limit must keep the applied value within 300 characters`);
+    assert.match(await limitAlert.innerText(), language === "ko" ? /일부만 반영되었습니다/u : /was not applied/iu, `${language}/template-limit must describe the rejected input attempt instead of an over-limit current count`);
+    await template.fill("same settings");
+
+    await page.locator("[data-finish-tab='header-footer']").click();
+    await page.locator("[data-testid='pdf-finish-template']").fill("same settings");
+    await page.locator("[data-testid='pdf-finish-font-size']").fill("10.0");
+    await page.locator("[data-testid='pdf-finish-margin']").fill("24.0");
+    await page.locator("[data-finish-region='bottom-center']").click();
+    await waitForReadyPreflight(page);
+    assert.equal(await page.locator("[data-testid='pdf-download']").count(), 0, `${language}/equal-settings-tab setup retained a stale output`);
+
+    const transition = observeScheduledPreflight(page);
+    await page.locator("[data-finish-tab='page-numbers']").click();
+    assert.deepEqual(await transition, { sawIdle: true, status: "checking" }, `${language}/equal-settings-tab did not schedule a new preflight after entering idle`);
+    await waitForReadyPreflight(page);
+    await assertReadyPreflight(page, action, `${language}/equal-settings-tab`);
+    generatedOutputs += await createFreshPdfResult(page, action, `${language}/equal-settings-tab`);
+    console.log(`[preflight tab] PASS ${language}/equal-settings-tab: idle -> checking -> ready; create enabled; fresh PDF generated`);
+    tabCases += 1;
+
+    await context.close();
+  }
+  assert.equal(numericCases, 8);
+  assert.equal(tabCases, 2);
+  assert.equal(generatedOutputs, 10);
+}
+
+function observeScheduledPreflight(page) {
+  return page.locator("[data-testid='pdf-finish-ready']").evaluate((panel) => new Promise((resolve, reject) => {
+    let sawIdle = panel.getAttribute("data-preflight-status") === "idle";
+    const timeout = window.setTimeout(() => {
+      observer.disconnect();
+      reject(new Error("changed input did not schedule preflight"));
+    }, 5_000);
+    const observer = new MutationObserver(() => {
+      const status = panel.getAttribute("data-preflight-status");
+      if (status === "idle") sawIdle = true;
+      if (status === "checking") {
+        window.clearTimeout(timeout);
+        observer.disconnect();
+        resolve({ sawIdle, status });
+      }
+    });
+    observer.observe(panel, { attributes: true, attributeFilter: ["data-preflight-status"] });
+  }));
+}
+
+async function createFreshPdfResult(page, action, label) {
+  await page.locator("[data-testid='pdf-download']").waitFor({ state: "detached" });
+  await action.click();
+  const download = page.locator("[data-testid='pdf-download']");
+  await download.waitFor();
+  assert.match(await download.getAttribute("download"), /\.pdf$/iu, `${label} did not create a PDF result`);
+  assert.equal(await page.locator("[data-route-error]").count(), 0, `${label} escaped the finish route during generation`);
+  return 1;
 }
 
 async function testOutputNameDownloads(browserInstance, fixture) {
