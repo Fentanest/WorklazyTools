@@ -15,7 +15,15 @@ import {
   UnsafeFileNameError,
   validateSafeFileName,
 } from "../../src/utils/fileNameSafety.ts";
-import { appendXlsxReportSheets, writeUntrustedText, writeXlsxReport } from "../../src/utils/xlsxReport.ts";
+import {
+  appendXlsxReportSheets,
+  assertXlsxWorkbookXmlTextSafe,
+  sanitizeXlsxText,
+  writeUntrustedText,
+  writeXlsxReport,
+  writeXlsxWorkbook,
+} from "../../src/utils/xlsxReport.ts";
+import { assertVisibleXlsxReport } from "../xlsx-report-assertions.mjs";
 
 test("spreadsheet adapter classifies OOXML from package contents and parses it only once into the common model", async () => {
   const workbook = new ExcelJS.Workbook();
@@ -133,6 +141,198 @@ test("writeUntrustedText stores every external value as text without formula coe
   assert.equal(reopenedSheet.getCell(9, 1).value, "[object Object]");
 });
 
+test("XLSX text boundaries replace XML 1.0-disallowed characters without deleting positions", async () => {
+  const disallowedControls = Array.from({ length: 0x20 }, (_, codeUnit) => codeUnit)
+    .filter((codeUnit) => codeUnit !== 0x09 && codeUnit !== 0x0a && codeUnit !== 0x0d)
+    .map((codeUnit) => String.fromCharCode(codeUnit))
+    .join("");
+  const fddNoncharacters = Array.from({ length: 0x20 }, (_, index) => String.fromCodePoint(0xfdd0 + index)).join("");
+  const normal = `한글😀&<>"'\t\n\r${fddNoncharacters}`;
+  const source = `앞${disallowedControls}중\uFFFE\uFFFF\uD800뒤\uDC00${normal}`;
+  const expected = `앞${"\uFFFD".repeat(29)}중\uFFFD\uFFFD\uFFFD뒤\uFFFD${normal}`;
+  assert.equal(sanitizeXlsxText(source), expected);
+  assert.equal(expected.length, source.length);
+  assert.equal(sanitizeXlsxText(normal), normal);
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Boundary");
+  writeUntrustedText(sheet.getCell("A1"), source);
+  assert.equal(sheet.getCell("A1").value, expected);
+
+  const output = await writeXlsxReport({
+    sheets: [
+      { name: "이름\uFFFE😀\uD800", headers: [normal], rows: [[source]] },
+      { name: "이름\uFFFF😀\uDC00", headers: ["Value"], rows: [["visible"]] },
+    ],
+  });
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(output);
+  assert.deepEqual(reopened.worksheets.map((worksheet) => worksheet.name), ["이름�😀�", "이름�😀� (2)"]);
+  assert.equal(reopened.worksheets[0].getCell("A1").value, normal.replace("\r", "\n"));
+  assert.equal(reopened.worksheets[0].getCell("A2").value, expected.replace("\r", "\n"));
+});
+
+test("XLSX value-and-number-format backstop rejects disallowed text that bypasses writer boundaries", () => {
+  for (const value of ["raw\u0000value", "raw\uFFFEvalue", "raw\uFFFFvalue", "raw\uD800value", "raw\uDC00value"]) {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Raw");
+    sheet.getCell("A1").value = value;
+    assert.throws(
+      () => assertXlsxWorkbookXmlTextSafe(workbook),
+      (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED" && error.message === "REPORT_INTEGRITY_FAILED",
+    );
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Raw\uFFFE");
+  sheet.getCell("A1").value = "visible";
+  assert.throws(
+    () => assertXlsxWorkbookXmlTextSafe(workbook),
+    (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED",
+  );
+
+  for (const numberFormat of ["0\"A\u0000B\"", "0\"A\uFFFEB\"", "0\"A\uFFFFB\"", "0\"A\uD800B\"", "0\"A\uDC00B\""]) {
+    const numberFormatWorkbook = new ExcelJS.Workbook();
+    const numberFormatSheet = numberFormatWorkbook.addWorksheet("Raw");
+    numberFormatSheet.getCell("C7").style = { numFmt: numberFormat };
+    assert.equal(numberFormatSheet.getCell("C7").value, null);
+    assert.throws(
+      () => assertXlsxWorkbookXmlTextSafe(numberFormatWorkbook),
+      (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED",
+    );
+  }
+
+  const safeWorkbook = new ExcelJS.Workbook();
+  const safeSheet = safeWorkbook.addWorksheet("Safe");
+  const fddNoncharacters = Array.from({ length: 0x20 }, (_, index) => String.fromCodePoint(0xfdd0 + index)).join("");
+  ["#,##0.00;[Red]-#,##0.00", "yyyy-mm-dd", `0\"한글😀₩$${fddNoncharacters}\"`].forEach((numberFormat, index) => {
+    safeSheet.getCell(index + 1, 1).numFmt = numberFormat;
+  });
+  assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(safeWorkbook));
+});
+
+test("XLSX backstop rejects six value and eight number-format paths before serialization", async () => {
+  const valueInjections: Array<[string, (workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet) => void]> = [
+    ["name", (_workbook, sheet) => { sheet.name = "Unsafe\uFFFE"; }],
+    ["scalar", (_workbook, sheet) => { sheet.getCell("A2").value = "Unsafe\uFFFE"; }],
+    ["formula", (_workbook, sheet) => { sheet.getCell("A2").value = { formula: "1+\uFFFE", result: 1 }; }],
+    ["cache", (_workbook, sheet) => { sheet.getCell("A2").value = { formula: "1+1", result: "Unsafe\uFFFE" }; }],
+    ["rich-text", (_workbook, sheet) => { sheet.getCell("A2").value = { richText: [{ text: "Unsafe\uFFFE" }] }; }],
+    ["hyperlink", (_workbook, sheet) => { sheet.getCell("A2").value = { text: "Link", hyperlink: "https://example.com/\uFFFE" }; }],
+  ];
+  const numberFormatInjections: Array<[string, (sheet: ExcelJS.Worksheet) => void]> = [
+    ["cell-numFmt", (sheet) => { sheet.getCell("A2").numFmt = "0\"\uFFFE\""; }],
+    ["style-numFmt", (sheet) => { sheet.getCell("A2").style = { numFmt: "0\"\uFFFF\"" }; }],
+    ["empty-row-numFmt", (sheet) => { sheet.getCell("A50").numFmt = "0\"\uD800\""; }],
+    ["sparse-last-column", (sheet) => { sheet.getCell("M2").numFmt = "0\"\u0001\""; }],
+    ["row-inherited", (sheet) => { sheet.getRow(2).numFmt = "0\"\uFFFE\""; sheet.getCell("A2"); }],
+    ["column-inherited", (sheet) => { sheet.getColumn(2).numFmt = "0\"\uFFFE\""; sheet.getCell("B2"); }],
+    ["row-style-without-cell", (sheet) => { sheet.getCell("C2").value = 123; sheet.getRow(2).style = { numFmt: "0\"\uFFFE\"" }; }],
+    ["column-style-without-cell", (sheet) => { sheet.getCell("C2").value = 123; sheet.getColumn(2).style = { numFmt: "0\"\uFFFE\"" }; }],
+  ];
+
+  const rejectsBeforeSerialization = async (id: string, setup: (workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet) => void) => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Safe");
+    sheet.getCell("A1").value = "Header";
+    setup(workbook, sheet);
+    let serializerCalls = 0;
+    workbook.xlsx.writeBuffer = async () => {
+      serializerCalls += 1;
+      return Buffer.from("unexpected serializer call");
+    };
+    await assert.rejects(
+      () => writeXlsxWorkbook(workbook),
+      (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED" && error.message === "REPORT_INTEGRITY_FAILED",
+      id,
+    );
+    assert.equal(serializerCalls, 0, id);
+  };
+
+  for (const [id, setup] of valueInjections) await rejectsBeforeSerialization(id, setup);
+  for (const [id, setup] of numberFormatInjections) {
+    await rejectsBeforeSerialization(id, (_workbook, sheet) => setup(sheet));
+  }
+});
+
+test("XLSX backstop scans existing sparse objects without allocating missing coordinates", () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Sparse");
+  sheet.getCell("A1").value = "Header";
+  sheet.getCell("G25").numFmt = "yyyy-mm-dd";
+  sheet.getCell("M50").value = "Tail";
+  const before = countExistingWorkbookObjects(workbook);
+
+  assert.deepEqual(before, { rows: 3, cells: 3 });
+  assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(workbook));
+  assert.deepEqual(countExistingWorkbookObjects(workbook), before);
+  assert.equal(sheet.findRow(25)?.findCell(7)?.value, null);
+});
+
+test("XLSX backstop preserves safe row and column number formats without allocating coordinates", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Safe");
+  sheet.getCell("A1").value = "Header";
+  sheet.getCell("C2").value = 123;
+  sheet.getCell("G25").numFmt = "yyyy-mm-dd";
+  sheet.getColumn(2).style = { numFmt: "0\"열😀\"" };
+  sheet.getColumn(20).style = { numFmt: "#,##0.00" };
+  sheet.getRow(2).style = { numFmt: "0\"행₩\"" };
+  sheet.getRow(75).style = { numFmt: "0.00" };
+  sheet.getRow(75).height = 20;
+  const before = countExistingWorkbookObjects(workbook);
+
+  assert.deepEqual(before, { rows: 4, cells: 3 });
+  assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(workbook));
+  assert.deepEqual(countExistingWorkbookObjects(workbook), before);
+  assert.equal(sheet.columnCount, 3);
+  assert.equal(sheet.columns.length, 20);
+  assert.equal(sheet.findRow(2)?.findCell(2), undefined);
+  assert.equal(sheet.findRow(75)?.cellCount, 0);
+
+  const output = await writeXlsxWorkbook(workbook);
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(output);
+  const reopenedSheet = reopened.getWorksheet("Safe")!;
+  assert.equal(reopenedSheet.getCell("C2").value, 123);
+  assert.equal(reopenedSheet.getCell("G25").numFmt, "yyyy-mm-dd");
+  assert.equal(reopenedSheet.getColumn(2).numFmt, "0\"열😀\"");
+  assert.equal(reopenedSheet.getColumn(20).numFmt, "#,##0.00");
+  assert.equal(reopenedSheet.getRow(2).numFmt, "0\"행₩\"");
+  assert.equal(reopenedSheet.getRow(75).numFmt, "0.00");
+});
+
+test("XLSX reports serialize finite positive widths for sparse ExcelJS columns", async () => {
+  const output = await writeXlsxReport({
+    sheets: [{
+      name: "Widths",
+      headers: ["First", "Second", "Third", "Fourth"],
+      rows: [
+        ["short", "a longer value", "한글", 42],
+        ["tail", "", null, false],
+        [Number.NaN, Number.POSITIVE_INFINITY, undefined, Number.NEGATIVE_INFINITY],
+      ],
+    }],
+  });
+  const visibility = await assertVisibleXlsxReport(output);
+  assert.equal(visibility.worksheetCount, 1);
+  assert.equal(visibility.customWidthColumns, 4);
+  assert.ok(visibility.widths.every((width) => Number.isFinite(width) && width >= 12 && width <= 48));
+});
+
+test("XLSX reports size a 50,000-row column without argument overflow", async () => {
+  const output = await writeXlsxReport({
+    sheets: [{
+      name: "Large",
+      headers: ["Value"],
+      rows: Array.from({ length: 50_000 }, (_, index) => [`row-${index}`]),
+    }],
+  });
+  const visibility = await assertVisibleXlsxReport(output);
+  assert.equal(visibility.customWidthColumns, 1);
+  assert.equal(visibility.dataRows, 50_000);
+});
+
 test("appendXlsxReportSheets preserves cleaned sheets and resolves report-name collisions deterministically", () => {
   const workbook = new ExcelJS.Workbook();
   workbook.addWorksheet("Summary").getCell("A1").value = "cleaned";
@@ -151,4 +351,20 @@ function transferable(value: ExcelJS.Buffer): ArrayBuffer {
   if (value instanceof ArrayBuffer) return value;
   const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   return bytes.slice().buffer;
+}
+
+function countExistingWorkbookObjects(workbook: ExcelJS.Workbook) {
+  let rows = 0;
+  let cells = 0;
+  for (const worksheet of workbook.worksheets) {
+    for (let rowNumber = 1; rowNumber <= worksheet.rowCount; rowNumber += 1) {
+      const row = worksheet.findRow(rowNumber);
+      if (!row) continue;
+      rows += 1;
+      for (let columnNumber = 1; columnNumber <= row.cellCount; columnNumber += 1) {
+        if (row.findCell(columnNumber)) cells += 1;
+      }
+    }
+  }
+  return { rows, cells };
 }
