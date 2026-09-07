@@ -197,6 +197,44 @@ test("XLSX data-row scanning preserves self-closing boundaries with quoted tag a
   assert.equal(countWorksheetDataRows(worksheetXml, sharedStringHasValue, 1), 1);
 });
 
+test("XLSX data-row scanning separates character data and decodes bounded XML references once", () => {
+  const sharedStringHasValue = createSharedStringValueLookup([
+    "<sst>",
+    "<si><t><!-- no text --></t></si>",
+    "<si><t><?probe no-text?></t></si>",
+    "<si><t><![CDATA[]]></t></si>",
+    "<si><t><![CDATA[visible]]></t></si>",
+    "<si><t> </t></si>",
+    "</sst>",
+  ].join(""));
+  assert.deepEqual([0, 1, 2, 3, 4].map(sharedStringHasValue), [false, false, false, true, true]);
+
+  const header = '<row r="1" />';
+  const cases = [
+    ['<row r="&#50;"><c t="str"><v><!-- split -->0</v></c></row>', 1],
+    ['<row r="&#x32;"><c t="&#x73;"><v>&#51;</v></c></row>', 1],
+    ['<row r="2"><c t="str"><v><!-- no text --></v></c></row>', 0],
+    ['<row r="2"><c t="str"><v><?probe no-text?></v></c></row>', 0],
+    ['<row r="2"><c t="str"><v><![CDATA[]]></v></c></row>', 0],
+    ['<row r="2"><c t="str"><v><![CDATA[visible]]></v></c></row>', 1],
+    ['<row r="2"><c><f><!-- no text --></f><v /></c></row>', 0],
+    ['<row r="2"><c><f><?probe?>SUM(A1)</f><v /></c></row>', 1],
+    ['<row r="2"><c><f><![CDATA[SUM(A1)]]></f><v /></c></row>', 1],
+    ['<row r="2"><c t="inlineStr"><is><t><![CDATA[ ]]></t></is></c></row>', 1],
+    ['<row r="&#x110000;"><c><v>visible</v></c></row>', 0],
+    ['<row r="&amp;#50;"><c><v>visible</v></c></row>', 0],
+    ['<row r="2"><c t="&writer;"><v>visible</v></c></row>', 0],
+    ['<row r="2"><c t="&#0;"><v>visible</v></c></row>', 0],
+    ['<row r="2"><c t="s"><v>&#xZZ;</v></c></row>', 0],
+    ['<row r="2"><c t="s"><v>&amp;#51;</v></c></row>', 0],
+    ['<row r="2"><c t="s"><v><![CDATA[3]]></v></c></row>', 1],
+    ['<row r="2"><c t="s"><v><![CDATA[&#51;]]></v></c></row>', 0],
+  ] as const;
+  for (const [row, expected] of cases) {
+    assert.equal(countWorksheetDataRows(`<sheetData>${header}${row}</sheetData>`, sharedStringHasValue), expected, row);
+  }
+});
+
 test("generated report integrity accepts normal, mixed, and customWidth=true reports", async (context) => {
   const normal = reportArrayBuffer(await writeXlsxReport({ sheets: [{ name: "Data", headers: ["Value"], rows: [["visible"]] }] }));
   const mixed = reportArrayBuffer(await writeXlsxReport({ sheets: [

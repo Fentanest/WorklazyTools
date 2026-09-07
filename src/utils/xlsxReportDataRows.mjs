@@ -25,7 +25,9 @@ export function countWorksheetDataRows(xml, sharedStringHasValue = () => false, 
   for (const row of xmlElements(xml, ROW_ELEMENTS)) {
     ordinal += 1;
     const rawRowNumber = xmlAttribute(row.openingTag, "r");
-    const rowNumber = rawRowNumber === undefined ? ordinal : Number(rawRowNumber);
+    const decodedRowNumber = rawRowNumber === undefined ? undefined : decodeXmlCharacterReferences(rawRowNumber);
+    if (rawRowNumber !== undefined && decodedRowNumber === undefined) continue;
+    const rowNumber = rawRowNumber === undefined ? ordinal : Number(decodedRowNumber);
     if (!Number.isFinite(rowNumber) || rowNumber <= 1 || !rowHasCellValue(row.content, sharedStringHasValue)) continue;
     dataRows += 1;
     if (dataRows >= maximum) break;
@@ -43,13 +45,17 @@ function rowHasCellValue(rowXml, sharedStringHasValue) {
       else if (child.name === "is" && inlineString === undefined) inlineString = child.content;
       else if (child.name === "v" && value === undefined) value = child.content;
     }
-    if ((formula?.length ?? 0) > 0) return true;
-    if (xmlAttribute(cell.openingTag, "t") === "s") {
-      const indexText = value ?? "";
-      if (/^\d+$/u.test(indexText) && sharedStringHasValue(Number(indexText))) return true;
+    const rawCellType = xmlAttribute(cell.openingTag, "t");
+    const cellType = rawCellType === undefined ? undefined : decodeXmlCharacterReferences(rawCellType);
+    if (rawCellType !== undefined && cellType === undefined) continue;
+    const formulaText = formula === undefined ? undefined : xmlCharacterData(formula);
+    if ((formulaText?.length ?? 0) > 0) return true;
+    const valueText = value === undefined ? undefined : xmlCharacterData(value, cellType === "s");
+    if (cellType === "s") {
+      if (/^\d+$/u.test(valueText ?? "") && sharedStringHasValue(Number(valueText))) return true;
       continue;
     }
-    if ((value?.length ?? 0) > 0) return true;
+    if ((valueText?.length ?? 0) > 0) return true;
     if (inlineString !== undefined && textElementsHaveValue(inlineString)) return true;
   }
   return false;
@@ -57,9 +63,99 @@ function rowHasCellValue(rowXml, sharedStringHasValue) {
 
 function textElementsHaveValue(xml) {
   for (const text of xmlElements(xml, TEXT_ELEMENTS)) {
-    if (text.content.length > 0) return true;
+    if ((xmlCharacterData(text.content)?.length ?? 0) > 0) return true;
   }
   return false;
+}
+
+function xmlCharacterData(xml, decodeReferences = false) {
+  let cursor = 0;
+  let content = "";
+  while (cursor < xml.length) {
+    const start = xml.indexOf("<", cursor);
+    if (start < 0) {
+      const tail = decodeReferences ? decodeXmlCharacterReferences(xml.slice(cursor)) : xml.slice(cursor);
+      return tail === undefined ? undefined : content + tail;
+    }
+    const text = decodeReferences ? decodeXmlCharacterReferences(xml.slice(cursor, start)) : xml.slice(cursor, start);
+    if (text === undefined) return undefined;
+    content += text;
+
+    if (xml.startsWith("<!--", start)) {
+      const end = xml.indexOf("-->", start + 4);
+      if (end < 0) return undefined;
+      cursor = end + 3;
+      continue;
+    }
+    if (xml.startsWith("<![CDATA[", start)) {
+      const end = xml.indexOf("]]>", start + 9);
+      if (end < 0) return undefined;
+      content += xml.slice(start + 9, end);
+      cursor = end + 3;
+      continue;
+    }
+    if (xml.startsWith("<?", start)) {
+      const end = xml.indexOf("?>", start + 2);
+      if (end < 0) return undefined;
+      cursor = end + 2;
+      continue;
+    }
+
+    const end = findXmlTagEnd(xml, start + 1);
+    if (end < 0) return undefined;
+    cursor = end;
+  }
+  return content;
+}
+
+function decodeXmlCharacterReferences(value) {
+  let cursor = 0;
+  let decoded = "";
+  while (cursor < value.length) {
+    const start = value.indexOf("&", cursor);
+    if (start < 0) return decoded + value.slice(cursor);
+    decoded += value.slice(cursor, start);
+    const end = value.indexOf(";", start + 1);
+    if (end < 0) return undefined;
+    const reference = value.slice(start + 1, end);
+    const character = decodeXmlCharacterReference(reference);
+    if (character === undefined) return undefined;
+    decoded += character;
+    cursor = end + 1;
+  }
+  return decoded;
+}
+
+function decodeXmlCharacterReference(reference) {
+  if (reference === "amp") return "&";
+  if (reference === "lt") return "<";
+  if (reference === "gt") return ">";
+  if (reference === "quot") return '"';
+  if (reference === "apos") return "'";
+
+  let digits;
+  let radix;
+  if (/^#[0-9]+$/u.test(reference)) {
+    digits = reference.slice(1);
+    radix = 10;
+  } else if (/^#x[0-9a-fA-F]+$/u.test(reference)) {
+    digits = reference.slice(2);
+    radix = 16;
+  } else {
+    return undefined;
+  }
+  const codePoint = Number.parseInt(digits, radix);
+  if (!isXmlCharacter(codePoint)) return undefined;
+  return String.fromCodePoint(codePoint);
+}
+
+function isXmlCharacter(codePoint) {
+  return codePoint === 9
+    || codePoint === 10
+    || codePoint === 13
+    || (codePoint >= 32 && codePoint <= 0xd7ff)
+    || (codePoint >= 0xe000 && codePoint <= 0xfffd)
+    || (codePoint >= 0x10000 && codePoint <= 0x10ffff);
 }
 
 function* xmlElements(xml, names) {
