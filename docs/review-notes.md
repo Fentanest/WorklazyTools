@@ -4,6 +4,61 @@
 
 ## 2026-09-07
 
+### U4-3(F1) PDF 페이지 번호·머리말/꼬리말 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·범위** — `PROJECT_RULES.md` 전문과 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 route/preset/navigation·토큰/선택·clock·폰트·실행 realm/취소·미리보기/썸네일·H5/H6 게이트 및 U4-0~2 기록·기각 이력을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=446a1e35ba60ebc308a32a13f8b675a02b095365`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 충돌은 없었다. 착수 시 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML을 보존했다. 검증 중 새로 나타난 사용자 소유 `newui/`도 열거나 stage하지 않았다. main 병합·push·배포는 수행하지 않는다.
+
+**route·SEO·정적 표면** — finish는 기존 PDF 도구의 다섯 번째 navigation이며 organize 뒤에 놓인다. navigation 항목은 위치가 아니라 `data-pdf-nav-mode`로 식별하고 320·390px에서 active 항목이 보이도록 자동 스크롤한다. 세 직접 경로는 하나의 lazy panel과 두 구현 탭을 공유하며 탭 변경은 URL을 바꾸지 않는다. `PdfFinishTab`은 후속 단계용 `watermark`·`stamp`까지 타입에 보존하되 F1 화면은 번호·머리말/꼬리말만 노출한다.
+
+| 직접 경로 | 최초 탭 | canonical | ko/en SEO·FAQ | sitemap·정적·소셜 |
+|---|---|---|---|---|
+| `/tools/pdf-editor/finish` | 페이지 번호 | `/finish` | 등록 | 등록 |
+| `/tools/pdf-editor/page-numbers` | 페이지 번호 | `/finish` | 등록 | 등록 |
+| `/tools/pdf-editor/header-footer` | 머리말/꼬리말 | `/finish` | 등록 | 등록 |
+
+빌드는 crawlable 정적 페이지 **67개**, startup recovery 문서 **113개**를 만들었고 3경로×2언어 소셜 PNG **6장**은 생성기로 만들었다. `docs/PUBLISHING_CHECKLIST.md`의 sitemap·canonical·Open Graph·FAQ 동반 갱신 항목과 대조했으며 체크리스트 자체의 정책 문안 변경은 필요하지 않았다. finish는 격리 경로가 아니므로 AppShell의 일반 광고 loader 조건을 그대로 상속한다. 전체 unit의 repo-wide 실행 파일 광고 문자열 최소 허용목록과 production utility 양성 대조가 통과했고 격리 경계 코드는 바꾸지 않았다.
+
+**화면·엔진 계약** — 한 PDF 업로드 뒤 두 탭에서 공통 템플릿, 6영역, 글자 크기·색·여백, 시작 번호·시작 쪽·표지 제외, 범위·홀짝을 편집한다. 범위와 썸네일 체크는 U4-1의 물리 페이지 exact set을 양방향으로 공유하고 하한 밖 페이지는 비활성화한다. 우측 PDF.js canvas 위에는 첫 선택 페이지의 텍스트 오버레이와 근사 안내를 표시하며, 이 미리보기는 최종 임베드 글꼴·정확 줄바꿈의 렌더 oracle이 아니다. 실제 출력은 별도 엔진의 U4-1 text layout과 geometry를 사용한다.
+
+엔진은 메인 스레드에서 파일을 concurrency 1로 처리한다. 배치 시작 시 clock을 한 번 캡처하고 `{page}`·`{pages}`·`{filename}`·locale `{date}`·허용 date format을 단일 pass로 확장한 뒤 전처리/coverage와 다중 줄 overflow를 판정한다. ASCII/Latin-1 범위는 Helvetica, 그 밖은 고정 전체 Noto OTF **4,644,748B / SHA-256 `69975a0a…8d68`**를 배치당 한 번 fetch·size/hash 검증하고 문서당 한 번 `subset:false`로 임베드한다. 회전 0/90/180/270, 비영점 CropBox와 UserUnit을 PDF.js transform 동형으로 역변환해 6영역 anchor에 upright 텍스트를 그린다. 보호 문서는 행동 중심 ko/en 오류로 수렴하고 알 수 없는 파서 예외는 일반 읽기 오류로 치환한다.
+
+공용 `pdfFontEmbed` 청크는 PDF finish와 QR Studio가 함께 소유하며 document 생성·표준/커스텀 폰트 임베드만 담당한다. QR은 기존 subset/full 선택과 폰트 fallback을 유지한다. 각 파일 load 전후, 폰트 fetch/검증 전후, 페이지 반복마다 `yieldToEventLoop` 뒤, save 전후와 결과 등록 전 `yieldBeforeResultRegistration`에서 abort를 재검사한다. 동기 `pdf-lib` 호출 한가운데 즉시 중단은 보장하지 않는다는 안내를 ko/en에 명시했고 취소 결과는 stale download로 등록하지 않는다.
+
+**하네스·실측** — 전용 스모크는 3경로×2언어×desktop/mobile **12 직접 진입**, 실제 `PdfFinishPanel` 청크 404 1회 주입 뒤 문서 요청 정확히 2회(자동 reload 1회)와 guard 정리, SPA organize→finish와 탭 URL 불변, 320/390/820/821px navigation, 필드/빈 선택 차단, 범위↔썸네일, 회전+CropBox 출력, PDF.js·Poppler 텍스트, 취소 뒤 stale 결과 0·재시도를 검증한다. 캡처는 `/tmp/worklazy-u4-3/shots/`에 12장 있다. 신규 시각 상태는 두 탭 full profile **16장**과 navigation 시작/활성/끝×ko/en×390/320 **12장**, 합계 **28장**이다. 다섯 탭으로 폭이 바뀐 기존 PDF 기준선은 생성기로 갱신했다.
+
+첫 전체 시각 실행은 신규 28장은 통과했으나 의도된 다섯 탭 변화 때문에 기존 PDF 빈 화면 4장이 0.1710~0.2807% 차이로 실패했다. diff가 navigation에만 있음을 확인하고 `VISUAL_ONLY=pdf-editor-empty UPDATE_VISUAL_BASELINES=1` 생성기를 쓴 뒤 전체 **203/203**을 재통과했다. 최종 지시 로케일별 재검증도 `ko_KR.UTF-8` **203/203, 7분 25.69초**, `en_US.UTF-8` **203/203, 7분 17.76초**다. 접근성은 11페이지 위반 **0**이며 finish ko desktop/mobile/en의 axe pass가 각각 **42/44/42**다. rendering은 6대상×3회·외부 요청 0, 기존 3대상 CLS 0, 세 finish 경로 최대 CLS가 모두 **0.0001480365514755249**로 상한 0.1을 통과했다. 신규 등록 과정에서 실행 기본 상한을 0으로 잘못 낮춘 첫 측정은 이 미세 shift를 차단했다. 단위 계약은 계속 0.1이었으므로 실행값을 정본대로 복구한 뒤 재측정해 통과했다.
+
+| 번들 지표(gzip) | U4-0 대비 순증분 | 고정 상한 | 판정 |
+|---|---:|---:|---|
+| entry JS | +4,211B | +20,480B | 통과 |
+| affected PDF route JS | +11,509B | +61,440B | 통과 |
+| shared JS | +2,081B | +30,720B | 통과 |
+| app JS | +18,274B | +81,920B | 통과 |
+| CSS | +82B | +10,240B | 통과 |
+
+override·배수 변경은 0이다. 공용화로 QR route에서 shared로 옮겨간 **509,380B**는 모듈 귀속 이동으로 분리됐으며 순증분에 넣지 않았다. production 청크는 `PdfFinishPanel` **26.78kB / gzip 10.00kB**, `pdfFontEmbed` **1,149.25kB / gzip 509.31kB**, QR PDF adapter **1.78kB / gzip 0.93kB**로 분리됐다. 원보고서는 `/tmp/worklazy-u4-3/bundle-u4-3.json`이다.
+
+| 검증 | 최종 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **297/297**, fail·skip 0 |
+| 4GiB `npm run build` · `npm run test:static` | 2,844 modules·정적 67페이지; startup 113, 통과 |
+| `npm run test:pdf-finish` | 12 진입+실제 청크 404/1회 reload+출력+취소/재시도 통과 |
+| `TEST_SCOPE=pdf npm run test:browser` · 전체 browser | 기존 PDF 4모드 / Excel·Word·PDF·shared UI 통과 |
+| new-tools · utilities · office | HWP·Image·Audio·Video 및 ko/en 유틸리티·Office 통과 |
+| QR bulk · QR font render | 4 폰트 시나리오·취소·404 통과; 3 fixture Poppler changed pixels **0**, PDF.js text 동일 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff **0** |
+| Excel Cleaner · Compare | 취소/재실행·보고서·모바일 포함 통과 |
+| 두 `LANG` 전체 visual | 각각 **203/203**, 위 시간으로 통과 |
+| local-QA build · a11y · rendering | 정적 67; 11페이지 위반 0; finish CLS max 0.000148, 외부 요청 0 |
+| bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 **20** 불변 |
+| selector·광역 금지·공백 | `.pdf-tool-navigation a:nth-child` 0; 광고 allowlist 통과; `git diff --check` 통과 |
+
+반복 경고는 제품 실패와 구분한다. Node PDF.js의 `standardFontDataUrl` 경고 2회와 QR Poppler의 기존 OTF font-type 경고가 있었지만 finish 텍스트 oracle과 QR 3 fixture 픽셀/PDF.js oracle은 통과했다. new-tools의 Dolby Vision base-layer는 이 Chrome에 호환 경로가 없어 기존 계약대로 skip했고 결정적 capability unit·fallback 안내는 통과했다.
+
+**광역 비노출 검사** — 실행 가능 확장자의 저장소 전체 재귀 검색으로 raw exception 후보와 광고 문자열을 확인했다. 이번 runtime diff에서 새 `.message` 참조의 최소 허용목록은 정확히 둘이다: `PdfFinishPanel.tsx`는 세 개의 message-catalog 현지화 문자열과 일치할 때만 표시하고 나머지는 일반 오류로 치환하며, `finish/engine.ts`는 암호/권한 오류 분류 정규식에만 쓰고 cause를 화면에 넘기지 않는다. 내부 오류 code·fontkit/pdf-lib/AbortError 명칭은 사용자 문구에 없다. 광고 문자열은 전체 unit의 고정 repo-wide allowlist와 일치했다.
+
+**범위 밖 발견** — 정본은 F1의 초기 템플릿·초기 위치·글자 크기·여백·색, 미리보기 불투명도, 결과 파일 접미사를 지정하지 않았다. 동작 가능한 form을 위해 현행 구현은 비계약 UI 초기값으로 번호 `{page} / {pages}`·아래 가운데, 머리말 `{filename} · {date}`·위 가운데, 10pt·24pt·`#34343a`, 미리보기 0.9, `-finished.pdf`를 사용한다. 이 값들은 후속 정본 결정으로 확정된 정책이라고 간주하지 않으며 Claude 판정 대상이다. F2 워터마크·F3 도장·F4 정리/래스터·다중 결과 ZIP은 명시 제외대로 구현하지 않았다. — Codx
+
 ### U4-2 fix-1 — terminal 확정 오류 불변 (Codx)
 
 **F1 원인·수리** — astra의 같은-turn 반례 4개를 수용했다. 공용 `runModuleWorker`는 terminal을 한 번만 수락했지만 PDF facade가 그 guard 밖의 `envelopeError`를 무조건 갱신해 promise rejection handler가 실행되기 전 늦은 error의 `LATE/LATE_CODE`를 읽을 수 있었다. PDF 소유 adapter의 `terminate()`가 자체 종료 상태를 원 Worker 종료보다 먼저 확정하고 원 `message`/`error` callback을 해제하며, 이후 callback은 외부 상태 갱신과 lifecycle 전달을 모두 거부하도록 고쳤다. 최초 수락한 PDF error envelope는 message/code 값만 복사해 고정하므로 abort와 시작 실패는 다른 envelope로 새 Error가 되지 않는다. 공용 `src/utils/workerLifecycle.ts`, Excel 두 기능, 기존 4모드 UI·문구는 바꾸지 않았다.
