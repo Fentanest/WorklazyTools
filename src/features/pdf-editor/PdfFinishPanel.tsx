@@ -1,5 +1,5 @@
 import { FileCheck2, Hash, Image as ImageIcon, PanelTop, SquareDashed, Stamp, Type, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { UtilityField, UtilityInput, UtilityNotice, UtilitySelect, UtilityTextarea } from "../../components/UtilitySurface";
@@ -182,6 +182,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const [excludeCover, setExcludeCover] = useState(false);
   const [error, setError] = useState("");
   const [inspecting, setInspecting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [preflight, setPreflight] = useState<{
     status: "idle" | "checking" | "ready";
     errors: PdfFinishPreflightError[];
@@ -191,6 +192,9 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const operation = useOperationProgress();
   const download = useDownloadResult();
   const controllerRef = useRef<AbortController | undefined>(undefined);
+  const fileLifecycleControllerRef = useRef<AbortController | undefined>(undefined);
+  const fileRequestRef = useRef(0);
+  const previewOwnerRef = useRef<object | undefined>(undefined);
   const fileRef = useRef<File | null>(null);
   const tabPanelId = useId();
   const form = forms[activeTab];
@@ -215,6 +219,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   useEffect(() => { fileRef.current = file; }, [file]);
   useEffect(() => () => {
     controllerRef.current?.abort();
+    fileLifecycleControllerRef.current?.abort();
     if (fileRef.current) void releasePdf(fileRef.current);
   }, []);
 
@@ -275,6 +280,16 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     }
   };
 
+  const updatePreviewing = useCallback((next: boolean, owner: object) => {
+    if (next) {
+      previewOwnerRef.current = owner;
+      setPreviewing(true);
+    } else if (previewOwnerRef.current === owner) {
+      previewOwnerRef.current = undefined;
+      setPreviewing(false);
+    }
+  }, []);
+
   const replaceFile = async (incoming: File[]) => {
     const next = incoming[0];
     if (!next) return;
@@ -282,34 +297,57 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       setError(copy.invalidFile);
       return;
     }
+    const requestId = fileRequestRef.current + 1;
+    fileRequestRef.current = requestId;
+    fileLifecycleControllerRef.current?.abort();
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    fileLifecycleControllerRef.current = controller;
+    const previous = fileRef.current;
+    fileRef.current = next;
+    setFile(next);
+    setFileKey("");
+    setPageCount(0);
+    setRangeText("");
+    previewOwnerRef.current = undefined;
+    setPreviewing(false);
     setInspecting(true);
     setError("");
     setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
     setRiskAccepted(false);
     operation.reset();
     download.clearResult();
-    if (fileRef.current) await releasePdf(fileRef.current);
-    setFile(null);
-    setPageCount(0);
+    if (previous && previous !== next) void releasePdf(previous);
     try {
-      const inspected = await inspectPdf(next, language, { requirePdfLibCompatibility: true });
+      const inspected = await inspectPdf(next, language, { requirePdfLibCompatibility: true, signal: controller.signal });
+      if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
       const key = createLocalId("finish-source");
-      setFile(next);
       setFileKey(key);
       setPageCount(inspected.pageCount);
       setRangeText(`1-${inspected.pageCount}`);
       setParity("all");
     } catch (reason) {
+      if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
       setError(inspectionErrorMessage(reason, language, copy));
+      fileRef.current = null;
+      setFile(null);
       await releasePdf(next);
     } finally {
-      setInspecting(false);
+      if (fileRequestRef.current === requestId) setInspecting(false);
     }
   };
 
   const removeFile = () => {
+    fileRequestRef.current += 1;
+    fileLifecycleControllerRef.current?.abort();
+    fileLifecycleControllerRef.current = undefined;
     controllerRef.current?.abort();
-    if (fileRef.current) void releasePdf(fileRef.current);
+    const current = fileRef.current;
+    fileRef.current = null;
+    if (current) void releasePdf(current);
+    setInspecting(false);
+    previewOwnerRef.current = undefined;
+    setPreviewing(false);
     setFile(null);
     setPageCount(0);
     setRangeText("");
@@ -445,10 +483,11 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         <SectionCard step={1} title={copy.uploadTitle} description={copy.uploadDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
           <FileDropZone accept=".pdf,application/pdf" files={file ? [file] : []} onFiles={replaceFile} disabled={locked} accent="violet" hint={inspecting ? copy.inspecting : copy.uploadHint} />
           <FileList files={file ? [file] : []} onRemove={removeFile} accent="violet" />
+          {(inspecting || previewing) && operation.status !== "running" && <Button type="button" variant="outline" className="mt-2 min-h-11 w-full rounded-xl text-destructive" data-testid="pdf-finish-file-cancel" onClick={removeFile}><X size={17} />{copy.cancel}</Button>}
         </SectionCard>
         <PdfError message={error} />
 
-        {file && (
+        {file && pageCount > 0 && (
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)] items-start gap-4 max-[820px]:grid-cols-1">
             <div className="min-w-0">
               <SectionCard step={2} title={copy.settingsTitle} description={copy.settingsDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
@@ -457,12 +496,12 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                   <UtilityField>{copy.watermark.layer}<UtilitySelect data-testid="pdf-watermark-layer" value={watermark.layer} disabled={locked} onChange={(event) => updateWatermark("layer", event.target.value as WatermarkLayer)}><option value="background">{copy.watermark.background}</option><option value="foreground">{copy.watermark.foreground}</option></UtilitySelect></UtilityField>
                   <UtilityField>{copy.watermark.pattern}<UtilitySelect data-testid="pdf-watermark-pattern" value={watermark.pattern} disabled={locked} onChange={(event) => updateWatermark("pattern", event.target.value as WatermarkPattern)}><option value="single">{copy.watermark.single}</option><option value="tile">{copy.watermark.tile}</option></UtilitySelect></UtilityField>
                 </div>}
-                {watermarkActive && watermark.content === "image" ? <UtilityField className="mt-5">{copy.watermark.imageFile}<UtilityInput data-testid="pdf-watermark-image" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={locked} aria-invalid={!!fieldErrors.image || undefined} aria-describedby={fieldErrors.image ? `${tabPanelId}-image-error` : `${tabPanelId}-image-hint`} onChange={(event) => updateWatermark("image", event.target.files?.[0])} /><span id={`${tabPanelId}-image-hint`} className="text-xs leading-relaxed text-muted-foreground">{watermark.image?.name || copy.watermark.imageHint}</span>{fieldErrors.image && <span id={`${tabPanelId}-image-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.image}</span>}</UtilityField> : <>
-                  <UtilityField className={watermarkActive ? "mt-5" : undefined}>{copy.template}<UtilityTextarea data-testid="pdf-finish-template" className="min-h-24 max-h-48" value={form.template} disabled={locked} maxLength={300} placeholder={copy.templatePlaceholder[activeTab]} aria-invalid={!!fieldErrors.template || undefined} aria-describedby={`${tabPanelId}-template-count${fieldErrors.template || templateLimitNotices[activeTab] ? ` ${tabPanelId}-template-error` : ""}`} onBeforeInput={(event) => { const nativeEvent = event.nativeEvent as InputEvent; if (nativeEvent.data) noteTemplateLimitAttempt(event.currentTarget.value, event.currentTarget.selectionStart, event.currentTarget.selectionEnd, nativeEvent.data); }} onPaste={(event) => noteTemplateLimitAttempt(event.currentTarget.value, event.currentTarget.selectionStart, event.currentTarget.selectionEnd, event.clipboardData.getData("text"))} onChange={(event) => updateForm("template", event.target.value)} />{(fieldErrors.template || templateLimitNotices[activeTab]) && <span id={`${tabPanelId}-template-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.template || copy.fieldErrors.templateLength}</span>}</UtilityField>
-                  <div className="mt-2 flex items-start justify-between gap-3 text-xs leading-relaxed text-muted-foreground"><p>{copy.templateHelp} <code>{"{page} {pages} {filename} {date} {date:YYYY-MM-DD}"}</code></p><span id={`${tabPanelId}-template-count`} className="shrink-0 tabular-nums" data-testid="pdf-finish-template-count">{copy.templateCount.replace("{{count}}", `${form.template.length}`)}</span></div>
+                {watermarkActive && watermark.content === "image" ? <UtilityField className="mt-5" data-pdf-watermark-owned>{copy.watermark.imageFile}<UtilityInput data-testid="pdf-watermark-image" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={locked} aria-invalid={!!fieldErrors.image || undefined} aria-describedby={fieldErrors.image ? `${tabPanelId}-image-error` : `${tabPanelId}-image-hint`} onChange={(event) => updateWatermark("image", event.target.files?.[0])} /><span id={`${tabPanelId}-image-hint`} className="text-xs leading-relaxed text-muted-foreground">{watermark.image?.name || copy.watermark.imageHint}</span>{fieldErrors.image && <span id={`${tabPanelId}-image-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.image}</span>}</UtilityField> : <>
+                  <UtilityField className={watermarkActive ? "mt-5" : undefined} data-pdf-watermark-owned={watermarkActive || undefined}>{copy.template}<UtilityTextarea data-testid="pdf-finish-template" className="min-h-24 max-h-48" value={form.template} disabled={locked} maxLength={300} placeholder={copy.templatePlaceholder[activeTab]} aria-invalid={!!fieldErrors.template || undefined} aria-describedby={`${tabPanelId}-template-count${fieldErrors.template || templateLimitNotices[activeTab] ? ` ${tabPanelId}-template-error` : ""}`} onBeforeInput={(event) => { const nativeEvent = event.nativeEvent as InputEvent; if (nativeEvent.data) noteTemplateLimitAttempt(event.currentTarget.value, event.currentTarget.selectionStart, event.currentTarget.selectionEnd, nativeEvent.data); }} onPaste={(event) => noteTemplateLimitAttempt(event.currentTarget.value, event.currentTarget.selectionStart, event.currentTarget.selectionEnd, event.clipboardData.getData("text"))} onChange={(event) => updateForm("template", event.target.value)} />{(fieldErrors.template || templateLimitNotices[activeTab]) && <span id={`${tabPanelId}-template-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.template || copy.fieldErrors.templateLength}</span>}</UtilityField>
+                  <div className="mt-2 flex items-start justify-between gap-3 text-xs leading-relaxed text-muted-foreground" data-pdf-watermark-owned={watermarkActive || undefined}><p>{copy.templateHelp} <code>{"{page} {pages} {filename} {date} {date:YYYY-MM-DD}"}</code></p><span id={`${tabPanelId}-template-count`} className="shrink-0 tabular-nums" data-testid="pdf-finish-template-count">{copy.templateCount.replace("{{count}}", `${form.template.length}`)}</span></div>
                 </>}
-                {(!watermarkActive || watermark.pattern === "single") && <fieldset className="mt-5" disabled={locked}><legend className="mb-2 text-[13px] font-bold text-muted-foreground">{copy.position}</legend><div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={copy.position}>{(watermarkActive ? watermarkRegions : regions).map((region) => <Button key={region} type="button" variant="outline" role="radio" aria-checked={form.region === region} data-finish-region={region} data-selected={form.region === region || undefined} className={cn("min-h-11 rounded-xl text-xs", form.region === region && "border-violet-600 bg-violet-500/10 text-violet-700 dark:text-violet-300")} onClick={() => updateForm("region", region)}>{copy.regions[region]}</Button>)}</div></fieldset>}
-                <div className="mt-5 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">
+                {(!watermarkActive || watermark.pattern === "single") && <fieldset className="mt-5" disabled={locked} data-pdf-watermark-owned={watermarkActive || undefined}><legend className="mb-2 text-[13px] font-bold text-muted-foreground">{copy.position}</legend><div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={copy.position}>{(watermarkActive ? watermarkRegions : regions).map((region) => <Button key={region} type="button" variant="outline" role="radio" aria-checked={form.region === region} data-finish-region={region} data-selected={form.region === region || undefined} className={cn("min-h-11 rounded-xl text-xs", form.region === region && "border-violet-600 bg-violet-500/10 text-violet-700 dark:text-violet-300")} onClick={() => updateForm("region", region)}>{copy.regions[region]}</Button>)}</div></fieldset>}
+                <div className="mt-5 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1" data-pdf-watermark-owned={watermarkActive || undefined}>
                   {(!watermarkActive || watermark.content === "text") && <UtilityField>{copy.fontSize}<UtilityInput data-testid="pdf-finish-font-size" type="number" min={6} max={72} step={1} value={form.fontSize} disabled={locked} aria-invalid={!!fieldErrors.fontSize || undefined} aria-describedby={fieldErrors.fontSize ? `${tabPanelId}-font-size-error` : undefined} onChange={(event) => updateForm("fontSize", event.target.value)} />{fieldErrors.fontSize && <span id={`${tabPanelId}-font-size-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.fontSize}</span>}</UtilityField>}
                   <UtilityField>{copy.margin}<UtilityInput data-testid="pdf-finish-margin" type="number" min={0} max={144} step={1} value={form.margin} disabled={locked} aria-invalid={!!fieldErrors.margin || undefined} aria-describedby={fieldErrors.margin ? `${tabPanelId}-margin-error` : undefined} onChange={(event) => updateForm("margin", event.target.value)} />{fieldErrors.margin && <span id={`${tabPanelId}-margin-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.margin}</span>}</UtilityField>
                   {(!watermarkActive || watermark.content === "text") && <UtilityField>{copy.color}<UtilityInput data-testid="pdf-finish-color" className="p-1" type="color" value={form.color} disabled={locked} onChange={(event) => updateForm("color", event.target.value)} /></UtilityField>}
@@ -502,14 +541,14 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
               <Card as="section" className="gap-0 overflow-visible rounded-3xl border border-border p-5 py-5 shadow-sm ring-0" aria-labelledby={`${tabPanelId}-preview-title`}>
                 <div className="mb-4 flex items-center gap-2 text-violet-700 dark:text-violet-300"><SquareDashed size={18} /><h2 id={`${tabPanelId}-preview-title`} className="font-heading text-base font-medium text-foreground">{copy.previewTitle}</h2></div>
                 <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{copy.previewDescription}</p>
-                <FinishPreview file={file} pageIndex={Math.max(0, (selection.exactPages[0] ?? 1) - 1)} language={language} form={{ ...form, fontSize: Number.isFinite(fontSize) ? fontSize : 10, margin: Number.isFinite(margin) ? margin : 24 }} startNumber={Number.isSafeInteger(startingNumber) ? startingNumber : 1} startPage={validLowerBound ? startingPage : 1} excludeCover={excludeCover} pageCount={pageCount} copy={copy} watermark={watermarkActive ? { ...watermark, rotation: watermarkRotation, opacity: watermarkOpacity, sizePercent: watermarkSize, gap: watermarkGap, offsetX: watermarkOffsetX, offsetY: watermarkOffsetY } : undefined} />
-                <UtilityNotice className="mt-3" tone="warning">{copy.previewDisclaimer}</UtilityNotice>
-                {preflight.status === "checking" && <UtilityNotice className="mt-3" tone="warning" role="status" data-testid="pdf-finish-preflight-checking">{copy.preflightChecking}</UtilityNotice>}
+                <FinishPreview file={file} pageIndex={Math.max(0, (selection.exactPages[0] ?? 1) - 1)} language={language} form={{ ...form, fontSize: Number.isFinite(fontSize) ? fontSize : 10, margin: Number.isFinite(margin) ? margin : 24 }} startNumber={Number.isSafeInteger(startingNumber) ? startingNumber : 1} startPage={validLowerBound ? startingPage : 1} excludeCover={excludeCover} pageCount={pageCount} copy={copy} lifecycleSignal={fileLifecycleControllerRef.current?.signal} onRenderingChange={updatePreviewing} watermark={watermarkActive ? { ...watermark, rotation: watermarkRotation, opacity: watermarkOpacity, sizePercent: watermarkSize, gap: watermarkGap, offsetX: watermarkOffsetX, offsetY: watermarkOffsetY } : undefined} />
+                <UtilityNotice className="mt-3" tone="warning" data-testid="pdf-finish-preview-disclaimer" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.previewDisclaimer}</UtilityNotice>
+                {preflight.status === "checking" && <UtilityNotice className="mt-3" tone="warning" role="status" data-testid="pdf-finish-preflight-checking" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.preflightChecking}</UtilityNotice>}
                 {preflight.status === "ready" && <span className="sr-only" data-testid="pdf-finish-preflight-ready">ready</span>}
-                {preflightErrorText && <UtilityNotice className="mt-3" tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={firstPreflightError?.code}>{preflightErrorText}</UtilityNotice>}
-                {preflightFailure && <UtilityNotice className="mt-3" tone="error" role="alert" data-testid="pdf-finish-preflight-error">{preflightFailure}</UtilityNotice>}
-                {!!preflight.warnings.length && <div className="mt-3 space-y-2" data-testid="pdf-finish-preflight-warnings">{preflight.warnings.map((warning) => <UtilityNotice key={warning} tone="warning" data-warning-code={warning}>{copy.warnings[warning]}</UtilityNotice>)}</div>}
-                {!!riskWarnings.length && <div className="mt-3 overflow-hidden rounded-2xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20" data-testid="pdf-watermark-risk-confirmation"><p className="px-4 pt-4 text-sm font-bold text-foreground">{copy.watermark.riskTitle}</p><ToggleRow label={copy.watermark.riskConsent} description={copy.watermark.riskConsentDescription} checked={riskAccepted} onChange={(checked) => { setRiskAccepted(checked); download.clearResult(); }} disabled={locked} /></div>}
+                {preflightErrorText && <UtilityNotice className="mt-3" tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={firstPreflightError?.code} data-pdf-watermark-owned={watermarkActive || undefined}>{preflightErrorText}</UtilityNotice>}
+                {preflightFailure && <UtilityNotice className="mt-3" tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-pdf-watermark-owned={watermarkActive || undefined}>{preflightFailure}</UtilityNotice>}
+                {!!preflight.warnings.length && <div className="mt-3 space-y-2" data-testid="pdf-finish-preflight-warnings" data-pdf-watermark-owned={watermarkActive || undefined}>{preflight.warnings.map((warning) => <UtilityNotice key={warning} tone="warning" data-warning-code={warning}>{copy.warnings[warning]}</UtilityNotice>)}</div>}
+                {!!riskWarnings.length && <div className="mt-3 overflow-hidden rounded-2xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20" data-testid="pdf-watermark-risk-confirmation" data-pdf-watermark-owned><p className="px-4 pt-4 text-sm font-bold text-foreground">{copy.watermark.riskTitle}</p><ToggleRow label={copy.watermark.riskConsent} description={copy.watermark.riskConsentDescription} checked={riskAccepted} onChange={(checked) => { setRiskAccepted(checked); download.clearResult(); }} disabled={locked} /></div>}
                 {selectionEvaluation.error && <UtilityNotice className="mt-3" tone="error" role="alert">{copy.rangeErrors[selectionEvaluation.error]}</UtilityNotice>}
                 <div className="mt-4">
                   <PrimaryButton accent="violet" disabled={!selection.canExecute || !!fieldError || !!selectionEvaluation.error || preflightBlocked || locked} loading={operation.status === "running"} onClick={() => void execute()}>{operation.status !== "running" && <FileCheck2 size={18} />}{operation.status === "running" ? copy.creating : operation.status === "error" ? copy.retry : copy.create}</PrimaryButton>
@@ -526,7 +565,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   );
 }
 
-function FinishPreview({ file, pageIndex, language, form, startNumber, startPage, excludeCover, pageCount, copy, watermark }: {
+function FinishPreview({ file, pageIndex, language, form, startNumber, startPage, excludeCover, pageCount, copy, lifecycleSignal, onRenderingChange, watermark }: {
   file: File;
   pageIndex: number;
   language: AppLanguage;
@@ -536,6 +575,8 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
   excludeCover: boolean;
   pageCount: number;
   copy: FinishCopy;
+  lifecycleSignal?: AbortSignal;
+  onRenderingChange: (rendering: boolean, owner: object) => void;
   watermark?: Omit<PdfWatermarkSettings, "region">;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -548,24 +589,39 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
     const canvas = canvasRef.current;
     if (!canvas) return;
     const controller = new AbortController();
+    const owner = {};
+    const cancelFromLifecycle = () => controller.abort();
+    lifecycleSignal?.addEventListener("abort", cancelFromLifecycle, { once: true });
+    if (lifecycleSignal?.aborted) controller.abort();
     setRendering(true);
+    onRenderingChange(true, owner);
     setFailed(false);
     setDimensions(null);
     void renderPdfThumbnail(file, pageIndex, canvas, 520, language, controller.signal)
       .then((nextDimensions) => {
         canvas.style.width = "100%";
         canvas.style.height = "auto";
-        setDimensions(nextDimensions);
-        setRendering(false);
+        if (!controller.signal.aborted) {
+          setDimensions(nextDimensions);
+          setRendering(false);
+          onRenderingChange(false, owner);
+        }
       })
       .catch((reason) => {
         if (!(reason instanceof DOMException && reason.name === "AbortError")) {
-          setFailed(true);
-          setRendering(false);
+          if (!controller.signal.aborted) {
+            setFailed(true);
+            setRendering(false);
+            onRenderingChange(false, owner);
+          }
         }
       });
-    return () => controller.abort();
-  }, [file, language, pageIndex]);
+    return () => {
+      lifecycleSignal?.removeEventListener("abort", cancelFromLifecycle);
+      controller.abort();
+      onRenderingChange(false, owner);
+    };
+  }, [file, language, lifecycleSignal, onRenderingChange, pageIndex]);
   useEffect(() => {
     if (!watermark?.image) {
       setImageUrl("");
@@ -648,7 +704,7 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
     }
   }
   const previewPlacements = watermarkPlan?.ok ? watermarkPlan.placements : [];
-  return <div className="relative min-h-72 overflow-hidden rounded-2xl bg-[#e9e9ed] p-2 dark:bg-[#202023]" data-testid="pdf-finish-preview">
+  return <div className="relative min-h-72 overflow-hidden rounded-2xl bg-[#e9e9ed] p-2 dark:bg-[#202023]" data-testid="pdf-finish-preview" data-preview-status={rendering ? "rendering" : failed ? "failed" : "ready"}>
     {(rendering || failed) && <span className="absolute inset-0 grid place-items-center p-4 text-center text-sm font-bold text-muted-foreground">{failed ? copy.previewFailed : copy.previewWaiting}</span>}
     <div className={cn("relative mx-auto max-w-full", rendering && "invisible")} data-testid="pdf-finish-canvas-area" style={dimensions ? { width: `${dimensions.width}px`, aspectRatio: `${dimensions.width} / ${dimensions.height}`, containerType: "inline-size" } : undefined}>
       <canvas ref={canvasRef} className="block h-auto w-full bg-white shadow-md" style={{ width: "100%", height: "auto" }} />

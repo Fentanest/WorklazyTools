@@ -32,7 +32,7 @@ import {
   createTextWatermarkXObject,
   createWatermarkPlacements,
   embedWatermarkImage,
-  inspectWatermarkRisks,
+  inspectWatermarkRisksCooperatively,
   measureTextWatermarkBox,
   textWatermarkFontName,
   validateWatermarkResult,
@@ -67,6 +67,7 @@ export type PdfFinishEngineErrorCode =
   | "invalid-layout"
   | "font-asset"
   | "image-format"
+  | "empty-text"
   | "empty-placement"
   | "tile-limit"
   | "background-placement"
@@ -100,6 +101,7 @@ export type PdfFinishPreflightErrorCode =
   | "invalid-margin"
   | "invalid-layout"
   | "image-format"
+  | "empty-text"
   | "empty-placement"
   | "tile-limit"
   | "background-placement";
@@ -191,6 +193,7 @@ interface PageDecorationPlan extends PreparedPage {
   watermarkPlacements?: WatermarkPlacement[];
   watermarkWidth?: number;
   watermarkHeight?: number;
+  watermarkBBoxHeight?: number;
   watermarkBaselineOffset?: number;
 }
 
@@ -352,27 +355,32 @@ function templatePosition(template: string, offset: number) {
 }
 
 function preparedTextErrors(source: PdfFinishInputFile, options: PdfFinishDecorationOptions, pages: readonly PreparedPage[]): PdfFinishPreflightError[] {
-  return pages.flatMap(({ physicalPage, prepared }) => prepared.errors.map((error) => {
-    if (error.code === "date-format") {
+  return pages.flatMap(({ physicalPage, prepared }): PdfFinishPreflightError[] => {
+    if (!prepared.text.trim()) {
+      return [{ code: "empty-text" as const, field: "template" as const, fileKey: source.key, physicalPage }];
+    }
+    return prepared.errors.map((error) => {
+      if (error.code === "date-format") {
+        return {
+          code: "date-format" as const,
+          field: "template" as const,
+          fileKey: source.key,
+          physicalPage,
+          ...templatePosition(options.template, error.offset),
+          token: error.token,
+        };
+      }
       return {
-        code: "date-format" as const,
+        code: "control-character" as const,
         field: "template" as const,
         fileKey: source.key,
         physicalPage,
-        ...templatePosition(options.template, error.offset),
-        token: error.token,
+        line: error.line,
+        column: error.column,
+        codePoint: error.codePoint,
       };
-    }
-    return {
-      code: "control-character" as const,
-      field: "template" as const,
-      fileKey: source.key,
-      physicalPage,
-      line: error.line,
-      column: error.column,
-      codePoint: error.codePoint,
-    };
-  }));
+    });
+  });
 }
 
 function isProtectedLoadError(error: unknown) {
@@ -511,6 +519,7 @@ function createPageDecorationPlan(
       watermarkPlacements: placement.placements,
       watermarkWidth: width,
       watermarkHeight: height,
+      watermarkBBoxHeight: textBox.bboxHeight,
       watermarkBaselineOffset: textBox.baselineOffset,
     };
   }
@@ -608,7 +617,7 @@ async function analyzeDocument(
 
   const document = await loadDocument(source.file, input.signal);
   if (input.options.watermark) {
-    for (const warning of inspectWatermarkRisks(document)) warnings.add(warning);
+    for (const warning of await inspectWatermarkRisksCooperatively(document, input.signal)) warnings.add(warning);
   }
   if (input.options.watermark?.content === "image") return analyzeImageWatermark(input, source, document, warnings);
   const needsNoto = fontNeedsNoto(preparedPages);
@@ -697,13 +706,13 @@ async function decorateDocument(input: PdfFinishEngineInput, plans: readonly Dec
       if (!watermark) throw new PdfFinishEngineError("invalid-layout");
       await addWatermarkXObject(plan.page, plan.image.ref, 1, 1, plan.viewport, plan.watermarkPlacements, watermark.opacity, watermark.layer, input.signal);
     } else if (plan.kind === "watermark-text") {
-      if (!watermark || !plan.watermarkPlacements || !plan.watermarkWidth || !plan.watermarkHeight) throw new PdfFinishEngineError("invalid-layout");
+      if (!watermark || !plan.watermarkPlacements || !plan.watermarkWidth || !plan.watermarkHeight || !plan.watermarkBBoxHeight) throw new PdfFinishEngineError("invalid-layout");
       const form = createTextWatermarkXObject(
         plan.page.doc,
         plan.font.ref,
         watermarkTextOperators(plan, input),
         plan.watermarkWidth,
-        plan.watermarkHeight,
+        plan.watermarkBBoxHeight,
       );
       await addWatermarkXObject(plan.page, form.reference, plan.watermarkWidth, plan.watermarkHeight, plan.viewport, plan.watermarkPlacements, watermark.opacity, watermark.layer, input.signal);
     } else {
@@ -780,8 +789,9 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       throwIfAborted(input.signal);
       if (input.options.watermark) {
         try {
-          await (input.validateWatermarkOutput ?? validateWatermarkResult)(bytes, source.selection.totalPages, source.selection.exactPages, input.options.watermark.layer);
+          await (input.validateWatermarkOutput ?? validateWatermarkResult)(bytes, source.selection.totalPages, source.selection.exactPages, input.options.watermark.layer, input.signal);
         } catch (error) {
+          if (error instanceof Error && error.name === "AbortError") throw error;
           throw new PdfFinishEngineError("output-validation", {}, error);
         }
         throwIfAborted(input.signal);

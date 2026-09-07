@@ -31,6 +31,7 @@ export interface CachedPdfThumbnail {
 interface PdfThumbnailCacheEntry {
   promise: Promise<CachedPdfThumbnail>;
   url?: string;
+  controller?: AbortController;
 }
 
 const documentCache = new Map<File, CachedPdfDocument>();
@@ -43,11 +44,31 @@ const TESSERACT_BASE_URL = new URL(
   new URL(import.meta.env.BASE_URL, window.location.origin),
 ).href;
 
+function waitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal, canceledMessage = "PDF loading cancelled") {
+  throwIfAborted(signal, canceledMessage);
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new DOMException(canceledMessage, "AbortError"));
+    signal.addEventListener("abort", abort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (reason) => {
+        signal.removeEventListener("abort", abort);
+        reject(reason);
+      },
+    );
+  });
+}
 
-export async function getPdfDocument(file: File, language: AppLanguage = "ko") {
+export async function getPdfDocument(file: File, language: AppLanguage = "ko", signal?: AbortSignal) {
+  throwIfAborted(signal, "PDF loading cancelled");
   const cached = documentCache.get(file);
-  if (cached) return cached.promise;
-  const buffer = await file.arrayBuffer();
+  if (cached) return waitWithAbort(cached.promise, signal);
+  const buffer = await waitWithAbort(file.arrayBuffer(), signal);
+  throwIfAborted(signal, "PDF loading cancelled");
   const loadingTask = getDocument({
     data: new Uint8Array(buffer),
     password: "",
@@ -63,12 +84,13 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko") {
     throw normalizePdfOpenError(error, language);
   });
   documentCache.set(file, { loadingTask, promise });
-  return promise;
+  return waitWithAbort(promise, signal);
 }
 
-export async function inspectPdf(file: File, language: AppLanguage = "ko", options: { requirePdfLibCompatibility?: boolean } = {}) {
-  const document = await getPdfDocument(file, language);
-  const permissions = await document.getPermissions();
+export async function inspectPdf(file: File, language: AppLanguage = "ko", options: { requirePdfLibCompatibility?: boolean; signal?: AbortSignal } = {}) {
+  const document = await getPdfDocument(file, language, options.signal);
+  const permissions = await waitWithAbort(document.getPermissions(), options.signal, "PDF inspection cancelled");
+  throwIfAborted(options.signal, "PDF inspection cancelled");
   if (permissions !== null && options.requirePdfLibCompatibility) {
     await releasePdf(file);
     throw new Error(featureMessage(language, "pdf.messages.pdfPreview.encryptedOrPermissionRestrictedPdfsCannotBeEdited"));
@@ -81,7 +103,10 @@ export async function releasePdf(file: File) {
   const cachedThumbnails = thumbnailCache.get(file);
   documentCache.delete(file);
   thumbnailCache.delete(file);
-  cachedThumbnails?.forEach((entry) => { if (entry.url) URL.revokeObjectURL(entry.url); });
+  cachedThumbnails?.forEach((entry) => {
+    entry.controller?.abort();
+    if (entry.url) URL.revokeObjectURL(entry.url);
+  });
   if (cached) {
     try { await cached.loadingTask.destroy(); } catch { /* 이미 종료된 문서는 무시합니다. */ }
   }
@@ -98,13 +123,14 @@ export function getCachedPdfThumbnail(file: File, pageIndex: number, targetWidth
   const cached = fileCache.get(cacheKey);
   if (cached) return cached.promise;
 
-  const entry = {} as PdfThumbnailCacheEntry;
+  const controller = new AbortController();
+  const entry = { controller } as PdfThumbnailCacheEntry;
   fileCache.set(cacheKey, entry);
   entry.promise = queueThumbnailRender(async () => {
     if (thumbnailCache.get(file)?.get(cacheKey) !== entry) throw new DOMException("Thumbnail no longer needed", "AbortError");
     const canvas = document.createElement("canvas");
     try {
-      const dimensions = await renderPdfThumbnail(file, pageIndex, canvas, targetWidth, language);
+      const dimensions = await renderPdfThumbnail(file, pageIndex, canvas, targetWidth, language, controller.signal);
       const blob = await canvasToBlob(canvas, "image/webp", 0.86, language);
       const url = URL.createObjectURL(blob);
       if (thumbnailCache.get(file)?.get(cacheKey) !== entry) {
@@ -138,11 +164,69 @@ function queueThumbnailRender<T>(task: () => Promise<T>) {
   });
 }
 
+async function renderPdfThumbnailOffMainThread(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth: number, signal?: AbortSignal) {
+  if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined" || typeof ImageBitmap === "undefined") return undefined;
+  throwIfAborted(signal, "Thumbnail rendering cancelled");
+  const worker = new Worker(new URL("./pdfThumbnailRender.worker.ts", import.meta.url), { type: "module" });
+  return new Promise<{ width: number; height: number; sourceWidth: number; sourceHeight: number }>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", abort);
+      worker.terminate();
+      callback();
+    };
+    const abort = () => finish(() => reject(new DOMException("Thumbnail rendering cancelled", "AbortError")));
+    signal?.addEventListener("abort", abort, { once: true });
+    worker.onmessage = (event: MessageEvent<{ type: "result"; bitmap: ImageBitmap; dimensions: { width: number; height: number; sourceWidth: number; sourceHeight: number } } | { type: "error"; message: string }>) => {
+      const data = event.data;
+      if (!data || !["result", "error"].includes(data.type)) return;
+      if (data.type === "error") {
+        finish(() => reject(new Error(data.message)));
+        return;
+      }
+      const { bitmap, dimensions } = data;
+      finish(() => {
+        if (signal?.aborted) {
+          bitmap.close();
+          reject(new DOMException("Thumbnail rendering cancelled", "AbortError"));
+          return;
+        }
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.style.width = `${Math.floor(dimensions.width)}px`;
+        canvas.style.height = `${Math.floor(dimensions.height)}px`;
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) {
+          bitmap.close();
+          reject(new Error("Preview canvas unavailable"));
+          return;
+        }
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        resolve(dimensions);
+      });
+    };
+    worker.onerror = (event) => finish(() => reject(new Error(event.message || "Preview worker failed")));
+    worker.postMessage({ file, pageIndex, targetWidth, outputScale: Math.min(window.devicePixelRatio || 1, 2) });
+  });
+}
+
 export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172, language: AppLanguage = "ko", signal?: AbortSignal) {
   throwIfAborted(signal, "Thumbnail rendering cancelled");
-  const pdfDocument = await getPdfDocument(file, language);
+  try {
+    const workerResult = await renderPdfThumbnailOffMainThread(file, pageIndex, canvas, targetWidth, signal);
+    if (workerResult) return workerResult;
+  } catch (error) {
+    if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+    // Browsers without a usable worker canvas retain the established compatibility renderer below.
+  }
+  const pdfDocument = await getPdfDocument(file, language, signal);
   throwIfAborted(signal, "Thumbnail rendering cancelled");
-  const page = await pdfDocument.getPage(pageIndex + 1);
+  const page = await waitWithAbort(pdfDocument.getPage(pageIndex + 1), signal, "Thumbnail rendering cancelled");
   throwIfAborted(signal, "Thumbnail rendering cancelled");
   const natural = page.getViewport({ scale: 1 });
   const cssScale = targetWidth / natural.width;

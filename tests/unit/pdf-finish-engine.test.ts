@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, decodePDFRawStream, degrees } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, decodePDFRawStream, degrees, type PDFFont } from "pdf-lib";
 import { PNG } from "pngjs";
 
 import {
@@ -15,7 +15,7 @@ import {
   PdfFinishEngineError,
 } from "../../src/features/pdf-editor/finish/engine.ts";
 import { createPageSelection } from "../../src/features/pdf-editor/finish/selection.ts";
-import { validateWatermarkResult } from "../../src/features/pdf-editor/finish/watermark.ts";
+import { createWatermarkPlacements, inspectWatermarkRisksCooperatively, measureTextWatermarkBox, validateWatermarkResult } from "../../src/features/pdf-editor/finish/watermark.ts";
 import { finishOutputName } from "../../src/features/pdf-editor/outputName.ts";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -190,6 +190,15 @@ test("finish preflight reports positioned text failures and layout/font warnings
   assert.ok((await run(Array.from({ length: 75 }, (_, index) => `line ${index}`).join("\n"))).warnings.includes("vertical-overflow"));
   assert.ok((await run("Русский")).warnings.includes("embedded-font"));
   assert.equal((await run("W", { fontSize: 72, margin: 144 })).errors[0]?.code, "narrow-region");
+  assert.deepEqual((await run(" \n\t ")).errors[0], { code: "empty-text", field: "template", fileKey: "preflight", physicalPage: 1 });
+  await assert.rejects(
+    finishPdfFiles({
+      files: [{ key: "empty-text", file, selection: selection(3, "1") }],
+      options: watermarkOptions({ template: "\n  \n" }),
+      locale: "en-US",
+    }),
+    (error: unknown) => error instanceof PdfFinishEngineError && error.code === "empty-text",
+  );
 
   const smallDocument = await PDFDocument.create({ updateMetadata: false });
   smallDocument.addPage([200, 200]);
@@ -353,8 +362,16 @@ test("watermark warns about risky structures and proceeds only with explicit con
 });
 
 test("watermark risk scanning advances across inline image bytes and balances logical content streams", async () => {
+  const inlinePayload = Buffer.alloc(597, 0x58);
+  Buffer.from(" EI) Q q 0 0 0 0 re W n ", "latin1").copy(inlinePayload, 257);
+  const exactInline = Buffer.concat([
+    Buffer.from("q\nBI /W 597 /H 1 /BPC 8 /CS /G ID\n", "latin1"),
+    inlinePayload,
+    Buffer.from("\nEI\nQ", "latin1"),
+  ]);
   const cases = [
     { name: "inline.pdf", streams: ["q\nBI /W 1 /H 1 /BPC 8 /CS /G ID\n)\nEI\nQ"], risky: false },
+    { name: "inline-597.pdf", streams: [exactInline], risky: false },
     { name: "lexical.pdf", streams: ["q\n% Q ) q\n(escaped \\( q Q \\)) Tj\n<712951> Tj\nQ"], risky: false },
     { name: "split.pdf", streams: ["q", "Q"], risky: false },
     { name: "closing-paren.pdf", streams: ["q\n)\nQ"], risky: true },
@@ -374,6 +391,68 @@ test("watermark risk scanning advances across inline image bytes and balances lo
     assert.equal(preflight.warnings.includes("risky-graphics-state"), testCase.risky, testCase.name);
     if (!testCase.risky) assert.equal((await finishPdfFiles(input)).length, 1);
   }
+});
+
+test("watermark tile visibility uses the rotated object instead of its axis-aligned bounds", () => {
+  const viewport = { width: 200, height: 200, rotation: 0 as const, transform: [1, 0, 0, -1, 0, 200] as const };
+  const outside = createWatermarkPlacements({
+    viewport,
+    width: 100,
+    height: 100,
+    settings: { pattern: "tile", region: "center", rotation: 45, gap: 0, offsetX: 180, offsetY: 180 },
+    margin: 0,
+  });
+  assert.deepEqual(outside, { ok: false, error: "empty-placement" });
+
+  const onePixel = createWatermarkPlacements({
+    viewport,
+    width: 100,
+    height: 100,
+    settings: { pattern: "tile", region: "center", rotation: 0, gap: 0, offsetX: 199, offsetY: 199 },
+    margin: 0,
+  });
+  assert.ok(onePixel.ok && onePixel.placements.length === 1);
+});
+
+test("text watermark BBox adds top glyph room without shrinking or respacing the tile", () => {
+  const font = {
+    heightAtSize: (_size: number, options?: { descender?: boolean }) => options?.descender === false ? 26 : 36,
+  } as PDFFont;
+  assert.deepEqual(measureTextWatermarkBox(font, 36, 43.2, 2), {
+    baselineOffset: 10,
+    height: 79.2,
+    bboxHeight: 80.325,
+  });
+});
+
+test("uncertain inline image scans require consent but do not prove an empty inherited clip", async () => {
+  const document = await PDFDocument.create({ updateMetadata: false });
+  const page = document.addPage([200, 200]);
+  const content = "q\nBI /W 1 /H 1 /BPC 8 /CS /G /F /Unknown ID\n0 0 0 0 re W n\nEI\nQ";
+  page.node.set(PDFName.of("Contents"), document.context.register(document.context.flateStream(content)));
+  const file = new File([await document.save()], "uncertain-inline.pdf", { type: "application/pdf" });
+  const input = {
+    files: [{ key: "uncertain-inline", file, selection: selection(1, "1") }],
+    options: watermarkOptions(),
+    locale: "en-US",
+  };
+  const preflight = await preflightPdfFiles(input);
+  assert.ok(preflight.warnings.includes("risky-graphics-state"));
+  assert.equal((await finishPdfFiles({ ...input, allowRiskyDocuments: true })).length, 1);
+});
+
+test("large stream inspection yields to external cancellation", async () => {
+  const document = await PDFDocument.create({ updateMetadata: false });
+  const page = document.addPage([200, 200]);
+  const content = new Uint8Array(4 * 1024 * 1024);
+  content.fill(0x20);
+  content[0] = 0x71;
+  content[content.length - 1] = 0x51;
+  page.node.set(PDFName.of("Contents"), document.context.register(document.context.stream(content)));
+  const controller = new AbortController();
+  const inspection = inspectWatermarkRisksCooperatively(document, controller.signal);
+  setTimeout(() => controller.abort(), 0);
+  await assert.rejects(inspection, (error: unknown) => error instanceof DOMException && error.name === "AbortError");
 });
 
 test("watermark tile preflight rejects zero placements and canonical numeric boundaries remain aligned", async () => {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { pages, accessibilityExceptions, assertAccessibilityResults } from "../accessibility-audit.mjs";
+import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
@@ -59,4 +59,12 @@ test("a11y incomplete targets and reasons remain visible while only F2-owned nod
   const discarded = report();
   discarded.results[0].incomplete.push({ id: "color-contrast", nodes: [{ target: [], reasons: [], owner: "shared-existing" }] });
   assert.throws(() => assertAccessibilityResults(discarded), /target or reason was discarded/);
+});
+
+test("a11y incomplete selector resolution never defaults missing or invalid targets to shared ownership", () => {
+  assert.equal(accessibilityOwnerFromResolution("f2-watermark", "owned"), "f2-watermark");
+  assert.equal(accessibilityOwnerFromResolution("shared-existing", "shared"), "shared-existing");
+  assert.throws(() => accessibilityOwnerFromResolution("missing", "missing-selector"), /missing-selector/);
+  assert.throws(() => accessibilityOwnerFromResolution("invalid", "invalid-selector"), /invalid-selector/);
+  assert.throws(() => accessibilityOwnerFromResolution(undefined, "no-resolution"), /no-resolution/);
 });

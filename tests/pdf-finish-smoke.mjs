@@ -73,10 +73,11 @@ try {
   await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
-  await testWatermarkWorkflow(browser, fixture, inlineImageFixture);
+  await testWatermarkWorkflow(browser, fixture, inlineImageFixture, smallFixture);
+  await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks();
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, watermark text/image/tile/risk confirmation, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, watermark text/image/tile/risk confirmation, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -630,7 +631,7 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await context.close();
 }
 
-async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixture) {
+async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixture, smallFixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
   await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
   const page = await context.newPage();
@@ -639,6 +640,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   const pdfInput = page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']");
   await pdfInput.setInputFiles({ name: "watermark-browser.pdf", mimeType: "application/pdf", buffer: fixture });
   await page.locator("[data-testid='pdf-finish-overlay']").waitFor();
+  await assertF2Owned(page, "[data-testid='pdf-finish-template'], [data-testid='pdf-finish-font-size'], [data-testid='pdf-finish-color'], [data-finish-region='center'], [data-testid='pdf-finish-preview-disclaimer']", "text state");
   await page.locator("[data-testid='pdf-watermark-pattern']").selectOption("tile");
   await page.locator("[data-testid='pdf-watermark-layer']").selectOption("background");
   await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-overlay']")?.getAttribute("data-watermark-pattern") === "tile");
@@ -657,6 +659,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   await page.locator("[data-testid='pdf-watermark-offset-x']").fill("2000");
   const emptyPlacement = page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='empty-placement']");
   await emptyPlacement.waitFor();
+  await assertF2Owned(page, "[data-testid='pdf-finish-preflight-error'][data-error-code='empty-placement']", "error state");
   assert.match(await emptyPlacement.innerText(), /No watermark would appear/iu);
   const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
   assert.equal(await action.isDisabled(), true, "zero watermark placements must block result creation");
@@ -670,6 +673,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   await page.locator("[data-testid='pdf-watermark-content-image']").click();
   await page.locator("[data-testid='pdf-watermark-image']").setInputFiles({ name: "mark.png", mimeType: "image/png", buffer: PNG.sync.write(png) });
   await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+  await assertF2Owned(page, "[data-testid='pdf-watermark-image']", "image state");
   const image = page.locator("[data-testid='pdf-finish-overlay'] img").first();
   await image.waitFor();
   const ratio = await image.evaluate((node) => node.naturalWidth / node.naturalHeight);
@@ -678,6 +682,24 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   await action.click();
   await page.locator("[data-testid='pdf-download']").waitFor();
   assert.equal(await page.locator("[data-route-error]").count(), 0);
+
+  const boundaryPng = new PNG({ width: 100, height: 50 });
+  for (let index = 0; index < boundaryPng.data.length; index += 4) {
+    boundaryPng.data[index] = 220; boundaryPng.data[index + 1] = 20; boundaryPng.data[index + 2] = 40; boundaryPng.data[index + 3] = 255;
+  }
+  await pdfInput.setInputFiles({ name: "rotated-boundary.pdf", mimeType: "application/pdf", buffer: smallFixture });
+  await page.locator("[data-testid='pdf-watermark-image']").setInputFiles({ name: "boundary.png", mimeType: "image/png", buffer: PNG.sync.write(boundaryPng) });
+  await page.locator("[data-testid='pdf-watermark-size']").fill("60");
+  await page.locator("[data-testid='pdf-watermark-rotation']").fill("45");
+  await page.locator("[data-testid='pdf-watermark-offset-x']").fill("180");
+  await page.locator("[data-testid='pdf-watermark-offset-y']").fill("180");
+  await page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='empty-placement']").waitFor();
+  assert.equal(await action.isDisabled(), true, "a rotated tile wholly outside the page must be rejected");
+  await page.locator("[data-testid='pdf-watermark-rotation']").fill("0");
+  await page.locator("[data-testid='pdf-watermark-offset-x']").fill("199");
+  await page.locator("[data-testid='pdf-watermark-offset-y']").fill("199");
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready" && !document.querySelector("[data-testid='pdf-finish-preflight-error']"));
+  assert.equal(await page.locator("[data-testid='pdf-finish-overlay']").getAttribute("data-placement-count"), "1", "a one-pixel tile intersection must remain accepted");
 
   await page.locator("[data-testid='pdf-watermark-content-text']").click();
   await pdfInput.setInputFiles({ name: "valid-inline-image.pdf", mimeType: "application/pdf", buffer: inlineImageFixture });
@@ -704,10 +726,37 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
 
   await pdfInput.setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/risk/graphics-state-imbalance.pdf"));
   await page.locator("[data-testid='pdf-watermark-risk-confirmation']").waitFor();
+  await assertF2Owned(page, "[data-testid='pdf-watermark-risk-confirmation']", "risk state");
   assert.equal(await action.isDisabled(), true, "a risky document must wait for explicit consent");
   await page.locator("[data-testid='pdf-watermark-risk-confirmation'] button[role='switch']").click();
   assert.equal(await action.isEnabled(), true, "risk consent must allow the warned operation");
   await context.close();
+}
+
+async function testWhitespaceWatermark(browserInstance, fixture) {
+  for (const language of ["ko", "en"]) {
+    const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/watermark/`, { waitUntil: "networkidle" });
+    await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']").setInputFiles({ name: `whitespace-${language}.pdf`, mimeType: "application/pdf", buffer: fixture });
+    await page.locator("[data-testid='pdf-finish-template']").fill(" \n\n ");
+    const error = page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='empty-text']");
+    await error.waitFor();
+    assert.match(await error.innerText(), language === "ko" ? /공백|줄바꿈/u : /visible content|Spaces|line breaks/iu);
+    assert.equal(await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").isDisabled(), true);
+    await assertF2Owned(page, "[data-testid='pdf-finish-preflight-error'][data-error-code='empty-text']", `${language} whitespace error state`);
+    await context.close();
+  }
+}
+
+async function assertF2Owned(page, selector, label) {
+  const ownership = await page.locator(selector).evaluateAll((nodes) => ({
+    count: nodes.length,
+    unowned: nodes.filter((node) => !node.closest("[data-pdf-watermark-owned]")).map((node) => node.outerHTML.slice(0, 160)),
+  }));
+  assert.ok(ownership.count > 0, `${label} did not expose an actual DOM target`);
+  assert.deepEqual(ownership.unowned, [], `${label} escaped F2 ownership`);
 }
 
 async function testBoundaryCropRendering(browserInstance, fixture) {
@@ -798,7 +847,10 @@ async function createSmallFixture() {
 async function createInlineImageFixture() {
   const document = await PDFDocument.create({ updateMetadata: false });
   const page = document.addPage([200, 200]);
-  page.node.set(PDFName.of("Contents"), document.context.register(document.context.flateStream("q\n80 0 0 80 60 60 cm\nBI /W 1 /H 1 /BPC 8 /CS /G ID\n)\nEI\nQ")));
+  const payload = Buffer.alloc(597, 0x58);
+  Buffer.from(" EI) Q q 0 0 0 0 re W n ", "latin1").copy(payload, 257);
+  const content = Buffer.concat([Buffer.from("q\n80 0 0 80 60 60 cm\nBI /W 597 /H 1 /BPC 8 /CS /G ID\n", "latin1"), payload, Buffer.from("\nEI\nQ", "latin1")]);
+  page.node.set(PDFName.of("Contents"), document.context.register(document.context.flateStream(content)));
   return Buffer.from(await document.save());
 }
 

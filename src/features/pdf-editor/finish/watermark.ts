@@ -60,145 +60,331 @@ function dictionaryHas(dictionary: PDFDict, name: string) {
   return dictionary.has(PDFName.of(name));
 }
 
-function decodedStreamText(stream: PDFRawStream) {
-  const bytes = decodePDFRawStream(stream).decode();
-  let text = "";
-  const chunk = 0x8000;
-  for (let index = 0; index < bytes.length; index += chunk) {
-    text += String.fromCharCode(...bytes.subarray(index, index + chunk));
-  }
-  return text;
-}
-
 interface ContentScan {
   tokens: string[];
   uncertain: boolean;
 }
 
-function isWhitespace(character: string | undefined) {
-  return character === undefined || /[\x00\t\n\f\r ]/u.test(character);
+type ContentScanEvent = { type: "token"; value: string } | { type: "uncertain" } | { type: "checkpoint" };
+
+const CONTENT_SCAN_CHECKPOINT_BYTES = 64 * 1024;
+const MAXIMUM_TOKEN_BYTES = 256;
+
+function isWhitespaceByte(value: number | undefined) {
+  return value === undefined || value === 0 || value === 9 || value === 10 || value === 12 || value === 13 || value === 32;
 }
 
-function isDelimiter(character: string | undefined) {
-  return character === undefined || "()<>[]{}/%".includes(character);
+function isDelimiterByte(value: number | undefined) {
+  return value === undefined || value === 0x28 || value === 0x29 || value === 0x3c || value === 0x3e
+    || value === 0x5b || value === 0x5d || value === 0x7b || value === 0x7d || value === 0x2f || value === 0x25;
 }
 
-function scanContent(source: string): ContentScan {
-  const tokens: string[] = [];
-  let uncertain = false;
+function tokenFromBytes(source: Uint8Array, start: number, end: number) {
+  if (end - start > MAXIMUM_TOKEN_BYTES) return undefined;
+  let value = "";
+  for (let index = start; index < end; index += 1) value += String.fromCharCode(source[index]);
+  return value;
+}
+
+function inlineDictionaryValue(tokens: readonly string[], keys: readonly string[]) {
+  for (let index = tokens.length - 2; index >= 0; index -= 1) {
+    if (keys.includes(tokens[index])) return tokens[index + 1];
+  }
+  return undefined;
+}
+
+function inlineImagePayloadLength(tokens: readonly string[]) {
+  if (inlineDictionaryValue(tokens, ["/F", "/Filter"]) !== undefined) return undefined;
+  const width = Number(inlineDictionaryValue(tokens, ["/W", "/Width"]));
+  const height = Number(inlineDictionaryValue(tokens, ["/H", "/Height"]));
+  const imageMask = inlineDictionaryValue(tokens, ["/IM", "/ImageMask"]) === "true";
+  const bits = imageMask ? 1 : Number(inlineDictionaryValue(tokens, ["/BPC", "/BitsPerComponent"]));
+  const colorSpace = inlineDictionaryValue(tokens, ["/CS", "/ColorSpace"]);
+  const components = imageMask || colorSpace === "/G" || colorSpace === "/DeviceGray" || colorSpace === "/I" || colorSpace === "/Indexed"
+    ? 1
+    : colorSpace === "/RGB" || colorSpace === "/DeviceRGB"
+      ? 3
+      : colorSpace === "/CMYK" || colorSpace === "/DeviceCMYK"
+        ? 4
+        : undefined;
+  if (!Number.isSafeInteger(width) || width <= 0 || !Number.isSafeInteger(height) || height <= 0
+      || !Number.isSafeInteger(bits) || bits <= 0 || bits > 16 || components === undefined) return undefined;
+  const rowBytes = Math.ceil(width * components * bits / 8);
+  const length = rowBytes * height;
+  return Number.isSafeInteger(length) ? length : undefined;
+}
+
+function inlineTerminatorEnd(source: Uint8Array, payloadEnd: number) {
+  let index = payloadEnd;
+  while (index < source.length && isWhitespaceByte(source[index])) index += 1;
+  if (source[index] !== 0x45 || source[index + 1] !== 0x49 || !isWhitespaceByte(source[index + 2]) && !isDelimiterByte(source[index + 2])) return -1;
+  return index + 2;
+}
+
+function* scanContentEvents(source: Uint8Array): Generator<ContentScanEvent> {
+  let nextCheckpoint = CONTENT_SCAN_CHECKPOINT_BYTES;
+  const checkpoint = function* (index: number): Generator<ContentScanEvent> {
+    if (index >= nextCheckpoint) {
+      nextCheckpoint = index + CONTENT_SCAN_CHECKPOINT_BYTES;
+      yield { type: "checkpoint" };
+    }
+  };
   let index = 0;
   let inlineDictionary = false;
+  let inlineTokens: string[] = [];
   while (index < source.length) {
     const character = source[index];
     const iterationStart = index;
-    if (isWhitespace(character)) {
+    yield* checkpoint(index);
+    if (isWhitespaceByte(character)) {
       index += 1;
       continue;
     }
-    if (character === "%") {
-      while (index < source.length && !/[\r\n]/u.test(source[index])) index += 1;
+    if (character === 0x25) {
+      while (index < source.length && source[index] !== 0x0d && source[index] !== 0x0a) {
+        index += 1;
+        yield* checkpoint(index);
+      }
       continue;
     }
-    if (character === "(") {
+    if (character === 0x28) {
       index += 1;
       let nesting = 1;
       while (index < source.length && nesting > 0) {
-        if (source[index] === "\\") index += 2;
+        if (source[index] === 0x5c) index += 2;
         else {
-          if (source[index] === "(") nesting += 1;
-          if (source[index] === ")") nesting -= 1;
+          if (source[index] === 0x28) nesting += 1;
+          if (source[index] === 0x29) nesting -= 1;
           index += 1;
         }
+        yield* checkpoint(index);
       }
-      if (nesting > 0) uncertain = true;
+      if (nesting > 0) yield { type: "uncertain" };
       continue;
     }
-    if (character === "<" && source[index + 1] !== "<") {
+    if (character === 0x3c && source[index + 1] !== 0x3c) {
       index += 1;
-      while (index < source.length && source[index] !== ">") index += 1;
+      while (index < source.length && source[index] !== 0x3e) {
+        index += 1;
+        yield* checkpoint(index);
+      }
       if (index < source.length) index += 1;
-      else uncertain = true;
+      else yield { type: "uncertain" };
       continue;
     }
-    if ((character === "<" && source[index + 1] === "<") || (character === ">" && source[index + 1] === ">")) {
-      tokens.push(source.slice(index, index + 2));
+    if (character === 0x3c && source[index + 1] === 0x3c || character === 0x3e && source[index + 1] === 0x3e) {
+      const token = character === 0x3c ? "<<" : ">>";
+      yield { type: "token", value: token };
+      if (inlineDictionary) inlineTokens.push(token);
       index += 2;
       continue;
     }
-    if (character === "/") {
+    if (character === 0x2f) {
       const start = index;
       index += 1;
-      while (index < source.length && !isWhitespace(source[index]) && !isDelimiter(source[index])) index += 1;
-      tokens.push(source.slice(start, index));
+      while (index < source.length && !isWhitespaceByte(source[index]) && !isDelimiterByte(source[index])) {
+        index += 1;
+        yield* checkpoint(index);
+      }
+      const token = tokenFromBytes(source, start, index);
+      if (token === undefined) yield { type: "uncertain" };
+      else {
+        yield { type: "token", value: token };
+        if (inlineDictionary) inlineTokens.push(token);
+      }
       continue;
     }
-    if ("[]{}".includes(character)) {
-      tokens.push(character);
+    if (character === 0x5b || character === 0x5d || character === 0x7b || character === 0x7d) {
+      const token = String.fromCharCode(character);
+      yield { type: "token", value: token };
+      if (inlineDictionary) inlineTokens.push(token);
       index += 1;
       continue;
     }
-    if (character === ")" || character === ">") {
-      uncertain = true;
+    if (character === 0x29 || character === 0x3e) {
+      yield { type: "uncertain" };
       index += 1;
       continue;
     }
     const start = index;
-    while (index < source.length && !isWhitespace(source[index]) && !isDelimiter(source[index])) index += 1;
+    while (index < source.length && !isWhitespaceByte(source[index]) && !isDelimiterByte(source[index])) {
+      index += 1;
+      yield* checkpoint(index);
+    }
     if (index === start) {
-      uncertain = true;
+      yield { type: "uncertain" };
       index += 1;
       continue;
     }
-    const token = source.slice(start, index);
-    tokens.push(token);
-    if (!inlineDictionary && token === "BI") inlineDictionary = true;
+    const token = tokenFromBytes(source, start, index);
+    if (token === undefined) {
+      yield { type: "uncertain" };
+      continue;
+    }
+    yield { type: "token", value: token };
+    if (inlineDictionary) inlineTokens.push(token);
+    if (!inlineDictionary && token === "BI") {
+      inlineDictionary = true;
+      inlineTokens = [];
+    }
     else if (inlineDictionary && token === "ID") {
-      if (!isWhitespace(source[index])) {
-        uncertain = true;
+      if (!isWhitespaceByte(source[index])) {
+        yield { type: "uncertain" };
         inlineDictionary = false;
         continue;
       }
-      if (source[index] === "\r" && source[index + 1] === "\n") index += 2;
+      if (source[index] === 0x0d && source[index + 1] === 0x0a) index += 2;
       else index += 1;
+      const payloadLength = inlineImagePayloadLength(inlineTokens);
       let end = -1;
-      for (let cursor = index; cursor + 1 < source.length; cursor += 1) {
-        if (source[cursor] === "E" && source[cursor + 1] === "I"
-            && isWhitespace(source[cursor - 1])
-            && (isWhitespace(source[cursor + 2]) || isDelimiter(source[cursor + 2]))) {
-          end = cursor;
-          break;
+      if (payloadLength !== undefined && index + payloadLength <= source.length) {
+        end = inlineTerminatorEnd(source, index + payloadLength);
+      }
+      if (end < 0) {
+        yield { type: "uncertain" };
+        for (let cursor = index; cursor + 1 < source.length; cursor += 1) {
+          yield* checkpoint(cursor);
+          if (source[cursor] === 0x45 && source[cursor + 1] === 0x49
+              && isWhitespaceByte(source[cursor - 1])
+              && (isWhitespaceByte(source[cursor + 2]) || isDelimiterByte(source[cursor + 2]))) {
+            end = cursor + 2;
+            break;
+          }
         }
       }
       if (end < 0) {
-        uncertain = true;
         index = source.length;
       } else {
-        index = end + 2;
-        tokens.push("EI");
+        index = end;
+        yield { type: "token", value: "EI" };
       }
       inlineDictionary = false;
+      inlineTokens = [];
     }
     if (index <= iterationStart) {
-      uncertain = true;
+      yield { type: "uncertain" };
       index = iterationStart + 1;
     }
   }
-  if (inlineDictionary) uncertain = true;
+  if (inlineDictionary) yield { type: "uncertain" };
+}
+
+function collectContentScan(events: Iterable<ContentScanEvent>): ContentScan {
+  const tokens: string[] = [];
+  let uncertain = false;
+  for (const event of events) {
+    if (event.type === "token") tokens.push(event.value);
+    if (event.type === "uncertain") uncertain = true;
+  }
   return { tokens, uncertain };
 }
 
-function graphicsStateLooksUnbalanced(source: string) {
-  const scan = scanContent(source);
-  if (scan.uncertain) return true;
-  let depth = 0;
-  for (const token of scan.tokens) {
-    if (token === "q") depth += 1;
-    if (token === "Q") {
-      if (depth === 0) return true;
-      depth -= 1;
+function scanContent(source: Uint8Array): ContentScan {
+  return collectContentScan(scanContentEvents(source));
+}
+
+async function scanContentCooperatively(source: Uint8Array, signal?: AbortSignal): Promise<ContentScan> {
+  const tokens: string[] = [];
+  let uncertain = false;
+  for (const event of scanContentEvents(source)) {
+    if (event.type === "checkpoint") {
+      throwIfAborted(signal);
+      await yieldToEventLoop();
+      throwIfAborted(signal);
+    } else if (event.type === "token") tokens.push(event.value);
+    else uncertain = true;
+  }
+  return { tokens, uncertain };
+}
+
+function rawStreamFilterName(stream: PDFRawStream) {
+  const filter = stream.dict.lookup(PDFName.of("Filter"));
+  return filter instanceof PDFName ? filter.asString() : undefined;
+}
+
+async function inflateStreamCooperatively(stream: PDFRawStream, signal?: AbortSignal) {
+  throwIfAborted(signal);
+  const reader = new Blob([stream.contents.slice().buffer]).stream()
+    .pipeThrough(new DecompressionStream("deflate"))
+    .getReader();
+  const abort = () => { void reader.cancel(); };
+  signal?.addEventListener("abort", abort, { once: true });
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  let nextYield = 1024 * 1024;
+  try {
+    while (true) {
+      throwIfAborted(signal);
+      const { done, value } = await reader.read();
+      throwIfAborted(signal);
+      if (done) break;
+      chunks.push(value);
+      length += value.length;
+      if (length >= nextYield) {
+        nextYield = length + 1024 * 1024;
+        await yieldToEventLoop();
+      }
+    }
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    reader.releaseLock();
+  }
+  const result = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+    if (offset % (1024 * 1024) < chunk.length) {
+      throwIfAborted(signal);
+      await yieldToEventLoop();
     }
   }
-  return depth !== 0;
+  throwIfAborted(signal);
+  return result;
+}
+
+async function decodedStreamBytesCooperatively(stream: PDFRawStream, signal?: AbortSignal) {
+  if ((rawStreamFilterName(stream) === "/FlateDecode" || rawStreamFilterName(stream) === "/Fl")
+      && !stream.dict.get(PDFName.of("DecodeParms")) && typeof DecompressionStream !== "undefined") {
+    return inflateStreamCooperatively(stream, signal);
+  }
+  throwIfAborted(signal);
+  await yieldToEventLoop();
+  throwIfAborted(signal);
+  const decoded = decodePDFRawStream(stream).decode();
+  throwIfAborted(signal);
+  await yieldToEventLoop();
+  throwIfAborted(signal);
+  return decoded;
+}
+
+function graphicsStateTokensLookUnbalanced(scans: readonly ContentScan[]) {
+  let uncertain = false;
+  let depth = 0;
+  for (const scan of scans) {
+    uncertain ||= scan.uncertain;
+    for (const token of scan.tokens) {
+      if (token === "q") depth += 1;
+      if (token === "Q") {
+        if (depth === 0) return true;
+        depth -= 1;
+      }
+    }
+  }
+  return uncertain || depth !== 0;
+}
+
+function graphicsStateLooksUnbalanced(streams: readonly PDFRawStream[]) {
+  return graphicsStateTokensLookUnbalanced(streams.map((stream) => scanContent(decodePDFRawStream(stream).decode())));
+}
+
+async function graphicsStateLooksUnbalancedCooperatively(streams: readonly PDFRawStream[], signal?: AbortSignal) {
+  const scans: ContentScan[] = [];
+  for (const stream of streams) {
+    throwIfAborted(signal);
+    scans.push(await scanContentCooperatively(await decodedStreamBytesCooperatively(stream, signal), signal));
+  }
+  return graphicsStateTokensLookUnbalanced(scans);
 }
 
 function pageContentStreams(page: PDFPage): PDFRawStream[] {
@@ -219,14 +405,32 @@ export function inspectWatermarkRisks(document: PDFDocument): WatermarkRiskCode[
   if (dictionaryHas(document.catalog, "StructTreeRoot") || dictionaryHas(document.catalog, "MarkInfo")) risks.add("risky-tagged-document");
   for (const page of document.getPages()) {
     try {
-      const logicalContent = pageContentStreams(page).map(decodedStreamText).join("\n");
-      if (graphicsStateLooksUnbalanced(logicalContent)) {
+      if (graphicsStateLooksUnbalanced(pageContentStreams(page))) {
         risks.add("risky-graphics-state");
       }
     } catch {
       risks.add("risky-graphics-state");
     }
   }
+  return [...risks];
+}
+
+export async function inspectWatermarkRisksCooperatively(document: PDFDocument, signal?: AbortSignal): Promise<WatermarkRiskCode[]> {
+  const risks = new Set<WatermarkRiskCode>();
+  if (dictionaryHas(document.catalog, "OCProperties")) risks.add("risky-optional-content");
+  if (dictionaryHas(document.catalog, "StructTreeRoot") || dictionaryHas(document.catalog, "MarkInfo")) risks.add("risky-tagged-document");
+  for (const page of document.getPages()) {
+    throwIfAborted(signal);
+    try {
+      if (await graphicsStateLooksUnbalancedCooperatively(pageContentStreams(page), signal)) risks.add("risky-graphics-state");
+    } catch (error) {
+      throwIfAborted(signal);
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      risks.add("risky-graphics-state");
+    }
+    await yieldToEventLoop();
+  }
+  throwIfAborted(signal);
   return [...risks];
 }
 
@@ -247,6 +451,63 @@ function rotatedBounds(width: number, height: number, rotation: number) {
     width: Math.abs(width * Math.cos(radians)) + Math.abs(height * Math.sin(radians)),
     height: Math.abs(width * Math.sin(radians)) + Math.abs(height * Math.cos(radians)),
   };
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+function clipPolygon(points: readonly Point[], inside: (point: Point) => boolean, intersection: (start: Point, end: Point) => Point) {
+  const clipped: Point[] = [];
+  for (let index = 0; index < points.length; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    const startInside = inside(start);
+    const endInside = inside(end);
+    if (startInside && endInside) clipped.push(end);
+    else if (startInside) clipped.push(intersection(start, end));
+    else if (endInside) clipped.push(intersection(start, end), end);
+  }
+  return clipped;
+}
+
+function placementIntersectionArea(placement: WatermarkPlacement, viewport: PdfViewportGeometry) {
+  const radians = placement.rotation * Math.PI / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  let polygon: Point[] = [
+    { x: -placement.width / 2, y: -placement.height / 2 },
+    { x: placement.width / 2, y: -placement.height / 2 },
+    { x: placement.width / 2, y: placement.height / 2 },
+    { x: -placement.width / 2, y: placement.height / 2 },
+  ].map(({ x, y }) => ({
+    x: placement.centerX + x * cosine - y * sine,
+    y: placement.centerY + x * sine + y * cosine,
+  }));
+  const verticalIntersection = (x: number) => (start: Point, end: Point) => {
+    const ratio = (x - start.x) / (end.x - start.x);
+    return { x, y: start.y + (end.y - start.y) * ratio };
+  };
+  const horizontalIntersection = (y: number) => (start: Point, end: Point) => {
+    const ratio = (y - start.y) / (end.y - start.y);
+    return { x: start.x + (end.x - start.x) * ratio, y };
+  };
+  polygon = clipPolygon(polygon, ({ x }) => x >= 0, verticalIntersection(0));
+  if (!polygon.length) return 0;
+  polygon = clipPolygon(polygon, ({ x }) => x <= viewport.width, verticalIntersection(viewport.width));
+  if (!polygon.length) return 0;
+  polygon = clipPolygon(polygon, ({ y }) => y >= 0, horizontalIntersection(0));
+  if (!polygon.length) return 0;
+  polygon = clipPolygon(polygon, ({ y }) => y <= viewport.height, horizontalIntersection(viewport.height));
+  if (polygon.length < 3) return 0;
+  let doubledArea = 0;
+  for (let index = 0; index < polygon.length; index += 1) {
+    const point = polygon[index];
+    const next = polygon[(index + 1) % polygon.length];
+    doubledArea += point.x * next.y - next.x * point.y;
+  }
+  return Math.abs(doubledArea) / 2;
 }
 
 function singlePlacement(
@@ -294,16 +555,14 @@ export function createWatermarkPlacements(input: {
     if (tiled.error === "tile-limit" || tiled.error === "empty-placement") return { ok: false, error: tiled.error };
     return { ok: false, error: "invalid-layout" };
   }
-  return {
-    ok: true,
-    placements: tiled.placements.map((placement) => ({
+  const placements = tiled.placements.map((placement) => ({
       centerX: placement.x + bounds.width / 2,
       centerY: placement.y + bounds.height / 2,
       width,
       height,
       rotation: placement.rotation,
-    })),
-  };
+    })).filter((placement) => placementIntersectionArea(placement, viewport) > Number.EPSILON * 16);
+  return placements.length > 0 ? { ok: true, placements } : { ok: false, error: "empty-placement" };
 }
 
 function inverseViewportTransform(transform: PdfViewportGeometry["transform"]) {
@@ -389,7 +648,9 @@ export function measureTextWatermarkBox(font: PDFFont, size: number, lineHeight:
   const ascenderHeight = font.heightAtSize(size, { descender: false });
   const baselineOffset = Math.max(0, fullHeight - ascenderHeight);
   const glyphBlockHeight = Math.max(0, lineCount - 1) * lineHeight + fullHeight;
-  return { baselineOffset, height: Math.max(lineHeight, glyphBlockHeight) };
+  const height = Math.max(lineHeight, glyphBlockHeight);
+  const topEdgePadding = Math.max(1, size / 32);
+  return { baselineOffset, height, bboxHeight: height + topEdgePadding };
 }
 
 export async function addWatermarkXObject(page: PDFPage, reference: PDFRef, objectWidth: number, objectHeight: number, viewport: PdfViewportGeometry, placements: readonly WatermarkPlacement[], opacity: number, layer: WatermarkLayer, signal?: AbortSignal) {
@@ -409,8 +670,7 @@ export async function embedWatermarkImage(document: PDFDocument, file: File, sig
   throw new Error("unsupported-image-format");
 }
 
-function streamDrawnXObjects(page: PDFPage, stream: PDFRawStream) {
-  const tokens = scanContent(decodedStreamText(stream)).tokens;
+function streamDrawnXObjects(page: PDFPage, tokens: readonly string[]) {
   const names: string[] = [];
   for (let index = 1; index < tokens.length; index += 1) {
     if (tokens[index] === "Do" && tokens[index - 1].startsWith("/")) names.push(tokens[index - 1].slice(1));
@@ -426,8 +686,13 @@ function streamDrawnXObjects(page: PDFPage, stream: PDFRawStream) {
   }
 }
 
-function contentLeavesEmptyClip(streams: readonly PDFRawStream[]) {
-  const { tokens } = scanContent(streams.map(decodedStreamText).join("\n"));
+async function contentLeavesDefinitelyEmptyClip(streams: readonly PDFRawStream[], signal?: AbortSignal) {
+  const tokens: string[] = [];
+  for (const stream of streams) {
+    const scan = await scanContentCooperatively(await decodedStreamBytesCooperatively(stream, signal), signal);
+    if (scan.uncertain) return false;
+    for (const token of scan.tokens) tokens.push(token);
+  }
   const clipStack: boolean[] = [];
   let clipEmpty = false;
   let pathSeen = false;
@@ -468,16 +733,31 @@ function contentLeavesEmptyClip(streams: readonly PDFRawStream[]) {
   return clipEmpty;
 }
 
-export async function validateWatermarkResult(bytes: Uint8Array, pageCount: number, selectedPages: readonly number[], layer: WatermarkLayer) {
+function latin1Text(source: Uint8Array) {
+  let result = "";
+  for (let index = 0; index < source.length; index += 0x8000) {
+    result += String.fromCharCode(...source.subarray(index, index + 0x8000));
+  }
+  return result;
+}
+
+export async function validateWatermarkResult(bytes: Uint8Array, pageCount: number, selectedPages: readonly number[], layer: WatermarkLayer, signal?: AbortSignal) {
+  throwIfAborted(signal);
   const document = await PDFDocument.load(bytes, { updateMetadata: false });
+  throwIfAborted(signal);
   if (document.getPageCount() !== pageCount) throw new Error("page-count-changed");
   for (const physicalPage of selectedPages) {
+    throwIfAborted(signal);
     const streams = pageContentStreams(document.getPage(physicalPage - 1));
     if (streams.length === 0) throw new Error("watermark-stream-missing");
     const stream = streams[layer === "background" ? 0 : streams.length - 1];
-    const content = decodedStreamText(stream).trim();
+    const decoded = await decodedStreamBytesCooperatively(stream, signal);
+    const scan = await scanContentCooperatively(decoded, signal);
+    const content = latin1Text(decoded).trim();
     if (!content.startsWith("q\n/Artifact BMC") || !content.endsWith("EMC\nQ")) throw new Error("watermark-stream-invalid");
-    streamDrawnXObjects(document.getPage(physicalPage - 1), stream);
-    if (layer === "foreground" && contentLeavesEmptyClip(streams.slice(0, -1))) throw new Error("watermark-clipped");
+    streamDrawnXObjects(document.getPage(physicalPage - 1), scan.tokens);
+    if (layer === "foreground" && await contentLeavesDefinitelyEmptyClip(streams.slice(0, -1), signal)) throw new Error("watermark-clipped");
+    await yieldToEventLoop();
   }
+  throwIfAborted(signal);
 }

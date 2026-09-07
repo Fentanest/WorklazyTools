@@ -42,6 +42,14 @@ export const accessibilityExceptions = Object.freeze([
 
 export const f2OwnedSelector = "[data-pdf-watermark-owned]";
 
+export function accessibilityOwnerFromResolution(resolution, context = "unknown") {
+  if (resolution === "f2-watermark" || resolution === "shared-existing") return resolution;
+  if (resolution === "missing" || resolution === "invalid") {
+    throw new Error(`Accessibility incomplete target is ${resolution}: ${context}.`);
+  }
+  throw new Error(`Accessibility incomplete target resolution is unknown: ${context}.`);
+}
+
 export function summarizeAccessibility(results, registeredPages = pages) {
   const ids = results.map(({ id }) => id);
   if (new Set(ids).size !== ids.length || ids.length !== registeredPages.length
@@ -146,16 +154,25 @@ export async function runAccessibilityAudit() {
         const nodes = [];
         for (const node of rule.nodes) {
           const firstTarget = node.target.flat(Infinity).find((value) => typeof value === "string");
-          const owned = typeof firstTarget === "string" && await page.evaluate(({ target, selector }) => {
-            try { return Boolean(document.querySelector(target)?.closest(selector)); }
-            catch { return false; }
+          if (typeof firstTarget !== "string" || !firstTarget.trim()) {
+            throw new Error(`Accessibility incomplete target is missing: ${target.id}/${rule.id}.`);
+          }
+          const ownership = await page.evaluate(({ target, selector }) => {
+            try {
+              const element = document.querySelector(target);
+              if (!element) return "missing";
+              return element.closest(selector) ? "f2-watermark" : "shared-existing";
+            } catch {
+              return "invalid";
+            }
           }, { target: firstTarget, selector: f2OwnedSelector });
+          const owner = accessibilityOwnerFromResolution(ownership, `${target.id}/${rule.id}/${firstTarget}`);
           const reasons = [...node.any, ...node.all, ...node.none].map(({ message }) => message).filter(Boolean);
           nodes.push({
             target: node.target,
             failureSummary: node.failureSummary,
             reasons: reasons.length ? reasons : [node.failureSummary || rule.help || rule.id],
-            owner: owned ? "f2-watermark" : "shared-existing",
+            owner,
           });
         }
         incomplete.push({ id: rule.id, impact: rule.impact, help: rule.help, helpUrl: rule.helpUrl, nodes });

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "package": "pdfjs-dist",
+  "version": "6.2.108",
+  "description": "RGB source offsets",
+  "reason": "Preserve the source offset when PDF.js converts later RGB image chunks to RGBA.",
+  "files": [
+    {
+      "path": "build/pdf.mjs",
+      "originalSha256": "487bde1bcf89e041f791173d0509a1dc18d0feb6655d78395e1611f9da0de17d",
+      "patchedSha256": "e0fac5c8abfe978d550ea1efc23bcd384bb4c9e1e5c91e13084cbb6d0ca69812",
+      "occurrences": 2
+    },
+    {
+      "path": "legacy/build/pdf.mjs",
+      "originalSha256": "842284e0d1d439e60701e3355c2128cd3016ebebf14220e27f512467682aad66",
+      "patchedSha256": "36644d07144713ca05f8749012cf174afc7c94a50b08efd6966442741d830004",
+      "occurrences": 2
+    },
+    {
+      "path": "build/pdf.min.mjs",
+      "originalSha256": "e0be3863c23c8af2305b16548febd58e7f8874a460253317d7771cddbc1c0f6d",
+      "patchedSha256": "a678944e8b233ef4ebe832ad08ff3ede55e8a7fee8c3e03a4f622a8caa5c6c5c",
+      "occurrences": 2,
+      "replacement": {
+        "from": "for(let s=4*r,a=e+o;s<a;s+=3)",
+        "to": "for(let s=e+4*r,a=e+o;s<a;s+=3)"
+      }
+    },
+    {
+      "path": "legacy/build/pdf.min.mjs",
+      "originalSha256": "9fab0c910bf1484835c5c2aeb68f7eb3dfce7f9eb435a004526c5af86d70890c",
+      "patchedSha256": "377bcc2a9ca97fb68fcd6137955be0c8538573c02a708933121281c2f5f68da3",
+      "occurrences": 2,
+      "replacement": {
+        "from": "for(let s=4*a,r=e+o;s<r;s+=3)",
+        "to": "for(let s=e+4*a,r=e+o;s<r;s+=3)"
+      }
+    }
+  ],
+  "replacement": {
+    "from": "for (let j = i * 4, jj = srcPos + len; j < jj; j += 3) {",
+    "to": "for (let j = srcPos + i * 4, jj = srcPos + len; j < jj; j += 3) {"
+  }
+}
