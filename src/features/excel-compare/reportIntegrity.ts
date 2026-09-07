@@ -1,5 +1,7 @@
 import JSZip from "jszip";
 
+import { countWorksheetDataRows, createSharedStringValueLookup } from "../../utils/xlsxReportDataRows.mjs";
+
 export const REPORT_INTEGRITY_ERROR_CODE = "REPORT_INTEGRITY_FAILED";
 
 const WORKSHEET_PATH = /^xl\/worksheets\/sheet\d+\.xml$/u;
@@ -13,6 +15,8 @@ export async function assertGeneratedXlsxReport(buffer: ArrayBuffer) {
     const archive = await JSZip.loadAsync(buffer);
     const worksheets = Object.values(archive.files).filter((entry) => !entry.dir && WORKSHEET_PATH.test(entry.name));
     if (!worksheets.length) throw new Error("MISSING_WORKSHEET");
+    const sharedStringsXml = await archive.file("xl/sharedStrings.xml")?.async("string");
+    const sharedStringHasValue = sharedStringsXml ? createSharedStringValueLookup(sharedStringsXml) : undefined;
     let hasDataRow = false;
     for (const worksheet of worksheets) {
       const xml = await worksheet.async("string");
@@ -23,12 +27,7 @@ export async function assertGeneratedXlsxReport(buffer: ArrayBuffer) {
         const width = rawWidth === undefined ? Number.NaN : Number(rawWidth);
         if (!Number.isFinite(width) || width <= 0) throw new Error("INVALID_COLUMN_WIDTH");
       }
-      let ordinal = 0;
-      for (const match of xml.matchAll(/<row\b[^>]*>/gu)) {
-        ordinal += 1;
-        const rowNumber = Number(xmlAttribute(match[0], "r") ?? ordinal);
-        if (Number.isFinite(rowNumber) && rowNumber > 1) hasDataRow = true;
-      }
+      if (!hasDataRow && countWorksheetDataRows(xml, sharedStringHasValue, 1) > 0) hasDataRow = true;
     }
     if (!hasDataRow) throw new Error("MISSING_REPORT_DATA");
   } catch {

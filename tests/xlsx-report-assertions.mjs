@@ -1,11 +1,15 @@
 import JSZip from "jszip";
 
+import { countWorksheetDataRows, createSharedStringValueLookup } from "../src/utils/xlsxReportDataRows.mjs";
+
 const WORKSHEET_PATH = /^xl\/worksheets\/sheet\d+\.xml$/u;
 
 export async function assertVisibleXlsxReport(bytes) {
   const archive = await JSZip.loadAsync(bytes);
   const worksheets = Object.values(archive.files).filter((entry) => !entry.dir && WORKSHEET_PATH.test(entry.name));
   if (!worksheets.length) throw new Error("XLSX report contains no worksheets.");
+  const sharedStringsXml = await archive.file("xl/sharedStrings.xml")?.async("string");
+  const sharedStringHasValue = sharedStringsXml ? createSharedStringValueLookup(sharedStringsXml) : undefined;
 
   let customWidthColumns = 0;
   let dataRows = 0;
@@ -27,15 +31,9 @@ export async function assertVisibleXlsxReport(bytes) {
       customWidthColumns += span - 1;
       for (let index = 0; index < span; index += 1) widths.push(width);
     }
-    let ordinal = 0;
-    for (const match of xml.matchAll(/<row\b[^>]*>/gu)) {
-      ordinal += 1;
-      const rowNumber = Number(xmlAttribute(match[0], "r") ?? ordinal);
-      if (Number.isFinite(rowNumber) && rowNumber > 1) dataRows += 1;
-    }
+    dataRows += countWorksheetDataRows(xml, sharedStringHasValue);
   }
   if (!customWidthColumns) throw new Error("XLSX report contains no custom-width columns.");
-  if (!dataRows) throw new Error("XLSX report contains no data rows.");
   return { worksheetCount: worksheets.length, customWidthColumns, dataRows, widths };
 }
 

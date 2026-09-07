@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 
 import { compareSpreadsheetPair } from "../../src/features/excel-compare/compareEngine.ts";
 import { buildExcelCompareReport } from "../../src/features/excel-compare/report.ts";
@@ -21,6 +22,7 @@ import type {
   SpreadsheetScalar,
 } from "../../src/features/spreadsheet-core/inputAdapter.ts";
 import { writeXlsxReport } from "../../src/utils/xlsxReport.ts";
+import { assertVisibleXlsxReport } from "../xlsx-report-assertions.mjs";
 
 const baseOptions = (): ExcelComparePairOptions => ({
   mode: "position",
@@ -56,6 +58,69 @@ test("generated report integrity rejects missing column widths and header-only w
       () => assertGeneratedXlsxReport(invalid),
       (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE,
     );
+  }
+});
+
+test("generated report integrity requires a populated cell after the header", async (context) => {
+  const rowHeightOnly = new ExcelJS.Workbook();
+  const rowHeightSheet = rowHeightOnly.addWorksheet("RowHeight");
+  rowHeightSheet.addRow(["Header"]);
+  rowHeightSheet.getColumn(1).width = 12;
+  rowHeightSheet.getRow(2).height = 20;
+
+  const cellFormatOnly = new ExcelJS.Workbook();
+  const cellFormatSheet = cellFormatOnly.addWorksheet("CellFormat");
+  cellFormatSheet.addRow(["Header"]);
+  cellFormatSheet.getColumn(1).width = 12;
+  cellFormatSheet.getCell("A2").numFmt = "@";
+
+  const headersOnly = new ExcelJS.Workbook();
+  for (const name of ["First", "Second"]) {
+    const sheet = headersOnly.addWorksheet(name);
+    sheet.addRow(["Header"]);
+    sheet.getColumn(1).width = 12;
+  }
+
+  const emptyStringOnly = new ExcelJS.Workbook();
+  const emptyStringSheet = emptyStringOnly.addWorksheet("EmptyString");
+  emptyStringSheet.addRows([["Header"], [""]]);
+  emptyStringSheet.getColumn(1).width = 12;
+
+  for (const [name, workbook] of [
+    ["row height only", rowHeightOnly],
+    ["cell format only", cellFormatOnly],
+    ["headers only", headersOnly],
+    ["empty string only", emptyStringOnly],
+  ] as const) {
+    await context.test(name, async () => {
+      const bytes = reportArrayBuffer(await workbook.xlsx.writeBuffer());
+      assert.equal(await countReopenedPopulatedDataRows(bytes), 0);
+      assert.equal((await assertVisibleXlsxReport(bytes)).dataRows, 0);
+      await assert.rejects(
+        () => assertGeneratedXlsxReport(bytes),
+        (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE,
+      );
+    });
+  }
+});
+
+test("generated report integrity accepts normal, mixed, and customWidth=true reports", async (context) => {
+  const normal = reportArrayBuffer(await writeXlsxReport({ sheets: [{ name: "Data", headers: ["Value"], rows: [["visible"]] }] }));
+  const mixed = reportArrayBuffer(await writeXlsxReport({ sheets: [
+    { name: "Empty", headers: ["Value"], rows: [] },
+    { name: "Data", headers: ["Value"], rows: [[0], [false]] },
+  ] }));
+  const customWidthTrue = await replaceCustomWidthWithTrue(normal);
+  for (const [name, bytes, expectedRows] of [
+    ["normal", normal, 1],
+    ["mixed", mixed, 2],
+    ["customWidth=true", customWidthTrue, 1],
+  ] as const) {
+    await context.test(name, async () => {
+      assert.equal(await countReopenedPopulatedDataRows(bytes), expectedRows);
+      assert.equal((await assertVisibleXlsxReport(bytes)).dataRows, expectedRows);
+      await assert.doesNotReject(() => assertGeneratedXlsxReport(bytes));
+    });
   }
 });
 
@@ -368,4 +433,34 @@ function reportArrayBuffer(value: ExcelJS.Buffer) {
   if (value instanceof ArrayBuffer) return value;
   if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
   throw new Error("Unexpected report buffer type.");
+}
+
+async function countReopenedPopulatedDataRows(bytes: ArrayBuffer) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(bytes);
+  let populatedRows = 0;
+  for (const sheet of workbook.worksheets) {
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber <= 1) return;
+      let populated = false;
+      row.eachCell((cell) => {
+        if (cell.value !== null && cell.value !== undefined && cell.value !== "") populated = true;
+      });
+      if (populated) populatedRows += 1;
+    });
+  }
+  return populatedRows;
+}
+
+async function replaceCustomWidthWithTrue(bytes: ArrayBuffer) {
+  const archive = await JSZip.loadAsync(bytes);
+  let replacements = 0;
+  for (const worksheet of Object.values(archive.files)) {
+    if (worksheet.dir || !/^xl\/worksheets\/sheet\d+\.xml$/u.test(worksheet.name)) continue;
+    const xml = await worksheet.async("string");
+    replacements += xml.match(/customWidth="1"/gu)?.length ?? 0;
+    archive.file(worksheet.name, xml.replaceAll('customWidth="1"', 'customWidth="true"'));
+  }
+  assert.ok(replacements > 0);
+  return archive.generateAsync({ type: "arraybuffer" });
 }
