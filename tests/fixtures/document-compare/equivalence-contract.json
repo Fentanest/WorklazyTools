@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "offsetUnit": "unicode-code-point",
+  "fixturePairs": [
+    {
+      "pairId": "base",
+      "before": "oracle/base-before.docx",
+      "after": "oracle/base-after.docx",
+      "rejectTextExceptions": [
+        {
+          "storyPart": "word/document.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "메모가 연결된 이전 문단입니다.", "after": "메모가 연결된 문단입니다." }
+          ]
+        }
+      ]
+    },
+    {
+      "pairId": "split",
+      "before": "oracle/split-before.docx",
+      "after": "oracle/split-after.docx",
+      "rejectTextExceptions": [
+        {
+          "storyPart": "word/document.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "메모가 연결된 이전 문단입니다.", "after": "메모가 연결된 문단입니다." }
+          ]
+        }
+      ]
+    },
+    { "pairId": "boundary", "before": "oracle/boundary-before.docx", "after": "oracle/boundary-after.docx" },
+    { "pairId": "formatting", "before": "oracle/formatting-before.docx", "after": "oracle/formatting-after.docx" },
+    {
+      "pairId": "revisions",
+      "before": "oracle/revisions-before.docx",
+      "after": "oracle/revisions-after.docx",
+      "rejectTextExceptions": [
+        {
+          "storyPart": "word/document.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before accepted", "after": "After accepted" }
+          ]
+        },
+        {
+          "storyPart": "word/header1.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before header", "after": "After header" }
+          ]
+        },
+        {
+          "storyPart": "word/footer1.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before footer", "after": "After footer" }
+          ]
+        },
+        {
+          "storyPart": "word/footnotes.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before footnote", "after": "After footnote" }
+          ]
+        },
+        {
+          "storyPart": "word/endnotes.xml",
+          "reasonId": "E1",
+          "replacements": [
+            { "before": "Before endnote", "after": "After endnote" }
+          ]
+        }
+      ]
+    }
+  ],
+  "exactPackagePair": { "pairId": "exact", "before": "oracle/exact-before.docx", "after": "oracle/exact-after.docx" },
+  "exceptionFixturePairs": [
+    {
+      "pairId": "comments-multipara",
+      "before": "oracle/comments-multipara-before.docx.b64",
+      "after": "oracle/comments-multipara-after.docx.b64"
+    }
+  ],
+  "packageReject": {
+    "targetAuthor": "Worklazy Oracle",
+    "fixturePairIds": ["base", "split", "boundary", "formatting", "revisions"],
+    "expectedStoryParts": 13,
+    "expectedStructuralRevisions": 5
+  },
+  "preservedPackageParts": [
+    "word/comments.xml",
+    "word/commentsExtended.xml",
+    "word/commentsIds.xml",
+    "word/people.xml"
+  ],
+  "packagePartNegativeControls": [
+    {
+      "mutation": "remove-comments-part",
+      "category": "part-removal",
+      "pairId": "comments-multipara",
+      "part": "word/comments.xml",
+      "action": "remove"
+    },
+    {
+      "mutation": "corrupt-comments-bytes",
+      "category": "bytes-corruption",
+      "pairId": "comments-multipara",
+      "part": "word/comments.xml",
+      "action": "corrupt"
+    },
+    {
+      "mutation": "add-output-only-comments-part",
+      "category": "output-only-addition",
+      "pairId": "exact",
+      "part": "word/comments.xml",
+      "action": "add"
+    },
+    {
+      "mutation": "remove-comments-extended-part",
+      "category": "related-part-removal",
+      "pairId": "revisions",
+      "part": "word/commentsExtended.xml",
+      "action": "remove"
+    },
+    {
+      "mutation": "remove-comments-ids-part",
+      "category": "related-part-removal",
+      "pairId": "revisions",
+      "part": "word/commentsIds.xml",
+      "action": "remove"
+    },
+    {
+      "mutation": "remove-people-part",
+      "category": "related-part-removal",
+      "pairId": "revisions",
+      "part": "word/people.xml",
+      "action": "remove"
+    }
+  ],
+  "commentFixture": {
+    "fixtureId": "comments-multipara:comments-preserved",
+    "pairId": "comments-multipara",
+    "preservedPackagePart": "word/comments.xml",
+    "preservedFrom": "after",
+    "before": { "author": "Before Reviewer", "text": "Before comment body" },
+    "after": { "author": "After Reviewer", "text": "After comment body" }
+  },
+  "multiParagraphCellFixture": {
+    "fixtureId": "comments-multipara:joined-cell-input",
+    "pairId": "comments-multipara",
+    "beforeParagraphs": ["Alpha ", "Beta"],
+    "afterParagraphs": ["Alpha", "Beta"],
+    "webInput": { "before": "Alpha \nBeta", "after": "Alpha\nBeta" },
+    "webChanges": [
+      { "type": "deleted", "text": " \n", "beforeOffset": 5, "afterOffset": 5 },
+      { "type": "added", "text": "\n", "beforeOffset": 7, "afterOffset": 5 }
+    ],
+    "generatorInputs": [
+      {
+        "beforePath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[0]",
+        "afterPath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[0]",
+        "before": "Alpha ",
+        "after": "Alpha"
+      },
+      {
+        "beforePath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[1]",
+        "afterPath": "document/body[0]/tbl[0]/tr[0]/tc[0]/p[1]",
+        "before": "Beta",
+        "after": "Beta"
+      }
+    ],
+    "generatorChanges": [
+      { "type": "deleted", "text": " ", "beforeOffset": 5, "afterOffset": 5 }
+    ]
+  },
+  "exceptions": [
+    {
+      "reasonId": "E1",
+      "fixtureId": "revisions:existing-after-revision",
+      "reason": "Existing revisions in the after document are preserved, including cases whose accepted text is unchanged."
+    },
+    {
+      "reasonId": "E2",
+      "fixtureId": "split:one-to-two-paragraph-group",
+      "reason": "Paragraph split/merge and row, column, or paragraph marks do not share one text-diff input."
+    },
+    {
+      "reasonId": "E3",
+      "fixtureId": "base:automatic-number-display-prefix",
+      "reason": "Automatic numbering is a display prefix outside the paragraph text passed to the DOCX emitter."
+    },
+    {
+      "reasonId": "E4",
+      "fixtureId": "comments-multipara:comments-preserved",
+      "reason": "Comment body and author bytes are preserved from the after document."
+    },
+    {
+      "reasonId": "E5",
+      "fixtureId": "formatting:property-revision",
+      "reason": "Formatting property revisions are not text segments."
+    },
+    {
+      "reasonId": "E6",
+      "fixtureId": "comments-multipara:joined-cell-input",
+      "reason": "A web cell joins multiple paragraphs with newlines while the DOCX emitter diffs each paragraph separately."
+    }
+  ]
+}

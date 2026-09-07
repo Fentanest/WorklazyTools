@@ -22,6 +22,10 @@ const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing || only
 const onlyHwp = process.env.TEST_ONLY_HWP === "1";
 const HWP_ROUNDTRIP_SENTINEL = "WL_RHWP_086_SENTINEL";
 const HWP_FIXTURE_SHA256 = "35c590e316c18e7310bb7b2f954b87d32f1d45416179466aee2bebb99d7e706f";
+const HWP_DIFF_BEFORE_SHA256 = "65255f73e971e65b317b225e30060b2786e18a86b075ded00d2d4243fc8a5980";
+const HWP_DIFF_AFTER_SHA256 = "451e25962a5f32833f60c6099ffd57d5e7c63bc2096d00869882254a06d2e0b6";
+const HWP_WARNING_KO = "HWP/HWPX 의 검토 메모와 변경 추적 기록은 비교하지 않습니다. 해당 기록이 있는 문서는 변경 내용을 모두 적용한 사본으로 비교해 주세요.";
+const HWP_WARNING_EN = "Review comments and tracked changes in HWP/HWPX files are not compared. For files with these records, compare copies with the changes accepted.";
 let rhwpInitialization;
 const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-new-tools-"));
 
@@ -51,7 +55,7 @@ try {
 
     if (onlyHwp) {
       console.log("[1/1] HWP editor and comparison");
-      await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
+      await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx, fixtures.editorHwp);
     } else if (onlyImageMobile) {
       console.log("[1/1] Image studio mobile interactions");
       await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
@@ -66,7 +70,7 @@ try {
     } else if (!onlyVideo && !onlyAudio) {
       if (!onlyImage) {
         console.log("[1/4] HWP editor");
-        await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx);
+        await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx, fixtures.editorHwp);
       }
     console.log("[2/4] Image studio");
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
@@ -123,7 +127,7 @@ try {
   await fs.rm(tempDirectory, { recursive: true, force: true });
 }
 
-async function testHwpEditor(page, hwpPaths, wordDocx) {
+async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
   await page.goto(`${koBaseUrl}/tools/document-compare`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-slot='rhwp-version-notice']");
   const compareVersion = await page.$eval("[data-slot='rhwp-version-notice']", (element) => element.textContent || "");
@@ -150,7 +154,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 2);
   const hwpAddButton = await page.$eval("[data-tool-page='document-compare'] [data-ui-part=drop-target] [data-slot=button]", (button) => button.textContent || "");
   if (!hwpAddButton.includes("더 추가")) throw new Error(`HWP comparison does not expose incremental file addition: ${hwpAddButton}`);
-  await page.$eval("[data-testid='document-file-item'] button[title]", (button) => button.click());
+  await page.$eval("[data-testid='document-file-list-before'] [data-testid='document-file-item']:nth-child(2) button[title]", (button) => button.click());
   await page.waitForFunction(() => {
     const lists = document.querySelectorAll("[data-testid^='document-file-list-']");
     return lists.length === 2 && lists[0].children.length === 1 && lists[1].children.length === 1;
@@ -166,6 +170,10 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
   }
   await page.$eval("[data-testid='document-result-card'] [data-testid='document-view-result']", (button) => button.click());
   await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1") && document.querySelector("[data-testid='document-result-summary']"));
+  await assertHwpComparisonResult(page, HWP_WARNING_KO);
+
+  await runHwpComparison(page, `${baseUrl}/en/tools/document-compare`, hwpPaths);
+  await assertHwpComparisonResult(page, HWP_WARNING_EN);
 
   const forbiddenRhwpRequests = [];
   const recordRhwpRequest = (request) => {
@@ -186,7 +194,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
     throw new Error(`HWP editor is not using the isolated self-hosted runtime: ${JSON.stringify(runtime)}`);
   }
   await page.waitForSelector("[data-tool-page='hwp-editor'] input[type=file]");
-  await (await page.$("[data-tool-page='hwp-editor'] input[type=file]")).uploadFile(hwpPaths[0]);
+  await (await page.$("[data-tool-page='hwp-editor'] input[type=file]")).uploadFile(editorHwp);
   await page.waitForSelector("[data-testid='hwp-focus-toolbar']");
   const editorDescription = await page.$eval("[data-ui-component='section-card']:has([data-testid='hwp-editor-shell'])", (element) => element.textContent || "");
   if (!editorDescription.includes("1페이지")) throw new Error(`HWP page count is incorrect: ${editorDescription}`);
@@ -208,7 +216,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
     throw new Error(`HWP editor version notice is incomplete: ${editorVersion}`);
   }
 
-  const sourceStructure = await inspectHwpBytes(await fs.readFile(hwpPaths[0]));
+  const sourceStructure = await inspectHwpBytes(await fs.readFile(editorHwp));
   await page.evaluate(() => {
     window.__worklazyOriginalCreateObjectURL = URL.createObjectURL.bind(URL);
     window.__worklazyCapturedHwpBlob = undefined;
@@ -243,7 +251,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
     throw new Error(`HWP round-trip parse verification failed: ${JSON.stringify({ sourceStructure, roundTripStructure })}`);
   }
   const reopenedName = "rhwp-roundtrip-reopened.hwp";
-  const reopenedPath = path.join(path.dirname(hwpPaths[0]), reopenedName);
+  const reopenedPath = path.join(path.dirname(editorHwp), reopenedName);
   await fs.writeFile(reopenedPath, roundTripBytes);
   await (await page.$("[data-testid='hwp-focus-open']")).uploadFile(reopenedPath);
   await page.waitForFunction((expectedName) => document.querySelector("[data-testid='hwp-focus-document'] strong")?.textContent === expectedName
@@ -252,6 +260,47 @@ async function testHwpEditor(page, hwpPaths, wordDocx) {
 
   page.off("request", recordRhwpRequest);
   if (forbiddenRhwpRequests.length) throw new Error(`HWP editor requested external rhwp resources: ${forbiddenRhwpRequests.join(", ")}`);
+}
+
+async function runHwpComparison(page, url, hwpPaths) {
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("[data-tool-page='document-compare'] input[type=file]");
+  let inputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
+  await inputs[0].uploadFile(hwpPaths[0]);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[0]?.children.length === 1);
+  inputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
+  await inputs[1].uploadFile(hwpPaths[1]);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid^='document-file-list-']")[1]?.children.length === 1);
+  await page.$eval("[data-testid='document-action-bar'] [data-ui-component='primary-button']", (button) => button.click());
+  await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success") || document.querySelector("[data-tool-page='document-compare'] [role='alert']"), { timeout: 120_000 });
+  const error = await page.$eval("[data-tool-page='document-compare'] [role='alert']", (element) => element.textContent || "").catch(() => "");
+  if (error) throw new Error(`HWP comparison failed: ${error}`);
+  await page.$eval("[data-testid='document-result-card'] [data-testid='document-view-result']", (button) => button.click());
+  await page.waitForFunction(() => location.pathname.endsWith("/tools/document-compare/results/1") && document.querySelector("[data-testid='document-result-summary']"));
+}
+
+async function assertHwpComparisonResult(page, expectedWarning) {
+  const contract = await page.evaluate(() => {
+    const warning = Array.from(document.querySelectorAll("[data-slot='notice']"))
+      .map((element) => element.textContent?.trim() || "")
+      .find((text) => text.includes("HWP/HWPX")) || "";
+    const row = Array.from(document.querySelectorAll("[data-testid='document-page-view'] [role='row']"))
+      .find((element) => element.getAttribute("data-document-kind") === "changed");
+    return {
+      warning,
+      deleted: row ? Array.from(row.querySelectorAll("[data-diff-kind='deleted']"), (element) => element.textContent || "") : [],
+      added: row ? Array.from(row.querySelectorAll("[data-diff-kind='added']"), (element) => element.textContent || "") : [],
+      sides: row ? Array.from(row.querySelectorAll(":scope > [role='cell']"), (element) => element.textContent || "") : [],
+    };
+  });
+  if (contract.warning !== expectedWarning) throw new Error(`HWP review-history guidance mismatch: ${JSON.stringify(contract)}`);
+  if (JSON.stringify(contract.deleted) !== JSON.stringify(["을"])
+    || JSON.stringify(contract.added) !== JSON.stringify(["자금을"])
+    || contract.sides.length !== 2
+    || !contract.sides[0].includes("등)을 대여")
+    || !contract.sides[1].includes("등)자금을 대여")) {
+    throw new Error(`HWP real-text diff did not preserve the revised body: ${JSON.stringify(contract)}`);
+  }
 }
 
 async function testImageStudio(page, imagePaths) {
@@ -4225,14 +4274,30 @@ async function createHwpFixtures(directory) {
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   if (sha256 !== HWP_FIXTURE_SHA256) throw new Error(`Pinned HWP fixture hash mismatch: ${sha256}`);
   const blankHwp = path.join(directory, "rhwp-roundtrip-empty.hwp");
-  const blankHwpTwo = path.join(directory, "rhwp-roundtrip-empty-copy.hwp");
+  const diffBefore = await decodePinnedHwpFixture("./fixtures/document-compare/hwp-diff-before.hwp.b64", HWP_DIFF_BEFORE_SHA256);
+  const diffAfter = await decodePinnedHwpFixture("./fixtures/document-compare/hwp-diff-after.hwp.b64", HWP_DIFF_AFTER_SHA256);
+  const diffBeforePath = path.join(directory, "hwp-diff-before.hwp");
+  const diffAfterPath = path.join(directory, "hwp-diff-after.hwp");
   const wordDocx = path.join(directory, "word-family.docx");
   await Promise.all([
     fs.writeFile(blankHwp, bytes),
-    fs.writeFile(blankHwpTwo, bytes),
+    fs.writeFile(diffBeforePath, diffBefore),
+    fs.writeFile(diffAfterPath, diffAfter),
     fs.writeFile(wordDocx, await createMinimalDocx()),
   ]);
-  return { hwpFiles: [blankHwp, blankHwpTwo], wordDocx };
+  const [beforeStructure, afterStructure] = await Promise.all([inspectHwpBytes(diffBefore), inspectHwpBytes(diffAfter)]);
+  if (beforeStructure.text !== "등)을 대여" || afterStructure.text !== "등)자금을 대여") {
+    throw new Error(`Pinned HWP diff fixture text mismatch: ${JSON.stringify({ beforeStructure, afterStructure })}`);
+  }
+  return { hwpFiles: [diffBeforePath, diffAfterPath], editorHwp: blankHwp, wordDocx };
+}
+
+async function decodePinnedHwpFixture(relativePath, expectedSha256) {
+  const encoded = await fs.readFile(new URL(relativePath, import.meta.url), "utf8");
+  const bytes = Buffer.from(encoded.replace(/\s/g, ""), "base64");
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  if (sha256 !== expectedSha256) throw new Error(`Pinned HWP diff fixture hash mismatch: ${sha256}`);
+  return bytes;
 }
 
 async function inspectHwpBytes(bytes) {

@@ -22,6 +22,7 @@
     "preview": "vite preview",
     "test:recovery": "node tests/blank-page-recovery-smoke.mjs",
     "test:browser": "node tests/browser-smoke.mjs",
+    "test:document-diff": "node --experimental-strip-types tests/document-diff-equivalence.mjs",
     "test:office": "node tests/office-editor-smoke.mjs",
     "test:xls-preserve": "node tests/xls-preserve-smoke.mjs",
     "test:xls-first-load": "node tests/xls-preserve-first-load-smoke.mjs",

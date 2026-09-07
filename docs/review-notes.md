@@ -2,6 +2,65 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-07
+
+### 문서 비교 동치 oracle fix-2 — 메모 관련 package part 부재 일치 (Codx)
+
+**R2-1 원인과 수리** — fix-1의 `commentsPreserved`는 output에 `word/comments.xml`이 없으면 after를 읽지 않고 참을 반환했다. 따라서 bytes 훼손은 잡았지만 part 전체 누락은 통과했고, 메모 fixture의 수락 package 불일치와도 연결되지 않았다. 보호 대상을 `word/comments.xml`·`word/commentsExtended.xml`·`word/commentsIds.xml`·`word/people.xml`의 명시 목록으로 고정하고, 기존 5쌍·exact·E4/E6 pair를 포함한 **7개 모든 대상 쌍**에서 각 part의 after/output 존재 여부가 같고, 존재할 때 bytes도 같아야 통과하도록 바꿨다. after에 없으면 output에도 없어야 하므로 output-only part 추가도 거부한다. `commentsPreserved`는 4개 part 행 전체가 일치할 때만 참이다.
+
+**검사 범위와 음성 대조** — 정상 oracle은 7쌍 × 4 part = **28행**(after에 존재 7·부재 21)을 검사해 통과했다. `comments-multipara`의 `comments.xml` 제거는 `afterPresent=true/outputPresent=false`, bytes 훼손은 `true/true/bytesEqual=false`, 메모 없는 `exact` output에만 `comments.xml` 추가는 `false/true`로 각각 **exit 1**이며 모두 `commentsPreserved=false`였다. 실제 관련 part 3개가 함께 있는 `revisions`에서 `commentsExtended.xml`·`commentsIds.xml`·`people.xml`을 하나씩 제거한 실행도 각각 `true/false`, **exit 1**이었다. 따라서 패키지 part 누락·bytes 훼손·부재 불일치와 실제 존재하는 관련 part 각각의 누락이 독립적으로 실패한다. 원출력은 `/tmp/worklazy-dc-fix2/logs/negative-*.log`에 보존했다.
+
+**범위 판정** — 제품 생성기, `diffText`, 문단·표 정렬, UI·한영 문구, SEO/정적 페이지, 광고 격리 경로는 변경하지 않았다. oracle의 package part 검사·음성 대조 계약과 이 기록만 바꿨으므로 시각 회귀는 생략한다. — Codx
+
+**완료 검증** — 전용 `TMPDIR`·npm cache와 `NODE_OPTIONS=--max-old-space-size=4096`를 사용해 `npx tsc -b` 진단 0, `test:unit` **345/345**, 정상 oracle 28행, production build 2,834 modules·정적 61페이지, `test:static`, Word·HWP·Office·Excel cleaner·Excel compare 스모크를 모두 통과시켰다. `bundle:measure` 5종은 **299,294 / 2,450,893 / 2,711,698 / 5,461,885 / 37,687 bytes**, CSS orphan 0, route registry 20개, `git diff --check`도 통과했다. 브라우저 검증은 `127.0.0.1:4290 --strictPort`에서 직렬 실행했고 종료 후 4290~4299 listening socket은 0이었다. 전체 원출력은 `/tmp/worklazy-dc-fix2/logs/`에 보존했다.
+
+### 문서 비교 동치 oracle fix-1 — 구조 키·패키지 거부·E6 fixture 정정 (Codx)
+
+**원인과 수리** — 최초 oracle은 sidecar 구조 키의 존재·타입만 확인하고 실제 대조와 E1 허용 판정은 호출 순번 문자열로 했으므로 경로·인덱스·분할 slice를 바꿔도 통과했다. 또한 저장 전 sidecar를 거부 문자열처럼 재구성했을 뿐 최종 ZIP을 거부한 결과는 검사하지 않았고, E4/E6은 등록되지 않은 `comments-multipara` pair 이름만 가리켰다. 이를 독립 정적 fixture의 **62개 구조 키·기대 결과**와 실제 observation을 일대일 대응하도록 바꾸고, 누락·중복·예상 밖 키와 `pairId`·`storyPart`·양쪽 index/path·선택적 `[start,end)` `sourceSlice` 오염을 모두 실패시켰다. E1 9건은 각 구조 키가 `E1` 사유에 연결될 때만 허용하며 호출 순번은 식별에 사용하지 않는다.
+
+**최종 패키지 검사 범위** — 기존 5쌍의 생성 완료 ZIP에서 본문·활성 머리말/꼬리말·각주/미주의 총 13개 story part를 다시 읽고, `Worklazy Oracle` 작성자의 삽입 text/행/셀만 제거하고 삭제 text/행/셀은 복원하는 거부 결과를 before와 대조한다. 기존 after 문서의 다른 작성자 revision은 그대로 두고 E1의 구조 키·사유에 대응하는 본문 3건과 머리말/꼬리말/각주/미주 4건만 명시 치환한다. `comments.xml`은 거부 대상이 아니며, fix-1 당시 별도 검사는 **output에 part가 있을 때의 after bytes 대조만 보장하고 part 누락은 놓쳤다**. 이 과대 진술은 위 fix-2의 존재·부재·bytes 양방향 검사로 보정했다. 정상 실행에서 구조 revision 5개가 실제 거부 경로를 통과하며, 저장 직전 생성 삭제 텍스트를 훼손하면 sidecar·수락 결과와 무관하게 최종 패키지 거부 대조가 실패한다.
+
+**E4/E6 실행 fixture와 음성 대조** — `comments-multipara` 실제 DOCX pair는 before/after 메모 작성자·본문을 다르게 두고 after `comments.xml` bytes 보존을 검사한다. 같은 pair의 셀은 `['Alpha ', 'Beta']→['Alpha', 'Beta']` 두 문단을 실제 XML에 담는다. 웹 입력 `Alpha ␠\nBeta→Alpha\nBeta`는 삭제 `␠\n` `(5,5)`·삽입 `\n` `(7,5)`, 생성기 문단 입력은 첫 문단 삭제 `␠` `(5,5)`와 둘째 문단 무변경임을 각각 단언하며 **이 fixture ID만 E6**으로 둔다. 구조 키 오염·최종 ZIP 삭제 텍스트 훼손·E6 실행 pair 제거의 세 음성 대조는 모두 exit 1로 실패한다. 따라서 이전 기록의 “E1~E6 통과”는 이름 존재 검사가 아니라 위 실제 실행 범위로 정정한다. `diffText`·문단 정렬·UI·한영 문구·SEO/정적 페이지·광고 격리 경로는 변경하지 않았다.
+
+**완료 검증** — 전용 `TMPDIR`·npm cache와 `NODE_OPTIONS=--max-old-space-size=4096`를 사용해 `npx tsc -b` 진단 0, `test:unit` **345/345**, production build 2,834 modules·정적 61페이지, `test:static`, 정상 oracle(기존 5쌍/55 sidecar·전체 구조 키 62·E1 허용 9·package reject 5쌍/13 story part/구조 revision 5·exact 4키·E6 1 fixture), `bundle:measure` 5종, `css:orphans` 0, route registry 20개를 통과시켰다. 4290 `--strictPort` production preview에서 Word·HWP·Office·Excel cleaner·Excel compare 스모크가 모두 통과했고 서버 종료 뒤 4290~4299 listening socket은 0이었다. 시각 회귀는 제품/UI/HWP 안내 문구 변경 없이 oracle·fixture만 바꾼 작업이므로 지시서 조건에 따라 생략했다. 원출력은 `/tmp/worklazy-dc-fix1/logs/`에 보존했다.
+
+### 문서 비교 diff 코어 통일 — 분리 checkout 구현·검증 (Codx)
+
+**착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 디스패치와 정본 `document-compare-granularity-20260907.md`의 「정본화 (2026-09-07 11:55, v3)」, 1·2차 반박 보고서·수정안, 관련 기각 이력을 확인했다. `main`이 지정 기준 **`5bc6854175331bdd73b267784d9633cdccda8446`**와 정확히 같고 열린 계획서와 충돌하지 않음을 확인한 뒤 `/tmp/worklazy-dc-impl`의 `document-compare-engine-20260907` 브랜치에서만 작업했다. 기존 `s3-pdf-finish` checkout은 전환·수정하지 않았다. 문서 결과 폭·이동 rail·모바일 toolbar·ARIA와 결과 상태 a11y/rendering 등록은 `ui-theme-redesign-20260907.md` 이관을 따랐으며 이번 변경에 넣지 않았다.
+
+**공용 코어·경계** — `documentComparison.ts`의 현행 단어 토큰/LCS/역추적/인접 병합과 토큰 셀 1,500,000 가드를 97쌍 정적 골든(합성 27·Word 68·HWP 2)으로 고정했다. worker 전역의 동기 `worklazyDiffJson`은 이 함수 결과만 JSON으로 넘기며 Python fallback은 두지 않았다. `tracked_docx.py`의 `_paragraph_revision`만 이 값을 받아 Python `len()` 기반 0-origin Unicode code point cursor를 누적하고, 각 조각의 타입·문자열·양쪽 재구성과 마지막 cursor를 검사한다. 탭·`w:br`·`w:cr`·surrogate·결합문자·빈 run/빈 text를 Pyodide 0.29.4에서 재현했다. 문단·표 정렬과 서식 비교의 `SequenceMatcher`/`diffCharacters`, after의 `comments.xml` bytes 보존은 그대로다. bridge 주입·타입·재구성 실패는 기존 현지화 작업 오류 경계로 전달하며 내부 함수명이나 원시 예외를 사용자에게 새로 노출하지 않는다.
+
+**죽은 비교 코드 제거** — 삭제 정본 `probes-r2/pruning.json`의 SHA-256 **`d2c74bea63190073d951e57818bec11d1e072a9580282577fdccf58b53997894`**를 대조했다. 착수 코드에는 `removed` 31개와 `keep` 17개가 정확히 존재했고 교집합은 0이었다. 31개 정의만 제거한 뒤 keep 17개·추출 의존 폐쇄·`compare.py?raw` import·`runPython(compareScript)`를 보존했다. 합성 DOCX 10개에 ko/en × tables on/off × metadata on/off를 적용한 구현 전후 **80/80** 직렬화 출력이 동일했다(229,909B, SHA-256 **`888853b43226e6aea8340a919d18151b299834bf73e1e68cc41c3fd35d4a9f0d`**).
+
+**동치 oracle** — 커밋한 합성 DOCX 5쌍에서 실제 생성기의 `_paragraph_revision`만 계측해 `pairId, storyPart, beforeIndexes[], afterIndexes[], beforePath, afterPath` sidecar와 분할 source slice를 검증했다. 총 **55 sidecar 중 보장 범위 46개가 문자열·code point offset·순서까지 정확 일치**했고, 나머지 9개는 고정한 E1 기존 after revision 사례와 정확히 일치했다. 별도 4-key package fixture는 본문 3개와 단일 문단 셀 1개의 실제 생성 DOCX XML을 웹 모델 결과와 정확 대조했다. offset 하나를 +1한 음성 대조는 실패했고, 이름 붙인 E1~E6(기존 revision·분할/병합·자동번호·메모·property revision·다문단 연결 셀) 목록과 탭/개행/Unicode/빈 항목 8경계도 통과했다. 이 결과는 revision 없는 1:1 문단·단일 문단 셀 범위의 보장이지 문단 정렬·E2/E6까지 통일했다는 주장이 아니다.
+
+**HWP·화면 문구** — 기존 빈 HWP fixture는 편집기 왕복용으로 유지했다. 실제 본문 `등)을 대여` → `등)자금을 대여`가 든 고정 fixture 두 개는 각각 3,584B이고 SHA-256은 before **`65255f73e971e65b317b225e30060b2786e18a86b075ded00d2d4243fc8a5980`**, after **`451e25962a5f32833f60c6099ffd57d5e7c63bc2096d00869882254a06d2e0b6`**다. HWP diff 알고리즘은 이미 공용 `compareDocumentModels`를 사용하므로 바꾸지 않고, 정본의 한·영 검토 메모·변경 추적 안내를 worker inline `L(ko,en)`으로 교체했다. 따라서 locale JSON·SEO/FAQ 정적 본문·route·sitemap·광고/격리 경계는 불변이며 worker bundle hash 변화는 정적 본문 변화가 아니다.
+
+QA 결과 화면을 ko/en × 1,440px/320px로 직접 캡처·확인했다. 네 경우 모두 안내 문자열 정확 일치, notice overflow 0, 잘림 0, document 가로 초과 0이었고 정상 DOCX 표본도 삭제/추가 강조와 표 정렬을 확인했다. 시각 회귀 최초 실행은 10장 중 새 영어 안내가 있는 `interaction-hwp-result` 한 장만 **34,155px / 2.7802%** 달랐다. 기준·실제·diff를 확인해 이 한 장만 갱신했고 최종 문서 비교 **10/10**이 일치했다. HWP editor 스모크의 `[CanvasView] 페이지 0 정보가 없습니다` 2줄은 기존 빈 fixture를 여는 상류 로그이며 실제 3,584B·1페이지 저장/재파싱/재개방은 통과했다.
+
+**사용자 문서 메모리 재현** — `dummyfortest`의 v1.2/v1.4를 복사·fixture화·커밋하지 않고 Pyodide 메모리에만 넣어 1회 실행했다. 제14조 ④의 공용 source 세그먼트와 생성 DOCX XML은 **deleted `을` (before 104, after 104) → added `자금을` (before 105, after 104)**로 문자열·0-based code point offset·순서가 정확히 같았고, 변경 적용 후 텍스트도 after 수락본과 일치했다. 웹 표시 좌표는 각각 (106,106)·(107,106)인데 이는 정본 E3의 자동번호 display 접두 `④ ` 2 code point 때문이며, source 좌표로 환산하면 위 XML 값과 정확히 같다. 전체 생성 호출은 1,158회, revision count는 153이었다.
+
+**완료 기준 검증** — 전용 `TMPDIR`·npm cache, `NODE_OPTIONS=--max-old-space-size=4096`, 4210 `--strictPort` preview를 사용하고 빌드·브라우저를 직렬 실행했다. 원문 로그·화면 캡처는 `/tmp/worklazy-dc-impl-out/`에 보존했다.
+
+| 명령/검증 | 실제 결과 |
+|---|---|
+| production `npm run build` | 2,834 modules·정적 61페이지 통과; Word worker 164.07kB |
+| `npx --no-install tsc -b --pretty false` | 진단 0 |
+| `npm run test:unit` | **345/345**(골든 inventory+97쌍 포함) |
+| `npm run test:static` | locale/hreflang/runtime/ads/robots/sitemap·startup 104문서 통과 |
+| `VITE_LOCAL_QA=1 npm run build` | 2,834 modules·정적 61페이지; 위 화면 표본 확인 |
+| `TEST_SCOPE=word npm run test:browser` / 전체 `test:browser` | 둘 다 통과; 추적 DOCX 내려받기·웹 결과 포함 |
+| `TEST_ONLY_HWP=1 npm run test:new-tools` | 실제 `을`→`자금을`, ko/en 안내, 본문 복원·HWP 편집 왕복 통과 |
+| `npm run test:office` | 96 download·7 cache 상태, Calc 편집, 저장 DOCX 5,088B |
+| `npm run test:excel-cleaner` / `test:excel-compare` | production preview에서 둘 다 통과 |
+| `npm run test:document-diff` | Pyodide 0.29.4·bridge 97호출·5쌍/55 sidecar·4 package key·+1 offset 음성 대조·E1~E6 통과 |
+| `npm run bundle:measure` | entry 299,294B·affected routes 2,450,893B·shared 2,711,698B·app 5,461,885B·CSS 37,687B gzip |
+| `npm run css:orphans` / route registry | orphan selector arm 0 / 기대 20·누락·예상 외·중복 0 |
+| `VISUAL_ONLY=document-compare VISUAL_CONCURRENCY=1 npm run test:visual` | 기준선 한 장 한정 갱신 후 **10/10** 일치 |
+| 사용자 문서 메모리 재현 / `git diff --check` | 위 E3 환산 exact match / 공백 오류 0 |
+
+**실행 중 판정** — 첫 Excel cleaner 실행은 QA 산출물에서 production 광고 DOM을 요구해 `ads:false`로 중단됐다. 이는 `VITE_LOCAL_QA=1`의 의도된 추적 제거와 스모크 전제의 충돌이므로 production을 다시 빌드·기동해 동일 명령을 통과시켰고 광고 계약을 낮추지 않았다. HWP 스모크 첫 개발 실행은 실텍스트 두 번째 파일 대신 첫 파일을 after 열로 옮기던 기존 selector 결함을 드러냈다. 두 파일이 모두 비었던 과거에는 보이지 않던 문제로, 두 번째 항목을 명시하는 selector로 고쳐 실제 before/after 방향을 검증했다. 사용자 재현 첫 대조는 자동번호 display 접두를 source XML offset과 바로 비교해 +2 차이를 냈고, 문단 원문이 든 실패 로그는 제거한 뒤 정본 E3를 명시 적용해 재실행했다. 새 제품 결함을 무시하거나 허용치를 넓힌 경우는 없다.
+
 ## 2026-09-06
 
 ### S2b QR 라벨 PDF 한글 글꼴 감량 — 브랜치 구현·검증 (Codx)

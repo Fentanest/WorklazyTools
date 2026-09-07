@@ -2,9 +2,12 @@ import copy
 import datetime
 import difflib
 import io
+import json
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+
+from js import worklazyDiffJson
 
 
 WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -677,6 +680,50 @@ def _whole_paragraph_revision(source, kind, writer):
     return paragraph
 
 
+def _shared_text_opcodes(before, after):
+    """Adapt shared TypeScript diff segments to code-point token ranges."""
+    try:
+        encoded = worklazyDiffJson(before, after)
+    except Exception as error:
+        raise ValueError("SHARED_DIFF_CALL_FAILED") from error
+    if not isinstance(encoded, str):
+        raise TypeError("SHARED_DIFF_RESULT_NOT_JSON")
+    try:
+        segments = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise ValueError("SHARED_DIFF_RESULT_NOT_JSON") from error
+    if not isinstance(segments, list):
+        raise TypeError("SHARED_DIFF_RESULT_NOT_LIST")
+
+    before_cursor = 0
+    after_cursor = 0
+    for segment in segments:
+        if not isinstance(segment, dict):
+            raise TypeError("SHARED_DIFF_SEGMENT_NOT_OBJECT")
+        kind = segment.get("type")
+        text = segment.get("text")
+        if kind not in ("equal", "deleted", "added") or not isinstance(text, str):
+            raise TypeError("SHARED_DIFF_SEGMENT_INVALID")
+
+        # Python len/slices count Unicode code points. JavaScript UTF-16 length
+        # must never be used to address the character-token arrays below.
+        size = len(text)
+        before_end = before_cursor + (size if kind != "added" else 0)
+        after_end = after_cursor + (size if kind != "deleted" else 0)
+        if kind != "added" and before[before_cursor:before_end] != text:
+            raise ValueError("SHARED_DIFF_BEFORE_RECONSTRUCTION_FAILED")
+        if kind != "deleted" and after[after_cursor:after_end] != text:
+            raise ValueError("SHARED_DIFF_AFTER_RECONSTRUCTION_FAILED")
+        if size:
+            opcode = "equal" if kind == "equal" else "delete" if kind == "deleted" else "insert"
+            yield opcode, before_cursor, before_end, after_cursor, after_end
+        before_cursor = before_end
+        after_cursor = after_end
+
+    if before_cursor != len(before) or after_cursor != len(after):
+        raise ValueError("SHARED_DIFF_OFFSET_MISMATCH")
+
+
 def _paragraph_revision(before, after, include_formatting, writer):
     before_text = _comparison_text(before)
     after_text = _comparison_text(after)
@@ -791,8 +838,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
             position = end
         emit_events(j2)
 
-    matcher = difflib.SequenceMatcher(None, before_values, after_values, autojunk=False)
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+    for tag, i1, i2, j1, j2 in _shared_text_opcodes("".join(before_values), "".join(after_values)):
         if tag == "equal":
             emit_equal(i1, j1, j2)
         else:
