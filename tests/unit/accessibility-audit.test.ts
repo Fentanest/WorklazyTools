@@ -20,8 +20,13 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.throws(() => assertAccessibilityResults(missing), /registration/);
   const duplicate = report(); duplicate.results[1] = duplicate.results[0];
   assert.throws(() => assertAccessibilityResults(duplicate), /registration/);
-  assert.deepEqual(pages.filter(({ viewport }) => viewport).map(({ path, viewport }) => [path, viewport.width]), [["/ko", 412], ["/ko/tools", 412]]);
+  assert.deepEqual(pages.filter(({ id }) => ["home-mobile-ko", "tools-mobile-ko"].includes(id)).map(({ path, viewport }) => [path, viewport?.width]), [["/ko", 412], ["/ko/tools", 412]]);
   assert.ok(pages.some(({ id }) => id === "hwp-editor"));
+  const duplicateResults = pages.filter(({ setup }) => setup === "excel-duplicates");
+  assert.equal(duplicateResults.length, 8);
+  assert.deepEqual(new Set(duplicateResults.map(({ language }) => language)), new Set(["ko", "en"]));
+  assert.deepEqual(new Set(duplicateResults.map(({ colorScheme }) => colorScheme)), new Set(["light", "dark"]));
+  assert.deepEqual(new Set(duplicateResults.map(({ viewport }) => viewport ? "mobile" : "desktop")), new Set(["desktop", "mobile"]));
 });
 
 test("a11y exception is exactly one upstream iframe with explicit owner and reason", () => {

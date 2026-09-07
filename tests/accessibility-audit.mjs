@@ -26,6 +26,10 @@ export const pages = Object.freeze([
   { id: "hwp-editor", path: "/ko/tools/hwp-editor", readySelector: 'iframe[title="rhwp HWP 문서 편집기"]' },
   { id: "home-mobile-ko", path: "/ko", viewport: { width: 412, height: 839 } },
   { id: "tools-mobile-ko", path: "/ko/tools", viewport: { width: 412, height: 839 } },
+  ...["ko", "en"].flatMap((language) => ["light", "dark"].flatMap((colorScheme) => [
+    { id: `excel-compare-duplicates-${language}-${colorScheme}-desktop`, path: `/${language}/tools/excel-compare`, language, colorScheme, setup: "excel-duplicates" },
+    { id: `excel-compare-duplicates-${language}-${colorScheme}-mobile`, path: `/${language}/tools/excel-compare`, language, colorScheme, viewport: { width: 390, height: 844 }, setup: "excel-duplicates" },
+  ])),
 ]);
 
 // Minimal exception: rhwp Studio 0.8.6 upstream owns these vendor iframe nodes.
@@ -85,14 +89,15 @@ export async function runAccessibilityAudit() {
         hasTouch: Boolean(target.viewport),
         serviceWorkers: "block",
         deviceScaleFactor: 1,
-        colorScheme: "light",
+        colorScheme: target.colorScheme ?? "light",
         reducedMotion: "reduce",
-        locale: "ko-KR",
+        locale: target.language === "en" ? "en-US" : "ko-KR",
         timezoneId: "Asia/Seoul",
       });
-      await context.addInitScript(() => {
+      await context.addInitScript((language) => {
         localStorage.setItem("worklazy_privacy_consent", "granted");
-      });
+        if (language) localStorage.setItem("worklazy_lang", language);
+      }, target.language);
 
       const page = await context.newPage();
       page.on("request", (request) => {
@@ -101,6 +106,7 @@ export async function runAccessibilityAudit() {
         if (!allowed) externalRequests.push({ page: target.id, url: request.url() });
       });
       await page.goto(new URL(target.path, baseUrl).href, { waitUntil: "networkidle" });
+      if (target.setup === "excel-duplicates") await prepareExcelDuplicateResult(page);
       if (target.readySelector) await page.locator(target.readySelector).waitFor({ state: "visible" });
       await page.addStyleTag({
         content: "*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important;caret-color:transparent!important;scroll-behavior:auto!important}",
@@ -116,6 +122,10 @@ export async function runAccessibilityAudit() {
         builder.exclude(exception.selector);
       }
       const audit = await builder.analyze();
+      const duplicateContrast = target.setup === "excel-duplicates" ? await measureDuplicateResultContrast(page) : undefined;
+      if (duplicateContrast && duplicateContrast.minimum < 4.5) {
+        throw new Error(`Excel duplicate result text contrast fell below 4.5:1: ${JSON.stringify(duplicateContrast)}`);
+      }
       if (target.id === "document-compare") {
         placeholderContrast = await page.locator('[data-testid="document-revision-author"] input[placeholder]').evaluate((input) => {
           const parseRgb = (color) => {
@@ -140,6 +150,8 @@ export async function runAccessibilityAudit() {
         viewport: page.viewportSize(),
         exceptions,
         passes: audit.passes.length,
+        duplicateContrast,
+        incomplete: audit.incomplete.map((item) => ({ id: item.id, impact: item.impact, nodes: item.nodes.length, targets: item.nodes.map((node) => node.target) })),
         violations: audit.violations.map((violation) => ({
           id: violation.id,
           impact: violation.impact,
@@ -177,6 +189,72 @@ export async function runAccessibilityAudit() {
     await browser?.close();
     if (server) await stopServer(server);
   }
+}
+
+async function prepareExcelDuplicateResult(page) {
+  const input = page.locator('[data-testid="excel-compare-page"] input[type="file"]');
+  await input.setInputFiles({
+    name: "a11y-duplicate-left.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(`Key,Value\nA,${"accessible-long-value-".repeat(16)}\nA,left-tail`, "utf8"),
+  });
+  await input.setInputFiles({
+    name: "a11y-duplicate-right.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Key,Value\nA,right-only", "utf8"),
+  });
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+  await page.locator('[data-testid="excel-compare-mode-grid"] button:nth-child(2)').click();
+  await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+  await page.locator('[data-testid="excel-compare-actions"] [data-ui-component="primary-button"]').click();
+  await page.locator('[data-testid="excel-duplicate-row"]').waitFor({ state: "visible", timeout: 240_000 });
+  await page.locator('[data-testid="excel-duplicate-toggle"][data-side="left"]').click();
+  await page.locator('[data-testid="excel-duplicate-list"][data-side="left"]').waitFor({ state: "visible" });
+}
+
+async function measureDuplicateResultContrast(page) {
+  return page.evaluate(() => {
+    const selectors = [
+      "[data-testid=excel-duplicate-guidance] strong",
+      "[data-testid=excel-duplicate-guidance] strong + span",
+      "[data-testid=excel-duplicate-toggle][data-side=left] span",
+      "[data-testid=excel-duplicate-list][data-side=left] li > span:first-child",
+      "[data-testid=excel-duplicate-value-preview]",
+      "[data-testid=excel-full-value-trigger]",
+    ];
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    const parse = (value) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = value;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data];
+    };
+    const composite = ([red, green, blue, alpha], backdrop) => {
+      const opacity = alpha / 255;
+      return [red, green, blue].map((channel, index) => channel * opacity + backdrop[index] * (1 - opacity));
+    };
+    const luminance = (channels) => channels.map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    }).reduce((value, channel, index) => value + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    const ratioFor = (element) => {
+      const backgrounds = [];
+      for (let current = element; current; current = current.parentElement) backgrounds.push(parse(getComputedStyle(current).backgroundColor));
+      const background = backgrounds.reverse().reduce((backdrop, color) => composite(color, backdrop), [255, 255, 255]);
+      const foreground = composite(parse(getComputedStyle(element).color), background);
+      const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+      return (values[0] + 0.05) / (values[1] + 0.05);
+    };
+    const measurements = selectors.map((selector) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) throw new Error(`Missing contrast target ${selector}.`);
+      return { selector, ratio: ratioFor(element) };
+    });
+    return { minimum: Math.min(...measurements.map(({ ratio }) => ratio)), measurements };
+  });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await runAccessibilityAudit();

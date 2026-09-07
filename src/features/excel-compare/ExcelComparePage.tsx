@@ -1,6 +1,7 @@
 import { BlobWriter } from "@zip.js/zip.js";
-import { AlertCircle, ArrowLeftRight, Download, FileSpreadsheet, Plus, Search, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { AlertCircle, ArrowLeftRight, ChevronDown, ChevronUp, Download, FileSpreadsheet, Plus, Search, Trash2, X } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -23,6 +24,8 @@ import {
   type ExcelCompareMode,
   type ExcelComparePairOptions,
   type ExcelComparePairResult,
+  type ExcelCompareDuplicateRecord,
+  type ExcelCompareRecord,
   type ExcelCompareStatus,
 } from "./types.ts";
 
@@ -53,6 +56,8 @@ const STATUS_DOT_CLASSES: Record<ExcelCompareStatus, string> = {
   error: "bg-rose-500",
 };
 const ACCEPT = ".xlsx,.xlsm,.xls,.xlsb,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv";
+const DUPLICATE_LIST_PAGE_SIZE = 50;
+const VALUE_PREVIEW_CODE_POINT_LIMIT = 160;
 type LooseT = (key: string, options?: Record<string, unknown>) => string;
 
 export function ExcelComparePage() {
@@ -207,10 +212,11 @@ export function ExcelComparePage() {
   const resultRows = useMemo(() => {
     const query = search.normalize("NFC").toLocaleLowerCase(language);
     return completed.flatMap((item, pairIndex) => item.result.records
-      .filter((record) => statuses.has(record.status))
-      .filter((record) => !query || [record.key, record.leftValue, record.rightValue, record.change, record.reason].join(" ").normalize("NFC").toLocaleLowerCase(language).includes(query))
-      .map((record) => ({ item, pairIndex, record })));
+      .map((record, recordIndex) => ({ item, pairIndex, record, recordIndex }))
+      .filter(({ record }) => statuses.has(record.status))
+      .filter(({ record }) => !query || recordSearchText(record, language).includes(query)));
   }, [completed, language, search, statuses]);
+  const duplicateCount = useMemo(() => completed.reduce((total, item) => total + item.result.summary.duplicate, 0), [completed]);
 
   return (
     <UtilityPage toolId="excel-compare">
@@ -250,19 +256,20 @@ export function ExcelComparePage() {
         </div>
         {completed.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.results.downloadCheck")}</p>}
         {failed.map((item) => <UtilityNotice className="mt-2" data-testid="excel-compare-error" tone="error" role="alert" key={`${item.pairId}-${item.leftName}`}><AlertCircle className="mt-0.5 shrink-0" size={16} /><span className="flex flex-col"><strong>{item.leftName && item.rightName ? `${item.leftName} ↔ ${item.rightName}` : t("features:excelCompare.results.zip")}</strong>{item.message}</span></UtilityNotice>)}
+        {duplicateCount > 0 && <UtilityNotice className="mt-3" data-testid="excel-duplicate-guidance"><AlertCircle className="mt-0.5 shrink-0" size={16} /><span><strong className="block">{t("features:excelCompare.results.duplicateCount", { count: duplicateCount })}</strong><span className="mt-1 block text-sm">{t("features:excelCompare.results.duplicateGuidance")}</span></span></UtilityNotice>}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5" data-testid="excel-status-filters" aria-label={t("features:excelCompare.results.filters")}>
+          <div className="flex flex-wrap gap-1.5" data-testid="excel-status-filters" role="group" aria-label={t("features:excelCompare.results.filters")}>
             {STATUSES.map((status) => { const selected = statuses.has(status); return <Button type="button" size="sm" variant="outline" data-status={status} aria-pressed={selected} className={`rounded-full ${selected ? "border-green-700/60 bg-green-500/10 text-foreground dark:border-green-300/60" : "opacity-55"}`} key={status} onClick={() => toggleStatus(status)}><span className={`size-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />{t(`features:excelCompare.status.${status}` as never)}</Button>; })}
           </div>
           <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-xl border border-input bg-background px-3 text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20" data-testid="excel-result-search"><Search size={16} /><span className="sr-only">{t("features:excelCompare.results.search")}</span><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground max-[620px]:text-base" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleLimit(500); }} placeholder={t("features:excelCompare.results.search")} /></label>
         </div>
-        <div className="mt-3 overflow-x-auto rounded-xl border border-border">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" role="region" aria-label={t("features:excelCompare.results.tableRegion")} tabIndex={0}>
           <table className="w-full min-w-[920px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left" data-testid="excel-result-table"><thead><tr><th>{t("features:excelCompare.results.pair")}</th><th>{t("features:excelCompare.results.state")}</th><th>{t("features:excelCompare.results.location")}</th><th>{t("features:excelCompare.results.key")}</th><th>{t("features:excelCompare.results.left")}</th><th>{t("features:excelCompare.results.right")}</th><th>{t("features:excelCompare.results.reason")}</th></tr></thead><tbody>
-            {resultRows.slice(0, visibleLimit).map(({ item, pairIndex, record }, index) => <tr data-status={record.status} key={`${item.pairId}-${index}-${record.leftRow}-${record.rightRow}-${record.leftColumn}`}><td>{pairIndex + 1}</td><td><span className="font-bold">{t(`features:excelCompare.status.${record.status}` as never)}</span></td><td>{locationText(record.leftRow, record.rightRow, record.leftColumn, record.rightColumn)}</td><td>{record.key}</td><td>{record.leftValue}</td><td>{record.rightValue}</td><td>{reasonText(record.reason, translate)}</td></tr>)}
+            {resultRows.slice(0, visibleLimit).map(({ item, pairIndex, record, recordIndex }) => <ResultRow item={item} pairIndex={pairIndex} record={record} recordIndex={recordIndex} t={translate} key={resultRowKey(item.pairId, record, recordIndex)} />)}
           </tbody></table>
           {!resultRows.length && <p className="p-4 text-center text-sm text-muted-foreground">{t("features:excelCompare.results.empty")}</p>}
         </div>
-        {resultRows.length > visibleLimit && <Button className="mt-3 rounded-xl" variant="secondary" type="button" onClick={() => setVisibleLimit((current) => current + 500)}>{t("features:excelCompare.results.showMore", { remaining: resultRows.length - visibleLimit })}</Button>}
+        {resultRows.length > visibleLimit && <Button className="mt-3 min-h-11 rounded-xl" data-testid="excel-result-show-more" variant="secondary" type="button" onClick={() => setVisibleLimit((current) => current + 500)}>{t("features:excelCompare.results.showMore", { remaining: resultRows.length - visibleLimit })}</Button>}
       </Card>}
 
       <ToolGuide title={t("features:excelCompare.guide.title")} description={t("features:excelCompare.guide.description")} blocks={(t("features:excelCompare.guide.blocks", { returnObjects: true }) as Array<{ title: string; text: string }>).map((item) => ({ title: item.title, paragraphs: [item.text] }))} faq={(t("features:excelCompare.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map((item) => ({ question: item.q, answer: item.a }))} />
@@ -270,6 +277,136 @@ export function ExcelComparePage() {
     </UtilityPage>
   );
 }
+
+function ResultRow({ item, pairIndex, record, t }: {
+  item: CompletedPair;
+  pairIndex: number;
+  record: ExcelCompareRecord;
+  recordIndex: number;
+  t: LooseT;
+}) {
+  if (record.status === "duplicate") {
+    return <tr data-status={record.status} data-testid="excel-duplicate-row">
+      <td>{pairIndex + 1}</td>
+      <td><span className="font-bold">{t("features:excelCompare.status.duplicate")}</span></td>
+      <td><span className="sr-only">{t("features:excelCompare.results.groupedLocation")}</span><span aria-hidden="true">—</span></td>
+      <td className="max-w-56 [overflow-wrap:anywhere]">{record.displayKey}</td>
+      <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="left" t={t} /></td>
+      <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="right" t={t} /></td>
+      <td>{reasonText(record.reason, t)}</td>
+    </tr>;
+  }
+  return <tr data-status={record.status}>
+    <td>{pairIndex + 1}</td>
+    <td><span className="font-bold">{t(`features:excelCompare.status.${record.status}`)}</span></td>
+    <td>{locationText(record.leftRow, record.rightRow, record.leftColumn, record.rightColumn)}</td>
+    <td className="[overflow-wrap:anywhere]">{record.key}</td>
+    <td className="[overflow-wrap:anywhere]">{record.leftValue}</td>
+    <td className="[overflow-wrap:anywhere]">{record.rightValue}</td>
+    <td>{reasonText(record.reason, t)}</td>
+  </tr>;
+}
+
+function DuplicateSideList({ pairId, record, side, t }: {
+  pairId: number;
+  record: ExcelCompareDuplicateRecord;
+  side: "left" | "right";
+  t: LooseT;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(DUPLICATE_LIST_PAGE_SIZE);
+  const contentId = useId();
+  const rows = side === "left" ? record.leftRows : record.rightRows;
+  const values = side === "left" ? record.leftValues : record.rightValues;
+  const sideLabel = t(`features:excelCompare.results.side.${side}`);
+  if (!rows.length) return <span data-testid="excel-duplicate-empty" data-side={side}>{t(`features:excelCompare.results.no${capitalize(side)}Rows`)}</span>;
+
+  const shown = Math.min(visibleCount, rows.length);
+  const remaining = rows.length - shown;
+  const toggleKey = expanded ? `hide${capitalize(side)}Rows` : `show${capitalize(side)}Rows`;
+  return <div data-testid="excel-duplicate-side" data-side={side}>
+    <Button
+      className="min-h-11 w-full justify-between rounded-xl px-3 text-left"
+      data-testid="excel-duplicate-toggle"
+      data-side={side}
+      variant="outline"
+      type="button"
+      aria-controls={contentId}
+      aria-expanded={expanded}
+      onClick={() => {
+        setExpanded((current) => !current);
+        if (expanded) setVisibleCount(DUPLICATE_LIST_PAGE_SIZE);
+      }}
+    >
+      <span>{t(`features:excelCompare.results.${toggleKey}`, { count: rows.length })}</span>
+      {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+    </Button>
+    {expanded && <div className="mt-2" data-testid="excel-duplicate-list" data-side={side} id={contentId}>
+      <ol className="grid gap-2">
+        {rows.slice(0, shown).map((row, index) => <li className="rounded-xl border border-border bg-muted/35 p-2.5" key={`${pairId}:${record.key}:${side}:${row}:${index}`}>
+          <span className="block text-xs font-bold text-muted-foreground">{t("features:excelCompare.results.sourceRow", { row })}</span>
+          <DuplicateValue value={values[index]} row={row} side={side} sideLabel={sideLabel} t={t} />
+        </li>)}
+      </ol>
+      {remaining > 0 && <Button
+        className="mt-2 min-h-11 w-full rounded-xl"
+        data-testid="excel-duplicate-show-more"
+        data-side={side}
+        variant="secondary"
+        type="button"
+        onClick={() => setVisibleCount((current) => current + DUPLICATE_LIST_PAGE_SIZE)}
+      >{t("features:excelCompare.results.showMoreRows", { count: Math.min(DUPLICATE_LIST_PAGE_SIZE, remaining), remaining })}</Button>}
+    </div>}
+  </div>;
+}
+
+function DuplicateValue({ value, row, side, sideLabel, t }: {
+  value: string;
+  row: number;
+  side: "left" | "right";
+  sideLabel: string;
+  t: LooseT;
+}) {
+  const characters = Array.from(value);
+  if (!characters.length) return <span className="mt-1 block text-sm text-muted-foreground">{t("features:excelCompare.results.emptyValue")}</span>;
+  if (characters.length <= VALUE_PREVIEW_CODE_POINT_LIMIT) return <span className="mt-1 block whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</span>;
+  const preview = `${characters.slice(0, VALUE_PREVIEW_CODE_POINT_LIMIT).join("")}…`;
+  return <div className="mt-1 grid gap-2">
+    <span className="block whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="excel-duplicate-value-preview">{preview}</span>
+    <DialogPrimitive.Root>
+      <DialogPrimitive.Trigger
+        render={<Button className="min-h-11 w-fit rounded-xl" data-testid="excel-full-value-trigger" data-side={side} variant="secondary" type="button" />}
+        aria-label={t("features:excelCompare.results.fullValueButtonLabel", { side: sideLabel, row })}
+      >{t("features:excelCompare.results.fullValue")}</DialogPrimitive.Trigger>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm" />
+        <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 flex max-h-[min(80vh,720px)] w-[min(680px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-3xl border border-border bg-popover p-5 text-popover-foreground shadow-2xl" data-testid="excel-full-value-dialog">
+          <DialogPrimitive.Title className="pr-12 font-heading text-xl font-medium">{t("features:excelCompare.results.fullValue")}</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="mt-1 text-sm text-muted-foreground">{t("features:excelCompare.results.fullValueDescription", { side: sideLabel, row })}</DialogPrimitive.Description>
+          <pre className="mt-4 min-h-16 overflow-auto whitespace-pre-wrap rounded-2xl border border-border bg-muted/40 p-3 font-sans text-sm [overflow-wrap:anywhere]">{value}</pre>
+          <DialogPrimitive.Close render={<Button className="mt-4 min-h-11 self-end rounded-xl" variant="secondary" type="button" />}>
+            {t("common:actions.close")}
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Popup>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  </div>;
+}
+
+function recordSearchText(record: ExcelCompareRecord, language: string) {
+  const fields = record.status === "duplicate"
+    ? [record.displayKey, ...record.leftRows.map(String), ...record.rightRows.map(String), ...record.leftValues, ...record.rightValues]
+    : [record.key, record.leftValue, record.rightValue, record.change, record.reason];
+  return fields.join(" ").normalize("NFC").toLocaleLowerCase(language);
+}
+
+function resultRowKey(pairId: number, record: ExcelCompareRecord, recordIndex: number) {
+  return record.status === "duplicate"
+    ? `${pairId}:duplicate:${record.key}`
+    : `${pairId}:record:${recordIndex}`;
+}
+
+function capitalize(value: "left" | "right") { return value === "left" ? "Left" : "Right"; }
 
 function PairCard({ pair, index, mode, busy, t, updatePair, selectFile, refreshHeader, removePair, canRemove }: {
   pair: PairState; index: number; mode: ExcelCompareMode; busy: boolean; t: LooseT;
@@ -374,7 +511,7 @@ function SupportTable({ t }: { t: LooseT }) {
     ["XLS (BIFF8)", "○", "○", "○", "○", "×", "○"], ["XLSB", "○", "○", "○", "○", "×", "○"],
     ["SpreadsheetML .xls", "○", "○", "○", "○", "×", "○"], ["CSV", "○", "—", "—", "—", "—", "—"],
   ];
-  return <div data-testid="excel-support-table"><div className="overflow-x-auto rounded-xl border border-border"><table className="w-full min-w-[680px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td:not(:first-child)]:text-center [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th:not(:first-child)]:text-center"><thead><tr>{["format", "value", "display", "formula", "cache", "style", "merge"].map((key) => <th key={key}>{t(`features:excelCompare.support.${key}` as never)}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`}>{cell}</td>)}</tr>)}</tbody></table></div><p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.support.note")}</p></div>;
+  return <div data-testid="excel-support-table"><div className="overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" role="region" aria-label={t("features:excelCompare.support.title")} tabIndex={0}><table className="w-full min-w-[680px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td:not(:first-child)]:text-center [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th:not(:first-child)]:text-center"><thead><tr>{["format", "value", "display", "formula", "cache", "style", "merge"].map((key) => <th key={key}>{t(`features:excelCompare.support.${key}` as never)}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`}>{cell}</td>)}</tr>)}</tbody></table></div><p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.support.note")}</p></div>;
 }
 
 function newPair(id: number): PairState {

@@ -4,6 +4,30 @@
 
 ## 2026-09-08
 
+### Excel 중복키 S2 — 결과 화면 그룹 소비 전환 (Codx)
+
+**착수 게이트·범위** — 지정 브랜치 `excel-dupkey-20260907`의 시작 HEAD가 `c1e44f60096dfad33e6c225fdb96f5323516edf6`이고 추적 변경이 없음을 확인했다. 대상 worktree에는 ignore된 todo 계획서가 없어서 S0 증거 디렉터리에 보존된 동일 정본과 채택된 1~3차 보강 문서를 읽었고, 같은 HEAD의 S1 재검수에서 열린 계획서 19개와 충돌 없음·S1 통과가 이미 확인된 근거를 사용했다. S0 번들 기준선 SHA-256도 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`로 일치했다. S3 머리글 감지, main 병합·push·배포는 포함하지 않았다.
+
+**화면 소비 판정** — `status=duplicate` 레코드는 내부 normalized `key` 대신 `displayKey`를 표시하고, 한 그룹을 표의 한 행으로 렌더한다. 좌우 `Rows/Values`는 서로 독립된 기본 접힘 목록이며 0건 측은 버튼 없이 텍스트만 표시한다. 펼칠 때만 항목 DOM을 만들고 각 측 50건부터 50건씩 늘리며, 닫으면 그 측만 50건으로 초기화한다. 그룹과 측 항목의 React identity에만 `pairId+record.key`를 쓰고 검색·표시 DOM에는 내부 키를 쓰지 않는다. 검색 문자열은 접힘/500행 가시 범위와 무관하게 공개 키, 양측 전체 값, 모든 원본 행 번호를 미리 포함한다. 긴 값은 160 code point 미리보기 뒤 Base UI modal로 원문을 손실 없이 제공하며 키보드 Enter, 이름, Escape 닫기와 trigger 초점 반환을 확인했다. 결과 표와 지원 표의 모바일 가로 스크롤 영역은 이름 있는 focusable region으로 만들었다.
+
+501그룹 합성 fixture에서 duplicate 필터의 최초 DOM은 정확히 500행, `더 보기` 잔여는 1이었다. 접힌 목록 DOM 0, 값 검색 결과 1그룹, 행 번호 검색에 단측 K001 그룹 포함, 양측 50/0 → 51/50 독립 전개, 닫은 뒤 0/50, 최소 버튼 높이 44px, 0건 측 버튼 0을 실브라우저에서 단언했다. 기존 보고서 경로도 개별·ZIP 모두 9시트·Duplicates 13열·연속 행 복원을 유지했다. `string:`·`number:`·원시 `DUPLICATE_KEY`는 표에 없었다. 저장소 검색에서 남는 `DUPLICATE_KEY`는 엔진 판정값과 ko/en 번역 키, `DUPLICATE_KEY_TOO_LONG`은 안전 오류 상수와 번역 키뿐이며 실제 ko/en 오류·결과 화면 스모크는 원시 code 비노출을 확인한다.
+
+**문구·정적 표면 판정** — ko/en 결과 문구에 그룹 수, 좌우 단·복수 접기, 0건, 원본 행, 빈 값, 더 보기, 전체 값 대화상자를 함께 추가했다. 가이드·FAQ와 도구 설명·SEO 설명/featureList/static FAQ는 좌우 같은 줄이 자동 매칭이 아니며 보조키·발생 순번을 선택할 수 있다는 의미로 동기화했다. SEO path key 집합은 기준과 같은 31개, production sitemap은 61 URL이고 정적 검증의 canonical/hreflang도 통과해 URL·canonical·사이트맵 집합은 불변이다. 광고·격리·network/API·서버 전제 코드는 바꾸지 않았다.
+
+**시각·접근성 판정** — 실제 중복 결과를 여는 `interaction-duplicate-result`를 ko/en × light/dark × desktop/mobile 8개 profile로 추가했다. 최초 기준선 갱신은 8개 중 마지막 profile의 두 파일 upload가 React 갱신 전에 연속 실행되는 경합으로 7개 뒤 대기 실패했으며, 첫 파일 선택 완료와 두 번째 inspection 완료를 각각 기다리도록 시나리오를 고정한 뒤 **8/8 갱신·8/8 재일치**했다. 바뀐 기준선은 이 신규 상태 8장뿐이다. 화면 육안 검사에서도 표의 가로 스크롤, 긴 값 줄바꿈, 접기 목록, 안내 카드가 네 대표 조합에서 깨지지 않았다.
+
+axe 등록은 기존 8페이지에 위 8개 결과 상태를 더해 총 16페이지다. 첫 모바일 감사가 기존 지원 표의 focus 불가 가로 스크롤을 네 profile에서 찾아 이름·초점을 보강했고, 최종은 **16페이지·위반 0·외부 요청 0**이다. `incomplete`은 통과로 세지 않고 대상 selector를 보고서에 보존했다. 상태 필터의 기존 무역할 `aria-label`은 `role=group`으로 명확히 해 ARIA 보류를 0으로 만들었다. oklab 색상 때문에 자동 판정 보류인 대비는 렌더 픽셀 합성으로 별도 계산해 새 결과 텍스트 최소가 light **5.273:1**, dark **5.733:1**임을 확인했다.
+
+**사용자 파일 재현** — `/tmp/worklazy-userfiles/` 사본 두 개만 읽어 production 동형 브라우저에서 다음 결과와 그룹당 한 행·기본 접힘·`displayKey` 일치를 확인했다. 원본/사본을 fixture로 추가하거나 저장소에 넣지 않았다.
+
+| 머리글/키 | 중복 그룹·UI 행 | matched | changed | added |
+|---|---:|---:|---:|---:|
+| 1행/B열 | **1/1** | 713 | 37 | 48 |
+| 4행/A열 | **6/6** | 486 | 134 | 31 |
+| 4행/B열 | **0/0** | 703 | 37 | 48 |
+
+**회귀·번들** — 최종 TypeScript 진단 0, unit **380/380**, production/QA build 각 2,835 modules, production 정적 61페이지·startup 104문서, Excel 비교·Excel Cleaner·QR bulk·전체 browser 스모크, CSS orphan 0, 도구 registry 20개와 `git diff --check`를 통과했다. 브라우저는 `127.0.0.1:4350 --strictPort`에서 직렬 실행했다. S0 대비 gzip 현재값/증분/상한은 entry **300,694/+1,406/+20,480B**, affected routes **2,453,004/+1,423/+61,440B**, shared **2,715,789/+1,281/+30,720B**, app JS **5,469,487/+4,110/+81,920B**, CSS **37,818/+125/+10,240B**로 다섯 예산을 모두 통과했다. JSON·사용자 재현·접근성 원출력과 최종 보고서는 `/tmp/worklazy-xd-s2/`에 보존한다. — Codx
+
 ### Excel 중복키 S1 fix-1 — 긴 키 오류 안내·기록 정정 (Codx)
 
 **누락·재현** — 지원되는 정상 CSV에서 선택 키 값 32,768자가 두 행에 반복되면 보고서 Key 절대 한도 guard가 `DUPLICATE_KEY_TOO_LONG`으로 그 쌍만 안전하게 제외한다. S1 커밋은 code 전달과 쌍 격리를 구현했지만 `excelCompare.error`의 ko/en 키를 빠뜨려, UI가 정상 입력에 `PROCESSING_FAILED`의 파일 손상·지원 형식 확인 안내를 표시했다. 이는 객체 주입·ZIP 변조 없이 도달하는 R2-01 정본 경로다.

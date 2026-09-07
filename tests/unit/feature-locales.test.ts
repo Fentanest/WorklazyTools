@@ -35,6 +35,23 @@ test("video messages in both languages hide internal processing names", async ()
   }
 });
 
+test("Excel duplicate result copy keeps independent-list, zero-row, dialog, and guide contracts", async () => {
+  const [ko, en] = await Promise.all(["ko", "en"].map(async (language) => JSON.parse(await readFile(new URL(`src/locales/${language}/features.json`, root), "utf8"))));
+  assert.equal(ko.excelCompare.results.noLeftRows, "왼쪽 0건");
+  assert.equal(en.excelCompare.results.noLeftRows, "No left rows");
+  assert.equal(en.excelCompare.results.showLeftRows_one, "Show {{count}} left row");
+  assert.equal(en.excelCompare.results.showLeftRows, "Show {{count}} left rows");
+  assert.match(ko.excelCompare.results.duplicateGuidance, /자동으로 연결하지 않았습니다/);
+  assert.match(en.excelCompare.results.duplicateGuidance, /not been matched automatically/);
+  for (const resource of [ko, en]) {
+    const copy = Object.values(stringLeaves(resource.excelCompare)).join("\n");
+    assert.ok(resource.excelCompare.results.fullValue);
+    assert.ok(resource.excelCompare.guide.blocks.some(({ text }: { text: string }) => /같은 줄끼리 연결한 결과가 아닙니다|same line are not matched/.test(text)));
+    assert.ok(resource.excelCompare.guide.faq.some(({ q, a }: { q: string; a: string }) => /중복키|same key/i.test(`${q} ${a}`)));
+    assert.doesNotMatch(copy, /string:|number:|DUPLICATE_KEY_TOO_LONG/);
+  }
+});
+
 function leafKeys(value: unknown, prefix = ""): string[] {
   if (!value || typeof value !== "object") return [prefix];
   return Object.entries(value).flatMap(([key, child]) => leafKeys(child, prefix ? `${prefix}.${key}` : key)).sort();

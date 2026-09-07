@@ -29,6 +29,21 @@ try {
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-right-b.csv"), "Key,Value\nB,right", "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"), `Key\n${"k".repeat(32_768)}\n${"k".repeat(32_768)}`, "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"), "Key\nother", "utf8");
+  const groupedUiLeft = ["Key,Value"];
+  const groupedUiRight = ["Key,Value"];
+  for (let index = 0; index < 51; index += 1) groupedUiLeft.push(`K000,left-zero-${index}`);
+  for (let index = 0; index < 51; index += 1) {
+    groupedUiLeft.push(`K002,${index === 0 ? `dialog-${"x".repeat(220)}` : `left-two-${index}`}`);
+    groupedUiRight.push(`K002,right-two-${index}`);
+  }
+  for (let group = 3; group <= 500; group += 1) {
+    const key = `K${String(group).padStart(3, "0")}`;
+    groupedUiLeft.push(`${key},left-${group}-a`, `${key},left-${group}-b`);
+    groupedUiRight.push(`${key},right-${group}`);
+  }
+  groupedUiRight.push("K001,right-only-first", "K001,right-only-tail-value");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-ui-left.csv"), `${groupedUiLeft.join("\n")}\n`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-ui-right.csv"), `${groupedUiRight.join("\n")}\n`, "utf8");
   const fixture = (name) => path.join(temporaryDirectory, name);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -213,6 +228,10 @@ try {
       leftB: path.join(temporaryDirectory, "duplicate-left-b.csv"),
       rightB: path.join(temporaryDirectory, "duplicate-right-b.csv"),
     }, downloadRoot);
+    const groupedDuplicateUi = await assertGroupedDuplicateUi(browser, {
+      left: path.join(temporaryDirectory, "duplicate-ui-left.csv"),
+      right: path.join(temporaryDirectory, "duplicate-ui-right.csv"),
+    });
     const duplicateKeyTooLong = [];
     for (const language of ["ko", "en"]) {
       duplicateKeyTooLong.push(await assertDuplicateKeyTooLongIsolation(browser, {
@@ -240,6 +259,7 @@ try {
       swapDirection,
       optionalReconciliation,
       groupedDuplicates,
+      groupedDuplicateUi,
       duplicateKeyTooLong,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
@@ -548,6 +568,131 @@ async function assertGroupedDuplicateDownloads(browser, files, root) {
   }
 }
 
+async function assertGroupedDuplicateUi(browser, files) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.setViewport({ width: 1360, height: 940, deviceScaleFactor: 1 });
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
+    await input.uploadFile(files.left, files.right);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    await page.$$eval('[data-testid=excel-status-filters] button:not([data-status="duplicate"])', (buttons) => buttons.forEach((button) => button.click()));
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 500);
+
+    const collapsed = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length,
+      duplicateLists: document.querySelectorAll("[data-testid=excel-duplicate-list]").length,
+      countText: document.querySelector("[data-testid=excel-duplicate-guidance] strong")?.textContent?.trim() || "",
+      hasInternalText: /string:|number:|DUPLICATE_KEY/u.test(document.querySelector("[data-testid=excel-result-table]")?.textContent || ""),
+      showMore: document.querySelector("[data-testid=excel-result-show-more]")?.textContent?.trim() || "",
+      firstRightEmpty: document.querySelector("[data-testid=excel-duplicate-row]:first-child [data-testid=excel-duplicate-empty][data-side=right]")?.textContent?.trim() || "",
+      firstRightButtons: document.querySelectorAll("[data-testid=excel-duplicate-row]:first-child [data-side=right] button").length,
+    }));
+    if (collapsed.rows !== 500 || collapsed.duplicateLists !== 0 || collapsed.countText !== "중복 키 501개" || collapsed.showMore !== "결과 더 보기 (1개 남음)"
+      || collapsed.firstRightEmpty !== "오른쪽 0건" || collapsed.firstRightButtons !== 0
+      || collapsed.hasInternalText) {
+      throw new Error(`Grouped duplicate collapsed state, display key, or 500-group limit is invalid: ${JSON.stringify(collapsed)}`);
+    }
+
+    await setResultSearch(page, "right-only-tail-value");
+    const valueSearch = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length,
+      text: document.querySelector("[data-testid=excel-result-table] tbody")?.textContent || "",
+      lists: document.querySelectorAll("[data-testid=excel-duplicate-list]").length,
+    }));
+    if (valueSearch.rows !== 1 || !valueSearch.text.includes("K001") || valueSearch.text.includes("right-only-tail-value") || valueSearch.lists !== 0) {
+      throw new Error(`Search did not inspect a value outside the closed DOM: ${JSON.stringify(valueSearch)}`);
+    }
+    await setResultSearch(page, "552");
+    const rowSearch = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length,
+      text: document.querySelector("[data-testid=excel-result-table] tbody")?.textContent || "",
+    }));
+    if (rowSearch.rows < 1 || !rowSearch.text.includes("K001") || !rowSearch.text.includes("왼쪽 0건")) {
+      throw new Error(`Search did not inspect every source row number outside the closed DOM: ${JSON.stringify(rowSearch)}`);
+    }
+    await setResultSearch(page, "");
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 500);
+    await page.click("[data-testid=excel-result-show-more]");
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 501);
+    const lastGroup = await page.$eval("[data-testid=excel-duplicate-row]:last-child", (row) => ({
+      text: row.textContent || "",
+      leftButtons: row.querySelectorAll('[data-side="left"] button').length,
+    }));
+    if (!lastGroup.text.includes("K001") || !lastGroup.text.includes("왼쪽 0건") || lastGroup.leftButtons !== 0) {
+      throw new Error(`The 501st group or zero-side text is invalid: ${JSON.stringify(lastGroup)}`);
+    }
+
+    await page.click('[data-testid=excel-status-filters] button[data-status="duplicate"]');
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 0);
+    await page.click('[data-testid=excel-status-filters] button[data-status="duplicate"]');
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 500);
+
+    const secondRow = "[data-testid=excel-duplicate-row]:nth-child(2)";
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=left]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list][data-side=left] li`).length === 50, {}, secondRow);
+    const independentBeforeMore = await page.$eval(secondRow, (row) => ({
+      leftItems: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="left"] li').length,
+      rightLists: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="right"]').length,
+      leftExpanded: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="left"]')?.getAttribute("aria-expanded"),
+      rightExpanded: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="right"]')?.getAttribute("aria-expanded"),
+    }));
+    if (JSON.stringify(independentBeforeMore) !== JSON.stringify({ leftItems: 50, rightLists: 0, leftExpanded: "true", rightExpanded: "false" })) {
+      throw new Error(`Duplicate sides did not expand independently at 50 rows: ${JSON.stringify(independentBeforeMore)}`);
+    }
+    await page.click(`${secondRow} [data-testid=excel-duplicate-show-more][data-side=left]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list][data-side=left] li`).length === 51, {}, secondRow);
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=right]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list][data-side=right] li`).length === 50, {}, secondRow);
+
+    const fullValueTrigger = await page.$(`${secondRow} [data-testid=excel-full-value-trigger][data-side=left]`);
+    await fullValueTrigger.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('[data-testid=excel-full-value-dialog][role="dialog"]');
+    const dialog = await page.$eval('[data-testid=excel-full-value-dialog]', (element) => ({
+      label: element.getAttribute("aria-labelledby"),
+      text: element.textContent || "",
+    }));
+    if (!dialog.label || !dialog.text.includes("전체 값") || !dialog.text.includes(`dialog-${"x".repeat(220)}`)) {
+      throw new Error(`Full-value dialog is not named or lossless: ${JSON.stringify({ ...dialog, text: dialog.text.slice(0, 80) })}`);
+    }
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-full-value-dialog]"));
+    const focusReturned = await page.evaluate(() => document.activeElement?.matches('[data-testid=excel-full-value-trigger][data-side="left"]'));
+    if (!focusReturned) throw new Error("Full-value dialog did not return focus to its keyboard trigger after Escape.");
+
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=left]`);
+    const independentAfterClose = await page.$eval(secondRow, (row) => ({
+      leftLists: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="left"]').length,
+      rightItems: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="right"] li').length,
+      nestedButtons: row.querySelectorAll('button button').length,
+      minimumTargetHeight: Math.min(...Array.from(row.querySelectorAll("button"), (button) => button.getBoundingClientRect().height)),
+    }));
+    if (independentAfterClose.leftLists !== 0 || independentAfterClose.rightItems !== 50 || independentAfterClose.nestedButtons !== 0 || independentAfterClose.minimumTargetHeight < 44) {
+      throw new Error(`Independent close, button nesting, or touch targets are invalid: ${JSON.stringify(independentAfterClose)}`);
+    }
+    return { collapsed, valueSearch, rowSearch, lastGroup, independentBeforeMore, independentAfterClose, dialogNamed: true, keyboardOpen: true, escapeClosed: true, focusReturned };
+  } finally {
+    await page.close();
+  }
+}
+
+async function setResultSearch(page, value) {
+  await page.$eval("[data-testid=excel-result-search] input", (input, nextValue) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter.call(input, nextValue);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }, value);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
 async function assertGroupedDuplicateReport(bytes) {
   const summary = await assertNineSheetReport(bytes, {
     matched: 0, changed: 0, added: 0, removed: 0, duplicate: 1, ambiguous: 0, unmatched: 0, error: 0,
@@ -609,6 +754,20 @@ async function assertDuplicateKeyTooLongIsolation(browser, files, root, language
     await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
     await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
     await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    const localizedUi = await page.$eval("[data-testid=excel-duplicate-row]", (row) => ({
+      count: document.querySelector("[data-testid=excel-duplicate-guidance] strong")?.textContent?.trim() || "",
+      left: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="left"]')?.textContent?.trim() || "",
+      right: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="right"]')?.textContent?.trim() || "",
+      key: row.querySelector("td:nth-child(4)")?.textContent?.trim() || "",
+      table: document.querySelector("[data-testid=excel-result-table]")?.textContent || "",
+    }));
+    const expectedUi = language === "ko"
+      ? { count: "중복 키 2개", left: "왼쪽 2건 보기", right: "오른쪽 1건 보기" }
+      : { count: "2 duplicate keys", left: "Show 2 left rows", right: "Show 1 right row" };
+    if (localizedUi.count !== expectedUi.count || localizedUi.left !== expectedUi.left || localizedUi.right !== expectedUi.right
+      || !/^[AB]$/u.test(localizedUi.key) || localizedUi.table.includes("string:") || localizedUi.table.includes("DUPLICATE_KEY")) {
+      throw new Error(`Grouped duplicate locale, plural, or public display is invalid (${language}): ${JSON.stringify(localizedUi)}`);
+    }
     const downloads = await downloadReportLinks(page, client, root, `duplicate-key-too-long-${language}`);
     const reports = downloads.filter((item) => item.name.endsWith(".xlsx"));
     const archives = downloads.filter((item) => item.name.endsWith(".zip"));
@@ -631,7 +790,7 @@ async function assertDuplicateKeyTooLongIsolation(browser, files, root, language
       || failure.includes("DUPLICATE_KEY_TOO_LONG") || !failure.includes(expectedGuidance)) {
       throw new Error(`The overlong-key cause and recovery guidance were not safely isolated (${language}): ${failure}`);
     }
-    return { language, reports: reports.length, zipEntries: entries.length, rawCodeHidden: true, causeAndRecoveryGuidance: expectedGuidance, failure };
+    return { language, reports: reports.length, zipEntries: entries.length, rawCodeHidden: true, localizedUi, causeAndRecoveryGuidance: expectedGuidance, failure };
   } finally {
     await page.close();
   }
