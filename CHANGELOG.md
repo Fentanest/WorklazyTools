@@ -4,6 +4,7 @@
 
 ## 2026-09-07
 
+- PDF 마무리 검수 결함을 수리해 입력 중 시작 페이지 오류와 보호 문서 안내, 실제 캔버스 기준 미리보기, CropBox 경계, 실행 전 글꼴·배치 안내, 취소 부분 결과, 현지화 파일명과 821px navigation을 보강하고 QR PDF metadata 출력을 복구했다. — Codx
 - U4-3 PDF 마무리에 페이지 번호·머리말/꼬리말 화면과 3개 진입 경로를 추가했다. 정확 페이지 선택·토큰·회전/CropBox/UserUnit 배치·전체 Noto 글꼴 임베드·협력적 취소 엔진, QR과의 공용 PDF 글꼴 청크, ko/en SEO·정적·소셜 표면 및 전용 브라우저·시각·접근성·CLS 회귀를 함께 고정했다. — Codx
 - PDF worker lifecycle adapter가 종료 상태를 먼저 잠그고 원 Worker 콜백을 차단해 취소·오류 확정 뒤 같은 턴의 늦은 오류가 최초 name·message·code를 덮어쓰지 못하도록 수정하고 terminal 경합 회귀를 보강했다. — Codx
 - U4-2 PDF worker 호출을 PDF 소유 lifecycle facade로 이관하고 마지막 optional AbortSignal, task 양보·결과 등록 전 재검사 helper, PDF.js 렌더 취소의 정착·cleanup·소유 문서 destroy 순서를 추가했다. legacy oracle·Excel 무변경·worker 수명주기 회귀도 함께 고정했다. — Codx

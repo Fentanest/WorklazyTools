@@ -10,6 +10,8 @@ import type { PdfWorkerResult } from "./types";
 import { featureMessage } from "../../i18n/featureMessages";
 import { cn } from "../../lib/utils";
 
+export { normalizeOutputName } from "./outputName.ts";
+
 export interface DownloadResult {
   url: string;
   fileName: string;
@@ -70,8 +72,4 @@ export function PdfError({ message }: { message: string }) {
   const language = useAppLanguage();
   if (!message) return null;
   return <div className="mt-4 flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-destructive" data-testid="pdf-error" role="alert"><AlertTriangle className="shrink-0" size={19} /><div className="flex flex-col"><strong className="text-sm">{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span className="mt-1 text-sm leading-relaxed text-muted-foreground">{message}</span></div></div>;
-}
-
-export function normalizeOutputName(value: string, fallback: string) {
-  return value.trim().replace(/[\\/:*?"<>|]+/g, "-") || fallback;
 }

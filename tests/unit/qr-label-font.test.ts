@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
+import { PDFDocument } from "pdf-lib";
 import ts from "typescript";
 
 import coverageInput from "../../scripts/assets/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/coverage.json" with { type: "json" };
@@ -157,6 +158,12 @@ test("only font registration or embedding failures cross the typed font-init bou
   ));
   const font = gunzipSync(compressed);
   const exactFont = font.buffer.slice(font.byteOffset, font.byteOffset + font.byteLength);
+  const metadataPdf = await createQrLabelPdf([], "a4", exactFont);
+  const metadataDocument = await PDFDocument.load(await metadataPdf.arrayBuffer(), { updateMetadata: false });
+  assert.match(metadataDocument.getProducer() ?? "", /pdf-lib/u);
+  assert.match(metadataDocument.getCreator() ?? "", /pdf-lib/u);
+  assert.ok(metadataDocument.getCreationDate() instanceof Date);
+  assert.ok(metadataDocument.getModificationDate() instanceof Date);
   await assert.rejects(
     createQrLabelPdf([{ png: new Blob(["not a png"]), title: "한글", description: "" }], "a4", exactFont),
     (error) => !(error instanceof QrLabelFontInitError),

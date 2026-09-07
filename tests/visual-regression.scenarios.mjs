@@ -624,6 +624,7 @@ const pdfFinishScenarios = [
     actions: [
       { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[type='file']" },
       { type: "wait", selector: "[data-testid='pdf-finish-overlay']", timeoutMs: 60_000 },
+      { type: "wait", selector: "[data-testid='pdf-finish-preflight-ready']", timeoutMs: 60_000 },
       { type: "scroll-into-view", selector: "[data-testid='pdf-finish-preview']", offset: -88 },
     ],
     readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='page-numbers']",
@@ -643,6 +644,7 @@ const pdfFinishScenarios = [
     actions: [
       { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[type='file']" },
       { type: "wait", selector: "[data-testid='pdf-finish-overlay']", timeoutMs: 60_000 },
+      { type: "wait", selector: "[data-testid='pdf-finish-preflight-ready']", timeoutMs: 60_000 },
       { type: "scroll-into-view", selector: "[data-testid='pdf-finish-preview']", offset: -88 },
     ],
     readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='header-footer']",

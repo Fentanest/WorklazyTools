@@ -4,6 +4,36 @@
 
 ## 2026-09-07
 
+### U4-3 fix-1 — astra F1~F9 수리·계약 확정 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix dispatch, astra 원보고서와 재현 산출물, 제품 결정문, PDF finish 정본·원 지시서·관련 기각 이력을 읽었다. 기준은 `s3-pdf-finish` `HEAD=c8bff1fd1ab64f89afb7240778e0a373c953d1a3`, `main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`로 일치했고 추적 변경과 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았고 main 병합·push·배포도 하지 않았다. 계획서 편집 금지와 F9의 정본 반영 요구는, Claude가 확정한 fix dispatch를 결정 정본으로 삼고 아래에 정본 반영 문안을 기록하되 `docs/jobs/todo/pdf-finish-20260905.md` 자체는 바꾸지 않는 것으로 함께 지켰다.
+
+**F1~F4 수리** — F1은 시작 번호·시작 페이지와 글자 크기·여백을 입력 중 문자열로 보존한다. 특히 시작 페이지가 빈 값·`0`·`-1`·`1.5`이면 유효 lower bound를 만들지 않아 selection·thumbnail 순수 함수 호출을 막고, 파일·폼을 유지한 채 해당 ko/en 필드 오류와 실행 비활성만 적용한다. 정상값 복귀도 같은 화면에서 성공한다. F2는 업로드 오류를 파일 조건부 영역 밖에 두고 R2/R6 암호·권한 제한 4종을 “보호되어 편집 불가”, 손상 파일을 읽기 실패 안내로 분리했으며 재업로드와 원시 예외 치환 경계를 유지했다. F3은 가운데 위치를 `left:50%`로 고치고 helper의 inline 높이를 반응형으로 초기화한 뒤, 원본 종횡비의 실제 canvas wrapper 안에 overlay를 넣었다. 모바일 portrait/landscape×6영역×ko/en×light/dark **48/48**에서 종횡비 오차 ≤0.002, canvas wrapper 일치, overlay 내부 포함, 가운데 오차 ≤1px였다. F4는 CropBox와 MediaBox의 교집합을 표시 영역으로 쓰고 빈 교집합은 MediaBox로 되돌린다. 네 회전 viewport unit과 경계 밖 CropBox를 단위·브라우저 출력에 고정했고 PDF.js·Poppler 모두 장식 픽셀과 upright 텍스트를 검출했다.
+
+**F5~F8 수리** — F5의 `analyzeDocument`는 token 치환→전처리→font coverage→layout의 한 계획을 preflight와 실제 draw가 함께 사용한다. 제어 문자·잘못된 날짜 형식·누락 glyph는 scalar 기준 행·열을 붙여 필드에 표시하고 생성 전 차단한다. 너무 좁은 영역·무효 여백은 페이지를 붙여 구별하며, 알 수 없는 토큰·가로 말줄임·세로 생략·전체 글꼴 임베드는 생성 전에 경고한다. ko/en 전체 글꼴 문안에는 실측 근거인 **약 3.8MB 증가**를 명시했다. F6은 file load 전후, font fetch/coverage/embed 전후, 반복 양보 뒤, save 전후, 등록 전에 abort를 재검사한다. 반환 배열 형식은 유지하고, 완료 결과가 있는 취소 rejection만 `PdfFinishCanceledError.partialResults`로 공개하는 명시적 부분 결과 계약을 추가했다. astra 동일 반례는 부분 결과 **1**, 두 번째 파일 read **0**이며 U4-8 다중 업로드 UI·ZIP은 앞당기지 않았다. F7은 신규 문서 helper가 `PDFDocument.create()` 기본 metadata를 그대로 보존하고 선택적 create options만 전달하게 했다. 기존 문서 load의 `updateMetadata:false`는 그대로다. 고정 시각 QR subset/full은 각각 **661,064B / 3,911,538B**, main과 byte·SHA·Info/Producer/Creator/날짜가 동일하고 Poppler 2쪽 SHA도 동일했다. F8은 다섯 navigation 항목에 148px 실제 최소 폭을 주고 viewport 821px 강제 5열 전환을 제거했으며 overflow가 있으면 fade를 계속 보인다. 영어 821px 실측은 client **523px** / scroll **764px**, 다섯 링크 모두 client=scroll **148px**로 레이블 잘림·겹침이 없다.
+
+**F9 확정 계약·정본 반영 문안** — 번호 탭 초기값은 `{page} / {pages}`·아래 가운데, 머리말/바닥글 탭은 `{filename} · {date}`·위 가운데이고 두 탭 공통 10pt·24pt·`#34343a`다. `opacity=0.9`는 미리보기뿐 아니라 실제 PDF draw의 출력 계약이다. 출력명은 정리한 원본 basename에 ko `-마무리.pdf`, en `-finished.pdf`를 붙이며, 이미 붙은 두 접미사를 제거하고 반복 `.pdf`를 한 번으로 정리한다. 빈 basename fallback은 ko `Worklazy-PDF-마무리.pdf`, en `Worklazy-PDF-finished.pdf`다. 이 값은 locale message catalog와 engine 기대값에 함께 고정했다. 입력 범위 6~72pt와 0~144pt는 layout 안전성과 기존 UI 조작 범위를 보존하는 검증 한계이며 조용히 clamp하지 않고 필드 오류를 낸다. 템플릿 300자는 즉시 preflight·미리보기 갱신 비용과 좁은 표시 영역의 과도한 입력을 제한하는 UI 한계다. native `maxLength=300`, 보이는 글자 수 counter와 초과 입력 시 ko/en 안내를 함께 제공해 조용한 잘림으로 보이지 않게 했다. 이 문단이 편집 금지된 기존 계획서에 반영할 확정 문안이다.
+
+**기록·재현 정정** — 최초 U4-3 구현 때 지정됐던 `/tmp/worklazy-u4-3/REPORT.md`와 logs는 astra 검수 시 존재하지 않아 원실행 이력을 검증할 수 없었다. 이번 fix는 `/tmp/worklazy-u4-3-fix1/REPORT.md`와 `logs/` 원문을 남기고 ignored state report에도 복사한다. 앞선 기록의 selector “전체 0”은 문자 그대로는 부정확하다. 위 U4-3 표의 문서 인용 한 건만 존재하며 실행 경로 `src tests scripts`에는 **0건**이라는 것이 정확한 범위다. astra 검수 스크립트와 산출물은 수정하지 않았고, QR·engine·focused-browser는 원본 복사본에 import/output/base URL만 바꾼 별도 드라이버로 실행해 diff를 함께 보존했다.
+
+**시각 기준선·실패 보존** — UI 수리 뒤 finish 두 탭 16장과 navigation 12장, F8이 보이는 기존 PDF 모바일 2장, 합계 **30장**만 생성기로 갱신했다. 기존 convert/pdf-to-image interaction의 실행시간 표기만 달라져 갱신됐던 2장은 제품 변화가 아니므로 HEAD 이미지로 되돌렸다. 첫 전체 시각 실행은 새 최소 폭 영향이 남은 기존 모바일 기준선 2장 때문에 201/203(0.3050%·0.3889%)이었고, diff가 navigation에만 있음을 육안 확인한 뒤 두 장을 갱신했다. 최종은 ko **203/203, 7분 32.11초**, en **203/203, 7분 24.11초**다.
+
+| 검증 | 최종 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **301/301**, fail·skip 0 |
+| production build · static | **2,845 modules**, 정적 **67페이지**, startup recovery **113**, 통과 |
+| finish smoke · astra engine probe | 12 직접 진입, F1/F2/F5/F6 반례, 48 preview, 4회전 boundary 출력 통과; geometry **24/24**, 부분 결과 1·next read 0 |
+| PDF scope browser · 전체 browser | 기존 PDF 4모드와 Excel·Word·shared UI 통과 |
+| new-tools · utilities · office | HWP·Image·Audio·Video, ko/en 유틸리티, Office 통과 |
+| QR bulk · font render · 고정 시각 비교 | 4 font scenario/취소/404 통과; 3 fixture changed pixels 0; subset/full byte·Poppler 동일 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff 0 |
+| Excel Cleaner · Compare | 취소/재실행·보고서·모바일 포함 통과 |
+| 두 `LANG` 전체 visual | 각각 **203/203**, 위 시간으로 통과 |
+| local-QA build · a11y · rendering | 정적 67; 11페이지 axe 위반 0; 6대상×3회, 외부 요청 0, CLS max **0.0116485** < 0.1 |
+| bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 20 불변 |
+
+번들 순증분은 entry **4,837B**, affected PDF route **13,753B**, shared **2,066B**, app **21,109B**, CSS **118B**로 다섯 고정 상한 안이며 override `{}`·multiplier 1이다. QR→shared 이동 **509,380B**는 순증분과 분리했다. 반복된 PDF.js `standardFontDataUrl`과 Poppler OTF font-type 경고, new-tools의 Dolby Vision host capability skip은 기존 환경 경고이며 각각 텍스트·픽셀 oracle과 결정적 capability/fallback 검증은 통과했다. 복구 스위트는 병행 포트 규칙을 재현할 수 있도록 optional `RECOVERY_TEST_PORT`를 받아 지정 포트에 정확히 bind하도록 하네스만 보강했다. — Codx
+
 ### U4-3(F1) PDF 페이지 번호·머리말/꼬리말 — 브랜치 구현·검증 (Codx)
 
 **착수 게이트·범위** — `PROJECT_RULES.md` 전문과 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 route/preset/navigation·토큰/선택·clock·폰트·실행 realm/취소·미리보기/썸네일·H5/H6 게이트 및 U4-0~2 기록·기각 이력을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=446a1e35ba60ebc308a32a13f8b675a02b095365`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 충돌은 없었다. 착수 시 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML을 보존했다. 검증 중 새로 나타난 사용자 소유 `newui/`도 열거나 stage하지 않았다. main 병합·push·배포는 수행하지 않는다.

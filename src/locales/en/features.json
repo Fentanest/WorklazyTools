@@ -894,6 +894,7 @@
       "settingsDescription": "Set tokens, position, font size, and color.",
       "template": "Content to display",
       "templateHelp": "Available tokens:",
+      "templateCount": "{{count}} / 300 characters",
       "templatePlaceholder": {
         "page-numbers": "Example: {page} / {pages}",
         "header-footer": "Example: {filename} · {date}"
@@ -931,6 +932,15 @@
       "previewDisclaimer": "This preview is an on-screen approximation. Text spacing and placement in the finished PDF may differ slightly.",
       "previewWaiting": "Rendering the page preview…",
       "previewFailed": "The preview could not be displayed. You can check the settings and retry PDF creation.",
+      "preflightChecking": "Checking the content and page layout before creation…",
+      "preflightErrors": {
+        "control-character": "The content has an unsupported control character at line {{line}}, column {{column}}.",
+        "date-format": "Check the date format at line {{line}}, column {{column}}.",
+        "missing-glyph": "The character at line {{line}}, column {{column}} cannot be displayed with the available font.",
+        "narrow-region": "The display area on page {{page}} is too narrow for text. Reduce the margin or font size.",
+        "invalid-margin": "The margin uses all of the display area on page {{page}}. Reduce the margin.",
+        "invalid-layout": "The content cannot be placed on page {{page}}. Adjust the margin or font size."
+      },
       "create": "Create finished PDF",
       "creating": "Finishing the PDF…",
       "retry": "Try again",
@@ -950,7 +960,8 @@
         "margin": "Enter a margin from 0 to 144.",
         "startNumber": "Enter the starting number as an integer.",
         "startPage": "Enter the starting page as an integer of 1 or more.",
-        "template": "Enter the content to display."
+        "template": "Enter the content to display.",
+        "templateLength": "Keep the content within 300 characters. The current count exceeds the limit."
       },
       "rangeErrors": {
         "empty-range": "Enter a page range to apply.",
@@ -963,7 +974,11 @@
         "unreadable-document": "The PDF could not be read. Check the file and choose it again.",
         "invalid-field": "Check the input values and try again.",
         "invalid-text": "The content contains an unsupported control character or date format.",
+        "control-character": "The content contains an unsupported control character.",
+        "date-format": "Check the date format in the content.",
         "missing-glyph": "Some characters cannot be displayed with the available document font.",
+        "narrow-region": "The display area is too narrow. Reduce the margin or font size.",
+        "invalid-margin": "The margin uses all of the page display area. Reduce the margin.",
         "invalid-layout": "The content does not fit this page size and margin. Reduce the margin or font size.",
         "font-asset": "The Korean font could not be prepared. Check your connection and try again."
       },
@@ -971,7 +986,11 @@
         "unknown-token": "Unknown tokens were kept as entered.",
         "horizontal-overflow": "Some long lines were shortened with an ellipsis.",
         "vertical-overflow": "Some lines outside the available region were omitted.",
-        "embedded-font": "A full font was embedded for Korean and extended characters, which may increase the file size."
+        "embedded-font": "Embedding the full font for Korean and extended characters may add about 3.8 MB to the output file."
+      },
+      "outputFileName": {
+        "suffix": "finished",
+        "fallback": "Worklazy-PDF-finished"
       }
     },
     "page": {

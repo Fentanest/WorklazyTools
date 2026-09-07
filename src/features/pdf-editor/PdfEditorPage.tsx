@@ -112,7 +112,7 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
     >
       <nav
         ref={navigationRef}
-        className="pdf-tool-navigation grid grid-cols-[repeat(5,minmax(120px,1fr))] gap-1 overflow-x-auto rounded-2xl bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-[821px]:grid-cols-5"
+        className="pdf-tool-navigation grid grid-cols-[repeat(5,minmax(148px,1fr))] gap-1 overflow-x-auto rounded-2xl bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         aria-label={ariaLabel}
       >
         {navigation.map((item) => {
@@ -132,8 +132,8 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
           );
         })}
       </nav>
-      {overflow.left && <span aria-hidden="true" data-scroll-cue-side="left" className="pointer-events-none absolute inset-y-1 left-0 z-10 w-10 rounded-l-2xl bg-gradient-to-r from-background via-background/90 to-transparent min-[821px]:hidden" />}
-      {overflow.right && <span aria-hidden="true" data-scroll-cue-side="right" className="pointer-events-none absolute inset-y-1 right-0 z-10 w-12 rounded-r-2xl bg-gradient-to-l from-background via-background/90 to-transparent min-[821px]:hidden" />}
+      {overflow.left && <span aria-hidden="true" data-scroll-cue-side="left" className="pointer-events-none absolute inset-y-1 left-0 z-10 w-10 rounded-l-2xl bg-gradient-to-r from-background via-background/90 to-transparent" />}
+      {overflow.right && <span aria-hidden="true" data-scroll-cue-side="right" className="pointer-events-none absolute inset-y-1 right-0 z-10 w-12 rounded-r-2xl bg-gradient-to-l from-background via-background/90 to-transparent" />}
     </div>
   );
 }

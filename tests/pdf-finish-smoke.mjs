@@ -6,8 +6,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
+import { createCanvas } from "@napi-rs/canvas";
 import { chromium } from "playwright";
 import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
+import { PNG } from "pngjs";
 
 const execFileAsync = promisify(execFile);
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +24,8 @@ let browser;
 try {
   await fs.mkdir(shots, { recursive: true });
   const fixture = await createFixture();
+  const boundaryCropFixture = await createBoundaryCropFixture();
+  const smallFixture = await createSmallFixture();
   if (!process.env.TEST_BASE_URL) server = await startPreview();
   browser = await chromium.launch({
     executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome",
@@ -61,9 +65,13 @@ try {
 
   await testChunkRecovery(browser);
   await testNavigation(browser);
+  await testUploadErrors(browser);
+  await testPreviewGeometry(browser, fixture);
+  await testPreflightGuidance(browser, fixture, smallFixture);
   await testFinishWorkflow(browser, fixture);
+  await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks();
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, SPA tabs/navigation, selection sync, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 48 preview placements, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -117,6 +125,7 @@ async function testNavigation(browserInstance) {
         overflow: navigation.scrollWidth > navigation.clientWidth,
         activeVisible: activeRect.left >= navRect.left - 1 && activeRect.right <= navRect.right + 1,
         cue: navigation.parentElement?.getAttribute("data-scroll-cue"),
+        labelsFit: [...navigation.querySelectorAll("[data-pdf-nav-mode]")].every((link) => link.scrollWidth <= link.clientWidth + 1),
       };
     });
     assert.equal(metrics.count, 5);
@@ -124,6 +133,11 @@ async function testNavigation(browserInstance) {
     if (width <= 390) {
       assert.equal(metrics.overflow, true);
       assert.notEqual(metrics.cue, "none");
+    }
+    if (width === 821) {
+      assert.equal(metrics.overflow, true, "the 821px shell must keep scrolling when the sidebar reduces available width");
+      assert.notEqual(metrics.cue, "none", "the 821px overflow must retain a visible scroll cue");
+      assert.equal(metrics.labelsFit, true, "English navigation labels must not overlap or clip at 821px");
     }
     await context.close();
   }
@@ -142,6 +156,148 @@ async function testNavigation(browserInstance) {
   await context.close();
 }
 
+async function testUploadErrors(browserInstance) {
+  const protectedFixtures = [
+    "encrypted-r2-open.pdf",
+    "encrypted-r2-restricted.pdf",
+    "encrypted-r6-open.pdf",
+    "encrypted-r6-restricted.pdf",
+  ];
+  for (const language of ["ko", "en"]) {
+    const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
+    const input = page.locator("[data-testid='pdf-finish-ready'] input[type='file']");
+    for (const name of protectedFixtures) {
+      await input.setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/encrypted", name));
+      const message = await page.locator("[data-testid='pdf-error']").innerText();
+      assert.match(message, language === "ko" ? /보호.*편집할 수 없/u : /protected.*cannot be edited/iu, `${language}/${name} did not expose the protected-document guidance`);
+      assert.equal(await page.locator("[data-route-error]").count(), 0);
+      assert.equal(await input.count(), 1, "a rejected PDF must leave the upload control available");
+    }
+    await input.setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/damage/truncated-half.pdf"));
+    const damagedMessage = await page.locator("[data-testid='pdf-error']").innerText();
+    assert.match(damagedMessage, language === "ko" ? /읽지 못했습니다/u : /could not be read/iu);
+    assert.equal(await page.locator("[data-route-error]").count(), 0);
+    await context.close();
+  }
+}
+
+async function testPreviewGeometry(browserInstance, fixture) {
+  let placements = 0;
+  for (const language of ["ko", "en"]) {
+    for (const colorScheme of ["light", "dark"]) {
+      const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: language === "ko" ? "ko-KR" : "en-US", colorScheme, serviceWorkers: "block" });
+      await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+      const page = await context.newPage();
+      await page.goto(`${baseUrl}/${language}/tools/pdf-editor/header-footer/`, { waitUntil: "networkidle" });
+      await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles({ name: "preview-geometry.pdf", mimeType: "application/pdf", buffer: fixture });
+      const range = page.locator("[data-testid='pdf-finish-range']");
+      for (const [rangeValue, landscape] of [["1", false], ["2", true]]) {
+        await range.fill(rangeValue);
+        await page.waitForFunction((expectLandscape) => {
+          const canvas = document.querySelector("[data-testid='pdf-finish-canvas-area'] canvas");
+          if (!(canvas instanceof HTMLCanvasElement) || !canvas.width || !canvas.height) return false;
+          return (canvas.width > canvas.height) === expectLandscape;
+        }, landscape);
+        for (const region of ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"]) {
+          await page.locator(`[data-finish-region='${region}']`).click();
+          const metrics = await page.locator("[data-testid='pdf-finish-canvas-area']").evaluate((area, selectedRegion) => {
+            const canvas = area.querySelector("canvas");
+            const overlay = area.querySelector("[data-testid='pdf-finish-overlay']");
+            if (!(canvas instanceof HTMLCanvasElement) || !(overlay instanceof HTMLElement)) throw new Error("preview geometry is unavailable");
+            const areaRect = area.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            const overlayRect = overlay.getBoundingClientRect();
+            const horizontal = String(selectedRegion).split("-")[1];
+            return {
+              aspectError: Math.abs(canvasRect.width / canvasRect.height - canvas.width / canvas.height),
+              areaMatchesCanvas: Math.abs(areaRect.width - canvasRect.width) <= 1 && Math.abs(areaRect.height - canvasRect.height) <= 1,
+              overlayInside: overlayRect.left >= canvasRect.left - 1 && overlayRect.right <= canvasRect.right + 1 && overlayRect.top >= canvasRect.top - 1 && overlayRect.bottom <= canvasRect.bottom + 1,
+              centerError: horizontal === "center" ? Math.abs((overlayRect.left + overlayRect.right) / 2 - (canvasRect.left + canvasRect.right) / 2) : 0,
+            };
+          }, region);
+          assert.ok(metrics.aspectError <= 0.002, `${language}/${colorScheme}/${rangeValue}/${region} distorted the canvas aspect ratio: ${metrics.aspectError}`);
+          assert.equal(metrics.areaMatchesCanvas, true, `${language}/${colorScheme}/${rangeValue}/${region} did not anchor the overlay to the canvas area`);
+          assert.equal(metrics.overlayInside, true, `${language}/${colorScheme}/${rangeValue}/${region} placed the overlay outside the canvas`);
+          assert.ok(metrics.centerError <= 1, `${language}/${colorScheme}/${rangeValue}/${region} missed the canvas center by ${metrics.centerError}px`);
+          placements += 1;
+        }
+      }
+      await context.close();
+    }
+  }
+  assert.equal(placements, 48);
+}
+
+async function testPreflightGuidance(browserInstance, fixture, smallFixture) {
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  const page = await context.newPage();
+  page.setDefaultTimeout(120_000);
+  await page.goto(`${baseUrl}/en/tools/pdf-editor/header-footer/`, { waitUntil: "networkidle" });
+  const input = page.locator("[data-testid='pdf-finish-ready'] input[type='file']");
+  await input.setInputFiles({ name: "preflight.pdf", mimeType: "application/pdf", buffer: fixture });
+  const template = page.locator("[data-testid='pdf-finish-template']");
+  const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+
+  for (const [value, code, position] of [
+    ["A😀Z", "missing-glyph", /line 1, column 2/iu],
+    ["ok\nABC\u0001DEF", "control-character", /line 2, column 4/iu],
+    ["line\n{date:foo}", "date-format", /line 2, column 1/iu],
+  ]) {
+    await template.fill(value);
+    const error = page.locator(`[data-testid='pdf-finish-preflight-error'][data-error-code='${code}']`);
+    await error.waitFor();
+    assert.match(await error.innerText(), position);
+    assert.equal(await action.isDisabled(), true);
+  }
+
+  await template.fill("A".repeat(300));
+  await template.press("End");
+  await template.press("A");
+  await page.waitForFunction(() => [...document.querySelectorAll("[role='alert']")].some((element) => element.textContent?.includes("300")));
+  assert.match(await page.locator("[data-testid='pdf-finish-template-count']").innerText(), /^300/u);
+  assert.match(await page.locator("[data-testid='pdf-finish-template']").getAttribute("aria-describedby"), /template-error/u);
+  assert.match(await page.locator("[data-testid='pdf-finish-template']").locator("xpath=following-sibling::*[@role='alert'][1]").innerText(), /300/u);
+
+  for (const [value, warning] of [
+    ["{mystery}", "unknown-token"],
+    ["W".repeat(200), "horizontal-overflow"],
+    [Array.from({ length: 75 }, (_, index) => `line ${index}`).join("\n"), "vertical-overflow"],
+    ["Русский", "embedded-font"],
+  ]) {
+    await template.fill(value);
+    const notice = page.locator(`[data-testid='pdf-finish-preflight-warnings'] [data-warning-code='${warning}']`);
+    await notice.waitFor();
+    if (warning === "embedded-font") assert.match(await notice.innerText(), /3\.8\s*MB/iu);
+    await action.waitFor({ state: "visible" });
+    assert.equal(await action.isEnabled(), true, `${warning} guidance must not block valid output`);
+  }
+
+  const fontSize = page.locator("[data-testid='pdf-finish-font-size']");
+  const margin = page.locator("[data-testid='pdf-finish-margin']");
+  await fontSize.fill("73");
+  assert.equal(await action.isDisabled(), true, "font sizes above 72pt must be rejected instead of clamped");
+  await fontSize.fill("72");
+  await margin.fill("145");
+  assert.equal(await action.isDisabled(), true, "margins above 144pt must be rejected instead of clamped");
+  await margin.fill("144");
+  await template.fill("W");
+  await page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='narrow-region']").waitFor();
+  assert.equal(await action.isDisabled(), true);
+
+  await fontSize.fill("10");
+  await margin.fill("24");
+  await template.fill("A");
+  await input.setInputFiles({ name: "small.pdf", mimeType: "application/pdf", buffer: smallFixture });
+  await margin.fill("100");
+  await page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='invalid-margin']").waitFor();
+  assert.equal(await action.isDisabled(), true);
+  await context.close();
+}
+
 async function testFinishWorkflow(browserInstance, fixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block", acceptDownloads: false });
   await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
@@ -153,6 +309,17 @@ async function testFinishWorkflow(browserInstance, fixture) {
   assert.equal(await page.locator("[data-testid='pdf-finish-thumbnails'] .pdf-page-card").count(), 3);
 
   const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+  const startPage = page.locator("[data-testid='pdf-finish-start-page']");
+  for (const invalid of ["", "0", "-1", "1.5"]) {
+    await startPage.fill(invalid);
+    await page.locator("[data-testid='pdf-finish-start-page-error']").waitFor();
+    assert.equal(await action.isDisabled(), true, `starting page ${JSON.stringify(invalid)} must disable execution`);
+    assert.equal(await page.locator("[data-route-error]").count(), 0, `starting page ${JSON.stringify(invalid)} escaped the form boundary`);
+    assert.equal(await page.locator("[data-testid='pdf-finish-ready']").count(), 1, "the finish form must survive an invalid starting page");
+  }
+  await startPage.fill("1");
+  await page.waitForFunction(() => !document.querySelector("[data-testid='pdf-finish-start-page-error']"));
+  await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor({ state: "attached" });
   await page.locator("[data-testid='pdf-finish-font-size']").fill("2");
   assert.equal(await action.isDisabled(), true, "invalid font size must disable execution");
   assert.match(await page.locator("[role='alert']").last().innerText(), /6|font size/iu);
@@ -180,9 +347,11 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await page.locator("[data-testid='pdf-finish-start-number']").fill("5");
   await page.locator("[data-testid='pdf-finish-template']").fill("P{page}/{pages} {date:YYYY-MM-DD}");
   await page.locator("[data-finish-region='bottom-right']").click();
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready" && !document.querySelector("[data-testid='pdf-finish-preflight-error']"));
   await action.click();
   const download = page.locator("[data-testid='pdf-download']");
   await download.waitFor({ timeout: 120_000 });
+  assert.equal(await download.getAttribute("download"), "finish-browser-finished.pdf");
   const output = Buffer.from(await download.evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
   const outputPath = path.join(tempDirectory, "finished.pdf");
   await fs.writeFile(outputPath, output);
@@ -227,10 +396,64 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await page.waitForFunction(() => document.querySelector("[data-testid='pdf-error']")?.textContent?.match(/cancel|취소/i));
   assert.equal(await page.locator("[data-testid='pdf-download']").count(), 0, "canceled work must not register a stale result");
   await page.locator("[data-testid='pdf-finish-template']").fill("Retry {page}");
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready" && !document.querySelector("[data-testid='pdf-finish-preflight-error']"));
   await action.click();
   await page.locator("[data-testid='pdf-download']").waitFor({ timeout: 120_000 });
   assert.equal(await page.locator("[data-route-error]").count(), 0);
   await context.close();
+}
+
+async function testBoundaryCropRendering(browserInstance, fixture) {
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  const page = await context.newPage();
+  page.setDefaultTimeout(120_000);
+  await page.goto(`${baseUrl}/en/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
+  await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles({ name: "outside-crop.pdf", mimeType: "application/pdf", buffer: fixture });
+  await page.locator("[data-testid='pdf-finish-template']").fill("BOUNDARY");
+  await page.locator("[data-testid='pdf-finish-color']").fill("#ff0000");
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready" && !document.querySelector("[data-testid='pdf-finish-preflight-error']"));
+  await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").click();
+  const download = page.locator("[data-testid='pdf-download']");
+  await download.waitFor();
+  const output = Buffer.from(await download.evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
+  const outputPath = path.join(tempDirectory, "outside-crop-finished.pdf");
+  const prefix = path.join(tempDirectory, "outside-crop-poppler");
+  await fs.writeFile(outputPath, output);
+  await execFileAsync("pdftoppm", ["-cropbox", "-r", "72", "-png", outputPath, prefix]);
+
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = pdfjs.getDocument({ data: new Uint8Array(output) });
+  try {
+    const document = await task.promise;
+    assert.equal(document.numPages, 4);
+    for (let pageNumber = 1; pageNumber <= 4; pageNumber += 1) {
+      const renderedPage = await document.getPage(pageNumber);
+      const viewport = renderedPage.getViewport({ scale: 1 });
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+      await renderedPage.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      const pdfjsPixels = redPixelCount(PNG.sync.read(canvas.toBuffer("image/png")));
+      const popplerPixels = redPixelCount(PNG.sync.read(await fs.readFile(`${prefix}-${pageNumber}.png`)));
+      assert.ok(pdfjsPixels > 0, `PDF.js rendered zero decoration pixels for outside CropBox rotation page ${pageNumber}`);
+      assert.ok(popplerPixels > 0, `Poppler rendered zero decoration pixels for outside CropBox rotation page ${pageNumber}`);
+      const text = await renderedPage.getTextContent();
+      const mark = text.items.find((item) => item.str === "BOUNDARY");
+      assert.ok(mark, `page ${pageNumber} is missing the boundary decoration text`);
+      const transform = pdfjs.Util.transform(viewport.transform, mark.transform);
+      assert.ok(transform[0] > 0 && Math.abs(transform[1]) < 1e-6, `page ${pageNumber} decoration is not upright`);
+    }
+  } finally {
+    await task.destroy();
+  }
+  await context.close();
+}
+
+function redPixelCount(image) {
+  let count = 0;
+  for (let index = 0; index < image.data.length; index += 4) {
+    if (image.data[index] > 160 && image.data[index + 1] < 110 && image.data[index + 2] < 110) count += 1;
+  }
+  return count;
 }
 
 async function createFixture() {
@@ -244,6 +467,24 @@ async function createFixture() {
   second.drawText("Original second page", { x: 60, y: 350, size: 14, font });
   const third = document.addPage([400, 600]);
   third.drawText("Original third page", { x: 40, y: 520, size: 14, font });
+  return Buffer.from(await document.save());
+}
+
+async function createBoundaryCropFixture() {
+  const document = await PDFDocument.create({ updateMetadata: false });
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  for (const rotation of [0, 90, 180, 270]) {
+    const page = document.addPage([400, 600]);
+    page.setCropBox(-50, -80, 600, 850);
+    page.setRotation(degrees(rotation));
+    page.drawText(`Original ${rotation}`, { x: 40, y: 520, size: 14, font });
+  }
+  return Buffer.from(await document.save());
+}
+
+async function createSmallFixture() {
+  const document = await PDFDocument.create({ updateMetadata: false });
+  document.addPage([200, 200]);
   return Buffer.from(await document.save());
 }
 

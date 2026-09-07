@@ -894,6 +894,7 @@
       "settingsDescription": "토큰, 위치, 글자 크기와 색상을 정하세요.",
       "template": "표시할 내용",
       "templateHelp": "사용 가능한 토큰:",
+      "templateCount": "{{count}} / 300자",
       "templatePlaceholder": {
         "page-numbers": "예: {page} / {pages}",
         "header-footer": "예: {filename} · {date}"
@@ -931,6 +932,15 @@
       "previewDisclaimer": "미리보기는 화면 확인용 근사치입니다. 실제 PDF의 글자 간격과 위치는 조금 다를 수 있습니다.",
       "previewWaiting": "페이지 미리보기를 만드는 중…",
       "previewFailed": "미리보기를 표시하지 못했습니다. 설정을 확인한 뒤 PDF 생성은 다시 시도할 수 있습니다.",
+      "preflightChecking": "표시할 내용과 페이지 배치를 미리 확인하는 중…",
+      "preflightErrors": {
+        "control-character": "표시할 내용 {{line}}행 {{column}}열에 사용할 수 없는 제어 문자가 있습니다.",
+        "date-format": "표시할 내용 {{line}}행 {{column}}열의 날짜 형식을 확인하세요.",
+        "missing-glyph": "표시할 내용 {{line}}행 {{column}}열의 문자는 현재 글꼴로 표시할 수 없습니다.",
+        "narrow-region": "{{page}}페이지의 표시 영역이 글자를 넣기에 너무 좁습니다. 여백이나 글자 크기를 줄여 주세요.",
+        "invalid-margin": "{{page}}페이지에서 여백이 표시 영역을 모두 차지합니다. 여백을 줄여 주세요.",
+        "invalid-layout": "{{page}}페이지에 내용을 배치할 수 없습니다. 여백이나 글자 크기를 조정해 주세요."
+      },
       "create": "마무리 PDF 만들기",
       "creating": "PDF를 마무리하는 중…",
       "retry": "다시 만들기",
@@ -950,7 +960,8 @@
         "margin": "여백은 0~144 사이의 숫자로 입력하세요.",
         "startNumber": "시작 번호는 정수로 입력하세요.",
         "startPage": "시작 페이지는 1 이상의 정수로 입력하세요.",
-        "template": "표시할 내용을 입력하세요."
+        "template": "표시할 내용을 입력하세요.",
+        "templateLength": "표시할 내용은 300자 이내로 입력하세요. 현재 글자 수가 제한을 넘었습니다."
       },
       "rangeErrors": {
         "empty-range": "적용할 페이지 범위를 입력하세요.",
@@ -963,7 +974,11 @@
         "unreadable-document": "PDF를 읽지 못했습니다. 파일을 확인한 뒤 다시 선택해 주세요.",
         "invalid-field": "입력값을 확인한 뒤 다시 시도해 주세요.",
         "invalid-text": "표시 내용에 지원하지 않는 제어 문자나 날짜 형식이 있습니다.",
+        "control-character": "표시 내용에 사용할 수 없는 제어 문자가 있습니다.",
+        "date-format": "표시 내용의 날짜 형식을 확인해 주세요.",
         "missing-glyph": "입력한 문자 중 현재 글꼴로 표시할 수 없는 문자가 있습니다.",
+        "narrow-region": "표시 영역이 너무 좁습니다. 여백이나 글자 크기를 줄여 주세요.",
+        "invalid-margin": "여백이 페이지의 표시 영역을 모두 차지합니다. 여백을 줄여 주세요.",
         "invalid-layout": "현재 페이지 크기와 여백에는 내용을 배치할 수 없습니다. 여백이나 글자 크기를 줄여 주세요.",
         "font-asset": "한국어 글꼴을 준비하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요."
       },
@@ -971,7 +986,11 @@
         "unknown-token": "알 수 없는 토큰은 입력한 그대로 표시했습니다.",
         "horizontal-overflow": "일부 긴 줄을 말줄임표로 줄였습니다.",
         "vertical-overflow": "표시 영역을 벗어나는 일부 줄을 생략했습니다.",
-        "embedded-font": "한국어와 확장 문자를 위해 전체 글꼴이 PDF에 포함되어 파일 크기가 커질 수 있습니다."
+        "embedded-font": "한국어와 확장 문자를 위해 전체 글꼴이 포함되면 출력 파일이 약 3.8MB 커질 수 있습니다."
+      },
+      "outputFileName": {
+        "suffix": "마무리",
+        "fallback": "Worklazy-PDF-마무리"
       }
     },
     "page": {

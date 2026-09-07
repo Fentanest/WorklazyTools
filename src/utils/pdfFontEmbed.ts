@@ -4,15 +4,16 @@ import {
   StandardFonts,
   degrees,
   rgb,
+  type CreateOptions,
   type LoadOptions,
   type PDFFont,
 } from "pdf-lib";
 
 export { degrees, rgb };
-export type { PDFDocument, PDFFont, LoadOptions };
+export type { PDFDocument, PDFFont, CreateOptions, LoadOptions };
 
-export function createPdfDocument() {
-  return PDFDocument.create({ updateMetadata: false });
+export function createPdfDocument(options?: CreateOptions) {
+  return PDFDocument.create(options);
 }
 
 export function loadPdfDocument(bytes: ArrayBuffer | Uint8Array, options: LoadOptions = {}) {
