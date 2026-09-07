@@ -293,7 +293,7 @@ test("key comparison implements duplicate error, occurrence and secondary-key po
   const duplicateError = baseOptions();
   duplicateError.mode = "key";
   duplicateError.key = { leftColumns: [1], rightColumns: [1], secondaryLeftColumns: [], secondaryRightColumns: [], duplicatePolicy: "error" };
-  assert.equal(compareSpreadsheetPair(left, right, duplicateError).summary.duplicate, 4);
+  assert.equal(compareSpreadsheetPair(left, right, duplicateError).summary.duplicate, 1);
 
   const occurrence = structuredClone(duplicateError);
   occurrence.key!.duplicatePolicy = "occurrence";

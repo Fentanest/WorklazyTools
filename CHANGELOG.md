@@ -2,6 +2,10 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-08
+
+- Excel 비교의 중복 오류를 키당 한 레코드와 좌우 행·값 배열로 바꾸고 표시 키를 분리했다. 긴 중복 그룹의 연속 행 보고서 분할, 키 길이 안전 중단, 그룹 단위 요약과 Parameters 메타데이터·회귀를 추가했다. — Codx
+
 ## 2026-09-07
 
 - 문서 비교 엔진 통일 merge commit `d69e73a`를 main에 병합·배포하고 GitHub Pages 및 한·영 DOCX/HWP 라이브 동작을 확인했다. — Codx

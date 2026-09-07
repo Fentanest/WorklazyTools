@@ -9,8 +9,10 @@ import {
 } from "./normalization.ts";
 import { isReconcileConfigValid, type ReconcileConfig } from "./reconcileConfig.ts";
 import type {
+  ExcelCompareDuplicateRecord,
   ExcelComparePairOptions,
   ExcelCompareRecord,
+  ExcelCompareStandardRecord,
   ExcelCompareSummary,
 } from "./types.ts";
 
@@ -113,27 +115,47 @@ function compareByKey(
   const columnAlignment = alignColumns(left, right, options, checkCanceled);
   const leftRows = dataRows(left.sheet, options.left.headerRow);
   const rightRows = dataRows(right.sheet, options.right.headerRow);
-  const primaryLeft = groupRows(left, leftRows, keyOptions.leftColumns, options);
-  const primaryRight = groupRows(right, rightRows, keyOptions.rightColumns, options);
+  const groupedRowsProcessed = { value: 0 };
+  const primaryLeft = groupRows(left, leftRows, keyOptions.leftColumns, options, checkCanceled, groupedRowsProcessed);
+  const primaryRight = groupRows(right, rightRows, keyOptions.rightColumns, options, checkCanceled, groupedRowsProcessed);
   const records: ExcelCompareRecord[] = [];
   const compareStyles = leftBook.supportsStyleComparison && rightBook.supportsStyleComparison;
   if (options.normalization.compareFormatting && !compareStyles) warnings.push("FORMATTING_NOT_SUPPORTED_FOR_PAIR");
 
   if (keyOptions.duplicatePolicy === "error") {
-    const duplicateKeys = new Set([...primaryLeft, ...primaryRight].filter(([, rows]) => rows.length > 1).map(([key]) => key));
+    const duplicateKeys = new Set<string>();
+    let scannedGroups = 0;
+    for (const [key, rows] of primaryLeft) {
+      if (rows.length > 1) duplicateKeys.add(key);
+      if ((scannedGroups += 1) % 4096 === 0) checkCanceled();
+    }
+    for (const [key, rows] of primaryRight) {
+      if (rows.length > 1) duplicateKeys.add(key);
+      if ((scannedGroups += 1) % 4096 === 0) checkCanceled();
+    }
+    const duplicateRowsProcessed = { value: 0 };
     duplicateKeys.forEach((key) => {
-      for (const row of primaryLeft.get(key) ?? []) records.push(record("duplicate", row, null, null, null, key, rowText(left, row), "", "KEY", "DUPLICATE_KEY"));
-      for (const row of primaryRight.get(key) ?? []) records.push(record("duplicate", null, row, null, null, key, "", rowText(right, row), "KEY", "DUPLICATE_KEY"));
+      records.push(duplicateRecord(
+        left,
+        right,
+        primaryLeft.get(key) ?? [],
+        primaryRight.get(key) ?? [],
+        keyOptions.leftColumns,
+        keyOptions.rightColumns,
+        key,
+        checkCanceled,
+        duplicateRowsProcessed,
+      ));
       primaryLeft.delete(key);
       primaryRight.delete(key);
     });
   }
 
   const leftGroups = keyOptions.duplicatePolicy === "secondary"
-    ? groupRows(left, leftRows, [...keyOptions.leftColumns, ...keyOptions.secondaryLeftColumns], options)
+    ? groupRows(left, leftRows, [...keyOptions.leftColumns, ...keyOptions.secondaryLeftColumns], options, checkCanceled, groupedRowsProcessed)
     : primaryLeft;
   const rightGroups = keyOptions.duplicatePolicy === "secondary"
-    ? groupRows(right, rightRows, [...keyOptions.rightColumns, ...keyOptions.secondaryRightColumns], options)
+    ? groupRows(right, rightRows, [...keyOptions.rightColumns, ...keyOptions.secondaryRightColumns], options, checkCanceled, groupedRowsProcessed)
     : primaryRight;
   const keys = new Set([...leftGroups.keys(), ...rightGroups.keys()]);
   for (const key of [...keys].sort()) {
@@ -375,13 +397,70 @@ function compareMerges(left: SpreadsheetSheetData, right: SpreadsheetSheetData) 
   return records;
 }
 
-function groupRows(index: SheetIndex, rows: number[], columns: number[], options: ExcelComparePairOptions) {
+function groupRows(
+  index: SheetIndex,
+  rows: number[],
+  columns: number[],
+  options: ExcelComparePairOptions,
+  checkCanceled: () => void,
+  processed: { value: number },
+) {
   const groups = new Map<string, number[]>();
   rows.forEach((row) => {
     const key = columns.map((column) => normalizeKeyPart(getCell(index, row, column), options.normalization)).join("\u241f");
-    groups.set(key, [...(groups.get(key) ?? []), row]);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+    if ((processed.value += 1) % 4096 === 0) checkCanceled();
   });
   return groups;
+}
+
+function duplicateRecord(
+  left: SheetIndex,
+  right: SheetIndex,
+  leftRows: number[],
+  rightRows: number[],
+  leftKeyColumns: number[],
+  rightKeyColumns: number[],
+  key: string,
+  checkCanceled: () => void,
+  processed: { value: number },
+): ExcelCompareDuplicateRecord {
+  const leftValues = duplicateRowValues(left, leftRows, checkCanceled, processed);
+  const rightValues = duplicateRowValues(right, rightRows, checkCanceled, processed);
+  const displayIndex = leftRows.length ? left : right;
+  const displayRow = leftRows[0] ?? rightRows[0];
+  const displayColumns = leftRows.length ? leftKeyColumns : rightKeyColumns;
+  const displayKey = displayRow === undefined
+    ? ""
+    : displayColumns.map((column) => cellText(getCell(displayIndex, displayRow, column))).join(" | ");
+  return {
+    status: "duplicate",
+    leftRow: null,
+    rightRow: null,
+    leftColumn: null,
+    rightColumn: null,
+    key,
+    displayKey,
+    leftValue: "",
+    rightValue: "",
+    change: "KEY",
+    reason: "DUPLICATE_KEY",
+    leftRows,
+    rightRows,
+    leftValues,
+    rightValues,
+  };
+}
+
+function duplicateRowValues(index: SheetIndex, rows: number[], checkCanceled: () => void, processed: { value: number }) {
+  const values: string[] = [];
+  rows.forEach((row) => {
+    values.push(rowText(index, row));
+    if ((processed.value += 1) % 4096 === 0) checkCanceled();
+  });
+  return values;
 }
 
 function columnContent(index: SheetIndex, column: number, headerRow: number, options: ExcelComparePairOptions) {
@@ -453,7 +532,7 @@ function roundAmount(value: number, unit: number) {
   return Math.round(value / normalizedUnit) * normalizedUnit;
 }
 
-function reconciliationRecord(status: ExcelCompareRecord["status"], left: Array<{ row: number; amountText: string; partner: string }>, right: Array<{ row: number; amountText: string; partner: string }>, reason: string) {
+function reconciliationRecord(status: ExcelCompareStandardRecord["status"], left: Array<{ row: number; amountText: string; partner: string }>, right: Array<{ row: number; amountText: string; partner: string }>, reason: string) {
   return record(status, left[0]?.row ?? null, right[0]?.row ?? null, null, null, left[0]?.partner ?? right[0]?.partner ?? "", left.map((item) => item.amountText).join(" + "), right.map((item) => item.amountText).join(" + "), "RECONCILIATION", reason);
 }
 
@@ -480,10 +559,10 @@ function dataRows(sheet: SpreadsheetSheetData, headerRow: number) {
 }
 
 function record(
-  status: ExcelCompareRecord["status"], leftRow: number | null, rightRow: number | null,
+  status: ExcelCompareStandardRecord["status"], leftRow: number | null, rightRow: number | null,
   leftColumn: number | null, rightColumn: number | null, key: string, leftValue: string,
   rightValue: string, change: string, reason: string,
-): ExcelCompareRecord {
+): ExcelCompareStandardRecord {
   return { status, leftRow, rightRow, leftColumn, rightColumn, key, leftValue, rightValue, change, reason };
 }
 

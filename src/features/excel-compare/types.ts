@@ -54,8 +54,7 @@ export interface ExcelComparePairOptions {
   alignmentCellBudget?: number;
 }
 
-export interface ExcelCompareRecord {
-  status: ExcelCompareStatus;
+interface ExcelCompareRecordBase {
   leftRow: number | null;
   rightRow: number | null;
   leftColumn: number | null;
@@ -66,6 +65,32 @@ export interface ExcelCompareRecord {
   change: string;
   reason: string;
 }
+
+export interface ExcelCompareDuplicateRecord extends ExcelCompareRecordBase {
+  status: "duplicate";
+  leftRow: null;
+  rightRow: null;
+  leftColumn: null;
+  rightColumn: null;
+  leftValue: "";
+  rightValue: "";
+  displayKey: string;
+  leftRows: number[];
+  rightRows: number[];
+  leftValues: string[];
+  rightValues: string[];
+}
+
+export interface ExcelCompareStandardRecord extends ExcelCompareRecordBase {
+  status: Exclude<ExcelCompareStatus, "duplicate">;
+  displayKey?: never;
+  leftRows?: never;
+  rightRows?: never;
+  leftValues?: never;
+  rightValues?: never;
+}
+
+export type ExcelCompareRecord = ExcelCompareDuplicateRecord | ExcelCompareStandardRecord;
 
 export interface ExcelCompareSummary {
   matched: number;

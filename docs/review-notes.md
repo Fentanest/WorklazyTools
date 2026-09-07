@@ -2,6 +2,43 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-08
+
+### Excel 중복키 S1 — 그룹 스키마·엔진·보고서 분할 (Codx)
+
+**착수 게이트·범위** — 지정 기준 `597a92ff56ed9c3eb23755a58df2580b0269b8bd`가 실제 `origin/main`과 같고 부모가 `cdb4007`·`0654fa7`임을 확인했다. 열린 작업계획서 19개에 S1과 상반된 지시가 없음을 확인한 뒤 `/tmp/worklazy-xd`의 `excel-dupkey-20260907` 브랜치에서만 작업했다. `/tmp/worklazy-excel-s0/evidence/bundle-baseline.json`의 SHA-256은 지정값 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`과 일치했다. 화면 소비처 전환 S2와 머리글 감지 S3는 넣지 않았고, main 병합·push·배포도 하지 않는다. S1 단독은 배포 후보가 아니다.
+
+**스키마·엔진 판정** — `status=duplicate`를 판별 가능한 레코드로 분리해 scalar 행·열은 `null`, scalar 값은 빈 문자열로 고정하고 `leftRows/rightRows/leftValues/rightValues` 네 배열과 `displayKey`를 필수화했다. 중복 오류 정책은 2:0·0:2·2:1·1:2 모두 키당 한 레코드를 만들며 반대편 단일 행까지 포함한 뒤 양쪽 map에서 제거한다. 1:1과 다른 상태의 scalar 계약은 그대로다. 내부 그룹 identity는 기존 `normalizeKeyPart`와 U+241F 복합키를 유지하고, `displayKey`만 첫 좌측 원본 행 또는 좌측이 없을 때 첫 우측 원본 행의 선택 키 열을 기존 `cellText`로 읽어 ` | `로 잇는다. 표시 문자열이 같은 number/string 두 내부 키도 별도 그룹으로 남는 대조를 추가했다. `groupRows`의 누적 배열 spread는 append로 교체했고 그룹 생성·중복 스캔·값 수집에 공유 4,096개 간격 취소 검사를 넣었다. 30,000행 단일 그룹은 한 레코드로 완주했고 실제 취소 callback도 그룹 생성과 값 수집에서 발생했다. `summary.duplicate`는 레코드 수와 같아져 중복키 **그룹 수** 의미가 되며 기존 골든은 4에서 1로 갱신했다.
+
+**보고서 formatter·안전 경계** — 9시트·13열 이름과 순서를 유지하면서 Duplicates의 행 번호는 `, `, 값은 `원본행번호: 행값`과 LF로 직렬화하고 Key에는 내부 identity가 아닌 `displayKey`를 쓴다. 좌우는 독립적으로 원본 행 단위 탐욕 분할하고 각 목록 셀은 접두사·구분자 포함 16,000 UTF-16 code unit 이하로 제한한다. 단일 원본 행이 더 길면 전용 조각으로 나눠 `r [i/n]`을 표시하며 surrogate pair와 CRLF 사이를 경계로 삼지 않는다. 더 짧은 측이 먼저 끝나면 뒤 물리 행은 빈 셀로 둔다. 분할 행은 보고서 전용 객체에만 존재하고 엔진 `records`를 바꾸지 않는다. 모든 셀은 기존 공용 writer의 `writeUntrustedText`를 통과하며 수식 객체가 생기지 않는 것을 재개방으로 확인했다.
+
+반복되는 `displayKey`에는 단일 줄 32,767, CR/LF 포함 여러 줄 16,000의 별도 guard를 두었다. 각 정확 경계는 통과하고 1 code unit 초과는 `DUPLICATE_KEY_TOO_LONG`으로 거부하며 자르거나 대체하지 않는다. Chrome에서 32,768자 중복키 쌍과 정상 쌍을 한 배치로 실행한 결과 정상 XLSX 1건만 남고 ZIP은 생성되지 않았으며, 실패 쌍은 일반 사용자 안내로 격리되고 원시 코드는 노출되지 않았다. Parameters는 키/오류 정책에서 고정 9항목(`duplicateCountUnit=key-group`, split 여부·그룹 수·물리 행 수, 세 한도, layout, 표기 설명)과 `duplicateReportGroup.<n>=Duplicates!시작행:끝행`을 기록한다. 따라서 그룹 1개 보고서는 요구된 10개 항목이며, 적용 밖 모드는 고정 9항목을 `UNUSED`로 기록한다.
+
+**사용자 파일 재현** — 입력은 원본을 읽기만 했고 fixture나 커밋에 넣지 않았다. 두 파일은 각각 19,605B/SHA-256 `3152fb51…6a4a9`, 20,263B/`faab6f10…319cf`다. 모든 보고서는 9시트·Duplicates 13열·유한 폭 12~48을 유지했다.
+
+| 머리글/키 | S0 레코드·그룹 | S1 `summary.duplicate`/레코드 | S1 Duplicates 물리 행 | 나머지 요약 |
+|---|---:|---:|---:|---|
+| 1행/B열 | 4·1 | **1/1** | 1 | matched 713·changed 37·added 48 |
+| 4행/A열 | 24·6 | **6/6** | 6 | matched 486·changed 134·added 31 |
+| 4행/B열 | 0·0 | **0/0** | 0 | matched 703·changed 37·added 48 |
+
+1행/B열 그룹은 좌우 모두 `[2,3]`, 표시 키는 원본 `□ 2026년 설명절 선물 발송처(대외, 임직원)`이었다. 4행/A열은 표시 키 1~6과 각 측 두 행의 순서를 보존했다. 세 사용자 보고서와 17,000자 합성 분할 보고서를 ExcelJS/생성 무결성/가시성 검사로 다시 열고, 각 ZIP의 XML/rels **18개 전부**를 ElementTree로 파싱했다. 산출물은 `/tmp/worklazy-xd-s1/user-*.xlsx`, `synthetic-split.xlsx`, `user-file-results.json`에 보존했다.
+
+**회귀·번들·제품 영향** — 첫 타입 검사에서 일반 레코드 필터의 union narrowing 진단을 발견해 명시적 type guard로 고친 뒤 전체를 다시 실행했다. 공용 writer 문자 안전화·희소 데이터행 판정·Row/Column `numFmt` backstop 파일은 기준 커밋과 byte diff가 없으며, 전용 64개 회귀에서 금지 문자·수식 주입·희소 객체 수·행/열 서식·유한 폭 계약이 모두 통과했다. 최종 결과는 다음과 같다.
+
+| 검증 | 결과 |
+|---|---|
+| `./node_modules/.bin/tsc -b --pretty false` | 진단 0 |
+| `npm run test:unit` | 상위 371개·하위 포함 **379/379** |
+| `npm run build` / `npm run test:static` | 2,835 modules·정적 61페이지 / startup 104문서 통과 |
+| `npm run test:excel-compare` | 그룹 분할 개별 2 XLSX+ZIP 내부 2 XLSX, 키 길이 실패 격리, 기존 취소·모바일·무결성 포함 통과 |
+| `npm run test:excel-cleaner` / `npm run test:qr-bulk` | 5시트 출력·문자/서식 경계 / 7종·ZIP·2시트 manifest·PDF 글꼴 4시나리오 통과 |
+| `npm run test:browser` | Excel·Word·PDF 편집/분할/변환 통과 |
+| `npm run css:orphans` / route registry | orphan 0 / 도구 20개·누락/예상 외/중복 0 |
+| `git diff --check` | 공백 오류 0 |
+
+S0 기준 번들 gzip 현재값/증분은 entry **299,294/+6B**, affected routes **2,451,591/+10B**, shared **2,715,815/+1,307B**, app JS **5,466,700/+1,323B**, CSS **37,693/+0B**로 다섯 예산을 모두 통과했다. production 브라우저는 `127.0.0.1:4350 --strictPort`, QR 보조 프록시는 저장소 밖 preload로 4351에 고정해 직렬 실행했다. 변경된 제품 소스에 network/API·광고 경로·서버 전제를 추가하지 않았고 locale·SEO 입력·정적 페이지 생성기·URL/canonical/hreflang/sitemap 집합도 바꾸지 않았다. 새 화면 문구가 없고 내부 key identity/reason/error code는 UI에 노출하지 않으므로 S1 범위의 추가 ko/en·SEO·AdSense 수정은 불필요하다. 번들 JSON과 재현 산출물·최종 보고서는 `/tmp/worklazy-xd-s1/`에 둔다. — Codx
+
 ## 2026-09-07
 
 ### 문서 비교 엔진 통일 — main 배포·라이브 검증 (Codx)

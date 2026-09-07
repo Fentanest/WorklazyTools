@@ -23,6 +23,12 @@ try {
   await fs.writeFile(path.join(temporaryDirectory, "direction-right.csv"), "ID,Value\nA,left\nB,right-only", "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "amount-left.csv"), "Amount\n10\n10", "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "amount-right.csv"), "Amount\n10\n10\n10", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-left-a.csv"), `Key,Value\nA,${"x".repeat(17_000)}\nA,tail`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-right-a.csv"), "Key,Value\nA,right", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-left-b.csv"), `Key,Value\nB,${"y".repeat(17_000)}\nB,tail`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-right-b.csv"), "Key,Value\nB,right", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"), `Key\n${"k".repeat(32_768)}\n${"k".repeat(32_768)}`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"), "Key\nother", "utf8");
   const fixture = (name) => path.join(temporaryDirectory, name);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -201,6 +207,18 @@ try {
     for (const mode of ["zero", "mismatch"]) integrityFailures.push(await assertIntegrityFailure(browser, fixture("left.xlsx"), fixture("right.xlsx"), mode));
     const swapDirection = await assertSwapDirection(browser, path.join(temporaryDirectory, "direction-left.csv"), path.join(temporaryDirectory, "direction-right.csv"));
     const optionalReconciliation = await assertOptionalReconciliation(browser, path.join(temporaryDirectory, "amount-left.csv"), path.join(temporaryDirectory, "amount-right.csv"), downloadRoot);
+    const groupedDuplicates = await assertGroupedDuplicateDownloads(browser, {
+      leftA: path.join(temporaryDirectory, "duplicate-left-a.csv"),
+      rightA: path.join(temporaryDirectory, "duplicate-right-a.csv"),
+      leftB: path.join(temporaryDirectory, "duplicate-left-b.csv"),
+      rightB: path.join(temporaryDirectory, "duplicate-right-b.csv"),
+    }, downloadRoot);
+    const duplicateKeyTooLong = await assertDuplicateKeyTooLongIsolation(browser, {
+      invalidLeft: path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"),
+      invalidRight: path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"),
+      validLeft: fixture("left.xlsx"),
+      validRight: fixture("right.xlsx"),
+    }, downloadRoot);
 
     if (pageErrors.length) throw new Error(`Browser page errors:\n${pageErrors.join("\n")}`);
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
@@ -216,6 +234,8 @@ try {
       pairAssignment: { namesBeforeSwap, namesAfterSwap, overflowRejected: 2 },
       swapDirection,
       optionalReconciliation,
+      groupedDuplicates,
+      duplicateKeyTooLong,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
       b4Affordance,
@@ -476,6 +496,123 @@ async function assertOptionalReconciliation(browser, leftPath, rightPath, root) 
     }
     if (parameters.reconciliationCandidatesPerTarget !== "10") throw new Error(`Candidate limit did not match Parameters: ${parameters.reconciliationCandidatesPerTarget}`);
     return { size: report.size, summary, unused: "date+partner", candidateLimit: parameters.reconciliationCandidatesPerTarget };
+  } finally {
+    await page.close();
+  }
+}
+
+async function assertGroupedDuplicateDownloads(browser, files, root) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const client = await page.createCDPSession();
+    let inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[0].uploadFile(files.leftA, files.rightA);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.select('[data-testid=excel-pair-mode-options] select', "error");
+    await page.click("[data-testid=excel-add-pair]");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
+    inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[1].uploadFile(files.leftB, files.rightB);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 4);
+    const policySelectors = await page.$$('[data-testid=excel-pair-mode-options] select');
+    await policySelectors[1].select("error");
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    const downloads = await downloadReportLinks(page, client, root, "grouped-duplicates");
+    const reports = downloads.filter((item) => item.name.endsWith(".xlsx"));
+    const zipFile = downloads.find((item) => item.name.endsWith(".zip"));
+    if (reports.length !== 2 || !zipFile) throw new Error(`Grouped duplicate run must create two reports and one ZIP: ${downloads.map((item) => item.name).join(", ")}`);
+
+    const direct = [];
+    for (const report of reports) direct.push(await assertGroupedDuplicateReport(report.bytes));
+    const archive = await JSZip.loadAsync(zipFile.bytes);
+    const zipped = [];
+    for (const entry of Object.values(archive.files).filter((candidate) => !candidate.dir)) {
+      zipped.push(await assertGroupedDuplicateReport(await entry.async("uint8array")));
+    }
+    if (zipped.length !== 2) throw new Error(`Grouped duplicate ZIP must contain two reports: ${zipped.length}`);
+    return { direct, zipped, zipBytes: zipFile.size };
+  } finally {
+    await page.close();
+  }
+}
+
+async function assertGroupedDuplicateReport(bytes) {
+  const summary = await assertNineSheetReport(bytes, {
+    matched: 0, changed: 0, added: 0, removed: 0, duplicate: 1, ambiguous: 0, unmatched: 0, error: 0,
+  });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(bytes);
+  const duplicates = workbook.getWorksheet("Duplicates");
+  if (duplicates.columnCount !== 13 || duplicates.rowCount !== 4) throw new Error(`Grouped duplicate report shape is invalid: ${duplicates.rowCount}x${duplicates.columnCount}`);
+  const rowNotations = duplicates.getRows(2, 3).map((row) => String(row.getCell(5).value ?? ""));
+  const rightRows = duplicates.getRows(2, 3).map((row) => String(row.getCell(6).value ?? ""));
+  if (JSON.stringify(rowNotations) !== JSON.stringify(["2 [1/2]", "2 [2/2]", "3"]) || JSON.stringify(rightRows) !== JSON.stringify(["2", "", ""])) {
+    throw new Error(`Grouped duplicate row notation or independent-side exhaustion is invalid: ${JSON.stringify({ rowNotations, rightRows })}`);
+  }
+  const longValue = duplicates.getRows(2, 2).map((row) => String(row.getCell(10).value).slice("2: ".length)).join("");
+  if (!/^[AB] \| [xy]{17000}$/u.test(longValue)) throw new Error(`Grouped duplicate long source row was not restored: ${longValue.length}`);
+  const parametersSheet = workbook.getWorksheet("Parameters");
+  const parameters = Object.fromEntries(parametersSheet.getRows(2, parametersSheet.rowCount - 1).map((row) => [String(row.getCell(1).value), String(row.getCell(2).value)]));
+  const expected = {
+    duplicateCountUnit: "key-group",
+    duplicateReportSplit: "true",
+    duplicateReportSplitGroupCount: "1",
+    duplicateReportDataRows: "3",
+    duplicateReportCellLimit: "32767",
+    duplicateReportListCellLimit: "16000",
+    duplicateReportMultilineKeyLimit: "16000",
+    duplicateReportLayout: "independent-side-chunks-v1",
+    "duplicateReportGroup.1": "Duplicates!2:4",
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (parameters[key] !== value) throw new Error(`Grouped duplicate Parameter ${key} differs: ${parameters[key]}`);
+  }
+  return { summary, dataRows: duplicates.rowCount - 1, rowNotations, key: String(duplicates.getCell("I2").value) };
+}
+
+async function assertDuplicateKeyTooLongIsolation(browser, files, root) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const client = await page.createCDPSession();
+    let inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[0].uploadFile(files.invalidLeft, files.invalidRight);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.select('[data-testid=excel-pair-mode-options] select', "error");
+    await page.click("[data-testid=excel-add-pair]");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
+    inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[1].uploadFile(files.validLeft, files.validRight);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 4);
+    const policySelectors = await page.$$('[data-testid=excel-pair-mode-options] select');
+    await policySelectors[1].select("error");
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    const downloads = await downloadReportLinks(page, client, root, "duplicate-key-too-long");
+    if (downloads.length !== 1 || !downloads[0].name.endsWith(".xlsx")) {
+      throw new Error(`An overlong duplicate key must exclude only its report and ZIP: ${downloads.map((item) => item.name).join(", ")}`);
+    }
+    await assertNineSheetReport(downloads[0].bytes, {
+      matched: 8, changed: 2, added: 0, removed: 0, duplicate: 0, ambiguous: 0, unmatched: 0, error: 0,
+    });
+    const failure = await page.$eval("[data-testid=excel-compare-error]", (element) => element.textContent || "");
+    if (!failure.includes("duplicate-key-too-long-left.csv") || !failure.includes("duplicate-key-too-long-right.csv")
+      || failure.includes("DUPLICATE_KEY_TOO_LONG") || !failure.includes("파일을 비교하지 못했습니다")) {
+      throw new Error(`The overlong-key failure was not safely isolated: ${failure}`);
+    }
+    return { reports: downloads.length, zip: false, rawCodeHidden: true, failure };
   } finally {
     await page.close();
   }
