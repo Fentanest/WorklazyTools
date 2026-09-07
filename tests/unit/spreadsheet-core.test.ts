@@ -21,6 +21,7 @@ import {
   sanitizeXlsxText,
   writeUntrustedText,
   writeXlsxReport,
+  writeXlsxWorkbook,
 } from "../../src/utils/xlsxReport.ts";
 import { assertVisibleXlsxReport } from "../xlsx-report-assertions.mjs";
 
@@ -210,6 +211,62 @@ test("XLSX value-and-number-format backstop rejects disallowed text that bypasse
   assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(safeWorkbook));
 });
 
+test("XLSX backstop rejects six value and six value-less number-format paths before serialization", async () => {
+  const valueInjections: Array<[string, (workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet) => void]> = [
+    ["name", (_workbook, sheet) => { sheet.name = "Unsafe\uFFFE"; }],
+    ["scalar", (_workbook, sheet) => { sheet.getCell("A2").value = "Unsafe\uFFFE"; }],
+    ["formula", (_workbook, sheet) => { sheet.getCell("A2").value = { formula: "1+\uFFFE", result: 1 }; }],
+    ["cache", (_workbook, sheet) => { sheet.getCell("A2").value = { formula: "1+1", result: "Unsafe\uFFFE" }; }],
+    ["rich-text", (_workbook, sheet) => { sheet.getCell("A2").value = { richText: [{ text: "Unsafe\uFFFE" }] }; }],
+    ["hyperlink", (_workbook, sheet) => { sheet.getCell("A2").value = { text: "Link", hyperlink: "https://example.com/\uFFFE" }; }],
+  ];
+  const numberFormatInjections: Array<[string, (sheet: ExcelJS.Worksheet) => void]> = [
+    ["cell-numFmt", (sheet) => { sheet.getCell("A2").numFmt = "0\"\uFFFE\""; }],
+    ["style-numFmt", (sheet) => { sheet.getCell("A2").style = { numFmt: "0\"\uFFFF\"" }; }],
+    ["empty-row-numFmt", (sheet) => { sheet.getCell("A50").numFmt = "0\"\uD800\""; }],
+    ["sparse-last-column", (sheet) => { sheet.getCell("M2").numFmt = "0\"\u0001\""; }],
+    ["row-inherited", (sheet) => { sheet.getRow(2).numFmt = "0\"\uFFFE\""; sheet.getCell("A2"); }],
+    ["column-inherited", (sheet) => { sheet.getColumn(2).numFmt = "0\"\uFFFE\""; sheet.getCell("B2"); }],
+  ];
+
+  const rejectsBeforeSerialization = async (id: string, setup: (workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet) => void) => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Safe");
+    sheet.getCell("A1").value = "Header";
+    setup(workbook, sheet);
+    let serializerCalls = 0;
+    workbook.xlsx.writeBuffer = async () => {
+      serializerCalls += 1;
+      return Buffer.from("unexpected serializer call");
+    };
+    await assert.rejects(
+      () => writeXlsxWorkbook(workbook),
+      (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED" && error.message === "REPORT_INTEGRITY_FAILED",
+      id,
+    );
+    assert.equal(serializerCalls, 0, id);
+  };
+
+  for (const [id, setup] of valueInjections) await rejectsBeforeSerialization(id, setup);
+  for (const [id, setup] of numberFormatInjections) {
+    await rejectsBeforeSerialization(id, (_workbook, sheet) => setup(sheet));
+  }
+});
+
+test("XLSX backstop scans existing sparse objects without allocating missing coordinates", () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Sparse");
+  sheet.getCell("A1").value = "Header";
+  sheet.getCell("G25").numFmt = "yyyy-mm-dd";
+  sheet.getCell("M50").value = "Tail";
+  const before = countExistingWorkbookObjects(workbook);
+
+  assert.deepEqual(before, { rows: 3, cells: 3 });
+  assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(workbook));
+  assert.deepEqual(countExistingWorkbookObjects(workbook), before);
+  assert.equal(sheet.findRow(25)?.findCell(7)?.value, null);
+});
+
 test("XLSX reports serialize finite positive widths for sparse ExcelJS columns", async () => {
   const output = await writeXlsxReport({
     sheets: [{
@@ -259,4 +316,20 @@ function transferable(value: ExcelJS.Buffer): ArrayBuffer {
   if (value instanceof ArrayBuffer) return value;
   const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   return bytes.slice().buffer;
+}
+
+function countExistingWorkbookObjects(workbook: ExcelJS.Workbook) {
+  let rows = 0;
+  let cells = 0;
+  for (const worksheet of workbook.worksheets) {
+    for (let rowNumber = 1; rowNumber <= worksheet.rowCount; rowNumber += 1) {
+      const row = worksheet.findRow(rowNumber);
+      if (!row) continue;
+      rows += 1;
+      for (let columnNumber = 1; columnNumber <= row.cellCount; columnNumber += 1) {
+        if (row.findCell(columnNumber)) cells += 1;
+      }
+    }
+  }
+  return { rows, cells };
 }
