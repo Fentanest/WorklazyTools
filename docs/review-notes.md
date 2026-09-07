@@ -4,6 +4,20 @@
 
 ## 2026-09-08
 
+### Excel 중복키 S1 fix-1 — 긴 키 오류 안내·기록 정정 (Codx)
+
+**누락·재현** — 지원되는 정상 CSV에서 선택 키 값 32,768자가 두 행에 반복되면 보고서 Key 절대 한도 guard가 `DUPLICATE_KEY_TOO_LONG`으로 그 쌍만 안전하게 제외한다. S1 커밋은 code 전달과 쌍 격리를 구현했지만 `excelCompare.error`의 ko/en 키를 빠뜨려, UI가 정상 입력에 `PROCESSING_FAILED`의 파일 손상·지원 형식 확인 안내를 표시했다. 이는 객체 주입·ZIP 변조 없이 도달하는 R2-01 정본 경로다.
+
+**수리·회귀 단언** — ko/en `features.json`에 R2-01의 원인·복구 문구를 그대로 연결했다. `tests/excel-compare-smoke.mjs`는 각 언어에서 정상 A → 긴 키 실패 → 정상 B 순서로 실행하고, 실패 파일명과 해당 언어의 원인·더 짧은 키 열 선택 안내, 원시 code 비노출을 단언한다. 성공 산출물은 개별 XLSX 2개와 ZIP 1개뿐이고 ZIP 내부도 정상 XLSX 2개뿐이며, 개별·ZIP 보고서의 9시트·Duplicates 13열·분할 복원 결과가 일치한다.
+
+**원본 probe·실화면** — astra의 `browser-extra.mjs`(SHA-256 `026e60ab…cc760c`)와 `error-contract.py`(`159f38a…e8e9e`)를 바꾸지 않고 읽기 전용 검수 디렉터리와 쓰기 가능한 이번 증거 디렉터리를 격리 마운트해 실행했다. error contract는 직전 ko/en 0/2에서 **2/2**로 바뀌었고, browser probe의 ko/en 두 실행 모두 정상 보고서 2개·ZIP 내부 2개, direct/ZIP 내용 일치, page error 0을 기록했다. 실제 오류 캡처에서도 ko/en 정본 문구가 잘림 없이 표시됐다. 증거는 `/tmp/worklazy-xd-s1-fix1/evidence/`에 보존한다.
+
+**완료 검증** — `tsc -b` 진단 0, 단위시험 **379/379**, production build 2,835 modules, 정적 startup 104문서, 강화 Excel 비교·Excel Cleaner·QR bulk·전체 browser 스모크를 모두 통과했다. 원본 사용자 파일의 1행/B·4행/A·4행/B는 각각 **1·6·0그룹**, matched/changed/added **713·37·48 / 486·134·31 / 703·37·48**을 유지했고, 독립 결과 27파일·486 XML/rels가 9시트·13열·폭 12~48·문자 길이와 함께 전부 재개방됐다. 선행 안전화 원본 17명령과 보존 산출물 204파일·2,267 XML/rels도 예상 밖 malformed 0으로 통과했다. 보존 XML 집계의 첫 실행은 격리 경로에 원본 SHA manifest를 복사하지 않아 제품 실행 전에 실패했으며, 그 로그를 보존하고 동일 원본 manifest를 제공한 재실행 결과를 채택했다.
+
+S0 기준 번들 gzip 현재값/증분은 entry **299,402/+114B**, affected routes **2,451,562/−19B**, shared **2,715,801/+1,293B**, app JS **5,466,765/+1,388B**, CSS **37,693/+0B**로 다섯 예산을 모두 통과했다. fix 기준 변경 파일은 locale 2개·스모크·두 기록 파일뿐이고 locale 구조 diff는 양쪽 모두 `excelCompare.error.DUPLICATE_KEY_TOO_LONG` 한 키다. URL 문서105·canonical62·hreflang91·sitemap61 집합은 S0와 같고, 신설 network/API·광고·서버 전제 줄은 0이다.
+
+**S1/S2 경계 정정** — 신설 원시 오류 코드는 숨겨지지만, S1 시점 결과 화면에는 기존 `string:`/`number:` 내부 key 표시와 빈 scalar에 따른 그룹 값 소비가 남아 있다. 이는 정본이 S1+S2를 단일 제품 전환으로 요구한 단계 경계이며 별도 제품 결함으로 세지 않는다. 기존 기록의 “내부 key identity/reason/error code는 UI에 노출되지 않고 신규 ko/en 작업도 없다”는 전체 UI에 대한 일반화와 locale 판정을 이 내용으로 정정한다. S2 화면 전환과 S3 감지는 이번 fix에 포함하지 않았다. — Codx
+
 ### Excel 중복키 S1 — 그룹 스키마·엔진·보고서 분할 (Codx)
 
 **착수 게이트·범위** — 지정 기준 `597a92ff56ed9c3eb23755a58df2580b0269b8bd`가 실제 `origin/main`과 같고 부모가 `cdb4007`·`0654fa7`임을 확인했다. 열린 작업계획서 19개에 S1과 상반된 지시가 없음을 확인한 뒤 `/tmp/worklazy-xd`의 `excel-dupkey-20260907` 브랜치에서만 작업했다. `/tmp/worklazy-excel-s0/evidence/bundle-baseline.json`의 SHA-256은 지정값 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`과 일치했다. 화면 소비처 전환 S2와 머리글 감지 S3는 넣지 않았고, main 병합·push·배포도 하지 않는다. S1 단독은 배포 후보가 아니다.
@@ -37,7 +51,7 @@
 | `npm run css:orphans` / route registry | orphan 0 / 도구 20개·누락/예상 외/중복 0 |
 | `git diff --check` | 공백 오류 0 |
 
-S0 기준 번들 gzip 현재값/증분은 entry **299,294/+6B**, affected routes **2,451,591/+10B**, shared **2,715,815/+1,307B**, app JS **5,466,700/+1,323B**, CSS **37,693/+0B**로 다섯 예산을 모두 통과했다. production 브라우저는 `127.0.0.1:4350 --strictPort`, QR 보조 프록시는 저장소 밖 preload로 4351에 고정해 직렬 실행했다. 변경된 제품 소스에 network/API·광고 경로·서버 전제를 추가하지 않았고 locale·SEO 입력·정적 페이지 생성기·URL/canonical/hreflang/sitemap 집합도 바꾸지 않았다. 새 화면 문구가 없고 내부 key identity/reason/error code는 UI에 노출하지 않으므로 S1 범위의 추가 ko/en·SEO·AdSense 수정은 불필요하다. 번들 JSON과 재현 산출물·최종 보고서는 `/tmp/worklazy-xd-s1/`에 둔다. — Codx
+S0 기준 번들 gzip 현재값/증분은 entry **299,294/+6B**, affected routes **2,451,591/+10B**, shared **2,715,815/+1,307B**, app JS **5,466,700/+1,323B**, CSS **37,693/+0B**로 다섯 예산을 모두 통과했다. production 브라우저는 `127.0.0.1:4350 --strictPort`, QR 보조 프록시는 저장소 밖 preload로 4351에 고정해 직렬 실행했다. 변경된 제품 소스에 network/API·광고 경로·서버 전제를 추가하지 않았고 locale·SEO 입력·정적 페이지 생성기·URL/canonical/hreflang/sitemap 집합도 바꾸지 않았다. 신설 원시 오류 코드는 숨겨지지만, 기존 내부 key 표시와 그룹 값 소비는 S2에 남아 있다. 이는 정본이 S1+S2 단일 전환을 요구한 단계 경계이며 별도 제품 결함이 아니다. 또한 S1 신설 `DUPLICATE_KEY_TOO_LONG`에는 ko/en 복구 안내가 필요했으므로 추가 locale 작업이 불필요하다는 당시 판정은 잘못이었고, 위 fix-1 기록으로 정정한다. 번들 JSON과 재현 산출물·최종 보고서는 `/tmp/worklazy-xd-s1/`에 둔다. — Codx
 
 ## 2026-09-07
 

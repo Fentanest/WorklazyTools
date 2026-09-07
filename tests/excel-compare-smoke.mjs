@@ -213,12 +213,17 @@ try {
       leftB: path.join(temporaryDirectory, "duplicate-left-b.csv"),
       rightB: path.join(temporaryDirectory, "duplicate-right-b.csv"),
     }, downloadRoot);
-    const duplicateKeyTooLong = await assertDuplicateKeyTooLongIsolation(browser, {
-      invalidLeft: path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"),
-      invalidRight: path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"),
-      validLeft: fixture("left.xlsx"),
-      validRight: fixture("right.xlsx"),
-    }, downloadRoot);
+    const duplicateKeyTooLong = [];
+    for (const language of ["ko", "en"]) {
+      duplicateKeyTooLong.push(await assertDuplicateKeyTooLongIsolation(browser, {
+        validLeftA: path.join(temporaryDirectory, "duplicate-left-a.csv"),
+        validRightA: path.join(temporaryDirectory, "duplicate-right-a.csv"),
+        invalidLeft: path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"),
+        invalidRight: path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"),
+        validLeftB: path.join(temporaryDirectory, "duplicate-left-b.csv"),
+        validRightB: path.join(temporaryDirectory, "duplicate-right-b.csv"),
+      }, downloadRoot, language));
+    }
 
     if (pageErrors.length) throw new Error(`Browser page errors:\n${pageErrors.join("\n")}`);
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
@@ -577,42 +582,56 @@ async function assertGroupedDuplicateReport(bytes) {
   return { summary, dataRows: duplicates.rowCount - 1, rowNotations, key: String(duplicates.getCell("I2").value) };
 }
 
-async function assertDuplicateKeyTooLongIsolation(browser, files, root) {
+async function assertDuplicateKeyTooLongIsolation(browser, files, root, language) {
   const page = await browser.newPage();
   try {
     page.setDefaultTimeout(180_000);
     await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
-    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${baseUrl}/${language}/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const client = await page.createCDPSession();
     let inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
-    await inputs[0].uploadFile(files.invalidLeft, files.invalidRight);
+    await inputs[0].uploadFile(files.validLeftA, files.validRightA);
     await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
     await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
     await page.select('[data-testid=excel-pair-mode-options] select', "error");
     await page.click("[data-testid=excel-add-pair]");
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
     inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
-    await inputs[1].uploadFile(files.validLeft, files.validRight);
+    await inputs[1].uploadFile(files.invalidLeft, files.invalidRight);
     await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 4);
-    const policySelectors = await page.$$('[data-testid=excel-pair-mode-options] select');
-    await policySelectors[1].select("error");
+    await page.click("[data-testid=excel-add-pair]");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 3);
+    inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[2].uploadFile(files.validLeftB, files.validRightB);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 6);
+    for (const policy of await page.$$('[data-testid=excel-pair-mode-options] select')) await policy.select("error");
     await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
     await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
     await page.waitForSelector(".ui-operation-progress.ui-status-success");
-    const downloads = await downloadReportLinks(page, client, root, "duplicate-key-too-long");
-    if (downloads.length !== 1 || !downloads[0].name.endsWith(".xlsx")) {
-      throw new Error(`An overlong duplicate key must exclude only its report and ZIP: ${downloads.map((item) => item.name).join(", ")}`);
+    const downloads = await downloadReportLinks(page, client, root, `duplicate-key-too-long-${language}`);
+    const reports = downloads.filter((item) => item.name.endsWith(".xlsx"));
+    const archives = downloads.filter((item) => item.name.endsWith(".zip"));
+    if (reports.length !== 2 || archives.length !== 1 || downloads.length !== 3) {
+      throw new Error(`Two valid pairs and one overlong-key pair must create only two reports and one ZIP (${language}): ${downloads.map((item) => item.name).join(", ")}`);
     }
-    await assertNineSheetReport(downloads[0].bytes, {
-      matched: 8, changed: 2, added: 0, removed: 0, duplicate: 0, ambiguous: 0, unmatched: 0, error: 0,
-    });
+    const direct = [];
+    for (const report of reports) direct.push(await assertGroupedDuplicateReport(report.bytes));
+    const archive = await JSZip.loadAsync(archives[0].bytes);
+    const entries = Object.values(archive.files).filter((entry) => !entry.dir);
+    if (entries.length !== 2) throw new Error(`The overlong-key ZIP must contain only the two valid reports (${language}): ${entries.length}`);
+    const zipped = [];
+    for (const entry of entries) zipped.push(await assertGroupedDuplicateReport(await entry.async("uint8array")));
+    if (JSON.stringify(direct) !== JSON.stringify(zipped)) throw new Error(`Direct and ZIP reports differ for the overlong-key batch (${language}).`);
     const failure = await page.$eval("[data-testid=excel-compare-error]", (element) => element.textContent || "");
+    const expectedGuidance = language === "ko"
+      ? "선택한 키 열의 내용이 너무 길어 보고서를 만들지 못했습니다. 더 짧은 값이 있는 열을 키로 선택해 다시 비교해 주세요."
+      : "The selected key columns contain too much text for the report. Choose key columns with shorter values and compare again.";
     if (!failure.includes("duplicate-key-too-long-left.csv") || !failure.includes("duplicate-key-too-long-right.csv")
-      || failure.includes("DUPLICATE_KEY_TOO_LONG") || !failure.includes("파일을 비교하지 못했습니다")) {
-      throw new Error(`The overlong-key failure was not safely isolated: ${failure}`);
+      || failure.includes("DUPLICATE_KEY_TOO_LONG") || !failure.includes(expectedGuidance)) {
+      throw new Error(`The overlong-key cause and recovery guidance were not safely isolated (${language}): ${failure}`);
     }
-    return { reports: downloads.length, zip: false, rawCodeHidden: true, failure };
+    return { language, reports: reports.length, zipEntries: entries.length, rawCodeHidden: true, causeAndRecoveryGuidance: expectedGuidance, failure };
   } finally {
     await page.close();
   }
