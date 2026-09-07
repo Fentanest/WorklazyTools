@@ -21,6 +21,7 @@ import type {
   SpreadsheetCellData,
   SpreadsheetScalar,
 } from "../../src/features/spreadsheet-core/inputAdapter.ts";
+import { countWorksheetDataRows, createSharedStringValueLookup } from "../../src/utils/xlsxReportDataRows.mjs";
 import { writeXlsxReport } from "../../src/utils/xlsxReport.ts";
 import { assertVisibleXlsxReport } from "../xlsx-report-assertions.mjs";
 
@@ -86,11 +87,20 @@ test("generated report integrity requires a populated cell after the header", as
   emptyStringSheet.addRows([["Header"], [""]]);
   emptyStringSheet.getColumn(1).width = 12;
 
+  const styleBeforeEmptyString = new ExcelJS.Workbook();
+  const styleBeforeEmptyStringSheet = styleBeforeEmptyString.addWorksheet("StyleBeforeEmpty");
+  styleBeforeEmptyStringSheet.addRow(["Header A", "Header B"]);
+  styleBeforeEmptyStringSheet.getColumn(1).width = 12;
+  styleBeforeEmptyStringSheet.getColumn(2).width = 12;
+  styleBeforeEmptyStringSheet.getCell("A2").numFmt = "@";
+  styleBeforeEmptyStringSheet.getCell("B2").value = "";
+
   for (const [name, workbook] of [
     ["row height only", rowHeightOnly],
     ["cell format only", cellFormatOnly],
     ["headers only", headersOnly],
     ["empty string only", emptyStringOnly],
+    ["style before empty string in the same row", styleBeforeEmptyString],
   ] as const) {
     await context.test(name, async () => {
       const bytes = reportArrayBuffer(await workbook.xlsx.writeBuffer());
@@ -102,6 +112,89 @@ test("generated report integrity requires a populated cell after the header", as
       );
     });
   }
+});
+
+test("XLSX data-row scanning matches ExcelJS across cell, value, and placement combinations", async () => {
+  const cellKinds = ["self-closing", "empty-c", "v", "shared", "inline", "formula"] as const;
+  const placements = ["same-row-before", "same-row-after", "skipped-row", "attribute-only-row"] as const;
+  const values = [
+    { name: "empty-string", value: "" },
+    { name: "space", value: " " },
+    { name: "zero", value: 0 },
+    { name: "false", value: false },
+    { name: "long-string", value: "long".repeat(80) },
+    { name: "quotes", value: `'single' and "double"` },
+    { name: "greater-than", value: "left>right" },
+    { name: "slash", value: "left/right" },
+  ] as const;
+  const workbook = new ExcelJS.Workbook();
+  const cases = [];
+  for (const cellKind of cellKinds) {
+    for (const [valueIndex, value] of values.entries()) {
+      for (const placement of placements) {
+        const sheet = workbook.addWorksheet(`Matrix${cases.length + 1}`);
+        sheet.addRow(["Header"]);
+        sheet.getColumn(1).width = 12;
+        sheet.getColumn(2).width = 12;
+        sheet.getCell("B4").numFmt = "@";
+        cases.push({ sheetName: sheet.name, cellKind, value, valueIndex, placement });
+      }
+    }
+  }
+  assert.equal(cases.length, 192);
+
+  const archive = await JSZip.loadAsync(await workbook.xlsx.writeBuffer());
+  archive.file("xl/sharedStrings.xml", matrixSharedStringsXml(values));
+  for (const [index, matrixCase] of cases.entries()) {
+    const path = `xl/worksheets/sheet${index + 1}.xml`;
+    const xml = await archive.file(path)?.async("string");
+    assert.ok(xml, `missing ${path}`);
+    archive.file(path, xml.replace(/<sheetData>[\s\S]*?<\/sheetData>/u, matrixSheetDataXml(matrixCase, index)));
+  }
+  const bytes = await archive.generateAsync({ type: "arraybuffer" });
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(bytes);
+  const generatedArchive = await JSZip.loadAsync(bytes);
+  const sharedStringsXml = await generatedArchive.file("xl/sharedStrings.xml")?.async("string");
+  assert.ok(sharedStringsXml);
+  const sharedStringHasValue = createSharedStringValueLookup(sharedStringsXml);
+  let reopenedTotal = 0;
+  let scannerTotal = 0;
+  for (const [index, matrixCase] of cases.entries()) {
+    const reopenedRows = countWorksheetPopulatedDataRows(reopened.getWorksheet(matrixCase.sheetName));
+    const worksheetXml = await generatedArchive.file(`xl/worksheets/sheet${index + 1}.xml`)?.async("string");
+    assert.ok(worksheetXml);
+    const scannedRows = countWorksheetDataRows(worksheetXml, sharedStringHasValue);
+    assert.equal(scannedRows, reopenedRows, JSON.stringify(matrixCase));
+    reopenedTotal += reopenedRows;
+    scannerTotal += scannedRows;
+  }
+  assert.equal(scannerTotal, reopenedTotal);
+  assert.equal((await assertVisibleXlsxReport(bytes)).dataRows, reopenedTotal);
+  await assert.doesNotReject(() => assertGeneratedXlsxReport(bytes));
+});
+
+test("XLSX data-row scanning preserves self-closing boundaries with quoted tag attributes", () => {
+  const sharedStringHasValue = createSharedStringValueLookup([
+    '<sst probe="a/b > c">',
+    '<si probe="a/b > c"><t probe="a/b > c">Header</t></si>',
+    '<si probe="a/b > c" />',
+    '<si probe="a/b > c"><t probe="a/b > c" /></si>',
+    '<si probe="a/b > c"><t probe="a/b > c">visible</t></si>',
+    "</sst>",
+  ].join(""));
+  assert.deepEqual([0, 1, 2, 3].map(sharedStringHasValue), [true, false, false, true]);
+
+  const worksheetXml = [
+    '<sheetData probe="a/b > c">',
+    '<row probe="a/b > c" r="1" />',
+    '<row probe="a/b > c" r="2"><c probe="a/b > c" r="A2" s="1" /><c probe="a/b > c" r="B2" t="s"><v probe="a/b > c">1</v></c></row>',
+    '<row probe="a/b > c" r="3"><c probe="a/b > c" r="A3" t="inlineStr"><is probe="a/b > c"><r><t probe="a/b > c" /></r><r><t probe="a/b > c"></t></r></is></c></row>',
+    '<row probe="a/b > c" r="4"><c probe="a/b > c" r="A4"><v probe="a/b > c">0</v></c></row>',
+    "</sheetData>",
+  ].join("");
+  assert.equal(countWorksheetDataRows(worksheetXml, sharedStringHasValue), 1);
+  assert.equal(countWorksheetDataRows(worksheetXml, sharedStringHasValue, 1), 1);
 });
 
 test("generated report integrity accepts normal, mixed, and customWidth=true reports", async (context) => {
@@ -440,16 +533,102 @@ async function countReopenedPopulatedDataRows(bytes: ArrayBuffer) {
   await workbook.xlsx.load(bytes);
   let populatedRows = 0;
   for (const sheet of workbook.worksheets) {
-    sheet.eachRow((row, rowNumber) => {
-      if (rowNumber <= 1) return;
-      let populated = false;
-      row.eachCell((cell) => {
-        if (cell.value !== null && cell.value !== undefined && cell.value !== "") populated = true;
-      });
-      if (populated) populatedRows += 1;
-    });
+    populatedRows += countWorksheetPopulatedDataRows(sheet);
   }
   return populatedRows;
+}
+
+function countWorksheetPopulatedDataRows(sheet: ExcelJS.Worksheet | undefined) {
+  assert.ok(sheet);
+  let populatedRows = 0;
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber <= 1) return;
+    let populated = false;
+    row.eachCell((cell) => {
+      if (cell.value !== null && cell.value !== undefined && cell.value !== "") populated = true;
+    });
+    if (populated) populatedRows += 1;
+  });
+  return populatedRows;
+}
+
+function matrixSharedStringsXml(values: readonly { name: string; value: string | number | boolean }[]) {
+  const entries = values.map((value) => {
+    const probe = matrixAttributeValue(`${value.name}/${String(value.value)}>shared`);
+    return `<si probe="${probe}"><t probe="${probe}">${matrixTextValue(value.value)}</t></si>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${entries.length}" uniqueCount="${entries.length}" probe="a/b > shared">${entries.join("")}</sst>`;
+}
+
+function matrixSheetDataXml(
+  matrixCase: {
+    cellKind: "self-closing" | "empty-c" | "v" | "shared" | "inline" | "formula";
+    placement: "same-row-before" | "same-row-after" | "skipped-row" | "attribute-only-row";
+    value: { name: string; value: string | number | boolean };
+    valueIndex: number;
+  },
+  caseIndex: number,
+) {
+  const probe = matrixAttributeValue(`${matrixCase.value.name}/${String(matrixCase.value.value)}>case-${caseIndex}`);
+  const header = `<row probe="header/a > b" r="1"><c r="A1" t="inlineStr"><is><t>Header</t></is></c></row>`;
+  const structuralCell = (reference: string) => `<c probe="${probe}" r="${reference}" s="1"\n />`;
+  const targetCell = (reference: string) => matrixCellXml(matrixCase, reference, probe, caseIndex);
+  if (matrixCase.placement === "same-row-before") {
+    return `<sheetData>${header}<row probe="${probe}" r="2">${structuralCell("A2")}${targetCell("B2")}</row></sheetData>`;
+  }
+  if (matrixCase.placement === "same-row-after") {
+    return `<sheetData>${header}<row r = '2' probe="${probe}">${targetCell("A2")}${structuralCell("B2")}</row></sheetData>`;
+  }
+  if (matrixCase.placement === "skipped-row") {
+    return `<sheetData>${header}<row probe="${probe}" r="2">${structuralCell("A2")}</row><row r = '4' probe="${probe}">${targetCell("B4")}</row></sheetData>`;
+  }
+  return `<sheetData>${header}<row probe="${probe}" r="2" /><row probe="${probe}" r = '4'>${targetCell("A4")}</row></sheetData>`;
+}
+
+function matrixCellXml(
+  matrixCase: {
+    cellKind: "self-closing" | "empty-c" | "v" | "shared" | "inline" | "formula";
+    value: { name: string; value: string | number | boolean };
+    valueIndex: number;
+  },
+  reference: string,
+  probe: string,
+  caseIndex: number,
+) {
+  const referenceAttribute = caseIndex % 2 === 0 ? `r="${reference}"` : `r = '${reference}'`;
+  const attributes = `probe="${probe}" ${referenceAttribute}`;
+  if (matrixCase.cellKind === "self-closing") return `<c ${attributes} s="1"\n />`;
+  if (matrixCase.cellKind === "empty-c") return `<c ${attributes}></c>`;
+  if (matrixCase.cellKind === "shared") return `<c ${attributes} t = 's'><v probe="${probe}">${matrixCase.valueIndex}</v></c>`;
+  if (matrixCase.cellKind === "inline") {
+    return `<c ${attributes} t="inlineStr"><is probe="${probe}"><t probe="${probe}">${matrixTextValue(matrixCase.value.value)}</t></is></c>`;
+  }
+  if (matrixCase.cellKind === "formula") {
+    const type = typeof matrixCase.value.value === "string" ? ' t="str"' : matrixCase.value.value === false ? ' t="b"' : "";
+    return `<c ${attributes}${type}><f probe="${probe}">${matrixFormula(matrixCase.value.value)}</f><v probe="${probe}">${matrixTextValue(matrixCase.value.value)}</v></c>`;
+  }
+  const type = typeof matrixCase.value.value === "string" ? ' t="str"' : matrixCase.value.value === false ? ' t="b"' : "";
+  return `<c ${attributes}${type}><v probe="${probe}">${matrixTextValue(matrixCase.value.value)}</v></c>`;
+}
+
+function matrixFormula(value: string | number | boolean) {
+  if (typeof value === "string") return matrixTextValue(`="${value.replaceAll('"', '""')}"`);
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  return String(value);
+}
+
+function matrixTextValue(value: string | number | boolean) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function matrixAttributeValue(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll('"', "&quot;");
 }
 
 async function replaceCustomWidthWithTrue(bytes: ArrayBuffer) {
