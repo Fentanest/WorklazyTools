@@ -4,6 +4,28 @@
 
 ## 2026-09-08
 
+### U4-4 fix-3 — PDF 표시 런타임 공유·배포 실행 자산 계측 정정 (Codx)
+
+**기각 사유·구성 수리** — fix-2의 “PDF.js 표시 런타임 중복 없음”과 번들 5종 통과 기록은 `.mjs`를 집계하지 않은 측정에 기대어 **기각**한다. 실제 fix-2 산출물은 main이 full `pdf.mjs`를 정적 번들하고 thumbnail worker가 별도 `pdf.min.mjs` URL 자산을 로드해 표시 런타임이 두 벌이었다. fix-3에서 main의 정적 import를 제거하고 main과 전용 worker 모두 고정 패치된 full `pdf.mjs?url`을 동적 import하게 해 **하나의 배포 자산** `assets/pdf-CCjkBPdx.mjs`를 공유한다. OffscreenCanvas worker는 유지하고, PDF.js 내부 worker `pdf.worker.min-CHFwMXne.mjs`도 유지한다.
+
+**계측 경계·기준선** — bundle schema를 v3으로 올리고 `vendor/**`와 `runtime/` 트리 밖의 모든 `.js`·`.mjs`를 배포 실행 inventory와 gzip 합계에 넣었다. route chunk가 URL로 참조하는 worker·public 실행 자산에 route 소유권을 전파하며, 동일 SHA-256 자산은 한 번만 세고 변경 전부터 있던 동일 SHA의 `pdf.worker.min.mjs`는 신규 증가로 세지 않는다. 같은 v3 범위로 S3 고정 기준선을 재생성한 뒤 `pdf-editor`만 scoped 측정했다. unscoped 비교는 S3 기준선에 없는 후속 `audio-studio` route 때문에 fail-closed하며 통과로 기록하지 않는다.
+
+| 번들 지표(gzip) | fix-2 산출물을 v3로 정정 재계측 | fix-3 최종 | 고정 상한 | 최종 판정 |
+|---|---:|---:|---:|---|
+| entry JS | +7,177B | **+7,178B** | +20,480B | 통과 |
+| affected PDF route JS | +22,750B | **+58,079B** | +61,440B | 통과 |
+| shared JS(귀속 이동 제외) | **+133,495B** | **+2,152B** | +30,720B | 통과 |
+| app JS | **+164,213B** | **+68,185B** | +81,920B | 통과 |
+| CSS | +235B | **+235B** | +10,240B | 통과 |
+
+override `{}`·multiplier 1이며 상한 변경은 없다. astra의 원본 `bundle-review.mjs`는 `unmeasuredNewDisplay=[]`과 scoped 5종 통과를 재현했다. 실제 워터마크 워크플로에서 로드된 `.js/.mjs` 20개는 전부 inventory에 있어 `missingFromMeasurement=[]`이었고, 표시 자산 하나를 `PdfEditorPage`와 `pdfThumbnailRender.worker`가 같이 참조했다.
+
+**응답성·패치 안전성** — 고정 fixture를 128MiB까지 늘려 12개×3 새 context를 측정했다. 16/32/64/128MiB 중앙 처리시간은 **1.692/1.977/3.017/5.701초**, heartbeat는 **41.665/45.750/86.220/161.120ms**로 모두 200ms 이하였다. 외부 취소 click→UI는 **105.491ms**, 늦은 canvas·결과 0, 재시도 성공이었다. `Worker`를 생성할 수 없게 한 실제 브라우저 대조도 preview·download 성공, route error 0으로 호환 경로를 통과했다. fixture manifest SHA-256은 `c2629b4719786580cab709143a17af1728b86eb8e515493109ad2d7276d85eb2`다.
+
+의존 패치는 원본 astra probe를 제품 파일 read-only 격리로 재실행했다. modern/legacy×full/minified 네 변형이 각각 180 fixture를 전부 렌더했고 변환 실패는 0이며 33 fixture에서 의도한 패치 차이가 나타났다. 독립 scalar oracle 대비 패치 픽셀 차이 0, 원본 차이 77, raw oracle 오류 0, 네 변형 SHA 동일을 확인했다. PDF.js와 lockfile은 **6.2.108**에 고정됐고 패치 대상 범위 밖 package 변경 0이다. 알 수 없는 hash·version, 원본 출현 0, 패치 출현, 결과 hash 불일치의 fail-closed 5개 음성 대조는 모두 Vite 실행 전 실패했고 원본·멱등 재적용은 통과했다.
+
+**전체 회귀·동시 검토** — TypeScript 진단 0, unit **319/319**, production/local-QA 각 2,847 modules·정적 69페이지, startup recovery 116을 통과했다. PDF finish와 PDF.js/Poppler 골든 **160/160**, PDF 범위·전체 browser, new-tools·utilities·Office·QR bulk·QR font, recovery **147**, legacy oracle 총 diff 0, Excel Cleaner·Compare를 모두 통과했다. 기준선 갱신 없이 `ko_KR.UTF-8`·`en_US.UTF-8` visual은 각각 **211/211** 일치했다. local-QA a11y는 위반 0·F2 incomplete 0·상속 925·외부 요청 0, rendering은 7대상×3회·외부 요청 0과 finish 최대 CLS `0.0001480366`으로 통과했다. CSS orphan 0, legacy 155 rules/153 removed/0 split/2 active, tool 20개도 불변이다. 사용자 문구·화면·route는 바꾸지 않아 한·영 현지화, SEO·정적 페이지, AdSense 격리 경로에 추가 반영할 변경은 없었다. 원보고서와 JSON·캡처는 `/tmp/worklazy-u4-4-fix3/`에 보존한다. — Codx
+
 ### U4-4 fix-2 — PDF 워터마크 응답성·오탐·가시성·귀속 수리 (Codx)
 
 **실행 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, fix-2 dispatch, astra 2b/1차 검수 보고, PDF finish 정본과 U4-4 기각 이력을 대조했다. `s3-pdf-finish`의 시작 `HEAD=15bad33cfb569ee032ba90c4fe42b75c1c48cf73`은 지시와 일치했고 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았다. 검수 디렉터리는 읽기 전용으로만 사용했고 금지된 다른 worktree에는 접근하지 않았다. main 병합·push·배포는 수행하지 않는다.
@@ -12,7 +34,7 @@
 
 두 번째 원인은 decoded content stream 전체를 이미지 payload까지 Latin-1 문자열로 바꾸던 위험/결과 검사였다. 이제 byte lexer가 문자열·주석·hex·name을 구분하고 inline dictionary의 W/H/BPC/CS/IM로 무필터 payload 길이를 계산해 원시 bytes를 건너뛴다. 토큰은 256 bytes로 제한하고 64KiB마다 실제 macrotask에 양보·abort를 재검사한다. Flate는 `DecompressionStream` chunk를 누적하면서 1MiB마다 같은 계약을 적용하고, 분할할 수 없는 fallback decode는 호출 전후 abort와 결과 미등록을 보장한다. 위험 검사와 결과 검사는 모두 이 byte 경로를 쓰며 생성한 짧은 marker stream 외에는 이미지 바이너리를 문자열로 만들지 않는다.
 
-**미리보기·파일 수명주기** — 큰 이미지의 canvas 작업은 PDF.js 표시 런타임을 중복 번들하지 않는 전용 OffscreenCanvas worker에서 실행한다. worker 본체는 1.67kB이고 고정 버전의 패치된 minified 표시 모듈을 빌드 해시 자산으로 동적 로드한다. 전용 worker를 제거한 기각 대조에서는 32/64MiB heartbeat 중앙값이 약 **219/387ms**로 목표 200ms를 넘었으므로 main-thread 호환 경로만 쓰는 안을 기각했다. 호환 플래그는 그대로 false이며 worker canvas를 못 쓰는 브라우저만 기존 경로를 사용한다. 파일별 controller/request token을 업로드 검사·thumbnail/large preview에 전달하고 제거·교체·unmount에서 abort, PDF document destroy, object URL 회수, 늦은 상태/canvas 등록 차단을 함께 수행한다. 검사 중 `pdf-finish-file-cancel`과 변환 중 기존 `pdf-finish-cancel`을 분리했으며 실제 외부 click 뒤 파일·canvas·결과가 사라지고 같은 탭 재시도가 성공한다.
+**미리보기·파일 수명주기** — fix-2에서는 큰 이미지의 canvas 작업을 전용 OffscreenCanvas worker에서 실행했으나, 이 시점의 **“PDF.js 표시 런타임을 중복 번들하지 않는다”는 기록은 fix-3 계측으로 거짓임이 확인되어 기각한다.** 당시 worker 본체는 1.67kB이지만 main의 full 모듈과 worker의 minified URL 모듈이 별도 산출물이었다. 전용 worker를 제거한 기각 대조에서는 32/64MiB heartbeat 중앙값이 약 **219/387ms**로 목표 200ms를 넘었으므로 main-thread 호환 경로만 쓰는 안을 기각했다. 파일별 controller/request token을 업로드 검사·thumbnail/large preview에 전달하고 제거·교체·unmount에서 abort, PDF document destroy, object URL 회수, 늦은 상태/canvas 등록 차단을 함께 수행한다. 검사 중 `pdf-finish-file-cancel`과 변환 중 기존 `pdf-finish-cancel`을 분리했으며 실제 외부 click 뒤 파일·canvas·결과가 사라지고 같은 탭 재시도가 성공한다.
 
 | 성능 지표 | 수정 전 | fix-2 최종 중앙값 | 목표·판정 |
 |---|---:|---:|---|
@@ -40,7 +62,9 @@ Helvetica 두 줄 tile은 배치 높이·글자 크기·간격을 그대로 두�
 
 **astra 원본 probe** — 원본 SHA를 확인하고 수정하지 않은 채, 4270과 검수 경로를 하드코딩한 브라우저 probe만 bwrap read-only mapping과 4280→4288 same-origin proxy adapter로 실행했다. `resume-performance`, `adversarial-engine`, `cancel-fuzz`, `render-new`, `contracts-new`, `bbox-controls`, `a11y-aggregation-negative`, `browser-focused`는 제품 계약을 재현했다. cancel-fuzz는 1,256개 fuzz 최대 1.921ms, direct abort 26.13ms/UI 0.319ms, full engine abort 52.22ms/UI 1.18ms와 재시도 성공을 기록했다. `browser-new`는 597B 정상 파일에서 더 이상 false risk 경고가 나오지 않는데 구 계약대로 risk-confirmation을 click하려 해 그 지점에서 종료됐다. 이는 새 요구의 성공 관찰이며 PASS로 세지 않았다. `golden-recount-all` 이름의 독립 실행 파일은 없고, 현행 생성기/제품 골든이 **160/160**을 직접 재집계했다.
 
-| 번들 지표(gzip) | S3 고정 기준 대비 순증분 | 고정 상한 | 판정 |
+**fix-2 번들 기록 정정** — 아래는 `.mjs` 실행 자산을 누락한 당시 값이므로 5종 통과 근거로 쓸 수 없어 기각한다. 동일 산출물을 v3로 정정 재계측한 shared/app 증분은 +133,495B/+164,213B로 실제로는 상한을 넘었다.
+
+| 번들 지표(gzip) | S3 고정 기준 대비 순증분 | 고정 상한 | 당시 판정(기각) |
 |---|---:|---:|---|
 | entry JS | +7,177B | +20,480B | 통과 |
 | affected PDF route JS | +22,750B | +61,440B | 통과 |
@@ -48,7 +72,7 @@ Helvetica 두 줄 tile은 배치 높이·글자 크기·간격을 그대로 두�
 | app JS | +33,786B | +81,920B | 통과 |
 | CSS | +235B | +10,240B | 통과 |
 
-override `{}`·multiplier 1이며 QR/image-studio→shared 이동 **509,794B**는 순증분과 분리했다. 처음 PDF.js 표시 모듈을 worker에 정적 포함한 구현은 app +184,494B/shared +153,800B로 예산을 넘겨 기각했고, 현재 1.67kB worker+해시 `.mjs` 자산 경계에서 다섯 상한을 통과했다.
+override `{}`·multiplier 1이며 QR/image-studio→shared 이동 **509,794B**는 순증분과 분리했다. 처음 PDF.js 표시 모듈을 worker에 정적 포함한 구현은 app +184,494B/shared +153,800B로 예산을 넘겨 기각했다. **당시 1.67kB worker+해시 `.mjs` 자산 경계에서 다섯 상한을 통과했다는 결론은 `.mjs` 누락으로 오판한 것이며 fix-3에서 상단과 같이 정정했다.**
 
 | 검증 | 최종 결과 |
 |---|---|

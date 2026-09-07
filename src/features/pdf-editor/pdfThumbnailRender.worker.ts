@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import pdfDisplayUrl from "pdfjs-dist/build/pdf.min.mjs?url";
+import pdfDisplayUrl from "pdfjs-dist/build/pdf.mjs?url";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;

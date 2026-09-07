@@ -10,6 +10,7 @@ import { createCanvas } from "@napi-rs/canvas";
 import { chromium } from "playwright";
 import { PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
 import { PNG } from "pngjs";
+import { collectDeploymentExecutionAssetPaths, isDeploymentExecutionAsset } from "../scripts/measure-bundle-budget.mjs";
 
 const execFileAsync = promisify(execFile);
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +18,7 @@ const repositoryRoot = path.resolve(testDirectory, "..");
 const port = Number(process.env.PDF_FINISH_TEST_PORT ?? "4183");
 const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
 const shots = path.resolve(process.env.PDF_FINISH_SHOTS || "/tmp/worklazy-u4-3/shots");
+const runtimeReportPath = process.env.PDF_FINISH_RUNTIME_REPORT ? path.resolve(process.env.PDF_FINISH_RUNTIME_REPORT) : undefined;
 const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-pdf-finish-"));
 let server;
 let browser;
@@ -73,11 +75,11 @@ try {
   await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
-  await testWatermarkWorkflow(browser, fixture, inlineImageFixture, smallFixture);
+  const watermarkRuntimeRequests = await testWatermarkWorkflow(browser, fixture, inlineImageFixture, smallFixture);
   await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
-  await assertLazyChunks();
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, watermark text/image/tile/risk confirmation, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  await assertLazyChunks(watermarkRuntimeRequests);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -635,6 +637,14 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
   await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
   const page = await context.newPage();
+  const runtimeRequests = new Set();
+  page.on("response", (response) => {
+    if (!response.ok()) return;
+    const url = new URL(response.url());
+    if (url.origin !== new URL(baseUrl).origin) return;
+    const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, "");
+    if (isDeploymentExecutionAsset(relativePath)) runtimeRequests.add(relativePath);
+  });
   page.setDefaultTimeout(120_000);
   await page.goto(`${baseUrl}/en/tools/pdf-editor/watermark/`, { waitUntil: "networkidle" });
   const pdfInput = page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']");
@@ -731,6 +741,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   await page.locator("[data-testid='pdf-watermark-risk-confirmation'] button[role='switch']").click();
   assert.equal(await action.isEnabled(), true, "risk consent must allow the warned operation");
   await context.close();
+  return [...runtimeRequests].sort();
 }
 
 async function testWhitespaceWatermark(browserInstance, fixture) {
@@ -854,10 +865,39 @@ async function createInlineImageFixture() {
   return Buffer.from(await document.save());
 }
 
-async function assertLazyChunks() {
-  const assets = await fs.readdir(path.join(repositoryRoot, "dist/assets"));
+async function assertLazyChunks(runtimeRequests) {
+  const assetsDirectory = path.join(repositoryRoot, "dist/assets");
+  const assets = await fs.readdir(assetsDirectory);
   assert.ok(assets.some((name) => /^PdfFinishPanel-.+\.js$/u.test(name)), "PdfFinishPanel must be a distinct lazy chunk");
   assert.ok(assets.some((name) => /^pdfFontEmbed-.+\.js$/u.test(name)), "finish and QR must share the pdfFontEmbed lazy chunk");
+  const displayAssets = assets.filter((name) => /^pdf-.+\.mjs$/u.test(name));
+  assert.equal(displayAssets.length, 1, `main and thumbnail worker must deploy one shared PDF display runtime: ${displayAssets.join(", ")}`);
+  assert.equal(assets.some((name) => /^pdf\.min-.+\.mjs$/u.test(name)), false, "the worker-only duplicate PDF display runtime must be absent");
+
+  const editorChunk = assets.find((name) => /^PdfEditorPage-.+\.js$/u.test(name));
+  const thumbnailWorker = assets.find((name) => /^pdfThumbnailRender\.worker-.+\.js$/u.test(name));
+  assert.ok(editorChunk && thumbnailWorker, "PDF editor and thumbnail worker chunks must exist");
+  const displayUrl = `/assets/${displayAssets[0]}`;
+  for (const asset of [editorChunk, thumbnailWorker]) {
+    const source = await fs.readFile(path.join(assetsDirectory, asset), "utf8");
+    assert.ok(source.includes(displayUrl), `${asset} must reference the shared PDF display runtime`);
+  }
+
+  const measuredInventory = new Set(collectDeploymentExecutionAssetPaths(path.join(repositoryRoot, "dist")));
+  assert.ok(runtimeRequests.includes(displayUrl.replace(/^\//, "")), "the shared PDF display runtime must be reached by the real watermark workflow");
+  for (const request of runtimeRequests) {
+    assert.ok(measuredInventory.has(request), `loaded execution asset is missing from bundle inventory: ${request}`);
+  }
+  if (runtimeReportPath) {
+    await fs.mkdir(path.dirname(runtimeReportPath), { recursive: true });
+    await fs.writeFile(runtimeReportPath, `${JSON.stringify({
+      displayAsset: displayAssets[0],
+      referencedBy: [editorChunk, thumbnailWorker],
+      loadedExecutionAssets: runtimeRequests,
+      measuredExecutionAssets: [...measuredInventory].sort(),
+      missingFromMeasurement: runtimeRequests.filter((request) => !measuredInventory.has(request)),
+    }, null, 2)}\n`);
+  }
 }
 
 async function startPreview() {

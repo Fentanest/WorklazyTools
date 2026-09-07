@@ -19,7 +19,7 @@ const fixtureFilter = process.env.PDF_WATERMARK_PERFORMANCE_FILTER;
 const selectedFixtures = fixtureFilter ? manifest.files.filter(({ id }) => id.includes(fixtureFilter)) : manifest.files;
 
 assert.equal(manifest.schemaVersion, 1);
-assert.equal(manifest.files.length, 11);
+assert.equal(manifest.files.length, 12);
 assert.ok(Number.isSafeInteger(repeats) && repeats >= 3);
 for (const fixture of manifest.files) {
   const bytes = await fs.readFile(path.join(fixtureDirectory, fixture.file));
@@ -109,16 +109,19 @@ try {
     await fs.writeFile(reportPath, `${JSON.stringify({ diagnosticFilter: fixtureFilter, medians, rows }, null, 2)}\n`);
     console.log(`PDF watermark performance diagnostic passed: filter=${fixtureFilter}; report=${reportPath}`);
   } else {
-    const curve = ["curve-16MiB-w8192", "curve-32MiB-w8192", "curve-64MiB-w8192"].map((id) => ({ id, ...medians[id] }));
-    assert.ok(curve[2].totalMs / curve[0].totalMs <= 6, `16/32/64MiB total-time curve is not quasi-linear: ${JSON.stringify(curve)}`);
-    assert.ok(curve[2].maxHeartbeatGapMs <= 200, `64MiB heartbeat gap regressed: ${JSON.stringify(curve)}`);
+    const curve = ["curve-16MiB-w8192", "curve-32MiB-w8192", "curve-64MiB-w8192", "curve-128MiB-w8192"]
+      .map((id) => ({ id, ...medians[id] }));
+    assert.ok(curve[3].totalMs / curve[0].totalMs <= 8, `16/32/64/128MiB total-time curve is not quasi-linear: ${JSON.stringify(curve)}`);
+    assert.ok(curve[3].maxHeartbeatGapMs <= 200, `128MiB heartbeat gap regressed: ${JSON.stringify(curve)}`);
 
     const cancellation = await measureCancellation(browser);
     assert.ok(cancellation.uiResponseMs <= 250, `external cancellation UI response exceeded 250ms: ${JSON.stringify(cancellation)}`);
     assert.equal(cancellation.staleCanvas, false);
     assert.equal(cancellation.staleResult, false);
     assert.equal(cancellation.retrySucceeded, true);
-    const report = { environment: { viewport: "1280x900", deviceScaleFactor: 1, cpuThrottling: false, repeats }, medians, curve, cancellation, rows };
+    const fallback = await measureWorkerFallback(browser);
+    assert.deepEqual(fallback, { previewReady: true, outputPreserved: true, routeError: false });
+    const report = { environment: { viewport: "1280x900", deviceScaleFactor: 1, cpuThrottling: false, repeats }, medians, curve, cancellation, fallback, rows };
     await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
     console.log(`PDF watermark performance passed: ${manifest.files.length} inputs x ${repeats} fresh contexts; report=${reportPath}`);
     console.log(`Performance targets: ${JSON.stringify({ maxMedianHeartbeatGapMs: Math.max(...Object.values(medians).map(({ maxHeartbeatGapMs }) => maxHeartbeatGapMs)), cancellationUiResponseMs: cancellation.uiResponseMs, curve })}`);
@@ -174,6 +177,31 @@ async function measureCancellation(browserInstance) {
   const retrySucceeded = await page.locator("[data-testid='pdf-finish-overlay']").count() === 1;
   await context.close();
   return { uiResponseMs, staleCanvas, staleResult, retrySucceeded };
+}
+
+async function measureWorkerFallback(browserInstance) {
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => {
+    localStorage.setItem("worklazy_privacy_consent", "denied");
+    Object.defineProperty(globalThis, "Worker", { configurable: true, value: undefined });
+  });
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/en/tools/pdf-editor/watermark`, { waitUntil: "networkidle" });
+  await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+    .setInputFiles(path.join(fixtureDirectory, "flate-1MiB-w8192.pdf"));
+  await page.waitForFunction(() => {
+    const panel = document.querySelector("[data-testid='pdf-finish-ready']");
+    return panel?.getAttribute("data-preflight-status") === "ready"
+      && panel.querySelector("[data-testid='pdf-finish-preview']")?.getAttribute("data-preview-status") === "ready";
+  }, undefined, { timeout: 30_000 });
+  const previewReady = await page.locator("[data-testid='pdf-finish-canvas-area'] canvas").count() === 1;
+  await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").click();
+  const download = page.locator("[data-testid='pdf-download']");
+  await download.waitFor({ timeout: 30_000 });
+  const outputPreserved = Boolean(await download.getAttribute("href"));
+  const routeError = await page.locator("[data-route-error]").count() > 0;
+  await context.close();
+  return { previewReady, outputPreserved, routeError };
 }
 
 function median(values) {

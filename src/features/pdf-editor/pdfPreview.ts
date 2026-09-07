@@ -1,10 +1,6 @@
 import JSZip from "jszip";
-import {
-  getDocument,
-  GlobalWorkerOptions,
-  PasswordException,
-  type PDFDocumentProxy,
-} from "pdfjs-dist";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
+import pdfDisplayUrl from "pdfjs-dist/build/pdf.mjs?url";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 import type { PdfTextCell, PdfTextDocument, PdfTextLine, PdfTextPage, WorkerProgress } from "./types";
@@ -13,10 +9,22 @@ import { featureMessage } from "../../i18n/featureMessages";
 import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from "../../utils/cooperativeCancel.ts";
 import { waitForPdfRender } from "./pdfRenderLifecycle";
 
-GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+type PdfDisplayModule = typeof import("pdfjs-dist");
+
+let pdfDisplayModulePromise: Promise<PdfDisplayModule> | undefined;
+let passwordExceptionConstructor: PdfDisplayModule["PasswordException"] | undefined;
+
+function loadPdfDisplayModule() {
+  pdfDisplayModulePromise ??= (import(/* @vite-ignore */ pdfDisplayUrl) as Promise<PdfDisplayModule>).then((module) => {
+    module.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+    passwordExceptionConstructor = module.PasswordException;
+    return module;
+  });
+  return pdfDisplayModulePromise;
+}
 
 interface CachedPdfDocument {
-  loadingTask: ReturnType<typeof getDocument>;
+  loadingTask: PDFDocumentLoadingTask;
   promise: Promise<PDFDocumentProxy>;
 }
 
@@ -67,6 +75,8 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko", s
   throwIfAborted(signal, "PDF loading cancelled");
   const cached = documentCache.get(file);
   if (cached) return waitWithAbort(cached.promise, signal);
+  const { getDocument } = await waitWithAbort(loadPdfDisplayModule(), signal);
+  throwIfAborted(signal, "PDF loading cancelled");
   const buffer = await waitWithAbort(file.arrayBuffer(), signal);
   throwIfAborted(signal, "PDF loading cancelled");
   const loadingTask = getDocument({
@@ -564,7 +574,8 @@ function translateOcrStatus(status: string, language: AppLanguage) {
 }
 
 function normalizePdfOpenError(error: unknown, language: AppLanguage) {
-  if (error instanceof PasswordException || (error instanceof Error && error.name === "PasswordException")) {
+  if ((passwordExceptionConstructor && error instanceof passwordExceptionConstructor)
+      || (error instanceof Error && error.name === "PasswordException")) {
     return new Error(featureMessage(language, "pdf.messages.pdfPreview.thisPdfIsPasswordProtectedTryAgainWith"));
   }
   if (error instanceof Error && /password|encrypted/i.test(error.message)) {

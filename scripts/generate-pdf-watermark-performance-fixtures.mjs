@@ -19,6 +19,7 @@ const definitions = [
   { id: "curve-16MiB-w8192", decodedBytes: 16 * 1024 * 1024, width: 8192, compression: "flate", curve: true },
   { id: "curve-32MiB-w8192", decodedBytes: 32 * 1024 * 1024, width: 8192, compression: "flate", curve: true },
   { id: "curve-64MiB-w8192", decodedBytes: 64 * 1024 * 1024, width: 8192, compression: "flate", curve: true },
+  { id: "curve-128MiB-w8192", decodedBytes: 128 * 1024 * 1024, width: 8192, compression: "flate", curve: true },
 ];
 
 await fs.mkdir(outputDirectory, { recursive: true });

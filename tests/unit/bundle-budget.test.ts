@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  budgetLimits, compareWithBaseline, measureOutput, resolveBudgetLimits, selectAffectedRoutes,
+  budgetLimits, compareWithBaseline, isDeploymentExecutionAsset, measureOutput, resolveBudgetLimits, selectAffectedRoutes,
 } from "../../scripts/measure-bundle-budget.mjs";
 import {
   BUNDLE_MEASUREMENT_SCHEMA_VERSION,
@@ -143,7 +143,7 @@ test("old bundle measurement schemas are rejected instead of using SHA fallback"
   assert.throws(() => compareWithBaseline(report(), missingInventory, budget, quiet), /unsupported bundle measurement schema/);
 });
 
-test("schema v2 rejects empty or partial main metadata on both comparison sides", () => {
+test("the current schema rejects empty or partial main metadata on both comparison sides", () => {
   for (const side of ["baseline", "current"] as const) {
     for (const mutation of [
       (target: ReturnType<typeof report>) => { target.modules = []; },
@@ -162,6 +162,8 @@ test("only explicitly inventoried worker and public JavaScript use opaque attrib
     ["tools/video-studio/workers/video.worker-example.js", "worker", 7],
     ["assets/pdf.worker-example.js", "asset-worker", 5],
     ["assets/worker-example.js", "generic-worker", 3],
+    ["assets/pdf.worker.min-example.mjs", "module-worker", 13],
+    ["assets/pdf-example.mjs", "module-public", 17],
     ["service-worker.js", "public", 11],
   ] as const) {
     measured.files.push({ hash, type: "js", category: "shared", gzipBytes: bytes, bytes, paths: [file], routeOwners: [] });
@@ -172,12 +174,23 @@ test("only explicitly inventoried worker and public JavaScript use opaque attrib
   assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:worker" && bytes === 7));
   assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:asset-worker" && bytes === 5));
   assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:generic-worker" && bytes === 3));
-  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:public:sha256:public" && bytes === 11));
+  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:module-worker" && bytes === 13));
+  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:public:sha256:module-public" && bytes === 17));
+  assert.ok(contributions.some(({ id, bytes }) => id === "opaque:worker:sha256:public" && bytes === 11));
   const invalid = structuredClone(measured);
   invalid.files.push({ hash: "lost", type: "js", category: "shared", gzipBytes: 1, bytes: 1, paths: ["assets/lost.js"], routeOwners: [] });
   invalid.moduleInventory.push(moduleInventoryEntry("assets/lost.js"));
   invalid.metrics.appJsGzip += 1;
   assert.throws(() => buildModuleContributions(invalid), /missing main chunk metadata/);
+});
+
+test("deployment execution inventory includes js and mjs outside pinned vendor and runtime trees", () => {
+  for (const file of ["assets/main.js", "assets/pdf.mjs", "nested/service-worker.js", "module.mjs"]) {
+    assert.equal(isDeploymentExecutionAsset(file), true, file);
+  }
+  for (const file of ["vendor/tool.js", "vendor/tool.mjs", "tools/video/runtime/core.js", "runtime/core.mjs", "assets/style.css"]) {
+    assert.equal(isDeploymentExecutionAsset(file), false, file);
+  }
 });
 
 test("largest-remainder allocation is integer, deterministic, and conserves the chunk gzip size", () => {
@@ -250,16 +263,29 @@ test("measurement validates selected routes against the actual build graph", () 
     writeFileSync(path.join(root, "output/entry.js"), "entry");
     for (const id of routes) {
       manifest[`src/features/${id}/Page.tsx`] = { file: `${id}.js` };
-      writeFileSync(path.join(root, `output/${id}.js`), `console.log('${id}');`);
+      const dependency = id === routes[0] ? "const worker = '/assets/thumbnail.worker.js';" : "";
+      writeFileSync(path.join(root, `output/${id}.js`), `console.log('${id}');${dependency}`);
       moduleChunks.push({ file: `${id}.js`, modules: [{
         id: path.join(root, `src/features/${id}/Page.tsx`), renderedLength: 5, renderedGzip: 5, renderedSha256, codeAvailable: true,
       }] });
     }
+    mkdirSync(path.join(root, "output/assets"), { recursive: true });
+    writeFileSync(path.join(root, "output/assets/thumbnail.worker.js"), "import('/assets/pdf.mjs')");
+    writeFileSync(path.join(root, "output/assets/pdf.mjs"), "export const display = true;");
+    writeFileSync(path.join(root, "output/assets/pdf-copy.mjs"), "export const display = true;");
+    writeFileSync(path.join(root, "output/assets/not-executable.txt"), "ignored");
     writeFileSync(path.join(root, "output/.vite/manifest.json"), JSON.stringify(manifest));
     const options = { sourceRoot: root, directory: path.join(root, "output"), routes: [routes[0]], moduleChunks };
     const current = measureOutput(options);
     assert.deepEqual(current.affectedRoutes, [routes[0]]);
     assert.ok(current.metrics.affectedRouteJsGzip > 0);
+    const worker = current.files.find(({ paths }) => paths.includes("assets/thumbnail.worker.js"));
+    const display = current.files.find(({ paths }) => paths.includes("assets/pdf.mjs"));
+    assert.deepEqual(worker.routeOwners, [routes[0]], "worker URL dependencies must inherit their route owner");
+    assert.deepEqual(display.routeOwners, [routes[0]], "mjs URL imports must inherit ownership through the worker");
+    assert.deepEqual(display.paths.sort(), ["assets/pdf-copy.mjs", "assets/pdf.mjs"], "identical deployment assets must be SHA-deduplicated");
+    assert.ok(current.moduleInventory.some(({ file, attribution }) => file === "assets/pdf.mjs" && attribution === "opaque"));
+    assert.equal(current.files.some(({ paths }) => paths.includes("assets/not-executable.txt")), false);
     assert.throws(() => measureOutput({ ...options, routes: ["typo"] }), /unknown or non-lazy/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

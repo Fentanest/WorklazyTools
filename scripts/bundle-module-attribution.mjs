@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export const BUNDLE_MEASUREMENT_SCHEMA_VERSION = 2;
+export const BUNDLE_MEASUREMENT_SCHEMA_VERSION = 3;
 export const MODULE_ATTRIBUTION_SCHEMA = "independent-rendered-gzip-largest-remainder-v1-main-opaque-workers";
 
 function assertBytes(value, label) {
@@ -25,7 +25,7 @@ function compareCodePoints(left, right) {
 
 export function outputFileRealm(file) {
   const normalized = normalizePath(file);
-  if (/(?:^|\/)tools\/video-studio\/workers\/|(?:^|\/)(?:[^/]+\.)?worker-[^/]*\.js$/.test(normalized)) return "worker";
+  if (/(?:^|\/)tools\/video-studio\/workers\/|(?:^|\/)[^/]*worker(?:[.-][^/.-]+)*\.m?js$/.test(normalized)) return "worker";
   if (normalized.startsWith("assets/") && normalized.endsWith(".js")) return "main";
   return "public";
 }
@@ -40,7 +40,7 @@ export function moduleInventoryEntry(file) {
     attribution: "opaque",
     reason: realm === "worker"
       ? "worker module collection is deferred"
-      : "public JavaScript has no Rollup main-chunk module graph",
+      : "public execution asset has no Rollup main-chunk module graph",
   };
 }
 

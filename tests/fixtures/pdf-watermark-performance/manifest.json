@@ -113,6 +113,17 @@
       "file": "curve-64MiB-w8192.pdf",
       "inputBytes": 65776,
       "sha256": "04ba8fe11b36e2e53c85b73dbe410b5f9206d4f14a1f18f85855738c8b9d91f1"
+    },
+    {
+      "id": "curve-128MiB-w8192",
+      "decodedBytes": 134217728,
+      "width": 8192,
+      "compression": "flate",
+      "curve": true,
+      "height": 16384,
+      "file": "curve-128MiB-w8192.pdf",
+      "inputBytes": 131009,
+      "sha256": "2bc85038606f651ab69585fb11804a96e3119b27686783bff8ac28ca61e9e654"
     }
   ]
 }

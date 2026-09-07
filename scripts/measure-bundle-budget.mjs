@@ -87,16 +87,15 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
   const allFiles = walkFiles(outputDirectory);
   const includedFiles = allFiles.filter((filePath) => {
     const relativePath = posixRelative(filePath);
-    if (relativePath.startsWith("vendor/") || relativePath.includes("/runtime/")) return false;
+    if (isExcludedDeploymentTree(relativePath)) return false;
+    if (isDeploymentExecutionAsset(relativePath)) return true;
     if (relativePath.endsWith(".css")) return relativePath.startsWith("assets/") || relativePath.includes("/") || !relativePath.includes("/");
-    if (!relativePath.endsWith(".js")) return false;
-    return relativePath.startsWith("assets/")
-      || !relativePath.includes("/")
-      || relativePath.startsWith("tools/video-studio/workers/");
+    return false;
   });
 
   const recordsByHash = new Map();
   const hashByOutputFile = new Map();
+  const contentsByHash = new Map();
   for (const filePath of includedFiles) {
     const bytes = fs.readFileSync(filePath);
     const hash = crypto.createHash("sha256").update(bytes).digest("hex");
@@ -107,6 +106,7 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
       existing.paths.push(relativePath);
       continue;
     }
+    contentsByHash.set(hash, bytes);
     recordsByHash.set(hash, {
       hash,
       paths: [relativePath],
@@ -145,7 +145,41 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
     }
   }
 
+  const executionRecords = [...recordsByHash.values()].filter(({ type }) => type === "js");
+  const recordsByOutputPath = new Map(executionRecords.flatMap((record) => record.paths.map((filePath) => [filePath, record])));
+  const referencedRecords = new Map(executionRecords.map((record) => [record, new Set()]));
+  const referenceSources = new Map(executionRecords.map((record) => [record, new Set()]));
+  for (const sourceRecord of executionRecords) {
+    const source = contentsByHash.get(sourceRecord.hash).toString("utf8");
+    for (const [targetPath, targetRecord] of recordsByOutputPath) {
+      if (targetRecord === sourceRecord || moduleInventoryEntry(targetPath).attribution !== "opaque" || !source.includes(targetPath)) continue;
+      referencedRecords.get(sourceRecord).add(targetRecord);
+      referenceSources.get(targetRecord).add(sourceRecord.paths[0]);
+    }
+  }
+
+  let propagated = true;
+  while (propagated) {
+    propagated = false;
+    for (const [sourceRecord, targets] of referencedRecords) {
+      if (!sourceRecord.routeOwners.size) continue;
+      for (const targetRecord of targets) {
+        for (const owner of sourceRecord.routeOwners) {
+          if (targetRecord.routeOwners.has(owner)) continue;
+          targetRecord.routeOwners.add(owner);
+          propagated = true;
+        }
+      }
+    }
+  }
+
   const classificationNotes = [];
+  for (const record of executionRecords.filter(({ routeOwners }) => routeOwners.size)) {
+    const sources = [...referenceSources.get(record)].sort();
+    if (sources.length) {
+      classificationNotes.push(`${record.paths[0]} inherits route ownership from deployed references in ${sources.join(", ")}.`);
+    }
+  }
   for (const record of recordsByHash.values()) {
     if (record.type !== "js" || record.routeOwners.size || entryHashes.has(record.hash)) continue;
     const videoWorker = record.paths.find((filePath) => filePath.startsWith("tools/video-studio/workers/"));
@@ -167,7 +201,8 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
   const measuredMainFiles = new Set(normalizedModules.map(({ file }) => file));
   const missingManifestChunks = [...new Set(Object.values(viteManifest)
     .map(({ file }) => file)
-    .filter((file) => file?.endsWith(".js") && hashByOutputFile.has(file) && !measuredMainFiles.has(file)))];
+    .filter((file) => file && hashByOutputFile.has(file)
+      && moduleInventoryEntry(file).attribution === "modules" && !measuredMainFiles.has(file)))];
   if (missingManifestChunks.length) {
     throw new Error(`Module attribution metadata is missing Vite main chunks: ${missingManifestChunks.join(", ")}.`);
   }
@@ -192,7 +227,7 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
       .sort((left, right) => left.file < right.file ? -1 : left.file > right.file ? 1 : 0),
     generatedAt: new Date().toISOString(),
     buildCommand: "vite build --manifest --outDir dist-measure",
-    includeRules: ["assets/**/*.js", "*.js", "tools/video-studio/workers/**/*.js", "assets/**/*.css", "**/*.css"],
+    includeRules: ["**/*.js", "**/*.mjs", "assets/**/*.css", "**/*.css"],
     excludeRules: ["vendor/**", "**/runtime/**", "duplicate SHA-256 content after the first copy"],
     affectedRoutes,
     availableLazyRoutes: availableRoutes,
@@ -224,6 +259,24 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
         .map(([source, item]) => ({ source, name: item.name ?? null })),
     })),
   };
+}
+
+export function isDeploymentExecutionAsset(relativePath) {
+  const normalized = relativePath.replaceAll("\\", "/").replace(/^\.\//, "");
+  if (isExcludedDeploymentTree(normalized)) return false;
+  return normalized.endsWith(".js") || normalized.endsWith(".mjs");
+}
+
+function isExcludedDeploymentTree(relativePath) {
+  const normalized = relativePath.replaceAll("\\", "/").replace(/^\.\//, "");
+  return normalized.startsWith("vendor/") || normalized.startsWith("runtime/") || normalized.includes("/runtime/");
+}
+
+export function collectDeploymentExecutionAssetPaths(directory) {
+  return walkFiles(directory)
+    .map((filePath) => path.relative(directory, filePath).split(path.sep).join("/"))
+    .filter(isDeploymentExecutionAsset)
+    .sort();
 }
 
 function deriveLazyRouteSources(sourceRoot) {
