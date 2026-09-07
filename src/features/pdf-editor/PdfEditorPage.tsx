@@ -1,18 +1,21 @@
-import { FileImage, FileOutput, ImageDown, Layers3 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { BadgeCheck, FileImage, FileOutput, ImageDown, Layers3 } from "lucide-react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuide } from "../../components/ToolGuide";
 import { UtilityPage } from "../../components/UtilitySurface";
 import { PageHeader } from "../../components/ui";
+import { ToolReady } from "../../components/RouteErrorBoundary";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
 import { localizedPath } from "../../i18n/languages";
 import { useAppLanguage } from "../../i18n/routing";
 import { PdfConvertPanel } from "./PdfConvertPanel";
 import { PdfImagePanel } from "./PdfImagePanel";
 import { PdfOrganizePanel } from "./PdfOrganizePanel";
-import type { PdfToolMode } from "./types";
+import type { PdfFinishPreset, PdfToolMode } from "./types";
+
+const PdfFinishPanel = lazy(() => import("./PdfFinishPanel").then((module) => ({ default: module.PdfFinishPanel })));
 
 interface PdfGuideCopy {
   title: string;
@@ -29,12 +32,18 @@ interface PdfPageCopy {
 
 const navigation = [
   { mode: "organize", to: "/tools/pdf-editor", icon: Layers3 },
+  { mode: "finish", to: "/tools/pdf-editor/finish", icon: BadgeCheck },
   { mode: "image-to-pdf", to: "/tools/pdf-editor/image-to-pdf", icon: FileImage },
   { mode: "pdf-to-image", to: "/tools/pdf-editor/pdf-to-image", icon: ImageDown },
   { mode: "convert", to: "/tools/pdf-editor/convert", icon: FileOutput },
 ] as const;
 
-export function PdfEditorPage({ mode }: { mode: PdfToolMode }) {
+type PdfEditorPageProps =
+  | { mode: Exclude<PdfToolMode, "finish">; finishPreset?: never }
+  | { mode: "finish"; finishPreset: PdfFinishPreset };
+
+export function PdfEditorPage(props: PdfEditorPageProps) {
+  const { mode } = props;
   const language = useAppLanguage();
   const page = featureResource<PdfPageCopy>(language, "pdf.page");
   const definition = page.modes[mode];
@@ -48,6 +57,11 @@ export function PdfEditorPage({ mode }: { mode: PdfToolMode }) {
         <PdfModeNavigation mode={mode} labels={page.navigation} ariaLabel={featureMessage(language, "pdf.messages.PdfEditorPage.pdfTools")} language={language} />
 
         {mode === "organize" && <PdfOrganizePanel />}
+        {mode === "finish" && (
+          <Suspense fallback={<div className="tool-route-loading min-h-[420px]" role="status">{featureMessage(language, "pdf.messages.PdfEditorPage.loadingFinish")}</div>}>
+            <ToolReady><PdfFinishPanel preset={props.finishPreset} /></ToolReady>
+          </Suspense>
+        )}
         {(mode === "image-to-pdf" || mode === "pdf-to-image") && <PdfImagePanel direction={mode} />}
         {mode === "convert" && <PdfConvertPanel />}
 
@@ -65,6 +79,13 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
 }) {
   const navigationRef = useRef<HTMLElement>(null);
   const [overflow, setOverflow] = useState({ left: false, right: false });
+
+  useLayoutEffect(() => {
+    const element = navigationRef.current;
+    if (!element) return;
+    const active = element.querySelector<HTMLElement>(`[data-pdf-nav-mode="${mode}"]`);
+    if (active) element.scrollLeft = Math.max(0, active.offsetLeft - (element.clientWidth - active.offsetWidth) / 2);
+  }, [mode]);
 
   useEffect(() => {
     const element = navigationRef.current;
@@ -91,7 +112,7 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
     >
       <nav
         ref={navigationRef}
-        className="pdf-tool-navigation grid grid-cols-[repeat(4,minmax(120px,1fr))] gap-1 overflow-x-auto rounded-2xl bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-[821px]:grid-cols-4"
+        className="pdf-tool-navigation grid grid-cols-[repeat(5,minmax(120px,1fr))] gap-1 overflow-x-auto rounded-2xl bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-[821px]:grid-cols-5"
         aria-label={ariaLabel}
       >
         {navigation.map((item) => {
@@ -103,6 +124,7 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
               to={localizedPath(language, item.to)}
               end={item.mode === "organize"}
               data-active={selected || undefined}
+              data-pdf-nav-mode={item.mode}
               className={`flex min-h-[43px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-bold outline-none transition-[color,background-color,box-shadow] focus-visible:ring-3 focus-visible:ring-violet-700/30 ${selected ? "bg-card text-violet-700 shadow-sm dark:text-violet-300" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
             >
               <Icon size={17} /><span>{labels[item.mode]}</span>

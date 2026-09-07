@@ -14,7 +14,7 @@ import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
 import { ToolsPage } from "../pages/ToolsPage";
 import { LanguageLandingPage } from "../pages/LanguageLandingPage";
-import type { PdfToolMode } from "../features/pdf-editor/types";
+import type { PdfFinishPreset, PdfToolMode } from "../features/pdf-editor/types";
 import type { QrMode } from "../features/qr-studio/QrStudioPage";
 import { InvalidLanguageRedirect, LocalizedNavigate, useAppLanguage } from "../i18n/routing";
 import { isAppLanguage } from "../i18n/languages";
@@ -58,6 +58,9 @@ export function App() {
           <Route path="tools/pdf-editor/image-to-pdf" element={<PdfRoute mode="image-to-pdf" />} />
           <Route path="tools/pdf-editor/pdf-to-image" element={<PdfRoute mode="pdf-to-image" />} />
           <Route path="tools/pdf-editor/convert" element={<PdfRoute mode="convert" />} />
+          <Route path="tools/pdf-editor/finish" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
+          <Route path="tools/pdf-editor/page-numbers" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
+          <Route path="tools/pdf-editor/header-footer" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "header-footer" }} />} />
           <Route path="tools/document-compare" element={<DocumentCompareSessionProvider />}>
             <Route index element={<LazyToolRoute label="Document compare"><DocumentComparePage /></LazyToolRoute>} />
             <Route path="results/:pairNumber" element={<LazyToolRoute label="Document comparison results"><DocumentCompareResultPage /></LazyToolRoute>} />
@@ -127,9 +130,13 @@ function KoreanOnlyRoute({ children }: { children: React.ReactNode }) {
   return language === "ko" ? children : <LocalizedNavigate to="/tools" />;
 }
 
-function PdfRoute({ mode }: { mode: PdfToolMode }) {
+type PdfRouteProps =
+  | { mode: Exclude<PdfToolMode, "finish">; finishPreset?: never }
+  | { mode: "finish"; finishPreset: PdfFinishPreset };
+
+function PdfRoute(props: PdfRouteProps) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><ToolReady><PdfEditorPage mode={mode} /></ToolReady></Suspense>;
+  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><ToolReady><PdfEditorPage {...props} /></ToolReady></Suspense>;
 }
 
 function QrRoute({ mode }: { mode: QrMode }) {

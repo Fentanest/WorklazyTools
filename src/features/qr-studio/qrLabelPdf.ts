@@ -1,6 +1,6 @@
-import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import type { PDFFont, PDFPage } from "pdf-lib";
 
+import { createPdfDocument, embedCustomPdfFont, rgb } from "../../utils/pdfFontEmbed.ts";
 import { QR_LABEL_PRESETS, qrLabelCell } from "./qrBulk.ts";
 import { QrLabelFontInitError } from "./qrLabelFont.ts";
 
@@ -12,12 +12,11 @@ export interface QrLabelEntry {
 
 export async function createQrLabelPdf(entries: QrLabelEntry[], preset: keyof typeof QR_LABEL_PRESETS, fontBytes: ArrayBuffer, signal?: AbortSignal) {
   signal?.throwIfAborted();
-  const document = await PDFDocument.create();
+  const document = await createPdfDocument();
   signal?.throwIfAborted();
   let font: PDFFont;
   try {
-    document.registerFontkit(fontkit);
-    font = await document.embedFont(fontBytes, { subset: false });
+    font = await embedCustomPdfFont(document, fontBytes);
   } catch (error) {
     signal?.throwIfAborted();
     throw new QrLabelFontInitError(error);

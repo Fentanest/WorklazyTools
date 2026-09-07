@@ -703,7 +703,8 @@
         "unableToReadTheImageFile": "이미지 파일을 읽지 못했습니다."
       },
       "PdfEditorPage": {
-        "pdfTools": "PDF 기능"
+        "pdfTools": "PDF 기능",
+        "loadingFinish": "PDF 마무리 도구를 불러오는 중…"
       },
       "pdf": {
         "unsupportedPdfOperation": "지원하지 않는 PDF 작업입니다.",
@@ -878,12 +879,112 @@
         "unableToOpenThePdfFile": "PDF 파일을 열지 못했습니다."
       }
     },
+    "finish": {
+      "tabsLabel": "PDF 마무리 종류",
+      "tabs": {
+        "page-numbers": "페이지 번호",
+        "header-footer": "머리글·바닥글"
+      },
+      "uploadTitle": "PDF 선택",
+      "uploadDescription": "페이지 번호나 문서 정보를 넣을 PDF 하나를 추가하세요.",
+      "uploadHint": "암호 보호가 해제된 PDF 한 개를 선택하세요.",
+      "invalidFile": "PDF 파일만 추가할 수 있습니다.",
+      "inspecting": "페이지와 보안 설정을 확인하는 중…",
+      "settingsTitle": "표시 내용과 위치",
+      "settingsDescription": "토큰, 위치, 글자 크기와 색상을 정하세요.",
+      "template": "표시할 내용",
+      "templateHelp": "사용 가능한 토큰:",
+      "templatePlaceholder": {
+        "page-numbers": "예: {page} / {pages}",
+        "header-footer": "예: {filename} · {date}"
+      },
+      "position": "표시 위치",
+      "regions": {
+        "top-left": "위 왼쪽",
+        "top-center": "위 가운데",
+        "top-right": "위 오른쪽",
+        "bottom-left": "아래 왼쪽",
+        "bottom-center": "아래 가운데",
+        "bottom-right": "아래 오른쪽"
+      },
+      "fontSize": "글자 크기 (6–72 pt)",
+      "color": "글자 색상",
+      "margin": "페이지 여백 (0–144 pt)",
+      "numberingTitle": "번호 시작 기준",
+      "startNumber": "시작 번호",
+      "startPage": "시작 페이지",
+      "excludeCover": "표지 제외",
+      "excludeCoverDescription": "첫 페이지에는 표시하지 않고 번호 기준도 2페이지부터 시작합니다.",
+      "pagesTitle": "적용 페이지",
+      "pagesDescription": "범위와 홀짝 조건을 고르거나 아래 썸네일 체크박스로 정확한 페이지를 선택하세요.",
+      "pageRange": "페이지 범위",
+      "pageRangeExample": "예: 1-3,5,8",
+      "parity": "홀짝 필터",
+      "parityOptions": {
+        "all": "전체",
+        "odd": "홀수 페이지만",
+        "even": "짝수 페이지만"
+      },
+      "selectedPages": "{{count}} / {{total}}페이지 선택",
+      "previewTitle": "오버레이 미리보기",
+      "previewDescription": "선택된 첫 페이지에서 위치와 내용을 확인하세요.",
+      "previewDisclaimer": "미리보기는 화면 확인용 근사치입니다. 실제 PDF의 글자 간격과 위치는 조금 다를 수 있습니다.",
+      "previewWaiting": "페이지 미리보기를 만드는 중…",
+      "previewFailed": "미리보기를 표시하지 못했습니다. 설정을 확인한 뒤 PDF 생성은 다시 시도할 수 있습니다.",
+      "create": "마무리 PDF 만들기",
+      "creating": "PDF를 마무리하는 중…",
+      "retry": "다시 만들기",
+      "cancel": "작업 취소",
+      "canceled": "작업을 취소했습니다. 설정을 확인한 뒤 다시 시작할 수 있습니다.",
+      "progressTitle": "PDF 마무리 진행 상황",
+      "progress": {
+        "reading": "원본 PDF를 읽는 중…",
+        "font": "문서 글꼴을 준비하는 중…",
+        "decorating": "선택한 페이지에 내용을 넣는 중…",
+        "saving": "완성된 PDF를 저장하는 중…"
+      },
+      "complete": "페이지 번호와 문서 정보를 넣었습니다.",
+      "ready": "마무리한 PDF가 준비됐어요.",
+      "fieldErrors": {
+        "fontSize": "글자 크기는 6~72 사이의 숫자로 입력하세요.",
+        "margin": "여백은 0~144 사이의 숫자로 입력하세요.",
+        "startNumber": "시작 번호는 정수로 입력하세요.",
+        "startPage": "시작 페이지는 1 이상의 정수로 입력하세요.",
+        "template": "표시할 내용을 입력하세요."
+      },
+      "rangeErrors": {
+        "empty-range": "적용할 페이지 범위를 입력하세요.",
+        "invalid-range": "페이지 범위 형식을 확인하세요. 예: 1-3,5,8",
+        "descending-range": "범위의 시작 페이지가 끝 페이지보다 클 수 없습니다.",
+        "page-out-of-bounds": "문서 안에 있는 페이지 번호만 입력하세요."
+      },
+      "errors": {
+        "protected-document": "이 PDF는 보호되어 있어 편집할 수 없습니다. 보호가 해제된 사본을 준비해 주세요.",
+        "unreadable-document": "PDF를 읽지 못했습니다. 파일을 확인한 뒤 다시 선택해 주세요.",
+        "invalid-field": "입력값을 확인한 뒤 다시 시도해 주세요.",
+        "invalid-text": "표시 내용에 지원하지 않는 제어 문자나 날짜 형식이 있습니다.",
+        "missing-glyph": "입력한 문자 중 현재 글꼴로 표시할 수 없는 문자가 있습니다.",
+        "invalid-layout": "현재 페이지 크기와 여백에는 내용을 배치할 수 없습니다. 여백이나 글자 크기를 줄여 주세요.",
+        "font-asset": "한국어 글꼴을 준비하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요."
+      },
+      "warnings": {
+        "unknown-token": "알 수 없는 토큰은 입력한 그대로 표시했습니다.",
+        "horizontal-overflow": "일부 긴 줄을 말줄임표로 줄였습니다.",
+        "vertical-overflow": "표시 영역을 벗어나는 일부 줄을 생략했습니다.",
+        "embedded-font": "한국어와 확장 문자를 위해 전체 글꼴이 PDF에 포함되어 파일 크기가 커질 수 있습니다."
+      }
+    },
     "page": {
       "modes": {
         "organize": {
           "eyebrow": "PDF PAGE EDITOR",
           "title": "PDF 페이지 편집·병합·추출",
           "description": "페이지를 눈으로 확인하며 순서 변경·회전·선택하고, 하나의 PDF나 여러 범위별 PDF로 저장하세요."
+        },
+        "finish": {
+          "eyebrow": "PDF FINISH",
+          "title": "PDF 페이지 번호·머리글·바닥글",
+          "description": "페이지 번호와 문서 정보를 원하는 위치에 넣고 미리보기로 확인한 뒤 PDF를 완성하세요."
         },
         "image-to-pdf": {
           "eyebrow": "IMAGE TO PDF",
@@ -903,6 +1004,7 @@
       },
       "navigation": {
         "organize": "편집·병합·추출",
+        "finish": "마무리",
         "image-to-pdf": "이미지→PDF",
         "pdf-to-image": "PDF→이미지",
         "convert": "문서·OCR"

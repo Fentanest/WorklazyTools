@@ -703,7 +703,8 @@
         "unableToReadTheImageFile": "Unable to read the image file."
       },
       "PdfEditorPage": {
-        "pdfTools": "PDF tools"
+        "pdfTools": "PDF tools",
+        "loadingFinish": "Loading PDF finishing tools…"
       },
       "pdf": {
         "unsupportedPdfOperation": "Unsupported PDF operation.",
@@ -878,12 +879,112 @@
         "unableToOpenThePdfFile": "Unable to open the PDF file."
       }
     },
+    "finish": {
+      "tabsLabel": "PDF finishing type",
+      "tabs": {
+        "page-numbers": "Page numbers",
+        "header-footer": "Header & footer"
+      },
+      "uploadTitle": "Choose a PDF",
+      "uploadDescription": "Add one PDF that needs page numbers or document details.",
+      "uploadHint": "Choose one PDF without password protection.",
+      "invalidFile": "Only PDF files can be added.",
+      "inspecting": "Checking pages and security settings…",
+      "settingsTitle": "Content and position",
+      "settingsDescription": "Set tokens, position, font size, and color.",
+      "template": "Content to display",
+      "templateHelp": "Available tokens:",
+      "templatePlaceholder": {
+        "page-numbers": "Example: {page} / {pages}",
+        "header-footer": "Example: {filename} · {date}"
+      },
+      "position": "Position",
+      "regions": {
+        "top-left": "Top left",
+        "top-center": "Top center",
+        "top-right": "Top right",
+        "bottom-left": "Bottom left",
+        "bottom-center": "Bottom center",
+        "bottom-right": "Bottom right"
+      },
+      "fontSize": "Font size (6–72 pt)",
+      "color": "Text color",
+      "margin": "Page margin (0–144 pt)",
+      "numberingTitle": "Numbering start",
+      "startNumber": "Starting number",
+      "startPage": "Starting page",
+      "excludeCover": "Exclude cover",
+      "excludeCoverDescription": "Do not decorate the first page and begin the numbering anchor on page 2.",
+      "pagesTitle": "Pages to apply",
+      "pagesDescription": "Choose a range and parity, or use the thumbnail checkboxes below for an exact selection.",
+      "pageRange": "Page range",
+      "pageRangeExample": "Example: 1-3,5,8",
+      "parity": "Parity filter",
+      "parityOptions": {
+        "all": "All pages",
+        "odd": "Odd pages only",
+        "even": "Even pages only"
+      },
+      "selectedPages": "{{count}} of {{total}} pages selected",
+      "previewTitle": "Overlay preview",
+      "previewDescription": "Check the content and position on the first selected page.",
+      "previewDisclaimer": "This preview is an on-screen approximation. Text spacing and placement in the finished PDF may differ slightly.",
+      "previewWaiting": "Rendering the page preview…",
+      "previewFailed": "The preview could not be displayed. You can check the settings and retry PDF creation.",
+      "create": "Create finished PDF",
+      "creating": "Finishing the PDF…",
+      "retry": "Try again",
+      "cancel": "Cancel operation",
+      "canceled": "The operation was canceled. Check the settings and start again.",
+      "progressTitle": "PDF finishing progress",
+      "progress": {
+        "reading": "Reading the source PDF…",
+        "font": "Preparing the document font…",
+        "decorating": "Adding content to selected pages…",
+        "saving": "Saving the finished PDF…"
+      },
+      "complete": "Page numbers and document details were added.",
+      "ready": "Your finished PDF is ready.",
+      "fieldErrors": {
+        "fontSize": "Enter a font size from 6 to 72.",
+        "margin": "Enter a margin from 0 to 144.",
+        "startNumber": "Enter the starting number as an integer.",
+        "startPage": "Enter the starting page as an integer of 1 or more.",
+        "template": "Enter the content to display."
+      },
+      "rangeErrors": {
+        "empty-range": "Enter a page range to apply.",
+        "invalid-range": "Check the page range format. Example: 1-3,5,8",
+        "descending-range": "A range cannot start after it ends.",
+        "page-out-of-bounds": "Use only page numbers contained in this document."
+      },
+      "errors": {
+        "protected-document": "This PDF is protected and cannot be edited. Prepare an unlocked copy and try again.",
+        "unreadable-document": "The PDF could not be read. Check the file and choose it again.",
+        "invalid-field": "Check the input values and try again.",
+        "invalid-text": "The content contains an unsupported control character or date format.",
+        "missing-glyph": "Some characters cannot be displayed with the available document font.",
+        "invalid-layout": "The content does not fit this page size and margin. Reduce the margin or font size.",
+        "font-asset": "The Korean font could not be prepared. Check your connection and try again."
+      },
+      "warnings": {
+        "unknown-token": "Unknown tokens were kept as entered.",
+        "horizontal-overflow": "Some long lines were shortened with an ellipsis.",
+        "vertical-overflow": "Some lines outside the available region were omitted.",
+        "embedded-font": "A full font was embedded for Korean and extended characters, which may increase the file size."
+      }
+    },
     "page": {
       "modes": {
         "organize": {
           "eyebrow": "PDF PAGE EDITOR",
           "title": "Edit, merge, and extract PDF pages",
           "description": "Review pages visually, reorder, rotate, and select them, then export one PDF or several page ranges."
+        },
+        "finish": {
+          "eyebrow": "PDF FINISH",
+          "title": "PDF page numbers, headers, and footers",
+          "description": "Add page numbers and document details where you want them, check the preview, and finish your PDF."
         },
         "image-to-pdf": {
           "eyebrow": "IMAGE TO PDF",
@@ -903,6 +1004,7 @@
       },
       "navigation": {
         "organize": "Edit, merge & extract",
+        "finish": "Finish",
         "image-to-pdf": "Image → PDF",
         "pdf-to-image": "PDF → Image",
         "convert": "Document & OCR"

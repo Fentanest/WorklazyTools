@@ -1,4 +1,10 @@
-export type PdfToolMode = "organize" | "image-to-pdf" | "pdf-to-image" | "convert";
+export type PdfToolMode = "organize" | "finish" | "image-to-pdf" | "pdf-to-image" | "convert";
+
+export type PdfFinishTab = "page-numbers" | "header-footer" | "watermark" | "stamp";
+
+export interface PdfFinishPreset {
+  initialTab: PdfFinishTab;
+}
 
 export interface PdfSourceFile {
   id: string;
