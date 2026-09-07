@@ -2,6 +2,10 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-07
+
+- 공용 XLSX 보고서의 sparse 열 폭 계산을 선형 유한값 계산으로 교체하고, 비교 보고서 생성 직후 열 폭·데이터 행 가시성 검사와 Excel 비교·정리·QR 일괄 회귀를 추가했다. — Codx
+
 ## 2026-09-06
 
 - QR 라벨 PDF에 해시 고정 KS X 1001 기반 빌드 타임 글꼴 subset과 원문+NFC coverage 선택·전체 폰트 폴백을 추가했다. Node-only 벤더 전개, ZIP/PDF 공용 export 수명주기, typed 폰트 초기화 경계와 3시나리오 전송 계측·Poppler/PDF.js 렌더 회귀를 함께 고정하고, 실제 handler mutation·폰트 404/S0·내보내기 취소 브라우저 회귀를 보강했다. — Codx

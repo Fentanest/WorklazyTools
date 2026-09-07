@@ -63,7 +63,7 @@ async function handle(request: Request) {
       rightSheet: request.options.right.sheetName,
     });
     const reportBuffer = transferableArrayBuffer(reportBytes);
-    assertGeneratedXlsxReport(reportBuffer);
+    await assertGeneratedXlsxReport(reportBuffer);
     const reportByteLength = reportBuffer.byteLength;
     const result: ExcelComparePairResult = {
       leftName: request.leftName,

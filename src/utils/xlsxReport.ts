@@ -47,7 +47,9 @@ export function appendXlsxReportSheets(workbook: ExcelJS.Workbook, sheets: XlsxR
     sheet.views = [{ state: "frozen", ySplit: 1 }];
     if (definitionSheet.headers.length) sheet.autoFilter = { from: "A1", to: header.getCell(definitionSheet.headers.length).address };
     definitionSheet.headers.forEach((_value, index) => {
-      sheet.getColumn(index + 1).width = Math.min(48, Math.max(12, ...sheet.getColumn(index + 1).values.map((value) => String(value ?? "").length + 2)));
+      const column = sheet.getColumn(index + 1);
+      const measuredWidth = measureColumnWidth(column.values);
+      column.width = Number.isFinite(measuredWidth) && measuredWidth > 0 ? measuredWidth : 12;
     });
   });
   return names;
@@ -55,6 +57,16 @@ export function appendXlsxReportSheets(workbook: ExcelJS.Workbook, sheets: XlsxR
 
 export async function writeXlsxReport(definition: XlsxReportDefinition) {
   return buildXlsxReport(definition).xlsx.writeBuffer();
+}
+
+function measureColumnWidth(values: readonly unknown[]) {
+  let width = 12;
+  values.forEach((value) => {
+    const candidate = String(value ?? "").length + 2;
+    if (Number.isFinite(candidate)) width = Math.max(width, candidate);
+  });
+  const bounded = Math.min(48, width);
+  return Number.isFinite(bounded) ? bounded : 12;
 }
 
 function uniqueWorksheetName(workbook: ExcelJS.Workbook, requested: string) {

@@ -9,6 +9,7 @@ import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
 
 import { assertMobileBottomLayout } from "./mobile-bottom-assertion.mjs";
+import { assertVisibleXlsxReport } from "./xlsx-report-assertions.mjs";
 
 const run = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
@@ -247,6 +248,7 @@ async function downloadReportLinks(page, client, root, phase) {
 }
 
 async function assertNineSheetReport(bytes, expectedSummary) {
+  await assertVisibleXlsxReport(bytes);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(bytes);
   const names = workbook.worksheets.map((sheet) => sheet.name);

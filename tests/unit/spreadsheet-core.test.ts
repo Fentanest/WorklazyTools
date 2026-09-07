@@ -16,6 +16,7 @@ import {
   validateSafeFileName,
 } from "../../src/utils/fileNameSafety.ts";
 import { appendXlsxReportSheets, writeUntrustedText, writeXlsxReport } from "../../src/utils/xlsxReport.ts";
+import { assertVisibleXlsxReport } from "../xlsx-report-assertions.mjs";
 
 test("spreadsheet adapter classifies OOXML from package contents and parses it only once into the common model", async () => {
   const workbook = new ExcelJS.Workbook();
@@ -131,6 +132,37 @@ test("writeUntrustedText stores every external value as text without formula coe
   const reopenedSheet = reopened.getWorksheet("Rows")!;
   values.forEach((_value, index) => assert.equal(typeof reopenedSheet.getCell(index + 2, 1).value, "string"));
   assert.equal(reopenedSheet.getCell(9, 1).value, "[object Object]");
+});
+
+test("XLSX reports serialize finite positive widths for sparse ExcelJS columns", async () => {
+  const output = await writeXlsxReport({
+    sheets: [{
+      name: "Widths",
+      headers: ["First", "Second", "Third", "Fourth"],
+      rows: [
+        ["short", "a longer value", "한글", 42],
+        ["tail", "", null, false],
+        [Number.NaN, Number.POSITIVE_INFINITY, undefined, Number.NEGATIVE_INFINITY],
+      ],
+    }],
+  });
+  const visibility = await assertVisibleXlsxReport(output);
+  assert.equal(visibility.worksheetCount, 1);
+  assert.equal(visibility.customWidthColumns, 4);
+  assert.ok(visibility.widths.every((width) => Number.isFinite(width) && width >= 12 && width <= 48));
+});
+
+test("XLSX reports size a 50,000-row column without argument overflow", async () => {
+  const output = await writeXlsxReport({
+    sheets: [{
+      name: "Large",
+      headers: ["Value"],
+      rows: Array.from({ length: 50_000 }, (_, index) => [`row-${index}`]),
+    }],
+  });
+  const visibility = await assertVisibleXlsxReport(output);
+  assert.equal(visibility.customWidthColumns, 1);
+  assert.equal(visibility.dataRows, 50_000);
 });
 
 test("appendXlsxReportSheets preserves cleaned sheets and resolves report-name collisions deterministically", () => {

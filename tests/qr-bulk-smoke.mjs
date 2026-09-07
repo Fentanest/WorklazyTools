@@ -7,6 +7,7 @@ import path from "node:path";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { assertPinnedQrPdf, createQrFontScenarioServer, fontPaths, qrFontBrowserScenarios, qrFontFixture } from "./qr-font-scenarios.mjs";
+import { assertVisibleXlsxReport } from "./xlsx-report-assertions.mjs";
 import puppeteer from "puppeteer-core";
 
 const repositoryRoot = path.resolve(new URL("..", import.meta.url).pathname);
@@ -120,8 +121,10 @@ try {
   await waitForDownload("worklazy-qr-manifest.xlsx");
   const zip = await JSZip.loadAsync(await fs.readFile(path.join(downloadDirectory, "worklazy-qr-bulk.zip")));
   if (Object.keys(zip.files).filter((name) => name.endsWith(".png")).length !== 2) throw new Error("Incremental QR ZIP does not contain both PNG results.");
+  const manifestBytes = await fs.readFile(path.join(downloadDirectory, "worklazy-qr-manifest.xlsx"));
+  await assertVisibleXlsxReport(manifestBytes);
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(await fs.readFile(path.join(downloadDirectory, "worklazy-qr-manifest.xlsx")));
+  await workbook.xlsx.load(manifestBytes);
   if (workbook.worksheets.length !== 2 || workbook.worksheets[0].rowCount !== 3 || workbook.worksheets[1].rowCount !== 1) throw new Error("QR manifest or failed-row sheet is inconsistent.");
   // Each navigation creates a fresh panel loader; disabled HTTP cache also
   // guarantees the corrupt case reaches the test server after the subset case.

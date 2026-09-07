@@ -8,6 +8,8 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
 
+import { assertVisibleXlsxReport } from "./xlsx-report-assertions.mjs";
+
 const runCommand = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-excel-cleaner-smoke-"));
@@ -269,9 +271,10 @@ async function waitForDownload(directory, name) {
 }
 
 async function inspectCleanerWorkbook(bytes, cleanedSheetName) {
+  const visibility = await assertVisibleXlsxReport(bytes);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(bytes);
   const cleaned = workbook.getWorksheet(cleanedSheetName);
   const reports = ["변경 요약", "처리 규칙", "오류 행", "제외 행"].filter((name) => workbook.getWorksheet(name));
-  return { sheetCount: workbook.worksheets.length, reportSheets: reports.length, formula: cleaned?.getCell("D2").formula };
+  return { sheetCount: workbook.worksheets.length, reportSheets: reports.length, formula: cleaned?.getCell("D2").formula, visibility };
 }

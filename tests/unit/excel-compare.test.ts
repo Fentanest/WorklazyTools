@@ -20,6 +20,7 @@ import type {
   SpreadsheetCellData,
   SpreadsheetScalar,
 } from "../../src/features/spreadsheet-core/inputAdapter.ts";
+import { writeXlsxReport } from "../../src/utils/xlsxReport.ts";
 
 const baseOptions = (): ExcelComparePairOptions => ({
   mode: "position",
@@ -28,18 +29,33 @@ const baseOptions = (): ExcelComparePairOptions => ({
   normalization: { ...DEFAULT_EXCEL_COMPARE_OPTIONS, compareFormatting: false, compareDisplayValues: false },
 });
 
-test("report integrity checks keep worker, client, and page responsibilities distinct", () => {
-  const valid = Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 0x01]).buffer;
-  assert.doesNotThrow(() => assertGeneratedXlsxReport(valid));
-  assert.doesNotThrow(() => assertReceivedXlsxReport(valid, 5));
-  assert.doesNotThrow(() => assertReportBlobSize(new Blob([valid]), 5));
+test("report integrity checks keep worker, client, and page responsibilities distinct", async () => {
+  const valid = reportArrayBuffer(await writeXlsxReport({ sheets: [{ name: "Report", headers: ["Value"], rows: [["visible"]] }] }));
+  await assert.doesNotReject(() => assertGeneratedXlsxReport(valid));
+  assert.doesNotThrow(() => assertReceivedXlsxReport(valid, valid.byteLength));
+  assert.doesNotThrow(() => assertReportBlobSize(new Blob([valid]), valid.byteLength));
   for (const action of [
     () => assertGeneratedXlsxReport(new ArrayBuffer(0)),
     () => assertGeneratedXlsxReport(Uint8Array.from([1, 2, 3, 4]).buffer),
-    () => assertReceivedXlsxReport(valid, 4),
-    () => assertReportBlobSize(new Blob([valid]), 4),
   ]) {
-    assert.throws(action, (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE);
+    await assert.rejects(action, (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE);
+  }
+  assert.throws(() => assertReceivedXlsxReport(valid, valid.byteLength - 1), (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE);
+  assert.throws(() => assertReportBlobSize(new Blob([valid]), valid.byteLength - 1), (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE);
+});
+
+test("generated report integrity rejects missing column widths and header-only workbooks", async () => {
+  const mutant = new ExcelJS.Workbook();
+  const mutantSheet = mutant.addWorksheet("Mutant");
+  mutantSheet.addRows([["Value"], ["hidden"]]);
+  mutantSheet.getColumn(1).width = Number.NaN;
+  const missingWidth = reportArrayBuffer(await mutant.xlsx.writeBuffer());
+  const headerOnly = reportArrayBuffer(await writeXlsxReport({ sheets: [{ name: "Empty", headers: ["Value"], rows: [] }] }));
+  for (const invalid of [missingWidth, headerOnly]) {
+    await assert.rejects(
+      () => assertGeneratedXlsxReport(invalid),
+      (error: Error & { code?: string }) => error.code === REPORT_INTEGRITY_ERROR_CODE,
+    );
   }
 });
 
@@ -346,4 +362,10 @@ function formulaCell(row: number, column: number, formula: string, cachedValue: 
     formula,
     cachedValue,
   };
+}
+
+function reportArrayBuffer(value: ExcelJS.Buffer) {
+  if (value instanceof ArrayBuffer) return value;
+  if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
+  throw new Error("Unexpected report buffer type.");
 }

@@ -2,6 +2,22 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-07
+
+### XLSX 보고서 열 폭 NaN — 빈 화면 근본 원인·가시성 무결성 판정 (Codx)
+
+**근본 원인 확정** — `ExcelJS.Column.values`는 1-based 행 번호를 반영해 index 0이 hole인 sparse 배열이다. 기존 `values.map(...)`는 hole을 보존하지만 이를 `Math.max(12, ...mapped)`로 펼치면 hole이 `undefined` 인자로 바뀌어 결과가 `NaN`이 된다. ExcelJS는 `column.width = NaN`을 `<col customWidth="1"/>`로 직렬화하면서 `width` 속성을 생략하고, Excel은 이 열을 폭 0으로 렌더한다. 셀과 shared string은 그대로라 시트명만 보이고 내용이 없는 것처럼 보였다. 2026-09-03 X-A가 확인한 byte 길이·`PK` 서명·재개방·행 수는 모두 참이어도 열 가시성은 보장하지 않으므로, 당시 서비스워커·전송 계층 가설은 이 증상의 원인이 아니며 “근본 원인 미확정” 판정을 폐기한다.
+
+**영향·수정 경계** — 공용 `writeXlsxReport`를 쓰는 Excel 비교 `report.ts`, Excel 정리 `output.ts`, QR 일괄 `QrBulkPanel.tsx`의 보고서가 같은 결함을 공유했다. 폭 계산은 sparse hole을 건너뛰는 `forEach` 선형 순회로 바꿔 열당 인자 배열을 만들거나 spread하지 않고, 후보와 최종 폭을 `Number.isFinite`로 거른 뒤 12~48에 고정했다. 생성 직후 비교 워커의 무결성 검사는 XLSX ZIP을 다시 열어 모든 worksheet XML을 순차적으로 읽고, `customWidth=1|true`인 모든 `<col>`의 `width`가 유한한 양수인지와 2행 이후 데이터가 있는 시트가 최소 하나인지 확인한다. 실패는 기존 `REPORT_INTEGRITY_FAILED` 하나로만 귀결해 내부 원인을 사용자에게 노출하지 않는다. 전 시트를 검사해야 누락 열을 조용히 통과시키지 않으므로 샘플 상한은 두지 않았고, 한 번에 worksheet XML 하나만 문자열로 유지해 피크를 제한했다.
+
+**mutant·검사기 판정** — 수정 전 코드를 그대로 둔 상태에서 새 XML 골든을 실행하자 exit 1과 함께 `XLSX report column has an invalid custom width in xl/worksheets/sheet1.xml: <col min="1" max="1" customWidth="1"/>`가 재현됐다(`/tmp/worklazy-xr-out/mutant-width-failure.log`). 수정 뒤 4개 논리 열 모두 폭 12~48, 50,000행 단일 열도 1.08초에 `RangeError` 없이 완료했다. 인접 열 폭이 같으면 ExcelJS가 `<col min="3" max="4">`처럼 한 태그로 합치므로, 테스트의 열 수는 태그 수가 아니라 `min..max` span으로 계산한다. 누락 폭 mutant와 헤더만 있는 보고서는 생산 무결성 검사에서 모두 기존 안전 오류 코드로 거부됐다.
+
+**사용자 파일 실측** — 읽기 전용 원본 `2026년 설 선물 발송처_20260204_취합중.xlsx`(19,605B, SHA-256 `3152fb51…6a4a9`)와 `2026년 설 선물 발송처_20260204_취합_송창훈.xlsx`(20,263B, `faab6f10…319cf`)를 기존 보고서 Parameters와 같은 `최종` 시트·헤더 1행·키 2열·중복 오류 정책으로 다시 비교했다. 결과는 matched 713·changed 37·added 48·duplicate 4이고 새 54,122B 보고서는 9시트·논리 열 95개·데이터 행 856개, 폭 최솟값 12·최댓값 48·비유한/0 폭 0개였다. 기존 다운로드 보고서는 custom-width `<col>` 95개 모두 `width`가 없었고, 새 보고서는 병합 직렬화된 `<col>` 태그 68개 모두 `width`가 있으며 누락 0개였다. LibreOffice headless 변환도 exit 0이며 첫 시트 CSV는 99B/9행으로 `matched,713`, `changed,37`, `added,48`을 보존했다. 원본은 수정·복사·스테이징하지 않았고 생성물과 원출력은 `/tmp/worklazy-xr-out/`에만 뒀다.
+
+**완료 검증** — 전용 `TMPDIR`·npm cache와 `NODE_OPTIONS=--max-old-space-size=4096`에서 `npx tsc -b`, 전체 unit 250/250, 표준 build 2,834 modules·정적 61페이지, `test:static`, `test:excel-compare`, `test:excel-cleaner`, `test:qr-bulk`, 전체 `test:browser`, `bundle:measure`, `css:orphans`, `node tests/tool-registry-routes.mjs`, `git diff --check`가 모두 exit 0이다. 브라우저는 단일 production preview `127.0.0.1:4330 --strictPort`에서 직렬 실행했다. Excel 비교의 9시트 다운로드, Excel 정리의 5시트/논리 열 33개/데이터 18행, QR 일괄의 2시트 manifest 모두 독립 raw XML 폭 단언을 통과했다. 원출력은 `/tmp/worklazy-xr-out/`에 보존했다.
+
+**동반 영향 검토** — 사용자 문구·URL·기능 의미·SEO 메타데이터·정적 페이지·FAQ·광고 배치와 광고 제외 격리 경로는 바뀌지 않는다. 기존 ko/en 안전 오류 문구를 그대로 사용하고 정적 GitHub Pages 실행 구조와 새 의존 없음 계약을 유지하므로 이 표면의 추가 현지화·SEO·AdSense 수정은 불필요하다.
+
 ## 2026-09-06
 
 ### S2b QR 라벨 PDF 한글 글꼴 감량 — 브랜치 구현·검증 (Codx)
