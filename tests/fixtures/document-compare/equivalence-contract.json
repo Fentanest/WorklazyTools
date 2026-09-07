@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "offsetUnit": "unicode-code-point",
+  "fixturePairs": [
+    { "pairId": "base", "before": "oracle/base-before.docx", "after": "oracle/base-after.docx" },
+    { "pairId": "split", "before": "oracle/split-before.docx", "after": "oracle/split-after.docx" },
+    { "pairId": "boundary", "before": "oracle/boundary-before.docx", "after": "oracle/boundary-after.docx" },
+    { "pairId": "formatting", "before": "oracle/formatting-before.docx", "after": "oracle/formatting-after.docx" },
+    { "pairId": "revisions", "before": "oracle/revisions-before.docx", "after": "oracle/revisions-after.docx" }
+  ],
+  "exactPackagePair": { "pairId": "exact", "before": "oracle/exact-before.docx", "after": "oracle/exact-after.docx" },
+  "allowedSidecarMismatches": [
+    "base:paragraph-call:1",
+    "split:paragraph-call:2",
+    "boundary:paragraph-call:2",
+    "revisions:paragraph-call:0",
+    "revisions:paragraph-call:8",
+    "revisions:paragraph-call:12",
+    "revisions:paragraph-call:13",
+    "revisions:paragraph-call:14",
+    "revisions:paragraph-call:15"
+  ],
+  "exceptions": [
+    {
+      "reasonId": "E1",
+      "fixtureId": "revisions:existing-after-revision",
+      "reason": "Existing revisions in the after document are preserved, including cases whose accepted text is unchanged."
+    },
+    {
+      "reasonId": "E2",
+      "fixtureId": "split:one-to-two-paragraph-group",
+      "reason": "Paragraph split/merge and row, column, or paragraph marks do not share one text-diff input."
+    },
+    {
+      "reasonId": "E3",
+      "fixtureId": "base:automatic-number-display-prefix",
+      "reason": "Automatic numbering is a display prefix outside the paragraph text passed to the DOCX emitter."
+    },
+    {
+      "reasonId": "E4",
+      "fixtureId": "comments-multipara:comments-preserved",
+      "reason": "Comment body and author bytes are preserved from the after document."
+    },
+    {
+      "reasonId": "E5",
+      "fixtureId": "formatting:property-revision",
+      "reason": "Formatting property revisions are not text segments."
+    },
+    {
+      "reasonId": "E6",
+      "fixtureId": "comments-multipara:joined-cell-input",
+      "reason": "A web cell joins multiple paragraphs with newlines while the DOCX emitter diffs each paragraph separately."
+    }
+  ]
+}
