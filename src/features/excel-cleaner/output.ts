@@ -2,7 +2,14 @@ import { Buffer } from "buffer";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
 
-import { appendXlsxReportSheets, writeUntrustedText, type XlsxReportSheet } from "../../utils/xlsxReport.ts";
+import {
+  appendXlsxReportSheets,
+  sanitizeXlsxText,
+  uniqueWorksheetName,
+  writeUntrustedText,
+  writeXlsxWorkbook,
+  type XlsxReportSheet,
+} from "../../utils/xlsxReport.ts";
 import type { SpreadsheetScalar } from "../spreadsheet-core/inputAdapter.ts";
 import type { CleanerCell, CleanerSheetModel, ExcelCleanerEngineResult, ExcelCleanerOutput, ExcelCleanerPipeline } from "./types.ts";
 
@@ -31,12 +38,12 @@ async function buildXlsx(result: ExcelCleanerEngineResult, context: ExcelCleaner
   workbook.modified = new Date();
   result.sheets.forEach((model) => writeCleanedSheet(workbook, model));
   appendXlsxReportSheets(workbook, reportSheets(result, context));
-  const buffer = transferable(await workbook.xlsx.writeBuffer());
+  const buffer = transferable(await writeXlsxWorkbook(workbook));
   return { kind: "xlsx", suggestedName: `${fileStem(context.fileName)}-cleaned.xlsx`, byteLength: buffer.byteLength, buffer };
 }
 
 function writeCleanedSheet(workbook: ExcelJS.Workbook, model: CleanerSheetModel) {
-  const sheet = workbook.addWorksheet(safeWorksheetName(model.name, workbook));
+  const sheet = workbook.addWorksheet(uniqueWorksheetName(workbook, model.name, "Sheet"));
   const header = sheet.getRow(model.headerRow);
   model.columns.forEach((column, index) => writeUntrustedText(header.getCell(index + 1), column.name));
   header.font = { bold: true };
@@ -53,7 +60,7 @@ function writeCleanedSheet(workbook: ExcelJS.Workbook, model: CleanerSheetModel)
 
 function writeCleanedCell(target: ExcelJS.Cell, source: CleanerCell) {
   if (source.formula && !source.formulaDegraded) {
-    target.value = { formula: source.formula, result: formulaResult(source.cachedValue) };
+    target.value = { formula: sanitizeXlsxText(source.formula), result: formulaResult(source.cachedValue) };
   } else target.value = excelValue(source.formula ? source.cachedValue : source.value);
   if (source.style) target.style = structuredClone(source.style) as Partial<ExcelJS.Style>;
   if (source.numberFormat) target.numFmt = source.numberFormat;
@@ -95,14 +102,9 @@ export function hasCsvInjectionRisk(value: unknown) { return CSV_RISK.test(scala
 export function protectCsvValue(value: unknown) { const text = scalarText(value); return CSV_RISK.test(text) ? `'${text}` : text; }
 function decisionValue(value: CleanerCell | undefined) { return value?.formula ? value.cachedValue : value?.value; }
 function scalarText(value: unknown) { return value instanceof Date ? value.toISOString() : value === null || value === undefined ? "" : String(value); }
-function excelValue(value: SpreadsheetScalar | undefined): ExcelJS.CellValue { return value ?? null; }
-function formulaResult(value: SpreadsheetScalar | undefined): ExcelJS.CellFormulaValue["result"] { return value ?? ""; }
+function excelValue(value: SpreadsheetScalar | undefined): ExcelJS.CellValue { return typeof value === "string" ? sanitizeXlsxText(value) : value ?? null; }
+function formulaResult(value: SpreadsheetScalar | undefined): ExcelJS.CellFormulaValue["result"] { return typeof value === "string" ? sanitizeXlsxText(value) : value ?? ""; }
 function fileStem(value: string) { return value.replace(/\.[^.]+$/u, ""); }
-function safeWorksheetName(value: string, workbook: ExcelJS.Workbook) {
-  const base = (value.replace(/[\\/*?:\[\]]/gu, " ").trim() || "Sheet").slice(0, 31);
-  if (!workbook.getWorksheet(base)) return base;
-  for (let index = 2; ; index += 1) { const suffix = ` (${index})`; const candidate = `${base.slice(0, 31 - suffix.length)}${suffix}`; if (!workbook.getWorksheet(candidate)) return candidate; }
-}
 function transferable(value: ExcelJS.Buffer) {
   if (value instanceof ArrayBuffer) return value;
   const bytes = new Uint8Array(value as Buffer);

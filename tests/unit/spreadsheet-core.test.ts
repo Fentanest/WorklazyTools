@@ -15,7 +15,13 @@ import {
   UnsafeFileNameError,
   validateSafeFileName,
 } from "../../src/utils/fileNameSafety.ts";
-import { appendXlsxReportSheets, writeUntrustedText, writeXlsxReport } from "../../src/utils/xlsxReport.ts";
+import {
+  appendXlsxReportSheets,
+  assertXlsxWorkbookXmlTextSafe,
+  sanitizeXlsxText,
+  writeUntrustedText,
+  writeXlsxReport,
+} from "../../src/utils/xlsxReport.ts";
 import { assertVisibleXlsxReport } from "../xlsx-report-assertions.mjs";
 
 test("spreadsheet adapter classifies OOXML from package contents and parses it only once into the common model", async () => {
@@ -132,6 +138,56 @@ test("writeUntrustedText stores every external value as text without formula coe
   const reopenedSheet = reopened.getWorksheet("Rows")!;
   values.forEach((_value, index) => assert.equal(typeof reopenedSheet.getCell(index + 2, 1).value, "string"));
   assert.equal(reopenedSheet.getCell(9, 1).value, "[object Object]");
+});
+
+test("XLSX text boundaries replace XML 1.0-disallowed characters without deleting positions", async () => {
+  const disallowedControls = Array.from({ length: 0x20 }, (_, codeUnit) => codeUnit)
+    .filter((codeUnit) => codeUnit !== 0x09 && codeUnit !== 0x0a && codeUnit !== 0x0d)
+    .map((codeUnit) => String.fromCharCode(codeUnit))
+    .join("");
+  const normal = `한글😀&<>"'\t\n`;
+  const source = `앞${disallowedControls}중\uFFFE\uFFFF\uD800뒤\uDC00${normal}`;
+  const expected = `앞${"\uFFFD".repeat(29)}중\uFFFD\uFFFD\uFFFD뒤\uFFFD${normal}`;
+  assert.equal(sanitizeXlsxText(source), expected);
+  assert.equal(expected.length, source.length);
+  assert.equal(sanitizeXlsxText(normal), normal);
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Boundary");
+  writeUntrustedText(sheet.getCell("A1"), source);
+  assert.equal(sheet.getCell("A1").value, expected);
+
+  const output = await writeXlsxReport({
+    sheets: [
+      { name: "이름\uFFFE😀\uD800", headers: [normal], rows: [[source]] },
+      { name: "이름\uFFFF😀\uDC00", headers: ["Value"], rows: [["visible"]] },
+    ],
+  });
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(output);
+  assert.deepEqual(reopened.worksheets.map((worksheet) => worksheet.name), ["이름�😀�", "이름�😀� (2)"]);
+  assert.equal(reopened.worksheets[0].getCell("A1").value, normal);
+  assert.equal(reopened.worksheets[0].getCell("A2").value, expected);
+});
+
+test("XLSX value-scan backstop rejects disallowed text that bypasses the writer boundary", () => {
+  for (const value of ["raw\u0000value", "raw\uFFFEvalue", "raw\uFFFFvalue", "raw\uD800value", "raw\uDC00value"]) {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Raw");
+    sheet.getCell("A1").value = value;
+    assert.throws(
+      () => assertXlsxWorkbookXmlTextSafe(workbook),
+      (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED" && error.message === "REPORT_INTEGRITY_FAILED",
+    );
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Raw\uFFFE");
+  sheet.getCell("A1").value = "visible";
+  assert.throws(
+    () => assertXlsxWorkbookXmlTextSafe(workbook),
+    (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED",
+  );
 });
 
 test("XLSX reports serialize finite positive widths for sparse ExcelJS columns", async () => {

@@ -245,6 +245,32 @@ test("XLSX output appends four reports, reopens formulas, and CSV modes warn or 
   assert.equal(shiftedWorkbook.getWorksheet("Data")!.getCell("D2").formula, "B2+C2");
 });
 
+test("XLSX cleaner output replaces disallowed text in sheet names, values, and formulas", async () => {
+  const sheet = model([["A\u0000B", "ignored"]]);
+  sheet.name = "Data\uFFFF";
+  sheet.columns[0].name = "Header\uFFFE";
+  sheet.rows[0].cells["column:2"] = {
+    value: "ignored",
+    formula: `"formula\uFFFE"`,
+    cachedValue: "cached\uD800value",
+    cacheState: "present",
+    formulaType: "normal",
+  };
+  const engine = runExcelCleanerPipeline([sheet], pipeline([]));
+  const outputs = await buildExcelCleanerOutputs(
+    engine,
+    { fileName: "input.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false },
+    "xlsx",
+  );
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(outputs[0].buffer);
+  const cleaned = workbook.getWorksheet("Data�")!;
+  assert.equal(cleaned.getCell("A1").value, "Header�");
+  assert.equal(cleaned.getCell("A2").value, "A�B");
+  assert.equal(cleaned.getCell("B2").formula, `"formula�"`);
+  assert.equal(cleaned.getCell("B2").result, "cached�value");
+});
+
 test("worker watchdog reports the active rule while user cancellation remains AbortError", async () => {
   const stalled = fakeWorker((worker) => setTimeout(() => worker.emit({ type: "rule-start", ruleId: rid(20), progress: 10 }), 1));
   await assert.rejects(runModuleWorker(() => stalled as unknown as Worker, {}, {

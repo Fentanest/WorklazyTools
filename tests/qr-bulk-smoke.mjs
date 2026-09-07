@@ -27,6 +27,7 @@ const fixtures = [
   { type: "wifi", csv: "Primary,Password\n워크레이지 와이파이,비밀;암호", templates: { password: "{{Password}}" } },
   { type: "vcard", csv: "Primary,Family,Given,Org,Phone,Email,Url\n김한글,김,한글,워크레이지,+82-10-1234-5678,qr@example.com,https://worklazy.net/", templates: { familyName: "{{Family}}", givenName: "{{Given}}", organization: "{{Org}}", phone: "{{Phone}}", email: "{{Email}}", url: "{{Url}}" } },
   { type: "url", csv: "Primary\nhttps://worklazy.net/ko/tools/qr-studio/bulk\nhttps://worklazy.net/en/tools/qr-studio/bulk", logo: true, title: "한글 라벨 제목", outputs: 2 },
+  { type: "text", csv: "Primary\nA\uFFFEB\nC\uFFFFD", outputs: 2, manifestPayloads: ["A�B", "C�D"] },
 ];
 const qrPdfChunks = (await fs.readdir(path.join(repositoryRoot, "dist/assets")))
   .filter((name) => /^qrLabelPdf-.+\.js$/u.test(name));
@@ -126,6 +127,8 @@ try {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(manifestBytes);
   if (workbook.worksheets.length !== 2 || workbook.worksheets[0].rowCount !== 3 || workbook.worksheets[1].rowCount !== 1) throw new Error("QR manifest or failed-row sheet is inconsistent.");
+  const manifestPayloads = workbook.worksheets[0].getColumn(5).values.slice(2);
+  if (JSON.stringify(manifestPayloads) !== JSON.stringify(fixtures.at(-1).manifestPayloads)) throw new Error(`QR manifest XML replacement mismatch: ${JSON.stringify(manifestPayloads)}`);
   // Each navigation creates a fresh panel loader; disabled HTTP cache also
   // guarantees the corrupt case reaches the test server after the subset case.
   await page.setCacheEnabled(false);
