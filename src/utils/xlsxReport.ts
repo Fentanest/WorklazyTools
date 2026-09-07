@@ -87,9 +87,19 @@ export function assertXlsxWorkbookXmlTextSafe(workbook: ExcelJS.Workbook) {
   for (const worksheet of workbook.worksheets) {
     if (hasXml10DisallowedCharacter(worksheet.name)) throw xlsxReportIntegrityError();
     let unsafe = false;
+    for (const column of worksheet.columns ?? []) {
+      if (typeof column.numFmt === "string" && hasXml10DisallowedCharacter(column.numFmt)) {
+        unsafe = true;
+        break;
+      }
+    }
     for (let rowNumber = 1; rowNumber <= worksheet.rowCount && !unsafe; rowNumber += 1) {
       const row = worksheet.findRow(rowNumber);
       if (!row) continue;
+      if (typeof row.numFmt === "string" && hasXml10DisallowedCharacter(row.numFmt)) {
+        unsafe = true;
+        break;
+      }
       for (let columnNumber = 1; columnNumber <= row.cellCount; columnNumber += 1) {
         const cell = row.findCell(columnNumber);
         if (!cell) continue;

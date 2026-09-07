@@ -211,7 +211,7 @@ test("XLSX value-and-number-format backstop rejects disallowed text that bypasse
   assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(safeWorkbook));
 });
 
-test("XLSX backstop rejects six value and six value-less number-format paths before serialization", async () => {
+test("XLSX backstop rejects six value and eight number-format paths before serialization", async () => {
   const valueInjections: Array<[string, (workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet) => void]> = [
     ["name", (_workbook, sheet) => { sheet.name = "Unsafe\uFFFE"; }],
     ["scalar", (_workbook, sheet) => { sheet.getCell("A2").value = "Unsafe\uFFFE"; }],
@@ -227,6 +227,8 @@ test("XLSX backstop rejects six value and six value-less number-format paths bef
     ["sparse-last-column", (sheet) => { sheet.getCell("M2").numFmt = "0\"\u0001\""; }],
     ["row-inherited", (sheet) => { sheet.getRow(2).numFmt = "0\"\uFFFE\""; sheet.getCell("A2"); }],
     ["column-inherited", (sheet) => { sheet.getColumn(2).numFmt = "0\"\uFFFE\""; sheet.getCell("B2"); }],
+    ["row-style-without-cell", (sheet) => { sheet.getCell("C2").value = 123; sheet.getRow(2).style = { numFmt: "0\"\uFFFE\"" }; }],
+    ["column-style-without-cell", (sheet) => { sheet.getCell("C2").value = 123; sheet.getColumn(2).style = { numFmt: "0\"\uFFFE\"" }; }],
   ];
 
   const rejectsBeforeSerialization = async (id: string, setup: (workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet) => void) => {
@@ -265,6 +267,39 @@ test("XLSX backstop scans existing sparse objects without allocating missing coo
   assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(workbook));
   assert.deepEqual(countExistingWorkbookObjects(workbook), before);
   assert.equal(sheet.findRow(25)?.findCell(7)?.value, null);
+});
+
+test("XLSX backstop preserves safe row and column number formats without allocating coordinates", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Safe");
+  sheet.getCell("A1").value = "Header";
+  sheet.getCell("C2").value = 123;
+  sheet.getCell("G25").numFmt = "yyyy-mm-dd";
+  sheet.getColumn(2).style = { numFmt: "0\"열😀\"" };
+  sheet.getColumn(20).style = { numFmt: "#,##0.00" };
+  sheet.getRow(2).style = { numFmt: "0\"행₩\"" };
+  sheet.getRow(75).style = { numFmt: "0.00" };
+  sheet.getRow(75).height = 20;
+  const before = countExistingWorkbookObjects(workbook);
+
+  assert.deepEqual(before, { rows: 4, cells: 3 });
+  assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(workbook));
+  assert.deepEqual(countExistingWorkbookObjects(workbook), before);
+  assert.equal(sheet.columnCount, 3);
+  assert.equal(sheet.columns.length, 20);
+  assert.equal(sheet.findRow(2)?.findCell(2), undefined);
+  assert.equal(sheet.findRow(75)?.cellCount, 0);
+
+  const output = await writeXlsxWorkbook(workbook);
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(output);
+  const reopenedSheet = reopened.getWorksheet("Safe")!;
+  assert.equal(reopenedSheet.getCell("C2").value, 123);
+  assert.equal(reopenedSheet.getCell("G25").numFmt, "yyyy-mm-dd");
+  assert.equal(reopenedSheet.getColumn(2).numFmt, "0\"열😀\"");
+  assert.equal(reopenedSheet.getColumn(20).numFmt, "#,##0.00");
+  assert.equal(reopenedSheet.getRow(2).numFmt, "0\"행₩\"");
+  assert.equal(reopenedSheet.getRow(75).numFmt, "0.00");
 });
 
 test("XLSX reports serialize finite positive widths for sparse ExcelJS columns", async () => {
