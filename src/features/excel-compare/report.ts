@@ -87,7 +87,7 @@ function recordSheet(name: string, records: ExcelCompareStandardRecord[], contex
       item.rightRow ?? "",
       item.leftColumn ?? "",
       item.rightColumn ?? "",
-      item.key,
+      item.displayKey,
       item.leftValue,
       item.rightValue,
       item.change,

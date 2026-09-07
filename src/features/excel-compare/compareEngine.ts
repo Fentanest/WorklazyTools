@@ -157,14 +157,20 @@ function compareByKey(
   const rightGroups = keyOptions.duplicatePolicy === "secondary"
     ? groupRows(right, rightRows, [...keyOptions.rightColumns, ...keyOptions.secondaryRightColumns], options, checkCanceled, groupedRowsProcessed)
     : primaryRight;
+  const leftDisplayColumns = keyOptions.duplicatePolicy === "secondary"
+    ? [...keyOptions.leftColumns, ...keyOptions.secondaryLeftColumns]
+    : keyOptions.leftColumns;
+  const rightDisplayColumns = keyOptions.duplicatePolicy === "secondary"
+    ? [...keyOptions.rightColumns, ...keyOptions.secondaryRightColumns]
+    : keyOptions.rightColumns;
   const keys = new Set([...leftGroups.keys(), ...rightGroups.keys()]);
   for (const key of [...keys].sort()) {
     checkCanceled();
     const beforeRows = leftGroups.get(key) ?? [];
     const afterRows = rightGroups.get(key) ?? [];
     if (keyOptions.duplicatePolicy !== "occurrence" && (beforeRows.length > 1 || afterRows.length > 1)) {
-      beforeRows.forEach((row) => records.push(record("ambiguous", row, null, null, null, key, rowText(left, row), "", "KEY", "MULTIPLE_CANDIDATES")));
-      afterRows.forEach((row) => records.push(record("ambiguous", null, row, null, null, key, "", rowText(right, row), "KEY", "MULTIPLE_CANDIDATES")));
+      beforeRows.forEach((row) => records.push(record("ambiguous", row, null, null, null, key, rowText(left, row), "", "KEY", "MULTIPLE_CANDIDATES", displayKeyForRows(left, right, row, null, leftDisplayColumns, rightDisplayColumns))));
+      afterRows.forEach((row) => records.push(record("ambiguous", null, row, null, null, key, "", rowText(right, row), "KEY", "MULTIPLE_CANDIDATES", displayKeyForRows(left, right, null, row, leftDisplayColumns, rightDisplayColumns))));
       continue;
     }
     const count = Math.max(beforeRows.length, afterRows.length);
@@ -177,6 +183,14 @@ function compareByKey(
         options,
         compareStyles,
         key,
+        displayKeyForRows(
+          left,
+          right,
+          beforeRows[index] ?? null,
+          afterRows[index] ?? null,
+          leftDisplayColumns,
+          rightDisplayColumns,
+        ),
       ));
     }
   }
@@ -366,6 +380,7 @@ function compareRowPair(
   options: ExcelComparePairOptions,
   compareStyles: boolean,
   key: string,
+  displayKey = key,
 ) {
   const records: ExcelCompareRecord[] = [];
   for (const columnsPair of columns) {
@@ -374,16 +389,16 @@ function compareRowPair(
     const leftCell = rows.beforeIndex === null || leftColumn === null ? undefined : getCell(left, rows.beforeIndex, leftColumn);
     const rightCell = rows.afterIndex === null || rightColumn === null ? undefined : getCell(right, rows.afterIndex, rightColumn);
     if (rows.beforeIndex === null || leftColumn === null) {
-      if (rightCell) records.push(record("added", null, rows.afterIndex, null, rightColumn, key, "", cellText(rightCell), "CELL", "ADDED"));
+      if (rightCell) records.push(record("added", null, rows.afterIndex, null, rightColumn, key, "", cellText(rightCell), "CELL", "ADDED", displayKey));
       continue;
     }
     if (rows.afterIndex === null || rightColumn === null) {
-      if (leftCell) records.push(record("removed", rows.beforeIndex, null, leftColumn, null, key, cellText(leftCell), "", "CELL", "REMOVED"));
+      if (leftCell) records.push(record("removed", rows.beforeIndex, null, leftColumn, null, key, cellText(leftCell), "", "CELL", "REMOVED", displayKey));
       continue;
     }
     const comparison = compareSpreadsheetCells(leftCell, rightCell, options.normalization, compareStyles);
     const reason = [...comparison.changes, ...comparison.notes].join("+");
-    records.push(record(comparison.equal ? "matched" : "changed", rows.beforeIndex, rows.afterIndex, leftColumn, rightColumn, key, comparison.leftText, comparison.rightText, comparison.changes.join("+"), reason || "MATCHED"));
+    records.push(record(comparison.equal ? "matched" : "changed", rows.beforeIndex, rows.afterIndex, leftColumn, rightColumn, key, comparison.leftText, comparison.rightText, comparison.changes.join("+"), reason || "MATCHED", displayKey));
   }
   return records;
 }
@@ -429,12 +444,14 @@ function duplicateRecord(
 ): ExcelCompareDuplicateRecord {
   const leftValues = duplicateRowValues(left, leftRows, checkCanceled, processed);
   const rightValues = duplicateRowValues(right, rightRows, checkCanceled, processed);
-  const displayIndex = leftRows.length ? left : right;
-  const displayRow = leftRows[0] ?? rightRows[0];
-  const displayColumns = leftRows.length ? leftKeyColumns : rightKeyColumns;
-  const displayKey = displayRow === undefined
-    ? ""
-    : displayColumns.map((column) => cellText(getCell(displayIndex, displayRow, column))).join(" | ");
+  const displayKey = displayKeyForRows(
+    left,
+    right,
+    leftRows[0] ?? null,
+    rightRows[0] ?? null,
+    leftKeyColumns,
+    rightKeyColumns,
+  );
   return {
     status: "duplicate",
     leftRow: null,
@@ -461,6 +478,22 @@ function duplicateRowValues(index: SheetIndex, rows: number[], checkCanceled: ()
     if ((processed.value += 1) % 4096 === 0) checkCanceled();
   });
   return values;
+}
+
+function displayKeyForRows(
+  left: SheetIndex,
+  right: SheetIndex,
+  leftRow: number | null,
+  rightRow: number | null,
+  leftColumns: number[],
+  rightColumns: number[],
+) {
+  const source = leftRow === null
+    ? rightRow === null ? undefined : { index: right, row: rightRow, columns: rightColumns }
+    : { index: left, row: leftRow, columns: leftColumns };
+  return source
+    ? source.columns.map((column) => cellText(getCell(source.index, source.row, column))).join(" | ")
+    : "";
 }
 
 function columnContent(index: SheetIndex, column: number, headerRow: number, options: ExcelComparePairOptions) {
@@ -561,9 +594,9 @@ function dataRows(sheet: SpreadsheetSheetData, headerRow: number) {
 function record(
   status: ExcelCompareStandardRecord["status"], leftRow: number | null, rightRow: number | null,
   leftColumn: number | null, rightColumn: number | null, key: string, leftValue: string,
-  rightValue: string, change: string, reason: string,
+  rightValue: string, change: string, reason: string, displayKey = key,
 ): ExcelCompareStandardRecord {
-  return { status, leftRow, rightRow, leftColumn, rightColumn, key, leftValue, rightValue, change, reason };
+  return { status, leftRow, rightRow, leftColumn, rightColumn, key, displayKey, leftValue, rightValue, change, reason };
 }
 
 function summarize(records: ExcelCompareRecord[]): ExcelCompareSummary {

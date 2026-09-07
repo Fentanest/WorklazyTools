@@ -264,7 +264,7 @@ export function ExcelComparePage() {
           <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-xl border border-input bg-background px-3 text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20" data-testid="excel-result-search"><Search size={16} /><span className="sr-only">{t("features:excelCompare.results.search")}</span><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground max-[620px]:text-base" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleLimit(500); }} placeholder={t("features:excelCompare.results.search")} /></label>
         </div>
         <div className="mt-3 overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" role="region" aria-label={t("features:excelCompare.results.tableRegion")} tabIndex={0}>
-          <table className="w-full min-w-[920px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left" data-testid="excel-result-table"><thead><tr><th>{t("features:excelCompare.results.pair")}</th><th>{t("features:excelCompare.results.state")}</th><th>{t("features:excelCompare.results.location")}</th><th>{t("features:excelCompare.results.key")}</th><th>{t("features:excelCompare.results.left")}</th><th>{t("features:excelCompare.results.right")}</th><th>{t("features:excelCompare.results.reason")}</th></tr></thead><tbody>
+          <table className="w-full min-w-[1040px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left" data-testid="excel-result-table"><thead><tr><th className="min-w-14 whitespace-nowrap">{t("features:excelCompare.results.pair")}</th><th className="min-w-24 whitespace-nowrap">{t("features:excelCompare.results.state")}</th><th className="min-w-20 whitespace-nowrap">{t("features:excelCompare.results.location")}</th><th className="min-w-32 whitespace-nowrap">{t("features:excelCompare.results.key")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.left")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.right")}</th><th className="min-w-28 whitespace-nowrap">{t("features:excelCompare.results.reason")}</th></tr></thead><tbody>
             {resultRows.slice(0, visibleLimit).map(({ item, pairIndex, record, recordIndex }) => <ResultRow item={item} pairIndex={pairIndex} record={record} recordIndex={recordIndex} t={translate} key={resultRowKey(item.pairId, record, recordIndex)} />)}
           </tbody></table>
           {!resultRows.length && <p className="p-4 text-center text-sm text-muted-foreground">{t("features:excelCompare.results.empty")}</p>}
@@ -287,23 +287,23 @@ function ResultRow({ item, pairIndex, record, t }: {
 }) {
   if (record.status === "duplicate") {
     return <tr data-status={record.status} data-testid="excel-duplicate-row">
-      <td>{pairIndex + 1}</td>
-      <td><span className="font-bold">{t("features:excelCompare.status.duplicate")}</span></td>
-      <td><span className="sr-only">{t("features:excelCompare.results.groupedLocation")}</span><span aria-hidden="true">—</span></td>
-      <td className="max-w-56 [overflow-wrap:anywhere]">{record.displayKey}</td>
+      <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
+      <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t("features:excelCompare.status.duplicate")}</span></td>
+      <td className="min-w-20 whitespace-nowrap"><span className="sr-only">{t("features:excelCompare.results.groupedLocation")}</span><span aria-hidden="true">—</span></td>
+      <td className="min-w-32 max-w-56 [overflow-wrap:anywhere]">{record.displayKey}</td>
       <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="left" t={t} /></td>
       <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="right" t={t} /></td>
-      <td>{reasonText(record.reason, t)}</td>
+      <td className="min-w-28 whitespace-nowrap">{reasonText(record.reason, t)}</td>
     </tr>;
   }
   return <tr data-status={record.status}>
-    <td>{pairIndex + 1}</td>
-    <td><span className="font-bold">{t(`features:excelCompare.status.${record.status}`)}</span></td>
-    <td>{locationText(record.leftRow, record.rightRow, record.leftColumn, record.rightColumn)}</td>
-    <td className="[overflow-wrap:anywhere]">{record.key}</td>
-    <td className="[overflow-wrap:anywhere]">{record.leftValue}</td>
-    <td className="[overflow-wrap:anywhere]">{record.rightValue}</td>
-    <td>{reasonText(record.reason, t)}</td>
+    <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
+    <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t(`features:excelCompare.status.${record.status}`)}</span></td>
+    <td className="min-w-20 whitespace-nowrap">{locationText(record.leftRow, record.rightRow, record.leftColumn, record.rightColumn)}</td>
+    <td className="min-w-32 [overflow-wrap:anywhere]">{record.displayKey}</td>
+    <td className="min-w-64 [overflow-wrap:anywhere]">{record.leftValue}</td>
+    <td className="min-w-64 [overflow-wrap:anywhere]">{record.rightValue}</td>
+    <td className="min-w-28 whitespace-nowrap">{reasonText(record.reason, t)}</td>
   </tr>;
 }
 
@@ -396,7 +396,7 @@ function DuplicateValue({ value, row, side, sideLabel, t }: {
 function recordSearchText(record: ExcelCompareRecord, language: string) {
   const fields = record.status === "duplicate"
     ? [record.displayKey, ...record.leftRows.map(String), ...record.rightRows.map(String), ...record.leftValues, ...record.rightValues]
-    : [record.key, record.leftValue, record.rightValue, record.change, record.reason];
+    : [record.displayKey, record.leftValue, record.rightValue, record.change, record.reason];
   return fields.join(" ").normalize("NFC").toLocaleLowerCase(language);
 }
 

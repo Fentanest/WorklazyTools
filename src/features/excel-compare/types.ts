@@ -83,7 +83,7 @@ export interface ExcelCompareDuplicateRecord extends ExcelCompareRecordBase {
 
 export interface ExcelCompareStandardRecord extends ExcelCompareRecordBase {
   status: Exclude<ExcelCompareStatus, "duplicate">;
-  displayKey?: never;
+  displayKey: string;
   leftRows?: never;
   rightRows?: never;
   leftValues?: never;

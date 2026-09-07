@@ -64,8 +64,39 @@ test("a 1:1 key stays on the existing scalar comparison path", () => {
   for (const record of result.records) {
     assert.equal("leftRows" in record, false);
     assert.equal("rightRows" in record, false);
-    assert.equal("displayKey" in record, false);
+    assert.equal(record.displayKey, "A");
   }
+});
+
+test("standard key records and report Key cells use original typed key values", async () => {
+  const left = book([
+    ["Key", "Value"],
+    [1, "before-number-one"],
+    ["1", "before-text-one"],
+    [2, "before-number-two"],
+    ["Unique", "before-text-unique"],
+  ]);
+  const right = book([
+    ["Key", "Value"],
+    [1, "after-number-one"],
+    ["1", "after-text-one"],
+    [2, "after-number-two"],
+    ["Unique", "after-text-unique"],
+  ]);
+  const result = compareSpreadsheetPair(left, right, keyOptions());
+  const changed = result.records.filter((record) => record.status === "changed");
+
+  assert.deepEqual(changed.map((record) => record.displayKey).sort(), ["1", "1", "2", "Unique"].sort());
+  assert.deepEqual(changed.map((record) => record.key).sort(), ["number:1", "number:2", "string:1", "string:Unique"].sort());
+  assert.ok(result.records.every((record) => record.status === "duplicate" || !/^(?:number|string):/u.test(record.displayKey)));
+
+  const buffer = reportArrayBuffer(await buildExcelCompareReport(result, reportContext()));
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const reportKeys = workbook.getWorksheet("Changed")!.getRows(2, changed.length)!
+    .map((row) => String(row.getCell(9).value));
+  assert.deepEqual(reportKeys.sort(), ["1", "1", "2", "Unique"].sort());
+  assert.ok(reportKeys.every((key) => !/^(?:number|string):/u.test(key)));
 });
 
 test("displayKey uses original key cells, prefers the first left row, and never becomes group identity", () => {

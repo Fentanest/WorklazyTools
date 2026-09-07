@@ -29,6 +29,8 @@ try {
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-right-b.csv"), "Key,Value\nB,right", "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"), `Key\n${"k".repeat(32_768)}\n${"k".repeat(32_768)}`, "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"), "Key\nother", "utf8");
+  await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-left.xlsx"), "before");
+  await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-right.xlsx"), "after");
   const groupedUiLeft = ["Key,Value"];
   const groupedUiRight = ["Key,Value"];
   for (let index = 0; index < 51; index += 1) groupedUiLeft.push(`K000,left-zero-${index}`);
@@ -232,6 +234,10 @@ try {
       left: path.join(temporaryDirectory, "duplicate-ui-left.csv"),
       right: path.join(temporaryDirectory, "duplicate-ui-right.csv"),
     });
+    const standardKeyDisplay = await assertStandardKeyDisplay(browser, {
+      left: path.join(temporaryDirectory, "typed-key-left.xlsx"),
+      right: path.join(temporaryDirectory, "typed-key-right.xlsx"),
+    }, downloadRoot);
     const duplicateKeyTooLong = [];
     for (const language of ["ko", "en"]) {
       duplicateKeyTooLong.push(await assertDuplicateKeyTooLongIsolation(browser, {
@@ -260,6 +266,7 @@ try {
       optionalReconciliation,
       groupedDuplicates,
       groupedDuplicateUi,
+      standardKeyDisplay,
       duplicateKeyTooLong,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
@@ -678,10 +685,108 @@ async function assertGroupedDuplicateUi(browser, files) {
     if (independentAfterClose.leftLists !== 0 || independentAfterClose.rightItems !== 50 || independentAfterClose.nestedButtons !== 0 || independentAfterClose.minimumTargetHeight < 44) {
       throw new Error(`Independent close, button nesting, or touch targets are invalid: ${JSON.stringify(independentAfterClose)}`);
     }
-    return { collapsed, valueSearch, rowSearch, lastGroup, independentBeforeMore, independentAfterClose, dialogNamed: true, keyboardOpen: true, escapeClosed: true, focusReturned };
+    const layout = await page.$eval(secondRow, (row) => {
+      const lineCount = (element) => {
+        const range = document.createRange();
+        const text = element.firstChild;
+        if (!text) return 0;
+        const lines = new Set();
+        for (let index = 0; index < text.length; index += 1) {
+          if (!text.data[index].trim()) continue;
+          range.setStart(text, index);
+          range.setEnd(text, index + 1);
+          lines.add(range.getBoundingClientRect().y);
+        }
+        return lines.size;
+      };
+      const table = row.closest("table");
+      const region = table.parentElement;
+      const headers = [...table.querySelectorAll("th")];
+      return {
+        statusLines: lineCount(row.cells[1].querySelector("span")),
+        reasonLines: lineCount(row.cells[6]),
+        statusWidth: row.cells[1].getBoundingClientRect().width,
+        reasonWidth: row.cells[6].getBoundingClientRect().width,
+        keyWidth: row.cells[3].getBoundingClientRect().width,
+        statusWhiteSpace: getComputedStyle(row.cells[1]).whiteSpace,
+        reasonWhiteSpace: getComputedStyle(row.cells[6]).whiteSpace,
+        headerWhiteSpace: headers.map((header) => getComputedStyle(header).whiteSpace),
+        tableWidth: table.getBoundingClientRect().width,
+        regionWidth: region.getBoundingClientRect().width,
+      };
+    });
+    if (layout.statusLines !== 1 || layout.reasonLines !== 1 || layout.statusWhiteSpace !== "nowrap" || layout.reasonWhiteSpace !== "nowrap"
+      || layout.headerWhiteSpace.some((value) => value !== "nowrap") || layout.keyWidth < 128 || layout.tableWidth <= layout.regionWidth) {
+      throw new Error(`Grouped result status, reason, header, key width, or named horizontal scroll layout is invalid: ${JSON.stringify(layout)}`);
+    }
+    return { collapsed, valueSearch, rowSearch, lastGroup, independentBeforeMore, independentAfterClose, layout, dialogNamed: true, keyboardOpen: true, escapeClosed: true, focusReturned };
   } finally {
     await page.close();
   }
+}
+
+async function assertStandardKeyDisplay(browser, files, root) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const client = await page.createCDPSession();
+    const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
+    await input.uploadFile(files.left, files.right);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+
+    const inspectRows = () => page.$$eval("[data-testid=excel-result-table] tbody tr", (rows) => ({
+      keys: rows.map((row) => row.cells[3]?.textContent?.trim() || ""),
+      values: rows.map((row) => row.cells[4]?.textContent?.trim() || ""),
+      internal: rows.filter((row) => /(?:number|string):|DUPLICATE_KEY|REPORT_INTEGRITY_FAILED|PROCESSING_FAILED/u.test(row.textContent || "")).map((row) => row.textContent || ""),
+    }));
+    const beforeFilter = await inspectRows();
+    if (beforeFilter.internal.length || !["1", "2", "Unique"].every((key) => beforeFilter.keys.includes(key))) {
+      throw new Error(`Standard typed keys are not public display values before filtering: ${JSON.stringify(beforeFilter)}`);
+    }
+
+    await page.$$eval('[data-testid=excel-status-filters] button:not([data-status="changed"])', (buttons) => buttons.forEach((button) => button.click()));
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 4);
+    const afterFilter = await inspectRows();
+    if (afterFilter.internal.length || JSON.stringify(afterFilter.keys.sort()) !== JSON.stringify(["1", "1", "2", "Unique"].sort())) {
+      throw new Error(`Standard typed keys are not public display values after filtering: ${JSON.stringify(afterFilter)}`);
+    }
+    if (!afterFilter.values.some((value) => value.includes("before-number-one")) || !afterFilter.values.some((value) => value.includes("before-text-one"))) {
+      throw new Error(`Number and text keys with the same display did not remain independent: ${JSON.stringify(afterFilter)}`);
+    }
+
+    const downloads = await downloadReportLinks(page, client, root, "standard-key-display");
+    const report = downloads.find((item) => item.name.endsWith(".xlsx"));
+    if (!report) throw new Error("Standard key display comparison did not produce an XLSX report.");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(report.bytes);
+    const changed = workbook.getWorksheet("Changed");
+    const reportKeys = changed.getRows(2, changed.rowCount - 1).map((row) => String(row.getCell(9).value ?? ""));
+    if (reportKeys.some((key) => /^(?:number|string):/u.test(key)) || JSON.stringify(reportKeys.sort()) !== JSON.stringify(["1", "1", "2", "Unique"].sort())) {
+      throw new Error(`Standard report Key cells expose normalized identities: ${JSON.stringify(reportKeys)}`);
+    }
+    return { beforeFilter, afterFilter, reportKeys };
+  } finally {
+    await page.close();
+  }
+}
+
+async function writeTypedKeyWorkbook(filePath, label) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Data");
+  sheet.addRow(["Key", "Value"]);
+  sheet.addRow([1, `${label}-number-one`]);
+  const textOne = sheet.addRow(["1", `${label}-text-one`]);
+  textOne.getCell(1).numFmt = "@";
+  sheet.addRow([2, `${label}-number-two`]);
+  sheet.addRow(["Unique", `${label}-text-unique`]);
+  await workbook.xlsx.writeFile(filePath);
 }
 
 async function setResultSearch(page, value) {
