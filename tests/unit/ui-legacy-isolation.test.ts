@@ -66,8 +66,14 @@ const migratedB5aToolFiles = [
   "src/features/pdf-editor/PdfImagePanel.tsx",
   "src/features/pdf-editor/PdfConvertPanel.tsx",
   "src/features/pdf-editor/PdfThumbnail.tsx",
+  "src/features/pdf-editor/PdfFinishPanel.tsx",
   "src/features/pdf-editor/pdfUi.tsx",
 ];
+
+const b5aOwnedGlobalClassAllowlist = new Set([
+  // U4-3 H2: nested PDF finish Suspense must participate in the shared chunk-recovery ready marker.
+  "src/features/pdf-editor/PdfEditorPage.tsx:tool-route-loading",
+]);
 
 const migratedB5bToolFiles = [
   "src/features/video-studio/VideoStudioPage.tsx",
@@ -241,7 +247,8 @@ test("the B5a audio and PDF surfaces emit no legacy or global.css-owned class to
       || legacyDynamicPrefixes.some((prefix) => token.startsWith(prefix))
       || cssClassTokens.has(token)
     ))
-    .map((token) => `${relativePath}:${token}`));
+    .map((token) => `${relativePath}:${token}`)
+    .filter((match) => !b5aOwnedGlobalClassAllowlist.has(match)));
 
   assert.deepEqual(legacyMatches, []);
   assert.match(read("src/features/audio-studio/AudioStudioPage.tsx"), /<UtilityPage toolId="audio-studio"/);
