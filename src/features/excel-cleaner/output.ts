@@ -62,8 +62,12 @@ function writeCleanedCell(target: ExcelJS.Cell, source: CleanerCell) {
   if (source.formula && !source.formulaDegraded) {
     target.value = { formula: sanitizeXlsxText(source.formula), result: formulaResult(source.cachedValue) };
   } else target.value = excelValue(source.formula ? source.cachedValue : source.value);
-  if (source.style) target.style = structuredClone(source.style) as Partial<ExcelJS.Style>;
-  if (source.numberFormat) target.numFmt = source.numberFormat;
+  if (source.style) {
+    const style = structuredClone(source.style) as Partial<ExcelJS.Style>;
+    if (typeof style.numFmt === "string") style.numFmt = sanitizeXlsxText(style.numFmt);
+    target.style = style;
+  }
+  if (source.numberFormat) target.numFmt = sanitizeXlsxText(source.numberFormat);
 }
 
 function buildCsv(sheet: CleanerSheetModel, context: ExcelCleanerOutputContext): ExcelCleanerOutput {

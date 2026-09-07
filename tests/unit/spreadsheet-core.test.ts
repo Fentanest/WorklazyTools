@@ -145,7 +145,8 @@ test("XLSX text boundaries replace XML 1.0-disallowed characters without deletin
     .filter((codeUnit) => codeUnit !== 0x09 && codeUnit !== 0x0a && codeUnit !== 0x0d)
     .map((codeUnit) => String.fromCharCode(codeUnit))
     .join("");
-  const normal = `한글😀&<>"'\t\n`;
+  const fddNoncharacters = Array.from({ length: 0x20 }, (_, index) => String.fromCodePoint(0xfdd0 + index)).join("");
+  const normal = `한글😀&<>"'\t\n\r${fddNoncharacters}`;
   const source = `앞${disallowedControls}중\uFFFE\uFFFF\uD800뒤\uDC00${normal}`;
   const expected = `앞${"\uFFFD".repeat(29)}중\uFFFD\uFFFD\uFFFD뒤\uFFFD${normal}`;
   assert.equal(sanitizeXlsxText(source), expected);
@@ -166,11 +167,11 @@ test("XLSX text boundaries replace XML 1.0-disallowed characters without deletin
   const reopened = new ExcelJS.Workbook();
   await reopened.xlsx.load(output);
   assert.deepEqual(reopened.worksheets.map((worksheet) => worksheet.name), ["이름�😀�", "이름�😀� (2)"]);
-  assert.equal(reopened.worksheets[0].getCell("A1").value, normal);
-  assert.equal(reopened.worksheets[0].getCell("A2").value, expected);
+  assert.equal(reopened.worksheets[0].getCell("A1").value, normal.replace("\r", "\n"));
+  assert.equal(reopened.worksheets[0].getCell("A2").value, expected.replace("\r", "\n"));
 });
 
-test("XLSX value-scan backstop rejects disallowed text that bypasses the writer boundary", () => {
+test("XLSX value-and-number-format backstop rejects disallowed text that bypasses writer boundaries", () => {
   for (const value of ["raw\u0000value", "raw\uFFFEvalue", "raw\uFFFFvalue", "raw\uD800value", "raw\uDC00value"]) {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Raw");
@@ -188,6 +189,25 @@ test("XLSX value-scan backstop rejects disallowed text that bypasses the writer 
     () => assertXlsxWorkbookXmlTextSafe(workbook),
     (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED",
   );
+
+  for (const numberFormat of ["0\"A\u0000B\"", "0\"A\uFFFEB\"", "0\"A\uFFFFB\"", "0\"A\uD800B\"", "0\"A\uDC00B\""]) {
+    const numberFormatWorkbook = new ExcelJS.Workbook();
+    const numberFormatSheet = numberFormatWorkbook.addWorksheet("Raw");
+    numberFormatSheet.getCell("C7").style = { numFmt: numberFormat };
+    assert.equal(numberFormatSheet.getCell("C7").value, null);
+    assert.throws(
+      () => assertXlsxWorkbookXmlTextSafe(numberFormatWorkbook),
+      (error: Error & { code?: string }) => error.code === "REPORT_INTEGRITY_FAILED",
+    );
+  }
+
+  const safeWorkbook = new ExcelJS.Workbook();
+  const safeSheet = safeWorkbook.addWorksheet("Safe");
+  const fddNoncharacters = Array.from({ length: 0x20 }, (_, index) => String.fromCodePoint(0xfdd0 + index)).join("");
+  ["#,##0.00;[Red]-#,##0.00", "yyyy-mm-dd", `0\"한글😀₩$${fddNoncharacters}\"`].forEach((numberFormat, index) => {
+    safeSheet.getCell(index + 1, 1).numFmt = numberFormat;
+  });
+  assert.doesNotThrow(() => assertXlsxWorkbookXmlTextSafe(safeWorkbook));
 });
 
 test("XLSX reports serialize finite positive widths for sparse ExcelJS columns", async () => {

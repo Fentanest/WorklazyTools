@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
+import * as XLSX from "xlsx";
 
 import { runExcelCleanerPipeline } from "../../src/features/excel-cleaner/engine.ts";
 import { formulaNeedsValueDowngrade, transformFormulaReferences } from "../../src/features/excel-cleaner/formulaTransform.ts";
@@ -269,6 +271,56 @@ test("XLSX cleaner output replaces disallowed text in sheet names, values, and f
   assert.equal(cleaned.getCell("A2").value, "A�B");
   assert.equal(cleaned.getCell("B2").formula, `"formula�"`);
   assert.equal(cleaned.getCell("B2").result, "cached�value");
+});
+
+test("XLSX cleaner output sanitizes preserved number formats without changing safe formats or numbers", async () => {
+  const fddNoncharacters = Array.from({ length: 0x20 }, (_, index) => String.fromCodePoint(0xfdd0 + index)).join("");
+  const formats = [
+    `0\"A\uFFFEB\"`,
+    `0\"C\uFFFFD\"`,
+    `#,##0.00;[Red]-#,##0.00;\"한글\\문자 ₩$€😀\"`,
+    "yyyy-mm-dd",
+    `0\"${fddNoncharacters}\"`,
+  ];
+  const sourceBook = XLSX.utils.book_new();
+  const sourceSheet = XLSX.utils.aoa_to_sheet([["A", "B", "C", "D", "E"], [123, 123, 123, "date", 123]]);
+  formats.forEach((numberFormat, index) => { sourceSheet[XLSX.utils.encode_cell({ r: 1, c: index })].z = numberFormat; });
+  XLSX.utils.book_append_sheet(sourceBook, sourceSheet, "Data");
+  const input = XLSX.write(sourceBook, { type: "array", bookType: "biff8" }) as ArrayBuffer;
+  const parsed = await parseSpreadsheetInput("formats.xls", input);
+  assert.deepEqual(parsed.sheets[0].cells.filter(({ row }) => row === 2).map(({ numberFormat }) => numberFormat), formats);
+
+  const preflight = preflightExcelCleaner(parsed, [{ sheetName: "Data", headerRow: 1 }], pipeline([]));
+  const result = runExcelCleanerPipeline(createCleanerSheetModels(parsed, [{ sheetName: "Data", headerRow: 1 }], preflight.downgradeFormulas), pipeline([]));
+  const outputs = await buildExcelCleanerOutputs(result, { fileName: "formats.xls", language: "en", pipeline: pipeline([]), csvSafeMode: false }, "xlsx");
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(outputs[0].buffer);
+  const cleaned = reopened.getWorksheet("Data")!;
+  const archive = await JSZip.loadAsync(outputs[0].buffer);
+  const stylesXml = await archive.file("xl/styles.xml")!.async("string");
+  assert.match(stylesXml, /한글\\문자/u);
+  assert.equal(stylesXml.includes("\uFFFE"), false);
+  assert.equal(stylesXml.includes("\uFFFF"), false);
+  assert.deepEqual(["A2", "B2", "C2", "D2", "E2"].map((address) => cleaned.getCell(address).value), [123, 123, 123, "date", 123]);
+  assert.deepEqual(["A2", "B2", "C2", "D2", "E2"].map((address) => cleaned.getCell(address).numFmt), [
+    `0\"A�B\"`,
+    `0\"C�D\"`,
+    formats[2].replace("\\", ""),
+    formats[3],
+    formats[4],
+  ]);
+
+  const styleOnly = model([[123]]);
+  styleOnly.rows[0].cells["column:1"].style = { numFmt: `0\"style\uFFFEvalue\"` };
+  const styleOutput = await buildExcelCleanerOutputs(
+    runExcelCleanerPipeline([styleOnly], pipeline([])),
+    { fileName: "style.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false },
+    "xlsx",
+  );
+  const styleReopened = new ExcelJS.Workbook();
+  await styleReopened.xlsx.load(styleOutput[0].buffer);
+  assert.equal(styleReopened.getWorksheet("Data")!.getCell("A2").numFmt, `0\"style�value\"`);
+  assert.equal(styleReopened.getWorksheet("Data")!.getCell("A2").value, 123);
 });
 
 test("worker watchdog reports the active rule while user cancellation remains AbortError", async () => {

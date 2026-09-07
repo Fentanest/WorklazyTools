@@ -87,10 +87,10 @@ export function assertXlsxWorkbookXmlTextSafe(workbook: ExcelJS.Workbook) {
   for (const worksheet of workbook.worksheets) {
     if (hasXml10DisallowedCharacter(worksheet.name)) throw xlsxReportIntegrityError();
     let unsafe = false;
-    worksheet.eachRow({ includeEmpty: false }, (row) => {
+    worksheet.eachRow({ includeEmpty: true }, (row) => {
       if (unsafe) return;
-      row.eachCell({ includeEmpty: false }, (cell) => {
-        if (cellValueHasXml10DisallowedCharacter(cell.value)) unsafe = true;
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        if ((typeof cell.numFmt === "string" && hasXml10DisallowedCharacter(cell.numFmt)) || cellValueHasXml10DisallowedCharacter(cell.value)) unsafe = true;
       });
     });
     if (unsafe) throw xlsxReportIntegrityError();
