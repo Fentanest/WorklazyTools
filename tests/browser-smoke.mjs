@@ -262,7 +262,7 @@ async function testPdfTools(page, fixtures, tempDir) {
     && document.activeElement?.classList.contains("pdf-mobile-output-summary"));
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
 
-  await navigatePdfTab(page, 2, "/tools/pdf-editor/image-to-pdf", "image-to-pdf", "image/jpeg");
+  await navigatePdfTab(page, "/tools/pdf-editor/image-to-pdf", "image-to-pdf", "image/jpeg");
   await (await page.$('input[type="file"][accept*="image/jpeg"]')).uploadFile(fixtures.tinyPng);
   await page.waitForSelector(".pdf-image-card");
   await clickPrimaryAction(page);
@@ -272,7 +272,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
-  await navigatePdfTab(page, 3, "/tools/pdf-editor/pdf-to-image", "pdf-to-image", "application/pdf");
+  await navigatePdfTab(page, "/tools/pdf-editor/pdf-to-image", "pdf-to-image", "application/pdf");
   await (await page.$('input[type="file"]')).uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
   await clickPrimaryAction(page);
@@ -283,7 +283,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
 
-  await navigatePdfTab(page, 4, "/tools/pdf-editor/convert", "convert", "application/pdf");
+  await navigatePdfTab(page, "/tools/pdf-editor/convert", "convert", "application/pdf");
   const convertInput = await page.$('input[type="file"]');
   await convertInput.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
@@ -345,8 +345,8 @@ async function navigateTo(page, url) {
   }
 }
 
-async function navigatePdfTab(page, index, pathname, mode, acceptedType) {
-  await page.$eval(`.pdf-tool-navigation a:nth-child(${index})`, (link) => link.click());
+async function navigatePdfTab(page, pathname, mode, acceptedType) {
+  await page.$eval(`.pdf-tool-navigation [data-pdf-nav-mode="${mode}"]`, (link) => link.click());
   await page.waitForFunction((expectedPath, expectedMode, expectedType) => {
     const panel = document.querySelector(`.pdf-tool-page[data-pdf-mode="${expectedMode}"]`);
     const input = document.querySelector(".pdf-tool-page input[type='file']");

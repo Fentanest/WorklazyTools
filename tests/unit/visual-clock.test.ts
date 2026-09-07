@@ -43,16 +43,17 @@ test("visual Date ignores host day/year changes and preserves explicit dates and
   }
 });
 
-test("all states and QA profiles of the three calendar tools receive the same pre-navigation clock", async () => {
-  assert.deepEqual(Object.keys(clock.toolReasons).sort(), ["payroll-calculator", "timezone-calculator", "work-calculator"]);
-  for (const [scenarios, expectedCaptures] of [[visualRegressionConfig.scenarios, 21], [qaCaptureScenarios, 72]] as const) {
+test("all states and QA profiles of the three calendar tools and PDF finish receive the same pre-navigation clock", async () => {
+  const clockedTools = ["payroll-calculator", "pdf-editor", "timezone-calculator", "work-calculator"];
+  assert.deepEqual(Object.keys(clock.toolReasons).sort(), clockedTools);
+  for (const [scenarios, expectedScenarios, expectedCaptures] of [[visualRegressionConfig.scenarios, 20, 59], [qaCaptureScenarios, 15, 120]] as const) {
     let fixedScenarios = 0;
     let fixedCaptures = 0;
     for (const scenario of scenarios) {
       const registrations: unknown[][] = [];
       const page = { evaluateOnNewDocument: async (...args: unknown[]) => { registrations.push(args); } };
       const result = await configureVisualClock(page, scenario, clock);
-      if (["payroll-calculator", "timezone-calculator", "work-calculator"].includes(scenario.toolId)) {
+      if (clockedTools.includes(scenario.toolId)) {
         assert.equal(result, fixedTime);
         assert.deepEqual(registrations, [[installFixedDate, fixedTime]]);
         assert.ok(clock.toolReasons[scenario.toolId]);
@@ -63,7 +64,7 @@ test("all states and QA profiles of the three calendar tools receive the same pr
         assert.deepEqual(registrations, []);
       }
     }
-    assert.equal(fixedScenarios, 9);
+    assert.equal(fixedScenarios, expectedScenarios);
     assert.equal(fixedCaptures, expectedCaptures);
   }
   await assert.rejects(configureVisualClock({}, { toolId: "work-calculator" }, { ...clock, isoTime: "invalid" }), /Invalid visual clock/);

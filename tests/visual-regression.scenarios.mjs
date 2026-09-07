@@ -10,6 +10,8 @@ const enLightDesktop = profile("en", "light", "desktop");
 const enLightMobile = profile("en", "light", "mobile");
 const enDarkDesktop = profile("en", "dark", "desktop");
 const enDarkMobile = profile("en", "dark", "mobile");
+const koLightMobile320 = profile("ko", "light", "mobile-320");
+const enLightMobile320 = profile("en", "light", "mobile-320");
 
 const fullProfiles = Object.freeze([
   koLightDesktop,
@@ -34,6 +36,7 @@ const koreanOnlyProfiles = Object.freeze([koLightDesktop, koDarkMobile]);
 const koreanOnlyBottomProfiles = Object.freeze([koDarkMobile]);
 const englishRedirectProfiles = Object.freeze([enLightMobile, enDarkDesktop]);
 const interactionProfiles = Object.freeze([enDarkDesktop]);
+const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, koLightMobile320, enLightMobile320]);
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
   "text-formatter",
@@ -230,7 +233,7 @@ const interactionDefinitions = Object.freeze({
       stateId: "interaction-image-to-pdf-thumbnails",
       fixture: { kind: "generated-png", fileName: "visual-page.png", width: 320, height: 220 },
       actions: [
-        { type: "click", selector: ".pdf-tool-navigation a:nth-child(2)" },
+        { type: "click", selector: ".pdf-tool-navigation [data-pdf-nav-mode='image-to-pdf']" },
         { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='image-to-pdf']" },
         { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
         { type: "wait", selector: ".pdf-image-card" },
@@ -242,7 +245,7 @@ const interactionDefinitions = Object.freeze({
       stateId: "interaction-pdf-to-image-thumbnails",
       fixture: { kind: "generated-pdf", fileName: "visual-images.pdf", pageCount: 2 },
       actions: [
-        { type: "click", selector: ".pdf-tool-navigation a:nth-child(3)" },
+        { type: "click", selector: ".pdf-tool-navigation [data-pdf-nav-mode='pdf-to-image']" },
         { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='pdf-to-image']" },
         { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
         { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
@@ -255,7 +258,7 @@ const interactionDefinitions = Object.freeze({
       stateId: "interaction-convert-thumbnails",
       fixture: { kind: "generated-pdf", fileName: "visual-convert.pdf", pageCount: 2 },
       actions: [
-        { type: "click", selector: ".pdf-tool-navigation a:nth-child(4)" },
+        { type: "click", selector: ".pdf-tool-navigation [data-pdf-nav-mode='convert']" },
         { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='convert']" },
         { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
         { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
@@ -606,10 +609,71 @@ const hwpEnglishRedirectScenario = scenario({
   localeNotApplicableReason: "Korean is N/A for this redirect assertion because /ko/tools/hwp-editor is the supported tool route.",
 });
 
+const pdfFinishScenarios = [
+  scenario({
+    scenarioId: "pdf-finish-page-numbers--interaction",
+    routeId: "pdf-finish-page-numbers",
+    toolId: "pdf-editor",
+    stateId: "interaction",
+    stateType: "finish",
+    path: "/tools/pdf-editor/page-numbers",
+    kind: "tool",
+    profiles: fullProfiles,
+    profileReductionReason: "No reduction: the first finish tab retains the complete locale, theme, and desktop/mobile product.",
+    fixture: { kind: "generated-pdf", fileName: "visual-finish-pages.pdf", pageCount: 3 },
+    actions: [
+      { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[type='file']" },
+      { type: "wait", selector: "[data-testid='pdf-finish-overlay']", timeoutMs: 60_000 },
+      { type: "scroll-into-view", selector: "[data-testid='pdf-finish-preview']", offset: -88 },
+    ],
+    readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='page-numbers']",
+    assertSelector: "[data-testid='pdf-finish-overlay']",
+  }),
+  scenario({
+    scenarioId: "pdf-finish-header-footer--interaction",
+    routeId: "pdf-finish-header-footer",
+    toolId: "pdf-editor",
+    stateId: "interaction",
+    stateType: "finish",
+    path: "/tools/pdf-editor/header-footer",
+    kind: "tool",
+    profiles: fullProfiles,
+    profileReductionReason: "No reduction: the second finish tab retains the complete locale, theme, and desktop/mobile product.",
+    fixture: { kind: "generated-pdf", fileName: "visual-finish-header.pdf", pageCount: 3 },
+    actions: [
+      { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[type='file']" },
+      { type: "wait", selector: "[data-testid='pdf-finish-overlay']", timeoutMs: 60_000 },
+      { type: "scroll-into-view", selector: "[data-testid='pdf-finish-preview']", offset: -88 },
+    ],
+    readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='header-footer']",
+    assertSelector: "[data-testid='pdf-finish-overlay']",
+  }),
+  ...[
+    ["start", "/tools/pdf-editor", "organize"],
+    ["active", "/tools/pdf-editor/finish", "finish"],
+    ["end", "/tools/pdf-editor/convert", "convert"],
+  ].map(([stateId, path, mode]) => scenario({
+    scenarioId: `pdf-finish-navigation--${stateId}`,
+    routeId: "pdf-finish-navigation",
+    toolId: "pdf-editor",
+    stateId,
+    stateType: "finish-navigation",
+    path,
+    kind: "tool",
+    profiles: finishNavigationProfiles,
+    profileReductionReason: "The navigation contract is mobile-only; Korean and English are captured at both 320px and 390px in the stable light theme.",
+    fixture: null,
+    actions: [],
+    readySelector: `.pdf-tool-navigation [data-pdf-nav-mode='${mode}'][data-active='true']`,
+    assertSelector: `.pdf-tool-navigation [data-pdf-nav-mode='${mode}'][data-active='true']`,
+  })),
+];
+
 export const visualRegressionScenarios = Object.freeze([
   ...indexScenarios,
   ...toolScenarios,
   hwpEnglishRedirectScenario,
+  ...pdfFinishScenarios,
 ]);
 
 export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDefinitions).sort());

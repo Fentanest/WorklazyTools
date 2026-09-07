@@ -17,6 +17,9 @@ export const targets = Object.freeze([
   { id: "home", path: "/ko", readySelector: ".home-page .hero" },
   { id: "document-compare", path: "/ko/tools/document-compare", readySelector: '[data-tool-page="document-compare"]' },
   { id: "pdf-editor", path: "/ko/tools/pdf-editor", readySelector: '[data-tool-page="pdf-editor"]' },
+  { id: "pdf-finish", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']" },
+  { id: "pdf-page-numbers", path: "/ko/tools/pdf-editor/page-numbers", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='page-numbers']" },
+  { id: "pdf-header-footer", path: "/ko/tools/pdf-editor/header-footer", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='header-footer']" },
 ]);
 
 // Self-contained so the browser runs exactly the observer exercised by unit tests.
@@ -146,7 +149,7 @@ export async function runRenderingBaseline() {
         serviceWorker: "blocked",
         throttling: "none (local loopback; no CPU or network emulation)",
         runsPerPage,
-        maxCls: Number(process.env.RENDER_MAX_CLS ?? "0.1"),
+        maxCls: Number(process.env.RENDER_MAX_CLS ?? "0"),
         settleTimeMs,
         blockingMetric: "Long-task blocking time equivalent: sum(max(0, duration - 50ms)) for long tasks starting after FCP through the measurement window.",
       },

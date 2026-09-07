@@ -5,6 +5,7 @@ export const visualRegressionConfig = Object.freeze({
   viewports: Object.freeze([
     Object.freeze({ id: "desktop", width: 1365, height: 900, deviceScaleFactor: 1 }),
     Object.freeze({ id: "mobile", width: 390, height: 844, deviceScaleFactor: 1 }),
+    Object.freeze({ id: "mobile-320", width: 320, height: 844, deviceScaleFactor: 1 }),
   ]),
   animation: Object.freeze({
     css: "none",
@@ -18,6 +19,7 @@ export const visualRegressionConfig = Object.freeze({
         "timezone-calculator": "Initial date/time, world clocks and current-time action use DateTime.now().",
         "work-calculator": "Business dates, annual-leave reference date and hire year default to today.",
         "payroll-calculator": "The retirement reference date defaults to today, including before its mode is selected.",
+        "pdf-editor": "Finish header/footer `{date}` token captures the batch start date.",
       }),
     }),
     fontFamily: "Worklazy Visual Noto Sans KR",
