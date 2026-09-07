@@ -59,15 +59,46 @@ try {
   }
   assert.equal(directEntries.length, 12);
 
+  await testChunkRecovery(browser);
   await testNavigation(browser);
   await testFinishWorkflow(browser, fixture);
   await assertLazyChunks();
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, SPA tabs/navigation, selection sync, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, SPA tabs/navigation, selection sync, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
   if (server) await stopServer(server);
   await fs.rm(tempDirectory, { recursive: true, force: true });
+}
+
+async function testChunkRecovery(browserInstance) {
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  const page = await context.newPage();
+  const documentRequests = [];
+  let injectedFailures = 0;
+  page.on("request", (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame() && request.url().startsWith(baseUrl)) documentRequests.push(request.url());
+  });
+  await page.route("**/assets/PdfFinishPanel-*.js", async (route) => {
+    if (injectedFailures === 0) {
+      injectedFailures += 1;
+      await route.fulfill({ status: 404, contentType: "text/javascript", headers: { "cache-control": "no-store" }, body: "Unavailable" });
+      return;
+    }
+    await route.continue();
+  });
+  try {
+    await page.goto(`${baseUrl}/en/tools/pdf-editor/finish`, { waitUntil: "domcontentloaded" });
+  } catch (reason) {
+    if (!(reason instanceof Error) || !/ERR_ABORTED/u.test(reason.message)) throw reason;
+  }
+  await page.locator("[data-testid='pdf-finish-ready']").waitFor({ timeout: 60_000 });
+  await page.waitForFunction(() => !Object.keys(sessionStorage).some((key) => key.startsWith("worklazy_tool_reload:")));
+  assert.equal(injectedFailures, 1, "finish recovery must inject exactly one chunk failure");
+  assert.equal(documentRequests.length, 2, `finish chunk failure must spend exactly one automatic reload: ${JSON.stringify(documentRequests)}`);
+  assert.equal(await page.locator("[data-route-error]").count(), 0);
+  await context.close();
 }
 
 async function testNavigation(browserInstance) {
@@ -179,8 +210,20 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await range.fill("1-3");
   await page.locator("[data-testid='pdf-finish-start-page']").fill("1");
   await page.locator("[data-testid='pdf-finish-template']").fill("취소 확인 {page}");
+  const cancelWhenRendered = page.evaluate(() => new Promise((resolve) => {
+    const clickCancel = () => {
+      const button = document.querySelector("[data-testid='pdf-finish-cancel']");
+      if (!(button instanceof HTMLButtonElement)) return false;
+      button.click();
+      resolve(true);
+      return true;
+    };
+    if (clickCancel()) return;
+    const observer = new MutationObserver(() => { if (clickCancel()) observer.disconnect(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }));
   await action.click();
-  await page.locator("[data-testid='pdf-finish-cancel']").click();
+  await cancelWhenRendered;
   await page.waitForFunction(() => document.querySelector("[data-testid='pdf-error']")?.textContent?.match(/cancel|취소/i));
   assert.equal(await page.locator("[data-testid='pdf-download']").count(), 0, "canceled work must not register a stale result");
   await page.locator("[data-testid='pdf-finish-template']").fill("Retry {page}");
