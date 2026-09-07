@@ -4,6 +4,16 @@
 
 ## 2026-09-07
 
+### 문서 비교 엔진 통일 — main 배포·라이브 검증 (Codx)
+
+**병합 게이트** — `git fetch` 전후 `main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`, 구현 브랜치 `document-compare-engine-20260907=4a625489ae2f317d975e0246ffb90e1fd234250a`, merge-base와 기준 조상 검사를 통과했다. 원 `s3-pdf-finish` 워킹트리를 전환하지 않고 별도 `/tmp/worklazy-dc-main`에서 `--no-ff --no-commit` 병합 트리를 먼저 만들었다. 충돌은 없었으며 staging tree `9ef5a02085afb729bea4b5b36d6b4902e1585719`가 구현 브랜치 tree와 정확히 같았다. 공통 파일 `CHANGELOG.md`·`docs/review-notes.md`·`package.json`은 각각 diff를 확인해 main의 기존 내용을 보존하면서 문서 비교 기록과 `test:document-diff` 명령만 추가된 상태로 병합했다. `excel-report-width-20260907`은 병합하지 않았다.
+
+**배포 전 전체 검증** — `NODE_OPTIONS=--max-old-space-size=4096`로 빌드와 브라우저 검사를 직렬 실행했다. `tsc -b` 진단 0, unit **345/345**, production·QA build 각각 2,834 modules/정적 61페이지, static startup 104문서, Word 범위·HWP 범위·전체 browser·Office·Excel Cleaner·Excel Compare 스모크가 모두 통과했다. Office 실측은 download 95·cache 7·저장 DOCX 5,089B였다. 동치 oracle은 Pyodide 0.29.4, bridge 101회, sidecar 62(일치 53·E1 9), package reject 5쌍/13 story part/구조 revision 5, 보호 part 28행(존재 7·부재 21), exact key 4, E6 fixture 1, edge 8 및 offset 음성 대조를 통과했다. 번들 gzip 5종은 **299,294 / 2,450,893 / 2,711,698 / 5,461,885 / 37,687B**, CSS orphan 0, route registry 20개, staged/unstaged `git diff --check`도 통과했다.
+
+**규칙 19·사용자 문서** — `VITE_LOCAL_QA=1` 빌드와 4290~4292 `--strictPort`만 사용했다. HWP 안내 결과를 ko/en × 1,440px/320px로 캡처해 네 표본 모두 문구 exact, notice/document overflow 0, 좌우 잘림 0을 확인했고 정상 DOCX 표본도 4행·삭제/추가 강조·표 배치를 육안 확인했다. `VISUAL_ONLY=document-compare VISUAL_CONCURRENCY=1`은 Chrome 152에서 **10/10** 기존 기준선과 일치해 추가 차이 0이었다. 사용자 v1.2/v1.4 문서는 복제·fixture화하지 않고 Pyodide 메모리에서만 재현했다. 제14조 ④는 웹과 추적 DOCX 모두 deleted `을` `(104,104)` → added `자금을` `(105,104)`로 문자열·0-based code point offset·순서가 정확히 같고 수락 본문도 after와 일치했다. 오래된 임시 재현 하네스의 첫 실행은 fix-2 입력 `PRESERVED_PACKAGE_PARTS_JSON` 누락으로 제품 비교 전에 종료됐고, 두 번째는 입력을 잘못 삽입한 임시 스크립트 구문 오류였다. 저장소를 바꾸지 않고 최신 oracle 입력 계약으로 보정한 세 번째 실행만 위 최종 재현값으로 채택했으며 실패 원출력도 함께 보존했다.
+
+**배포·라이브 판정** — 두 부모 `5bc6854`·`4a62548`의 merge commit은 **`d69e73a5162840837ed36a7ffb7817cab597966a`**다. 일반 push로 `origin/main`에 올렸고 GitHub Actions **Deploy GitHub Pages #34089072595**가 build 5분46초·deploy 19초로 성공했다. Actions의 Node 20 deprecation 표시는 경고이며 모든 build/SEO·AdSense/FFmpeg smoke/artifact/deploy 단계는 성공했다. `https://worklazy.net`에서 essential-only 동의 상태로 ko/en DOCX 비교를 각각 실행해 결과 4행·삭제 3·추가 10·가로 overflow 0을 확인하고, 각 9,455B 추적 DOCX를 실제 내려받아 `word/document.xml`의 `w:ins`·`w:del`을 확인했다. ko HWP 결과의 안내 문구도 exact·overflow 0·잘림 0이었다. 세 라이브 흐름 전체에서 console error 0, page error 0, request failure 0, HTTP 4xx/5xx 0이었다. 첫 HWP 캡처가 결과 전환 중 옅은 프레임을 잡아 1.5초 안정화 뒤 재측정했고 body/main opacity 1·열린 dialog 0인 정상 화면으로 재캡처했다. 원출력과 최종 로컬·라이브 화면은 `/tmp/worklazy-dc-deploy/logs/`·`/tmp/worklazy-dc-deploy/shots/`에 보존했다. — Codx
+
 ### 문서 비교 동치 oracle fix-2 — 메모 관련 package part 부재 일치 (Codx)
 
 **R2-1 원인과 수리** — fix-1의 `commentsPreserved`는 output에 `word/comments.xml`이 없으면 after를 읽지 않고 참을 반환했다. 따라서 bytes 훼손은 잡았지만 part 전체 누락은 통과했고, 메모 fixture의 수락 package 불일치와도 연결되지 않았다. 보호 대상을 `word/comments.xml`·`word/commentsExtended.xml`·`word/commentsIds.xml`·`word/people.xml`의 명시 목록으로 고정하고, 기존 5쌍·exact·E4/E6 pair를 포함한 **7개 모든 대상 쌍**에서 각 part의 after/output 존재 여부가 같고, 존재할 때 bytes도 같아야 통과하도록 바꿨다. after에 없으면 output에도 없어야 하므로 output-only part 추가도 거부한다. `commentsPreserved`는 4개 part 행 전체가 일치할 때만 참이다.
