@@ -36,7 +36,7 @@ try {
   for (let index = 0; index < 51; index += 1) groupedUiLeft.push(`K000,left-zero-${index}`);
   for (let index = 0; index < 51; index += 1) {
     groupedUiLeft.push(`K002,${index === 0 ? `dialog-${"x".repeat(220)}` : `left-two-${index}`}`);
-    groupedUiRight.push(`K002,right-two-${index}`);
+    groupedUiRight.push(`K002,${index === 0 ? `dialog-right-${"y".repeat(220)}` : `right-two-${index}`}`);
   }
   for (let group = 3; group <= 500; group += 1) {
     const key = `K${String(group).padStart(3, "0")}`;
@@ -719,7 +719,56 @@ async function assertGroupedDuplicateUi(browser, files) {
       || layout.headerWhiteSpace.some((value) => value !== "nowrap") || layout.keyWidth < 128 || layout.tableWidth <= layout.regionWidth) {
       throw new Error(`Grouped result status, reason, header, key width, or named horizontal scroll layout is invalid: ${JSON.stringify(layout)}`);
     }
-    return { collapsed, valueSearch, rowSearch, lastGroup, independentBeforeMore, independentAfterClose, layout, dialogNamed: true, keyboardOpen: true, escapeClosed: true, focusReturned };
+
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=right]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list]`).length === 0, {}, secondRow);
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+    await setResultSearch(page, "K002");
+    await page.$eval('[data-testid="excel-result-search"] input', (input) => input.focus());
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileLeftToggleCollapsed = await focusedResultVisibility(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const mobileLeftToggle = await focusedResultVisibility(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileLeftValue = await focusedResultVisibility(page, "excel-full-value-trigger", "left");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('[data-testid=excel-full-value-dialog][role="dialog"]');
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-full-value-dialog]"));
+    await settleFocusScroll(page);
+    const mobileLeftValueAfterEscape = await focusedResultVisibility(page, "excel-full-value-trigger", "left");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileRightToggle = await focusedResultVisibility(page, "excel-duplicate-toggle", "right");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const mobileRightToggleExpanded = await focusedResultVisibility(page, "excel-duplicate-toggle", "right");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileRightValue = await focusedResultVisibility(page, "excel-full-value-trigger", "right");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('[data-testid=excel-full-value-dialog][role="dialog"]');
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-full-value-dialog]"));
+    await settleFocusScroll(page);
+    const mobileRightValueAfterEscape = await focusedResultVisibility(page, "excel-full-value-trigger", "right");
+    const mobileFocusVisibility = {
+      leftToggleCollapsed: mobileLeftToggleCollapsed,
+      leftToggle: mobileLeftToggle,
+      leftValue: mobileLeftValue,
+      leftValueAfterEscape: mobileLeftValueAfterEscape,
+      rightToggle: mobileRightToggle,
+      rightToggleExpanded: mobileRightToggleExpanded,
+      rightValue: mobileRightValue,
+      rightValueAfterEscape: mobileRightValueAfterEscape,
+    };
+    return { collapsed, valueSearch, rowSearch, lastGroup, independentBeforeMore, independentAfterClose, layout, dialogNamed: true, keyboardOpen: true, escapeClosed: true, focusReturned, mobileFocusVisibility };
   } finally {
     await page.close();
   }
@@ -796,6 +845,48 @@ async function setResultSearch(page, value) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   }, value);
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function settleFocusScroll(page) {
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function focusedResultVisibility(page, testId, side) {
+  const visibility = await page.evaluate(() => {
+    const element = document.activeElement;
+    const region = element.closest('[data-testid="excel-result-scroll-region"]');
+    const header = document.querySelector(".mobile-header");
+    const tabs = document.querySelector(".bottom-tabs");
+    const rect = element.getBoundingClientRect();
+    const regionRect = region.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const tabsRect = tabs.getBoundingClientRect();
+    const ringGap = 3;
+    const regionLeft = regionRect.left + region.clientLeft;
+    const regionRight = regionLeft + region.clientWidth;
+    const center = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return {
+      testId: element.dataset.testid,
+      side: element.dataset.side,
+      rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height },
+      headerBottom: headerRect.bottom,
+      tabsTop: tabsRect.top,
+      regionLeft,
+      regionRight,
+      viewportWidth: window.innerWidth,
+      mobileQuery: window.matchMedia("(max-width: 820px)").matches,
+      scrollY: window.scrollY,
+      scrollHeight: document.scrollingElement.scrollHeight,
+      markedForFocusVisibility: element.hasAttribute("data-excel-result-focus"),
+      centerVisible: center === element || element.contains(center),
+      fullyVisible: rect.top >= headerRect.bottom + ringGap && rect.bottom <= tabsRect.top - ringGap
+        && rect.left >= regionLeft + ringGap && rect.right <= regionRight - ringGap,
+    };
+  });
+  if (visibility.testId !== testId || visibility.side !== side || !visibility.centerVisible || !visibility.fullyVisible || visibility.rect.height < 44) {
+    throw new Error(`Mobile keyboard focus is obscured by fixed chrome or the result region: ${JSON.stringify({ expected: { testId, side }, visibility })}`);
+  }
+  return visibility;
 }
 
 async function assertGroupedDuplicateReport(bytes) {

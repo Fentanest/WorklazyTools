@@ -58,6 +58,8 @@ const STATUS_DOT_CLASSES: Record<ExcelCompareStatus, string> = {
 const ACCEPT = ".xlsx,.xlsm,.xls,.xlsb,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv";
 const DUPLICATE_LIST_PAGE_SIZE = 50;
 const VALUE_PREVIEW_CODE_POINT_LIMIT = 160;
+const MOBILE_SHELL_QUERY = "(max-width: 820px)";
+const FOCUS_VISIBILITY_GAP = 4;
 type LooseT = (key: string, options?: Record<string, unknown>) => string;
 
 export function ExcelComparePage() {
@@ -248,7 +250,7 @@ export function ExcelComparePage() {
       {operation.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" data-testid="excel-compare-cancel" variant="destructive" type="button" onClick={() => controllerRef.current?.abort()}><X size={16} /> {t("features:excelCompare.actions.cancel")}</Button></div>}
       <OperationProgress {...operation} accent="green" title={t("features:excelCompare.progress.title")} />
 
-      {(completed.length > 0 || failed.length > 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title">
+      {(completed.length > 0 || failed.length > 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title" onFocusCapture={(event) => scheduleResultFocusVisibility(event.target)}>
         <div><p className="text-xs font-extrabold tracking-[.08em] text-green-700 uppercase dark:text-green-300">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })}</p></div>
         <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="excel-report-downloads">
           {completed.map((item, index) => <Button render={<a href={item.url} download={item.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left" key={item.pairId}><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{item.fileName} · {formatBytes(item.blob.size)}</small></span></Button>)}
@@ -263,13 +265,16 @@ export function ExcelComparePage() {
           </div>
           <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-xl border border-input bg-background px-3 text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20" data-testid="excel-result-search"><Search size={16} /><span className="sr-only">{t("features:excelCompare.results.search")}</span><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground max-[620px]:text-base" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleLimit(500); }} placeholder={t("features:excelCompare.results.search")} /></label>
         </div>
-        <div className="mt-3 overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" role="region" aria-label={t("features:excelCompare.results.tableRegion")} tabIndex={0}>
+        <div className="mt-3 overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" data-testid="excel-result-scroll-region" role="region" aria-label={t("features:excelCompare.results.tableRegion")} tabIndex={0}>
           <table className="w-full min-w-[1040px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left" data-testid="excel-result-table"><thead><tr><th className="min-w-14 whitespace-nowrap">{t("features:excelCompare.results.pair")}</th><th className="min-w-24 whitespace-nowrap">{t("features:excelCompare.results.state")}</th><th className="min-w-20 whitespace-nowrap">{t("features:excelCompare.results.location")}</th><th className="min-w-32 whitespace-nowrap">{t("features:excelCompare.results.key")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.left")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.right")}</th><th className="min-w-28 whitespace-nowrap">{t("features:excelCompare.results.reason")}</th></tr></thead><tbody>
             {resultRows.slice(0, visibleLimit).map(({ item, pairIndex, record, recordIndex }) => <ResultRow item={item} pairIndex={pairIndex} record={record} recordIndex={recordIndex} t={translate} key={resultRowKey(item.pairId, record, recordIndex)} />)}
           </tbody></table>
           {!resultRows.length && <p className="p-4 text-center text-sm text-muted-foreground">{t("features:excelCompare.results.empty")}</p>}
         </div>
-        {resultRows.length > visibleLimit && <Button className="mt-3 min-h-11 rounded-xl" data-testid="excel-result-show-more" variant="secondary" type="button" onClick={() => setVisibleLimit((current) => current + 500)}>{t("features:excelCompare.results.showMore", { remaining: resultRows.length - visibleLimit })}</Button>}
+        {resultRows.length > visibleLimit && <Button className="mt-3 min-h-11 rounded-xl" data-excel-result-focus="" data-testid="excel-result-show-more" variant="secondary" type="button" onClick={(event) => {
+          setVisibleLimit((current) => current + 500);
+          scheduleResultFocusVisibility(event.currentTarget);
+        }}>{t("features:excelCompare.results.showMore", { remaining: resultRows.length - visibleLimit })}</Button>}
       </Card>}
 
       <ToolGuide title={t("features:excelCompare.guide.title")} description={t("features:excelCompare.guide.description")} blocks={(t("features:excelCompare.guide.blocks", { returnObjects: true }) as Array<{ title: string; text: string }>).map((item) => ({ title: item.title, paragraphs: [item.text] }))} faq={(t("features:excelCompare.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map((item) => ({ question: item.q, answer: item.a }))} />
@@ -327,15 +332,17 @@ function DuplicateSideList({ pairId, record, side, t }: {
   return <div data-testid="excel-duplicate-side" data-side={side}>
     <Button
       className="min-h-11 w-full justify-between rounded-xl px-3 text-left"
+      data-excel-result-focus=""
       data-testid="excel-duplicate-toggle"
       data-side={side}
       variant="outline"
       type="button"
       aria-controls={contentId}
       aria-expanded={expanded}
-      onClick={() => {
+      onClick={(event) => {
         setExpanded((current) => !current);
         if (expanded) setVisibleCount(DUPLICATE_LIST_PAGE_SIZE);
+        scheduleResultFocusVisibility(event.currentTarget);
       }}
     >
       <span>{t(`features:excelCompare.results.${toggleKey}`, { count: rows.length })}</span>
@@ -350,11 +357,15 @@ function DuplicateSideList({ pairId, record, side, t }: {
       </ol>
       {remaining > 0 && <Button
         className="mt-2 min-h-11 w-full rounded-xl"
+        data-excel-result-focus=""
         data-testid="excel-duplicate-show-more"
         data-side={side}
         variant="secondary"
         type="button"
-        onClick={() => setVisibleCount((current) => current + DUPLICATE_LIST_PAGE_SIZE)}
+        onClick={(event) => {
+          setVisibleCount((current) => current + DUPLICATE_LIST_PAGE_SIZE);
+          scheduleResultFocusVisibility(event.currentTarget);
+        }}
       >{t("features:excelCompare.results.showMoreRows", { count: Math.min(DUPLICATE_LIST_PAGE_SIZE, remaining), remaining })}</Button>}
     </div>}
   </div>;
@@ -375,7 +386,7 @@ function DuplicateValue({ value, row, side, sideLabel, t }: {
     <span className="block whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="excel-duplicate-value-preview">{preview}</span>
     <DialogPrimitive.Root>
       <DialogPrimitive.Trigger
-        render={<Button className="min-h-11 w-fit rounded-xl" data-testid="excel-full-value-trigger" data-side={side} variant="secondary" type="button" />}
+        render={<Button className="min-h-11 w-fit rounded-xl" data-excel-result-focus="" data-testid="excel-full-value-trigger" data-side={side} variant="secondary" type="button" />}
         aria-label={t("features:excelCompare.results.fullValueButtonLabel", { side: sideLabel, row })}
       >{t("features:excelCompare.results.fullValue")}</DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
@@ -391,6 +402,42 @@ function DuplicateValue({ value, row, side, sideLabel, t }: {
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   </div>;
+}
+
+function scheduleResultFocusVisibility(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement) || !target.matches("[data-excel-result-focus]")) return;
+  const keepVisible = () => {
+    if (target.isConnected && document.activeElement === target) keepResultFocusVisible(target);
+  };
+  keepVisible();
+  requestAnimationFrame(() => {
+    keepVisible();
+    requestAnimationFrame(keepVisible);
+  });
+}
+
+function keepResultFocusVisible(target: HTMLElement) {
+  if (!window.matchMedia(MOBILE_SHELL_QUERY).matches) return;
+
+  const scrollRegion = target.closest<HTMLElement>('[data-testid="excel-result-scroll-region"]');
+  if (scrollRegion) {
+    const targetRect = target.getBoundingClientRect();
+    const regionRect = scrollRegion.getBoundingClientRect();
+    const visibleLeft = regionRect.left + scrollRegion.clientLeft + FOCUS_VISIBILITY_GAP;
+    const visibleRight = visibleLeft + scrollRegion.clientWidth - FOCUS_VISIBILITY_GAP * 2;
+    if (targetRect.left < visibleLeft) scrollRegion.scrollBy({ left: targetRect.left - visibleLeft, behavior: "instant" });
+    else if (targetRect.right > visibleRight) scrollRegion.scrollBy({ left: targetRect.right - visibleRight, behavior: "instant" });
+  }
+
+  const headerBottom = document.querySelector<HTMLElement>(".mobile-header")?.getBoundingClientRect().bottom ?? 0;
+  const tabsTop = document.querySelector<HTMLElement>(".bottom-tabs")?.getBoundingClientRect().top ?? window.innerHeight;
+  const visibleTop = Math.max(0, headerBottom) + FOCUS_VISIBILITY_GAP;
+  const visibleBottom = Math.min(window.innerHeight, tabsTop) - FOCUS_VISIBILITY_GAP;
+  const targetRect = target.getBoundingClientRect();
+  const verticalDelta = targetRect.top < visibleTop
+    ? targetRect.top - visibleTop
+    : targetRect.bottom > visibleBottom ? targetRect.bottom - visibleBottom : 0;
+  if (verticalDelta) window.scrollBy({ top: verticalDelta, behavior: "instant" });
 }
 
 function recordSearchText(record: ExcelCompareRecord, language: string) {
