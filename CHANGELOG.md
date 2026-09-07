@@ -2,6 +2,11 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-09-07
+
+- 문서 비교의 단어 단위 `diffText`를 Word 변경 추적 DOCX 생성기에도 연결하고, 코드포인트 offset 검증·97쌍 골든·DOCX 동치 oracle을 추가했다. 추출 전용 Python 경로는 보존하면서 도달 불가 비교 정의 31개를 제거했다. — Codx
+- 실제 텍스트 변경 HWP fixture와 한·영 검토 메모·변경 추적 안내 회귀를 추가하고, 문구 변화가 반영된 HWP 결과 시각 기준선 한 장을 갱신했다. — Codx
+
 ## 2026-09-06
 
 - QR 라벨 PDF에 해시 고정 KS X 1001 기반 빌드 타임 글꼴 subset과 원문+NFC coverage 선택·전체 폰트 폴백을 추가했다. Node-only 벤더 전개, ZIP/PDF 공용 export 수명주기, typed 폰트 초기화 경계와 3시나리오 전송 계측·Poppler/PDF.js 렌더 회귀를 함께 고정하고, 실제 handler mutation·폰트 404/S0·내보내기 취소 브라우저 회귀를 보강했다. — Codx
