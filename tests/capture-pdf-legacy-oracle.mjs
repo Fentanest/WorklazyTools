@@ -25,6 +25,7 @@ const { PDFDocument, PDFRawStream, StandardFonts, decodePDFRawStream, degrees, r
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const relative = (absolute) => path.relative(outputDirectory, absolute).split(path.sep).join("/");
 const clientSourcePath = path.join(repositoryRoot, "src", "features", "pdf-editor", "pdfWorkerClient.ts");
+const legacyPresetPath = path.join(repositoryRoot, "src", "features", "pdf-editor", "legacyOrganizePreset.ts");
 const workerSourcePath = path.join(repositoryRoot, "src", "features", "pdf-editor", "pdf.worker.ts");
 
 function command(commandName, args, options = {}) {
@@ -127,7 +128,10 @@ try {
   const functionStart = clientSource.indexOf("async function createWatermarkImage(");
   const functionEnd = clientSource.indexOf("\nexport async function imagesToPdf", functionStart);
   assert.ok(functionStart >= 0 && functionEnd > functionStart, "Legacy watermark function was not found.");
-  const browserSource = (await transform(`${clientSource.slice(functionStart, functionEnd)}\nglobalThis.createLegacyWatermarkPng = createWatermarkImage;`, { loader: "ts", format: "iife" })).code;
+  const presetSource = clientSource.slice(functionStart, functionEnd).includes("LEGACY_ORGANIZE_PDF_PRESET")
+    ? await fs.readFile(legacyPresetPath, "utf8")
+    : "";
+  const browserSource = (await transform(`${presetSource}\n${clientSource.slice(functionStart, functionEnd)}\nglobalThis.createLegacyWatermarkPng = createWatermarkImage;`, { loader: "ts", format: "iife" })).code;
   browser = await chromium.launch({
     executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome",
     headless: true,

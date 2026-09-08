@@ -101,7 +101,7 @@ for (const route of routes) {
   }
   if (html.includes("#/")) throw new Error(`${filePath} still contains a hash route.`);
   if (["tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
-    const canonicalRoute = route === "tools/pdf-editor/watermark" || route === "tools/pdf-editor/stamp" ? route : "tools/pdf-editor/finish";
+    const canonicalRoute = "tools/pdf-editor/finish";
     const expectedCanonical = `https://worklazy.net/${language}/${canonicalRoute}/`;
     if (!html.includes(`<link rel="canonical" href="${expectedCanonical}" />`) || !html.includes(`<meta property="og:url" content="${expectedCanonical}" />`)) {
       throw new Error(`${filePath} does not use the expected canonical URL ${expectedCanonical}.`);

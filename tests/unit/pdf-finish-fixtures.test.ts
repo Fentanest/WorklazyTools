@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { generatePdfFinishFixtures } from "../../scripts/generate-pdf-finish-fixtures.mjs";
+import { LEGACY_ORGANIZE_PDF_PRESET } from "../../src/features/pdf-editor/legacyOrganizePreset.ts";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../..");
 const trackedFixtureDirectory = path.join(repositoryRoot, "tests", "fixtures", "pdf-finish");
@@ -86,6 +87,28 @@ test("legacy PDF oracles remain tied to the exact main blobs and all three oracl
     { name: "wide", width: 1800, height: 92 },
     { name: "surrogate", width: 1800, height: 92 },
   ]);
+});
+
+test("legacy organize compatibility preset remains pinned and rejects a mutated contract", () => {
+  const expected = {
+    watermarkCanvas: {
+      font: "600 46px system-ui, sans-serif",
+      minWidth: 420,
+      maxWidth: 1_800,
+      horizontalPadding: 80,
+      height: 92,
+      fillStyle: "rgba(30, 30, 34, .82)",
+      utf16SliceUnits: 120,
+    },
+    watermarkPlacement: { pageWidthRatio: 0.72, imageWidthRatio: 0.55, rotation: -32, opacity: 0.2 },
+    pageNumber: { size: 9, y: 12, color: [0.35, 0.35, 0.38], opacity: 0.9 },
+  };
+  const assertCompatibility = (candidate: unknown) => assert.deepEqual(candidate, expected);
+  assertCompatibility(LEGACY_ORGANIZE_PDF_PRESET);
+  assert.throws(() => assertCompatibility({
+    ...LEGACY_ORGANIZE_PDF_PRESET,
+    watermarkPlacement: { ...LEGACY_ORGANIZE_PDF_PRESET.watermarkPlacement, rotation: -31 },
+  }));
 });
 
 test("PDF finish OCG manifest preserves canonical cohorts and exact SHA oracles", async () => {

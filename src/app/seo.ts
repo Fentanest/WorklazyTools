@@ -274,9 +274,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "PDF 문서 변환·OCR", featureList: ["처리 페이지 범위 선택", "PDF DOCX 변환", "PDF XLSX 변환", "PDF TXT 변환", "로컬 한국어·영어 OCR", "검색 가능한 PDF"] },
   },
   "/tools/pdf-editor/finish": {
-    title: "PDF 페이지 번호·머리글·바닥글 넣기",
-    description: "PDF의 원하는 페이지에 번호, 파일명과 날짜를 여섯 위치 중 하나에 넣고 오버레이 미리보기로 확인하세요.",
-    application: { name: "PDF 마무리", featureList: ["페이지 번호", "머리글·바닥글", "6개 표시 위치", "페이지 범위·홀짝 선택", "파일명·날짜 토큰", "한국어 글꼴 포함"] },
+    title: "PDF 페이지 번호·워터마크·도장 함께 넣기",
+    description: "여러 PDF에 페이지 번호, 머리글·바닥글, 워터마크와 도장을 함께 적용하고 개별 파일과 ZIP으로 내려받으세요.",
+    application: { name: "PDF 마무리", featureList: ["페이지 번호", "머리글·바닥글", "텍스트·이미지 워터마크", "도장·서명 이미지", "여러 PDF 일괄 처리", "ZIP 다운로드"] },
   },
   "/tools/pdf-editor/page-numbers": {
     title: "PDF 페이지 번호 넣기 - 시작 번호·표지 제외",
@@ -433,7 +433,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
   "/tools/pdf-editor/convert": { title: "Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", description: "Convert selected PDF pages to DOCX, XLSX, TXT or searchable PDF using self-hosted English and Korean OCR in your browser.", application: { name: "PDF Document Conversion and OCR", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },
-  "/tools/pdf-editor/finish": { title: "Add PDF Page Numbers, Headers & Footers | Worklazy Tools", description: "Add page numbers, filenames, dates, headers, and footers to selected PDF pages in six positions with an overlay preview.", application: { name: "PDF Finish", featureList: ["Page numbers", "Headers and footers", "Six positions", "Range and parity selection", "Filename and date tokens", "Korean font embedding"] } },
+  "/tools/pdf-editor/finish": { title: "Add PDF Page Numbers, Watermarks & Stamps | Worklazy Tools", description: "Apply page numbers, headers, footers, watermarks, and stamps together to multiple PDFs, then download individual files or a ZIP.", application: { name: "PDF Finish", featureList: ["Page numbers", "Headers and footers", "Text and image watermarks", "Stamp and signature images", "Multiple PDF processing", "ZIP download"] } },
   "/tools/pdf-editor/page-numbers": { title: "Add Page Numbers to PDF | Worklazy Tools", description: "Add page numbers to an exact PDF page range with starting-page, starting-number, cover-exclusion, and parity controls.", application: { name: "PDF Page Numbers", featureList: ["Starting number", "Starting page", "Cover exclusion", "Page ranges", "Parity filter", "Thumbnail selection"] } },
   "/tools/pdf-editor/header-footer": { title: "Add PDF Headers & Footers | Worklazy Tools", description: "Add custom headers and footers with filename, date, page-number tokens, position, size, and color controls.", application: { name: "PDF Headers and Footers", featureList: ["Filename token", "Batch-start date", "Page-number tokens", "Six positions", "Size and color", "Overlay preview"] } },
   "/tools/pdf-editor/watermark": { title: "Add Text or Image Watermarks to PDF | Worklazy Tools", description: "Add text, PNG, or JPEG watermarks in front of or behind PDF content with rotation, opacity, sizing, and repeated tile controls.", application: { name: "PDF Watermark", featureList: ["Vector text", "PNG and JPEG images", "Background and foreground layers", "Single and repeated placement", "Rotation and opacity", "Overlay preview"] } },
@@ -481,7 +481,7 @@ export function normalizeSeoPath(pathname: string) {
 
 export function canonicalSeoPath(pathname: string) {
   const path = normalizeSeoPath(pathname);
-  return path === "/tools/pdf-editor/page-numbers" || path === "/tools/pdf-editor/header-footer"
+  return ["/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp"].includes(path)
     ? "/tools/pdf-editor/finish"
     : path;
 }

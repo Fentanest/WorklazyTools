@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import officeCrypto from "officecrypto-tool";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, rgb } from "pdf-lib";
 import puppeteer from "puppeteer-core";
 import * as XLSX from "xlsx";
 
@@ -108,6 +108,12 @@ async function testPdfTools(page, fixtures, tempDir) {
     throw new Error(`PDF thumbnail rotation was not reflected immediately: ${JSON.stringify(rotationState)}`);
   }
   await page.waitForFunction(() => !document.querySelector(":is(.summary-card,[data-testid='excel-merge-summary'],[data-testid='pdf-output-card']) [data-ui-component=primary-button]")?.disabled);
+  const watermarkInput = await page.$('.pdf-output-field input[maxlength="120"]');
+  if (!watermarkInput) throw new Error("Legacy PDF watermark field was not found.");
+  await replaceInputValue(page, watermarkInput, "호환 프리셋");
+  await page.click('button[role="switch"][aria-label="페이지 번호 넣기"]');
+  await page.waitForFunction(() => document.querySelector('.pdf-output-field input[maxlength="120"]')?.value === "호환 프리셋"
+    && document.querySelector('button[role="switch"][aria-label="페이지 번호 넣기"]')?.getAttribute("aria-checked") === "true");
   await clickPrimaryAction(page);
   const immediateFeedback = await page.$eval(".pdf-output-action-zone", (element) => ({
     running: Boolean(element.querySelector(".ui-operation-progress.ui-status-running")),
@@ -121,9 +127,30 @@ async function testPdfTools(page, fixtures, tempDir) {
   await assertProgressLog(page, "PDF 페이지 편집");
   const rotatedPath = path.join(tempDir, "rotated.pdf");
   await saveBlobLink(page, "[data-testid='pdf-download']", rotatedPath);
-  const rotated = await PDFDocument.load(await fs.readFile(rotatedPath));
+  const rotatedBytes = await fs.readFile(rotatedPath);
+  const rotated = await PDFDocument.load(rotatedBytes);
   if (rotated.getPageCount() !== 2 || rotated.getPage(0).getRotation().angle !== 90) {
     throw new Error(`PDF output rotation was not persisted: pages=${rotated.getPageCount()}, rotation=${rotated.getPage(0).getRotation().angle}`);
+  }
+  for (const [index, outputPage] of rotated.getPages().entries()) {
+    const xObjects = outputPage.node.Resources()?.lookupMaybe(PDFName.of("XObject"), PDFDict);
+    const hasPngWatermark = xObjects?.entries().some(([, reference]) => {
+      const object = rotated.context.lookup(reference);
+      return object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Image");
+    });
+    if (!hasPngWatermark) throw new Error(`Legacy PDF page ${index + 1} omitted the enabled watermark.`);
+  }
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(rotatedBytes) });
+  try {
+    const parsed = await loadingTask.promise;
+    for (let pageNumber = 1; pageNumber <= parsed.numPages; pageNumber += 1) {
+      const text = await (await parsed.getPage(pageNumber)).getTextContent();
+      const extracted = text.items.map((item) => item.str ?? "").join(" ");
+      if (!new RegExp(`(?:^|\\s)${pageNumber}(?=\\s|$)`, "u").test(extracted)) throw new Error(`Legacy PDF page ${pageNumber} omitted the enabled page number: ${JSON.stringify(extracted)}`);
+    }
+  } finally {
+    await loadingTask.destroy();
   }
 
   await page.$eval('.pdf-page-card:first-child input[aria-label="1번 페이지 선택 해제"]', (checkbox) => checkbox.click());

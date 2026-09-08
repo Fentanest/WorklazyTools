@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { createCanvas } from "@napi-rs/canvas";
+import JSZip from "jszip";
 import { chromium } from "playwright";
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, degrees } from "pdf-lib";
 import { PNG } from "pngjs";
@@ -79,6 +80,7 @@ try {
   await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
+  await testCombinedBatchWorkflow(browser, fixture);
   await testStructureWorkflow(browser);
   await testRasterWorkflow(browser, fixture);
   const watermarkRuntimeRequests = await testWatermarkWorkflow(browser, fixture, inlineImageFixture, smallFixture);
@@ -86,7 +88,7 @@ try {
   await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks(watermarkRuntimeRequests);
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds, two appearance-preserving UI downloads, localized unsupported-form blocking and a 13-row pre-execution table, selected-page raster flatten with fixed defaults and size warning, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, combined two-file output with two safe Unicode ZIP entries, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds, two appearance-preserving UI downloads, localized unsupported-form blocking and a 13-row pre-execution table, selected-page raster flatten with fixed defaults and size warning, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -375,6 +377,8 @@ async function testPreflightGuidance(browserInstance, fixture, smallFixture) {
   await fontSize.fill("10");
   await margin.fill("24");
   await template.fill("A");
+  await page.locator("[data-ui-component='file-list'] button").click();
+  await page.locator("[data-ui-component='file-list']").waitFor({ state: "detached" });
   await input.setInputFiles({ name: "small.pdf", mimeType: "application/pdf", buffer: smallFixture });
   await margin.fill("100");
   await page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='invalid-margin']").waitFor();
@@ -568,6 +572,13 @@ async function waitForReadyPreflight(page) {
   await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready" && !document.querySelector("[data-testid='pdf-finish-preflight-error']"));
 }
 
+async function clearSingleFinishFile(page) {
+  const list = page.locator("[data-ui-component='file-list']");
+  assert.equal(await list.locator("li").count(), 1, "single-file replacement setup unexpectedly retained a batch");
+  await list.locator("button").click();
+  await list.waitFor({ state: "detached" });
+}
+
 async function assertReadyPreflight(page, action, label) {
   const snapshot = await page.locator("[data-testid='pdf-finish-ready']").evaluate((panel) => ({
     status: panel.getAttribute("data-preflight-status"),
@@ -685,6 +696,60 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await context.close();
 }
 
+async function testCombinedBatchWorkflow(browserInstance, fixture) {
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "ko-KR", serviceWorkers: "block", acceptDownloads: false });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  const page = await context.newPage();
+  page.setDefaultTimeout(120_000);
+  await page.goto(`${baseUrl}/ko/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
+  await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles([
+    { name: "결과.pdf", mimeType: "application/pdf", buffer: fixture },
+    { name: "결과.pdf", mimeType: "application/pdf", buffer: fixture },
+  ]);
+  await page.waitForFunction(() => document.querySelectorAll("[data-ui-component='file-list'] li").length === 2);
+  await page.locator("[data-finish-tab='watermark']").click();
+  await page.locator("[data-testid='pdf-finish-decoration-toggle'] [role='switch']").click();
+  await page.locator("[data-testid='pdf-finish-template']").fill("BATCH-WATERMARK");
+  await waitForReadyPreflight(page);
+  const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+  assert.equal(await action.isEnabled(), true, "combined batch output must be executable");
+  await action.click();
+  const downloads = page.locator("[data-testid='pdf-download']");
+  await downloads.nth(2).waitFor();
+  assert.equal(await downloads.count(), 3, "two PDF results must also expose one ZIP result");
+  assert.deepEqual(await downloads.evaluateAll((links) => links.map((link) => link.getAttribute("download"))), [
+    "결과-마무리.pdf",
+    "결과-마무리.pdf",
+    "worklazy-pdf-finished.zip",
+  ]);
+  const zipBytes = Buffer.from(await downloads.nth(2).evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
+  const archive = await JSZip.loadAsync(zipBytes);
+  const entries = Object.keys(archive.files).sort();
+  assert.deepEqual(entries, ["결과-마무리-2.pdf", "결과-마무리.pdf"].sort(), "ZIP entries must preserve Unicode and resolve duplicate names through C2");
+  for (const entry of entries) {
+    const bytes = await archive.file(entry)?.async("uint8array");
+    assert.ok(bytes, `${entry} was not readable from the ZIP`);
+    const document = await PDFDocument.load(bytes);
+    assert.equal(document.getPageCount(), 3, `${entry} did not preserve the source page count`);
+    const firstPage = document.getPage(0).node;
+    const resources = firstPage.Resources();
+    assert.ok(resources?.lookupMaybe(PDFName.of("XObject"), PDFDict), `${entry} omitted the requested watermark`);
+    assert.equal(resources?.lookupMaybe(PDFName.of("Font"), PDFDict)?.entries().length, 2, `${entry} must retain the source font and embed exactly one shared decoration font`);
+  }
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const firstPdf = await archive.file("결과-마무리.pdf")?.async("uint8array");
+  assert.ok(firstPdf);
+  const loadingTask = pdfjs.getDocument({ data: firstPdf });
+  try {
+    const parsed = await loadingTask.promise;
+    const content = await (await parsed.getPage(1)).getTextContent();
+    assert.match(content.items.map((item) => item.str ?? "").join(" "), /1\s*\/\s*3/u, "combined batch PDF silently omitted page numbering");
+  } finally {
+    await loadingTask.destroy();
+  }
+  await context.close();
+}
+
 async function renderBlueAppearance(bytes) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const task = pdfjs.getDocument({ data: Uint8Array.from(bytes), useSystemFonts: true });
@@ -785,6 +850,7 @@ async function testStructureWorkflow(browserInstance) {
     }
 
     const input = page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']");
+    await clearSingleFinishFile(page);
     await input.setInputFiles(scaledAppearancePath);
     await page.waitForFunction(() => {
       const panel = document.querySelector("[data-testid='pdf-finish-ready']");
@@ -798,6 +864,7 @@ async function testStructureWorkflow(browserInstance) {
     const appearanceOutput = Buffer.from(await download.evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
     assert.deepEqual(await renderBlueAppearance(appearanceOutput), expectedAppearance, `${language}: downloaded flatten changed appearance geometry`);
 
+    await clearSingleFinishFile(page);
     await input.setInputFiles(singularAppearancePath);
     const unsupported = page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='form-unsupported']");
     await unsupported.waitFor();
@@ -947,6 +1014,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   for (let index = 0; index < boundaryPng.data.length; index += 4) {
     boundaryPng.data[index] = 220; boundaryPng.data[index + 1] = 20; boundaryPng.data[index + 2] = 40; boundaryPng.data[index + 3] = 255;
   }
+  await clearSingleFinishFile(page);
   await pdfInput.setInputFiles({ name: "rotated-boundary.pdf", mimeType: "application/pdf", buffer: smallFixture });
   await page.locator("[data-testid='pdf-watermark-image']").setInputFiles({ name: "boundary.png", mimeType: "image/png", buffer: PNG.sync.write(boundaryPng) });
   await page.locator("[data-testid='pdf-watermark-size']").fill("60");
@@ -962,6 +1030,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   assert.equal(await page.locator("[data-testid='pdf-finish-overlay']").getAttribute("data-placement-count"), "1", "a one-pixel tile intersection must remain accepted");
 
   await page.locator("[data-testid='pdf-watermark-content-text']").click();
+  await clearSingleFinishFile(page);
   await pdfInput.setInputFiles({ name: "valid-inline-image.pdf", mimeType: "application/pdf", buffer: inlineImageFixture });
   await page.locator("[data-testid='pdf-watermark-layer']").selectOption("foreground");
   await page.locator("[data-testid='pdf-finish-font-size']").fill("6");
@@ -984,6 +1053,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   await action.click();
   await page.locator("[data-testid='pdf-download']").waitFor();
 
+  await clearSingleFinishFile(page);
   await pdfInput.setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/risk/graphics-state-imbalance.pdf"));
   await page.locator("[data-testid='pdf-watermark-risk-confirmation']").waitFor();
   await assertF2Owned(page, "[data-testid='pdf-watermark-risk-confirmation']", "risk state");

@@ -890,12 +890,14 @@
         "stamp": "도장·서명"
       },
       "uploadTitle": "PDF 선택",
-      "uploadDescription": "페이지 번호나 문서 정보를 넣을 PDF 하나를 추가하세요.",
-      "uploadHint": "암호 보호가 해제된 PDF 한 개를 선택하세요.",
+      "uploadDescription": "PDF를 하나 이상 추가하면 같은 마무리 설정을 파일마다 적용합니다.",
+      "uploadHint": "암호 보호가 해제된 PDF를 선택하세요.",
       "invalidFile": "PDF 파일만 추가할 수 있습니다.",
       "inspecting": "페이지와 보안 설정을 확인하는 중…",
       "settingsTitle": "표시 내용과 위치",
       "settingsDescription": "토큰, 위치, 글자 크기와 색상을 정하세요.",
+      "includeDecoration": "이 마무리 옵션 포함",
+      "includeDecorationDescription": "켜 둔 옵션은 PDF를 만들 때 안전한 순서로 함께 적용합니다.",
       "template": "표시할 내용",
       "templateHelp": "사용 가능한 토큰:",
       "templateCount": "{{count}} / 300자",
@@ -1057,6 +1059,7 @@
       },
       "create": "마무리 PDF 만들기",
       "creating": "PDF를 마무리하는 중…",
+      "packing": "마무리한 PDF를 ZIP으로 묶는 중…",
       "retry": "다시 만들기",
       "cancel": "작업 취소",
       "canceled": "작업을 취소했습니다. 설정을 확인한 뒤 다시 시작할 수 있습니다.",
@@ -1068,7 +1071,7 @@
         "saving": "완성된 PDF를 저장하는 중…"
         ,"rasterizing": "선택한 페이지를 이미지로 바꾸는 중…"
       },
-      "complete": "페이지 번호와 문서 정보를 넣었습니다.",
+      "complete": "선택한 마무리 옵션을 적용했습니다.",
       "ready": "마무리한 PDF가 준비됐어요.",
       "fieldErrors": {
         "fontSize": "글자 크기는 6~72 사이의 숫자로 입력하세요.",
@@ -1132,7 +1135,8 @@
       "outputFileName": {
         "suffix": "마무리",
         "fallback": "Worklazy-PDF-마무리"
-      }
+      },
+      "archiveFileName": "worklazy-pdf-finished.zip"
     },
     "page": {
       "modes": {
@@ -1143,8 +1147,8 @@
         },
         "finish": {
           "eyebrow": "PDF FINISH",
-          "title": "PDF 페이지 번호·머리글·바닥글",
-          "description": "페이지 번호와 문서 정보를 원하는 위치에 넣고 미리보기로 확인한 뒤 PDF를 완성하세요."
+          "title": "PDF 마무리 옵션 함께 적용",
+          "description": "하나 이상의 PDF에 페이지 번호, 머리글, 워터마크와 도장을 적용하고 결과 파일과 ZIP을 내려받으세요."
         },
         "image-to-pdf": {
           "eyebrow": "IMAGE TO PDF",

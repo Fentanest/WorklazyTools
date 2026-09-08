@@ -69,15 +69,15 @@ test("English tool titles do not fall back to a generic browser-tool label", () 
 
 test("PDF finish aliases retain distinct metadata and canonicalize to the finish guide", () => {
   for (const language of ["ko", "en"] as const) {
-    const routes = ["/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer"];
-    assert.equal(new Set(routes.map((route) => getSeoDefinition(language, route).title)).size, 3);
+    const routes = ["/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp"];
+    assert.equal(new Set(routes.map((route) => getSeoDefinition(language, route).title)).size, 5);
     assert.ok(routes.every((route) => getSeoDefinition(language, route).faq?.length === 2));
   }
   assert.equal(canonicalSeoPath("/tools/pdf-editor/finish"), "/tools/pdf-editor/finish");
   assert.equal(canonicalSeoPath("/tools/pdf-editor/page-numbers"), "/tools/pdf-editor/finish");
   assert.equal(canonicalSeoPath("/tools/pdf-editor/header-footer/"), "/tools/pdf-editor/finish");
-  assert.equal(canonicalSeoPath("/tools/pdf-editor/watermark/"), "/tools/pdf-editor/watermark");
-  assert.equal(canonicalSeoPath("/tools/pdf-editor/stamp/"), "/tools/pdf-editor/stamp");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/watermark/"), "/tools/pdf-editor/finish");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/stamp/"), "/tools/pdf-editor/finish");
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {

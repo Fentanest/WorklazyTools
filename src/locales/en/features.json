@@ -889,13 +889,15 @@
         "watermark": "Watermark",
         "stamp": "Stamp & signature"
       },
-      "uploadTitle": "Choose a PDF",
-      "uploadDescription": "Add one PDF that needs page numbers or document details.",
-      "uploadHint": "Choose one PDF without password protection.",
+      "uploadTitle": "Choose PDFs",
+      "uploadDescription": "Add one or more PDFs and apply the same finishing settings to each file.",
+      "uploadHint": "Choose PDFs without password protection.",
       "invalidFile": "Only PDF files can be added.",
       "inspecting": "Checking pages and security settings…",
       "settingsTitle": "Content and position",
       "settingsDescription": "Set tokens, position, font size, and color.",
+      "includeDecoration": "Include this finishing option",
+      "includeDecorationDescription": "Enabled options are combined in a safe order when the PDFs are created.",
       "template": "Content to display",
       "templateHelp": "Available tokens:",
       "templateCount": "{{count}} / 300 characters",
@@ -1056,7 +1058,8 @@
         ,"raster-unsupported": "Page {{page}} exceeds the single-image limit even at 150 DPI. Remove it from the range or split the PDF around smaller pages."
       },
       "create": "Create finished PDF",
-      "creating": "Finishing the PDF…",
+      "creating": "Finishing the PDFs…",
+      "packing": "Packing the finished PDFs into a ZIP…",
       "retry": "Try again",
       "cancel": "Cancel operation",
       "canceled": "The operation was canceled. Check the settings and start again.",
@@ -1068,7 +1071,7 @@
         "saving": "Saving the finished PDF…"
         ,"rasterizing": "Converting selected pages to images…"
       },
-      "complete": "Page numbers and document details were added.",
+      "complete": "The selected finishing options were applied.",
       "ready": "Your finished PDF is ready.",
       "fieldErrors": {
         "fontSize": "Enter a font size from 6 to 72.",
@@ -1132,7 +1135,8 @@
       "outputFileName": {
         "suffix": "finished",
         "fallback": "Worklazy-PDF-finished"
-      }
+      },
+      "archiveFileName": "worklazy-pdf-finished.zip"
     },
     "page": {
       "modes": {
@@ -1143,8 +1147,8 @@
         },
         "finish": {
           "eyebrow": "PDF FINISH",
-          "title": "PDF page numbers, headers, and footers",
-          "description": "Add page numbers and document details where you want them, check the preview, and finish your PDF."
+          "title": "Combine PDF finishing options",
+          "description": "Apply page numbers, headers, watermarks, and stamps to one or more PDFs, then download each result or a ZIP."
         },
         "image-to-pdf": {
           "eyebrow": "IMAGE TO PDF",

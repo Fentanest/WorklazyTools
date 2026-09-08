@@ -780,15 +780,24 @@ export async function validateWatermarkResult(bytes: Uint8Array, pageCount: numb
   if (document.getPageCount() !== pageCount) throw new Error("page-count-changed");
   for (const physicalPage of selectedPages) {
     throwIfAborted(signal);
-    const streams = pageContentStreams(document.getPage(physicalPage - 1));
+    const page = document.getPage(physicalPage - 1);
+    const streams = pageContentStreams(page);
     if (streams.length === 0) throw new Error("watermark-stream-missing");
-    const stream = streams[layer === "background" ? 0 : streams.length - 1];
-    const decoded = await decodedStreamBytesCooperatively(stream, signal);
-    const scan = await scanContentCooperatively(decoded, signal);
-    const content = latin1Text(decoded).trim();
-    if (!content.startsWith("q\n/Artifact BMC") || !content.endsWith("EMC\nQ")) throw new Error("watermark-stream-invalid");
-    streamDrawnXObjects(document.getPage(physicalPage - 1), scan.tokens);
-    if (layer === "foreground" && await contentLeavesDefinitelyEmptyClip(streams.slice(0, -1), signal)) throw new Error("watermark-clipped");
+    const candidates = layer === "background"
+      ? [[streams[0], 0] as const]
+      : streams.map((stream, index) => [stream, index] as const).reverse();
+    let validatedIndex = -1;
+    for (const [stream, index] of candidates) {
+      const decoded = await decodedStreamBytesCooperatively(stream, signal);
+      const content = latin1Text(decoded).trim();
+      if (!content.startsWith("q\n/Artifact BMC") || !content.endsWith("EMC\nQ")) continue;
+      const scan = await scanContentCooperatively(decoded, signal);
+      streamDrawnXObjects(page, scan.tokens);
+      validatedIndex = index;
+      break;
+    }
+    if (validatedIndex < 0) throw new Error("watermark-stream-invalid");
+    if (layer === "foreground" && await contentLeavesDefinitelyEmptyClip(streams.slice(0, validatedIndex), signal)) throw new Error("watermark-clipped");
     await yieldToEventLoop();
   }
   throwIfAborted(signal);

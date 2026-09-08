@@ -5,6 +5,7 @@ import {
   reserveSafeZipEntryPath,
   SafeFileNameRegistry,
   SafeZipEntryPathRegistry,
+  createUniqueSafeFileName,
   validateSafeZipEntryPath,
   type SafeFileName,
   type SafeZipEntryPath,
@@ -13,6 +14,14 @@ import {
 export interface ZipArchiveSource {
   fileName: SafeFileName;
   blob: Blob;
+}
+
+export function createSafeZipArchiveSources(files: Array<{ fileName: string; blob: Blob }>): ZipArchiveSource[] {
+  const names = new SafeFileNameRegistry();
+  return files.map(({ fileName, blob }, index) => ({
+    fileName: createUniqueSafeFileName(fileName, names, `result-${index + 1}`),
+    blob,
+  }));
 }
 
 export interface ZipArchiveProgress {

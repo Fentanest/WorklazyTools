@@ -10,6 +10,7 @@ import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage } from "../../i18n/featureMessages";
 import { throwIfAborted } from "../../utils/cooperativeCancel.ts";
 import { pdfWorkerCanceledMessage, runPdfWorker } from "./pdfWorkerLifecycle";
+import { LEGACY_ORGANIZE_PDF_PRESET } from "./legacyOrganizePreset.ts";
 
 function createPdfWorker() {
   return new Worker(new URL("./pdf.worker.ts", import.meta.url), { type: "module" });
@@ -89,18 +90,19 @@ async function serializeOutputOptions(options: PdfOutputOptions, language: AppLa
 }
 
 async function createWatermarkImage(text: string) {
+  const preset = LEGACY_ORGANIZE_PDF_PRESET.watermarkCanvas;
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Unable to prepare the watermark.");
-  context.font = "600 46px system-ui, sans-serif";
-  const width = Math.min(1800, Math.max(420, Math.ceil(context.measureText(text).width + 80)));
+  context.font = preset.font;
+  const width = Math.min(preset.maxWidth, Math.max(preset.minWidth, Math.ceil(context.measureText(text).width + preset.horizontalPadding)));
   canvas.width = width;
-  canvas.height = 92;
-  context.font = "600 46px system-ui, sans-serif";
-  context.fillStyle = "rgba(30, 30, 34, .82)";
+  canvas.height = preset.height;
+  context.font = preset.font;
+  context.fillStyle = preset.fillStyle;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(text.slice(0, 120), width / 2, canvas.height / 2);
+  context.fillText(text.slice(0, preset.utf16SliceUnits), width / 2, canvas.height / 2);
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Unable to prepare the watermark.")), "image/png"));
   canvas.width = 1; canvas.height = 1;
   return blob.arrayBuffer();

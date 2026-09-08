@@ -4,6 +4,20 @@
 
 ## 2026-09-09
 
+### U4-8 — PDF 마무리 복합 실행·다중 결과·최종 감사 (Codx)
+
+**실행 게이트와 결함 귀속** — 시작 branch/head는 `s3-pdf-finish`/`620f87943e27c76312e384a3dae5104941d12c98`로 지시와 일치했고 열린 계획서 충돌과 추적된 루트 merge-gate 문서는 없었다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다. U4-5에서 들어온 워터마크+도장 배타와 도장/이미지 워터마크 조기 반환은 정본 12에 근거 없는 기존 결함으로 판정했다. 다중 선택 도입 뒤 “다시 선택하면 교체”를 전제하던 finish 테스트는 이번 변경 귀속으로 명시적 제거→선택 흐름으로 고쳤다.
+
+**복합 엔진·사용자 경로** — `analyzeDocument`를 계열별 plan 누적으로 바꾸고 구조 재구축 뒤 background 워터마크→원문→foreground 워터마크→번호/머리말/꼬리말→도장→선택적 raster 순서를 실제 content stream으로 만들었다. 네 장식 축은 조합 폭발을 피하되 모든 상호작용을 덮는 6개 pairwise + all-on foreground/background 2개, 총 **8개 실제 출력 PDF**로 줄였다. PDF.js 텍스트, content operator 순서, XObject와 Font ref를 검사했으며 같은 문서의 텍스트 장식은 Font 1개를 공유한다. 제품에서 text plan을 제거한 mutant는 `missing text decoration: PAGE-1`로 **exit 1**이었고 원복 뒤 체인에 등록된 정상 골든이 통과했다.
+
+**다중 결과·호환성** — finish 업로드는 파일을 concurrency 1로 검사·처리하고 첫 active preview 외 PDF.js cache를 즉시 해제한다. 각 결과는 기존 OPFS/Blob store의 dispose를 유지하며 취소·후속 ZIP 실패 때 완료된 부분 결과를 UI에 보존한다. 결과가 2개 이상이면 C2로 한글·중복명을 안전하게 예약하고 C3와 `@zip.js/zip.js`를 지연 import해 ZIP을 만든다. 브라우저 스모크는 같은 `결과.pdf` 2개에서 개별 PDF 2개+ZIP 1개, ZIP entry `결과-마무리.pdf`/`결과-마무리-2.pdf`, 각 출력의 번호·워터마크와 원문 Font 1+공유 장식 Font 1을 단언했다. legacy organize는 UI·문구와 worker blob을 바꾸지 않고 PNG canvas와 worker 배치 상수를 `legacy-organize` preset으로 고정했다. 실제 Chrome 두 옵션 스모크는 각 페이지의 PNG XObject와 번호를 단언하며, 페이지 번호 font를 끈 제품 mutant는 `Legacy PDF page 1 omitted…`, **exit 1**이었다. 기존 oracle은 client 3·structure 4·render 32·output 4·input 1, `totalDiffs=0`이다.
+
+**누락 감사·현지화** — 정본 확정 1~27을 파일/줄로 다시 대조해 26개는 U4-0~U4-7 산출물에서 확인했다. 이 과정에서 watermark/stamp preset만 자기 canonical을 유지하던 **1건**을 발견해 page-numbers/header-footer와 함께 `/tools/pdf-editor/finish`로 통일하고 unit·정적 출력 검증을 보강했다. 다중 업로드·ZIP·진행 문구와 finish 메타/소셜 입력은 ko/en을 동시에 갱신했다. route 수는 늘지 않아 기존 71개 정적 페이지·사이트맵 범위만 재생성했고 AdSense 실행 경로는 건드리지 않았다. 27행 전체 표와 재현 로그는 `/tmp/worklazy-u4-8/REPORT.md`에 보존한다.
+
+**탐색 빌드와 예산** — 고정 schema-v3 기준선 SHA-256은 `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`, multiplier `1`이며 상한은 불변이다. 최초→엔진에서 entry/PDF route/shared/app/CSS 증분은 각각 **+14/+398/+48/+520/0B**, 엔진→복수 선택 UI에서는 **+204/+1,111/+58/+1,361/0B**였다. 70% 중단선 아래라 계속했다. 최종 정본 감사 수정까지 포함한 증분/상한/잔여는 entry **12,414/20,480/8,066B**, PDF route **77,436/82,000/4,564B**, shared **2,542/30,720/28,178B**, app **93,325/96,000/2,675B**, CSS **400/10,240/9,840B**다. 의무 초기·엔진·UI 세 checkpoint 뒤 legacy/누락 감사 변경의 최종성을 확인하려고 최종 계측을 추가 실행했으며, 어느 측정에서도 상한 상향·override는 사용하지 않았다.
+
+**검증** — TypeScript, 전체 unit 346건, production build 2,855 modules·71 정적 페이지, static(startup recovery 119), PDF finish 체인(직접 진입 20+복합 배치+기존 4종 golden+신규 복합 8), 공식 oracle 87/허용56/제외31/양 renderer SHA56, PDF scoped browser, legacy 3종 oracle, CSS orphan 0, tool registry 20을 통과했다. 전체 browser·office·new-tools·utilities·QR 2종·recovery·Excel 2종·full a11y·full visual·full rendering·`legacy:manifest`·성능 12입력은 지시대로 병합 게이트 1회로 유예한다. — Codx
+
 ### U4-7 fix-1 — 벤치 게이트·부분 결과·페이지 정리 수리 (Codx)
 
 **실행 게이트·귀속** — 시작 branch/head는 `s3-pdf-finish`/`661f717bc11ecbab06a777a25db2700164988648`로 지시와 일치했고 관련 열린 계획서의 상반 지시는 없었다. 검수 R1~R5는 이 기준 커밋에서 생긴 결함으로 수용해 모두 수리했다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고, main 병합·push·배포도 하지 않았다. 기존 `save()` 할당 오류, preview 포트 오인, scoped 로그 문구, 공용 incomplete 125, 실기기 미교정, 128MiB heartbeat·의존 패치는 이번 결함과 분리해 `docs/backlog.md`에 이월했다.

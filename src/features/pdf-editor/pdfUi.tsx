@@ -49,6 +49,27 @@ export function useDownloadResult() {
   return useMemo(() => ({ result, makeResult, makeBlobResult, clearResult }), [clearResult, makeBlobResult, makeResult, result]);
 }
 
+export function useDownloadResults() {
+  const [results, setResults] = useState<DownloadResult[]>([]);
+  const resultsRef = useRef<DownloadResult[]>([]);
+  const clearResults = useCallback(() => {
+    for (const result of resultsRef.current) {
+      URL.revokeObjectURL(result.url);
+      void result.dispose?.();
+    }
+    resultsRef.current = [];
+    setResults([]);
+  }, []);
+  useEffect(() => clearResults, [clearResults]);
+  const makeBlobResults = useCallback((items: Array<Omit<DownloadResult, "url" | "size"> & { blob: Blob }>) => {
+    clearResults();
+    const next = items.map(({ blob, ...item }) => ({ ...item, url: URL.createObjectURL(blob), size: blob.size }));
+    resultsRef.current = next;
+    setResults(next);
+  }, [clearResults]);
+  return useMemo(() => ({ results, makeBlobResults, clearResults }), [clearResults, makeBlobResults, results]);
+}
+
 export function PdfDownloadCard({ result, title, compact = false }: { result: DownloadResult; title?: string; compact?: boolean }) {
   const language = useAppLanguage();
   const displayTitle = title ?? featureMessage(language, "pdf.messages.pdfUi.yourFileIsReady");
