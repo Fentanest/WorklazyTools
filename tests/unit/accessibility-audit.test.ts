@@ -7,6 +7,8 @@ function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
     results: pages.map(({ id, scenario }) => ({ id, violations: [], incomplete: [], ...(scenario === "pdf-watermark-empty-text" ? {
       settledContrast: [{ target: "invalid-textarea", ratio: 4.5 }, { target: "empty-text-notice", ratio: 4.5 }],
+    } : {}), ...(scenario === "pdf-watermark-display-load-failure" ? {
+      interactiveContrast: ["normal", "hover", "focus"].map((state) => ({ state, ratio: 4.5 })),
     } : {}) })) };
 }
 
@@ -30,6 +32,20 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.equal(errorStates.length, 4);
   assert.deepEqual([...new Set(errorStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
   assert.deepEqual([...new Set(errorStates.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
+  const displayFailures = pages.filter(({ scenario }) => scenario === "pdf-watermark-display-load-failure");
+  assert.equal(displayFailures.length, 4);
+  assert.deepEqual([...new Set(displayFailures.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
+  assert.deepEqual([...new Set(displayFailures.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
+});
+
+test("a11y PDF display reload contrast requires normal, hover and focus in every locale and theme", () => {
+  const missing = report();
+  missing.results.find(({ id }) => id === "pdf-watermark-display-error-en-dark").interactiveContrast.pop();
+  assert.throws(() => assertAccessibilityResults(missing), /missing an interaction state/);
+
+  const low = report();
+  low.results.find(({ id }) => id === "pdf-watermark-display-error-ko-light").interactiveContrast[2].ratio = 4.49;
+  assert.throws(() => assertAccessibilityResults(low), /below 4\.5:1/);
 });
 
 test("a11y watermark error-state contrast is required for every locale and theme without raising limits", () => {
@@ -75,6 +91,19 @@ test("a11y incomplete targets and reasons remain visible while only F2-owned nod
   const discarded = report();
   discarded.results[0].incomplete.push({ id: "color-contrast", nodes: [{ target: [], reasons: [], owner: "shared-existing" }] });
   assert.throws(() => assertAccessibilityResults(discarded), /target or reason was discarded/);
+});
+
+test("a11y gradient incomplete is separately retained only after reload pixel contrast passes", () => {
+  const measured = report();
+  measured.results.find(({ id }) => id === "pdf-watermark-display-error-ko-dark").resolvedIncomplete = [{
+    rule: "color-contrast", target: ["[data-testid='pdf-display-reload']"], reasons: ["Background gradient"], resolution: "measured-pixel",
+  }];
+  const summary = assertAccessibilityResults(measured);
+  assert.equal(summary.pixelResolvedIncompleteNodes, 1);
+  assert.equal(summary.inheritedIncompleteNodes, 0);
+
+  measured.results.find(({ id }) => id === "pdf-watermark-display-error-ko-dark").interactiveContrast[0].ratio = 4.49;
+  assert.throws(() => assertAccessibilityResults(measured), /below 4\.5:1/);
 });
 
 test("a11y incomplete selector resolution never defaults missing or invalid targets to shared ownership", () => {

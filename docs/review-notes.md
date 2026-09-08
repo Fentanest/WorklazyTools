@@ -4,6 +4,23 @@
 
 ## 2026-09-08
 
+### U4-4 fix-5 — 표시 실패 새로고침 버튼 대비 회귀 수리 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-5/fix-4 지시서, astra 5차 검수 보고, PDF finish 정본과 열린 계획서를 대조했다. 시작 branch/head는 `s3-pdf-finish`/`c3288856b10953e663a0910a9ca125c7bfe667eb`로 지시와 일치했고 동일 코드 표면의 상반 지시는 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`와 금지 worktree는 건드리지 않았으며 main 병합·push·배포는 범위 밖이다.
+
+**원인·최소 수리** — fix-4에서 새로 만든 `pdf-display-reload` outline 버튼에 정상 전경색이 없어 상위 오류 컨테이너의 `text-destructive`를 상속했다. 버튼 범위에만 정상·hover·focus-visible `text-foreground`를 명시해 상속을 끊었다. 공용 팔레트·Button primitive·기능·한/영 문구·Tab 접근·36px 높이·marker·소유 분류·접근성 한도는 바꾸지 않았다.
+
+| 언어·테마 | 수정 전 normal / hover / focus | 수정 후 normal / hover / focus |
+|---|---:|---:|
+| ko light | **4.2746 / 12.0215 / 4.2746** | **15.8771 / 12.0215 / 15.8771** |
+| en light | **4.2746 / 12.0491 / 4.2746** | **15.8771 / 12.0491 / 15.8771** |
+| ko dark | **6.5720 / 15.8803 / 6.5720** | **17.4330 / 15.8803 / 17.4330** |
+| en dark | **6.6017 / 15.8803 / 6.6017** | **17.5118 / 15.8803 / 17.5118** |
+
+수치는 Chrome 152에서 같은 버튼의 전경만 투명하게 만든 뒤 테두리·모서리를 제외한 내부 렌더 픽셀 전수와 계산 전경색을 대조한 최저값이다. 기준 커밋 보존 빌드는 light normal/focus에서 4.5:1 미만이며 Axe serious 2건으로 원래 집계기가 실제 실패했다. 수정 뒤 12조합 전부 4.5:1 이상이다. dark의 normal/focus는 gradient 때문에 Axe `incomplete` 2노드로 남아 이를 기존 shared 부채에 섞지 않고 `measured-pixel` 증거로 별도 보존하며, 해당 세 상태 픽셀 수치가 하나라도 4.5 미만이면 게이트가 실패한다.
+
+**회귀 유지·검증** — 최초 표시 자산 요청을 중단한 ko/en 스모크에서 1.2초 동안 자동 재시도 0·자동 reload 0, 현지화 안내와 버튼, 원시 예외/자산 경로 노출 0을 확인했다. 명시적 새로고침은 선택을 비우고 재선택 뒤 preview와 `%PDF-` 저장까지 성공했으며 표시 URL은 하나다. fix-4의 기존 오류 요소는 light textarea/notice **7.6428/6.9595**, dark **8.9891/8.3795**로 양 언어에서 그대로 유지됐다. 범위 접근성 9상태는 위반 0·F2 incomplete 0·픽셀 해소 2·외부 요청 0이고, watermark interaction 시각은 기준선 변경 없이 ko/en×light/dark×desktop/mobile **8/8**이다. 전용 접근성 unit **9/9**, `npx tsc -b`, production build **2,847 modules·정적 69페이지**를 통과했다. 색과 하네스만 바뀌어 번역·SEO·정적 경로·AdSense 격리에는 추가 변경이 없다. full unit/browser/PDF finish/성능/번들/기타 전 스코프는 지시대로 병합 직전 1회로 이월한다. 원보고서와 JSON은 `/tmp/worklazy-u4-4-fix5/`에 보존한다. — Codx
+
 ### U4-4 fix-4 — 표시 실패 복구·배포 계측·오류 대비·128MiB 재측정 (Codx)
 
 **실행 게이트·범위** — `PROJECT_RULES.md`와 `AGENTS.md` 전문, fix-4 지시서, PDF finish 정본, fix-3 기록과 read-only 검수 산출물을 대조했다. 시작 branch/head는 `s3-pdf-finish`/`e30018dd2d4801c5abba54a88f200e9ac69325d3`로 지시와 일치했고 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았으며 금지 worktree에는 접근하지 않았다. main 병합·push·배포는 범위 밖이다.

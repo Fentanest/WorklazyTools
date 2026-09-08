@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
+import { PNG } from "pngjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
@@ -31,6 +32,10 @@ export const pages = Object.freeze([
   { id: "pdf-watermark-error-ko-dark", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "dark", locale: "ko-KR" },
   { id: "pdf-watermark-error-en-light", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "light", locale: "en-US" },
   { id: "pdf-watermark-error-en-dark", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "dark", locale: "en-US" },
+  { id: "pdf-watermark-display-error-ko-light", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-display-load-failure", colorScheme: "light", locale: "ko-KR" },
+  { id: "pdf-watermark-display-error-ko-dark", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-display-load-failure", colorScheme: "dark", locale: "ko-KR" },
+  { id: "pdf-watermark-display-error-en-light", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-display-load-failure", colorScheme: "light", locale: "en-US" },
+  { id: "pdf-watermark-display-error-en-dark", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-display-load-failure", colorScheme: "dark", locale: "en-US" },
   { id: "hwp-editor", path: "/ko/tools/hwp-editor", readySelector: 'iframe[title="rhwp HWP 문서 편집기"]' },
   { id: "home-mobile-ko", path: "/ko", viewport: { width: 412, height: 839 } },
   { id: "tools-mobile-ko", path: "/ko/tools", viewport: { width: 412, height: 839 } },
@@ -69,6 +74,7 @@ export function summarizeAccessibility(results, registeredPages = pages) {
   let incompleteNodes = 0;
   let f2IncompleteNodes = 0;
   let inheritedIncompleteNodes = 0;
+  let pixelResolvedIncompleteNodes = 0;
   for (const result of results) {
     if (!Array.isArray(result.violations)) throw new Error(`Missing accessibility violations: ${result.id}.`);
     if (!Array.isArray(result.incomplete)) throw new Error(`Missing accessibility incomplete results: ${result.id}.`);
@@ -90,8 +96,15 @@ export function summarizeAccessibility(results, registeredPages = pages) {
         else throw new Error(`Unknown accessibility incomplete owner: ${result.id}/${incomplete.id}.`);
       }
     }
+    for (const node of result.resolvedIncomplete ?? []) {
+      if (!Array.isArray(node.target) || !node.target.length || !Array.isArray(node.reasons) || !node.reasons.length
+        || node.resolution !== "measured-pixel") {
+        throw new Error(`Resolved accessibility incomplete evidence is invalid: ${result.id}.`);
+      }
+      pixelResolvedIncompleteNodes += 1;
+    }
   }
-  return { pages: results.length, violations, severityCounts, incompleteRules, incompleteNodes, f2IncompleteNodes, inheritedIncompleteNodes };
+  return { pages: results.length, violations, severityCounts, incompleteRules, incompleteNodes, f2IncompleteNodes, inheritedIncompleteNodes, pixelResolvedIncompleteNodes };
 }
 
 export function assertAccessibilityResults(report, { registeredPages = pages, limits = { critical: 0, serious: 0, total: 0 } } = {}) {
@@ -112,6 +125,21 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
     for (const measurement of measurements) {
       if (!Number.isFinite(measurement.ratio) || measurement.ratio < 4.5) {
         throw new Error(`PDF watermark error-state contrast is below 4.5:1: ${target.id}/${measurement.target}=${measurement.ratio}.`);
+      }
+    }
+  }
+  const displayFailurePages = registeredPages.filter(({ scenario }) => scenario === "pdf-watermark-display-load-failure");
+  for (const target of displayFailurePages) {
+    const result = report.results.find(({ id }) => id === target.id);
+    const measurements = result?.interactiveContrast;
+    const states = measurements?.map(({ state }) => state).sort();
+    if (!Array.isArray(measurements) || measurements.length !== 3
+      || JSON.stringify(states) !== JSON.stringify(["focus", "hover", "normal"])) {
+      throw new Error(`PDF display reload contrast is missing an interaction state: ${target.id}.`);
+    }
+    for (const measurement of measurements) {
+      if (!Number.isFinite(measurement.ratio) || measurement.ratio < 4.5) {
+        throw new Error(`PDF display reload contrast is below 4.5:1: ${target.id}/${measurement.state}=${measurement.ratio}.`);
       }
     }
   }
@@ -153,6 +181,13 @@ export async function runAccessibilityAudit() {
       });
 
       const page = await context.newPage();
+      let displayAssetRequests = 0;
+      if (target.scenario === "pdf-watermark-display-load-failure") {
+        await page.route("**/assets/pdf-*.mjs", async (route) => {
+          displayAssetRequests += 1;
+          await route.abort("failed");
+        });
+      }
       page.on("request", (request) => {
         const requestUrl = new URL(request.url());
         const allowed = requestUrl.origin === new URL(baseUrl).origin || ["data:", "blob:"].includes(requestUrl.protocol);
@@ -164,6 +199,7 @@ export async function runAccessibilityAudit() {
         content: "*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important;caret-color:transparent!important;scroll-behavior:auto!important}",
       });
       let settledContrast;
+      let interactiveContrast;
       if (target.scenario === "pdf-watermark-empty-text") {
         await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
           .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/ordinary/no-resources.pdf"));
@@ -179,6 +215,14 @@ export async function runAccessibilityAudit() {
           { target: "invalid-textarea", selector: "[data-testid='pdf-finish-template'][aria-invalid='true']" },
           { target: "empty-text-notice", selector: "[data-testid='pdf-finish-preflight-error'][data-error-code='empty-text']" },
         ]);
+      } else if (target.scenario === "pdf-watermark-display-load-failure") {
+        await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+          .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/ordinary/no-resources.pdf"));
+        const reloadButton = page.locator("[data-testid='pdf-display-reload']");
+        await reloadButton.waitFor();
+        await page.waitForTimeout(1_200);
+        if (displayAssetRequests !== 1) throw new Error(`PDF display failure must stop after its first asset request: ${target.id}/${displayAssetRequests}.`);
+        interactiveContrast = await measureInteractivePixelContrast(page, reloadButton);
       }
       await page.evaluate(async () => {
         if (document.fonts?.ready) await document.fonts.ready;
@@ -192,6 +236,7 @@ export async function runAccessibilityAudit() {
       }
       const audit = await builder.analyze();
       const incomplete = [];
+      const resolvedIncomplete = [];
       for (const rule of audit.incomplete) {
         const nodes = [];
         for (const node of rule.nodes) {
@@ -199,17 +244,27 @@ export async function runAccessibilityAudit() {
           if (typeof firstTarget !== "string" || !firstTarget.trim()) {
             throw new Error(`Accessibility incomplete target is missing: ${target.id}/${rule.id}.`);
           }
-          const ownership = await page.evaluate(({ target, selector }) => {
+          const ownership = await page.evaluate(({ target, selector, pixelMeasuredReload }) => {
             try {
               const element = document.querySelector(target);
               if (!element) return "missing";
+              if (pixelMeasuredReload && element.matches("[data-testid='pdf-display-reload']")) return "measured-pixel";
               return element.closest(selector) ? "f2-watermark" : "shared-existing";
             } catch {
               return "invalid";
             }
-          }, { target: firstTarget, selector: f2OwnedSelector });
-          const owner = accessibilityOwnerFromResolution(ownership, `${target.id}/${rule.id}/${firstTarget}`);
+          }, { target: firstTarget, selector: f2OwnedSelector, pixelMeasuredReload: target.scenario === "pdf-watermark-display-load-failure" && rule.id === "color-contrast" });
           const reasons = [...node.any, ...node.all, ...node.none].map(({ message }) => message).filter(Boolean);
+          if (ownership === "measured-pixel") {
+            resolvedIncomplete.push({
+              rule: rule.id,
+              target: node.target,
+              reasons: reasons.length ? reasons : [node.failureSummary || rule.help || rule.id],
+              resolution: "measured-pixel",
+            });
+            continue;
+          }
+          const owner = accessibilityOwnerFromResolution(ownership, `${target.id}/${rule.id}/${firstTarget}`);
           nodes.push({
             target: node.target,
             failureSummary: node.failureSummary,
@@ -217,7 +272,7 @@ export async function runAccessibilityAudit() {
             owner,
           });
         }
-        incomplete.push({ id: rule.id, impact: rule.impact, help: rule.help, helpUrl: rule.helpUrl, nodes });
+        if (nodes.length) incomplete.push({ id: rule.id, impact: rule.impact, help: rule.help, helpUrl: rule.helpUrl, nodes });
       }
       if (target.id === "document-compare") {
         placeholderContrast = await page.locator('[data-testid="document-revision-author"] input[placeholder]').evaluate((input) => {
@@ -250,7 +305,9 @@ export async function runAccessibilityAudit() {
           targets: violation.nodes.map((node) => node.target),
         })),
         incomplete,
+        ...(resolvedIncomplete.length ? { resolvedIncomplete } : {}),
         ...(settledContrast ? { settledContrast } : {}),
+        ...(interactiveContrast ? { interactiveContrast } : {}),
       });
       await context.close();
     }
@@ -279,6 +336,9 @@ export async function runAccessibilityAudit() {
     for (const result of results.filter(({ settledContrast }) => settledContrast)) {
       console.log(`${result.id} settled contrast: ${result.settledContrast.map(({ target, ratio }) => `${target}=${ratio.toFixed(4)}:1`).join(", ")}`);
     }
+    for (const result of results.filter(({ interactiveContrast }) => interactiveContrast)) {
+      console.log(`${result.id} reload contrast: ${result.interactiveContrast.map(({ state, ratio }) => `${state}=${ratio.toFixed(4)}:1`).join(", ")}`);
+    }
     console.log(`Accessibility report: ${reportPath}`);
 
     assertAccessibilityResults(report, { registeredPages: auditedPages, limits });
@@ -286,6 +346,78 @@ export async function runAccessibilityAudit() {
     await browser?.close();
     if (server) await stopServer(server);
   }
+}
+
+async function measureInteractivePixelContrast(page, button) {
+  const measurements = [];
+  for (const state of ["normal", "hover", "focus"]) {
+    await page.mouse.move(0, 0);
+    if (state === "normal") {
+      await button.evaluate((element) => element.blur());
+    } else if (state === "hover") {
+      await button.hover();
+    } else {
+      await button.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+    }
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const stateApplied = await button.evaluate((element, expectedState) => expectedState === "normal"
+      ? !element.matches(":hover") && !element.matches(":focus-visible")
+      : element.matches(expectedState === "hover" ? ":hover" : ":focus-visible"), state);
+    if (!stateApplied) throw new Error(`PDF display reload ${state} state could not be applied.`);
+    measurements.push(await measureElementPixelContrast(button, state));
+  }
+  await page.mouse.move(0, 0);
+  await button.evaluate((element) => element.blur());
+  return measurements;
+}
+
+async function measureElementPixelContrast(locator, state) {
+  const foreground = await locator.evaluate((element) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Could not create a color measurement canvas.");
+    const color = getComputedStyle(element).color;
+    context.fillStyle = color;
+    context.fillRect(0, 0, 1, 1);
+    return { css: color, rgba: [...context.getImageData(0, 0, 1, 1).data] };
+  });
+  await locator.evaluate((element) => element.style.setProperty("color", "transparent", "important"));
+  let screenshot;
+  try {
+    screenshot = await locator.screenshot({ animations: "disabled" });
+  } finally {
+    await locator.evaluate((element) => element.style.removeProperty("color"));
+  }
+  const image = PNG.sync.read(screenshot);
+  const foregroundLuminance = luminance(foreground.rgba);
+  const ratios = [];
+  for (let y = 9; y < image.height - 9; y += 1) {
+    for (let x = 12; x < image.width - 12; x += 1) {
+      const offset = (y * image.width + x) * 4;
+      const backgroundLuminance = luminance(image.data.subarray(offset, offset + 4));
+      ratios.push((Math.max(foregroundLuminance, backgroundLuminance) + 0.05) / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05));
+    }
+  }
+  if (!ratios.length) throw new Error("PDF display reload background pixel sample is empty.");
+  return {
+    state,
+    foreground: foreground.css,
+    ratio: Math.min(...ratios),
+    maximumRatio: Math.max(...ratios),
+    samples: ratios.length,
+    method: "Computed foreground against rendered background pixels after making only the button foreground transparent; the inner rectangle excludes borders and corners.",
+  };
+}
+
+function luminance(color) {
+  return [...color].slice(0, 3).map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  }).reduce((value, channel, index) => value + channel * [0.2126, 0.7152, 0.0722][index], 0);
 }
 
 async function measureRenderedContrast(page, targets) {
