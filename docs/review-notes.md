@@ -4,6 +4,22 @@
 
 ## 2026-09-08
 
+### Excel 중복키·머리글 S4 — 최종 통합 회귀 (Codx)
+
+**게이트·범위** — `/tmp/worklazy-xd`, `excel-dupkey-20260907`, 시작 HEAD `657dec8bb6b7479ee93e54708544aef7b559ebc1`과 clean 상태, S0 bundle 기준 SHA-256 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`를 확인했다. 대상에는 ignored `docs/jobs/todo`가 없어서 S0/S3가 보존한 19개 열린 계획서 스캔과 v3 정본 사본을 사용했고 상반 지시는 0건이었다. 실행 규칙 로드 외에는 원 워킹트리를 조사하지 않았고 `/tmp/worklazy-xr*`, `/tmp/worklazy-dc-impl`은 읽지 않았으며, 포트는 4350~4351 strict, 빌드·브라우저는 heap 4GiB·직렬로 실행했다. 새 기능, main 병합·push·배포, BL01~BL05 수리는 범위에 넣지 않았다.
+
+**통합 결함·시각 판정** — QA 전체 시각 회귀 첫 실행은 **178/183**이었다. 실패 5장은 S3에서 홈/전체 도구의 Excel 카드 설명·태그를 머리글 후보·그룹 중복키 의미로 바꾼 뒤 공용 desktop 기준선을 갱신하지 않은 통합 누락이었다. 실제/기준/diff를 직접 열어 문구만 의도대로 바뀌고 정렬·토글·잘림 파손이 없음을 확인한 뒤 아래 5장만 첫 실행 actual로 갱신했다: `home-default__initial__{ko,en}__{light,dark}__desktop.png` 4장, `hwp-editor-empty__redirect-en-tools__en__dark__desktop.png` 1장. 전체를 다시 실행해 **183/183** 재일치했고 Excel 중복 결과 ko/en × desktop/mobile × light/dark 8상태도 모두 포함됐다. 기준선 reset·허용치 변경·결함 화면 승인은 없었다.
+
+**전체 회귀와 정본 5군** — 타입 진단 0, unit **396/396**, production/QA build 각 2,836 modules·정적 61페이지, production static 104문서, browser 전체, Excel 비교·Cleaner, QR bulk, new-tools, utilities, office, recovery **147사례**, CSS orphan 0, registry 20도구, diff check를 통과했다. Excel 비교 스모크와 unit은 ① 2:3·2:1·2:0·0:2·1:1·빈 키·정규화·복합키·복수 쌍·그룹 순서 ② 전체값/행번호 검색·필터·500그룹·50개 더보기·좌우 독립 전개 ③ 9시트·Duplicates 13열·Summary/Parameters·주입 문자열·16,000/32,767 경계와 연속 분할·유한 폭/가시성·직접 다운로드/ZIP 재개방 ④ 원형 22+세로병합 23번째 × XLSX/XLSM/XLS/XLSB/SpreadsheetML/CSV 138조합, 다중 시트·수동 캐시/왕복·swap·완료 역전·제거/unmount·pre-abort를 전수했다. ⑤ 결과 8상태 visual/a11y는 빈 상태로 대체하지 않았다.
+
+**사용자 파일** — `/tmp/worklazy-userfiles/`의 읽기 전용 사본만 사용했다. 수동 1행/B는 중복 **1그룹**, matched/changed/added **713/37/48**. 두 파일 자동 후보는 모두 **4행**이고 4행/B는 **0그룹·703/37/48**, 4행/A는 **6그룹·486/134/31**이다. 표시 키 1~6은 각각 왼쪽 2행·오른쪽 2행 배열이며 첫 그룹은 좌 `[5,73]`, 우 `[5,79]`; 화면에서 좌2→우2를 독립 전개해 DOM 4항목을 확인했다. ko/en 다운로드는 각 9시트, Duplicates 13열, 전체 폭 **12~48**, ZIP 안 XML/rels 각 **18개**가 ElementTree로 재개방됐다. 사용자명 포함 캡처와 보고서는 `/tmp/worklazy-xd-s4/evidence/private/`에만 보존하고 저장소에 넣지 않았다.
+
+**접근성 분리** — `A11Y_MAX_TOTAL=0` 전체 16페이지는 자동 위반 0·외부 요청 0이지만, axe `incomplete` **1,274노드**(color-contrast 1,271·aria-prohibited-attr 3)는 자동 통과로 세지 않았다. 이번 작업의 중복 결과 노드 6종을 8프로필에서 직접 합성색 계산한 **48측정**은 light 최저 **5.272954:1**, dark 최저 **5.732903:1**이고, 머리글 guidance/help/input도 suggested/fallback 16상태 **48측정**, 최저 **5.272954:1**로 해결 판정했다. 나머지 공용 shell·도구 카드·기존 표/guide/footer·모바일 탭과 기존 ARIA 보류는 이번 기능 노드와 분리해 UI 재설계 계획 소유의 공용 부채로 기록만 한다. BL01~BL05의 실측과 재현 경로는 `docs/backlog.md`의 「Excel 비교 — 중복키·머리글 후속」에 이관했으며 감지 정확도에 직접 영향을 주는 BL04를 높은 우선순위로 지정했다.
+
+**제품 규칙·번들·보존** — ko/en features·guide/FAQ·tools·SEO/static 입력의 동시 변경을 unit/static/route 검사로 재확인했고 URL·canonical·hreflang·사이트맵 집합, 광고 예외, 서버 전제, 의존성은 바뀌지 않았다. 실행 확장자 전역 광고 참조의 명시적 allowlist unit을 포함해 396/396이 통과했고 화면 스모크의 내부 identity/reason/error 노출 배열은 0이다. Parameters 계약명은 XLSX metadata에만 남는다. S0 대비 gzip 증분은 entry **+2,242B**, affected routes **+4,008B**, shared **+1,766B**, app 전체 **+8,016B**, CSS **+146B**로 5종 예산을 모두 통과했으며 override·multiplier 변경은 없다.
+
+**규칙 19 차이** — `VITE_LOCAL_QA=1` 빌드에서 결과 화면을 직접 열고 183장 전체 캡처, 사용자 ko/en 결과·머리글 16상태 캡처를 `/tmp/worklazy-xd-s4/evidence/`에 보존했다. 정본은 Gemini 직접 검수를 요구하지만 이번 S4 지시가 이를 Codex 실측+캡처 보존 및 Claude 확인으로 대체했으므로 Gemini가 직접 화면을 본 것으로 기록하지 않는다. 상세 명령·exit·원출력과 최종 보고는 `/tmp/worklazy-xd-s4/REPORT.md`에 둔다. — Codx
+
 ### Excel 중복키 S3 — 보수적 머리글 후보·수동 우선 상태 (Codx)
 
 **착수 게이트·범위** — 지정 worktree `/tmp/worklazy-xd`, 브랜치 `excel-dupkey-20260907`, 시작 HEAD `bdd09a7d6bc10da74db8fd3b2b8565da9c3f054e`와 clean 상태를 확인했다. 대상에는 열린 `docs/jobs/todo` 계획서가 없어 S0에 보존된 19개 열린 계획서 스캔과 같은 기준의 S2 최종 검수 통과 문서를 교차해 충돌 없음으로 판정했다. 명시적으로 접근 금지된 원 워킹트리는 live 재스캔하지 않았다. 이번 단계는 S3 머리글 감지와 그 화면·하네스만 포함하며 S1 그룹 엔진·보고서와 S2 결과 소비 의미를 바꾸지 않았다. main 병합·push·배포와 S4 통합 검증은 수행하지 않았다.
