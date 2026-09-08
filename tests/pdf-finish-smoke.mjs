@@ -76,6 +76,7 @@ try {
   await testUploadErrors(browser);
   await testPreviewGeometry(browser, fixture);
   await testPreflightGuidance(browser, fixture, smallFixture);
+  await testBatchFontWarning(browser, fixture);
   await testPreflightReselection(browser, fixture);
   await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
@@ -88,7 +89,7 @@ try {
   await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks(watermarkRuntimeRequests);
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, combined two-file output with two safe Unicode ZIP entries, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds, two appearance-preserving UI downloads, localized unsupported-form blocking and a 13-row pre-execution table, selected-page raster flatten with fixed defaults and size warning, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, ko/en three-output font totals, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, combined two-file output with two safe Unicode ZIP entries, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds, two appearance-preserving UI downloads, localized unsupported-form blocking and a 13-row pre-execution table, selected-page raster flatten with fixed defaults and size warning, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -384,6 +385,27 @@ async function testPreflightGuidance(browserInstance, fixture, smallFixture) {
   await page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='invalid-margin']").waitFor();
   assert.equal(await action.isDisabled(), true);
   await context.close();
+}
+
+async function testBatchFontWarning(browserInstance, fixture) {
+  for (const language of ["ko", "en"]) {
+    const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
+    await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles(["가.pdf", "나.pdf", "다.pdf"].map((name) => ({
+      name,
+      mimeType: "application/pdf",
+      buffer: fixture,
+    })));
+    await page.locator("[data-testid='pdf-finish-template']").fill("한글");
+    await waitForReadyPreflight(page);
+    const warning = await page.locator("[data-warning-code='embedded-font']").innerText();
+    assert.match(warning, language === "ko" ? /출력은\s*3개/u : /3\s*output/iu, `${language}: the full-font output count was omitted`);
+    assert.match(warning, /3\.8\s*MB/iu, `${language}: the per-output full-font estimate was omitted`);
+    assert.match(warning, /11\.4\s*MB/iu, `${language}: the three-output full-font batch estimate was omitted`);
+    await context.close();
+  }
 }
 
 async function testPreflightReselection(browserInstance, fixture) {

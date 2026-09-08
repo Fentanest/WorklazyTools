@@ -150,6 +150,7 @@ export interface PdfFinishPreflightError {
 export interface PdfFinishPreflightResult {
   errors: PdfFinishPreflightError[];
   warnings: PdfFinishWarningCode[];
+  embeddedFontOutputCount: number;
 }
 
 export interface PdfFinishTextDecorationOptions {
@@ -960,12 +961,14 @@ export async function preflightPdfFiles(input: PdfFinishEngineInput): Promise<Pd
   const resources = createBatchFontResources(input);
   const warnings = new Set<PdfFinishWarningCode>();
   const errors: PdfFinishPreflightError[] = [];
+  let embeddedFontOutputCount = 0;
   for (const [fileIndex, source] of input.files.entries()) {
     throwIfAborted(input.signal);
     await yieldToEventLoop();
     throwIfAborted(input.signal);
     const analyzed = await analyzeDocument(input, source, batchDate, resources, fileIndex);
     for (const warning of analyzed.warnings) warnings.add(warning);
+    if (analyzed.warnings.has("embedded-font")) embeddedFontOutputCount += 1;
     errors.push(...analyzed.errors);
     if (input.options.raster?.enabled && analyzed.document) {
       const { raster, outputWarning } = preflightRasterDocument(source, analyzed.document, input.options.raster);
@@ -982,7 +985,7 @@ export async function preflightPdfFiles(input: PdfFinishEngineInput): Promise<Pd
       }
     }
   }
-  return { errors, warnings: [...warnings] };
+  return { errors, warnings: [...warnings], embeddedFontOutputCount };
 }
 
 export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFinishOutput[]> {

@@ -1125,7 +1125,7 @@
         "unknown-token": "Unknown tokens were kept as entered.",
         "horizontal-overflow": "Some long lines were shortened with an ellipsis.",
         "vertical-overflow": "Some lines outside the available region were omitted.",
-        "embedded-font": "Embedding the full font for Korean and extended characters may add about 3.8 MB to the output file.",
+        "embedded-font": "The full font is needed for {{count}} output(s). It may add about 3.8 MB per file, or about {{total}} MB for this batch.",
         "raster-dpi-lowered": "Some pages used a lower resolution to stay within the single-image limit.",
         "raster-output-large": "The image-based result may be much larger than the source PDF. Reduce the page range or resolution if needed.",
         "risky-graphics-state": "Some pages have unbalanced saved and restored graphics state. Their appearance may change after watermarking.",

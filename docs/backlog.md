@@ -32,6 +32,10 @@
 
 - **main·legacy worker의 `pdf-lib` 단일화** — U4-6 번들 조사에서 main 그래프의 `pdf-lib` 귀속 **118,977B**와 legacy `pdf.worker` **219,622B** 내부의 별도 `pdf-lib` 번들을 확인했다. 목표는 중복 실행 경계를 하나로 합쳐 **순감량 80~120KB**를 확보하는 것이다. 예상 비용은 설계·연결 **3~6인일**, 회귀·계측 **2~4인일**, 합계 **5~10인일**이다. U4-6의 app/PDF route 상한 상향은 이 부채를 해결한 것이 아니라 U4 완료 뒤 구조 변경으로 미룬 결정이다. — Codx
 
+## PDF 마무리 API 후속
+
+- **상위 텍스트 옵션의 조용한 누락 — 기존 P2 API 계약** — `PdfFinishDecorationOptions`가 상위 텍스트 필드를 유지하면서 `textDecorations`는 optional인 계약(`src/features/pdf-editor/finish/engine.ts:151-173`) 때문에, 배열을 생략하고 stamp 또는 image watermark를 함께 넘기면 `engine.ts:785-788`에서 상위 텍스트 장식이 조용히 버려진다. 부모 revision도 같고 제품 UI는 항상 명시적 `textDecorations` 배열을 넘겨 안전하므로 이번 회귀 수리 범위에는 넣지 않았다. 후속 수리는 ① typed/discriminated 계약과 문서로 호출 의미를 명시하거나 ② 모호한 입력을 오류로 거부하는 두 방향을 비교한다. 단순 fallback은 기존 stamp-only 호출에 placeholder 텍스트를 새로 출력할 수 있어 기각한다. — Codx
+
 ## PDF 이미지 평탄화 후속
 
 - **`save()` 할당 실패의 부분 결과 비노출 — 기존 P2** — `PDFDocument.save()`가 두 번째 파일에서 할당 오류를 내면 부모와 U4-7 대상 모두 완료된 첫 파일을 `partialResults`로 공개하지 않는다. U4-7 fix-1에서 수리한 새 `Blob()` 할당 경로와 별개이며, 일반 저장·직렬화 예외를 완료 결과 보존 계약에 연결하는 후속 작업이 필요하다. — Codx

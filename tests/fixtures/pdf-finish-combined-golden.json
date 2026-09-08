@@ -1,10 +1,21 @@
 {
-  "number-header": { "text": ["PAGE-1", "HEADER-A"], "order": ["original", "text"], "fontCount": 1, "xobjectCount": 0 },
-  "number-watermark": { "text": ["PAGE-1"], "order": ["original", "watermark", "text"], "fontCount": 1, "xobjectCount": 1 },
-  "number-stamp": { "text": ["PAGE-1"], "order": ["original", "text", "stamp"], "fontCount": 1, "xobjectCount": 1 },
-  "header-watermark": { "text": ["HEADER-A"], "order": ["original", "watermark", "text"], "fontCount": 1, "xobjectCount": 1 },
-  "header-stamp": { "text": ["HEADER-A"], "order": ["original", "text", "stamp"], "fontCount": 1, "xobjectCount": 1 },
-  "watermark-stamp": { "text": [], "order": ["original", "watermark", "stamp"], "fontCount": 0, "xobjectCount": 2 },
-  "all-foreground": { "text": ["PAGE-1", "HEADER-A"], "order": ["original", "watermark", "text", "stamp"], "fontCount": 1, "xobjectCount": 2 },
-  "all-background": { "text": ["PAGE-1", "HEADER-A"], "order": ["watermark", "original", "text", "stamp"], "fontCount": 1, "xobjectCount": 2 }
+  "axes": {
+    "cleanup": ["remove", "preserve"],
+    "form": ["flatten", "preserve"],
+    "watermark": ["image", "text"],
+    "layer": ["background", "foreground"],
+    "text": ["number-header", "number"],
+    "stamp": ["on", "off"],
+    "raster": ["on", "off"]
+  },
+  "combinations": [
+    { "id": "pair-1", "cleanup": "remove", "form": "flatten", "watermark": "image", "layer": "background", "text": "number-header", "stamp": "on", "raster": "on" },
+    { "id": "pair-2", "cleanup": "remove", "form": "flatten", "watermark": "text", "layer": "background", "text": "number", "stamp": "off", "raster": "off" },
+    { "id": "pair-3", "cleanup": "remove", "form": "preserve", "watermark": "image", "layer": "foreground", "text": "number-header", "stamp": "off", "raster": "off" },
+    { "id": "pair-4", "cleanup": "remove", "form": "preserve", "watermark": "text", "layer": "foreground", "text": "number", "stamp": "on", "raster": "on" },
+    { "id": "pair-5", "cleanup": "preserve", "form": "flatten", "watermark": "image", "layer": "foreground", "text": "number", "stamp": "on", "raster": "off" },
+    { "id": "pair-6", "cleanup": "preserve", "form": "flatten", "watermark": "text", "layer": "foreground", "text": "number-header", "stamp": "off", "raster": "on" },
+    { "id": "pair-7", "cleanup": "preserve", "form": "preserve", "watermark": "image", "layer": "background", "text": "number", "stamp": "off", "raster": "on" },
+    { "id": "pair-8", "cleanup": "preserve", "form": "preserve", "watermark": "text", "layer": "background", "text": "number-header", "stamp": "on", "raster": "off" }
+  ]
 }

@@ -251,6 +251,17 @@ function formatPreflightError(copy: FinishCopy, error: PdfFinishPreflightError) 
     .replace("{{column}}", `${error.column ?? 1}`);
 }
 
+async function disposeFinishOutputs(outputs: readonly PdfFinishOutput[]) {
+  await Promise.allSettled(outputs.map((output) => output.dispose()));
+}
+
+function formatFinishWarning(copy: FinishCopy, warning: PdfFinishWarningCode, embeddedFontOutputCount: number) {
+  if (warning !== "embedded-font") return copy.warnings[warning];
+  return copy.warnings[warning]
+    .replace("{{count}}", `${embeddedFontOutputCount}`)
+    .replace("{{total}}", (embeddedFontOutputCount * 3.8).toFixed(1));
+}
+
 export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const language = useAppLanguage();
   const copy = featureResource<FinishCopy>(language, "pdf.finish");
@@ -299,11 +310,13 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     status: "idle" | "checking" | "ready";
     errors: PdfFinishPreflightError[];
     warnings: PdfFinishWarningCode[];
+    embeddedFontOutputCount: number;
     failure: string;
-  }>({ status: "idle", errors: [], warnings: [], failure: "" });
+  }>({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
   const operation = useOperationProgress();
   const download = useDownloadResults();
   const controllerRef = useRef<AbortController | undefined>(undefined);
+  const executionOwnerRef = useRef(0);
   const fileLifecycleControllerRef = useRef<AbortController | undefined>(undefined);
   const fileRequestRef = useRef(0);
   const previewOwnerRef = useRef<object | undefined>(undefined);
@@ -363,6 +376,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     };
   }, [stampImage]);
   useEffect(() => () => {
+    executionOwnerRef.current += 1;
     controllerRef.current?.abort();
     fileLifecycleControllerRef.current?.abort();
     if (fileRef.current) void releasePdf(fileRef.current);
@@ -396,7 +410,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const updateForm = <K extends keyof FinishFormState>(field: K, value: FinishFormState[K]) => {
     if (Object.is(forms[activeTab][field], value)) return;
     setForms((current) => ({ ...current, [activeTab]: { ...current[activeTab], [field]: value } }));
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     if (field === "template" && typeof value === "string" && value.length < 300) {
       setTemplateLimitNotices((current) => ({ ...current, [activeTab]: false }));
@@ -407,13 +421,13 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const updateWatermark = <K extends keyof typeof watermark>(field: K, value: (typeof watermark)[K]) => {
     if (Object.is(watermark[field], value)) return;
     setWatermark((current) => ({ ...current, [field]: value }));
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     download.clearResults();
   };
 
   const resetStampValidation = () => {
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     download.clearResults();
   };
@@ -447,14 +461,14 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const updatePreflightInput = <T,>(currentValue: T, nextValue: T, setValue: (value: T) => void) => {
     if (Object.is(currentValue, nextValue)) return;
     setValue(nextValue);
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     download.clearResults();
   };
 
   const updateStructure = <K extends keyof PdfStructureOptions>(field: K, value: PdfStructureOptions[K]) => {
     setStructure((current) => ({ ...current, [field]: value }));
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     download.clearResults();
   };
 
@@ -462,7 +476,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     if (next.enabled !== undefined) setRasterEnabled(next.enabled);
     if (next.dpi !== undefined) setRasterDpi(next.dpi);
     if (next.format !== undefined) setRasterFormat(next.format);
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     download.clearResults();
   };
 
@@ -470,13 +484,13 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     if (activeTab === tab) return;
     setActiveTab(tab);
     setError("");
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
   };
 
   const setDecorationEnabled = (value: boolean) => {
     setEnabled((current) => ({ ...current, [activeTab]: value }));
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     download.clearResults();
   };
@@ -506,6 +520,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     }
     const requestId = fileRequestRef.current + 1;
     fileRequestRef.current = requestId;
+    executionOwnerRef.current += 1;
     fileLifecycleControllerRef.current?.abort();
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -521,7 +536,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     setPreviewing(false);
     setInspecting(true);
     setError("");
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     operation.reset();
     download.clearResults();
@@ -558,6 +573,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       return;
     }
     fileRequestRef.current += 1;
+    executionOwnerRef.current += 1;
     fileLifecycleControllerRef.current?.abort();
     fileLifecycleControllerRef.current = undefined;
     controllerRef.current?.abort();
@@ -572,7 +588,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     setPageCount(0);
     setRangeText("");
     setError("");
-    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     operation.reset();
     download.clearResults();
@@ -660,12 +676,12 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
 
   useEffect(() => {
     if (!file || !batchSelection.files.length || combinedFieldError || batchSelection.error || !lowerBound) {
-      setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+      setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
       return;
     }
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
-      setPreflight({ status: "checking", errors: [], warnings: [], failure: "" });
+      setPreflight({ status: "checking", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
       void preflightPdfFiles({
         files: batchSelection.files,
         options: finishOptions,
@@ -676,7 +692,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       }).catch((reason) => {
         if (reason instanceof Error && reason.name === "AbortError") return;
         const code = reason instanceof PdfFinishEngineError ? reason.code : "unreadable-document";
-        if (!controller.signal.aborted) setPreflight({ status: "ready", errors: [], warnings: [], failure: code });
+        if (!controller.signal.aborted) setPreflight({ status: "ready", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: code });
       });
     }, 120);
     return () => {
@@ -705,6 +721,9 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
+    const executionOwner = executionOwnerRef.current + 1;
+    executionOwnerRef.current = executionOwner;
+    const ownsResults = () => executionOwnerRef.current === executionOwner;
     setError("");
     download.clearResults();
     operation.start(copy.creating);
@@ -720,10 +739,15 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         signal: controller.signal,
         onProgress: (progress) => operation.update(Math.max(2, progress.percent), copy.progress[progress.phase], progress.phase),
       });
+      if (!ownsResults()) {
+        await disposeFinishOutputs(outputs);
+        return;
+      }
+      const embeddedFontOutputCount = outputs.filter((output) => output.warnings.includes("embedded-font")).length;
       const items: Array<{ blob: Blob; fileName: string; warnings: string[]; dispose?: () => void | Promise<void> }> = outputs.map((output) => ({
         blob: output.blob,
         fileName: output.fileName,
-        warnings: output.warnings.map((warning) => copy.warnings[warning]),
+        warnings: output.warnings.map((warning) => formatFinishWarning(copy, warning, embeddedFontOutputCount)),
         dispose: output.dispose,
       }));
       if (outputs.length > 1) {
@@ -736,6 +760,10 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         const blob = await writer.getData();
         items.push({ blob, fileName: copy.archiveFileName, warnings: [] });
       }
+      if (!ownsResults()) {
+        await disposeFinishOutputs(outputs);
+        return;
+      }
       download.makeBlobResults(items);
       handedOff = true;
       operation.succeed(copy.complete);
@@ -744,16 +772,19 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         const partial = outputs.length ? outputs : reason && typeof reason === "object" && "partialResults" in reason
           ? (reason as { partialResults: readonly PdfFinishOutput[] }).partialResults
           : [];
+        if (!ownsResults()) {
+          await disposeFinishOutputs(partial);
+          return;
+        }
         if (partial.length) {
+          const embeddedFontOutputCount = partial.filter((output) => output.warnings.includes("embedded-font")).length;
           download.makeBlobResults(partial.map((output) => ({
             blob: output.blob,
             fileName: output.fileName,
-            warnings: output.warnings.map((warning) => copy.warnings[warning]),
+            warnings: output.warnings.map((warning) => formatFinishWarning(copy, warning, embeddedFontOutputCount)),
             dispose: output.dispose,
           })));
           handedOff = true;
-        } else {
-          await Promise.allSettled(partial.map((output) => output.dispose()));
         }
       }
       const canceled = reason instanceof DOMException && reason.name === "AbortError";
@@ -889,7 +920,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                 {(selectionEvaluation.error || batchSelection.error) && <UtilityNotice className="mt-3" tone="error" role="alert">{copy.rangeErrors[selectionEvaluation.error || batchSelection.error]}</UtilityNotice>}
                 <p className="mt-3 text-sm font-bold text-violet-700 dark:text-violet-300" aria-live="polite">{copy.selectedPages.replace("{{count}}", `${selection.exactPages.length}`).replace("{{total}}", `${pageCount}`)}</p>
                 <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3 max-[620px]:grid-cols-2" data-testid="pdf-finish-thumbnails">
-                  {pages.map((item, index) => <PdfThumbnail key={item.id} item={item} file={file} outputIndex={index} totalItems={pages.length} draggable={false} selected={selection.exactPages.includes(index + 1)} selectionDisabled={locked || !lowerBound || isThumbnailDisabled(index + 1, pageCount, lowerBound)} onSelect={() => { if (!lowerBound) return; const next = toggleThumbnailPage(selection, index + 1, lowerBound); setRangeText(next.rangeText); setParity(next.parity); setPreflight({ status: "idle", errors: [], warnings: [], failure: "" }); setRiskAccepted(false); download.clearResults(); }} />)}
+                  {pages.map((item, index) => <PdfThumbnail key={item.id} item={item} file={file} outputIndex={index} totalItems={pages.length} draggable={false} selected={selection.exactPages.includes(index + 1)} selectionDisabled={locked || !lowerBound || isThumbnailDisabled(index + 1, pageCount, lowerBound)} onSelect={() => { if (!lowerBound) return; const next = toggleThumbnailPage(selection, index + 1, lowerBound); setRangeText(next.rangeText); setParity(next.parity); setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" }); setRiskAccepted(false); download.clearResults(); }} />)}
                 </div>
               </SectionCard>
             </div>
@@ -904,7 +935,10 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                 {preflight.status === "ready" && <span className="sr-only" data-testid="pdf-finish-preflight-ready">ready</span>}
                 {preflightErrorText && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={firstPreflightError?.code} data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-raster-owned={firstPreflightError?.field === "raster" || undefined}>{preflightErrorText}</UtilityNotice>}
                 {preflightFailure && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={preflight.failure} data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-structure-owned={["structure-unsupported", "form-unsupported"].includes(preflight.failure) || undefined}>{preflightFailure}</UtilityNotice>}
-                {!!preflight.warnings.length && <div className="mt-3 space-y-2" data-testid="pdf-finish-preflight-warnings" data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-raster-owned={rasterEnabled || undefined}>{preflight.warnings.map((warning) => <UtilityNotice key={warning} tone="warning" data-warning-code={warning}>{copy.warnings[warning]}</UtilityNotice>)}</div>}
+                {!!preflight.warnings.length && <div className="mt-3 space-y-2" data-testid="pdf-finish-preflight-warnings" data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-raster-owned={rasterEnabled || undefined}>{preflight.warnings.map((warning) => {
+                  const message = formatFinishWarning(copy, warning, preflight.embeddedFontOutputCount);
+                  return <UtilityNotice key={warning} tone="warning" data-warning-code={warning}>{message}</UtilityNotice>;
+                })}</div>}
                 {!!riskWarnings.length && <div className="mt-3 overflow-hidden rounded-2xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20" data-testid="pdf-watermark-risk-confirmation" data-pdf-watermark-owned><p className="px-4 pt-4 text-sm font-bold text-foreground">{copy.watermark.riskTitle}</p><ToggleRow label={copy.watermark.riskConsent} description={copy.watermark.riskConsentDescription} checked={riskAccepted} onChange={(checked) => { setRiskAccepted(checked); download.clearResults(); }} disabled={locked} /></div>}
                 {(selectionEvaluation.error || batchSelection.error) && <UtilityNotice className="mt-3" tone="error" role="alert">{copy.rangeErrors[selectionEvaluation.error || batchSelection.error]}</UtilityNotice>}
                 <div className="mt-4">
