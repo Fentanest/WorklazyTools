@@ -1005,6 +1005,20 @@
         "taggedStructureResult": "Accessibility tags and their parent-tree references are removed; visual page content is preserved.",
         "unsupportedResult": "Unsupported annotation types and other name trees are removed after this disclosure. XFA, signatures, and missing or broken field appearances block form flattening."
       },
+      "raster": {
+        "title": "Flatten pages as images",
+        "description": "Only selected pages are converted to images; other pages stay unchanged. If one page is too large, only that page steps down from 300 to 200 to 150 DPI.",
+        "enabled": "Flatten selected pages as images",
+        "enabledDescription": "Runs last, after every selected finishing option has been applied.",
+        "dpi": "Image resolution",
+        "format": "Image format",
+        "formats": {
+          "png": "PNG (lossless)",
+          "jpeg": "JPEG (quality 85)"
+        },
+        "lossNotice": "Rasterized pages lose text search and selection, accessibility tags, forms, and hyperlinks. Links are not reattached.",
+        "mobileLimitNotice": "The mobile default is 150 DPI because no physical-device limit has been calibrated yet. Emulation results are not treated as a physical-device limit."
+      },
       "numberingTitle": "Numbering start",
       "startNumber": "Starting number",
       "startPage": "Starting page",
@@ -1039,6 +1053,7 @@
         "empty-placement": "No watermark would appear on page {{page}} with these tile offsets. Move the watermark onto the page.",
         "tile-limit": "Page {{page}} would contain too many repeated watermarks. Increase the size or tile gap.",
         "background-placement": "A background watermark could not be added safely to page {{page}}. Try the foreground option or another PDF copy."
+        ,"raster-unsupported": "Page {{page}} exceeds the single-image limit even at 150 DPI. Remove it from the range or split the PDF around smaller pages."
       },
       "create": "Create finished PDF",
       "creating": "Finishing the PDF…",
@@ -1051,6 +1066,7 @@
         "font": "Preparing the document font…",
         "decorating": "Adding content to selected pages…",
         "saving": "Saving the finished PDF…"
+        ,"rasterizing": "Converting selected pages to images…"
       },
       "complete": "Page numbers and document details were added.",
       "ready": "Your finished PDF is ready.",
@@ -1096,6 +1112,10 @@
         "risk-confirmation-required": "Review the document structure warning and consent before continuing.",
         "structure-unsupported": "This PDF has a layer, font, or document structure that cannot be rebuilt safely. Change the cleanup options or use another PDF copy.",
         "form-unsupported": "This form cannot be flattened safely because it uses XFA, a signature field, or form visuals that cannot be positioned safely.",
+        "raster-unsupported": "The selected page exceeds the supported range even at 150 DPI. Reduce the page range or split the PDF and try again.",
+        "raster-failed": "The pages could not be converted to images. The source file was not changed.",
+        "result-memory-limit": "This result was not retained because it exceeds the browser memory limit. Reduce the page range or split the file.",
+        "result-storage": "The remaining files were not processed because browser storage is unavailable. Download any completed results first.",
         "output-validation": "A problem was found while checking the finished PDF. The source file was not changed."
       },
       "warnings": {
@@ -1103,6 +1123,8 @@
         "horizontal-overflow": "Some long lines were shortened with an ellipsis.",
         "vertical-overflow": "Some lines outside the available region were omitted.",
         "embedded-font": "Embedding the full font for Korean and extended characters may add about 3.8 MB to the output file.",
+        "raster-dpi-lowered": "Some pages used a lower resolution to stay within the single-image limit.",
+        "raster-output-large": "The image-based result may be much larger than the source PDF. Reduce the page range or resolution if needed.",
         "risky-graphics-state": "Some pages have unbalanced saved and restored graphics state. Their appearance may change after watermarking.",
         "risky-optional-content": "This document contains optional layers. Layer behavior may change after watermarking.",
         "risky-tagged-document": "This document contains accessibility tags. The tag structure may change after watermarking."

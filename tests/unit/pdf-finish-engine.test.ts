@@ -13,7 +13,9 @@ import {
   preflightPdfFiles,
   PdfFinishCanceledError,
   PdfFinishEngineError,
+  PdfFinishPartialError,
 } from "../../src/features/pdf-editor/finish/engine.ts";
+import { PdfFinishStorageError, type PdfFinishResultStore } from "../../src/features/pdf-editor/finish/resultStorage.ts";
 import { createPageSelection } from "../../src/features/pdf-editor/finish/selection.ts";
 import { createWatermarkPlacements, inspectWatermarkRisksCooperatively, measureTextWatermarkBox, validateWatermarkResult } from "../../src/features/pdf-editor/finish/watermark.ts";
 import { finishOutputName } from "../../src/features/pdf-editor/outputName.ts";
@@ -101,7 +103,8 @@ test("finish engine decorates the exact page set with one batch clock and rotate
   assert.equal(clockCalls, 1);
   assert.equal(output.fileName, "quarterly-finished.pdf");
   assert.deepEqual(output.warnings, []);
-  const decorated = await PDFDocument.load(output.buffer, { updateMetadata: false });
+  const outputBytes = await output.blob.arrayBuffer();
+  const decorated = await PDFDocument.load(outputBytes, { updateMetadata: false });
   const extGState = decorated.getPage(1).node.Resources()?.lookup(PDFName.of("ExtGState"), PDFDict);
   assert.ok(extGState);
   const nonStrokingOpacities = extGState.keys().map((key) => (
@@ -109,7 +112,7 @@ test("finish engine decorates the exact page set with one batch clock and rotate
   ));
   assert.ok(nonStrokingOpacities.some((opacity) => Math.abs(opacity - 0.9) < Number.EPSILON));
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const task = pdfjs.getDocument({ data: new Uint8Array(output.buffer) });
+  const task = pdfjs.getDocument({ data: new Uint8Array(outputBytes) });
   try {
     const document = await task.promise;
     assert.equal(document.numPages, 3);
@@ -244,6 +247,76 @@ test("finish cancellation preserves registered outputs and blocks the next file 
   assert.equal(secondReads, 0);
 });
 
+test("finish storage failure preserves completed outputs, discards the current result, and never starts the next file", async () => {
+  const first = await fixture("first.pdf");
+  const second = await fixture("second.pdf");
+  const thirdBytes = Buffer.from(await (await fixture("third.pdf")).arrayBuffer());
+  let thirdReads = 0;
+  const third = new File([thirdBytes], "third.pdf", { type: "application/pdf" });
+  third.arrayBuffer = async () => {
+    thirdReads += 1;
+    return thirdBytes.buffer.slice(thirdBytes.byteOffset, thirdBytes.byteOffset + thirdBytes.byteLength) as ArrayBuffer;
+  };
+  let registrations = 0;
+  const resultStore: PdfFinishResultStore = {
+    mode: "opfs",
+    async store(bytes) {
+      registrations += 1;
+      if (registrations === 2) throw new PdfFinishStorageError("opfs-write");
+      return { blob: new Blob([bytes], { type: "application/pdf" }), mode: "opfs", dispose: async () => undefined };
+    },
+    dispose: async () => undefined,
+  };
+  await assert.rejects(
+    finishPdfFiles({
+      files: [first, second, third].map((file, index) => ({ key: `${index}`, file, selection: selection(3, "1") })),
+      options: { template: "{page}", region: "bottom-center", fontSize: 10, color: "#34343a", margin: 24, startNumber: 1, startPage: 1, excludeCover: false },
+      locale: "en-US",
+      resultStore,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof PdfFinishPartialError);
+      assert.equal(error.code, "result-storage");
+      assert.equal(error.partialResults.length, 1);
+      assert.equal(error.partialResults[0].key, "0");
+      return true;
+    },
+  );
+  assert.equal(registrations, 2);
+  assert.equal(thirdReads, 0);
+});
+
+test("finish file failure exposes completed outputs and never starts the next file", async () => {
+  const first = await fixture("first.pdf");
+  const broken = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], "broken.pdf", { type: "application/pdf" });
+  const thirdBytes = Buffer.from(await (await fixture("third.pdf")).arrayBuffer());
+  let thirdReads = 0;
+  const third = new File([thirdBytes], "third.pdf", { type: "application/pdf" });
+  third.arrayBuffer = async () => {
+    thirdReads += 1;
+    return thirdBytes.buffer.slice(thirdBytes.byteOffset, thirdBytes.byteOffset + thirdBytes.byteLength) as ArrayBuffer;
+  };
+  await assert.rejects(
+    finishPdfFiles({
+      files: [
+        { key: "first", file: first, selection: selection(3, "1") },
+        { key: "broken", file: broken, selection: selection(1, "1") },
+        { key: "third", file: third, selection: selection(3, "1") },
+      ],
+      options: { template: "{page}", region: "bottom-center", fontSize: 10, color: "#34343a", margin: 24, startNumber: 1, startPage: 1, excludeCover: false },
+      locale: "en-US",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof PdfFinishPartialError);
+      assert.equal(error.code, "unreadable-document");
+      assert.equal(error.partialResults.length, 1);
+      assert.equal(error.partialResults[0].key, "first");
+      return true;
+    },
+  );
+  assert.equal(thirdReads, 0);
+});
+
 test("finish output names are localized, sanitized, deduplicated, and have one extension", () => {
   const cases = [
     { source: "  report.pdf  ", base: "report" },
@@ -272,7 +345,8 @@ test("watermark text uses an independent isolated stream in the requested layer"
         options: watermarkOptions({ watermark: { ...watermarkOptions().watermark, layer } }),
         locale: "en-US",
       });
-      const result = await PDFDocument.load(output.buffer, { updateMetadata: false });
+      const outputBytes = await output.blob.arrayBuffer();
+      const result = await PDFDocument.load(outputBytes, { updateMetadata: false });
       const streams = decodedPageStreams(result);
       const watermarkIndex = layer === "background" ? 0 : streams.length - 1;
       assert.match(streams[watermarkIndex], /^q\n\/Artifact BMC/u, `${fixtureName}/${layer} did not isolate the watermark stream`);
@@ -284,7 +358,7 @@ test("watermark text uses an independent isolated stream in the requested layer"
         const formFonts = watermarkForms[0].dict.lookup(PDFName.of("Resources"), PDFDict).lookup(PDFName.of("Font"), PDFDict);
         assert.equal(formFonts.keys().length, 1, "the vector text watermark form must expose one shared font resource");
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        const task = pdfjs.getDocument({ data: new Uint8Array(output.buffer) });
+        const task = pdfjs.getDocument({ data: new Uint8Array(outputBytes) });
         try {
           const content = await (await (await task.promise).getPage(1)).getTextContent();
           assert.match(content.items.map((item: any) => item.str ?? "").join(" "), /CON/u);
@@ -327,16 +401,18 @@ test("watermark image tiles preserve one embedded image resource and repeated re
     options: watermarkOptions({ watermark: { ...baseOptions.watermark, pattern: "tile" as const } }),
     locale: "en-US",
   });
-  const result = await PDFDocument.load(tileOutput.buffer, { updateMetadata: false });
+  const singleOutputBytes = await singleOutput.blob.arrayBuffer();
+  const tileOutputBytes = await tileOutput.blob.arrayBuffer();
+  const result = await PDFDocument.load(tileOutputBytes, { updateMetadata: false });
   const imageObjects = result.context.enumerateIndirectObjects().filter(([, object]) => object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Image"));
   assert.equal(imageObjects.length, 1, "tile placement must embed the source image only once per document");
   const watermarkStream = decodedPageStreams(result).at(-1) ?? "";
   assert.ok((watermarkStream.match(/\/Watermark[^ ]* Do/gu) ?? []).length > 1, "tile placement must reference the shared image repeatedly");
   assert.ok(
-    tileOutput.buffer.byteLength - singleOutput.buffer.byteLength < image.size * 2 + 4_096,
+    tileOutputBytes.byteLength - singleOutputBytes.byteLength < image.size * 2 + 4_096,
     "tile output growth must be limited to placement operators rather than duplicated image payloads",
   );
-  context.diagnostic(`image watermark output bytes: single=${singleOutput.buffer.byteLength}; tile=${tileOutput.buffer.byteLength}; delta=${tileOutput.buffer.byteLength - singleOutput.buffer.byteLength}; source=${image.size}`);
+  context.diagnostic(`image watermark output bytes: single=${singleOutputBytes.byteLength}; tile=${tileOutputBytes.byteLength}; delta=${tileOutputBytes.byteLength - singleOutputBytes.byteLength}; source=${image.size}`);
 });
 
 test("watermark warns about risky structures and proceeds only with explicit consent", async () => {
@@ -487,7 +563,7 @@ test("watermark text forms reserve descenders and use the six-region width contr
     locale: "en-US",
   });
   assert.ok(output.warnings.includes("horizontal-overflow"));
-  const document = await PDFDocument.load(output.buffer, { updateMetadata: false });
+  const document = await PDFDocument.load(await output.blob.arrayBuffer(), { updateMetadata: false });
   const form = document.context.enumerateIndirectObjects().map(([, object]) => object).find((object): object is PDFRawStream => object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Form"));
   assert.ok(form);
   const box = form.dict.lookup(PDFName.of("BBox"), PDFArray).asArray().map((entry) => (entry as PDFNumber).asNumber());

@@ -23,29 +23,25 @@ export async function cancelPdfRender(
     throw new Error("An owned PDF document requires its loading task.");
   }
 
-  renderTask.cancel();
-  let pendingError: unknown;
+  try {
+    renderTask.cancel();
+  } catch {
+    // Cancellation cleanup is best-effort. A renderer that has already settled
+    // can throw here, but it must not replace the user's cancellation result.
+  }
   try {
     await renderTask.promise;
-  } catch (error) {
-    if (!isRenderingCancelledException(error)) pendingError = error;
-  }
+  } catch { /* RenderingCancelledException and late renderer failures are swallowed during cancellation. */ }
 
   try {
     page.cleanup();
-  } catch (error) {
-    pendingError ??= error;
-  }
+  } catch { /* Page resources are already being abandoned. */ }
 
   if (ownership.ownsDocument) {
     try {
       await ownership.loadingTask?.destroy();
-    } catch (error) {
-      pendingError ??= error;
-    }
+    } catch { /* Document destruction is the terminal best-effort cleanup step. */ }
   }
-
-  if (pendingError !== undefined) throw pendingError;
 }
 
 export async function waitForPdfRender(

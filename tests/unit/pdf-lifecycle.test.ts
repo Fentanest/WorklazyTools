@@ -323,6 +323,19 @@ test("PDF render cancellation never destroys a shared preview document without o
   assert.deepEqual(log, ["cancel", "settled", "cleanup"]);
 });
 
+test("PDF render cancellation preserves cleanup order while swallowing every cancellation cleanup exception", async () => {
+  const log: string[] = [];
+  await assert.doesNotReject(cancelPdfRender(
+    {
+      cancel: () => { log.push("cancel"); throw new Error("already settled"); },
+      promise: Promise.reject(Object.assign(new Error("cancelled"), { name: "RenderingCancelledException" })).finally(() => { log.push("settled"); }),
+    },
+    { cleanup: () => { log.push("cleanup"); throw new Error("cleanup failed"); } },
+    { ownsDocument: true, loadingTask: { destroy: async () => { log.push("destroy"); throw new Error("destroy failed"); } } },
+  ));
+  assert.deepEqual(log, ["cancel", "settled", "cleanup", "destroy"]);
+});
+
 test("AbortSignal drives PDF render cancellation through settle and cleanup", async () => {
   const log: string[] = [];
   const renderTask = cancelingRenderTask(log);

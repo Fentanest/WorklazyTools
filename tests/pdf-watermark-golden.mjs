@@ -70,10 +70,11 @@ for (const layer of ["background", "foreground"]) {
       options: options(layer, pattern),
       locale: "en-US",
     });
+    const outputBytes = await output.blob.arrayBuffer();
     const pdfPath = path.join(artifactDirectory, `${id}.pdf`);
-    await fs.writeFile(pdfPath, Buffer.from(output.buffer));
+    await fs.writeFile(pdfPath, Buffer.from(outputBytes));
     metrics[id] = {
-      pdfjs: await renderPdfJs(output.buffer, id),
+      pdfjs: await renderPdfJs(outputBytes, id),
       poppler: await renderPoppler(pdfPath, id),
     };
   }
@@ -117,7 +118,7 @@ async function verifyContentStreamFixtures() {
         const file = new File([bytes], name, { type: "application/pdf" });
         const outputs = await finishPdfFiles({ files: [{ key: name, file, selection: selection(1) }], options: options(layer, pattern), locale: "en-US" });
         assert.equal(outputs.length, 1, `${name}/${layer}/${pattern} produced no result`);
-        const reopened = await PDFDocument.load(outputs[0].buffer, { updateMetadata: false });
+        const reopened = await PDFDocument.load(await outputs[0].blob.arrayBuffer(), { updateMetadata: false });
         assert.equal(reopened.getPageCount(), 1, `${name}/${layer}/${pattern} did not reopen`);
       }
     }
@@ -144,10 +145,11 @@ async function verifyContentStreamPixelMatrix() {
         for (const layer of ["background", "foreground"]) {
           const id = `contents-${fixtureName.replace(/\.pdf$/u, "")}-${rotation}-${pattern}-${layer}`;
           const [output] = await finishPdfFiles({ files: [{ key: id, file, selection: selection(1) }], options: options(layer, pattern), locale: "en-US" });
+          const outputBytes = await output.blob.arrayBuffer();
           const pdfPath = path.join(artifactDirectory, `${id}.pdf`);
-          await fs.writeFile(pdfPath, Buffer.from(output.buffer));
+          await fs.writeFile(pdfPath, Buffer.from(outputBytes));
           pair[layer] = {
-            pdfjs: (await renderPdfJs(output.buffer, id))[0],
+            pdfjs: (await renderPdfJs(outputBytes, id))[0],
             poppler: (await renderPoppler(pdfPath, id, 1))[0],
           };
         }
@@ -197,10 +199,11 @@ async function verifyTextDescenderMatrix() {
         locale: "en-US",
         loadFontAsset: async () => fontAsset(),
       });
+      const outputBytes = await output.blob.arrayBuffer();
       const pdfPath = path.join(artifactDirectory, `${id}.pdf`);
-      await fs.writeFile(pdfPath, Buffer.from(output.buffer));
+      await fs.writeFile(pdfPath, Buffer.from(outputBytes));
       stable[id] = {
-        pdfjs: (await renderPdfJs(output.buffer, id)).map(({ width, height, red }) => ({ width, height, red })),
+        pdfjs: (await renderPdfJs(outputBytes, id)).map(({ width, height, red }) => ({ width, height, red })),
         poppler: (await renderPoppler(pdfPath, id)).map(({ width, height, red }) => ({ width, height, red })),
       };
       for (const renderer of ["pdfjs", "poppler"]) {

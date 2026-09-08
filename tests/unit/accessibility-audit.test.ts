@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets } from "../accessibility-audit.mjs";
+import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets, f4bOwnedSelector, f4bRasterOwnershipTargets } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
@@ -11,6 +11,8 @@ function report() {
       stampOwnership: { owner: "f3-stamp", selector: f3OwnedSelector, targets: f3StampOwnershipTargets.map(({ id: targetId }) => ({ id: targetId, matches: 1 })) },
     } : {}), ...(scenario === "pdf-structure-editing" ? {
       structureOwnership: { owner: "f4a-structure", selector: f4aOwnedSelector, targets: f4aStructureOwnershipTargets.map(({ id: targetId, expected }) => ({ id: targetId, matches: expected })) },
+    } : {}), ...(scenario === "pdf-raster-editing" ? {
+      rasterOwnership: { owner: "f4b-raster", selector: f4bOwnedSelector, targets: f4bRasterOwnershipTargets.map(({ id: targetId, expected }) => ({ id: targetId, matches: expected })) },
     } : {}), ...(scenario === "pdf-watermark-empty-text" ? {
       settledContrast: [{ target: "invalid-textarea", ratio: 4.5 }, { target: "empty-text-notice", ratio: 4.5 }],
     } : {}), ...(scenario === "pdf-watermark-display-load-failure" ? {
@@ -43,6 +45,10 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.equal(structureEditingStates.length, 4);
   assert.deepEqual([...new Set(structureEditingStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
   assert.deepEqual([...new Set(structureEditingStates.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
+  const rasterEditingStates = pages.filter(({ scenario }) => scenario === "pdf-raster-editing");
+  assert.equal(rasterEditingStates.length, 4);
+  assert.deepEqual([...new Set(rasterEditingStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
+  assert.deepEqual([...new Set(rasterEditingStates.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
   const errorStates = pages.filter(({ scenario }) => scenario === "pdf-watermark-empty-text");
   assert.equal(errorStates.length, 4);
   assert.deepEqual([...new Set(errorStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
@@ -126,6 +132,24 @@ test("a11y F4a gate fails closed for missing ownership, omitted states, and inco
   assert.throws(() => assertAccessibilityResults(unresolved), /F4a accessibility incomplete nodes/);
 });
 
+test("a11y F4b gate fails closed for missing ownership, omitted states, and incomplete nodes", () => {
+  const missingMarker = report();
+  missingMarker.results.find(({ id }) => id === "pdf-raster-editing-ko-light").rasterOwnership.targets
+    .find(({ id }) => id === "format").matches = 0;
+  assert.throws(() => assertAccessibilityResults(missingMarker), /ownership marker is missing or ambiguous/);
+
+  const omitted = report();
+  omitted.results = omitted.results.filter(({ id }) => id !== "pdf-raster-editing-en-dark");
+  assert.throws(() => assertAccessibilityResults(omitted), /registration mismatch/);
+
+  const unresolved = report();
+  unresolved.results.find(({ id }) => id === "pdf-raster-editing-en-light").incomplete.push({
+    id: "color-contrast",
+    nodes: [{ target: ["[data-testid='pdf-finish-raster-loss']"], reasons: ["Needs manual review"], owner: "f4b-raster" }],
+  });
+  assert.throws(() => assertAccessibilityResults(unresolved), /F4b accessibility incomplete nodes/);
+});
+
 test("a11y gradient incomplete is separately retained only after reload pixel contrast passes", () => {
   const measured = report();
   measured.results.find(({ id }) => id === "pdf-watermark-display-error-ko-dark").resolvedIncomplete = [{
@@ -143,6 +167,7 @@ test("a11y incomplete selector resolution never defaults missing or invalid targ
   assert.equal(accessibilityOwnerFromResolution("f2-watermark", "owned"), "f2-watermark");
   assert.equal(accessibilityOwnerFromResolution("f3-stamp", "owned"), "f3-stamp");
   assert.equal(accessibilityOwnerFromResolution("f4a-structure", "owned"), "f4a-structure");
+  assert.equal(accessibilityOwnerFromResolution("f4b-raster", "owned"), "f4b-raster");
   assert.equal(accessibilityOwnerFromResolution("shared-existing", "shared"), "shared-existing");
   assert.throws(() => accessibilityOwnerFromResolution("missing", "missing-selector"), /missing-selector/);
   assert.throws(() => accessibilityOwnerFromResolution("invalid", "invalid-selector"), /invalid-selector/);

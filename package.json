@@ -13,6 +13,7 @@
     "measure:qr": "node tests/qr-stage-metrics.mjs",
     "bundle:measure": "node scripts/measure-bundle-budget.mjs",
     "fixtures:pdf-finish": "node scripts/generate-pdf-finish-fixtures.mjs",
+    "fixtures:pdf-raster-benchmark": "node scripts/generate-pdf-raster-benchmark-fixtures.mjs",
     "fixtures:pdf-watermark-performance": "node scripts/generate-pdf-watermark-performance-fixtures.mjs",
     "fixtures:pdf-legacy-oracle": "node tests/compare-pdf-legacy-oracle.mjs",
     "css:orphans": "node scripts/audit-css-orphans.mjs",
@@ -46,6 +47,7 @@
     "test:rendering": "node tests/rendering-baseline.mjs",
     "test:pdf-finish-oracle": "node --experimental-strip-types tests/pdf-finish-oracle.mjs",
     "test:pdf-finish": "node tests/pdf-finish-smoke.mjs && node --experimental-strip-types tests/pdf-watermark-golden.mjs && node --experimental-strip-types tests/pdf-stamp-golden.mjs && node --experimental-strip-types tests/pdf-structure-golden.mjs",
+    "test:pdf-raster-benchmark": "node tests/pdf-raster-benchmark.mjs",
     "test:pdf-watermark-performance": "node tests/pdf-watermark-performance.mjs",
     "test:static": "node scripts/validate-static-output.mjs"
   },

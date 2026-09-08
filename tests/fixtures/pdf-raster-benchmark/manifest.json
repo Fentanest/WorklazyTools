@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-09T00:00:00.000Z",
+  "page": {
+    "widthPoints": 595.28,
+    "heightPoints": 841.89,
+    "background": "#FFFFFF"
+  },
+  "photo": {
+    "width": 1024,
+    "height": 1448,
+    "seed": "0x574c5437",
+    "sourceSha256": "dd961c40538048da8e030a44abc1004e800c843e2de33b96c8111180d1b32b6c"
+  },
+  "transparency": {
+    "width": 640,
+    "height": 640,
+    "sourceSha256": "2c12f8076e62ee141998f654acd41e2b0c515cfb0df130784fd1000e08dfcddc"
+  },
+  "readability": {
+    "text": "xxxxxxxxxx",
+    "font": "Helvetica",
+    "fontSizePoints": 8,
+    "baseline": {
+      "x": 72,
+      "y": 720
+    },
+    "inkThreshold": 127,
+    "roiPointsFromTop": {
+      "x": 68,
+      "y": 112,
+      "width": 58,
+      "height": 18
+    },
+    "minimumInkHeightFormula": "floor(DPI * 0.057)"
+  },
+  "files": [
+    {
+      "type": "blank",
+      "pageCount": 1,
+      "file": "blank-1.pdf",
+      "bytes": 990,
+      "sha256": "42784ec04c3fadc6b6bd9c4ceb1064121c10778d05ece5ad6144452311b55528"
+    },
+    {
+      "type": "blank",
+      "pageCount": 4,
+      "file": "blank-4.pdf",
+      "bytes": 1360,
+      "sha256": "059d463b89e4e9cf70070d3409ec095721fbb851c9d30f38760b2cc8484eabaf"
+    },
+    {
+      "type": "blank",
+      "pageCount": 16,
+      "file": "blank-16.pdf",
+      "bytes": 2863,
+      "sha256": "f433f761de3e289a93b710df7131a5c671ea73ba00fc64ef2d46d305893065d9"
+    },
+    {
+      "type": "text-vector",
+      "pageCount": 1,
+      "file": "text-vector-1.pdf",
+      "bytes": 2737,
+      "sha256": "48f47ce3daad5b88ac47ee61a8c225cd47059f1f3d499e29244fb018f965cb10"
+    },
+    {
+      "type": "text-vector",
+      "pageCount": 4,
+      "file": "text-vector-4.pdf",
+      "bytes": 7935,
+      "sha256": "d9015e9aa93b210c04bfae41282cc165737d28f88a02007b809f318afdee8157"
+    },
+    {
+      "type": "text-vector",
+      "pageCount": 16,
+      "file": "text-vector-16.pdf",
+      "bytes": 28697,
+      "sha256": "0807c75ab7d64f104f232e6d8044dc07723f35392054b54104e7c8605abeeadf"
+    },
+    {
+      "type": "photo-scan",
+      "pageCount": 1,
+      "file": "photo-scan-1.pdf",
+      "bytes": 3602236,
+      "sha256": "9c3acc51f82d4b625bdeb6fabf0e97ec845e32d033466e44262cb9fe536c8772"
+    },
+    {
+      "type": "photo-scan",
+      "pageCount": 4,
+      "file": "photo-scan-4.pdf",
+      "bytes": 3603366,
+      "sha256": "4bd73cc3d8fce121662a3574996db46a59891a82c14e669a139621de86abc15b"
+    },
+    {
+      "type": "photo-scan",
+      "pageCount": 16,
+      "file": "photo-scan-16.pdf",
+      "bytes": 3607903,
+      "sha256": "a7e788af085af0c10ac86dff38239110d98f29529a5a6f857feaef5f50ec9804"
+    },
+    {
+      "type": "transparency",
+      "pageCount": 1,
+      "file": "transparency-1.pdf",
+      "bytes": 541306,
+      "sha256": "6213448e80eaf7b5211aa0424c65f21e7646d013459f2aa6631b5dff3315c900"
+    },
+    {
+      "type": "transparency",
+      "pageCount": 4,
+      "file": "transparency-4.pdf",
+      "bytes": 543239,
+      "sha256": "afbb7825a5df2e8a18039d3f2eb72fa9270b77af21dc6904dc3e153844263558"
+    },
+    {
+      "type": "transparency",
+      "pageCount": 16,
+      "file": "transparency-16.pdf",
+      "bytes": 550981,
+      "sha256": "321e13369d937bfa785567f12c12e851fe99aeffe20335ccf77880d9136ee5e2"
+    }
+  ]
+}

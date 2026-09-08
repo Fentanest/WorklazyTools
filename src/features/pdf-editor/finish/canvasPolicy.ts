@@ -67,6 +67,19 @@ export interface BatchResourceMetrics {
 
 export type RasterOutputFormat = "png" | "jpeg";
 
+/**
+ * Locked U4-7 benchmark maxima for photo-scan final PDF bytes per selected
+ * pixel (1/4/16 pages, desktop/Pixel 7 emulation, three recorded runs).
+ */
+export const RASTER_OUTPUT_BYTES_PER_PIXEL: Readonly<Record<`${150 | 200 | 300}-${RasterOutputFormat}`, number>> = Object.freeze({
+  "150-png": 2.2751643072999026,
+  "150-jpeg": 0.3164912799752287,
+  "200-png": 2.2396780732368913,
+  "200-jpeg": 0.3908593726170973,
+  "300-png": 2.1839512794386713,
+  "300-jpeg": 0.34944035329852374,
+});
+
 const DEFAULT_LIMITS = { maxSide: DEFAULT_CANVAS_MAX_SIDE, maxArea: DEFAULT_CANVAS_MAX_AREA };
 
 export function measureCanvas(
@@ -187,6 +200,23 @@ export function estimatePreflightOutputWarning(input: {
     inputBytes: input.inputBytes,
     absoluteLimitBytes: input.absoluteLimitBytes,
   });
+}
+
+export function estimateRasterOutputWarning(input: {
+  pages: readonly { pixels: number; dpi: 150 | 200 | 300 }[];
+  format: RasterOutputFormat;
+  inputBytes: number;
+  absoluteLimitBytes?: number;
+}) {
+  if (input.pages.some(({ pixels }) => !Number.isSafeInteger(pixels) || pixels < 0)) {
+    throw new RangeError("invalid-selected-page-pixels");
+  }
+  const estimatedBytes = input.pages.reduce(
+    (sum, page) => sum + page.pixels * RASTER_OUTPUT_BYTES_PER_PIXEL[`${page.dpi}-${input.format}`],
+    0,
+  );
+  const thresholdBytes = Math.min(input.inputBytes * 10, input.absoluteLimitBytes ?? OUTPUT_WARNING_LIMIT_BYTES);
+  return { estimatedBytes, thresholdBytes, warn: estimatedBytes > thresholdBytes };
 }
 
 export function checkMemoryResultRegistration(

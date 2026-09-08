@@ -29,6 +29,8 @@ import type { FinishRegion } from "./finish/geometry.ts";
 import { createWatermarkPlacements, type PdfWatermarkSettings, type WatermarkContentKind, type WatermarkLayer, type WatermarkPattern, type WatermarkRegion } from "./finish/watermark.ts";
 import { commitStamp, createStampHistory, redoStamp, undoStamp, type NormalizedStamp } from "./finish/stamp.ts";
 import type { PdfFormMode, PdfStructureOptions } from "./finish/structure.ts";
+import { DEFAULT_RASTER_DPI, DEFAULT_RASTER_FORMAT, RASTER_DPI_VALUES, type RasterDpi } from "./finish/raster.ts";
+import type { RasterOutputFormat } from "./finish/canvasPolicy.ts";
 import { createLocalId, type PdfFinishPreset, type PdfFinishTab, type PdfPageItem } from "./types";
 
 type ImplementedFinishTab = PdfFinishTab;
@@ -149,6 +151,17 @@ interface FinishCopy {
     taggedStructureResult: string;
     unsupportedResult: string;
   };
+  raster: {
+    title: string;
+    description: string;
+    enabled: string;
+    enabledDescription: string;
+    dpi: string;
+    format: string;
+    formats: Record<RasterOutputFormat, string>;
+    lossNotice: string;
+    mobileLimitNotice: string;
+  };
   numberingTitle: string;
   startNumber: string;
   startPage: string;
@@ -250,6 +263,9 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const [stampHistory, setStampHistory] = useState(() => createStampHistory(initialStamp()));
   const [riskAccepted, setRiskAccepted] = useState(false);
   const [structure, setStructure] = useState<PdfStructureOptions>({ removeMetadata: false, removeAnnotations: false, removeAttachments: false, formMode: "preserve" });
+  const [rasterEnabled, setRasterEnabled] = useState(false);
+  const [rasterDpi, setRasterDpi] = useState<RasterDpi>(DEFAULT_RASTER_DPI);
+  const [rasterFormat, setRasterFormat] = useState<RasterOutputFormat>(DEFAULT_RASTER_FORMAT);
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState("");
   const [pageCount, setPageCount] = useState(0);
@@ -410,6 +426,14 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     download.clearResult();
   };
 
+  const updateRaster = (next: { enabled?: boolean; dpi?: RasterDpi; format?: RasterOutputFormat }) => {
+    if (next.enabled !== undefined) setRasterEnabled(next.enabled);
+    if (next.dpi !== undefined) setRasterDpi(next.dpi);
+    if (next.format !== undefined) setRasterFormat(next.format);
+    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    download.clearResult();
+  };
+
   const selectTab = (tab: ImplementedFinishTab) => {
     if (activeTab === tab) return;
     setActiveTab(tab);
@@ -558,6 +582,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
           watermark: watermarkSettings,
           stamp: stampSettings,
           structure,
+          raster: { enabled: rasterEnabled, dpi: rasterDpi, format: rasterFormat },
         },
         locale: language === "ko" ? "ko-KR" : "en-US",
         signal: controller.signal,
@@ -573,7 +598,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [activeTab, baseFieldError, excludeCover, file, fileKey, fontSize, form.color, form.fontSize, form.margin, form.region, form.template, language, lowerBound, margin, selection, selectionEvaluation.error, stampHistory.present, stampImage, stampImageStatus, startNumber, startPage, startingNumber, startingPage, structure, watermark.content, watermark.gap, watermark.image, watermark.layer, watermark.offsetX, watermark.offsetY, watermark.opacity, watermark.pattern, watermark.rotation, watermark.sizePercent, watermarkGap, watermarkOffsetX, watermarkOffsetY, watermarkOpacity, watermarkRotation, watermarkSize]);
+  }, [activeTab, baseFieldError, excludeCover, file, fileKey, fontSize, form.color, form.fontSize, form.margin, form.region, form.template, language, lowerBound, margin, rasterDpi, rasterEnabled, rasterFormat, selection, selectionEvaluation.error, stampHistory.present, stampImage, stampImageStatus, startNumber, startPage, startingNumber, startingPage, structure, watermark.content, watermark.gap, watermark.image, watermark.layer, watermark.offsetX, watermark.offsetY, watermark.opacity, watermark.pattern, watermark.rotation, watermark.sizePercent, watermarkGap, watermarkOffsetX, watermarkOffsetY, watermarkOpacity, watermarkRotation, watermarkSize]);
 
   const firstPreflightError = preflight.errors[0];
   const preflightErrorText = firstPreflightError ? formatPreflightError(copy, firstPreflightError) : "";
@@ -601,7 +626,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     try {
       const [output] = await finishPdfFiles({
         files: [{ key: fileKey, file, selection }],
-        options: { ...form, fontSize, margin, startNumber: startingNumber, startPage: startingPage, excludeCover, opacity: 0.9, watermark: watermarkSettings, stamp: stampSettings, structure },
+        options: { ...form, fontSize, margin, startNumber: startingNumber, startPage: startingPage, excludeCover, opacity: 0.9, watermark: watermarkSettings, stamp: stampSettings, structure, raster: { enabled: rasterEnabled, dpi: rasterDpi, format: rasterFormat } },
         locale: language === "ko" ? "ko-KR" : "en-US",
         allowRiskyDocuments: riskAccepted,
         outputName: copy.outputFileName,
@@ -609,7 +634,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         onProgress: (progress) => operation.update(Math.max(2, progress.percent), copy.progress[progress.phase], progress.phase),
       });
       const warnings = output.warnings.map((warning) => copy.warnings[warning]);
-      download.makeBlobResult(new Blob([output.buffer], { type: "application/pdf" }), output.fileName, warnings);
+      download.makeBlobResult(output.blob, output.fileName, warnings, output.dispose);
       operation.succeed(stampActive ? copy.stamp.complete : copy.complete);
     } catch (reason) {
       const canceled = reason instanceof DOMException && reason.name === "AbortError";
@@ -696,12 +721,25 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                   <summary className="cursor-pointer font-heading font-medium" data-testid="pdf-finish-structure-summary">{copy.structure.title}</summary>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy.structure.description}</p>
                   <UtilityNotice className="mt-3" tone="warning" data-testid="pdf-finish-link-preservation">{copy.structure.linkNotice}</UtilityNotice>
-                  <div className="mt-3 overflow-hidden rounded-xl border border-border">
+                  <div className="mt-3 overflow-hidden rounded-xl border border-border" data-testid="pdf-finish-structure-cleanup-switches">
                     <ToggleRow label={copy.structure.metadata} description={copy.structure.metadataDescription} checked={structure.removeMetadata} onChange={(value) => updateStructure("removeMetadata", value)} disabled={locked} />
                     <ToggleRow label={copy.structure.annotations} description={copy.structure.annotationsDescription} checked={structure.removeAnnotations} onChange={(value) => updateStructure("removeAnnotations", value)} disabled={locked} />
                     <ToggleRow label={copy.structure.attachments} description={copy.structure.attachmentsDescription} checked={structure.removeAttachments} onChange={(value) => updateStructure("removeAttachments", value)} disabled={locked} />
                   </div>
                   <UtilityField className="mt-3">{copy.structure.forms}<UtilitySelect data-testid="pdf-finish-form-mode" value={structure.formMode} disabled={locked} onChange={(event) => updateStructure("formMode", event.target.value as PdfFormMode)}>{(["preserve", "remove", "flatten"] as const).map((value) => <option key={value} value={value}>{copy.structure.formOptions[value]}</option>)}</UtilitySelect></UtilityField>
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-border" data-testid="pdf-finish-raster" data-pdf-raster-owned>
+                    <ToggleRow label={copy.raster.enabled} description={copy.raster.enabledDescription} checked={rasterEnabled} onChange={(enabled) => updateRaster({ enabled })} disabled={locked} />
+                    {rasterEnabled && <div className="border-t border-border p-4" data-testid="pdf-finish-raster-settings">
+                      <h3 className="font-heading text-sm font-medium">{copy.raster.title}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{copy.raster.description}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-3 max-[620px]:grid-cols-1">
+                        <UtilityField>{copy.raster.dpi}<UtilitySelect data-testid="pdf-finish-raster-dpi" value={rasterDpi} disabled={locked} onChange={(event) => updateRaster({ dpi: Number(event.target.value) as RasterDpi })}>{RASTER_DPI_VALUES.map((dpi) => <option key={dpi} value={dpi}>{dpi} DPI</option>)}</UtilitySelect></UtilityField>
+                        <UtilityField>{copy.raster.format}<UtilitySelect data-testid="pdf-finish-raster-format" value={rasterFormat} disabled={locked} onChange={(event) => updateRaster({ format: event.target.value as RasterOutputFormat })}>{(["png", "jpeg"] as const).map((format) => <option key={format} value={format}>{copy.raster.formats[format]}</option>)}</UtilitySelect></UtilityField>
+                      </div>
+                      <UtilityNotice className="mt-3" tone="warning" data-testid="pdf-finish-raster-loss">{copy.raster.lossNotice}</UtilityNotice>
+                      <p className="mt-2 text-xs leading-relaxed text-muted-foreground" data-testid="pdf-finish-raster-mobile-limit">{copy.raster.mobileLimitNotice}</p>
+                    </div>}
+                  </div>
                   <h3 className="mt-4 text-sm font-bold">{copy.structure.tableTitle}</h3>
                   <div className="mt-2 overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th className="pb-2 pr-3">{copy.structure.structureLabel}</th><th className="pb-2">{copy.structure.resultLabel}</th></tr></thead><tbody>{[
                     { id: "pages", label: copy.structure.pages, result: copy.structure.pagesResult },
@@ -742,9 +780,9 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                 {!stampActive && <UtilityNotice className="mt-3" tone="warning" data-testid="pdf-finish-preview-disclaimer" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.previewDisclaimer}</UtilityNotice>}
                 {preflight.status === "checking" && <UtilityNotice className="mt-3" tone="warning" role="status" data-testid="pdf-finish-preflight-checking" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.preflightChecking}</UtilityNotice>}
                 {preflight.status === "ready" && <span className="sr-only" data-testid="pdf-finish-preflight-ready">ready</span>}
-                {preflightErrorText && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={firstPreflightError?.code} data-pdf-watermark-owned={watermarkActive || undefined}>{preflightErrorText}</UtilityNotice>}
+                {preflightErrorText && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={firstPreflightError?.code} data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-raster-owned={firstPreflightError?.field === "raster" || undefined}>{preflightErrorText}</UtilityNotice>}
                 {preflightFailure && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={preflight.failure} data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-structure-owned={["structure-unsupported", "form-unsupported"].includes(preflight.failure) || undefined}>{preflightFailure}</UtilityNotice>}
-                {!!preflight.warnings.length && <div className="mt-3 space-y-2" data-testid="pdf-finish-preflight-warnings" data-pdf-watermark-owned={watermarkActive || undefined}>{preflight.warnings.map((warning) => <UtilityNotice key={warning} tone="warning" data-warning-code={warning}>{copy.warnings[warning]}</UtilityNotice>)}</div>}
+                {!!preflight.warnings.length && <div className="mt-3 space-y-2" data-testid="pdf-finish-preflight-warnings" data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-raster-owned={rasterEnabled || undefined}>{preflight.warnings.map((warning) => <UtilityNotice key={warning} tone="warning" data-warning-code={warning}>{copy.warnings[warning]}</UtilityNotice>)}</div>}
                 {!!riskWarnings.length && <div className="mt-3 overflow-hidden rounded-2xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20" data-testid="pdf-watermark-risk-confirmation" data-pdf-watermark-owned><p className="px-4 pt-4 text-sm font-bold text-foreground">{copy.watermark.riskTitle}</p><ToggleRow label={copy.watermark.riskConsent} description={copy.watermark.riskConsentDescription} checked={riskAccepted} onChange={(checked) => { setRiskAccepted(checked); download.clearResult(); }} disabled={locked} /></div>}
                 {selectionEvaluation.error && <UtilityNotice className="mt-3" tone="error" role="alert">{copy.rangeErrors[selectionEvaluation.error]}</UtilityNotice>}
                 <div className="mt-4">

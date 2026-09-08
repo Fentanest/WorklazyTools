@@ -17,17 +17,24 @@ export interface DownloadResult {
   fileName: string;
   size: number;
   warnings: string[];
+  dispose?: () => void | Promise<void>;
 }
 
 export function useDownloadResult() {
   const [result, setResult] = useState<DownloadResult | null>(null);
   const resultRef = useRef<DownloadResult | null>(null);
   useEffect(() => () => {
-    if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
+    if (resultRef.current) {
+      URL.revokeObjectURL(resultRef.current.url);
+      void resultRef.current.dispose?.();
+    }
   }, []);
 
   const replaceResult = useCallback((next: DownloadResult | null) => {
-    if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
+    if (resultRef.current) {
+      URL.revokeObjectURL(resultRef.current.url);
+      void resultRef.current.dispose?.();
+    }
     resultRef.current = next;
     setResult(next);
   }, []);
@@ -35,8 +42,8 @@ export function useDownloadResult() {
     const blob = new Blob([output.buffer], { type: output.mimeType });
     replaceResult({ url: URL.createObjectURL(blob), fileName: output.fileName, size: blob.size, warnings: output.warnings });
   }, [replaceResult]);
-  const makeBlobResult = useCallback((blob: Blob, fileName: string, warnings: string[] = []) => {
-    replaceResult({ url: URL.createObjectURL(blob), fileName, size: blob.size, warnings });
+  const makeBlobResult = useCallback((blob: Blob, fileName: string, warnings: string[] = [], dispose?: () => void | Promise<void>) => {
+    replaceResult({ url: URL.createObjectURL(blob), fileName, size: blob.size, warnings, dispose });
   }, [replaceResult]);
   const clearResult = useCallback(() => replaceResult(null), [replaceResult]);
   return useMemo(() => ({ result, makeResult, makeBlobResult, clearResult }), [clearResult, makeBlobResult, makeResult, result]);

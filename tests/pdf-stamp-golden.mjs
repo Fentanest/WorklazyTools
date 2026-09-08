@@ -39,16 +39,17 @@ const [output] = await finishPdfFiles({
   options: finishOptions(placement),
   locale: "en-US",
 });
+const outputBytes = await output.blob.arrayBuffer();
 const outputPath = path.join(artifactDirectory, "stamp-all-pages.pdf");
-await fs.writeFile(outputPath, Buffer.from(output.buffer));
+await fs.writeFile(outputPath, Buffer.from(outputBytes));
 
-const pdfjsPages = await renderPdfJs(output.buffer.slice(0), "stamp-all-pages");
+const pdfjsPages = await renderPdfJs(outputBytes.slice(0), "stamp-all-pages");
 const popplerPages = await renderPoppler(outputPath, "stamp-all-pages", 4);
 assert.equal(pdfjsPages.length, 4);
 assert.equal(popplerPages.length, 4);
 
 const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-const loadingTask = pdfjs.getDocument({ data: new Uint8Array(output.buffer) });
+const loadingTask = pdfjs.getDocument({ data: new Uint8Array(outputBytes) });
 const comparisons = [];
 try {
   const document = await loadingTask.promise;
@@ -107,9 +108,10 @@ const [selectedOutput] = await finishPdfFiles({
   options: finishOptions(placement),
   locale: "en-US",
 });
+const selectedOutputBytes = await selectedOutput.blob.arrayBuffer();
 const selectedPath = path.join(artifactDirectory, "stamp-selected-pages.pdf");
-await fs.writeFile(selectedPath, Buffer.from(selectedOutput.buffer));
-const selectedPixels = await renderPdfJs(selectedOutput.buffer, "stamp-selected-pages");
+await fs.writeFile(selectedPath, Buffer.from(selectedOutputBytes));
+const selectedPixels = await renderPdfJs(selectedOutputBytes, "stamp-selected-pages");
 assert.deepEqual(selectedPixels.map(({ count }) => count > 0), [true, false, true, false], "stamp must appear only on selected pages");
 
 const browserComparisons = await runBrowserPreviewGolden(await createBrowserFixture(), stampBytes);

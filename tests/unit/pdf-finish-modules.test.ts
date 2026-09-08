@@ -25,6 +25,7 @@ import {
   displayNumber,
   estimateOutputWarning,
   estimatePreflightOutputWarning,
+  estimateRasterOutputWarning,
   expandTokens,
   formatCanonicalRange,
   formatDatePattern,
@@ -34,6 +35,9 @@ import {
   measureCanvas,
   parseRange,
   preprocessText,
+  RASTER_OUTPUT_BYTES_PER_PIXEL,
+  createPdfFinishResultStore,
+  PdfFinishStorageError,
   commitStamp,
   redoStamp,
   selectionAnchor,
@@ -573,6 +577,22 @@ test("canvas A policy, DPI fallback, B-only metrics, warning expression and 200M
     inputBytes: 100,
   }), { estimatedBytes: 2_000, thresholdBytes: 1_000, warn: true });
   assert.equal(coefficientCalls, 1);
+  assert.deepEqual(RASTER_OUTPUT_BYTES_PER_PIXEL, {
+    "150-png": 2.2751643072999026,
+    "150-jpeg": 0.3164912799752287,
+    "200-png": 2.2396780732368913,
+    "200-jpeg": 0.3908593726170973,
+    "300-png": 2.1839512794386713,
+    "300-jpeg": 0.34944035329852374,
+  });
+  const mixedDpiWarning = estimateRasterOutputWarning({
+    pages: [{ pixels: 1_000, dpi: 300 }, { pixels: 2_000, dpi: 150 }],
+    format: "jpeg",
+    inputBytes: 100,
+  });
+  assert.equal(mixedDpiWarning.estimatedBytes, 1_000 * RASTER_OUTPUT_BYTES_PER_PIXEL["300-jpeg"] + 2_000 * RASTER_OUTPUT_BYTES_PER_PIXEL["150-jpeg"]);
+  assert.equal(mixedDpiWarning.thresholdBytes, 1_000);
+  assert.equal(mixedDpiWarning.warn, false);
 
   const mib = 1024 * 1024;
   const rows = [
@@ -594,6 +614,59 @@ test("canvas A policy, DPI fallback, B-only metrics, warning expression and 200M
   }
   assert.equal(checkMemoryResultRegistration(MEMORY_RESULT_LIMIT_BYTES - 1, 1).register, true);
   assert.equal(checkMemoryResultRegistration(MEMORY_RESULT_LIMIT_BYTES, 1).register, false);
+});
+
+test("finish result storage falls back only before work and enforces registration before retaining memory", async () => {
+  const store = await createPdfFinishResultStore({
+    storage: { getDirectory: async () => { throw new Error("OPFS unavailable"); } },
+    memoryLimitBytes: 5,
+  });
+  assert.equal(store.mode, "memory");
+  const first = await store.store(new Uint8Array([1, 2, 3, 4, 5]), "first.pdf");
+  assert.equal(first.blob.size, 5);
+  await assert.rejects(
+    store.store(new Uint8Array([6]), "second.pdf"),
+    (error: unknown) => error instanceof PdfFinishStorageError && error.reason === "memory-limit",
+  );
+  assert.deepEqual([...new Uint8Array(await first.blob.arrayBuffer())], [1, 2, 3, 4, 5]);
+  await first.dispose();
+  assert.equal((await store.store(new Uint8Array([6]), "retry.pdf")).blob.size, 1);
+  await store.dispose();
+});
+
+test("OPFS write failure removes the incomplete entry without silently switching to memory", async () => {
+  const removed = [] as string[];
+  let aborted = 0;
+  const session = {
+    getFileHandle: async () => ({
+      createWritable: async () => ({
+        write: async () => { throw new Error("quota"); },
+        close: async () => undefined,
+        abort: async () => { aborted += 1; },
+      }),
+      getFile: async () => new File([], "result.pdf", { type: "application/pdf" }),
+    }),
+    removeEntry: async (name: string) => { removed.push(name); },
+  };
+  const root = {
+    getDirectoryHandle: async () => session,
+    removeEntry: async (name: string) => { removed.push(name); },
+  };
+  const storageRoot = { getDirectoryHandle: async () => root };
+  const store = await createPdfFinishResultStore({
+    storage: { getDirectory: async () => storageRoot as unknown as FileSystemDirectoryHandle },
+    id: "test",
+  });
+  assert.equal(store.mode, "opfs");
+  await assert.rejects(
+    store.store(new Uint8Array([1, 2, 3]), "failed.pdf"),
+    (error: unknown) => error instanceof PdfFinishStorageError && error.reason === "opfs-write",
+  );
+  assert.equal(store.mode, "opfs");
+  assert.equal(aborted, 1);
+  assert.deepEqual(removed, ["result-1.pdf"]);
+  await store.dispose();
+  assert.deepEqual(removed, ["result-1.pdf", "session-test"]);
 });
 
 test("stamp coordinates ignore DPR, preserve center-relative width/aspect, scale uniformly and clamp", async () => {

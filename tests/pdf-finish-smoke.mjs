@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { createCanvas } from "@napi-rs/canvas";
 import { chromium } from "playwright";
-import { PDFArray, PDFDict, PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, degrees } from "pdf-lib";
 import { PNG } from "pngjs";
 import { collectDeploymentExecutionAssetPaths, isJavaScriptExecutionPath } from "../scripts/measure-bundle-budget.mjs";
 
@@ -80,12 +80,13 @@ try {
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
   await testStructureWorkflow(browser);
+  await testRasterWorkflow(browser, fixture);
   const watermarkRuntimeRequests = await testWatermarkWorkflow(browser, fixture, inlineImageFixture, smallFixture);
   await testStampWorkflow(browser, fixture);
   await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks(watermarkRuntimeRequests);
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds, two appearance-preserving UI downloads, localized unsupported-form blocking and a 13-row pre-execution table, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds, two appearance-preserving UI downloads, localized unsupported-form blocking and a 13-row pre-execution table, selected-page raster flatten with fixed defaults and size warning, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -739,7 +740,7 @@ async function testStructureWorkflow(browserInstance) {
     for (const name of ["/Outlines", "/Names /Dests", "/PageLabels", "/ViewerPreferences", "/OCProperties", "/StructTreeRoot", "/Metadata", "/AcroForm", "/Annots /Link"]) {
       assert.ok(tableText.includes(name), `${language}: preservation table omitted ${name}`);
     }
-    const switches = structure.locator("[role='switch']");
+    const switches = structure.locator("[data-testid='pdf-finish-structure-cleanup-switches'] [role='switch']");
     assert.equal(await switches.count(), 3);
     for (let index = 0; index < 3; index += 1) await switches.nth(index).click();
     await structure.locator("[data-testid='pdf-finish-form-mode']").selectOption("flatten");
@@ -822,6 +823,63 @@ async function testStructureWorkflow(browserInstance) {
   assert.match(await error.innerText(), /cannot be rebuilt safely/iu);
   assert.doesNotMatch(await error.innerText(), /OCG|OCMD|Type3|pdf-lib|exception/iu);
   assert.equal(await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").isDisabled(), true);
+  await context.close();
+}
+
+async function testRasterWorkflow(browserInstance, fixture) {
+  const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+  const page = await context.newPage();
+  page.setDefaultTimeout(120_000);
+  await page.goto(`${baseUrl}/en/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
+  await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+    .setInputFiles({ name: "raster-browser.pdf", mimeType: "application/pdf", buffer: fixture });
+  await page.locator("[data-testid='pdf-finish-structure-summary']").click();
+  const raster = page.locator("[data-testid='pdf-finish-raster']");
+  assert.equal(await raster.locator("[data-testid='pdf-finish-raster-dpi']").count(), 0);
+  await raster.locator("[role='switch']").click();
+  await raster.locator("[data-testid='pdf-finish-raster-settings']").waitFor();
+  assert.equal(await raster.locator("[data-testid='pdf-finish-raster-dpi']").inputValue(), "150");
+  assert.equal(await raster.locator("[data-testid='pdf-finish-raster-format']").inputValue(), "jpeg");
+  assert.match(await raster.locator("[data-testid='pdf-finish-raster-mobile-limit']").innerText(), /not.*physical-device|no physical-device limit/iu);
+  await page.locator("[data-testid='pdf-finish-range']").fill("1,3");
+  await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+  const sizeWarning = page.locator("[data-warning-code='raster-output-large']");
+  await sizeWarning.waitFor();
+  assert.match(await sizeWarning.innerText(), /larger.*source|page range.*resolution/iu);
+  const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
+  await action.click();
+  const download = page.locator("[data-testid='pdf-download']");
+  await download.waitFor();
+  const output = Buffer.from(await download.evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
+  const document = await PDFDocument.load(output, { updateMetadata: false });
+  const pageImageFilters = document.getPages().map((pdfPage) => {
+    const resources = pdfPage.node.Resources();
+    const xObjects = resources?.lookupMaybe(PDFName.of("XObject"), PDFDict);
+    if (!xObjects) return [];
+    return xObjects.values().flatMap((entry) => {
+      const stream = document.context.lookup(entry);
+      return stream instanceof PDFRawStream && stream.dict.get(PDFName.of("Subtype")) === PDFName.of("Image")
+        ? [stream.dict.get(PDFName.of("Filter"))?.toString()]
+        : [];
+    });
+  });
+  assert.ok(pageImageFilters[0].includes("/DCTDecode") && pageImageFilters[2].includes("/DCTDecode"), "selected pages must use the benchmark-selected JPEG q85 default");
+  assert.equal(pageImageFilters[1].length, 0, "unselected pages must remain vector pages");
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = pdfjs.getDocument({ data: Uint8Array.from(output) });
+  try {
+    const parsed = await task.promise;
+    const text = [];
+    for (let pageNumber = 1; pageNumber <= parsed.numPages; pageNumber += 1) {
+      text.push((await (await parsed.getPage(pageNumber)).getTextContent()).items.map((item) => item.str ?? "").join(" "));
+    }
+    assert.deepEqual(text.map((value) => value.trim().length > 0), [false, true, false], "only selected pages must lose their text layer");
+    assert.match(text[1], /Original second page/u);
+  } finally {
+    await task.destroy();
+  }
+  assert.equal(await page.locator("[data-route-error]").count(), 0);
   await context.close();
 }
 

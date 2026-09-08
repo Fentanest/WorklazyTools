@@ -25,6 +25,7 @@ const fullProfiles = Object.freeze([
 ]);
 const stampProfiles = Object.freeze([...fullProfiles, enLightMobile320]);
 const structureProfiles = Object.freeze([...fullProfiles, enLightMobile320]);
+const rasterProfiles = Object.freeze([...fullProfiles, enLightMobile320]);
 
 const representativeProfiles = Object.freeze([
   koLightDesktop,
@@ -717,6 +718,28 @@ const pdfFinishScenarios = [
     ],
     readySelector: "[data-testid='pdf-finish-ready']",
     assertSelector: "[data-pdf-structure-owned] [data-structure-row='unsupported']",
+  }),
+  scenario({
+    scenarioId: "pdf-finish-raster--interaction",
+    routeId: "pdf-finish-raster",
+    toolId: "pdf-editor",
+    stateId: "interaction",
+    stateType: "finish",
+    path: "/tools/pdf-editor/finish",
+    kind: "tool",
+    profiles: rasterProfiles,
+    profileReductionReason: "No reduction: raster controls and disclosures retain the complete locale, theme, and desktop/mobile product, plus the required 320px English mobile check.",
+    fixture: { kind: "generated-pdf", fileName: "visual-finish-raster.pdf", pageCount: 2 },
+    actions: [
+      { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[accept*='application/pdf']" },
+      { type: "wait", selector: "[data-testid='pdf-finish-preflight-ready']", timeoutMs: 60_000 },
+      { type: "click", selector: "[data-testid='pdf-finish-structure-summary']" },
+      { type: "click", selector: "[data-testid='pdf-finish-raster'] [role='switch']" },
+      { type: "wait", selector: "[data-testid='pdf-finish-raster-settings']", timeoutMs: 60_000 },
+      { type: "scroll-into-view", selector: "[data-testid='pdf-finish-raster']", offset: -88 },
+    ],
+    readySelector: "[data-testid='pdf-finish-ready']",
+    assertSelector: "[data-testid='pdf-finish-raster-settings']",
   }),
   ...[
     ["start", "/tools/pdf-editor", "organize"],

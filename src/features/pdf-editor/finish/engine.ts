@@ -49,6 +49,19 @@ import {
   type PdfStructureOptions,
 } from "./structure.ts";
 import {
+  PdfRasterError,
+  preflightRasterPages,
+  rasterizePdf,
+  type PdfRasterOptions,
+} from "./raster.ts";
+import { estimateRasterOutputWarning } from "./canvasPolicy.ts";
+import {
+  createPdfFinishResultStore,
+  PdfFinishStorageError,
+  type PdfFinishResultStore,
+  type PdfFinishStorageMode,
+} from "./resultStorage.ts";
+import {
   degrees,
   embedCustomPdfFont,
   embedHelvetica,
@@ -82,6 +95,10 @@ export type PdfFinishEngineErrorCode =
   | "risk-confirmation-required"
   | "structure-unsupported"
   | "form-unsupported"
+  | "raster-unsupported"
+  | "raster-failed"
+  | "result-memory-limit"
+  | "result-storage"
   | "output-validation";
 
 export class PdfFinishEngineError extends Error {
@@ -101,6 +118,8 @@ export type PdfFinishWarningCode =
   | "horizontal-overflow"
   | "vertical-overflow"
   | "embedded-font"
+  | "raster-dpi-lowered"
+  | "raster-output-large"
   | WatermarkRiskCode;
 
 export type PdfFinishPreflightErrorCode =
@@ -114,11 +133,12 @@ export type PdfFinishPreflightErrorCode =
   | "empty-text"
   | "empty-placement"
   | "tile-limit"
-  | "background-placement";
+  | "background-placement"
+  | "raster-unsupported";
 
 export interface PdfFinishPreflightError {
   code: PdfFinishPreflightErrorCode;
-  field: "template" | "fontSize" | "margin" | "watermark" | "image";
+  field: "template" | "fontSize" | "margin" | "watermark" | "image" | "raster";
   fileKey: string;
   physicalPage: number;
   line?: number;
@@ -145,6 +165,7 @@ export interface PdfFinishDecorationOptions {
   watermark?: PdfWatermarkSettings;
   stamp?: PdfStampSettings;
   structure?: PdfStructureOptions;
+  raster?: PdfRasterOptions;
 }
 
 export interface PdfFinishInputFile {
@@ -156,12 +177,14 @@ export interface PdfFinishInputFile {
 export interface PdfFinishOutput {
   key: string;
   fileName: string;
-  buffer: ArrayBuffer;
+  blob: Blob;
+  storage: PdfFinishStorageMode;
+  dispose: () => Promise<void>;
   warnings: PdfFinishWarningCode[];
 }
 
 export interface PdfFinishProgress {
-  phase: "reading" | "font" | "decorating" | "saving";
+  phase: "reading" | "font" | "decorating" | "rasterizing" | "saving";
   completed: number;
   total: number;
   percent: number;
@@ -178,6 +201,7 @@ export interface PdfFinishEngineInput {
   outputName?: { suffix: string; fallback: string };
   allowRiskyDocuments?: boolean;
   validateWatermarkOutput?: typeof validateWatermarkResult;
+  resultStore?: PdfFinishResultStore;
 }
 
 export class PdfFinishCanceledError extends DOMException {
@@ -187,6 +211,20 @@ export class PdfFinishCanceledError extends DOMException {
     super(message, "AbortError");
     this.partialResults = [...partialResults];
   }
+}
+
+export class PdfFinishPartialError extends PdfFinishEngineError {
+  readonly partialResults: readonly PdfFinishOutput[];
+
+  constructor(code: PdfFinishEngineErrorCode, partialResults: readonly PdfFinishOutput[], cause?: unknown) {
+    super(code, {}, cause);
+    this.name = "PdfFinishPartialError";
+    this.partialResults = [...partialResults];
+  }
+}
+
+export async function pdfFinishOutputBytes(output: PdfFinishOutput) {
+  return output.blob.arrayBuffer();
 }
 
 interface PreparedPage {
@@ -249,6 +287,11 @@ function validateOptions(options: PdfFinishDecorationOptions) {
   if (options.watermark && options.stamp) throw new PdfFinishEngineError("invalid-field", { field: "decoration" });
   if (options.structure && !(["preserve", "remove", "flatten"] as const).includes(options.structure.formMode)) {
     throw new PdfFinishEngineError("invalid-field", { field: "structure" });
+  }
+  if (options.raster && (typeof options.raster.enabled !== "boolean"
+      || !([150, 200, 300] as const).includes(options.raster.dpi)
+      || !(["png", "jpeg"] as const).includes(options.raster.format))) {
+    throw new PdfFinishEngineError("invalid-field", { field: "raster" });
   }
   if (options.stamp) {
     const { placement } = options.stamp;
@@ -780,6 +823,21 @@ function watermarkTextOperators(plan: PageDecorationPlan, input: PdfFinishEngine
   }));
 }
 
+function preflightRasterDocument(source: PdfFinishInputFile, document: PDFDocument, options: PdfRasterOptions) {
+  const raster = preflightRasterPages(source.selection.exactPages.map((pageNumber) => {
+    const page = document.getPages()[pageNumber - 1];
+    if (!page) throw new PdfFinishEngineError("invalid-field", { field: "selection" });
+    const viewport = pdfPageViewport(page);
+    return { pageNumber, widthPoints: viewport.width, heightPoints: viewport.height };
+  }), options.dpi);
+  const outputWarning = raster.supported ? estimateRasterOutputWarning({
+    pages: raster.plans.map(({ measurement, appliedDpi }) => ({ pixels: measurement.pixels, dpi: appliedDpi })),
+    format: options.format,
+    inputBytes: source.file.size,
+  }) : undefined;
+  return { raster, outputWarning };
+}
+
 async function decorateDocument(input: PdfFinishEngineInput, plans: readonly DecorationPlan[], warnings: Set<PdfFinishWarningCode>, completed: { value: number }, total: number) {
   const color = colorComponents(input.options.color);
   for (const plan of plans) {
@@ -839,6 +897,20 @@ export async function preflightPdfFiles(input: PdfFinishEngineInput): Promise<Pd
     const analyzed = await analyzeDocument(input, source, batchDate, resources, fileIndex);
     for (const warning of analyzed.warnings) warnings.add(warning);
     errors.push(...analyzed.errors);
+    if (input.options.raster?.enabled && analyzed.document) {
+      const { raster, outputWarning } = preflightRasterDocument(source, analyzed.document, input.options.raster);
+      if (!raster.supported) {
+        errors.push({
+          code: "raster-unsupported",
+          field: "raster",
+          fileKey: source.key,
+          physicalPage: raster.unsupportedPage ?? source.selection.exactPages[0],
+        });
+      } else {
+        if (raster.plans.some(({ downgraded }) => downgraded)) warnings.add("raster-dpi-lowered");
+        if (outputWarning?.warn) warnings.add("raster-output-large");
+      }
+    }
   }
   return { errors, warnings: [...warnings] };
 }
@@ -854,6 +926,7 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
   const completed = { value: 0 };
   const resources = createBatchFontResources(input);
   const outputs: PdfFinishOutput[] = [];
+  const resultStore = input.resultStore ?? await createPdfFinishResultStore();
   try {
     for (const [fileIndex, source] of input.files.entries()) {
       throwIfAborted(input.signal);
@@ -868,6 +941,12 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       }
       const document = analyzed.document;
       if (!document) throw new PdfFinishEngineError("invalid-layout");
+      if (input.options.raster?.enabled) {
+        const { raster, outputWarning } = preflightRasterDocument(source, document, input.options.raster);
+        if (!raster.supported) throw new PdfFinishEngineError("raster-unsupported", { physicalPage: raster.unsupportedPage });
+        if (raster.plans.some(({ downgraded }) => downgraded)) analyzed.warnings.add("raster-dpi-lowered");
+        if (outputWarning?.warn) analyzed.warnings.add("raster-output-large");
+      }
       await decorateDocument(input, analyzed.plans, analyzed.warnings, completed, total);
       throwIfAborted(input.signal);
       report(input, "saving", fileIndex, input.files.length);
@@ -876,7 +955,7 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       // large document must at least retain visible, truthful progress.
       await yieldToEventLoop();
       throwIfAborted(input.signal);
-      const bytes = await document.save({ updateFieldAppearances: false });
+      let bytes = await document.save({ updateFieldAppearances: false });
       throwIfAborted(input.signal);
       if (input.options.watermark || input.options.stamp) {
         try {
@@ -887,11 +966,43 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
         }
         throwIfAborted(input.signal);
       }
+      if (input.options.raster?.enabled) {
+        try {
+          const raster = await rasterizePdf({
+            bytes,
+            selectedPages: source.selection.exactPages,
+            options: input.options.raster,
+            language: input.locale.toLowerCase().startsWith("ko") ? "ko" : "en",
+            signal: input.signal,
+            onPage: (rasterCompleted, rasterTotal) => report(input, "rasterizing", rasterCompleted, rasterTotal),
+          });
+          bytes = raster.bytes;
+          if (raster.downgradedPages.length) analyzed.warnings.add("raster-dpi-lowered");
+        } catch (error) {
+          if (error instanceof Error && error.name === "AbortError") throw error;
+          if (error instanceof PdfRasterError && ["unsupported-page", "canvas"].includes(error.reason)) {
+            throw new PdfFinishEngineError("raster-unsupported", { physicalPage: error.pageNumber }, error);
+          }
+          throw new PdfFinishEngineError("raster-failed", {}, error);
+        }
+      }
       await yieldBeforeResultRegistration(input.signal);
+      let stored;
+      try {
+        stored = await resultStore.store(bytes, finishOutputName(source.file.name, input.locale, input.outputName), input.signal);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") throw error;
+        if (error instanceof PdfFinishStorageError) {
+          throw new PdfFinishPartialError(error.reason === "memory-limit" ? "result-memory-limit" : "result-storage", outputs, error);
+        }
+        throw error;
+      }
       outputs.push({
         key: source.key,
         fileName: finishOutputName(source.file.name, input.locale, input.outputName),
-        buffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+        blob: stored.blob,
+        storage: stored.mode,
+        dispose: stored.dispose,
         warnings: [...analyzed.warnings],
       });
     }
@@ -899,6 +1010,10 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
     if (error instanceof Error && error.name === "AbortError" && outputs.length > 0) {
       throw new PdfFinishCanceledError(error.message, outputs);
     }
+    if (outputs.length > 0 && error instanceof PdfFinishEngineError && !(error instanceof PdfFinishPartialError)) {
+      throw new PdfFinishPartialError(error.code, outputs, error);
+    }
+    if (outputs.length === 0) await resultStore.dispose();
     throw error;
   }
   return outputs;

@@ -2,6 +2,8 @@ export * from "./canvasPolicy.ts";
 export * from "./geometry.ts";
 export * from "./plan.ts";
 export * from "./preflight.ts";
+export * from "./raster.ts";
+export * from "./resultStorage.ts";
 export * from "./selection.ts";
 export * from "./stamp.ts";
 export * from "./text.ts";

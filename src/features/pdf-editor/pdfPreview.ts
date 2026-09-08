@@ -31,6 +31,40 @@ function loadPdfDisplayModule() {
   return pdfDisplayModulePromise;
 }
 
+export async function openOwnedPdfDocument(
+  bytes: Uint8Array | ArrayBuffer,
+  language: AppLanguage = "ko",
+  signal?: AbortSignal,
+) {
+  throwIfAborted(signal, "PDF loading cancelled");
+  let pdfDisplayModule: PdfDisplayModule;
+  try {
+    pdfDisplayModule = await waitWithAbort(loadPdfDisplayModule(), signal);
+  } catch (error) {
+    if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+    throw new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
+  }
+  throwIfAborted(signal, "PDF loading cancelled");
+  const source = bytes instanceof Uint8Array ? bytes.slice() : new Uint8Array(bytes.slice(0));
+  const loadingTask = pdfDisplayModule.getDocument({
+    data: source,
+    password: "",
+    enableXfa: true,
+    useSystemFonts: true,
+    isOffscreenCanvasSupported: false,
+    isImageDecoderSupported: false,
+  });
+  try {
+    const document = await waitWithAbort(loadingTask.promise, signal, "PDF loading cancelled");
+    throwIfAborted(signal, "PDF loading cancelled");
+    return { document, loadingTask };
+  } catch (error) {
+    try { await loadingTask.destroy(); } catch { /* A failed owned load has no reusable resources. */ }
+    if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+    throw normalizePdfOpenError(error, language);
+  }
+}
+
 interface CachedPdfDocument {
   loadingTask: PDFDocumentLoadingTask;
   promise: Promise<PDFDocumentProxy>;
