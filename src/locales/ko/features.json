@@ -1095,7 +1095,7 @@
         "background-placement": "배경 워터마크를 안전하게 넣지 못했습니다. 전경 옵션이나 다른 PDF 사본으로 시도해 주세요.",
         "risk-confirmation-required": "문서 구조 위험 경고를 확인한 뒤 계속하기에 동의해 주세요.",
         "structure-unsupported": "이 PDF에는 안전하게 재구축할 수 없는 레이어, 글꼴 또는 문서 구조가 있습니다. 정리 옵션을 바꾸거나 다른 PDF 사본을 사용하세요.",
-        "form-unsupported": "XFA, 서명 필드 또는 없거나 손상된 모양이 있어 이 양식을 안전하게 평탄화할 수 없습니다.",
+        "form-unsupported": "XFA, 서명 필드 또는 안전하게 배치할 수 없는 양식 모양이 있어 이 양식을 평탄화할 수 없습니다.",
         "output-validation": "완성된 PDF를 다시 확인하는 과정에서 문제가 발견되었습니다. 원본은 변경되지 않았습니다."
       },
       "warnings": {

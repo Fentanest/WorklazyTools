@@ -2,6 +2,24 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-09
+
+### U4-6 fix-1 — 양식 appearance 기하 보존·첨부 Popup 관계 수리 (Codx)
+
+**실행 게이트·원인 판정** — 시작 branch/head는 `s3-pdf-finish`/`cea060b65cd983bf3b2b3fdce698a4092e187169`로 지시와 일치했고 열린 계획서 충돌은 없었다. R1은 pdf-lib 기본 flatten이 Widget Rect의 원점 이동만 적용하고 AP의 BBox·Matrix가 만든 실제 경계를 Rect에 맞추지 않은 것이 직접 원인이다. 하부 라이브러리 동작이어도 검증 없이 새 제품 경로로 허용한 것이 이번 단계 책임이라는 검수 판정을 수용했다. R2는 FileAttachment를 Annots에서 제거한 뒤 양방향 `/Popup`·`/Parent` 관계를 닫지 않아 Popup만 살아남은 것이 원인이다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`, 미추적 DOCX·HTML·`newui/`와 금지 worktree는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다.
+
+**R1 수리·지원 경계** — 선택된 정상 AP stream의 유한 4값 BBox와 선택적 유한 6값 Matrix로 네 모서리의 transformed bounds를 구하고, 그 경계에서 정규화한 Widget Rect로 가는 독립 x/y 배율과 평행이동을 page content의 `q/cm/Do/Q`에 적용한다. appearance state dictionary는 상속 `/AS`, 그다음 `/V`로 실제 정상 상태만 선택한다. 모든 Widget의 기존 indirect raw stream·Rect·BBox·Matrix를 먼저 검사한 뒤에만 그리므로 일부만 평면화된 결과가 생기지 않는다. XFA·서명·AP 누락/손상에 더해 비유한·퇴화 Rect/BBox, 유효하지 않거나 특이행렬인 변환은 `unsupported-form`으로 실행 전에 차단한다. 값과 appearance를 새로 생성하지 않고 `updateFieldAppearances:false`를 유지했다. ko/en 안내는 내부 구현명이 아니라 안전하게 배치할 수 없는 양식 모양과 결과 미생성을 설명한다.
+
+identity, 절반 BBox, 비영점 BBox, 2배 Matrix, 평행이동 Matrix 5종은 PDF.js와 Poppler 모두 원본·평면화 결과가 **300×300, 파란 픽셀 2,000, 경계 `[100,180,199,199]`, RGBA SHA-256 `ab80b4ec…033b`**로 정확히 일치했다. 특이행렬 fixture는 지원 제외됐다. 실제 제품 화면에서는 절반 BBox 입력이 `preflight=ready` 뒤 다운로드됐고 **2,000→2,000** 픽셀을 보존했으며, ko/en 각각 같은 다운로드 검사를 통과했다. 특이행렬은 양 언어에서 현지화 오류, 실행 버튼 disabled, 다운로드 0이었다. 검수자 원본 appearance probe도 수정 없이 5종×양 renderer를 통과했고 제품 probe는 고정 4274를 런타임 loader에서 허용 포트 4284로만 치환해 `produced=true`, `preserved=true`를 확인했다.
+
+**R2 관계 폐쇄·출력 검증** — 최초 옵션 선별로 제거된 annotation의 raw ref와 dict를 집합에 넣고, 각 페이지 Annots의 Popup 중 `/Parent`가 제거 대상이거나 제거 대상의 `/Popup`이 가리키는 항목을 고정점까지 함께 제거한다. 살아 있는 annotation에서는 제거된 대상만 가리키는 `/Popup`·`/IRT`·`/Parent`를 지우며 일반 Text↔Popup과 FreeText `/IRT`, 첨부 미제거 대조는 보존한다. 최종 전체 객체 검사에서 모든 `/Popup`의 필수 Parent가 dict로 해석되지 않으면 결과를 거부한다. 최소 fixture의 보존/첨부만/주석만/둘 다 네 조합은 parentless Popup·누락 ref·깨진 관계·PDF.js missing-parent 경고가 모두 0이고, 첨부만 제거 결과는 `Text, Popup, FreeText`와 살아 있는 reply를 유지하면서 payload·고수준 attachment를 0으로 만들었다.
+
+검수자의 복합 **12페이지·610객체·압축 첨부 decoded 1,286,144B** 입력에서 첨부만 제거한 출력은 **23,628B/472객체**, parentless Popup **24→0**, 고아·누락 ref·decode 오류·잘못된 관계·첨부 sentinel 모두 0, 링크 108·이름 목적지 84를 유지했다. 입력과 출력 모두 PDF.js의 missing/invalid Popup parent 경고는 0이다. 여섯 옵션 조합도 parentless Popup 0을 통과했다. 원 `assert-evidence.py`는 결함 재현용 기대값 24를 고정해 수리 후 그 한 줄에서 의도대로 실패했으며, 검수 산출물은 읽기 전용으로 보존하고 `/tmp/worklazy-u4-6-fix1/probes/assert-evidence-fixed.py` 사본의 기대값만 0으로 바꿔 나머지 모든 원 assert를 통과시켰다.
+
+**회귀·예산·동반 영향** — `test:pdf-finish`는 실제 ko/en 다운로드 2건, 지원 제외 2건을 포함해 smoke·watermark 128렌더·stamp 16좌표/16브라우저/8 renderer page·새 structure golden을 모두 실행했다. 공식 OCG oracle은 87 preflight, 허용 56/57페이지, 제외 31, 제외 transform 0, 양 renderer SHA 56/56이며 legacy oracle은 client 3·structure 4·render 32·output 4·input 1에서 diff 0이다. full unit **332/332**, TypeScript, production build **2,851 modules·정적 71페이지**, static, 구조 visual **9/9**, F4a+finish a11y 7상태 위반 0·F4a incomplete 0·상속 125·외부 요청 0을 통과했다. 의존 patch hash 음성 대조도 Vite 이전 exit 1을 확인했다.
+
+schema-v3 고정 baseline과 `BUNDLE_ROUTES=pdf-editor` 재계측 증분/상한은 entry **11,091/20,480B**, PDF route **71,060/82,000B**, shared 순증 **2,430/30,720B**, app **85,498/96,000B**, CSS **400/10,240B**다. override `{}`·multiplier `1`이며 한도·배수·측정 범위를 바꾸지 않았다. route·SEO 의미·광고 위치·격리 경로·서버 전제·의존성은 변하지 않았고, 사용자 오류 문구만 ko/en 동시 반영해 정적 검사를 통과했다. 원출력·JSON·PNG/PDF와 하네스 적응 기록은 `/tmp/worklazy-u4-6-fix1/REPORT.md` 및 그 하위에 보존한다. — Codx
+
 ## 2026-09-08
 
 ### U4-6 — 구조 제거·양식 평면화·링크 보존 고지와 최종 번들 상향 (Codx)

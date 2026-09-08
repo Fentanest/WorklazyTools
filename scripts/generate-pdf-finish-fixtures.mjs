@@ -251,6 +251,36 @@ function createRemovalPdf() {
   ], { info: 30 });
 }
 
+function createAppearancePdf(bbox, matrix) {
+  const matrixEntry = matrix ? ` /Matrix [${matrix.join(" ")}]` : "";
+  const [x0, y0, x1, y1] = bbox;
+  return assemblePdf([
+    "<< /Type /Catalog /Pages 2 0 R /AcroForm 6 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Resources << >> /Contents 4 0 R /Annots [7 0 R] >>",
+    pdfStream(""),
+    pdfStream(`q 0 0 1 rg ${x0} ${y0} ${x1 - x0} ${y1 - y0} re f Q`, `/Type /XObject /Subtype /Form /BBox [${bbox.join(" ")}] /Resources << >>${matrixEntry}`),
+    "<< /Fields [7 0 R] /NeedAppearances false >>",
+    "<< /Type /Annot /Subtype /Widget /FT /Tx /T (appearanceField) /V (visible value) /Rect [100 100 200 120] /P 3 0 R /F 4 /AP << /N 5 0 R >> >>",
+  ]);
+}
+
+function createAttachmentPopupPdf() {
+  return assemblePdf([
+    "<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles << /Names [(attachment.txt) 6 0 R] >> >> /AF [6 0 R] >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Resources << >> /Contents 4 0 R /AF [6 0 R] /Annots [5 0 R 7 0 R 9 0 R 10 0 R 11 0 R] >>",
+    pdfStream(""),
+    "<< /Type /Annot /Subtype /FileAttachment /Rect [10 10 30 30] /FS 6 0 R /P 3 0 R /Popup 7 0 R >>",
+    "<< /Type /Filespec /F (attachment.txt) /UF (attachment.txt) /EF << /F 8 0 R /UF 8 0 R >> /AFRelationship /Data >>",
+    "<< /Type /Annot /Subtype /Popup /Rect [40 40 160 120] /Parent 5 0 R /P 3 0 R >>",
+    pdfStream("PDF finish attachment popup sentinel", "/Type /EmbeddedFile /Subtype /text#2Fplain"),
+    "<< /Type /Annot /Subtype /Text /Rect [170 20 190 40] /Contents (live markup) /P 3 0 R /Popup 10 0 R >>",
+    "<< /Type /Annot /Subtype /Popup /Rect [170 50 280 130] /Parent 9 0 R /P 3 0 R >>",
+    "<< /Type /Annot /Subtype /FreeText /Rect [20 150 180 180] /Contents (live reply) /IRT 9 0 R /P 3 0 R /DA (/Helv 10 Tf 0 g) >>",
+  ]);
+}
+
 function encryptedOracle(revision, variant, permissions) {
   const openPermissions = [4, 8, 16, 32, 256, 512, 1024, 2048];
   const restrictedPermissions = revision === 2 ? [256, 512, 1024, 2048] : [];
@@ -274,7 +304,7 @@ function encryptedOracle(revision, variant, permissions) {
 export async function generatePdfFinishFixtures(outputDirectory = defaultOutputDirectory) {
   const resolvedOutput = path.resolve(outputDirectory);
   await fs.mkdir(resolvedOutput, { recursive: true });
-  for (const ownedPath of ["encrypted", "damage", "background", "risk", "removal", "ordinary", "ocg", "manifest.json"]) {
+  for (const ownedPath of ["encrypted", "damage", "background", "risk", "removal", "appearance", "relationships", "ordinary", "ocg", "manifest.json"]) {
     await fs.rm(path.join(resolvedOutput, ownedPath), { recursive: true, force: true });
   }
   const records = [];
@@ -316,6 +346,37 @@ export async function generatePdfFinishFixtures(outputDirectory = defaultOutputD
     linkKinds: ["URI", "direct-destination", "named-destination"],
     embeddedSentinel: "PDF finish embedded attachment sentinel",
     xmpSentinel: "<pdf:Keywords>remove-me</pdf:Keywords>",
+  });
+  const appearancePixelOracle = {
+    width: 300,
+    height: 300,
+    bluePixels: 2_000,
+    blueBox: [100, 180, 199, 199],
+    pdfjsSha256: "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+    popplerSha256: "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+  };
+  for (const [name, bbox, matrix] of [
+    ["identity", [0, 0, 100, 20], null],
+    ["scaled-bbox", [0, 0, 50, 10], null],
+    ["offset-bbox", [10, 20, 110, 40], null],
+    ["scaled-matrix", [0, 0, 100, 20], [2, 0, 0, 2, 0, 0]],
+    ["translated-matrix", [0, 0, 100, 20], [1, 0, 0, 1, 30, 40]],
+  ]) {
+    await writeFixture("appearance", `${name}.pdf`, createAppearancePdf(bbox, matrix), {
+      supported: true,
+      bbox,
+      matrix,
+      pixelOracle: appearancePixelOracle,
+    });
+  }
+  await writeFixture("appearance", "singular-matrix.pdf", createAppearancePdf([0, 0, 100, 20], [1, 0, 0, 0, 0, 0]), {
+    supported: false,
+    reason: "degenerate appearance transform",
+  });
+  await writeFixture("relationships", "attachment-popup.pdf", createAttachmentPopupPdf(), {
+    attachmentSentinel: "PDF finish attachment popup sentinel",
+    sourceAnnotationSubtypes: ["FileAttachment", "Popup", "Text", "Popup", "FreeText"],
+    attachmentOnlyAnnotationSubtypes: ["Text", "Popup", "FreeText"],
   });
   await writeFixture("ordinary", "named-properties.pdf", createOrdinaryPropertiesPdf(), {
     preflight: { allowed: true, reason: "allow" },

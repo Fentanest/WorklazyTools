@@ -1095,7 +1095,7 @@
         "background-placement": "A background watermark could not be added safely. Try the foreground option or another PDF copy.",
         "risk-confirmation-required": "Review the document structure warning and consent before continuing.",
         "structure-unsupported": "This PDF has a layer, font, or document structure that cannot be rebuilt safely. Change the cleanup options or use another PDF copy.",
-        "form-unsupported": "This form cannot be flattened safely because it uses XFA, a signature field, or a missing or broken appearance.",
+        "form-unsupported": "This form cannot be flattened safely because it uses XFA, a signature field, or form visuals that cannot be positioned safely.",
         "output-validation": "A problem was found while checking the finished PDF. The source file was not changed."
       },
       "warnings": {

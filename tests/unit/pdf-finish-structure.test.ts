@@ -17,6 +17,7 @@ import { PdfStructureError, rebuildPdfStructure, type PdfStructureOptions } from
 
 const fixtureRoot = path.resolve(import.meta.dirname, "../fixtures/pdf-finish");
 const removalPath = path.join(fixtureRoot, "removal/removal-structures.pdf");
+const attachmentPopupPath = path.join(fixtureRoot, "relationships/attachment-popup.pdf");
 const removeEverything: PdfStructureOptions = {
   removeMetadata: true,
   removeAnnotations: true,
@@ -167,6 +168,29 @@ test("form preserve, remove, and flatten are mutually exclusive and flatten keep
   assert.notEqual(flattenContents, removeContents, "flatten must add the existing field appearance to page content");
 });
 
+test("attachment removal closes over dependent popups while preserving live markup and reply relations", async () => {
+  const rebuilt = await rebuildPdfStructure(await fs.readFile(attachmentPopupPath), {
+    removeMetadata: false,
+    removeAnnotations: false,
+    removeAttachments: true,
+    formMode: "preserve",
+  });
+  const outputBytes = Buffer.from(await rebuilt.document.save({ updateFieldAppearances: false }));
+  const output = await PDFDocument.load(outputBytes, { updateMetadata: false });
+  assert.deepEqual(pageAnnotationSubtypes(output), ["/Text", "/Popup", "/FreeText"]);
+  const rows = inspectEveryIndirectObject(output);
+  assert.equal(rows.some(({ type, subtype }) => type === "/Filespec" || type === "/EmbeddedFile" || subtype === "/FileAttachment"), false);
+  assert.equal(rows.some(({ decoded }) => decoded.includes(Buffer.from("PDF finish attachment popup sentinel"))), false);
+  for (const [, object] of output.context.enumerateIndirectObjects()) {
+    const dictionary = object instanceof PDFStream ? object.dict : object;
+    if (!(dictionary instanceof PDFDict)) continue;
+    const subtype = nameOf(lookup(output, dictionary, "Subtype"));
+    if (subtype === "/Popup") assert.ok(lookup(output, dictionary, "Parent") instanceof PDFDict);
+    if (subtype === "/Text") assert.ok(lookup(output, dictionary, "Popup") instanceof PDFDict);
+    if (subtype === "/FreeText") assert.ok(lookup(output, dictionary, "IRT") instanceof PDFDict);
+  }
+});
+
 test("flatten blocks XFA, signatures, and missing or malformed appearances, and structure cleanup blocks an excluded OCG fixture", async () => {
   const bytes = await fs.readFile(removalPath);
   const xfa = await PDFDocument.load(bytes, { updateMetadata: false });
@@ -206,6 +230,23 @@ test("flatten blocks XFA, signatures, and missing or malformed appearances, and 
   await assert.rejects(
     rebuildPdfStructure(await malformedAppearance.save({ updateFieldAppearances: false }), { ...removeEverything, formMode: "flatten" }),
     (error: unknown) => error instanceof PdfStructureError && error.reason === "unsupported-form",
+  );
+
+  await assert.rejects(
+    rebuildPdfStructure(await fs.readFile(path.join(fixtureRoot, "appearance/singular-matrix.pdf")), { ...removeEverything, formMode: "flatten" }),
+    (error: unknown) => error instanceof PdfStructureError && error.reason === "unsupported-form",
+  );
+
+  const parentlessPopup = await PDFDocument.load(await fs.readFile(attachmentPopupPath), { updateMetadata: false });
+  for (const [, object] of parentlessPopup.context.enumerateIndirectObjects()) {
+    if (object instanceof PDFDict && nameOf(lookup(parentlessPopup, object, "Subtype")) === "/Popup") {
+      object.delete(key("Parent"));
+      break;
+    }
+  }
+  await assert.rejects(
+    rebuildPdfStructure(await parentlessPopup.save({ updateFieldAppearances: false }), { ...removeEverything, removeAnnotations: false, removeAttachments: false, formMode: "preserve" }),
+    (error: unknown) => error instanceof PdfStructureError && error.reason === "validation",
   );
 
   const manifest = JSON.parse(await fs.readFile(path.join(fixtureRoot, "manifest.json"), "utf8"));

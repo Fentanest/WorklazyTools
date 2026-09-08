@@ -35,8 +35,18 @@ test("PDF finish fixtures are deterministic twice and match the tracked oracle t
     const firstManifest = await generatePdfFinishFixtures(first);
     const secondManifest = await generatePdfFinishFixtures(second);
     assert.deepEqual(firstManifest.counts, {
-      total: 104,
-      byCategory: { encrypted: 4, damage: 3, background: 4, risk: 3, removal: 1, ordinary: 2, ocg: 87 },
+      total: 111,
+      byCategory: {
+        encrypted: 4,
+        damage: 3,
+        background: 4,
+        risk: 3,
+        removal: 1,
+        appearance: 6,
+        relationships: 1,
+        ordinary: 2,
+        ocg: 87,
+      },
       ocg: { allowed: 4, excluded: 31, directArrayRegression: 32, representatives: 20, pixelOracle: 56 },
     });
     assert.deepEqual(secondManifest, firstManifest);

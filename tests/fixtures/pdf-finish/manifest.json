@@ -3,13 +3,15 @@
   "generator": "scripts/generate-pdf-finish-fixtures.mjs",
   "deterministicInputs": "fixed test-only keys, salts, strings, object ordering, and canonical OCG snapshot bytes",
   "counts": {
-    "total": 104,
+    "total": 111,
     "byCategory": {
       "encrypted": 4,
       "damage": 3,
       "background": 4,
       "risk": 3,
       "removal": 1,
+      "appearance": 6,
+      "relationships": 1,
       "ordinary": 2,
       "ocg": 87
     },
@@ -2857,6 +2859,196 @@
         ],
         "embeddedSentinel": "PDF finish embedded attachment sentinel",
         "xmpSentinel": "<pdf:Keywords>remove-me</pdf:Keywords>"
+      }
+    },
+    {
+      "file": "appearance/identity.pdf",
+      "category": "appearance",
+      "bytes": 889,
+      "sha256": "13cb62328e8a89158e19c463f6e50e20cf4b8858fce0f52381945b4f4c5f66ec",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          100,
+          20
+        ],
+        "matrix": null,
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/scaled-bbox.pdf",
+      "category": "appearance",
+      "bytes": 887,
+      "sha256": "cd554ef2c0d6b48764fd555e3e949f0649f66dbb82949a6c1edb4eee78439390",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          50,
+          10
+        ],
+        "matrix": null,
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/offset-bbox.pdf",
+      "category": "appearance",
+      "bytes": 893,
+      "sha256": "08586ec334378339d91bb729b352c2c269ee068d993b0aba99f9dc15ee869c09",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          10,
+          20,
+          110,
+          40
+        ],
+        "matrix": null,
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/scaled-matrix.pdf",
+      "category": "appearance",
+      "bytes": 911,
+      "sha256": "4e25aadc16a753832d76b94ed1ea225166aae4ff5486279f00922d80857ce973",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          100,
+          20
+        ],
+        "matrix": [
+          2,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/translated-matrix.pdf",
+      "category": "appearance",
+      "bytes": 913,
+      "sha256": "85b4fdd4646a880487c01bffafd26a2bb7fd2d2402e1040706df0b025b302afc",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          100,
+          20
+        ],
+        "matrix": [
+          1,
+          0,
+          0,
+          1,
+          30,
+          40
+        ],
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/singular-matrix.pdf",
+      "category": "appearance",
+      "bytes": 911,
+      "sha256": "19986941ffd25afe9201f4e28460dad7eae798aeea2da320dbe7e167f59faf9a",
+      "expectation": {
+        "supported": false,
+        "reason": "degenerate appearance transform"
+      }
+    },
+    {
+      "file": "relationships/attachment-popup.pdf",
+      "category": "relationships",
+      "bytes": 1533,
+      "sha256": "984b092759a87ce3bc30374dc2576400af87ad19c49365c5ef718ffdbdbe308a",
+      "expectation": {
+        "attachmentSentinel": "PDF finish attachment popup sentinel",
+        "sourceAnnotationSubtypes": [
+          "FileAttachment",
+          "Popup",
+          "Text",
+          "Popup",
+          "FreeText"
+        ],
+        "attachmentOnlyAnnotationSubtypes": [
+          "Text",
+          "Popup",
+          "FreeText"
+        ]
       }
     },
     {

@@ -85,7 +85,7 @@ try {
   await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks(watermarkRuntimeRequests);
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds and a 13-row pre-execution table, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds, two appearance-preserving UI downloads, localized unsupported-form blocking and a 13-row pre-execution table, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -684,8 +684,44 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await context.close();
 }
 
+async function renderBlueAppearance(bytes) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = pdfjs.getDocument({ data: Uint8Array.from(bytes), useSystemFonts: true });
+  try {
+    const document = await task.promise;
+    const page = await document.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+    const canvas = createCanvas(viewport.width, viewport.height);
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const pixels = PNG.sync.read(canvas.toBuffer("image/png"));
+    let count = 0;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -1;
+    let y1 = -1;
+    for (let y = 0; y < pixels.height; y += 1) for (let x = 0; x < pixels.width; x += 1) {
+      const index = (y * pixels.width + x) * 4;
+      if (pixels.data[index] < 30 && pixels.data[index + 1] < 30 && pixels.data[index + 2] > 220) {
+        count += 1;
+        x0 = Math.min(x0, x);
+        y0 = Math.min(y0, y);
+        x1 = Math.max(x1, x);
+        y1 = Math.max(y1, y);
+      }
+    }
+    return { count, box: [x0, y0, x1, y1] };
+  } finally {
+    await task.destroy();
+  }
+}
+
 async function testStructureWorkflow(browserInstance) {
   const fixturePath = path.join(repositoryRoot, "tests/fixtures/pdf-finish/removal/removal-structures.pdf");
+  const scaledAppearancePath = path.join(repositoryRoot, "tests/fixtures/pdf-finish/appearance/scaled-bbox.pdf");
+  const singularAppearancePath = path.join(repositoryRoot, "tests/fixtures/pdf-finish/appearance/singular-matrix.pdf");
+  const scaledAppearanceSource = await fs.readFile(scaledAppearancePath);
+  const expectedAppearance = await renderBlueAppearance(scaledAppearanceSource);
+  assert.deepEqual(expectedAppearance, { count: 2_000, box: [100, 180, 199, 199] });
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
     await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
@@ -746,6 +782,27 @@ async function testStructureWorkflow(browserInstance) {
     } finally {
       await task.destroy();
     }
+
+    const input = page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']");
+    await input.setInputFiles(scaledAppearancePath);
+    await page.waitForFunction(() => {
+      const panel = document.querySelector("[data-testid='pdf-finish-ready']");
+      const button = panel?.querySelector("[data-ui-component='primary-button']");
+      return panel?.getAttribute("data-preflight-status") === "ready"
+        && !panel.querySelector("[data-testid='pdf-finish-preflight-error']")
+        && button instanceof HTMLButtonElement && !button.disabled;
+    });
+    await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").click();
+    await download.waitFor();
+    const appearanceOutput = Buffer.from(await download.evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
+    assert.deepEqual(await renderBlueAppearance(appearanceOutput), expectedAppearance, `${language}: downloaded flatten changed appearance geometry`);
+
+    await input.setInputFiles(singularAppearancePath);
+    const unsupported = page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='form-unsupported']");
+    await unsupported.waitFor();
+    assert.match(await unsupported.innerText(), language === "ko" ? /안전하게 배치할 수 없는 양식 모양/u : /form visuals that cannot be positioned safely/iu);
+    assert.equal(await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").isDisabled(), true);
+    assert.equal(await page.locator("[data-testid='pdf-download']").count(), 0, `${language}: unsupported form must not expose a result`);
     assert.equal(await page.locator("[data-route-error]").count(), 0);
     await context.close();
   }
