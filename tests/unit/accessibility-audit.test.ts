@@ -24,10 +24,11 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.throws(() => assertAccessibilityResults(missing), /registration/);
   const duplicate = report(); duplicate.results[1] = duplicate.results[0];
   assert.throws(() => assertAccessibilityResults(duplicate), /registration/);
-  assert.deepEqual(pages.filter(({ viewport }) => viewport).map(({ path, viewport }) => [path, viewport.width]), [["/ko/tools/pdf-editor/finish", 412], ["/ko", 412], ["/ko/tools", 412]]);
+  assert.deepEqual(pages.filter(({ viewport }) => viewport).map(({ path, viewport }) => [path, viewport.width]), [["/ko/tools/pdf-editor/finish", 412], ["/ko/tools/pdf-editor/stamp", 412], ["/ko", 412], ["/ko/tools", 412]]);
   assert.ok(pages.some(({ id }) => id === "hwp-editor"));
   assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-finish")).map(({ id }) => id), ["pdf-finish-ko", "pdf-finish-mobile-ko", "pdf-finish-en"]);
   assert.ok(pages.some(({ id }) => id === "pdf-watermark-ko"));
+  assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-stamp")).map(({ id }) => id), ["pdf-stamp-ko", "pdf-stamp-mobile-ko", "pdf-stamp-en"]);
   const errorStates = pages.filter(({ scenario }) => scenario === "pdf-watermark-empty-text");
   assert.equal(errorStates.length, 4);
   assert.deepEqual([...new Set(errorStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);

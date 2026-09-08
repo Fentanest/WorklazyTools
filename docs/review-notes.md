@@ -4,6 +4,32 @@
 
 ## 2026-09-08
 
+### U4-5 — PDF 도장·서명 이미지와 PDF route 예산 1건 상향 (Codx)
+
+**사용자 결정과 이전 SCOPE-OUT 판정** — 2026-09-08 사용자 결정으로 `affectedRouteJsGzip` 기본 상한만 **61,440B → 72,000B**로 올렸다. U4 전체를 2,850~4,650줄로 추정해 잡은 구 상한이 U4-1~U4-4만으로 95% 소모됐고, 탐색 시제품은 동적 청크 62,997B로 구 상한보다 1,557B 부족했다. 정적 통합 대조는 61,414B로 26B만 남았지만 핵심 패널 329줄뿐이며 골든·한/영 문구·비전자서명 고지·접근성·SEO가 빠졌으므로, 당시 구현을 중단한 SCOPE-OUT 판정은 옳았다. 1,557B는 당시 PDF route 절대 gzip 약 1,135,719B의 0.14%였고, 추정 실패를 도장 기능의 비대화로 보지 않는다는 결정이다.
+
+`scripts/measure-bundle-budget.mjs`에서는 `affectedRouteJsGzip: 60 * 1024` 한 줄만 `72000`으로 바꿨다. entry 20,480B·shared 30,720B·app 81,920B·CSS 10,240B는 불변이고 override `{}`·multiplier 1이다. 다른 route 감량으로 PDF route 증가를 상쇄하는 해석도 계속 금지한다. 기준선은 schema v3 `/tmp/worklazy-u4-4-review5/evidence/bundle-baseline.json`(SHA-256 `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`)만 사용했으며 schema v2 `/tmp/s3-bundle-baseline.json`은 사용하지 않았다. U4-6~U4-8에서 다시 초과하면 추가 상향을 요청하지 않고 SCOPE-OUT으로 보고해 감량·구조 변경 판정을 받는다.
+
+| 번들 지표(gzip) | schema v3 대비 최종 증분 | 상한 | 잔여 | 판정 |
+|---|---:|---:|---:|---|
+| entry JS | 8,888B | 20,480B | 11,592B | 통과 |
+| PDF route JS | **61,879B** | **72,000B** | **10,121B** | 통과 |
+| shared JS(귀속 이동 제외) | 2,400B | 30,720B | 28,320B | 통과 |
+| app JS | **74,059B** | **81,920B** | **7,861B** | 통과 |
+| CSS | 376B | 10,240B | 9,864B | 통과 |
+
+scoped PDF route 절대값은 1,139,166B였다. full route 비교도 같은 app 순증분과 5개 상한, override `{}`·multiplier 1로 통과했다. 앱 잔여 13,348B에서 시작한 이번 단계가 5,487B를 사용해 7,861B를 남겼으며 app 상한은 올리지 않았다.
+
+**좌표·기능 계약** — 저장 모델은 raw PDF나 화면 픽셀이 아니라 회전된 visual viewport의 중심 `(cx, cy)`, 상대 폭 `rw`, 원본 비율 `aspect`다. CSS 포인터는 `getBoundingClientRect()`에서 viewport 좌표로 한 번 옮기고, 대상 페이지마다 적용 사각형의 **네 모서리 전부**를 기존 `viewportPointToPdf` 변환에 넣는다. 이 변환이 CropBox·UserUnit·회전·scale을 처리하므로 결과를 scale로 다시 나누는 이중 보정은 넣지 않았다. PNG/JPEG를 미리보기에서 직접 이동하고 오른쪽 아래 핸들로 비율 고정 크기 조절하며, 선택 페이지 모두에 같은 상대 위치를 적용한다. 이동·크기 변경은 현재 선택 이미지에 한정된 undo/redo history에 들어가고 다른 이미지를 고르면 history를 새로 시작한다. 포인터를 쓰기 어려운 사용자를 위해 상·하·좌·우와 확대·축소 버튼을 함께 제공한다.
+
+화면의 ko/en 경고는 이 기능이 도장·서명 **이미지만 삽입**하며 공인 전자서명이나 인증서 기반·암호학적 디지털 서명을 만들거나 검증하지 않는다고 명시한다. `/tools/pdf-editor/stamp`는 자체 canonical, FAQ, application metadata와 ko/en 소셜 이미지를 갖고 정적 생성·sitemap 검증에 포함된다.
+
+**골든·회귀 판정** — 비영점 CropBox, UserUnit 1/1.25/1.5/2, 회전 0/90/180/270의 혼합 4페이지에서 불투명 도장 픽셀 경계를 PDF.js와 Poppler로 렌더했다. DPR 1/2 × CSS 표시 배율 1/0.5 × 회전 4종의 **16조합**에서 CSS→viewport 모델, DPR bitmap의 PDF 점, 실제 출력 경계를 비교했고 양 렌더러 8페이지에서 위치·크기·비율을 통과했다. 별도 `1,3` 선택 출력은 페이지별 도장 존재가 `[true,false,true,false]`였다. legacy organize oracle은 client 3·structure 4·render 32·output 4·input 1에서 총 diff 0이다.
+
+`test:pdf-finish`는 20개 직접 진입과 실제 drag/resize/undo/redo/대체 버튼/회전 페이지 동일 상대 좌표/3페이지 출력을 통과했다. unit 323/323, production 및 `VITE_LOCAL_QA=1` build 2,849 modules·정적 71페이지, static startup recovery 119, PDF scoped browser도 통과했다. local-QA stamp+finish a11y 6페이지는 violations 0·기존 상속 incomplete 253·외부 요청 0이며 incomplete를 통과로 세지 않았다. rendering은 8대상×3회, stamp 최대 CLS `0.0001480365514755249`, 외부 요청 0이다. 시각 회귀는 영향 45장을 ko/en에서 diff 0으로 재실행했고 stamp는 desktop/mobile 390px의 양 테마·양 언어 8장과 영어 light 320px 1장을 포함한다. 직접 열람 결과 도장·핸들·선택 썸네일·작업 버튼의 겹침이나 잘림은 없었다.
+
+시각 기준선 변경은 새 `pdf-finish-stamp__interaction__{ko,en}__{light,dark}__{desktop,mobile}.png` 8장, 영어 light `mobile-320` 1장, 4탭 전환으로 달라진 `pdf-finish-navigation__active__{ko,en}__light__{mobile,mobile-320}.png` 4장, 총 13장이다. 상세 JSON·렌더 원출력·캡처와 실행 보고는 `/tmp/worklazy-u4-5/`에 보존한다. merge-time full browser/new-tools/utilities/office/QR/recovery/Excel/a11y/visual/CSS/legacy/registry/성능 항목은 정본 checklist대로 U4-8 병합 직전 1회로 이월한다. — Codx
+
 ### U4-4 fix-5 — 표시 실패 새로고침 버튼 대비 회귀 수리 (Codx)
 
 **실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-5/fix-4 지시서, astra 5차 검수 보고, PDF finish 정본과 열린 계획서를 대조했다. 시작 branch/head는 `s3-pdf-finish`/`c3288856b10953e663a0910a9ca125c7bfe667eb`로 지시와 일치했고 동일 코드 표면의 상반 지시는 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`와 금지 worktree는 건드리지 않았으며 main 병합·push·배포는 범위 밖이다.

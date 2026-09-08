@@ -23,6 +23,7 @@ const fullProfiles = Object.freeze([
   enDarkDesktop,
   enDarkMobile,
 ]);
+const stampProfiles = Object.freeze([...fullProfiles, enLightMobile320]);
 
 const representativeProfiles = Object.freeze([
   koLightDesktop,
@@ -669,6 +670,28 @@ const pdfFinishScenarios = [
     ],
     readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']",
     assertSelector: "[data-testid='pdf-finish-overlay']",
+  }),
+  scenario({
+    scenarioId: "pdf-finish-stamp--interaction",
+    routeId: "pdf-finish-stamp",
+    toolId: "pdf-editor",
+    stateId: "interaction",
+    stateType: "finish",
+    path: "/tools/pdf-editor/stamp",
+    kind: "tool",
+    profiles: stampProfiles,
+    profileReductionReason: "No reduction: stamp controls and the draggable preview retain the complete locale, theme, and desktop/mobile product, plus the required 320px English mobile check.",
+    fixture: { kind: "generated-pdf", fileName: "visual-finish-stamp.pdf", pageCount: 3 },
+    actions: [
+      { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[accept*='application/pdf']" },
+      { type: "wait", selector: "[data-testid='pdf-stamp-image']", timeoutMs: 60_000 },
+      { type: "upload", selector: "[data-testid='pdf-stamp-image']", fixture: { kind: "generated-png", fileName: "visual-stamp.png", width: 160, height: 80 } },
+      { type: "wait", selector: "[data-testid='pdf-stamp-overlay']", timeoutMs: 60_000 },
+      { type: "wait", selector: "[data-testid='pdf-finish-preflight-ready']", timeoutMs: 60_000 },
+      { type: "scroll-into-view", selector: "[data-testid='pdf-finish-preview']", offset: -88 },
+    ],
+    readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']",
+    assertSelector: "[data-testid='pdf-stamp-overlay']",
   }),
   ...[
     ["start", "/tools/pdf-editor", "organize"],

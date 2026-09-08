@@ -83,7 +83,7 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 211);
+  assert.equal(names.length, 220);
   assert.equal(qaCaptureScenarios.length, 79);
   assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 620);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
@@ -143,8 +143,8 @@ test("visual regression scenario manifest covers every available tool and state 
     "interaction-image-to-pdf-thumbnails", "interaction-pdf-to-image-thumbnails", "interaction-convert-thumbnails",
   ]));
   const finishScenarios = visualRegressionScenarios.filter(({ stateType }) => ["finish", "finish-navigation"].includes(stateType));
-  assert.equal(finishScenarios.length, 6);
-  assert.equal(finishScenarios.flatMap(({ profiles }) => profiles).length, 36);
+  assert.equal(finishScenarios.length, 7);
+  assert.equal(finishScenarios.flatMap(({ profiles }) => profiles).length, 45);
   assert.deepEqual(new Set(finishScenarios.flatMap(({ profiles }) => profiles.map(({ viewport }) => viewport))), new Set(["desktop", "mobile", "mobile-320"]));
   assert.ok(finishScenarios.filter(({ stateType }) => stateType === "finish-navigation").every(({ profiles }) => profiles.every(({ theme }) => theme === "light")));
   const b5bQaScenarios = qaCaptureScenarios.filter(({ toolId }) => toolId === "video-studio");

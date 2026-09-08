@@ -16,6 +16,7 @@ import {
   createFinishAnchors,
   createFinishExecutionPlan,
   createNormalizedStamp,
+  createStampHistory,
   createPageSelection,
   createSixTextRegions,
   createTilePlacements,
@@ -33,11 +34,14 @@ import {
   measureCanvas,
   parseRange,
   preprocessText,
+  commitStamp,
+  redoStamp,
   selectionAnchor,
   setFilePageSelection,
   stampPdfCorners,
   toggleThumbnailPage,
   tokenPageCount,
+  undoStamp,
   viewportPointToPdf,
   type CapturedTokenValues,
   type PdfViewportGeometry,
@@ -660,6 +664,18 @@ test("stamp coordinates ignore DPR, preserve center-relative width/aspect, scale
     ),
     [{ x: 11, y: 22 }, { x: 41, y: 22 }, { x: 11, y: 62 }, { x: 41, y: 62 }],
   );
+
+  const first = { cx: 0.5, cy: 0.5, rw: 0.2, aspect: 2 };
+  const second = { ...first, cx: 0.7 };
+  const third = { ...second, rw: 0.3 };
+  const initialHistory = createStampHistory(first);
+  const twoEdits = commitStamp(commitStamp(initialHistory, second), third);
+  assert.deepEqual(twoEdits, { past: [first, second], present: third, future: [] });
+  const undone = undoStamp(twoEdits);
+  assert.deepEqual(undone, { past: [first], present: second, future: [third] });
+  assert.deepEqual(redoStamp(undone), twoEdits);
+  assert.deepEqual(commitStamp(undone, first).future, [], "a new edit must clear redo history");
+  assert.equal(commitStamp(initialHistory, first), initialHistory, "an unchanged placement must not add history");
 });
 
 test("finish plan emits the canonical composite order as a pure 1-based plan", () => {

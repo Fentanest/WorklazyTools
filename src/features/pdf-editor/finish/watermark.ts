@@ -659,6 +659,38 @@ export async function addWatermarkXObject(page: PDFPage, reference: PDFRef, obje
   return addIndependentContentStream(page, await watermarkOperators(name, graphicsState, viewport, placements, objectWidth, objectHeight, signal), layer);
 }
 
+export async function addImageXObjectAtPdfCorners(
+  page: PDFPage,
+  reference: PDFRef,
+  corners: readonly [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }],
+  signal?: AbortSignal,
+) {
+  throwIfAborted(signal);
+  await yieldToEventLoop();
+  throwIfAborted(signal);
+  const [topLeft, topRight, bottomLeft, bottomRight] = corners;
+  const values = corners.flatMap(({ x, y }) => [x, y]);
+  if (values.some((value) => !Number.isFinite(value))) throw new Error("invalid-image-corners");
+  const horizontal = { x: bottomRight.x - bottomLeft.x, y: bottomRight.y - bottomLeft.y };
+  const vertical = { x: topLeft.x - bottomLeft.x, y: topLeft.y - bottomLeft.y };
+  const tolerance = 1e-7;
+  if (Math.abs(topRight.x - bottomLeft.x - horizontal.x - vertical.x) > tolerance
+      || Math.abs(topRight.y - bottomLeft.y - horizontal.y - vertical.y) > tolerance) {
+    throw new Error("non-affine-image-corners");
+  }
+  const name = page.node.newXObject("Stamp", reference);
+  return addIndependentContentStream(page, [
+    pushGraphicsState(),
+    beginMarkedContent("Artifact"),
+    pushGraphicsState(),
+    concatTransformationMatrix(horizontal.x, horizontal.y, vertical.x, vertical.y, bottomLeft.x, bottomLeft.y),
+    drawObject(name),
+    popGraphicsState(),
+    endMarkedContent(),
+    popGraphicsState(),
+  ], "foreground");
+}
+
 export async function embedWatermarkImage(document: PDFDocument, file: File, signal?: AbortSignal): Promise<PDFImage> {
   throwIfAborted(signal);
   const bytes = await file.arrayBuffer();

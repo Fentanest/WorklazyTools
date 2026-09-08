@@ -37,7 +37,7 @@ try {
   });
   const directEntries = [];
   for (const language of ["ko", "en"]) {
-    for (const route of ["finish", "page-numbers", "header-footer", "watermark"]) {
+    for (const route of ["finish", "page-numbers", "header-footer", "watermark", "stamp"]) {
       for (const viewport of [{ id: "desktop", width: 1365, height: 900 }, { id: "mobile", width: 390, height: 844 }]) {
         const context = await browser.newContext({ viewport, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
         await context.addInitScript(() => {
@@ -51,8 +51,11 @@ try {
         const documentNavigations = [];
         page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) documentNavigations.push(frame.url()); });
         await page.goto(`${baseUrl}/${language}/tools/pdf-editor/${route}/`, { waitUntil: "networkidle" });
-        const expectedTab = route === "header-footer" ? "header-footer" : route === "watermark" ? "watermark" : "page-numbers";
+        const expectedTab = route === "header-footer" ? "header-footer" : route === "watermark" ? "watermark" : route === "stamp" ? "stamp" : "page-numbers";
         await page.locator(`[data-testid='pdf-finish-ready'][data-pdf-finish-tab='${expectedTab}']`).waitFor();
+        if (route === "stamp") {
+          assert.match(await page.locator("[data-testid='pdf-stamp-notice']").innerText(), language === "ko" ? /공인 전자서명|디지털 서명/u : /certified electronic|digital signature/iu);
+        }
         await page.waitForFunction(() => !document.querySelector(".tool-route-loading") && !Object.keys(sessionStorage).some((key) => key.startsWith("worklazy_tool_reload:")));
         assert.equal(await page.locator(".pdf-tool-navigation [data-pdf-nav-mode]").count(), 5);
         assert.equal(await page.locator(".pdf-tool-navigation [data-pdf-nav-mode='finish'][data-active='true']").count(), 1);
@@ -64,7 +67,7 @@ try {
       }
     }
   }
-  assert.equal(directEntries.length, 16);
+  assert.equal(directEntries.length, 20);
 
   await testChunkRecovery(browser);
   await testDisplayModuleRecovery(browser, fixture);
@@ -77,10 +80,11 @@ try {
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
   const watermarkRuntimeRequests = await testWatermarkWorkflow(browser, fixture, inlineImageFixture, smallFixture);
+  await testStampWorkflow(browser, fixture);
   await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks(watermarkRuntimeRequests);
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -788,6 +792,104 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
   assert.equal(await action.isEnabled(), true, "risk consent must allow the warned operation");
   await context.close();
   return [...runtimeRequests].sort();
+}
+
+async function testStampWorkflow(browserInstance, fixture) {
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  const page = await context.newPage();
+  page.setDefaultTimeout(120_000);
+  await page.goto(`${baseUrl}/en/tools/pdf-editor/stamp/`, { waitUntil: "networkidle" });
+  assert.match(await page.locator("[data-testid='pdf-stamp-notice']").innerText(), /only inserts.+image|does not create.+digital signature/is);
+
+  await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+    .setInputFiles({ name: "stamp-browser.pdf", mimeType: "application/pdf", buffer: fixture });
+  const stampPng = new PNG({ width: 160, height: 80 });
+  for (let index = 0; index < stampPng.data.length; index += 4) {
+    stampPng.data[index] = 202;
+    stampPng.data[index + 1] = 30;
+    stampPng.data[index + 2] = 55;
+    stampPng.data[index + 3] = index % 32 < 16 ? 255 : 205;
+  }
+  await page.locator("[data-testid='pdf-stamp-image']")
+    .setInputFiles({ name: "signature-stamp.png", mimeType: "image/png", buffer: PNG.sync.write(stampPng) });
+  const overlay = page.locator("[data-testid='pdf-stamp-overlay']");
+  await overlay.waitFor();
+  await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+  await overlay.scrollIntoViewIfNeeded();
+
+  const placement = async () => overlay.evaluate((node) => Object.fromEntries(["cx", "cy", "rw", "aspect"].map((key) => [key, Number(node.getAttribute(`data-stamp-${key}`))])));
+  const waitForPlacement = async (expected) => page.waitForFunction((target) => {
+    const node = document.querySelector("[data-testid='pdf-stamp-overlay']");
+    return node && ["cx", "cy", "rw", "aspect"].every((key) => Math.abs(Number(node.getAttribute(`data-stamp-${key}`)) - target[key]) < 1e-9);
+  }, expected);
+  const initial = await placement();
+  assert.ok(Math.abs(initial.aspect - 2) < 1e-6, `stamp model lost the intrinsic ratio: ${JSON.stringify(initial)}`);
+  const initialBox = await overlay.boundingBox();
+  assert.ok(initialBox && Math.abs(initialBox.width / initialBox.height - 2) < 0.04, `stamp preview ratio is wrong: ${JSON.stringify(initialBox)}`);
+
+  await page.mouse.move(initialBox.x + initialBox.width / 2, initialBox.y + initialBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(initialBox.x + initialBox.width / 2 - 42, initialBox.y + initialBox.height / 2 - 28, { steps: 4 });
+  await page.mouse.up();
+  const moved = await placement();
+  assert.ok(moved.cx < initial.cx && moved.cy < initial.cy, `direct move did not update normalized placement: ${JSON.stringify({ initial, moved })}`);
+  assert.equal(await page.locator("[data-testid='pdf-stamp-undo']").isEnabled(), true);
+  await page.locator("[data-testid='pdf-stamp-undo']").click();
+  await waitForPlacement(initial);
+  assert.deepEqual(await placement(), initial, "undo did not restore the prior placement");
+  assert.equal(await page.locator("[data-testid='pdf-stamp-redo']").isEnabled(), true);
+  await page.locator("[data-testid='pdf-stamp-redo']").click();
+  await waitForPlacement(moved);
+  assert.deepEqual(await placement(), moved, "redo did not restore the moved placement");
+
+  const movedBox = await overlay.boundingBox();
+  assert.ok(movedBox);
+  const resizeHandle = page.locator("[data-testid='pdf-stamp-resize-handle']");
+  const handleBox = await resizeHandle.boundingBox();
+  assert.ok(handleBox);
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2 + 54, handleBox.y + handleBox.height / 2 + 27, { steps: 4 });
+  await page.mouse.up();
+  const resized = await placement();
+  const resizedBox = await overlay.boundingBox();
+  assert.ok(resized.rw > moved.rw, `direct resize did not increase relative width: ${JSON.stringify({ moved, resized })}`);
+  assert.ok(resizedBox && Math.abs(resizedBox.width / resizedBox.height - 2) < 0.04, `direct resize changed the fixed aspect ratio: ${JSON.stringify(resizedBox)}`);
+
+  const smaller = page.getByRole("button", { name: "Smaller" });
+  await smaller.click();
+  await page.waitForFunction((previous) => Number(document.querySelector("[data-testid='pdf-stamp-overlay']")?.getAttribute("data-stamp-rw")) < previous, resized.rw);
+  const keyboardSized = await placement();
+  assert.ok(keyboardSized.rw < resized.rw, "the accessible size alternative did not change the stamp");
+  await page.locator("[data-testid='pdf-stamp-undo']").click();
+  await waitForPlacement(resized);
+  assert.deepEqual(await placement(), resized, "undo did not include the accessible size action");
+
+  const range = page.locator("[data-testid='pdf-finish-range']");
+  await range.fill("1");
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-preview']")?.getAttribute("data-preview-status") === "ready");
+  const firstCanvas = await page.locator("[data-testid='pdf-finish-canvas-area'] canvas").evaluate((canvas) => ({ width: canvas.width, height: canvas.height }));
+  const firstPagePlacement = await placement();
+  await range.fill("2");
+  await page.waitForFunction((before) => {
+    const canvas = document.querySelector("[data-testid='pdf-finish-canvas-area'] canvas");
+    return canvas instanceof HTMLCanvasElement && (canvas.width !== before.width || canvas.height !== before.height);
+  }, firstCanvas);
+  await overlay.waitFor();
+  assert.deepEqual(await placement(), firstPagePlacement, "a rotated target page did not retain the same normalized visible-area placement");
+
+  await range.fill("1-3");
+  await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready");
+  await page.screenshot({ path: path.join(shots, "en-stamp-edited-desktop.png"), fullPage: false });
+  await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").click();
+  const download = page.locator("[data-testid='pdf-download']");
+  await download.waitFor();
+  const output = Buffer.from(await download.evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
+  const outputDocument = await PDFDocument.load(output);
+  assert.equal(outputDocument.getPageCount(), 3);
+  assert.equal(await page.locator("[data-route-error]").count(), 0);
+  await context.close();
 }
 
 async function testWhitespaceWatermark(browserInstance, fixture) {

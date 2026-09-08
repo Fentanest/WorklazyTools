@@ -27,6 +27,7 @@ import {
   type TextFontProbe,
 } from "./text.ts";
 import {
+  addImageXObjectAtPdfCorners,
   addWatermarkXObject,
   assertBackgroundPlacementSupported,
   createTextWatermarkXObject,
@@ -40,6 +41,7 @@ import {
   type WatermarkPlacement,
   type WatermarkRiskCode,
 } from "./watermark.ts";
+import { applyNormalizedStamp, stampPdfCorners, type PdfStampSettings, type StampPdfCorners } from "./stamp.ts";
 import {
   degrees,
   embedCustomPdfFont,
@@ -133,6 +135,7 @@ export interface PdfFinishDecorationOptions {
   excludeCover: boolean;
   opacity?: number;
   watermark?: PdfWatermarkSettings;
+  stamp?: PdfStampSettings;
 }
 
 export interface PdfFinishInputFile {
@@ -206,7 +209,15 @@ interface ImageWatermarkPlan {
   watermarkPlacements: WatermarkPlacement[];
 }
 
-type DecorationPlan = PageDecorationPlan | ImageWatermarkPlan;
+interface ImageStampPlan {
+  kind: "stamp-image";
+  physicalPage: number;
+  page: PDFPage;
+  image: PDFImage;
+  corners: StampPdfCorners;
+}
+
+type DecorationPlan = PageDecorationPlan | ImageWatermarkPlan | ImageStampPlan;
 
 interface BatchFontResources {
   getFontAsset: () => Promise<ArrayBuffer>;
@@ -225,6 +236,18 @@ function validateOptions(options: PdfFinishDecorationOptions) {
   if (!/^#[0-9a-f]{6}$/iu.test(options.color)) throw new PdfFinishEngineError("invalid-field", { field: "color" });
   if (options.opacity !== undefined && (!Number.isFinite(options.opacity) || options.opacity < 0 || options.opacity > 1)) {
     throw new PdfFinishEngineError("invalid-field", { field: "opacity" });
+  }
+  if (options.watermark && options.stamp) throw new PdfFinishEngineError("invalid-field", { field: "decoration" });
+  if (options.stamp) {
+    const { placement } = options.stamp;
+    if (!options.stamp.image
+        || [placement.cx, placement.cy, placement.rw, placement.aspect].some((value) => !Number.isFinite(value))
+        || placement.cx < 0 || placement.cx > 1
+        || placement.cy < 0 || placement.cy > 1
+        || placement.rw <= 0 || placement.rw > 1
+        || placement.aspect <= 0) {
+      throw new PdfFinishEngineError("invalid-field", { field: "stamp" });
+    }
   }
   const watermark = options.watermark;
   if (!watermark) return;
@@ -602,6 +625,48 @@ async function analyzeImageWatermark(
   return { document, plans, warnings, errors };
 }
 
+async function analyzeStamp(
+  input: PdfFinishEngineInput,
+  source: PdfFinishInputFile,
+  document: PDFDocument,
+): Promise<{ document: PDFDocument; plans: ImageStampPlan[]; warnings: Set<PdfFinishWarningCode>; errors: PdfFinishPreflightError[] }> {
+  const settings = input.options.stamp;
+  const warnings = new Set<PdfFinishWarningCode>();
+  if (!settings?.image) return { document, plans: [], warnings, errors: [imageWatermarkError(source, source.selection.exactPages[0] ?? 1, "image-format")] };
+  let image: PDFImage;
+  try {
+    image = await embedWatermarkImage(document, settings.image, input.signal);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    return { document, plans: [], warnings, errors: [imageWatermarkError(source, source.selection.exactPages[0] ?? 1, "image-format")] };
+  }
+  const intrinsicAspect = image.width / image.height;
+  if (!Number.isFinite(intrinsicAspect) || intrinsicAspect <= 0
+      || Math.abs(intrinsicAspect / settings.placement.aspect - 1) > 0.001) {
+    return { document, plans: [], warnings, errors: [imageWatermarkError(source, source.selection.exactPages[0] ?? 1, "image-format")] };
+  }
+  const plans: ImageStampPlan[] = [];
+  for (const physicalPage of source.selection.exactPages) {
+    throwIfAborted(input.signal);
+    await yieldToEventLoop();
+    throwIfAborted(input.signal);
+    const page = document.getPages()[physicalPage - 1];
+    if (!page) throw new PdfFinishEngineError("invalid-field", { field: "selection" });
+    const viewport = pdfPageViewport(page);
+    const applied = applyNormalizedStamp(settings.placement, viewport);
+    const corners = stampPdfCorners(applied, {
+      width: viewport.width,
+      height: viewport.height,
+      convertToPdfPoint: (x, y) => {
+        const point = viewportPointToPdf(viewport.transform, x, y);
+        return [point.x, point.y];
+      },
+    });
+    plans.push({ kind: "stamp-image", physicalPage, page, image, corners });
+  }
+  return { document, plans, warnings, errors: [] };
+}
+
 async function analyzeDocument(
   input: PdfFinishEngineInput,
   source: PdfFinishInputFile,
@@ -609,6 +674,10 @@ async function analyzeDocument(
   resources: BatchFontResources,
   fileIndex: number,
 ): Promise<{ document?: PDFDocument; plans: DecorationPlan[]; warnings: Set<PdfFinishWarningCode>; errors: PdfFinishPreflightError[] }> {
+  if (input.options.stamp) {
+    const document = await loadDocument(source.file, input.signal);
+    return analyzeStamp(input, source, document);
+  }
   const preparedPages = preparePages(source, input.options, input.locale, new Date(batchDate.getTime()));
   const warnings = new Set<PdfFinishWarningCode>();
   addTextWarnings(warnings, preparedPages);
@@ -702,7 +771,9 @@ async function decorateDocument(input: PdfFinishEngineInput, plans: readonly Dec
     await yieldToEventLoop();
     throwIfAborted(input.signal);
     const watermark = input.options.watermark;
-    if (plan.kind === "watermark-image") {
+    if (plan.kind === "stamp-image") {
+      await addImageXObjectAtPdfCorners(plan.page, plan.image.ref, plan.corners, input.signal);
+    } else if (plan.kind === "watermark-image") {
       if (!watermark) throw new PdfFinishEngineError("invalid-layout");
       await addWatermarkXObject(plan.page, plan.image.ref, 1, 1, plan.viewport, plan.watermarkPlacements, watermark.opacity, watermark.layer, input.signal);
     } else if (plan.kind === "watermark-text") {
@@ -791,9 +862,9 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       throwIfAborted(input.signal);
       const bytes = await document.save();
       throwIfAborted(input.signal);
-      if (input.options.watermark) {
+      if (input.options.watermark || input.options.stamp) {
         try {
-          await (input.validateWatermarkOutput ?? validateWatermarkResult)(bytes, source.selection.totalPages, source.selection.exactPages, input.options.watermark.layer, input.signal);
+          await (input.validateWatermarkOutput ?? validateWatermarkResult)(bytes, source.selection.totalPages, source.selection.exactPages, input.options.watermark?.layer ?? "foreground", input.signal);
         } catch (error) {
           if (error instanceof Error && error.name === "AbortError") throw error;
           throw new PdfFinishEngineError("output-validation", {}, error);

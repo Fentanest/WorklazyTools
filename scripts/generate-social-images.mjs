@@ -17,6 +17,7 @@ const tools = [
   tool("pdf-page-numbers", "#7554d8", "PDF 마무리", "PDF 페이지 번호", "시작 번호 · 표지 제외 · 홀짝·범위 선택", "PDF finishing", "PDF Page Numbers", "Starting number · cover exclusion · exact pages"),
   tool("pdf-header-footer", "#7554d8", "PDF 마무리", "PDF 머리글·바닥글", "파일명·날짜 토큰 · 6개 위치 · 미리보기", "PDF finishing", "PDF Headers & Footers", "Filename & date tokens · six positions · preview"),
   tool("pdf-watermark", "#7554d8", "PDF 마무리", "PDF 워터마크", "텍스트·이미지 · 앞·뒤 배치 · 반복 타일", "PDF finishing", "PDF Watermark", "Text & images · front or back · repeated tiles"),
+  tool("pdf-stamp", "#7554d8", "PDF 마무리", "PDF 도장·서명 이미지", "직접 이동·크기 조절 · 선택 페이지 같은 위치", "PDF finishing", "PDF Stamp & Signature Image", "Move & resize · same position on selected pages"),
   tool("hwp-editor", "#db7a16", "한글 문서", "HWP 편집기", "HWP·HWPX · 본문 · 표 · 개체 편집", "Hangul documents", "HWP Editor", "HWP & HWPX · text · tables · objects"),
   tool("office-editor", "#7554d8", "브라우저 오피스", "오피스 편집기", "Writer · Calc · Impress · 브라우저 저장", "Browser office", "Office Editor", "Writer · Calc · Impress · local saving"),
   tool("video-studio", "#d8468f", "미디어", "비디오 스튜디오", "영상 자르기 · 이어붙이기 · 음원 추출", "Media", "Video Studio", "Trim · join · extract audio"),

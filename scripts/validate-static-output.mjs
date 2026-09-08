@@ -13,7 +13,7 @@ const routes = [
   "", "tools", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-compare",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
-  "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark",
+  "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
   "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
   "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
@@ -23,7 +23,7 @@ const routes = [
 const socialSlugByRoute = {
   "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-compare": "document-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
-  "tools/pdf-editor/finish": "pdf-finish", "tools/pdf-editor/page-numbers": "pdf-page-numbers", "tools/pdf-editor/header-footer": "pdf-header-footer", "tools/pdf-editor/watermark": "pdf-watermark",
+  "tools/pdf-editor/finish": "pdf-finish", "tools/pdf-editor/page-numbers": "pdf-page-numbers", "tools/pdf-editor/header-footer": "pdf-header-footer", "tools/pdf-editor/watermark": "pdf-watermark", "tools/pdf-editor/stamp": "pdf-stamp",
   "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",
   "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-merger": "text-merger", "tools/text-tools": "text-tools",
   "tools/text-formatter": "code-formatter", "tools/work-calculator": "workday-calculator", "tools/timezone-calculator": "world-time-planner",
@@ -71,7 +71,7 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk", "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark"].includes(route)) {
+  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk", "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
       ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/excel-compare"
@@ -90,6 +90,8 @@ for (const route of routes) {
           ? language === "ko" ? "머리글과 바닥글에 어떤 정보를 넣을 수 있나요?" : "What can I put in a header or footer?"
         : route === "tools/pdf-editor/watermark"
           ? language === "ko" ? "PDF에 텍스트와 이미지 워터마크를 모두 넣을 수 있나요?" : "Can I add both text and image watermarks to a PDF?"
+        : route === "tools/pdf-editor/stamp"
+          ? language === "ko" ? "도장이나 서명 이미지를 여러 페이지의 같은 위치에 넣을 수 있나요?" : "Can I place a stamp or signature image in the same position on multiple pages?"
         : route.startsWith("tools/pdf-editor/")
           ? language === "ko" ? "페이지 번호를 원하는 페이지에만 넣을 수 있나요?" : "Can page numbers be added only to selected pages?"
           : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";
@@ -98,8 +100,8 @@ for (const route of routes) {
     }
   }
   if (html.includes("#/")) throw new Error(`${filePath} still contains a hash route.`);
-  if (["tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark"].includes(route)) {
-    const canonicalRoute = route === "tools/pdf-editor/watermark" ? route : "tools/pdf-editor/finish";
+  if (["tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
+    const canonicalRoute = route === "tools/pdf-editor/watermark" || route === "tools/pdf-editor/stamp" ? route : "tools/pdf-editor/finish";
     const expectedCanonical = `https://worklazy.net/${language}/${canonicalRoute}/`;
     if (!html.includes(`<link rel="canonical" href="${expectedCanonical}" />`) || !html.includes(`<meta property="og:url" content="${expectedCanonical}" />`)) {
       throw new Error(`${filePath} does not use the expected canonical URL ${expectedCanonical}.`);
