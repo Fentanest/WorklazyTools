@@ -4,11 +4,11 @@
 
 ## Excel 비교 — 중복키·머리글 후속
 
-- **BL01 · 마지막 더보기 소진 뒤 초점 목적지** — 151행 중복 목록을 키보드로 펼친 뒤 마지막 50개를 불러오면 버튼이 DOM에서 사라지고 초점이 `BODY`로 이동했다(ko/en × light/dark **4/4**). `/ko/tools/excel-compare/`에서 151행 동일 키 CSV 두 파일 → 키 비교 → 중복 목록 → 마지막 더보기를 Tab·Enter로 실행해 재현한다. 다음 Tab의 목적지와 완료 안내 정책을 별도 접근성 계약으로 정한다. — Codx
-- **BL02 · 한국어 guide의 긴 시트명 나열 잘림** — Excel 비교 안내 카드의 연속 영문 시트명 문자열이 카드 오른쪽에서 잘리는 상태가 기존 시각 기준선과 S2/S3 캡처에 동일하게 남아 있다. `/ko/tools/excel-compare/` guide를 모바일 폭 390px·dark에서 최하단까지 내려 재현하며, 표현 또는 줄바꿈을 고친 뒤 해당 기준선만 갱신한다. — Codx
-- **BL03 · desktop 결과 컨트롤 상단 부분 가림** — 1365×900 한국어 사용자 1행/B 결과에서 오른쪽 목록을 Enter로 펼친 뒤 toggle rect가 `y=-19.53125..24.46875`, 전후 Tab·Shift+Tab 상태는 `y=0.46875`로 3px 초점 링 여백이 부족했다. 중앙 hit는 보이지만 라벨·링 일부가 잘리며 두 테마 **6상태**가 이전 커밋과 동일하다. `/ko/tools/excel-compare/` 결과에서 오른쪽 toggle을 키보드로 열고 앞뒤로 이동해 재현한다. 고정 shell이 없는 desktop 상단 회피 정책은 UI 재설계 계획에서 정한다. — Codx
+- **BL01 · 마지막 더보기 소진 뒤 초점 목적지 — 낮은 우선순위(P3)** — 151행 중복 목록을 키보드로 펼친 뒤 마지막 50개를 불러오면 버튼이 DOM에서 사라지고 초점이 `BODY`로 이동했다(ko/en × light/dark **4/4**). `/ko/tools/excel-compare/`에서 151행 동일 키 CSV 두 파일 → 키 비교 → 중복 목록 → 마지막 더보기를 Tab·Enter로 실행해 재현한다. 다음 Tab의 목적지와 완료 안내 정책을 별도 접근성 계약으로 정한다. — Codx
+- **BL02 · 한국어 guide의 긴 시트명 나열 잘림 — 낮은 우선순위(P3)** — Excel 비교 안내 카드의 연속 영문 시트명 문자열이 카드 오른쪽에서 잘리는 상태가 기존 시각 기준선과 S2/S3 캡처에 동일하게 남아 있다. `/ko/tools/excel-compare/` guide를 모바일 폭 390px·dark에서 최하단까지 내려 재현하며, 표현 또는 줄바꿈을 고친 뒤 해당 기준선만 갱신한다. — Codx
+- **BL03 · desktop 결과 컨트롤 상단 부분 가림 — 낮은 우선순위(P3)** — 1365×900 한국어 사용자 1행/B 결과에서 오른쪽 목록을 Enter로 펼친 뒤 toggle rect가 `y=-19.53125..24.46875`, 전후 Tab·Shift+Tab 상태는 `y=0.46875`로 3px 초점 링 여백이 부족했다. 중앙 hit는 보이지만 라벨·링 일부가 잘리며 두 테마 **6상태**가 이전 커밋과 동일하다. `/ko/tools/excel-compare/` 결과에서 오른쪽 toggle을 키보드로 열고 앞뒤로 이동해 재현한다. 고정 shell이 없는 desktop 상단 회피 정책은 UI 재설계 계획에서 정한다. — Codx
 - **BL04 · XLSX/XLSM 오류 셀 타입 소실 — 높은 우선순위(spreadsheet-core)** — 정상 OOXML의 `A1=ID`, `B1=#DIV/0!`, `C1=#N/A`와 아래 데이터 2행을 읽으면 XLSX/XLSM 어댑터가 두 오류를 문자열로 바꿔 머리글 감지가 `suggested(1)`을 내지만, 오류 타입을 보존하는 XLS/XLSB/SpreadsheetML과 타입 보존 대조군은 `uncertain(null)`이다. 따라서 **비오류 문자열 비율 조건과 감지 정확도에 직접 영향**한다. `parseSpreadsheetInput`→`detectExcelCompareHeader` 경로에서 위 5형식을 직렬화·재개방해 재현하고, ExcelJS 경로에서 진짜 오류 셀과 텍스트 `#N/A`를 구별한다. 감지기 문자열 blacklist 우회는 금지한다. — Codx
-- **BL05 · 결과 검색 입력의 고정 모바일 헤더 가림** — 390×844 결과 준비 단계에서 검색 입력 중앙 가시성은 전체 72상태 중 **71/72**였고, 실제 Tab 진입 시 ko/en `y=44.5/44.53125`, header bottom `63`, 중앙 hit가 `HEADER`였다. `/ko/tools/excel-compare/` 또는 `/en/tools/excel-compare/`에서 결과를 만든 뒤 검색 입력까지 Tab으로 이동해 재현한다. 고정 chrome 회피 범위를 검색 입력까지 넓힐지는 UI 재설계 계획에서 정한다. — Codx
+- **BL05 · 결과 검색 입력의 고정 모바일 헤더 가림 — 낮은 우선순위(P3)** — 390×844 결과 준비 단계에서 검색 입력 중앙 가시성은 전체 72상태 중 **71/72**였고, 실제 Tab 진입 시 ko/en `y=44.5/44.53125`, header bottom `63`, 중앙 hit가 `HEADER`였다. `/ko/tools/excel-compare/` 또는 `/en/tools/excel-compare/`에서 결과를 만든 뒤 검색 입력까지 Tab으로 이동해 재현한다. 고정 chrome 회피 범위를 검색 입력까지 넓힐지는 UI 재설계 계획에서 정한다. — Codx
 
 ## 비디오 스튜디오
 
