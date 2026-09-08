@@ -14,7 +14,7 @@ test("CLS 0.1 passes; 0.100001 (and 1) fails using the worst run, not median", (
 });
 
 test("rendering registration and all three samples are required", () => {
-  assert.deepEqual(targets.map(({ id }) => id), ["home", "document-compare", "pdf-editor", "pdf-finish", "pdf-page-numbers", "pdf-header-footer", "pdf-watermark", "pdf-stamp"]);
+  assert.deepEqual(targets.map(({ id }) => id), ["home", "document-compare", "pdf-editor", "pdf-finish", "pdf-finish-structure", "pdf-page-numbers", "pdf-header-footer", "pdf-watermark", "pdf-stamp"]);
   assert.throws(() => assertRenderingResults(results().slice(1)), /registration/);
   const duplicate = results(); duplicate[1] = duplicate[0];
   assert.throws(() => assertRenderingResults(duplicate), /registration/);

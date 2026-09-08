@@ -56,6 +56,9 @@ function decodeLatin1(bytes: Uint8Array) {
   }
   return result;
 }
+function encodeLatin1(source: string) {
+  return Uint8Array.from(source, (character) => character.charCodeAt(0));
+}
 const key = (name: string) => PDFName.of(name);
 const lookup = (document: PDFDocument, dictionary: PdfValue, name: string): PdfValue => document.context.lookup(dictionary?.get(key(name)));
 const nameOf = (object: PdfValue): string | undefined => object?.toString();
@@ -153,6 +156,19 @@ function pageContent(page: PdfValue) {
   }).join("\n");
 }
 
+function pageResources(page: PdfValue) {
+  const document: PDFDocument = page.doc;
+  const seen = new Set<PdfValue>();
+  let node: PdfValue = page.node;
+  while (node instanceof PDFDict && !seen.has(node)) {
+    seen.add(node);
+    const resources = node.get(key("Resources"));
+    if (resources) return document.context.lookup(resources);
+    node = document.context.lookup(node.get(key("Parent")));
+  }
+  return undefined;
+}
+
 function guardV10(document: PDFDocument) {
   const seen = new Set<PdfValue>();
   function walk(value: PdfValue) {
@@ -216,7 +232,7 @@ function prepare(document: PDFDocument) {
     throw new Error("unknown-OC-type");
   }
   for (const page of document.getPages()) {
-    const resources = page.node.Resources();
+    const resources = pageResources(page);
     const properties = lookup(document, resources, "Properties");
     const xobjects = lookup(document, resources, "XObject");
     const seenForms = new Set<string>();
@@ -532,4 +548,93 @@ export async function classifyOcgPreflight(bytes: Uint8Array | ArrayBuffer): Pro
     const reason = `preflight-error:${error instanceof Error ? error.message : "unknown"}`;
     return { allowed: false, reason, reasonCode: reasonCodeFor(reason, false) };
   }
+}
+function applyContentEdits(source: string, edits: Array<[number, number, string]>) {
+  let result = source;
+  for (const [start, end, replacement] of edits.sort((left, right) => right[0] - left[0])) {
+    result = result.slice(0, start) + replacement + result.slice(end);
+  }
+  return result;
+}
+
+/** Called only after classifyOcgPreflight has accepted the same source bytes. */
+export function flattenSupportedDocumentStructure(document: PDFDocument) {
+  const { visible } = prepare(document);
+  const rewrittenStreams = new Set<PdfValue>();
+  const propertyResources = new Set<PDFDict>();
+  const xobjectResources = new Set<PDFDict>();
+  for (const page of document.getPages()) {
+    const source = pageContent(page);
+    const resources = pageResources(page);
+    const properties = lookup(document, resources, "Properties");
+    const xobjects = lookup(document, resources, "XObject");
+    const edits: Array<[number, number, string]> = [];
+    let active: { start: number; markEnd: number; on: boolean } | undefined;
+    for (const operator of operators(source)) {
+      if (operator.op === "BDC" && decodeName(operator.args[0]?.raw) === "/OC") {
+        const property = decodeName(operator.args[1]?.raw?.slice(1));
+        active = { start: operator.start, markEnd: operator.end, on: visible(properties?.get(key(property ?? ""))) };
+      } else if (operator.op === "BDC") {
+        edits.push([operator.start, operator.end, `${operator.args[0]?.raw ?? "/Span"} BMC`]);
+      } else if (operator.op === "EMC" && active) {
+        edits.push(active.on
+          ? [active.start, active.markEnd, ""]
+          : [active.start, operator.end, ""]);
+        if (active.on) edits.push([operator.start, operator.end, ""]);
+        active = undefined;
+      } else if (operator.op === "Do" && !active) {
+        const reference = xobjects?.get(key(decodeName(operator.args[0]?.raw?.slice(1)) ?? ""));
+        const object = document.context.lookup(reference);
+        if (object instanceof PDFRawStream && object.dict.has(key("OC")) && !visible(object.dict.get(key("OC")))) {
+          edits.push([operator.start, operator.end, ""]);
+        }
+      }
+    }
+    const rawContents = document.context.lookup(page.node.get(key("Contents")));
+    for (const value of rawContents instanceof PDFArray ? rawContents.asArray() : rawContents ? [rawContents] : []) {
+      rewrittenStreams.add(document.context.lookup(value));
+    }
+    page.node.set(key("Contents"), document.context.register(document.context.flateStream(encodeLatin1(applyContentEdits(source, edits)))));
+    if (properties instanceof PDFDict) propertyResources.add(properties);
+    if (xobjects instanceof PDFDict) xobjectResources.add(xobjects);
+  }
+  for (const properties of propertyResources) {
+    for (const [entry, value] of properties.entries()) {
+      const type = nameOf(lookup(document, document.context.lookup(value), "Type"));
+      if (type === "/OCG" || type === "/OCMD") properties.delete(entry);
+    }
+  }
+  for (const xobjects of xobjectResources) {
+    for (const [entry, value] of xobjects.entries()) {
+      const object = document.context.lookup(value);
+      if (!(object instanceof PDFRawStream) || !object.dict.has(key("OC"))) continue;
+      if (visible(object.dict.get(key("OC")))) object.dict.delete(key("OC"));
+      else xobjects.delete(entry);
+    }
+  }
+
+  const characterProcedures = new Set<PdfValue>();
+  for (const [, object] of document.context.enumerateIndirectObjects()) if (object instanceof PDFDict) {
+    const procedures = lookup(document, object, "CharProcs");
+    if (procedures instanceof PDFDict) for (const [, value] of procedures.entries()) characterProcedures.add(document.context.lookup(value));
+  }
+  for (const [, object] of document.context.enumerateIndirectObjects()) {
+    if (object instanceof PDFDict) object.delete(key("MCID"));
+    if (!(object instanceof PDFRawStream) || rewrittenStreams.has(object)) continue;
+    const isContent = nameOf(lookup(document, object.dict, "Subtype")) === "/Form"
+      || nameOf(lookup(document, object.dict, "Type")) === "/Pattern"
+      || characterProcedures.has(object);
+    if (!isContent) continue;
+    const source = decodeLatin1(decodePDFRawStream(object).decode());
+    const edits: Array<[number, number, string]> = [];
+    for (const operator of operators(source)) if (operator.op === "BDC") {
+      edits.push([operator.start, operator.end, `${operator.args[0]?.raw ?? "/Span"} BMC`]);
+    }
+    if (edits.length) {
+      (object as unknown as { contents: Uint8Array }).contents = encodeLatin1(applyContentEdits(source, edits));
+      object.dict.delete(key("Filter"));
+      object.dict.delete(key("DecodeParms"));
+    }
+  }
+  document.catalog.delete(key("OCProperties"));
 }

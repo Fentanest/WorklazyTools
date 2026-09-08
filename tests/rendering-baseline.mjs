@@ -18,11 +18,17 @@ export const targets = Object.freeze([
   { id: "document-compare", path: "/ko/tools/document-compare", readySelector: '[data-tool-page="document-compare"]' },
   { id: "pdf-editor", path: "/ko/tools/pdf-editor", readySelector: '[data-tool-page="pdf-editor"]' },
   { id: "pdf-finish", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']" },
+  { id: "pdf-finish-structure", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']", scenario: "pdf-structure-editing" },
   { id: "pdf-page-numbers", path: "/ko/tools/pdf-editor/page-numbers", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='page-numbers']" },
   { id: "pdf-header-footer", path: "/ko/tools/pdf-editor/header-footer", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='header-footer']" },
   { id: "pdf-watermark", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']" },
   { id: "pdf-stamp", path: "/ko/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']" },
 ]);
+const selectedTargetIds = (process.env.RENDER_TARGET_IDS || "").split(",").map((value) => value.trim()).filter(Boolean);
+const measuredTargets = selectedTargetIds.length ? targets.filter(({ id }) => selectedTargetIds.includes(id)) : targets;
+if (selectedTargetIds.length && (new Set(selectedTargetIds).size !== selectedTargetIds.length || measuredTargets.length !== selectedTargetIds.length)) {
+  throw new Error(`RENDER_TARGET_IDS contains an unknown or duplicate target: ${selectedTargetIds.join(",")}.`);
+}
 
 // Self-contained so the browser runs exactly the observer exercised by unit tests.
 export function installRenderingObservers() {
@@ -88,7 +94,7 @@ export async function runRenderingBaseline() {
     const results = [];
     const externalRequests = [];
 
-    for (const target of targets) {
+    for (const target of measuredTargets) {
       const samples = [];
       for (let run = 1; run <= runsPerPage; run += 1) {
         const context = await browser.newContext({
@@ -112,6 +118,12 @@ export async function runRenderingBaseline() {
         await session.send("Network.setCacheDisabled", { cacheDisabled: true });
         await page.goto(new URL(target.path, baseUrl).href, { waitUntil: "networkidle" });
         await page.locator(target.readySelector).waitFor({ state: "visible" });
+        if (target.scenario === "pdf-structure-editing") {
+          await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+            .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/removal/removal-structures.pdf"));
+          await page.locator("[data-testid='pdf-finish-structure-summary']").click();
+          await page.locator("[data-testid='pdf-finish-link-preservation']").waitFor();
+        }
         await page.waitForTimeout(settleTimeMs);
         const sample = await page.evaluate(() => {
           const navigation = performance.getEntriesByType("navigation")[0];
@@ -162,7 +174,7 @@ export async function runRenderingBaseline() {
     for (const result of results) console.log(`${result.id}: ${JSON.stringify(result.median)}`);
     console.log(`Rendering baseline summary: pages=${results.length}; runs=${runsPerPage}; externalRequests=${externalRequests.length}.`);
     console.log(`Rendering baseline report: ${reportPath}`);
-    const maxima = assertRenderingResults(results, { maxCls: report.conditions.maxCls });
+    const maxima = assertRenderingResults(results, { registeredTargets: measuredTargets, maxCls: report.conditions.maxCls });
     console.log(`CLS gate passed (page maxima): ${JSON.stringify(maxima)}`);
     if (externalRequests.length) throw new Error(`Rendering baseline made ${externalRequests.length} external request(s).`);
   } finally {

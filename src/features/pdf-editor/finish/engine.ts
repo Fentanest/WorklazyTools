@@ -43,6 +43,12 @@ import {
 } from "./watermark.ts";
 import { applyNormalizedStamp, stampPdfCorners, type PdfStampSettings, type StampPdfCorners } from "./stamp.ts";
 import {
+  hasStructureChanges,
+  rebuildPdfStructure,
+  PdfStructureError,
+  type PdfStructureOptions,
+} from "./structure.ts";
+import {
   degrees,
   embedCustomPdfFont,
   embedHelvetica,
@@ -74,6 +80,8 @@ export type PdfFinishEngineErrorCode =
   | "tile-limit"
   | "background-placement"
   | "risk-confirmation-required"
+  | "structure-unsupported"
+  | "form-unsupported"
   | "output-validation";
 
 export class PdfFinishEngineError extends Error {
@@ -136,6 +144,7 @@ export interface PdfFinishDecorationOptions {
   opacity?: number;
   watermark?: PdfWatermarkSettings;
   stamp?: PdfStampSettings;
+  structure?: PdfStructureOptions;
 }
 
 export interface PdfFinishInputFile {
@@ -238,6 +247,9 @@ function validateOptions(options: PdfFinishDecorationOptions) {
     throw new PdfFinishEngineError("invalid-field", { field: "opacity" });
   }
   if (options.watermark && options.stamp) throw new PdfFinishEngineError("invalid-field", { field: "decoration" });
+  if (options.structure && !(["preserve", "remove", "flatten"] as const).includes(options.structure.formMode)) {
+    throw new PdfFinishEngineError("invalid-field", { field: "structure" });
+  }
   if (options.stamp) {
     const { placement } = options.stamp;
     if (!options.stamp.image
@@ -410,16 +422,20 @@ function isProtectedLoadError(error: unknown) {
   return error instanceof Error && /encrypt|password|permission/iu.test(`${error.name} ${error.message}`);
 }
 
-async function loadDocument(file: File, signal?: AbortSignal) {
+async function loadDocument(file: File, signal?: AbortSignal, structure?: PdfStructureOptions) {
   try {
     throwIfAborted(signal);
     const bytes = await file.arrayBuffer();
     throwIfAborted(signal);
-    const document = await loadPdfDocument(bytes);
+    const rebuilt = hasStructureChanges(structure) ? await rebuildPdfStructure(bytes, structure!) : undefined;
+    const document = rebuilt?.document ?? await loadPdfDocument(bytes);
     throwIfAborted(signal);
     return document;
   } catch (error) {
     throwIfAborted(signal);
+    if (error instanceof PdfStructureError) {
+      throw new PdfFinishEngineError(error.reason === "unsupported-form" ? "form-unsupported" : "structure-unsupported", {}, error);
+    }
     throw new PdfFinishEngineError(isProtectedLoadError(error) ? "protected-document" : "unreadable-document", {}, error);
   }
 }
@@ -675,7 +691,7 @@ async function analyzeDocument(
   fileIndex: number,
 ): Promise<{ document?: PDFDocument; plans: DecorationPlan[]; warnings: Set<PdfFinishWarningCode>; errors: PdfFinishPreflightError[] }> {
   if (input.options.stamp) {
-    const document = await loadDocument(source.file, input.signal);
+    const document = await loadDocument(source.file, input.signal, input.options.structure);
     return analyzeStamp(input, source, document);
   }
   const preparedPages = preparePages(source, input.options, input.locale, new Date(batchDate.getTime()));
@@ -684,7 +700,7 @@ async function analyzeDocument(
   const textErrors = input.options.watermark?.content === "image" ? [] : preparedTextErrors(source, input.options, preparedPages);
   if (textErrors.length > 0) return { plans: [], warnings, errors: textErrors };
 
-  const document = await loadDocument(source.file, input.signal);
+  const document = await loadDocument(source.file, input.signal, input.options.structure);
   if (input.options.watermark) {
     for (const warning of await inspectWatermarkRisksCooperatively(document, input.signal)) warnings.add(warning);
   }
@@ -860,7 +876,7 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       // large document must at least retain visible, truthful progress.
       await yieldToEventLoop();
       throwIfAborted(input.signal);
-      const bytes = await document.save();
+      const bytes = await document.save({ updateFieldAppearances: false });
       throwIfAborted(input.signal);
       if (input.options.watermark || input.options.stamp) {
         try {

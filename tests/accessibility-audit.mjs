@@ -20,15 +20,25 @@ const limits = {
 };
 export const f2OwnedSelector = "[data-pdf-watermark-owned]";
 export const f3OwnedSelector = "[data-pdf-stamp-owned]";
+export const f4aOwnedSelector = "[data-pdf-structure-owned]";
 export const accessibilityOwnedSelectors = Object.freeze([
   Object.freeze({ owner: "f2-watermark", selector: f2OwnedSelector }),
   Object.freeze({ owner: "f3-stamp", selector: f3OwnedSelector }),
+  Object.freeze({ owner: "f4a-structure", selector: f4aOwnedSelector }),
 ]);
 export const f3StampOwnershipTargets = Object.freeze([
   Object.freeze({ id: "tab", selector: "[data-finish-tab='stamp'][data-pdf-stamp-owned]" }),
   Object.freeze({ id: "notice", selector: "[data-testid='pdf-stamp-notice'][data-pdf-stamp-owned]" }),
   Object.freeze({ id: "settings", selector: "[data-pdf-stamp-owned] [data-testid='pdf-stamp-image']" }),
   Object.freeze({ id: "overlay", selector: "[data-testid='pdf-stamp-overlay'][data-pdf-stamp-owned]" }),
+]);
+export const f4aStructureOwnershipTargets = Object.freeze([
+  Object.freeze({ id: "panel", selector: "[data-testid='pdf-finish-structure'][data-pdf-structure-owned]", expected: 1 }),
+  Object.freeze({ id: "summary", selector: "[data-pdf-structure-owned] [data-testid='pdf-finish-structure-summary']", expected: 1 }),
+  Object.freeze({ id: "link-notice", selector: "[data-pdf-structure-owned] [data-testid='pdf-finish-link-preservation']", expected: 1 }),
+  Object.freeze({ id: "cleanup-switches", selector: "[data-pdf-structure-owned] [role='switch']", expected: 3 }),
+  Object.freeze({ id: "form-mode", selector: "[data-pdf-structure-owned] [data-testid='pdf-finish-form-mode']", expected: 1 }),
+  Object.freeze({ id: "preservation-rows", selector: "[data-pdf-structure-owned] [data-structure-row]", expected: 13 }),
 ]);
 export const pages = Object.freeze([
   { id: "home", path: "/" },
@@ -47,6 +57,10 @@ export const pages = Object.freeze([
   { id: "pdf-stamp-editing-ko-dark", path: "/ko/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']", scenario: "pdf-stamp-editing", colorScheme: "dark", locale: "ko-KR", ownedSelector: f3OwnedSelector },
   { id: "pdf-stamp-editing-en-light", path: "/en/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']", scenario: "pdf-stamp-editing", colorScheme: "light", locale: "en-US", ownedSelector: f3OwnedSelector },
   { id: "pdf-stamp-editing-en-dark", path: "/en/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']", scenario: "pdf-stamp-editing", colorScheme: "dark", locale: "en-US", ownedSelector: f3OwnedSelector },
+  { id: "pdf-structure-editing-ko-light", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']", scenario: "pdf-structure-editing", colorScheme: "light", locale: "ko-KR", ownedSelector: f4aOwnedSelector },
+  { id: "pdf-structure-editing-ko-dark", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']", scenario: "pdf-structure-editing", colorScheme: "dark", locale: "ko-KR", ownedSelector: f4aOwnedSelector },
+  { id: "pdf-structure-editing-en-light", path: "/en/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']", scenario: "pdf-structure-editing", colorScheme: "light", locale: "en-US", ownedSelector: f4aOwnedSelector },
+  { id: "pdf-structure-editing-en-dark", path: "/en/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']", scenario: "pdf-structure-editing", colorScheme: "dark", locale: "en-US", ownedSelector: f4aOwnedSelector },
   { id: "pdf-watermark-error-ko-light", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "light", locale: "ko-KR" },
   { id: "pdf-watermark-error-ko-dark", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "dark", locale: "ko-KR" },
   { id: "pdf-watermark-error-en-light", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "light", locale: "en-US" },
@@ -74,7 +88,7 @@ export const accessibilityExceptions = Object.freeze([
 ]);
 
 export function accessibilityOwnerFromResolution(resolution, context = "unknown") {
-  if (resolution === "f2-watermark" || resolution === "f3-stamp" || resolution === "shared-existing") return resolution;
+  if (resolution === "f2-watermark" || resolution === "f3-stamp" || resolution === "f4a-structure" || resolution === "shared-existing") return resolution;
   if (resolution === "missing" || resolution === "invalid") {
     throw new Error(`Accessibility incomplete target is ${resolution}: ${context}.`);
   }
@@ -91,6 +105,7 @@ export function summarizeAccessibility(results, registeredPages = pages) {
   let incompleteNodes = 0;
   let f2IncompleteNodes = 0;
   let f3IncompleteNodes = 0;
+  let f4aIncompleteNodes = 0;
   let inheritedIncompleteNodes = 0;
   let pixelResolvedIncompleteNodes = 0;
   for (const result of results) {
@@ -111,6 +126,7 @@ export function summarizeAccessibility(results, registeredPages = pages) {
         }
         if (node.owner === "f2-watermark") f2IncompleteNodes += 1;
         else if (node.owner === "f3-stamp") f3IncompleteNodes += 1;
+        else if (node.owner === "f4a-structure") f4aIncompleteNodes += 1;
         else if (node.owner === "shared-existing") inheritedIncompleteNodes += 1;
         else throw new Error(`Unknown accessibility incomplete owner: ${result.id}/${incomplete.id}.`);
       }
@@ -123,7 +139,7 @@ export function summarizeAccessibility(results, registeredPages = pages) {
       pixelResolvedIncompleteNodes += 1;
     }
   }
-  return { pages: results.length, violations, severityCounts, incompleteRules, incompleteNodes, f2IncompleteNodes, f3IncompleteNodes, inheritedIncompleteNodes, pixelResolvedIncompleteNodes };
+  return { pages: results.length, violations, severityCounts, incompleteRules, incompleteNodes, f2IncompleteNodes, f3IncompleteNodes, f4aIncompleteNodes, inheritedIncompleteNodes, pixelResolvedIncompleteNodes };
 }
 
 export function assertAccessibilityResults(report, { registeredPages = pages, limits = { critical: 0, serious: 0, total: 0 } } = {}) {
@@ -203,10 +219,30 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
       throw new Error(`Resolved F3 stamp evidence reuses a pixel measurement target: ${target.id}.`);
     }
   }
+  const structurePages = registeredPages.filter(({ scenario }) => scenario === "pdf-structure-editing");
+  for (const target of structurePages) {
+    const result = report.results.find(({ id }) => id === target.id);
+    for (const rule of result?.incomplete ?? []) {
+      for (const node of rule.nodes) {
+        if (node.owner !== "f4a-structure") {
+          throw new Error(`F4a structure editing incomplete node lost ownership: ${target.id}/${rule.id}.`);
+        }
+      }
+    }
+    const ownership = result?.structureOwnership;
+    const expectedTargets = f4aStructureOwnershipTargets.map(({ id }) => id).sort();
+    const actualTargets = ownership?.targets?.map(({ id }) => id).sort();
+    if (ownership?.owner !== "f4a-structure" || ownership.selector !== f4aOwnedSelector
+      || JSON.stringify(actualTargets) !== JSON.stringify(expectedTargets)
+      || ownership.targets.some(({ id, matches }) => matches !== f4aStructureOwnershipTargets.find((targetDefinition) => targetDefinition.id === id)?.expected)) {
+      throw new Error(`F4a structure editing ownership marker is missing or ambiguous: ${target.id}.`);
+    }
+  }
   if ((summary.severityCounts.critical || 0) > limits.critical || (summary.severityCounts.serious || 0) > limits.serious
     || summary.violations > limits.total) throw new Error(`Accessibility limits exceeded: ${JSON.stringify({ ...summary, limits })}`);
   if (summary.f2IncompleteNodes > 0) throw new Error(`F2 accessibility incomplete nodes must be resolved: ${JSON.stringify(summary)}`);
   if (summary.f3IncompleteNodes > 0) throw new Error(`F3 accessibility incomplete nodes must be resolved: ${JSON.stringify(summary)}`);
+  if (summary.f4aIncompleteNodes > 0) throw new Error(`F4a accessibility incomplete nodes must be resolved: ${JSON.stringify(summary)}`);
   return summary;
 }
 
@@ -262,6 +298,7 @@ export async function runAccessibilityAudit() {
       let settledContrast;
       let interactiveContrast;
       let stampOwnership;
+      let structureOwnership;
       let stampContrast;
       if (target.scenario === "pdf-watermark-empty-text") {
         await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
@@ -300,6 +337,19 @@ export async function runAccessibilityAudit() {
           owner: "f3-stamp",
           selector: f3OwnedSelector,
           targets: await Promise.all(f3StampOwnershipTargets.map(async ({ id, selector }) => ({
+            id,
+            matches: await page.locator(selector).count(),
+          }))),
+        };
+      } else if (target.scenario === "pdf-structure-editing") {
+        await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+          .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/removal/removal-structures.pdf"));
+        await page.locator("[data-testid='pdf-finish-structure-summary']").click();
+        await page.locator("[data-testid='pdf-finish-link-preservation']").waitFor();
+        structureOwnership = {
+          owner: "f4a-structure",
+          selector: f4aOwnedSelector,
+          targets: await Promise.all(f4aStructureOwnershipTargets.map(async ({ id, selector }) => ({
             id,
             matches: await page.locator(selector).count(),
           }))),
@@ -411,6 +461,7 @@ export async function runAccessibilityAudit() {
         ...(settledContrast ? { settledContrast } : {}),
         ...(interactiveContrast ? { interactiveContrast } : {}),
         ...(stampOwnership ? { stampOwnership } : {}),
+        ...(structureOwnership ? { structureOwnership } : {}),
         ...(stampContrast ? { stampContrast } : {}),
       });
       await context.close();

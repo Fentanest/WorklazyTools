@@ -28,6 +28,10 @@
 - **Ghostscript 한글 tofu — pdf-lib OTF descriptor 경계** — S2b QR 글꼴 감량 렌더 대조에서 전체·빌드 타임 subset OTF 모두 Poppler는 정상 렌더했지만 Ghostscript는 원본 전체 OTF부터 한글을 tofu로 표시했다. PDF의 `FontFile2` descriptor에 `OTTO` CFF 스트림이 들어가는 pdf-lib/fontkit 임베드 경계의 기존 결함이며 S2b subset 회귀가 아니다. U4 공용 PDF 글꼴 임베드 경계를 구현할 때 descriptor/stream 조합을 교정하고 GS·Poppler 동시 렌더로 판정한다. — Codx
 - **PDF.js 텍스트 추출이 입력 문자열과 다름 — U4 관련** — 같은 S2b fixture에서 PDF.js는 전체 OTF와 subset OTF 사이 추출 결과는 동일했지만 일부 공백을 `堺`로, shaping 숫자를 한자로 추출하는 기존 오류가 남았다. S2b의 oracle은 전체 대비 불변이고 입력 문자열과의 완전 일치는 범위 밖이다. U4에서 ToUnicode/CMap 생성 경계를 다룰 때 입력 문자열 일치 fixture를 별도 추가한다. — Codx
 
+## PDF 생성 라이브러리 중복 배포
+
+- **main·legacy worker의 `pdf-lib` 단일화** — U4-6 번들 조사에서 main 그래프의 `pdf-lib` 귀속 **118,977B**와 legacy `pdf.worker` **219,622B** 내부의 별도 `pdf-lib` 번들을 확인했다. 목표는 중복 실행 경계를 하나로 합쳐 **순감량 80~120KB**를 확보하는 것이다. 예상 비용은 설계·연결 **3~6인일**, 회귀·계측 **2~4인일**, 합계 **5~10인일**이다. U4-6의 app/PDF route 상한 상향은 이 부채를 해결한 것이 아니라 U4 완료 뒤 구조 변경으로 미룬 결정이다. — Codx
+
 ## UI 색 체계 — 도구 고유색 축소·컨트롤 단일 primary
 
 > 2026-09-06 사용자 결정("1안"). shadcn 전환 후 스위치·버튼·포커스 링은 `--primary`(인디고) 단일인데 도구 고유색(아이콘 타일 6색)이 따로 놀아 어색하다는 사용자 소견. **`!계획!` 미발동 — 결정 기록만.** UI 변경이므로 「배포 전 로컬 시각 검수」·시각 기준선 갱신 수반. 로드맵(`roadmap-completion-20260906`) 순서상 S2 이후 별도 단위 후보. — Claude

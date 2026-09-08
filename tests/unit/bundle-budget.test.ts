@@ -23,12 +23,12 @@ const quiet = () => {};
 const budget = resolveBudgetLimits({});
 const renderedSha256 = "a".repeat(64);
 
-test("default budget changes only the PDF route allowance to 72,000 bytes", () => {
+test("default budget records the final PDF route and application allowances", () => {
   assert.deepEqual(budgetLimits, {
     entryJsGzip: 20 * 1024,
-    affectedRouteJsGzip: 72_000,
+    affectedRouteJsGzip: 82_000,
     sharedJsGzip: 30 * 1024,
-    appJsGzip: 80 * 1024,
+    appJsGzip: 96_000,
     cssGzip: 10 * 1024,
   });
   assert.deepEqual(budget, { limits: budgetLimits, overrides: {}, multiplier: 1 });

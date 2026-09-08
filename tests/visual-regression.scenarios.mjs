@@ -24,6 +24,7 @@ const fullProfiles = Object.freeze([
   enDarkMobile,
 ]);
 const stampProfiles = Object.freeze([...fullProfiles, enLightMobile320]);
+const structureProfiles = Object.freeze([...fullProfiles, enLightMobile320]);
 
 const representativeProfiles = Object.freeze([
   koLightDesktop,
@@ -692,6 +693,30 @@ const pdfFinishScenarios = [
     ],
     readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']",
     assertSelector: "[data-testid='pdf-stamp-overlay']",
+  }),
+  scenario({
+    scenarioId: "pdf-finish-structure--interaction",
+    routeId: "pdf-finish-structure",
+    toolId: "pdf-editor",
+    stateId: "interaction",
+    stateType: "finish",
+    path: "/tools/pdf-editor/finish",
+    kind: "tool",
+    profiles: structureProfiles,
+    profileReductionReason: "No reduction: the structure-specific preservation table retains the complete locale, theme, and desktop/mobile product, plus the required 320px English mobile check.",
+    fixture: { kind: "generated-pdf", fileName: "visual-finish-structure.pdf", pageCount: 2 },
+    actions: [
+      { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[accept*='application/pdf']" },
+      { type: "wait", selector: "[data-testid='pdf-finish-preflight-ready']", timeoutMs: 60_000 },
+      { type: "click", selector: "[data-testid='pdf-finish-structure-summary']" },
+      { type: "click", selector: "[data-pdf-structure-owned] [role='switch']", elementIndex: 0 },
+      { type: "click", selector: "[data-pdf-structure-owned] [role='switch']", elementIndex: 1 },
+      { type: "click", selector: "[data-pdf-structure-owned] [role='switch']", elementIndex: 2 },
+      { type: "select", selector: "[data-testid='pdf-finish-form-mode']", value: "flatten" },
+      { type: "scroll-into-view", selector: "[data-testid='pdf-finish-structure']", offset: -88 },
+    ],
+    readySelector: "[data-testid='pdf-finish-ready']",
+    assertSelector: "[data-pdf-structure-owned] [data-structure-row='unsupported']",
   }),
   ...[
     ["start", "/tools/pdf-editor", "organize"],

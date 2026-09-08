@@ -24,9 +24,9 @@ const baselinePath = process.env.BUNDLE_BASELINE ? path.resolve(process.env.BUND
 const reportPath = process.env.BUNDLE_MEASURE_OUTPUT ? path.resolve(process.env.BUNDLE_MEASURE_OUTPUT) : null;
 export const budgetLimits = Object.freeze({
   entryJsGzip: 20 * 1024,
-  affectedRouteJsGzip: 72000,
+  affectedRouteJsGzip: 82000,
   sharedJsGzip: 30 * 1024,
-  appJsGzip: 80 * 1024,
+  appJsGzip: 96000,
   cssGzip: 10 * 1024,
 });
 

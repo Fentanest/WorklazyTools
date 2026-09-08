@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, f3OwnedSelector, f3StampOwnershipTargets } from "../accessibility-audit.mjs";
+import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
@@ -9,6 +9,8 @@ function report() {
       stampContrast: [{ target: "notice-body", ratio: 5.87 }, { target: "notice-title", ratio: 14.66 }],
     } : {}), ...(scenario === "pdf-stamp-editing" ? {
       stampOwnership: { owner: "f3-stamp", selector: f3OwnedSelector, targets: f3StampOwnershipTargets.map(({ id: targetId }) => ({ id: targetId, matches: 1 })) },
+    } : {}), ...(scenario === "pdf-structure-editing" ? {
+      structureOwnership: { owner: "f4a-structure", selector: f4aOwnedSelector, targets: f4aStructureOwnershipTargets.map(({ id: targetId, expected }) => ({ id: targetId, matches: expected })) },
     } : {}), ...(scenario === "pdf-watermark-empty-text" ? {
       settledContrast: [{ target: "invalid-textarea", ratio: 4.5 }, { target: "empty-text-notice", ratio: 4.5 }],
     } : {}), ...(scenario === "pdf-watermark-display-load-failure" ? {
@@ -37,6 +39,10 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.equal(stampEditingStates.length, 4);
   assert.deepEqual([...new Set(stampEditingStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
   assert.deepEqual([...new Set(stampEditingStates.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
+  const structureEditingStates = pages.filter(({ scenario }) => scenario === "pdf-structure-editing");
+  assert.equal(structureEditingStates.length, 4);
+  assert.deepEqual([...new Set(structureEditingStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
+  assert.deepEqual([...new Set(structureEditingStates.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
   const errorStates = pages.filter(({ scenario }) => scenario === "pdf-watermark-empty-text");
   assert.equal(errorStates.length, 4);
   assert.deepEqual([...new Set(errorStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
@@ -102,6 +108,24 @@ test("a11y incomplete targets and reasons remain visible while F2/F3-owned nodes
   assert.throws(() => assertAccessibilityResults(discarded), /target or reason was discarded/);
 });
 
+test("a11y F4a gate fails closed for missing ownership, omitted states, and incomplete nodes", () => {
+  const missingMarker = report();
+  missingMarker.results.find(({ id }) => id === "pdf-structure-editing-ko-light").structureOwnership.targets
+    .find(({ id }) => id === "preservation-rows").matches = 12;
+  assert.throws(() => assertAccessibilityResults(missingMarker), /ownership marker is missing or ambiguous/);
+
+  const omitted = report();
+  omitted.results = omitted.results.filter(({ id }) => id !== "pdf-structure-editing-en-dark");
+  assert.throws(() => assertAccessibilityResults(omitted), /registration mismatch/);
+
+  const unresolved = report();
+  unresolved.results.find(({ id }) => id === "pdf-structure-editing-en-light").incomplete.push({
+    id: "color-contrast",
+    nodes: [{ target: ["[data-testid='pdf-finish-link-preservation']"], reasons: ["Needs manual review"], owner: "f4a-structure" }],
+  });
+  assert.throws(() => assertAccessibilityResults(unresolved), /F4a accessibility incomplete nodes/);
+});
+
 test("a11y gradient incomplete is separately retained only after reload pixel contrast passes", () => {
   const measured = report();
   measured.results.find(({ id }) => id === "pdf-watermark-display-error-ko-dark").resolvedIncomplete = [{
@@ -118,6 +142,7 @@ test("a11y gradient incomplete is separately retained only after reload pixel co
 test("a11y incomplete selector resolution never defaults missing or invalid targets to shared ownership", () => {
   assert.equal(accessibilityOwnerFromResolution("f2-watermark", "owned"), "f2-watermark");
   assert.equal(accessibilityOwnerFromResolution("f3-stamp", "owned"), "f3-stamp");
+  assert.equal(accessibilityOwnerFromResolution("f4a-structure", "owned"), "f4a-structure");
   assert.equal(accessibilityOwnerFromResolution("shared-existing", "shared"), "shared-existing");
   assert.throws(() => accessibilityOwnerFromResolution("missing", "missing-selector"), /missing-selector/);
   assert.throws(() => accessibilityOwnerFromResolution("invalid", "invalid-selector"), /invalid-selector/);

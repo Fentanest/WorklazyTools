@@ -28,6 +28,7 @@ import { expandTokens } from "./finish/tokens.ts";
 import type { FinishRegion } from "./finish/geometry.ts";
 import { createWatermarkPlacements, type PdfWatermarkSettings, type WatermarkContentKind, type WatermarkLayer, type WatermarkPattern, type WatermarkRegion } from "./finish/watermark.ts";
 import { commitStamp, createStampHistory, redoStamp, undoStamp, type NormalizedStamp } from "./finish/stamp.ts";
+import type { PdfFormMode, PdfStructureOptions } from "./finish/structure.ts";
 import { createLocalId, type PdfFinishPreset, type PdfFinishTab, type PdfPageItem } from "./types";
 
 type ImplementedFinishTab = PdfFinishTab;
@@ -106,6 +107,47 @@ interface FinishCopy {
     previewDescription: string;
     create: string;
     complete: string;
+  };
+  structure: {
+    title: string;
+    description: string;
+    metadata: string;
+    metadataDescription: string;
+    annotations: string;
+    annotationsDescription: string;
+    attachments: string;
+    attachmentsDescription: string;
+    forms: string;
+    formOptions: Record<PdfFormMode, string>;
+    formResults: Record<PdfFormMode, string>;
+    linkNotice: string;
+    tableTitle: string;
+    structureLabel: string;
+    resultLabel: string;
+    pages: string;
+    outlines: string;
+    destinations: string;
+    embeddedFiles: string;
+    pageLabels: string;
+    viewerPreferences: string;
+    optionalContent: string;
+    taggedStructure: string;
+    xmpMetadata: string;
+    acroForm: string;
+    linkAnnotations: string;
+    markupAnnotations: string;
+    unsupported: string;
+    preserveResult: string;
+    removeResult: string;
+    pagesResult: string;
+    outlinesResult: string;
+    destinationsResult: string;
+    pageLabelsResult: string;
+    viewerPreferencesResult: string;
+    linksResult: string;
+    optionalContentResult: string;
+    taggedStructureResult: string;
+    unsupportedResult: string;
   };
   numberingTitle: string;
   startNumber: string;
@@ -207,6 +249,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const [stampImageStatus, setStampImageStatus] = useState<"empty" | "loading" | "ready" | "error">("empty");
   const [stampHistory, setStampHistory] = useState(() => createStampHistory(initialStamp()));
   const [riskAccepted, setRiskAccepted] = useState(false);
+  const [structure, setStructure] = useState<PdfStructureOptions>({ removeMetadata: false, removeAnnotations: false, removeAttachments: false, formMode: "preserve" });
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState("");
   const [pageCount, setPageCount] = useState(0);
@@ -361,6 +404,12 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     download.clearResult();
   };
 
+  const updateStructure = <K extends keyof PdfStructureOptions>(field: K, value: PdfStructureOptions[K]) => {
+    setStructure((current) => ({ ...current, [field]: value }));
+    setPreflight({ status: "idle", errors: [], warnings: [], failure: "" });
+    download.clearResult();
+  };
+
   const selectTab = (tab: ImplementedFinishTab) => {
     if (activeTab === tab) return;
     setActiveTab(tab);
@@ -508,6 +557,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
           excludeCover,
           watermark: watermarkSettings,
           stamp: stampSettings,
+          structure,
         },
         locale: language === "ko" ? "ko-KR" : "en-US",
         signal: controller.signal,
@@ -523,7 +573,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [activeTab, baseFieldError, excludeCover, file, fileKey, fontSize, form.color, form.fontSize, form.margin, form.region, form.template, language, lowerBound, margin, selection, selectionEvaluation.error, stampHistory.present, stampImage, stampImageStatus, startNumber, startPage, startingNumber, startingPage, watermark.content, watermark.gap, watermark.image, watermark.layer, watermark.offsetX, watermark.offsetY, watermark.opacity, watermark.pattern, watermark.rotation, watermark.sizePercent, watermarkGap, watermarkOffsetX, watermarkOffsetY, watermarkOpacity, watermarkRotation, watermarkSize]);
+  }, [activeTab, baseFieldError, excludeCover, file, fileKey, fontSize, form.color, form.fontSize, form.margin, form.region, form.template, language, lowerBound, margin, selection, selectionEvaluation.error, stampHistory.present, stampImage, stampImageStatus, startNumber, startPage, startingNumber, startingPage, structure, watermark.content, watermark.gap, watermark.image, watermark.layer, watermark.offsetX, watermark.offsetY, watermark.opacity, watermark.pattern, watermark.rotation, watermark.sizePercent, watermarkGap, watermarkOffsetX, watermarkOffsetY, watermarkOpacity, watermarkRotation, watermarkSize]);
 
   const firstPreflightError = preflight.errors[0];
   const preflightErrorText = firstPreflightError ? formatPreflightError(copy, firstPreflightError) : "";
@@ -551,7 +601,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     try {
       const [output] = await finishPdfFiles({
         files: [{ key: fileKey, file, selection }],
-        options: { ...form, fontSize, margin, startNumber: startingNumber, startPage: startingPage, excludeCover, opacity: 0.9, watermark: watermarkSettings, stamp: stampSettings },
+        options: { ...form, fontSize, margin, startNumber: startingNumber, startPage: startingPage, excludeCover, opacity: 0.9, watermark: watermarkSettings, stamp: stampSettings, structure },
         locale: language === "ko" ? "ko-KR" : "en-US",
         allowRiskyDocuments: riskAccepted,
         outputName: copy.outputFileName,
@@ -642,6 +692,33 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                   <UtilityField>{copy.startPage}<UtilityInput data-testid="pdf-finish-start-page" type="number" min={1} max={pageCount} step={1} value={startPage} disabled={locked} aria-invalid={!!fieldErrors.startPage || undefined} aria-describedby={fieldErrors.startPage ? `${tabPanelId}-start-page-error` : undefined} onChange={(event) => updatePreflightInput(startPage, event.target.value, setStartPage)} />{fieldErrors.startPage && <span id={`${tabPanelId}-start-page-error`} className="text-xs leading-relaxed text-destructive" data-testid="pdf-finish-start-page-error" role="alert">{fieldErrors.startPage}</span>}</UtilityField>
                 </div>
                 <div className="mt-4 overflow-hidden rounded-2xl border border-border"><ToggleRow label={copy.excludeCover} description={copy.excludeCoverDescription} checked={excludeCover} onChange={(checked) => updatePreflightInput(excludeCover, checked, setExcludeCover)} disabled={locked} /></div></>}
+                <details className="mt-4 rounded-2xl border border-border p-4" data-testid="pdf-finish-structure" data-pdf-structure-owned>
+                  <summary className="cursor-pointer font-heading font-medium" data-testid="pdf-finish-structure-summary">{copy.structure.title}</summary>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy.structure.description}</p>
+                  <UtilityNotice className="mt-3" tone="warning" data-testid="pdf-finish-link-preservation">{copy.structure.linkNotice}</UtilityNotice>
+                  <div className="mt-3 overflow-hidden rounded-xl border border-border">
+                    <ToggleRow label={copy.structure.metadata} description={copy.structure.metadataDescription} checked={structure.removeMetadata} onChange={(value) => updateStructure("removeMetadata", value)} disabled={locked} />
+                    <ToggleRow label={copy.structure.annotations} description={copy.structure.annotationsDescription} checked={structure.removeAnnotations} onChange={(value) => updateStructure("removeAnnotations", value)} disabled={locked} />
+                    <ToggleRow label={copy.structure.attachments} description={copy.structure.attachmentsDescription} checked={structure.removeAttachments} onChange={(value) => updateStructure("removeAttachments", value)} disabled={locked} />
+                  </div>
+                  <UtilityField className="mt-3">{copy.structure.forms}<UtilitySelect data-testid="pdf-finish-form-mode" value={structure.formMode} disabled={locked} onChange={(event) => updateStructure("formMode", event.target.value as PdfFormMode)}>{(["preserve", "remove", "flatten"] as const).map((value) => <option key={value} value={value}>{copy.structure.formOptions[value]}</option>)}</UtilitySelect></UtilityField>
+                  <h3 className="mt-4 text-sm font-bold">{copy.structure.tableTitle}</h3>
+                  <div className="mt-2 overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th className="pb-2 pr-3">{copy.structure.structureLabel}</th><th className="pb-2">{copy.structure.resultLabel}</th></tr></thead><tbody>{[
+                    { id: "pages", label: copy.structure.pages, result: copy.structure.pagesResult },
+                    { id: "outlines", label: copy.structure.outlines, result: copy.structure.outlinesResult },
+                    { id: "destinations", label: copy.structure.destinations, result: copy.structure.destinationsResult },
+                    { id: "embedded-files", label: copy.structure.embeddedFiles, result: structure.removeAttachments ? copy.structure.removeResult : copy.structure.preserveResult },
+                    { id: "page-labels", label: copy.structure.pageLabels, result: copy.structure.pageLabelsResult },
+                    { id: "viewer-preferences", label: copy.structure.viewerPreferences, result: copy.structure.viewerPreferencesResult },
+                    { id: "optional-content", label: copy.structure.optionalContent, result: copy.structure.optionalContentResult },
+                    { id: "tagged-structure", label: copy.structure.taggedStructure, result: copy.structure.taggedStructureResult },
+                    { id: "xmp-metadata", label: copy.structure.xmpMetadata, result: structure.removeMetadata ? copy.structure.removeResult : copy.structure.preserveResult },
+                    { id: "acroform", label: copy.structure.acroForm, result: copy.structure.formResults[structure.formMode] },
+                    { id: "link-annotations", label: copy.structure.linkAnnotations, result: copy.structure.linksResult },
+                    { id: "markup-annotations", label: copy.structure.markupAnnotations, result: structure.removeAnnotations ? copy.structure.removeResult : copy.structure.preserveResult },
+                    { id: "unsupported", label: copy.structure.unsupported, result: copy.structure.unsupportedResult },
+                  ].map(({ id, label, result }) => <tr key={id} className="border-t border-border" data-structure-row={id}><th scope="row" className="py-2 pr-3 align-top">{label}</th><td className="py-2 leading-relaxed text-muted-foreground">{result}</td></tr>)}</tbody></table></div>
+                </details>
               </SectionCard>
 
               <SectionCard step={3} title={copy.pagesTitle} description={copy.pagesDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
@@ -666,7 +743,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                 {preflight.status === "checking" && <UtilityNotice className="mt-3" tone="warning" role="status" data-testid="pdf-finish-preflight-checking" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.preflightChecking}</UtilityNotice>}
                 {preflight.status === "ready" && <span className="sr-only" data-testid="pdf-finish-preflight-ready">ready</span>}
                 {preflightErrorText && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={firstPreflightError?.code} data-pdf-watermark-owned={watermarkActive || undefined}>{preflightErrorText}</UtilityNotice>}
-                {preflightFailure && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-pdf-watermark-owned={watermarkActive || undefined}>{preflightFailure}</UtilityNotice>}
+                {preflightFailure && <UtilityNotice className={cn("mt-3", watermarkActive && "text-red-800 dark:text-red-200")} tone="error" role="alert" data-testid="pdf-finish-preflight-error" data-error-code={preflight.failure} data-pdf-watermark-owned={watermarkActive || undefined} data-pdf-structure-owned={["structure-unsupported", "form-unsupported"].includes(preflight.failure) || undefined}>{preflightFailure}</UtilityNotice>}
                 {!!preflight.warnings.length && <div className="mt-3 space-y-2" data-testid="pdf-finish-preflight-warnings" data-pdf-watermark-owned={watermarkActive || undefined}>{preflight.warnings.map((warning) => <UtilityNotice key={warning} tone="warning" data-warning-code={warning}>{copy.warnings[warning]}</UtilityNotice>)}</div>}
                 {!!riskWarnings.length && <div className="mt-3 overflow-hidden rounded-2xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20" data-testid="pdf-watermark-risk-confirmation" data-pdf-watermark-owned><p className="px-4 pt-4 text-sm font-bold text-foreground">{copy.watermark.riskTitle}</p><ToggleRow label={copy.watermark.riskConsent} description={copy.watermark.riskConsentDescription} checked={riskAccepted} onChange={(checked) => { setRiskAccepted(checked); download.clearResult(); }} disabled={locked} /></div>}
                 {selectionEvaluation.error && <UtilityNotice className="mt-3" tone="error" role="alert">{copy.rangeErrors[selectionEvaluation.error]}</UtilityNotice>}

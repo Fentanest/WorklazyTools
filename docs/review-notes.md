@@ -4,6 +4,16 @@
 
 ## 2026-09-08
 
+### U4-6 — 구조 제거·양식 평면화·링크 보존 고지와 최종 번들 상향 (Codx)
+
+**예산 결정** — 1차 구현 후보의 app 증분이 **82,887B > 81,920B**로 **967B 초과**해 `SCOPE-OUT`한 판정은 옳았다. 967B만 줄이는 탐색안은 정적 JSON 1,390B 증가까지 합치면 순감량이 20B에 그치고, 후속 F4b/F5가 3,411~10,188B를 더 요구해 곧바로 다시 차단된다. 후보 PDF route도 **69,435B/72,000B**, 잔여 **2,565B**뿐이었다. 사용자 결정에 따라 `appJsGzip`을 `80 * 1024`에서 **96,000B**, `affectedRouteJsGzip`을 `72,000B`에서 **82,000B**로 올렸고 entry/shared/CSS, override `{}`, multiplier `1`은 그대로 두었다. 이는 **마지막 상향**이다. U4-7·U4-8에서 다시 초과하면 상향을 요청하지 않고 `SCOPE-OUT`으로 보고해 구조 변경으로 넘긴다.
+
+고정 schema-v3 baseline(SHA-256 `4caaa9c6…`)과 `BUNDLE_ROUTES=pdf-editor`로 최종 재계측한 증분/상한/잔여는 entry **11,065/20,480/9,415B**, PDF route **70,335/82,000/11,665B**, shared 순증 **2,455/30,720/28,265B**, app **84,776/96,000/11,224B**, CSS **400/10,240/9,840B**다. 다른 route 감소로 PDF 증가를 상쇄하지 않았고 측정 범위도 줄이지 않았다. 탐색 시 shared gross 512,387B 중 509,960B가 분류 이동이었으며, 최종은 gross **512,417B**·이동 **509,962B**·순증 2,455B다. 이동분은 app에 다시 더하지 않는다. `PDFObjectCopier`는 공용 `pdfFontEmbed` 청크에 정확히 한 벌이고 이번 작업이 새 중복을 만든 것이 아니다. main `pdf-lib` 귀속 118,977B와 legacy `pdf.worker` 219,622B 내부의 별도 번들은 순감량 80~120KB·총 5~10인일의 backlog로 이관했다. 이번 상향은 이 부채의 해결이 아니라 유예다.
+
+**제품 판정·구현** — 기존 문서에서 참조만 끊는 방식은 제거 payload를 orphan으로 남기므로 기각하고, 지원 구조를 정리한 뒤 page ref를 먼저 대응시켜 도달 가능한 루트만 새 `PDFDocument`에 복사했다. 페이지 tree/content/resources/MediaBox/CropBox/Rotate, 로컬 outline, Names/Dests와 구식 Dests, PageLabels, ViewerPreferences는 새 page ref로 보존한다. 고정 기본 가시성으로 정규화 가능한 optional content는 화면 의미를 보존한 채 구조를 제거하고, tagged structure는 제거한다. 지원하지 않는 OC·Type3는 실행 전 차단한다. Info와 XMP, EmbeddedFiles/Filespec/EmbeddedFile/catalog·page AF, AcroForm/Widget, 선택한 markup subtype은 전 객체 그래프와 출력에서 제거한다. URI·직접 Dest·이름 Dest의 Link는 subtype 선별로 세 종류 모두 보존하며 ko/en 옵션 화면에 실행 전에 “하이퍼링크는 유지됩니다”를 항상 표시한다. 임의 주석 평면화는 지원하지 않고 Redact 제거가 본문 가림이 아님을 밝힌다. 양식은 보존·제거·평면화 배타 모드이고, 평면화는 기존 AP만 `updateFieldAppearances:false`로 사용하며 XFA·서명·AP 누락/손상은 사전 차단한다.
+
+**검증·증거** — 제거 결과의 **전체 14개 indirect object**를 raw dictionary/stream, raw·decoded SHA-256, 금지 key/type/subtype, 첨부·XMP sentinel로 전수 기록했다. 금지 구조와 두 decoded sentinel 잔여는 0이며 PDF.js 고수준 검사에서도 첨부·metadata가 없고 Link 3종, outline, page labels, viewer preferences가 보존됐다. 허용 OC fixture **56개/57페이지**는 제품 preflight와 제품 재구축을 거쳐 PDF.js·Poppler 원본/결과 RGBA SHA가 모두 일치했고, 제외 31개와 양 renderer 음성 대조는 모두 차단됐다. unit **331/331**, production/local-QA build(2,851 modules·정적 71페이지), `test:static`, `test:pdf-finish`, `TEST_SCOPE=pdf test:browser`, legacy oracle diff 0을 통과했다. 구조 시각 기준선은 ko/en·light/dark·desktop/mobile 및 영어 320px를 포함해 **9장** 추가했고 9/9 일치했다. F4a+finish 접근성은 7상태, 위반 0·F4a incomplete 0·기존 상속 125·외부 요청 0이고, 새 rendering 대상 3회 최대 CLS는 **0.0001480366**이다. 원자료와 전체 indirect-object 원출력은 `/tmp/worklazy-u4-6/`에 보존한다. — Codx
+
 ### U4-5 fix-1 — 도장 실제 픽셀 골든·F3 접근성 게이트 수리 (Codx)
 
 **실행 게이트·원인 판정** — 시작 branch/head는 `s3-pdf-finish`/`8ec3e4edd97439dfc5b7807645d22c8373d69d11`로 지시와 일치했고 열린 계획서와 상반되는 지시는 없었다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`, DOCX 2개·네이버 확인 HTML·`newui/`는 수정·stage하지 않았으며 금지 worktree, main 병합·push·배포에도 접근하지 않았다. 도장 좌표 모델과 출력 엔진은 옳았지만 model box의 `border-2`가 내부 2px씩을 차지하고 `<img class="h-full w-full">`가 그 content box에 다시 맞춰져 실제 화면 도장만 작아졌다. 기존 `tests/pdf-stamp-golden.mjs`의 16조합은 브라우저 미리보기 픽셀을 렌더하지 않고 계산된 사각형과 출력 좌표를 비교했으므로 이 결함을 검증했다는 종전 기록은 기각한다.

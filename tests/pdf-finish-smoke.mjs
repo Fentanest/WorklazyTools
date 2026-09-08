@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { createCanvas } from "@napi-rs/canvas";
 import { chromium } from "playwright";
-import { PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
 import { PNG } from "pngjs";
 import { collectDeploymentExecutionAssetPaths, isJavaScriptExecutionPath } from "../scripts/measure-bundle-budget.mjs";
 
@@ -79,12 +79,13 @@ try {
   await testPreflightRawInputAndTabChanges(browser, fixture);
   await testOutputNameDownloads(browser, fixture);
   await testFinishWorkflow(browser, fixture);
+  await testStructureWorkflow(browser);
   const watermarkRuntimeRequests = await testWatermarkWorkflow(browser, fixture, inlineImageFixture, smallFixture);
   await testStampWorkflow(browser, fixture);
   await testWhitespaceWatermark(browser, fixture);
   await testBoundaryCropRendering(browser, boundaryCropFixture);
   await assertLazyChunks(watermarkRuntimeRequests);
-  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
+  console.log(`PDF finish smoke passed: ${directEntries.length} direct entries, one-reload chunk recovery, protected/corrupt upload errors, input recovery, preflight guidance, 6 preflight reselection/change combinations, 8 raw numeric representation changes, 2 equal-settings tab changes, 10 fresh PDF outputs for those changes, 4 localized edge-name downloads, 48 preview placements, structure cleanup/form flatten in ko/en with three preserved link kinds and a 13-row pre-execution table, one shared PDF display runtime with complete JS/MJS inventory, watermark text/image/tile/risk confirmation, stamp drag/resize/fixed-ratio/undo/redo/same-position/selected-pages, rotated visibility boundaries, ko/en whitespace errors, F2 DOM ownership, four-rotation boundary CropBox pixels, output, cancel and retry.`);
   console.log(`PDF finish screenshots: ${shots}`);
 } finally {
   await browser?.close();
@@ -680,6 +681,90 @@ async function testFinishWorkflow(browserInstance, fixture) {
   await action.click();
   await page.locator("[data-testid='pdf-download']").waitFor({ timeout: 120_000 });
   assert.equal(await page.locator("[data-route-error]").count(), 0);
+  await context.close();
+}
+
+async function testStructureWorkflow(browserInstance) {
+  const fixturePath = path.join(repositoryRoot, "tests/fixtures/pdf-finish/removal/removal-structures.pdf");
+  for (const language of ["ko", "en"]) {
+    const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+    const page = await context.newPage();
+    page.setDefaultTimeout(120_000);
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
+    await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']").setInputFiles(fixturePath);
+    await page.locator("[data-testid='pdf-finish-structure-summary']").click();
+    const notice = page.locator("[data-testid='pdf-finish-link-preservation']");
+    await notice.waitFor();
+    assert.match(await notice.innerText(), language === "ko" ? /주석 제거.*하이퍼링크.*계속/isu : /Hyperlinks remain active.*Remove annotations/isu);
+    const structure = page.locator("[data-testid='pdf-finish-structure']");
+    assert.equal(await structure.locator("[data-structure-row]").count(), 13);
+    const tableText = await structure.innerText();
+    for (const name of ["/Outlines", "/Names /Dests", "/PageLabels", "/ViewerPreferences", "/OCProperties", "/StructTreeRoot", "/Metadata", "/AcroForm", "/Annots /Link"]) {
+      assert.ok(tableText.includes(name), `${language}: preservation table omitted ${name}`);
+    }
+    const switches = structure.locator("[role='switch']");
+    assert.equal(await switches.count(), 3);
+    for (let index = 0; index < 3; index += 1) await switches.nth(index).click();
+    await structure.locator("[data-testid='pdf-finish-form-mode']").selectOption("flatten");
+    assert.equal(await structure.locator("[data-structure-row='embedded-files'] td").innerText(), language === "ko" ? "제거" : "Removed");
+    assert.match(await structure.locator("[data-structure-row='acroform'] td").innerText(), language === "ko" ? /페이지에 그린 뒤.*제거/u : /drawn onto the pages.*removed/iu);
+    await page.waitForFunction(() => {
+      const panel = document.querySelector("[data-testid='pdf-finish-ready']");
+      const button = panel?.querySelector("[data-ui-component='primary-button']");
+      return panel?.getAttribute("data-preflight-status") === "ready" && button instanceof HTMLButtonElement && !button.disabled;
+    });
+    await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").click();
+    const download = page.locator("[data-testid='pdf-download']");
+    await download.waitFor();
+    const output = Buffer.from(await download.evaluate(async (link) => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer()))));
+    const document = await PDFDocument.load(output, { updateMetadata: false });
+    assert.equal(document.catalog.has(PDFName.of("Metadata")), false);
+    assert.equal(document.catalog.has(PDFName.of("AcroForm")), false);
+    assert.equal(document.catalog.has(PDFName.of("AF")), false);
+    const subtypes = document.getPages().flatMap((pdfPage) => {
+      const annotations = document.context.lookup(pdfPage.node.get(PDFName.of("Annots")));
+      if (!(annotations instanceof PDFArray)) return [];
+      return annotations.asArray().map((value) => {
+        const annotation = document.context.lookup(value);
+        assert.ok(annotation instanceof PDFDict);
+        return document.context.lookup(annotation.get(PDFName.of("Subtype")))?.toString();
+      });
+    });
+    assert.deepEqual(subtypes, ["/Link", "/Link", "/Link"]);
+    assert.equal(output.includes(Buffer.from("PDF finish embedded attachment sentinel")), false);
+    assert.equal(output.includes(Buffer.from("<pdf:Keywords>remove-me</pdf:Keywords>")), false);
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const task = pdfjs.getDocument({ data: Uint8Array.from(output), useSystemFonts: true });
+    try {
+      const parsed = await task.promise;
+      const annotations = (await Promise.all(Array.from({ length: parsed.numPages }, async (_, index) => (
+        (await parsed.getPage(index + 1)).getAnnotations()
+      )))).flat();
+      assert.deepEqual(annotations.map((annotation) => annotation.url ? "URI" : Array.isArray(annotation.dest) ? "direct-destination" : typeof annotation.dest === "string" ? "named-destination" : "unknown").sort(), ["URI", "direct-destination", "named-destination"]);
+      assert.equal(await parsed.getAttachments(), null);
+    } finally {
+      await task.destroy();
+    }
+    assert.equal(await page.locator("[data-route-error]").count(), 0);
+    await context.close();
+  }
+
+  const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/en/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
+  const manifest = JSON.parse(await fs.readFile(path.join(repositoryRoot, "tests/fixtures/pdf-finish/manifest.json"), "utf8"));
+  const excluded = manifest.ocg.files.find(({ preflight }) => !preflight.allowed);
+  await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+    .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish", excluded.file));
+  await page.locator("[data-testid='pdf-finish-structure-summary']").click();
+  await page.locator("[data-pdf-structure-owned] [role='switch']").first().click();
+  const error = page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='structure-unsupported']");
+  await error.waitFor();
+  assert.match(await error.innerText(), /cannot be rebuilt safely/iu);
+  assert.doesNotMatch(await error.innerText(), /OCG|OCMD|Type3|pdf-lib|exception/iu);
+  assert.equal(await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").isDisabled(), true);
   await context.close();
 }
 

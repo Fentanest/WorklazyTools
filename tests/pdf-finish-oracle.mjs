@@ -7,12 +7,12 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import { classifyOcgPreflight } from "./helpers/pdf-finish-ocg-preflight.mjs";
 import {
   emptyFirstPageContent,
   findOptionalContentResiduals,
-  flattenOptionalContent,
 } from "./helpers/pdf-finish-ocg-transform.mjs";
+import { rebuildPdfStructure } from "../src/features/pdf-editor/finish/structure.ts";
+import { classifyOcgPreflight as classifyProductionOcgPreflight } from "../src/features/pdf-editor/finish/preflight.ts";
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, "..");
@@ -21,11 +21,13 @@ const manifest = JSON.parse(await fs.readFile(path.join(fixtureRoot, "manifest.j
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const { PNG } = require("pngjs");
-const { PDFArray, PDFDict, PDFDocument, PDFName } = require("pdf-lib");
+const { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFStream, decodePDFRawStream } = require("pdf-lib");
 const nodePdfjs = await import(pathToFileURL(path.join(repositoryRoot, "node_modules", "pdfjs-dist", "legacy", "build", "pdf.mjs")).href);
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const outputPath = process.env.PDF_FINISH_ORACLE_OUTPUT || path.join(os.tmpdir(), "worklazy-u4-0", "pdf-finish-oracle.json");
 const chromeExecutable = process.env.CHROME_BIN || "/usr/bin/google-chrome";
+const oraclePort = Number(process.env.PDF_FINISH_ORACLE_PORT || "4289");
+if (!Number.isSafeInteger(oraclePort) || oraclePort < 4280 || oraclePort > 4289) throw new Error("PDF_FINISH_ORACLE_PORT must be between 4280 and 4289.");
 
 function commandVersion(command, args) {
   const result = spawnSync(command, args, { encoding: "utf8" });
@@ -55,7 +57,13 @@ async function startPdfjsServer() {
       response.end(error.message);
     }
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(oraclePort, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
   const address = server.address();
   return { server, origin: `http://127.0.0.1:${address.port}` };
 }
@@ -127,6 +135,32 @@ function mismatchDetected(left, right) {
   } catch {
     return true;
   }
+}
+
+function indirectObjectSnapshot(document, sentinels = []) {
+  return document.context.enumerateIndirectObjects().map(([reference, object]) => {
+    const dictionary = object instanceof PDFStream ? object.dict : object;
+    let decoded = Buffer.alloc(0);
+    let decodeError = null;
+    if (object instanceof PDFRawStream) {
+      try { decoded = Buffer.from(decodePDFRawStream(object).decode()); }
+      catch (error) { decodeError = error instanceof Error ? error.message : String(error); }
+    }
+    const raw = object.toString();
+    return {
+      reference: reference.toString(),
+      className: object.constructor.name,
+      raw,
+      rawSha256: sha256(Buffer.from(raw, "latin1")),
+      keys: dictionary instanceof PDFDict ? dictionary.keys().map((entry) => entry.decodeText()).sort() : [],
+      type: dictionary instanceof PDFDict ? document.context.lookup(dictionary.get(PDFName.of("Type")))?.toString() : undefined,
+      subtype: dictionary instanceof PDFDict ? document.context.lookup(dictionary.get(PDFName.of("Subtype")))?.toString() : undefined,
+      decodedBytes: decoded.length,
+      decodedSha256: decoded.length ? sha256(decoded) : null,
+      decodedSentinels: Object.fromEntries(sentinels.map((sentinel) => [sentinel, decoded.includes(Buffer.from(sentinel))])),
+      decodeError,
+    };
+  });
 }
 
 function normalizeExpectedAttempt(attempt) {
@@ -234,7 +268,71 @@ async function verifyFixtureContracts() {
   } finally {
     await removalTask.destroy();
   }
-  return { encryption, damage, removal };
+
+  const rebuilt = await rebuildPdfStructure(removalBytes, {
+    removeMetadata: true,
+    removeAnnotations: true,
+    removeAttachments: true,
+    formMode: "remove",
+  });
+  const rebuiltBytes = Buffer.from(await rebuilt.document.save({ updateFieldAppearances: false }));
+  const rebuiltDocument = await PDFDocument.load(rebuiltBytes, { updateMetadata: false });
+  const sentinels = [removalFixture.expectation.embeddedSentinel, removalFixture.expectation.xmpSentinel];
+  const objects = indirectObjectSnapshot(rebuiltDocument, sentinels);
+  const forbiddenKeys = new Set(["AF", "EmbeddedFiles", "Metadata", "AcroForm", "StructTreeRoot", "StructParents", "StructParent", "ParentTree", "MCID", "MarkInfo", "OCProperties", "OC"]);
+  const forbiddenTypes = new Set(["/Filespec", "/EmbeddedFile", "/Metadata", "/OCG", "/OCMD"]);
+  const forbiddenSubtypes = new Set(["/Widget", "/FileAttachment", "/Text", "/FreeText", "/Highlight", "/Ink", "/Stamp", "/Square", "/Circle", "/Popup", "/Line", "/Polygon", "/Caret", "/Redact"]);
+  for (const object of objects) {
+    assert.equal(forbiddenTypes.has(object.type), false, `${object.reference}:${object.type}`);
+    assert.equal(forbiddenSubtypes.has(object.subtype), false, `${object.reference}:${object.subtype}`);
+    assert.deepEqual(object.keys.filter((entry) => forbiddenKeys.has(entry)), [], `${object.reference}:${object.keys.join(",")}`);
+    assert.ok(Object.values(object.decodedSentinels).every((present) => !present), `${object.reference}: decoded removal sentinel`);
+  }
+  assert.ok(sentinels.every((sentinel) => !rebuiltBytes.includes(Buffer.from(sentinel))), "raw rebuilt bytes contain a removal sentinel");
+  const rebuiltTask = nodePdfjs.getDocument({ data: Uint8Array.from(rebuiltBytes), useSystemFonts: true });
+  let rebuiltHighLevel;
+  try {
+    const document = await rebuiltTask.promise;
+    const annotations = (await Promise.all(Array.from({ length: document.numPages }, async (_, index) => (
+      (await document.getPage(index + 1)).getAnnotations()
+    )))).flat();
+    const attachments = await document.getAttachments();
+    const metadata = await document.getMetadata();
+    rebuiltHighLevel = {
+      annotationCount: annotations.length,
+      linkKinds: annotations.map((annotation) => annotation.url ? "URI" : Array.isArray(annotation.dest) ? "direct-destination" : typeof annotation.dest === "string" ? "named-destination" : "unknown").sort(),
+      attachments: attachments ? [...attachments.keys()] : null,
+      outlineItems: (await document.getOutline())?.length ?? 0,
+      pageLabels: await document.getPageLabels(),
+      viewerPreferences: Object.fromEntries(await document.getViewerPreferences()),
+      metadata: { hasXmp: metadata.metadata !== null, infoKeys: Object.keys(metadata.info).sort() },
+    };
+    assert.equal(rebuiltHighLevel.annotationCount, 3);
+    assert.deepEqual(rebuiltHighLevel.linkKinds, ["URI", "direct-destination", "named-destination"]);
+    assert.equal(rebuiltHighLevel.attachments, null);
+    assert.equal(rebuiltHighLevel.outlineItems, 1);
+    assert.deepEqual(rebuiltHighLevel.pageLabels, ["i", "A-1"]);
+    assert.equal(rebuiltHighLevel.viewerPreferences.HideToolbar, true);
+    assert.equal(rebuiltHighLevel.viewerPreferences.Duplex, "DuplexFlipLongEdge");
+    assert.equal(rebuiltHighLevel.metadata.hasXmp, false);
+    assert.equal(rebuiltHighLevel.metadata.infoKeys.includes("Title"), false);
+    assert.equal(rebuiltHighLevel.metadata.infoKeys.includes("Producer"), false);
+  } finally {
+    await rebuiltTask.destroy();
+  }
+  const removalOutput = {
+    bytes: rebuiltBytes.length,
+    sha256: sha256(rebuiltBytes),
+    expectedLinks: rebuilt.expectedLinks,
+    wholeIndirectObjectCount: objects.length,
+    wholeIndirectObjects: objects,
+    forbiddenKeys: [...forbiddenKeys].sort(),
+    forbiddenTypes: [...forbiddenTypes].sort(),
+    forbiddenSubtypes: [...forbiddenSubtypes].sort(),
+    decodedSentinelOccurrences: Object.fromEntries(sentinels.map((sentinel) => [sentinel, objects.filter((object) => object.decodedSentinels[sentinel]).length])),
+    highLevel: rebuiltHighLevel,
+  };
+  return { encryption, damage, removal, removalOutput };
 }
 
 assert.equal(manifest.counts.ocg.pixelOracle, 56);
@@ -248,7 +346,7 @@ page.on("request", (request) => { if (!request.url().startsWith(origin)) externa
 const browserConsole = [];
 page.on("console", (message) => browserConsole.push({ type: message.type(), text: message.text() }));
 const result = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   environment: {
     node: process.version,
     platform: `${os.platform()} ${os.release()} ${os.arch()}`,
@@ -272,7 +370,7 @@ try {
   });
   for (const fixture of manifest.fixtures.filter(({ category }) => category === "ordinary")) {
     const bytes = await fs.readFile(path.join(fixtureRoot, fixture.file));
-    const classification = await classifyOcgPreflight(bytes);
+    const classification = await classifyProductionOcgPreflight(bytes);
     assert.deepEqual({ allowed: classification.allowed, reason: classification.reason }, fixture.expectation.preflight, fixture.file);
     const rendered = await renderDocument(page, bytes, `${fixture.file}-source`, temporaryRoot);
     assert.deepEqual(rendered.poppler, fixture.expectation.pixelOracle.poppler, `${fixture.file}: Poppler pixel oracle`);
@@ -284,7 +382,7 @@ try {
   const transformCache = new Map();
   for (const fixture of manifest.ocg.files) {
     const bytes = await fs.readFile(path.join(fixtureRoot, fixture.file));
-    const classification = await classifyOcgPreflight(bytes);
+    const classification = await classifyProductionOcgPreflight(bytes);
     assert.equal(classification.allowed, fixture.preflight.allowed, `${fixture.file}: ${classification.reason}`);
     const row = {
       file: fixture.file,
@@ -303,7 +401,13 @@ try {
     }
     if (classification.allowed) {
       transformAttempts += 1;
-      const transformedBytes = await flattenOptionalContent(bytes);
+      const rebuilt = await rebuildPdfStructure(bytes, {
+        removeMetadata: true,
+        removeAnnotations: false,
+        removeAttachments: false,
+        formMode: "preserve",
+      });
+      const transformedBytes = Buffer.from(await rebuilt.document.save({ updateFieldAppearances: false }));
       const transformedRender = await renderDocument(page, transformedBytes, `${fixture.file}-transformed`, temporaryRoot);
       const residual = await findOptionalContentResiduals(transformedBytes);
       const shaMatch = {
@@ -355,6 +459,9 @@ try {
     deepResidualZero: result.ocg.filter(({ transformed, residual }) => transformed && residual.length === 0).length,
     shaMatchBothRenderers: result.ocg.filter(({ shaMatch }) => shaMatch?.poppler && shaMatch?.pdfjs).length,
     negativeControl: result.negativeControl,
+    removalWholeIndirectObjects: result.fixtureContracts.removalOutput.wholeIndirectObjectCount,
+    removalExpectedLinks: result.fixtureContracts.removalOutput.expectedLinks,
+    removalDecodedSentinelOccurrences: result.fixtureContracts.removalOutput.decodedSentinelOccurrences,
   };
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);
