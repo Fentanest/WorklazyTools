@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -8,17 +9,27 @@ import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 import pngjs from "pngjs";
 
+import {
+  assertCompleteRawBenchmark,
+  createStoredHeapPeak,
+  dpis,
+  fixtureTypes,
+  formats,
+  formatDecision,
+  median,
+  pageCounts,
+  summarizeBatches,
+  summarizeCell,
+  warningCoefficients,
+} from "./pdf-raster-benchmark-validation.mjs";
+
 const { PNG } = pngjs;
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = path.join(repositoryRoot, "tests/fixtures/pdf-raster-benchmark");
 const outputRoot = path.resolve(process.env.PDF_RASTER_BENCH_OUTPUT || "/tmp/worklazy-u4-7/benchmark");
-const port = Number(process.env.PDF_RASTER_BENCH_PORT || 4286);
+const port = Number(process.env.PDF_RASTER_BENCH_PORT || 4276);
 const baseUrl = `http://127.0.0.1:${port}`;
 const chromeExecutable = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
-const fixtureTypes = ["blank", "text-vector", "photo-scan", "transparency"];
-const pageCounts = [1, 4, 16];
-const dpis = [150, 200, 300];
-const formats = ["png", "jpeg"];
 const environments = [
   {
     id: "desktop",
@@ -36,12 +47,7 @@ const environments = [
   },
 ];
 
-assert.ok(Number.isSafeInteger(port) && port >= 4280 && port <= 4289, "benchmark port must stay in 4280..4289");
-
-function median(values) {
-  assert.equal(values.length, 3, "recorded medians require exactly three runs");
-  return [...values].sort((left, right) => left - right)[1];
-}
+assert.ok(Number.isSafeInteger(port) && port >= 4270 && port <= 4279, "benchmark port must stay in 4270..4279");
 
 function fixtureUrl(type, pageCount) {
   return `/@fs/${path.join(fixtureRoot, `${type}-${pageCount}.pdf`)}`;
@@ -97,7 +103,6 @@ async function createHeapSampler(browser, page) {
 
   function start() {
     const samples = [];
-    let peak = { usedSize: 0, backingStorageSize: 0, targetCount: 0, byTarget: {} };
     let sampling = false;
     const sample = async (boundary, force = false) => {
       if (sampling && !force) return;
@@ -116,8 +121,6 @@ async function createHeapSampler(browser, page) {
           backingStorageSize: total.backingStorageSize + usage.backingStorageSize,
         }), { usedSize: 0, backingStorageSize: 0 });
         samples.push({ atMs: performance.now(), boundary, byTarget, ...aggregate });
-        if (aggregate.usedSize > peak.usedSize) peak = { ...aggregate, targetCount: Object.keys(byTarget).length, byTarget };
-        else if (aggregate.backingStorageSize > peak.backingStorageSize) peak.backingStorageSize = aggregate.backingStorageSize;
       } finally {
         sampling = false;
       }
@@ -129,7 +132,7 @@ async function createHeapSampler(browser, page) {
       while (sampling) await new Promise((resolve) => setTimeout(resolve, 5));
       await sample({ name: "release", scope: "host" }, true);
       activeBoundarySampler = undefined;
-      return { peak, samples };
+      return { peak: createStoredHeapPeak(samples), samples };
     };
   }
 
@@ -211,23 +214,6 @@ async function runBatch(page, sampler, format) {
   }
 }
 
-function summarizeCell(cell) {
-  return {
-    fixtureType: cell.fixtureType,
-    pageCount: cell.pageCount,
-    dpi: cell.dpi,
-    format: cell.format,
-    environment: cell.environment,
-    finalPdfBytesMedian: median(cell.records.map(({ finalPdfBytes }) => finalPdfBytes)),
-    totalMsMedian: median(cell.records.map(({ metrics }) => metrics.totalMs)),
-    hostWallMsMedian: median(cell.records.map(({ hostWallMs }) => hostWallMs)),
-    peakHeapUsedSizeMax: Math.max(...cell.records.map(({ heap }) => heap.peak.usedSize)),
-    peakHeapBackingStorageSizeMax: Math.max(...cell.records.map(({ heap }) => heap.peak.backingStorageSize)),
-    peakRawRgbaBytesMax: Math.max(...cell.records.map(({ metrics }) => metrics.peakRawRgbaBytes)),
-    intermediateImageBytesMedian: median(cell.records.map(({ metrics }) => metrics.intermediateImageBytes)),
-  };
-}
-
 function bytes(value) {
   return value >= 1024 * 1024 ? `${(value / 1024 / 1024).toFixed(2)}MiB` : `${(value / 1024).toFixed(1)}KiB`;
 }
@@ -245,50 +231,24 @@ function buildTable(summary) {
   ].join("\n");
 }
 
-function assertCompleteRawBenchmark(raw) {
-  const expectedCellCount = fixtureTypes.length * pageCounts.length * dpis.length * formats.length * environments.length;
-  assert.equal(raw.cells.length, expectedCellCount, "report-only mode requires the complete 144-cell matrix");
-  assert.equal(new Set(raw.cells.map((cell) => [cell.fixtureType, cell.pageCount, cell.dpi, cell.format, cell.environment].join("/"))).size, expectedCellCount, "matrix cells must be unique");
-  assert.equal(raw.batches.length, environments.length, "report-only mode requires both batch environments");
-  assert.ok(raw.cells.every((cell) => cell.warmup && cell.records.length === 3), "every matrix cell must retain one warm-up and three records");
-  assert.ok(raw.batches.every((batch) => batch.warmup && batch.records.length === 3), "every batch must retain one warm-up and three records");
-  const runs = raw.cells.flatMap((cell) => [cell.warmup, ...cell.records])
-    .concat(raw.batches.flatMap((batch) => [batch.warmup, ...batch.records]));
-  const expectedStages = ["embed", "encode", "load", "release", "render", "retain", "save"];
-  for (const run of runs) {
-    assert.ok(run.heap.samples.some(({ byTarget }) => Object.keys(byTarget).some((name) => name.startsWith("worker-"))), "every run requires a PDF.js worker heap sample");
-    const stages = [...new Set(run.heap.samples.map(({ boundary }) => boundary?.name).filter(Boolean))].sort();
-    assert.deepEqual(stages, expectedStages, "every run requires all seven boundary samples");
-    assert.ok(Number.isFinite(run.heap.peak.usedSize) && Number.isFinite(run.heap.peak.backingStorageSize), "every run requires finite CDP resource maxima");
-  }
+const heapAggregationFormula = "For every run, each sample total must equal the sum of its target values; usedSize and backingStorageSize maxima are selected independently from raw samples, then the maximum recorded run is selected per cell.";
+
+function rawSourceSha256() {
+  return createHash("sha256").update(fs.readFileSync(path.join(outputRoot, "raw.json"))).digest("hex");
 }
 
-function summarizeBatches(batches) {
-  return batches.map((batch) => ({
-    environment: batch.environment,
-    dpi: batch.dpi,
-    format: batch.format,
-    retainedBytesMedian: median(batch.records.map(({ retainedBytes }) => retainedBytes)),
-    hostWallMsMedian: median(batch.records.map(({ hostWallMs }) => hostWallMs)),
-    peakHeapUsedSizeMax: Math.max(...batch.records.map(({ heap }) => heap.peak.usedSize)),
-    peakHeapBackingStorageSizeMax: Math.max(...batch.records.map(({ heap }) => heap.peak.backingStorageSize)),
-  }));
+function summaryDocument(summary, batches) {
+  return {
+    schemaVersion: 2,
+    sourceRawSha256: rawSourceSha256(),
+    heapAggregationFormula,
+    cells: summary,
+    batches,
+  };
 }
 
-function formatDecision(summary, environment) {
-  const png = summary.find((cell) => cell.fixtureType === "photo-scan" && cell.pageCount === 1 && cell.dpi === 300 && cell.format === "png" && cell.environment === environment);
-  const jpeg = summary.find((cell) => cell.fixtureType === "photo-scan" && cell.pageCount === 1 && cell.dpi === 300 && cell.format === "jpeg" && cell.environment === environment);
-  const ratios = png.raw.records.map((record, index) => record.finalPdfBytes / jpeg.raw.records[index].finalPdfBytes);
-  const ratio = median(ratios);
-  return { environment, pairedRatios: ratios, medianPairedRatio: ratio, format: ratio >= 2 ? "jpeg" : "png" };
-}
-
-function warningCoefficients(summary) {
-  return Object.fromEntries(dpis.flatMap((dpi) => formats.map((format) => {
-    const candidates = summary.filter((cell) => cell.fixtureType === "photo-scan" && cell.dpi === dpi && cell.format === format);
-    const coefficient = Math.max(...candidates.flatMap(({ raw }) => raw.records.map((record) => record.finalPdfBytes / record.metrics.cumulativePixels)));
-    return [`${dpi}-${format}`, coefficient];
-  })));
+function tableDocument(summary) {
+  return `Raw source SHA-256: \`${rawSourceSha256()}\`\n\nHeap aggregation: ${heapAggregationFormula}\n\n${buildTable(summary)}\n`;
 }
 
 function readabilityOracle(files, manifest) {
@@ -352,10 +312,10 @@ if (process.argv.includes("--report-only")) {
     warningBytesPerPixel: warningCoefficients(summary),
   };
   const summaryWithoutRaw = summary.map(({ raw: _raw, ...cell }) => cell);
-  writeJson("summary.json", { schemaVersion: 1, cells: summaryWithoutRaw, batches: summarizeBatches(raw.batches) });
+  writeJson("summary.json", summaryDocument(summaryWithoutRaw, summarizeBatches(raw.batches)));
   writeJson("decision.json", decisions);
-  const table = buildTable(summary);
-  fs.writeFileSync(path.join(outputRoot, "table.md"), `${table}\n`);
+  const table = tableDocument(summary);
+  fs.writeFileSync(path.join(outputRoot, "table.md"), table);
   console.log(table);
   console.log(`FORMAT_DECISION ${JSON.stringify(decisions.format)}`);
   console.log(`DPI_DECISION ${JSON.stringify(decisions.dpi)}`);
@@ -413,7 +373,7 @@ try {
           process.stdout.write(`BENCH ${environment.id} ${fixtureType} ${pageCount}p ${dpi} ${format} run${repetition + 1} ${record.finalPdfBytes}B ${record.metrics.totalMs.toFixed(1)}ms\n`);
         }
         rawCells.push({ ...definition, environmentMetadata, warmup, records });
-        writeJson("raw.json", { schemaVersion: 1, warmupRuns: 1, recordedRuns: 3, cells: rawCells, batches: batchRaw });
+        writeJson("raw.json", { schemaVersion: 2, warmupRuns: 1, recordedRuns: 3, cells: rawCells, batches: batchRaw });
       }
     } finally {
       await sampler.dispose();
@@ -437,7 +397,7 @@ try {
       const records = [];
       for (let repetition = 0; repetition < 3; repetition += 1) records.push(await runBatch(page, sampler, chosenFormat));
       batchRaw.push({ environment: environment.id, dpi: 150, format: chosenFormat, files: ["blank-4", "text-vector-4", "photo-scan-4"], warmup, records });
-      writeJson("raw.json", { schemaVersion: 1, warmupRuns: 1, recordedRuns: 3, cells: rawCells, batches: batchRaw });
+      writeJson("raw.json", { schemaVersion: 2, warmupRuns: 1, recordedRuns: 3, cells: rawCells, batches: batchRaw });
     } finally {
       await sampler.dispose();
       await page.close();
@@ -465,10 +425,10 @@ try {
     warningBytesPerPixel: warningCoefficients(summary),
   };
   const summaryWithoutRaw = summary.map(({ raw, ...cell }) => cell);
-  writeJson("summary.json", { schemaVersion: 1, cells: summaryWithoutRaw, batches: summarizeBatches(batchRaw) });
+  writeJson("summary.json", summaryDocument(summaryWithoutRaw, summarizeBatches(batchRaw)));
   writeJson("decision.json", decisions);
   writeJson("readability.json", readability);
-  fs.writeFileSync(path.join(outputRoot, "table.md"), `${table}\n`);
+  fs.writeFileSync(path.join(outputRoot, "table.md"), tableDocument(summary));
   console.log(table);
   console.log(`FORMAT_DECISION ${JSON.stringify(decisions.format)}`);
   console.log(`DPI_DECISION ${JSON.stringify(decisions.dpi)}`);

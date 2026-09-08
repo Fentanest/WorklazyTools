@@ -4,34 +4,50 @@
 
 ## 2026-09-09
 
+### U4-7 fix-1 — 벤치 게이트·부분 결과·페이지 정리 수리 (Codx)
+
+**실행 게이트·귀속** — 시작 branch/head는 `s3-pdf-finish`/`661f717bc11ecbab06a777a25db2700164988648`로 지시와 일치했고 관련 열린 계획서의 상반 지시는 없었다. 검수 R1~R5는 이 기준 커밋에서 생긴 결함으로 수용해 모두 수리했다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고, main 병합·push·배포도 하지 않았다. 기존 `save()` 할당 오류, preview 포트 오인, scoped 로그 문구, 공용 incomplete 125, 실기기 미교정, 128MiB heartbeat·의존 패치는 이번 결함과 분리해 `docs/backlog.md`에 이월했다.
+
+**R1 정정·R2 게이트 건전성** — 보존 원자료 `/tmp/worklazy-u4-7/benchmark-final/raw.json`의 SHA-256은 수정 전후 모두 **`6deae09a9f03e35cd5c879d456c924caad5ece14e94c54b54c966c9beb1b2f55`**다. 각 표본에서 target별 합계를 먼저 대조한 뒤 `usedSize`와 `backingStorageSize`의 최고점을 서로 독립 계산하고, 세 기록에서 지표별 최댓값을 선택했다. backing 값은 **25/144셀**이 정정됐고 used 값 변경은 0이다. 최대 정정은 desktop/photo-scan/16쪽/300DPI/PNG의 **461,501,557 → 585,737,224B**, 차이 **124,235,667B(118.4804MiB)**다. 기존 U4-7의 48행 표·계산식도 정정했으며 JPEG q0.85·미교정 폴백 150 DPI·결정 JSON은 바꾸지 않았다.
+
+report-only는 저장 peak를 결과로 신뢰하지 않고 정확한 144셀 Cartesian 집합, 환경별 정확한 배치 집합, `blank-4 → text-vector-4 → photo-scan-4` 순서, 실행별 결과 3개와 보유 bytes 합, worker 표본, load/render/encode/embed/save/retain/release 7경계를 검사한다. 실제 음성 주입은 `peak=0`을 **`stored peak does not match its raw samples`**, 모바일 배치의 desktop 복제를 **`batch environments must equal the exact configured set`**, 결과 3→2 삭제를 **`must contain exactly three outputs (2 !== 3)`**로 모두 거부했다. 기존 worker 삭제와 render 경계 삭제 음성도 계속 거부한다. 대표 실제 재집계는 desktop/blank/4쪽/300DPI/PNG backing **176,358,692 → 277,836,862B**이며 record 1/sample 21의 두 target 합이 근거다.
+
+**R3·R4 저장 경계** — OPFS B의 `close()` 또는 `getFile()` await 직후 abort를 재검사해 미완료 B만 제거하고 완료 A를 보존한다. 두 재현 모두 종전 `[A,B]` 등록/마지막 파일 정상 반환에서 **AbortError, partial `[A]`, entry `result-1.pdf`만 잔존**으로 바뀌었다. 결과별 dispose가 자기 entry만 제거하고 마지막 결과가 해제될 때만 세션을 지우며, 배치 dispose의 전체 세션 해제 계약은 유지한다. 두 번째 메모리 결과의 실제 `new Blob()` RangeError는 종전 raw `RangeError`·partial 없음에서 **`PdfFinishPartialError` / `PDF_FINISH_RESULT_MEMORY_LIMIT` / partial `[A]`**로 정규화됐고 C는 읽지 않았다. 별도 기존 `PDFDocument.save()` RangeError는 여전히 raw 오류·partial 없음이며 이번 수리 성과로 포함하지 않는다.
+
+**R5 페이지 수명주기** — geometry preflight와 실제 페이지의 취득·캔버스 할당·render·encode·embed를 각각 page 단위 `try/finally`로 묶었다. 실제 PDF.js 재현에서 render 중 취소는 `render → cancel → settled(RenderingCancelledException) → cleanup → release → destroy`, encode 경계 취소는 `render → settled → render stage → encode stage → cleanup → release → destroy`, canvas context 할당 실패는 `cleanup → release → destroy` 순서다. 이를 실제 메모리 누수 입증으로 확대하지 않고 명시된 정리 순서 복구로 판정한다. Chromium OPFS close-abort도 종전 성공 `{returnedSize:3}`에서 `{mode:"opfs", error:"AbortError"}`로 바뀌었다.
+
+**검증·예산** — TypeScript, 전체 unit **345/345**, production build **2,854 modules·71 정적 페이지**, static(startup recovery 119), `test:pdf-finish`의 직접 진입 20·watermark contents4+128+32·stamp16+16+8·structure appearance5×2/조합4/parentless0, 공식 oracle 87/허용56/제외31/양 renderer SHA56, PDF scoped browser, legacy oracle client3·structure4·render32·output4·input1/totalDiffs0을 통과했다. 전체 144셀 벤치는 다시 실행하지 않고 보존 raw의 report-only만 수행했다. 최초 scoped/full 번들을 실수로 겹쳐 시작한 시도는 JSON 생성 전에 중단돼 증거에서 폐기했고, 이후 두 측정을 순차 독립 실행했다.
+
+최종 scoped 증분/상한/잔여는 entry **12,201/20,480/8,279B**, PDF route **75,807/82,000/6,193B**, shared 순증 **2,413/30,720/28,307B**, app **91,306/96,000/4,694B**, CSS **400/10,240/9,840B**다. override `{}`, multiplier `1`, 배포·계측 inventory 누락 0이며 상한을 바꾸지 않았다. full은 같은 entry/shared/app/CSS와 19-route 합산 **-433,267B**로 통과했고 scoped PDF 증가와 상쇄하지 않았다. 이번 변경은 테스트·내부 저장/정리 경계뿐이라 사용자 문구·route를 바꾸지 않았고 ko/en 현지화, SEO·정적 페이지, AdSense 격리에는 동반 변경할 표면이 없었다. 추적돼 있던 루트 `MERGE-GATE-CHECKLIST.md`는 내용 손실 없이 무시되는 `docs/jobs/todo/s3-pdf-finish-state/` 최신본에 합치고 추적에서 제거했다. 상세 로그·정정 25셀·전후 재현은 `/tmp/worklazy-u4-7-fix1/REPORT.md`에 보존한다. — Codx
+
 ### U4-7 — 이미지 변환 평탄화·벤치 매트릭스 (Codx)
 
 **실행 게이트·탐색 빌드** — 시작 branch/head는 `s3-pdf-finish`/`509730a7c0b412f82834946b84231d3e07d00544`로 지시와 일치했고 열린 계획서 충돌은 없었다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`, 미추적 DOCX·HTML·`newui/`와 금지 worktree는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다. schema-v3 기준선 SHA-256은 `4caaa9c6…30ea`다. 구현 전 탐색값은 entry **11,091B**, PDF route **71,060B**, shared 순증 **2,430B**, app **85,498B**, CSS **400B**였고 잔여는 PDF **10,940B**, app **10,502B**였다. 선택 페이지 래스터·OPFS 보유·한영 UI를 묶은 탐색 후보도 PDF **73,821/82,000B**, app **89,158/96,000B**로 예산 안임을 확인한 뒤 구현을 확정했다.
 
-**벤치 절차·환경** — 아래 48행은 fixture 4종 × 쪽수 3종 × 포맷 2종 × 환경 2종이며 각 행의 150/200/300 DPI 셀이 세 열이다(총 144 실행 셀). 각 셀은 준비 1회 뒤 3회 기록했고 최종 PDF bytes와 raster 전체 처리시간은 중앙값, CDP 자원은 세 기록의 최댓값이다. CDP 값은 50ms 주기와 load/render/encode/embed/save/retain/release 경계에서 메인+PDF.js worker의 `Runtime.getHeapUsage`를 합산했으며 원자료에는 target별 `usedSize`·`backingStorageSize`와 모든 표본을 보존했다. Chrome binary는 **152.0.7977.64**다. Pixel 7 조건은 **412×839, DPR 2.625, touch와 mobile UA를 적용한 에뮬레이션이며 실기기가 아니다**. native/renderer/canvas 메모리는 실기기 계측이 없어 **미측정**이다. 원자료 `/tmp/worklazy-u4-7/benchmark-final/raw.json`(19MB), 집계 `summary.json`, 판정 `decision.json`, 가독성 `readability.json`, 표 `table.md`를 보존했다. report-only 재집계는 144개 고유 셀, 432개 기록 반복, 매 기록의 worker 표본과 7개 경계를 fail-closed로 다시 검사한 뒤 동일 표를 만들었다.
+**벤치 절차·환경** — 아래 48행은 fixture 4종 × 쪽수 3종 × 포맷 2종 × 환경 2종이며 각 행의 150/200/300 DPI 셀이 세 열이다(총 144 실행 셀). 각 셀은 준비 1회 뒤 3회 기록했고 최종 PDF bytes와 raster 전체 처리시간은 중앙값, CDP 자원은 세 기록의 최댓값이다. CDP 값은 50ms 주기와 load/render/encode/embed/save/retain/release 경계에서 메인+PDF.js worker의 `Runtime.getHeapUsage`를 합산했으며 원자료에는 target별 `usedSize`·`backingStorageSize`와 모든 표본을 보존했다. Chrome binary는 **152.0.7977.64**다. Pixel 7 조건은 **412×839, DPR 2.625, touch와 mobile UA를 적용한 에뮬레이션이며 실기기가 아니다**. native/renderer/canvas 메모리는 실기기 계측이 없어 **미측정**이다. 원자료 `/tmp/worklazy-u4-7/benchmark-final/raw.json`(19MB, SHA-256 **`6deae09a9f03e35cd5c879d456c924caad5ece14e94c54b54c966c9beb1b2f55`**)은 덮어쓰지 않았다. 정정 집계는 각 표본 합계를 target별 값의 합과 먼저 대조하고, 각 기록의 `usedSize`와 `backingStorageSize` 최고점을 원시 표본에서 서로 독립 계산한 뒤 세 기록의 최댓값을 셀 값으로 선택한다. report-only는 정확한 144셀 Cartesian 집합, 환경별 배치, 파일·출력 순서와 보유 bytes 합, 매 실행 worker 표본·7경계를 fail-closed로 검사하며 `summary.json`에는 각 최고점의 기록 번호·표본 시각·경계·target 근거를 남긴다.
 
 표의 각 DPI 셀 표기: **최종 PDF bytes 중앙값 / 처리시간 중앙값 / peak CDP used·backing 최댓값**.
 
 | fixture | pages | format | environment | 150 DPI bytes / time / peak CDP used·backing | 200 DPI bytes / time / peak CDP used·backing | 300 DPI bytes / time / peak CDP used·backing |
 |---|---:|---|---|---:|---:|---:|
-| blank | 1 | PNG | Desktop host measurement | 7.1KiB / 598ms / 64.69MiB·74.93MiB | 12.0KiB / 755ms / 63.97MiB·87.87MiB | 25.7KiB / 1136ms / 64.11MiB·149.77MiB |
-| blank | 1 | PNG | Pixel 7 emulation (not a physical device) | 7.1KiB / 573ms / 64.60MiB·74.93MiB | 12.0KiB / 699ms / 64.01MiB·87.87MiB | 25.7KiB / 1096ms / 64.09MiB·149.78MiB |
+| blank | 1 | PNG | Desktop host measurement | 7.1KiB / 598ms / 64.69MiB·80.14MiB | 12.0KiB / 755ms / 63.97MiB·97.96MiB | 25.7KiB / 1136ms / 64.11MiB·149.77MiB |
+| blank | 1 | PNG | Pixel 7 emulation (not a physical device) | 7.1KiB / 573ms / 64.60MiB·80.14MiB | 12.0KiB / 699ms / 64.01MiB·97.96MiB | 25.7KiB / 1096ms / 64.09MiB·149.78MiB |
 | blank | 1 | JPEG | Desktop host measurement | 14.2KiB / 379ms / 63.61MiB·58.03MiB | 24.1KiB / 405ms / 64.04MiB·58.05MiB | 51.9KiB / 442ms / 63.90MiB·58.10MiB |
 | blank | 1 | JPEG | Pixel 7 emulation (not a physical device) | 14.2KiB / 368ms / 64.06MiB·58.03MiB | 24.1KiB / 371ms / 64.08MiB·58.05MiB | 51.9KiB / 413ms / 63.88MiB·58.10MiB |
-| blank | 4 | PNG | Desktop host measurement | 26.8KiB / 1444ms / 63.86MiB·117.65MiB | 46.0KiB / 2209ms / 64.12MiB·164.63MiB | 101.1KiB / 3540ms / 64.17MiB·168.19MiB |
-| blank | 4 | PNG | Pixel 7 emulation (not a physical device) | 26.8KiB / 1413ms / 63.85MiB·117.65MiB | 46.0KiB / 2092ms / 64.85MiB·164.63MiB | 101.1KiB / 3373ms / 64.13MiB·168.19MiB |
+| blank | 4 | PNG | Desktop host measurement | 26.8KiB / 1444ms / 63.86MiB·117.65MiB | 46.0KiB / 2209ms / 64.12MiB·164.63MiB | 101.1KiB / 3540ms / 64.17MiB·264.97MiB |
+| blank | 4 | PNG | Pixel 7 emulation (not a physical device) | 26.8KiB / 1413ms / 63.85MiB·117.65MiB | 46.0KiB / 2092ms / 64.85MiB·164.63MiB | 101.1KiB / 3373ms / 64.13MiB·264.97MiB |
 | blank | 4 | JPEG | Desktop host measurement | 55.1KiB / 468ms / 63.85MiB·58.92MiB | 94.5KiB / 536ms / 63.85MiB·59.00MiB | 206.0KiB / 660ms / 63.86MiB·59.22MiB |
 | blank | 4 | JPEG | Pixel 7 emulation (not a physical device) | 55.1KiB / 450ms / 64.42MiB·58.92MiB | 94.5KiB / 535ms / 63.84MiB·59.00MiB | 206.0KiB / 668ms / 63.84MiB·59.22MiB |
-| blank | 16 | PNG | Desktop host measurement | 105.3KiB / 3820ms / 64.89MiB·185.07MiB | 182.3KiB / 6261ms / 64.54MiB·297.45MiB | 402.7KiB / 12381ms / 65.20MiB·530.57MiB |
-| blank | 16 | PNG | Pixel 7 emulation (not a physical device) | 105.3KiB / 3759ms / 64.87MiB·185.07MiB | 182.3KiB / 6190ms / 64.98MiB·297.45MiB | 402.7KiB / 12089ms / 65.21MiB·471.69MiB |
+| blank | 16 | PNG | Desktop host measurement | 105.3KiB / 3820ms / 64.89MiB·209.11MiB | 182.3KiB / 6261ms / 64.54MiB·297.45MiB | 402.7KiB / 12381ms / 65.20MiB·530.57MiB |
+| blank | 16 | PNG | Pixel 7 emulation (not a physical device) | 105.3KiB / 3759ms / 64.87MiB·186.16MiB | 182.3KiB / 6190ms / 64.98MiB·297.45MiB | 402.7KiB / 12089ms / 65.21MiB·530.57MiB |
 | blank | 16 | JPEG | Desktop host measurement | 218.8KiB / 840ms / 64.61MiB·62.49MiB | 376.0KiB / 1202ms / 64.63MiB·62.79MiB | 822.1KiB / 1661ms / 64.61MiB·63.67MiB |
 | blank | 16 | JPEG | Pixel 7 emulation (not a physical device) | 218.8KiB / 860ms / 64.64MiB·62.49MiB | 376.0KiB / 1134ms / 64.59MiB·62.79MiB | 822.1KiB / 1608ms / 64.65MiB·63.67MiB |
 | text-vector | 1 | PNG | Desktop host measurement | 81.2KiB / 923ms / 65.84MiB·80.40MiB | 119.9KiB / 1329ms / 65.95MiB·98.43MiB | 189.6KiB / 2292ms / 64.70MiB·150.42MiB |
 | text-vector | 1 | PNG | Pixel 7 emulation (not a physical device) | 85.5KiB / 921ms / 65.84MiB·80.43MiB | 125.7KiB / 1358ms / 66.12MiB·98.45MiB | 196.3KiB / 2263ms / 64.85MiB·150.46MiB |
 | text-vector | 1 | JPEG | Desktop host measurement | 102.8KiB / 401ms / 64.68MiB·58.11MiB | 154.7KiB / 414ms / 65.48MiB·58.21MiB | 272.5KiB / 458ms / 64.76MiB·58.44MiB |
 | text-vector | 1 | JPEG | Pixel 7 emulation (not a physical device) | 103.8KiB / 445ms / 64.76MiB·58.11MiB | 153.6KiB / 466ms / 64.74MiB·58.21MiB | 274.3KiB / 499ms / 64.73MiB·58.45MiB |
-| text-vector | 4 | PNG | Desktop host measurement | 328.5KiB / 1483ms / 65.71MiB·118.49MiB | 487.2KiB / 1964ms / 65.40MiB·124.21MiB | 769.2KiB / 3619ms / 65.61MiB·170.38MiB |
-| text-vector | 4 | PNG | Pixel 7 emulation (not a physical device) | 346.0KiB / 1568ms / 65.46MiB·118.54MiB | 509.5KiB / 2301ms / 65.38MiB·124.28MiB | 796.8KiB / 3648ms / 65.61MiB·170.48MiB |
+| text-vector | 4 | PNG | Desktop host measurement | 328.5KiB / 1483ms / 65.71MiB·118.49MiB | 487.2KiB / 1964ms / 65.40MiB·180.70MiB | 769.2KiB / 3619ms / 65.61MiB·265.50MiB |
+| text-vector | 4 | PNG | Pixel 7 emulation (not a physical device) | 346.0KiB / 1568ms / 65.46MiB·118.54MiB | 509.5KiB / 2301ms / 65.38MiB·166.00MiB | 796.8KiB / 3648ms / 65.61MiB·265.50MiB |
 | text-vector | 4 | JPEG | Desktop host measurement | 410.2KiB / 498ms / 65.58MiB·59.57MiB | 622.7KiB / 575ms / 65.57MiB·59.98MiB | 1.07MiB / 722ms / 65.58MiB·60.92MiB |
 | text-vector | 4 | JPEG | Pixel 7 emulation (not a physical device) | 414.2KiB / 562ms / 65.55MiB·59.58MiB | 618.0KiB / 603ms / 65.55MiB·59.98MiB | 1.08MiB / 770ms / 65.56MiB·60.93MiB |
 | text-vector | 16 | PNG | Desktop host measurement | 1.31MiB / 4106ms / 67.27MiB·210.46MiB | 1.93MiB / 6702ms / 66.79MiB·298.90MiB | 3.06MiB / 12868ms / 66.26MiB·531.21MiB |
@@ -42,11 +58,11 @@
 | photo-scan | 1 | PNG | Pixel 7 emulation (not a physical device) | 4.72MiB / 1556ms / 64.67MiB·122.32MiB | 8.26MiB / 2418ms / 64.73MiB·158.70MiB | 18.13MiB / 4674ms / 65.08MiB·204.84MiB |
 | photo-scan | 1 | JPEG | Desktop host measurement | 672.8KiB / 419ms / 64.22MiB·74.73MiB | 1.44MiB / 478ms / 64.25MiB·76.30MiB | 2.90MiB / 537ms / 64.25MiB·79.22MiB |
 | photo-scan | 1 | JPEG | Pixel 7 emulation (not a physical device) | 672.8KiB / 426ms / 64.24MiB·74.73MiB | 1.03MiB / 459ms / 64.17MiB·75.47MiB | 1.87MiB / 542ms / 64.13MiB·77.16MiB |
-| photo-scan | 4 | PNG | Desktop host measurement | 18.89MiB / 3891ms / 65.09MiB·166.91MiB | 15.76MiB / 4344ms / 65.13MiB·193.11MiB | 17.11MiB / 6369ms / 65.35MiB·242.92MiB |
-| photo-scan | 4 | PNG | Pixel 7 emulation (not a physical device) | 18.89MiB / 3878ms / 65.10MiB·166.91MiB | 33.05MiB / 6458ms / 64.85MiB·246.42MiB | 72.51MiB / 14185ms / 64.31MiB·311.57MiB |
+| photo-scan | 4 | PNG | Desktop host measurement | 18.89MiB / 3891ms / 65.09MiB·178.82MiB | 15.76MiB / 4344ms / 65.13MiB·193.11MiB | 17.11MiB / 6369ms / 65.35MiB·297.36MiB |
+| photo-scan | 4 | PNG | Pixel 7 emulation (not a physical device) | 18.89MiB / 3878ms / 65.10MiB·178.82MiB | 33.05MiB / 6458ms / 64.85MiB·246.42MiB | 72.51MiB / 14185ms / 64.31MiB·311.57MiB |
 | photo-scan | 4 | JPEG | Desktop host measurement | 2.63MiB / 648ms / 64.39MiB·83.73MiB | 5.77MiB / 756ms / 64.39MiB·90.01MiB | 11.60MiB / 1122ms / 64.38MiB·101.68MiB |
 | photo-scan | 4 | JPEG | Pixel 7 emulation (not a physical device) | 2.63MiB / 632ms / 64.35MiB·83.73MiB | 4.11MiB / 753ms / 64.38MiB·86.70MiB | 7.47MiB / 1069ms / 64.05MiB·93.43MiB |
-| photo-scan | 16 | PNG | Desktop host measurement | 75.56MiB / 14090ms / 65.23MiB·310.23MiB | 63.03MiB / 15764ms / 65.22MiB·314.08MiB | 68.43MiB / 23745ms / 64.97MiB·440.12MiB |
+| photo-scan | 16 | PNG | Desktop host measurement | 75.56MiB / 14090ms / 65.23MiB·310.23MiB | 63.03MiB / 15764ms / 65.22MiB·314.08MiB | 68.43MiB / 23745ms / 64.97MiB·558.60MiB |
 | photo-scan | 16 | PNG | Pixel 7 emulation (not a physical device) | 75.56MiB / 14021ms / 65.49MiB·318.80MiB | 132.20MiB / 23823ms / 65.22MiB·430.88MiB | 290.03MiB / 52170ms / 64.69MiB·734.97MiB |
 | photo-scan | 16 | JPEG | Desktop host measurement | 10.50MiB / 1373ms / 65.56MiB·103.49MiB | 23.06MiB / 1884ms / 64.81MiB·127.86MiB | 46.40MiB / 3237ms / 65.07MiB·174.47MiB |
 | photo-scan | 16 | JPEG | Pixel 7 emulation (not a physical device) | 10.50MiB / 1329ms / 64.84MiB·103.49MiB | 16.45MiB / 1819ms / 64.79MiB·114.69MiB | 29.90MiB / 3150ms / 64.85MiB·141.65MiB |
@@ -54,11 +70,11 @@
 | transparency | 1 | PNG | Pixel 7 emulation (not a physical device) | 991.2KiB / 1055ms / 64.42MiB·87.72MiB | 1.33MiB / 1449ms / 64.08MiB·109.54MiB | 1.99MiB / 2553ms / 64.09MiB·162.98MiB |
 | transparency | 1 | JPEG | Desktop host measurement | 90.4KiB / 380ms / 64.08MiB·63.94MiB | 133.3KiB / 409ms / 64.09MiB·64.02MiB | 230.1KiB / 449ms / 64.00MiB·64.21MiB |
 | transparency | 1 | JPEG | Pixel 7 emulation (not a physical device) | 84.9KiB / 381ms / 63.77MiB·63.93MiB | 124.5KiB / 413ms / 64.05MiB·64.00MiB | 211.7KiB / 462ms / 64.07MiB·64.17MiB |
-| transparency | 4 | PNG | Desktop host measurement | 2.90MiB / 1991ms / 64.54MiB·103.24MiB | 3.13MiB / 2425ms / 64.60MiB·139.74MiB | 3.43MiB / 4226ms / 64.81MiB·186.04MiB |
-| transparency | 4 | PNG | Pixel 7 emulation (not a physical device) | 3.87MiB / 2075ms / 64.51MiB·106.25MiB | 5.33MiB / 2729ms / 64.63MiB·146.73MiB | 7.96MiB / 5107ms / 64.93MiB·200.54MiB |
+| transparency | 4 | PNG | Desktop host measurement | 2.90MiB / 1991ms / 64.54MiB·128.19MiB | 3.13MiB / 2425ms / 64.60MiB·190.69MiB | 3.43MiB / 4226ms / 64.81MiB·273.59MiB |
+| transparency | 4 | PNG | Pixel 7 emulation (not a physical device) | 3.87MiB / 2075ms / 64.51MiB·129.16MiB | 5.33MiB / 2729ms / 64.63MiB·193.01MiB | 7.96MiB / 5107ms / 64.93MiB·275.34MiB |
 | transparency | 4 | JPEG | Desktop host measurement | 359.8KiB / 512ms / 64.41MiB·68.40MiB | 531.4KiB / 601ms / 64.64MiB·68.74MiB | 918.4KiB / 796ms / 64.54MiB·69.49MiB |
 | transparency | 4 | JPEG | Pixel 7 emulation (not a physical device) | 337.7KiB / 539ms / 64.38MiB·68.36MiB | 496.1KiB / 570ms / 64.60MiB·68.67MiB | 845.0KiB / 794ms / 64.39MiB·69.35MiB |
-| transparency | 16 | PNG | Desktop host measurement | 11.61MiB / 5973ms / 66.36MiB·223.50MiB | 12.50MiB / 8219ms / 65.38MiB·291.99MiB | 13.73MiB / 15578ms / 65.40MiB·537.66MiB |
+| transparency | 16 | PNG | Desktop host measurement | 11.61MiB / 5973ms / 66.36MiB·223.50MiB | 12.50MiB / 8219ms / 65.38MiB·307.22MiB | 13.73MiB / 15578ms / 65.40MiB·537.66MiB |
 | transparency | 16 | PNG | Pixel 7 emulation (not a physical device) | 15.48MiB / 6369ms / 65.22MiB·220.94MiB | 21.32MiB / 9370ms / 65.59MiB·300.08MiB | 31.85MiB / 18369ms / 65.82MiB·548.83MiB |
 | transparency | 16 | JPEG | Desktop host measurement | 1.40MiB / 1052ms / 65.59MiB·72.69MiB | 2.07MiB / 1270ms / 65.59MiB·74.03MiB | 3.59MiB / 2127ms / 65.59MiB·77.05MiB |
 | transparency | 16 | JPEG | Pixel 7 emulation (not a physical device) | 1.32MiB / 1065ms / 65.57MiB·72.52MiB | 1.94MiB / 1285ms / 65.57MiB·73.75MiB | 3.30MiB / 2245ms / 65.58MiB·76.48MiB |

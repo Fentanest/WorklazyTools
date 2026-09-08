@@ -15,7 +15,7 @@ import {
   PdfFinishEngineError,
   PdfFinishPartialError,
 } from "../../src/features/pdf-editor/finish/engine.ts";
-import { PdfFinishStorageError, type PdfFinishResultStore } from "../../src/features/pdf-editor/finish/resultStorage.ts";
+import { createPdfFinishResultStore, PdfFinishStorageError, type PdfFinishResultStore } from "../../src/features/pdf-editor/finish/resultStorage.ts";
 import { createPageSelection } from "../../src/features/pdf-editor/finish/selection.ts";
 import { createWatermarkPlacements, inspectWatermarkRisksCooperatively, measureTextWatermarkBox, validateWatermarkResult } from "../../src/features/pdf-editor/finish/watermark.ts";
 import { finishOutputName } from "../../src/features/pdf-editor/outputName.ts";
@@ -284,6 +284,49 @@ test("finish storage failure preserves completed outputs, discards the current r
   );
   assert.equal(registrations, 2);
   assert.equal(thirdReads, 0);
+});
+
+test("finish Blob allocation failure exposes completed outputs and never starts the next file", async () => {
+  const files = await Promise.all(["first", "second", "third"].map((name) => fixture(`${name}.pdf`)));
+  const originalThirdRead = files[2].arrayBuffer.bind(files[2]);
+  let thirdReads = 0;
+  files[2].arrayBuffer = async () => { thirdReads += 1; return originalThirdRead(); };
+  const store = await createPdfFinishResultStore({ storage: {} });
+  const OriginalBlob = globalThis.Blob;
+  let blobAllocations = 0;
+  globalThis.Blob = new Proxy(OriginalBlob, {
+    construct(target, args, newTarget) {
+      blobAllocations += 1;
+      if (blobAllocations === 2) throw new RangeError("injected Blob allocation failure");
+      return Reflect.construct(target, args, newTarget);
+    },
+  });
+  let partial: PdfFinishPartialError | undefined;
+  try {
+    await assert.rejects(
+      finishPdfFiles({
+        files: files.map((file, index) => ({ key: `${index}`, file, selection: selection(3, "1") })),
+        options: { template: "{page}", region: "bottom-center", fontSize: 10, color: "#34343a", margin: 24, startNumber: 1, startPage: 1, excludeCover: false },
+        locale: "en-US",
+        resultStore: store,
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof PdfFinishPartialError);
+        partial = error;
+        assert.equal(error.code, "result-memory-limit");
+        assert.deepEqual(error.partialResults.map(({ key }) => key), ["0"]);
+        return true;
+      },
+    );
+  } finally {
+    globalThis.Blob = OriginalBlob;
+  }
+  assert.equal(blobAllocations, 2);
+  assert.equal(thirdReads, 0);
+  assert.ok(partial);
+  assert.ok((await partial.partialResults[0].blob.arrayBuffer()).byteLength > 0);
+  await partial.partialResults[0].dispose();
+  await store.dispose();
 });
 
 test("finish file failure exposes completed outputs and never starts the next file", async () => {

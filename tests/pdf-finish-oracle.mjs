@@ -26,8 +26,8 @@ const nodePdfjs = await import(pathToFileURL(path.join(repositoryRoot, "node_mod
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const outputPath = process.env.PDF_FINISH_ORACLE_OUTPUT || path.join(os.tmpdir(), "worklazy-u4-0", "pdf-finish-oracle.json");
 const chromeExecutable = process.env.CHROME_BIN || "/usr/bin/google-chrome";
-const oraclePort = Number(process.env.PDF_FINISH_ORACLE_PORT || "4289");
-if (!Number.isSafeInteger(oraclePort) || oraclePort < 4280 || oraclePort > 4289) throw new Error("PDF_FINISH_ORACLE_PORT must be between 4280 and 4289.");
+const oraclePort = Number(process.env.PDF_FINISH_ORACLE_PORT || "4278");
+if (!Number.isSafeInteger(oraclePort) || oraclePort < 4270 || oraclePort > 4279) throw new Error("PDF_FINISH_ORACLE_PORT must be between 4270 and 4279.");
 
 function commandVersion(command, args) {
   const result = spawnSync(command, args, { encoding: "utf8" });

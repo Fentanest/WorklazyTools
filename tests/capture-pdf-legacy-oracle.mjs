@@ -14,6 +14,8 @@ const trackedOutputDirectory = path.join(testsDirectory, "fixtures", "pdf-finish
 const requestedOutputDirectory = process.env.PDF_LEGACY_ORACLE_OUTPUT;
 const outputDirectory = requestedOutputDirectory ? path.resolve(requestedOutputDirectory) : trackedOutputDirectory;
 const captureCurrentSource = process.env.PDF_LEGACY_ORACLE_SOURCE === "current";
+const pdfjsPort = Number(process.env.PDF_LEGACY_ORACLE_PORT || "4275");
+if (!Number.isSafeInteger(pdfjsPort) || pdfjsPort < 4270 || pdfjsPort > 4279) throw new Error("PDF_LEGACY_ORACLE_PORT must be between 4270 and 4279.");
 const baseCommit = "5bc6854175331bdd73b267784d9633cdccda8446";
 const require = createRequire(path.join(repositoryRoot, "package.json"));
 const { build, transform } = require("esbuild");
@@ -62,7 +64,7 @@ async function startPdfjsServer() {
       response.end(error.message);
     }
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(pdfjsPort, "127.0.0.1", resolve));
   return { server, origin: `http://127.0.0.1:${server.address().port}` };
 }
 

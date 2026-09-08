@@ -634,6 +634,112 @@ test("finish result storage falls back only before work and enforces registratio
   await store.dispose();
 });
 
+test("memory result storage normalizes Blob allocation failure without discarding completed output", async () => {
+  const store = await createPdfFinishResultStore({ storage: {}, memoryLimitBytes: 100 });
+  const first = await store.store(new Uint8Array([1, 2, 3]), "first.pdf");
+  const OriginalBlob = globalThis.Blob;
+  globalThis.Blob = new Proxy(OriginalBlob, {
+    construct() { throw new RangeError("injected Blob allocation failure"); },
+  });
+  try {
+    await assert.rejects(
+      store.store(new Uint8Array([4, 5, 6]), "second.pdf"),
+      (error: unknown) => error instanceof PdfFinishStorageError
+        && error.reason === "memory-limit"
+        && error.cause instanceof RangeError,
+    );
+  } finally {
+    globalThis.Blob = OriginalBlob;
+  }
+  assert.deepEqual([...new Uint8Array(await first.blob.arrayBuffer())], [1, 2, 3]);
+  await first.dispose();
+  await store.dispose();
+});
+
+test("OPFS registration rechecks cancellation after close and getFile and removes only the current entry", async () => {
+  for (const abortAt of ["close", "getFile"] as const) {
+    const controller = new AbortController();
+    const entries = new Map<string, Uint8Array | undefined>();
+    const removed: string[] = [];
+    let sequence = 0;
+    const session = {
+      async getFileHandle(name: string) {
+        sequence += 1;
+        const current = sequence;
+        entries.set(name, undefined);
+        let data = new Uint8Array();
+        return {
+          async createWritable() {
+            return {
+              async write(bytes: Uint8Array) { data = bytes; },
+              async close() {
+                entries.set(name, data);
+                if (current === 2 && abortAt === "close") controller.abort();
+              },
+              async abort() {},
+            };
+          },
+          async getFile() {
+            if (current === 2 && abortAt === "getFile") controller.abort();
+            return new File([data], name, { type: "application/pdf" });
+          },
+        };
+      },
+      async removeEntry(name: string) { removed.push(name); entries.delete(name); },
+    };
+    const root = {
+      async getDirectoryHandle() { return session; },
+      async removeEntry(name: string) { removed.push(name); entries.clear(); },
+    };
+    const store = await createPdfFinishResultStore({
+      storage: { getDirectory: async () => ({ getDirectoryHandle: async () => root }) as unknown as FileSystemDirectoryHandle },
+      id: `cancel-${abortAt}`,
+    });
+    const first = await store.store(new Uint8Array([1]), "first.pdf");
+    await assert.rejects(
+      store.store(new Uint8Array([2]), "second.pdf", controller.signal),
+      (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+    );
+    assert.deepEqual([...entries.keys()], ["result-1.pdf"]);
+    assert.ok(removed.includes("result-2.pdf"));
+    assert.equal((await first.blob.arrayBuffer()).byteLength, 1);
+    await first.dispose();
+    assert.ok(removed.includes(`session-cancel-${abortAt}`));
+  }
+});
+
+test("OPFS result disposal preserves sibling entries until each owner releases its result", async () => {
+  const entries = new Map<string, Uint8Array>();
+  const removed: string[] = [];
+  const session = {
+    async getFileHandle(name: string) {
+      let data = new Uint8Array();
+      return {
+        async createWritable() {
+          return { async write(bytes: Uint8Array) { data = bytes; }, async close() { entries.set(name, data); }, async abort() {} };
+        },
+        async getFile() { return new File([data], name, { type: "application/pdf" }); },
+      };
+    },
+    async removeEntry(name: string) { removed.push(name); entries.delete(name); },
+  };
+  const root = {
+    async getDirectoryHandle() { return session; },
+    async removeEntry(name: string) { removed.push(name); entries.clear(); },
+  };
+  const store = await createPdfFinishResultStore({
+    storage: { getDirectory: async () => ({ getDirectoryHandle: async () => root }) as unknown as FileSystemDirectoryHandle },
+    id: "ownership",
+  });
+  const first = await store.store(new Uint8Array([1]), "first.pdf");
+  const second = await store.store(new Uint8Array([2]), "second.pdf");
+  await first.dispose();
+  assert.deepEqual([...entries.keys()], ["result-2.pdf"]);
+  assert.deepEqual(removed, ["result-1.pdf"]);
+  await second.dispose();
+  assert.deepEqual(removed, ["result-1.pdf", "result-2.pdf", "session-ownership"]);
+});
+
 test("OPFS write failure removes the incomplete entry without silently switching to memory", async () => {
   const removed = [] as string[];
   let aborted = 0;

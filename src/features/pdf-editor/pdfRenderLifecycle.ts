@@ -12,6 +12,18 @@ interface PdfRenderDocumentOwnership {
 interface WaitForPdfRenderOptions extends PdfRenderDocumentOwnership {
   signal?: AbortSignal;
   canceledMessage?: string;
+  cleanupOnCancel?: boolean;
+}
+
+async function settleCanceledRender(renderTask: PdfRenderTask): Promise<void> {
+  try {
+    renderTask.cancel();
+  } catch {
+    // A renderer that has already settled can reject a late cancellation.
+  }
+  try {
+    await renderTask.promise;
+  } catch { /* RenderingCancelledException and late renderer failures are swallowed during cancellation. */ }
 }
 
 export async function cancelPdfRender(
@@ -23,15 +35,7 @@ export async function cancelPdfRender(
     throw new Error("An owned PDF document requires its loading task.");
   }
 
-  try {
-    renderTask.cancel();
-  } catch {
-    // Cancellation cleanup is best-effort. A renderer that has already settled
-    // can throw here, but it must not replace the user's cancellation result.
-  }
-  try {
-    await renderTask.promise;
-  } catch { /* RenderingCancelledException and late renderer failures are swallowed during cancellation. */ }
+  await settleCanceledRender(renderTask);
 
   try {
     page.cleanup();
@@ -51,7 +55,9 @@ export async function waitForPdfRender(
 ): Promise<void> {
   let cancellation: Promise<void> | undefined;
   const cancel = () => {
-    cancellation ??= cancelPdfRender(renderTask, page, options);
+    cancellation ??= options.cleanupOnCancel === false
+      ? settleCanceledRender(renderTask)
+      : cancelPdfRender(renderTask, page, options);
   };
   options.signal?.addEventListener("abort", cancel, { once: true });
   if (options.signal?.aborted) cancel();

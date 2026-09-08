@@ -163,7 +163,6 @@ export async function rasterizePdf(input: {
   const sourceBytes = input.bytes instanceof Uint8Array ? input.bytes : new Uint8Array(input.bytes);
   const selected = new Set(input.selectedPages);
   let owned: { document: PDFDocumentProxy; loadingTask: PDFDocumentLoadingTask } | undefined;
-  let canvas: HTMLCanvasElement | undefined;
   try {
     const { openOwnedPdfDocument } = await import("../pdfPreview.ts");
     owned = await openOwnedPdfDocument(sourceBytes, input.language, input.signal);
@@ -175,9 +174,12 @@ export async function rasterizePdf(input: {
     const geometries: RasterPageGeometry[] = [];
     for (const pageNumber of pageNumbers) {
       const page = await owned.document.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 1 });
-      geometries.push({ pageNumber, widthPoints: viewport.width, heightPoints: viewport.height });
-      try { page.cleanup(); } catch { /* Preflight resources are not retained. */ }
+      try {
+        const viewport = page.getViewport({ scale: 1 });
+        geometries.push({ pageNumber, widthPoints: viewport.width, heightPoints: viewport.height });
+      } finally {
+        try { page.cleanup(); } catch { /* Preflight resources are not retained. */ }
+      }
     }
     const preflight = preflightRasterPages(geometries, input.options.dpi);
     if (!preflight.supported) throw new PdfRasterError("unsupported-page", preflight.unsupportedPage);
@@ -201,68 +203,76 @@ export async function rasterizePdf(input: {
       }
 
       const page = await owned.document.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: plan.appliedDpi / 72 });
-      const immediate = measureCanvas(viewport);
-      if (!immediate.allowed || immediate.width !== plan.measurement.width || immediate.height !== plan.measurement.height) {
-        try { page.cleanup(); } catch { /* The page is about to be abandoned. */ }
-        throw new PdfRasterError("canvas", pageNumber);
-      }
-      canvas = document.createElement("canvas");
-      canvas.width = immediate.width;
-      canvas.height = immediate.height;
-      const context = canvas.getContext("2d", { alpha: false });
-      if (!context) throw new PdfRasterError("canvas", pageNumber);
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      const renderStartedAt = performance.now();
-      const renderTask = page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" });
+      let canvas: HTMLCanvasElement | undefined;
       try {
-        await waitForPdfRender(renderTask, page, { signal: input.signal, canceledMessage: "PDF raster rendering was canceled." });
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") throw error;
-        throw new PdfRasterError("render", pageNumber, error);
+        const viewport = page.getViewport({ scale: plan.appliedDpi / 72 });
+        const immediate = measureCanvas(viewport);
+        if (!immediate.allowed || immediate.width !== plan.measurement.width || immediate.height !== plan.measurement.height) {
+          throw new PdfRasterError("canvas", pageNumber);
+        }
+        canvas = document.createElement("canvas");
+        canvas.width = immediate.width;
+        canvas.height = immediate.height;
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) throw new PdfRasterError("canvas", pageNumber);
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        const renderStartedAt = performance.now();
+        const renderTask = page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" });
+        try {
+          await waitForPdfRender(renderTask, page, {
+            signal: input.signal,
+            canceledMessage: "PDF raster rendering was canceled.",
+            cleanupOnCancel: false,
+          });
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") throw error;
+          throw new PdfRasterError("render", pageNumber, error);
+        }
+        const renderMs = elapsed(renderStartedAt);
+        await input.onStage?.({ name: "render", pageNumber });
+        throwIfAborted(input.signal);
+        const encodeStartedAt = performance.now();
+        let imageBytes: Uint8Array;
+        try {
+          imageBytes = new Uint8Array(await (await canvasBlob(canvas, input.options.format)).arrayBuffer());
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") throw error;
+          throw new PdfRasterError("encode", pageNumber, error);
+        }
+        const encodeMs = elapsed(encodeStartedAt);
+        await input.onStage?.({ name: "encode", pageNumber });
+        throwIfAborted(input.signal);
+        const embedStartedAt = performance.now();
+        const image = input.options.format === "png"
+          ? await output.embedPng(imageBytes)
+          : await output.embedJpg(imageBytes);
+        const natural = page.getViewport({ scale: 1 });
+        const outputPage = output.addPage([natural.width, natural.height]);
+        outputPage.drawImage(image, { x: 0, y: 0, width: natural.width, height: natural.height });
+        const embedMs = elapsed(embedStartedAt);
+        await input.onStage?.({ name: "embed", pageNumber });
+        pageMetrics.push({
+          pageNumber,
+          requestedDpi: plan.requestedDpi,
+          appliedDpi: plan.appliedDpi,
+          width: immediate.width,
+          height: immediate.height,
+          pixels: immediate.pixels,
+          rgbaBytes: immediate.rgbaBytes,
+          encodedBytes: imageBytes.byteLength,
+          renderMs,
+          encodeMs,
+          embedMs,
+        });
+      } finally {
+        if (canvas) {
+          canvas.width = 1;
+          canvas.height = 1;
+        }
+        try { page.cleanup(); } catch { /* The current page is no longer needed. */ }
+        await input.onStage?.({ name: "release", pageNumber });
       }
-      const renderMs = elapsed(renderStartedAt);
-      await input.onStage?.({ name: "render", pageNumber });
-      throwIfAborted(input.signal);
-      const encodeStartedAt = performance.now();
-      let imageBytes: Uint8Array;
-      try {
-        imageBytes = new Uint8Array(await (await canvasBlob(canvas, input.options.format)).arrayBuffer());
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") throw error;
-        throw new PdfRasterError("encode", pageNumber, error);
-      }
-      const encodeMs = elapsed(encodeStartedAt);
-      await input.onStage?.({ name: "encode", pageNumber });
-      throwIfAborted(input.signal);
-      const embedStartedAt = performance.now();
-      const image = input.options.format === "png"
-        ? await output.embedPng(imageBytes)
-        : await output.embedJpg(imageBytes);
-      const natural = page.getViewport({ scale: 1 });
-      const outputPage = output.addPage([natural.width, natural.height]);
-      outputPage.drawImage(image, { x: 0, y: 0, width: natural.width, height: natural.height });
-      const embedMs = elapsed(embedStartedAt);
-      await input.onStage?.({ name: "embed", pageNumber });
-      pageMetrics.push({
-        pageNumber,
-        requestedDpi: plan.requestedDpi,
-        appliedDpi: plan.appliedDpi,
-        width: immediate.width,
-        height: immediate.height,
-        pixels: immediate.pixels,
-        rgbaBytes: immediate.rgbaBytes,
-        encodedBytes: imageBytes.byteLength,
-        renderMs,
-        encodeMs,
-        embedMs,
-      });
-      canvas.width = 1;
-      canvas.height = 1;
-      canvas = undefined;
-      try { page.cleanup(); } catch { /* The rendered page is no longer needed. */ }
-      await input.onStage?.({ name: "release", pageNumber });
       completed += 1;
       input.onPage?.(completed, pageNumbers.length);
     }
@@ -288,10 +298,6 @@ export async function rasterizePdf(input: {
     await input.onStage?.({ name: "retain" });
     return result;
   } finally {
-    if (canvas) {
-      canvas.width = 1;
-      canvas.height = 1;
-    }
     if (owned) {
       try { await owned.loadingTask.destroy(); } catch { /* Owned raster documents never enter the preview cache. */ }
     }

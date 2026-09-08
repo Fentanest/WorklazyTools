@@ -61,7 +61,13 @@ function memoryStore(limit: number): PdfFinishResultStore {
       if (signal?.aborted) throw new DOMException("PDF result registration canceled", "AbortError");
       const decision = checkMemoryResultRegistration(retained, bytes.byteLength, limit);
       if (!decision.register) throw new PdfFinishStorageError("memory-limit");
-      const blob = new Blob([bytes], { type: "application/pdf" });
+      let blob: Blob;
+      try {
+        blob = new Blob([bytes], { type: "application/pdf" });
+      } catch (error) {
+        throw new PdfFinishStorageError("memory-limit", error);
+      }
+      if (signal?.aborted) throw new DOMException("PDF result registration canceled", "AbortError");
       retained += blob.size;
       results.add(blob);
       return {
@@ -89,11 +95,19 @@ function opfsStore(
   let sequence = 0;
   let disposed = false;
   const entries = new Set<string>();
-  const dispose = async () => {
+  const removeSession = async () => {
     if (disposed) return;
     disposed = true;
     entries.clear();
     try { await root.removeEntry(sessionName, { recursive: true }); } catch { /* Already removed or unavailable. */ }
+  };
+  const dispose = async () => {
+    await removeSession();
+  };
+  const disposeEntry = async (entryName: string) => {
+    if (disposed || !entries.delete(entryName)) return;
+    try { await session.removeEntry(entryName); } catch { /* Already removed or unavailable. */ }
+    if (entries.size === 0) await removeSession();
   };
   return {
     mode: "opfs",
@@ -108,9 +122,11 @@ function opfsStore(
         if (signal?.aborted) throw new DOMException("PDF result registration canceled", "AbortError");
         await writable.close();
         writable = undefined;
+        if (signal?.aborted) throw new DOMException("PDF result registration canceled", "AbortError");
         const blob = await handle.getFile();
+        if (signal?.aborted) throw new DOMException("PDF result registration canceled", "AbortError");
         entries.add(entryName);
-        return { blob, mode: "opfs", dispose };
+        return { blob, mode: "opfs", dispose: () => disposeEntry(entryName) };
       } catch (error) {
         try { await writable?.abort(); } catch { /* Cancellation exceptions are ignored. */ }
         try { await session.removeEntry(entryName); } catch { /* Partial entry may not exist. */ }
