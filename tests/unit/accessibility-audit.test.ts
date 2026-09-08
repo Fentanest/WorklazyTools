@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults } from "../accessibility-audit.mjs";
+import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, f3OwnedSelector, f3StampOwnershipTargets } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
-    results: pages.map(({ id, scenario }) => ({ id, violations: [], incomplete: [], ...(scenario === "pdf-watermark-empty-text" ? {
+    results: pages.map(({ id, scenario }) => ({ id, violations: [], incomplete: [], ...(id.startsWith("pdf-stamp") ? {
+      stampContrast: [{ target: "notice-body", ratio: 5.87 }, { target: "notice-title", ratio: 14.66 }],
+    } : {}), ...(scenario === "pdf-stamp-editing" ? {
+      stampOwnership: { owner: "f3-stamp", selector: f3OwnedSelector, targets: f3StampOwnershipTargets.map(({ id: targetId }) => ({ id: targetId, matches: 1 })) },
+    } : {}), ...(scenario === "pdf-watermark-empty-text" ? {
       settledContrast: [{ target: "invalid-textarea", ratio: 4.5 }, { target: "empty-text-notice", ratio: 4.5 }],
     } : {}), ...(scenario === "pdf-watermark-display-load-failure" ? {
       interactiveContrast: ["normal", "hover", "focus"].map((state) => ({ state, ratio: 4.5 })),
@@ -28,7 +32,11 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.ok(pages.some(({ id }) => id === "hwp-editor"));
   assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-finish")).map(({ id }) => id), ["pdf-finish-ko", "pdf-finish-mobile-ko", "pdf-finish-en"]);
   assert.ok(pages.some(({ id }) => id === "pdf-watermark-ko"));
-  assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-stamp")).map(({ id }) => id), ["pdf-stamp-ko", "pdf-stamp-mobile-ko", "pdf-stamp-en"]);
+  assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-stamp")).map(({ id }) => id), ["pdf-stamp-ko", "pdf-stamp-mobile-ko", "pdf-stamp-en", "pdf-stamp-editing-ko-light", "pdf-stamp-editing-ko-dark", "pdf-stamp-editing-en-light", "pdf-stamp-editing-en-dark"]);
+  const stampEditingStates = pages.filter(({ scenario }) => scenario === "pdf-stamp-editing");
+  assert.equal(stampEditingStates.length, 4);
+  assert.deepEqual([...new Set(stampEditingStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
+  assert.deepEqual([...new Set(stampEditingStates.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
   const errorStates = pages.filter(({ scenario }) => scenario === "pdf-watermark-empty-text");
   assert.equal(errorStates.length, 4);
   assert.deepEqual([...new Set(errorStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
@@ -77,7 +85,7 @@ test("recorded desktop zero-result JSON passes and an injected violation fails",
   assert.throws(() => assertAccessibilityResults(measured, { registeredPages }), /limits exceeded/);
 });
 
-test("a11y incomplete targets and reasons remain visible while only F2-owned nodes fail the gate", () => {
+test("a11y incomplete targets and reasons remain visible while F2/F3-owned nodes fail the gate", () => {
   const inherited = report();
   inherited.results[0].incomplete.push({ id: "color-contrast", nodes: [{ target: [".shared"], reasons: ["Needs manual review"], owner: "shared-existing" }] });
   const summary = assertAccessibilityResults(inherited);
@@ -97,7 +105,7 @@ test("a11y incomplete targets and reasons remain visible while only F2-owned nod
 test("a11y gradient incomplete is separately retained only after reload pixel contrast passes", () => {
   const measured = report();
   measured.results.find(({ id }) => id === "pdf-watermark-display-error-ko-dark").resolvedIncomplete = [{
-    rule: "color-contrast", target: ["[data-testid='pdf-display-reload']"], reasons: ["Background gradient"], resolution: "measured-pixel",
+    rule: "color-contrast", target: ["[data-testid='pdf-display-reload']"], reasons: ["Background gradient"], resolution: "measured-pixel", owner: "f2-watermark",
   }];
   const summary = assertAccessibilityResults(measured);
   assert.equal(summary.pixelResolvedIncompleteNodes, 1);
@@ -109,8 +117,35 @@ test("a11y gradient incomplete is separately retained only after reload pixel co
 
 test("a11y incomplete selector resolution never defaults missing or invalid targets to shared ownership", () => {
   assert.equal(accessibilityOwnerFromResolution("f2-watermark", "owned"), "f2-watermark");
+  assert.equal(accessibilityOwnerFromResolution("f3-stamp", "owned"), "f3-stamp");
   assert.equal(accessibilityOwnerFromResolution("shared-existing", "shared"), "shared-existing");
   assert.throws(() => accessibilityOwnerFromResolution("missing", "missing-selector"), /missing-selector/);
   assert.throws(() => accessibilityOwnerFromResolution("invalid", "invalid-selector"), /invalid-selector/);
   assert.throws(() => accessibilityOwnerFromResolution(undefined, "no-resolution"), /no-resolution/);
+});
+
+test("a11y F3 gate fails closed when a required ownership marker is removed", () => {
+  const missingMarker = report();
+  const editing = missingMarker.results.find(({ id }) => id === "pdf-stamp-editing-ko-light");
+  editing.stampOwnership.targets.find(({ id }) => id === "overlay").matches = 0;
+  assert.throws(() => assertAccessibilityResults(missingMarker), /ownership marker is missing or ambiguous/);
+});
+
+test("a11y F3 gate fails closed when an owned target cannot be found", () => {
+  assert.throws(() => accessibilityOwnerFromResolution("missing", "pdf-stamp-editing/notice"), /target is missing/);
+});
+
+test("a11y F3 gate fails closed when an editing-state result is omitted", () => {
+  const omitted = report();
+  omitted.results = omitted.results.filter(({ id }) => id !== "pdf-stamp-editing-en-dark");
+  assert.throws(() => assertAccessibilityResults(omitted), /registration mismatch/);
+});
+
+test("a11y F3 gate fails closed while an owned incomplete result remains unresolved", () => {
+  const unresolved = report();
+  unresolved.results.find(({ id }) => id === "pdf-stamp-editing-en-light").incomplete.push({
+    id: "color-contrast",
+    nodes: [{ target: ["[data-testid='pdf-stamp-notice']"], reasons: ["Needs manual review"], owner: "f3-stamp" }],
+  });
+  assert.throws(() => assertAccessibilityResults(unresolved), /F3 accessibility incomplete nodes/);
 });

@@ -18,6 +18,18 @@ const limits = {
   serious: readInteger("A11Y_MAX_SERIOUS", 0),
   total: readInteger("A11Y_MAX_TOTAL", 0),
 };
+export const f2OwnedSelector = "[data-pdf-watermark-owned]";
+export const f3OwnedSelector = "[data-pdf-stamp-owned]";
+export const accessibilityOwnedSelectors = Object.freeze([
+  Object.freeze({ owner: "f2-watermark", selector: f2OwnedSelector }),
+  Object.freeze({ owner: "f3-stamp", selector: f3OwnedSelector }),
+]);
+export const f3StampOwnershipTargets = Object.freeze([
+  Object.freeze({ id: "tab", selector: "[data-finish-tab='stamp'][data-pdf-stamp-owned]" }),
+  Object.freeze({ id: "notice", selector: "[data-testid='pdf-stamp-notice'][data-pdf-stamp-owned]" }),
+  Object.freeze({ id: "settings", selector: "[data-pdf-stamp-owned] [data-testid='pdf-stamp-image']" }),
+  Object.freeze({ id: "overlay", selector: "[data-testid='pdf-stamp-overlay'][data-pdf-stamp-owned]" }),
+]);
 export const pages = Object.freeze([
   { id: "home", path: "/" },
   { id: "document-compare", path: "/ko/tools/document-compare" },
@@ -31,6 +43,10 @@ export const pages = Object.freeze([
   { id: "pdf-stamp-ko", path: "/ko/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']" },
   { id: "pdf-stamp-mobile-ko", path: "/ko/tools/pdf-editor/stamp", viewport: { width: 412, height: 839 }, readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']" },
   { id: "pdf-stamp-en", path: "/en/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']" },
+  { id: "pdf-stamp-editing-ko-light", path: "/ko/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']", scenario: "pdf-stamp-editing", colorScheme: "light", locale: "ko-KR", ownedSelector: f3OwnedSelector },
+  { id: "pdf-stamp-editing-ko-dark", path: "/ko/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']", scenario: "pdf-stamp-editing", colorScheme: "dark", locale: "ko-KR", ownedSelector: f3OwnedSelector },
+  { id: "pdf-stamp-editing-en-light", path: "/en/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']", scenario: "pdf-stamp-editing", colorScheme: "light", locale: "en-US", ownedSelector: f3OwnedSelector },
+  { id: "pdf-stamp-editing-en-dark", path: "/en/tools/pdf-editor/stamp", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='stamp']", scenario: "pdf-stamp-editing", colorScheme: "dark", locale: "en-US", ownedSelector: f3OwnedSelector },
   { id: "pdf-watermark-error-ko-light", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "light", locale: "ko-KR" },
   { id: "pdf-watermark-error-ko-dark", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "dark", locale: "ko-KR" },
   { id: "pdf-watermark-error-en-light", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "light", locale: "en-US" },
@@ -57,10 +73,8 @@ export const accessibilityExceptions = Object.freeze([
     reason: "Vendor iframe: four upstream accessibility nodes; docs/backlog.md — HWP 편집기 iframe 접근성 위반 4노드" }),
 ]);
 
-export const f2OwnedSelector = "[data-pdf-watermark-owned]";
-
 export function accessibilityOwnerFromResolution(resolution, context = "unknown") {
-  if (resolution === "f2-watermark" || resolution === "shared-existing") return resolution;
+  if (resolution === "f2-watermark" || resolution === "f3-stamp" || resolution === "shared-existing") return resolution;
   if (resolution === "missing" || resolution === "invalid") {
     throw new Error(`Accessibility incomplete target is ${resolution}: ${context}.`);
   }
@@ -76,6 +90,7 @@ export function summarizeAccessibility(results, registeredPages = pages) {
   let incompleteRules = 0;
   let incompleteNodes = 0;
   let f2IncompleteNodes = 0;
+  let f3IncompleteNodes = 0;
   let inheritedIncompleteNodes = 0;
   let pixelResolvedIncompleteNodes = 0;
   for (const result of results) {
@@ -95,19 +110,20 @@ export function summarizeAccessibility(results, registeredPages = pages) {
           throw new Error(`Incomplete accessibility target or reason was discarded: ${result.id}/${incomplete.id}.`);
         }
         if (node.owner === "f2-watermark") f2IncompleteNodes += 1;
+        else if (node.owner === "f3-stamp") f3IncompleteNodes += 1;
         else if (node.owner === "shared-existing") inheritedIncompleteNodes += 1;
         else throw new Error(`Unknown accessibility incomplete owner: ${result.id}/${incomplete.id}.`);
       }
     }
     for (const node of result.resolvedIncomplete ?? []) {
       if (!Array.isArray(node.target) || !node.target.length || !Array.isArray(node.reasons) || !node.reasons.length
-        || node.resolution !== "measured-pixel") {
+        || node.resolution !== "measured-pixel" || !["f2-watermark", "f3-stamp"].includes(node.owner)) {
         throw new Error(`Resolved accessibility incomplete evidence is invalid: ${result.id}.`);
       }
       pixelResolvedIncompleteNodes += 1;
     }
   }
-  return { pages: results.length, violations, severityCounts, incompleteRules, incompleteNodes, f2IncompleteNodes, inheritedIncompleteNodes, pixelResolvedIncompleteNodes };
+  return { pages: results.length, violations, severityCounts, incompleteRules, incompleteNodes, f2IncompleteNodes, f3IncompleteNodes, inheritedIncompleteNodes, pixelResolvedIncompleteNodes };
 }
 
 export function assertAccessibilityResults(report, { registeredPages = pages, limits = { critical: 0, serious: 0, total: 0 } } = {}) {
@@ -146,9 +162,51 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
       }
     }
   }
+  const stampPages = registeredPages.filter(({ id }) => id.startsWith("pdf-stamp"));
+  for (const target of stampPages) {
+    const result = report.results.find(({ id }) => id === target.id);
+    if (target.scenario === "pdf-stamp-editing" || target.id.startsWith("pdf-stamp-editing")) {
+      for (const rule of result?.incomplete ?? []) {
+        for (const node of rule.nodes) {
+          if (node.owner !== "f3-stamp") {
+            throw new Error(`F3 stamp editing incomplete node lost ownership: ${target.id}/${rule.id}.`);
+          }
+        }
+      }
+      const ownership = result?.stampOwnership;
+      const expectedTargets = f3StampOwnershipTargets.map(({ id }) => id).sort();
+      const actualTargets = ownership?.targets?.map(({ id }) => id).sort();
+      if (ownership?.owner !== "f3-stamp" || ownership.selector !== f3OwnedSelector
+        || JSON.stringify(actualTargets) !== JSON.stringify(expectedTargets)
+        || ownership.targets.some(({ matches }) => matches !== 1)) {
+        throw new Error(`F3 stamp editing ownership marker is missing or ambiguous: ${target.id}.`);
+      }
+    }
+    const measurements = result?.stampContrast;
+    const measuredTargets = measurements?.map(({ target: measuredTarget }) => measuredTarget).sort();
+    if (!Array.isArray(measurements) || measurements.length !== 2
+      || JSON.stringify(measuredTargets) !== JSON.stringify(["notice-body", "notice-title"])) {
+      throw new Error(`PDF stamp notice contrast evidence is missing: ${target.id}.`);
+    }
+    for (const measurement of measurements) {
+      if (!Number.isFinite(measurement.ratio) || measurement.ratio < 4.5) {
+        throw new Error(`PDF stamp notice contrast is below 4.5:1: ${target.id}/${measurement.target}=${measurement.ratio}.`);
+      }
+    }
+    for (const node of result?.resolvedIncomplete ?? []) {
+      if (node.owner === "f3-stamp" && !measurements.some(({ target: measuredTarget }) => measuredTarget === node.measurementTarget)) {
+        throw new Error(`Resolved F3 stamp evidence is missing its pixel measurement: ${target.id}/${node.measurementTarget}.`);
+      }
+    }
+    const resolvedStampTargets = (result?.resolvedIncomplete ?? []).filter(({ owner }) => owner === "f3-stamp").map(({ measurementTarget }) => measurementTarget);
+    if (new Set(resolvedStampTargets).size !== resolvedStampTargets.length) {
+      throw new Error(`Resolved F3 stamp evidence reuses a pixel measurement target: ${target.id}.`);
+    }
+  }
   if ((summary.severityCounts.critical || 0) > limits.critical || (summary.severityCounts.serious || 0) > limits.serious
     || summary.violations > limits.total) throw new Error(`Accessibility limits exceeded: ${JSON.stringify({ ...summary, limits })}`);
   if (summary.f2IncompleteNodes > 0) throw new Error(`F2 accessibility incomplete nodes must be resolved: ${JSON.stringify(summary)}`);
+  if (summary.f3IncompleteNodes > 0) throw new Error(`F3 accessibility incomplete nodes must be resolved: ${JSON.stringify(summary)}`);
   return summary;
 }
 
@@ -203,6 +261,8 @@ export async function runAccessibilityAudit() {
       });
       let settledContrast;
       let interactiveContrast;
+      let stampOwnership;
+      let stampContrast;
       if (target.scenario === "pdf-watermark-empty-text") {
         await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
           .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/ordinary/no-resources.pdf"));
@@ -226,12 +286,32 @@ export async function runAccessibilityAudit() {
         await page.waitForTimeout(1_200);
         if (displayAssetRequests !== 1) throw new Error(`PDF display failure must stop after its first asset request: ${target.id}/${displayAssetRequests}.`);
         interactiveContrast = await measureInteractivePixelContrast(page, reloadButton);
+      } else if (target.scenario === "pdf-stamp-editing") {
+        await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+          .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/ordinary/no-resources.pdf"));
+        await page.locator("[data-testid='pdf-stamp-image']").setInputFiles({
+          name: "accessibility-stamp.png",
+          mimeType: "image/png",
+          buffer: createAccessibilityStamp(),
+        });
+        await page.locator("[data-testid='pdf-stamp-overlay']").waitFor();
+        await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+        stampOwnership = {
+          owner: "f3-stamp",
+          selector: f3OwnedSelector,
+          targets: await Promise.all(f3StampOwnershipTargets.map(async ({ id, selector }) => ({
+            id,
+            matches: await page.locator(selector).count(),
+          }))),
+        };
       }
       await page.evaluate(async () => {
         if (document.fonts?.ready) await document.fonts.ready;
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       });
+      if (target.id.startsWith("pdf-stamp")) stampContrast = await measureStampNoticeContrast(page);
       const builder = new AxeBuilder({ page });
+      if (target.ownedSelector) builder.include(target.ownedSelector);
       const exceptions = accessibilityExceptions.filter(({ pageId }) => pageId === target.id);
       for (const exception of exceptions) {
         if (await page.locator(exception.selector).count() !== 1) throw new Error(`Accessibility exception must match exactly one iframe: ${exception.selector}`);
@@ -247,27 +327,46 @@ export async function runAccessibilityAudit() {
           if (typeof firstTarget !== "string" || !firstTarget.trim()) {
             throw new Error(`Accessibility incomplete target is missing: ${target.id}/${rule.id}.`);
           }
-          const ownership = await page.evaluate(({ target, selector, pixelMeasuredReload }) => {
+          const ownership = await page.evaluate(({ target, ownedSelectors, pixelMeasuredReload, pixelMeasuredStamp }) => {
             try {
               const element = document.querySelector(target);
-              if (!element) return "missing";
-              if (pixelMeasuredReload && element.matches("[data-testid='pdf-display-reload']")) return "measured-pixel";
-              return element.closest(selector) ? "f2-watermark" : "shared-existing";
+              if (!element) return { resolution: "missing" };
+              if (pixelMeasuredReload && element.matches("[data-testid='pdf-display-reload']")) {
+                return { resolution: "measured-pixel", owner: "f2-watermark" };
+              }
+              if (pixelMeasuredStamp && element.closest("[data-testid='pdf-stamp-notice']")) {
+                return {
+                  resolution: "measured-pixel",
+                  owner: "f3-stamp",
+                  measurementTarget: element.matches("[data-testid='pdf-stamp-notice-title']") ? "notice-title" : "notice-body",
+                };
+              }
+              for (const owned of ownedSelectors) {
+                if (element.closest(owned.selector)) return { resolution: "owned", owner: owned.owner };
+              }
+              return { resolution: "owned", owner: "shared-existing" };
             } catch {
-              return "invalid";
+              return { resolution: "invalid" };
             }
-          }, { target: firstTarget, selector: f2OwnedSelector, pixelMeasuredReload: target.scenario === "pdf-watermark-display-load-failure" && rule.id === "color-contrast" });
+          }, {
+            target: firstTarget,
+            ownedSelectors: accessibilityOwnedSelectors,
+            pixelMeasuredReload: target.scenario === "pdf-watermark-display-load-failure" && rule.id === "color-contrast",
+            pixelMeasuredStamp: target.id.startsWith("pdf-stamp") && rule.id === "color-contrast",
+          });
           const reasons = [...node.any, ...node.all, ...node.none].map(({ message }) => message).filter(Boolean);
-          if (ownership === "measured-pixel") {
+          if (ownership.resolution === "measured-pixel") {
             resolvedIncomplete.push({
               rule: rule.id,
               target: node.target,
               reasons: reasons.length ? reasons : [node.failureSummary || rule.help || rule.id],
               resolution: "measured-pixel",
+              owner: ownership.owner,
+              ...(ownership.measurementTarget ? { measurementTarget: ownership.measurementTarget } : {}),
             });
             continue;
           }
-          const owner = accessibilityOwnerFromResolution(ownership, `${target.id}/${rule.id}/${firstTarget}`);
+          const owner = accessibilityOwnerFromResolution(ownership.resolution === "owned" ? ownership.owner : ownership.resolution, `${target.id}/${rule.id}/${firstTarget}`);
           nodes.push({
             target: node.target,
             failureSummary: node.failureSummary,
@@ -311,6 +410,8 @@ export async function runAccessibilityAudit() {
         ...(resolvedIncomplete.length ? { resolvedIncomplete } : {}),
         ...(settledContrast ? { settledContrast } : {}),
         ...(interactiveContrast ? { interactiveContrast } : {}),
+        ...(stampOwnership ? { stampOwnership } : {}),
+        ...(stampContrast ? { stampContrast } : {}),
       });
       await context.close();
     }
@@ -342,6 +443,9 @@ export async function runAccessibilityAudit() {
     for (const result of results.filter(({ interactiveContrast }) => interactiveContrast)) {
       console.log(`${result.id} reload contrast: ${result.interactiveContrast.map(({ state, ratio }) => `${state}=${ratio.toFixed(4)}:1`).join(", ")}`);
     }
+    for (const result of results.filter(({ stampContrast }) => stampContrast)) {
+      console.log(`${result.id} stamp notice contrast: ${result.stampContrast.map(({ target, ratio }) => `${target}=${ratio.toFixed(4)}:1`).join(", ")}`);
+    }
     console.log(`Accessibility report: ${reportPath}`);
 
     assertAccessibilityResults(report, { registeredPages: auditedPages, limits });
@@ -349,6 +453,65 @@ export async function runAccessibilityAudit() {
     await browser?.close();
     if (server) await stopServer(server);
   }
+}
+
+function createAccessibilityStamp() {
+  const image = new PNG({ width: 160, height: 80 });
+  for (let index = 0; index < image.data.length; index += 4) {
+    image.data[index] = 202;
+    image.data[index + 1] = 30;
+    image.data[index + 2] = 55;
+    image.data[index + 3] = 255;
+  }
+  return PNG.sync.write(image);
+}
+
+async function measureStampNoticeContrast(page) {
+  return Promise.all([
+    measureTextPixelContrast(page.locator("[data-testid='pdf-stamp-notice-description']"), "notice-body"),
+    measureTextPixelContrast(page.locator("[data-testid='pdf-stamp-notice-title']"), "notice-title"),
+  ]);
+}
+
+async function measureTextPixelContrast(locator, target) {
+  const foreground = await locator.evaluate((element) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Could not create a color measurement canvas.");
+    const color = getComputedStyle(element).color;
+    context.fillStyle = color;
+    context.fillRect(0, 0, 1, 1);
+    return { css: color, rgba: [...context.getImageData(0, 0, 1, 1).data] };
+  });
+  await locator.evaluate((element) => element.style.setProperty("color", "transparent", "important"));
+  let screenshot;
+  try {
+    await locator.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    screenshot = await locator.screenshot({ animations: "disabled" });
+  } finally {
+    await locator.evaluate((element) => element.style.removeProperty("color"));
+  }
+  const image = PNG.sync.read(screenshot);
+  const foregroundLuminance = luminance(foreground.rgba);
+  const ratios = [];
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const offset = (y * image.width + x) * 4;
+      const backgroundLuminance = luminance(image.data.subarray(offset, offset + 4));
+      ratios.push((Math.max(foregroundLuminance, backgroundLuminance) + 0.05) / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05));
+    }
+  }
+  if (!ratios.length) throw new Error(`PDF stamp ${target} background pixel sample is empty.`);
+  return {
+    target,
+    foreground: foreground.css,
+    ratio: Math.min(...ratios),
+    maximumRatio: Math.max(...ratios),
+    samples: ratios.length,
+    method: "Computed text color against every rendered pixel behind that text after making only that text transparent.",
+  };
 }
 
 async function measureInteractivePixelContrast(page, button) {

@@ -4,6 +4,22 @@
 
 ## 2026-09-08
 
+### U4-5 fix-1 — 도장 실제 픽셀 골든·F3 접근성 게이트 수리 (Codx)
+
+**실행 게이트·원인 판정** — 시작 branch/head는 `s3-pdf-finish`/`8ec3e4edd97439dfc5b7807645d22c8373d69d11`로 지시와 일치했고 열린 계획서와 상반되는 지시는 없었다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`, DOCX 2개·네이버 확인 HTML·`newui/`는 수정·stage하지 않았으며 금지 worktree, main 병합·push·배포에도 접근하지 않았다. 도장 좌표 모델과 출력 엔진은 옳았지만 model box의 `border-2`가 내부 2px씩을 차지하고 `<img class="h-full w-full">`가 그 content box에 다시 맞춰져 실제 화면 도장만 작아졌다. 기존 `tests/pdf-stamp-golden.mjs`의 16조합은 브라우저 미리보기 픽셀을 렌더하지 않고 계산된 사각형과 출력 좌표를 비교했으므로 이 결함을 검증했다는 종전 기록은 기각한다.
+
+**R1 최소 수리·실제 픽셀 골든** — 선택 표시를 model box를 소비하지 않는 2px solid outline으로 옮겼다. 혼합 4페이지 fixture는 MediaBox `400×600/800×500/600×400/500×800`, CropBox `[20,35,350,510]/[45,30,680,410]/[30,25,520,330]/[40,55,400,680]`, 회전 `0/90/180/270`, UserUnit `1/1.25/1.5/2`다. 실제 Chrome context의 DPR `1/2` × canvas CSS 폭 `1/0.5` × 회전 4종에서 포인터 이동·크기 조절 후 canvas 영역을 device pixel로 캡처하고, 다운로드 PDF의 같은 페이지를 PDF.js로 같은 표시 폭·bitmap 크기에 렌더해 불투명 적색 픽셀 경계를 비교한다. 16조합 모두 종전 최대 **7~8.5 CSS px**에서 수정 후 **0.5~1 CSS px**로 줄어 허용 `≤2px`를 통과했고, DOM에서도 border `0px`, outline `2px`, 이미지와 model box 네 변 차이 `<0.1px`, DPR별 canvas backing 폭 `520/1040px`를 확인했다. 이 실제 경로는 저장소 정규 `npm run test:pdf-finish`에 포함했다.
+
+좌표·출력 코드는 수정하지 않았다. 수정 전/후 `stamp-all-pages.pdf` SHA-256은 모두 `3831baa3abd1817e83f56928be578a7061f3686179e670475a43abf789568156`, `stamp-selected-pages.pdf`는 모두 `12ad29d42e992cd545ca78129f45ebffc5c6d0997ec5c6f4ea038f5850df8548`로 byte-identical하다. 기존 좌표 16조합, PDF.js/Poppler 8페이지, 선택 페이지 `[true,false,true,false]`와 legacy organize oracle의 client 3·structure 4·render 32·output 4·input 1 총 diff 0도 유지됐다.
+
+**R2 F3 게이트 수리** — `[data-pdf-stamp-owned]`를 `f3-stamp` 소유 범주로 등록하고 stamp tab·notice·settings input·실제 overlay 네 marker를 각각 정확히 1개 요구한다. 기본 감사에 업로드 뒤 도장 overlay가 생긴 ko/en × light/dark 편집 상태 4개를 넣고 이 범위를 F3 selector로 직접 감사한다. gradient 때문에 Axe가 `color-contrast`를 incomplete로 돌려주는 notice title/body는 실제 렌더 배경 픽셀 전수와 계산 전경색을 대조한 증거에만 연결한다. body는 light **5.8648:1**, dark **13.0790:1**, title은 ko light/dark **14.6179/17.3805:1**, en light/dark **14.5232/17.2436:1**로 모두 4.5:1 이상이므로 대비 결함이 아니라 소유·상태 누락 결함이라는 판정을 유지한다. 범위 감사 10페이지는 violations 0, F3 unresolved incomplete 0, pixel-resolved 14, 상속 incomplete 247, 외부 요청 0이다.
+
+marker 제거, 소유 target 미발견, 등록된 편집 결과 누락, F3 unresolved incomplete 잔존을 각각 독립 unit으로 fail-closed했고 full unit은 **327/327**다. 검수자의 원본 F3 probe도 제품 코드의 새 판정기에 unresolved 실제 노드 2개를 주입했을 때 `F3 stamp editing incomplete node lost ownership`으로 거절됐다. 원 probe가 금지된 4271 포트·read-only 검수 경로 쓰기·옛 archive import를 고정해 현재 실행 규율과 충돌하므로, probe 원본 SHA를 보존한 채 임시 loader/adapter에서 포트 4283·출력 `/tmp/worklazy-u4-5-fix1/`·현 워크트리 audit import만 치환했다. 원본 UI/verify probe 결과는 16조합 실패 0·최대 1px이며 검수 산출물의 종전 metrics(최대 8.5px)에는 쓰지 않았다.
+
+**시각·예산·동시 검토** — outline의 실제 픽셀 변화로 stamp interaction 기준선 9장을 갱신했다. 최초 대조는 390px mobile 4장이 각 782px(`0.2376%`), en light 320px가 587px(`0.2173%`) 차이로 실패했고 desktop 4장도 0.1% 아래의 선택선 픽셀 변화가 있어 9장 전부 정규 update 후 **9/9** 일치했다. 직접 열람과 diff에서 변화는 선택선·핸들 주변뿐이었다. schema v3 고정 기준선 SHA `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`·multiplier 1로 PDF scoped gzip은 entry **8,878/20,480B**, PDF route **61,923/72,000B**, shared **2,407/30,720B**, app **74,107/81,920B**, CSS **393/10,240B**로 모두 통과했다. 사용자 문구·route가 바뀌지 않아 한·영 번역, SEO·정적 페이지, AdSense 격리에는 추가 변경이 없고 서버·새 의존성도 없다.
+
+`npx tsc -b`, production build 2,849 modules·정적 71페이지, `npm run test:pdf-finish`, full unit 327/327, 영향 visual 9/9, stamp+finish a11y, dependency version mismatch의 Vite 전 fail-closed, scoped bundle, `git diff --check`를 실제 실행했다. merge-time full browser/new-tools/utilities/office, QR bulk/font, recovery/static, Excel 2종, full a11y/visual/rendering, CSS orphan, legacy manifest, registry routes, 12개 성능은 지시대로 이번 fix에서 유예한다. 상세 수치·명령·실패 이력은 `/tmp/worklazy-u4-5-fix1/REPORT.md`에 보존한다. — Codx
+
 ### U4-5 — PDF 도장·서명 이미지와 PDF route 예산 1건 상향 (Codx)
 
 **사용자 결정과 이전 SCOPE-OUT 판정** — 2026-09-08 사용자 결정으로 `affectedRouteJsGzip` 기본 상한만 **61,440B → 72,000B**로 올렸다. U4 전체를 2,850~4,650줄로 추정해 잡은 구 상한이 U4-1~U4-4만으로 95% 소모됐고, 탐색 시제품은 동적 청크 62,997B로 구 상한보다 1,557B 부족했다. 정적 통합 대조는 61,414B로 26B만 남았지만 핵심 패널 329줄뿐이며 골든·한/영 문구·비전자서명 고지·접근성·SEO가 빠졌으므로, 당시 구현을 중단한 SCOPE-OUT 판정은 옳았다. 1,557B는 당시 PDF route 절대 gzip 약 1,135,719B의 0.14%였고, 추정 실패를 도장 기능의 비대화로 보지 않는다는 결정이다.

@@ -124,8 +124,9 @@ export function PdfStampOverlay({
 
   return (
     <div
-      className="absolute touch-none select-none rounded-md border-2 border-violet-600 bg-white/10 shadow-sm outline-none focus-visible:ring-3 focus-visible:ring-violet-600/40"
+      className="absolute touch-none select-none rounded-md bg-white/10 shadow-sm outline-solid outline-2 outline-violet-600 focus-visible:ring-3 focus-visible:ring-violet-600/40"
       data-testid="pdf-stamp-overlay"
+      data-pdf-stamp-owned
       data-stamp-cx={draft.cx}
       data-stamp-cy={draft.cy}
       data-stamp-rw={draft.rw}
