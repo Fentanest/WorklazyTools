@@ -40,6 +40,13 @@ export const accessibilityExceptions = Object.freeze([
     reason: "Vendor iframe: four upstream accessibility nodes; docs/backlog.md — HWP 편집기 iframe 접근성 위반 4노드" }),
 ]);
 
+export function selectAccessibilityPages(scope, registeredPages = pages) {
+  if (!scope) return registeredPages;
+  const selected = registeredPages.filter(({ id }) => id === scope || id.startsWith(`${scope}-`));
+  if (!selected.length) throw new Error(`A11Y_ONLY did not match a registered page: ${scope}.`);
+  return selected;
+}
+
 export function summarizeAccessibility(results, registeredPages = pages) {
   const ids = results.map(({ id }) => id);
   if (new Set(ids).size !== ids.length || ids.length !== registeredPages.length
@@ -62,7 +69,9 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
   for (const key of ["critical", "serious", "total"]) if (!Number.isSafeInteger(limits[key]) || limits[key] < 0) throw new Error(`Invalid accessibility limit: ${key}.`);
   if (report.externalRequests.length) throw new Error(`Accessibility audit made ${report.externalRequests.length} external request(s).`);
   const contrast = report.summary.placeholderContrast?.ratio;
-  if (!Number.isFinite(contrast) || contrast < 4.5) throw new Error("Document placeholder contrast is below 4.5:1 or missing.");
+  if (registeredPages.some(({ id }) => id === "document-compare") && (!Number.isFinite(contrast) || contrast < 4.5)) {
+    throw new Error("Document placeholder contrast is below 4.5:1 or missing.");
+  }
   if ((summary.severityCounts.critical || 0) > limits.critical || (summary.severityCounts.serious || 0) > limits.serious
     || summary.violations > limits.total) throw new Error(`Accessibility limits exceeded: ${JSON.stringify({ ...summary, limits })}`);
   return summary;
@@ -71,6 +80,7 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
 export async function runAccessibilityAudit() {
   let server;
   let browser;
+  const auditedPages = selectAccessibilityPages(process.env.A11Y_ONLY);
 
   try {
     if (!process.env.TEST_BASE_URL) server = await startPreview();
@@ -82,7 +92,7 @@ export async function runAccessibilityAudit() {
     const results = [];
     const externalRequests = [];
     let placeholderContrast;
-    for (const target of pages) {
+    for (const target of auditedPages) {
       const context = await browser.newContext({
         viewport: target.viewport ?? { width: 1280, height: 800 },
         isMobile: Boolean(target.viewport),
@@ -162,7 +172,7 @@ export async function runAccessibilityAudit() {
       await context.close();
     }
 
-    const aggregation = summarizeAccessibility(results);
+    const aggregation = summarizeAccessibility(results, auditedPages);
     const summary = {
       axeCore: "4.13.0",
       browserDriver: "playwright 1.63.0",
@@ -171,6 +181,7 @@ export async function runAccessibilityAudit() {
       colorScheme: "light",
       externalRequests: externalRequests.length,
       placeholderContrast,
+      scope: process.env.A11Y_ONLY || "all",
       limits,
     };
     const report = { summary, results, externalRequests };
@@ -181,10 +192,10 @@ export async function runAccessibilityAudit() {
       console.log(`${result.id}: passes=${result.passes}; violations=${result.violations.length}; ${detail}`);
     }
     console.log(`Accessibility audit summary: ${JSON.stringify(summary)}`);
-    console.log(`Document placeholder contrast: ${placeholderContrast.ratio.toFixed(4)}:1 (${placeholderContrast.foreground} on ${placeholderContrast.background}).`);
+    if (placeholderContrast) console.log(`Document placeholder contrast: ${placeholderContrast.ratio.toFixed(4)}:1 (${placeholderContrast.foreground} on ${placeholderContrast.background}).`);
     console.log(`Accessibility report: ${reportPath}`);
 
-    assertAccessibilityResults(report, { limits });
+    assertAccessibilityResults(report, { registeredPages: auditedPages, limits });
   } finally {
     await browser?.close();
     if (server) await stopServer(server);

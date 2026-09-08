@@ -4,6 +4,12 @@ export type ExcelCompareMode = "position" | "key" | "reconcile";
 export type DuplicateKeyPolicy = "secondary" | "occurrence" | "error";
 export type FormulaComparisonMode = "formula" | "cached" | "both";
 export type ExcelCompareStatus = "matched" | "changed" | "added" | "removed" | "duplicate" | "ambiguous" | "unmatched" | "error";
+export type ExcelCompareHeaderSuggestionReason = "suggested" | "uncertain" | "none";
+
+export interface ExcelCompareHeaderSuggestion {
+  row: number | null;
+  reason: ExcelCompareHeaderSuggestionReason;
+}
 
 export interface ExcelCompareNormalizationOptions {
   trimWhitespace: boolean;
@@ -125,6 +131,7 @@ export interface ExcelCompareInspection {
     rowCount: number;
     columnCount: number;
     headerRows: Array<{ row: number; values: string[] }>;
+    headerSuggestion?: ExcelCompareHeaderSuggestion;
   }>;
 }
 

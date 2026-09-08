@@ -39,6 +39,9 @@ try {
   await fs.writeFile(path.join(temporaryDirectory, "focus-right.csv"), `${focusRight.join("\n")}\n`, "utf8");
   await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-left.xlsx"), "before");
   await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-right.xlsx"), "after");
+  await writeHeaderSuggestionWorkbook(path.join(temporaryDirectory, "header-suggestion-left.xlsx"), "left");
+  await writeHeaderSuggestionWorkbook(path.join(temporaryDirectory, "header-suggestion-right.xlsx"), "right");
+  await fs.writeFile(path.join(temporaryDirectory, "header-replacement.csv"), "ID,Name\nN1,New\nN2,File\n", "utf8");
   const groupedUiLeft = ["Key,Value"];
   const groupedUiRight = ["Key,Value"];
   for (let index = 0; index < 51; index += 1) groupedUiLeft.push(`K000,left-zero-${index}`);
@@ -227,6 +230,11 @@ try {
       || mobile.protectedHintSegmentLines !== 1
     ) throw new Error(`Mobile layout, drop-zone polish, or navigation clearance failed: ${JSON.stringify(mobile)}`);
 
+    const headerSelection = await assertHeaderSelectionFlow(browser, {
+      left: path.join(temporaryDirectory, "header-suggestion-left.xlsx"),
+      right: path.join(temporaryDirectory, "header-suggestion-right.xlsx"),
+      replacement: path.join(temporaryDirectory, "header-replacement.csv"),
+    });
     const b4Affordance = await assertB4Affordance(page, fixture("left.xlsx"), fixture("right.xlsx"));
     const integrityFailures = [];
     for (const mode of ["zero", "mismatch"]) integrityFailures.push(await assertIntegrityFailure(browser, fixture("left.xlsx"), fixture("right.xlsx"), mode));
@@ -283,6 +291,7 @@ try {
       duplicateKeyTooLong,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
+      headerSelection,
       b4Affordance,
       cancellation: "passed",
       mobile,
@@ -340,6 +349,176 @@ async function waitForDownload(directory, fileName) {
 
 async function selectedPairNames(page) {
   return page.$$eval('[data-testid="excel-compare-pair"]:first-of-type [data-testid=excel-selected-file] strong', (items) => items.map((item) => item.textContent || ""));
+}
+
+async function assertHeaderSelectionFlow(browser, files) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  page.setDefaultTimeout(180_000);
+  await page.setRequestInterception(true);
+  page.on("request", (request) => {
+    if (request.url().includes("excelCompare.worker")) setTimeout(() => request.continue(), 250);
+    else void request.continue();
+  });
+  await page.evaluateOnNewDocument(() => {
+    localStorage.setItem("worklazy_privacy_consent", "granted");
+    globalThis.__excelInspectMessages = [];
+    globalThis.__excelWorkerTerminations = 0;
+    const NativeWorker = globalThis.Worker;
+    globalThis.Worker = class extends NativeWorker {
+      postMessage(message, transfer) {
+        if (message?.type === "inspect") globalThis.__excelInspectMessages.push({
+          fileName: message.fileName,
+          headerRows: [...(message.headerRows || [])],
+          detectHeader: message.detectHeader,
+        });
+        return super.postMessage(message, transfer);
+      }
+      terminate() {
+        globalThis.__excelWorkerTerminations += 1;
+        return super.terminate();
+      }
+    };
+  });
+  try {
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
+    await input.uploadFile(files.left, files.right);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2
+      && !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+
+    const initial = await page.evaluate(() => ({
+      inputs: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((element) => element.value),
+      sources: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((element) => element.getAttribute("data-source")),
+      guidance: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((element) => element.textContent || ""),
+      help: [...document.querySelectorAll('[data-testid=excel-header-help]')].map((element) => element.textContent || ""),
+      describedBy: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((element) => {
+        const ids = (element.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+        return ids.length === 2 && ids.every((id) => Boolean(document.getElementById(id)));
+      }),
+      statuses: document.querySelectorAll('[data-testid=excel-header-status][role=status][aria-live=polite]').length,
+      messages: globalThis.__excelInspectMessages,
+    }));
+    const exactHelp = "선택한 행 다음부터 비교합니다. 설명·필터·요약 행이 앞에 있으면 실제 열 이름이 있는 행을 선택해 주세요. 머리글이 없는 표는 맨 위에 열 이름 행을 추가해 주세요.";
+    if (JSON.stringify(initial.inputs) !== JSON.stringify(["4", "4"])
+      || initial.sources.some((source) => source !== "suggested")
+      || initial.guidance.some((text) => !text.includes("4행을 머리글 후보로 선택했습니다"))
+      || initial.help.some((text) => text !== exactHelp)
+      || initial.describedBy.some((value) => !value)
+      || initial.statuses !== 2
+      || initial.messages.length !== 2
+      || initial.messages.some((message) => message.detectHeader !== true || JSON.stringify(message.headerRows) !== "[1]")) {
+      throw new Error(`Initial header suggestion, one-pass inspection, or accessible guidance failed: ${JSON.stringify(initial)}`);
+    }
+
+    await setHeaderInput(page, 0, "1");
+    await page.waitForFunction(() => document.querySelector('[data-testid=excel-header-guidance]')?.getAttribute("data-source") === "manual");
+    const cachedMessageCount = await page.evaluate(() => globalThis.__excelInspectMessages.length);
+    if (cachedMessageCount !== 2) throw new Error(`A cached manual row launched another inspection: ${cachedMessageCount}.`);
+
+    await setHeaderInput(page, 0, "5");
+    await page.waitForFunction(() => globalThis.__excelInspectMessages.length === 3);
+    const busyDuringRefresh = await page.$eval("[data-testid=excel-pair-swap]", (button) => button.disabled);
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-pair-swap]")?.disabled);
+    const manualRefresh = await page.evaluate(() => ({
+      guidance: document.querySelector('[data-testid=excel-header-guidance]')?.textContent || "",
+      source: document.querySelector('[data-testid=excel-header-guidance]')?.getAttribute("data-source"),
+      message: globalThis.__excelInspectMessages.at(-1),
+      statuses: document.querySelectorAll('[data-testid=excel-header-status]').length,
+    }));
+    if (!busyDuringRefresh || manualRefresh.source !== "manual" || !manualRefresh.guidance.includes("선택한 머리글: 5행")
+      || manualRefresh.message.detectHeader !== false || JSON.stringify(manualRefresh.message.headerRows) !== "[5]"
+      || manualRefresh.statuses !== 1) {
+      throw new Error(`Manual uncached header refresh did not preserve ownership and status semantics: ${JSON.stringify({ busyDuringRefresh, manualRefresh })}`);
+    }
+
+    const leftSheet = await page.$('[data-testid=excel-sheet-fields] select');
+    await leftSheet.select("Second");
+    await page.waitForFunction(() => document.querySelector('[data-testid=excel-sheet-fields] input[type=number]')?.value === "2");
+    await setHeaderInput(page, 0, "1");
+    await leftSheet.select("Candidate");
+    await page.waitForFunction(() => document.querySelector('[data-testid=excel-sheet-fields] input[type=number]')?.value === "5");
+
+    const beforeSwap = await page.evaluate(readHeaderPairState);
+    await page.click("[data-testid=excel-pair-swap]");
+    const afterSwap = await page.evaluate(readHeaderPairState);
+    if (JSON.stringify(afterSwap.names) !== JSON.stringify([...beforeSwap.names].reverse())
+      || JSON.stringify(afterSwap.sheets) !== JSON.stringify([...beforeSwap.sheets].reverse())
+      || JSON.stringify(afterSwap.rows) !== JSON.stringify([...beforeSwap.rows].reverse())
+      || JSON.stringify(afterSwap.sources) !== JSON.stringify([...beforeSwap.sources].reverse())) {
+      throw new Error(`Header suggestions and manual selections did not swap with their files: ${JSON.stringify({ beforeSwap, afterSwap })}`);
+    }
+
+    const terminationsBeforeReplacement = await page.evaluate(() => globalThis.__excelWorkerTerminations);
+    let selectedRemove = (await page.$$('[data-testid=excel-selected-file] button'))[0];
+    await selectedRemove.click();
+    await input.uploadFile(files.left);
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].some((item) => item.textContent === "header-suggestion-left.xlsx"));
+    selectedRemove = (await page.$$('[data-testid=excel-selected-file] button'))[0];
+    await selectedRemove.click();
+    await input.uploadFile(files.replacement);
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].some((item) => item.textContent === "header-replacement.csv")
+      && document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const replacement = await page.evaluate(() => ({
+      names: [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].map((item) => item.textContent || ""),
+      sheets: [...document.querySelectorAll('[data-testid=excel-sheet-fields] select')].map((item) => item.value),
+      rows: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((item) => item.value),
+      sources: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((item) => item.getAttribute("data-source")),
+      errors: document.querySelectorAll('[data-testid=excel-file-error]').length,
+      terminations: globalThis.__excelWorkerTerminations,
+    }));
+    const replacementIndex = replacement.names.indexOf("header-replacement.csv");
+    if (replacementIndex < 0 || replacement.rows[replacementIndex] !== "1" || replacement.sources[replacementIndex] !== "suggested"
+      || replacement.errors !== 0 || replacement.terminations <= terminationsBeforeReplacement) {
+      throw new Error(`Replacement race reused stale manual state or did not cancel its owner: ${JSON.stringify({ terminationsBeforeReplacement, replacement })}`);
+    }
+
+    await page.click("[data-testid=excel-add-pair]");
+    const pairInputs = await page.$$('[data-testid=excel-compare-page] input[type=file]');
+    await pairInputs[1].uploadFile(files.left);
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid=excel-compare-pair]').length === 2
+      && document.querySelectorAll('[data-testid=excel-selected-file]').length === 3);
+    const terminationsBeforePairRemoval = await page.evaluate(() => globalThis.__excelWorkerTerminations);
+    const pairRemoveButtons = await page.$$('[data-testid=excel-compare-pair] button[aria-label^="비교 쌍"]');
+    await pairRemoveButtons.at(-1).click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid=excel-compare-pair]').length === 1);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const afterPairRemoval = await page.evaluate(() => ({
+      pairs: document.querySelectorAll('[data-testid=excel-compare-pair]').length,
+      errors: document.querySelectorAll('[data-testid=excel-file-error]').length,
+      terminations: globalThis.__excelWorkerTerminations,
+    }));
+    if (afterPairRemoval.pairs !== 1 || afterPairRemoval.errors !== 0 || afterPairRemoval.terminations <= terminationsBeforePairRemoval) {
+      throw new Error(`Pair removal did not cancel and suppress its stale inspection: ${JSON.stringify({ terminationsBeforePairRemoval, afterPairRemoval })}`);
+    }
+
+    return { initial, cachedMessageCount, manualRefresh, beforeSwap, afterSwap, replacement, afterPairRemoval };
+  } finally {
+    await page.close();
+  }
+}
+
+function readHeaderPairState() {
+  return {
+    names: [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].map((item) => item.textContent || ""),
+    sheets: [...document.querySelectorAll('[data-testid=excel-sheet-fields] select')].map((item) => item.value),
+    rows: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((item) => item.value),
+    sources: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((item) => item.getAttribute("data-source")),
+  };
+}
+
+async function setHeaderInput(page, index, value) {
+  await page.$$eval('[data-testid=excel-sheet-fields] input[type=number]', (inputs, selected) => {
+    const input = inputs[selected.index];
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter.call(input, selected.value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  }, { index, value });
+  await page.waitForFunction((selected) => document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')[selected.index]?.value === selected.value, {}, { index, value });
+  await page.keyboard.press("Tab");
 }
 
 async function assertB4Affordance(page, leftPath, rightPath) {
@@ -1030,6 +1209,22 @@ async function writeTypedKeyWorkbook(filePath, label) {
   textOne.getCell(1).numFmt = "@";
   sheet.addRow([2, `${label}-number-two`]);
   sheet.addRow(["Unique", `${label}-text-unique`]);
+  await workbook.xlsx.writeFile(filePath);
+}
+
+async function writeHeaderSuggestionWorkbook(filePath, label) {
+  const workbook = new ExcelJS.Workbook();
+  const candidate = workbook.addWorksheet("Candidate");
+  candidate.getCell("A2").value = `${label} report title`;
+  candidate.mergeCells("A2:C3");
+  candidate.addRow(["ID", "Name", "Amount"]);
+  candidate.addRow([`${label}-1`, "Alpha", 10]);
+  candidate.addRow([`${label}-2`, "Beta", 20]);
+  const second = workbook.addWorksheet("Second");
+  second.addRow([`${label} contacts`]);
+  second.addRow(["ID", "Name"]);
+  second.addRow([`${label}-a`, "Alice"]);
+  second.addRow([`${label}-b`, "Bob"]);
   await workbook.xlsx.writeFile(filePath);
 }
 

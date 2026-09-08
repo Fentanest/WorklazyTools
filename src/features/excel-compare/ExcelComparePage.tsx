@@ -14,8 +14,18 @@ import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { createUniqueSafeFileName, SafeFileNameRegistry, type SafeFileName } from "../../utils/fileNameSafety.ts";
 import { writeZipArchive } from "../../utils/zipArchive.ts";
 import { inspectExcelCompareFile, runExcelComparePair } from "./excelCompareClient.ts";
+import { ExcelCompareInspectionRequests } from "./inspectionRequests.ts";
 import { PairFileDropZone } from "./PairFileDropZone.tsx";
-import { assignPairFiles, swapPairSides, type PairState } from "./pairFiles.ts";
+import {
+  applyInitialInspection,
+  assignPairFiles,
+  mergeExcelCompareInspection,
+  selectManualHeader,
+  selectPairSheet,
+  swapPairSides,
+  type HeaderSelection,
+  type PairState,
+} from "./pairFiles.ts";
 import { isReconcileConfigValid } from "./reconcileConfig.ts";
 import { assertReportBlobSize } from "./reportIntegrity.ts";
 import {
@@ -70,6 +80,7 @@ export function ExcelComparePage() {
   const nextPairId = useRef(2);
   const operation = useOperationProgress();
   const controllerRef = useRef<AbortController | undefined>(undefined);
+  const inspectionRequestsRef = useRef(new ExcelCompareInspectionRequests());
   const objectUrls = useRef<Set<string>>(new Set());
   const pendingRevokeUrls = useRef<string[]>([]);
   const [pairs, setPairs] = useState<PairState[]>([newPair(1)]);
@@ -95,6 +106,7 @@ export function ExcelComparePage() {
 
   useEffect(() => () => {
     controllerRef.current?.abort();
+    inspectionRequestsRef.current.cancelAll();
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
   }, []);
@@ -110,40 +122,83 @@ export function ExcelComparePage() {
   };
 
   const selectFile = async (pairId: number, side: "left" | "right", file: File | undefined) => {
-    const fileKey = side;
-    const inspectionKey = `${side}Inspection` as const;
     const errorKey = `${side}Error` as const;
     const inspectingKey = `${side}Inspecting` as const;
-    updatePair(pairId, { [fileKey]: file, [inspectionKey]: undefined, [errorKey]: undefined, [inspectingKey]: Boolean(file) } as Partial<PairState>);
+    inspectionRequestsRef.current.cancel(pairId, side);
+    updatePair(pairId, (pair) => resetPairFile(pair, side, file));
     if (!file) return;
+    const request = inspectionRequestsRef.current.begin(pairId, side, file);
     try {
-      const inspection = await inspectExcelCompareFile(file, language);
+      const inspection = await inspectExcelCompareFile(file, language, request.controller.signal, [1], true);
+      if (!inspectionRequestsRef.current.isCurrent(request)) return;
       updatePair(pairId, (pair) => {
         if (pair[side] !== file) return pair;
-        const firstSheet = inspection.sheets[0]?.name ?? "";
-        return { ...pair, [inspectionKey]: inspection, [errorKey]: undefined, [`${side}Sheet`]: firstSheet, [`${side}HeaderRow`]: 1 };
+        return applyInitialInspection(pair, side, inspection);
       });
     } catch (error) {
-      updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [errorKey]: safeError(error, translate) } : pair);
+      if (inspectionRequestsRef.current.isCurrent(request)) {
+        updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [errorKey]: safeError(error, translate) } : pair);
+      }
     } finally {
-      updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
+      if (inspectionRequestsRef.current.finish(request)) {
+        updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
+      }
     }
   };
 
-  const refreshHeader = async (pairId: number, side: "left" | "right", headerRow: number) => {
-    const pair = pairs.find((item) => item.id === pairId);
-    const file = pair?.[side];
-    if (!file || !Number.isInteger(headerRow) || headerRow < 1) return;
+  const refreshHeader = async (pairId: number, side: "left" | "right", file: File, headerRow: number) => {
+    const request = inspectionRequestsRef.current.begin(pairId, side, file);
+    const inspectingKey = `${side}Inspecting` as const;
+    updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: true } : pair);
     try {
-      const next = await inspectExcelCompareFile(file, language, undefined, [1, headerRow]);
-      updatePair(pairId, (current) => current[side] === file ? { ...current, [`${side}Inspection`]: next } : current);
+      const next = await inspectExcelCompareFile(file, language, request.controller.signal, [headerRow], false);
+      if (!inspectionRequestsRef.current.isCurrent(request)) return;
+      updatePair(pairId, (current) => {
+        const inspectionKey = `${side}Inspection` as const;
+        const inspection = current[inspectionKey];
+        return current[side] === file && inspection
+          ? { ...current, [inspectionKey]: mergeExcelCompareInspection(inspection, next) }
+          : current;
+      });
     } catch {
       // The initial inspection already owns the user-facing file error.
+    } finally {
+      if (inspectionRequestsRef.current.finish(request)) {
+        updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
+      }
     }
+  };
+
+  const changeSheet = (pairId: number, side: "left" | "right", sheetName: string) => {
+    updatePair(pairId, (pair) => selectPairSheet(pair, side, sheetName));
+  };
+
+  const changeHeaderInput = (pairId: number, side: "left" | "right", value: string) => {
+    updatePair(pairId, side === "left" ? { leftHeaderInput: value } : { rightHeaderInput: value });
+  };
+
+  const commitHeader = (pairId: number, side: "left" | "right") => {
+    const pair = pairs.find((item) => item.id === pairId);
+    const file = pair?.[side];
+    const sheet = pair ? selectedSheet(pair, side) : undefined;
+    if (!pair || !file || !sheet) return;
+    const input = side === "left" ? pair.leftHeaderInput : pair.rightHeaderInput;
+    const row = Number(input);
+    const maximumRow = Math.max(1, sheet.rowCount);
+    if (!Number.isInteger(row) || row < 1 || row > maximumRow) {
+      changeHeaderInput(pairId, side, String(side === "left" ? pair.leftHeaderRow : pair.rightHeaderRow));
+      return;
+    }
+    const cached = sheet.headerRows.some((header) => header.row === row);
+    updatePair(pairId, (current) => current[side] === file ? selectManualHeader(current, side, row) : current);
+    if (!cached) void refreshHeader(pairId, side, file, row);
   };
 
   const addPair = () => setPairs((current) => [...current, newPair(nextPairId.current++)]);
-  const removePair = (id: number) => setPairs((current) => current.length === 1 ? current : current.filter((pair) => pair.id !== id));
+  const removePair = (id: number) => {
+    inspectionRequestsRef.current.cancelPair(id);
+    setPairs((current) => current.length === 1 ? current : current.filter((pair) => pair.id !== id));
+  };
   const cleanupResults = () => {
     pendingRevokeUrls.current.push(...completed.map((item) => item.url), ...(zipResult ? [zipResult.url] : []));
     setCompleted([]);
@@ -234,7 +289,7 @@ export function ExcelComparePage() {
 
       <UtilitySectionCard step={1} title={t("features:excelCompare.pairs.title")} description={t("features:excelCompare.pairs.description")}>
         <div className="grid gap-3" data-testid="excel-compare-pair-list">
-          {pairs.map((pair, index) => <PairCard key={pair.id} pair={pair} index={index} mode={mode} busy={operation.status === "running"} t={translate} updatePair={updatePair} selectFile={selectFile} refreshHeader={refreshHeader} removePair={removePair} canRemove={pairs.length > 1} />)}
+          {pairs.map((pair, index) => <PairCard key={pair.id} pair={pair} index={index} mode={mode} busy={operation.status === "running"} t={translate} updatePair={updatePair} selectFile={selectFile} changeSheet={changeSheet} changeHeaderInput={changeHeaderInput} commitHeader={commitHeader} removePair={removePair} canRemove={pairs.length > 1} />)}
         </div>
         <Button className="mt-3 min-h-11 self-start rounded-xl border-green-700/50 px-4 font-bold text-green-800 shadow-sm hover:border-green-700! hover:bg-green-500/10! focus-visible:border-green-700! focus-visible:ring-green-700/30! dark:border-green-300/60 dark:text-green-300 dark:hover:border-green-300! dark:hover:bg-green-400/10!" data-testid="excel-add-pair" variant="outline" type="button" onClick={addPair} disabled={operation.status === "running"}><Plus size={17} /> {t("features:excelCompare.pairs.add")}</Button>
       </UtilitySectionCard>
@@ -505,13 +560,16 @@ function resultRowKey(pairId: number, record: ExcelCompareRecord, recordIndex: n
 
 function capitalize(value: "left" | "right") { return value === "left" ? "Left" : "Right"; }
 
-function PairCard({ pair, index, mode, busy, t, updatePair, selectFile, refreshHeader, removePair, canRemove }: {
+function PairCard({ pair, index, mode, busy, t, updatePair, selectFile, changeSheet, changeHeaderInput, commitHeader, removePair, canRemove }: {
   pair: PairState; index: number; mode: ExcelCompareMode; busy: boolean; t: LooseT;
   updatePair: (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => void;
   selectFile: (id: number, side: "left" | "right", file: File | undefined) => Promise<void>;
-  refreshHeader: (id: number, side: "left" | "right", row: number) => Promise<void>;
+  changeSheet: (id: number, side: "left" | "right", sheetName: string) => void;
+  changeHeaderInput: (id: number, side: "left" | "right", value: string) => void;
+  commitHeader: (id: number, side: "left" | "right") => void;
   removePair: (id: number) => void; canRemove: boolean;
 }) {
+  const headerGuidanceBaseId = useId();
   const leftHeaders = headersFor(pair, "left");
   const rightHeaders = headersFor(pair, "right");
   const inspectionBusy = pair.leftInspecting || pair.rightInspecting;
@@ -528,16 +586,25 @@ function PairCard({ pair, index, mode, busy, t, updatePair, selectFile, refreshH
     <PairFileDropZone label={t("features:excelCompare.pairs.dropLabel")} hint={t("features:excelCompare.pairs.fileHint")} accept={ACCEPT} files={[pair.left, pair.right].filter((file): file is File => Boolean(file))} onFiles={addFiles} disabled={busy} />
     {pair.unassignedFileCount > 0 && <UtilityNotice className="mt-2" data-testid="excel-pair-overflow" role="status"><AlertCircle className="mt-0.5 shrink-0" size={15} /> {t("features:excelCompare.pairs.overflow", { count: pair.unassignedFileCount })}</UtilityNotice>}
     <div className="mt-3 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1" data-testid="excel-pair-files">
-      {(["left", "right"] as const).map((side) => <div className="min-w-0 rounded-2xl border border-border bg-muted/35 p-3" key={side}>
+      {(["left", "right"] as const).map((side) => {
+        const selection = headerSelectionFor(pair, side);
+        const guidanceId = `${headerGuidanceBaseId}-${side}-header-guidance`;
+        const helpId = `${headerGuidanceBaseId}-${side}-header-help`;
+        const announcement = pair[`${side}HeaderAnnouncement`];
+        return <div className="min-w-0 rounded-2xl border border-border bg-muted/35 p-3" key={side}>
         <p className="mb-2 text-xs font-extrabold tracking-wide text-muted-foreground uppercase">{t(`features:excelCompare.pairs.${side}` as never)}</p>
         {pair[side] && <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl bg-background p-2 ring-1 ring-border" data-testid="excel-selected-file"><FileSpreadsheet className="text-green-700 dark:text-green-300" size={16} /><span className="min-w-0"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{pair[side]!.name}</strong><small className="block text-xs text-muted-foreground">{formatBytes(pair[side]!.size)}</small></span><Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void selectFile(pair.id, side, undefined)} aria-label={t("common:files.remove", { name: pair[side]!.name })}><X size={15} /></Button></div>}
         {pair[`${side}Error`] && <p className="mt-2 flex items-start gap-1.5 text-sm font-bold text-destructive" data-testid="excel-file-error"><AlertCircle className="mt-0.5 shrink-0" size={14} /> {pair[`${side}Error`]}</p>}
         {pair[`${side}Inspection`] && <div className="mt-3 grid grid-cols-[minmax(0,1fr)_92px] gap-2" data-testid="excel-sheet-fields">
-          <UtilityField><span>{t("features:excelCompare.pairs.sheet")}</span><UtilitySelect value={pair[`${side}Sheet`]} onChange={(event) => updatePair(pair.id, { [`${side}Sheet`]: event.target.value } as Partial<PairState>)}>{pair[`${side}Inspection`]!.sheets.map((sheet) => <option key={sheet.name}>{sheet.name}</option>)}</UtilitySelect></UtilityField>
-          <UtilityField><span>{t("features:excelCompare.pairs.headerRow")}</span><UtilityInput type="number" min={1} max={selectedSheet(pair, side)?.rowCount || 1} value={pair[`${side}HeaderRow`]} onChange={(event) => updatePair(pair.id, { [`${side}HeaderRow`]: Math.max(1, Number(event.target.value) || 1) } as Partial<PairState>)} onBlur={() => void refreshHeader(pair.id, side, pair[`${side}HeaderRow`])} /></UtilityField>
+          <UtilityField><span>{t("features:excelCompare.pairs.sheet")}</span><UtilitySelect value={pair[`${side}Sheet`]} onChange={(event) => changeSheet(pair.id, side, event.target.value)}>{pair[`${side}Inspection`]!.sheets.map((sheet) => <option key={sheet.name}>{sheet.name}</option>)}</UtilitySelect></UtilityField>
+          <UtilityField><span>{t("features:excelCompare.pairs.headerRow")}</span><UtilityInput type="number" min={1} max={selectedSheet(pair, side)?.rowCount || 1} value={pair[`${side}HeaderInput`]} aria-describedby={`${guidanceId} ${helpId}`} onChange={(event) => changeHeaderInput(pair.id, side, event.target.value)} onBlur={() => commitHeader(pair.id, side)} /></UtilityField>
+          <p className="col-span-full text-xs font-medium text-foreground" data-testid="excel-header-guidance" data-source={selection.source} id={guidanceId}>{headerGuidanceText(selection, t)}</p>
+          <p className="col-span-full text-xs text-muted-foreground" data-testid="excel-header-help" id={helpId}>{t("features:excelCompare.pairs.headerHelp")}</p>
           <p className="col-span-full text-xs text-muted-foreground">{formatLabel(pair[`${side}Inspection`]!.format, pair[`${side}Inspection`]!.supportsStyleComparison, t)}</p>
+          {announcement && <span className="sr-only" data-testid="excel-header-status" role="status" aria-live="polite">{headerGuidanceText(announcement, t)}</span>}
         </div>}
-      </div>)}
+      </div>;
+      })}
     </div>
     {mode === "key" && pair.leftInspection && pair.rightInspection && <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3" data-testid="excel-pair-mode-options">
       <h3 className="mb-3 font-heading text-base font-medium">{t("features:excelCompare.key.title")}</h3>
@@ -612,7 +679,7 @@ function SupportTable({ t }: { t: LooseT }) {
 }
 
 function newPair(id: number): PairState {
-  return { id, leftInspecting: false, rightInspecting: false, leftSheet: "", rightSheet: "", leftHeaderRow: 1, rightHeaderRow: 1, primaryLeft: [1], primaryRight: [1], secondaryLeft: [], secondaryRight: [], duplicatePolicy: "error", reconcile: { leftAmountColumn: 1, rightAmountColumn: 1, leftDateColumn: 2, rightDateColumn: 2, leftPartnerColumn: 3, rightPartnerColumn: 3, dateToleranceDays: 0, allowGroupedMatches: false, roundingUnit: 0.01 }, unassignedFileCount: 0 };
+  return { id, leftInspecting: false, rightInspecting: false, leftSheet: "", rightSheet: "", leftHeaderRow: 1, rightHeaderRow: 1, leftHeaderInput: "1", rightHeaderInput: "1", leftHeaderSelections: {}, rightHeaderSelections: {}, primaryLeft: [1], primaryRight: [1], secondaryLeft: [], secondaryRight: [], duplicatePolicy: "error", reconcile: { leftAmountColumn: 1, rightAmountColumn: 1, leftDateColumn: 2, rightDateColumn: 2, leftPartnerColumn: 3, rightPartnerColumn: 3, dateToleranceDays: 0, allowGroupedMatches: false, roundingUnit: 0.01 }, unassignedFileCount: 0 };
 }
 
 function pairOptions(pair: PairState, mode: ExcelCompareMode, normalization: typeof DEFAULT_EXCEL_COMPARE_OPTIONS): ExcelComparePairOptions {
@@ -620,20 +687,37 @@ function pairOptions(pair: PairState, mode: ExcelCompareMode, normalization: typ
 }
 
 function pairReady(pair: PairState, mode: ExcelCompareMode) {
-  if (!pair.left || !pair.right || !pair.leftInspection || !pair.rightInspection || pair.leftError || pair.rightError || !pair.leftSheet || !pair.rightSheet) return false;
-  if (mode === "key") return pair.primaryLeft.length > 0 && pair.primaryLeft.length === pair.primaryRight.length && (pair.duplicatePolicy !== "secondary" || pair.secondaryLeft.length === pair.secondaryRight.length);
-  if (mode === "reconcile") return isReconcileConfigValid(pair.reconcile);
+  if (pair.leftInspecting || pair.rightInspecting || !pair.left || !pair.right || !pair.leftInspection || !pair.rightInspection || pair.leftError || pair.rightError || !pair.leftSheet || !pair.rightSheet) return false;
+  const leftSheet = selectedSheet(pair, "left");
+  const rightSheet = selectedSheet(pair, "right");
+  const leftHeaders = headersFor(pair, "left");
+  const rightHeaders = headersFor(pair, "right");
+  if (!leftSheet || !rightSheet || leftHeaders.length === 0 || rightHeaders.length === 0
+    || pair.leftHeaderInput !== String(pair.leftHeaderRow) || pair.rightHeaderInput !== String(pair.rightHeaderRow)
+    || pair.leftHeaderRow < 1 || pair.leftHeaderRow > Math.max(1, leftSheet.rowCount)
+    || pair.rightHeaderRow < 1 || pair.rightHeaderRow > Math.max(1, rightSheet.rowCount)) return false;
+  if (mode === "key") return pair.primaryLeft.length > 0 && pair.primaryLeft.length === pair.primaryRight.length
+    && validColumns(pair.primaryLeft, leftHeaders) && validColumns(pair.primaryRight, rightHeaders)
+    && (pair.duplicatePolicy !== "secondary" || (pair.secondaryLeft.length === pair.secondaryRight.length
+      && validColumns(pair.secondaryLeft, leftHeaders) && validColumns(pair.secondaryRight, rightHeaders)));
+  if (mode === "reconcile") return isReconcileConfigValid(pair.reconcile)
+    && validColumns([pair.reconcile.leftAmountColumn, pair.reconcile.leftDateColumn, pair.reconcile.leftPartnerColumn], leftHeaders)
+    && validColumns([pair.reconcile.rightAmountColumn, pair.reconcile.rightDateColumn, pair.reconcile.rightPartnerColumn], rightHeaders);
   return true;
 }
 
 function pairConfigured(pair: PairState, mode: ExcelCompareMode) {
+  if (pair.leftInspecting || pair.rightInspecting) return false;
   if (!pair.left || !pair.right) return false;
   if (pair.leftError || pair.rightError) return true;
   return pairReady(pair, mode);
 }
 
 function selectedSheet(pair: PairState, side: "left" | "right") { return pair[`${side}Inspection`]?.sheets.find((sheet) => sheet.name === pair[`${side}Sheet`]); }
-function headersFor(pair: PairState, side: "left" | "right") { const sheet = selectedSheet(pair, side); const row = sheet?.headerRows.find((item) => item.row === pair[`${side}HeaderRow`]); return row?.values ?? Array.from({ length: sheet?.columnCount ?? 0 }, (_, index) => columnLabel(index + 1)); }
+function headersFor(pair: PairState, side: "left" | "right") { const sheet = selectedSheet(pair, side); const row = sheet?.headerRows.find((item) => item.row === pair[`${side}HeaderRow`]); return row?.values ?? []; }
+function validColumns(columns: Array<number | undefined>, headers: string[]) { return columns.every((column) => column === undefined || (Number.isInteger(column) && column >= 1 && column <= headers.length)); }
+function headerSelectionFor(pair: PairState, side: "left" | "right"): HeaderSelection { return pair[`${side}HeaderSelections`][pair[`${side}Sheet`]] ?? { row: pair[`${side}HeaderRow`], source: "fallback" }; }
+function headerGuidanceText(selection: HeaderSelection, t: LooseT) { return selection.source === "manual" ? t("features:excelCompare.pairs.headerManual", { row: selection.row }) : selection.source === "suggested" ? t("features:excelCompare.pairs.headerSuggested", { row: selection.row }) : t("features:excelCompare.pairs.headerNotFound"); }
 function columnLabel(column: number) { let value = column; let result = ""; while (value > 0) { value -= 1; result = String.fromCharCode(65 + value % 26) + result; value = Math.floor(value / 26); } return result; }
 function fileStem(name: string) { return name.replace(/\.[^.]+$/u, ""); }
 function keepObjectUrl(url: string, ref: { current: Set<string> }) { ref.current.add(url); return url; }
@@ -641,3 +725,8 @@ function locationText(leftRow: number | null, rightRow: number | null, leftColum
 function formatLabel(format: string, style: boolean, t: LooseT) { return `${format.toUpperCase()} · ${style ? t("features:excelCompare.pairs.styleSupported") : t("features:excelCompare.pairs.styleExcluded")}`; }
 function reasonText(reason: string, t: LooseT) { return reason.split("+").map((code) => t(`features:excelCompare.reason.${code}`, { defaultValue: t("features:excelCompare.reason.generic") })).join(" · "); }
 function safeError(error: unknown, t: LooseT) { const code = error && typeof error === "object" && "code" in error ? String(error.code) : "PROCESSING_FAILED"; return t(`features:excelCompare.error.${code}`, { defaultValue: t("features:excelCompare.error.PROCESSING_FAILED") }); }
+
+function resetPairFile(pair: PairState, side: "left" | "right", file: File | undefined): PairState {
+  if (side === "left") return { ...pair, left: file, leftInspection: undefined, leftInspecting: Boolean(file), leftError: undefined, leftSheet: "", leftHeaderRow: 1, leftHeaderInput: "1", leftHeaderSelections: {}, leftHeaderAnnouncement: undefined };
+  return { ...pair, right: file, rightInspection: undefined, rightInspecting: Boolean(file), rightError: undefined, rightSheet: "", rightHeaderRow: 1, rightHeaderInput: "1", rightHeaderSelections: {}, rightHeaderAnnouncement: undefined };
+}

@@ -19,13 +19,22 @@ function createWorker() {
   return new Worker(new URL("./excelCompare.worker.ts", import.meta.url), { type: "module" });
 }
 
-export async function inspectExcelCompareFile(file: File, language: "ko" | "en", signal?: AbortSignal, headerRows: number[] = [1]) {
+export async function inspectExcelCompareFile(
+  file: File,
+  language: "ko" | "en",
+  signal?: AbortSignal,
+  headerRows: number[] = [1],
+  detectHeader = true,
+) {
+  throwIfInspectionAborted(signal, language);
   const buffer = await file.arrayBuffer();
+  throwIfInspectionAborted(signal, language);
   return runModuleWorker<object, ExcelCompareInspection>(createWorker, {
     type: "inspect",
     fileName: file.name,
     buffer,
     headerRows,
+    detectHeader,
   }, {
     transfer: [buffer],
     signal,
@@ -33,6 +42,10 @@ export async function inspectExcelCompareFile(file: File, language: "ko" | "en",
     startErrorMessage: messages[language].start,
     resultErrorMessage: messages[language].result,
   });
+}
+
+function throwIfInspectionAborted(signal: AbortSignal | undefined, language: "ko" | "en") {
+  if (signal?.aborted) throw new DOMException(messages[language].canceled, "AbortError");
 }
 
 export async function runExcelComparePair(

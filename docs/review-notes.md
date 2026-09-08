@@ -4,6 +4,26 @@
 
 ## 2026-09-08
 
+### Excel 중복키 S3 — 보수적 머리글 후보·수동 우선 상태 (Codx)
+
+**착수 게이트·범위** — 지정 worktree `/tmp/worklazy-xd`, 브랜치 `excel-dupkey-20260907`, 시작 HEAD `bdd09a7d6bc10da74db8fd3b2b8565da9c3f054e`와 clean 상태를 확인했다. 대상에는 열린 `docs/jobs/todo` 계획서가 없어 S0에 보존된 19개 열린 계획서 스캔과 같은 기준의 S2 최종 검수 통과 문서를 교차해 충돌 없음으로 판정했다. 명시적으로 접근 금지된 원 워킹트리는 live 재스캔하지 않았다. 이번 단계는 S3 머리글 감지와 그 화면·하네스만 포함하며 S1 그룹 엔진·보고서와 S2 결과 소비 의미를 바꾸지 않았다. main 병합·push·배포와 S4 통합 검증은 수행하지 않았다.
+
+**감지 판정** — 공용 어댑터의 raw cell type·formula·error·merge 정보로 각 시트의 물리 1~20행만 후보로 보고 아래 최대 5행, 즉 25행까지만 지지도를 읽는다. 값은 null이 아니고 trim 뒤 비어 있지 않은 셀만 센다. 가로 병합 행은 건너뛰고, 세로 병합이 아닌 한 셀 제목 행은 다음 5행에 두 셀 이상 행이 있을 때만 건너뛴다. 그 뒤 처음 만난 행 하나만 `2셀 이상`, 비수식·비오류 문자열 비율 `>=1/2`, trim 값 중복 없음, 후보 열의 40% 이상을 채운 아래 행 2개 이상, 세로 병합 없음으로 판정하며 하나라도 어기면 뒤 행을 찾지 않고 `uncertain`으로 멈춘다. 후보가 없을 때만 `none`이다. `suggested`만 정수 행을 가지며 나머지는 null이다.
+
+고정 원형 22패턴은 **suggested 12·uncertain 8·none 2**이고, 제안 12건 가운데 필터·설명·요약·머리글 없는 전부 텍스트·세 단계 비세로 병합의 **의미상 오탐 5건**을 성공으로 세탁하지 않고 fixture에 표시했다. 세로 병합 접두 사례를 23번째로 추가해 첫 한 셀 행에서 즉시 `uncertain`이 되는 것을 고정했다. XLSX·XLSM·BIFF8 XLS·XLSB·SpreadsheetML·CSV의 명시적 기대표 **138조합**을 실제 직렬화→각 형식 파서→감지로 통과했다. CSV는 병합 정보 소실과 숫자 문자열화 때문에 merged-title, numeric-header-after-title, dense-numeric-header, three-level-no-vertical, vertical-prefix의 정확히 5건이 원형과 다르다. 다단 머리글 합성, 20행 밖 탐색, 단일 열 의미 판별, 숫자 머리글 확인, 머리글 없음 모드는 지원 범위에서 제외하고 0행 모드는 만들지 않았다.
+
+**초기 검사·상태 소유권** — 첫 inspect 응답이 모든 시트의 `headerSuggestion`과 요청 행∪제안 행의 열 이름을 함께 반환해 제안 행만을 위한 두 번째 parse/worker 왕복을 없앴다. 수동 행은 캐시에 있으면 재검사하지 않고, 없을 때만 `detectHeader:false`의 전체 parse 한 번으로 해당 행 열 이름을 병합한다. 파일·시트별 `{row, source=suggested|manual|fallback}`을 두 측에 독립 보관해 시트 전환은 수동→제안→1행 순으로 복원하고 수동 선택을 항상 우선한다. 파일 교체는 이전 선택·상태 안내를 지우며 좌우 교환은 파일, 검사 결과, 시트, 행 입력, 선택 source, 열 연결과 대사 열까지 함께 바꾼다.
+
+검사 요청은 pair+side별 AbortController와 단조 token, File identity를 함께 소유한다. 새 파일·파일 제거·쌍 제거·unmount는 현재 요청을 terminate하고, 완료·오류·finally는 네 소유 조건이 모두 현재일 때만 상태를 갱신한다. pre-abort는 `arrayBuffer`와 worker 생성을 모두 막고, 읽기 직후 abort도 worker 생성을 막는다. 수동 미캐시 검사 중에는 compare와 swap이 비활성화되며 stale finally가 새 busy를 지우지 않는다. 단위시험은 양측 독립 취소·cancelPair·cancelAll과 stale finish 거부를, Chrome 스모크는 교체 경합·쌍 삭제 후 오류 0과 worker 종료를 확인했다.
+
+**문구·화면 판정** — `suggested`는 “머리글 후보”, `uncertain/none`은 감지 성공으로 표현하지 않는 동일 1행 fallback, 수동은 선택 행으로 구분한다. 두 언어 모두 입력에 현재 판정 안내와 영구 도움말을 `aria-describedby`로 연결했고, 비동기 최초 결과만 polite status로 한 번 추가했다. 도움말은 선택 행 다음부터 비교하며 설명·필터·요약 선행 행에서는 실제 열 이름 행을 고르고 머리글이 없으면 맨 위에 열 이름 행을 추가하라는 복구 행동을 명시한다. ko/en 기능 문구·가이드·FAQ·도구 메타와 SEO 설명·featureList·static FAQ 입력을 함께 갱신했다. URL·canonical·hreflang·사이트맵 key, 광고 경계, 서버 전제와 의존성은 바꾸지 않았다.
+
+Chrome 스모크에서 두 XLSX는 최초 inspect 메시지 각 1개(`headerRows=[1]`, `detectHeader=true`)만 보내고 모두 4행 후보와 그 열 이름으로 준비됐다. 캐시된 수동 1행은 추가 메시지 0개, 미캐시 5행은 `headerRows=[5]`, `detectHeader=false` 한 번이며 수동 안내와 busy 상태를 유지했다. 두 번째 시트 제안 2행과 각 시트 수동 선택 복원, 좌우의 suggested/manual source 및 행 교환, 새 CSV가 이전 수동 5행을 물려받지 않고 자기 1행 제안을 쓰는 것까지 확인했다. Excel 전용 16개 시각 기준선을 ko/en·light/dark·desktop/mobile 결과 상태로 갱신하고 대표 3장을 직접 확인한 뒤 **16/16 재일치**했다. QA axe는 기본 화면과 중복 결과 8상태, 총 **9페이지 위반 0·외부 요청 0**이다. 자동 판정 보류 `incomplete`은 각 페이지 color-contrast 1건, 총 **9건**이며 통과로 세지 않았다.
+
+**사용자 사본 재현** — `/tmp/worklazy-userfiles/`의 두 원본 사본만 읽고 저장소 fixture나 산출물로 넣지 않았다. 두 `최종` 시트 모두 `{row:4, reason:suggested}`였다. 4행/B열은 중복 그룹 0·matched 703·changed 37·added 48, 4행/A열은 중복 그룹 6·matched 486·changed 134·added 31이었다. A열 표시 키 1~6은 각각 왼쪽 두 행과 오른쪽 두 행을 한 그룹으로 보존했고 재시작 행은 왼쪽 73, 오른쪽 79였다.
+
+**검증·후속 경계** — `./node_modules/.bin/tsc -b` 진단 0, unit **396/396**, production·`VITE_LOCAL_QA=1` build 각각 2,836 modules와 정적 61페이지, 강화 Excel 비교 스모크, Excel 전용 visual **16/16**, Excel 전용 axe **9페이지/위반 0**, `git diff --check`를 통과했다. 빌드와 브라우저 검사는 `NODE_OPTIONS=--max-old-space-size=4096` 및 `127.0.0.1:4350 --strictPort`에서 직렬 실행했다. 단계 지시대로 전체 browser, Excel Cleaner, QR bulk, production static, full a11y, bundle 측정, CSS orphan, registry는 S4로 미뤘으며 이번 S3 통과로 대신하지 않는다. 증거는 `/tmp/worklazy-xd-s3/evidence/`, 최종 보고서는 `/tmp/worklazy-xd-s3/REPORT.md`에 둔다. — Codx
+
 ### Excel 중복키 S2 fix-3 — 포인터 위치·전 폭 초점 경계 (Codx)
 
 **R05 원인·입력 경계** — 기존 예약 보정은 결과 컨트롤이 `activeElement`인지 여부만 확인해 마우스 클릭·터치 탭으로 생긴 비가시 초점도 키보드 초점처럼 따라갔다. 151행 목록에서 50개를 더 불러오면 같은 버튼의 새 좌표를 향해 `instant` 세로 보정이 실행되어 읽던 위치가 9,725px 이동했다. 보정 예약과 각 실행 프레임에서 결과 컨트롤의 `:focus-visible`을 확인하고, 포인터·터치 이동·wheel·스크롤 키 입력이 들어오면 남은 예약을 취소하도록 입력 경계를 분리했다. 실제 mouse/touch의 펼침·50개 추가·닫힘은 모두 `ΔscrollY=0`, 제품 보정 호출 0이고, 추가 뒤 항목은 100개이며 새 첫 항목 Source row 52가 화면에 보였다. 키보드로 포커스한 경로의 `instant` 보정과 모달 Escape 초점 복귀는 유지했다.

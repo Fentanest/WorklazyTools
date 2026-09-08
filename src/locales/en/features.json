@@ -1050,7 +1050,7 @@
     "description": "Compare multiple spreadsheet pairs by position, key, or transaction and create a nine-sheet XLSX report for each pair. Selected files stay in this browser.",
     "pairs": {
       "title": "File pairs",
-      "description": "Connect a left and right file, then choose each sheet and header row. Drop a file or use the file-selection button.",
+      "description": "Connect a left and right file to select a suggested header. Check the column names, then change either sheet or header row if needed.",
       "add": "Add file pair",
       "pair": "Comparison pair {{number}}",
       "pairHint": "Pairs run independently. A failed pair does not stop the remaining pairs.",
@@ -1063,6 +1063,10 @@
       "swap": "Swap left and right files and settings",
       "sheet": "Sheet to compare",
       "headerRow": "Header row",
+      "headerSuggested": "Row {{row}} is selected as a suggested header. Check the column names and change the row if needed.",
+      "headerNotFound": "We could not identify a header row, so row 1 is selected. Check the column names and choose the header row.",
+      "headerManual": "Selected header: row {{row}}",
+      "headerHelp": "Comparison starts after the selected row. If description, filter, or summary rows come first, choose the row with the actual column names. For a table without headers, add a column-name row at the top.",
       "styleSupported": "Cell-format comparison available",
       "styleExcluded": "Cell-format comparison excluded"
     },
@@ -1126,11 +1130,12 @@
     "guide": {
       "title": "Excel comparison and reconciliation guide", "description": "Learn how to create new reports without modifying your source files and review the support limits.",
       "blocks": [
-        { "title": "Position, key, and transaction methods", "text": "Position mode aligns columns before rows. Key mode uses composite keys and a duplicate policy. The left and right lists in a duplicate-key row each follow their source order; items on the same line are not matched to each other. Add a secondary key or choose occurrence order when you need a matching rule. Reconciliation combines amount, date, and partner rules with optional 1:N and N:1 sums." },
+        { "title": "Header rows and comparison methods", "text": "A suggested header is selected when a file opens. If description, filter, or summary rows come first, choose the row with the actual column names. For a table without headers, add a column-name row at the top. Position mode aligns columns before rows. Key mode uses composite keys and a duplicate policy. The left and right lists in a duplicate-key row each follow their source order; items on the same line are not matched to each other. Add a secondary key or choose occurrence order when you need a matching rule. Reconciliation combines amount, date, and partner rules with optional 1:N and N:1 sums." },
         { "title": "Large files and cancellation", "text": "The two Excel files in the current pair are read, the selected sheets are compared, and memory is released when that pair finishes. Desktop browsers are more reliable for large files, and you can cancel at any time." },
         { "title": "Reports and privacy", "text": "Each pair produces Summary, Parameters, Matched, Changed, Added, Removed, Duplicates, Ambiguous, and Errors sheets. Files and cell values are not sent to an external processing server." }
       ],
       "faq": [
+        { "q": "What if the suggested header is not the actual column-name row?", "a": "Choose the row with the actual column names in each file's header-row field. Comparison starts after that row. For a table without headers, add a column-name row at the top and select the file again." },
         { "q": "How are multiple rows with the same key shown?", "a": "Each duplicate key counts as one result row with separate collapsible lists for the left and right source rows. Items on the same line are not matched automatically; use a secondary key or occurrence order to change the matching rule." },
         { "q": "Are XLS and XLSB cell formats compared?", "a": "No. Values, display values, formulas, stored results, and merged cells are compared, but XLS and XLSB cell-format differences are excluded." },
         { "q": "Is a formula without a stored result an error?", "a": "No. The formula can still be compared. Missing stored and display values are recorded separately, and the browser does not recalculate formulas." },
