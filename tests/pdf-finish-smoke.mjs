@@ -10,7 +10,7 @@ import { createCanvas } from "@napi-rs/canvas";
 import { chromium } from "playwright";
 import { PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
 import { PNG } from "pngjs";
-import { collectDeploymentExecutionAssetPaths, isDeploymentExecutionAsset } from "../scripts/measure-bundle-budget.mjs";
+import { collectDeploymentExecutionAssetPaths, isJavaScriptExecutionPath } from "../scripts/measure-bundle-budget.mjs";
 
 const execFileAsync = promisify(execFile);
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +67,7 @@ try {
   assert.equal(directEntries.length, 16);
 
   await testChunkRecovery(browser);
+  await testDisplayModuleRecovery(browser, fixture);
   await testNavigation(browser);
   await testUploadErrors(browser);
   await testPreviewGeometry(browser, fixture);
@@ -115,6 +116,51 @@ async function testChunkRecovery(browserInstance) {
   assert.equal(documentRequests.length, 2, `finish chunk failure must spend exactly one automatic reload: ${JSON.stringify(documentRequests)}`);
   assert.equal(await page.locator("[data-route-error]").count(), 0);
   await context.close();
+}
+
+async function testDisplayModuleRecovery(browserInstance, fixture) {
+  const expected = {
+    ko: "PDF를 표시하는 데 필요한 파일을 불러오지 못했습니다. 연결을 확인하고 페이지를 새로고침한 뒤 PDF를 다시 선택해 주세요.",
+    en: "Files needed to display the PDF could not be loaded. Check your connection, refresh the page, and choose the PDF again.",
+  };
+  for (const language of ["ko", "en"]) {
+    const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+    const page = await context.newPage();
+    const displayRequests = [];
+    let recoveryStarted = false;
+    await page.route("**/assets/pdf-*.mjs", async (route) => {
+      displayRequests.push({ url: route.request().url(), recoveryStarted });
+      if (displayRequests.length === 1) await route.abort("failed");
+      else await route.continue();
+    });
+    await page.goto(`${baseUrl}/${language}/tools/pdf-editor/watermark/`, { waitUntil: "networkidle" });
+    const input = page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']");
+    await input.setInputFiles({ name: "healthy-watermark.pdf", mimeType: "application/pdf", buffer: fixture });
+    const error = page.locator("[data-testid='pdf-error']");
+    await error.waitFor();
+    const errorText = await error.textContent();
+    assert.ok(errorText?.includes(expected[language]), `${language} display load failure was not localized: ${errorText}`);
+    assert.doesNotMatch(errorText ?? "", /Failed to fetch|dynamically imported|\/assets\/|runtime/iu);
+    assert.equal(displayRequests.length, 1, `${language} failed display import must not retry before the explicit recovery action`);
+    await page.screenshot({ path: path.join(shots, `${language}-display-load-recovery.png`), fullPage: false });
+    const reloaded = page.waitForNavigation({ waitUntil: "networkidle" });
+    recoveryStarted = true;
+    await page.locator("[data-testid='pdf-display-reload']").click();
+    await reloaded;
+    await page.locator("[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']").waitFor();
+    assert.equal(await page.locator("[data-ui-component='file-list']").count(), 0, "reload must clearly discard the selected file before reselection");
+    await input.setInputFiles({ name: "healthy-watermark.pdf", mimeType: "application/pdf", buffer: fixture });
+    await page.locator("[data-testid='pdf-finish-overlay']").waitFor();
+    await page.locator("[data-testid='pdf-finish-preflight-ready']").waitFor();
+    await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").click();
+    await page.locator("[data-testid='pdf-download']").waitFor({ timeout: 120_000 });
+    assert.equal(await page.locator("[data-route-error]").count(), 0);
+    const uniqueDisplayUrls = new Set(displayRequests.map(({ url }) => new URL(url).pathname));
+    assert.equal(uniqueDisplayUrls.size, 1, `${language} recovery must preserve one shared main/worker display URL`);
+    assert.ok(displayRequests.some((request) => request.recoveryStarted), `${language} recovery did not request the display URL after reload`);
+    await context.close();
+  }
 }
 
 async function testNavigation(browserInstance) {
@@ -643,7 +689,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
     const url = new URL(response.url());
     if (url.origin !== new URL(baseUrl).origin) return;
     const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, "");
-    if (isDeploymentExecutionAsset(relativePath)) runtimeRequests.add(relativePath);
+    if (isJavaScriptExecutionPath(relativePath)) runtimeRequests.add(relativePath);
   });
   page.setDefaultTimeout(120_000);
   await page.goto(`${baseUrl}/en/tools/pdf-editor/watermark/`, { waitUntil: "networkidle" });

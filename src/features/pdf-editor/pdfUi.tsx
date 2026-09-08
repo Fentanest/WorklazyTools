@@ -1,8 +1,8 @@
-import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ResultCard, formatBytes } from "../../components/ui";
-import { buttonVariants } from "../../components/ui/button";
+import { Button, buttonVariants } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { FileShareButton } from "../../components/FileShareButton";
 import { useAppLanguage } from "../../i18n/routing";
@@ -71,5 +71,6 @@ export function PdfDownloadCard({ result, title, compact = false }: { result: Do
 export function PdfError({ message }: { message: string }) {
   const language = useAppLanguage();
   if (!message) return null;
-  return <div className="mt-4 flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-destructive" data-testid="pdf-error" role="alert"><AlertTriangle className="shrink-0" size={19} /><div className="flex flex-col"><strong className="text-sm">{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span className="mt-1 text-sm leading-relaxed text-muted-foreground">{message}</span></div></div>;
+  const displayLoadFailure = message === featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable");
+  return <div className="mt-4 flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-destructive" data-testid="pdf-error" role="alert"><AlertTriangle className="shrink-0" size={19} /><div className="flex flex-col"><strong className="text-sm">{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span className="mt-1 text-sm leading-relaxed text-muted-foreground">{message}</span>{displayLoadFailure && <Button className="mt-3 w-fit rounded-xl" type="button" variant="outline" data-testid="pdf-display-reload" onClick={() => window.location.reload()}><RefreshCw size={16} />{featureMessage(language, "pdf.messages.pdfPreview.refreshPage")}</Button>}</div></div>;
 }

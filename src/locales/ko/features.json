@@ -855,6 +855,8 @@
         "unableToContinue": "작업을 계속할 수 없습니다."
       },
       "pdfPreview": {
+        "displayFilesUnavailable": "PDF를 표시하는 데 필요한 파일을 불러오지 못했습니다. 연결을 확인하고 페이지를 새로고침한 뒤 PDF를 다시 선택해 주세요.",
+        "refreshPage": "페이지 새로고침",
         "encryptedOrPermissionRestrictedPdfsCannotBeEdited": "암호화되거나 권한이 제한된 PDF는 편집할 수 없습니다. 보호가 해제된 사본으로 다시 시도해 주세요.",
         "unableToRenderThePdfPreview": "PDF 미리보기를 표시할 수 없습니다.",
         "unableToDisplayThePdfPreview": "PDF 미리보기를 화면에 복사할 수 없습니다.",

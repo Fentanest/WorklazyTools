@@ -14,6 +14,14 @@ type PdfDisplayModule = typeof import("pdfjs-dist");
 let pdfDisplayModulePromise: Promise<PdfDisplayModule> | undefined;
 let passwordExceptionConstructor: PdfDisplayModule["PasswordException"] | undefined;
 
+export class PdfDisplayLoadError extends Error {
+  readonly code = "pdf-display-load";
+}
+
+export function isPdfDisplayLoadError(error: unknown): error is PdfDisplayLoadError {
+  return error instanceof PdfDisplayLoadError;
+}
+
 function loadPdfDisplayModule() {
   pdfDisplayModulePromise ??= (import(/* @vite-ignore */ pdfDisplayUrl) as Promise<PdfDisplayModule>).then((module) => {
     module.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -75,7 +83,17 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko", s
   throwIfAborted(signal, "PDF loading cancelled");
   const cached = documentCache.get(file);
   if (cached) return waitWithAbort(cached.promise, signal);
-  const { getDocument } = await waitWithAbort(loadPdfDisplayModule(), signal);
+  let pdfDisplayModule: PdfDisplayModule;
+  try {
+    pdfDisplayModule = await waitWithAbort(loadPdfDisplayModule(), signal);
+  } catch (error) {
+    if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+    // A failed module import is cached by the browser for this document. Keep the
+    // shared URL stable and ask for one explicit document reload instead of
+    // misclassifying a healthy PDF or retrying an operation that cannot recover.
+    throw new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
+  }
+  const { getDocument } = pdfDisplayModule;
   throwIfAborted(signal, "PDF loading cancelled");
   const buffer = await waitWithAbort(file.arrayBuffer(), signal);
   throwIfAborted(signal, "PDF loading cancelled");

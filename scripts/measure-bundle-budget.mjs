@@ -53,15 +53,25 @@ export function runBundleMeasurement() {
   try {
     fs.rmSync(outputDirectory, { recursive: true, force: true });
     execFileSync(process.execPath, [
-      path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js"),
-      "build", "--manifest", "--outDir", "dist-measure",
+      path.join(scriptRepositoryRoot, "node_modules", "vite", "bin", "vite.js"),
+      "build", repositoryRoot, "--config", path.join(scriptRepositoryRoot, "vite.config.ts"),
+      "--manifest", "--outDir", outputDirectory,
     ], {
       cwd: repositoryRoot,
       stdio: "inherit",
       env: { ...process.env, BUNDLE_MODULE_ATTRIBUTION_OUTPUT: metadataPath },
     });
+    execFileSync(process.execPath, [
+      "--experimental-strip-types",
+      path.join(scriptRepositoryRoot, "scripts", "generate-static-pages.mjs"),
+    ], {
+      cwd: repositoryRoot,
+      stdio: "inherit",
+      env: { ...process.env, WORKLAZY_STATIC_OUTPUT_DIR: outputDirectory, WORKLAZY_SOURCE_ROOT: repositoryRoot },
+    });
     const moduleChunks = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
     const report = measureOutput({ moduleChunks });
+    report.deploymentInventory = assertMeasuredDeploymentExecutionAssets(report, outputDirectory);
     report.budget = budget;
     printReport(report);
     // Persist the measurements even when the comparison rejects the build.
@@ -226,7 +236,7 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
     moduleInventory: jsRecords.flatMap(({ paths }) => paths.map(moduleInventoryEntry))
       .sort((left, right) => left.file < right.file ? -1 : left.file > right.file ? 1 : 0),
     generatedAt: new Date().toISOString(),
-    buildCommand: "vite build --manifest --outDir dist-measure",
+    buildCommand: "vite build --manifest --outDir dist-measure && generate-static-pages (WORKLAZY_STATIC_OUTPUT_DIR=dist-measure)",
     includeRules: ["**/*.js", "**/*.mjs", "assets/**/*.css", "**/*.css"],
     excludeRules: ["vendor/**", "**/runtime/**", "duplicate SHA-256 content after the first copy"],
     affectedRoutes,
@@ -263,7 +273,14 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
 
 export function isDeploymentExecutionAsset(relativePath) {
   const normalized = relativePath.replaceAll("\\", "/").replace(/^\.\//, "");
-  if (isExcludedDeploymentTree(normalized)) return false;
+  return isJavaScriptExecutionPath(normalized) && !isExcludedDeploymentTree(normalized);
+}
+
+// Network observations deliberately use this broader predicate. Applying the
+// deployment exclusion to both the observed and expected sides would let an
+// incorrectly excluded, actually loaded script disappear from the comparison.
+export function isJavaScriptExecutionPath(relativePath) {
+  const normalized = relativePath.replaceAll("\\", "/").replace(/^\.\//, "");
   return normalized.endsWith(".js") || normalized.endsWith(".mjs");
 }
 
@@ -277,6 +294,19 @@ export function collectDeploymentExecutionAssetPaths(directory) {
     .map((filePath) => path.relative(directory, filePath).split(path.sep).join("/"))
     .filter(isDeploymentExecutionAsset)
     .sort();
+}
+
+export function assertMeasuredDeploymentExecutionAssets(report, directory) {
+  const deployed = collectDeploymentExecutionAssetPaths(directory);
+  const measured = [...new Set((report.moduleInventory ?? []).map(({ file }) => file))].sort();
+  const deployedSet = new Set(deployed);
+  const measuredSet = new Set(measured);
+  const missingFromMeasurement = deployed.filter((file) => !measuredSet.has(file));
+  const missingFromDeployment = measured.filter((file) => !deployedSet.has(file));
+  if (missingFromMeasurement.length || missingFromDeployment.length) {
+    throw new Error(`Bundle deployment execution inventory mismatch: ${JSON.stringify({ missingFromMeasurement, missingFromDeployment })}`);
+  }
+  return { deployed, measured, missingFromMeasurement, missingFromDeployment };
 }
 
 function deriveLazyRouteSources(sourceRoot) {

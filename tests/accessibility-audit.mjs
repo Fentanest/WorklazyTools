@@ -27,10 +27,19 @@ export const pages = Object.freeze([
   { id: "pdf-finish-mobile-ko", path: "/ko/tools/pdf-editor/finish", viewport: { width: 412, height: 839 }, readySelector: "[data-testid='pdf-finish-ready']" },
   { id: "pdf-finish-en", path: "/en/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']" },
   { id: "pdf-watermark-ko", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']" },
+  { id: "pdf-watermark-error-ko-light", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "light", locale: "ko-KR" },
+  { id: "pdf-watermark-error-ko-dark", path: "/ko/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "dark", locale: "ko-KR" },
+  { id: "pdf-watermark-error-en-light", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "light", locale: "en-US" },
+  { id: "pdf-watermark-error-en-dark", path: "/en/tools/pdf-editor/watermark", readySelector: "[data-testid='pdf-finish-ready'][data-pdf-finish-tab='watermark']", scenario: "pdf-watermark-empty-text", colorScheme: "dark", locale: "en-US" },
   { id: "hwp-editor", path: "/ko/tools/hwp-editor", readySelector: 'iframe[title="rhwp HWP 문서 편집기"]' },
   { id: "home-mobile-ko", path: "/ko", viewport: { width: 412, height: 839 } },
   { id: "tools-mobile-ko", path: "/ko/tools", viewport: { width: 412, height: 839 } },
 ]);
+const selectedPageIds = (process.env.A11Y_PAGE_IDS || "").split(",").map((value) => value.trim()).filter(Boolean);
+const auditedPages = selectedPageIds.length ? pages.filter(({ id }) => selectedPageIds.includes(id)) : pages;
+if (selectedPageIds.length && (new Set(selectedPageIds).size !== selectedPageIds.length || auditedPages.length !== selectedPageIds.length)) {
+  throw new Error(`A11Y_PAGE_IDS contains an unknown or duplicate page: ${selectedPageIds.join(",")}.`);
+}
 
 // Minimal exception: rhwp Studio 0.8.6 upstream owns these vendor iframe nodes.
 // See docs/backlog.md, "HWP 편집기 iframe 접근성 위반 4노드". The host page stays audited.
@@ -89,8 +98,23 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
   const summary = summarizeAccessibility(report.results, registeredPages);
   for (const key of ["critical", "serious", "total"]) if (!Number.isSafeInteger(limits[key]) || limits[key] < 0) throw new Error(`Invalid accessibility limit: ${key}.`);
   if (report.externalRequests.length) throw new Error(`Accessibility audit made ${report.externalRequests.length} external request(s).`);
-  const contrast = report.summary.placeholderContrast?.ratio;
-  if (!Number.isFinite(contrast) || contrast < 4.5) throw new Error("Document placeholder contrast is below 4.5:1 or missing.");
+  if (registeredPages.some(({ id }) => id === "document-compare")) {
+    const contrast = report.summary.placeholderContrast?.ratio;
+    if (!Number.isFinite(contrast) || contrast < 4.5) throw new Error("Document placeholder contrast is below 4.5:1 or missing.");
+  }
+  const errorStatePages = registeredPages.filter(({ scenario }) => scenario === "pdf-watermark-empty-text");
+  for (const target of errorStatePages) {
+    const result = report.results.find(({ id }) => id === target.id);
+    const measurements = result?.settledContrast;
+    if (!Array.isArray(measurements) || measurements.length !== 2) {
+      throw new Error(`PDF watermark error-state contrast is missing: ${target.id}.`);
+    }
+    for (const measurement of measurements) {
+      if (!Number.isFinite(measurement.ratio) || measurement.ratio < 4.5) {
+        throw new Error(`PDF watermark error-state contrast is below 4.5:1: ${target.id}/${measurement.target}=${measurement.ratio}.`);
+      }
+    }
+  }
   if ((summary.severityCounts.critical || 0) > limits.critical || (summary.severityCounts.serious || 0) > limits.serious
     || summary.violations > limits.total) throw new Error(`Accessibility limits exceeded: ${JSON.stringify({ ...summary, limits })}`);
   if (summary.f2IncompleteNodes > 0) throw new Error(`F2 accessibility incomplete nodes must be resolved: ${JSON.stringify(summary)}`);
@@ -102,6 +126,7 @@ export async function runAccessibilityAudit() {
   let browser;
 
   try {
+    await fs.mkdir(path.dirname(reportPath), { recursive: true });
     if (!process.env.TEST_BASE_URL) server = await startPreview();
     browser = await chromium.launch({
       executablePath: chromeExecutable,
@@ -111,16 +136,16 @@ export async function runAccessibilityAudit() {
     const results = [];
     const externalRequests = [];
     let placeholderContrast;
-    for (const target of pages) {
+    for (const target of auditedPages) {
       const context = await browser.newContext({
         viewport: target.viewport ?? { width: 1280, height: 800 },
         isMobile: Boolean(target.viewport),
         hasTouch: Boolean(target.viewport),
         serviceWorkers: "block",
         deviceScaleFactor: 1,
-        colorScheme: "light",
+        colorScheme: target.colorScheme ?? "light",
         reducedMotion: "reduce",
-        locale: "ko-KR",
+        locale: target.locale ?? "ko-KR",
         timezoneId: "Asia/Seoul",
       });
       await context.addInitScript(() => {
@@ -138,6 +163,23 @@ export async function runAccessibilityAudit() {
       await page.addStyleTag({
         content: "*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important;caret-color:transparent!important;scroll-behavior:auto!important}",
       });
+      let settledContrast;
+      if (target.scenario === "pdf-watermark-empty-text") {
+        await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
+          .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/ordinary/no-resources.pdf"));
+        await page.waitForFunction(() => {
+          const panel = document.querySelector("[data-testid='pdf-finish-ready']");
+          return panel?.getAttribute("data-preflight-status") === "ready"
+            && panel.querySelector("[data-testid='pdf-finish-preview']")?.getAttribute("data-preview-status") === "ready";
+        }, undefined, { timeout: 30_000 });
+        await page.locator("[data-testid='pdf-finish-template']").fill(" \n\n ");
+        await page.locator("[data-testid='pdf-finish-preflight-error'][data-error-code='empty-text']").waitFor();
+        await page.waitForTimeout(1_000);
+        settledContrast = await measureRenderedContrast(page, [
+          { target: "invalid-textarea", selector: "[data-testid='pdf-finish-template'][aria-invalid='true']" },
+          { target: "empty-text-notice", selector: "[data-testid='pdf-finish-preflight-error'][data-error-code='empty-text']" },
+        ]);
+      }
       await page.evaluate(async () => {
         if (document.fonts?.ready) await document.fonts.ready;
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -208,17 +250,18 @@ export async function runAccessibilityAudit() {
           targets: violation.nodes.map((node) => node.target),
         })),
         incomplete,
+        ...(settledContrast ? { settledContrast } : {}),
       });
       await context.close();
     }
 
-    const aggregation = summarizeAccessibility(results);
+    const aggregation = summarizeAccessibility(results, auditedPages);
     const summary = {
       axeCore: "4.13.0",
       browserDriver: "playwright 1.63.0",
       ...aggregation,
       measuredAt: new Date().toISOString(),
-      colorScheme: "light",
+      colorSchemes: [...new Set(auditedPages.map(({ colorScheme }) => colorScheme ?? "light"))],
       externalRequests: externalRequests.length,
       placeholderContrast,
       limits,
@@ -232,14 +275,64 @@ export async function runAccessibilityAudit() {
       console.log(`${result.id}: passes=${result.passes}; violations=${result.violations.length}; ${detail}; incomplete=${incompleteDetail}`);
     }
     console.log(`Accessibility audit summary: ${JSON.stringify(summary)}`);
-    console.log(`Document placeholder contrast: ${placeholderContrast.ratio.toFixed(4)}:1 (${placeholderContrast.foreground} on ${placeholderContrast.background}).`);
+    if (placeholderContrast) console.log(`Document placeholder contrast: ${placeholderContrast.ratio.toFixed(4)}:1 (${placeholderContrast.foreground} on ${placeholderContrast.background}).`);
+    for (const result of results.filter(({ settledContrast }) => settledContrast)) {
+      console.log(`${result.id} settled contrast: ${result.settledContrast.map(({ target, ratio }) => `${target}=${ratio.toFixed(4)}:1`).join(", ")}`);
+    }
     console.log(`Accessibility report: ${reportPath}`);
 
-    assertAccessibilityResults(report, { limits });
+    assertAccessibilityResults(report, { registeredPages: auditedPages, limits });
   } finally {
     await browser?.close();
     if (server) await stopServer(server);
   }
+}
+
+async function measureRenderedContrast(page, targets) {
+  return page.evaluate((definitions) => {
+    const parseColor = (color) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Could not create a color measurement canvas.");
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data].map((channel, index) => index === 3 ? channel / 255 : channel);
+    };
+    const over = (front, back) => {
+      const alpha = front[3] + back[3] * (1 - front[3]);
+      if (alpha === 0) return [0, 0, 0, 0];
+      return [0, 1, 2].map((index) => (front[index] * front[3] + back[index] * back[3] * (1 - front[3])) / alpha).concat(alpha);
+    };
+    const backgroundFor = (element) => {
+      let background = [0, 0, 0, 0];
+      for (let current = element; current; current = current.parentElement) {
+        background = over(background, parseColor(getComputedStyle(current).backgroundColor));
+      }
+      return over(background, [255, 255, 255, 1]);
+    };
+    const luminance = (color) => color.slice(0, 3).map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    }).reduce((value, channel, index) => value + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    return definitions.map(({ target, selector }) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) throw new Error(`Contrast target is missing: ${selector}.`);
+      const foreground = parseColor(getComputedStyle(element).color);
+      const background = backgroundFor(element);
+      const renderedForeground = over(foreground, background);
+      const foregroundLuminance = luminance(renderedForeground);
+      const backgroundLuminance = luminance(background);
+      return {
+        target,
+        foreground: getComputedStyle(element).color,
+        background: getComputedStyle(element).backgroundColor,
+        ratio: (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05),
+      };
+    });
+  }, targets);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await runAccessibilityAudit();

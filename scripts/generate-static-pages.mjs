@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const outputDirectory = path.resolve("dist");
+// Production builds use dist; bundle measurement supplies its own Vite output
+// so static generation and measurement see the exact same deployment tree.
+const sourceRoot = path.resolve(process.env.WORKLAZY_SOURCE_ROOT || ".");
+const outputDirectory = path.resolve(process.env.WORKLAZY_STATIC_OUTPUT_DIR || path.join(sourceRoot, "dist"));
 const sourceHtml = await fs.readFile(path.join(outputDirectory, "index.html"), "utf8");
 const siteUrl = ensureTrailingSlash(process.env.VITE_SITE_URL || "https://worklazy.net/");
 const languages = ["ko", "en"];
@@ -71,9 +74,9 @@ for (const route of retiredCompareRoutes) {
   }
 }
 
-const coiSource = path.resolve("node_modules/coi-serviceworker/coi-serviceworker.min.js");
+const coiSource = path.join(sourceRoot, "node_modules/coi-serviceworker/coi-serviceworker.min.js");
 const coiSourceText = await fs.readFile(coiSource, "utf8");
-const officeCoiSourceText = await fs.readFile(path.resolve("src/features/office-editor/office_coi_serviceworker.js"), "utf8");
+const officeCoiSourceText = await fs.readFile(path.join(sourceRoot, "src/features/office-editor/office_coi_serviceworker.js"), "utf8");
 const credentiallessCoiSource = coiSourceText.replace("let coepCredentialless=!1;", "let coepCredentialless=!0;");
 if (credentiallessCoiSource === coiSourceText) throw new Error("Unable to configure the video isolation service worker for credentialless subresources.");
 for (const language of languages) {

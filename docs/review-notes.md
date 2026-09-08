@@ -4,6 +4,24 @@
 
 ## 2026-09-08
 
+### U4-4 fix-4 — 표시 실패 복구·배포 계측·오류 대비·128MiB 재측정 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`와 `AGENTS.md` 전문, fix-4 지시서, PDF finish 정본, fix-3 기록과 read-only 검수 산출물을 대조했다. 시작 branch/head는 `s3-pdf-finish`/`e30018dd2d4801c5abba54a88f200e9ac69325d3`로 지시와 일치했고 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았으며 금지 worktree에는 접근하지 않았다. main 병합·push·배포는 범위 밖이다.
+
+**R-A 표시 런타임 최초 실패 복구** — 공유 표시 모듈 import 실패를 `PdfDisplayLoadError`라는 UI 경계용 오류로 분리해 정상 PDF의 손상·읽기 불가 판정으로 흘러가지 않게 했다. 브라우저 모듈 로더가 거부된 import를 캐시할 수 있어 같은 문서 안 자동 재시도는 실효성이 없다는 점을 근거로, ko/en 모두 연결 확인·페이지 새로고침·PDF 재선택을 안내하는 명시적 버튼을 제공한다. 자동 재시도 폭주는 없고 새로고침 전 선택은 폐기되며, 재선택 뒤 preview/save가 성공한다. 런타임 URL은 하나만 유지하고 worker fallback·취소 계약도 보존했다. 최초 요청을 중단한 실제 브라우저 회귀에서 내부 이름·원시 경로 노출 0, 고유 표시 URL 1개, 복구 뒤 미리보기·저장 성공을 확인했다.
+
+**R-B 배포 실행 자산 계측** — 측정 순서를 Vite build 뒤 현재 정적 생성기로 69개 정적 페이지까지 생성한 다음 inventory하는 절차로 고정하고, baseline/current 모두 같은 측정기·생성 절차를 쓰되 소스 root만 바꾼다. ko/en 같은 내용의 생성 `.js/.mjs` 경로는 모두 deployment inventory에 남기고 gzip은 SHA-256마다 한 번만 부과한다. raw network 관측 집합은 기대 inventory의 `vendor/**`·`runtime/` 제외 규칙과 분리해, 제외 자산이 실제 로드돼도 누락을 숨기지 않는다. 정적 생성 뒤 늦게 추가한 `.mjs`가 양방향 inventory guard에서 실패하는 음성 대조도 추가했다.
+
+S3 기준선 `5bc6854175331bdd73b267784d9633cdccda8446`을 임시 소스에 복원하고 당시 vendor 생성물을 준비한 뒤 재측정했다. baseline은 고유 실행 SHA 83개/배포 경로 99개, current는 89개/105개이고 양쪽 `missingFromInventory=[]`, `missingFromDeployment=[]`, 중복 경로 16개다. scoped 최종 gzip 증분은 entry **7,288B**, affected PDF **58,423B**, shared **2,095B**, app **68,529B**, CSS **300B**로 고정 상한 **20,480/61,440/30,720/81,920/10,240B**를 모두 통과했다. override `{}`·multiplier 1이며 상한은 바꾸지 않았다. full 비교도 5종 통과했고 affected 전체는 기준선보다 450,647B 작았다. 보고서 SHA-256은 baseline `ffc52532…`, scoped `64ee7a82…`, full `94201b35…`이다.
+
+**R-C F2 오류 대비** — 잘못된 워터마크 텍스트 textarea와 empty-text notice를 light의 `red-800`, dark의 `red-200`으로 올리고 기존 F2 marker·공용 debt·판정 상한은 건드리지 않았다. ko/en×light/dark 네 settled error 상태를 실제 Axe 대상으로 등록하고 계산 스타일 대비를 별도 fail-closed 수치로 저장한다. 실측은 light textarea **7.6428:1**/notice **6.9595:1**, dark textarea **8.9891:1**/notice **8.3795:1**로 모두 4.5:1 이상이다. 위반 0, F2 incomplete 0, 상속 incomplete 253, 외부 요청 0이며 review 전 light textarea 4.36, light notice 3.98, dark notice 4.20의 실패를 해소했다.
+
+**R-D 128MiB 응답성 재판정** — 12개 입력을 각각 새 browser context에서 3회 재측정했다. 128MiB 실제 최대 heartbeat는 **347.185/161.810/154.410ms**로, 3회 중 1회가 목표 200ms를 넘었으므로 **목표 미달**로 판정한다. 중앙 총 처리시간/heartbeat 곡선은 16MiB **1,796.767/142.395ms**, 32MiB **2,143.507/57.600ms**, 64MiB **3,120.417/88.705ms**, 128MiB **5,780.848/161.810ms**이고 총시간 비율 3.217로 준선형이다. 최대 breach의 phase는 saving이며 long task는 169ms였다. 원인은 pdf-lib가 단일 128MiB stream을 `object.copyBytesInto`에서 분할 불가능하게 직렬화하는 구간이라 기존 `objectsPerTick` 양보로 내부를 쪼갤 수 없다. 안전한 200ms 확정은 저장기 재설계 없이는 할 수 없어 통과로 주장하지 않는다. 대신 saving 상태를 먼저 그린 뒤 event loop에 양보하고 직렬화를 시작하도록 해 세 번 모두 사용자 진행 표시가 실제 paint됐으며, 취소 UI **115.170ms**, 늦은 결과 0·재시도 성공, Worker 생성 불가 fallback도 preview/download 성공·route error 0을 유지했다. 원보고서 SHA-256은 `439c0c51…`이다.
+
+**검증·실패 이력** — `npx tsc -b` 진단 0, unit **320/320**, production/local-QA build 각 2,847 modules·정적 69페이지, PDF finish browser와 PDF.js/Poppler 골든 **160/160**, legacy oracle 총 diff 0, watermark interaction visual **8/8**을 통과했다. 의존 버전을 6.2.109로 바꾼 격리 음성 대조는 Vite 전에 정확히 fail-closed했다. 도중 full unit 1회는 빈 `A11Y_PAGE_IDS` 처리 결함, scoped a11y 1회는 보고서 디렉터리 미생성, 표시 복구 smoke 1회는 새로고침 뒤 여러 realm 요청을 정확히 2회로 가정한 테스트 결함으로 실패했고 각각 harness를 고쳐 최종 재실행을 통과했다. baseline 준비도 현행 SEO API와 baseline 생성기의 불일치, 당시 video runtime 미생성으로 두 번 실패한 뒤 현재 생성 절차와 baseline vendor 준비를 명시해 성공했다.
+
+지시서에 따라 merge-time의 full `test:browser`, `test:new-tools`, `test:utilities`, `test:office`, `test:qr-bulk`, `test:qr-font-render`, `test:recovery`, `test:static`, full a11y, `css:orphans`, `legacy:manifest`, `tool-registry-routes`는 이번 범위에서 유예한다. 상세 보고서·JSON·캡처는 `/tmp/worklazy-u4-4-fix4/`에 보존한다. — Codx
+
 ### U4-4 fix-3 — PDF 표시 런타임 공유·배포 실행 자산 계측 정정 (Codx)
 
 **기각 사유·구성 수리** — fix-2의 “PDF.js 표시 런타임 중복 없음”과 번들 5종 통과 기록은 `.mjs`를 집계하지 않은 측정에 기대어 **기각**한다. 실제 fix-2 산출물은 main이 full `pdf.mjs`를 정적 번들하고 thumbnail worker가 별도 `pdf.min.mjs` URL 자산을 로드해 표시 런타임이 두 벌이었다. fix-3에서 main의 정적 import를 제거하고 main과 전용 worker 모두 고정 패치된 full `pdf.mjs?url`을 동적 import하게 해 **하나의 배포 자산** `assets/pdf-CCjkBPdx.mjs`를 공유한다. OffscreenCanvas worker는 유지하고, PDF.js 내부 worker `pdf.worker.min-CHFwMXne.mjs`도 유지한다.

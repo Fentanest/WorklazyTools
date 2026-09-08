@@ -12,6 +12,7 @@ import { gzipSync } from "node:zlib";
 const configuredBase = process.env.VITE_BASE_PATH || "/";
 const base = `${configuredBase.startsWith("/") ? "" : "/"}${configuredBase.replace(/\/$/, "")}/`;
 const moduleAttributionOutput = process.env.BUNDLE_MODULE_ATTRIBUTION_OUTPUT;
+const bundleSourceRoot = process.env.BUNDLE_SOURCE_ROOT ? path.resolve(process.env.BUNDLE_SOURCE_ROOT) : undefined;
 
 const browserNodePolyfills = () => nodePolyfills({
   globals: {
@@ -55,7 +56,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": bundleSourceRoot ? path.join(bundleSourceRoot, "src") : fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   worker: {

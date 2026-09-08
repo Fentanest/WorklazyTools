@@ -6,7 +6,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  budgetLimits, compareWithBaseline, isDeploymentExecutionAsset, measureOutput, resolveBudgetLimits, selectAffectedRoutes,
+  assertMeasuredDeploymentExecutionAssets, budgetLimits, compareWithBaseline, isDeploymentExecutionAsset,
+  isJavaScriptExecutionPath, measureOutput, resolveBudgetLimits, selectAffectedRoutes,
 } from "../../scripts/measure-bundle-budget.mjs";
 import {
   BUNDLE_MEASUREMENT_SCHEMA_VERSION,
@@ -191,6 +192,10 @@ test("deployment execution inventory includes js and mjs outside pinned vendor a
   for (const file of ["vendor/tool.js", "vendor/tool.mjs", "tools/video/runtime/core.js", "runtime/core.mjs", "assets/style.css"]) {
     assert.equal(isDeploymentExecutionAsset(file), false, file);
   }
+  for (const file of ["vendor/tool.js", "tools/video/runtime/core.mjs", "assets/main.js"]) {
+    assert.equal(isJavaScriptExecutionPath(file), true, `raw network census must retain ${file}`);
+  }
+  assert.equal(isJavaScriptExecutionPath("assets/style.css"), false);
 });
 
 test("largest-remainder allocation is integer, deterministic, and conserves the chunk gzip size", () => {
@@ -273,6 +278,10 @@ test("measurement validates selected routes against the actual build graph", () 
     writeFileSync(path.join(root, "output/assets/thumbnail.worker.js"), "import('/assets/pdf.mjs')");
     writeFileSync(path.join(root, "output/assets/pdf.mjs"), "export const display = true;");
     writeFileSync(path.join(root, "output/assets/pdf-copy.mjs"), "export const display = true;");
+    mkdirSync(path.join(root, "output/ko/generated"), { recursive: true });
+    mkdirSync(path.join(root, "output/en/generated"), { recursive: true });
+    writeFileSync(path.join(root, "output/ko/generated/static.js"), "self.generated = true;");
+    writeFileSync(path.join(root, "output/en/generated/static.js"), "self.generated = true;");
     writeFileSync(path.join(root, "output/assets/not-executable.txt"), "ignored");
     writeFileSync(path.join(root, "output/.vite/manifest.json"), JSON.stringify(manifest));
     const options = { sourceRoot: root, directory: path.join(root, "output"), routes: [routes[0]], moduleChunks };
@@ -284,8 +293,17 @@ test("measurement validates selected routes against the actual build graph", () 
     assert.deepEqual(worker.routeOwners, [routes[0]], "worker URL dependencies must inherit their route owner");
     assert.deepEqual(display.routeOwners, [routes[0]], "mjs URL imports must inherit ownership through the worker");
     assert.deepEqual(display.paths.sort(), ["assets/pdf-copy.mjs", "assets/pdf.mjs"], "identical deployment assets must be SHA-deduplicated");
+    const localizedGenerated = current.files.find(({ paths }) => paths.includes("ko/generated/static.js"));
+    assert.deepEqual(localizedGenerated.paths.sort(), ["en/generated/static.js", "ko/generated/static.js"], "locale copies stay inventoried while identical bytes are charged once");
     assert.ok(current.moduleInventory.some(({ file, attribution }) => file === "assets/pdf.mjs" && attribution === "opaque"));
     assert.equal(current.files.some(({ paths }) => paths.includes("assets/not-executable.txt")), false);
+    assert.doesNotThrow(() => assertMeasuredDeploymentExecutionAssets(current, path.join(root, "output")));
+    writeFileSync(path.join(root, "output/ko/generated/late-static.mjs"), "export const late = true;");
+    assert.throws(
+      () => assertMeasuredDeploymentExecutionAssets(current, path.join(root, "output")),
+      /late-static\.mjs/,
+      "a JS/MJS file created after measurement must fail the deployment inventory guard",
+    );
     assert.throws(() => measureOutput({ ...options, routes: ["typo"] }), /unknown or non-lazy/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

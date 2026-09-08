@@ -5,7 +5,9 @@ import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, asser
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
-    results: pages.map(({ id }) => ({ id, violations: [], incomplete: [] })) };
+    results: pages.map(({ id, scenario }) => ({ id, violations: [], incomplete: [], ...(scenario === "pdf-watermark-empty-text" ? {
+      settledContrast: [{ target: "invalid-textarea", ratio: 4.5 }, { target: "empty-text-notice", ratio: 4.5 }],
+    } : {}) })) };
 }
 
 test("a11y zero passes; one violation fails even if stored summary still says zero", () => {
@@ -24,6 +26,20 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.ok(pages.some(({ id }) => id === "hwp-editor"));
   assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-finish")).map(({ id }) => id), ["pdf-finish-ko", "pdf-finish-mobile-ko", "pdf-finish-en"]);
   assert.ok(pages.some(({ id }) => id === "pdf-watermark-ko"));
+  const errorStates = pages.filter(({ scenario }) => scenario === "pdf-watermark-empty-text");
+  assert.equal(errorStates.length, 4);
+  assert.deepEqual([...new Set(errorStates.map(({ colorScheme }) => colorScheme))].sort(), ["dark", "light"]);
+  assert.deepEqual([...new Set(errorStates.map(({ locale }) => locale))].sort(), ["en-US", "ko-KR"]);
+});
+
+test("a11y watermark error-state contrast is required for every locale and theme without raising limits", () => {
+  const missing = report();
+  delete missing.results.find(({ id }) => id === "pdf-watermark-error-en-dark")?.settledContrast;
+  assert.throws(() => assertAccessibilityResults(missing), /contrast is missing/);
+
+  const low = report();
+  low.results.find(({ id }) => id === "pdf-watermark-error-ko-light").settledContrast[1].ratio = 4.49;
+  assert.throws(() => assertAccessibilityResults(low), /below 4\.5:1/);
 });
 
 test("a11y exception is exactly one upstream iframe with explicit owner and reason", () => {

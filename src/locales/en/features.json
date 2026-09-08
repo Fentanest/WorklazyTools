@@ -855,6 +855,8 @@
         "unableToContinue": "Unable to continue."
       },
       "pdfPreview": {
+        "displayFilesUnavailable": "Files needed to display the PDF could not be loaded. Check your connection, refresh the page, and choose the PDF again.",
+        "refreshPage": "Refresh page",
         "encryptedOrPermissionRestrictedPdfsCannotBeEdited": "Encrypted or permission-restricted PDFs cannot be edited. Try again with an unlocked copy.",
         "unableToRenderThePdfPreview": "Unable to render the PDF preview.",
         "unableToDisplayThePdfPreview": "Unable to display the PDF preview.",

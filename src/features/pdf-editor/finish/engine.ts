@@ -784,6 +784,10 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       await decorateDocument(input, analyzed.plans, analyzed.warnings, completed, total);
       throwIfAborted(input.signal);
       report(input, "saving", fileIndex, input.files.length);
+      // Let the saving state paint before pdf-lib enters its indivisible
+      // serialization step. That step cannot be interrupted synchronously, so a
+      // large document must at least retain visible, truthful progress.
+      await yieldToEventLoop();
       throwIfAborted(input.signal);
       const bytes = await document.save();
       throwIfAborted(input.signal);
