@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 
-import { parseSpreadsheetInput, spreadsheetHeaders } from "../spreadsheet-core/inputAdapter.ts";
+import { parseSpreadsheetInput } from "../spreadsheet-core/inputAdapter.ts";
 import { compareSpreadsheetPair } from "./compareEngine.ts";
+import { buildExcelCompareInspection } from "./inspection.ts";
 import { buildExcelCompareReport } from "./report.ts";
 import { assertGeneratedXlsxReport } from "./reportIntegrity.ts";
 import type { ExcelCompareInspection, ExcelComparePairOptions, ExcelComparePairResult } from "./types.ts";
@@ -14,6 +15,7 @@ type Request = {
   buffer: ArrayBuffer;
   csvEncoding?: "auto" | "utf-8" | "euc-kr";
   headerRows?: number[];
+  detectHeader?: boolean;
 } | {
   type: "compare";
   leftName: string;
@@ -32,19 +34,12 @@ async function handle(request: Request) {
     if (request.type === "inspect") {
       progress(5, "READING");
       const book = await parseSpreadsheetInput(request.fileName, request.buffer, { csvEncoding: request.csvEncoding });
-      const result: ExcelCompareInspection = {
-        fileName: request.fileName,
-        format: book.format,
-        supportsStyleComparison: book.supportsStyleComparison,
-        sheets: book.sheets.map((sheet) => ({
-          name: sheet.name,
-          rowCount: sheet.rowCount,
-          columnCount: sheet.columnCount,
-          headerRows: (request.headerRows?.length ? request.headerRows : [1])
-            .filter((row) => row >= 1 && row <= Math.max(1, sheet.rowCount))
-            .map((row) => ({ row, values: spreadsheetHeaders(sheet, row).map((header) => header.name) })),
-        })),
-      };
+      const result: ExcelCompareInspection = buildExcelCompareInspection(
+        request.fileName,
+        book,
+        request.headerRows,
+        request.detectHeader !== false,
+      );
       progress(100, "READY");
       worker.postMessage({ type: "result", result });
       return;

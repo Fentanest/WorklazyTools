@@ -293,7 +293,7 @@ test("key comparison implements duplicate error, occurrence and secondary-key po
   const duplicateError = baseOptions();
   duplicateError.mode = "key";
   duplicateError.key = { leftColumns: [1], rightColumns: [1], secondaryLeftColumns: [], secondaryRightColumns: [], duplicatePolicy: "error" };
-  assert.equal(compareSpreadsheetPair(left, right, duplicateError).summary.duplicate, 4);
+  assert.equal(compareSpreadsheetPair(left, right, duplicateError).summary.duplicate, 1);
 
   const occurrence = structuredClone(duplicateError);
   occurrence.key!.duplicatePolicy = "occurrence";
@@ -305,7 +305,7 @@ test("key comparison implements duplicate error, occurrence and secondary-key po
   const secondaryResult = compareSpreadsheetPair(left, right, secondary);
   assert.equal(secondaryResult.summary.duplicate, 0);
   assert.equal(secondaryResult.summary.ambiguous, 0);
-  assert.ok(secondaryResult.records.some((item) => item.status === "changed" && item.key.includes("string:y")));
+  assert.ok(secondaryResult.records.some((item) => item.status === "changed" && item.key.includes("string:y") && item.displayKey === "A | y"));
 });
 
 test("normalization preserves leading-zero text and missing formula caches while honoring numeric opt-in elsewhere", () => {

@@ -4,6 +4,12 @@ export type ExcelCompareMode = "position" | "key" | "reconcile";
 export type DuplicateKeyPolicy = "secondary" | "occurrence" | "error";
 export type FormulaComparisonMode = "formula" | "cached" | "both";
 export type ExcelCompareStatus = "matched" | "changed" | "added" | "removed" | "duplicate" | "ambiguous" | "unmatched" | "error";
+export type ExcelCompareHeaderSuggestionReason = "suggested" | "uncertain" | "none";
+
+export interface ExcelCompareHeaderSuggestion {
+  row: number | null;
+  reason: ExcelCompareHeaderSuggestionReason;
+}
 
 export interface ExcelCompareNormalizationOptions {
   trimWhitespace: boolean;
@@ -54,8 +60,7 @@ export interface ExcelComparePairOptions {
   alignmentCellBudget?: number;
 }
 
-export interface ExcelCompareRecord {
-  status: ExcelCompareStatus;
+interface ExcelCompareRecordBase {
   leftRow: number | null;
   rightRow: number | null;
   leftColumn: number | null;
@@ -66,6 +71,32 @@ export interface ExcelCompareRecord {
   change: string;
   reason: string;
 }
+
+export interface ExcelCompareDuplicateRecord extends ExcelCompareRecordBase {
+  status: "duplicate";
+  leftRow: null;
+  rightRow: null;
+  leftColumn: null;
+  rightColumn: null;
+  leftValue: "";
+  rightValue: "";
+  displayKey: string;
+  leftRows: number[];
+  rightRows: number[];
+  leftValues: string[];
+  rightValues: string[];
+}
+
+export interface ExcelCompareStandardRecord extends ExcelCompareRecordBase {
+  status: Exclude<ExcelCompareStatus, "duplicate">;
+  displayKey: string;
+  leftRows?: never;
+  rightRows?: never;
+  leftValues?: never;
+  rightValues?: never;
+}
+
+export type ExcelCompareRecord = ExcelCompareDuplicateRecord | ExcelCompareStandardRecord;
 
 export interface ExcelCompareSummary {
   matched: number;
@@ -100,6 +131,7 @@ export interface ExcelCompareInspection {
     rowCount: number;
     columnCount: number;
     headerRows: Array<{ row: number; values: string[] }>;
+    headerSuggestion?: ExcelCompareHeaderSuggestion;
   }>;
 }
 

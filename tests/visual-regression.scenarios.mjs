@@ -186,6 +186,24 @@ const interactionDefinitions = Object.freeze({
       ],
       assertSelector: "[data-testid='excel-pair-files']",
     }),
+    Object.freeze({
+      stateId: "interaction-duplicate-result",
+      profiles: fullProfiles,
+      profileReductionReason: "No reduction: the grouped duplicate result is new user-facing output and keeps the full locale, theme, and viewport product.",
+      actions: [
+        { type: "upload", selector: "[data-testid='excel-compare-page'] input[type='file']", fixture: { kind: "inline-file", fileName: "visual-duplicate-left.csv", mimeType: "text/csv", contents: `Key,Value\nA,${"left-value-".repeat(24)}\nA,left-tail` } },
+        { type: "wait", selector: "[data-testid='excel-pair-files'] > div:first-child [data-testid='excel-selected-file']" },
+        { type: "upload", selector: "[data-testid='excel-compare-page'] input[type='file']", fixture: { kind: "inline-file", fileName: "visual-duplicate-right.csv", mimeType: "text/csv", contents: "Key,Value\nA,right-only" } },
+        { type: "wait", selector: "[data-testid='excel-pair-files'] > div:nth-child(2) [data-testid='excel-sheet-fields']" },
+        { type: "click", selector: "[data-testid='excel-compare-mode-grid'] button:nth-child(2)" },
+        { type: "wait-enabled", selector: "[data-testid='excel-compare-actions'] [data-ui-component='primary-button']" },
+        { type: "click", selector: "[data-testid='excel-compare-actions'] [data-ui-component='primary-button']" },
+        { type: "wait", selector: "[data-testid='excel-duplicate-row']", timeoutMs: 240_000 },
+        { type: "click", selector: "[data-testid='excel-duplicate-toggle'][data-side='left']" },
+        { type: "scroll-into-view", selector: "[data-testid='excel-duplicate-list'][data-side='left']", offset: -88 },
+      ],
+      assertSelector: "[data-testid='excel-duplicate-list'][data-side='left']",
+    }),
   ]),
   "excel-cleaner": Object.freeze([
     Object.freeze({

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { pages, accessibilityExceptions, assertAccessibilityResults } from "../accessibility-audit.mjs";
+import { pages, accessibilityExceptions, assertAccessibilityResults, selectAccessibilityPages } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
@@ -20,8 +20,23 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.throws(() => assertAccessibilityResults(missing), /registration/);
   const duplicate = report(); duplicate.results[1] = duplicate.results[0];
   assert.throws(() => assertAccessibilityResults(duplicate), /registration/);
-  assert.deepEqual(pages.filter(({ viewport }) => viewport).map(({ path, viewport }) => [path, viewport.width]), [["/ko", 412], ["/ko/tools", 412]]);
+  assert.deepEqual(pages.filter(({ id }) => ["home-mobile-ko", "tools-mobile-ko"].includes(id)).map(({ path, viewport }) => [path, viewport?.width]), [["/ko", 412], ["/ko/tools", 412]]);
   assert.ok(pages.some(({ id }) => id === "hwp-editor"));
+  const duplicateResults = pages.filter(({ setup }) => setup === "excel-duplicates");
+  assert.equal(duplicateResults.length, 8);
+  assert.deepEqual(new Set(duplicateResults.map(({ language }) => language)), new Set(["ko", "en"]));
+  assert.deepEqual(new Set(duplicateResults.map(({ colorScheme }) => colorScheme)), new Set(["light", "dark"]));
+  assert.deepEqual(new Set(duplicateResults.map(({ viewport }) => viewport ? "mobile" : "desktop")), new Set(["desktop", "mobile"]));
+});
+
+test("A11Y_ONLY=excel-compare selects the base page and all eight duplicate-result states", () => {
+  const selected = selectAccessibilityPages("excel-compare");
+  assert.equal(selected.length, 9);
+  assert.equal(selected[0].id, "excel-compare");
+  assert.ok(selected.slice(1).every(({ id }) => id.startsWith("excel-compare-duplicates-")));
+  assert.throws(() => selectAccessibilityPages("missing-page"), /did not match/);
+  const scoped = { summary: { violations: 0 }, externalRequests: [], results: selected.map(({ id }) => ({ id, violations: [] })) };
+  assert.equal(assertAccessibilityResults(scoped, { registeredPages: selected }).violations, 0);
 });
 
 test("a11y exception is exactly one upstream iframe with explicit owner and reason", () => {

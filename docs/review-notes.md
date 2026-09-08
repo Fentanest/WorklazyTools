@@ -2,6 +2,157 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-08
+
+### Excel 중복키·머리글 S4 — 최종 통합 회귀 (Codx)
+
+**게이트·범위** — `/tmp/worklazy-xd`, `excel-dupkey-20260907`, 시작 HEAD `657dec8bb6b7479ee93e54708544aef7b559ebc1`과 clean 상태, S0 bundle 기준 SHA-256 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`를 확인했다. 대상에는 ignored `docs/jobs/todo`가 없어서 S0/S3가 보존한 19개 열린 계획서 스캔과 v3 정본 사본을 사용했고 상반 지시는 0건이었다. 실행 규칙 로드 외에는 원 워킹트리를 조사하지 않았고 `/tmp/worklazy-xr*`, `/tmp/worklazy-dc-impl`은 읽지 않았으며, 포트는 4350~4351 strict, 빌드·브라우저는 heap 4GiB·직렬로 실행했다. 새 기능, main 병합·push·배포, BL01~BL05 수리는 범위에 넣지 않았다.
+
+**통합 결함·시각 판정** — QA 전체 시각 회귀 첫 실행은 **178/183**이었다. 실패 5장은 S3에서 홈/전체 도구의 Excel 카드 설명·태그를 머리글 후보·그룹 중복키 의미로 바꾼 뒤 공용 desktop 기준선을 갱신하지 않은 통합 누락이었다. 실제/기준/diff를 직접 열어 문구만 의도대로 바뀌고 정렬·토글·잘림 파손이 없음을 확인한 뒤 아래 5장만 첫 실행 actual로 갱신했다: `home-default__initial__{ko,en}__{light,dark}__desktop.png` 4장, `hwp-editor-empty__redirect-en-tools__en__dark__desktop.png` 1장. 전체를 다시 실행해 **183/183** 재일치했고 Excel 중복 결과 ko/en × desktop/mobile × light/dark 8상태도 모두 포함됐다. 기준선 reset·허용치 변경·결함 화면 승인은 없었다.
+
+**전체 회귀와 스모크 경계 정정** — S4에서 타입 진단 0, unit **396/396**, production/QA build 각 2,836 modules·정적 61페이지, production static 104문서, browser 전체, Excel 비교·Cleaner, QR bulk, new-tools, utilities, office, recovery **147사례**, CSS orphan 0, registry 20도구, diff check 명령이 종료 코드 0이었다. 다만 `npm run test:new-tools`의 종료 코드 0은 모든 내부 세부 경로가 실행됐다는 뜻이 아니다. 그 로그 80행은 이 Chrome 호스트가 호환 경로를 제공하지 않아 **Dolby Vision base-layer 실제 streaming을 건너뛰었다**고 명시한다. 해당 실행에서 fallback 결과 안내와 deterministic capability unit은 통과했지만, 실제 base-layer streaming 및 이어지는 target-encode 경로는 실행하지 않았다. 이는 기존 기능·호스트 제약의 경계이며 이 단계에서 영상 기능을 수리하거나 미실행 경로를 통과로 바꾸지 않는다.
+
+**정본 회귀 5군의 명령·단언 연결** — ① 중복 엔진은 S4의 `npm run test:unit`·`npm run test:excel-compare`가 2:1·2:0·0:2·1:1, 빈 키·정규화·복합키·복수 쌍·그룹 순서를 확인했고, fix-1의 `node --experimental-strip-types /tmp/worklazy-xd-s4-fix1/probes/shape-23.mjs`가 빠졌던 실제 CSV **2:3**을 중복 1그룹·좌 행 `[2,3]`·우 행 `[2,3,4]` 및 좌우 전체 값 보존으로 보완했다. ② 결과 화면은 S4의 `npm run test:excel-compare`가 초기 500/총 501그룹, 접힌 DOM 0, 마지막 값·원본 행번호 검색, 좌 50→100과 우 독립 전개, 0건 버튼 0, dialog·Escape 초점 반환을 단언했다. ③ 보고서는 S4의 `npm run test:unit`·`npm run test:excel-compare` 및 사용자 XML probe가 16,000/16,001·32,767/32,768·LF/CRLF·surrogate 분할, 9시트·13열·Summary/Parameters·주입 문자열, 직접 2+ZIP 2 재개방과 유한 폭 12~48을 확인했다. ④ 감지는 S4 `npm run test:unit`이 원형 23 및 6형식×23=138 기대표와 controller의 `finish(old)=false`·`cancelAll`·pre-abort를 확인했지만 실제 브라우저 완료 역전·unmount는 아니었다. fix-1의 `node /tmp/worklazy-xd-s4-fix1/probes/header-lifecycle-browser.mjs`가 오래된 5행 완료 뒤에도 새 6행과 busy를 유지하고 새 완료 뒤에만 busy를 해제하며, 보류 응답 상태에서 `/en/tools`로 unmount한 뒤 worker 종료 4→5·늦은 응답 무효·오류 0을 실제 브라우저에서 확인했다. ⑤ 결과 상태는 S4 `npm run test:visual`과 `A11Y_MAX_TOTAL=0 npm run test:a11y`가 ko/en×desktop/mobile×light/dark 8개 실제 중복 결과 상태를 포함해 visual 183/183·자동 violation 0을 냈고 빈 상태로 대체하지 않았다.
+
+**실행 주체 분리** — S3의 astra 독립 검수도 과거에 `node ../probes/header-browser.mjs`로 완료 역전·stale finally·unmount 단언까지 도달했으나 뒤의 캡처 오류 때문에 명령 전체는 exit 1이었고, S4 astra 검수자가 사본을 `env -u HEADER_PHASE node /tmp/worklazy-xd-s4-review/lifecycle/probes/header-browser.mjs`로 보충 실행해 exit 0을 얻었다. 둘은 **검수자 실행**이며 S4 작성자의 실행으로 소급하지 않는다. 원 S4 작성자 실행은 `env HEADER_PHASE=user node /tmp/worklazy-xd-s4/probes/header-browser.mjs`여서 구조화 출력이 `profiles=0`, `races=0`, `user=2`였고 완료 역전·unmount를 건너뛰었다. 위 fix-1 두 명령만 이번 Codx 보완 실행이며 원출력·구조화 결과는 `/tmp/worklazy-xd-s4-fix1/evidence/`에 보존했다.
+
+**사용자 파일** — `/tmp/worklazy-userfiles/`의 읽기 전용 사본만 사용했다. 수동 1행/B는 중복 **1그룹**, matched/changed/added **713/37/48**. 두 파일 자동 후보는 모두 **4행**이고 4행/B는 **0그룹·703/37/48**, 4행/A는 **6그룹·486/134/31**이다. 표시 키 1~6은 각각 왼쪽 2행·오른쪽 2행 배열이며 첫 그룹은 좌 `[5,73]`, 우 `[5,79]`; 화면에서 좌2→우2를 독립 전개해 DOM 4항목을 확인했다. ko/en 다운로드는 각 9시트, Duplicates 13열, 전체 폭 **12~48**, ZIP 안 XML/rels 각 **18개**가 ElementTree로 재개방됐다. 사용자명 포함 캡처와 보고서는 `/tmp/worklazy-xd-s4/evidence/private/`에만 보존하고 저장소에 넣지 않았다.
+
+**접근성 분리 정정** — `A11Y_MAX_TOTAL=0` 전체 16페이지는 자동 위반 0·외부 요청 0이지만, axe `incomplete` **1,274노드**(color-contrast 1,271·aria-prohibited-attr 3)는 자동 통과로 세지 않았다. 이 가운데 안정 selector `[data-testid=excel-duplicate-row] .max-w-56`인 모바일 ko/en×light/dark **4노드**와 `[data-testid=excel-duplicate-toggle][data-side=right] span`인 dark 모바일 ko/en **2노드**는 공용 화면 상속이 아니라 S1~S3가 만든 새 결과 노드다. 원 S4의 6종×8프로필 48측정은 왼쪽 toggle과 대표 원본행 항목 중심이어서 이 6노드를 덮지 못했다. astra 검수자의 보충 측정은 위 두 안정 selector를 ko/en×desktop/mobile×light/dark **8프로필에서 각각 측정한 16개 값**이며 모두 기준을 넘고 최저가 **12.799508:1**이므로 두 새 노드 종류는 해결로 판정한다. 이 보충값은 검수자 실행 증거이며 Codx 측정으로 소급하지 않는다. 나머지 incomplete **1,268노드**는 공용 shell·도구 카드·기존 표/guide/footer·모바일 탭과 기존 ARIA 보류로 분리해 UI 재설계 계획 소유의 공용 부채로 유지하며 공용 UI를 수리하지 않는다. BL01·BL02·BL03·BL05는 낮은 우선순위(P3), 감지 정확도에 직접 영향을 주는 BL04는 기존 높은 우선순위와 `spreadsheet-core` 귀속·실제 오류 타입 보존 방침을 유지한다.
+
+**제품 규칙·번들·보존** — ko/en features·guide/FAQ·tools·SEO/static 입력의 동시 변경을 unit/static/route 검사로 재확인했고 URL·canonical·hreflang·사이트맵 집합, 광고 예외, 서버 전제, 의존성은 바뀌지 않았다. 실행 확장자 전역 광고 참조의 명시적 allowlist unit을 포함해 396/396이 통과했고 화면 스모크의 내부 identity/reason/error 노출 배열은 0이다. Parameters 계약명은 XLSX metadata에만 남는다. S0 대비 gzip 증분은 entry **+2,242B**, affected routes **+4,008B**, shared **+1,766B**, app 전체 **+8,016B**, CSS **+146B**로 5종 예산을 모두 통과했으며 override·multiplier 변경은 없다.
+
+**규칙 19 차이** — `VITE_LOCAL_QA=1` 빌드에서 결과 화면을 직접 열고 183장 전체 캡처, 사용자 ko/en 결과·머리글 16상태 캡처를 `/tmp/worklazy-xd-s4/evidence/`에 보존했다. 정본은 Gemini 직접 검수를 요구하지만 이번 S4 지시가 이를 Codex 실측+캡처 보존 및 Claude 확인으로 대체했으므로 Gemini가 직접 화면을 본 것으로 기록하지 않는다. 최초 상세 보고 `/tmp/worklazy-xd-s4/REPORT.md`의 위 과장·귀속 오류는 fix-1 보고 `/tmp/worklazy-xd-s4-fix1/REPORT.md`가 정정하며, 누락 실행 원출력도 같은 fix-1 산출물에 둔다. — Codx
+
+### Excel 중복키 S3 — 보수적 머리글 후보·수동 우선 상태 (Codx)
+
+**착수 게이트·범위** — 지정 worktree `/tmp/worklazy-xd`, 브랜치 `excel-dupkey-20260907`, 시작 HEAD `bdd09a7d6bc10da74db8fd3b2b8565da9c3f054e`와 clean 상태를 확인했다. 대상에는 열린 `docs/jobs/todo` 계획서가 없어 S0에 보존된 19개 열린 계획서 스캔과 같은 기준의 S2 최종 검수 통과 문서를 교차해 충돌 없음으로 판정했다. 명시적으로 접근 금지된 원 워킹트리는 live 재스캔하지 않았다. 이번 단계는 S3 머리글 감지와 그 화면·하네스만 포함하며 S1 그룹 엔진·보고서와 S2 결과 소비 의미를 바꾸지 않았다. main 병합·push·배포와 S4 통합 검증은 수행하지 않았다.
+
+**감지 판정** — 공용 어댑터의 raw cell type·formula·error·merge 정보로 각 시트의 물리 1~20행만 후보로 보고 아래 최대 5행, 즉 25행까지만 지지도를 읽는다. 값은 null이 아니고 trim 뒤 비어 있지 않은 셀만 센다. 가로 병합 행은 건너뛰고, 세로 병합이 아닌 한 셀 제목 행은 다음 5행에 두 셀 이상 행이 있을 때만 건너뛴다. 그 뒤 처음 만난 행 하나만 `2셀 이상`, 비수식·비오류 문자열 비율 `>=1/2`, trim 값 중복 없음, 후보 열의 40% 이상을 채운 아래 행 2개 이상, 세로 병합 없음으로 판정하며 하나라도 어기면 뒤 행을 찾지 않고 `uncertain`으로 멈춘다. 후보가 없을 때만 `none`이다. `suggested`만 정수 행을 가지며 나머지는 null이다.
+
+고정 원형 22패턴은 **suggested 12·uncertain 8·none 2**이고, 제안 12건 가운데 필터·설명·요약·머리글 없는 전부 텍스트·세 단계 비세로 병합의 **의미상 오탐 5건**을 성공으로 세탁하지 않고 fixture에 표시했다. 세로 병합 접두 사례를 23번째로 추가해 첫 한 셀 행에서 즉시 `uncertain`이 되는 것을 고정했다. XLSX·XLSM·BIFF8 XLS·XLSB·SpreadsheetML·CSV의 명시적 기대표 **138조합**을 실제 직렬화→각 형식 파서→감지로 통과했다. CSV는 병합 정보 소실과 숫자 문자열화 때문에 merged-title, numeric-header-after-title, dense-numeric-header, three-level-no-vertical, vertical-prefix의 정확히 5건이 원형과 다르다. 다단 머리글 합성, 20행 밖 탐색, 단일 열 의미 판별, 숫자 머리글 확인, 머리글 없음 모드는 지원 범위에서 제외하고 0행 모드는 만들지 않았다.
+
+**초기 검사·상태 소유권** — 첫 inspect 응답이 모든 시트의 `headerSuggestion`과 요청 행∪제안 행의 열 이름을 함께 반환해 제안 행만을 위한 두 번째 parse/worker 왕복을 없앴다. 수동 행은 캐시에 있으면 재검사하지 않고, 없을 때만 `detectHeader:false`의 전체 parse 한 번으로 해당 행 열 이름을 병합한다. 파일·시트별 `{row, source=suggested|manual|fallback}`을 두 측에 독립 보관해 시트 전환은 수동→제안→1행 순으로 복원하고 수동 선택을 항상 우선한다. 파일 교체는 이전 선택·상태 안내를 지우며 좌우 교환은 파일, 검사 결과, 시트, 행 입력, 선택 source, 열 연결과 대사 열까지 함께 바꾼다.
+
+검사 요청은 pair+side별 AbortController와 단조 token, File identity를 함께 소유한다. 새 파일·파일 제거·쌍 제거·unmount는 현재 요청을 terminate하고, 완료·오류·finally는 네 소유 조건이 모두 현재일 때만 상태를 갱신한다. pre-abort는 `arrayBuffer`와 worker 생성을 모두 막고, 읽기 직후 abort도 worker 생성을 막는다. 수동 미캐시 검사 중에는 compare와 swap이 비활성화되며 stale finally가 새 busy를 지우지 않는다. 단위시험은 양측 독립 취소·cancelPair·cancelAll과 stale finish 거부를, Chrome 스모크는 교체 경합·쌍 삭제 후 오류 0과 worker 종료를 확인했다.
+
+**문구·화면 판정** — `suggested`는 “머리글 후보”, `uncertain/none`은 감지 성공으로 표현하지 않는 동일 1행 fallback, 수동은 선택 행으로 구분한다. 두 언어 모두 입력에 현재 판정 안내와 영구 도움말을 `aria-describedby`로 연결했고, 비동기 최초 결과만 polite status로 한 번 추가했다. 도움말은 선택 행 다음부터 비교하며 설명·필터·요약 선행 행에서는 실제 열 이름 행을 고르고 머리글이 없으면 맨 위에 열 이름 행을 추가하라는 복구 행동을 명시한다. ko/en 기능 문구·가이드·FAQ·도구 메타와 SEO 설명·featureList·static FAQ 입력을 함께 갱신했다. URL·canonical·hreflang·사이트맵 key, 광고 경계, 서버 전제와 의존성은 바꾸지 않았다.
+
+Chrome 스모크에서 두 XLSX는 최초 inspect 메시지 각 1개(`headerRows=[1]`, `detectHeader=true`)만 보내고 모두 4행 후보와 그 열 이름으로 준비됐다. 캐시된 수동 1행은 추가 메시지 0개, 미캐시 5행은 `headerRows=[5]`, `detectHeader=false` 한 번이며 수동 안내와 busy 상태를 유지했다. 두 번째 시트 제안 2행과 각 시트 수동 선택 복원, 좌우의 suggested/manual source 및 행 교환, 새 CSV가 이전 수동 5행을 물려받지 않고 자기 1행 제안을 쓰는 것까지 확인했다. Excel 전용 16개 시각 기준선을 ko/en·light/dark·desktop/mobile 결과 상태로 갱신하고 대표 3장을 직접 확인한 뒤 **16/16 재일치**했다. QA axe는 기본 화면과 중복 결과 8상태, 총 **9페이지 위반 0·외부 요청 0**이다. 자동 판정 보류 `incomplete`은 각 페이지 color-contrast 1건, 총 **9건**이며 통과로 세지 않았다.
+
+**사용자 사본 재현** — `/tmp/worklazy-userfiles/`의 두 원본 사본만 읽고 저장소 fixture나 산출물로 넣지 않았다. 두 `최종` 시트 모두 `{row:4, reason:suggested}`였다. 4행/B열은 중복 그룹 0·matched 703·changed 37·added 48, 4행/A열은 중복 그룹 6·matched 486·changed 134·added 31이었다. A열 표시 키 1~6은 각각 왼쪽 두 행과 오른쪽 두 행을 한 그룹으로 보존했고 재시작 행은 왼쪽 73, 오른쪽 79였다.
+
+**검증·후속 경계** — `./node_modules/.bin/tsc -b` 진단 0, unit **396/396**, production·`VITE_LOCAL_QA=1` build 각각 2,836 modules와 정적 61페이지, 강화 Excel 비교 스모크, Excel 전용 visual **16/16**, Excel 전용 axe **9페이지/위반 0**, `git diff --check`를 통과했다. 빌드와 브라우저 검사는 `NODE_OPTIONS=--max-old-space-size=4096` 및 `127.0.0.1:4350 --strictPort`에서 직렬 실행했다. 단계 지시대로 전체 browser, Excel Cleaner, QR bulk, production static, full a11y, bundle 측정, CSS orphan, registry는 S4로 미뤘으며 이번 S3 통과로 대신하지 않는다. 증거는 `/tmp/worklazy-xd-s3/evidence/`, 최종 보고서는 `/tmp/worklazy-xd-s3/REPORT.md`에 둔다. — Codx
+
+### Excel 중복키 S2 fix-3 — 포인터 위치·전 폭 초점 경계 (Codx)
+
+**R05 원인·입력 경계** — 기존 예약 보정은 결과 컨트롤이 `activeElement`인지 여부만 확인해 마우스 클릭·터치 탭으로 생긴 비가시 초점도 키보드 초점처럼 따라갔다. 151행 목록에서 50개를 더 불러오면 같은 버튼의 새 좌표를 향해 `instant` 세로 보정이 실행되어 읽던 위치가 9,725px 이동했다. 보정 예약과 각 실행 프레임에서 결과 컨트롤의 `:focus-visible`을 확인하고, 포인터·터치 이동·wheel·스크롤 키 입력이 들어오면 남은 예약을 취소하도록 입력 경계를 분리했다. 실제 mouse/touch의 펼침·50개 추가·닫힘은 모두 `ΔscrollY=0`, 제품 보정 호출 0이고, 추가 뒤 항목은 100개이며 새 첫 항목 Source row 52가 화면에 보였다. 키보드로 포커스한 경로의 `instant` 보정과 모달 Escape 초점 복귀는 유지했다.
+
+**R06 기존 결함 귀속·축 분리** — `(max-width: 820px)` 하나로 세로·가로 보정을 함께 막아 821px에서 왼쪽 toggle의 중앙이 결과 region 밖으로 나가던 문제는 부모 `ab00de3`에서도 ko/en × light/dark의 접힘·Enter 두 상태가 같은 좌표로 **8/8 실패**했으므로 fix-2 신규 회귀가 아닌 기존 미해소 결함으로 귀속한다. 가로 보정은 viewport 폭 제한 없이 실제 결과 scroll region의 client 경계에 적용하고, resize 때 현재 가시 초점을 다시 검사한다. 세로 보정은 매직 브레이크포인트 대신 `.mobile-header`·`.bottom-tabs`가 실제 DOM에 있고 계산 스타일이 `position: fixed`이며 표시·크기·viewport 교차 조건을 만족할 때만 각 실제 rect를 경계로 쓴다. 현재 819/820/821은 폭별 4프로필×18단계가 각각 **72/72 중앙 가시**이고, 활성 초점 820→821 resize 네 프로필은 각 1회 가로 보정·window 보정 0으로 라벨과 링을 region 안에 넣었다. 821에서는 고정 header/tab이 없으므로 세로 제품 보정은 없고, 1365×900도 72/72 중앙 가시·정상 상태 제품 보정 0이며 시각 기준선은 바뀌지 않았다.
+
+**R07 시작 모서리 우선** — 320px 결과 region의 client 폭은 260px, 4px 양쪽 여백을 뺀 사용 폭은 252px인데 펼친 왼쪽 toggle은 ko 283.984px, en 264.781px라 양쪽 경계를 동시에 만족할 수 없다. 대상 폭이 사용 폭보다 크면 LTR 시작 모서리를 한 번에 맞추도록 판정을 명시했다. ko는 가로 보정 `−42px` 1회 뒤 왼쪽 간격 4px, en은 `−22.797px` 1회 뒤 4.203px이며 반대 방향 보정은 0이다. 두 언어·두 테마 모두 중앙과 라벨·시작쪽 3px 링, 44px 높이를 유지했다. 버튼 축소·초점 표시 제거·`smooth` 전환은 사용하지 않았다.
+
+**회귀·범위 판정** — R04 원본 표본은 이전 실패 20/20과 현재 버튼 48/48이 계속 가시이고, smooth 키보드 경로는 폭별 72/72 중앙 가시, 사용자 사본은 1행/B **1·713·37·48**, 4행/A **6·486·134·31**, 4행/B **0·703·37·48**, 최초 500행 내부 키 노출 0을 유지했다. 상태·판정 72/72 한 줄, Excel 시각 **16/16**, S1 엔진 245조합과 독립 계약 8/8도 통과했다. 변경은 Excel 결과의 초점 이동 판정과 전용 스모크뿐이며 한·영 문구, SEO·정적 URL, 광고 격리, 서버 전제, 생성물·벤더, 의존성과 데스크톱 레이아웃은 바꾸지 않았다. 마지막 더보기 페이지를 키보드로 소진해 버튼 DOM이 사라질 때 초점 목적지가 `BODY`가 되는 기존 경로는 이번 세 결함의 범위 밖으로 유지하고 후속 판정 대상으로 기록한다. — Codx
+
+### Excel 중복키 S2 fix-2 — 모바일 키보드 초점 가시성 (Codx)
+
+**R04 원인과 수리** — 390×844 결과 표에서 브라우저의 기본 초점 스크롤은 고정 모바일 헤더·하단 탭의 실제 경계를 알지 못했고, 가로 스크롤도 초점 버튼 일부만 영역에 들여 오른쪽 영문 라벨과 3px 초점 링을 잘랐다. Excel 결과의 펼침·추가 로드·전체 값 버튼에 모바일 전용 가시성 보정을 연결했다. 초점 시점과 펼침/추가 로드 뒤 두 프레임에 고정 헤더 `bottom`, 하단 탭 `top`, 결과 region의 실제 client 경계를 다시 읽고 4px 여백 안으로 세로·가로 스크롤한다. 전역 `scroll-behavior: smooth`가 빠른 Tab→Enter 입력의 보정을 늦추지 않도록 이 접근성 보정만 `instant`로 실행한다. 데스크톱에서는 `(max-width: 820px)` 조건에서 즉시 반환하며 초점 링·고정 탭·44px 타깃은 그대로 유지한다.
+
+**키보드·경계 단언** — astra의 `overlap-review.mjs`를 수정하지 않고 사용자 1행/B 파일에 다시 실행했다. ko/en × light/dark 모바일 네 프로필의 현재 구현 48개 펼침·전체 값·Escape 복귀 초점 상태는 9점 hit test가 모두 **48/48** 가시였고, 직전 보고서에서 중앙이 가렸던 동일 단계 20개는 중앙과 9점 모두 **20/20**으로 바뀌었다. 한국어 전체 값 버튼은 y=724.5~768.5로 하단 탭 top=773 위에 4.5px를 남겼다. 영문 오른쪽 전체 값 버튼은 x=117.969~203.891로 region client x=30~360 안에 라벨과 링이 들어왔다. 원본 focus contract 출력은 빈 실패 배열 `[]`이다. 별도 제품 스모크는 CSS smooth scroll을 켠 채 51행 좌·우 목록의 빠른 Tab→Enter, 양측 전체 값, Escape 복귀를 검사해 각 버튼이 고정 chrome과 region에서 3px 이상 떨어지고 중앙 hit·44px 높이를 유지함을 확인했다.
+
+**회귀·범위 판정** — 사용자 사본은 1행/B **1·713·37·48**, 4행/A **6·486·134·31**, 4행/B **0·703·37·48**을 유지했고 세 화면의 최초 렌더 내부 키 노출은 모두 0이었다. 상태·판정은 합성 ko/en desktop/mobile의 접힘·좌측·양측 전개에서 모두 1줄이며, Excel 비교 시각 기준선은 **16/16 일치**해 데스크톱과 기존 모바일 정적 배치 변화가 없다. 제품 변경은 Excel 결과의 초점 시 스크롤 동작과 전용 스모크뿐이다. 한·영 문구, SEO·정적 URL, 광고 격리, 서버 전제, 생성물·벤더, 의존성은 바꾸지 않았다. — Codx
+
+### Excel 중복키 S2 fix-1 — 일반 키 표시 경계·결과 표 열 안정화 (Codx)
+
+**착수 게이트·범위** — 지정 worktree와 브랜치의 시작 HEAD가 `ebba5203d2984b9ddcb8b321beaf80f4b953f2a4`이고 추적 변경이 없음을 확인했다. 대상에 ignore된 todo 계획서가 없어 S0의 계획서 목록·inventory와 동일 HEAD의 S2 검수 문서를 교차했고 충돌하는 열린 계획은 없었다. S0 번들 기준선 SHA-256은 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`로 일치했다. S3 머리글 감지, main 병합·push·배포, 다른 worktree는 범위 밖으로 유지했다.
+
+**R01 표시 경계** — 일반 키 레코드에도 내부 `key`와 별개의 필수 `displayKey`를 둔다. `error`·`secondary`·`occurrence` 정책 모두 실제 해당 레코드의 왼쪽 원본 행, 왼쪽이 없으면 오른쪽 원본 행에서 선택 키 열을 `cellText`로 읽어 열 순서대로 ` | `로 연결한다. 접두사 절단이나 normalized identity 역파싱은 사용하지 않는다. UI 렌더·검색과 보고서 9번째 `Key` 열은 이 공개 표시값만 소비하고 내부 `key`는 그룹 identity와 React identity에만 남긴다. 숫자 `1`과 문자열 `1`은 둘 다 `1`로 보이지만 내부 `number:1`·`string:1` 그룹과 판정은 독립이다. 필터 전·후 전 행과 내려받은 Changed 시트에서 `number:`·`string:` 노출 0, 표시 키 `1`·`2`·`Unique`를 확인했다. 사용자 파일 최초 결과에서도 기존 499/494/500개 접두사 노출은 세 경우 모두 0이 됐다.
+
+S1 원본 `independent.mjs`와 `supplement.mjs`는 검수 산출물을 수정하지 않고 실행했다. 둘은 S1 당시 계약인 “일반 레코드에 `displayKey` 속성이 없어야 한다”와 부모 결과와의 필드 단위 완전 동일을 직접 단언하므로, 이번 R01 정본의 필수 필드 하나 때문에 각각 4/8 통과와 첫 deep-equal 실패를 기록했다. 이는 비교 판정 실패로 세탁하지 않았다. 새 필드만 제거한 의미 대조에서는 0~8행 243조합, 정규화 21조합, 다른 모드 5개, 사용자 파일 3조합의 일반 레코드·순서·요약·warnings·parameters가 S1 부모와 동일했고, 원본 S1 프로브의 분할·한도·4,096 취소·보고서 불변 항목 D/E/F/G는 그대로 통과했다.
+
+**R02 열 배분** — 좌우 목록의 `min-w-64`가 자동 표 레이아웃에서 짧은 상태·판정 열의 폭을 잠식했고, 셀 padding을 빼면 한국어 상태 세 글자를 담지 못했다. 표 최소 폭을 1,040px로 정하고 상태 96px·판정 112px·키 128px을 비롯한 짧은 머리글/셀에 최소 폭과 `nowrap`을 적용했다. 긴 키·좌우 값은 자기 셀에서 `overflow-wrap`하고 부족한 뷰포트에서는 기존 이름 있고 키보드 초점 가능한 가로 스크롤 영역을 사용한다. 합성 fixture와 사용자 1행/B·4행/A를 접힘·왼쪽 펼침·양쪽 펼침 × ko/en × desktop/mobile × light/dark로 잰 24개 화면·72개 상태에서 상태/판정은 전부 1줄, 실제 최소 폭은 96/112/128px, 표는 1,040px, 영역은 332~987px였다. 좌우 독립 DOM, 50/50 지연 전개와 최소 44px 버튼도 유지됐다.
+
+**R03 시각 기준선** — 수리 전 전체 16개 실행은 결함 화면을 포함한 중복 결과 8장과 FAQ 추가로 아래 내용 위치가 바뀐 기존 bottom 2장만 실패했고, 무관한 6장은 일치했다. 수리 화면을 육안·기하 검사한 뒤 중복 결과 8장과 `excel-compare-empty__bottom__ko__dark__mobile.png`, `excel-compare-empty__bottom__en__light__mobile.png`만 갱신했다. update 모드가 기계적으로 다시 쓴 무관한 6장은 같은 시작 HEAD bytes로 복원했으며 최종 전체는 Chrome 152에서 **16/16 일치**했다. 따라서 한 글자씩 세로로 무너진 기존 신규 화면은 승인 기준선으로 남기지 않았다.
+
+**N01 160 code point 판정** — 미리보기 경계 160 code point를 유지한다. code point 단위라 surrogate를 가르지 않고, 160 이하는 원문 전체를 렌더해 불필요한 모달을 만들지 않으며 160 초과에만 명시적 말줄임과 전체 원문 모달을 제공한다. 반응형 실제 높이에 연동하는 방식은 접힘·지연 DOM에서 측정 전후 버튼 존재가 달라지고 뷰포트에 따라 키보드 경로가 흔들리므로 기각했다. 160은 긴 셀 두세 줄의 예측 가능한 탐색 밀도와 무손실 접근 경계를 함께 고정하는 제품 임계값이며, 잘린 값의 Enter·Escape·이름·초점 복귀 계약은 기존 실브라우저 회귀로 유지한다.
+
+**사용자 파일 재현** — `/tmp/worklazy-userfiles/` 사본만 읽었다. 1행/B열은 중복 1·matched 713·changed 37·added 48, 4행/A열은 6·486·134·31, 4행/B열은 0·703·37·48을 유지했다. 첫 두 결과의 좌우 목록을 동시에 펼친 캡처에서 열 폭과 독립 목록을 확인했고 세 경우 모두 초기 렌더 내부 접두사 수는 0이었다.
+
+**검증 산출물** — TypeScript 진단 0, unit **381/381**, production/QA build 각 2,835 modules, production static 61페이지·startup 104문서, Excel 비교·Excel Cleaner·QR bulk·전체 browser, CSS orphan 0, registry 20개와 diff check를 통과했다. QA axe는 16페이지 위반 0·외부 요청 0이다. `incomplete`은 통과로 세지 않았다. 현재 1,265 selector를 모두 수동 측정해 S2 기준의 inherited 미달 171개가 그대로임을 확인했고, 이번 Excel 결과 소유 14개는 미달 0(최소 12.800:1), 별도 전체 결과 텍스트 608개도 미달 0(최소 5.273:1)이었다. S0 대비 번들 현재값/증분/상한은 entry **300,692/+1,404/+20,480B**, affected routes **2,453,104/+1,523/+61,440B**, shared **2,715,918/+1,410/+30,720B**, app JS **5,469,714/+4,337/+81,920B**, CSS **37,839/+146/+10,240B**로 전부 통과했다. R01 원본 셀 복원, R02 24조합, R03 16장, 사용자 결과, 원본/호환 S1 프로브와 접근성 수동 판정 원출력은 `/tmp/worklazy-xd-s2-fix1/evidence/`에 보존하고 최종 보고서는 같은 작업의 `REPORT.md`에 둔다. — Codx
+
+### Excel 중복키 S2 — 결과 화면 그룹 소비 전환 (Codx)
+
+**착수 게이트·범위** — 지정 브랜치 `excel-dupkey-20260907`의 시작 HEAD가 `c1e44f60096dfad33e6c225fdb96f5323516edf6`이고 추적 변경이 없음을 확인했다. 대상 worktree에는 ignore된 todo 계획서가 없어서 S0 증거 디렉터리에 보존된 동일 정본과 채택된 1~3차 보강 문서를 읽었고, 같은 HEAD의 S1 재검수에서 열린 계획서 19개와 충돌 없음·S1 통과가 이미 확인된 근거를 사용했다. S0 번들 기준선 SHA-256도 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`로 일치했다. S3 머리글 감지, main 병합·push·배포는 포함하지 않았다.
+
+**화면 소비 판정** — `status=duplicate` 레코드는 내부 normalized `key` 대신 `displayKey`를 표시하고, 한 그룹을 표의 한 행으로 렌더한다. 좌우 `Rows/Values`는 서로 독립된 기본 접힘 목록이며 0건 측은 버튼 없이 텍스트만 표시한다. 펼칠 때만 항목 DOM을 만들고 각 측 50건부터 50건씩 늘리며, 닫으면 그 측만 50건으로 초기화한다. 그룹과 측 항목의 React identity에만 `pairId+record.key`를 쓰고 검색·표시 DOM에는 내부 키를 쓰지 않는다. 검색 문자열은 접힘/500행 가시 범위와 무관하게 공개 키, 양측 전체 값, 모든 원본 행 번호를 미리 포함한다. 긴 값은 160 code point 미리보기 뒤 Base UI modal로 원문을 손실 없이 제공하며 키보드 Enter, 이름, Escape 닫기와 trigger 초점 반환을 확인했다. 결과 표와 지원 표의 모바일 가로 스크롤 영역은 이름 있는 focusable region으로 만들었다.
+
+501그룹 합성 fixture에서 duplicate 필터의 최초 DOM은 정확히 500행, `더 보기` 잔여는 1이었다. 접힌 목록 DOM 0, 값 검색 결과 1그룹, 행 번호 검색에 단측 K001 그룹 포함, 양측 50/0 → 51/50 독립 전개, 닫은 뒤 0/50, 최소 버튼 높이 44px, 0건 측 버튼 0을 실브라우저에서 단언했다. 기존 보고서 경로도 개별·ZIP 모두 9시트·Duplicates 13열·연속 행 복원을 유지했다. 당시 검증한 **duplicate 필터 화면**에는 `string:`·`number:`·원시 `DUPLICATE_KEY`가 없었지만 일반 키 결과는 범위 밖이었고, 위 fix-1에서 전체 표·검색·보고서까지 공개 표시값 경계로 확장했다. 저장소 검색에서 남는 `DUPLICATE_KEY`는 엔진 판정값과 ko/en 번역 키, `DUPLICATE_KEY_TOO_LONG`은 안전 오류 상수와 번역 키뿐이며 실제 ko/en 오류·결과 화면 스모크는 원시 code 비노출을 확인한다.
+
+**문구·정적 표면 판정** — ko/en 결과 문구에 그룹 수, 좌우 단·복수 접기, 0건, 원본 행, 빈 값, 더 보기, 전체 값 대화상자를 함께 추가했다. 가이드·FAQ와 도구 설명·SEO 설명/featureList/static FAQ는 좌우 같은 줄이 자동 매칭이 아니며 보조키·발생 순번을 선택할 수 있다는 의미로 동기화했다. SEO path key 집합은 기준과 같은 31개, production sitemap은 61 URL이고 정적 검증의 canonical/hreflang도 통과해 URL·canonical·사이트맵 집합은 불변이다. 광고·격리·network/API·서버 전제 코드는 바꾸지 않았다.
+
+**시각·접근성 판정** — 실제 중복 결과를 여는 `interaction-duplicate-result`를 ko/en × light/dark × desktop/mobile 8개 profile로 추가했다. 최초 기준선 갱신은 8개 중 마지막 profile의 두 파일 upload가 React 갱신 전에 연속 실행되는 경합으로 7개 뒤 대기 실패했으며, 첫 파일 선택 완료와 두 번째 inspection 완료를 각각 기다리도록 시나리오를 고정한 뒤 **8/8 생성·재일치**했다. 다만 후속 S2 검수에서 목록 전개 시 상태·판정 열이 세로로 무너지는 결함을 발견했으므로 이 8장은 품질 승인된 최종 화면이 아니며, 위 fix-1에서 열 배분을 수리한 화면으로 모두 교체했다. FAQ 영향 bottom 2장 누락도 같은 fix에서 정정했다.
+
+axe 등록은 기존 8페이지에 위 8개 결과 상태를 더해 총 16페이지다. 첫 모바일 감사가 기존 지원 표의 focus 불가 가로 스크롤을 네 profile에서 찾아 이름·초점을 보강했고, 최종은 **16페이지·위반 0·외부 요청 0**이다. `incomplete`은 통과로 세지 않고 대상 selector를 보고서에 보존했다. 상태 필터의 기존 무역할 `aria-label`은 `role=group`으로 명확히 해 ARIA 보류를 0으로 만들었다. oklab 색상 때문에 자동 판정 보류인 대비는 렌더 픽셀 합성으로 별도 계산해 새 결과 텍스트 최소가 light **5.273:1**, dark **5.733:1**임을 확인했다.
+
+**사용자 파일 재현** — `/tmp/worklazy-userfiles/` 사본 두 개만 읽어 production 동형 브라우저에서 다음 결과와 그룹당 한 행·기본 접힘·`displayKey` 일치를 확인했다. 원본/사본을 fixture로 추가하거나 저장소에 넣지 않았다.
+
+| 머리글/키 | 중복 그룹·UI 행 | matched | changed | added |
+|---|---:|---:|---:|---:|
+| 1행/B열 | **1/1** | 713 | 37 | 48 |
+| 4행/A열 | **6/6** | 486 | 134 | 31 |
+| 4행/B열 | **0/0** | 703 | 37 | 48 |
+
+**회귀·번들** — 최종 TypeScript 진단 0, unit **380/380**, production/QA build 각 2,835 modules, production 정적 61페이지·startup 104문서, Excel 비교·Excel Cleaner·QR bulk·전체 browser 스모크, CSS orphan 0, 도구 registry 20개와 `git diff --check`를 통과했다. 브라우저는 `127.0.0.1:4350 --strictPort`에서 직렬 실행했다. S0 대비 gzip 현재값/증분/상한은 entry **300,694/+1,406/+20,480B**, affected routes **2,453,004/+1,423/+61,440B**, shared **2,715,789/+1,281/+30,720B**, app JS **5,469,487/+4,110/+81,920B**, CSS **37,818/+125/+10,240B**로 다섯 예산을 모두 통과했다. JSON·사용자 재현·접근성 원출력과 최종 보고서는 `/tmp/worklazy-xd-s2/`에 보존한다. — Codx
+
+### Excel 중복키 S1 fix-1 — 긴 키 오류 안내·기록 정정 (Codx)
+
+**누락·재현** — 지원되는 정상 CSV에서 선택 키 값 32,768자가 두 행에 반복되면 보고서 Key 절대 한도 guard가 `DUPLICATE_KEY_TOO_LONG`으로 그 쌍만 안전하게 제외한다. S1 커밋은 code 전달과 쌍 격리를 구현했지만 `excelCompare.error`의 ko/en 키를 빠뜨려, UI가 정상 입력에 `PROCESSING_FAILED`의 파일 손상·지원 형식 확인 안내를 표시했다. 이는 객체 주입·ZIP 변조 없이 도달하는 R2-01 정본 경로다.
+
+**수리·회귀 단언** — ko/en `features.json`에 R2-01의 원인·복구 문구를 그대로 연결했다. `tests/excel-compare-smoke.mjs`는 각 언어에서 정상 A → 긴 키 실패 → 정상 B 순서로 실행하고, 실패 파일명과 해당 언어의 원인·더 짧은 키 열 선택 안내, 원시 code 비노출을 단언한다. 성공 산출물은 개별 XLSX 2개와 ZIP 1개뿐이고 ZIP 내부도 정상 XLSX 2개뿐이며, 개별·ZIP 보고서의 9시트·Duplicates 13열·분할 복원 결과가 일치한다.
+
+**원본 probe·실화면** — astra의 `browser-extra.mjs`(SHA-256 `026e60ab…cc760c`)와 `error-contract.py`(`159f38a…e8e9e`)를 바꾸지 않고 읽기 전용 검수 디렉터리와 쓰기 가능한 이번 증거 디렉터리를 격리 마운트해 실행했다. error contract는 직전 ko/en 0/2에서 **2/2**로 바뀌었고, browser probe의 ko/en 두 실행 모두 정상 보고서 2개·ZIP 내부 2개, direct/ZIP 내용 일치, page error 0을 기록했다. 실제 오류 캡처에서도 ko/en 정본 문구가 잘림 없이 표시됐다. 증거는 `/tmp/worklazy-xd-s1-fix1/evidence/`에 보존한다.
+
+**완료 검증** — `tsc -b` 진단 0, 단위시험 **379/379**, production build 2,835 modules, 정적 startup 104문서, 강화 Excel 비교·Excel Cleaner·QR bulk·전체 browser 스모크를 모두 통과했다. 원본 사용자 파일의 1행/B·4행/A·4행/B는 각각 **1·6·0그룹**, matched/changed/added **713·37·48 / 486·134·31 / 703·37·48**을 유지했고, 독립 결과 27파일·486 XML/rels가 9시트·13열·폭 12~48·문자 길이와 함께 전부 재개방됐다. 선행 안전화 원본 17명령과 보존 산출물 204파일·2,267 XML/rels도 예상 밖 malformed 0으로 통과했다. 보존 XML 집계의 첫 실행은 격리 경로에 원본 SHA manifest를 복사하지 않아 제품 실행 전에 실패했으며, 그 로그를 보존하고 동일 원본 manifest를 제공한 재실행 결과를 채택했다.
+
+S0 기준 번들 gzip 현재값/증분은 entry **299,402/+114B**, affected routes **2,451,562/−19B**, shared **2,715,801/+1,293B**, app JS **5,466,765/+1,388B**, CSS **37,693/+0B**로 다섯 예산을 모두 통과했다. fix 기준 변경 파일은 locale 2개·스모크·두 기록 파일뿐이고 locale 구조 diff는 양쪽 모두 `excelCompare.error.DUPLICATE_KEY_TOO_LONG` 한 키다. URL 문서105·canonical62·hreflang91·sitemap61 집합은 S0와 같고, 신설 network/API·광고·서버 전제 줄은 0이다.
+
+**S1/S2 경계 정정** — 신설 원시 오류 코드는 숨겨지지만, S1 시점 결과 화면에는 기존 `string:`/`number:` 내부 key 표시와 빈 scalar에 따른 그룹 값 소비가 남아 있다. 이는 정본이 S1+S2를 단일 제품 전환으로 요구한 단계 경계이며 별도 제품 결함으로 세지 않는다. 기존 기록의 “내부 key identity/reason/error code는 UI에 노출되지 않고 신규 ko/en 작업도 없다”는 전체 UI에 대한 일반화와 locale 판정을 이 내용으로 정정한다. S2 화면 전환과 S3 감지는 이번 fix에 포함하지 않았다. — Codx
+
+### Excel 중복키 S1 — 그룹 스키마·엔진·보고서 분할 (Codx)
+
+**착수 게이트·범위** — 지정 기준 `597a92ff56ed9c3eb23755a58df2580b0269b8bd`가 실제 `origin/main`과 같고 부모가 `cdb4007`·`0654fa7`임을 확인했다. 열린 작업계획서 19개에 S1과 상반된 지시가 없음을 확인한 뒤 `/tmp/worklazy-xd`의 `excel-dupkey-20260907` 브랜치에서만 작업했다. `/tmp/worklazy-excel-s0/evidence/bundle-baseline.json`의 SHA-256은 지정값 `726a2d5be21ca250c76a5a9c9220affb8931da9286769f762f3531fd64d002c8`과 일치했다. 화면 소비처 전환 S2와 머리글 감지 S3는 넣지 않았고, main 병합·push·배포도 하지 않는다. S1 단독은 배포 후보가 아니다.
+
+**스키마·엔진 판정** — `status=duplicate`를 판별 가능한 레코드로 분리해 scalar 행·열은 `null`, scalar 값은 빈 문자열로 고정하고 `leftRows/rightRows/leftValues/rightValues` 네 배열과 `displayKey`를 필수화했다. 중복 오류 정책은 2:0·0:2·2:1·1:2 모두 키당 한 레코드를 만들며 반대편 단일 행까지 포함한 뒤 양쪽 map에서 제거한다. 1:1과 다른 상태의 scalar 계약은 그대로다. 내부 그룹 identity는 기존 `normalizeKeyPart`와 U+241F 복합키를 유지하고, `displayKey`만 첫 좌측 원본 행 또는 좌측이 없을 때 첫 우측 원본 행의 선택 키 열을 기존 `cellText`로 읽어 ` | `로 잇는다. 표시 문자열이 같은 number/string 두 내부 키도 별도 그룹으로 남는 대조를 추가했다. `groupRows`의 누적 배열 spread는 append로 교체했고 그룹 생성·중복 스캔·값 수집에 공유 4,096개 간격 취소 검사를 넣었다. 30,000행 단일 그룹은 한 레코드로 완주했고 실제 취소 callback도 그룹 생성과 값 수집에서 발생했다. `summary.duplicate`는 레코드 수와 같아져 중복키 **그룹 수** 의미가 되며 기존 골든은 4에서 1로 갱신했다.
+
+**보고서 formatter·안전 경계** — 9시트·13열 이름과 순서를 유지하면서 Duplicates의 행 번호는 `, `, 값은 `원본행번호: 행값`과 LF로 직렬화하고 Key에는 내부 identity가 아닌 `displayKey`를 쓴다. 좌우는 독립적으로 원본 행 단위 탐욕 분할하고 각 목록 셀은 접두사·구분자 포함 16,000 UTF-16 code unit 이하로 제한한다. 단일 원본 행이 더 길면 전용 조각으로 나눠 `r [i/n]`을 표시하며 surrogate pair와 CRLF 사이를 경계로 삼지 않는다. 더 짧은 측이 먼저 끝나면 뒤 물리 행은 빈 셀로 둔다. 분할 행은 보고서 전용 객체에만 존재하고 엔진 `records`를 바꾸지 않는다. 모든 셀은 기존 공용 writer의 `writeUntrustedText`를 통과하며 수식 객체가 생기지 않는 것을 재개방으로 확인했다.
+
+반복되는 `displayKey`에는 단일 줄 32,767, CR/LF 포함 여러 줄 16,000의 별도 guard를 두었다. 각 정확 경계는 통과하고 1 code unit 초과는 `DUPLICATE_KEY_TOO_LONG`으로 거부하며 자르거나 대체하지 않는다. Chrome에서 32,768자 중복키 쌍과 정상 쌍을 한 배치로 실행한 결과 정상 XLSX 1건만 남고 ZIP은 생성되지 않았으며, 실패 쌍은 일반 사용자 안내로 격리되고 원시 코드는 노출되지 않았다. Parameters는 키/오류 정책에서 고정 9항목(`duplicateCountUnit=key-group`, split 여부·그룹 수·물리 행 수, 세 한도, layout, 표기 설명)과 `duplicateReportGroup.<n>=Duplicates!시작행:끝행`을 기록한다. 따라서 그룹 1개 보고서는 요구된 10개 항목이며, 적용 밖 모드는 고정 9항목을 `UNUSED`로 기록한다.
+
+**사용자 파일 재현** — 입력은 원본을 읽기만 했고 fixture나 커밋에 넣지 않았다. 두 파일은 각각 19,605B/SHA-256 `3152fb51…6a4a9`, 20,263B/`faab6f10…319cf`다. 모든 보고서는 9시트·Duplicates 13열·유한 폭 12~48을 유지했다.
+
+| 머리글/키 | S0 레코드·그룹 | S1 `summary.duplicate`/레코드 | S1 Duplicates 물리 행 | 나머지 요약 |
+|---|---:|---:|---:|---|
+| 1행/B열 | 4·1 | **1/1** | 1 | matched 713·changed 37·added 48 |
+| 4행/A열 | 24·6 | **6/6** | 6 | matched 486·changed 134·added 31 |
+| 4행/B열 | 0·0 | **0/0** | 0 | matched 703·changed 37·added 48 |
+
+1행/B열 그룹은 좌우 모두 `[2,3]`, 표시 키는 원본 `□ 2026년 설명절 선물 발송처(대외, 임직원)`이었다. 4행/A열은 표시 키 1~6과 각 측 두 행의 순서를 보존했다. 세 사용자 보고서와 17,000자 합성 분할 보고서를 ExcelJS/생성 무결성/가시성 검사로 다시 열고, 각 ZIP의 XML/rels **18개 전부**를 ElementTree로 파싱했다. 산출물은 `/tmp/worklazy-xd-s1/user-*.xlsx`, `synthetic-split.xlsx`, `user-file-results.json`에 보존했다.
+
+**회귀·번들·제품 영향** — 첫 타입 검사에서 일반 레코드 필터의 union narrowing 진단을 발견해 명시적 type guard로 고친 뒤 전체를 다시 실행했다. 공용 writer 문자 안전화·희소 데이터행 판정·Row/Column `numFmt` backstop 파일은 기준 커밋과 byte diff가 없으며, 전용 64개 회귀에서 금지 문자·수식 주입·희소 객체 수·행/열 서식·유한 폭 계약이 모두 통과했다. 최종 결과는 다음과 같다.
+
+| 검증 | 결과 |
+|---|---|
+| `./node_modules/.bin/tsc -b --pretty false` | 진단 0 |
+| `npm run test:unit` | 상위 371개·하위 포함 **379/379** |
+| `npm run build` / `npm run test:static` | 2,835 modules·정적 61페이지 / startup 104문서 통과 |
+| `npm run test:excel-compare` | 그룹 분할 개별 2 XLSX+ZIP 내부 2 XLSX, 키 길이 실패 격리, 기존 취소·모바일·무결성 포함 통과 |
+| `npm run test:excel-cleaner` / `npm run test:qr-bulk` | 5시트 출력·문자/서식 경계 / 7종·ZIP·2시트 manifest·PDF 글꼴 4시나리오 통과 |
+| `npm run test:browser` | Excel·Word·PDF 편집/분할/변환 통과 |
+| `npm run css:orphans` / route registry | orphan 0 / 도구 20개·누락/예상 외/중복 0 |
+| `git diff --check` | 공백 오류 0 |
+
+S0 기준 번들 gzip 현재값/증분은 entry **299,294/+6B**, affected routes **2,451,591/+10B**, shared **2,715,815/+1,307B**, app JS **5,466,700/+1,323B**, CSS **37,693/+0B**로 다섯 예산을 모두 통과했다. production 브라우저는 `127.0.0.1:4350 --strictPort`, QR 보조 프록시는 저장소 밖 preload로 4351에 고정해 직렬 실행했다. 변경된 제품 소스에 network/API·광고 경로·서버 전제를 추가하지 않았고 locale·SEO 입력·정적 페이지 생성기·URL/canonical/hreflang/sitemap 집합도 바꾸지 않았다. 신설 원시 오류 코드는 숨겨지지만, 기존 내부 key 표시와 그룹 값 소비는 S2에 남아 있다. 이는 정본이 S1+S2 단일 전환을 요구한 단계 경계이며 별도 제품 결함이 아니다. 또한 S1 신설 `DUPLICATE_KEY_TOO_LONG`에는 ko/en 복구 안내가 필요했으므로 추가 locale 작업이 불필요하다는 당시 판정은 잘못이었고, 위 fix-1 기록으로 정정한다. 번들 JSON과 재현 산출물·최종 보고서는 `/tmp/worklazy-xd-s1/`에 둔다. — Codx
+
 ## 2026-09-07
 
 ### 문서 비교 엔진 통일 — main 배포·라이브 검증 (Codx)

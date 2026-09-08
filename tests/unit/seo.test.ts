@@ -83,8 +83,10 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     assert.equal(excelFaq?.length, 3);
     assert.ok(excelFaq?.every((item) => item.question && item.answer));
     const excelCompareFaq = getSeoDefinition(language, "/tools/excel-compare").faq;
-    assert.equal(excelCompareFaq?.length, 3);
+    assert.equal(excelCompareFaq?.length, 5);
     assert.ok(excelCompareFaq?.every((item) => item.question && item.answer));
+    assert.ok(excelCompareFaq?.some((item) => /중복 키|duplicate key/i.test(`${item.question} ${item.answer}`)));
+    assert.ok(excelCompareFaq?.some((item) => /머리글|header/i.test(`${item.question} ${item.answer}`)));
     const excelCleanerFaq = getSeoDefinition(language, "/tools/excel-cleaner").faq;
     assert.equal(excelCleanerFaq?.length, 3);
     assert.ok(excelCleanerFaq?.every((item) => item.question && item.answer));
