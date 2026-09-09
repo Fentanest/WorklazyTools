@@ -22,6 +22,18 @@ const axes = {
   stamp: ["on", "off"],
   raster: ["on", "off"],
 };
+const visibilityCases = [
+  { id: "visibility-image-foreground", cleanup: "preserve", form: "flatten", watermark: "image", layer: "foreground", text: "number", stamp: "off", raster: "on" },
+  { id: "visibility-text-background", cleanup: "preserve", form: "flatten", watermark: "text", layer: "background", text: "number", stamp: "off", raster: "on" },
+];
+const sentinelRegions = {
+  header: { x: 112, y: 0, width: 176, height: 48 },
+  pageNumber: { x: 112, y: 552, width: 176, height: 48 },
+  watermark: { x: 104, y: 232, width: 192, height: 136 },
+  originalOverlap: { x: 120, y: 270, width: 72, height: 24 },
+  formOverlap: { x: 210, y: 308, width: 72, height: 24 },
+  stamp: { x: 288, y: 452, width: 80, height: 64 },
+};
 assert.deepEqual(specification.axes, axes, "combined golden axes changed without an explicit contract update");
 assertPairwiseCoverage(specification.combinations);
 assert.deepEqual(specification.combinations[0], {
@@ -34,10 +46,15 @@ assert.deepEqual(specification.combinations[0], {
   stamp: "on",
   raster: "on",
 }, "the required structure + decoration + final raster case must remain explicit");
+assert.deepEqual(visibilityCases.map(({ watermark, layer, raster }) => ({ watermark, layer, raster })), [
+  { watermark: "image", layer: "foreground", raster: "on" },
+  { watermark: "text", layer: "background", raster: "on" },
+], "the two raster visibility cases must close the pairwise array's watermark/layer triple gap");
 
 await fs.mkdir(artifactDirectory, { recursive: true });
 const sourceBytes = await createSourcePdf();
-const imageBytes = createImageBytes();
+const watermarkImageBytes = createImageBytes([208, 0, 208]);
+const stampImageBytes = createImageBytes([255, 101, 0]);
 const server = await startModuleServer();
 let browser;
 const summary = [];
@@ -49,8 +66,8 @@ try {
   });
   const page = await browser.newPage();
   await page.goto(server.url, { waitUntil: "networkidle" });
-  for (const testCase of specification.combinations) {
-    const result = await createOutput(page, testCase, sourceBytes, imageBytes);
+  for (const testCase of [...specification.combinations, ...visibilityCases]) {
+    const result = await createOutput(page, testCase, sourceBytes, watermarkImageBytes, stampImageBytes);
     const audited = await auditOutput(result, testCase);
     summary.push({ id: testCase.id, axes: testCase, ...audited });
     await fs.writeFile(path.join(artifactDirectory, `${testCase.id}-pre-raster.pdf`), result.preRaster);
@@ -61,8 +78,13 @@ try {
   await server.close();
 }
 
+assert.deepEqual(
+  [...new Set(summary.filter(({ finalRaster }) => finalRaster).map(({ axes: testCase }) => `${testCase.watermark}/${testCase.layer}`))].sort(),
+  ["image/background", "image/foreground", "text/background", "text/foreground"],
+  "final raster must visibly exercise image/text watermarks on both background and foreground layers",
+);
 await fs.writeFile(path.join(artifactDirectory, "summary.json"), `${JSON.stringify({ axes, combinations: summary }, null, 2)}\n`);
-console.log(`PDF finish combined golden passed: ${specification.combinations.length} actual pairwise outputs across ${Object.keys(axes).length} declared axes; ${summary.filter(({ finalRaster }) => finalRaster).length} include final raster. Artifacts: ${artifactDirectory}`);
+console.log(`PDF finish combined golden passed: ${specification.combinations.length} actual pairwise outputs across ${Object.keys(axes).length} declared axes plus ${visibilityCases.length} raster visibility controls; ${summary.filter(({ finalRaster }) => finalRaster).length} include final raster and cover image/text × background/foreground. Artifacts: ${artifactDirectory}`);
 
 function assertPairwiseCoverage(cases) {
   assert.equal(cases.length, 8, "the seven binary axes use an eight-row pairwise covering array");
@@ -88,22 +110,28 @@ async function createSourcePdf() {
   document.setTitle("COMBINED-REMOVE-ME");
   await document.attach(new TextEncoder().encode("COMBINED-ATTACHMENT-REMOVE-ME"), "combined.txt", { mimeType: "text/plain" });
   const page = document.addPage([400, 600]);
-  page.drawRectangle({ x: 32, y: 54, width: 336, height: 492, color: rgb(0.08, 0.2, 0.78) });
+  for (const rectangle of [
+    { x: 32, y: 54, width: 68, height: 492 },
+    { x: 300, y: 54, width: 68, height: 492 },
+    { x: 100, y: 54, width: 200, height: 176 },
+    { x: 100, y: 370, width: 200, height: 176 },
+  ]) page.drawRectangle({ ...rectangle, color: rgb(0.08, 0.2, 0.78) });
+  page.drawRectangle({ x: 118, y: 304, width: 76, height: 28, color: rgb(0, 0.28, 0.92) });
   const font = await document.embedFont(StandardFonts.Helvetica);
   const form = document.getForm();
   const field = form.createTextField("combined-field");
   field.setText("FORM-A");
-  field.addToPage(page, { x: 148, y: 286, width: 104, height: 28, borderWidth: 0, font });
+  field.addToPage(page, { x: 208, y: 266, width: 76, height: 28, borderWidth: 0, backgroundColor: rgb(1, 0.86, 0.05), font });
   form.updateFieldAppearances(font);
   return new Uint8Array(await document.save({ updateFieldAppearances: false }));
 }
 
-function createImageBytes() {
-  const image = new PNG({ width: 40, height: 20 });
+function createImageBytes([red, green, blue]) {
+  const image = new PNG({ width: 60, height: 40 });
   for (let offset = 0; offset < image.data.length; offset += 4) {
-    image.data[offset] = 225;
-    image.data[offset + 1] = 28;
-    image.data[offset + 2] = 42;
+    image.data[offset] = red;
+    image.data[offset + 1] = green;
+    image.data[offset + 2] = blue;
     image.data[offset + 3] = 255;
   }
   return PNG.sync.write(image);
@@ -149,8 +177,8 @@ function availablePort() {
   });
 }
 
-async function createOutput(page, testCase, source, image) {
-  const serialized = await page.evaluate(async ({ testCase: inputCase, sourceBytes, imageBytes }) => {
+async function createOutput(page, testCase, source, watermarkImage, stampImage) {
+  const serialized = await page.evaluate(async ({ testCase: inputCase, sourceBytes, watermarkImageBytes, stampImageBytes }) => {
     const [{ finishPdfFiles }, { createPageSelection }, { validateWatermarkResult }] = await Promise.all([
       import("/src/features/pdf-editor/finish/engine.ts"),
       import("/src/features/pdf-editor/finish/selection.ts"),
@@ -159,31 +187,32 @@ async function createOutput(page, testCase, source, image) {
     const selection = createPageSelection(1, "1", "all", { startPage: 1, excludeCover: false });
     if ("error" in selection) throw new Error(selection.error);
     const sourceFile = new File([Uint8Array.from(sourceBytes)], "combined-source.pdf", { type: "application/pdf" });
-    const decorationImage = new File([Uint8Array.from(imageBytes)], "combined.png", { type: "image/png" });
-    const textOption = (template, region) => ({ template, region, fontSize: 10, color: "#202024", margin: 18, startNumber: 1, startPage: 1, excludeCover: false, opacity: 0.9 });
+    const watermarkImage = new File([Uint8Array.from(watermarkImageBytes)], "watermark-sentinel.png", { type: "image/png" });
+    const stampImage = new File([Uint8Array.from(stampImageBytes)], "stamp-sentinel.png", { type: "image/png" });
+    const textOption = (template, region, color, fontSize) => ({ template, region, fontSize, color, margin: 18, startNumber: 1, startPage: 1, excludeCover: false, opacity: 1 });
     let preRaster;
     const [output] = await finishPdfFiles({
       files: [{ key: inputCase.id, file: sourceFile, selection }],
       options: {
-        ...textOption("WATERMARK-A", "center"),
+        ...textOption("WM-SRC\nWM-FRM", "center", "#d000d0", 26),
         textDecorations: [
-          textOption("PAGE-{page}", "bottom-center"),
-          ...(inputCase.text === "number-header" ? [textOption("HEADER-A", "top-center")] : []),
+          textOption("PAGE-{page}", "bottom-center", "#0010ff", 18),
+          ...(inputCase.text === "number-header" ? [textOption("HEADER-A", "top-center", "#009b3a", 18)] : []),
         ],
         watermark: {
           content: inputCase.watermark,
-          image: inputCase.watermark === "image" ? decorationImage : undefined,
+          image: inputCase.watermark === "image" ? watermarkImage : undefined,
           layer: inputCase.layer,
           pattern: "single",
           region: "center",
-          rotation: -20,
-          opacity: 0.55,
+          rotation: 0,
+          opacity: 1,
           sizePercent: 45,
           gap: 20,
           offsetX: 0,
           offsetY: 0,
         },
-        stamp: inputCase.stamp === "on" ? { image: decorationImage, placement: { cx: 0.8, cy: 0.78, rw: 0.18, aspect: 2 } } : undefined,
+        stamp: inputCase.stamp === "on" ? { image: stampImage, placement: { cx: 0.82, cy: 0.8, rw: 0.16, aspect: 1.5 } } : undefined,
         structure: {
           removeMetadata: inputCase.cleanup === "remove",
           removeAnnotations: false,
@@ -215,7 +244,12 @@ async function createOutput(page, testCase, source, image) {
     const final = new Uint8Array(await output.blob.arrayBuffer());
     await output.dispose();
     return { preRaster: Array.from(preRaster), final: Array.from(final) };
-  }, { testCase, sourceBytes: Array.from(source), imageBytes: Array.from(image) });
+  }, {
+    testCase,
+    sourceBytes: Array.from(source),
+    watermarkImageBytes: Array.from(watermarkImage),
+    stampImageBytes: Array.from(stampImage),
+  });
   return { preRaster: Uint8Array.from(serialized.preRaster), final: Uint8Array.from(serialized.final) };
 }
 
@@ -241,13 +275,16 @@ async function auditOutput(result, testCase) {
   assert.equal(order.includes("form"), testCase.form === "flatten", `${testCase.id}: the flattened form appearance call is missing`);
 
   const extracted = await extractText(result.preRaster);
-  assert.ok(extracted.includes("PAGE-1"), `${testCase.id}: missing page-number decoration`);
-  assert.equal(extracted.includes("HEADER-A"), testCase.text === "number-header", `${testCase.id}: header decoration axis changed`);
-  assert.equal(extracted.includes("WATERMARK-A"), testCase.watermark === "text", `${testCase.id}: watermark content axis changed`);
+  const extractedText = extracted.join("\n");
+  assert.ok(extractedText.includes("PAGE-1"), `${testCase.id}: missing page-number decoration`);
+  assert.equal(extractedText.includes("HEADER-A"), testCase.text === "number-header", `${testCase.id}: header decoration axis changed`);
+  assert.equal(extractedText.includes("WM-SRC") && extractedText.includes("WM-FRM"), testCase.watermark === "text", `${testCase.id}: watermark content axis changed`);
 
+  const preRasterPixels = await renderPage(result.preRaster);
+  const preRasterSentinels = assertDecorationSentinels(preRasterPixels, testCase, "pre-raster");
   if (testCase.raster === "off") {
     assert.deepEqual(result.final, result.preRaster, `${testCase.id}: a non-raster case changed after output validation`);
-    return { order, structure, extracted, finalRaster: false };
+    return { order, structure, extracted, finalRaster: false, sentinels: { preRaster: preRasterSentinels } };
   }
 
   const finalDocument = await PDFDocument.load(result.final, { updateMetadata: false });
@@ -266,10 +303,76 @@ async function auditOutput(result, testCase) {
   assert.equal(finalDocument.catalog.has(PDFName.of("AcroForm")), false, `${testCase.id}: final raster retained AcroForm structure`);
   const finalAnnotations = finalDocument.context.lookup(finalPage.node.get(PDFName.of("Annots")));
   assert.equal(finalAnnotations instanceof PDFArray ? finalAnnotations.size() : 0, 0, `${testCase.id}: final raster retained annotations`);
-  const pixels = comparePixels(await renderPage(result.preRaster), await renderPage(result.final));
+  const finalPixels = await renderPage(result.final);
+  const finalSentinels = assertDecorationSentinels(finalPixels, testCase, "final raster");
+  const pixels = comparePixels(preRasterPixels, finalPixels);
   assert.ok(pixels.changedRatio < 0.08, `${testCase.id}: final raster lost visible content (${pixels.changedRatio})`);
   assert.ok(pixels.meanChannelDifference < 8, `${testCase.id}: final raster diverged from decorated structure output (${pixels.meanChannelDifference})`);
-  return { order, structure, extracted, finalRaster: true, pixels };
+  return { order, structure, extracted, finalRaster: true, pixels, sentinels: { preRaster: preRasterSentinels, final: finalSentinels } };
+}
+
+function assertDecorationSentinels(image, testCase, stage) {
+  const predicates = {
+    pageNumber: (red, green, blue) => red < 80 && green < 130 && blue > 170,
+    header: (red, green, blue) => red < 80 && green > 110 && blue < 120,
+    watermark: (red, green, blue) => red > 140 && green < 120 && blue > 140,
+    original: (red, green, blue) => red < 80 && green < 130 && blue > 170,
+    form: (red, green, blue) => red > 170 && green > 140 && blue < 120,
+    stamp: (red, green, blue) => red > 190 && green > 35 && green < 175 && blue < 100,
+  };
+  const counts = {
+    pageNumber: countPixels(image, sentinelRegions.pageNumber, predicates.pageNumber),
+    header: countPixels(image, sentinelRegions.header, predicates.header),
+    watermark: countPixels(image, sentinelRegions.watermark, predicates.watermark, [sentinelRegions.originalOverlap, sentinelRegions.formOverlap]),
+    watermarkOverOriginal: countPixels(image, sentinelRegions.originalOverlap, predicates.watermark),
+    watermarkOverForm: countPixels(image, sentinelRegions.formOverlap, predicates.watermark),
+    original: countPixels(image, sentinelRegions.originalOverlap, predicates.original),
+    form: countPixels(image, sentinelRegions.formOverlap, predicates.form),
+    stamp: countPixels(image, sentinelRegions.stamp, predicates.stamp),
+  };
+  assert.ok(counts.pageNumber >= 20, `${testCase.id}: ${stage} lost the page-number sentinel (${counts.pageNumber})`);
+  if (testCase.text === "number-header") {
+    assert.ok(counts.header >= 20, `${testCase.id}: ${stage} lost the header sentinel (${counts.header})`);
+  } else {
+    assert.equal(counts.header, 0, `${testCase.id}: ${stage} gained an unexpected header sentinel`);
+  }
+  const watermarkMinimum = testCase.watermark === "image" ? 4_000 : 80;
+  assert.ok(counts.watermark >= watermarkMinimum, `${testCase.id}: ${stage} lost its ${testCase.watermark} ${testCase.layer} watermark sentinel (${counts.watermark})`);
+  if (testCase.stamp === "on") {
+    assert.ok(counts.stamp >= 1_500, `${testCase.id}: ${stage} lost the stamp sentinel (${counts.stamp})`);
+  } else {
+    assert.equal(counts.stamp, 0, `${testCase.id}: ${stage} gained an unexpected stamp sentinel`);
+  }
+  const overlapMinimum = testCase.watermark === "image" ? 400 : 50;
+  if (testCase.layer === "background") {
+    assert.equal(counts.watermarkOverOriginal, 0, `${testCase.id}: ${stage} background watermark painted in front of the original sentinel`);
+    assert.ok(counts.original >= 1_500, `${testCase.id}: ${stage} background layering lost the original sentinel (${counts.original})`);
+    if (testCase.form === "flatten") {
+      assert.equal(counts.watermarkOverForm, 0, `${testCase.id}: ${stage} background watermark painted in front of the flattened-form sentinel`);
+      assert.ok(counts.form >= 1_000, `${testCase.id}: ${stage} background layering lost the flattened-form sentinel (${counts.form})`);
+    }
+  } else {
+    assert.ok(counts.watermarkOverOriginal >= overlapMinimum, `${testCase.id}: ${stage} foreground watermark did not paint over the original sentinel (${counts.watermarkOverOriginal})`);
+    if (testCase.watermark === "image") assert.equal(counts.original, 0, `${testCase.id}: ${stage} opaque foreground image did not cover the original sentinel`);
+    if (testCase.form === "flatten") {
+      assert.ok(counts.watermarkOverForm >= overlapMinimum, `${testCase.id}: ${stage} foreground watermark did not paint over the flattened-form sentinel (${counts.watermarkOverForm})`);
+      if (testCase.watermark === "image") assert.equal(counts.form, 0, `${testCase.id}: ${stage} opaque foreground image did not cover the flattened-form sentinel`);
+    }
+  }
+  return counts;
+}
+
+function countPixels(image, region, predicate, excludedRegions = []) {
+  assert.ok(region.x >= 0 && region.y >= 0 && region.x + region.width <= image.width && region.y + region.height <= image.height, "sentinel region escaped the rendered page");
+  let count = 0;
+  for (let y = region.y; y < region.y + region.height; y += 1) {
+    for (let x = region.x; x < region.x + region.width; x += 1) {
+      if (excludedRegions.some((excluded) => x >= excluded.x && x < excluded.x + excluded.width && y >= excluded.y && y < excluded.y + excluded.height)) continue;
+      const offset = (y * image.width + x) * 4;
+      if (predicate(image.data[offset], image.data[offset + 1], image.data[offset + 2])) count += 1;
+    }
+  }
+  return count;
 }
 
 function contentOrder(document, page) {
