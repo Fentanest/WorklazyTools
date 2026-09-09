@@ -1,13 +1,10 @@
 import { defineConfig } from "vite";
-import type { Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { gzipSync } from "node:zlib";
+import { moduleAttributionPlugin } from "./scripts/bundle-output-metadata.mjs";
 
 const configuredBase = process.env.VITE_BASE_PATH || "/";
 const base = `${configuredBase.startsWith("/") ? "" : "/"}${configuredBase.replace(/\/$/, "")}/`;
@@ -23,28 +20,6 @@ const browserNodePolyfills = () => nodePolyfills({
   protocolImports: true,
 });
 
-const moduleAttributionPlugin = (outputPath: string): Plugin => ({
-  name: "worklazy-bundle-module-attribution",
-  apply: "build",
-  generateBundle(_options, bundle) {
-    const chunks = Object.values(bundle).filter((item) => item.type === "chunk").map((chunk) => ({
-      file: chunk.fileName,
-      modules: Object.entries(chunk.modules).map(([id, module]) => {
-        const codeAvailable = typeof module.code === "string";
-        const code = codeAvailable ? module.code : "";
-        return {
-          id,
-          renderedLength: module.renderedLength,
-          renderedGzip: code.length ? gzipSync(code).length : 0,
-          renderedSha256: crypto.createHash("sha256").update(code).digest("hex"),
-          codeAvailable,
-        };
-      }),
-    }));
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, `${JSON.stringify(chunks)}\n`);
-  },
-});
 
 export default defineConfig({
   base,

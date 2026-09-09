@@ -8,11 +8,15 @@ import os from "node:os";
 import {
   BUNDLE_MEASUREMENT_SCHEMA_VERSION,
   MODULE_ATTRIBUTION_SCHEMA,
+  OUTPUT_KIND_MEASUREMENT_SCHEMA_VERSION,
+  OUTPUT_KIND_ATTRIBUTION_SCHEMA,
+  validateOutputKinds,
   assertMeasurementSchema,
   compareModuleAttribution,
   moduleInventoryEntry,
   normalizeModuleChunks,
 } from "./bundle-module-attribution.mjs";
+import { OUTPUT_METADATA_SCHEMA } from "./bundle-output-metadata.mjs";
 
 const scriptRepositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = process.env.BUNDLE_SOURCE_ROOT
@@ -73,7 +77,8 @@ export function runBundleMeasurement() {
       env: { ...process.env, WORKLAZY_STATIC_OUTPUT_DIR: outputDirectory, WORKLAZY_SOURCE_ROOT: repositoryRoot },
     });
     const moduleChunks = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
-    const report = measureOutput({ moduleChunks });
+    const metadataSha256 = fs.readFileSync(`${metadataPath}.sha256`, "utf8").trim();
+    const report = measureOutput({ moduleChunks, metadataSha256 });
     report.deploymentInventory = assertMeasuredDeploymentExecutionAssets(report, outputDirectory);
     report.budget = budget;
     printReport(report);
@@ -92,7 +97,7 @@ export function runBundleMeasurement() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runBundleMeasurement();
 
-export function measureOutput({ directory = outputDirectory, sourceRoot = repositoryRoot, routes = selectedRoutes, moduleChunks } = {}) {
+export function measureOutput({ directory = outputDirectory, sourceRoot = repositoryRoot, routes = selectedRoutes, moduleChunks, metadataSha256 } = {}) {
   const outputDirectory = directory;
   const manifestPath = path.join(directory, ".vite", "manifest.json");
   const posixRelative = (filePath) => path.relative(directory, filePath).split(path.sep).join("/");
@@ -130,6 +135,14 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
     });
   }
 
+  const legacyMetadata = Array.isArray(moduleChunks);
+  if (!legacyMetadata && moduleChunks?.schema !== OUTPUT_METADATA_SCHEMA) throw new Error("Unsupported Vite output metadata schema.");
+  if (!legacyMetadata && (!/^[a-f0-9]{64}$/.test(metadataSha256 ?? "")
+      || crypto.createHash("sha256").update(`${JSON.stringify(moduleChunks)}\n`).digest("hex") !== metadataSha256)) {
+    throw new Error("Vite output metadata does not match the independently retained SHA receipt.");
+  }
+  const outputKinds = legacyMetadata ? new Map() : validateOutputKinds(moduleChunks.outputs, [...recordsByHash.values()]);
+  const inventoryEntry = (file) => moduleInventoryEntry(file, outputKinds.get(file));
   const entryManifest = viteManifest["index.html"];
   if (!entryManifest?.file) throw new Error("Vite manifest does not contain the index.html entry chunk.");
   const entryHashes = new Set([hashByOutputFile.get(entryManifest.file)].filter(Boolean));
@@ -165,9 +178,22 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
   for (const sourceRecord of executionRecords) {
     const source = contentsByHash.get(sourceRecord.hash).toString("utf8");
     for (const [targetPath, targetRecord] of recordsByOutputPath) {
-      if (targetRecord === sourceRecord || moduleInventoryEntry(targetPath).attribution !== "opaque" || !source.includes(targetPath)) continue;
+      if (targetRecord === sourceRecord || inventoryEntry(targetPath).attribution !== "opaque" || !source.includes(targetPath)) continue;
       referencedRecords.get(sourceRecord).add(targetRecord);
       referenceSources.get(targetRecord).add(sourceRecord.paths[0]);
+    }
+  }
+
+  // Vite records URL assets as actual output references. Keep the historical
+  // reference propagation for existing worker/public assets unchanged.
+  for (const output of outputKinds.values()) {
+    const owner = recordsByOutputPath.get(output.file);
+    if (!owner) continue;
+    for (const reference of output.references) {
+      const target = recordsByOutputPath.get(reference);
+      if (!target || target === owner || inventoryEntry(reference).attribution !== "opaque") continue;
+      referencedRecords.get(owner).add(target);
+      referenceSources.get(target).add(output.file);
     }
   }
 
@@ -206,16 +232,18 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
 
   const availableRoutes = [...routeSourceEntries.keys()].sort();
   const affectedRoutes = selectAffectedRoutes(availableRoutes, routes);
-  const normalizedModules = normalizeModuleChunks(moduleChunks, {
+  const normalizedModules = normalizeModuleChunks(legacyMetadata ? moduleChunks : moduleChunks.chunks, {
     sourceRoot,
     nodeModulesRoot: path.join(sourceRoot, "node_modules"),
     realm: "main",
   });
   const measuredMainFiles = new Set(normalizedModules.map(({ file }) => file));
+  const missingOutputChunks = [...outputKinds.values()].filter(({ file, kind }) => kind === "chunk" && !measuredMainFiles.has(file));
+  if (missingOutputChunks.length) throw new Error(`Missing actual chunk module metadata: ${missingOutputChunks.map(({ file }) => file).join(", ")}.`);
   const missingManifestChunks = [...new Set(Object.values(viteManifest)
     .map(({ file }) => file)
     .filter((file) => file && hashByOutputFile.has(file)
-      && moduleInventoryEntry(file).attribution === "modules" && !measuredMainFiles.has(file)))];
+      && inventoryEntry(file).attribution === "modules" && !measuredMainFiles.has(file)))];
   if (missingManifestChunks.length) {
     throw new Error(`Module attribution metadata is missing Vite main chunks: ${missingManifestChunks.join(", ")}.`);
   }
@@ -232,11 +260,13 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
     record.routeOwners.size === 1 && record.routeOwners.has(routeId)
   ))) ]));
 
-  return {
-    schemaVersion: BUNDLE_MEASUREMENT_SCHEMA_VERSION,
-    moduleAttributionSchema: MODULE_ATTRIBUTION_SCHEMA,
+  const report = {
+    schemaVersion: legacyMetadata ? BUNDLE_MEASUREMENT_SCHEMA_VERSION : OUTPUT_KIND_MEASUREMENT_SCHEMA_VERSION,
+    moduleAttributionSchema: legacyMetadata ? MODULE_ATTRIBUTION_SCHEMA : OUTPUT_KIND_ATTRIBUTION_SCHEMA,
+    ...(!legacyMetadata ? { viteOutputs: moduleChunks.outputs, metadataSha256,
+      viteOutputsSha256: crypto.createHash("sha256").update(JSON.stringify(moduleChunks.outputs)).digest("hex") } : {}),
     modules: normalizedModules,
-    moduleInventory: jsRecords.flatMap(({ paths }) => paths.map(moduleInventoryEntry))
+    moduleInventory: jsRecords.flatMap(({ paths }) => paths.map(inventoryEntry))
       .sort((left, right) => left.file < right.file ? -1 : left.file > right.file ? 1 : 0),
     generatedAt: new Date().toISOString(),
     buildCommand: "vite build --manifest --outDir dist-measure && generate-static-pages (WORKLAZY_STATIC_OUTPUT_DIR=dist-measure)",
@@ -272,6 +302,8 @@ export function measureOutput({ directory = outputDirectory, sourceRoot = reposi
         .map(([source, item]) => ({ source, name: item.name ?? null })),
     })),
   };
+  if (!legacyMetadata) assertMeasurementSchema(report, "measurement");
+  return report;
 }
 
 export function isDeploymentExecutionAsset(relativePath) {
@@ -308,6 +340,14 @@ export function assertMeasuredDeploymentExecutionAssets(report, directory) {
   const missingFromDeployment = measured.filter((file) => !deployedSet.has(file));
   if (missingFromMeasurement.length || missingFromDeployment.length) {
     throw new Error(`Bundle deployment execution inventory mismatch: ${JSON.stringify({ missingFromMeasurement, missingFromDeployment })}`);
+  }
+  for (const record of report.files.filter(({ type }) => type === "js")) {
+    for (const file of record.paths) {
+      const bytes = fs.readFileSync(path.join(directory, file));
+      if (bytes.length !== record.bytes || crypto.createHash("sha256").update(bytes).digest("hex") !== record.hash) {
+        throw new Error(`Bundle deployment execution bytes/SHA mismatch: ${file}.`);
+      }
+    }
   }
   return { deployed, measured, missingFromMeasurement, missingFromDeployment };
 }

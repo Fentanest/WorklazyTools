@@ -1,7 +1,11 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 
+// Historical exports remain stable for readers/fixtures of the pinned baseline.
 export const BUNDLE_MEASUREMENT_SCHEMA_VERSION = 3;
+export const OUTPUT_KIND_MEASUREMENT_SCHEMA_VERSION = 4;
+export const OUTPUT_KIND_ATTRIBUTION_SCHEMA = "independent-rendered-gzip-largest-remainder-v1-main-opaque-vite-assets";
 export const MODULE_ATTRIBUTION_SCHEMA = "independent-rendered-gzip-largest-remainder-v1-main-opaque-workers";
 
 function assertBytes(value, label) {
@@ -30,9 +34,11 @@ export function outputFileRealm(file) {
   return "public";
 }
 
-export function moduleInventoryEntry(file) {
+export function moduleInventoryEntry(file, output) {
   const normalized = normalizePath(file);
-  const realm = outputFileRealm(normalized);
+  const realm = output?.kind === "chunk" ? "main"
+    : output?.kind === "asset" && outputFileRealm(normalized) === "main" ? "public"
+      : outputFileRealm(normalized);
   if (realm === "main") return { file: normalized, realm, attribution: "modules" };
   return {
     file: normalized,
@@ -247,14 +253,24 @@ export function compareModuleAttribution(current, baseline) {
 }
 
 export function assertMeasurementSchema(report, label) {
-  if (report?.schemaVersion !== BUNDLE_MEASUREMENT_SCHEMA_VERSION
-      || report?.moduleAttributionSchema !== MODULE_ATTRIBUTION_SCHEMA
+  const outputKindSchema = report?.schemaVersion === OUTPUT_KIND_MEASUREMENT_SCHEMA_VERSION
+    && report?.moduleAttributionSchema === OUTPUT_KIND_ATTRIBUTION_SCHEMA;
+  const historicalSchema = report?.schemaVersion === BUNDLE_MEASUREMENT_SCHEMA_VERSION
+    && report?.moduleAttributionSchema === MODULE_ATTRIBUTION_SCHEMA;
+  if ((!historicalSchema && !outputKindSchema)
       || !Array.isArray(report?.modules)
       || !Array.isArray(report?.moduleInventory)) {
     throw new Error(`${label} uses an unsupported bundle measurement schema; regenerate it with the module-attribution meter.`);
   }
   if (!Array.isArray(report.files)) throw new Error(`${label}.files must be an array.`);
 
+  if (outputKindSchema && !/^[a-f0-9]{64}$/.test(report.metadataSha256 ?? "")) {
+    throw new Error(`${label} is missing its Vite metadata provenance SHA.`);
+  }
+  if (outputKindSchema && crypto.createHash("sha256").update(JSON.stringify(report.viteOutputs) ?? "").digest("hex") !== report.viteOutputsSha256) {
+    throw new Error(`${label} Vite output evidence digest mismatch.`);
+  }
+  const outputs = outputKindSchema ? validateOutputKinds(report.viteOutputs, report.files, label) : new Map();
   const expectedInventory = new Map();
   for (const [fileIndex, file] of report.files.entries()) {
     if (file?.type !== "js") continue;
@@ -263,7 +279,7 @@ export function assertMeasurementSchema(report, label) {
       if (typeof filePath !== "string" || !filePath) throw new Error(`${label}.files[${fileIndex}].paths[${pathIndex}] must be a non-empty string.`);
       const normalized = normalizePath(filePath);
       if (expectedInventory.has(normalized)) throw new Error(`${label} has duplicate JS output path ${normalized}.`);
-      expectedInventory.set(normalized, moduleInventoryEntry(normalized));
+      expectedInventory.set(normalized, moduleInventoryEntry(normalized, outputs.get(normalized)));
     }
   }
 
@@ -316,4 +332,30 @@ export function assertMeasurementSchema(report, label) {
     if (entry.realm === "main" && !chunks.has(file)) throw new Error(`${label} is missing main chunk metadata for ${file}.`);
     if (entry.realm !== "main" && chunks.has(file)) throw new Error(`${label} may only use opaque attribution for worker/public JavaScript: ${file}.`);
   }
+}
+
+// Version 3 reports retain their exact historical classifier. Version 4 binds
+// emitted kinds to the measured bytes; absent evidence never creates an asset.
+export function validateOutputKinds(outputs, files, label = "metadata") {
+  if (!Array.isArray(outputs) || !outputs.length) throw new Error(`${label} requires Vite output-kind metadata.`);
+  const physical = new Map(files.filter(({ type }) => type === "js").flatMap((record) => record.paths.map((file) => [file, record])));
+  const result = new Map();
+  for (const output of outputs) {
+    const file = output?.file;
+    if (typeof file !== "string" || !file || file !== normalizePath(file)
+        || path.posix.isAbsolute(file) || file.split("/").some((part) => !part || part === "." || part === "..")
+        || !/\.m?js$/.test(file)) throw new Error(`${label} has invalid Vite output path.`);
+    if (result.has(file)) throw new Error(`${label} has duplicate Vite output ${file}.`);
+    if (!["asset", "chunk"].includes(output.kind)) throw new Error(`${label} has invalid Vite output kind for ${file}.`);
+    assertBytes(output.bytes, `${label}.${file}.bytes`);
+    if (!/^[a-f0-9]{64}$/.test(output.sha256 ?? "")) throw new Error(`${label} has invalid Vite output SHA for ${file}.`);
+    if (!Array.isArray(output.references) || output.references.some((ref) => typeof ref !== "string")) throw new Error(`${label} has invalid Vite output references for ${file}.`);
+    const record = physical.get(file);
+    if (!record || record.hash !== output.sha256 || record.bytes !== output.bytes) throw new Error(`${label} Vite output bytes/SHA mismatch or missing file: ${file}.`);
+    result.set(file, output);
+  }
+  for (const file of physical.keys()) {
+    if (file.startsWith("assets/") && !result.has(file)) throw new Error(`${label} is missing Vite output-kind metadata for ${file}.`);
+  }
+  return result;
 }

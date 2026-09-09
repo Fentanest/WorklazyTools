@@ -4,6 +4,30 @@
 
 ## 2026-09-09
 
+### U6 P0 검사기 재검토·부분 채택 (Codx)
+
+사용자의 계속 실행 지시와 Claude 재시도 RESOURCE_EXHAUSTED를 근거로 이번 U6에 한해 서로 다른 Astra 작성자 간 교차검수와 root 실측으로 재검토를 진행했다. Claude 판정을 받았다는 뜻이 아니며 전역 역할 규칙은 수정하지 않았다. 검사기 후보는 실제 OutputAsset/OutputChunk 증거를 사용하는 schema4로 채택했다. 고정 schema3 baseline·모듈별 gzip 및 largest-remainder 계산·기본5상한 null/override{}/multiplier1은 유지한다. 실제 청크는 동일 SHA 자산 별칭이 있어도 경로별 metadata가 필요하고, raw JS/MJS는 물리 SHA 중복제거 합계와 참조 route에 포함된다. 별도 metadata SHA receipt와 빌드/source/config 증거를 보존하며 receipt를 서명·동시 재작성 방지 보장으로 해석하지 않는다.
+
+후보의 기존 U4 replay 및 새 hook 실제 U4 빌드는 107 실행 경로의 바이트·5지표·모듈/귀속이 동일했다. 별도 worktree의 세 의존성 manifest 표기만 symlink 실경로로 대조했으며 바이트·귀속 비교를 완화하지 않았다. 원 P0 실패 출력도 새 hook metadata로 재계측해 113경로/97SHA, entry314301·route184794·shared1944120·app6128678·CSS38284B를 확인했다. 이 값은 이전 기술 prototype 그래프의 탐색이며 새 장부 엔진 전체 제품의 용량이 아니다. 원 실패 로그를 보존했다. 후보 CI37개 및 음성20개, 독립 Astra의 핵심4 replay, root의 기존/새 U4 및 음성 재실행이 통과했다. 저장소 통합 뒤 전체 단위511/511, production build(71정적 페이지), static 검증을 실제 통과했다. 현재 production JS/MJS/CSS108경로는 보존 U4 산출물과 실제 바이트가 전부 같았고 누락/추가0이므로 PDF 사용자 경로의 제품 코드는 변하지 않았다. 원 검사기 실패/누락 음성은 앞선 실제 replay를 유지한다. 통합 로그는 `/tmp/worklazy-u6-preflight/root-review/meter-integration-*`, 바이트 대조는 `meter-production-byte-oracle.json`이다. 자료: `/tmp/worklazy-u6-meter-p0/evidence/REPORT.md`, `/tmp/worklazy-u6-ledger-p0/meter-cross-audit/REPORT.md`.
+
+전체 U6 P0는 아직 미통과다. 신규 장부 pipeline의 A4150/200·24조합·pending encode 취소와 root 별도 실행은 통과했으나 반복 ZIP 등 독립 검수가 진행 중이며 자원식 후보 채택/P1 착수와 분리한다. 사전 준비 자산과 native decoder 내부는 소유 장부/전체 heap 보장으로 합산하지 않는다. Gemini 재사용 조사에서는 등록20개/SEO36경로를 AST로 재확인했고, 정적 redirect를 HTTP302로 기술한 주장·공용 App import만으로 광고 실행이라는 주장·공용 ZIP helper 무변경 재사용 주장은 실제 코드로 정정했다.
+
+### PDF 머리글·바닥글 파일명 축약 설정 요청 (Codx)
+
+사용자는 자동 말줄임으로 긴 파일명의 식별 의미가 약해진다는 이유로, 숫자로 축약 기준을 입력받고 해당 글자 수 이상에서 줄이는 옵션을 요청했다. 비긴급으로 진행 중 작업 사이에 편성하라는 우선순위를 backlog와 실행 목록에 기록했다. 기본 입력값이나 실제 배치 폭 초과 시 표시 정책까지 확정한 요청으로 확대하지 않았으며, 이번에는 제품 코드를 바꾸지 않았다. — Codx
+
+### U4 후속 라이브 종결과 U6 P0 실증 차단 (Codx)
+
+U4 사용자 신고 수리와 탭별 포함 체크박스는 `77c9ccd`를 포함한 release `83f210406fbedae41632ed77edffe2db058cae63`으로 배포했고 Pages **34321552862**가 성공했다. 라이브 ko/en에서 초기 포함값, 네 옵션 동시 출력, 도장만 제외한 출력과 PDF 재열기를 확인했다. 합성 한글 PDF의 라이브 미리보기는 로컬 QA와 PNG SHA가 같았다. 10개 PDF 경로의 실행 자산 236회 관찰과 로컬 계측의 크기·SHA가 일치했고 HTTP 14개 확인도 통과했다. U4·BL04 작업지시서를 오프라인 아카이브로 옮겼다. 최종 근거는 `/tmp/worklazy-u4-user-bugs/integration/CLOSURE.json`이다.
+
+U6는 별도 `/tmp` 사본에서 P0만 실행했다. 정본 자원 corpus **80/80**, PNG **368관측**, PDF save **48관측**의 최대 비율은 22.25와 22.12962962962963이다. 정본 식의 계수는 **28/28**이므로 기본 A4 150dpi PNG 예약만 **244,840,544B**로 binary 128MiB를 넘는다. 독립 전수 재집계와 실제 최대 대표 두 건 재실행으로 확인했다. 기존 1MiB 고정 여유를 비율 산정 전에 분리하는 미채택 후보는 계수 **2/2**, 전수 actual≤cap, A4 예약 **18,462,288B**이며 4096² 예약은 여전히 한도를 넘는다. 이 후보는 정본 변경이므로 조용히 적용하지 않았고, 상한 확대·전체 heap 또는 실기기 보장으로 해석하지 않는다.
+
+기술 후보의 초기 재렌더 품질 실패 12/24와 검사기의 페이지 테두리 누락을 보존했다. 전체 캔버스를 검사하고 반올림한 이미지 크기를 출력 DPI의 픽셀 격자에 맞춰 배치하자, 페이지 물리 치수와 품질 임계를 유지한 최종 **24/24**가 내부 검정·외부 오차 0·텍스트 0·최소 PDF 구조 검사를 통과했다. 별도 production 4회와 총 **28쌍**의 Pillow 전픽셀 독립 검사도 외부 오차 0이었다. EXIF 8방향, 이미지 3형식, 표준 글꼴·CMap·JPX wasm의 실제 메모리 공급, load 취소·재시도, legacy 44파일 diff 0을 확인했다. 입력 활성화 정확 시점의 별도 1회 처리에서 진행 중 요청과 이후 HTTP/WS/CSP 시도가 0이었고, 활성화 **0.322ms** 뒤 요청 변이는 검출했다. 기존 24조합의 준비 후 관측과 이 시간 경계 검사를 같은 범위로 합산하지 않는다.
+
+원 번들 계측은 실패했다. 첫 사본의 ignored video runtime 누락을 보완한 재시도는 Vite build와 정적 71페이지 생성 후, raw JavaScript 자산 3개를 `assets/*.js` 경로만으로 main/modules로 분류하는 기존 검사기에서 중단됐다. Vite manifest의 자산 항목에는 Rollup chunk 모듈 메타데이터가 없으며, 원 `measureOutput` 재호출로 같은 오류를 독립 재현했다. 원 meter·정본 baseline SHA와 5개 null 상한·override `{}`·multiplier 1은 유지했다. 189개 자산 **3,466,109B**의 크기·SHA는 일치한다. 물리 JS/MJS **113경로·97 SHA·unique gzip 6,128,678B**는 부분 관측값이며, 생성되지 않은 공식 5종 보고서를 대신하지 않는다. 자산 삭제·확장자 변경·가짜 메타데이터·검사 완화는 하지 않았다.
+
+**전체 P0는 미통과이며 P1 미착수다.** 실제 render/encode/save/verify/ZIP에 장부 예약을 연결하고 input·clone·Blob·stream·ImageData·canvas의 동시 소유와 초과 시 결과 폐기를 실증하는 작업도 남았다. 이 항목은 이번 시제품의 미완료이며 기존 부채로 면제하지 않는다. 자원 식과 검사기 호환성은 근거 재왕복 대상이다. Claude Opus/Sonnet 연결이 사용량 한도로 거절돼 판정을 받지 못했으며 Claude·Codex 이견 0 조건을 임의 면제하지 않았다. 제품 코드와 U6 등록·배포는 바꾸지 않았다. 전체 근거와 재현 경로는 `/tmp/worklazy-u6-preflight/P0-RESULT.md`, 기술·자원·번들 개별 보고서에 보존했다. — Codx
+
 ### U4 최초 배포 사후 확인과 사용자 신고 수리 (Codx)
 
 U4+BL04는 `5caefc4cadcdcca9d332bfe885d6445ea87ffc96`를 main에 한 번 push했고 Pages run **34317542767**이 성공했다. HTTP 16개, BL04 실제 오류/유사 문자열 업로드 8개, PDF 10개 경로와 두 PDF·ZIP 다운로드, 격리 6개 경로의 사후 확인을 실행했다. 라이브의 entry SHA가 최초 로컬 계측과 달라 실패한 원인은 CI의 `VITE_SITE_URL=https://worklazy.net/` 누락이었다. 같은 환경으로 다시 빌드한 scoped/full 계측과 라이브 PDF 실행 자산 236회 관찰의 SHA·바이트가 일치했다. 최초 실패를 삭제하지 않았고, HTML URL 처리 35B raw 차이와 hash 전파라는 Astra 독립 귀속을 보존했다. 최초 배포 실측 app gzip은 **5,944,194B**다. 초기 표시 CLS 최대 **0.015826**와 별도 업로드부터 다운로드까지 확장 측정 **0.189165**는 다른 구간이며 후자를 초기 게이트 통과로 바꾸지 않는다. 확장 구간의 도입 시점 미확정 P3는 backlog에 남겼다. 실제 COI service worker를 허용한 격리 6경로에서 광고 0·페이지 오류 0·문서화된 요청 정책 일치를 확인했고, `serviceWorkers:block` 및 응답 본문 수집 중 reload의 실패 로그도 보존했다. 증거 `/tmp/worklazy-u4-mergegate4/live-current-status.json`.
