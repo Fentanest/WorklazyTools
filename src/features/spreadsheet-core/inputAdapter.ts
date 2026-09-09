@@ -186,6 +186,7 @@ async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: Ab
         const formula = cell.formula || undefined;
         const rawModel = cell.model as ExcelJS.CellModel & { shareType?: "shared" | "array"; ref?: string };
         const cacheState = formula ? formulaCacheStates[sheetIndex]?.get(cell.address) ?? (cell.result === undefined ? "missing" : "present") : undefined;
+        const rawTypeValue = formula && cacheState === "present" ? cell.result : formula ? undefined : cell.value;
         const cachedValue = formula && cacheState === "present"
           ? cell.result === undefined ? "" : normalizeExcelJsValue(cell.result, adjustExcelJsDate)
           : undefined;
@@ -195,7 +196,7 @@ async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: Ab
           row: rowNumber,
           column: columnNumber,
           address: cell.address,
-          type: scalarType(value),
+          type: scalarType(value, isExcelJsErrorValue(rawTypeValue)),
           value,
           formula,
           cachedValue,
@@ -444,6 +445,13 @@ function normalizeExcelJsValue(value: ExcelJS.CellValue | undefined, adjustDate1
   if ("richText" in value) return value.richText.map((run) => run.text).join("");
   if ("formula" in value) return normalizeExcelJsValue(value.result, adjustDate1904);
   return String(value);
+}
+
+function isExcelJsErrorValue(value: ExcelJS.CellValue | undefined) {
+  return value !== null
+    && typeof value === "object"
+    && Object.prototype.hasOwnProperty.call(value, "error")
+    && typeof (value as { error?: unknown }).error === "string";
 }
 
 function normalizeSheetJsValue(value: unknown): SpreadsheetScalar {

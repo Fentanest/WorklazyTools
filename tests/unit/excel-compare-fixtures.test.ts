@@ -9,6 +9,7 @@ import JSZip from "jszip";
 import XLSX from "xlsx";
 
 import { compareSpreadsheetPair } from "../../src/features/excel-compare/compareEngine.ts";
+import { detectExcelCompareHeader } from "../../src/features/excel-compare/headerDetection.ts";
 import { DEFAULT_EXCEL_COMPARE_OPTIONS, type ExcelComparePairOptions } from "../../src/features/excel-compare/types.ts";
 import { parseSpreadsheetInput } from "../../src/features/spreadsheet-core/inputAdapter.ts";
 
@@ -43,6 +44,22 @@ test("synthetic format fixtures preserve BIFF8/XLSB formulas, real XLSM VBA and 
   assert.equal(macro.supportsStyleComparison, true);
   assert.equal(macro.sheets[0].cells.find((cell) => cell.address === "D2")?.formula, "B2+C2");
 
+  const macroSheet = macroArchive.file("xl/worksheets/sheet1.xml");
+  assert.ok(macroSheet);
+  let macroSheetXml = await macroSheet.async("string");
+  macroSheetXml = replaceCellXml(macroSheetXml, "B1", '<c r="B1" t="e"><v>#DIV/0!</v></c>');
+  macroSheetXml = replaceCellXml(macroSheetXml, "C1", '<c r="C1" t="e"><v>#N/A</v></c>');
+  macroSheetXml = removeCellXml(macroSheetXml, "D1");
+  macroSheetXml = removeCellXml(macroSheetXml, "E1");
+  macroArchive.file("xl/worksheets/sheet1.xml", macroSheetXml);
+  const errorMacroBytes = await macroArchive.generateAsync({ type: "uint8array" });
+  const errorMacro = await parseSpreadsheetInput("macro-errors.xlsm", errorMacroBytes.buffer);
+  const errorMacroCells = new Map(errorMacro.sheets[0].cells.map((cell) => [cell.address, cell]));
+  assert.deepEqual([errorMacroCells.get("B1")?.value, errorMacroCells.get("B1")?.type], ["#DIV/0!", "error"]);
+  assert.deepEqual([errorMacroCells.get("C1")?.value, errorMacroCells.get("C1")?.type], ["#N/A", "error"]);
+  assert.deepEqual(detectExcelCompareHeader(errorMacro.sheets[0]), { row: null, reason: "uncertain" });
+  assert.deepEqual(await macroArchive.file("xl/vbaProject.bin")?.async("nodebuffer"), vbaProject);
+
   const date1900 = await parse(output, "date-1900.xlsx");
   const date1904 = await parse(output, "date-1904.xlsx");
   assert.equal(date1900.date1904, false);
@@ -63,4 +80,14 @@ test("synthetic format fixtures preserve BIFF8/XLSB formulas, real XLSM VBA and 
 async function parse(directory: string, name: string) {
   const buffer = await readFile(path.join(directory, name));
   return parseSpreadsheetInput(name, buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+}
+
+function replaceCellXml(xml: string, address: string, replacement: string) {
+  const expression = new RegExp(`<c\\b[^>]*\\br=["']${address}["'][^>]*>[\\s\\S]*?<\\/c>`, "u");
+  assert.match(xml, expression);
+  return xml.replace(expression, replacement);
+}
+
+function removeCellXml(xml: string, address: string) {
+  return replaceCellXml(xml, address, "");
 }

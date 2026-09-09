@@ -4,6 +4,12 @@
 
 ## 2026-09-09
 
+### BL04 XLSX/XLSM 오류 셀 타입 보존 (Codx)
+
+기준 `d9c79b7`과 BL04 대상 diff는 0이었다. ExcelJS 정규화 전의 일반 셀 값 또는 `cacheState=present`인 수식 result에 own string `error` 속성이 있는지만 판정해 모델 `type`을 `error`로 교정했다. 값·표시값·캐시 값은 기존 문자열을 유지하고 missing 수식 캐시는 `null/undefined/blank/missing`을 유지한다. 오류명 문자열 blacklist, wrapper 재귀 탐색, legacy 숫자 오류 통일은 실제 문자열과 기존 모델을 바꾸므로 채택하지 않았다.
+
+합성 XLSX와 실제 content type·VBA 프로젝트를 가진 XLSM에서 `#DIV/0!`·`#N/A` 머리글은 `uncertain`, 같은 literal 문자열은 `suggested(1)`이었다. 일반 오류 7종, cached/missing 수식, 실제 오류와 literal의 비교 차이, 기존 XLS/XLSB/SpreadsheetML 및 비오류 모델을 대조했다. helper false·문자열 blacklist·수식 cache 오류 누락의 세 음성 대조는 각각 새 회귀를 실패시켰다. 전체 unit **499/499**, production build **2,857 modules·71 정적 페이지**, Excel compare·cleaner·QR bulk·utilities 스모크와 static recovery **119**를 통과했다. 번들 계측은 91 JS/1 CSS, entry **314,039B**, affected routes **4,236,777B**, shared **1,393,351B**, app **5,944,167B**, CSS **38,242B**이며 상한은 적용하지 않았다. 기준 게이트 기록의 app **5,944,016B**보다 **+151B**다. 첫 Excel compare 스모크는 preview 미기동으로 연결 거부였고 같은 소스에서 서버를 띄운 재실행은 통과했다. — Codx
+
 ### U4 PDF 마무리 main 통합 게이트 SCOPE-OUT (Codx)
 
 원격 main `2d0ff3a8280bdd1c3149946306d0ca394244fd5c`, U4 `d3a8d89d19dbb6165cacce8257838dc3dff9b084`, merge-base `5bc6854175331bdd73b267784d9633cdccda8446`를 대조하고 `fb7abde0d40649444b877ccf4ef899bb84f46631`로 `--no-ff` 병합했다. 공통 12파일의 모의 충돌은 CHANGELOG 1·review-notes 1·접근성 감사 7·접근성 unit 2·visual unit 1 hunk였다.

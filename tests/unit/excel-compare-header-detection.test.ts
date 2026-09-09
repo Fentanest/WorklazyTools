@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 
 import { detectExcelCompareHeader } from "../../src/features/excel-compare/headerDetection.ts";
@@ -89,6 +90,25 @@ test("the first judgeable formula or error row stops detection as uncertain", ()
     cell.value = "#VALUE!";
   }
   assert.deepEqual(detectExcelCompareHeader(errorSheet), { row: null, reason: "uncertain" });
+});
+
+test("serialized OOXML errors make automatic header detection uncertain while identical literal text stays suggested", async () => {
+  for (const [name, asErrors, expected] of [
+    ["actual-errors", true, { row: null, reason: "uncertain" }],
+    ["literal-errors", false, { row: 1, reason: "suggested" }],
+  ] as const) {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Data");
+    sheet.addRows([["ID", "#DIV/0!", "#N/A"], ["A", 1, 2], ["B", 3, 4]]);
+    if (asErrors) {
+      sheet.getCell("B1").value = { error: "#DIV/0!" };
+      sheet.getCell("C1").value = { error: "#N/A" };
+    }
+    const bytes = await workbook.xlsx.writeBuffer();
+    const data = new Uint8Array(bytes);
+    const parsed = await parseSpreadsheetInput(`${name}.xlsx`, data.buffer);
+    assert.deepEqual(detectExcelCompareHeader(parsed.sheets[0]), expected);
+  }
 });
 
 test("inspection requests cancel by pair and side and stale completions cannot finish the owner", () => {
