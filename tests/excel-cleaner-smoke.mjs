@@ -7,13 +7,18 @@ import { promisify } from "node:util";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
+import * as XLSX from "xlsx";
+
+import { assertVisibleXlsxReport } from "./xlsx-report-assertions.mjs";
 
 const runCommand = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
+const artifactDirectory = process.env.TEST_ARTIFACT_DIR;
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-excel-cleaner-smoke-"));
 const downloads = path.join(temporaryDirectory, "downloads");
 
 try {
+  if (artifactDirectory) await fs.mkdir(artifactDirectory, { recursive: true });
   await runCommand(process.execPath, ["scripts/generate-excel-cleaner-fixtures.mjs", temporaryDirectory]);
   await fs.mkdir(downloads);
   const duplicateA = path.join(temporaryDirectory, "a", "same.xlsx");
@@ -27,6 +32,17 @@ try {
   const redosCsv = path.join(temporaryDirectory, "redos.csv");
   await fs.writeFile(redosCsv, `Value\n${"a".repeat(38)}!\n`, "utf8");
   const originalFormula = await fs.readFile(path.join(temporaryDirectory, "formula.xlsx"));
+  const styleBoundaryInputs = [];
+  for (const codePoint of [0xfffe, 0xffff]) {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([["Value"], [123]]);
+    sheet.A2.z = `0\"A${String.fromCodePoint(codePoint)}B\"`;
+    XLSX.utils.book_append_sheet(workbook, sheet, "Data");
+    const filePath = path.join(temporaryDirectory, `style-${codePoint.toString(16)}.xls`);
+    await fs.writeFile(filePath, XLSX.write(workbook, { type: "buffer", bookType: "biff8" }));
+    if (artifactDirectory) await fs.copyFile(filePath, path.join(artifactDirectory, path.basename(filePath)));
+    styleBoundaryInputs.push({ codePoint, filePath });
+  }
 
   const browser = await puppeteer.launch({ executablePath: "/usr/bin/google-chrome", headless: true, protocolTimeout: 300_000, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   try {
@@ -111,6 +127,26 @@ try {
     if (exactDownloads.length !== 1 || !exactDownloads[0].name.endsWith(".xlsx")) throw new Error(`Single input output topology failed: ${JSON.stringify(exactDownloads.map((item) => item.name))}`);
     const exact = await inspectCleanerWorkbook(exactDownloads[0].bytes, "Data");
     if (exact.sheetCount !== 5 || exact.formula !== "A2+B2" || exact.reportSheets !== 4) throw new Error(`Formula save/reopen or four-report topology failed: ${JSON.stringify(exact)}`);
+
+    const styleBoundaries = [];
+    for (const { codePoint, filePath } of styleBoundaryInputs) {
+      await openCleaner(page);
+      await upload(page, filePath, 1);
+      await page.click("[data-testid='excel-cleaner-actions'] [data-ui-component='primary-button']");
+      await page.waitForSelector(".ui-operation-progress.ui-status-success");
+      const [download] = await downloadLinks(page, client, downloads, `style-${codePoint.toString(16)}`);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(download.bytes);
+      const cell = workbook.getWorksheet("Data").getCell("A2");
+      const archive = await JSZip.loadAsync(download.bytes);
+      const stylesXml = await archive.file("xl/styles.xml").async("string");
+      const expectedFormat = `0\"A�B\"`;
+      if (cell.value !== 123 || cell.numFmt !== expectedFormat || stylesXml.includes(String.fromCodePoint(codePoint))) {
+        throw new Error(`Number-format XML boundary failed: ${JSON.stringify({ codePoint, value: cell.value, numberFormat: cell.numFmt })}`);
+      }
+      if (artifactDirectory) await fs.writeFile(path.join(artifactDirectory, `style-browser-${codePoint.toString(16)}.xlsx`), download.bytes);
+      styleBoundaries.push({ codePoint: `U+${codePoint.toString(16).toUpperCase()}`, value: cell.value, numberFormat: cell.numFmt });
+    }
 
     await openCleaner(page);
     await upload(page, duplicateA, duplicateB, path.join(temporaryDirectory, "damaged.xlsx"), 2);
@@ -200,6 +236,7 @@ try {
       ruleOrderAfterDrag: order,
       actionGeometry,
       exact,
+      styleBoundaries,
       multiDownloads: multiDownloads.map(({ name, size }) => ({ name, size })),
       archiveNames,
       damagedMessage,
@@ -269,9 +306,10 @@ async function waitForDownload(directory, name) {
 }
 
 async function inspectCleanerWorkbook(bytes, cleanedSheetName) {
+  const visibility = await assertVisibleXlsxReport(bytes);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(bytes);
   const cleaned = workbook.getWorksheet(cleanedSheetName);
   const reports = ["변경 요약", "처리 규칙", "오류 행", "제외 행"].filter((name) => workbook.getWorksheet(name));
-  return { sheetCount: workbook.worksheets.length, reportSheets: reports.length, formula: cleaned?.getCell("D2").formula };
+  return { sheetCount: workbook.worksheets.length, reportSheets: reports.length, formula: cleaned?.getCell("D2").formula, visibility };
 }

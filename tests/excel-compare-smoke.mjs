@@ -9,6 +9,7 @@ import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
 
 import { assertMobileBottomLayout } from "./mobile-bottom-assertion.mjs";
+import { assertVisibleXlsxReport } from "./xlsx-report-assertions.mjs";
 
 const run = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
@@ -22,6 +23,40 @@ try {
   await fs.writeFile(path.join(temporaryDirectory, "direction-right.csv"), "ID,Value\nA,left\nB,right-only", "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "amount-left.csv"), "Amount\n10\n10", "utf8");
   await fs.writeFile(path.join(temporaryDirectory, "amount-right.csv"), "Amount\n10\n10\n10", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-left-a.csv"), `Key,Value\nA,${"x".repeat(17_000)}\nA,tail`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-right-a.csv"), "Key,Value\nA,right", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-left-b.csv"), `Key,Value\nB,${"y".repeat(17_000)}\nB,tail`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-right-b.csv"), "Key,Value\nB,right", "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"), `Key\n${"k".repeat(32_768)}\n${"k".repeat(32_768)}`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"), "Key\nother", "utf8");
+  const focusLeft = ["Key,Value"];
+  const focusRight = ["Key,Value"];
+  for (let index = 0; index < 151; index += 1) {
+    focusLeft.push(`A,left ${index} ${"long-value ".repeat(20)}`);
+    focusRight.push(`A,right ${index} ${"long-value ".repeat(20)}`);
+  }
+  await fs.writeFile(path.join(temporaryDirectory, "focus-left.csv"), `${focusLeft.join("\n")}\n`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "focus-right.csv"), `${focusRight.join("\n")}\n`, "utf8");
+  await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-left.xlsx"), "before");
+  await writeTypedKeyWorkbook(path.join(temporaryDirectory, "typed-key-right.xlsx"), "after");
+  await writeHeaderSuggestionWorkbook(path.join(temporaryDirectory, "header-suggestion-left.xlsx"), "left");
+  await writeHeaderSuggestionWorkbook(path.join(temporaryDirectory, "header-suggestion-right.xlsx"), "right");
+  await fs.writeFile(path.join(temporaryDirectory, "header-replacement.csv"), "ID,Name\nN1,New\nN2,File\n", "utf8");
+  const groupedUiLeft = ["Key,Value"];
+  const groupedUiRight = ["Key,Value"];
+  for (let index = 0; index < 51; index += 1) groupedUiLeft.push(`K000,left-zero-${index}`);
+  for (let index = 0; index < 51; index += 1) {
+    groupedUiLeft.push(`K002,${index === 0 ? `dialog-${"x".repeat(220)}` : `left-two-${index}`}`);
+    groupedUiRight.push(`K002,${index === 0 ? `dialog-right-${"y".repeat(220)}` : `right-two-${index}`}`);
+  }
+  for (let group = 3; group <= 500; group += 1) {
+    const key = `K${String(group).padStart(3, "0")}`;
+    groupedUiLeft.push(`${key},left-${group}-a`, `${key},left-${group}-b`);
+    groupedUiRight.push(`${key},right-${group}`);
+  }
+  groupedUiRight.push("K001,right-only-first", "K001,right-only-tail-value");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-ui-left.csv"), `${groupedUiLeft.join("\n")}\n`, "utf8");
+  await fs.writeFile(path.join(temporaryDirectory, "duplicate-ui-right.csv"), `${groupedUiRight.join("\n")}\n`, "utf8");
   const fixture = (name) => path.join(temporaryDirectory, name);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
@@ -195,11 +230,45 @@ try {
       || mobile.protectedHintSegmentLines !== 1
     ) throw new Error(`Mobile layout, drop-zone polish, or navigation clearance failed: ${JSON.stringify(mobile)}`);
 
+    const headerSelection = await assertHeaderSelectionFlow(browser, {
+      left: path.join(temporaryDirectory, "header-suggestion-left.xlsx"),
+      right: path.join(temporaryDirectory, "header-suggestion-right.xlsx"),
+      replacement: path.join(temporaryDirectory, "header-replacement.csv"),
+    });
     const b4Affordance = await assertB4Affordance(page, fixture("left.xlsx"), fixture("right.xlsx"));
     const integrityFailures = [];
     for (const mode of ["zero", "mismatch"]) integrityFailures.push(await assertIntegrityFailure(browser, fixture("left.xlsx"), fixture("right.xlsx"), mode));
     const swapDirection = await assertSwapDirection(browser, path.join(temporaryDirectory, "direction-left.csv"), path.join(temporaryDirectory, "direction-right.csv"));
     const optionalReconciliation = await assertOptionalReconciliation(browser, path.join(temporaryDirectory, "amount-left.csv"), path.join(temporaryDirectory, "amount-right.csv"), downloadRoot);
+    const groupedDuplicates = await assertGroupedDuplicateDownloads(browser, {
+      leftA: path.join(temporaryDirectory, "duplicate-left-a.csv"),
+      rightA: path.join(temporaryDirectory, "duplicate-right-a.csv"),
+      leftB: path.join(temporaryDirectory, "duplicate-left-b.csv"),
+      rightB: path.join(temporaryDirectory, "duplicate-right-b.csv"),
+    }, downloadRoot);
+    const groupedDuplicateUi = await assertGroupedDuplicateUi(browser, {
+      left: path.join(temporaryDirectory, "duplicate-ui-left.csv"),
+      right: path.join(temporaryDirectory, "duplicate-ui-right.csv"),
+    });
+    const focusCorrections = await assertFocusCorrectionPaths(browser, {
+      left: path.join(temporaryDirectory, "focus-left.csv"),
+      right: path.join(temporaryDirectory, "focus-right.csv"),
+    });
+    const standardKeyDisplay = await assertStandardKeyDisplay(browser, {
+      left: path.join(temporaryDirectory, "typed-key-left.xlsx"),
+      right: path.join(temporaryDirectory, "typed-key-right.xlsx"),
+    }, downloadRoot);
+    const duplicateKeyTooLong = [];
+    for (const language of ["ko", "en"]) {
+      duplicateKeyTooLong.push(await assertDuplicateKeyTooLongIsolation(browser, {
+        validLeftA: path.join(temporaryDirectory, "duplicate-left-a.csv"),
+        validRightA: path.join(temporaryDirectory, "duplicate-right-a.csv"),
+        invalidLeft: path.join(temporaryDirectory, "duplicate-key-too-long-left.csv"),
+        invalidRight: path.join(temporaryDirectory, "duplicate-key-too-long-right.csv"),
+        validLeftB: path.join(temporaryDirectory, "duplicate-left-b.csv"),
+        validRightB: path.join(temporaryDirectory, "duplicate-right-b.csv"),
+      }, downloadRoot, language));
+    }
 
     if (pageErrors.length) throw new Error(`Browser page errors:\n${pageErrors.join("\n")}`);
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
@@ -215,8 +284,14 @@ try {
       pairAssignment: { namesBeforeSwap, namesAfterSwap, overflowRejected: 2 },
       swapDirection,
       optionalReconciliation,
+      groupedDuplicates,
+      groupedDuplicateUi,
+      focusCorrections,
+      standardKeyDisplay,
+      duplicateKeyTooLong,
       isolatedFailure,
       statusFilters: filters.map(({ text }) => text),
+      headerSelection,
       b4Affordance,
       cancellation: "passed",
       mobile,
@@ -247,6 +322,7 @@ async function downloadReportLinks(page, client, root, phase) {
 }
 
 async function assertNineSheetReport(bytes, expectedSummary) {
+  await assertVisibleXlsxReport(bytes);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(bytes);
   const names = workbook.worksheets.map((sheet) => sheet.name);
@@ -273,6 +349,176 @@ async function waitForDownload(directory, fileName) {
 
 async function selectedPairNames(page) {
   return page.$$eval('[data-testid="excel-compare-pair"]:first-of-type [data-testid=excel-selected-file] strong', (items) => items.map((item) => item.textContent || ""));
+}
+
+async function assertHeaderSelectionFlow(browser, files) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  page.setDefaultTimeout(180_000);
+  await page.setRequestInterception(true);
+  page.on("request", (request) => {
+    if (request.url().includes("excelCompare.worker")) setTimeout(() => request.continue(), 250);
+    else void request.continue();
+  });
+  await page.evaluateOnNewDocument(() => {
+    localStorage.setItem("worklazy_privacy_consent", "granted");
+    globalThis.__excelInspectMessages = [];
+    globalThis.__excelWorkerTerminations = 0;
+    const NativeWorker = globalThis.Worker;
+    globalThis.Worker = class extends NativeWorker {
+      postMessage(message, transfer) {
+        if (message?.type === "inspect") globalThis.__excelInspectMessages.push({
+          fileName: message.fileName,
+          headerRows: [...(message.headerRows || [])],
+          detectHeader: message.detectHeader,
+        });
+        return super.postMessage(message, transfer);
+      }
+      terminate() {
+        globalThis.__excelWorkerTerminations += 1;
+        return super.terminate();
+      }
+    };
+  });
+  try {
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
+    await input.uploadFile(files.left, files.right);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2
+      && !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+
+    const initial = await page.evaluate(() => ({
+      inputs: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((element) => element.value),
+      sources: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((element) => element.getAttribute("data-source")),
+      guidance: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((element) => element.textContent || ""),
+      help: [...document.querySelectorAll('[data-testid=excel-header-help]')].map((element) => element.textContent || ""),
+      describedBy: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((element) => {
+        const ids = (element.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+        return ids.length === 2 && ids.every((id) => Boolean(document.getElementById(id)));
+      }),
+      statuses: document.querySelectorAll('[data-testid=excel-header-status][role=status][aria-live=polite]').length,
+      messages: globalThis.__excelInspectMessages,
+    }));
+    const exactHelp = "선택한 행 다음부터 비교합니다. 설명·필터·요약 행이 앞에 있으면 실제 열 이름이 있는 행을 선택해 주세요. 머리글이 없는 표는 맨 위에 열 이름 행을 추가해 주세요.";
+    if (JSON.stringify(initial.inputs) !== JSON.stringify(["4", "4"])
+      || initial.sources.some((source) => source !== "suggested")
+      || initial.guidance.some((text) => !text.includes("4행을 머리글 후보로 선택했습니다"))
+      || initial.help.some((text) => text !== exactHelp)
+      || initial.describedBy.some((value) => !value)
+      || initial.statuses !== 2
+      || initial.messages.length !== 2
+      || initial.messages.some((message) => message.detectHeader !== true || JSON.stringify(message.headerRows) !== "[1]")) {
+      throw new Error(`Initial header suggestion, one-pass inspection, or accessible guidance failed: ${JSON.stringify(initial)}`);
+    }
+
+    await setHeaderInput(page, 0, "1");
+    await page.waitForFunction(() => document.querySelector('[data-testid=excel-header-guidance]')?.getAttribute("data-source") === "manual");
+    const cachedMessageCount = await page.evaluate(() => globalThis.__excelInspectMessages.length);
+    if (cachedMessageCount !== 2) throw new Error(`A cached manual row launched another inspection: ${cachedMessageCount}.`);
+
+    await setHeaderInput(page, 0, "5");
+    await page.waitForFunction(() => globalThis.__excelInspectMessages.length === 3);
+    const busyDuringRefresh = await page.$eval("[data-testid=excel-pair-swap]", (button) => button.disabled);
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-pair-swap]")?.disabled);
+    const manualRefresh = await page.evaluate(() => ({
+      guidance: document.querySelector('[data-testid=excel-header-guidance]')?.textContent || "",
+      source: document.querySelector('[data-testid=excel-header-guidance]')?.getAttribute("data-source"),
+      message: globalThis.__excelInspectMessages.at(-1),
+      statuses: document.querySelectorAll('[data-testid=excel-header-status]').length,
+    }));
+    if (!busyDuringRefresh || manualRefresh.source !== "manual" || !manualRefresh.guidance.includes("선택한 머리글: 5행")
+      || manualRefresh.message.detectHeader !== false || JSON.stringify(manualRefresh.message.headerRows) !== "[5]"
+      || manualRefresh.statuses !== 1) {
+      throw new Error(`Manual uncached header refresh did not preserve ownership and status semantics: ${JSON.stringify({ busyDuringRefresh, manualRefresh })}`);
+    }
+
+    const leftSheet = await page.$('[data-testid=excel-sheet-fields] select');
+    await leftSheet.select("Second");
+    await page.waitForFunction(() => document.querySelector('[data-testid=excel-sheet-fields] input[type=number]')?.value === "2");
+    await setHeaderInput(page, 0, "1");
+    await leftSheet.select("Candidate");
+    await page.waitForFunction(() => document.querySelector('[data-testid=excel-sheet-fields] input[type=number]')?.value === "5");
+
+    const beforeSwap = await page.evaluate(readHeaderPairState);
+    await page.click("[data-testid=excel-pair-swap]");
+    const afterSwap = await page.evaluate(readHeaderPairState);
+    if (JSON.stringify(afterSwap.names) !== JSON.stringify([...beforeSwap.names].reverse())
+      || JSON.stringify(afterSwap.sheets) !== JSON.stringify([...beforeSwap.sheets].reverse())
+      || JSON.stringify(afterSwap.rows) !== JSON.stringify([...beforeSwap.rows].reverse())
+      || JSON.stringify(afterSwap.sources) !== JSON.stringify([...beforeSwap.sources].reverse())) {
+      throw new Error(`Header suggestions and manual selections did not swap with their files: ${JSON.stringify({ beforeSwap, afterSwap })}`);
+    }
+
+    const terminationsBeforeReplacement = await page.evaluate(() => globalThis.__excelWorkerTerminations);
+    let selectedRemove = (await page.$$('[data-testid=excel-selected-file] button'))[0];
+    await selectedRemove.click();
+    await input.uploadFile(files.left);
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].some((item) => item.textContent === "header-suggestion-left.xlsx"));
+    selectedRemove = (await page.$$('[data-testid=excel-selected-file] button'))[0];
+    await selectedRemove.click();
+    await input.uploadFile(files.replacement);
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].some((item) => item.textContent === "header-replacement.csv")
+      && document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const replacement = await page.evaluate(() => ({
+      names: [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].map((item) => item.textContent || ""),
+      sheets: [...document.querySelectorAll('[data-testid=excel-sheet-fields] select')].map((item) => item.value),
+      rows: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((item) => item.value),
+      sources: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((item) => item.getAttribute("data-source")),
+      errors: document.querySelectorAll('[data-testid=excel-file-error]').length,
+      terminations: globalThis.__excelWorkerTerminations,
+    }));
+    const replacementIndex = replacement.names.indexOf("header-replacement.csv");
+    if (replacementIndex < 0 || replacement.rows[replacementIndex] !== "1" || replacement.sources[replacementIndex] !== "suggested"
+      || replacement.errors !== 0 || replacement.terminations <= terminationsBeforeReplacement) {
+      throw new Error(`Replacement race reused stale manual state or did not cancel its owner: ${JSON.stringify({ terminationsBeforeReplacement, replacement })}`);
+    }
+
+    await page.click("[data-testid=excel-add-pair]");
+    const pairInputs = await page.$$('[data-testid=excel-compare-page] input[type=file]');
+    await pairInputs[1].uploadFile(files.left);
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid=excel-compare-pair]').length === 2
+      && document.querySelectorAll('[data-testid=excel-selected-file]').length === 3);
+    const terminationsBeforePairRemoval = await page.evaluate(() => globalThis.__excelWorkerTerminations);
+    const pairRemoveButtons = await page.$$('[data-testid=excel-compare-pair] button[aria-label^="비교 쌍"]');
+    await pairRemoveButtons.at(-1).click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid=excel-compare-pair]').length === 1);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const afterPairRemoval = await page.evaluate(() => ({
+      pairs: document.querySelectorAll('[data-testid=excel-compare-pair]').length,
+      errors: document.querySelectorAll('[data-testid=excel-file-error]').length,
+      terminations: globalThis.__excelWorkerTerminations,
+    }));
+    if (afterPairRemoval.pairs !== 1 || afterPairRemoval.errors !== 0 || afterPairRemoval.terminations <= terminationsBeforePairRemoval) {
+      throw new Error(`Pair removal did not cancel and suppress its stale inspection: ${JSON.stringify({ terminationsBeforePairRemoval, afterPairRemoval })}`);
+    }
+
+    return { initial, cachedMessageCount, manualRefresh, beforeSwap, afterSwap, replacement, afterPairRemoval };
+  } finally {
+    await page.close();
+  }
+}
+
+function readHeaderPairState() {
+  return {
+    names: [...document.querySelectorAll('[data-testid=excel-selected-file] strong')].map((item) => item.textContent || ""),
+    sheets: [...document.querySelectorAll('[data-testid=excel-sheet-fields] select')].map((item) => item.value),
+    rows: [...document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')].map((item) => item.value),
+    sources: [...document.querySelectorAll('[data-testid=excel-header-guidance]')].map((item) => item.getAttribute("data-source")),
+  };
+}
+
+async function setHeaderInput(page, index, value) {
+  await page.$$eval('[data-testid=excel-sheet-fields] input[type=number]', (inputs, selected) => {
+    const input = inputs[selected.index];
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter.call(input, selected.value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  }, { index, value });
+  await page.waitForFunction((selected) => document.querySelectorAll('[data-testid=excel-sheet-fields] input[type=number]')[selected.index]?.value === selected.value, {}, { index, value });
+  await page.keyboard.press("Tab");
 }
 
 async function assertB4Affordance(page, leftPath, rightPath) {
@@ -474,6 +720,664 @@ async function assertOptionalReconciliation(browser, leftPath, rightPath, root) 
     }
     if (parameters.reconciliationCandidatesPerTarget !== "10") throw new Error(`Candidate limit did not match Parameters: ${parameters.reconciliationCandidatesPerTarget}`);
     return { size: report.size, summary, unused: "date+partner", candidateLimit: parameters.reconciliationCandidatesPerTarget };
+  } finally {
+    await page.close();
+  }
+}
+
+async function assertGroupedDuplicateDownloads(browser, files, root) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const client = await page.createCDPSession();
+    let inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[0].uploadFile(files.leftA, files.rightA);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.select('[data-testid=excel-pair-mode-options] select', "error");
+    await page.click("[data-testid=excel-add-pair]");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
+    inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[1].uploadFile(files.leftB, files.rightB);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 4);
+    const policySelectors = await page.$$('[data-testid=excel-pair-mode-options] select');
+    await policySelectors[1].select("error");
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    const downloads = await downloadReportLinks(page, client, root, "grouped-duplicates");
+    const reports = downloads.filter((item) => item.name.endsWith(".xlsx"));
+    const zipFile = downloads.find((item) => item.name.endsWith(".zip"));
+    if (reports.length !== 2 || !zipFile) throw new Error(`Grouped duplicate run must create two reports and one ZIP: ${downloads.map((item) => item.name).join(", ")}`);
+
+    const direct = [];
+    for (const report of reports) direct.push(await assertGroupedDuplicateReport(report.bytes));
+    const archive = await JSZip.loadAsync(zipFile.bytes);
+    const zipped = [];
+    for (const entry of Object.values(archive.files).filter((candidate) => !candidate.dir)) {
+      zipped.push(await assertGroupedDuplicateReport(await entry.async("uint8array")));
+    }
+    if (zipped.length !== 2) throw new Error(`Grouped duplicate ZIP must contain two reports: ${zipped.length}`);
+    return { direct, zipped, zipBytes: zipFile.size };
+  } finally {
+    await page.close();
+  }
+}
+
+async function assertGroupedDuplicateUi(browser, files) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.setViewport({ width: 1360, height: 940, deviceScaleFactor: 1 });
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
+    await input.uploadFile(files.left, files.right);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    await page.$$eval('[data-testid=excel-status-filters] button:not([data-status="duplicate"])', (buttons) => buttons.forEach((button) => button.click()));
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 500);
+
+    const collapsed = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length,
+      duplicateLists: document.querySelectorAll("[data-testid=excel-duplicate-list]").length,
+      countText: document.querySelector("[data-testid=excel-duplicate-guidance] strong")?.textContent?.trim() || "",
+      hasInternalText: /string:|number:|DUPLICATE_KEY/u.test(document.querySelector("[data-testid=excel-result-table]")?.textContent || ""),
+      showMore: document.querySelector("[data-testid=excel-result-show-more]")?.textContent?.trim() || "",
+      firstRightEmpty: document.querySelector("[data-testid=excel-duplicate-row]:first-child [data-testid=excel-duplicate-empty][data-side=right]")?.textContent?.trim() || "",
+      firstRightButtons: document.querySelectorAll("[data-testid=excel-duplicate-row]:first-child [data-side=right] button").length,
+    }));
+    if (collapsed.rows !== 500 || collapsed.duplicateLists !== 0 || collapsed.countText !== "중복 키 501개" || collapsed.showMore !== "결과 더 보기 (1개 남음)"
+      || collapsed.firstRightEmpty !== "오른쪽 0건" || collapsed.firstRightButtons !== 0
+      || collapsed.hasInternalText) {
+      throw new Error(`Grouped duplicate collapsed state, display key, or 500-group limit is invalid: ${JSON.stringify(collapsed)}`);
+    }
+
+    await setResultSearch(page, "right-only-tail-value");
+    const valueSearch = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length,
+      text: document.querySelector("[data-testid=excel-result-table] tbody")?.textContent || "",
+      lists: document.querySelectorAll("[data-testid=excel-duplicate-list]").length,
+    }));
+    if (valueSearch.rows !== 1 || !valueSearch.text.includes("K001") || valueSearch.text.includes("right-only-tail-value") || valueSearch.lists !== 0) {
+      throw new Error(`Search did not inspect a value outside the closed DOM: ${JSON.stringify(valueSearch)}`);
+    }
+    await setResultSearch(page, "552");
+    const rowSearch = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length,
+      text: document.querySelector("[data-testid=excel-result-table] tbody")?.textContent || "",
+    }));
+    if (rowSearch.rows < 1 || !rowSearch.text.includes("K001") || !rowSearch.text.includes("왼쪽 0건")) {
+      throw new Error(`Search did not inspect every source row number outside the closed DOM: ${JSON.stringify(rowSearch)}`);
+    }
+    await setResultSearch(page, "");
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 500);
+    await page.click("[data-testid=excel-result-show-more]");
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 501);
+    const lastGroup = await page.$eval("[data-testid=excel-duplicate-row]:last-child", (row) => ({
+      text: row.textContent || "",
+      leftButtons: row.querySelectorAll('[data-side="left"] button').length,
+    }));
+    if (!lastGroup.text.includes("K001") || !lastGroup.text.includes("왼쪽 0건") || lastGroup.leftButtons !== 0) {
+      throw new Error(`The 501st group or zero-side text is invalid: ${JSON.stringify(lastGroup)}`);
+    }
+
+    await page.click('[data-testid=excel-status-filters] button[data-status="duplicate"]');
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 0);
+    await page.click('[data-testid=excel-status-filters] button[data-status="duplicate"]');
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 500);
+
+    const secondRow = "[data-testid=excel-duplicate-row]:nth-child(2)";
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=left]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list][data-side=left] li`).length === 50, {}, secondRow);
+    const independentBeforeMore = await page.$eval(secondRow, (row) => ({
+      leftItems: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="left"] li').length,
+      rightLists: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="right"]').length,
+      leftExpanded: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="left"]')?.getAttribute("aria-expanded"),
+      rightExpanded: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="right"]')?.getAttribute("aria-expanded"),
+    }));
+    if (JSON.stringify(independentBeforeMore) !== JSON.stringify({ leftItems: 50, rightLists: 0, leftExpanded: "true", rightExpanded: "false" })) {
+      throw new Error(`Duplicate sides did not expand independently at 50 rows: ${JSON.stringify(independentBeforeMore)}`);
+    }
+    await page.click(`${secondRow} [data-testid=excel-duplicate-show-more][data-side=left]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list][data-side=left] li`).length === 51, {}, secondRow);
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=right]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list][data-side=right] li`).length === 50, {}, secondRow);
+
+    const fullValueTrigger = await page.$(`${secondRow} [data-testid=excel-full-value-trigger][data-side=left]`);
+    await fullValueTrigger.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('[data-testid=excel-full-value-dialog][role="dialog"]');
+    const dialog = await page.$eval('[data-testid=excel-full-value-dialog]', (element) => ({
+      label: element.getAttribute("aria-labelledby"),
+      text: element.textContent || "",
+    }));
+    if (!dialog.label || !dialog.text.includes("전체 값") || !dialog.text.includes(`dialog-${"x".repeat(220)}`)) {
+      throw new Error(`Full-value dialog is not named or lossless: ${JSON.stringify({ ...dialog, text: dialog.text.slice(0, 80) })}`);
+    }
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-full-value-dialog]"));
+    const focusReturned = await page.evaluate(() => document.activeElement?.matches('[data-testid=excel-full-value-trigger][data-side="left"]'));
+    if (!focusReturned) throw new Error("Full-value dialog did not return focus to its keyboard trigger after Escape.");
+
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=left]`);
+    const independentAfterClose = await page.$eval(secondRow, (row) => ({
+      leftLists: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="left"]').length,
+      rightItems: row.querySelectorAll('[data-testid=excel-duplicate-list][data-side="right"] li').length,
+      nestedButtons: row.querySelectorAll('button button').length,
+      minimumTargetHeight: Math.min(...Array.from(row.querySelectorAll("button"), (button) => button.getBoundingClientRect().height)),
+    }));
+    if (independentAfterClose.leftLists !== 0 || independentAfterClose.rightItems !== 50 || independentAfterClose.nestedButtons !== 0 || independentAfterClose.minimumTargetHeight < 44) {
+      throw new Error(`Independent close, button nesting, or touch targets are invalid: ${JSON.stringify(independentAfterClose)}`);
+    }
+    const layout = await page.$eval(secondRow, (row) => {
+      const lineCount = (element) => {
+        const range = document.createRange();
+        const text = element.firstChild;
+        if (!text) return 0;
+        const lines = new Set();
+        for (let index = 0; index < text.length; index += 1) {
+          if (!text.data[index].trim()) continue;
+          range.setStart(text, index);
+          range.setEnd(text, index + 1);
+          lines.add(range.getBoundingClientRect().y);
+        }
+        return lines.size;
+      };
+      const table = row.closest("table");
+      const region = table.parentElement;
+      const headers = [...table.querySelectorAll("th")];
+      return {
+        statusLines: lineCount(row.cells[1].querySelector("span")),
+        reasonLines: lineCount(row.cells[6]),
+        statusWidth: row.cells[1].getBoundingClientRect().width,
+        reasonWidth: row.cells[6].getBoundingClientRect().width,
+        keyWidth: row.cells[3].getBoundingClientRect().width,
+        statusWhiteSpace: getComputedStyle(row.cells[1]).whiteSpace,
+        reasonWhiteSpace: getComputedStyle(row.cells[6]).whiteSpace,
+        headerWhiteSpace: headers.map((header) => getComputedStyle(header).whiteSpace),
+        tableWidth: table.getBoundingClientRect().width,
+        regionWidth: region.getBoundingClientRect().width,
+      };
+    });
+    if (layout.statusLines !== 1 || layout.reasonLines !== 1 || layout.statusWhiteSpace !== "nowrap" || layout.reasonWhiteSpace !== "nowrap"
+      || layout.headerWhiteSpace.some((value) => value !== "nowrap") || layout.keyWidth < 128 || layout.tableWidth <= layout.regionWidth) {
+      throw new Error(`Grouped result status, reason, header, key width, or named horizontal scroll layout is invalid: ${JSON.stringify(layout)}`);
+    }
+
+    await page.click(`${secondRow} [data-testid=excel-duplicate-toggle][data-side=right]`);
+    await page.waitForFunction((selector) => document.querySelectorAll(`${selector} [data-testid=excel-duplicate-list]`).length === 0, {}, secondRow);
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+    await setResultSearch(page, "K002");
+    await page.$eval('[data-testid="excel-result-search"] input', (input) => input.focus());
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileLeftToggleCollapsed = await focusedResultVisibility(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const mobileLeftToggle = await focusedResultVisibility(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileLeftValue = await focusedResultVisibility(page, "excel-full-value-trigger", "left");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('[data-testid=excel-full-value-dialog][role="dialog"]');
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-full-value-dialog]"));
+    await settleFocusScroll(page);
+    const mobileLeftValueAfterEscape = await focusedResultVisibility(page, "excel-full-value-trigger", "left");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileRightToggle = await focusedResultVisibility(page, "excel-duplicate-toggle", "right");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const mobileRightToggleExpanded = await focusedResultVisibility(page, "excel-duplicate-toggle", "right");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const mobileRightValue = await focusedResultVisibility(page, "excel-full-value-trigger", "right");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('[data-testid=excel-full-value-dialog][role="dialog"]');
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector("[data-testid=excel-full-value-dialog]"));
+    await settleFocusScroll(page);
+    const mobileRightValueAfterEscape = await focusedResultVisibility(page, "excel-full-value-trigger", "right");
+    const mobileFocusVisibility = {
+      leftToggleCollapsed: mobileLeftToggleCollapsed,
+      leftToggle: mobileLeftToggle,
+      leftValue: mobileLeftValue,
+      leftValueAfterEscape: mobileLeftValueAfterEscape,
+      rightToggle: mobileRightToggle,
+      rightToggleExpanded: mobileRightToggleExpanded,
+      rightValue: mobileRightValue,
+      rightValueAfterEscape: mobileRightValueAfterEscape,
+    };
+    return { collapsed, valueSearch, rowSearch, lastGroup, independentBeforeMore, independentAfterClose, layout, dialogNamed: true, keyboardOpen: true, escapeClosed: true, focusReturned, mobileFocusVisibility };
+  } finally {
+    await page.close();
+  }
+}
+
+async function assertFocusCorrectionPaths(browser, files) {
+  const pointer = [];
+  for (const mode of ["mouse", "touch"]) {
+    const page = await openDuplicateFocusPage(browser, files, "en", { width: 390, height: 844, isMobile: true, hasTouch: true });
+    try {
+      const toggle = '[data-testid="excel-duplicate-toggle"][data-side="left"]';
+      const showMore = '[data-testid="excel-duplicate-show-more"][data-side="left"]';
+      await placeResultControl(page, toggle, 350);
+      const open = await pointerResultAction(page, toggle, mode, () => page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-duplicate-list"][data-side="left"] li').length === 50));
+      await placeResultControl(page, showMore, 350);
+      const loadMore = await pointerResultAction(page, showMore, mode, () => page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-duplicate-list"][data-side="left"] li').length === 100));
+      const loaded = await page.evaluate(() => {
+        const items = [...document.querySelectorAll('[data-testid="excel-duplicate-list"][data-side="left"] li')];
+        const firstNew = items[50];
+        const rect = firstNew.getBoundingClientRect();
+        return {
+          count: items.length,
+          firstNewText: firstNew.textContent || "",
+          firstNewVisible: rect.top < window.innerHeight && rect.bottom > 0,
+        };
+      });
+      await placeResultControl(page, toggle, 350);
+      const close = await pointerResultAction(page, toggle, mode, () => page.waitForFunction(() => !document.querySelector('[data-testid="excel-duplicate-list"][data-side="left"]')));
+      if ([open, loadMore, close].some((result) => Math.abs(result.deltaY) > 1 || result.focusVisible || result.calls.length)
+        || loaded.count !== 100 || !loaded.firstNewText.includes("Source row 52") || !loaded.firstNewVisible) {
+        throw new Error(`Pointer result controls moved the reading position or hid the first newly loaded row: ${JSON.stringify({ mode, open, loadMore, close, loaded })}`);
+      }
+      pointer.push({ mode, open, loadMore, close, loaded });
+    } finally {
+      await page.close();
+    }
+  }
+
+  const page = await openDuplicateFocusPage(browser, files, "en", { width: 821, height: 844 });
+  try {
+    await page.$eval('[data-testid="excel-result-search"] input', (input) => input.focus());
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const width821Collapsed = await focusedResultGeometry(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const width821Expanded = await focusedResultGeometry(page, "excel-duplicate-toggle", "left");
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    await page.setViewport({ width: 820, height: 844, deviceScaleFactor: 1 });
+    await settleFocusScroll(page);
+    await page.keyboard.press("Tab");
+    await settleFocusScroll(page);
+    const width820Right = await focusedResultGeometry(page, "excel-duplicate-toggle", "right");
+    await clearFocusScrollCalls(page);
+    await page.setViewport({ width: 821, height: 844, deviceScaleFactor: 1 });
+    await settleFocusScroll(page);
+    const width821AfterResize = await focusedResultGeometry(page, "excel-duplicate-toggle", "right");
+    const resizeCalls = await readFocusScrollCalls(page);
+    if (resizeCalls.filter((call) => call.scope === "element").length !== 1 || resizeCalls.some((call) => call.scope === "window")) {
+      throw new Error(`The active 820-to-821 focus resize did not use one horizontal-only correction: ${JSON.stringify(resizeCalls)}`);
+    }
+
+    await page.setViewport({ width: 320, height: 844, deviceScaleFactor: 1 });
+    await settleFocusScroll(page);
+    await page.keyboard.down("Shift");
+    await page.keyboard.press("Tab");
+    await page.keyboard.up("Shift");
+    await settleFocusScroll(page);
+    await clearFocusScrollCalls(page);
+    await page.keyboard.press("Enter");
+    await settleFocusScroll(page);
+    const width320 = await focusedResultGeometry(page, "excel-duplicate-toggle", "left");
+    const width320Calls = await readFocusScrollCalls(page);
+    const horizontalDeltas = width320Calls.filter((call) => call.scope === "element").map((call) => call.value);
+    if (width320.rect.width <= width320.availableWidth || width320.startGap < 3 || !width320.centerVisible
+      || horizontalDeltas.length !== 1 || horizontalDeltas.some((delta) => delta >= 0) || width320Calls.some((call) => call.scope === "window")) {
+      throw new Error(`The oversized 320px control did not settle at its start edge in one direction: ${JSON.stringify({ width320, width320Calls })}`);
+    }
+    return { pointer, width821Collapsed, width821Expanded, width820Right, width821AfterResize, resizeCalls, width320, width320Calls };
+  } finally {
+    await page.close();
+  }
+}
+
+async function openDuplicateFocusPage(browser, files, language, viewport) {
+  const page = await browser.newPage();
+  page.setDefaultTimeout(180_000);
+  await page.setViewport({ deviceScaleFactor: 1, ...viewport });
+  await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await page.goto(`${baseUrl}/${language}/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-testid="excel-compare-page"]');
+  const input = await page.$('[data-testid="excel-compare-page"] input[type="file"]');
+  await input.uploadFile(files.left, files.right);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+  await page.click('[data-testid="excel-compare-mode-grid"] button:nth-child(2)');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="excel-compare-actions"] [data-ui-component="primary-button"]')?.disabled);
+  await page.click('[data-testid="excel-compare-actions"] [data-ui-component="primary-button"]');
+  await page.waitForSelector(".ui-operation-progress.ui-status-success");
+  await page.$$eval('[data-testid="excel-status-filters"] button:not([data-status="duplicate"])', (buttons) => buttons.forEach((button) => button.click()));
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 1);
+  await page.evaluate(() => {
+    globalThis.__excelFocusScrollCalls = [];
+    const windowScrollBy = window.scrollBy.bind(window);
+    window.scrollBy = (...args) => {
+      globalThis.__excelFocusScrollCalls.push({ scope: "window", value: typeof args[0] === "object" ? args[0].top : args[1] });
+      return windowScrollBy(...args);
+    };
+    const elementScrollBy = Element.prototype.scrollBy;
+    Element.prototype.scrollBy = function (...args) {
+      globalThis.__excelFocusScrollCalls.push({ scope: "element", value: typeof args[0] === "object" ? args[0].left : args[0] });
+      return elementScrollBy.apply(this, args);
+    };
+  });
+  return page;
+}
+
+async function pointerResultAction(page, selector, mode, waitForResult) {
+  await clearFocusScrollCalls(page);
+  const beforeY = await page.evaluate(() => window.scrollY);
+  const box = await page.$eval(selector, (element) => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
+  if (mode === "touch") await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await waitForResult();
+  await settleFocusScroll(page);
+  const after = await page.evaluate(() => ({
+    scrollY: window.scrollY,
+    focusVisible: document.activeElement?.matches(":focus-visible") ?? false,
+  }));
+  return { deltaY: after.scrollY - beforeY, focusVisible: after.focusVisible, calls: await readFocusScrollCalls(page) };
+}
+
+async function placeResultControl(page, selector, y) {
+  await page.$eval(selector, (element, targetY) => {
+    document.activeElement?.blur();
+    const rect = element.getBoundingClientRect();
+    const region = element.closest('[data-testid="excel-result-scroll-region"]');
+    if (region) {
+      const regionRect = region.getBoundingClientRect();
+      region.scrollTo({ left: region.scrollLeft + rect.x - regionRect.x - 24, behavior: "instant" });
+    }
+    window.scrollTo({ top: window.scrollY + rect.y - targetY, behavior: "instant" });
+  }, y);
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+}
+
+async function focusedResultGeometry(page, testId, side) {
+  const geometry = await page.evaluate(() => {
+    const element = document.activeElement;
+    const region = element.closest('[data-testid="excel-result-scroll-region"]');
+    const rect = element.getBoundingClientRect();
+    const regionRect = region.getBoundingClientRect();
+    const clientLeft = regionRect.left + region.clientLeft;
+    const clientRight = clientLeft + region.clientWidth;
+    const center = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return {
+      testId: element.dataset.testid,
+      side: element.dataset.side,
+      rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+      availableWidth: region.clientWidth - 8,
+      startGap: rect.left - clientLeft,
+      endGap: clientRight - rect.right,
+      centerVisible: center === element || element.contains(center),
+      focusVisible: element.matches(":focus-visible"),
+    };
+  });
+  const fits = geometry.rect.width > geometry.availableWidth
+    ? geometry.startGap >= 3
+    : geometry.startGap >= 3 && geometry.endGap >= 3;
+  if (geometry.testId !== testId || geometry.side !== side || !geometry.centerVisible || !geometry.focusVisible || !fits || geometry.rect.height < 44) {
+    throw new Error(`Keyboard result focus is outside the named region: ${JSON.stringify({ expected: { testId, side }, geometry })}`);
+  }
+  return geometry;
+}
+
+async function clearFocusScrollCalls(page) {
+  await page.evaluate(() => { globalThis.__excelFocusScrollCalls = []; });
+}
+
+async function readFocusScrollCalls(page) {
+  return page.evaluate(() => globalThis.__excelFocusScrollCalls.splice(0));
+}
+
+async function assertStandardKeyDisplay(browser, files, root) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const client = await page.createCDPSession();
+    const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
+    await input.uploadFile(files.left, files.right);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+
+    const inspectRows = () => page.$$eval("[data-testid=excel-result-table] tbody tr", (rows) => ({
+      keys: rows.map((row) => row.cells[3]?.textContent?.trim() || ""),
+      values: rows.map((row) => row.cells[4]?.textContent?.trim() || ""),
+      internal: rows.filter((row) => /(?:number|string):|DUPLICATE_KEY|REPORT_INTEGRITY_FAILED|PROCESSING_FAILED/u.test(row.textContent || "")).map((row) => row.textContent || ""),
+    }));
+    const beforeFilter = await inspectRows();
+    if (beforeFilter.internal.length || !["1", "2", "Unique"].every((key) => beforeFilter.keys.includes(key))) {
+      throw new Error(`Standard typed keys are not public display values before filtering: ${JSON.stringify(beforeFilter)}`);
+    }
+
+    await page.$$eval('[data-testid=excel-status-filters] button:not([data-status="changed"])', (buttons) => buttons.forEach((button) => button.click()));
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-result-table] tbody tr").length === 4);
+    const afterFilter = await inspectRows();
+    if (afterFilter.internal.length || JSON.stringify(afterFilter.keys.sort()) !== JSON.stringify(["1", "1", "2", "Unique"].sort())) {
+      throw new Error(`Standard typed keys are not public display values after filtering: ${JSON.stringify(afterFilter)}`);
+    }
+    if (!afterFilter.values.some((value) => value.includes("before-number-one")) || !afterFilter.values.some((value) => value.includes("before-text-one"))) {
+      throw new Error(`Number and text keys with the same display did not remain independent: ${JSON.stringify(afterFilter)}`);
+    }
+
+    const downloads = await downloadReportLinks(page, client, root, "standard-key-display");
+    const report = downloads.find((item) => item.name.endsWith(".xlsx"));
+    if (!report) throw new Error("Standard key display comparison did not produce an XLSX report.");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(report.bytes);
+    const changed = workbook.getWorksheet("Changed");
+    const reportKeys = changed.getRows(2, changed.rowCount - 1).map((row) => String(row.getCell(9).value ?? ""));
+    if (reportKeys.some((key) => /^(?:number|string):/u.test(key)) || JSON.stringify(reportKeys.sort()) !== JSON.stringify(["1", "1", "2", "Unique"].sort())) {
+      throw new Error(`Standard report Key cells expose normalized identities: ${JSON.stringify(reportKeys)}`);
+    }
+    return { beforeFilter, afterFilter, reportKeys };
+  } finally {
+    await page.close();
+  }
+}
+
+async function writeTypedKeyWorkbook(filePath, label) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Data");
+  sheet.addRow(["Key", "Value"]);
+  sheet.addRow([1, `${label}-number-one`]);
+  const textOne = sheet.addRow(["1", `${label}-text-one`]);
+  textOne.getCell(1).numFmt = "@";
+  sheet.addRow([2, `${label}-number-two`]);
+  sheet.addRow(["Unique", `${label}-text-unique`]);
+  await workbook.xlsx.writeFile(filePath);
+}
+
+async function writeHeaderSuggestionWorkbook(filePath, label) {
+  const workbook = new ExcelJS.Workbook();
+  const candidate = workbook.addWorksheet("Candidate");
+  candidate.getCell("A2").value = `${label} report title`;
+  candidate.mergeCells("A2:C3");
+  candidate.addRow(["ID", "Name", "Amount"]);
+  candidate.addRow([`${label}-1`, "Alpha", 10]);
+  candidate.addRow([`${label}-2`, "Beta", 20]);
+  const second = workbook.addWorksheet("Second");
+  second.addRow([`${label} contacts`]);
+  second.addRow(["ID", "Name"]);
+  second.addRow([`${label}-a`, "Alice"]);
+  second.addRow([`${label}-b`, "Bob"]);
+  await workbook.xlsx.writeFile(filePath);
+}
+
+async function setResultSearch(page, value) {
+  await page.$eval("[data-testid=excel-result-search] input", (input, nextValue) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter.call(input, nextValue);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }, value);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function settleFocusScroll(page) {
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 650)));
+}
+
+async function focusedResultVisibility(page, testId, side) {
+  const visibility = await page.evaluate(() => {
+    const element = document.activeElement;
+    const region = element.closest('[data-testid="excel-result-scroll-region"]');
+    const header = document.querySelector(".mobile-header");
+    const tabs = document.querySelector(".bottom-tabs");
+    const rect = element.getBoundingClientRect();
+    const regionRect = region.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const tabsRect = tabs.getBoundingClientRect();
+    const ringGap = 3;
+    const regionLeft = regionRect.left + region.clientLeft;
+    const regionRight = regionLeft + region.clientWidth;
+    const center = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return {
+      testId: element.dataset.testid,
+      side: element.dataset.side,
+      rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height },
+      headerBottom: headerRect.bottom,
+      tabsTop: tabsRect.top,
+      regionLeft,
+      regionRight,
+      viewportWidth: window.innerWidth,
+      mobileQuery: window.matchMedia("(max-width: 820px)").matches,
+      scrollY: window.scrollY,
+      scrollHeight: document.scrollingElement.scrollHeight,
+      markedForFocusVisibility: element.hasAttribute("data-excel-result-focus"),
+      centerVisible: center === element || element.contains(center),
+      fullyVisible: rect.top >= headerRect.bottom + ringGap && rect.bottom <= tabsRect.top - ringGap
+        && rect.left >= regionLeft + ringGap && rect.right <= regionRight - ringGap,
+    };
+  });
+  if (visibility.testId !== testId || visibility.side !== side || !visibility.centerVisible || !visibility.fullyVisible || visibility.rect.height < 44) {
+    throw new Error(`Mobile keyboard focus is obscured by fixed chrome or the result region: ${JSON.stringify({ expected: { testId, side }, visibility })}`);
+  }
+  return visibility;
+}
+
+async function assertGroupedDuplicateReport(bytes) {
+  const summary = await assertNineSheetReport(bytes, {
+    matched: 0, changed: 0, added: 0, removed: 0, duplicate: 1, ambiguous: 0, unmatched: 0, error: 0,
+  });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(bytes);
+  const duplicates = workbook.getWorksheet("Duplicates");
+  if (duplicates.columnCount !== 13 || duplicates.rowCount !== 4) throw new Error(`Grouped duplicate report shape is invalid: ${duplicates.rowCount}x${duplicates.columnCount}`);
+  const rowNotations = duplicates.getRows(2, 3).map((row) => String(row.getCell(5).value ?? ""));
+  const rightRows = duplicates.getRows(2, 3).map((row) => String(row.getCell(6).value ?? ""));
+  if (JSON.stringify(rowNotations) !== JSON.stringify(["2 [1/2]", "2 [2/2]", "3"]) || JSON.stringify(rightRows) !== JSON.stringify(["2", "", ""])) {
+    throw new Error(`Grouped duplicate row notation or independent-side exhaustion is invalid: ${JSON.stringify({ rowNotations, rightRows })}`);
+  }
+  const longValue = duplicates.getRows(2, 2).map((row) => String(row.getCell(10).value).slice("2: ".length)).join("");
+  if (!/^[AB] \| [xy]{17000}$/u.test(longValue)) throw new Error(`Grouped duplicate long source row was not restored: ${longValue.length}`);
+  const parametersSheet = workbook.getWorksheet("Parameters");
+  const parameters = Object.fromEntries(parametersSheet.getRows(2, parametersSheet.rowCount - 1).map((row) => [String(row.getCell(1).value), String(row.getCell(2).value)]));
+  const expected = {
+    duplicateCountUnit: "key-group",
+    duplicateReportSplit: "true",
+    duplicateReportSplitGroupCount: "1",
+    duplicateReportDataRows: "3",
+    duplicateReportCellLimit: "32767",
+    duplicateReportListCellLimit: "16000",
+    duplicateReportMultilineKeyLimit: "16000",
+    duplicateReportLayout: "independent-side-chunks-v1",
+    "duplicateReportGroup.1": "Duplicates!2:4",
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (parameters[key] !== value) throw new Error(`Grouped duplicate Parameter ${key} differs: ${parameters[key]}`);
+  }
+  return { summary, dataRows: duplicates.rowCount - 1, rowNotations, key: String(duplicates.getCell("I2").value) };
+}
+
+async function assertDuplicateKeyTooLongIsolation(browser, files, root, language) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultTimeout(180_000);
+    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.goto(`${baseUrl}/${language}/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const client = await page.createCDPSession();
+    let inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[0].uploadFile(files.validLeftA, files.validRightA);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+    await page.click('[data-testid=excel-compare-mode-grid] button:nth-child(2)');
+    await page.select('[data-testid=excel-pair-mode-options] select', "error");
+    await page.click("[data-testid=excel-add-pair]");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 2);
+    inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[1].uploadFile(files.invalidLeft, files.invalidRight);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 4);
+    await page.click("[data-testid=excel-add-pair]");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="excel-compare-pair"]').length === 3);
+    inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
+    await inputs[2].uploadFile(files.validLeftB, files.validRightB);
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 6);
+    for (const policy of await page.$$('[data-testid=excel-pair-mode-options] select')) await policy.select("error");
+    await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+    await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    const localizedUi = await page.$eval("[data-testid=excel-duplicate-row]", (row) => ({
+      count: document.querySelector("[data-testid=excel-duplicate-guidance] strong")?.textContent?.trim() || "",
+      left: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="left"]')?.textContent?.trim() || "",
+      right: row.querySelector('[data-testid=excel-duplicate-toggle][data-side="right"]')?.textContent?.trim() || "",
+      key: row.querySelector("td:nth-child(4)")?.textContent?.trim() || "",
+      table: document.querySelector("[data-testid=excel-result-table]")?.textContent || "",
+    }));
+    const expectedUi = language === "ko"
+      ? { count: "중복 키 2개", left: "왼쪽 2건 보기", right: "오른쪽 1건 보기" }
+      : { count: "2 duplicate keys", left: "Show 2 left rows", right: "Show 1 right row" };
+    if (localizedUi.count !== expectedUi.count || localizedUi.left !== expectedUi.left || localizedUi.right !== expectedUi.right
+      || !/^[AB]$/u.test(localizedUi.key) || localizedUi.table.includes("string:") || localizedUi.table.includes("DUPLICATE_KEY")) {
+      throw new Error(`Grouped duplicate locale, plural, or public display is invalid (${language}): ${JSON.stringify(localizedUi)}`);
+    }
+    const downloads = await downloadReportLinks(page, client, root, `duplicate-key-too-long-${language}`);
+    const reports = downloads.filter((item) => item.name.endsWith(".xlsx"));
+    const archives = downloads.filter((item) => item.name.endsWith(".zip"));
+    if (reports.length !== 2 || archives.length !== 1 || downloads.length !== 3) {
+      throw new Error(`Two valid pairs and one overlong-key pair must create only two reports and one ZIP (${language}): ${downloads.map((item) => item.name).join(", ")}`);
+    }
+    const direct = [];
+    for (const report of reports) direct.push(await assertGroupedDuplicateReport(report.bytes));
+    const archive = await JSZip.loadAsync(archives[0].bytes);
+    const entries = Object.values(archive.files).filter((entry) => !entry.dir);
+    if (entries.length !== 2) throw new Error(`The overlong-key ZIP must contain only the two valid reports (${language}): ${entries.length}`);
+    const zipped = [];
+    for (const entry of entries) zipped.push(await assertGroupedDuplicateReport(await entry.async("uint8array")));
+    if (JSON.stringify(direct) !== JSON.stringify(zipped)) throw new Error(`Direct and ZIP reports differ for the overlong-key batch (${language}).`);
+    const failure = await page.$eval("[data-testid=excel-compare-error]", (element) => element.textContent || "");
+    const expectedGuidance = language === "ko"
+      ? "선택한 키 열의 내용이 너무 길어 보고서를 만들지 못했습니다. 더 짧은 값이 있는 열을 키로 선택해 다시 비교해 주세요."
+      : "The selected key columns contain too much text for the report. Choose key columns with shorter values and compare again.";
+    if (!failure.includes("duplicate-key-too-long-left.csv") || !failure.includes("duplicate-key-too-long-right.csv")
+      || failure.includes("DUPLICATE_KEY_TOO_LONG") || !failure.includes(expectedGuidance)) {
+      throw new Error(`The overlong-key cause and recovery guidance were not safely isolated (${language}): ${failure}`);
+    }
+    return { language, reports: reports.length, zipEntries: entries.length, rawCodeHidden: true, localizedUi, causeAndRecoveryGuidance: expectedGuidance, failure };
   } finally {
     await page.close();
   }

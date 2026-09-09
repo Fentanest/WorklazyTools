@@ -135,7 +135,7 @@ function parseDocument(name: string, buffer: ArrayBuffer, password: string | und
     const headerFooter = options.metadata ? readHeaderFooters(document, options.formatting) : [];
     const notes = options.metadata ? readNotes(document, options.formatting) : [];
     const warnings = [
-      L("HWP/HWPX의 검토 메모와 변경 추적 기록은 현재 브라우저 분석 범위에 포함되지 않아 비교 대상에서 제외됩니다.", "HWP/HWPX review comments and tracked changes are outside the current browser parser scope and are excluded from comparison."),
+      L("HWP/HWPX 의 검토 메모와 변경 추적 기록은 비교하지 않습니다. 해당 기록이 있는 문서는 변경 내용을 모두 적용한 사본으로 비교해 주세요.", "Review comments and tracked changes in HWP/HWPX files are not compared. For files with these records, compare copies with the changes accepted."),
     ];
     if (options.tables && tables.some((table) => table.grid.some((row) => row.some((cell) => /병합|merged/i.test(cell.location))))) {
       warnings.push(L("병합 셀은 시작 셀의 내용으로 비교하며 병합 범위 자체의 세부 차이는 단순화될 수 있습니다.", "Merged cells are compared by their leading cell; detailed differences in the merged range may be simplified."));

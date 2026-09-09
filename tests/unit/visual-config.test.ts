@@ -83,9 +83,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 238);
-  assert.equal(qaCaptureScenarios.length, 79);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 620);
+  assert.equal(names.length, 246);
+  assert.equal(qaCaptureScenarios.length, 80);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 628);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -121,14 +121,14 @@ test("visual regression scenario manifest covers every available tool and state 
     "interaction-rule", "interaction-result",
   ]));
   const b4QaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["excel-merger", "excel-compare", "qr-studio"].includes(toolId));
-  assert.equal(b4QaScenarios.length, 12);
-  assert.equal(b4QaScenarios.flatMap(({ profiles }) => profiles).length, 96);
+  assert.equal(b4QaScenarios.length, 13);
+  assert.equal(b4QaScenarios.flatMap(({ profiles }) => profiles).length, 104);
   assert.deepEqual(Object.fromEntries(["initial", "bottom", "interaction"].map((stateType) => [
     stateType,
     b4QaScenarios.filter((scenario) => scenario.stateType === stateType).flatMap(({ profiles }) => profiles).length,
-  ])), { initial: 24, bottom: 24, interaction: 48 });
+  ])), { initial: 24, bottom: 24, interaction: 56 });
   assert.deepEqual(new Set(b4QaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
-    "interaction-sheet-selection", "interaction-key-mode", "interaction-pair",
+    "interaction-sheet-selection", "interaction-key-mode", "interaction-pair", "interaction-duplicate-result",
     "interaction-bulk-mode", "interaction-create", "interaction-scan",
   ]));
   const b5aQaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["audio-studio", "pdf-editor"].includes(toolId));

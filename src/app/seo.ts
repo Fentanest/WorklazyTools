@@ -26,8 +26,10 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
     "/tools/excel-compare": [
       { question: "어떤 Excel 형식을 비교할 수 있나요?", answer: "XLSX, XLSM, XLS, XLSB, SpreadsheetML 형식의 XLS와 CSV를 비교할 수 있습니다. XLS와 XLSB는 값과 수식 비교를 지원하지만 서식 차이는 비교하지 않습니다." },
+      { question: "선택된 머리글 후보가 실제 열 이름 행과 다르면 어떻게 하나요?", answer: "각 파일의 머리글 행 입력에서 실제 열 이름이 있는 행을 선택하세요. 선택한 행 다음부터 비교하며, 머리글이 없는 표는 맨 위에 열 이름 행을 추가해야 합니다." },
       { question: "비교한 파일이 서버로 전송되나요?", answer: "아니요. 파일 읽기, 비교와 보고서 생성은 현재 브라우저에서 처리되며 파일 내용을 서버로 보내지 않습니다." },
       { question: "여러 파일 쌍을 한 번에 비교할 수 있나요?", answer: "가능합니다. 각 쌍의 시트와 비교 기준을 따로 정할 수 있고, 성공한 쌍마다 9개 시트의 XLSX 보고서를 받습니다. 성공한 쌍이 둘 이상이면 ZIP도 제공합니다." },
+      { question: "같은 키가 여러 행에 있으면 어떻게 표시하나요?", answer: "중복 키 하나를 결과 한 행으로 세고 왼쪽과 오른쪽 원본 행을 독립된 목록으로 보여 줍니다. 두 목록의 같은 줄을 자동으로 연결한 것은 아닙니다." },
     ],
     "/tools/excel-cleaner": [
       { question: "수식이 있는 Excel 파일도 정리할 수 있나요?", answer: "XLSX·XLSM의 같은 시트 일반 A1 참조는 행 삭제와 열 삭제·삽입·재배치에 맞춰 갱신합니다. 그 밖의 수식은 저장 계산값이 모두 있을 때 확인 후 값으로 출력합니다." },
@@ -92,8 +94,10 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
     "/tools/excel-compare": [
       { question: "Which Excel formats can I compare?", answer: "You can compare XLSX, XLSM, XLS, XLSB, SpreadsheetML XLS and CSV files. XLS and XLSB support values and formulas, but formatting differences are excluded." },
+      { question: "What if the selected header suggestion is not the actual column-name row?", answer: "Choose the actual column-name row in each file's header-row field. Comparison starts after that row. A table without headers needs a column-name row added at the top." },
       { question: "Are comparison files uploaded to a server?", answer: "No. Reading, comparison and report generation happen in the current browser, and file contents are not sent to a server." },
       { question: "Can I compare multiple file pairs at once?", answer: "Yes. Each pair can use its own sheets and matching rules. Every successful pair gets a nine-sheet XLSX report, and two or more successful pairs also get a ZIP." },
+      { question: "How are multiple rows with the same key shown?", answer: "Each duplicate key counts as one result row with independent lists of its left and right source rows. Items on the same line are not matched automatically." },
     ],
     "/tools/excel-cleaner": [
       { question: "Can I clean an Excel file that contains formulas?", answer: "Same-sheet ordinary A1 references in XLSX and XLSM are updated for row deletion and column deletion, insertion, and reordering. Other formulas require complete stored results and confirmation before becoming values." },
@@ -228,10 +232,10 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/excel-compare": {
     title: "Excel 파일 비교 - XLSX·XLSM·XLS·XLSB·CSV Diff",
-    description: "Excel·CSV 파일 쌍을 위치, 키 또는 대사 기준으로 비교하고 값·수식·표시값·서식 차이를 9개 시트의 XLSX 보고서로 확인하세요.",
+    description: "머리글 후보를 확인한 뒤 Excel·CSV 파일 쌍을 위치, 키 또는 대사 기준으로 비교하고 값·수식·서식 차이를 XLSX 보고서에서 확인하세요.",
     application: {
       name: "Excel Compare",
-      featureList: ["XLSX·XLSM·XLS·XLSB·SpreadsheetML·CSV", "위치·키·회계 대사 비교", "중복 키 정책", "수식·캐시값 비교", "XLSX·XLSM 서식 비교", "쌍별 9개 시트 보고서", "다중 쌍 ZIP"],
+      featureList: ["XLSX·XLSM·XLS·XLSB·SpreadsheetML·CSV", "머리글 후보 선택·직접 변경", "위치·키·회계 대사 비교", "중복 키 좌우 원본 행 묶음", "수식·캐시값 비교", "XLSX·XLSM 서식 비교", "쌍별 9개 시트 보고서", "다중 쌍 ZIP"],
     },
   },
   "/tools/excel-cleaner": {
@@ -427,7 +431,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
   "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with separate formula and formatting controls for XLSX and XLS input.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "Independent XLSX formula and formatting preservation", "Independent XLS formula and formatting preservation", "Encrypted input and output"] } },
-  "/tools/excel-compare": { title: "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files", description: "Compare pairs of Excel and CSV files by position, keys or reconciliation rules and download a nine-sheet XLSX report for every successful pair.", application: { name: "Excel Compare", featureList: ["XLSX, XLSM, XLS, XLSB, SpreadsheetML and CSV", "Position, key and reconciliation matching", "Duplicate-key policies", "Formula and cached-value comparison", "XLSX and XLSM formatting comparison", "Nine-sheet report per pair", "ZIP for multiple successful pairs"] } },
+  "/tools/excel-compare": { title: "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files", description: "Check a suggested header, compare Excel and CSV pairs by position, keys or reconciliation rules, and download a nine-sheet XLSX report.", application: { name: "Excel Compare", featureList: ["XLSX, XLSM, XLS, XLSB, SpreadsheetML and CSV", "Suggested header selection and manual changes", "Position, key and reconciliation matching", "Grouped left and right rows for duplicate keys", "Formula and cached-value comparison", "XLSX and XLSM formatting comparison", "Nine-sheet report per pair", "ZIP for multiple successful pairs"] } },
   "/tools/excel-cleaner": { title: "Excel Data Cleaner | Clean XLSX, XLS & CSV Files", description: "Apply 28 ordered structure, text, row-filter, and value-conversion rules to Excel and CSV files, then download cleaned XLSX, CSV, reports, and ZIP results.", application: { name: "Excel Data Cleaner", featureList: ["Multiple Excel and CSV files", "13 structure rules", "7 text rules", "3 row-filter rules", "5 value-conversion rules", "Formula-reference updates and safe fallback", "XLSX, CSV, and ZIP results"] } },
   "/tools/qr-studio/bulk": { title: "Bulk QR Generator | Excel & CSV to PNG, ZIP and Label PDF", description: "Create text, email, telephone, SMS, Wi-Fi, vCard or web QR codes from Excel and CSV rows, verify every final PNG, and export ZIP, label PDF and XLSX reports.", application: { name: "Bulk QR Generator", featureList: ["Excel and CSV row mapping", "Seven standard payload types", "Header templates", "Logo and transparent PNG", "Read-back verification", "Incremental ZIP", "A4 and Letter label PDF", "XLSX manifest and failures"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },

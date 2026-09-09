@@ -6,7 +6,7 @@ import compareScript from "./compare.py?raw";
 import trackedDocxScript from "./tracked_docx.py?raw";
 import pyodidePackage from "pyodide/package.json";
 import type { WordCompareResult } from "../excel-merger/types";
-import { compareDocumentModels, type ComparisonModel } from "../document-compare/documentComparison";
+import { compareDocumentModels, diffText, type ComparisonModel } from "../document-compare/documentComparison";
 import { sniffDocumentFormat, type DocumentFormat } from "../document-compare/documentFormat";
 import { extractLegacyDocModel } from "./docModel";
 
@@ -17,6 +17,16 @@ const PYODIDE_BASE_URL = new URL(
 ).href;
 const PYODIDE_MODULE_URL = `${PYODIDE_BASE_URL}pyodide.mjs`;
 const worker = self as unknown as DedicatedWorkerGlobalScope;
+const bridgeGlobal = worker as DedicatedWorkerGlobalScope & {
+  worklazyDiffJson: (before: string, after: string) => string;
+};
+
+bridgeGlobal.worklazyDiffJson = (before, after) => {
+  if (typeof before !== "string" || typeof after !== "string") {
+    throw new TypeError("Document diff inputs must be strings.");
+  }
+  return JSON.stringify(diffText(before, after));
+};
 
 worker.onmessage = async (event: MessageEvent) => {
   let extractFunction: { (...args: unknown[]): string; destroy?: () => void } | undefined;

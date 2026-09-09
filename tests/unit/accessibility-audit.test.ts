@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets, f4bOwnedSelector, f4bRasterOwnershipTargets } from "../accessibility-audit.mjs";
+import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, selectAccessibilityPages, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets, f4bOwnedSelector, f4bRasterOwnershipTargets } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
@@ -32,7 +32,7 @@ test("a11y registrations reject missing or duplicate pages and include mobile ko
   assert.throws(() => assertAccessibilityResults(missing), /registration/);
   const duplicate = report(); duplicate.results[1] = duplicate.results[0];
   assert.throws(() => assertAccessibilityResults(duplicate), /registration/);
-  assert.deepEqual(pages.filter(({ viewport }) => viewport).map(({ path, viewport }) => [path, viewport.width]), [["/ko/tools/pdf-editor/finish", 412], ["/ko/tools/pdf-editor/stamp", 412], ["/ko", 412], ["/ko/tools", 412]]);
+  assert.deepEqual(pages.filter(({ id }) => ["pdf-finish-mobile-ko", "pdf-stamp-mobile-ko", "home-mobile-ko", "tools-mobile-ko"].includes(id)).map(({ path, viewport }) => [path, viewport?.width]), [["/ko/tools/pdf-editor/finish", 412], ["/ko/tools/pdf-editor/stamp", 412], ["/ko", 412], ["/ko/tools", 412]]);
   assert.ok(pages.some(({ id }) => id === "hwp-editor"));
   assert.deepEqual(pages.filter(({ id }) => id.startsWith("pdf-finish")).map(({ id }) => id), ["pdf-finish-ko", "pdf-finish-mobile-ko", "pdf-finish-en"]);
   assert.ok(pages.some(({ id }) => id === "pdf-watermark-ko"));
@@ -77,6 +77,24 @@ test("a11y watermark error-state contrast is required for every locale and theme
   const low = report();
   low.results.find(({ id }) => id === "pdf-watermark-error-ko-light").settledContrast[1].ratio = 4.49;
   assert.throws(() => assertAccessibilityResults(low), /below 4\.5:1/);
+});
+
+test("a11y includes all eight Excel duplicate-result states", () => {
+  const duplicateResults = pages.filter(({ setup }) => setup === "excel-duplicates");
+  assert.equal(duplicateResults.length, 8);
+  assert.deepEqual(new Set(duplicateResults.map(({ language }) => language)), new Set(["ko", "en"]));
+  assert.deepEqual(new Set(duplicateResults.map(({ colorScheme }) => colorScheme)), new Set(["light", "dark"]));
+  assert.deepEqual(new Set(duplicateResults.map(({ viewport }) => viewport ? "mobile" : "desktop")), new Set(["desktop", "mobile"]));
+});
+
+test("A11Y_ONLY=excel-compare selects the base page and all eight duplicate-result states", () => {
+  const selected = selectAccessibilityPages("excel-compare");
+  assert.equal(selected.length, 9);
+  assert.equal(selected[0].id, "excel-compare");
+  assert.ok(selected.slice(1).every(({ id }) => id.startsWith("excel-compare-duplicates-")));
+  assert.throws(() => selectAccessibilityPages("missing-page"), /did not match/);
+  const scoped = { summary: { violations: 0 }, externalRequests: [], results: selected.map(({ id }) => ({ id, violations: [], incomplete: [] })) };
+  assert.equal(assertAccessibilityResults(scoped, { registeredPages: selected }).violations, 0);
 });
 
 test("a11y exception is exactly one upstream iframe with explicit owner and reason", () => {
