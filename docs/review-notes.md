@@ -4,6 +4,32 @@
 
 ## 2026-09-09
 
+### U4 최종 육안 검수에서 발견한 도장 공지 수리 (Codx)
+
+초기 화면을 추가로 직접 열어 보니 320/390px에서 도장 공지 제목과 본문이 가로 flex 항목으로 경쟁해 제목이 4~5줄의 좁은 열로 쪼개졌다. EN 320px 제목 폭 **66.14px**, KO **50.92px**였다. `d3a8d89`에서도 같았지만 해당 공지 조합은 U4 `8ec3e4e`가 도입했고 main에는 패널 자체가 없으므로 **U4 이전 부채로 면제할 수 없는 신규 P2**로 판정했다. Astra가 공지 한 곳에 `flex-col`만 추가했고, Opus도 기존 정본의 정렬 붕괴 수리 범위임을 증거로 확인했다. 공용 UtilityNotice·전역 CSS·문구·PDF 엔진은 바꾸지 않았다.
+
+수리 QA에서 **ko/en×light/dark×320/390/820/821, 16환경**의 제목 1~2줄·본문 아래 배치·넘침 0을 확인했다. 원래 가로 배치로 되돌린 DOM 대조 **16/16**은 같은 검사를 실패시켰다. Axe 원자료의 미확인 **32개**는 삭제하거나 공용 부채로 돌리지 않았다. 기존 감사의 실제 배경 픽셀 함수를 사용해 제목·본문 각각의 원대상을 재측정한 최저 대비는 **5.671:1**, 32/32가 4.5:1 이상이었다. 글자와 배경을 같은 색으로 만든 음성 두 건은 **1:1**로 거부됐다. 원자료·대상별 측정·배경 PNG는 `/tmp/worklazy-u4-audit3/stamp-notice-fix/contrast/`에 보존했다.
+
+수리 뒤 전체 unit **504/504**, 도장 실제 Tab/Enter **48회**, 교체 후 undo/redo 초기화, legacy oracle **totalDiffs 0**, production build **2,857 modules·71페이지**, static recovery **119**, 도장 CLS **3회 최대 0**을 확인했다. 필터 없는 전체 visual은 ko/en 호스트 각각 **246/246** 일치했다. 도장 9표본 중 기준 초과 차이는 3장이었고 의도된 수리 결과로 갱신했다. 추가로 PNG byte가 달라진 EN desktop 두 장은 실제 pixelmatch 차이 **0**이었다. 이때 전체 변경 기준선은 처음의 F5 55장 범위를 유지했다.
+
+최종 수리본 scoped/full 번들은 기본 상한 `null`·override `{}`·multiplier 1을 유지했다. gzip은 entry **314,041B**, PDF route **1,154,921B**, shared **1,393,354B**, app **5,944,173B**, CSS **38,242B**이고 고정 baseline 대비 scoped 순증은 **14,764 / 77,634 / 2,531 / 100,458 / 555B**다. 수리 전보다 app **+6B**이며 full route 합계 **4,236,778B**를 PDF 증가와 상쇄하지 않았다. 최종 production **107 JS/MJS 경로·1 CSS**의 크기·SHA와 물리 목록이 계측본과 일치했고, 16개 production 브라우저 경로의 요청·광고 분기도 다시 통과했다. 첫 임시 keyboard probe는 모듈 탐색 경로 누락, 계측 독립 검사는 이전 임시 폴더만 허용한 경로 가드 때문에 실행 전 실패했다. 각각 임시 의존 경로·정확한 새 폴더 가드만 교정한 재실행 로그를 원 실패와 함께 보존한다.
+
+육안 검수에서는 generic 소견을 반복 생성한 초기 Gemini 두 보고서를 승인 근거에서 제외했다. Gemini의 실제 quota 429 뒤 Claude CLI로 전환했으며 그 CLI도 주간 한도에 도달해 `agy`의 **Claude Opus 4.6 Thinking** 경로를 사용했다. 중단된 CLI의 **82개 고유 이미지**는 성공한 Read 이미지 결과·SHA·개별 관찰을 독립 대조했고, 경로의 `astual` 오타 1건은 입력 목록 및 실제 Read 경로와 일치하는 경우에만 별도 보정 기록을 남겼다. 수리 후 도장 **19장**도 실제 `view_file` 완료 이벤트·SHA·구체 소견을 확인했다. 이미지 관찰을 기능 실행이나 WCAG 판정으로 확대하지 않았다. 남은 육안 검수와 최종 배포 판정은 실행 후 별도로 기록한다. — Codx
+
+### U4 통합 게이트 재개 — 실제 검증과 기존 부채 귀속 (Codx)
+
+사용자가 이 세션에 U4 인계를 명시하고 번들 기본 상한을 해제했다. 후보 `0f02458`은 main 통합본에 BL04 입력 타입 교정과 기본 상한 해제를 더한 것으로 PDF 제품 소스는 U4 부모 `d3a8d89`와 동일하다. 아래 과거 SCOPE-OUT은 당시의 결과로 보존하며 새 검증으로 회수한 항목만 별도로 기록한다. 증거 묶음은 `/tmp/worklazy-u4-mergegate2/`와 `/tmp/worklazy-u4-mergegate3/`다.
+
+**실행한 회귀** — 전체 unit **504/504**, TypeScript, production/QA build, static, 전체 browser·new-tools·utilities·office·QR bulk/font·recovery·Excel cleaner/compare·XLS preserve/first-load·video-hybrid와 PDF finish 체인을 실행했다. old QR selector 및 PDF 대기 실패는 같은 소스 재실행 통과와 함께 두 로그를 보존했다. new-tools의 해당 호스트 Dolby Vision base-layer streaming 미지원 skip은 실행 성공으로 승격하지 않았다. legacy oracle **44파일·totalDiffs 0**, 공식 oracle **87 preflight·56 허용·31 제외·두 renderer SHA·sentinel 0·Link 3종**, fixture 결정성 두 번 **157 SHA 동일**을 확인했다. 도장 Tab/Enter **48회**, border control 최대 **1px**, 원래 2px border 변이는 실제 최종 픽셀 단언에서 거부됐다. F4b 원자료 **144셀·432회 측정·별도 배치 2건**, 가독성 **6/6** 및 결손·반복·peak 변이 거부를 독립 재확인했다. 실기기 모바일 한계는 여전히 미교정이다.
+
+**접근성·렌더링·F5** — 전량 접근성 **43페이지**에서 위반 0, F2/F3/F4a/F4b 소유 incomplete 0, 원자료의 공용 상속 **1,973건**을 보존했다. 신규 F5 토글·파일 목록·결과에 대해 별도 **8환경×5상태**의 Axe 원자료와 geometry, **56 PNG**, **8 ZIP·24 PDF**를 실제 생성했다. 위반·incomplete·thumb 이탈·외부 요청은 0이었다. Astra는 40개 원자료와 40개 thumb 좌표를 독립 재집계하고 판정 변이 5종을 거부했다. 이 보충은 취소·재시도·부분 결과를 새로 실행한 것이 아니며 기존 lifecycle oracle에 연결한다. 전량 rendering은 **9대상×3회 CLS 0**, CSS orphan 0, legacy manifest 155규칙·153제거·2활성, registry 20경로다. 접근성 요약기의 부모부터 존재한 빈 근거 수용과 성능 목표 미달은 backlog에 근거와 함께 남겼다.
+
+**최종 번들 계측** — 고정 schema-v3 baseline SHA `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`, multiplier 1, 기본 5상한 `null`로 scoped/full을 순차 독립 실행했다. entry **314,039B**, PDF route **1,154,915B**, shared **1,393,351B**, app **5,944,167B**, CSS **38,242B**이고 scoped 순증은 각각 **14,762 / 77,628 / 2,528 / 100,452 / 555B**다. full 19-route 합계 **4,236,777B**는 PDF 증가와 상쇄하지 않았다. 실제 배포 JS/MJS **107경로·91고유 SHA**를 재귀 물리 계수해 gzip 합계와 대조했다. 동일 SHA alias 증가 0, 내용 변경 alias **+176,390B**, 추가·삭제 inventory 및 명시 0B 상한 음성 거부를 확인했다. 계측 원본 스크립트를 그대로 호출하고 정리 직전 산출물을 보존해 원자료 replay와 독립 gzip 계수를 모두 수행했다. 물리 검사를 네트워크 검사로 부르지 않았다.
+
+**배포 파일 네트워크 대조** — production snapshot에서 PDF 10경로의 실제 JS/MJS 응답 크기·SHA가 계측 inventory와 일치했다. 일반 PDF는 동의 후 광고 loader·요청 각 1, 광고 제외 6경로는 각 0이었다. office/XLS preserve 외부 요청 0, video는 공개된 정책대로 동의한 Google/Naver 분석 두 URL만 요청했다. 원격 스크립트는 요청을 기록한 뒤 로컬 빈 응답으로 대체했다. 첫 probe는 video 분석까지 금지한 잘못된 가정으로 실패했고 정책을 근거로 검사만 교정한 16경로 재실행은 통과했다. 사용자 파일을 원격 추적 코드에 노출한 실험이 아니다. — Codx
+
+**마지막 자동 검증** — root의 `npm run build`와 `npm run test:static`를 다시 실제 실행해 2,857 modules·71페이지·recovery 119를 확인했다. 최종 산출물의 **107 JS/MJS 경로·1 CSS**가 보존한 production 계측본과 크기·SHA 모두 일치했고, 물리 전수 목록의 누락·추가도 0이었다. 한국어·영어 호스트 환경의 필터 없는 visual은 각각 **246/246**, **3분 23.67초 / 3분 22.60초**로 일치했다. 원래 불일치 55장은 F5 이전 기준선의 노후이며 부모에서도 같은 55장이 불일치했다(51장 byte 동일, 4장 pixelmatch 차이 0). 이 55장만 하네스로 갱신했고 전역 UI 재기준화는 실행하지 않았다. 장별 육안 판정은 이 자동 일치와 별개의 배포 게이트다. — Codx
+
 ### 번들 기본 상한 해제 (Codx)
 
 최신 사용자 결정에 따라 기본 5종 크기 한계를 JSON에서도 유지되는 `null`로 표현했다. 중간 워킹트리의 1GiB 한계는 여전히 초과 시 차단하므로 무상한과 같지 않아 채택하지 않았다. 계측 schema·정수 bytes·route·module 귀속·배포 inventory 검증은 유지하며, 명시 환경변수 상한은 통제된 대조용으로 계속 검증한다. 이 결정은 과거 U4 SCOPE-OUT의 크기 차단 사유를 해제하지만, 미실행 게이트나 성능 목표 미달을 통과로 바꾸지 않는다.

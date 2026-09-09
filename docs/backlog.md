@@ -40,6 +40,11 @@
 
 - **main·legacy worker의 `pdf-lib` 단일화** — U4-6 번들 조사에서 main 그래프의 `pdf-lib` 귀속 **118,977B**와 legacy `pdf.worker` **219,622B** 내부의 별도 `pdf-lib` 번들을 확인했다. 목표는 중복 실행 경계를 하나로 합쳐 **순감량 80~120KB**를 확보하는 것이다. 예상 비용은 설계·연결 **3~6인일**, 회귀·계측 **2~4인일**, 합계 **5~10인일**이다. U4-6의 app/PDF route 상한 상향은 이 부채를 해결한 것이 아니라 U4 완료 뒤 구조 변경으로 미룬 결정이다. — Codx
 
+## 공용 데스크톱 언어 전환 UI
+
+- **고정 언어 스위처의 스크롤된 콘텐츠 가림 — 기존 P3** — 1365px에서 PDF 마무리 화면을 아래로 스크롤하면 우상단 KO/EN 스위처가 모드 탭의 마지막 라벨 위에 겹친다. `src/styles/global.css`의 fixed 위치는 `76ceecc7`부터 존재하며 U4에서 바뀌지 않았다. 최상단에서는 탭이 보이고 이번 UI 추가 회귀는 아니다. UI 재설계에서 공용 고정 요소의 가림 정책으로 함께 처리한다. 실제 이미지 `/tmp/worklazy-u4-mergegate3/f5-audit/ko-light-1365-combined.png`, Claude 직접 열람 및 Codx source blame 교차. — Codx
+- **PDF 마무리 한국어 제목·탭의 단어 중간 줄바꿈 — U4 cosmetic P3** — 320/821px에서 제목이나 `머리글·바닥글` 탭의 마지막 글자가 다음 줄에 놓인다. 821px 탭 라벨 폭은 77.75px이며 두 줄이다. U4 라벨·4개 탭 구성의 영향이므로 부모 `d3a8d89`와 같다는 이유로 U4 이전 부채라고 부르지 않는다. UI 재설계에서 한국어 줄바꿈·폭 정책으로 묶어 처리한다. 개인정보 안내 pill의 같은 현상은 공용 CSS는 U4 이전이지만 F5 제목의 인접 폭 영향이 있어 정확한 증상 귀속은 미확정이다. P2 도장 공지의 제목 수직 붕괴는 이 항목으로 미루지 않고 U4에서 별도 수리했다. 근거 `/tmp/worklazy-u4-audit3/visual-dom-initial-final/REPORT.md`. — Codx
+
 ## PDF 마무리 API 후속
 
 - **상위 텍스트 옵션의 조용한 누락 — 기존 P2 API 계약** — `PdfFinishDecorationOptions`가 상위 텍스트 필드를 유지하면서 `textDecorations`는 optional인 계약(`src/features/pdf-editor/finish/engine.ts:151-173`) 때문에, 배열을 생략하고 stamp 또는 image watermark를 함께 넘기면 `engine.ts:785-788`에서 상위 텍스트 장식이 조용히 버려진다. 부모 revision도 같고 제품 UI는 항상 명시적 `textDecorations` 배열을 넘겨 안전하므로 이번 회귀 수리 범위에는 넣지 않았다. 후속 수리는 ① typed/discriminated 계약과 문서로 호출 의미를 명시하거나 ② 모호한 입력을 오류로 거부하는 두 방향을 비교한다. 단순 fallback은 기존 stamp-only 호출에 placeholder 텍스트를 새로 출력할 수 있어 기각한다. — Codx
@@ -49,9 +54,10 @@
 - **`save()` 할당 실패의 부분 결과 비노출 — 기존 P2** — `PDFDocument.save()`가 두 번째 파일에서 할당 오류를 내면 부모와 U4-7 대상 모두 완료된 첫 파일을 `partialResults`로 공개하지 않는다. U4-7 fix-1에서 수리한 새 `Blob()` 할당 경로와 별개이며, 일반 저장·직렬화 예외를 완료 결과 보존 계약에 연결하는 후속 작업이 필요하다. — Codx
 - **스모크 preview의 점유 포트 오인 — 기존 P2 하네스 부채** — `startPreview()`가 자신이 띄운 child의 listen 성공을 확인하기 전에 같은 포트의 HTTP 응답만 보고 준비 완료로 판정할 수 있다. 자기 서버 식별/준비 로그를 확인하고 점유 포트는 즉시 실패시키는 계약이 필요하다. fix-1 검증은 4270을 건드리지 않고 4275~4279의 점유 확인·고정 `--strictPort` 서버만 썼다. — Codx
 - **scoped browser 완료 문구 과장 — 기존 P3** — `TEST_SCOPE=pdf` 실행도 마지막 문구가 Excel·Word까지 완료했다고 열거한다. 실제 분기와 종료 코드만 PDF 범위 증거로 사용했으며, 후속에서 선택된 scope만 출력하게 한다. — Codx
-- **공용 UI incomplete 125 — 기존 UI 재설계 부채** — U4-7 F4b 소유 incomplete는 0이지만 공용 표면에서 상속된 125건은 그대로 남아 있다. 성공으로 재분류하거나 PDF 단계의 면제로 처리하지 않고 공용 UI 접근성 작업에서 해결한다. — Codx
+- **공용 UI incomplete — 기존 UI 재설계 부채** — U4-7의 125건과 전량 통합 감사의 표본 수를 혼합하지 않는다. 2026-09-09 통합 QA 43페이지에서는 상속 incomplete **1,973건**을 보존했고 F2/F3/F4a/F4b 소유 미확인은 0이었다. 별도 F5 8환경×5상태의 토글·파일 목록·다중 결과 원자료에서도 위반·incomplete는 0이다. 공용 미확인을 성공으로 재분류하지 않고 UI 재설계에서 표시·스크롤 상태를 포함해 해결한다. 근거 `/tmp/worklazy-u4-mergegate3/a11y.json`, `f5-audit/summary.json`. — Codx
 - **실기기 모바일 메모리 한계 미교정** — 벤치는 Pixel 7 에뮬레이션의 호스트 CDP heap만 측정했고 native/renderer/canvas 및 물리 기기 한계는 측정하지 않았다. 150 DPI는 사전 명시된 미교정 폴백이며, 실기기 확보 뒤 별도 교정하기 전에는 “기기 한계의 50% 안전 마진 달성”을 주장하지 않는다. — Codx
-- **128MiB heartbeat 미달·PDF.js 의존 패치 유지** — 128MiB 저장의 기존 실행별 최대 heartbeat 목표 미달과 고정 PDF.js 패치 유지 의무를 보존한다. 중앙값이나 진행 표시·취소 대체 계약으로 미달을 통과로 바꾸지 않으며, 의존 갱신 때 exact/lock/4SHA·4빌드×180렌더·음성·worker/fallback 검증을 다시 수행한다. — Codx
+- **PDF 마무리 heartbeat 목표 미달·PDF.js 의존 패치 유지 — 기존 P2** — 2026-09-09 같은 하네스·합성 12입력×3회 대조에서 부모 `d3a8d89`와 통합 `0f02458` 모두 **20/36회**가 실행별 200ms 목표를 넘었다(최대 **329.4/333.8ms**). 미달은 128MiB 저장에 한정되지 않고 사전 검사·미리보기와 생성에서도 재현된다. PDF 제품 소스는 두 후보 사이 동일하며 취소 응답 **111.1/159.5ms**, 늦은 결과 0·재시도·폴백은 통과했다. 중앙값·취소 가능성을 근거로 heartbeat 목표를 통과로 바꾸지 않는다. 원자료 `/tmp/worklazy-u4-performance-attribution/{parent,candidate-rerun}.json`; 첫 통합 재실행은 30/36에서 SIGTERM으로 중단됐으므로 별도 실패 로그로 보존했다. 의존 갱신 때 exact/lock/4SHA·4빌드×180렌더·음성·worker/fallback 검증을 다시 수행한다. — Codx
+- **접근성 요약 검사기의 빈 근거 수용 — 기존 P2 하네스 부채** — 통합 감사 독립 음성 대조에서 `targets:[""]`, `reasons:[""]`, 전체 `incomplete:[]` 치환은 요약 검사가 거부하지 못했다. 요약 함수는 부모 `d3a8d89`와 byte 동일하고 실제 브라우저 수집기는 빈 target·reason을 검사하므로 이번 원자료가 지워졌다는 뜻은 아니다. 수집·요약 사이 완전성 계약과 빈 문자열 거부를 별도 보강한다. 재현 `/tmp/worklazy-u4-audit3/a11y/results.json`; 현행 원자료의 상속 1,973건은 그대로 보존했다. — Codx
 
 ## UI 색 체계 — 도구 고유색 축소·컨트롤 단일 primary
 

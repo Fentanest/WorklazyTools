@@ -808,7 +808,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
       </div>
 
       <div id={tabPanelId} role="tabpanel" aria-labelledby={`${tabPanelId}-${activeTab}`}>
-        {stampActive && <UtilityNotice className="mb-4" tone="warning" data-testid="pdf-stamp-notice" data-pdf-stamp-owned><strong className="block text-foreground" data-testid="pdf-stamp-notice-title">{copy.stamp.noticeTitle}</strong><span data-testid="pdf-stamp-notice-description">{copy.stamp.noticeDescription}</span></UtilityNotice>}
+        {stampActive && <UtilityNotice className="mb-4 flex-col" tone="warning" data-testid="pdf-stamp-notice" data-pdf-stamp-owned><strong className="block text-foreground" data-testid="pdf-stamp-notice-title">{copy.stamp.noticeTitle}</strong><span data-testid="pdf-stamp-notice-description">{copy.stamp.noticeDescription}</span></UtilityNotice>}
         <SectionCard step={1} title={copy.uploadTitle} description={copy.uploadDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
           <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map(({ file: sourceFile }) => sourceFile)} onFiles={replaceFile} disabled={locked} accent="violet" hint={inspecting ? copy.inspecting : copy.uploadHint} />
           <FileList files={sources.map(({ file: sourceFile }) => sourceFile)} onRemove={removeFile} accent="violet" />
