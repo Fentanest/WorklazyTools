@@ -897,6 +897,8 @@
       "settingsTitle": "Content and position",
       "settingsDescription": "Set tokens, position, font size, and color.",
       "includeDecoration": "Include this finishing option",
+      "includeShort": "Include",
+      "excludedDraft": "These settings are a draft and are not included in the result. Select the checkbox above to apply them.",
       "includeDecorationDescription": "Enabled options are combined in a safe order when the PDFs are created.",
       "template": "Content to display",
       "templateHelp": "Available tokens:",

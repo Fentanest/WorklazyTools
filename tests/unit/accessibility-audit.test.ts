@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, selectAccessibilityPages, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets, f4bOwnedSelector, f4bRasterOwnershipTargets } from "../accessibility-audit.mjs";
+import { finishInclusionContrastTargets, assertFinishInclusionContrast, pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, selectAccessibilityPages, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets, f4bOwnedSelector, f4bRasterOwnershipTargets } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
-    results: pages.map(({ id, scenario }) => ({ id, violations: [], incomplete: [], ...(id.startsWith("pdf-stamp") ? {
+    results: pages.map(({ id, scenario, readySelector }) => ({ id, violations: [], incomplete: [], ...(readySelector?.startsWith("[data-testid='pdf-finish-ready']") ? { inclusionContrast: finishInclusionContrastTargets.map((target) => ({ ...target, ratio: 7, samples: 100, matches: 1, backgroundSHA: "a".repeat(64) })) } : {}), ...(id.startsWith("pdf-stamp") ? {
       stampContrast: [{ target: "notice-body", ratio: 5.87 }, { target: "notice-title", ratio: 14.66 }],
     } : {}), ...(scenario === "pdf-stamp-editing" ? {
       stampOwnership: { owner: "f3-stamp", selector: f3OwnedSelector, targets: f3StampOwnershipTargets.map(({ id: targetId }) => ({ id: targetId, matches: 1 })) },
@@ -216,4 +216,26 @@ test("a11y F3 gate fails closed while an owned incomplete result remains unresol
     nodes: [{ target: ["[data-testid='pdf-stamp-notice']"], reasons: ["Needs manual review"], owner: "f3-stamp" }],
   });
   assert.throws(() => assertAccessibilityResults(unresolved), /F3 accessibility incomplete nodes/);
+});
+
+test("finish inclusion pixel evidence rejects missing, mismatched and low-contrast measurements", () => {
+  const result = { id: "inclusion-control", inclusionContrast: finishInclusionContrastTargets.map((target) => ({ ...target, ratio: 7, samples: 100, matches: 1, backgroundSHA: "a".repeat(64) })), resolvedIncomplete: [{ rule: "color-contrast", owner: "f3-stamp", measurementKind: "finish-inclusion", measurementTarget: "include-stamp", measurementSelector: finishInclusionContrastTargets[1].selector }] };
+  assert.doesNotThrow(() => assertFinishInclusionContrast(result));
+  for (const mutate of [
+    (copy) => { copy.inclusionContrast = []; },
+    (copy) => { copy.inclusionContrast[1] = { ...copy.inclusionContrast[0] }; },
+    (copy) => { copy.inclusionContrast[0].ratio = 4.49; },
+    (copy) => { copy.inclusionContrast[0].ratio = NaN; },
+    (copy) => { copy.inclusionContrast[0].samples = 0; },
+    (copy) => { copy.inclusionContrast[0].backgroundSHA = ""; },
+    (copy) => { copy.inclusionContrast[0].matches = 2; },
+    (copy) => { copy.inclusionContrast[0].owner = "shared-existing"; },
+    (copy) => { copy.resolvedIncomplete[0].measurementSelector = "body"; },
+    (copy) => { copy.resolvedIncomplete[0].measurementTarget = "notice-body"; },
+    (copy) => { copy.resolvedIncomplete[0].rule = "label"; },
+  ]) {
+    const changed = structuredClone(result);
+    mutate(changed);
+    assert.throws(() => assertFinishInclusionContrast(changed));
+  }
 });

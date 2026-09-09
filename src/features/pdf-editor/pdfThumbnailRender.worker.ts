@@ -30,6 +30,11 @@ worker.onmessage = async (event: MessageEvent<{ file: File; pageIndex: number; t
   const { file, pageIndex, targetWidth, outputScale } = event.data;
   let loadingTask: { promise: Promise<{ numPages: number; getPage(pageNumber: number): Promise<any> }>; destroy(): Promise<void> } | undefined;
   try {
+    // PDF.js binds embedded fonts through ownerDocument.fonts. A dedicated
+    // worker has its own FontFaceSet, but no document; without this adapter
+    // rendering can succeed with replacement glyphs instead of the PDF font.
+    // Let the existing main-thread renderer handle browsers without this API.
+    if (!worker.fonts || typeof FontFace === "undefined") throw new Error("Worker font loading unavailable");
     const buffer = await file.arrayBuffer();
     const [{ getDocument, GlobalWorkerOptions }, workerModule] = await Promise.all([
       import(/* @vite-ignore */ pdfDisplayUrl) as Promise<typeof import("pdfjs-dist")>,
@@ -41,6 +46,7 @@ worker.onmessage = async (event: MessageEvent<{ file: File; pageIndex: number; t
       data: new Uint8Array(buffer),
       password: "",
       enableXfa: true,
+      ownerDocument: { fonts: worker.fonts } as unknown as Document,
       useSystemFonts: true,
       isOffscreenCanvasSupported: false,
       isImageDecoderSupported: false,

@@ -16,6 +16,7 @@ import { collectDeploymentExecutionAssetPaths, isJavaScriptExecutionPath } from 
 const execFileAsync = promisify(execFile);
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
+const distDirectory = path.resolve(process.env.PDF_FINISH_DIST_DIR || path.join(repositoryRoot, "dist"));
 const port = Number(process.env.PDF_FINISH_TEST_PORT ?? "4183");
 const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
 const shots = path.resolve(process.env.PDF_FINISH_SHOTS || "/tmp/worklazy-u4-3/shots");
@@ -730,7 +731,7 @@ async function testCombinedBatchWorkflow(browserInstance, fixture) {
   ]);
   await page.waitForFunction(() => document.querySelectorAll("[data-ui-component='file-list'] li").length === 2);
   await page.locator("[data-finish-tab='watermark']").click();
-  await page.locator("[data-testid='pdf-finish-decoration-toggle'] [role='switch']").click();
+  await page.locator("[data-testid='pdf-finish-include-watermark']").click();
   await page.locator("[data-testid='pdf-finish-template']").fill("BATCH-WATERMARK");
   await waitForReadyPreflight(page);
   const action = page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']");
@@ -1306,7 +1307,7 @@ async function createInlineImageFixture() {
 }
 
 async function assertLazyChunks(runtimeRequests) {
-  const assetsDirectory = path.join(repositoryRoot, "dist/assets");
+  const assetsDirectory = path.join(distDirectory, "assets");
   const assets = await fs.readdir(assetsDirectory);
   assert.ok(assets.some((name) => /^PdfFinishPanel-.+\.js$/u.test(name)), "PdfFinishPanel must be a distinct lazy chunk");
   assert.ok(assets.some((name) => /^pdfFontEmbed-.+\.js$/u.test(name)), "finish and QR must share the pdfFontEmbed lazy chunk");
@@ -1323,7 +1324,7 @@ async function assertLazyChunks(runtimeRequests) {
     assert.ok(source.includes(displayUrl), `${asset} must reference the shared PDF display runtime`);
   }
 
-  const measuredInventory = new Set(collectDeploymentExecutionAssetPaths(path.join(repositoryRoot, "dist")));
+  const measuredInventory = new Set(collectDeploymentExecutionAssetPaths(distDirectory));
   assert.ok(runtimeRequests.includes(displayUrl.replace(/^\//, "")), "the shared PDF display runtime must be reached by the real watermark workflow");
   for (const request of runtimeRequests) {
     assert.ok(measuredInventory.has(request), `loaded execution asset is missing from bundle inventory: ${request}`);
@@ -1331,6 +1332,7 @@ async function assertLazyChunks(runtimeRequests) {
   if (runtimeReportPath) {
     await fs.mkdir(path.dirname(runtimeReportPath), { recursive: true });
     await fs.writeFile(runtimeReportPath, `${JSON.stringify({
+      distDirectory,
       displayAsset: displayAssets[0],
       referencedBy: [editorChunk, thumbnailWorker],
       loadedExecutionAssets: runtimeRequests,
@@ -1343,7 +1345,7 @@ async function assertLazyChunks(runtimeRequests) {
 async function startPreview() {
   const { spawn } = await import("node:child_process");
   const viteBin = path.join(repositoryRoot, "node_modules/vite/bin/vite.js");
-  const child = spawn(process.execPath, [viteBin, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+  const child = spawn(process.execPath, [viteBin, "preview", "--outDir", distDirectory, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: repositoryRoot,
     env: { ...process.env, BROWSER: "none" },
     stdio: ["ignore", "pipe", "pipe"],

@@ -897,6 +897,8 @@
       "settingsTitle": "표시 내용과 위치",
       "settingsDescription": "토큰, 위치, 글자 크기와 색상을 정하세요.",
       "includeDecoration": "이 마무리 옵션 포함",
+      "includeShort": "포함",
+      "excludedDraft": "이 탭의 설정은 미리보기용이며 결과에 포함되지 않습니다. 적용하려면 위의 포함 체크박스를 선택하세요.",
       "includeDecorationDescription": "켜 둔 옵션은 PDF를 만들 때 안전한 순서로 함께 적용합니다.",
       "template": "표시할 내용",
       "templateHelp": "사용 가능한 토큰:",
