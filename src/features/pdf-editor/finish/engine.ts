@@ -579,7 +579,7 @@ function createPageDecorationPlan(
         return { code: "invalid-margin", field: "margin", fileKey: source.key, physicalPage };
       }
       if (!region) return { code: "invalid-layout", field: "watermark", fileKey: source.key, physicalPage };
-      width = Math.min(width, region.box.width);
+      // A watermark occupies its configured width at any anchor, not a header/footer column.
       regionHeight = region.box.height;
       alignment = region.alignment;
     }

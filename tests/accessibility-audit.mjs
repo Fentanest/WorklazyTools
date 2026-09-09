@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +29,32 @@ export const accessibilityOwnedSelectors = Object.freeze([
   Object.freeze({ owner: "f4b-raster", selector: f4bOwnedSelector }),
   Object.freeze({ owner: "f4a-structure", selector: f4aOwnedSelector }),
 ]);
+export const finishInclusionContrastTargets = Object.freeze([
+  Object.freeze({ target: "include-watermark", owner: "f2-watermark", selector: 'label:has(> input[data-testid="pdf-finish-include-watermark"]) > span' }),
+  Object.freeze({ target: "include-stamp", owner: "f3-stamp", selector: 'label:has(> input[data-testid="pdf-finish-include-stamp"]) > span' }),
+]);
+
+export function assertFinishInclusionContrast(result) {
+  const measurements = result.inclusionContrast;
+  if (!Array.isArray(measurements) || measurements.length !== finishInclusionContrastTargets.length) throw new Error(`Finish inclusion contrast evidence is missing: ${result.id}.`);
+  for (const expected of finishInclusionContrastTargets) {
+    const matching = measurements.filter(({ target }) => target === expected.target);
+    const measured = matching[0];
+    if (matching.length !== 1 || measured.selector !== expected.selector || measured.owner !== expected.owner || measured.matches !== 1
+      || !Number.isSafeInteger(measured.samples) || measured.samples < 1 || !/^[a-f0-9]{64}$/.test(measured.backgroundSHA ?? "")) {
+      throw new Error(`Finish inclusion pixel target evidence is invalid: ${result.id}/${expected.target}.`);
+    }
+    if (!Number.isFinite(measured.ratio) || measured.ratio < 4.5) throw new Error(`Finish inclusion contrast is below 4.5:1: ${result.id}/${expected.target}=${measured.ratio}.`);
+  }
+  for (const node of result.resolvedIncomplete ?? []) {
+    if (node.measurementKind !== "finish-inclusion") continue;
+    const measurement = measurements.find(({ target }) => target === node.measurementTarget);
+    if (!measurement || measurement.owner !== node.owner || measurement.selector !== node.measurementSelector || node.rule !== "color-contrast") {
+      throw new Error(`Resolved finish inclusion node lacks its exact pixel measurement: ${result.id}.`);
+    }
+  }
+}
+
 export const f3StampOwnershipTargets = Object.freeze([
   Object.freeze({ id: "tab", selector: "[data-finish-tab='stamp'][data-pdf-stamp-owned]" }),
   Object.freeze({ id: "notice", selector: "[data-testid='pdf-stamp-notice'][data-pdf-stamp-owned]" }),
@@ -179,6 +206,9 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
     const contrast = report.summary.placeholderContrast?.ratio;
     if (!Number.isFinite(contrast) || contrast < 4.5) throw new Error("Document placeholder contrast is below 4.5:1 or missing.");
   }
+  for (const target of registeredPages.filter(({ readySelector }) => readySelector?.startsWith("[data-testid='pdf-finish-ready']"))) {
+    assertFinishInclusionContrast(report.results.find(({ id }) => id === target.id));
+  }
   const errorStatePages = registeredPages.filter(({ scenario }) => scenario === "pdf-watermark-empty-text");
   for (const target of errorStatePages) {
     const result = report.results.find(({ id }) => id === target.id);
@@ -239,7 +269,7 @@ export function assertAccessibilityResults(report, { registeredPages = pages, li
       }
     }
     for (const node of result?.resolvedIncomplete ?? []) {
-      if (node.owner === "f3-stamp" && !measurements.some(({ target: measuredTarget }) => measuredTarget === node.measurementTarget)) {
+      if (node.owner === "f3-stamp" && node.measurementKind !== "finish-inclusion" && !measurements.some(({ target: measuredTarget }) => measuredTarget === node.measurementTarget)) {
         throw new Error(`Resolved F3 stamp evidence is missing its pixel measurement: ${target.id}/${node.measurementTarget}.`);
       }
     }
@@ -436,6 +466,18 @@ export async function runAccessibilityAudit() {
       if (duplicateContrast && duplicateContrast.minimum < 4.5) {
         throw new Error(`Excel duplicate result text contrast fell below 4.5:1: ${JSON.stringify(duplicateContrast)}`);
       }
+      const inclusionContrast = [];
+      if (target.readySelector?.startsWith("[data-testid='pdf-finish-ready']")) {
+        const pixelDirectory = path.join(path.dirname(reportPath), "inclusion-pixels");
+        await fs.mkdir(pixelDirectory, { recursive: true });
+        for (const expected of finishInclusionContrastTargets) {
+          const locator = page.locator(expected.selector);
+          const matches = await locator.count();
+          if (matches !== 1) throw new Error(`Finish inclusion contrast target is missing or ambiguous: ${target.id}/${expected.target}.`);
+          const backgroundPath = path.join(pixelDirectory, `${target.id}-${expected.target}.png`);
+          inclusionContrast.push({ ...expected, matches, ...await measureTextPixelContrast(locator, expected.target, backgroundPath) });
+        }
+      }
       const incomplete = [];
       const resolvedIncomplete = [];
       for (const rule of audit.incomplete) {
@@ -445,10 +487,13 @@ export async function runAccessibilityAudit() {
           if (typeof firstTarget !== "string" || !firstTarget.trim()) {
             throw new Error(`Accessibility incomplete target is missing: ${target.id}/${rule.id}.`);
           }
-          const ownership = await page.evaluate(({ target, ownedSelectors, pixelMeasuredReload, pixelMeasuredStamp }) => {
+          const ownership = await page.evaluate(({ target, ownedSelectors, pixelMeasuredReload, pixelMeasuredStamp, inclusionTargets }) => {
             try {
               const element = document.querySelector(target);
               if (!element) return { resolution: "missing" };
+              for (const expected of inclusionTargets) {
+                if (element.matches(expected.selector)) return { resolution: "measured-pixel", owner: expected.owner, measurementTarget: expected.target, measurementSelector: expected.selector, measurementKind: "finish-inclusion" };
+              }
               if (pixelMeasuredReload && element.matches("[data-testid='pdf-display-reload']")) {
                 return { resolution: "measured-pixel", owner: "f2-watermark" };
               }
@@ -469,6 +514,7 @@ export async function runAccessibilityAudit() {
           }, {
             target: firstTarget,
             ownedSelectors: accessibilityOwnedSelectors,
+            inclusionTargets: inclusionContrast.length && rule.id === "color-contrast" ? finishInclusionContrastTargets : [],
             pixelMeasuredReload: target.scenario === "pdf-watermark-display-load-failure" && rule.id === "color-contrast",
             pixelMeasuredStamp: target.id.startsWith("pdf-stamp") && rule.id === "color-contrast",
           });
@@ -481,6 +527,7 @@ export async function runAccessibilityAudit() {
               resolution: "measured-pixel",
               owner: ownership.owner,
               ...(ownership.measurementTarget ? { measurementTarget: ownership.measurementTarget } : {}),
+              ...(ownership.measurementKind ? { measurementKind: ownership.measurementKind, measurementSelector: ownership.measurementSelector } : {}),
             });
             continue;
           }
@@ -533,6 +580,7 @@ export async function runAccessibilityAudit() {
         ...(structureOwnership ? { structureOwnership } : {}),
         ...(rasterOwnership ? { rasterOwnership } : {}),
         ...(stampContrast ? { stampContrast } : {}),
+        ...(inclusionContrast.length ? { inclusionContrast } : {}),
       });
       await context.close();
     }
@@ -661,7 +709,7 @@ async function measureStampNoticeContrast(page) {
   ]);
 }
 
-async function measureTextPixelContrast(locator, target) {
+export async function measureTextPixelContrast(locator, target, backgroundPath) {
   const foreground = await locator.evaluate((element) => {
     const canvas = document.createElement("canvas");
     canvas.width = 1;
@@ -681,6 +729,7 @@ async function measureTextPixelContrast(locator, target) {
   } finally {
     await locator.evaluate((element) => element.style.removeProperty("color"));
   }
+  if (backgroundPath) await fs.writeFile(backgroundPath, screenshot);
   const image = PNG.sync.read(screenshot);
   const foregroundLuminance = luminance(foreground.rgba);
   const ratios = [];
@@ -694,6 +743,7 @@ async function measureTextPixelContrast(locator, target) {
   if (!ratios.length) throw new Error(`PDF stamp ${target} background pixel sample is empty.`);
   return {
     target,
+    ...(backgroundPath ? { backgroundPath, backgroundSHA: createHash("sha256").update(screenshot).digest("hex") } : {}),
     foreground: foreground.css,
     ratio: Math.min(...ratios),
     maximumRatio: Math.max(...ratios),

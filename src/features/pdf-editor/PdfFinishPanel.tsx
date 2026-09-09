@@ -63,6 +63,8 @@ interface FinishCopy {
   settingsTitle: string;
   settingsDescription: string;
   includeDecoration: string;
+  includeShort: string;
+  excludedDraft: string;
   includeDecorationDescription: string;
   template: string;
   templateHelp: string;
@@ -488,8 +490,8 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     setRiskAccepted(false);
   };
 
-  const setDecorationEnabled = (value: boolean) => {
-    setEnabled((current) => ({ ...current, [activeTab]: value }));
+  const setDecorationEnabled = (tab: ImplementedFinishTab, value: boolean) => {
+    setEnabled((current) => ({ ...current, [tab]: value }));
     setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
     setRiskAccepted(false);
     download.clearResults();
@@ -807,6 +809,14 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         })}
       </div>
 
+      <div className="mb-2 grid grid-cols-4 gap-1" role="group" aria-label={copy.includeDecoration}>
+        {(["page-numbers", "header-footer", "watermark", "stamp"] as const).map((tab) => <label key={tab} className="flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-xs font-medium sm:text-sm" data-pdf-finish-owned data-pdf-watermark-owned={tab === "watermark" || undefined} data-pdf-stamp-owned={tab === "stamp" || undefined}>
+          <input type="checkbox" style={{ accentColor: "var(--primary)" }} className="h-5 w-5 shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600" data-testid={`pdf-finish-include-${tab}`} aria-label={`${copy.tabs[tab]}: ${copy.includeDecoration}`} checked={enabled[tab]} disabled={locked} onChange={(event) => setDecorationEnabled(tab, event.target.checked)} />
+          <span>{copy.includeShort}</span>
+        </label>)}
+      </div>
+      <p className="mb-4 text-xs leading-relaxed text-muted-foreground">{copy.includeDecorationDescription}</p>
+
       <div id={tabPanelId} role="tabpanel" aria-labelledby={`${tabPanelId}-${activeTab}`}>
         {stampActive && <UtilityNotice className="mb-4 flex-col" tone="warning" data-testid="pdf-stamp-notice" data-pdf-stamp-owned><strong className="block text-foreground" data-testid="pdf-stamp-notice-title">{copy.stamp.noticeTitle}</strong><span data-testid="pdf-stamp-notice-description">{copy.stamp.noticeDescription}</span></UtilityNotice>}
         <SectionCard step={1} title={copy.uploadTitle} description={copy.uploadDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
@@ -820,9 +830,6 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)] items-start gap-4 max-[820px]:grid-cols-1">
             <div className="min-w-0">
               <SectionCard step={2} title={stampActive ? copy.stamp.settingsTitle : copy.settingsTitle} description={stampActive ? copy.stamp.settingsDescription : copy.settingsDescription} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">
-                <div className="mb-5 overflow-hidden rounded-2xl border border-border" data-testid="pdf-finish-decoration-toggle" data-decoration={activeTab}>
-                  <ToggleRow label={copy.includeDecoration} description={copy.includeDecorationDescription} checked={enabled[activeTab]} onChange={setDecorationEnabled} disabled={locked} />
-                </div>
                 {watermarkActive && <div className="grid grid-cols-3 gap-3 max-[620px]:grid-cols-1" data-pdf-watermark-owned>
                   <UtilityField>{copy.watermark.contentType}<div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={copy.watermark.contentType}><Button type="button" variant="outline" role="radio" aria-checked={watermark.content === "text"} data-testid="pdf-watermark-content-text" className={cn("min-h-11 rounded-xl", watermark.content === "text" && "border-violet-600 bg-violet-500/10 text-violet-700 dark:text-violet-300")} disabled={locked} onClick={() => updateWatermark("content", "text")}><Type size={16} />{copy.watermark.text}</Button><Button type="button" variant="outline" role="radio" aria-checked={watermark.content === "image"} data-testid="pdf-watermark-content-image" className={cn("min-h-11 rounded-xl", watermark.content === "image" && "border-violet-600 bg-violet-500/10 text-violet-700 dark:text-violet-300")} disabled={locked} onClick={() => updateWatermark("content", "image")}><ImageIcon size={16} />{copy.watermark.image}</Button></div></UtilityField>
                   <UtilityField>{copy.watermark.layer}<UtilitySelect data-testid="pdf-watermark-layer" value={watermark.layer} disabled={locked} onChange={(event) => updateWatermark("layer", event.target.value as WatermarkLayer)}><option value="background">{copy.watermark.background}</option><option value="foreground">{copy.watermark.foreground}</option></UtilitySelect></UtilityField>
@@ -929,6 +936,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
               <Card as="section" className="gap-0 overflow-visible rounded-3xl border border-border p-5 py-5 shadow-sm ring-0" aria-labelledby={`${tabPanelId}-preview-title`}>
                 <div className="mb-4 flex items-center gap-2 text-violet-700 dark:text-violet-300"><SquareDashed size={18} /><h2 id={`${tabPanelId}-preview-title`} className="font-heading text-base font-medium text-foreground">{stampActive ? copy.stamp.previewTitle : copy.previewTitle}</h2></div>
                 <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{stampActive ? copy.stamp.previewDescription : copy.previewDescription}</p>
+                {!enabled[activeTab] && <p className="mb-3 text-xs leading-relaxed text-muted-foreground" data-testid="pdf-finish-excluded-draft" data-pdf-finish-owned>{copy.excludedDraft}</p>}
                 <FinishPreview file={file} pageIndex={Math.max(0, (selection.exactPages[0] ?? 1) - 1)} language={language} form={{ ...form, fontSize: Number.isFinite(fontSize) ? fontSize : 10, margin: Number.isFinite(margin) ? margin : 24 }} startNumber={Number.isSafeInteger(startingNumber) ? startingNumber : 1} startPage={validLowerBound ? startingPage : 1} excludeCover={excludeCover} pageCount={pageCount} copy={copy} lifecycleSignal={fileLifecycleControllerRef.current?.signal} onRenderingChange={updatePreviewing} watermark={watermarkActive ? { ...watermark, rotation: watermarkRotation, opacity: watermarkOpacity, sizePercent: watermarkSize, gap: watermarkGap, offsetX: watermarkOffsetX, offsetY: watermarkOffsetY } : undefined} stamp={stampActive && stampImage && stampImageStatus === "ready" ? { image: stampImage, placement: stampHistory.present, onCommit: updateStampPlacement } : undefined} locked={locked} />
                 {!stampActive && <UtilityNotice className="mt-3" tone="warning" data-testid="pdf-finish-preview-disclaimer" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.previewDisclaimer}</UtilityNotice>}
                 {preflight.status === "checking" && <UtilityNotice className="mt-3" tone="warning" role="status" data-testid="pdf-finish-preflight-checking" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.preflightChecking}</UtilityNotice>}
@@ -1077,7 +1085,6 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
       const lineHeight = form.fontSize * 1.2;
       const regionHeight = form.region === "center" ? sourceHeight - form.margin * 2 : (sourceHeight - form.margin * 2) / 2;
       const visibleLineCount = Math.min(overlay.split("\n").length, Math.max(0, Math.floor(regionHeight / lineHeight)));
-      if (form.region !== "center") objectWidth = Math.min(objectWidth, Math.max(0, sourceWidth - form.margin * 2) / 3);
       if (visibleLineCount > 0) objectHeight = Math.max(lineHeight, (visibleLineCount - 1) * lineHeight + form.fontSize);
     }
     if (objectWidth > 0 && objectHeight > 0) {
@@ -1103,7 +1110,7 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
     <div className={cn("relative mx-auto max-w-full", rendering && "invisible")} data-testid="pdf-finish-canvas-area" style={dimensions ? { width: `${dimensions.width}px`, aspectRatio: `${dimensions.width} / ${dimensions.height}`, containerType: "inline-size" } : undefined}>
       <canvas ref={canvasRef} className="block h-auto w-full bg-white shadow-md" style={{ width: "100%", height: "auto" }} />
       {!failed && !rendering && stamp && imageUrl && dimensions && <PdfStampOverlay imageUrl={imageUrl} placement={stamp.placement} sourceWidth={dimensions.sourceWidth} sourceHeight={dimensions.sourceHeight} moveLabel={copy.stamp.move} resizeLabel={copy.stamp.resize} disabled={locked} onCommit={stamp.onCommit} />}
-      {!failed && !rendering && watermark && <div className="pointer-events-none absolute inset-0 overflow-hidden" data-testid="pdf-finish-overlay" data-watermark-pattern={watermark.pattern} data-watermark-layer={watermark.layer} data-placement-count={previewPlacements.length} aria-hidden="true">{dimensions && previewPlacements.map((placement, index) => <div key={`${placement.centerX}-${placement.centerY}-${index}`} className="absolute flex items-end overflow-hidden" data-watermark-placement style={{ left: `${placement.centerX / dimensions.sourceWidth * 100}%`, top: `${placement.centerY / dimensions.sourceHeight * 100}%`, width: `${placement.width / dimensions.sourceWidth * 100}%`, height: `${placement.height / dimensions.sourceHeight * 100}%`, color: form.color, fontSize: `${form.fontSize / dimensions.sourceWidth * 100}cqw`, opacity: Number.isFinite(watermark.opacity) ? watermark.opacity : 0.2, textAlign: horizontal, transform: `translate(-50%, -50%) rotate(${placement.rotation}deg)`, transformOrigin: "center" }}>{watermark.content === "image" ? imageUrl && <img src={imageUrl} alt="" className="block h-full w-full object-contain" /> : <span className="block w-full whitespace-pre-wrap break-words font-semibold leading-[1.2]">{overlay}</span>}</div>)}</div>}
+      {!failed && !rendering && watermark && <div className="pointer-events-none absolute inset-0 overflow-hidden" data-testid="pdf-finish-overlay" data-watermark-pattern={watermark.pattern} data-watermark-layer={watermark.layer} data-placement-count={previewPlacements.length} aria-hidden="true">{dimensions && previewPlacements.map((placement, index) => <div key={`${placement.centerX}-${placement.centerY}-${index}`} className="absolute flex items-end overflow-hidden" data-watermark-placement style={{ left: `${placement.centerX / dimensions.sourceWidth * 100}%`, top: `${placement.centerY / dimensions.sourceHeight * 100}%`, width: `${placement.width / dimensions.sourceWidth * 100}%`, height: `${placement.height / dimensions.sourceHeight * 100}%`, color: form.color, fontSize: `${form.fontSize / dimensions.sourceWidth * 100}cqw`, opacity: Number.isFinite(watermark.opacity) ? watermark.opacity : 0.2, textAlign: horizontal, transform: `translate(-50%, -50%) rotate(${placement.rotation}deg)`, transformOrigin: "center" }}>{watermark.content === "image" ? imageUrl && <img src={imageUrl} alt="" className="block h-full w-full object-contain" /> : <span className="block w-full min-w-0 font-semibold leading-[1.2]">{overlay.split("\n").map((line, lineIndex) => <span key={lineIndex} className="block min-h-[1.2em] overflow-hidden text-ellipsis whitespace-pre">{line || "\u00a0"}</span>)}</span>}</div>)}</div>}
       {!failed && !rendering && !watermark && !stamp && <span className="pointer-events-none absolute max-w-[60%] whitespace-pre-wrap break-words font-medium leading-[1.2] opacity-90" data-testid="pdf-finish-overlay" aria-hidden="true" style={positionStyle}>{overlay}</span>}
     </div>
   </div>;

@@ -4,6 +4,24 @@
 
 ## 2026-09-09
 
+### U4 최초 배포 사후 확인과 사용자 신고 수리 (Codx)
+
+U4+BL04는 `5caefc4cadcdcca9d332bfe885d6445ea87ffc96`를 main에 한 번 push했고 Pages run **34317542767**이 성공했다. HTTP 16개, BL04 실제 오류/유사 문자열 업로드 8개, PDF 10개 경로와 두 PDF·ZIP 다운로드, 격리 6개 경로의 사후 확인을 실행했다. 라이브의 entry SHA가 최초 로컬 계측과 달라 실패한 원인은 CI의 `VITE_SITE_URL=https://worklazy.net/` 누락이었다. 같은 환경으로 다시 빌드한 scoped/full 계측과 라이브 PDF 실행 자산 236회 관찰의 SHA·바이트가 일치했다. 최초 실패를 삭제하지 않았고, HTML URL 처리 35B raw 차이와 hash 전파라는 Astra 독립 귀속을 보존했다. 최초 배포 실측 app gzip은 **5,944,194B**다. 초기 표시 CLS 최대 **0.015826**와 별도 업로드부터 다운로드까지 확장 측정 **0.189165**는 다른 구간이며 후자를 초기 게이트 통과로 바꾸지 않는다. 확장 구간의 도입 시점 미확정 P3는 backlog에 남겼다. 실제 COI service worker를 허용한 격리 6경로에서 광고 0·페이지 오류 0·문서화된 요청 정책 일치를 확인했고, `serviceWorkers:block` 및 응답 본문 수집 중 reload의 실패 로그도 보존했다. 증거 `/tmp/worklazy-u4-mergegate4/live-current-status.json`.
+
+사용자의 명시 지시에 따라 dummyfortest의 PDF·PNG 두 파일만 로컬에서 재현했다. `/finish`의 초기 stamp=false인데 미리보기에는 그림을 편집할 수 있어 결과에서 빠졌으며, `/stamp` 직접 진입 출력에는 도장 XObject가 있었다. 도장 엔진 유실로 판정하지 않았다. 사용자가 원인을 확인하고 요청한 대로 네 탭 각각의 native checkbox로 포함 기능을 옮기고 기존 포함 박스만 제거했다. 기본값·탭 전환·기존 설정 카드는 보존하고 미포함 미리보기에는 짧은 한·영 안내를 추가했다. 합성 네 옵션 동시 출력 및 하나씩 제외, 한영 접근명·Space·label·기본값을 독립 검증했다. 허용 개인 입력은 수정하거나 추적 fixture·외부 검수에 보내지 않았다.
+
+위치 변경 시 워터마크 앞부분이 사라진 원인은 머리글/바닥글 3열 폭을 워터마크에도 적용하고 한 줄 높이 안에서 CSS 자동 줄바꿈을 허용한 조합이었다. 워터마크에만 설정 폭을 적용하고 명시 개행만 유지했다. 여섯 anchor×네 회전/CropBox/UserUnit full-word 출력, 실제 사용자 PDF 4쪽×6위치 24개, 양 renderer 골든 128+32개, legacy44파일 diff0을 확인했다. 좁은 420pt 페이지의 기본36pt 문구는 실제폭264.024pt가 설정223.2pt를 넘어 원래 계약대로 말줄임+경고이며, 이전 배포/수리본 native PNG SHA가 동일하다. 595pt 기본값은 전체 문구가 나온다. 회전된 Poppler 추출의 줄/공백 분할 때문에 포함기능 oracle은 회전0·size80·font10 합성 표본으로 분리했으며 기본 좁은 페이지 전체 가독성 PASS로 주장하지 않는다.
+
+한글 미리보기는 사용자 PDF의 내장 MalgunGothic 7개와 ToUnicode, Poppler 정상 표시를 확인한 뒤 전용 썸네일 worker의 PDF.js `ownerDocument.fonts` 누락으로 귀속했다. worker FontFaceSet 연결과 API 부재 시 기존 main fallback만 추가했다. 합성 worker/main PNG 동일, owner 제거 시 네모 mutant 검출, API 부재 fallback·취소 terminate1·재시도·외부0을 재현했다. 텍스트 추출만으로는 네모 현상을 검출할 수 없었다. 원본 양쪽 텍스트 2,858자의 glyph inventory는 같지만 읽기 순서는 달라 exact text oracle로 주장하지 않는다. 어려운 제품 코드는 Astra, 포함기능 수용검사는 Sol, UI/엔진과 worker는 서로 다른 Astra가 교차 검수했다.
+
+최종 QA/production build, static, unit **506/506**, PDF scoped browser, 전체 finish smoke와 lifecycle·stamp·structure·combined golden을 실제 실행했다. watermark golden·legacy는 같은 소스의 집중 라운드 실증을 승계했다. QA 7대상×3회 CLS 최대 **0.003456**, scoped visual **73/73** 재비교 일치이며 의도된 기준선 변경은 finish55+글꼴미리보기2, 총57 PNG이고 추가·삭제0이다. 첫 full unit의 새 accent utility 격리 위반은 로컬 primary 스타일로 수리하고 504/505 실패 원로그를 보존했다. QA 빌드 한 번은 완성 로그 뒤 tool exit143이므로 성공으로 세지 않고 별도 build05 exit0으로 확인했다. QA 서버를 열면서 root dist의 production inventory를 대조한 smoke 실패는 `PDF_FINISH_DIST_DIR`로 실제 서버와 검사 경로를 맞춰 해결했으며 잘못된 production 경로는 동일 단언으로 거부됐다. 최종 실제로 로드된 24개 실행 자산/물리inventory107개/미계측0이다.
+
+접근성 원감사 **28페이지·위반0·새라벨owned incomplete34**를 미확인 성공으로 처리하지 않았다. 워터마크/도장 체크박스의 정확한 라벨·소유자·배경PNG/SHA·픽셀 표본을 연결해 4.5:1을 검사했다. 최종54측정 최저 **15.4584:1**, 기존해소16+새34개가 측정 근거에 연결됐고 owned incomplete0, 공용미확인 **787개**는 원자료에 보존했다. 실제동색4건은1:1로 거부되고 누락·중복·잘못된target/owner·빈표본 등11개 변형도 거부됐다. 원실패는 `08-a11y.log`, 최종은 `21-a11y-final.log`이며 다른Astra의 검수에 연결한다.
+
+규칙19 시각 검수에서 Gemini가 추적없는 QA를 실제 Chromium8환경(ko/en·320/1365·light/dark)으로 열어 checkbox행을 조작하고8장을 개별 이미지 도구로 열었다. 추가 합성워터마크6·한글renderer2·모바일네옵션2, 총10경로의 실제열람도 원도구 이벤트와 SHA로 Codx가 대조했다(한글2장은 동일SHA별칭). Codx도 모바일·desktop·워터마크·한글을 직접 열어 교차했고, Sol의4옵션수용/8대표상태와 Astra의8직접진입을 함께 확인했다. 제공된 개인원본 파생 이미지는 Gemini에 보내지 않았다. 기등록KO탭 줄바꿈P3와 공용고정UI가림은 UI후속으로 남기며 다른 신규P2를 면제하지 않았다.
+
+생산환경의 scoped/full 계측과 최종dist **108 JS/MJS/CSS 경로**의 실제SHA·바이트가 일치했다. gzip entry **314,167B**, PDF route **1,155,175B**, shared **1,393,313B**, app **5,944,492B**, CSS **38,284B**이고 직전라이브 대비 app **+298B**다. 기본5상한 null/override{}/multiplier1과 고정baseline을 유지했고 물리census·추가/삭제·동일SHA별칭·내용변경·명시0상한 음성검사를 통과했다. 생산PDF10경로의 실행자산236관찰 SHA·바이트 일치, 한영2PDF+ZIP 다운로드/재열기, 초기CLS최대0을 확인했다. SEO/FAQ/canonical/광고격리 경로는 바뀌지 않았으며 현지화2키와 정적71페이지·광고요청분기를 확인했다. 무관Excel/Office/영상/QR전체는 이미실행한 최초배포검증을 승계하며 재실행하지 않았다. 기존 heartbeat 목표미달·실기기모바일미교정은 이전부채로 그대로 남는다. 후속수리 push와 라이브사후확인은 이검수뒤 실행한다. — Codx
+
 ### U4 배포 전 통합 검수 종결 (Codx)
 
 제품 후보 `f0a5b1693f0567b9f62d5420e182de1e9f871277`의 자동 게이트 이월분을 회수했다. Astra가 기록된 소스 2,297개·QA 자산 570개·생산 JS/MJS/CSS 108개와 16경로의 실제 로드 관찰 259건을 원자료에 재대조해 차이 0을 확인했다. 수리 후 최종 visual은 ko/en 각각 **246/246**, 하네스 소요 **3분 31.30초 / 3분 24.22초**다. 검증 당시 `0f02458`+미커밋 공지 수리라는 provenance는 보존하고, 커밋 소스 SHA 일치로 최종 후보에 연결했다. 문서·시각 기준선 커밋을 제품 재실행으로 표현하지 않는다. 상세 13묶음 대조는 `/tmp/worklazy-u4-audit3/final-gate4/REPORT.md`다.

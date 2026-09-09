@@ -598,21 +598,21 @@ test("watermark tile preflight rejects zero placements and canonical numeric bou
   );
 });
 
-test("watermark text forms reserve descenders and use the six-region width contract outside center", async () => {
+test("watermark text forms reserve descenders and configured width at corner anchors", async () => {
   const file = await fixture("text-contract.pdf");
   const [output] = await finishPdfFiles({
     files: [{ key: "text-contract", file, selection: selection(3, "1") }],
     options: watermarkOptions({ template: "gypqj\nsecond line", margin: 20, watermark: { ...watermarkOptions().watermark, region: "top-left" as const, rotation: 0, sizePercent: 100 } }),
     locale: "en-US",
   });
-  assert.ok(output.warnings.includes("horizontal-overflow"));
+  assert.ok(!output.warnings.includes("horizontal-overflow"));
   const document = await PDFDocument.load(await output.blob.arrayBuffer(), { updateMetadata: false });
   const form = document.context.enumerateIndirectObjects().map(([, object]) => object).find((object): object is PDFRawStream => object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Form"));
   assert.ok(form);
   const box = form.dict.lookup(PDFName.of("BBox"), PDFArray).asArray().map((entry) => (entry as PDFNumber).asNumber());
   assert.equal(box[0], 0);
   assert.equal(box[1], 0);
-  assert.ok(Math.abs(box[2] - 120) < 0.001, `unexpected six-region width: ${box[2]}`);
+  assert.ok(Math.abs(box[2] - 360) < 0.001, `unexpected configured watermark width: ${box[2]}`);
   assert.ok(box[3] > 28 * 1.2, `descender/multiline height was not reserved: ${box[3]}`);
   const content = Buffer.from(decodePDFRawStream(form).decode()).toString("latin1");
   const baselines = [...content.matchAll(/1 0 0 1 [^ ]+ ([^ ]+) Tm/gu)].map((match) => Number(match[1]));
@@ -693,4 +693,35 @@ test("watermark does not expose a result when reopen validation finds damage", a
     (error: unknown) => error instanceof PdfFinishEngineError && error.code === "output-validation",
   );
   assert.equal(validations, 1);
+});
+
+test("watermark corner anchors preserve a complete word instead of borrowing header/footer column widths", async () => {
+  const document = await PDFDocument.create({ updateMetadata: false });
+  for (const rotation of [0, 90, 180, 270]) {
+    const page = document.addPage([655, 902]);
+    page.setCropBox(30, 30, 595, 842);
+    page.setRotation(degrees(rotation));
+    if (rotation === 270) page.node.set(PDFName.of("UserUnit"), PDFNumber.of(2));
+  }
+  const file = new File([await document.save()], "watermark-corners.pdf", { type: "application/pdf" });
+  for (const region of ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"] as const) {
+    const [output] = await finishPdfFiles({
+      files: [{ key: region, file, selection: selection(4, "1-4") }],
+      options: watermarkOptions({ region, fontSize: 36, margin: 24, watermark: { ...watermarkOptions().watermark, region } }),
+      locale: "en-US",
+    });
+    assert.ok(!output.warnings.includes("horizontal-overflow"), `${region}: a valid full-width watermark must not be truncated`);
+    const result = await PDFDocument.load(await output.blob.arrayBuffer());
+    const forms = result.context.enumerateIndirectObjects().map(([, object]) => object).filter((object): object is PDFRawStream => object instanceof PDFRawStream && object.dict.get(PDFName.of("Subtype")) === PDFName.of("Form"));
+    assert.equal(forms.length, 4);
+    for (const form of forms) assert.match(Buffer.from(decodePDFRawStream(form).decode()).toString("latin1"), /<434F4E464944454E5449414C>/u, `${region}: every rotated/cropped output must contain the whole CONFIDENTIAL run`);
+    await output.dispose();
+  }
+  const [long] = await finishPdfFiles({
+    files: [{ key: "long", file, selection: selection(4, "1") }],
+    options: watermarkOptions({ template: "CONFIDENTIAL".repeat(30), region: "top-left", watermark: { ...watermarkOptions().watermark, region: "top-left" } }),
+    locale: "en-US",
+  });
+  assert.ok(long.warnings.includes("horizontal-overflow"), "genuinely oversized text retains the existing overflow warning");
+  await long.dispose();
 });

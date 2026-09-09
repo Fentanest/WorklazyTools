@@ -45,6 +45,10 @@
 - **고정 언어 스위처의 스크롤된 콘텐츠 가림 — 기존 P3** — 1365px에서 PDF 마무리 화면을 아래로 스크롤하면 우상단 KO/EN 스위처가 모드 탭의 마지막 라벨 위에 겹친다. `src/styles/global.css`의 fixed 위치는 `76ceecc7`부터 존재하며 U4에서 바뀌지 않았다. 최상단에서는 탭이 보이고 이번 UI 추가 회귀는 아니다. UI 재설계에서 공용 고정 요소의 가림 정책으로 함께 처리한다. 실제 이미지 `/tmp/worklazy-u4-mergegate3/f5-audit/ko-light-1365-combined.png`, Claude 직접 열람 및 Codx source blame 교차. — Codx
 - **PDF 마무리 한국어 제목·탭의 단어 중간 줄바꿈 — U4 cosmetic P3** — 320/821px에서 제목이나 `머리글·바닥글` 탭의 마지막 글자가 다음 줄에 놓인다. 821px 탭 라벨 폭은 77.75px이며 두 줄이다. U4 라벨·4개 탭 구성의 영향이므로 부모 `d3a8d89`와 같다는 이유로 U4 이전 부채라고 부르지 않는다. UI 재설계에서 한국어 줄바꿈·폭 정책으로 묶어 처리한다. 개인정보 안내 pill의 같은 현상은 공용 CSS는 U4 이전이지만 F5 제목의 인접 폭 영향이 있어 정확한 증상 귀속은 미확정이다. P2 도장 공지의 제목 수직 붕괴는 이 항목으로 미루지 않고 U4에서 별도 수리했다. 근거 `/tmp/worklazy-u4-audit3/visual-dom-initial-final/REPORT.md`. — Codx
 
+## PDF 마무리 확장 동작의 레이아웃 안정성
+
+- **업로드부터 다운로드까지 확장 구간 CLS — P3, 도입 시점 미확정** — 최초 U4 배포 뒤 합성 두 파일을 프로그램으로 선택하고 PDF·ZIP 다운로드까지 누적하면 CLS **0.189165**, 최대 단일 이동 **0.172023**이었다. 기존 초기 표시 게이트와 측정 구간이 달라 같은 목표 통과/실패로 혼합하지 않는다. 초기 표시 검증은 별도로 통과했다. 실제 사용자 입력의 `hadRecentInput`과 완료·결과 카드 삽입을 포함한 측정 계약을 UI 재설계에서 정하고 부모 실증으로 도입 시점을 확인한다. 이전 결함이라고 단정하지 않는다. 근거 `/tmp/worklazy-u4-mergegate4/live-asset-attribution/audit/CLS-SCOPE.md`, `live-network-ci-initial/rendering-ko-finish.json`. — Codx
+
 ## PDF 마무리 API 후속
 
 - **상위 텍스트 옵션의 조용한 누락 — 기존 P2 API 계약** — `PdfFinishDecorationOptions`가 상위 텍스트 필드를 유지하면서 `textDecorations`는 optional인 계약(`src/features/pdf-editor/finish/engine.ts:151-173`) 때문에, 배열을 생략하고 stamp 또는 image watermark를 함께 넘기면 `engine.ts:785-788`에서 상위 텍스트 장식이 조용히 버려진다. 부모 revision도 같고 제품 UI는 항상 명시적 `textDecorations` 배열을 넘겨 안전하므로 이번 회귀 수리 범위에는 넣지 않았다. 후속 수리는 ① typed/discriminated 계약과 문서로 호출 의미를 명시하거나 ② 모호한 입력을 오류로 거부하는 두 방향을 비교한다. 단순 fallback은 기존 stamp-only 호출에 placeholder 텍스트를 새로 출력할 수 있어 기각한다. — Codx
