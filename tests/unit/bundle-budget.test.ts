@@ -23,15 +23,16 @@ const quiet = () => {};
 const budget = resolveBudgetLimits({});
 const renderedSha256 = "a".repeat(64);
 
-test("default budget records the final PDF route and application allowances", () => {
+test("default budget records all five measurements without size limits", () => {
   assert.deepEqual(budgetLimits, {
-    entryJsGzip: 20 * 1024,
-    affectedRouteJsGzip: 82_000,
-    sharedJsGzip: 30 * 1024,
-    appJsGzip: 96_000,
-    cssGzip: 10 * 1024,
+    entryJsGzip: null,
+    affectedRouteJsGzip: null,
+    sharedJsGzip: null,
+    appJsGzip: null,
+    cssGzip: null,
   });
   assert.deepEqual(budget, { limits: budgetLimits, overrides: {}, multiplier: 1 });
+  assert.deepEqual(JSON.parse(JSON.stringify(budget)), budget);
 });
 
 function contributionFile(hash: string, gzipBytes: number, category: string, routeOwners: string[], id: string) {
@@ -86,10 +87,22 @@ function currentAtDelta(metric: string, delta: number) {
   return current;
 }
 
-for (const [metric, limit] of Object.entries(budgetLimits) as [string, number][]) {
-  test(`bundle ${metric}: limit passes; +1 byte fails`, () => {
-    assert.doesNotThrow(() => compareWithBaseline(currentAtDelta(metric, limit), report(), budget, quiet));
-    assert.throws(() => compareWithBaseline(currentAtDelta(metric, limit + 1), report(), budget, quiet), new RegExp(metric));
+for (const metric of Object.keys(budgetLimits)) {
+  test(`bundle ${metric}: no implicit size cap remains above one GiB`, () => {
+    const delta = 1024 ** 3 + 1;
+    const result = compareWithBaseline(currentAtDelta(metric, delta), report(), budget, quiet);
+    assert.equal(result.deltas[metric], delta);
+    assert.equal(result.limits[metric], null);
+  });
+  test(`bundle ${metric}: explicit limit passes; +1 byte fails`, () => {
+    const key = `BUNDLE_LIMIT_${metric.replace(/[A-Z]/g, (letter) => `_${letter}`).toUpperCase()}`;
+    const limit = 100;
+    const strictBudget = resolveBudgetLimits({ [key]: String(limit) });
+    assert.doesNotThrow(() => compareWithBaseline(currentAtDelta(metric, limit), report(), strictBudget, quiet));
+    assert.throws(() => compareWithBaseline(currentAtDelta(metric, limit + 1), report(), strictBudget, quiet), new RegExp(metric));
+    for (const invalid of [undefined, NaN, Infinity, -1, 0.5, "100"]) {
+      assert.throws(() => compareWithBaseline(report(), report(), { ...budget, limits: { ...budget.limits, [metric]: invalid } }, quiet), new RegExp(`limit.${metric}`));
+    }
   });
   test(`bundle ${metric}: both sides reject NaN, missing and non-integer bytes`, () => {
     for (const side of ["current", "baseline"]) for (const invalid of [NaN, Infinity, -1, 0.5, "100", undefined]) {

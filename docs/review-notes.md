@@ -4,6 +4,12 @@
 
 ## 2026-09-09
 
+### 번들 기본 상한 해제 (Codx)
+
+최신 사용자 결정에 따라 기본 5종 크기 한계를 JSON에서도 유지되는 `null`로 표현했다. 중간 워킹트리의 1GiB 한계는 여전히 초과 시 차단하므로 무상한과 같지 않아 채택하지 않았다. 계측 schema·정수 bytes·route·module 귀속·배포 inventory 검증은 유지하며, 명시 환경변수 상한은 통제된 대조용으로 계속 검증한다. 이 결정은 과거 U4 SCOPE-OUT의 크기 차단 사유를 해제하지만, 미실행 게이트나 성능 목표 미달을 통과로 바꾸지 않는다.
+
+관련 unit **32/32**를 실제 실행했다. Astra 독립 실험에서 각 지표 **2GiB+7B** 증가의 기본 통과, JSON null 보존, 명시 0B 상한 초과 거부와 경계 일치 통과를 확인했다. 잘못된 metric 값 6종×5와 schema·route·module·inventory 누락은 거부됐다. 증거 `/tmp/worklazy-todo-execution-20260909/bundle-unit.log`, `/tmp/worklazy-u4-audit3/meter-review/`; 검수 중 추적 파일 2,726개 SHA 변화 0. 최종 통합 번들 실측은 U4 병합 게이트에서 회수한다. — Codx
+
 ### BL04 XLSX/XLSM 오류 셀 타입 보존 (Codx)
 
 기준 `d9c79b7`과 BL04 대상 diff는 0이었다. ExcelJS 정규화 전의 일반 셀 값 또는 `cacheState=present`인 수식 result에 own string `error` 속성이 있는지만 판정해 모델 `type`을 `error`로 교정했다. 값·표시값·캐시 값은 기존 문자열을 유지하고 missing 수식 캐시는 `null/undefined/blank/missing`을 유지한다. 오류명 문자열 blacklist, wrapper 재귀 탐색, legacy 숫자 오류 통일은 실제 문자열과 기존 모델을 바꾸므로 채택하지 않았다.

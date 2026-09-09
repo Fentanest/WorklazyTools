@@ -22,12 +22,15 @@ const outputDirectory = path.join(repositoryRoot, "dist-measure");
 const selectedRoutes = parseCsv(process.env.BUNDLE_ROUTES);
 const baselinePath = process.env.BUNDLE_BASELINE ? path.resolve(process.env.BUNDLE_BASELINE) : null;
 const reportPath = process.env.BUNDLE_MEASURE_OUTPUT ? path.resolve(process.env.BUNDLE_MEASURE_OUTPUT) : null;
+// Size measurements remain mandatory; the 2026-09-09 decision removes default
+// size caps. Null survives JSON serialization and never pretends a large finite
+// allowance is unlimited. Explicit limits still support controlled gate checks.
 export const budgetLimits = Object.freeze({
-  entryJsGzip: 20 * 1024,
-  affectedRouteJsGzip: 82000,
-  sharedJsGzip: 30 * 1024,
-  appJsGzip: 96000,
-  cssGzip: 10 * 1024,
+  entryJsGzip: null,
+  affectedRouteJsGzip: null,
+  sharedJsGzip: null,
+  appJsGzip: null,
+  cssGzip: null,
 });
 
 export function resolveBudgetLimits(env = process.env) {
@@ -38,8 +41,8 @@ export function resolveBudgetLimits(env = process.env) {
     const key = `BUNDLE_LIMIT_${metric.replace(/[A-Z]/g, (letter) => `_${letter}`).toUpperCase()}`;
     const raw = env[key];
     if (raw !== undefined && !/^\d+$/.test(raw)) throw new Error(`${key} must be a non-negative integer in bytes.`);
-    const value = raw === undefined ? defaultLimit * multiplier : Number(raw);
-    if (!Number.isSafeInteger(value)) throw new Error(`${key} must be a finite safe integer.`);
+    const value = raw === undefined ? defaultLimit === null ? null : defaultLimit * multiplier : Number(raw);
+    if (value !== null && !Number.isSafeInteger(value)) throw new Error(`${key} must be a finite safe integer.`);
     if (raw !== undefined) overrides[metric] = { environment: key, bytes: value };
     return [metric, value];
   }));
@@ -375,7 +378,9 @@ export function compareWithBaseline(current, baseline, budget = resolveBudgetLim
   const deltas = Object.fromEntries(Object.keys(budgetLimits).map((metric) => [metric,
     current.metrics[metric] - (metric === "affectedRouteJsGzip" ? baselineRouteBytes : baseline.metrics[metric]),
   ]));
-  for (const metric of Object.keys(budgetLimits)) assertBytes(budget.limits[metric], `limit.${metric}`);
+  for (const metric of Object.keys(budgetLimits)) {
+    if (budget.limits[metric] !== null) assertBytes(budget.limits[metric], `limit.${metric}`);
+  }
   const grossDeltas = { ...deltas };
   const attribution = compareAttribution(current, baseline);
   deltas.sharedJsGzip = attribution.categoryDeltas.shared?.net ?? 0;
@@ -384,11 +389,16 @@ export function compareWithBaseline(current, baseline, budget = resolveBudgetLim
   log(`Bundle budget overrides (bytes): ${JSON.stringify(budget.overrides)}; multiplier=${budget.multiplier}`);
   log(`New current lazy routes (baseline contribution 0): ${newRoutes.join(", ") || "none"}`);
   log("Bundle budget deltas against baseline:");
-  for (const [metric, delta] of Object.entries(deltas)) log(`  ${metric}: ${delta} B (${formatBytes(delta)}; limit +${budget.limits[metric]} B)`);
+  for (const [metric, delta] of Object.entries(deltas)) {
+    const limit = budget.limits[metric];
+    log(`  ${metric}: ${delta} B (${formatBytes(delta)}; ${limit === null ? "no size limit" : `limit +${limit} B`})`);
+  }
   log(`Attribution movement vs net growth: ${JSON.stringify(attribution)}`);
-  const failures = Object.entries(deltas).filter(([metric, delta]) => delta > budget.limits[metric]);
+  const failures = Object.entries(deltas).filter(([metric, delta]) => budget.limits[metric] !== null && delta > budget.limits[metric]);
   if (failures.length) throw new Error(`Bundle budget exceeded: ${failures.map(([metric, delta]) => `${metric} ${delta} > +${budget.limits[metric]}`).join("; ")}.`);
-  log("Bundle budget passed: all five deltas are within their recorded limits.");
+  log(Object.values(budget.limits).every((limit) => limit === null)
+    ? "Bundle measurement validated: all five deltas recorded without size limits."
+    : "Bundle measurement validated: all explicitly configured size limits passed.");
   return comparison;
 }
 
