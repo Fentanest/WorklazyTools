@@ -4,6 +4,16 @@
 
 ## 2026-09-09
 
+### U4 PDF 마무리 main 통합 게이트 SCOPE-OUT (Codx)
+
+원격 main `2d0ff3a8280bdd1c3149946306d0ca394244fd5c`, U4 `d3a8d89d19dbb6165cacce8257838dc3dff9b084`, merge-base `5bc6854175331bdd73b267784d9633cdccda8446`를 대조하고 `fb7abde0d40649444b877ccf4ef899bb84f46631`로 `--no-ff` 병합했다. 공통 12파일의 모의 충돌은 CHANGELOG 1·review-notes 1·접근성 감사 7·접근성 unit 2·visual unit 1 hunk였다.
+
+접근성 감사는 U4의 소유권·incomplete·PDF F2/F3/F4a/F4b 상태와 main의 Excel 중복 결과 8상태·scope·대비 측정을 함께 유지했다. 양 부모 standalone 함수 12개 byte 동일, package와 ko/en locale의 양 부모 변경키 546개 누락 0, visual 246·QA scenario 80·profile 628, 충돌 단위 18/18을 확인했다. 부모 독립 의미 검수도 284파일 SHA와 PDF 35+main 16 등록의 합집합 43페이지를 대조해 승인했다(`/tmp/worklazy-u4-handoff/MERGE-REVIEW.md`). U4-8 최종 test-only 표본은 정상+필수7+추가2와 원문 대형 사각형4개 소실 mutant를 검출한 `/tmp/worklazy-u4-8-review4/REPORT.md` 승인에 연결된다.
+
+통합 후보에서 TypeScript, production build 2,857 modules·정적 71페이지, 전체 unit 496/496, static recovery 119, diff-check는 통과했다. 고정 schema-v3 baseline SHA `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`, multiplier 1의 scoped/full 측정은 둘 다 app JS 증가 **100,301B > 96,000B**로 실패했다. 병합 전 동일 schema-v3 93,493B에서 **+6,808B** 늘어 상한을 4,301B 넘었다. 부모 독립 재계산은 scoped/full 91 JS 파일·합계 5,944,016B 동일과 유일한 app 실패를 확인했다(`/tmp/worklazy-u4-handoff/bundle-stop-review.json`). category 증분은 entry +2,317B, Excel compare +8,071B, Excel cleaner +554B, QR +676B, document compare -4,810B, shared +7B, PDF -2B, 그 외 합 -5B다(`/tmp/worklazy-u4-handoff/merge-category-increment.json`).
+
+정본의 예산 우선 중단 조건에 따라 상한·baseline·기능을 바꾸지 않고 SCOPE-OUT했다. 전체 browser/office/new-tools/utilities/Excel/QR/recovery, PDF 골든·oracle·legacy, 12입력×3 성능, 144셀 raster, visual/a11y/rendering, 의존 음성, CSS·legacy·route 묶음과 규칙 19 시각 검수는 이 후보에서 미실행 pending이다. main push·배포도 하지 않았다. 원로그와 JSON은 `/tmp/worklazy-u4-mergegate/`에 보존했다.
+
 ### U4-8 fix-2 — 최종 raster 장식별 sentinel 보강 (Codx)
 
 **실행 게이트·범위** — 시작 branch/head는 `s3-pdf-finish`/`be20fdd1043ec7c7b51db665a54dbd63aa684748`로 지시와 일치했고 열린 PDF 계획서와 상반된 지시는 없었다. R1 자원 소유권 제품 코드는 검수 통과 범위로 보존했다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다.
