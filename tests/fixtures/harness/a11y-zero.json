@@ -29,7 +29,8 @@
       },
       "exceptions": [],
       "passes": 25,
-      "violations": []
+      "violations": [],
+      "incomplete": []
     },
     {
       "id": "document-compare",
@@ -40,7 +41,8 @@
       },
       "exceptions": [],
       "passes": 41,
-      "violations": []
+      "violations": [],
+      "incomplete": []
     },
     {
       "id": "tools",
@@ -51,7 +53,8 @@
       },
       "exceptions": [],
       "passes": 39,
-      "violations": []
+      "violations": [],
+      "incomplete": []
     },
     {
       "id": "excel-compare",
@@ -62,7 +65,8 @@
       },
       "exceptions": [],
       "passes": 46,
-      "violations": []
+      "violations": [],
+      "incomplete": []
     },
     {
       "id": "pdf-editor",
@@ -73,7 +77,8 @@
       },
       "exceptions": [],
       "passes": 43,
-      "violations": []
+      "violations": [],
+      "incomplete": []
     }
   ],
   "externalRequests": []

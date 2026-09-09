@@ -21,6 +21,7 @@ export function PdfThumbnail({
   groupNumbers = [],
   draggable = true,
   selected = false,
+  selectionDisabled = false,
   splitAfter = false,
 }: {
   item: PdfPageItem;
@@ -35,6 +36,7 @@ export function PdfThumbnail({
   groupNumbers?: number[];
   draggable?: boolean;
   selected?: boolean;
+  selectionDisabled?: boolean;
   splitAfter?: boolean;
 }) {
   const language = useAppLanguage();
@@ -99,7 +101,7 @@ export function PdfThumbnail({
         {draggable && <Button type="button" className="pdf-drag-handle size-[27px] touch-none cursor-grab rounded-lg p-0 text-muted-foreground active:cursor-grabbing max-[620px]:size-11" variant="ghost" size="icon-xs" aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.reorderPage", { p0: outputIndex + 1 })}><GripVertical size={16} /></Button>}
         <strong className="text-sm text-foreground">{outputIndex + 1}</strong>
         <span className="text-xs font-bold">{item.rotation ? `${item.rotation}°` : featureMessage(language, "pdf.messages.PdfThumbnail.original")}</span>
-        {onSelect && <label className={cn("pdf-page-select relative grid size-[22px] cursor-pointer place-items-center rounded-lg border border-border bg-muted text-transparent focus-within:ring-2 focus-within:ring-violet-600 focus-within:ring-offset-2", selected && "border-violet-600 bg-violet-700 text-white dark:border-violet-400")} data-selected={selected || undefined}><input className="absolute inset-0 z-10 m-0 size-full cursor-pointer opacity-0" type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked, Boolean((event.nativeEvent as MouseEvent).shiftKey))} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.page", { p0: outputIndex + 1, p1: featureMessage(language, selected ? "pdf.messages.PdfThumbnail.deselect" : "pdf.messages.PdfThumbnail.select") })} /><Check size={13} aria-hidden="true" /></label>}
+        {onSelect && <label className={cn("pdf-page-select relative grid size-[22px] cursor-pointer place-items-center rounded-lg border border-border bg-muted text-transparent focus-within:ring-2 focus-within:ring-violet-600 focus-within:ring-offset-2", selected && "border-violet-600 bg-violet-700 text-white dark:border-violet-400", selectionDisabled && "cursor-not-allowed opacity-45")} data-selected={selected || undefined} data-disabled={selectionDisabled || undefined}><input className="absolute inset-0 z-10 m-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" type="checkbox" checked={selected} disabled={selectionDisabled} onChange={(event) => onSelect(event.target.checked, Boolean((event.nativeEvent as MouseEvent).shiftKey))} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.page", { p0: outputIndex + 1, p1: featureMessage(language, selected ? "pdf.messages.PdfThumbnail.deselect" : "pdf.messages.PdfThumbnail.select") })} /><Check size={13} aria-hidden="true" /></label>}
       </div>
       <div className="pdf-thumbnail-frame relative m-2 grid w-[calc(100%-16px)] cursor-zoom-in place-items-center overflow-hidden rounded-lg bg-[#e9e9ed] transition-[aspect-ratio] dark:bg-[#202023]" style={frameStyle} onClick={() => setExpanded(true)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setExpanded(true); } }}>
         {!!groupNumbers.length && <span className="pdf-group-badges absolute top-1.5 left-1.5 z-10 flex max-w-[calc(100%-12px)] flex-wrap gap-1" aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.includedRangeGroups", { p0: groupNumbers.join(", ") })}>{groupNumbers.map((number) => <b className="grid h-[19px] min-w-[19px] place-items-center rounded-full border border-white/65 bg-violet-700 px-1.5 text-xs text-white shadow-sm" key={number}>{number}</b>)}</span>}

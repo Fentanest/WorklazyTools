@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 
 import { compareSpreadsheetPair } from "../../src/features/excel-compare/compareEngine.ts";
+import { compareSpreadsheetCells } from "../../src/features/excel-compare/normalization.ts";
 import { buildExcelCompareReport } from "../../src/features/excel-compare/report.ts";
 import {
   assertGeneratedXlsxReport,
@@ -30,6 +31,17 @@ const baseOptions = (): ExcelComparePairOptions => ({
   left: { sheetName: "Data", headerRow: 1 },
   right: { sheetName: "Data", headerRow: 1 },
   normalization: { ...DEFAULT_EXCEL_COMPARE_OPTIONS, compareFormatting: false, compareDisplayValues: false },
+});
+
+test("an actual spreadsheet error differs from identical literal text", () => {
+  const actualError = cell(1, 1, "#N/A");
+  actualError.type = "error";
+  const literalText = cell(1, 1, "#N/A");
+  const comparison = compareSpreadsheetCells(actualError, literalText, baseOptions().normalization, false);
+  assert.equal(comparison.equal, false);
+  assert.deepEqual(comparison.changes, ["VALUE"]);
+  assert.equal(comparison.leftText, "#N/A");
+  assert.equal(comparison.rightText, "#N/A");
 });
 
 test("report integrity checks keep worker, client, and page responsibilities distinct", async () => {

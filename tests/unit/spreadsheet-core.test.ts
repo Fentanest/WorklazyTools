@@ -51,6 +51,40 @@ test("spreadsheet adapter classifies OOXML from package contents and parses it o
   assert.equal(formula?.displayValue, "3.00");
 });
 
+test("OOXML errors retain their type without changing scalar values or formula cache states", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Errors");
+  const errors = ["#DIV/0!", "#N/A", "#REF!", "#VALUE!", "#NAME?", "#NUM!", "#NULL!"] as const;
+  errors.forEach((error, index) => { sheet.getCell(1, index + 1).value = { error }; });
+  sheet.getCell("A2").value = "#DIV/0!";
+  sheet.getCell("B2").value = "#N/A";
+  sheet.getCell("C2").value = { formula: "1/0", result: { error: "#DIV/0!" } };
+  sheet.getCell("D2").value = { formula: "NA()" };
+  sheet.getCell("E2").value = true;
+  sheet.getCell("F2").value = 7;
+  sheet.getCell("G2").value = new Date("2024-02-29T00:00:00.000Z");
+
+  const parsed = await parseSpreadsheetInput("errors.xlsx", transferable(await workbook.xlsx.writeBuffer()));
+  const cells = new Map(parsed.sheets[0].cells.map((cell) => [cell.address, cell]));
+  errors.forEach((error, index) => {
+    const cell = cells.get(`${String.fromCharCode(65 + index)}1`);
+    assert.deepEqual([cell?.value, cell?.displayValue, cell?.type], [error, error, "error"]);
+  });
+  assert.deepEqual([cells.get("A2")?.value, cells.get("A2")?.type], ["#DIV/0!", "string"]);
+  assert.deepEqual([cells.get("B2")?.value, cells.get("B2")?.type], ["#N/A", "string"]);
+  assert.deepEqual(
+    [cells.get("C2")?.value, cells.get("C2")?.cachedValue, cells.get("C2")?.type, cells.get("C2")?.cacheState],
+    ["#DIV/0!", "#DIV/0!", "error", "present"],
+  );
+  assert.deepEqual(
+    [cells.get("D2")?.value, cells.get("D2")?.cachedValue, cells.get("D2")?.type, cells.get("D2")?.cacheState],
+    [null, undefined, "blank", "missing"],
+  );
+  assert.deepEqual([cells.get("E2")?.value, cells.get("E2")?.type], [true, "boolean"]);
+  assert.deepEqual([cells.get("F2")?.value, cells.get("F2")?.type], [7, "number"]);
+  assert.deepEqual([cells.get("G2")?.value instanceof Date, cells.get("G2")?.type], [true, "date"]);
+});
+
 test("spreadsheet adapter uses SheetJS for BIFF8/XLSB and Papa Parse for CSV text", async () => {
   const source = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([["Key", "Value"], ["001", 7]]);

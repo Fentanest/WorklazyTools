@@ -7,12 +7,10 @@ import type {
   WorkerProgress,
 } from "./types";
 import type { AppLanguage } from "../../i18n/languages";
-import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessages";
-
-interface WorkerErrorPayload {
-  message: string;
-  code?: string;
-}
+import { featureMessage } from "../../i18n/featureMessages";
+import { throwIfAborted } from "../../utils/cooperativeCancel.ts";
+import { pdfWorkerCanceledMessage, runPdfWorker } from "./pdfWorkerLifecycle";
+import { LEGACY_ORGANIZE_PDF_PRESET } from "./legacyOrganizePreset.ts";
 
 function createPdfWorker() {
   return new Worker(new URL("./pdf.worker.ts", import.meta.url), { type: "module" });
@@ -22,49 +20,17 @@ function createPdfOfficeWorker() {
   return new Worker(new URL("./pdfOffice.worker.ts", import.meta.url), { type: "module" });
 }
 
-function runWorker<T>(message: object, transfer: Transferable[], onProgress?: WorkerProgress, language: AppLanguage = "ko") {
-  return runSpecificWorker<T>(createPdfWorker(), { ...message, language }, transfer, onProgress, language);
+function runWorker<T>(message: object, transfer: Transferable[], onProgress?: WorkerProgress, language: AppLanguage = "ko", signal?: AbortSignal) {
+  return runPdfWorker<object, T>(createPdfWorker, { ...message, language }, transfer, onProgress, language, signal);
 }
 
-function runSpecificWorker<T>(worker: Worker, message: object, transfer: Transferable[], onProgress?: WorkerProgress, language: AppLanguage = "ko") {
-    return new Promise<T>((resolve, reject) => {
-    worker.onmessage = (event: MessageEvent) => {
-      const data = event.data as {
-        type: "progress" | "result" | "error";
-        progress?: number;
-        message?: string;
-        result?: T;
-        error?: WorkerErrorPayload;
-      };
-      if (data.type === "progress") {
-        onProgress?.(data.progress ?? 0, data.message ? resolveFeatureMessage(language, data.message) : featureMessage(language, "pdf.messages.pdfWorkerClient.processing"));
-        return;
-      }
-      worker.terminate();
-      if (data.type === "result") resolve(localizeWorkerResult(data.result as T, language));
-      else {
-        const error = new Error(data.error?.message ? resolveFeatureMessage(language, data.error.message) : featureMessage(language, "pdf.messages.pdfWorkerClient.anErrorOccurredWhileProcessingThePdf")) as Error & { code?: string };
-        error.code = data.error?.code;
-        reject(error);
-      }
-    };
-    worker.onerror = (event) => {
-      worker.terminate();
-      reject(new Error(event.message || featureMessage(language, "pdf.messages.pdfWorkerClient.unableToStartThePdfOperation")));
-    };
-    worker.postMessage(message, transfer);
-  });
-}
-
-function localizeWorkerResult<T>(result: T, language: AppLanguage): T {
-  if (!result || typeof result !== "object" || !("warnings" in result) || !Array.isArray(result.warnings)) return result;
-  return { ...result, warnings: result.warnings.map((warning) => typeof warning === "string" ? resolveFeatureMessage(language, warning) : warning) };
-}
-
-async function serializeFiles(files: Array<{ id: string; file: File }>) {
+async function serializeFiles(files: Array<{ id: string; file: File }>, language: AppLanguage, signal?: AbortSignal) {
   const inputs: PdfWorkerInput[] = [];
   for (const { id, file } of files) {
-    inputs.push({ id, name: file.name, mimeType: file.type, buffer: await file.arrayBuffer() });
+    throwIfPdfWorkerAborted(signal, language);
+    const buffer = await file.arrayBuffer();
+    throwIfPdfWorkerAborted(signal, language);
+    inputs.push({ id, name: file.name, mimeType: file.type, buffer });
   }
   return inputs;
 }
@@ -76,16 +42,18 @@ export async function mergePdfPages(
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
   options: PdfOutputOptions = {},
+  signal?: AbortSignal,
 ) {
   const sourceIds = new Set(pages.map((page) => page.sourceId));
-  const inputs = await serializeFiles(files.filter((file) => sourceIds.has(file.id)));
-  const workerOptions = await serializeOutputOptions(options);
+  const inputs = await serializeFiles(files.filter((file) => sourceIds.has(file.id)), language, signal);
+  const workerOptions = await serializeOutputOptions(options, language, signal);
   const transfer = [...inputs.map((input) => input.buffer), ...(workerOptions.watermarkImage ? [workerOptions.watermarkImage] : [])];
   return runWorker<PdfWorkerResult>(
     { type: "merge", inputs, pages, fileName, options: workerOptions },
     transfer,
     onProgress,
     language,
+    signal,
   );
 }
 
@@ -96,39 +64,45 @@ export async function exportPdfGroups(
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
   options: PdfOutputOptions = {},
+  signal?: AbortSignal,
 ) {
   const sourceIds = new Set(groups.flatMap((group) => group.pages.map((page) => page.sourceId)));
-  const inputs = await serializeFiles(files.filter((file) => sourceIds.has(file.id)));
-  const workerOptions = await serializeOutputOptions(options);
+  const inputs = await serializeFiles(files.filter((file) => sourceIds.has(file.id)), language, signal);
+  const workerOptions = await serializeOutputOptions(options, language, signal);
   const transfer = [...inputs.map((input) => input.buffer), ...(workerOptions.watermarkImage ? [workerOptions.watermarkImage] : [])];
   return runWorker<PdfWorkerResult>(
     { type: "export-groups", inputs, groups, archiveName, splitPdfFallback: featureMessage(language, "pdf.messages.pdf.splitPdf"), options: workerOptions },
     transfer,
     onProgress,
     language,
+    signal,
   );
 }
 
-async function serializeOutputOptions(options: PdfOutputOptions) {
-  return {
+async function serializeOutputOptions(options: PdfOutputOptions, language: AppLanguage, signal?: AbortSignal) {
+  throwIfPdfWorkerAborted(signal, language);
+  const serialized = {
     pageNumbers: Boolean(options.pageNumbers),
     watermarkImage: options.watermarkText?.trim() ? await createWatermarkImage(options.watermarkText.trim()) : undefined,
   };
+  throwIfPdfWorkerAborted(signal, language);
+  return serialized;
 }
 
 async function createWatermarkImage(text: string) {
+  const preset = LEGACY_ORGANIZE_PDF_PRESET.watermarkCanvas;
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Unable to prepare the watermark.");
-  context.font = "600 46px system-ui, sans-serif";
-  const width = Math.min(1800, Math.max(420, Math.ceil(context.measureText(text).width + 80)));
+  context.font = preset.font;
+  const width = Math.min(preset.maxWidth, Math.max(preset.minWidth, Math.ceil(context.measureText(text).width + preset.horizontalPadding)));
   canvas.width = width;
-  canvas.height = 92;
-  context.font = "600 46px system-ui, sans-serif";
-  context.fillStyle = "rgba(30, 30, 34, .82)";
+  canvas.height = preset.height;
+  context.font = preset.font;
+  context.fillStyle = preset.fillStyle;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(text.slice(0, 120), width / 2, canvas.height / 2);
+  context.fillText(text.slice(0, preset.utf16SliceUnits), width / 2, canvas.height / 2);
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Unable to prepare the watermark.")), "image/png"));
   canvas.width = 1; canvas.height = 1;
   return blob.arrayBuffer();
@@ -141,19 +115,25 @@ export async function imagesToPdf(
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
   options: PdfOutputOptions = {},
+  signal?: AbortSignal,
 ) {
   const inputs: PdfWorkerInput[] = [];
   for (let index = 0; index < files.length; index += 1) {
+    throwIfPdfWorkerAborted(signal, language);
     const normalized = options.imagesAlreadyNormalized ? files[index] : await normalizeImageOrientation(files[index], language);
-    inputs.push({ id: `image-${index}`, name: normalized.name, mimeType: normalized.type, buffer: await normalized.arrayBuffer() });
+    throwIfPdfWorkerAborted(signal, language);
+    const buffer = await normalized.arrayBuffer();
+    throwIfPdfWorkerAborted(signal, language);
+    inputs.push({ id: `image-${index}`, name: normalized.name, mimeType: normalized.type, buffer });
   }
-  const workerOptions = await serializeOutputOptions(options);
+  const workerOptions = await serializeOutputOptions(options, language, signal);
   const transfer = [...inputs.map((input) => input.buffer), ...(workerOptions.watermarkImage ? [workerOptions.watermarkImage] : [])];
   return runWorker<PdfWorkerResult>(
     { type: "images-to-pdf", inputs, pageMode, fileName, options: workerOptions },
     transfer,
     onProgress,
     language,
+    signal,
   );
 }
 
@@ -201,9 +181,10 @@ export function textDocumentToOffice(
   fileName: string,
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",
+  signal?: AbortSignal,
 ) {
-  return runSpecificWorker<PdfWorkerResult>(
-    createPdfOfficeWorker(),
+  return runPdfWorker<object, PdfWorkerResult>(
+    createPdfOfficeWorker,
     {
       type: "text-to-office",
       document,
@@ -221,14 +202,20 @@ export function textDocumentToOffice(
     [],
     onProgress,
     language,
+    signal,
   );
 }
 
-export function combineOcrPdfPages(buffers: ArrayBuffer[], fileName: string, onProgress?: WorkerProgress, language: AppLanguage = "ko") {
+export function combineOcrPdfPages(buffers: ArrayBuffer[], fileName: string, onProgress?: WorkerProgress, language: AppLanguage = "ko", signal?: AbortSignal) {
   return runWorker<PdfWorkerResult>(
     { type: "combine-ocr-pdfs", buffers, fileName },
     buffers,
     onProgress,
     language,
+    signal,
   );
+}
+
+function throwIfPdfWorkerAborted(signal: AbortSignal | undefined, language: AppLanguage): void {
+  throwIfAborted(signal, pdfWorkerCanceledMessage(language));
 }

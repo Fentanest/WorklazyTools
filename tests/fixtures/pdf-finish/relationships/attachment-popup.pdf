@@ -1,0 +1,60 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles << /Names [(attachment.txt) 6 0 R] >> >> /AF [6 0 R] >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Resources << >> /Contents 4 0 R /AF [6 0 R] /Annots [5 0 R 7 0 R 9 0 R 10 0 R 11 0 R] >>
+endobj
+4 0 obj
+<< /Length 0 >>
+stream
+
+endstream
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /FileAttachment /Rect [10 10 30 30] /FS 6 0 R /P 3 0 R /Popup 7 0 R >>
+endobj
+6 0 obj
+<< /Type /Filespec /F (attachment.txt) /UF (attachment.txt) /EF << /F 8 0 R /UF 8 0 R >> /AFRelationship /Data >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Popup /Rect [40 40 160 120] /Parent 5 0 R /P 3 0 R >>
+endobj
+8 0 obj
+<< /Type /EmbeddedFile /Subtype /text#2Fplain /Length 36 >>
+stream
+PDF finish attachment popup sentinel
+endstream
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Text /Rect [170 20 190 40] /Contents (live markup) /P 3 0 R /Popup 10 0 R >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Popup /Rect [170 50 280 130] /Parent 9 0 R /P 3 0 R >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /FreeText /Rect [20 150 180 180] /Contents (live reply) /IRT 9 0 R /P 3 0 R /DA (/Helv 10 Tf 0 g) >>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000015 00000 n 
+0000000142 00000 n 
+0000000199 00000 n 
+0000000357 00000 n 
+0000000406 00000 n 
+0000000517 00000 n 
+0000000646 00000 n 
+0000000741 00000 n 
+0000000870 00000 n 
+0000000988 00000 n 
+0000001085 00000 n 
+trailer
+<< /Size 12 /Root 1 0 R >>
+startxref
+1227
+%%EOF

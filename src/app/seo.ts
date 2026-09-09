@@ -40,6 +40,26 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "여러 페이지 범위는 어떻게 선택하나요?", answer: "편집할 결과 범위를 고르고 페이지 체크박스를 누르세요. 연속 문서는 페이지 뒤의 나누기 위치를 정해 범위를 한 번에 만들 수 있고, 숫자 입력으로 비연속 페이지와 사용자 지정 순서도 선택할 수 있습니다." },
       { question: "완성된 PDF나 ZIP은 어디에서 받나요?", answer: "오른쪽 출력 작업 영역에서 진행 상황을 확인하고 완료된 파일을 바로 내려받을 수 있습니다. 모바일에서는 화면 아래의 출력 작업 버튼을 누르세요." },
     ],
+    "/tools/pdf-editor/finish": [
+      { question: "페이지 번호를 원하는 페이지에만 넣을 수 있나요?", answer: "네. 페이지 범위와 홀짝 필터를 사용하거나 썸네일 체크박스로 적용할 실제 페이지를 정확히 고를 수 있습니다." },
+      { question: "한국어 머리글과 날짜도 넣을 수 있나요?", answer: "네. 한국어를 포함한 문구와 파일명·날짜 토큰을 사용할 수 있으며 필요한 경우 전체 Noto 글꼴을 PDF에 포함합니다." },
+    ],
+    "/tools/pdf-editor/page-numbers": [
+      { question: "페이지 번호를 원하는 페이지에만 넣을 수 있나요?", answer: "네. 페이지 범위와 홀짝 필터를 사용하거나 썸네일 체크박스로 적용할 실제 페이지를 정확히 고를 수 있습니다." },
+      { question: "표지를 제외하고 2페이지부터 1로 시작할 수 있나요?", answer: "네. 표지 제외를 켜고 시작 페이지와 시작 번호를 지정하면 건너뛴 페이지를 포함한 실제 페이지 순서대로 번호를 계산합니다." },
+    ],
+    "/tools/pdf-editor/header-footer": [
+      { question: "머리글과 바닥글에 어떤 정보를 넣을 수 있나요?", answer: "페이지 번호, 전체 페이지 수, 파일명, 작업 시작 날짜 토큰과 직접 입력한 문구를 함께 사용할 수 있습니다." },
+      { question: "한국어 머리글도 표시되나요?", answer: "네. 한국어가 있으면 전체 Noto 글꼴을 PDF에 포함하며, 결과 파일 크기가 늘어날 수 있음을 작업 결과에서 안내합니다." },
+    ],
+    "/tools/pdf-editor/watermark": [
+      { question: "PDF에 텍스트와 이미지 워터마크를 모두 넣을 수 있나요?", answer: "네. 텍스트 또는 PNG·JPEG 이미지를 골라 한 번 배치하거나 페이지 전체에 반복할 수 있습니다." },
+      { question: "워터마크를 문서 내용 뒤에 넣을 수 있나요?", answer: "네. 내용 뒤 또는 앞을 선택할 수 있습니다. 복잡한 레이어·태그·그래픽 상태가 감지되면 먼저 위험을 알리고 확인 후 진행합니다." },
+    ],
+    "/tools/pdf-editor/stamp": [
+      { question: "도장이나 서명 이미지를 여러 페이지의 같은 위치에 넣을 수 있나요?", answer: "네. PNG 또는 JPEG 이미지를 미리보기에서 옮기고 크기를 조절한 뒤, 선택한 모든 페이지의 같은 상대 위치에 넣을 수 있습니다." },
+      { question: "이 기능으로 전자서명이나 디지털 서명을 만들 수 있나요?", answer: "아니요. 이 기능은 PDF에 도장 또는 서명 이미지만 넣으며, 인증서 기반 전자서명이나 암호학적 디지털 서명을 만들지 않습니다." },
+    ],
     "/tools/text-merger": [
       { question: "직접 입력을 TXT 파일 사이에 놓을 수 있나요?", answer: "가능합니다. 직접 입력과 TXT 파일은 같은 카드 목록에 추가되며 드래그하거나 위·아래 버튼으로 자유롭게 순서를 바꿀 수 있습니다." },
       { question: "붙여넣은 글이나 TXT 파일이 서버로 전송되나요?", answer: "아니요. 내용은 현재 브라우저에서만 읽고 병합하며 서버나 브라우저 저장소에 보관하지 않습니다." },
@@ -87,6 +107,26 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     "/tools/pdf-editor": [
       { question: "How do I select multiple page ranges?", answer: "Choose the output range to edit and use the page checkboxes. For a continuous document, mark split positions after pages to build the ranges at once. Number entry remains available for non-contiguous pages and custom ordering." },
       { question: "Where do I download the finished PDF or ZIP?", answer: "Follow progress and download the completed file in the output workspace on the right. On mobile, open it from the output button at the bottom of the screen." },
+    ],
+    "/tools/pdf-editor/finish": [
+      { question: "Can page numbers be added only to selected pages?", answer: "Yes. Use a page range and parity filter, or choose the exact physical pages with the thumbnail checkboxes." },
+      { question: "Can I add Korean headers and dates?", answer: "Yes. Text can include Korean plus filename and date tokens. The full Noto font is embedded when the content requires it." },
+    ],
+    "/tools/pdf-editor/page-numbers": [
+      { question: "Can page numbers be added only to selected pages?", answer: "Yes. Use a page range and parity filter, or choose the exact physical pages with the thumbnail checkboxes." },
+      { question: "Can numbering start at 1 on page 2 after a cover?", answer: "Yes. Enable cover exclusion and set the starting page and number. Numbering still follows the physical page order across skipped pages." },
+    ],
+    "/tools/pdf-editor/header-footer": [
+      { question: "What can I put in a header or footer?", answer: "Combine custom text with tokens for the page number, total pages, filename, and the date captured when the batch starts." },
+      { question: "Can headers contain Korean text?", answer: "Yes. The full Noto font is embedded when Korean is present, and the result warns that this can increase the file size." },
+    ],
+    "/tools/pdf-editor/watermark": [
+      { question: "Can I add both text and image watermarks to a PDF?", answer: "Yes. Choose text or a PNG or JPEG image, then place it once or repeat it across each selected page." },
+      { question: "Can a watermark appear behind the document content?", answer: "Yes. Choose a background or foreground layer. Complex layers, tags, or graphics state trigger a warning and require confirmation before continuing." },
+    ],
+    "/tools/pdf-editor/stamp": [
+      { question: "Can I place a stamp or signature image in the same position on multiple pages?", answer: "Yes. Move and resize a PNG or JPEG image in the preview, then place it at the same relative position on every selected page." },
+      { question: "Does this create an electronic or cryptographic digital signature?", answer: "No. This feature only inserts a stamp or signature image into the PDF. It does not create a certificate-based electronic or cryptographic digital signature." },
     ],
     "/tools/text-merger": [
       { question: "Can pasted text be placed between TXT files?", answer: "Yes. Pasted text and TXT files share one card list and can be reordered freely by dragging or with the up and down buttons." },
@@ -150,6 +190,11 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
   "/tools/pdf-editor/pdf-to-image": "pdf-to-image",
   "/tools/pdf-editor/convert": "pdf-convert",
+  "/tools/pdf-editor/finish": "pdf-finish",
+  "/tools/pdf-editor/page-numbers": "pdf-page-numbers",
+  "/tools/pdf-editor/header-footer": "pdf-header-footer",
+  "/tools/pdf-editor/watermark": "pdf-watermark",
+  "/tools/pdf-editor/stamp": "pdf-stamp",
   "/tools/hwp-editor": "hwp-editor",
   "/tools/office-editor": "office-editor",
   "/tools/video-studio": "video-studio",
@@ -231,6 +276,31 @@ export const seoByPath: Record<string, SeoDefinition> = {
     title: "PDF를 DOCX·XLSX·TXT로 변환·한국어 OCR",
     description: "원하는 PDF 페이지를 골라 자체 호스팅 한국어·영어 OCR로 DOCX, XLSX, TXT와 검색 가능한 PDF를 만드세요.",
     application: { name: "PDF 문서 변환·OCR", featureList: ["처리 페이지 범위 선택", "PDF DOCX 변환", "PDF XLSX 변환", "PDF TXT 변환", "로컬 한국어·영어 OCR", "검색 가능한 PDF"] },
+  },
+  "/tools/pdf-editor/finish": {
+    title: "PDF 페이지 번호·워터마크·도장 함께 넣기",
+    description: "여러 PDF에 페이지 번호, 머리글·바닥글, 워터마크와 도장을 함께 적용하고 개별 파일과 ZIP으로 내려받으세요.",
+    application: { name: "PDF 마무리", featureList: ["페이지 번호", "머리글·바닥글", "텍스트·이미지 워터마크", "도장·서명 이미지", "여러 PDF 일괄 처리", "ZIP 다운로드"] },
+  },
+  "/tools/pdf-editor/page-numbers": {
+    title: "PDF 페이지 번호 넣기 - 시작 번호·표지 제외",
+    description: "PDF 페이지 범위와 홀짝 조건을 고르고 시작 페이지·시작 번호·표지 제외 기준으로 페이지 번호를 넣으세요.",
+    application: { name: "PDF 페이지 번호", featureList: ["시작 번호", "시작 페이지", "표지 제외", "페이지 범위", "홀짝 필터", "썸네일 선택"] },
+  },
+  "/tools/pdf-editor/header-footer": {
+    title: "PDF 머리글·바닥글 넣기 - 파일명·날짜 토큰",
+    description: "PDF 머리글이나 바닥글에 파일명, 날짜, 페이지 번호와 직접 입력한 문구를 원하는 위치와 색상으로 넣으세요.",
+    application: { name: "PDF 머리글·바닥글", featureList: ["파일명 토큰", "작업 시작 날짜", "페이지 번호", "6개 표시 위치", "글자 크기·색상", "오버레이 미리보기"] },
+  },
+  "/tools/pdf-editor/watermark": {
+    title: "PDF 워터마크 넣기 - 텍스트·이미지 반복 배치",
+    description: "PDF에 텍스트 또는 PNG·JPEG 워터마크를 내용 앞이나 뒤에 넣고 회전·불투명도·크기와 반복 간격을 조절하세요.",
+    application: { name: "PDF 워터마크", featureList: ["벡터 텍스트", "PNG·JPEG 이미지", "앞·뒤 레이어", "단일·반복 배치", "회전·불투명도", "오버레이 미리보기"] },
+  },
+  "/tools/pdf-editor/stamp": {
+    title: "PDF 도장·서명 이미지 넣기 - 여러 페이지 같은 위치",
+    description: "PNG·JPEG 도장이나 서명 이미지를 PDF 미리보기에서 옮기고 비율을 유지해 크기를 조절한 뒤 선택한 페이지에 넣으세요.",
+    application: { name: "PDF 도장·서명 이미지", featureList: ["PNG·JPEG 이미지", "직접 이동·크기 조절", "고정 비율", "선택 페이지 적용", "같은 상대 위치", "실행 취소·다시 실행"] },
   },
   "/tools/hwp-editor": {
     title: "HWP·HWPX 문서 편집기 - 무료 온라인 HWP 편집",
@@ -367,6 +437,11 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
   "/tools/pdf-editor/convert": { title: "Convert PDF to DOCX, XLSX or TXT with OCR | Worklazy Tools", description: "Convert selected PDF pages to DOCX, XLSX, TXT or searchable PDF using self-hosted English and Korean OCR in your browser.", application: { name: "PDF Document Conversion and OCR", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },
+  "/tools/pdf-editor/finish": { title: "Add PDF Page Numbers, Watermarks & Stamps | Worklazy Tools", description: "Apply page numbers, headers, footers, watermarks, and stamps together to multiple PDFs, then download individual files or a ZIP.", application: { name: "PDF Finish", featureList: ["Page numbers", "Headers and footers", "Text and image watermarks", "Stamp and signature images", "Multiple PDF processing", "ZIP download"] } },
+  "/tools/pdf-editor/page-numbers": { title: "Add Page Numbers to PDF | Worklazy Tools", description: "Add page numbers to an exact PDF page range with starting-page, starting-number, cover-exclusion, and parity controls.", application: { name: "PDF Page Numbers", featureList: ["Starting number", "Starting page", "Cover exclusion", "Page ranges", "Parity filter", "Thumbnail selection"] } },
+  "/tools/pdf-editor/header-footer": { title: "Add PDF Headers & Footers | Worklazy Tools", description: "Add custom headers and footers with filename, date, page-number tokens, position, size, and color controls.", application: { name: "PDF Headers and Footers", featureList: ["Filename token", "Batch-start date", "Page-number tokens", "Six positions", "Size and color", "Overlay preview"] } },
+  "/tools/pdf-editor/watermark": { title: "Add Text or Image Watermarks to PDF | Worklazy Tools", description: "Add text, PNG, or JPEG watermarks in front of or behind PDF content with rotation, opacity, sizing, and repeated tile controls.", application: { name: "PDF Watermark", featureList: ["Vector text", "PNG and JPEG images", "Background and foreground layers", "Single and repeated placement", "Rotation and opacity", "Overlay preview"] } },
+  "/tools/pdf-editor/stamp": { title: "Add Stamp or Signature Images to PDF | Worklazy Tools", description: "Move and resize a PNG or JPEG stamp or signature image in the PDF preview, then place it at the same relative position on selected pages.", application: { name: "PDF Stamp and Signature Image", featureList: ["PNG and JPEG images", "Direct move and resize", "Fixed aspect ratio", "Selected-page placement", "Same relative position", "Undo and redo"] } },
   "/about": { title: "About | Worklazy Tools", description: "Learn how Worklazy Tools processes documents and media in the browser and where each tool's compatibility boundaries apply." },
   "/privacy": { title: "Privacy Policy | Worklazy Tools", description: "Read how local file processing, Google and Naver Analytics, advertising and cookies are handled by Worklazy Tools." },
   "/terms": { title: "Terms of Use | Worklazy Tools", description: "Review the conditions, supported scope, user responsibilities and limitations for Worklazy Tools browser utilities." },
@@ -408,6 +483,13 @@ export function normalizeSeoPath(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
 }
 
+export function canonicalSeoPath(pathname: string) {
+  const path = normalizeSeoPath(pathname);
+  return ["/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp"].includes(path)
+    ? "/tools/pdf-editor/finish"
+    : path;
+}
+
 export function getSiteBaseUrl() {
   const configured = import.meta.env.VITE_SITE_URL as string | undefined;
   if (configured) return ensureTrailingSlash(configured);
@@ -415,7 +497,7 @@ export function getSiteBaseUrl() {
 }
 
 export function getCanonicalUrl(language: AppLanguage, pathname: string) {
-  const path = normalizeSeoPath(stripLanguagePrefix(pathname));
+  const path = canonicalSeoPath(stripLanguagePrefix(pathname));
   const localized = path === "/" ? `${language}/` : `${language}${path}/`;
   return new URL(localized, getSiteBaseUrl()).href;
 }

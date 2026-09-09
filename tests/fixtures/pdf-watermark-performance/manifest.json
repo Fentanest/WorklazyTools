@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "id": "raw-1KiB-w1024",
+      "decodedBytes": 1024,
+      "width": 1024,
+      "compression": "raw",
+      "height": 1,
+      "file": "raw-1KiB-w1024.pdf",
+      "inputBytes": 1537,
+      "sha256": "ecb6363c6e0c0ff325fcf80dc7f73240d9ee6d03d3553f312c607b94ca22c3f4"
+    },
+    {
+      "id": "raw-10KiB-w1024",
+      "decodedBytes": 10240,
+      "width": 1024,
+      "compression": "raw",
+      "height": 10,
+      "file": "raw-10KiB-w1024.pdf",
+      "inputBytes": 10756,
+      "sha256": "2d8000dd9c7e4f191e843d5efba7b14b947659304f71c23f78ce33326059f4dd"
+    },
+    {
+      "id": "raw-64KiB-w1024",
+      "decodedBytes": 65536,
+      "width": 1024,
+      "compression": "raw",
+      "height": 64,
+      "file": "raw-64KiB-w1024.pdf",
+      "inputBytes": 66052,
+      "sha256": "1e24f458484e0a7040401410ebf629fd457ceca20c7e2090d9a8540623d6597b"
+    },
+    {
+      "id": "raw-200KiB-w1024",
+      "decodedBytes": 204800,
+      "width": 1024,
+      "compression": "raw",
+      "height": 200,
+      "file": "raw-200KiB-w1024.pdf",
+      "inputBytes": 205319,
+      "sha256": "807576bdfc238d6a444e88402d3ab7688ce784b360bb1065761f3e632e78a8d9"
+    },
+    {
+      "id": "raw-1MiB-w1024",
+      "decodedBytes": 1048576,
+      "width": 1024,
+      "compression": "raw",
+      "height": 1024,
+      "file": "raw-1MiB-w1024.pdf",
+      "inputBytes": 1049098,
+      "sha256": "731867f4e1c3791f6af468840dfa3be8c00761f3b9cc84d4e8b9a59479dca3be"
+    },
+    {
+      "id": "flate-1MiB-w8192",
+      "decodedBytes": 1048576,
+      "width": 8192,
+      "compression": "flate",
+      "height": 128,
+      "file": "flate-1MiB-w8192.pdf",
+      "inputBytes": 1572,
+      "sha256": "89d9ad7a346aa4823a4113b595d150531b18b547eac0bbe2c3c1e5af2bbfe223"
+    },
+    {
+      "id": "flate-4MiB-w8192",
+      "decodedBytes": 4194304,
+      "width": 8192,
+      "compression": "flate",
+      "height": 512,
+      "file": "flate-4MiB-w8192.pdf",
+      "inputBytes": 4619,
+      "sha256": "890845b0a7a505a611c37cdcab3990aeca748a1abf48df01fe69486d70bd614e"
+    },
+    {
+      "id": "flate-8MiB-w8192",
+      "decodedBytes": 8388608,
+      "width": 8192,
+      "compression": "flate",
+      "height": 1024,
+      "file": "flate-8MiB-w8192.pdf",
+      "inputBytes": 8700,
+      "sha256": "ff6664e20260c8caac276a174064f43eed927f2170f3b483fbf47a090971bfee"
+    },
+    {
+      "id": "curve-16MiB-w8192",
+      "decodedBytes": 16777216,
+      "width": 8192,
+      "compression": "flate",
+      "curve": true,
+      "height": 2048,
+      "file": "curve-16MiB-w8192.pdf",
+      "inputBytes": 16855,
+      "sha256": "fc704cc640a8ec33e4299e4fb16cdb860b1b8f2723de99e85e3b9858985f517e"
+    },
+    {
+      "id": "curve-32MiB-w8192",
+      "decodedBytes": 33554432,
+      "width": 8192,
+      "compression": "flate",
+      "curve": true,
+      "height": 4096,
+      "file": "curve-32MiB-w8192.pdf",
+      "inputBytes": 33164,
+      "sha256": "4aa00a6476cadeafd8f1461d6a711d1e1555e931cd2e8f714d792196c8d27141"
+    },
+    {
+      "id": "curve-64MiB-w8192",
+      "decodedBytes": 67108864,
+      "width": 8192,
+      "compression": "flate",
+      "curve": true,
+      "height": 8192,
+      "file": "curve-64MiB-w8192.pdf",
+      "inputBytes": 65776,
+      "sha256": "04ba8fe11b36e2e53c85b73dbe410b5f9206d4f14a1f18f85855738c8b9d91f1"
+    },
+    {
+      "id": "curve-128MiB-w8192",
+      "decodedBytes": 134217728,
+      "width": 8192,
+      "compression": "flate",
+      "curve": true,
+      "height": 16384,
+      "file": "curve-128MiB-w8192.pdf",
+      "inputBytes": 131009,
+      "sha256": "2bc85038606f651ab69585fb11804a96e3119b27686783bff8ac28ca61e9e654"
+    }
+  ]
+}

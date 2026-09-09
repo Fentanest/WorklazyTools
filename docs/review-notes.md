@@ -2,6 +2,806 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-09
+
+### U4 배포 전 통합 검수 종결 (Codx)
+
+제품 후보 `f0a5b1693f0567b9f62d5420e182de1e9f871277`의 자동 게이트 이월분을 회수했다. Astra가 기록된 소스 2,297개·QA 자산 570개·생산 JS/MJS/CSS 108개와 16경로의 실제 로드 관찰 259건을 원자료에 재대조해 차이 0을 확인했다. 수리 후 최종 visual은 ko/en 각각 **246/246**, 하네스 소요 **3분 31.30초 / 3분 24.22초**다. 검증 당시 `0f02458`+미커밋 공지 수리라는 provenance는 보존하고, 커밋 소스 SHA 일치로 최종 후보에 연결했다. 문서·시각 기준선 커밋을 제품 재실행으로 표현하지 않는다. 상세 13묶음 대조는 `/tmp/worklazy-u4-audit3/final-gate4/REPORT.md`다.
+
+규칙 19의 추적 없는 QA에서 Gemini 실제 브라우저 80환경, Claude 육안, Codx DOM 교차를 수행했다. 기존 선택 191경로/164고유 이미지 중 Claude CLI **82개**, agy Opus **50개**, Codex Astra 보충 **23개**를 실제 이미지 도구로 열람했다. 나머지 9개는 수리 전 도장 초기 화면이며, 이미 열람한 같은 종류 7개와 함께 **16개 초기 화면 전부를 수리 후 Opus 검수로 교체**했다. 그 16개와 변경된 도장 interaction 3개를 합친 Opus **19장**은 별도 원도구 이벤트·SHA·개별 소견으로 확인했다. 동일 SHA 별칭은 별도 열람으로 세지 않았고, EN desktop 기준선 2개의 추가 바이트 차이는 pixelmatch 차이 0으로 기존 검수에 연결했다. 최종 대조 `/tmp/worklazy-u4-mergegate4/visual-closure.json`의 미확인 필수 상태와 미해결 신규 P2는 **0**이다.
+
+초기 generic Gemini 보고서와 한도 중단 작업의 미열람 부분은 승인 근거에서 제외했다. Gemini·Claude CLI에 이어 agy Opus도 실제 429로 중단됐고, Flash 재시도는 429로 열람 0이었다. 마지막 23장은 **Codex Astra 보충 검수**로 명시했으며 Gemini/Claude 전수 완료라고 대필하지 않았다. 기존 고정 shell·언어 선택 가림과 U4 경미한 줄바꿈은 앞선 DOM 도달성 대조 및 backlog에 연결한다. 기존 heartbeat 목표 false, 공용 incomplete 1,973건, Dolby Vision base-layer 미지원 skip, 실기기 모바일 미교정은 여전히 미달·한계로 보존한다. 배포 전 검수는 종결했고 main 병합·한 번의 push·Pages 및 라이브 사후 확인은 이어서 실행한다. — Codx
+
+### U4 최종 육안 검수에서 발견한 도장 공지 수리 (Codx)
+
+초기 화면을 추가로 직접 열어 보니 320/390px에서 도장 공지 제목과 본문이 가로 flex 항목으로 경쟁해 제목이 4~5줄의 좁은 열로 쪼개졌다. EN 320px 제목 폭 **66.14px**, KO **50.92px**였다. `d3a8d89`에서도 같았지만 해당 공지 조합은 U4 `8ec3e4e`가 도입했고 main에는 패널 자체가 없으므로 **U4 이전 부채로 면제할 수 없는 신규 P2**로 판정했다. Astra가 공지 한 곳에 `flex-col`만 추가했고, Opus도 기존 정본의 정렬 붕괴 수리 범위임을 증거로 확인했다. 공용 UtilityNotice·전역 CSS·문구·PDF 엔진은 바꾸지 않았다.
+
+수리 QA에서 **ko/en×light/dark×320/390/820/821, 16환경**의 제목 1~2줄·본문 아래 배치·넘침 0을 확인했다. 원래 가로 배치로 되돌린 DOM 대조 **16/16**은 같은 검사를 실패시켰다. Axe 원자료의 미확인 **32개**는 삭제하거나 공용 부채로 돌리지 않았다. 기존 감사의 실제 배경 픽셀 함수를 사용해 제목·본문 각각의 원대상을 재측정한 최저 대비는 **5.671:1**, 32/32가 4.5:1 이상이었다. 글자와 배경을 같은 색으로 만든 음성 두 건은 **1:1**로 거부됐다. 원자료·대상별 측정·배경 PNG는 `/tmp/worklazy-u4-audit3/stamp-notice-fix/contrast/`에 보존했다.
+
+수리 뒤 전체 unit **504/504**, 도장 실제 Tab/Enter **48회**, 교체 후 undo/redo 초기화, legacy oracle **totalDiffs 0**, production build **2,857 modules·71페이지**, static recovery **119**, 도장 CLS **3회 최대 0**을 확인했다. 필터 없는 전체 visual은 ko/en 호스트 각각 **246/246** 일치했다. 도장 9표본 중 기준 초과 차이는 3장이었고 의도된 수리 결과로 갱신했다. 추가로 PNG byte가 달라진 EN desktop 두 장은 실제 pixelmatch 차이 **0**이었다. 이때 전체 변경 기준선은 처음의 F5 55장 범위를 유지했다.
+
+최종 수리본 scoped/full 번들은 기본 상한 `null`·override `{}`·multiplier 1을 유지했다. gzip은 entry **314,041B**, PDF route **1,154,921B**, shared **1,393,354B**, app **5,944,173B**, CSS **38,242B**이고 고정 baseline 대비 scoped 순증은 **14,764 / 77,634 / 2,531 / 100,458 / 555B**다. 수리 전보다 app **+6B**이며 full route 합계 **4,236,778B**를 PDF 증가와 상쇄하지 않았다. 최종 production **107 JS/MJS 경로·1 CSS**의 크기·SHA와 물리 목록이 계측본과 일치했고, 16개 production 브라우저 경로의 요청·광고 분기도 다시 통과했다. 첫 임시 keyboard probe는 모듈 탐색 경로 누락, 계측 독립 검사는 이전 임시 폴더만 허용한 경로 가드 때문에 실행 전 실패했다. 각각 임시 의존 경로·정확한 새 폴더 가드만 교정한 재실행 로그를 원 실패와 함께 보존한다.
+
+육안 검수에서는 generic 소견을 반복 생성한 초기 Gemini 두 보고서를 승인 근거에서 제외했다. Gemini의 실제 quota 429 뒤 Claude CLI로 전환했으며 그 CLI도 주간 한도에 도달해 `agy`의 **Claude Opus 4.6 Thinking** 경로를 사용했다. 중단된 CLI의 **82개 고유 이미지**는 성공한 Read 이미지 결과·SHA·개별 관찰을 독립 대조했고, 경로의 `astual` 오타 1건은 입력 목록 및 실제 Read 경로와 일치하는 경우에만 별도 보정 기록을 남겼다. 수리 후 도장 **19장**도 실제 `view_file` 완료 이벤트·SHA·구체 소견을 확인했다. 이미지 관찰을 기능 실행이나 WCAG 판정으로 확대하지 않았다. 남은 육안 검수와 최종 배포 판정은 실행 후 별도로 기록한다. — Codx
+
+### U4 통합 게이트 재개 — 실제 검증과 기존 부채 귀속 (Codx)
+
+사용자가 이 세션에 U4 인계를 명시하고 번들 기본 상한을 해제했다. 후보 `0f02458`은 main 통합본에 BL04 입력 타입 교정과 기본 상한 해제를 더한 것으로 PDF 제품 소스는 U4 부모 `d3a8d89`와 동일하다. 아래 과거 SCOPE-OUT은 당시의 결과로 보존하며 새 검증으로 회수한 항목만 별도로 기록한다. 증거 묶음은 `/tmp/worklazy-u4-mergegate2/`와 `/tmp/worklazy-u4-mergegate3/`다.
+
+**실행한 회귀** — 전체 unit **504/504**, TypeScript, production/QA build, static, 전체 browser·new-tools·utilities·office·QR bulk/font·recovery·Excel cleaner/compare·XLS preserve/first-load·video-hybrid와 PDF finish 체인을 실행했다. old QR selector 및 PDF 대기 실패는 같은 소스 재실행 통과와 함께 두 로그를 보존했다. new-tools의 해당 호스트 Dolby Vision base-layer streaming 미지원 skip은 실행 성공으로 승격하지 않았다. legacy oracle **44파일·totalDiffs 0**, 공식 oracle **87 preflight·56 허용·31 제외·두 renderer SHA·sentinel 0·Link 3종**, fixture 결정성 두 번 **157 SHA 동일**을 확인했다. 도장 Tab/Enter **48회**, border control 최대 **1px**, 원래 2px border 변이는 실제 최종 픽셀 단언에서 거부됐다. F4b 원자료 **144셀·432회 측정·별도 배치 2건**, 가독성 **6/6** 및 결손·반복·peak 변이 거부를 독립 재확인했다. 실기기 모바일 한계는 여전히 미교정이다.
+
+**접근성·렌더링·F5** — 전량 접근성 **43페이지**에서 위반 0, F2/F3/F4a/F4b 소유 incomplete 0, 원자료의 공용 상속 **1,973건**을 보존했다. 신규 F5 토글·파일 목록·결과에 대해 별도 **8환경×5상태**의 Axe 원자료와 geometry, **56 PNG**, **8 ZIP·24 PDF**를 실제 생성했다. 위반·incomplete·thumb 이탈·외부 요청은 0이었다. Astra는 40개 원자료와 40개 thumb 좌표를 독립 재집계하고 판정 변이 5종을 거부했다. 이 보충은 취소·재시도·부분 결과를 새로 실행한 것이 아니며 기존 lifecycle oracle에 연결한다. 전량 rendering은 **9대상×3회 CLS 0**, CSS orphan 0, legacy manifest 155규칙·153제거·2활성, registry 20경로다. 접근성 요약기의 부모부터 존재한 빈 근거 수용과 성능 목표 미달은 backlog에 근거와 함께 남겼다.
+
+**최종 번들 계측** — 고정 schema-v3 baseline SHA `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`, multiplier 1, 기본 5상한 `null`로 scoped/full을 순차 독립 실행했다. entry **314,039B**, PDF route **1,154,915B**, shared **1,393,351B**, app **5,944,167B**, CSS **38,242B**이고 scoped 순증은 각각 **14,762 / 77,628 / 2,528 / 100,452 / 555B**다. full 19-route 합계 **4,236,777B**는 PDF 증가와 상쇄하지 않았다. 실제 배포 JS/MJS **107경로·91고유 SHA**를 재귀 물리 계수해 gzip 합계와 대조했다. 동일 SHA alias 증가 0, 내용 변경 alias **+176,390B**, 추가·삭제 inventory 및 명시 0B 상한 음성 거부를 확인했다. 계측 원본 스크립트를 그대로 호출하고 정리 직전 산출물을 보존해 원자료 replay와 독립 gzip 계수를 모두 수행했다. 물리 검사를 네트워크 검사로 부르지 않았다.
+
+**배포 파일 네트워크 대조** — production snapshot에서 PDF 10경로의 실제 JS/MJS 응답 크기·SHA가 계측 inventory와 일치했다. 일반 PDF는 동의 후 광고 loader·요청 각 1, 광고 제외 6경로는 각 0이었다. office/XLS preserve 외부 요청 0, video는 공개된 정책대로 동의한 Google/Naver 분석 두 URL만 요청했다. 원격 스크립트는 요청을 기록한 뒤 로컬 빈 응답으로 대체했다. 첫 probe는 video 분석까지 금지한 잘못된 가정으로 실패했고 정책을 근거로 검사만 교정한 16경로 재실행은 통과했다. 사용자 파일을 원격 추적 코드에 노출한 실험이 아니다. — Codx
+
+**마지막 자동 검증** — root의 `npm run build`와 `npm run test:static`를 다시 실제 실행해 2,857 modules·71페이지·recovery 119를 확인했다. 최종 산출물의 **107 JS/MJS 경로·1 CSS**가 보존한 production 계측본과 크기·SHA 모두 일치했고, 물리 전수 목록의 누락·추가도 0이었다. 한국어·영어 호스트 환경의 필터 없는 visual은 각각 **246/246**, **3분 23.67초 / 3분 22.60초**로 일치했다. 원래 불일치 55장은 F5 이전 기준선의 노후이며 부모에서도 같은 55장이 불일치했다(51장 byte 동일, 4장 pixelmatch 차이 0). 이 55장만 하네스로 갱신했고 전역 UI 재기준화는 실행하지 않았다. 장별 육안 판정은 이 자동 일치와 별개의 배포 게이트다. — Codx
+
+### 번들 기본 상한 해제 (Codx)
+
+최신 사용자 결정에 따라 기본 5종 크기 한계를 JSON에서도 유지되는 `null`로 표현했다. 중간 워킹트리의 1GiB 한계는 여전히 초과 시 차단하므로 무상한과 같지 않아 채택하지 않았다. 계측 schema·정수 bytes·route·module 귀속·배포 inventory 검증은 유지하며, 명시 환경변수 상한은 통제된 대조용으로 계속 검증한다. 이 결정은 과거 U4 SCOPE-OUT의 크기 차단 사유를 해제하지만, 미실행 게이트나 성능 목표 미달을 통과로 바꾸지 않는다.
+
+관련 unit **32/32**를 실제 실행했다. Astra 독립 실험에서 각 지표 **2GiB+7B** 증가의 기본 통과, JSON null 보존, 명시 0B 상한 초과 거부와 경계 일치 통과를 확인했다. 잘못된 metric 값 6종×5와 schema·route·module·inventory 누락은 거부됐다. 증거 `/tmp/worklazy-todo-execution-20260909/bundle-unit.log`, `/tmp/worklazy-u4-audit3/meter-review/`; 검수 중 추적 파일 2,726개 SHA 변화 0. 최종 통합 번들 실측은 U4 병합 게이트에서 회수한다. — Codx
+
+### BL04 XLSX/XLSM 오류 셀 타입 보존 (Codx)
+
+기준 `d9c79b7`과 BL04 대상 diff는 0이었다. ExcelJS 정규화 전의 일반 셀 값 또는 `cacheState=present`인 수식 result에 own string `error` 속성이 있는지만 판정해 모델 `type`을 `error`로 교정했다. 값·표시값·캐시 값은 기존 문자열을 유지하고 missing 수식 캐시는 `null/undefined/blank/missing`을 유지한다. 오류명 문자열 blacklist, wrapper 재귀 탐색, legacy 숫자 오류 통일은 실제 문자열과 기존 모델을 바꾸므로 채택하지 않았다.
+
+합성 XLSX와 실제 content type·VBA 프로젝트를 가진 XLSM에서 `#DIV/0!`·`#N/A` 머리글은 `uncertain`, 같은 literal 문자열은 `suggested(1)`이었다. 일반 오류 7종, cached/missing 수식, 실제 오류와 literal의 비교 차이, 기존 XLS/XLSB/SpreadsheetML 및 비오류 모델을 대조했다. helper false·문자열 blacklist·수식 cache 오류 누락의 세 음성 대조는 각각 새 회귀를 실패시켰다. 전체 unit **499/499**, production build **2,857 modules·71 정적 페이지**, Excel compare·cleaner·QR bulk·utilities 스모크와 static recovery **119**를 통과했다. 번들 계측은 91 JS/1 CSS, entry **314,039B**, affected routes **4,236,777B**, shared **1,393,351B**, app **5,944,167B**, CSS **38,242B**이며 상한은 적용하지 않았다. 기준 게이트 기록의 app **5,944,016B**보다 **+151B**다. 첫 Excel compare 스모크는 preview 미기동으로 연결 거부였고 같은 소스에서 서버를 띄운 재실행은 통과했다. — Codx
+
+### U4 PDF 마무리 main 통합 게이트 SCOPE-OUT (Codx)
+
+원격 main `2d0ff3a8280bdd1c3149946306d0ca394244fd5c`, U4 `d3a8d89d19dbb6165cacce8257838dc3dff9b084`, merge-base `5bc6854175331bdd73b267784d9633cdccda8446`를 대조하고 `fb7abde0d40649444b877ccf4ef899bb84f46631`로 `--no-ff` 병합했다. 공통 12파일의 모의 충돌은 CHANGELOG 1·review-notes 1·접근성 감사 7·접근성 unit 2·visual unit 1 hunk였다.
+
+접근성 감사는 U4의 소유권·incomplete·PDF F2/F3/F4a/F4b 상태와 main의 Excel 중복 결과 8상태·scope·대비 측정을 함께 유지했다. 양 부모 standalone 함수 12개 byte 동일, package와 ko/en locale의 양 부모 변경키 546개 누락 0, visual 246·QA scenario 80·profile 628, 충돌 단위 18/18을 확인했다. 부모 독립 의미 검수도 284파일 SHA와 PDF 35+main 16 등록의 합집합 43페이지를 대조해 승인했다(`/tmp/worklazy-u4-handoff/MERGE-REVIEW.md`). U4-8 최종 test-only 표본은 정상+필수7+추가2와 원문 대형 사각형4개 소실 mutant를 검출한 `/tmp/worklazy-u4-8-review4/REPORT.md` 승인에 연결된다.
+
+통합 후보에서 TypeScript, production build 2,857 modules·정적 71페이지, 전체 unit 496/496, static recovery 119, diff-check는 통과했다. 고정 schema-v3 baseline SHA `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`, multiplier 1의 scoped/full 측정은 둘 다 app JS 증가 **100,301B > 96,000B**로 실패했다. 병합 전 동일 schema-v3 93,493B에서 **+6,808B** 늘어 상한을 4,301B 넘었다. 부모 독립 재계산은 scoped/full 91 JS 파일·합계 5,944,016B 동일과 유일한 app 실패를 확인했다(`/tmp/worklazy-u4-handoff/bundle-stop-review.json`). category 증분은 entry +2,317B, Excel compare +8,071B, Excel cleaner +554B, QR +676B, document compare -4,810B, shared +7B, PDF -2B, 그 외 합 -5B다(`/tmp/worklazy-u4-handoff/merge-category-increment.json`).
+
+정본의 예산 우선 중단 조건에 따라 상한·baseline·기능을 바꾸지 않고 SCOPE-OUT했다. 전체 browser/office/new-tools/utilities/Excel/QR/recovery, PDF 골든·oracle·legacy, 12입력×3 성능, 144셀 raster, visual/a11y/rendering, 의존 음성, CSS·legacy·route 묶음과 규칙 19 시각 검수는 이 후보에서 미실행 pending이다. main push·배포도 하지 않았다. 원로그와 JSON은 `/tmp/worklazy-u4-mergegate/`에 보존했다.
+
+### U4-8 fix-2 — 최종 raster 장식별 sentinel 보강 (Codx)
+
+**실행 게이트·범위** — 시작 branch/head는 `s3-pdf-finish`/`be20fdd1043ec7c7b51db665a54dbd63aa684748`로 지시와 일치했고 열린 PDF 계획서와 상반된 지시는 없었다. R1 자원 소유권 제품 코드는 검수 통과 범위로 보존했다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다.
+
+**장식별 검출 계약** — 8행·7축 pairwise와 구조 잔여·연산자 순서·전체 픽셀 비교는 유지하되, 전체 평균은 보조 대조로만 남겼다. 번호는 파랑, 머리말은 초록, 도장은 주황, image/text 워터마크는 자홍으로 분리하고 각 전용 영역의 색상 픽셀 수를 raster 직전과 최종 raster에서 직접 단언한다. 중앙 워터마크 존재 수는 원문·폼 겹침 영역을 제외해 비중첩으로 세며, 별도 겹침 영역에서는 background의 워터마크 픽셀 0과 원문/평면화 폼 보존, foreground의 워터마크 픽셀 존재와 불투명 image의 완전 덮임을 단언한다. pairwise 배열이 만들 수 없는 세 축 조합 두 건(image/foreground/raster-on, text/background/raster-on)을 실제 엔진 출력으로 보충해 image/text × background/foreground 네 최종 가시 대조를 모두 고정했다.
+
+**게이트 건전성** — 정상 control은 8 pairwise+2 가시성 대조, 최종 raster 6건으로 exit 0이었다. 기존 네 변이(text plan 생략, stamp/text 순서 반전, structure 옵션 생략, raster 분기 생략)는 각각 exit 1을 유지했다. raster 직전 stream에서 도장·텍스트·워터마크를 제거한 새 세 변이도 각각 최종 도장 **0**, 번호 **0**, 워터마크 **0** sentinel 단언으로 exit 1이었다. 일곱 변이는 모두 치환 횟수 1 이상과 원본 대비 source 변경을 확인했으며, 정상 최종 raster의 직접 계수는 번호 **166**, 머리말 **219**, 도장 **2,646**, 비중첩 image 워터마크 **17,344~18,144**, 비중첩 text 워터마크 **732~764** 픽셀이다. 원출력·patch·JSON은 `/tmp/worklazy-u4-8-fix2/`에 보존한다.
+
+**검증·귀속·이월** — TypeScript 진단 0, unit **346/346**, production build **2,855 modules·71 정적 페이지**, static(startup recovery 119), PDF finish 전체 체인과 legacy oracle `totalDiffs=0`을 통과했다. `TEST_SCOPE=pdf` browser 1차는 이번 변경과 무관한 legacy 출력의 토글 상태 대기(`tests/browser-smoke.mjs:115`)가 180초 timeout이었고, 소스 무변경 재실행은 통과해 두 로그를 모두 보존했다. schema-v3 scoped/full 번들은 override `{}`·multiplier 1에서 5종 모두 통과했고 scoped 증분/상한/잔여는 entry **12,449/20,480/8,031B**, PDF route **77,624/82,000/4,376B**, shared 순증 **2,511/30,720/28,209B**, app **93,493/96,000/2,507B**, CSS **400/10,240/9,840B**다. `git diff --check`도 통과했다. 제품·locale·SEO·AdSense 실행 경로와 추적된 시각 기준선은 바뀌지 않았다. 전체 browser·office·new-tools·utilities·QR 2종·recovery·Excel 2종·a11y 전량·visual 전량·rendering 전량·`legacy:manifest`·성능 12입력·144셀 벤치는 지시대로 병합 게이트 1회로 이월한다. — Codx
+
+### U4-8 fix-1 — 실행 소유권·전체 축 골든·다중 글꼴 안내 수리 (Codx)
+
+**실행 게이트·귀속** — 시작 branch/head는 `s3-pdf-finish`/`3dbef33967bb83d89f758094ce5d431d920d559d`로 지시와 일치했고 열린 계획서 충돌은 없었다. 검수 R1~R3을 이번 수리 범위로 수용했고, 부모에도 있는 상위 텍스트 옵션 API 함정 R4는 아래 backlog로 분리했다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다.
+
+**R1 실행 소유권** — PDF finish 실행마다 소유 세대를 부여하고 패널 unmount·파일 교체·파일 제거에서 세대를 폐기한 뒤 abort한다. 성공 반환, ZIP 생성 뒤, 오류의 `partialResults` 인계 전마다 소유권을 검사해 잃은 작업은 결과를 등록하거나 Object URL을 만들지 않고 각 output을 dispose한다. 취소 버튼은 세대를 폐기하지 않으므로 같은 화면 사용자의 취소에서는 이미 완료된 1개 결과를 계속 인계한다. 실제 Chromium 지연 주입에서 화면 이동과 파일 교체는 각각 다운로드 **0·PDF URL 0·OPFS 결과 0**, 같은 화면 취소는 다운로드 **1·OPFS 결과 1·미해제 PDF URL 1**을 보존했고 이후 화면 이탈 때 OPFS 0·URL revoke로 정리됐다. 저장소 회귀는 자신의 strict-port Vite 준비 로그를 확인하고 세 대조군을 모두 실행한다.
+
+**R2 전체 축 실제 출력 골든** — fixture에 이진 7축을 명시했다: cleanup remove/preserve, form flatten/preserve, watermark image/text, layer background/foreground, text number-header/number, stamp on/off, raster on/off. 8행 orthogonal covering array가 21개 축 쌍의 네 상호작용을 각각 정확히 두 번 덮으며, 여덟 행 모두 살아 있는 엔진의 실제 출력이다. 네 행은 마지막 150DPI PNG raster까지 수행한다. 대표 pair-1은 metadata·첨부 제거+form flatten+image background watermark+번호/머리말+stamp+raster를 함께 켜고 raster 직전 `/Contents` 순서 **watermark→원문→FlatWidget Do→text→stamp**, title/첨부/AcroForm/Widget 잔여 0, 최종 Font 0·Image XObject 1을 단언했다. PDF.js/NAPI-canvas의 직전/최종 400×600 비교는 변경 픽셀 **2.0642%**, 평균 채널 차이 **0.9585/255**였고 네 raster 케이스 모두 허용치 8%·8/255 안이다. 정상 control은 exit 0, 제품에서 text plan 생략·stamp/text 순서 반전·structure 옵션 생략·raster 분기 생략을 각각 주입한 네 mutant는 모두 exit 1이었다. 이전 골든에서 exit 0이던 structure/raster 생략까지는 검출했지만, 이 시점의 전 페이지 평균 비교는 raster 직전 장식 누락 세 변이를 검출하지 못했다. 장식별 생존 보장은 위 fix-2가 보완한다.
+
+**R3 다중 글꼴 용량 안내** — 사전 분석이 전체 글꼴 경고가 필요한 출력 수를 별도로 반환하고 preflight·완료·부분 결과 문구가 그 수와 `3.8MB × 수`를 함께 표시한다. 3개 실제 출력의 문구는 ko **“전체 글꼴이 필요한 출력은 3개입니다. 파일당 약 3.8MB, 이번 묶음은 합계 약 11.4MB 커질 수 있습니다.”**, en **“The full font is needed for 3 output(s). It may add about 3.8 MB per file, or about 11.4 MB for this batch.”**로 확인했다.
+
+**R4 분리와 보고 보정** — 상위 텍스트 옵션과 optional `textDecorations`를 함께 둔 API는 stamp/image watermark 호출에서 텍스트를 조용히 버릴 수 있다. 부모에도 같고 UI는 명시 배열을 사용하므로 신규 회귀로 수리하지 않았다. typed/discriminated 계약 문서화 또는 모호한 입력 거부를 `docs/backlog.md`에 남겼으며, stamp-only 호출에 placeholder를 추가할 수 있는 무조건 fallback은 기각했다. 아래 원 U4-8 기록의 “모든 상호작용”과 27항 완전 반영으로 읽히는 표현은 후속 검수 R1~R3을 반영해 장식 4축 및 당시 대조 범위로 정정했다.
+
+**검증·예산** — TypeScript, unit **346/346**, production build **2,855 modules·71 정적 페이지**, static(startup recovery 119), PDF finish의 UI·소유권·watermark·stamp·structure·7축 combined 체인, PDF scoped browser, legacy oracle(client3·structure4·render32·output4·input1, totalDiffs0), CSS orphan 0, registry20을 통과했다. schema-v3 고정 기준선과 override `{}`·multiplier 1에서 scoped 증분/상한/잔여는 entry **12,449/20,480/8,031B**, PDF route **77,624/82,000/4,376B**, shared 순증 **2,511/30,720/28,209B**, app **93,493/96,000/2,507B**, CSS **400/10,240/9,840B**다. full 독립 빌드도 같은 entry/shared/app/CSS와 19-route 합산 **-448,905B**로 통과했으며 PDF route 증가와 상쇄하지 않았다. 전체 browser·office·new-tools·utilities·QR 2종·recovery·Excel 2종·full a11y·full visual·full rendering·`legacy:manifest`·성능 12입력·144셀 벤치는 지시대로 이번 수리에서 실행하지 않고 통합 병합 게이트로 이월했다. 원출력·mutant 전후·브라우저 대조·계측 JSON은 `/tmp/worklazy-u4-8-fix1/REPORT.md`와 `logs/`에 보존한다. — Codx
+
+### U4-8 — PDF 마무리 복합 실행·다중 결과·최종 감사 (Codx)
+
+**실행 게이트와 결함 귀속** — 시작 branch/head는 `s3-pdf-finish`/`620f87943e27c76312e384a3dae5104941d12c98`로 지시와 일치했고 열린 계획서 충돌과 추적된 루트 merge-gate 문서는 없었다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다. U4-5에서 들어온 워터마크+도장 배타와 도장/이미지 워터마크 조기 반환은 정본 12에 근거 없는 기존 결함으로 판정했다. 다중 선택 도입 뒤 “다시 선택하면 교체”를 전제하던 finish 테스트는 이번 변경 귀속으로 명시적 제거→선택 흐름으로 고쳤다.
+
+**복합 엔진·사용자 경로** — `analyzeDocument`를 계열별 plan 누적으로 바꾸고 구조 재구축 뒤 background 워터마크→원문→foreground 워터마크→번호/머리말/꼬리말→도장→선택적 raster 순서를 실제 content stream으로 만들었다. 당시 네 장식 축은 조합 폭발을 피하되 **그 네 축 안의 pairwise 상호작용만** 덮는 6개 pairwise + all-on foreground/background 2개, 총 **8개 실제 출력 PDF**로 줄였다. 구조와 최종 raster 축은 이 골든에 없었고 위 fix-1의 7축 골든이 이를 대체한다. PDF.js 텍스트, content operator 순서, XObject와 Font ref를 검사했으며 같은 문서의 텍스트 장식은 Font 1개를 공유한다. 제품에서 text plan을 제거한 mutant는 `missing text decoration: PAGE-1`로 **exit 1**이었고 원복 뒤 체인에 등록된 정상 골든이 통과했다.
+
+**다중 결과·호환성** — finish 업로드는 파일을 concurrency 1로 검사·처리하고 첫 active preview 외 PDF.js cache를 즉시 해제한다. 각 결과는 기존 OPFS/Blob store의 dispose를 유지하며 취소·후속 ZIP 실패 때 완료된 부분 결과를 UI에 보존한다. 결과가 2개 이상이면 C2로 한글·중복명을 안전하게 예약하고 C3와 `@zip.js/zip.js`를 지연 import해 ZIP을 만든다. 브라우저 스모크는 같은 `결과.pdf` 2개에서 개별 PDF 2개+ZIP 1개, ZIP entry `결과-마무리.pdf`/`결과-마무리-2.pdf`, 각 출력의 번호·워터마크와 원문 Font 1+공유 장식 Font 1을 단언했다. legacy organize는 UI·문구와 worker blob을 바꾸지 않고 PNG canvas와 worker 배치 상수를 `legacy-organize` preset으로 고정했다. 실제 Chrome 두 옵션 스모크는 각 페이지의 PNG XObject와 번호를 단언하며, 페이지 번호 font를 끈 제품 mutant는 `Legacy PDF page 1 omitted…`, **exit 1**이었다. 기존 oracle은 client 3·structure 4·render 32·output 4·input 1, `totalDiffs=0`이다.
+
+**누락 감사·현지화** — 정본 확정 1~27을 파일/줄로 다시 대조해 당시 26개는 U4-0~U4-7 산출물에서 확인했다고 기록했고, watermark/stamp preset만 자기 canonical을 유지하던 **1건**을 발견해 page-numbers/header-footer와 함께 `/tools/pdf-editor/finish`로 통일하고 unit·정적 출력 검증을 보강했다. 후속 검수가 R1~R3을 찾아냈으므로 이 26+1 집계는 27항의 완전 반영 증거가 아니며 위 fix-1 판정이 우선한다. 다중 업로드·ZIP·진행 문구와 finish 메타/소셜 입력은 ko/en을 동시에 갱신했다. route 수는 늘지 않아 기존 71개 정적 페이지·사이트맵 범위만 재생성했고 AdSense 실행 경로는 건드리지 않았다. 당시 27행 대조표와 재현 로그는 `/tmp/worklazy-u4-8/REPORT.md`에 보존한다.
+
+**탐색 빌드와 예산** — 고정 schema-v3 기준선 SHA-256은 `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`, multiplier `1`이며 상한은 불변이다. 최초→엔진에서 entry/PDF route/shared/app/CSS 증분은 각각 **+14/+398/+48/+520/0B**, 엔진→복수 선택 UI에서는 **+204/+1,111/+58/+1,361/0B**였다. 70% 중단선 아래라 계속했다. 최종 정본 감사 수정까지 포함한 증분/상한/잔여는 entry **12,414/20,480/8,066B**, PDF route **77,436/82,000/4,564B**, shared **2,542/30,720/28,178B**, app **93,325/96,000/2,675B**, CSS **400/10,240/9,840B**다. 의무 초기·엔진·UI 세 checkpoint 뒤 legacy/누락 감사 변경의 최종성을 확인하려고 최종 계측을 추가 실행했으며, 어느 측정에서도 상한 상향·override는 사용하지 않았다.
+
+**검증** — TypeScript, 전체 unit 346건, production build 2,855 modules·71 정적 페이지, static(startup recovery 119), PDF finish 체인(직접 진입 20+복합 배치+기존 4종 golden+당시 장식 4축 복합 8), 공식 oracle 87/허용56/제외31/양 renderer SHA56, PDF scoped browser, legacy 3종 oracle, CSS orphan 0, tool registry 20을 통과했다. 이 통과 목록은 후속 검수가 발견한 R1~R3 및 구조/raster 결합 검출력까지 포함했다는 뜻이 아니며, 해당 보완은 위 fix-1에 기록한다. 전체 browser·office·new-tools·utilities·QR 2종·recovery·Excel 2종·full a11y·full visual·full rendering·`legacy:manifest`·성능 12입력은 지시대로 병합 게이트 1회로 유예한다. — Codx
+
+### U4-7 fix-1 — 벤치 게이트·부분 결과·페이지 정리 수리 (Codx)
+
+**실행 게이트·귀속** — 시작 branch/head는 `s3-pdf-finish`/`661f717bc11ecbab06a777a25db2700164988648`로 지시와 일치했고 관련 열린 계획서의 상반 지시는 없었다. 검수 R1~R5는 이 기준 커밋에서 생긴 결함으로 수용해 모두 수리했다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`와 미추적 DOCX·HTML·`newui/`는 수정·stage하지 않았고, main 병합·push·배포도 하지 않았다. 기존 `save()` 할당 오류, preview 포트 오인, scoped 로그 문구, 공용 incomplete 125, 실기기 미교정, 128MiB heartbeat·의존 패치는 이번 결함과 분리해 `docs/backlog.md`에 이월했다.
+
+**R1 정정·R2 게이트 건전성** — 보존 원자료 `/tmp/worklazy-u4-7/benchmark-final/raw.json`의 SHA-256은 수정 전후 모두 **`6deae09a9f03e35cd5c879d456c924caad5ece14e94c54b54c966c9beb1b2f55`**다. 각 표본에서 target별 합계를 먼저 대조한 뒤 `usedSize`와 `backingStorageSize`의 최고점을 서로 독립 계산하고, 세 기록에서 지표별 최댓값을 선택했다. backing 값은 **25/144셀**이 정정됐고 used 값 변경은 0이다. 최대 정정은 desktop/photo-scan/16쪽/300DPI/PNG의 **461,501,557 → 585,737,224B**, 차이 **124,235,667B(118.4804MiB)**다. 기존 U4-7의 48행 표·계산식도 정정했으며 JPEG q0.85·미교정 폴백 150 DPI·결정 JSON은 바꾸지 않았다.
+
+report-only는 저장 peak를 결과로 신뢰하지 않고 정확한 144셀 Cartesian 집합, 환경별 정확한 배치 집합, `blank-4 → text-vector-4 → photo-scan-4` 순서, 실행별 결과 3개와 보유 bytes 합, worker 표본, load/render/encode/embed/save/retain/release 7경계를 검사한다. 실제 음성 주입은 `peak=0`을 **`stored peak does not match its raw samples`**, 모바일 배치의 desktop 복제를 **`batch environments must equal the exact configured set`**, 결과 3→2 삭제를 **`must contain exactly three outputs (2 !== 3)`**로 모두 거부했다. 기존 worker 삭제와 render 경계 삭제 음성도 계속 거부한다. 대표 실제 재집계는 desktop/blank/4쪽/300DPI/PNG backing **176,358,692 → 277,836,862B**이며 record 1/sample 21의 두 target 합이 근거다.
+
+**R3·R4 저장 경계** — OPFS B의 `close()` 또는 `getFile()` await 직후 abort를 재검사해 미완료 B만 제거하고 완료 A를 보존한다. 두 재현 모두 종전 `[A,B]` 등록/마지막 파일 정상 반환에서 **AbortError, partial `[A]`, entry `result-1.pdf`만 잔존**으로 바뀌었다. 결과별 dispose가 자기 entry만 제거하고 마지막 결과가 해제될 때만 세션을 지우며, 배치 dispose의 전체 세션 해제 계약은 유지한다. 두 번째 메모리 결과의 실제 `new Blob()` RangeError는 종전 raw `RangeError`·partial 없음에서 **`PdfFinishPartialError` / `PDF_FINISH_RESULT_MEMORY_LIMIT` / partial `[A]`**로 정규화됐고 C는 읽지 않았다. 별도 기존 `PDFDocument.save()` RangeError는 여전히 raw 오류·partial 없음이며 이번 수리 성과로 포함하지 않는다.
+
+**R5 페이지 수명주기** — geometry preflight와 실제 페이지의 취득·캔버스 할당·render·encode·embed를 각각 page 단위 `try/finally`로 묶었다. 실제 PDF.js 재현에서 render 중 취소는 `render → cancel → settled(RenderingCancelledException) → cleanup → release → destroy`, encode 경계 취소는 `render → settled → render stage → encode stage → cleanup → release → destroy`, canvas context 할당 실패는 `cleanup → release → destroy` 순서다. 이를 실제 메모리 누수 입증으로 확대하지 않고 명시된 정리 순서 복구로 판정한다. Chromium OPFS close-abort도 종전 성공 `{returnedSize:3}`에서 `{mode:"opfs", error:"AbortError"}`로 바뀌었다.
+
+**검증·예산** — TypeScript, 전체 unit **345/345**, production build **2,854 modules·71 정적 페이지**, static(startup recovery 119), `test:pdf-finish`의 직접 진입 20·watermark contents4+128+32·stamp16+16+8·structure appearance5×2/조합4/parentless0, 공식 oracle 87/허용56/제외31/양 renderer SHA56, PDF scoped browser, legacy oracle client3·structure4·render32·output4·input1/totalDiffs0을 통과했다. 전체 144셀 벤치는 다시 실행하지 않고 보존 raw의 report-only만 수행했다. 최초 scoped/full 번들을 실수로 겹쳐 시작한 시도는 JSON 생성 전에 중단돼 증거에서 폐기했고, 이후 두 측정을 순차 독립 실행했다.
+
+최종 scoped 증분/상한/잔여는 entry **12,201/20,480/8,279B**, PDF route **75,807/82,000/6,193B**, shared 순증 **2,413/30,720/28,307B**, app **91,306/96,000/4,694B**, CSS **400/10,240/9,840B**다. override `{}`, multiplier `1`, 배포·계측 inventory 누락 0이며 상한을 바꾸지 않았다. full은 같은 entry/shared/app/CSS와 19-route 합산 **-433,267B**로 통과했고 scoped PDF 증가와 상쇄하지 않았다. 이번 변경은 테스트·내부 저장/정리 경계뿐이라 사용자 문구·route를 바꾸지 않았고 ko/en 현지화, SEO·정적 페이지, AdSense 격리에는 동반 변경할 표면이 없었다. 추적돼 있던 루트 `MERGE-GATE-CHECKLIST.md`는 내용 손실 없이 무시되는 `docs/jobs/todo/s3-pdf-finish-state/` 최신본에 합치고 추적에서 제거했다. 상세 로그·정정 25셀·전후 재현은 `/tmp/worklazy-u4-7-fix1/REPORT.md`에 보존한다. — Codx
+
+### U4-7 — 이미지 변환 평탄화·벤치 매트릭스 (Codx)
+
+**실행 게이트·탐색 빌드** — 시작 branch/head는 `s3-pdf-finish`/`509730a7c0b412f82834946b84231d3e07d00544`로 지시와 일치했고 열린 계획서 충돌은 없었다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`, 미추적 DOCX·HTML·`newui/`와 금지 worktree는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다. schema-v3 기준선 SHA-256은 `4caaa9c6…30ea`다. 구현 전 탐색값은 entry **11,091B**, PDF route **71,060B**, shared 순증 **2,430B**, app **85,498B**, CSS **400B**였고 잔여는 PDF **10,940B**, app **10,502B**였다. 선택 페이지 래스터·OPFS 보유·한영 UI를 묶은 탐색 후보도 PDF **73,821/82,000B**, app **89,158/96,000B**로 예산 안임을 확인한 뒤 구현을 확정했다.
+
+**벤치 절차·환경** — 아래 48행은 fixture 4종 × 쪽수 3종 × 포맷 2종 × 환경 2종이며 각 행의 150/200/300 DPI 셀이 세 열이다(총 144 실행 셀). 각 셀은 준비 1회 뒤 3회 기록했고 최종 PDF bytes와 raster 전체 처리시간은 중앙값, CDP 자원은 세 기록의 최댓값이다. CDP 값은 50ms 주기와 load/render/encode/embed/save/retain/release 경계에서 메인+PDF.js worker의 `Runtime.getHeapUsage`를 합산했으며 원자료에는 target별 `usedSize`·`backingStorageSize`와 모든 표본을 보존했다. Chrome binary는 **152.0.7977.64**다. Pixel 7 조건은 **412×839, DPR 2.625, touch와 mobile UA를 적용한 에뮬레이션이며 실기기가 아니다**. native/renderer/canvas 메모리는 실기기 계측이 없어 **미측정**이다. 원자료 `/tmp/worklazy-u4-7/benchmark-final/raw.json`(19MB, SHA-256 **`6deae09a9f03e35cd5c879d456c924caad5ece14e94c54b54c966c9beb1b2f55`**)은 덮어쓰지 않았다. 정정 집계는 각 표본 합계를 target별 값의 합과 먼저 대조하고, 각 기록의 `usedSize`와 `backingStorageSize` 최고점을 원시 표본에서 서로 독립 계산한 뒤 세 기록의 최댓값을 셀 값으로 선택한다. report-only는 정확한 144셀 Cartesian 집합, 환경별 배치, 파일·출력 순서와 보유 bytes 합, 매 실행 worker 표본·7경계를 fail-closed로 검사하며 `summary.json`에는 각 최고점의 기록 번호·표본 시각·경계·target 근거를 남긴다.
+
+표의 각 DPI 셀 표기: **최종 PDF bytes 중앙값 / 처리시간 중앙값 / peak CDP used·backing 최댓값**.
+
+| fixture | pages | format | environment | 150 DPI bytes / time / peak CDP used·backing | 200 DPI bytes / time / peak CDP used·backing | 300 DPI bytes / time / peak CDP used·backing |
+|---|---:|---|---|---:|---:|---:|
+| blank | 1 | PNG | Desktop host measurement | 7.1KiB / 598ms / 64.69MiB·80.14MiB | 12.0KiB / 755ms / 63.97MiB·97.96MiB | 25.7KiB / 1136ms / 64.11MiB·149.77MiB |
+| blank | 1 | PNG | Pixel 7 emulation (not a physical device) | 7.1KiB / 573ms / 64.60MiB·80.14MiB | 12.0KiB / 699ms / 64.01MiB·97.96MiB | 25.7KiB / 1096ms / 64.09MiB·149.78MiB |
+| blank | 1 | JPEG | Desktop host measurement | 14.2KiB / 379ms / 63.61MiB·58.03MiB | 24.1KiB / 405ms / 64.04MiB·58.05MiB | 51.9KiB / 442ms / 63.90MiB·58.10MiB |
+| blank | 1 | JPEG | Pixel 7 emulation (not a physical device) | 14.2KiB / 368ms / 64.06MiB·58.03MiB | 24.1KiB / 371ms / 64.08MiB·58.05MiB | 51.9KiB / 413ms / 63.88MiB·58.10MiB |
+| blank | 4 | PNG | Desktop host measurement | 26.8KiB / 1444ms / 63.86MiB·117.65MiB | 46.0KiB / 2209ms / 64.12MiB·164.63MiB | 101.1KiB / 3540ms / 64.17MiB·264.97MiB |
+| blank | 4 | PNG | Pixel 7 emulation (not a physical device) | 26.8KiB / 1413ms / 63.85MiB·117.65MiB | 46.0KiB / 2092ms / 64.85MiB·164.63MiB | 101.1KiB / 3373ms / 64.13MiB·264.97MiB |
+| blank | 4 | JPEG | Desktop host measurement | 55.1KiB / 468ms / 63.85MiB·58.92MiB | 94.5KiB / 536ms / 63.85MiB·59.00MiB | 206.0KiB / 660ms / 63.86MiB·59.22MiB |
+| blank | 4 | JPEG | Pixel 7 emulation (not a physical device) | 55.1KiB / 450ms / 64.42MiB·58.92MiB | 94.5KiB / 535ms / 63.84MiB·59.00MiB | 206.0KiB / 668ms / 63.84MiB·59.22MiB |
+| blank | 16 | PNG | Desktop host measurement | 105.3KiB / 3820ms / 64.89MiB·209.11MiB | 182.3KiB / 6261ms / 64.54MiB·297.45MiB | 402.7KiB / 12381ms / 65.20MiB·530.57MiB |
+| blank | 16 | PNG | Pixel 7 emulation (not a physical device) | 105.3KiB / 3759ms / 64.87MiB·186.16MiB | 182.3KiB / 6190ms / 64.98MiB·297.45MiB | 402.7KiB / 12089ms / 65.21MiB·530.57MiB |
+| blank | 16 | JPEG | Desktop host measurement | 218.8KiB / 840ms / 64.61MiB·62.49MiB | 376.0KiB / 1202ms / 64.63MiB·62.79MiB | 822.1KiB / 1661ms / 64.61MiB·63.67MiB |
+| blank | 16 | JPEG | Pixel 7 emulation (not a physical device) | 218.8KiB / 860ms / 64.64MiB·62.49MiB | 376.0KiB / 1134ms / 64.59MiB·62.79MiB | 822.1KiB / 1608ms / 64.65MiB·63.67MiB |
+| text-vector | 1 | PNG | Desktop host measurement | 81.2KiB / 923ms / 65.84MiB·80.40MiB | 119.9KiB / 1329ms / 65.95MiB·98.43MiB | 189.6KiB / 2292ms / 64.70MiB·150.42MiB |
+| text-vector | 1 | PNG | Pixel 7 emulation (not a physical device) | 85.5KiB / 921ms / 65.84MiB·80.43MiB | 125.7KiB / 1358ms / 66.12MiB·98.45MiB | 196.3KiB / 2263ms / 64.85MiB·150.46MiB |
+| text-vector | 1 | JPEG | Desktop host measurement | 102.8KiB / 401ms / 64.68MiB·58.11MiB | 154.7KiB / 414ms / 65.48MiB·58.21MiB | 272.5KiB / 458ms / 64.76MiB·58.44MiB |
+| text-vector | 1 | JPEG | Pixel 7 emulation (not a physical device) | 103.8KiB / 445ms / 64.76MiB·58.11MiB | 153.6KiB / 466ms / 64.74MiB·58.21MiB | 274.3KiB / 499ms / 64.73MiB·58.45MiB |
+| text-vector | 4 | PNG | Desktop host measurement | 328.5KiB / 1483ms / 65.71MiB·118.49MiB | 487.2KiB / 1964ms / 65.40MiB·180.70MiB | 769.2KiB / 3619ms / 65.61MiB·265.50MiB |
+| text-vector | 4 | PNG | Pixel 7 emulation (not a physical device) | 346.0KiB / 1568ms / 65.46MiB·118.54MiB | 509.5KiB / 2301ms / 65.38MiB·166.00MiB | 796.8KiB / 3648ms / 65.61MiB·265.50MiB |
+| text-vector | 4 | JPEG | Desktop host measurement | 410.2KiB / 498ms / 65.58MiB·59.57MiB | 622.7KiB / 575ms / 65.57MiB·59.98MiB | 1.07MiB / 722ms / 65.58MiB·60.92MiB |
+| text-vector | 4 | JPEG | Pixel 7 emulation (not a physical device) | 414.2KiB / 562ms / 65.55MiB·59.58MiB | 618.0KiB / 603ms / 65.55MiB·59.98MiB | 1.08MiB / 770ms / 65.56MiB·60.93MiB |
+| text-vector | 16 | PNG | Desktop host measurement | 1.31MiB / 4106ms / 67.27MiB·210.46MiB | 1.93MiB / 6702ms / 66.79MiB·298.90MiB | 3.06MiB / 12868ms / 66.26MiB·531.21MiB |
+| text-vector | 16 | PNG | Pixel 7 emulation (not a physical device) | 1.38MiB / 4181ms / 66.64MiB·210.53MiB | 2.02MiB / 6767ms / 66.80MiB·298.95MiB | 3.17MiB / 12846ms / 66.65MiB·531.23MiB |
+| text-vector | 16 | JPEG | Desktop host measurement | 1.63MiB / 953ms / 67.32MiB·65.42MiB | 2.47MiB / 1191ms / 67.37MiB·67.10MiB | 4.37MiB / 1801ms / 67.37MiB·70.90MiB |
+| text-vector | 16 | JPEG | Pixel 7 emulation (not a physical device) | 1.64MiB / 998ms / 67.30MiB·65.45MiB | 2.45MiB / 1244ms / 67.31MiB·67.07MiB | 4.40MiB / 1873ms / 67.40MiB·70.96MiB |
+| photo-scan | 1 | PNG | Desktop host measurement | 4.72MiB / 1578ms / 65.45MiB·122.32MiB | 3.94MiB / 1891ms / 65.04MiB·137.28MiB | 4.28MiB / 2982ms / 64.92MiB·190.87MiB |
+| photo-scan | 1 | PNG | Pixel 7 emulation (not a physical device) | 4.72MiB / 1556ms / 64.67MiB·122.32MiB | 8.26MiB / 2418ms / 64.73MiB·158.70MiB | 18.13MiB / 4674ms / 65.08MiB·204.84MiB |
+| photo-scan | 1 | JPEG | Desktop host measurement | 672.8KiB / 419ms / 64.22MiB·74.73MiB | 1.44MiB / 478ms / 64.25MiB·76.30MiB | 2.90MiB / 537ms / 64.25MiB·79.22MiB |
+| photo-scan | 1 | JPEG | Pixel 7 emulation (not a physical device) | 672.8KiB / 426ms / 64.24MiB·74.73MiB | 1.03MiB / 459ms / 64.17MiB·75.47MiB | 1.87MiB / 542ms / 64.13MiB·77.16MiB |
+| photo-scan | 4 | PNG | Desktop host measurement | 18.89MiB / 3891ms / 65.09MiB·178.82MiB | 15.76MiB / 4344ms / 65.13MiB·193.11MiB | 17.11MiB / 6369ms / 65.35MiB·297.36MiB |
+| photo-scan | 4 | PNG | Pixel 7 emulation (not a physical device) | 18.89MiB / 3878ms / 65.10MiB·178.82MiB | 33.05MiB / 6458ms / 64.85MiB·246.42MiB | 72.51MiB / 14185ms / 64.31MiB·311.57MiB |
+| photo-scan | 4 | JPEG | Desktop host measurement | 2.63MiB / 648ms / 64.39MiB·83.73MiB | 5.77MiB / 756ms / 64.39MiB·90.01MiB | 11.60MiB / 1122ms / 64.38MiB·101.68MiB |
+| photo-scan | 4 | JPEG | Pixel 7 emulation (not a physical device) | 2.63MiB / 632ms / 64.35MiB·83.73MiB | 4.11MiB / 753ms / 64.38MiB·86.70MiB | 7.47MiB / 1069ms / 64.05MiB·93.43MiB |
+| photo-scan | 16 | PNG | Desktop host measurement | 75.56MiB / 14090ms / 65.23MiB·310.23MiB | 63.03MiB / 15764ms / 65.22MiB·314.08MiB | 68.43MiB / 23745ms / 64.97MiB·558.60MiB |
+| photo-scan | 16 | PNG | Pixel 7 emulation (not a physical device) | 75.56MiB / 14021ms / 65.49MiB·318.80MiB | 132.20MiB / 23823ms / 65.22MiB·430.88MiB | 290.03MiB / 52170ms / 64.69MiB·734.97MiB |
+| photo-scan | 16 | JPEG | Desktop host measurement | 10.50MiB / 1373ms / 65.56MiB·103.49MiB | 23.06MiB / 1884ms / 64.81MiB·127.86MiB | 46.40MiB / 3237ms / 65.07MiB·174.47MiB |
+| photo-scan | 16 | JPEG | Pixel 7 emulation (not a physical device) | 10.50MiB / 1329ms / 64.84MiB·103.49MiB | 16.45MiB / 1819ms / 64.79MiB·114.69MiB | 29.90MiB / 3150ms / 64.85MiB·141.65MiB |
+| transparency | 1 | PNG | Desktop host measurement | 743.7KiB / 1018ms / 64.68MiB·87.31MiB | 800.7KiB / 1455ms / 64.10MiB·107.55MiB | 879.3KiB / 2376ms / 64.07MiB·158.70MiB |
+| transparency | 1 | PNG | Pixel 7 emulation (not a physical device) | 991.2KiB / 1055ms / 64.42MiB·87.72MiB | 1.33MiB / 1449ms / 64.08MiB·109.54MiB | 1.99MiB / 2553ms / 64.09MiB·162.98MiB |
+| transparency | 1 | JPEG | Desktop host measurement | 90.4KiB / 380ms / 64.08MiB·63.94MiB | 133.3KiB / 409ms / 64.09MiB·64.02MiB | 230.1KiB / 449ms / 64.00MiB·64.21MiB |
+| transparency | 1 | JPEG | Pixel 7 emulation (not a physical device) | 84.9KiB / 381ms / 63.77MiB·63.93MiB | 124.5KiB / 413ms / 64.05MiB·64.00MiB | 211.7KiB / 462ms / 64.07MiB·64.17MiB |
+| transparency | 4 | PNG | Desktop host measurement | 2.90MiB / 1991ms / 64.54MiB·128.19MiB | 3.13MiB / 2425ms / 64.60MiB·190.69MiB | 3.43MiB / 4226ms / 64.81MiB·273.59MiB |
+| transparency | 4 | PNG | Pixel 7 emulation (not a physical device) | 3.87MiB / 2075ms / 64.51MiB·129.16MiB | 5.33MiB / 2729ms / 64.63MiB·193.01MiB | 7.96MiB / 5107ms / 64.93MiB·275.34MiB |
+| transparency | 4 | JPEG | Desktop host measurement | 359.8KiB / 512ms / 64.41MiB·68.40MiB | 531.4KiB / 601ms / 64.64MiB·68.74MiB | 918.4KiB / 796ms / 64.54MiB·69.49MiB |
+| transparency | 4 | JPEG | Pixel 7 emulation (not a physical device) | 337.7KiB / 539ms / 64.38MiB·68.36MiB | 496.1KiB / 570ms / 64.60MiB·68.67MiB | 845.0KiB / 794ms / 64.39MiB·69.35MiB |
+| transparency | 16 | PNG | Desktop host measurement | 11.61MiB / 5973ms / 66.36MiB·223.50MiB | 12.50MiB / 8219ms / 65.38MiB·307.22MiB | 13.73MiB / 15578ms / 65.40MiB·537.66MiB |
+| transparency | 16 | PNG | Pixel 7 emulation (not a physical device) | 15.48MiB / 6369ms / 65.22MiB·220.94MiB | 21.32MiB / 9370ms / 65.59MiB·300.08MiB | 31.85MiB / 18369ms / 65.82MiB·548.83MiB |
+| transparency | 16 | JPEG | Desktop host measurement | 1.40MiB / 1052ms / 65.59MiB·72.69MiB | 2.07MiB / 1270ms / 65.59MiB·74.03MiB | 3.59MiB / 2127ms / 65.59MiB·77.05MiB |
+| transparency | 16 | JPEG | Pixel 7 emulation (not a physical device) | 1.32MiB / 1065ms / 65.57MiB·72.52MiB | 1.94MiB / 1285ms / 65.57MiB·73.75MiB | 3.30MiB / 2245ms / 65.58MiB·76.48MiB |
+
+**별도 3파일 배치** — 고정 결정 규칙으로 선택된 150 DPI/JPEG에서 `blank-4 → text-vector-4 → photo-scan-4`를 concurrency 1로 처리하고 세 결과 bytes를 배치 경계까지 함께 보유했다. 준비 1회+기록 3회를 별도로 수행했다.
+
+| 환경 | 결과 보유 bytes 중앙값 | host wall 중앙값 | peak CDP used·backing 최댓값 |
+|---|---:|---:|---:|
+| Desktop host measurement | 3,230,310B (3.08MiB) | 1,644.5ms | 65.30MiB · 88.43MiB |
+| Pixel 7 emulation (not a physical device) | 3,234,357B (3.08MiB) | 1,703.9ms | 65.30MiB · 88.43MiB |
+
+**사전 확정 규칙 적용** — 벤치 결과를 보고 규칙을 바꾸지 않았다. 포맷은 photo-scan·300DPI·1쪽의 세 대응 반복에서 PNG/JPEG 최종 bytes 비율 중앙값만 썼다. Desktop은 `1.474693`이라 PNG, Pixel 7 에뮬레이션은 `9.698305`라 JPEG였고, 환경이 갈리면 모바일 셀이 우선이라는 사전 규칙에 따라 전역 기본값은 **JPEG quality 0.85**다. DPI는 모바일 peak heap이 **실측 물리 기기 한계의 50% 이하인 최대값**으로 정하도록 고정했으나 이번 조건은 에뮬레이션뿐이라 물리 기기 한계를 얻지 못했다. `performance.memory.jsHeapSizeLimit`, `navigator.deviceMemory`, 고정 256MiB를 기기 한계로 대체하지 않고 미교정 사전 폴백 **150 DPI**를 적용했다. 실기기 교정은 명시 제외로 남긴다.
+
+예상 출력 경고 계수는 사전 확정식대로 각 DPI/포맷의 photo-scan 1·4·16쪽 × 두 환경 × 세 반복에서 `max(finalPdfBytes / selectedPixels)`를 썼다: 150-PNG **2.2751643073**, 150-JPEG **0.3164912800**, 200-PNG **2.2396780732**, 200-JPEG **0.3908593726**, 300-PNG **2.1839512794**, 300-JPEG **0.3494403533 B/px**. 예상값이 `min(input×10, 100MiB)`를 넘으면 사전 경고하며 임의 튜닝하지 않았다.
+
+**가독성 oracle** — 각 포맷의 최종 PDF를 같은 DPI의 Poppler **24.02.0**으로 다시 렌더했다. 고정 ROI `x=68,y=112,w=58,h=18pt from top`, RGB 각 채널 ≤127을 ink로 보고 임계값 `floor(DPI×0.057)`을 적용했다.
+
+| DPI | PNG ink height / threshold | JPEG ink height / threshold | 판정 |
+|---:|---:|---:|---|
+| 150 | 9 / 8 | 9 / 8 | 통과 |
+| 200 | 12 / 11 | 12 / 11 | 통과 |
+| 300 | 18 / 17 | 18 / 17 | 통과 |
+
+**제품·수명주기 판정** — 모든 장식과 구조 옵션을 먼저 적용한 뒤 선택 페이지만 흰 배경 PNG/JPEG 단일 이미지로 만들고 비선택 페이지는 벡터 페이지로 복사한다. (A)는 페이지별 `maxSide`/`maxArea`를 preflight와 실제 할당 직전에 검사하고 요청 DPI부터 300→200→150 순서로만 낮춘다. 150 DPI도 (A)를 넘으면 조용한 빈 렌더나 누적 예산 거부가 아니라 지원 제외와 페이지 범위 축소를 한영으로 안내한다. (B)는 누적 pixels·raw RGBA ledger·중간 image bytes·최종 PDF bytes·관측 peak를 측정만 하며 차단 게이트와 섞지 않았다. 결과 보유는 OPFS 우선, 최초 이용 불가 때만 메모리 Blob으로 폴백한다. 메모리 모드는 등록 직전 `retained+current > 200MiB`를 검사하고, OPFS create/write/close 실패는 현재 항목만 제거한 뒤 완료분을 보존하고 배치를 중단하며 메모리로 재전환하지 않는다. 후속 파일의 일반 엔진 오류도 이미 등록한 완료 결과를 부분 결과 계약으로 공개하고 다음 파일을 읽지 않는다.
+
+취소는 `RenderTask.cancel()` → render promise 정착 → `PDFPageProxy.cleanup()` → owned loading task의 document destroy 순서를 유지하고 각 취소 정리 예외를 삼킨다. 외부 preview cache에 이 문서를 넣지 않으며 성공·실패·취소에서 owned loading task를 파괴한다. 결과 교체/화면 종료 때 Object URL과 소유 storage를 함께 정리한다. raster 후 Link 재부착, (B) 차단 게이트, 실기기 한계 교정, wasm 메모리 상한은 착수하지 않았다.
+
+**검증·예산** — 전체 unit **338/338**, TypeScript, production 및 local-QA build **2,854 modules·정적 71페이지**, static(startup recovery 119), `test:pdf-finish`의 신규 선택 페이지 래스터 실제 다운로드와 기존 watermark 128+32 렌더·stamp 16좌표/16실픽셀/8양렌더러·structure 5 appearance×2 renderer, 공식 oracle 87 preflight/허용 56/제외 31/양 renderer SHA 56, `TEST_SCOPE=pdf test:browser`, legacy oracle client 3·structure 4·render 32·output 4·input 1 diff 0을 통과했다. 영향 visual은 한영·양 테마·desktop/mobile 390과 영어 320px **9/9** 재대조했고 직접 열람에서 가로 잘림·겹침이 없었다. F4b+finish a11y 7상태는 violations 0, F4b unresolved incomplete 0, 기존 상속 incomplete 125(통과로 계산하지 않음), 외부 요청 0이었다. 정적 검증이 기존 ko/en·SEO·sitemap·FAQ/정적·광고 경로를 통과했고 route·광고 위치·격리·서버리스 구조·의존성은 바꾸지 않았다.
+
+고정 상한의 최종 scoped 증분/상한/잔여는 entry **12,214/20,480/8,266B**, PDF route **75,673/82,000/6,327B**, shared 순증 **2,444/30,720/28,276B**, app **91,236/96,000/4,764B**, CSS **400/10,240/9,840B**다. override `{}`, multiplier `1`이며 상한을 올리지 않았다. full 교차 측정은 entry/app/shared/CSS가 같고 19-route 합산은 **-433,383B**로 통과했지만, 이를 scoped PDF 값과 상쇄·혼동하지 않는다. U4-8 뒤 한 번으로 이월한 전체 browser, new-tools·utilities·office, QR 2종, recovery, Excel 2종, 전체 a11y·visual·rendering, css:orphans, legacy:manifest, tool-registry-routes, 성능 12입력은 `MERGE-GATE-CHECKLIST.md`에 남겼다. 전체 원출력과 명령은 `/tmp/worklazy-u4-7/REPORT.md`에 보존한다. — Codx
+
+
+### U4-6 fix-1 — 양식 appearance 기하 보존·첨부 Popup 관계 수리 (Codx)
+
+**실행 게이트·원인 판정** — 시작 branch/head는 `s3-pdf-finish`/`cea060b65cd983bf3b2b3fdce698a4092e187169`로 지시와 일치했고 열린 계획서 충돌은 없었다. R1은 pdf-lib 기본 flatten이 Widget Rect의 원점 이동만 적용하고 AP의 BBox·Matrix가 만든 실제 경계를 Rect에 맞추지 않은 것이 직접 원인이다. 하부 라이브러리 동작이어도 검증 없이 새 제품 경로로 허용한 것이 이번 단계 책임이라는 검수 판정을 수용했다. R2는 FileAttachment를 Annots에서 제거한 뒤 양방향 `/Popup`·`/Parent` 관계를 닫지 않아 Popup만 살아남은 것이 원인이다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`, 미추적 DOCX·HTML·`newui/`와 금지 worktree는 수정·stage하지 않았고 main 병합·push·배포도 하지 않았다.
+
+**R1 수리·지원 경계** — 선택된 정상 AP stream의 유한 4값 BBox와 선택적 유한 6값 Matrix로 네 모서리의 transformed bounds를 구하고, 그 경계에서 정규화한 Widget Rect로 가는 독립 x/y 배율과 평행이동을 page content의 `q/cm/Do/Q`에 적용한다. appearance state dictionary는 상속 `/AS`, 그다음 `/V`로 실제 정상 상태만 선택한다. 모든 Widget의 기존 indirect raw stream·Rect·BBox·Matrix를 먼저 검사한 뒤에만 그리므로 일부만 평면화된 결과가 생기지 않는다. XFA·서명·AP 누락/손상에 더해 비유한·퇴화 Rect/BBox, 유효하지 않거나 특이행렬인 변환은 `unsupported-form`으로 실행 전에 차단한다. 값과 appearance를 새로 생성하지 않고 `updateFieldAppearances:false`를 유지했다. ko/en 안내는 내부 구현명이 아니라 안전하게 배치할 수 없는 양식 모양과 결과 미생성을 설명한다.
+
+identity, 절반 BBox, 비영점 BBox, 2배 Matrix, 평행이동 Matrix 5종은 PDF.js와 Poppler 모두 원본·평면화 결과가 **300×300, 파란 픽셀 2,000, 경계 `[100,180,199,199]`, RGBA SHA-256 `ab80b4ec…033b`**로 정확히 일치했다. 특이행렬 fixture는 지원 제외됐다. 실제 제품 화면에서는 절반 BBox 입력이 `preflight=ready` 뒤 다운로드됐고 **2,000→2,000** 픽셀을 보존했으며, ko/en 각각 같은 다운로드 검사를 통과했다. 특이행렬은 양 언어에서 현지화 오류, 실행 버튼 disabled, 다운로드 0이었다. 검수자 원본 appearance probe도 수정 없이 5종×양 renderer를 통과했고 제품 probe는 고정 4274를 런타임 loader에서 허용 포트 4284로만 치환해 `produced=true`, `preserved=true`를 확인했다.
+
+**R2 관계 폐쇄·출력 검증** — 최초 옵션 선별로 제거된 annotation의 raw ref와 dict를 집합에 넣고, 각 페이지 Annots의 Popup 중 `/Parent`가 제거 대상이거나 제거 대상의 `/Popup`이 가리키는 항목을 고정점까지 함께 제거한다. 살아 있는 annotation에서는 제거된 대상만 가리키는 `/Popup`·`/IRT`·`/Parent`를 지우며 일반 Text↔Popup과 FreeText `/IRT`, 첨부 미제거 대조는 보존한다. 최종 전체 객체 검사에서 모든 `/Popup`의 필수 Parent가 dict로 해석되지 않으면 결과를 거부한다. 최소 fixture의 보존/첨부만/주석만/둘 다 네 조합은 parentless Popup·누락 ref·깨진 관계·PDF.js missing-parent 경고가 모두 0이고, 첨부만 제거 결과는 `Text, Popup, FreeText`와 살아 있는 reply를 유지하면서 payload·고수준 attachment를 0으로 만들었다.
+
+검수자의 복합 **12페이지·610객체·압축 첨부 decoded 1,286,144B** 입력에서 첨부만 제거한 출력은 **23,628B/472객체**, parentless Popup **24→0**, 고아·누락 ref·decode 오류·잘못된 관계·첨부 sentinel 모두 0, 링크 108·이름 목적지 84를 유지했다. 입력과 출력 모두 PDF.js의 missing/invalid Popup parent 경고는 0이다. 여섯 옵션 조합도 parentless Popup 0을 통과했다. 원 `assert-evidence.py`는 결함 재현용 기대값 24를 고정해 수리 후 그 한 줄에서 의도대로 실패했으며, 검수 산출물은 읽기 전용으로 보존하고 `/tmp/worklazy-u4-6-fix1/probes/assert-evidence-fixed.py` 사본의 기대값만 0으로 바꿔 나머지 모든 원 assert를 통과시켰다.
+
+**회귀·예산·동반 영향** — `test:pdf-finish`는 실제 ko/en 다운로드 2건, 지원 제외 2건을 포함해 smoke·watermark 128렌더·stamp 16좌표/16브라우저/8 renderer page·새 structure golden을 모두 실행했다. 공식 OCG oracle은 87 preflight, 허용 56/57페이지, 제외 31, 제외 transform 0, 양 renderer SHA 56/56이며 legacy oracle은 client 3·structure 4·render 32·output 4·input 1에서 diff 0이다. full unit **332/332**, TypeScript, production build **2,851 modules·정적 71페이지**, static, 구조 visual **9/9**, F4a+finish a11y 7상태 위반 0·F4a incomplete 0·상속 125·외부 요청 0을 통과했다. 의존 patch hash 음성 대조도 Vite 이전 exit 1을 확인했다.
+
+schema-v3 고정 baseline과 `BUNDLE_ROUTES=pdf-editor` 재계측 증분/상한은 entry **11,091/20,480B**, PDF route **71,060/82,000B**, shared 순증 **2,430/30,720B**, app **85,498/96,000B**, CSS **400/10,240B**다. override `{}`·multiplier `1`이며 한도·배수·측정 범위를 바꾸지 않았다. route·SEO 의미·광고 위치·격리 경로·서버 전제·의존성은 변하지 않았고, 사용자 오류 문구만 ko/en 동시 반영해 정적 검사를 통과했다. 원출력·JSON·PNG/PDF와 하네스 적응 기록은 `/tmp/worklazy-u4-6-fix1/REPORT.md` 및 그 하위에 보존한다. — Codx
+
+## 2026-09-08
+
+### U4-6 — 구조 제거·양식 평면화·링크 보존 고지와 최종 번들 상향 (Codx)
+
+**예산 결정** — 1차 구현 후보의 app 증분이 **82,887B > 81,920B**로 **967B 초과**해 `SCOPE-OUT`한 판정은 옳았다. 967B만 줄이는 탐색안은 정적 JSON 1,390B 증가까지 합치면 순감량이 20B에 그치고, 후속 F4b/F5가 3,411~10,188B를 더 요구해 곧바로 다시 차단된다. 후보 PDF route도 **69,435B/72,000B**, 잔여 **2,565B**뿐이었다. 사용자 결정에 따라 `appJsGzip`을 `80 * 1024`에서 **96,000B**, `affectedRouteJsGzip`을 `72,000B`에서 **82,000B**로 올렸고 entry/shared/CSS, override `{}`, multiplier `1`은 그대로 두었다. 이는 **마지막 상향**이다. U4-7·U4-8에서 다시 초과하면 상향을 요청하지 않고 `SCOPE-OUT`으로 보고해 구조 변경으로 넘긴다.
+
+고정 schema-v3 baseline(SHA-256 `4caaa9c6…`)과 `BUNDLE_ROUTES=pdf-editor`로 최종 재계측한 증분/상한/잔여는 entry **11,065/20,480/9,415B**, PDF route **70,335/82,000/11,665B**, shared 순증 **2,455/30,720/28,265B**, app **84,776/96,000/11,224B**, CSS **400/10,240/9,840B**다. 다른 route 감소로 PDF 증가를 상쇄하지 않았고 측정 범위도 줄이지 않았다. 탐색 시 shared gross 512,387B 중 509,960B가 분류 이동이었으며, 최종은 gross **512,417B**·이동 **509,962B**·순증 2,455B다. 이동분은 app에 다시 더하지 않는다. `PDFObjectCopier`는 공용 `pdfFontEmbed` 청크에 정확히 한 벌이고 이번 작업이 새 중복을 만든 것이 아니다. main `pdf-lib` 귀속 118,977B와 legacy `pdf.worker` 219,622B 내부의 별도 번들은 순감량 80~120KB·총 5~10인일의 backlog로 이관했다. 이번 상향은 이 부채의 해결이 아니라 유예다.
+
+**제품 판정·구현** — 기존 문서에서 참조만 끊는 방식은 제거 payload를 orphan으로 남기므로 기각하고, 지원 구조를 정리한 뒤 page ref를 먼저 대응시켜 도달 가능한 루트만 새 `PDFDocument`에 복사했다. 페이지 tree/content/resources/MediaBox/CropBox/Rotate, 로컬 outline, Names/Dests와 구식 Dests, PageLabels, ViewerPreferences는 새 page ref로 보존한다. 고정 기본 가시성으로 정규화 가능한 optional content는 화면 의미를 보존한 채 구조를 제거하고, tagged structure는 제거한다. 지원하지 않는 OC·Type3는 실행 전 차단한다. Info와 XMP, EmbeddedFiles/Filespec/EmbeddedFile/catalog·page AF, AcroForm/Widget, 선택한 markup subtype은 전 객체 그래프와 출력에서 제거한다. URI·직접 Dest·이름 Dest의 Link는 subtype 선별로 세 종류 모두 보존하며 ko/en 옵션 화면에 실행 전에 “하이퍼링크는 유지됩니다”를 항상 표시한다. 임의 주석 평면화는 지원하지 않고 Redact 제거가 본문 가림이 아님을 밝힌다. 양식은 보존·제거·평면화 배타 모드이고, 평면화는 기존 AP만 `updateFieldAppearances:false`로 사용하며 XFA·서명·AP 누락/손상은 사전 차단한다.
+
+**검증·증거** — 제거 결과의 **전체 14개 indirect object**를 raw dictionary/stream, raw·decoded SHA-256, 금지 key/type/subtype, 첨부·XMP sentinel로 전수 기록했다. 금지 구조와 두 decoded sentinel 잔여는 0이며 PDF.js 고수준 검사에서도 첨부·metadata가 없고 Link 3종, outline, page labels, viewer preferences가 보존됐다. 허용 OC fixture **56개/57페이지**는 제품 preflight와 제품 재구축을 거쳐 PDF.js·Poppler 원본/결과 RGBA SHA가 모두 일치했고, 제외 31개와 양 renderer 음성 대조는 모두 차단됐다. unit **331/331**, production/local-QA build(2,851 modules·정적 71페이지), `test:static`, `test:pdf-finish`, `TEST_SCOPE=pdf test:browser`, legacy oracle diff 0을 통과했다. 구조 시각 기준선은 ko/en·light/dark·desktop/mobile 및 영어 320px를 포함해 **9장** 추가했고 9/9 일치했다. F4a+finish 접근성은 7상태, 위반 0·F4a incomplete 0·기존 상속 125·외부 요청 0이고, 새 rendering 대상 3회 최대 CLS는 **0.0001480366**이다. 원자료와 전체 indirect-object 원출력은 `/tmp/worklazy-u4-6/`에 보존한다. — Codx
+
+### U4-5 fix-1 — 도장 실제 픽셀 골든·F3 접근성 게이트 수리 (Codx)
+
+**실행 게이트·원인 판정** — 시작 branch/head는 `s3-pdf-finish`/`8ec3e4edd97439dfc5b7807645d22c8373d69d11`로 지시와 일치했고 열린 계획서와 상반되는 지시는 없었다. 사용자 소유 `CLAUDE.md`·`PROJECT_RULES.md`, DOCX 2개·네이버 확인 HTML·`newui/`는 수정·stage하지 않았으며 금지 worktree, main 병합·push·배포에도 접근하지 않았다. 도장 좌표 모델과 출력 엔진은 옳았지만 model box의 `border-2`가 내부 2px씩을 차지하고 `<img class="h-full w-full">`가 그 content box에 다시 맞춰져 실제 화면 도장만 작아졌다. 기존 `tests/pdf-stamp-golden.mjs`의 16조합은 브라우저 미리보기 픽셀을 렌더하지 않고 계산된 사각형과 출력 좌표를 비교했으므로 이 결함을 검증했다는 종전 기록은 기각한다.
+
+**R1 최소 수리·실제 픽셀 골든** — 선택 표시를 model box를 소비하지 않는 2px solid outline으로 옮겼다. 혼합 4페이지 fixture는 MediaBox `400×600/800×500/600×400/500×800`, CropBox `[20,35,350,510]/[45,30,680,410]/[30,25,520,330]/[40,55,400,680]`, 회전 `0/90/180/270`, UserUnit `1/1.25/1.5/2`다. 실제 Chrome context의 DPR `1/2` × canvas CSS 폭 `1/0.5` × 회전 4종에서 포인터 이동·크기 조절 후 canvas 영역을 device pixel로 캡처하고, 다운로드 PDF의 같은 페이지를 PDF.js로 같은 표시 폭·bitmap 크기에 렌더해 불투명 적색 픽셀 경계를 비교한다. 16조합 모두 종전 최대 **7~8.5 CSS px**에서 수정 후 **0.5~1 CSS px**로 줄어 허용 `≤2px`를 통과했고, DOM에서도 border `0px`, outline `2px`, 이미지와 model box 네 변 차이 `<0.1px`, DPR별 canvas backing 폭 `520/1040px`를 확인했다. 이 실제 경로는 저장소 정규 `npm run test:pdf-finish`에 포함했다.
+
+좌표·출력 코드는 수정하지 않았다. 수정 전/후 `stamp-all-pages.pdf` SHA-256은 모두 `3831baa3abd1817e83f56928be578a7061f3686179e670475a43abf789568156`, `stamp-selected-pages.pdf`는 모두 `12ad29d42e992cd545ca78129f45ebffc5c6d0997ec5c6f4ea038f5850df8548`로 byte-identical하다. 기존 좌표 16조합, PDF.js/Poppler 8페이지, 선택 페이지 `[true,false,true,false]`와 legacy organize oracle의 client 3·structure 4·render 32·output 4·input 1 총 diff 0도 유지됐다.
+
+**R2 F3 게이트 수리** — `[data-pdf-stamp-owned]`를 `f3-stamp` 소유 범주로 등록하고 stamp tab·notice·settings input·실제 overlay 네 marker를 각각 정확히 1개 요구한다. 기본 감사에 업로드 뒤 도장 overlay가 생긴 ko/en × light/dark 편집 상태 4개를 넣고 이 범위를 F3 selector로 직접 감사한다. gradient 때문에 Axe가 `color-contrast`를 incomplete로 돌려주는 notice title/body는 실제 렌더 배경 픽셀 전수와 계산 전경색을 대조한 증거에만 연결한다. body는 light **5.8648:1**, dark **13.0790:1**, title은 ko light/dark **14.6179/17.3805:1**, en light/dark **14.5232/17.2436:1**로 모두 4.5:1 이상이므로 대비 결함이 아니라 소유·상태 누락 결함이라는 판정을 유지한다. 범위 감사 10페이지는 violations 0, F3 unresolved incomplete 0, pixel-resolved 14, 상속 incomplete 247, 외부 요청 0이다.
+
+marker 제거, 소유 target 미발견, 등록된 편집 결과 누락, F3 unresolved incomplete 잔존을 각각 독립 unit으로 fail-closed했고 full unit은 **327/327**다. 검수자의 원본 F3 probe도 제품 코드의 새 판정기에 unresolved 실제 노드 2개를 주입했을 때 `F3 stamp editing incomplete node lost ownership`으로 거절됐다. 원 probe가 금지된 4271 포트·read-only 검수 경로 쓰기·옛 archive import를 고정해 현재 실행 규율과 충돌하므로, probe 원본 SHA를 보존한 채 임시 loader/adapter에서 포트 4283·출력 `/tmp/worklazy-u4-5-fix1/`·현 워크트리 audit import만 치환했다. 원본 UI/verify probe 결과는 16조합 실패 0·최대 1px이며 검수 산출물의 종전 metrics(최대 8.5px)에는 쓰지 않았다.
+
+**시각·예산·동시 검토** — outline의 실제 픽셀 변화로 stamp interaction 기준선 9장을 갱신했다. 최초 대조는 390px mobile 4장이 각 782px(`0.2376%`), en light 320px가 587px(`0.2173%`) 차이로 실패했고 desktop 4장도 0.1% 아래의 선택선 픽셀 변화가 있어 9장 전부 정규 update 후 **9/9** 일치했다. 직접 열람과 diff에서 변화는 선택선·핸들 주변뿐이었다. schema v3 고정 기준선 SHA `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`, override `{}`·multiplier 1로 PDF scoped gzip은 entry **8,878/20,480B**, PDF route **61,923/72,000B**, shared **2,407/30,720B**, app **74,107/81,920B**, CSS **393/10,240B**로 모두 통과했다. 사용자 문구·route가 바뀌지 않아 한·영 번역, SEO·정적 페이지, AdSense 격리에는 추가 변경이 없고 서버·새 의존성도 없다.
+
+`npx tsc -b`, production build 2,849 modules·정적 71페이지, `npm run test:pdf-finish`, full unit 327/327, 영향 visual 9/9, stamp+finish a11y, dependency version mismatch의 Vite 전 fail-closed, scoped bundle, `git diff --check`를 실제 실행했다. merge-time full browser/new-tools/utilities/office, QR bulk/font, recovery/static, Excel 2종, full a11y/visual/rendering, CSS orphan, legacy manifest, registry routes, 12개 성능은 지시대로 이번 fix에서 유예한다. 상세 수치·명령·실패 이력은 `/tmp/worklazy-u4-5-fix1/REPORT.md`에 보존한다. — Codx
+
+### U4-5 — PDF 도장·서명 이미지와 PDF route 예산 1건 상향 (Codx)
+
+**사용자 결정과 이전 SCOPE-OUT 판정** — 2026-09-08 사용자 결정으로 `affectedRouteJsGzip` 기본 상한만 **61,440B → 72,000B**로 올렸다. U4 전체를 2,850~4,650줄로 추정해 잡은 구 상한이 U4-1~U4-4만으로 95% 소모됐고, 탐색 시제품은 동적 청크 62,997B로 구 상한보다 1,557B 부족했다. 정적 통합 대조는 61,414B로 26B만 남았지만 핵심 패널 329줄뿐이며 골든·한/영 문구·비전자서명 고지·접근성·SEO가 빠졌으므로, 당시 구현을 중단한 SCOPE-OUT 판정은 옳았다. 1,557B는 당시 PDF route 절대 gzip 약 1,135,719B의 0.14%였고, 추정 실패를 도장 기능의 비대화로 보지 않는다는 결정이다.
+
+`scripts/measure-bundle-budget.mjs`에서는 `affectedRouteJsGzip: 60 * 1024` 한 줄만 `72000`으로 바꿨다. entry 20,480B·shared 30,720B·app 81,920B·CSS 10,240B는 불변이고 override `{}`·multiplier 1이다. 다른 route 감량으로 PDF route 증가를 상쇄하는 해석도 계속 금지한다. 기준선은 schema v3 `/tmp/worklazy-u4-4-review5/evidence/bundle-baseline.json`(SHA-256 `4caaa9c6c48df99dd740664d7991c995ffff7e8b6deaa7a1d87e982d302c30ea`)만 사용했으며 schema v2 `/tmp/s3-bundle-baseline.json`은 사용하지 않았다. U4-6~U4-8에서 다시 초과하면 추가 상향을 요청하지 않고 SCOPE-OUT으로 보고해 감량·구조 변경 판정을 받는다.
+
+| 번들 지표(gzip) | schema v3 대비 최종 증분 | 상한 | 잔여 | 판정 |
+|---|---:|---:|---:|---|
+| entry JS | 8,888B | 20,480B | 11,592B | 통과 |
+| PDF route JS | **61,879B** | **72,000B** | **10,121B** | 통과 |
+| shared JS(귀속 이동 제외) | 2,400B | 30,720B | 28,320B | 통과 |
+| app JS | **74,059B** | **81,920B** | **7,861B** | 통과 |
+| CSS | 376B | 10,240B | 9,864B | 통과 |
+
+scoped PDF route 절대값은 1,139,166B였다. full route 비교도 같은 app 순증분과 5개 상한, override `{}`·multiplier 1로 통과했다. 앱 잔여 13,348B에서 시작한 이번 단계가 5,487B를 사용해 7,861B를 남겼으며 app 상한은 올리지 않았다.
+
+**좌표·기능 계약** — 저장 모델은 raw PDF나 화면 픽셀이 아니라 회전된 visual viewport의 중심 `(cx, cy)`, 상대 폭 `rw`, 원본 비율 `aspect`다. CSS 포인터는 `getBoundingClientRect()`에서 viewport 좌표로 한 번 옮기고, 대상 페이지마다 적용 사각형의 **네 모서리 전부**를 기존 `viewportPointToPdf` 변환에 넣는다. 이 변환이 CropBox·UserUnit·회전·scale을 처리하므로 결과를 scale로 다시 나누는 이중 보정은 넣지 않았다. PNG/JPEG를 미리보기에서 직접 이동하고 오른쪽 아래 핸들로 비율 고정 크기 조절하며, 선택 페이지 모두에 같은 상대 위치를 적용한다. 이동·크기 변경은 현재 선택 이미지에 한정된 undo/redo history에 들어가고 다른 이미지를 고르면 history를 새로 시작한다. 포인터를 쓰기 어려운 사용자를 위해 상·하·좌·우와 확대·축소 버튼을 함께 제공한다.
+
+화면의 ko/en 경고는 이 기능이 도장·서명 **이미지만 삽입**하며 공인 전자서명이나 인증서 기반·암호학적 디지털 서명을 만들거나 검증하지 않는다고 명시한다. `/tools/pdf-editor/stamp`는 자체 canonical, FAQ, application metadata와 ko/en 소셜 이미지를 갖고 정적 생성·sitemap 검증에 포함된다.
+
+**골든·회귀 판정** — 비영점 CropBox, UserUnit 1/1.25/1.5/2, 회전 0/90/180/270의 혼합 4페이지에서 불투명 도장 픽셀 경계를 PDF.js와 Poppler로 렌더했다. DPR 1/2 × CSS 표시 배율 1/0.5 × 회전 4종의 **16조합**에서 CSS→viewport 모델, DPR bitmap의 PDF 점, 실제 출력 경계를 비교했고 양 렌더러 8페이지에서 위치·크기·비율을 통과했다. 별도 `1,3` 선택 출력은 페이지별 도장 존재가 `[true,false,true,false]`였다. legacy organize oracle은 client 3·structure 4·render 32·output 4·input 1에서 총 diff 0이다.
+
+`test:pdf-finish`는 20개 직접 진입과 실제 drag/resize/undo/redo/대체 버튼/회전 페이지 동일 상대 좌표/3페이지 출력을 통과했다. unit 323/323, production 및 `VITE_LOCAL_QA=1` build 2,849 modules·정적 71페이지, static startup recovery 119, PDF scoped browser도 통과했다. local-QA stamp+finish a11y 6페이지는 violations 0·기존 상속 incomplete 253·외부 요청 0이며 incomplete를 통과로 세지 않았다. rendering은 8대상×3회, stamp 최대 CLS `0.0001480365514755249`, 외부 요청 0이다. 시각 회귀는 영향 45장을 ko/en에서 diff 0으로 재실행했고 stamp는 desktop/mobile 390px의 양 테마·양 언어 8장과 영어 light 320px 1장을 포함한다. 직접 열람 결과 도장·핸들·선택 썸네일·작업 버튼의 겹침이나 잘림은 없었다.
+
+시각 기준선 변경은 새 `pdf-finish-stamp__interaction__{ko,en}__{light,dark}__{desktop,mobile}.png` 8장, 영어 light `mobile-320` 1장, 4탭 전환으로 달라진 `pdf-finish-navigation__active__{ko,en}__light__{mobile,mobile-320}.png` 4장, 총 13장이다. 상세 JSON·렌더 원출력·캡처와 실행 보고는 `/tmp/worklazy-u4-5/`에 보존한다. merge-time full browser/new-tools/utilities/office/QR/recovery/Excel/a11y/visual/CSS/legacy/registry/성능 항목은 정본 checklist대로 U4-8 병합 직전 1회로 이월한다. — Codx
+
+### U4-4 fix-5 — 표시 실패 새로고침 버튼 대비 회귀 수리 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-5/fix-4 지시서, astra 5차 검수 보고, PDF finish 정본과 열린 계획서를 대조했다. 시작 branch/head는 `s3-pdf-finish`/`c3288856b10953e663a0910a9ca125c7bfe667eb`로 지시와 일치했고 동일 코드 표면의 상반 지시는 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`와 금지 worktree는 건드리지 않았으며 main 병합·push·배포는 범위 밖이다.
+
+**원인·최소 수리** — fix-4에서 새로 만든 `pdf-display-reload` outline 버튼에 정상 전경색이 없어 상위 오류 컨테이너의 `text-destructive`를 상속했다. 버튼 범위에만 정상·hover·focus-visible `text-foreground`를 명시해 상속을 끊었다. 공용 팔레트·Button primitive·기능·한/영 문구·Tab 접근·36px 높이·marker·소유 분류·접근성 한도는 바꾸지 않았다.
+
+| 언어·테마 | 수정 전 normal / hover / focus | 수정 후 normal / hover / focus |
+|---|---:|---:|
+| ko light | **4.2746 / 12.0215 / 4.2746** | **15.8771 / 12.0215 / 15.8771** |
+| en light | **4.2746 / 12.0491 / 4.2746** | **15.8771 / 12.0491 / 15.8771** |
+| ko dark | **6.5720 / 15.8803 / 6.5720** | **17.4330 / 15.8803 / 17.4330** |
+| en dark | **6.6017 / 15.8803 / 6.6017** | **17.5118 / 15.8803 / 17.5118** |
+
+수치는 Chrome 152에서 같은 버튼의 전경만 투명하게 만든 뒤 테두리·모서리를 제외한 내부 렌더 픽셀 전수와 계산 전경색을 대조한 최저값이다. 기준 커밋 보존 빌드는 light normal/focus에서 4.5:1 미만이며 Axe serious 2건으로 원래 집계기가 실제 실패했다. 수정 뒤 12조합 전부 4.5:1 이상이다. dark의 normal/focus는 gradient 때문에 Axe `incomplete` 2노드로 남아 이를 기존 shared 부채에 섞지 않고 `measured-pixel` 증거로 별도 보존하며, 해당 세 상태 픽셀 수치가 하나라도 4.5 미만이면 게이트가 실패한다.
+
+**회귀 유지·검증** — 최초 표시 자산 요청을 중단한 ko/en 스모크에서 1.2초 동안 자동 재시도 0·자동 reload 0, 현지화 안내와 버튼, 원시 예외/자산 경로 노출 0을 확인했다. 명시적 새로고침은 선택을 비우고 재선택 뒤 preview와 `%PDF-` 저장까지 성공했으며 표시 URL은 하나다. fix-4의 기존 오류 요소는 light textarea/notice **7.6428/6.9595**, dark **8.9891/8.3795**로 양 언어에서 그대로 유지됐다. 범위 접근성 9상태는 위반 0·F2 incomplete 0·픽셀 해소 2·외부 요청 0이고, watermark interaction 시각은 기준선 변경 없이 ko/en×light/dark×desktop/mobile **8/8**이다. 전용 접근성 unit **9/9**, `npx tsc -b`, production build **2,847 modules·정적 69페이지**를 통과했다. 색과 하네스만 바뀌어 번역·SEO·정적 경로·AdSense 격리에는 추가 변경이 없다. full unit/browser/PDF finish/성능/번들/기타 전 스코프는 지시대로 병합 직전 1회로 이월한다. 원보고서와 JSON은 `/tmp/worklazy-u4-4-fix5/`에 보존한다. — Codx
+
+### U4-4 fix-4 — 표시 실패 복구·배포 계측·오류 대비·128MiB 재측정 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`와 `AGENTS.md` 전문, fix-4 지시서, PDF finish 정본, fix-3 기록과 read-only 검수 산출물을 대조했다. 시작 branch/head는 `s3-pdf-finish`/`e30018dd2d4801c5abba54a88f200e9ac69325d3`로 지시와 일치했고 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았으며 금지 worktree에는 접근하지 않았다. main 병합·push·배포는 범위 밖이다.
+
+**R-A 표시 런타임 최초 실패 복구** — 공유 표시 모듈 import 실패를 `PdfDisplayLoadError`라는 UI 경계용 오류로 분리해 정상 PDF의 손상·읽기 불가 판정으로 흘러가지 않게 했다. 브라우저 모듈 로더가 거부된 import를 캐시할 수 있어 같은 문서 안 자동 재시도는 실효성이 없다는 점을 근거로, ko/en 모두 연결 확인·페이지 새로고침·PDF 재선택을 안내하는 명시적 버튼을 제공한다. 자동 재시도 폭주는 없고 새로고침 전 선택은 폐기되며, 재선택 뒤 preview/save가 성공한다. 런타임 URL은 하나만 유지하고 worker fallback·취소 계약도 보존했다. 최초 요청을 중단한 실제 브라우저 회귀에서 내부 이름·원시 경로 노출 0, 고유 표시 URL 1개, 복구 뒤 미리보기·저장 성공을 확인했다.
+
+**R-B 배포 실행 자산 계측** — 측정 순서를 Vite build 뒤 현재 정적 생성기로 69개 정적 페이지까지 생성한 다음 inventory하는 절차로 고정하고, baseline/current 모두 같은 측정기·생성 절차를 쓰되 소스 root만 바꾼다. ko/en 같은 내용의 생성 `.js/.mjs` 경로는 모두 deployment inventory에 남기고 gzip은 SHA-256마다 한 번만 부과한다. raw network 관측 집합은 기대 inventory의 `vendor/**`·`runtime/` 제외 규칙과 분리해, 제외 자산이 실제 로드돼도 누락을 숨기지 않는다. 정적 생성 뒤 늦게 추가한 `.mjs`가 양방향 inventory guard에서 실패하는 음성 대조도 추가했다.
+
+S3 기준선 `5bc6854175331bdd73b267784d9633cdccda8446`을 임시 소스에 복원하고 당시 vendor 생성물을 준비한 뒤 재측정했다. baseline은 고유 실행 SHA 83개/배포 경로 99개, current는 89개/105개이고 양쪽 `missingFromInventory=[]`, `missingFromDeployment=[]`, 중복 경로 16개다. scoped 최종 gzip 증분은 entry **7,288B**, affected PDF **58,423B**, shared **2,095B**, app **68,529B**, CSS **300B**로 고정 상한 **20,480/61,440/30,720/81,920/10,240B**를 모두 통과했다. override `{}`·multiplier 1이며 상한은 바꾸지 않았다. full 비교도 5종 통과했고 affected 전체는 기준선보다 450,647B 작았다. 보고서 SHA-256은 baseline `ffc52532…`, scoped `64ee7a82…`, full `94201b35…`이다.
+
+**R-C F2 오류 대비** — 잘못된 워터마크 텍스트 textarea와 empty-text notice를 light의 `red-800`, dark의 `red-200`으로 올리고 기존 F2 marker·공용 debt·판정 상한은 건드리지 않았다. ko/en×light/dark 네 settled error 상태를 실제 Axe 대상으로 등록하고 계산 스타일 대비를 별도 fail-closed 수치로 저장한다. 실측은 light textarea **7.6428:1**/notice **6.9595:1**, dark textarea **8.9891:1**/notice **8.3795:1**로 모두 4.5:1 이상이다. 위반 0, F2 incomplete 0, 상속 incomplete 253, 외부 요청 0이며 review 전 light textarea 4.36, light notice 3.98, dark notice 4.20의 실패를 해소했다.
+
+**R-D 128MiB 응답성 재판정** — 12개 입력을 각각 새 browser context에서 3회 재측정했다. 128MiB 실제 최대 heartbeat는 **347.185/161.810/154.410ms**로, 3회 중 1회가 목표 200ms를 넘었으므로 **목표 미달**로 판정한다. 중앙 총 처리시간/heartbeat 곡선은 16MiB **1,796.767/142.395ms**, 32MiB **2,143.507/57.600ms**, 64MiB **3,120.417/88.705ms**, 128MiB **5,780.848/161.810ms**이고 총시간 비율 3.217로 준선형이다. 최대 breach의 phase는 saving이며 long task는 169ms였다. 원인은 pdf-lib가 단일 128MiB stream을 `object.copyBytesInto`에서 분할 불가능하게 직렬화하는 구간이라 기존 `objectsPerTick` 양보로 내부를 쪼갤 수 없다. 안전한 200ms 확정은 저장기 재설계 없이는 할 수 없어 통과로 주장하지 않는다. 대신 saving 상태를 먼저 그린 뒤 event loop에 양보하고 직렬화를 시작하도록 해 세 번 모두 사용자 진행 표시가 실제 paint됐으며, 취소 UI **115.170ms**, 늦은 결과 0·재시도 성공, Worker 생성 불가 fallback도 preview/download 성공·route error 0을 유지했다. 원보고서 SHA-256은 `439c0c51…`이다.
+
+**검증·실패 이력** — `npx tsc -b` 진단 0, unit **320/320**, production/local-QA build 각 2,847 modules·정적 69페이지, PDF finish browser와 PDF.js/Poppler 골든 **160/160**, legacy oracle 총 diff 0, watermark interaction visual **8/8**을 통과했다. 의존 버전을 6.2.109로 바꾼 격리 음성 대조는 Vite 전에 정확히 fail-closed했다. 도중 full unit 1회는 빈 `A11Y_PAGE_IDS` 처리 결함, scoped a11y 1회는 보고서 디렉터리 미생성, 표시 복구 smoke 1회는 새로고침 뒤 여러 realm 요청을 정확히 2회로 가정한 테스트 결함으로 실패했고 각각 harness를 고쳐 최종 재실행을 통과했다. baseline 준비도 현행 SEO API와 baseline 생성기의 불일치, 당시 video runtime 미생성으로 두 번 실패한 뒤 현재 생성 절차와 baseline vendor 준비를 명시해 성공했다.
+
+지시서에 따라 merge-time의 full `test:browser`, `test:new-tools`, `test:utilities`, `test:office`, `test:qr-bulk`, `test:qr-font-render`, `test:recovery`, `test:static`, full a11y, `css:orphans`, `legacy:manifest`, `tool-registry-routes`는 이번 범위에서 유예한다. 상세 보고서·JSON·캡처는 `/tmp/worklazy-u4-4-fix4/`에 보존한다. — Codx
+
+### U4-4 fix-3 — PDF 표시 런타임 공유·배포 실행 자산 계측 정정 (Codx)
+
+**기각 사유·구성 수리** — fix-2의 “PDF.js 표시 런타임 중복 없음”과 번들 5종 통과 기록은 `.mjs`를 집계하지 않은 측정에 기대어 **기각**한다. 실제 fix-2 산출물은 main이 full `pdf.mjs`를 정적 번들하고 thumbnail worker가 별도 `pdf.min.mjs` URL 자산을 로드해 표시 런타임이 두 벌이었다. fix-3에서 main의 정적 import를 제거하고 main과 전용 worker 모두 고정 패치된 full `pdf.mjs?url`을 동적 import하게 해 **하나의 배포 자산** `assets/pdf-CCjkBPdx.mjs`를 공유한다. OffscreenCanvas worker는 유지하고, PDF.js 내부 worker `pdf.worker.min-CHFwMXne.mjs`도 유지한다.
+
+**계측 경계·기준선** — bundle schema를 v3으로 올리고 `vendor/**`와 `runtime/` 트리 밖의 모든 `.js`·`.mjs`를 배포 실행 inventory와 gzip 합계에 넣었다. route chunk가 URL로 참조하는 worker·public 실행 자산에 route 소유권을 전파하며, 동일 SHA-256 자산은 한 번만 세고 변경 전부터 있던 동일 SHA의 `pdf.worker.min.mjs`는 신규 증가로 세지 않는다. 같은 v3 범위로 S3 고정 기준선을 재생성한 뒤 `pdf-editor`만 scoped 측정했다. unscoped 비교는 S3 기준선에 없는 후속 `audio-studio` route 때문에 fail-closed하며 통과로 기록하지 않는다.
+
+| 번들 지표(gzip) | fix-2 산출물을 v3로 정정 재계측 | fix-3 최종 | 고정 상한 | 최종 판정 |
+|---|---:|---:|---:|---|
+| entry JS | +7,177B | **+7,178B** | +20,480B | 통과 |
+| affected PDF route JS | +22,750B | **+58,079B** | +61,440B | 통과 |
+| shared JS(귀속 이동 제외) | **+133,495B** | **+2,152B** | +30,720B | 통과 |
+| app JS | **+164,213B** | **+68,185B** | +81,920B | 통과 |
+| CSS | +235B | **+235B** | +10,240B | 통과 |
+
+override `{}`·multiplier 1이며 상한 변경은 없다. astra의 원본 `bundle-review.mjs`는 `unmeasuredNewDisplay=[]`과 scoped 5종 통과를 재현했다. 실제 워터마크 워크플로에서 로드된 `.js/.mjs` 20개는 전부 inventory에 있어 `missingFromMeasurement=[]`이었고, 표시 자산 하나를 `PdfEditorPage`와 `pdfThumbnailRender.worker`가 같이 참조했다.
+
+**응답성·패치 안전성** — 고정 fixture를 128MiB까지 늘려 12개×3 새 context를 측정했다. 16/32/64/128MiB 중앙 처리시간은 **1.692/1.977/3.017/5.701초**, heartbeat는 **41.665/45.750/86.220/161.120ms**로 모두 200ms 이하였다. 외부 취소 click→UI는 **105.491ms**, 늦은 canvas·결과 0, 재시도 성공이었다. `Worker`를 생성할 수 없게 한 실제 브라우저 대조도 preview·download 성공, route error 0으로 호환 경로를 통과했다. fixture manifest SHA-256은 `c2629b4719786580cab709143a17af1728b86eb8e515493109ad2d7276d85eb2`다.
+
+의존 패치는 원본 astra probe를 제품 파일 read-only 격리로 재실행했다. modern/legacy×full/minified 네 변형이 각각 180 fixture를 전부 렌더했고 변환 실패는 0이며 33 fixture에서 의도한 패치 차이가 나타났다. 독립 scalar oracle 대비 패치 픽셀 차이 0, 원본 차이 77, raw oracle 오류 0, 네 변형 SHA 동일을 확인했다. PDF.js와 lockfile은 **6.2.108**에 고정됐고 패치 대상 범위 밖 package 변경 0이다. 알 수 없는 hash·version, 원본 출현 0, 패치 출현, 결과 hash 불일치의 fail-closed 5개 음성 대조는 모두 Vite 실행 전 실패했고 원본·멱등 재적용은 통과했다.
+
+**전체 회귀·동시 검토** — TypeScript 진단 0, unit **319/319**, production/local-QA 각 2,847 modules·정적 69페이지, startup recovery 116을 통과했다. PDF finish와 PDF.js/Poppler 골든 **160/160**, PDF 범위·전체 browser, new-tools·utilities·Office·QR bulk·QR font, recovery **147**, legacy oracle 총 diff 0, Excel Cleaner·Compare를 모두 통과했다. 기준선 갱신 없이 `ko_KR.UTF-8`·`en_US.UTF-8` visual은 각각 **211/211** 일치했다. local-QA a11y는 위반 0·F2 incomplete 0·상속 925·외부 요청 0, rendering은 7대상×3회·외부 요청 0과 finish 최대 CLS `0.0001480366`으로 통과했다. CSS orphan 0, legacy 155 rules/153 removed/0 split/2 active, tool 20개도 불변이다. 사용자 문구·화면·route는 바꾸지 않아 한·영 현지화, SEO·정적 페이지, AdSense 격리 경로에 추가 반영할 변경은 없었다. 원보고서와 JSON·캡처는 `/tmp/worklazy-u4-4-fix3/`에 보존한다. — Codx
+
+### U4-4 fix-2 — PDF 워터마크 응답성·오탐·가시성·귀속 수리 (Codx)
+
+**실행 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, fix-2 dispatch, astra 2b/1차 검수 보고, PDF finish 정본과 U4-4 기각 이력을 대조했다. `s3-pdf-finish`의 시작 `HEAD=15bad33cfb569ee032ba90c4fe42b75c1c48cf73`은 지시와 일치했고 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았다. 검수 디렉터리는 읽기 전용으로만 사용했고 금지된 다른 worktree에는 접근하지 않았다. main 병합·push·배포는 수행하지 않는다.
+
+**52초 응답 정지의 두 원인과 수리** — PDF.js 6.2.108의 RGB→RGBA remainder loop가 이후 chunk에서도 `srcPos`를 더하지 않아 앞 구간을 반복했다. package 버전을 정확히 고정하고 full/minified modern·legacy 빌드 4개에 원본/결과 SHA-256과 정확히 2회인 치환 횟수를 기록한 manifest를 두었다. `prepare`·`dev`·`prebuild`가 idempotent 적용과 hash를 검증하므로 `node_modules`·`public/vendor`·`dist` 수기 변경이나 버전 갱신은 없다. 원본→패치 hash는 modern full `487bde…17d`→`e0fac5…812`, legacy full `842284…a66`→`36644d…004`, modern min `e0be38…f6d`→`a67894…c5c`, legacy min `9fab0c…90c`→`377bcc…da3`이다. manifest 자체 SHA-256은 `8f6aaea47e122f7f85fc5f5d20251321f59b5652981817af70ccbdcc6880b8ef`이다.
+
+두 번째 원인은 decoded content stream 전체를 이미지 payload까지 Latin-1 문자열로 바꾸던 위험/결과 검사였다. 이제 byte lexer가 문자열·주석·hex·name을 구분하고 inline dictionary의 W/H/BPC/CS/IM로 무필터 payload 길이를 계산해 원시 bytes를 건너뛴다. 토큰은 256 bytes로 제한하고 64KiB마다 실제 macrotask에 양보·abort를 재검사한다. Flate는 `DecompressionStream` chunk를 누적하면서 1MiB마다 같은 계약을 적용하고, 분할할 수 없는 fallback decode는 호출 전후 abort와 결과 미등록을 보장한다. 위험 검사와 결과 검사는 모두 이 byte 경로를 쓰며 생성한 짧은 marker stream 외에는 이미지 바이너리를 문자열로 만들지 않는다.
+
+**미리보기·파일 수명주기** — fix-2에서는 큰 이미지의 canvas 작업을 전용 OffscreenCanvas worker에서 실행했으나, 이 시점의 **“PDF.js 표시 런타임을 중복 번들하지 않는다”는 기록은 fix-3 계측으로 거짓임이 확인되어 기각한다.** 당시 worker 본체는 1.67kB이지만 main의 full 모듈과 worker의 minified URL 모듈이 별도 산출물이었다. 전용 worker를 제거한 기각 대조에서는 32/64MiB heartbeat 중앙값이 약 **219/387ms**로 목표 200ms를 넘었으므로 main-thread 호환 경로만 쓰는 안을 기각했다. 파일별 controller/request token을 업로드 검사·thumbnail/large preview에 전달하고 제거·교체·unmount에서 abort, PDF document destroy, object URL 회수, 늦은 상태/canvas 등록 차단을 함께 수행한다. 검사 중 `pdf-finish-file-cancel`과 변환 중 기존 `pdf-finish-cancel`을 분리했으며 실제 외부 click 뒤 파일·canvas·결과가 사라지고 같은 탭 재시도가 성공한다.
+
+| 성능 지표 | 수정 전 | fix-2 최종 중앙값 | 목표·판정 |
+|---|---:|---:|---|
+| 최대 heartbeat | 16/32/64MiB **3.328/13.083/52.293초** | **67.185/57.040/67.590ms** | 각 ≤200ms, 통과 |
+| 총 처리시간 곡선 | heartbeat가 제곱 증가 | **2.463/2.571/3.602초** | 64/16=1.46, 준선형·통과 |
+| 외부 취소 click→UI | 파일 제거 약 50초 대기 | **101.806ms** | ≤250ms, 통과 |
+| 결과 보존 | 정상 파일은 약 52초 뒤 완료 | 3 curve 모두 preview dark sample·overlay·download 있음 | 통과 |
+
+측정은 1280×900, DPR 1, CPU/network 제한 없음, 케이스별 새 context, 11개 유효 PDF×3회다. raw 1KiB/10KiB/64KiB/200KiB/1MiB와 Flate 1/4/8MiB, 같은 폭의 Flate 16/32/64MiB를 고정했고 manifest SHA-256은 `046cc7edf428971e6580b4bad873d001ed6af4b753b96bc48a24d1f3cbfa60ee`다. 최종 11개 중 가장 큰 heartbeat 중앙값은 **76.565ms**, Long Task 중앙값은 모두 0ms였다. 원보고서는 `/tmp/worklazy-u4-4-fix2/performance-final-optimized.json`이다.
+
+**A3 네 반례와 가시성 정책**
+
+| 반례 | 최종 판정·증거 |
+|---|---|
+| 597B 정상 inline payload 안의 EI 유사 bytes | dictionary 기반 payload skip으로 위험 경고 없이 정상 처리·다운로드했다. payload bytes를 연산자로 읽지 않는다. |
+| 200×200, 100×50 이미지 tile 60%, 45°, offset 180 | 실제 회전 사각형 polygon과 유효 페이지의 교차 면적 0으로 `empty-placement` 사전 오류다. 0°·offset 199의 1-pixel 양성 대조는 배치 1개로 통과한다. |
+| 확장 뒤 공백/줄바꿈뿐인 텍스트 | ko/en 모두 template 필드의 `empty-text` 사전 오류이며 다운로드는 0이다. |
+| 복잡한 clip/path | scanner 불확실성을 확정 empty clip 근거로 쓰지 않는다. 확실한 zero rectangle만 결과 실패로 판정하고, 나머지는 기존 위험 경고·동의를 유지한 채 결과 1,376B를 제공하고 미리보기·다운로드 뒤 확인 안내를 적용한다. 완전한 가시성 판정이라고 주장하지 않는다. |
+
+결과 validator는 비어 있는 glyph와 확정 zero clip을 거부하되 불확실한 문서를 일괄 거부하거나 layer를 바꾸지 않는다. 회전 배치는 AABB 후보를 빠르게 거른 뒤 실제 polygon을 clip해 면적을 계산한다. 4MiB stream 중간 취소 unit은 timer가 실행되어 `AbortError`로 끝나며 결과를 등록하지 않는다.
+
+**A8·P3** — F2 고유 text/image 입력·helper, content/layer/pattern/position, font/margin/color, rotation/opacity/size, tile gap/offset, 미리보기 안내, 검사 상태·오류·경고·위험 동의의 실제 DOM 조상을 `[data-pdf-watermark-owned]`로 표시했다. 감사기는 selector 미발견·빈 target·해석 불가를 `shared-existing`으로 강등하지 않고 즉시 실패한다. 실제 text/image/risk/error 브라우저 상태에서 고유 target의 미귀속은 0이며, 6개 음성 mutation은 모두 거부됐다. local-QA 12페이지는 violations 0, incomplete **F2 0 / inherited 925**, 외부 요청 0이다.
+
+Helvetica 두 줄 tile은 배치 높이·글자 크기·간격을 그대로 두고 Form XObject BBox 상단에 `max(1pt, size/32)` 여유만 더했다. PDF.js 픽셀은 **14,520/10,972**로 불변이고 Poppler는 손실 상태 **16,023/12,144**에서 상단 +20pt 대조와 같은 **16,137/12,208**로 복구됐다. 하단 확장 대조는 변화가 없고 font 축소는 하지 않았다. 미리보기 안내는 확정한 ko/en 사용자 문구로 교체해 `PDF.js`·`UserUnit viewport coordinates`를 화면에서 제거했으며 기술 문서의 UserUnit 범위 설명은 유지했다. 이 문구의 흐름 변화만 확인해 page-number/header-footer/watermark 각 8장, 총 **24장**을 공식 생성기로 갱신했다. `LANG=ko_KR.UTF-8`와 `en_US.UTF-8` 전체 visual은 각각 **211/211** 일치했다.
+
+**astra 원본 probe** — 원본 SHA를 확인하고 수정하지 않은 채, 4270과 검수 경로를 하드코딩한 브라우저 probe만 bwrap read-only mapping과 4280→4288 same-origin proxy adapter로 실행했다. `resume-performance`, `adversarial-engine`, `cancel-fuzz`, `render-new`, `contracts-new`, `bbox-controls`, `a11y-aggregation-negative`, `browser-focused`는 제품 계약을 재현했다. cancel-fuzz는 1,256개 fuzz 최대 1.921ms, direct abort 26.13ms/UI 0.319ms, full engine abort 52.22ms/UI 1.18ms와 재시도 성공을 기록했다. `browser-new`는 597B 정상 파일에서 더 이상 false risk 경고가 나오지 않는데 구 계약대로 risk-confirmation을 click하려 해 그 지점에서 종료됐다. 이는 새 요구의 성공 관찰이며 PASS로 세지 않았다. `golden-recount-all` 이름의 독립 실행 파일은 없고, 현행 생성기/제품 골든이 **160/160**을 직접 재집계했다.
+
+**fix-2 번들 기록 정정** — 아래는 `.mjs` 실행 자산을 누락한 당시 값이므로 5종 통과 근거로 쓸 수 없어 기각한다. 동일 산출물을 v3로 정정 재계측한 shared/app 증분은 +133,495B/+164,213B로 실제로는 상한을 넘었다.
+
+| 번들 지표(gzip) | S3 고정 기준 대비 순증분 | 고정 상한 | 당시 판정(기각) |
+|---|---:|---:|---|
+| entry JS | +7,177B | +20,480B | 통과 |
+| affected PDF route JS | +22,750B | +61,440B | 통과 |
+| shared JS(귀속 이동 제외) | +3,068B | +30,720B | 통과 |
+| app JS | +33,786B | +81,920B | 통과 |
+| CSS | +235B | +10,240B | 통과 |
+
+override `{}`·multiplier 1이며 QR/image-studio→shared 이동 **509,794B**는 순증분과 분리했다. 처음 PDF.js 표시 모듈을 worker에 정적 포함한 구현은 app +184,494B/shared +153,800B로 예산을 넘겨 기각했다. **당시 1.67kB worker+해시 `.mjs` 자산 경계에서 다섯 상한을 통과했다는 결론은 `.mjs` 누락으로 오판한 것이며 fix-3에서 상단과 같이 정정했다.**
+
+| 검증 | 최종 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **318/318**, fail·skip 0 |
+| 4GiB production build · static | **2,847 modules**, 정적 **69페이지**, startup recovery **116**, 통과 |
+| PDF finish · watermark golden | 16 직접 진입·오류/입력 복구·48 preview 배치·A3·취소/재시도 통과; PDF.js/Poppler **160/160** |
+| PDF 범위/전체 browser · new-tools · utilities · Office | 모두 통과; new-tools 최종 실행은 네 도구 전체 통과, Dolby Vision host capability skip은 결정적 fallback 검증 통과 |
+| QR bulk · font · recovery · legacy oracle | 통과; font 3 fixture changed pixels 0, recovery **147**, legacy client 3/structure 4/render 32/output 4/input 1 총 diff 0 |
+| Excel Cleaner · Compare | 취소·재실행·보고서·모바일 포함 통과 |
+| 전체 visual ko/en | 각각 **211/211**, 실제 문구 변화 24장만 갱신 |
+| local-QA a11y · rendering | 위반 0·F2 incomplete 0·외부 요청 0; 7대상×3회, finish 계열 CLS max **0.0001480366** |
+| bundle · CSS · legacy · registry | scoped 5상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 **20** 불변 |
+
+`standardFontDataUrl` 경고는 기존 PDF.js 환경 경고이며 두 렌더러 골든과 출력 검증은 통과했다. 모든 원출력·JSON·캡처와 probe 격리 자료는 `/tmp/worklazy-u4-4-fix2/`에 보존한다. — Codx
+
+## 2026-09-07
+
+### U4-4 fix-1 — 1차 검수 R1~R9 수리·접근성 귀속 분리 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`를 첫 행동으로 전문 확인하고 `AGENTS.md`, fix-1 dispatch, PDF finish 정본과 U4-4 착수 지시서, 저장소에 보존된 1차 검수 보고·시각 판정을 대조했다. 시작 branch/HEAD는 `s3-pdf-finish`/`5767f135443f113e655fbb0801a01e4d3c11de23`으로 지시와 일치했고 열린 실행 계획과 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`와 금지된 다른 worktree·검수 산출물에는 접근하지 않았고 main 동기화·병합·push·배포도 하지 않는다.
+
+| 결함 | 원인과 수리·고정 회귀 |
+|---|---|
+| R1 inline image 멈춤 | content scanner가 연산자 밖의 `)`에서 index를 전진시키지 않았다. 모든 분기에 전진 보장을 두고 literal string·주석·hex·name과 `BI…ID…EI`의 원시 image data를 분리했다. 정상 `0x29` data, 닫는 괄호, 문자열/주석/hex, 여러 stream의 논리적 `q/Q` 균형 및 실제 업로드·취소·재시도를 고정했다. 불확실한 구문은 `risky-graphics-state` 경고이며 일괄 거부하지 않는다. |
+| R2 descender | 마지막 baseline 0과 Form `BBox=[0,0,w,h]`가 하단 glyph를 잘랐다. font의 descender 포함 높이와 ascender 차이로 baseline offset을 만들고 모든 줄과 BBox 높이에 동일 적용했다. 글자 크기는 유지한다. `gypqj`, 다중 줄 마지막 `gypqj`, Noto, 4회전, single/tile을 PDF.js·Poppler **32렌더** 고정 수치로 추가했고 기존 이미지 **128렌더**도 유지했다. |
+| R3 0개 배치 성공 | offset 뒤 행·열 수가 0이어도 성공으로 반환했고 validator는 marker만 확인했다. 회전 bounds와 signed offset의 실제 교차 타일부터 계산해 0개를 `empty-placement` 사전 필드 오류로 막고 ko/en 행동 안내를 추가했다. validator는 `Do≥1`, 참조 XObject 존재, 전경 앞의 `Q + zero-area/empty clip`을 확인해 marker-only·삭제 resource·비가시 결과를 거부한다. clamp·축소·전경 폴백은 하지 않는다. |
+| R4 모바일 탭 | 공용 Button의 nowrap 상태에서 icon+label 폭이 3등분 버튼보다 컸다. 320/390px에서 icon/label을 세로 배치하고 label 줄바꿈과 `min-width:0`을 줘 자기 bbox와 인접 경계를 지키게 했다. 상위 5칸 navigation 계약은 유지했다. |
+| R5 F1 미리보기 | F2 공용화 중 기존 F1 wrapper의 `white-space`, line-height, weight, opacity가 빠졌다. F1은 `whitespace-pre-wrap`, `leading-[1.2]`, `font-medium`, `opacity-90`, 최대 폭 60%를 복원했고 실제 두 줄 높이를 브라우저에서 단언한다. |
+| R6 타일 미리보기 | 3열·18개·82% 폭 DOM을 고정해 size/gap/offset 변화가 없었다. PDF.js scale-1 viewport 치수와 제품 `createWatermarkPlacements`를 공유해 text/image object 비율과 배치 수·중심·크기·회전을 %로 표시한다. 픽셀 동일성은 주장하지 않지만 유효 size 변경의 폭·개수 반응을 검사한다. |
+| R7 레이아웃·범위·취소 | 중앙 single은 전체 유효폭을 유지하고 나머지 6영역은 N3의 3열×2행 폭·높이에 같은 말줄임·수직 생략 경고를 적용했다. 확정 범위는 opacity **0.01~1(step .01)**, size **1~100%**, gap **0~2000pt**, offset **−2000~2000pt**이며 타일 상한 **400**은 유지한다. 각 tile operator 전에 abort 검사·event-loop 양보·재검사를 수행한다. 지원 설명은 **회전/CropBox 및 PDF.js 방식 UserUnit viewport 좌표 처리**로 한정하며 renderer 간 픽셀·치수 동일성을 뜻하지 않는다. |
+| R8 접근성 | 하네스가 axe `incomplete`를 버려 passes/violations만 저장했다. 이제 rule·impact·help URL과 노드 target·failure summary·검사 사유를 보존하고, 노드를 `f2-watermark`/`shared-existing`으로 분리한다. QA 실측은 violations **0**, 외부 요청 **0**, incomplete **925 inherited / F2 신규 0**이다. 기존 공용 대비·ARIA는 이 작업의 통과로 세지 않고 `docs/backlog.md`의 UI 전면 재설계 게이트로 이관했다. |
+| R9 내부 명칭 | ko/en의 “내부 구조/stream”을 “배경 워터마크를 안전하게 넣지 못함 → 전경 또는 다른 사본 시도”라는 행동·결과 문구로 교체했다. 원시 예외 미노출 경계는 그대로다. |
+
+**1차 기록 정정** — 기존 U4-4 기록의 글꼴 분기는 “ASCII/Latin-1 대 나머지”가 아니라 **각 후보 전체의 Helvetica encode 가능 여부와 Noto glyph coverage** 기준이다. 최초 구현에서 수정된 시각 기준선 20장은 모두 세 번째 탭 때문이 아니며 **16장은 안내문+F1 glyph 스타일·하단 흐름, 4장은 내부 3탭**이다. 당시 bundle 귀속 이동 **509,794B**는 **QR 509,380B + image-studio 414B**이고 전부 QR로 적지 않는다. UserUnit 지원은 위 PDF.js식 viewport 좌표 범위로 제한한다.
+
+fix-1에서는 공식 생성기로 필터 36장을 재생성했고 실제 변경은 **28장**이다: page-number 8·header/footer 8은 지원 안내와 F1 wrapper, watermark 8은 지원 안내와 새 배치 미리보기, active finish navigation 4는 모바일 내부 탭이다. start/end navigation 8장은 변경되지 않았다. 실제/diff 이미지를 확인한 뒤 갱신했으며 같은 필터 재실행 **36/36**이 기준에 일치했다.
+
+**접근성 귀속 재측정** — local-QA 12페이지에서 자동 위반은 0, 외부 요청은 0이다. 하네스가 보존한 incomplete은 rule 15건·node 925개이며 F2 소유 target 목록은 정확히 `[]`(0개), 공용 상속은 925개다. 페이지별 공용 상속 node는 home 5·document-compare 43·tools 199·excel-compare 64·pdf-editor 47·pdf-finish-ko 47·pdf-finish-mobile-ko 31·pdf-finish-en 47·pdf-watermark-ko 47·hwp-editor 44·home-mobile-ko 171·tools-mobile-ko 180이다. target을 찾지 못하거나 target/reason을 버린 결과는 하네스 오류로 처리한다. 공용 925개는 `docs/backlog.md`의 "공용 UI 접근성 incomplete 정리"와 `docs/jobs/todo/ui-theme-redesign-20260907.md` 게이트에 귀속했다.
+
+| 번들 지표(gzip) | 고정 S3 기준 대비 fix-1 누적 순증분 | 상한 | 잔여 |
+|---|---:|---:|---:|
+| entry JS | +7,128B | +20,480B | 13,352B |
+| affected PDF route JS | +20,415B | +61,440B | 41,025B |
+| shared JS(귀속 이동 제외 net) | +2,171B | +30,720B | 28,549B |
+| app JS | +30,494B | +81,920B | 51,426B |
+| CSS | +235B | +10,240B | 10,005B |
+
+고정 기준 SHA-256은 `2605437e04a5d77ed41c2dbfac4fae864a6a9c8b5e56941e696a80b7f76ac692`, override `{}`·multiplier 1이다. scoped 비교는 5지표 모두 통과했다. 전체 route 원실행은 기준의 `perRouteJsGzip`에 audio가 없어 fail-closed 했고 이를 성공으로 세지 않았다. 기준 `files[].routeOwners/gzipBytes`를 변경 없이 재집계해 기록된 PDF **171,864B**와 일치함을 먼저 단언한 뒤 19개 전체 route를 비교했으며, 기준 **2,450,827B**→현재 **1,962,228B**, 증분 **−488,599B**다. QR→shared 509,380B와 image-studio→shared 414B의 귀속 이동은 순증분에서 분리했다.
+
+| 검증 | fix-1 최종 결과 |
+|---|---|
+| TypeScript · unit · production build · static | 진단 0; **312/312**, fail·skip 0; **2,847 modules**, 정적 69페이지·startup recovery 116 통과 |
+| PDF finish · watermark golden | inline image `0x29`, split stream, 0배치·resource/clip 음성 대조, 실제 업로드·취소·재시도 통과; 기존 128 + descender 32 = **160/160** 렌더 |
+| PDF 범위/전체 browser · new-tools · utilities · Office | 전부 통과; 기존 host capability skip은 결정적 fallback 검증 통과 |
+| QR bulk · font · recovery · legacy oracle | 전부 통과; recovery **147 cases**, legacy client/structure/render/output/input 총 diff **0** |
+| Excel Cleaner · Compare | 취소·재실행·보고서·모바일 포함 통과 |
+| 전체 visual ko/en | **211/211**, 위 28개만 공식 생성기로 변경 |
+| local-QA a11y · rendering | 위반 0·F2 incomplete 0·공용 incomplete 925 보존·외부 요청 0; 7대상×3회, watermark CLS max **0.0001480366** |
+| bundle scoped/전체 · CSS · legacy · registry | scoped 5상한 통과·전체 −488,599B; orphan 0; 155/153/0/2; 도구 20 |
+| 공백·포트 | `git diff --check` 통과; 모든 명시 Vite 포트는 4280~4287 `--strictPort` |
+
+검수 probe 원본은 허용된 저장소·dispatch 경로에 없고 금지된 `/tmp/worklazy-u4-4-review1` 및 4270 하드코딩을 가리켜, "무수정 실행"과 이번 잡의 접근 금지·4280~4289 제약을 동시에 만족할 수 없었다. 금지 경로를 읽거나 probe를 고치지 않았고, 같은 R1/R2/R3/R6 계약은 제품 unit·브라우저·PDF.js/Poppler 골든에서 직접 재현했다. 최초 inline 브라우저 재현은 이전 ready locator를 재사용한 동기화 오류와 200pt/10%의 의도된 6영역 overflow를 각각 검출했으며, 제품 완화 없이 새 파일의 실행 버튼 활성 대기와 유효 6pt fixture로 교정한 뒤 최종 명령을 통과했다. 원출력과 JSON·캡처·PDF/PNG는 `/tmp/worklazy-u4-4-fix1/`에 보존한다. — Codx
+
+### U4-4(F2) PDF 벡터 워터마크·배경 stream — 브랜치 구현·검증 (Codx)
+
+**실행 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 현행 실측 1~3·확정 1/3/4/21/25/26·U4-4·H5 C-D·H6 및 관련 검토 이력을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=31529570059efe2478fb0326baf7740bc4861783`으로 지시와 일치했고 추적 변경과 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`를 열거나 stage하지 않았으며 금지된 다른 worktree·검수 산출물도 접근하지 않았다. main 동기화·병합·push·배포는 수행하지 않는다.
+
+**엔진·배경 stream 계약** — 텍스트는 페이지별 확장·줄바꿈 결과를 PDF Form XObject의 벡터 glyph로 만들고, 문서별 폰트 resource 하나를 각 form이 참조한다. ASCII/Latin-1은 Helvetica, 그 밖은 기존 고정 Noto asset의 glyph coverage·hash 검증과 배치당 1회 fetch를 그대로 공유한다. PNG/JPEG는 문서당 XObject 하나만 임베드하며 단일·타일 배치는 같은 reference를 반복 호출한다. 단일 7영역과 최대 400개 반복 타일은 회전된 bounds, 간격·x/y offset, CropBox∩MediaBox·UserUnit·0/90/180/270도 viewport 역변환을 적용한다.
+
+각 워터마크는 원본과 분리된 content stream 하나로 `q` → `/Artifact BMC` → 배치별 `q`/ExtGState/CTM/XObject/`Q` → `EMC` → `Q`를 닫는다. 전경은 `/Contents` 마지막, 배경은 먼저 새 stream을 등록해 정규화된 배열 끝에 붙인 뒤 그 정확한 reference를 제거하고 **index 0에 삽입**한다. 없음·단일 stream·다중 배열은 이 절차로 각각 `[watermark]`·`[watermark, original]`·`[watermark, ...originals]`가 됐고 원본 순서는 유지됐다. 비정상 entry는 생성 전 거부해 부분 결과가 없으며 조용한 전경 폴백은 배경 선택의 의미를 바꾸므로 기각했다. 저장 뒤 문서를 다시 열어 페이지 수와 선택 페이지의 첫/마지막 marker stream을 검사하고 실패하면 결과를 제공하지 않는다.
+
+**위험 문서·화면 표면** — 원본 stream의 `q/Q` 불균형, catalog의 optional content, tagged structure를 사전 검사 경고로 올린다. 위험 문서는 파일·설정을 유지한 채 명시 동의 전 실행만 막고, 동의 뒤에는 선택한 배경/전경 계약 그대로 실행한다. `/tools/pdf-editor/watermark`는 직접 진입 시 워터마크 탭을 열며 text/image, 배경/전경, 단일/타일, 영역·회전·불투명도·크기·여백·타일 간격/offset을 제공한다. 기존 exact page range와 썸네일 선택은 양방향 동기화되며 첫 선택 페이지 PDF.js canvas 위에 텍스트/이미지 단일·타일 overlay와 근사 안내를 표시한다. object URL은 교체·unmount 때 회수한다. ko/en 제목·설명·FAQ·canonical·정적 페이지·sitemap·소셜 PNG를 동반 등록했고 이 route는 격리 경로가 아니므로 기존 일반 광고 loader를 그대로 상속한다.
+
+**구조·픽셀·resource 증거** — `/Contents` fixture 4종은 빈 Contents·단일 stream·다중 stream·비정상 entry다. 앞의 3종은 배경/전경×단일/타일×4회전×PDF.js/Poppler **96렌더**, 별도 비영점 CropBox 4쪽 고정 색상 문서는 같은 32렌더를 만들어 총 **128/128**을 통과했고, 비정상 fixture는 결과 0으로 차단됐다. 고정 문서의 원시 분류 픽셀 범위는 아래와 같으며 배경에서는 파란 원본이 빨간 워터마크 위를 덮고 전경에서는 반대임을 두 renderer에서 단언했다. 전체 원수치는 `/tmp/worklazy-u4-4/golden/metrics.json`에 있다.
+
+| layer/pattern | PDF.js red / blue | Poppler red / blue |
+|---|---:|---:|
+| background single | 250~444 / 15,600 | 288~496 / 15,600 |
+| background tile | 2,850~5,417 / 15,600 | 3,012~5,597 / 15,600 |
+| foreground single | 7,852~9,722 / 6,256~7,923 | 8,054~9,926 / 6,170~7,834 |
+| foreground tile | 11,116~12,649 / 7,264~8,298 | 11,421~12,991 / 7,191~8,206 |
+
+이미지 타일 unit은 결과의 `/Subtype /Image`가 정확히 **1개**이고 워터마크 `Do`가 여러 개인 것을 함께 검사한다. 같은 116B PNG의 단일 결과는 **1,175B**, 타일 결과는 **1,270B**로 차이는 배치 연산자 **95B**뿐이었다. 텍스트 form도 font resource 정확히 1개와 vector text 추출을 확인했다. 첫 골든 실행에서 이미지 XObject의 고유 너비/높이를 다시 scale해 그림이 보이지 않던 결함을 검출했고, 이미지 자체가 단위 사각형을 그린다는 계약에 맞춰 object 크기를 1×1로 고친 뒤 전 렌더를 통과했다. 브라우저 이미지 비율 검사는 회전된 화면 bounds가 아니라 원본 `naturalWidth/naturalHeight`를 비교하도록 잘못된 하네스 판정을 교정했다.
+
+**시각 판정** — 워터마크 full profile ko/en×light/dark×desktop/mobile **8장**을 새로 추가했다. 세 번째 구현 탭 추가로 실제로 바뀐 기존 page-number/header-footer 16장과 active navigation 4장만 생성기로 갱신해 기준선 diff는 **신규 8 + 수정 20 = 28장**이다. 첫 전체 실행의 기존 finish 20장 실패는 모두 새 탭 폭/문구 변화였고 diff를 육안 확인한 뒤 해당 파일만 갱신했다. 최종 전체는 **211/211, 2분 15.11초**, threshold 0.1·상이 픽셀 0.1% 이하·AA 무시 조건으로 통과했다. ko/en 390px 직접 경로와 320px navigation은 별도 baseline 및 브라우저 스모크에 포함된다.
+
+| 번들 지표(gzip) | U4-0 고정 기준 대비 누적 순증분 | 고정 상한 | 잔여 | 판정 |
+|---|---:|---:|---:|---|
+| entry JS | +6,950B | +20,480B | 13,530B | 통과 |
+| affected PDF route JS | +18,881B | +61,440B | 42,559B | 통과 |
+| shared JS | +2,161B | +30,720B | 28,559B | 통과 |
+| app JS | +28,748B | +81,920B | 53,172B | 통과 |
+| CSS | +218B | +10,240B | 10,022B | 통과 |
+
+기준은 schema v2 `/tmp/s3-bundle-baseline.json`, 현재 실측은 `/tmp/worklazy-u4-4/bundle-u4-4.json`이며 override `{}`·multiplier 1이다. QR route에서 shared로 이동한 **509,794B**는 모듈 귀속 이동으로 분리했다. 첫 비교는 `BUNDLE_ROUTES`를 생략해 PDF-only 기준과 전체 route 집합을 잘못 대조했고 baseline의 audio route 부재를 정확히 거부했다. 이를 통과로 취급하지 않고 `BUNDLE_ROUTES=pdf-editor`로 재실행했다. 결과 검증의 불필요한 동적 import도 제거해 production `PdfFinishPanel`을 **54.56kB / gzip 17.21kB**로 줄인 뒤 위 최종 수치를 다시 측정했다.
+
+| 검증 | 최종 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **306/306**, fail·skip 0 |
+| production build · static | **2,847 modules**, 정적 **69페이지**, startup recovery **116**, 통과 |
+| PDF finish smoke · watermark golden | 16 직접 진입, text/image/tile/risk/4회전 CropBox/출력/취소/재시도; 4 Contents fixture·**128/128** 렌더 통과 |
+| PDF scope browser · 전체 browser | 기존 PDF 4모드와 Excel·Word·shared UI 통과 |
+| new-tools · utilities · office | HWP·Image·Audio·Video, ko/en 유틸리티, Office 통과 |
+| QR bulk · font render | 4 font scenario·취소·404 통과; 기존 fixture 픽셀·텍스트 oracle 통과 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff **0** |
+| Excel Cleaner · Compare | 취소·재실행·보고서·모바일 포함 통과 |
+| 전체 visual | ko/en 포함 **211/211**; 위 28개 기준선 변경 |
+| 최종 local-QA build · a11y · rendering | 정적 69; 12페이지 axe 위반 **0**; 7대상×3회 외부 요청 0, watermark CLS max **0.0001480366** < 0.1 |
+| bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 **20** 불변 |
+| 공백·포트 | `git diff --check` 통과; 4280~4289 `--strictPort` 범위 사용 |
+
+반복된 Node PDF.js `standardFontDataUrl`과 QR Poppler font-type 문구는 기존 환경 경고이며 PDF.js/Poppler 픽셀·텍스트 oracle은 통과했다. 원출력, bundle/a11y/rendering JSON, 직접 경로 캡처와 골든 PDF/PNG는 `/tmp/worklazy-u4-4/`에 보존한다. 범위 밖 F3 도장·F4 정리/래스터·다중 결과 ZIP은 구현하지 않았다. — Codx
+
+### U4-3 fix-3 — 원시 숫자·탭 사전 검사와 Office 스모크 동기화 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-3 dispatch, astra 3차·2차 보고와 fix-2 지시서를 전문 대조했다. 시작점은 `s3-pdf-finish` `HEAD=37470534a28b1bf1752a6d659820240fc3bc1b2a`로 지시와 일치했고 추적 변경은 없었다. 열린 계획의 문서 비교·Excel·UI 작업은 별도 작업 트리 또는 다른 제품 표면이며 이번 panel·스모크와 상반된 지시는 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`를 열거나 stage하지 않았고, 금지된 `/tmp/worklazy-xr`·`/tmp/worklazy-dc-impl`도 접근하지 않았다. main `cdb4007` 병합·push·배포는 하지 않는다.
+
+**R1 잔여 원인·수리** — fix-2의 동일 탭·위치 무시 가드는 유지됐다. 다만 `updateForm`과 공용 입력 helper는 원시 문자열의 실제 변화(`"10"→"10.0"`, `"1"→"01"`)를 보고 preflight를 `idle`로 지우는 반면, effect는 변환된 숫자만 의존해 값이 같으면 다시 실행되지 않았다. 실제 탭 전환도 `idle`을 만들지만 두 탭의 검사 설정이 같으면 effect 의존값이 바뀌지 않았다. 검사 effect가 `form.fontSize`·`form.margin`·`startNumber`·`startPage`·`activeTab`을 함께 의존하도록 초기화와 예약의 동일성을 맞췄다. 파일 없음·무효 입력은 계속 정상 `idle`이고 상태 은닉이나 버튼 강제 활성화는 없다.
+
+전용 단언 `testPreflightRawInputAndTabChanges`는 ko/en 각각 글자 크기 `10→10.0`, 여백 `24→24.0`, 시작 번호 `1→01`, 시작 쪽 `1→01`과 두 탭의 template·region·raw numeric·색을 같게 만든 뒤 탭 전환을 검사한다. 각 10건에서 원시 입력 보존, `idle→checking`, `ready`, alert 0, route error 0, 실행 활성과 새 PDF 결과를 모두 확인해 **숫자 표기 8/8·탭 전환 2/2·실제 PDF 생성 10/10**으로 통과했다. 기존 동일 탭/위치 재클릭과 실제 위치 변경 **6/6**, 무효→유효 복귀, 취소·재시도 단언도 같은 전용 스모크에서 유지됐다.
+
+**Office 플래키 수리** — 제품의 Office 저장·변환 코드는 바꾸지 않았다. `tests/office-editor-smoke.mjs`가 키 입력 API 반환을 셀 이동 완료로 간주하지 않고 실제 Office worker의 문서 controller와 첫 시트 값을 조건 대기한다. Ctrl+Home 뒤 A1(row 0, col 0)과 원래 한글 값, ArrowDown 뒤 A2(row 1, col 0)와 `이동 전`, Enter 뒤 A1 보존과 A2의 `Arrow navigation verified` 반영을 각각 확인한 뒤 다음 navigation과 저장을 수행한다. production preview 4250 `--strictPort`에서 원명령을 연속 **20/20, 실패 0**으로 실행했고 완료 기준의 별도 1회도 통과했다. 고정 sleep이나 기대값 완화는 추가하지 않았다.
+
+**기록 정정 4건** — (1) 위 숫자 표기 8건·동일 설정 탭 전환 2건의 새 반례와 수리·재검증을 기존 fix-2의 6개 표본과 구분해 기록했다. (2) fix-2 표의 번들 수치는 `ff0452b3` 대비가 아니라 SHA `2605437e…`인 고정 S3 `/tmp/s3-bundle-baseline.json` 대비였으므로 아래 기존 문장을 정정했다. fix-3 재측정은 같은 기준·override `{}`·multiplier 1에서 entry **+4,860B**, PDF route **+13,801B**, shared net **+2,051B**, app **+21,152B**, CSS **+118B**로 모두 상한 안이다. (3) 시각 결과는 정확한 픽셀 동일을 뜻하지 않으므로 기존 “변경 픽셀 0”을 **기준선 파일 변경 0**으로 정정했다. 실제 회귀는 ko/en 각각 **203/203**이고 threshold 0.1·상이 픽셀 비율 0.1% 이하·AA 무시 조건이다. (4) native `maxLength=300` 뒤 현재 값은 300/300이므로 “현재 개수 초과”가 아니라 **입력 시도가 300자 한도를 넘어 일부만 반영됨**을 설명하도록 ko/en catalog를 고쳤다.
+
+| 검증 | 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **301/301**, fail·skip 0 |
+| production build · static | **2,845 modules**, 정적 **67페이지**, startup recovery **113**, 통과 |
+| PDF finish smoke | 기존 F1~F9·재클릭/변경 6 유지, 새 R1 **10/10**, 해당 새 PDF **10/10**, 48 preview·4회전 boundary·취소/재시도 통과 |
+| PDF scope browser · 전체 browser · new-tools · utilities | 통과; 기존 Dolby Vision host capability skip과 결정적 fallback 결과를 원로그에 보존 |
+| Office | A1/A2/편집 반영 조건 대기 적용 후 연속 **20/20 실패 0**, 별도 완료 기준 1회 통과 |
+| QR bulk · font render | 4 scenario·취소·404 통과; 3 fixture Poppler changed pixels 0·PDF.js 추출 동일 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff 0 |
+| Excel Cleaner · Compare | 취소·재실행·보고서·모바일 포함 통과 |
+| 두 `LANG` 전체 visual | 각각 **203/203**, 7분 28.31초·7분 25.36초; **기준선 파일 변경 0** |
+| local-QA build · a11y · rendering | 정적 67; 11페이지 위반 0; 6대상×3회 외부 요청 0, finish 최대 CLS **0.0001480366** < 0.1 |
+| bundle · CSS · legacy · registry | 고정 S3 기준 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 20 불변 |
+
+제품 영향은 PDF finish 상태 예약과 ko/en 제한 안내뿐이다. route·SEO·정적 페이지 집합·광고 격리·기존 4모드·Office 제품 코드·의존성은 바꾸지 않았다. 원출력과 JSON은 `/tmp/worklazy-u4-3-fix3/` 및 ignored state report에 보존한다. — Codx
+
+### U4-3 fix-2 — 사전 검사 재선택·출력명 끝 공백 수리 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix-2 dispatch, astra 재검수 보고서와 앞선 fix 지시·보고서, U4-3 정본 및 열린 계획서를 읽었다. 시작점은 `s3-pdf-finish` `HEAD=ff0452b3ad171bfba920f41ec0789612e5ec2001`로 지시와 일치했다. `main`이 `cdb4007`로 갱신된 사실은 확인했지만 이번 작업에는 병합하지 않았고 열린 계획 충돌도 없었다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았으며, 금지된 `/tmp/worklazy-xr`·`/tmp/worklazy-dc-impl`도 건드리지 않았다. main 병합·push·배포는 수행하지 않는다.
+
+**R1 원인·수리** — 탭과 위치 클릭 handler가 실제 상태값이 같은 경우에도 preflight만 `idle`로 초기화했다. 반면 검사 effect는 탭·폼의 실제 입력값을 의존하므로 동일값 재선택에는 다시 실행되지 않아, 유효 입력인데도 만들기 버튼이 계속 비활성화됐다. `selectTab`, `updateForm`, 직접 preflight 입력 helper는 `Object.is`로 실제 변경을 먼저 확인하고 같은 값이면 완료된 상태를 보존한다. 값이 달라지면 기존처럼 결과를 지우고 `idle`로 전환하며, 변경된 effect 의존성으로 `checking`과 `ready`를 다시 예약한다. 범위·홀짝·표지 제외·시작 번호·시작 페이지에도 같은 불변식을 적용했다. 브라우저 회귀는 ko/en 각각 동일 페이지 번호 탭, 동일 아래 가운데 위치, 실제 위 왼쪽 위치 변경을 검증했다. 동일값 두 경우는 1.5초 뒤에도 `ready`, 만들기 활성, alert 0, route error 0이고, 실제 변경은 MutationObserver가 `idle → checking`을 관측한 뒤 `ready`와 PDF 생성까지 확인했다. 합계 **6/6**이다. 입력 자체가 무효인 정상 `idle` 상태는 그대로 허용하며, 이번 수리는 유효한 동일값 재선택이 미예약 `idle`을 만드는 경로만 닫는다.
+
+**R2 원인·수리** — 출력명은 원본에서 `.pdf`를 먼저 제거하고 나중에 trim·정규화해 끝 공백 앞 확장자를 놓쳤다. 이제 원본을 trim·정규화한 뒤 반복 `.pdf`와 기존 현지화 접미사를 제거한다. 단위 회귀는 `"  report.pdf  "`, `" .pdf "`, 반복 확장자, 확장자만 있는 이름, 확장자 없는 이름, Unicode 앞뒤 공백, 기존 `-finished` 접미사를 ko/en 각각 검사해 **16/16** 통과했고 기존 한글 금지 문자 정리도 보존했다. 실제 Chrome 다운로드 속성은 문제의 두 이름×ko/en **4/4**에서 `report-마무리.pdf`·`Worklazy-PDF-마무리.pdf`와 `report-finished.pdf`·`Worklazy-PDF-finished.pdf`로 확인했다. 따라서 빈 basename은 F9 fallback으로 수렴하고 확장자는 하나만 남는다.
+
+**F1~F9 보존·시각 판정** — 제품 코드는 위 두 원인에 필요한 panel 상태 전이와 출력명 순서만 바꿨고 route·engine·geometry·폰트·QR·navigation·번역·SEO·정적 페이지·광고 격리 계약은 바꾸지 않았다. 전체 PDF·공용 도구·QR·복구·legacy·Excel 회귀를 재실행했다. 시각 기준선은 갱신하지 않았으며 ko/en 각각 **203/203**, 기준선 파일 변경 0으로 통과했다.
+
+| 검증 | 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **301/301**, fail·skip 0 |
+| production build · static | **2,845 modules**, 정적 **67페이지**, startup recovery **113**, 통과 |
+| PDF finish smoke | 12 직접 진입과 기존 F1~F9 회귀, R1 **6/6**, R2 실제 다운로드 **4/4**, 48 preview·4회전 boundary·취소/재시도 통과 |
+| PDF scope browser · 전체 browser · new-tools · utilities | 통과; Dolby Vision host capability skip은 기존 환경 분기이며 결정적 fallback은 통과 |
+| Office | 첫 실행은 Calc fixture의 저장값이 `["Arrow navigation verified", "이동 전"]`으로 남아 실패; 소스 변경 없이 동일 명령 재실행은 94 download·7 cached·한글 Calc keyboard·5,088B DOCX로 통과해 두 로그 모두 보존 |
+| QR bulk · font render | 취소/복구/404와 4 시나리오 통과; 3 fixture Poppler changed pixels 0·PDF.js 추출 동일 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff 0 |
+| Excel Cleaner · Compare | 취소/재실행·보고서·모바일 포함 통과 |
+| 두 `LANG` 전체 visual | ko **203/203, 7분 17.54초**; en **203/203, 7분 14.83초**; 기준선 갱신 0 |
+| local-QA build · a11y · rendering | 정적 67; 11페이지 axe 위반 0; 6대상×3회 외부 요청 0, finish 최대 CLS **0.00014804** < 0.1 |
+| bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 20 불변 |
+
+고정 S3 `/tmp/s3-bundle-baseline.json` 대비 번들 순증분은 entry **4,834B**, affected PDF route **13,791B**, shared **2,062B**, app **21,143B**, CSS **118B**로 다섯 고정 상한 안이며 override `{}`·multiplier 1이다. QR→shared 이동 **509,380B**는 순증분과 분리했다. raw 로그·JSON·보고서는 `/tmp/worklazy-u4-3-fix2/`와 ignored state report에 보존한다. — Codx
+
+### U4-3 fix-1 — astra F1~F9 수리·계약 확정 (Codx)
+
+**실행 게이트·범위** — `PROJECT_RULES.md`·`AGENTS.md`, fix dispatch, astra 원보고서와 재현 산출물, 제품 결정문, PDF finish 정본·원 지시서·관련 기각 이력을 읽었다. 기준은 `s3-pdf-finish` `HEAD=c8bff1fd1ab64f89afb7240778e0a373c953d1a3`, `main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`로 일치했고 추적 변경과 열린 계획 충돌은 없었다. 사용자 미추적 DOCX 2개·네이버 확인 HTML·`newui/`는 열거나 stage하지 않았고 main 병합·push·배포도 하지 않았다. 계획서 편집 금지와 F9의 정본 반영 요구는, Claude가 확정한 fix dispatch를 결정 정본으로 삼고 아래에 정본 반영 문안을 기록하되 `docs/jobs/todo/pdf-finish-20260905.md` 자체는 바꾸지 않는 것으로 함께 지켰다.
+
+**F1~F4 수리** — F1은 시작 번호·시작 페이지와 글자 크기·여백을 입력 중 문자열로 보존한다. 특히 시작 페이지가 빈 값·`0`·`-1`·`1.5`이면 유효 lower bound를 만들지 않아 selection·thumbnail 순수 함수 호출을 막고, 파일·폼을 유지한 채 해당 ko/en 필드 오류와 실행 비활성만 적용한다. 정상값 복귀도 같은 화면에서 성공한다. F2는 업로드 오류를 파일 조건부 영역 밖에 두고 R2/R6 암호·권한 제한 4종을 “보호되어 편집 불가”, 손상 파일을 읽기 실패 안내로 분리했으며 재업로드와 원시 예외 치환 경계를 유지했다. F3은 가운데 위치를 `left:50%`로 고치고 helper의 inline 높이를 반응형으로 초기화한 뒤, 원본 종횡비의 실제 canvas wrapper 안에 overlay를 넣었다. 모바일 portrait/landscape×6영역×ko/en×light/dark **48/48**에서 종횡비 오차 ≤0.002, canvas wrapper 일치, overlay 내부 포함, 가운데 오차 ≤1px였다. F4는 CropBox와 MediaBox의 교집합을 표시 영역으로 쓰고 빈 교집합은 MediaBox로 되돌린다. 네 회전 viewport unit과 경계 밖 CropBox를 단위·브라우저 출력에 고정했고 PDF.js·Poppler 모두 장식 픽셀과 upright 텍스트를 검출했다.
+
+**F5~F8 수리** — F5의 `analyzeDocument`는 token 치환→전처리→font coverage→layout의 한 계획을 preflight와 실제 draw가 함께 사용한다. 제어 문자·잘못된 날짜 형식·누락 glyph는 scalar 기준 행·열을 붙여 필드에 표시하고 생성 전 차단한다. 너무 좁은 영역·무효 여백은 페이지를 붙여 구별하며, 알 수 없는 토큰·가로 말줄임·세로 생략·전체 글꼴 임베드는 생성 전에 경고한다. ko/en 전체 글꼴 문안에는 실측 근거인 **약 3.8MB 증가**를 명시했다. F6은 file load 전후, font fetch/coverage/embed 전후, 반복 양보 뒤, save 전후, 등록 전에 abort를 재검사한다. 반환 배열 형식은 유지하고, 완료 결과가 있는 취소 rejection만 `PdfFinishCanceledError.partialResults`로 공개하는 명시적 부분 결과 계약을 추가했다. astra 동일 반례는 부분 결과 **1**, 두 번째 파일 read **0**이며 U4-8 다중 업로드 UI·ZIP은 앞당기지 않았다. F7은 신규 문서 helper가 `PDFDocument.create()` 기본 metadata를 그대로 보존하고 선택적 create options만 전달하게 했다. 기존 문서 load의 `updateMetadata:false`는 그대로다. 고정 시각 QR subset/full은 각각 **661,064B / 3,911,538B**, main과 byte·SHA·Info/Producer/Creator/날짜가 동일하고 Poppler 2쪽 SHA도 동일했다. F8은 다섯 navigation 항목에 148px 실제 최소 폭을 주고 viewport 821px 강제 5열 전환을 제거했으며 overflow가 있으면 fade를 계속 보인다. 영어 821px 실측은 client **523px** / scroll **764px**, 다섯 링크 모두 client=scroll **148px**로 레이블 잘림·겹침이 없다.
+
+**F9 확정 계약·정본 반영 문안** — 번호 탭 초기값은 `{page} / {pages}`·아래 가운데, 머리말/바닥글 탭은 `{filename} · {date}`·위 가운데이고 두 탭 공통 10pt·24pt·`#34343a`다. `opacity=0.9`는 미리보기뿐 아니라 실제 PDF draw의 출력 계약이다. 출력명은 정리한 원본 basename에 ko `-마무리.pdf`, en `-finished.pdf`를 붙이며, 이미 붙은 두 접미사를 제거하고 반복 `.pdf`를 한 번으로 정리한다. 빈 basename fallback은 ko `Worklazy-PDF-마무리.pdf`, en `Worklazy-PDF-finished.pdf`다. 이 값은 locale message catalog와 engine 기대값에 함께 고정했다. 입력 범위 6~72pt와 0~144pt는 layout 안전성과 기존 UI 조작 범위를 보존하는 검증 한계이며 조용히 clamp하지 않고 필드 오류를 낸다. 템플릿 300자는 즉시 preflight·미리보기 갱신 비용과 좁은 표시 영역의 과도한 입력을 제한하는 UI 한계다. native `maxLength=300`, 보이는 글자 수 counter와 초과 입력 시 ko/en 안내를 함께 제공해 조용한 잘림으로 보이지 않게 했다. 이 문단이 편집 금지된 기존 계획서에 반영할 확정 문안이다.
+
+**기록·재현 정정** — 최초 U4-3 구현 때 지정됐던 `/tmp/worklazy-u4-3/REPORT.md`와 logs는 astra 검수 시 존재하지 않아 원실행 이력을 검증할 수 없었다. 이번 fix는 `/tmp/worklazy-u4-3-fix1/REPORT.md`와 `logs/` 원문을 남기고 ignored state report에도 복사한다. 앞선 기록의 selector “전체 0”은 문자 그대로는 부정확하다. 위 U4-3 표의 문서 인용 한 건만 존재하며 실행 경로 `src tests scripts`에는 **0건**이라는 것이 정확한 범위다. astra 검수 스크립트와 산출물은 수정하지 않았고, QR·engine·focused-browser는 원본 복사본에 import/output/base URL만 바꾼 별도 드라이버로 실행해 diff를 함께 보존했다.
+
+**시각 기준선·실패 보존** — UI 수리 뒤 finish 두 탭 16장과 navigation 12장, F8이 보이는 기존 PDF 모바일 2장, 합계 **30장**만 생성기로 갱신했다. 기존 convert/pdf-to-image interaction의 실행시간 표기만 달라져 갱신됐던 2장은 제품 변화가 아니므로 HEAD 이미지로 되돌렸다. 첫 전체 시각 실행은 새 최소 폭 영향이 남은 기존 모바일 기준선 2장 때문에 201/203(0.3050%·0.3889%)이었고, diff가 navigation에만 있음을 육안 확인한 뒤 두 장을 갱신했다. 최종은 ko **203/203, 7분 32.11초**, en **203/203, 7분 24.11초**다.
+
+| 검증 | 최종 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **301/301**, fail·skip 0 |
+| production build · static | **2,845 modules**, 정적 **67페이지**, startup recovery **113**, 통과 |
+| finish smoke · astra engine probe | 12 직접 진입, F1/F2/F5/F6 반례, 48 preview, 4회전 boundary 출력 통과; geometry **24/24**, 부분 결과 1·next read 0 |
+| PDF scope browser · 전체 browser | 기존 PDF 4모드와 Excel·Word·shared UI 통과 |
+| new-tools · utilities · office | HWP·Image·Audio·Video, ko/en 유틸리티, Office 통과 |
+| QR bulk · font render · 고정 시각 비교 | 4 font scenario/취소/404 통과; 3 fixture changed pixels 0; subset/full byte·Poppler 동일 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff 0 |
+| Excel Cleaner · Compare | 취소/재실행·보고서·모바일 포함 통과 |
+| 두 `LANG` 전체 visual | 각각 **203/203**, 위 시간으로 통과 |
+| local-QA build · a11y · rendering | 정적 67; 11페이지 axe 위반 0; 6대상×3회, 외부 요청 0, CLS max **0.0116485** < 0.1 |
+| bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 20 불변 |
+
+번들 순증분은 entry **4,837B**, affected PDF route **13,753B**, shared **2,066B**, app **21,109B**, CSS **118B**로 다섯 고정 상한 안이며 override `{}`·multiplier 1이다. QR→shared 이동 **509,380B**는 순증분과 분리했다. 반복된 PDF.js `standardFontDataUrl`과 Poppler OTF font-type 경고, new-tools의 Dolby Vision host capability skip은 기존 환경 경고이며 각각 텍스트·픽셀 oracle과 결정적 capability/fallback 검증은 통과했다. 복구 스위트는 병행 포트 규칙을 재현할 수 있도록 optional `RECOVERY_TEST_PORT`를 받아 지정 포트에 정확히 bind하도록 하네스만 보강했다. — Codx
+
+### U4-3(F1) PDF 페이지 번호·머리말/꼬리말 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·범위** — `PROJECT_RULES.md` 전문과 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 route/preset/navigation·토큰/선택·clock·폰트·실행 realm/취소·미리보기/썸네일·H5/H6 게이트 및 U4-0~2 기록·기각 이력을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=446a1e35ba60ebc308a32a13f8b675a02b095365`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 충돌은 없었다. 착수 시 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML을 보존했다. 검증 중 새로 나타난 사용자 소유 `newui/`도 열거나 stage하지 않았다. main 병합·push·배포는 수행하지 않는다.
+
+**route·SEO·정적 표면** — finish는 기존 PDF 도구의 다섯 번째 navigation이며 organize 뒤에 놓인다. navigation 항목은 위치가 아니라 `data-pdf-nav-mode`로 식별하고 320·390px에서 active 항목이 보이도록 자동 스크롤한다. 세 직접 경로는 하나의 lazy panel과 두 구현 탭을 공유하며 탭 변경은 URL을 바꾸지 않는다. `PdfFinishTab`은 후속 단계용 `watermark`·`stamp`까지 타입에 보존하되 F1 화면은 번호·머리말/꼬리말만 노출한다.
+
+| 직접 경로 | 최초 탭 | canonical | ko/en SEO·FAQ | sitemap·정적·소셜 |
+|---|---|---|---|---|
+| `/tools/pdf-editor/finish` | 페이지 번호 | `/finish` | 등록 | 등록 |
+| `/tools/pdf-editor/page-numbers` | 페이지 번호 | `/finish` | 등록 | 등록 |
+| `/tools/pdf-editor/header-footer` | 머리말/꼬리말 | `/finish` | 등록 | 등록 |
+
+빌드는 crawlable 정적 페이지 **67개**, startup recovery 문서 **113개**를 만들었고 3경로×2언어 소셜 PNG **6장**은 생성기로 만들었다. `docs/PUBLISHING_CHECKLIST.md`의 sitemap·canonical·Open Graph·FAQ 동반 갱신 항목과 대조했으며 체크리스트 자체의 정책 문안 변경은 필요하지 않았다. finish는 격리 경로가 아니므로 AppShell의 일반 광고 loader 조건을 그대로 상속한다. 전체 unit의 repo-wide 실행 파일 광고 문자열 최소 허용목록과 production utility 양성 대조가 통과했고 격리 경계 코드는 바꾸지 않았다.
+
+**화면·엔진 계약** — 한 PDF 업로드 뒤 두 탭에서 공통 템플릿, 6영역, 글자 크기·색·여백, 시작 번호·시작 쪽·표지 제외, 범위·홀짝을 편집한다. 범위와 썸네일 체크는 U4-1의 물리 페이지 exact set을 양방향으로 공유하고 하한 밖 페이지는 비활성화한다. 우측 PDF.js canvas 위에는 첫 선택 페이지의 텍스트 오버레이와 근사 안내를 표시하며, 이 미리보기는 최종 임베드 글꼴·정확 줄바꿈의 렌더 oracle이 아니다. 실제 출력은 별도 엔진의 U4-1 text layout과 geometry를 사용한다.
+
+엔진은 메인 스레드에서 파일을 concurrency 1로 처리한다. 배치 시작 시 clock을 한 번 캡처하고 `{page}`·`{pages}`·`{filename}`·locale `{date}`·허용 date format을 단일 pass로 확장한 뒤 전처리/coverage와 다중 줄 overflow를 판정한다. ASCII/Latin-1 범위는 Helvetica, 그 밖은 고정 전체 Noto OTF **4,644,748B / SHA-256 `69975a0a…8d68`**를 배치당 한 번 fetch·size/hash 검증하고 문서당 한 번 `subset:false`로 임베드한다. 회전 0/90/180/270, 비영점 CropBox와 UserUnit을 PDF.js transform 동형으로 역변환해 6영역 anchor에 upright 텍스트를 그린다. 보호 문서는 행동 중심 ko/en 오류로 수렴하고 알 수 없는 파서 예외는 일반 읽기 오류로 치환한다.
+
+공용 `pdfFontEmbed` 청크는 PDF finish와 QR Studio가 함께 소유하며 document 생성·표준/커스텀 폰트 임베드만 담당한다. QR은 기존 subset/full 선택과 폰트 fallback을 유지한다. 각 파일 load 전후, 폰트 fetch/검증 전후, 페이지 반복마다 `yieldToEventLoop` 뒤, save 전후와 결과 등록 전 `yieldBeforeResultRegistration`에서 abort를 재검사한다. 동기 `pdf-lib` 호출 한가운데 즉시 중단은 보장하지 않는다는 안내를 ko/en에 명시했고 취소 결과는 stale download로 등록하지 않는다.
+
+**하네스·실측** — 전용 스모크는 3경로×2언어×desktop/mobile **12 직접 진입**, 실제 `PdfFinishPanel` 청크 404 1회 주입 뒤 문서 요청 정확히 2회(자동 reload 1회)와 guard 정리, SPA organize→finish와 탭 URL 불변, 320/390/820/821px navigation, 필드/빈 선택 차단, 범위↔썸네일, 회전+CropBox 출력, PDF.js·Poppler 텍스트, 취소 뒤 stale 결과 0·재시도를 검증한다. 캡처는 `/tmp/worklazy-u4-3/shots/`에 12장 있다. 신규 시각 상태는 두 탭 full profile **16장**과 navigation 시작/활성/끝×ko/en×390/320 **12장**, 합계 **28장**이다. 다섯 탭으로 폭이 바뀐 기존 PDF 기준선은 생성기로 갱신했다.
+
+첫 전체 시각 실행은 신규 28장은 통과했으나 의도된 다섯 탭 변화 때문에 기존 PDF 빈 화면 4장이 0.1710~0.2807% 차이로 실패했다. diff가 navigation에만 있음을 확인하고 `VISUAL_ONLY=pdf-editor-empty UPDATE_VISUAL_BASELINES=1` 생성기를 쓴 뒤 전체 **203/203**을 재통과했다. 최종 지시 로케일별 재검증도 `ko_KR.UTF-8` **203/203, 7분 25.69초**, `en_US.UTF-8` **203/203, 7분 17.76초**다. 접근성은 11페이지 위반 **0**이며 finish ko desktop/mobile/en의 axe pass가 각각 **42/44/42**다. rendering은 6대상×3회·외부 요청 0, 기존 3대상 CLS 0, 세 finish 경로 최대 CLS가 모두 **0.0001480365514755249**로 상한 0.1을 통과했다. 신규 등록 과정에서 실행 기본 상한을 0으로 잘못 낮춘 첫 측정은 이 미세 shift를 차단했다. 단위 계약은 계속 0.1이었으므로 실행값을 정본대로 복구한 뒤 재측정해 통과했다.
+
+| 번들 지표(gzip) | U4-0 대비 순증분 | 고정 상한 | 판정 |
+|---|---:|---:|---|
+| entry JS | +4,211B | +20,480B | 통과 |
+| affected PDF route JS | +11,509B | +61,440B | 통과 |
+| shared JS | +2,081B | +30,720B | 통과 |
+| app JS | +18,274B | +81,920B | 통과 |
+| CSS | +82B | +10,240B | 통과 |
+
+override·배수 변경은 0이다. 공용화로 QR route에서 shared로 옮겨간 **509,380B**는 모듈 귀속 이동으로 분리됐으며 순증분에 넣지 않았다. production 청크는 `PdfFinishPanel` **26.78kB / gzip 10.00kB**, `pdfFontEmbed` **1,149.25kB / gzip 509.31kB**, QR PDF adapter **1.78kB / gzip 0.93kB**로 분리됐다. 원보고서는 `/tmp/worklazy-u4-3/bundle-u4-3.json`이다.
+
+| 검증 | 최종 결과 |
+|---|---|
+| `npx tsc -b` · `npm run test:unit` | 진단 0; **297/297**, fail·skip 0 |
+| 4GiB `npm run build` · `npm run test:static` | 2,844 modules·정적 67페이지; startup 113, 통과 |
+| `npm run test:pdf-finish` | 12 진입+실제 청크 404/1회 reload+출력+취소/재시도 통과 |
+| `TEST_SCOPE=pdf npm run test:browser` · 전체 browser | 기존 PDF 4모드 / Excel·Word·PDF·shared UI 통과 |
+| new-tools · utilities · office | HWP·Image·Audio·Video 및 ko/en 유틸리티·Office 통과 |
+| QR bulk · QR font render | 4 폰트 시나리오·취소·404 통과; 3 fixture Poppler changed pixels **0**, PDF.js text 동일 |
+| recovery · legacy oracle | **147 cases**; client 3·structure 4·render 32·output 4·input 1, 총 diff **0** |
+| Excel Cleaner · Compare | 취소/재실행·보고서·모바일 포함 통과 |
+| 두 `LANG` 전체 visual | 각각 **203/203**, 위 시간으로 통과 |
+| local-QA build · a11y · rendering | 정적 67; 11페이지 위반 0; finish CLS max 0.000148, 외부 요청 0 |
+| bundle · CSS · legacy · registry | 5종 상한 통과; orphan 0; 155 rules/153 removed/0 split/2 active; 도구 **20** 불변 |
+| selector·광역 금지·공백 | `.pdf-tool-navigation a:nth-child` 0; 광고 allowlist 통과; `git diff --check` 통과 |
+
+반복 경고는 제품 실패와 구분한다. Node PDF.js의 `standardFontDataUrl` 경고 2회와 QR Poppler의 기존 OTF font-type 경고가 있었지만 finish 텍스트 oracle과 QR 3 fixture 픽셀/PDF.js oracle은 통과했다. new-tools의 Dolby Vision base-layer는 이 Chrome에 호환 경로가 없어 기존 계약대로 skip했고 결정적 capability unit·fallback 안내는 통과했다.
+
+**광역 비노출 검사** — 실행 가능 확장자의 저장소 전체 재귀 검색으로 raw exception 후보와 광고 문자열을 확인했다. 이번 runtime diff에서 새 `.message` 참조의 최소 허용목록은 정확히 둘이다: `PdfFinishPanel.tsx`는 세 개의 message-catalog 현지화 문자열과 일치할 때만 표시하고 나머지는 일반 오류로 치환하며, `finish/engine.ts`는 암호/권한 오류 분류 정규식에만 쓰고 cause를 화면에 넘기지 않는다. 내부 오류 code·fontkit/pdf-lib/AbortError 명칭은 사용자 문구에 없다. 광고 문자열은 전체 unit의 고정 repo-wide allowlist와 일치했다.
+
+**범위 밖 발견** — 정본은 F1의 초기 템플릿·초기 위치·글자 크기·여백·색, 미리보기 불투명도, 결과 파일 접미사를 지정하지 않았다. 동작 가능한 form을 위해 현행 구현은 비계약 UI 초기값으로 번호 `{page} / {pages}`·아래 가운데, 머리말 `{filename} · {date}`·위 가운데, 10pt·24pt·`#34343a`, 미리보기 0.9, `-finished.pdf`를 사용한다. 이 값들은 후속 정본 결정으로 확정된 정책이라고 간주하지 않으며 Claude 판정 대상이다. F2 워터마크·F3 도장·F4 정리/래스터·다중 결과 ZIP은 명시 제외대로 구현하지 않았다. — Codx
+
+### U4-2 fix-1 — terminal 확정 오류 불변 (Codx)
+
+**F1 원인·수리** — astra의 같은-turn 반례 4개를 수용했다. 공용 `runModuleWorker`는 terminal을 한 번만 수락했지만 PDF facade가 그 guard 밖의 `envelopeError`를 무조건 갱신해 promise rejection handler가 실행되기 전 늦은 error의 `LATE/LATE_CODE`를 읽을 수 있었다. PDF 소유 adapter의 `terminate()`가 자체 종료 상태를 원 Worker 종료보다 먼저 확정하고 원 `message`/`error` callback을 해제하며, 이후 callback은 외부 상태 갱신과 lifecycle 전달을 모두 거부하도록 고쳤다. 최초 수락한 PDF error envelope는 message/code 값만 복사해 고정하므로 abort와 시작 실패는 다른 envelope로 새 Error가 되지 않는다. 공용 `src/utils/workerLifecycle.ts`, Excel 두 기능, 기존 4모드 UI·문구는 바꾸지 않았다.
+
+**회귀 경계** — unit에 다음 같은-turn 반례 4개를 각각 추가해 최초 오류의 name·message·code, terminate 1회, abort listener 0을 단언했다: `abort → late error`, `error → late error`, `error event → late error`, `postMessage throw → late error`. 기존 `result → late error`를 보존했고, 다음 task에서 늦은 error가 오는 abort 대조군도 추가했다. 전용 unit은 기존 17개에서 **22/22**, 전체 unit은 기존 289개에서 **294/294**다. astra 원본 `/tmp/worklazy-u4-2-review/probes/lifecycle.mjs`는 수정하지 않고 고정 `current` 사본의 제품 source만 현행 워킹트리로 갱신해 실행했으며 **49 PASS/0 FAIL**이었다. E3의 11개 lifecycle 검사 중 timeout 1개는 facade가 timeout 인자를 공개해서가 아니라 변경하지 않은 **공용 helper**를 직접 검사한 것이다.
+
+**생성물·번들 문안 정정** — U4-2 검수에서 current와 main/previous의 production SHA가 달랐던 파일 158개 중 156개는 PDF preload가 기존 `workerLifecycle` 청크를 새로 참조하면서 자산명이 정적 페이지까지 전파된 참조 해시 변경이었다. 나머지는 PDF 본체와 entry preload이며, 이를 “PDF 청크 외 SHA 동일”로 확대하지 않는다. fix-1의 47c0f22 대비 5종 변화는 entry **−18B**, PDF route **+46B**, shared **−17B**, app **+7B**, CSS **0B**다. main 기준 delta는 각각 **0B/+804B/+20B/+874B/0B**로 고정 상한 안이다.
+
+| 검증 | 실제 결과 |
+|---|---|
+| `npx tsc -b` | exit 0, 진단 0 |
+| `npm run test:unit` | **294/294**, fail·skip 0 |
+| astra 원본 `probes/lifecycle.mjs` | **49/49**, 네 terminal 반례와 다음-task 대조군 PASS |
+| 4GiB 직렬 `npm run build` · `npm run test:static` | 2,837 modules·정적 61페이지; startup recovery 104, 모두 exit 0 |
+| `TEST_SCOPE=pdf npm run test:browser` | 기존 PDF edit/range split/conversion 통과 |
+| `npm run test:excel-cleaner` · `npm run test:excel-compare` | cancellation/re-run 및 cancellation 포함 모두 통과 |
+| `npm run fixtures:pdf-legacy-oracle` | client 3·structure 4·render 32·output 4·input 1, **총 diff 0** |
+| `npm run bundle:measure` | 5종 전부 한도 내 |
+| 금지 표면·공백 | 공용 helper·Excel diff 0; `git diff --check` exit 0 |
+
+첫 전용 unit의 다음-task 대조군은 rejection 관찰을 타이머 뒤에 붙여 Node의 unhandled-rejection 감시에 1회 실패했고, 관찰을 즉시 등록하도록 테스트 순서만 바로잡은 뒤 22/22를 얻었다. 첫 PDF 브라우저 스모크도 preview 미기동으로 `ERR_CONNECTION_REFUSED`였으며 production preview를 명시적으로 띄운 같은 명령은 통과했다. 두 실패 원로그와 최종 로그, bundle JSON, legacy oracle은 `/tmp/worklazy-u4-2-fix1/`에 함께 보존한다. UI·번역·SEO·정적 페이지 내용·광고 격리 경로에는 변경이 없다. — Codx
+
+### U4-2(F0b) PDF worker lifecycle facade·협력적 취소 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 확정 2·3·16·19와 D5·V3-4, round 3·5·6 증거 및 U4-0/U4-1 기록을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=f56dc68d4c53d58cad520fe41973cd2699a4f548`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 이번 표면의 충돌은 없었다. 로드맵 끝의 `브랜치 최종 3672fc7/main 5485fad` 문장은 바로 앞 U4-1 기록·실제 ref·최신 dispatch와 모순되는 낡은 문구라 이번 기준으로 쓰지 않았다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML은 건드리지 않았고 main 병합·push·배포도 하지 않는다.
+
+**facade 계약** — `pdfWorkerLifecycle.ts`가 공용 `runModuleWorker`를 직접 소비하고 PDF 고유 envelope만 adapter 하나에서 변환한다. progress의 `message`는 공용 `phase`, 중첩 `error.message/code`는 공용 flat error로 넘긴 뒤 기존 `resolveFeatureMessage` 현지화와 result `warnings` 현지화를 PDF 소유 경계에서 복원한다. request·transfer 배열과 각 transferable의 identity는 복제하지 않으며 terminal은 공용 helper가 한 번만 수락하고 worker도 한 번만 종료한다. 생성·post·error-event 실패는 ko/en의 안전한 시작 오류로 수렴해 원시 예외를 사용자 메시지에 노출하지 않는다. `pdfWorkerClient.ts`의 PDF worker와 PDF Office worker 호출을 모두 facade로 이관했고 아래 공개 함수의 `signal`은 마지막 optional 인자다. 기존 호출자는 수정하지 않았으므로 미전달 4모드의 요청·출력·progress·warnings·오류 code·transfer 계약은 그대로다.
+
+| 호출 | signal 위치 | 추가 취소 경계 |
+|---|---|---|
+| `mergePdfPages`·`exportPdfGroups` | output options 뒤 마지막 | 각 source `arrayBuffer()` 전후, watermark 직전·직후, worker lifecycle |
+| `imagesToPdf` | output options 뒤 마지막 | 각 normalize/read 전후와 파일 loop 사이, watermark, worker lifecycle |
+| `textDocumentToOffice`·`combineOcrPdfPages` | language 뒤 마지막 | worker lifecycle |
+| `pdfToImageArchive`·`renderPdfPageAsJpeg` | 기존 인자 뒤 마지막 | load/getPage/render/blob·페이지 loop와 결과 등록 직전 |
+
+**협력적 취소·PDF.js 소유권** — 정본의 위치 기본값에 따라 `src/utils/cooperativeCancel.ts`에 `setTimeout(0)` task 양보, abort 검사, 결과 등록 전 양보 후 재검사를 두었다. 같은 12단계·단계당 약 3ms 반례에서 `await Promise.resolve()`는 타이머 abort를 받지 못해 **12/12 완료·aborted false**, task 양보는 첫 단계 뒤 abort를 받아 **1/12 완료·aborted true**였다. 이는 동기 단위 한가운데의 즉시 중단을 보장하지 않고 명시 검사점 사이에서만 협력적으로 멈춘다. 결과 등록 시험은 이전 결과만 남기고 새 결과를 등록하지 않음을 단언한다.
+
+`pdfRenderLifecycle.ts`는 abort 시 `renderTask.cancel()` → `renderTask.promise` rejection 정착 → `page.cleanup()` → 소유 문서일 때만 `loadingTask.destroy()` 순서를 고정한다. `RenderingCancelledException`만 취소 정착으로 삼고 예상 밖 오류는 cleanup/destroy 뒤 다시 던진다. unit의 소유 문서 로그는 정확히 `cancel, settled, cleanup, destroy`, 공유 preview 문서는 `cancel, settled, cleanup`이며 destroy가 없었다. 현재 preview는 공유 문서만 사용하므로 ownership을 주장하지 않는다.
+
+**legacy·Excel 불변 증명** — U4-0 baseline을 덮어쓰는 대신 현재 source를 `/tmp`에 별도 재채취하는 driver를 추가했다. baseline capture 원본의 기본 동작·단언은 유지하고, 별도 output/current-source 환경은 `/tmp` 하위만 허용한다. 기존 unit의 “현재 client blob이 main과 동일” 단언은 필수 facade 이관과 양립할 수 없어 baseline manifest의 client·worker SHA가 실제 main blob과 일치함을 직접 검증하고, 현재 client 동작은 아래 byte oracle 비교가 맡도록 경계를 바로잡았다.
+
+| 불변 표면 | 실제 결과 |
+|---|---|
+| legacy client oracle | 3파일, diff **0** |
+| legacy structure oracle | 4파일, diff **0** |
+| legacy render oracle | 32파일, diff **0** |
+| legacy output/input oracle | 4파일/1파일, diff **0**; 총 diff **0** |
+| PDF 4모드 | `TEST_SCOPE=pdf npm run test:browser` 통과; 전체 browser의 Word·Excel·PDF와 shared UI도 통과 |
+| Excel 회귀 | cleaner의 취소·재실행·입력 불변, compare의 취소·보고서·모바일 모두 통과 |
+| 금지 파일 | `workerLifecycle.ts`·두 Excel client diff 0; blob SHA는 각각 `a6406c8…`, `48ccc95…`, `ae130ad…`로 착수 시와 동일 |
+
+**unit·번들·제품 영향** — facade V3-4는 ko/en 성공·progress·warning·result/transfer identity 2건, ko/en 중첩 error 현지화·code 2건, pre-abort, abort 뒤 늦은 result, timeout, post 예외, 중복 terminal, error event, 생성 예외의 **11개 lifecycle 시나리오**를 고정했다. file read 전/후, task 양보 반례, 결과 등록, PDF.js 소유/공유/AbortSignal을 더해 전용 파일은 **17/17**, 전체 unit은 **289/289**다. 테스트가 extensionless transitive TS import를 native strip만으로 해석하지 못한 것은 U4-1에 이미 기록된 Node 실행 경계이므로 제품 import나 검수 probe를 바꾸지 않고 테스트 전용 esbuild bundle로 실제 facade/client를 로드했다. 새 의존성은 없다.
+
+U4-0 production baseline 대비 `pdf-editor` 선택 route의 번들 5종은 entry **+18B**(20,480B 한도), affected route **+758B**(61,440B), shared **+37B**(30,720B), app **+867B**(81,920B), CSS **0B**(10,240B)로 모두 통과했다. UI·route·기존 ko/en 문구·SEO·정적 페이지·광고 배치/격리 경로는 바꾸지 않았고 취소 버튼도 추가하지 않았다. signal 미전달 화면의 변화가 없으므로 전체 시각 회귀 대신 지시된 rendering 3페이지를 사용했다.
+
+**완료 기준 검증** — 아래 명령을 실제 실행했다. 첫 production rendering은 CLS가 모두 0이었지만 production에 의도된 분석 요청 126건 때문에 외부 요청 게이트가 exit 1이었다. `VITE_LOCAL_QA=1` 직렬 빌드 후 같은 검사를 다시 실행해 3페이지×3회, 외부 요청 0, home/document-compare/pdf-editor CLS 모두 0으로 통과했다. 이는 제품 회귀가 아니라 추적 없는 QA 렌더링의 요구 환경 차이다.
+
+QA 뒤 production `dist` 복원 시 앞서 통과한 것과 같은 4GiB 명령을 두 번 더 실행했으나, host 가용 3.1~3.4GiB·swap 4GiB 소진 상태에서 transform/chunk rendering 중 OS가 각각 exit 137로 종료했다. `--optimize-for-size`를 `NODE_OPTIONS`에 넣는 시도는 Node가 허용하지 않아 빌드 시작 전 exit 9였다. 완료 기준의 4GiB production 성공을 이 실패로 대체하지 않고, 복원만 `GOMAXPROCS=1 NODE_OPTIONS=--max-old-space-size=3072 npm run build`로 실행해 2,837 modules·정적 61페이지를 통과시켰다. 복원 `dist`의 번들 보고 대상 **81파일 SHA가 앞서 성공한 production bundle 측정과 81/81 동일**했고 static startup recovery 104도 다시 통과했다.
+
+| 명령 | 실제 결과 |
+|---|---|
+| `npx tsc -b --pretty false` | exit 0, 진단 0 |
+| `npm run test:unit` | **289/289**, 실패·skip 0 |
+| `npm run fixtures:pdf-legacy-oracle` | client 3·structure 4·render 32·output 4·input 1, 총 diff **0** |
+| `NODE_OPTIONS=--max-old-space-size=4096 npm run build` | production 2,837 modules·정적 61페이지 통과 |
+| 최종 production 복원 build / 번들 SHA 대조 | 3GiB·esbuild 병렬도 1로 통과; production 측정 81파일과 mismatch 0 |
+| `npm run test:static` | 정적 61페이지·startup recovery 104 통과 |
+| `TEST_SCOPE=pdf npm run test:browser` / 전체 `test:browser` | PDF 4모드 / Excel·Word·PDF·shared UI 통과 |
+| `npm run test:excel-cleaner` / `npm run test:excel-compare` | 양쪽 모두 취소 경로 포함 통과 |
+| `npm run test:new-tools` | HWP·Image·Audio·Video 통과 |
+| QA `npm run test:rendering` | 3×3, 외부 요청 0, CLS max 0 |
+| `npm run bundle:measure` | U4-0 baseline 대비 5종 한도 내 통과 |
+| `npm run css:orphans` | 212 class tokens, zero-reference selector arm 0 |
+| `git diff --check` | 공백 오류 0 |
+
+**범위 밖 발견** — 정본이 허용한 기본 위치에 공용 취소 helper를 둔 결정, 필수 client refactor와 충돌하던 legacy fixture test의 책임 분리, test-only TS resolver 우회는 위에 근거와 함께 기록했다. stale 로드맵 ref 외에 새 정책 판단이나 미해결 범위 밖 제품 결함은 없었다. 명령·oracle·bundle·rendering 산출은 `/tmp/worklazy-u4-2/`와 `/tmp/worklazytools-rendering-baseline.json`에 보존한다. — Codx
+
+### U4-1(F0a) PDF finish 순수 정책 모듈 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·범위** — 첫 행동으로 `PROJECT_RULES.md` 전문을 읽고 `AGENTS.md`, 지정 dispatch, PDF finish 정본의 확정 1·7·8·9·10·12·18·21·22·24 및 D2·D3·D7·D8·N1·N2·N3, round probe 원자료와 U4-0 기록을 확인했다. 시작점은 `s3-pdf-finish`의 `HEAD=5ee9b1a4af1e5611cee8f86ba3f177801225dc97`, `main=5bc6854175331bdd73b267784d9633cdccda8446`였고 열린 계획서와 같은 표면의 충돌은 없었다. 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML은 건드리지 않았다. 제품 변경은 `src/features/pdf-editor/finish/**`의 순수 TypeScript에 한정하고, U4-0 test helper는 그 제품 preflight를 import하는 단일 경계로 바꿨다. React·UI·route·locale·registry·worker·기존 4모드·pdf-lib 그리기 호출은 변경하지 않았으며 main 병합·push·배포도 하지 않는다.
+
+**astra fix-1 착수 게이트** — 검수 기준 `s3-pdf-finish` `HEAD=fd37ceab057ced2941fb752b2511124dbeaafda4`, `main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`와 dispatch가 일치했고 추적 변경은 없었다. 로드맵 진행 기록 끝의 `브랜치 최종 3672fc7/main 5485fad` 문장은 바로 앞 U4-1 진행 기록·실제 ref·최신 사용자 지시와 모순되는 낡은 문구라 최신 fix dispatch의 기준으로 대체했다. 열린 계획서에서 같은 finish 순수 모듈 표면의 상반 지시는 없었고 사용자 미추적 3파일을 계속 제외했다. UI·route·ko/en 문구·SEO·정적 페이지·광고 배치/격리 경로 영향은 없으며 test 실행 스크립트 한 줄만 명시 범위로 수정했다.
+
+**astra fix-2 착수 게이트** — 재검수 기준 `s3-pdf-finish` `HEAD=ba762b4b1cf38b13bef3013aa465e59e33eb9146`와 dispatch가 정확히 일치했다. 열린 계획서는 이번 unit·기록 보강과 충돌하지 않았고 기존 사용자 미추적 3파일을 계속 보존했다. 재검수 `/tmp/worklazy-u4-1-review2/`의 `REPORT.md`·`UNIT-MAPPING.md`·7개 변이와 독립 probe를 대조해, 정상 제품 계산이 아니라 커밋된 회귀 단언만 보강했다. 변경은 `tests/unit/pdf-finish-modules.test.ts`와 이 기록뿐이며 `src/`·UI·route·ko/en·SEO·정적 페이지·광고 경로·의존성 영향은 0이다.
+
+| 모듈 | export 계약·정본 대응 | 고정한 핵심 골든 |
+|---|---|---|
+| `geometry.ts` | PDF.js viewport transform 역변환, 상/하×좌/중/우 앵커, upright 회전; E5·확정 21 | 비영점 CropBox의 회전 4종과 실제 PDF.js 혼합 visual 크기 4쪽에서 여백 포함 중앙 앵커까지 24좌표 리터럴 |
+| `selection.ts` | 파일별 물리 exact set, range parse/canonical, parity, 하한·anchor·표시 번호·토글; 확정 7·9·24, D2, N1 | `2-8 + even`에서 3쪽 토글 → `{2,3,4,6,8}`·`2-4,6,8`; startPage 4+표지 제외에서 2·3쪽 disabled·`[4,6,8]`·disabled 토글 객체 동일; 표지 제외 빈 set 실행 불가 |
+| `tokens.ts` | 1회 clock/locale 캡처, 단일 pass 토큰 치환, date whitelist parser; 확정 7·10·24, N3 v8 | date 허용 5·오류 4·보충 14 전수, ko/en 로컬 날짜, 치환된 파일명 속 토큰 재해석 0, unknown 리터럴+경고 |
+| `text.ts` | 토큰→개행→TAB→제어문자→LF 분리, 후보 전체 glyph coverage, 문서당 단일 폰트, scalar 위치, 6영역 overflow; 확정 1·21, D8, N3 | E6-2 전처리·coverage 10입력 전수, `H:Русский→H:ASCII→N` 호출 순서, 6영역 두 줄 x/y·14.4pt 간격, `80A/B/C`의 50×10 0줄+두 경고와 50×28.8 두 run text/width/y 리터럴 |
+| `tiles.ts` | gap·offset·rotation 배치와 생성 전 불변 400 상한; N3 | 공개 `maximumTiles` 타입 키 0, 400 생성 400회, 420과 완화 시도 모두 생성 0회, gap 1은 361회; 20×20에서 offset 5/5·rotation 30의 네 좌표 리터럴 |
+| `canvasPolicy.ts` | A의 ceil·면적·RGBA·4096 한 변/면적 검사와 300→200→150 하향, B 지표만 산출, 계수 주입 경고, 200MiB 등록 전 검사; 확정 18, D3 v6~v9 | 실제 PDF.js rotation/UserUnit 12행, 요청 300의 attempts `[300,200,150]`·applied 150, 100×100의 독립 maxArea 초과, 4096² 허용·4096.01 한 변 거부; 동시 raw ledger 1,200B/2장 peak |
+| `stamp.ts` | CSS 상대 좌표→viewport→주입 `convertToPdfPoint`, `{cx,cy,rw,aspect}`, 균등 축소 후 중심 clamp; 확정 8·22, D7, N2 | 실제 legacy PDF.js fixture에서 DPR 1/2×CSS 1/0.5×회전 4의 독립 16조합과 리터럴 좌표 4개, 혼합 크기·clamp; (10,20,30,40) 주입 변환의 네 PDF corner 좌표 |
+| `plan.ts` | 부작용 없는 1-based 복합 실행 계획; 확정 12 | 구조/양식→background→원문→foreground→번호·머리말→도장→raster |
+| `preflight.ts` | U4-0 OCG classifier의 제품 단일 구현과 내부 사유 코드; D4 v13·U4-0 fixture | helper는 정적 re-export 한 줄, native strip에서 제품 export identity, OCG 87종 허용 56·제외 31과 두 renderer SHA 56 |
+
+**검증 출처 정합** — 세 실행을 구분한다. 원구현 `fd37ceab`의 `/tmp/worklazy-u4-1/unit.log`는 **271/271, finish 12/12**이며 같은 경로에 원출력이 있다. fix-1 `ba762b4b`는 `/tmp/worklazy-u4-1-fix1/REPORT.md`에 **272/272, finish 13/13**으로 보고됐지만 그 디렉터리에는 `REPORT.md`·`bundle.json`만 있어 당시 unit 원로그는 보존됐다고 주장하지 않는다. 대신 astra가 같은 `ba762b4b` 사본을 `/tmp/worklazy-u4-1-review2/unit.log`에서 **272/272, finish 13/13**으로 독립 재현했다. 이번 fix-2는 아래 명령의 cwd·환경·exit를 `/tmp/worklazy-u4-1-fix2/commands.json`, 원출력을 `/tmp/worklazy-u4-1-fix2/logs/`, 변이별 unit/probe를 `/tmp/worklazy-u4-1-fix2/mutants/`에 보존했다.
+
+| 명령 | 실제 결과 |
+|---|---|
+| `NODE_OPTIONS=--max-old-space-size=4096 TMPDIR=/tmp/worklazy-u4-1-fix2/tmp npx tsc -b --pretty false` | exit 0, 진단 0 |
+| 같은 환경의 `npm run test:unit` | exit 0, 전체 **272/272**, finish **13/13**, 실패·skip 0 |
+| `python3 /tmp/worklazy-u4-1-fix2/mutation-audit.py` | wrapper exit 0; 7변이 각각 unit **exit 1, 12 pass/1 fail**, 정상/변이 독립 probe는 각각 exit 0/1 |
+| `git diff --stat ba762b4b1cf38b13bef3013aa465e59e33eb9146` · `git diff --name-only … -- src` · `git diff --check` | 변경은 unit·이 기록 2파일뿐, `src/` diff 0, 공백 오류 0 |
+
+제품 코드 diff가 0인 회귀 단언·기록 전용 수정이므로 build·bundle·oracle·브라우저 스모크는 생략했다. fix-1 제품 코드에 대한 해당 검증 결과는 위 astra 재검수 `/tmp/worklazy-u4-1-review2/`에 보존돼 있으며, 이번 변경은 그 실행 결과를 제품 검증으로 재귀속하지 않는다.
+
+**astra F1~F5 판정·fix-1** — F1 공개 `maximumTiles`는 정본에 없는 상한 완화 정책이었으므로 “정본 미정의 정책 없음”이라는 앞선 문구를 철회하고 입력 타입·런타임 경로에서 제거했다. F2는 ellipsis 유효 폭 계산 직후 줄 길이와 무관하게 영역 폭을 검사한다. F3은 raw ledger entry를 “한 시점의 동시 생존 자원 목록”으로 고정하고 각 자원의 pixels·RGBA bytes·장수를 합산한 시점 합계의 최대만 peak로 삼는다. 문서 누적 pixels/raw bytes는 작업량 지표이며 peak나 차단 판정에 쓰지 않는다. F4는 전용 `register` loader를 제거해 helper를 정적 re-export 한 줄로 만들고 package script에서 native strip을 소유하게 했다. F5는 `UNIT-MAPPING.md` 누락 중 실제 PDF.js fixture·전처리 표·ledger·타일 생성 계측 등을 보강했으나, 재검수 변이 7종이 당시 13/13을 통과해 회귀 단언 전체 보강이라는 기록은 철회한다.
+
+**astra F5-R·fix-2** — 150DPI 성공 거부·maxArea 무시·startPage disabled 무시·비영점 타일 offset 무시·text y=0·stamp corner=0·Noto coverage 조기 호출의 7개 한 식 변이를 각각 실패시키는 독립 리터럴 단언을 추가했다. 조정한 mutation audit는 입력 `head`를 고정 검수 사본에서 현재 워킹트리로 바꾸고, 과거 “7개 생존(exit 0)” 기대를 “7개 모두 unit exit 비영(0 아님)”으로 뒤집었으며 제품 변경 식과 독립 probe는 그대로 유지했다. 7개 모두 12 pass/1 fail이어서 F5-R을 해소했고 정상 unit은 13/13이다.
+
+감사 명령 `node --experimental-strip-types /tmp/worklazy-u4-1-review/defects.mjs`는 스크립트가 현재 저장소가 아니라 자체 고정 사본 `/tmp/worklazy-u4-1-review/head`(`fd37cea`)을 import하므로 수정 뒤에도 옛 결함 4개와 `REPRODUCED`를 그대로 출력했다. 감사 사본을 훼손하지 않고 현재 워킹트리를 직접 import한 동치 probe를 별도로 실행해 420 입력 생성 0회·고정 상한 400, 긴/짧은/빈 줄 `narrow-region`, raw ledger `1,200B/2장`, helper/product export identity를 모두 확인했다. 원 loader를 손수 parser로 보는 우려는 Node 공식 API였다는 astra 기각을 유지하되, transitive `.ts` 의존을 놓치는 구성 결함 때문에 제거했다. 이 수정에서 새 정본 미정의 정책·UI 연결·실행 엔진은 추가하지 않았다. fix-1의 요약은 `/tmp/worklazy-u4-1-fix1/REPORT.md`, fix-2의 명령 원출력과 변이 결과는 `/tmp/worklazy-u4-1-fix2/`에 보존한다. — Codx
+
+### U4-0(F-fix) PDF finish fixture·oracle·번들 귀속 — 브랜치 구현·검증 (Codx)
+
+**착수 게이트·범위** — `PROJECT_RULES.md`를 첫 행동으로 전문 확인한 뒤 디스패치, `AGENTS.md`, 정본 `docs/jobs/todo/pdf-finish-20260905.md`의 「정본화」 우선순위, 로드맵 C-A~C-D·결정 11, 관련 기각 이력을 읽었다. 시작점은 `HEAD=main=origin/main=5bc6854175331bdd73b267784d9633cdccda8446`, 추적 변경 0이었다. 열린 계획서와 충돌이 없고 사용자 미추적 `after.docx`·`before.docx`·네이버 확인 HTML 3개가 있음을 확인한 뒤 `s3-pdf-finish`를 새로 분기했다. 제품 `src/`·UI·문구·번역·SEO·광고 경로는 바꾸지 않았고 main 병합·push·배포는 하지 않는다.
+
+**번들 모듈 귀속 schema v2** — 측정 전용 Vite 플러그인이 main 청크의 `chunk.modules[id].code`를 수집해 각 모듈의 독립 rendered gzip을 가중치로 삼는다. 청크 실제 gzip `G_c`를 `floor(G_c×w_i/Σw)`로 먼저 배분하고, 남은 1B는 나머지 내림차순·canonical id의 로케일 비의존 코드포인트 순으로 주어 `Σ contribution=G_c`를 보장한다. canonical id는 `main`/worker realm, `<node_modules>` 패키지 경로, virtual NUL prefix, query를 보존한다. 이전 기여는 같은 category 잔존분부터 대응하고 나머지는 `min(previousRemaining,currentNeed)`만 이동으로 1회 대응한다. category net은 `gross-movedIn+movedOut`, 모든 category net 합은 실제 app delta다. shared·app은 net, entry·선택 route·CSS는 gross로 게이트한다. 전체 JS inventory와 realm을 보고서에 따로 보존하고 main 58청크는 전부 modules metadata·중복 없음·양의 가중치를 요구한다. worker 21개와 public 1개만 각각 후속 worker 계측·Rollup main graph 부재를 근거로 SHA opaque를 허용한다. 구 schema, inventory 부재, main metadata 빈 배열·부분 누락은 SHA 폴백 없이 양쪽 보고서에서 오류다. 기존 5종 상한·multiplier·override는 바꾸지 않았다.
+
+| 지표 | main production baseline | 최종 측정 | delta | 고정 상한 |
+|---|---:|---:|---:|---:|
+| entry JS gzip | 299,287B | 299,287B | 0B | +20,480B |
+| 선택 PDF route JS gzip | 171,864B | 171,864B | 0B | +61,440B |
+| shared JS gzip(net gate) | 2,716,473B | 2,716,473B | 0B | +30,720B |
+| app JS gzip(net gate) | 5,466,587B | 5,466,587B | 0B | +81,920B |
+| CSS gzip | 37,687B | 37,687B | 0B | +10,240B |
+
+기준선은 같은 제품 `src`에서 inventory를 포함해 재생성한 `/tmp/s3-bundle-baseline.json`, 최종 보고는 `/tmp/worklazy-u4-0-fix1/bundle-current.json`이다. 둘 다 `schemaVersion=2`, `moduleAttributionSchema=independent-rendered-gzip-largest-remainder-v1-main-opaque-workers`, module chunk 58개·module record 1,012개·inventory main 58/worker 21/public 1이다. 기준 production `dist`의 포함 JS 80개·CSS 1개는 분기 전 main 산출물과 파일별 SHA가 전부 같았다. 최종 movement는 빈 배열, 모든 category gross/net과 app net은 0이다. unit은 이동만 있는 합성 입력의 shared net 0, 5개 상한 각각 limit 통과/+1B 실패, 구 schema와 main metadata 빈/부분 누락 양쪽 거부, en-US/sv-SE 동률 배분 동일을 단언한다.
+
+**결정적 fixture 생성기** — `scripts/generate-pdf-finish-fixtures.mjs`는 외부 패키지를 import하지 않고 Node `crypto`·`fs`·`path`·`url`·`zlib`만 사용한다. R2/RC4와 AES-256/R6는 고정 test key/salt로 직접 생성하고, raw PDF writer로 손상 3종·Contents 4종·위험 3종·제거 검증 1종·일반 Properties 2종을 만든다. exact-SHA가 계약인 OCG 87종은 r10~r12 원본을 SHA 대조해 만든 압축 snapshot seed에서 전개하며 전개 때 다시 검증한다. 두 독립 출력의 PDF 104개+manifest 1개 SHA 목록은 동일했고 그 목록 파일 SHA는 `ab261326…a207`이다. unit은 두 생성 결과와 tracked tree를 파일별로 대조한다. 전체 104개 fixture의 이름·SHA·기대값 정본은 `tests/fixtures/pdf-finish/manifest.json`, fixture 104행+legacy 7행 보고용 전개표는 `/tmp/worklazy-u4-0-fix1/fixture-table.json`(111행, SHA `73fb78da…58fb`)이다.
+
+| 암호 fixture | bytes · SHA-256 | 무암호/빈값 | 오답 | 정답·owner / permissions | finish 기대 |
+|---|---|---|---|---|---|
+| R2 open `/P=-4` | 897 · `c2c0980b…441425` | PasswordException 1 | 2 | OPEN / `[4,8,16,32,256,512,1024,2048]` | `permissions !== null`, 거부 |
+| R2 restricted `/P=-64` | 898 · `fab73fc6…d92b9` | OPEN | 2 | OPEN / `[256,512,1024,2048]` | 거부 |
+| R6 open `/P=-4` | 1,361 · `df27b107…25b56` | PasswordException 1 | 2 | OPEN / `[4,8,16,32,256,512,1024,2048]` | 거부 |
+| R6 restricted `/P=-3904` | 1,380 · `774e4b10…b694` | OPEN | 2 | OPEN / `[]` | 빈 배열도 거부 |
+
+| fixture 묶음 | 수·SHA/대표 | 기대 oracle |
+|---|---|---|
+| 손상 | truncated `4599115b…d12c`; xref-all-9 `223e9297…6f7`; malformed Contents `aecaaedf…ac3` | 각각 InvalidPDFException; OPEN 1쪽 recovery; OPEN 1쪽 + `Unknown command` 경고 |
+| 배경 stream | empty `4ead6f4d…f034`; single `39f68ee0…b13`; multiple `6a1ddd28…eb3f`; non-stream `a044d620…ffad` | 빈 배열 0 stream; 단일 ref 1; ref 배열 2; 비stream ref 0, 모두 PDF.js open |
+| 위험 | q/Q `35e86b59…fd30`; tagged `27d2a6ae…2730`; active action `fbde441c…642` | q 2/Q 1; MarkInfo+StructTreeRoot; OpenAction+Names.JavaScript+Launch |
+| 제거 검증 | 1종 5,202B `85ee6887…3136` | 첨부 sentinel·XMP, form/Widget, Outlines, Names(Dests·EmbeddedFiles·JavaScript), 구식 Dests, PageLabels, ViewerPreferences, URI/direct/named Link와 15개 subtype·Popup/IRT 관계 존재 |
+| 일반 Properties | named 585B `44d5d5c0…7097`; Resources 없음 420B `c7eae473…a529` | `/Span /TextInfo BDC`와 빈 페이지 모두 비-OC로 허용; 두 렌더러 SHA 각각 `04ce6cfb…101b`·`cdbf6c08…e33a` |
+| OCG | 허용 4·제외 31·직접 배열 32·대표 20 = 87 | exact input SHA; 전부 v13 preflight 기대, 허용 56개만 두 렌더러 픽셀 oracle |
+
+OCG 허용 4종은 `on=35cda479…83d90`, `xobject-off=06d11215…689a`, `xobject-on=9f495db7…1ed3`, `balanced-state=1b518232…cde9`다. 직접 배열은 위치 2(marked-content/form-xobject) × 정책 4 × 2그룹 상태 4 = 32, 대표는 duplicate/inheritance/image/indirect-name/escaped-name 축 20종이다. round 11 탐색 72개와 round 12 탐색 50개 축도 manifest에 보존했다. 제외 31개는 파일명/SHA allowlist가 아닌 OCProperties·OCMD 원시 문법, OFF block 상태, 금지 객체 경로, 도달 가능한 Type3 객체 그래프를 검사하는 test preflight로 전수 판정했으며 실제 허용 56/제외 31·불일치 0이다.
+
+**D4 재구축 보존/지원 제외표를 fixture 입력으로 고정** — 이번 단계는 제품 재구축을 구현하지 않고 다음 표를 fixture 구조·manifest 기대값으로 고정했다.
+
+| 구조 | 정본 결정·fixture 검증점 |
+|---|---|
+| 페이지 트리·Contents·Resources·Media/Crop/Rotate | 보존; background 4종과 legacy 회전/CropBox 입력 |
+| Outlines·Names/Dests·구식 Dests·PageLabels·ViewerPreferences | 새 page ref로 보존; removal fixture에 모두 존재 |
+| Info+XMP Metadata | 제거 선택 시 둘 다 제거, 미선택 보존; Info/XMP sentinel 포함 |
+| AcroForm·Widget | 미선택 보존, 제거/flatten 배타; form·Widget AP 포함, XFA·서명·AP 없음은 후속 지원 제외 |
+| EmbeddedFiles·EmbeddedFile·Filespec·AF·FileAttachment | 제거 선택 시 복사 전 필터, payload sentinel 부재까지 검사; fixture에는 catalog AF와 attachment가 있고 두 page에는 AF가 없음 |
+| Link URI·직접 Dest·이름 Dest | 보존·새 page map; 세 종류 모두 포함 |
+| Text·FreeText·Highlight·Ink·Stamp·Square/Circle·Line·Polygon·Caret·Popup·Redact 등 | 주석 제거 시 subtype별 제거, Popup/IRT/Parent 정리; 임의 annotation flatten은 지원하지 않음 |
+| OCProperties/OCG/OCMD | preflight 허용 OCG만 기본 표시를 고정해 구조 제거; 제외 OCG는 구조 제거 옵션을 비활성화하되 장식/raster는 허용 |
+| StructTreeRoot/ParentTree/MarkInfo | tagged 정보 제거는 OCG 지원 판정과 분리해 별도 손실 고지; tagged fixture로 고정 |
+| Sound/Movie/Screen/RichMedia/3D·알 수 없는 subtype·기타 Names | unsupported 사전 표시 후 제거; 조용한 삭제 금지 |
+| 최종 raster | 픽셀 보존 범위와 검색/태그/양식/링크 손실 명시, Link 재부착 없음 |
+
+**legacy-organize 3종 oracle** — exact main의 `pdfWorkerClient.ts`와 `pdf.worker.ts`가 기준 commit의 blob과 byte-identical임을 먼저 단언하고 `tests/fixtures/pdf-finish/legacy-oracle/`에 채취했다. 입력은 회전 0/90/180/270, 비영점 CropBox, 600×800/800×600 혼합 크기 4쪽이다. none/numbers/watermark/both 각 2회에서 output byte·PDF 구조가 같고 Poppler/PDF.js 각 16페이지의 2회 changed pixel은 모두 0이다. 출력은 각각 1,729B `f95081d4…61ff`, 2,766B `ebc4d35a…b4be`, 7,590B `6c671eb4…9507`, 7,990B `2089693b…024f`이며 r3 산출물과도 네 파일 모두 byte-identical이다. client PNG는 short 420×92 `480f0f9e…5c65`, wide 1800×92 `741931f9…d17`, surrogate 1800×92 `ed37b7e2…da1f`이고 r3와 동일하다. alpha 0.82(최대 209), UTF-16 120단위 slice를 실제 browser Canvas 호출로 기록했다.
+
+환경은 Linux 7.0.0-30-generic x64, Node 22.17.1, Chrome 152.0.7977.64, Poppler 24.02.0, pdf-lib 1.17.1, PDF.js 6.2.108, `system-ui=Noto Sans (/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf)`다. Poppler legacy baseline은 기본 150DPI에 `-scale-to 650`, PDF.js는 scale 1, 두 렌더 모두 흰 배경·unpremultiplied RGBA SHA-256이다.
+
+**두 렌더러 oracle·검증** — `npm run test:pdf-finish-oracle`은 먼저 OCG 87종 preflight와 허용 56종 57쪽의 원본 snapshot을 Poppler 72DPI·Chrome PDF.js scale 1로 각각 검증한다. 이어 허용 56개에만 12차 test 변환기를 실행해 각 renderer 안에서 원본=변환 결과 width/height/RGBA SHA 56/56, deep OC residual 0을 단언하고 제외 31개는 변환 시도 0을 단언한다. `on.pdf`의 변환 결과 Contents만 비운 음성 대조는 두 renderer 모두 차이를 검출했다. 일반 Properties·Resources 없음 2종도 비-OC 허용과 두 renderer SHA 동일을 확인한다. 같은 실행이 암호 20개 시나리오, 손상 기대표, Contents/위험 open, 제거 fixture의 catalog/attachment/outline/page label/annotation을 실제 API로 확인하며 외부 요청은 0이다.
+
+최초 U4-0 실행은 production `npm run build`, `npm run test:static`, 명시 `npx tsc -b`, 전체 unit **255/255**, schema v2 `npm run bundle:measure` 5종 PASS, tool registry **20**, CSS orphan **0**, legacy owner **155(153 removed·0 split·2 active)**, `TEST_SCOPE=pdf npm run test:browser`, fixture 독립 생성 2회, PDF finish 원본 oracle, QA build 뒤 rendering **3페이지×3회·CLS max 0·외부 요청 0**, `git diff --check`를 통과했다. 첫 browser 실행은 5173 서버 미기동으로 connection refused, dev 서버 첫 재실행은 Vite dependency optimize hot reload 뒤 convert 결과 대기 180초 timeout이었다. 이미 최적화된 동일 서버 재실행은 15.6초에 통과했다. 첫 rendering은 production 분석/광고 요청 126건을 검출했고 요구된 QA build로 재실행해 0건으로 통과했다. QA build 뒤 static은 분석 설정 부재를 감지했고 production build 복원 뒤 startup recovery 104개를 포함해 통과했다. 이 세 건은 제품 회귀 판정으로 세지 않는다.
+
+astra F1~F5 수정 후에는 `npx tsc -b`, 전체 unit **259/259**, fixture 2회 결정성, 확장 PDF oracle, schema v2 기준/현재 직렬 측정 5종 delta 0, 4차 E6 `shared +80B/app +13,264B`, production build, static startup recovery 104, 477입력 분류 불변, `src/` diff 0, `git diff --check`를 다시 통과했다. 수정 전/후 probe·원출력·JSON은 `/tmp/worklazy-u4-0-fix1/`에 보존한다. — Codx
 ## 2026-09-08
 
 ### Excel 중복키·머리글 S4 — 최종 통합 회귀 (Codx)

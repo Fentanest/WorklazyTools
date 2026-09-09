@@ -10,7 +10,10 @@ import { startRecoveryServer } from "./recovery-server.mjs";
 const output = path.resolve(process.env.RECOVERY_OUTPUT || "/tmp/worklazy-s0/recovery");
 await fs.mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-const server = await startRecoveryServer({ root: process.env.RECOVERY_DIST || "dist" });
+const server = await startRecoveryServer({
+  root: process.env.RECOVERY_DIST || "dist",
+  port: Number(process.env.RECOVERY_TEST_PORT || "0"),
+});
 const results = [];
 const profiles = process.env.RECOVERY_PROFILE ? [process.env.RECOVERY_PROFILE] : ["desktop", "android"];
 const only = process.env.RECOVERY_ONLY;

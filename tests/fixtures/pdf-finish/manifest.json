@@ -1,0 +1,5288 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/generate-pdf-finish-fixtures.mjs",
+  "deterministicInputs": "fixed test-only keys, salts, strings, object ordering, and canonical OCG snapshot bytes",
+  "counts": {
+    "total": 111,
+    "byCategory": {
+      "encrypted": 4,
+      "damage": 3,
+      "background": 4,
+      "risk": 3,
+      "removal": 1,
+      "appearance": 6,
+      "relationships": 1,
+      "ordinary": 2,
+      "ocg": 87
+    },
+    "ocg": {
+      "allowed": 4,
+      "excluded": 31,
+      "directArrayRegression": 32,
+      "representatives": 20,
+      "pixelOracle": 56
+    }
+  },
+  "passwords": {
+    "user": "open-secret",
+    "owner": "owner-secret",
+    "wrong": "incorrect"
+  },
+  "ocg": {
+    "exactShaRequired": true,
+    "pixelOracleCohorts": [
+      "allowed",
+      "direct-array-regression",
+      "representative"
+    ],
+    "preflightCohorts": [
+      "allowed",
+      "excluded",
+      "direct-array-regression",
+      "representative"
+    ],
+    "exploration": {
+      "directArrayAxes": {
+        "locations": [
+          "marked-content",
+          "form-xobject"
+        ],
+        "policies": [
+          "AnyOn",
+          "AllOn",
+          "AnyOff",
+          "AllOff"
+        ],
+        "twoGroupStates": [
+          "00",
+          "01",
+          "10",
+          "11"
+        ]
+      },
+      "round11": [
+        {
+          "name": "r11-ext-font-false-0",
+          "group": "ExtGState-Font",
+          "expected": true
+        },
+        {
+          "name": "r11-ext-font-true-0",
+          "group": "ExtGState-Font",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-font-false-1",
+          "group": "ExtGState-Font",
+          "expected": true
+        },
+        {
+          "name": "r11-ext-font-true-1",
+          "group": "ExtGState-Font",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-TR-0",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-TR-1",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-TR2-0",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-TR2-1",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-BG-0",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-BG-1",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-UCR-0",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-ext-UCR-1",
+          "group": "ExtGState-other",
+          "expected": false
+        },
+        {
+          "name": "r11-shading-direct-0",
+          "group": "Shading-OC",
+          "expected": false
+        },
+        {
+          "name": "r11-shading-indirect-0",
+          "group": "Shading-OC",
+          "expected": false
+        },
+        {
+          "name": "r11-shading-function-0",
+          "group": "Shading-OC",
+          "expected": false
+        },
+        {
+          "name": "r11-shading-direct-1",
+          "group": "Shading-OC",
+          "expected": false
+        },
+        {
+          "name": "r11-shading-indirect-1",
+          "group": "Shading-OC",
+          "expected": false
+        },
+        {
+          "name": "r11-shading-function-1",
+          "group": "Shading-OC",
+          "expected": false
+        },
+        {
+          "name": "r11-type3-internal-false-0",
+          "group": "Type3-CharProcs",
+          "expected": false
+        },
+        {
+          "name": "r11-type3-internal-true-0",
+          "group": "Type3-CharProcs",
+          "expected": false
+        },
+        {
+          "name": "r11-type3-internal-false-1",
+          "group": "Type3-CharProcs",
+          "expected": false
+        },
+        {
+          "name": "r11-type3-internal-true-1",
+          "group": "Type3-CharProcs",
+          "expected": false
+        },
+        {
+          "name": "r11-type3-page-false-0",
+          "group": "Type3-page-OC-control",
+          "expected": true
+        },
+        {
+          "name": "r11-type3-page-true-0",
+          "group": "Type3-page-OC-control",
+          "expected": true
+        },
+        {
+          "name": "r11-type3-page-false-1",
+          "group": "Type3-page-OC-control",
+          "expected": true
+        },
+        {
+          "name": "r11-type3-page-true-1",
+          "group": "Type3-page-OC-control",
+          "expected": true
+        },
+        {
+          "name": "r11-widget-annot-OC-0",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-annot-OC-1",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-AP-own-OC-0",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-AP-own-OC-1",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-AP-marked-0",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-AP-marked-1",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-shared-own-OC-0",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-shared-own-OC-1",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-shared-marked-0",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-shared-marked-1",
+          "group": "Widget-AP",
+          "expected": false
+        },
+        {
+          "name": "r11-widget-shared-plain-0",
+          "group": "Widget-AP",
+          "expected": true
+        },
+        {
+          "name": "r11-widget-shared-plain-1",
+          "group": "Widget-AP",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-2-false-0",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-2-true-0",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-2-false-1",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-2-true-1",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-4-false-0",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-4-true-0",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-4-false-1",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-4-true-1",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-7-false-0",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-7-true-0",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-7-false-1",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-inherit-7-true-1",
+          "group": "multi-level-Resources",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-none-on-first-false",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-none-on-first-true",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-none-off-first-false",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-none-off-first-true",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-on-on-first-false",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-on-on-first-true",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-on-off-first-false",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-on-off-first-true",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-off-on-first-false",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-off-on-first-true",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-off-off-first-false",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-shared-form-off-off-first-true",
+          "group": "same-Form-ON-OFF",
+          "expected": true
+        },
+        {
+          "name": "r11-dual-SMask-0",
+          "group": "dual-render-path",
+          "expected": false
+        },
+        {
+          "name": "r11-dual-SMask-1",
+          "group": "dual-render-path",
+          "expected": false
+        },
+        {
+          "name": "r11-dual-Pattern-0",
+          "group": "dual-render-path",
+          "expected": false
+        },
+        {
+          "name": "r11-dual-Pattern-1",
+          "group": "dual-render-path",
+          "expected": false
+        },
+        {
+          "name": "r11-dual-nestedForm-0",
+          "group": "dual-render-path",
+          "expected": false
+        },
+        {
+          "name": "r11-dual-nestedForm-1",
+          "group": "dual-render-path",
+          "expected": false
+        },
+        {
+          "name": "r11-off-do-clip-nz-n",
+          "group": "OFF-Do-path-control",
+          "expected": true
+        },
+        {
+          "name": "r11-off-do-clip-nz-f",
+          "group": "OFF-Do-path-control",
+          "expected": true
+        },
+        {
+          "name": "r11-off-do-clip-eo-n",
+          "group": "OFF-Do-path-control",
+          "expected": true
+        },
+        {
+          "name": "r11-off-do-clip-eo-f",
+          "group": "OFF-Do-path-control",
+          "expected": true
+        }
+      ],
+      "round12": [
+        {
+          "name": "r12-font-cid-truetype-false",
+          "group": "static-font",
+          "expected": true
+        },
+        {
+          "name": "r12-font-cid-truetype-true",
+          "group": "static-font",
+          "expected": true
+        },
+        {
+          "name": "r12-font-type1-pfb-false",
+          "group": "static-font",
+          "expected": true
+        },
+        {
+          "name": "r12-font-type1-pfb-true",
+          "group": "static-font",
+          "expected": true
+        },
+        {
+          "name": "r12-image-smask-plain-0",
+          "group": "image-Mask-SMask",
+          "expected": true
+        },
+        {
+          "name": "r12-image-smask-plain-1",
+          "group": "image-Mask-SMask",
+          "expected": true
+        },
+        {
+          "name": "r12-image-mask-plain-0",
+          "group": "image-Mask-SMask",
+          "expected": true
+        },
+        {
+          "name": "r12-image-mask-plain-1",
+          "group": "image-Mask-SMask",
+          "expected": true
+        },
+        {
+          "name": "r12-image-color-key-0",
+          "group": "image-Mask-SMask",
+          "expected": true
+        },
+        {
+          "name": "r12-image-color-key-1",
+          "group": "image-Mask-SMask",
+          "expected": true
+        },
+        {
+          "name": "r12-image-smask-oc-0",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-smask-oc-1",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-mask-oc-0",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-mask-oc-1",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-smask-shared-oc-0",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-smask-shared-oc-1",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-mask-shared-oc-0",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-mask-shared-oc-1",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-smask-transitive-oc-0",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-image-smask-transitive-oc-1",
+          "group": "image-Mask-SMask",
+          "expected": false
+        },
+        {
+          "name": "r12-group-false-false-0",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-false-false-1",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-false-true-0",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-false-true-1",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-true-false-0",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-true-false-1",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-true-true-0",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-true-true-1",
+          "group": "Transparency-Group",
+          "expected": true
+        },
+        {
+          "name": "r12-group-internal-0",
+          "group": "Transparency-Group",
+          "expected": false
+        },
+        {
+          "name": "r12-group-internal-1",
+          "group": "Transparency-Group",
+          "expected": false
+        },
+        {
+          "name": "r12-same-OCG-form-0-false",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-same-OCG-form-0-true",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-same-OCG-form-1-false",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-same-OCG-form-1-true",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-same-OCG-image-0-false",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-same-OCG-image-0-true",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-same-OCG-image-1-false",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-same-OCG-image-1-true",
+          "group": "same-OCG-Contents-XObject",
+          "expected": true
+        },
+        {
+          "name": "r12-type3-page-direct",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-page-indirect-name",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-page-indirect-font",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-ext-font",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-form",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-pattern",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-inherited",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-cyclic",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-no-OC",
+          "group": "Type3-reachability",
+          "expected": false
+        },
+        {
+          "name": "r12-type3-shadow-parent",
+          "group": "Type3-reachability",
+          "expected": true
+        },
+        {
+          "name": "r12-type3-orphan",
+          "group": "Type3-reachability",
+          "expected": true
+        },
+        {
+          "name": "r12-type3-second-page",
+          "group": "Type3-reachability",
+          "expected": false
+        }
+      ]
+    },
+    "files": [
+      {
+        "file": "ocg/on.pdf",
+        "sha256": "35cda4797274dfcc87738a36b6b1e1836cef2b0563fd5d9d3be5ac8563883d90",
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/xobject-off.pdf",
+        "sha256": "06d112158cbf39322c28992eb7818cdef18b1ad1fc4917501467b65d565d689a",
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/xobject-on.pdf",
+        "sha256": "9f495db7a89d6413e877488c3196fcc6eb75d366db7338b639fe8eef01431ed3",
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/balanced-state.pdf",
+        "sha256": "1b51823204485a24942ab7f182da47a9fde2ccd579d6fd57891f8d95c847cde9",
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/lexical-decoy.pdf",
+        "sha256": "8c8c937c6a7a1cff5b118b8dc065522ff48443a34e4270fbd2f0ce94e451e5c5",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      },
+      {
+        "file": "ocg/state-leak.pdf",
+        "sha256": "3fe60b30e0d36cc2332000a50f2b402288408520d8bf157654a7e50d90ecb5b3",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      },
+      {
+        "file": "ocg/path-leak.pdf",
+        "sha256": "38832014f9d63c47fd34ba304dd03d91b2ef5ee0c0d2db534da852837eb702b7",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      },
+      {
+        "file": "ocg/ocg-off-original.pdf",
+        "sha256": "dc951e2c18523b4e37b1fd07421fc09283fd7b6d2f67afb797ef05d33bd2f6af",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      },
+      {
+        "file": "ocg/incoming-path.pdf",
+        "sha256": "14f52bb31eecd0753407370b93bc5f3ff9d1a722a7c494ab4d7cafe2885da0d6",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      },
+      {
+        "file": "ocg/usage-viewstate-off.pdf",
+        "sha256": "abf7c0cdda4202944da44f0d6fac7bbd343a846a88fb59889601bc2cae92e3d6",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v10-OCG-Usage-key"
+        }
+      },
+      {
+        "file": "ocg/marked-single-AllOff-1.pdf",
+        "sha256": "e4b526bd9dad3dae822f728a3898f75e99018181869b15e755849e3ffb43b4ab",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "single-ref-negative-policy"
+        }
+      },
+      {
+        "file": "ocg/unlisted-off.pdf",
+        "sha256": "72f2d2a6c5ce72679c9e5707b6baa2af58506bdc6d7d6f809c6524ea63220804",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "ON-OFF-outside-registry-or-bad-array"
+        }
+      },
+      {
+        "file": "ocg/extra-marked-indirect-AnyOn-00.pdf",
+        "sha256": "18ae5a0df2670c4f93e749a840ce988693863a69aadc7a9d6293fc6889a54c74",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "indirect-array-or-unsupported-membership"
+        }
+      },
+      {
+        "file": "ocg/extra-form-indirect-AnyOn-00.pdf",
+        "sha256": "5a8f061eb5b5d1f92bb188b70be67a51fef40c41db78a89198b032f710cdb86f",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "indirect-array-or-unsupported-membership"
+        }
+      },
+      {
+        "file": "ocg/new-annot-Link-OCG-0.pdf",
+        "sha256": "5a99469a97d9a89358694aa829c7b4184faf94fd4ebc924a3ff847ba2b3d849d",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:OC-outside-page-direct-XObject"
+        }
+      },
+      {
+        "file": "ocg/supp-pending-clip-nonzero-empty.pdf",
+        "sha256": "4da6e14f0535acb741698a2a7b5330dd6fd5786d7c41bc8edc7435f03caac716",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12-7:pending-clipping-at-exit"
+        }
+      },
+      {
+        "file": "ocg/supp-form-incoming-text.pdf",
+        "sha256": "aa836834792f9c84ceedc2987d8f1104c5de1b1e6aa8fbff71183587aac28af6",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12-8:OFF-Do-in-text"
+        }
+      },
+      {
+        "file": "ocg/grammar-empty-unused-registry.pdf",
+        "sha256": "529dcd545f62d7b6dc6f5f2e2456bd070a0fdde49c9bd38084071e53b27e8c3b",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "empty-or-bad-registry"
+        }
+      },
+      {
+        "file": "ocg/grammar-orphan-empty-OCMD-without-catalog.pdf",
+        "sha256": "a9494f2e85665db80e7222465a42d67b99681f3e1f56f7a42e7975600b221d0e",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:OC-object-without-catalog"
+        }
+      },
+      {
+        "file": "ocg/r11-type3-page-true-1.pdf",
+        "sha256": "a4718041019e9f525182c8acf964db1b1f1cee8bd745fdfad7c38f3f1147c44a",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-type3-page-true-0.pdf",
+        "sha256": "328886f315026c475cf70a81d133dfcd97a80c0438405542d1710fabe2d899fa",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-ext-font-true-0.pdf",
+        "sha256": "4b0dc33710eb7b6fe03aaff636d26b34dade080d551e42bab04656fdbabdfbb5",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-ext-font-true-1.pdf",
+        "sha256": "881ad3d02dcf9301e832f49cf86826c938670ed89484f92e04e33d4f4f46da4b",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-type3-internal-false-0.pdf",
+        "sha256": "d10b4664df27c6e4376c73cb651a7146b7aa7eb0228c87375d7f82351af1a827",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-type3-internal-true-0.pdf",
+        "sha256": "a8a1a031021f88cf6ae1926e3c76ec8ffb2c74b43739d17e1d539b38ea59d041",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-type3-internal-false-1.pdf",
+        "sha256": "3b0f9727a23ff7626722cf78084154c03257927be74ef8c85729b90e60372ba9",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-type3-internal-true-1.pdf",
+        "sha256": "fc79643a59a2f76aef985b9977c859d5d504664f2595cce9167621bb5e0de38a",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      },
+      {
+        "file": "ocg/r11-widget-shared-own-OC-0.pdf",
+        "sha256": "be018ef6265674e90d67c6f21df61da8923c7150712c3e6d3fffc92e73fe5d3d",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Annots:OC"
+        }
+      },
+      {
+        "file": "ocg/r11-widget-shared-own-OC-1.pdf",
+        "sha256": "ad6686620f1cad39ee7b16f37dcd8c0dd825799fbbf1e6449d7bd2e295224cdf",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Annots:OC"
+        }
+      },
+      {
+        "file": "ocg/r11-dual-SMask-0.pdf",
+        "sha256": "9f2e9fd1455d5eb95990e6465a5901bcf925f2fef05fd86953816d91f6e12ec5",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.ExtGState:OC"
+        }
+      },
+      {
+        "file": "ocg/r11-dual-SMask-1.pdf",
+        "sha256": "1458480d6c2a4cf4585d1ebd059dd03036e0ba8cb596880ef089b80f78132c5a",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.ExtGState:OC"
+        }
+      },
+      {
+        "file": "ocg/r11-dual-Pattern-0.pdf",
+        "sha256": "31885b69146b1adb5da46b97a35874b9f16cf657545017932f3cbda26bb80a26",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.Pattern:OC"
+        }
+      },
+      {
+        "file": "ocg/r11-dual-Pattern-1.pdf",
+        "sha256": "942bb59a30541d1e2c515f8324567dd7b7cb59e2564c2766b526436e34bff5ae",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.Pattern:OC"
+        }
+      },
+      {
+        "file": "ocg/r11-dual-nestedForm-0.pdf",
+        "sha256": "808e60468ffded25e66db9a86331d85095c85cc4cc49c4ceed02330e77c9fece",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.XObject.Wrapper.Resources:OC"
+        }
+      },
+      {
+        "file": "ocg/r11-dual-nestedForm-1.pdf",
+        "sha256": "6698ca370dca8adc40698ff71bf15804b38072cb67e88bbff290c86221be6cae",
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.XObject.Wrapper.Resources:OC"
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOn-00.pdf",
+        "sha256": "dc43be4efa99f4ff21a6a0da9f06fa9d4045be96fc9b0bb3a74a9bec4e1b1ce5",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOn-01.pdf",
+        "sha256": "77b003094ebe18da5481be9299cc2d992371b88a7c3a793ab54cccb12fde19f4",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOn-10.pdf",
+        "sha256": "d7981c1a139400003bb63e15b0a6ce2351cf237ca31194eb5621b78eff994537",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOn-11.pdf",
+        "sha256": "46854852b10ff4d4e366a2eb8f97cca10f6e89047c95a0598d799969d000dfd3",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOn-00.pdf",
+        "sha256": "2b29e6f29b8d63f687c9ed0ee23dc4efab238ddb35cd1444267db24d91f94019",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOn-01.pdf",
+        "sha256": "25aed803a041679fc7c61c4f5d5eec122f80b1b977da6930fc2598e5aeda8026",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOn-10.pdf",
+        "sha256": "0859efc5bfe3762392b30e0710b1e032ac4267d0a4b2f0e11730836df6b45a16",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOn-11.pdf",
+        "sha256": "c44150f0a7d8a64264a607e4fd675f49ea3224d883c2d8379de0a7fe6b7bd870",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOff-00.pdf",
+        "sha256": "7bc132f762f9f8eb36cf6d58efb05438b90259c647c59cf686ab7f7317da30c5",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOff-01.pdf",
+        "sha256": "b4c7f043848f9cb9afa22dfc29d2cd240a75c3fe02c023ba644f977aa93defbf",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOff-10.pdf",
+        "sha256": "908aaf1939ca4d72da061b904d33a544616c8bfc3ab69911ca8d4491755023c9",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AnyOff-11.pdf",
+        "sha256": "7253c86b9cf4cbce85d49d701c4171e4cae1cbe5a491096457eae4210fe1ca25",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOff-00.pdf",
+        "sha256": "9c74f1d3b33626a962b14811cfbfed4aa618c2fc5322a0aae16ab3a8190fe7ff",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOff-01.pdf",
+        "sha256": "557e81723123e0c60cc0e3040c35980665decb4b968a49bde1eb49a00b608b31",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOff-10.pdf",
+        "sha256": "a8b97ea2c1ec0514ccb18b15fbe1fa904e9dd97ac1b74421d7f87e85285af4a3",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/marked-AllOff-11.pdf",
+        "sha256": "8a514b9c879cb8a09ae8e040b23f45d73dfd242f197a4f800e07be2a651072ce",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOn-00.pdf",
+        "sha256": "a90b209bdf9ec2e4b7a7f157f4223f0b7d23692f2dcfce93ee1309d47e8eb756",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOn-01.pdf",
+        "sha256": "7c5c9f792834f2d1bed8dfdbedb857b23b71cbd1aa0351d8ab80f9ec151a0a8c",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOn-10.pdf",
+        "sha256": "529038b25a4c13249ca66f17811fcfcdccbf555734e21d75b8714dfa9dc23b00",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOn-11.pdf",
+        "sha256": "a1b391874b2ea895b060d9233c0dbb241c36025f158c553e81252b43184a4482",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOn-00.pdf",
+        "sha256": "895bb9605388e481a58cdeddb4beed5eb068d669814debcd84847ef196dfff7d",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOn-01.pdf",
+        "sha256": "3a8354435aa6aafb601595e9c725eb83754a44eda42641af1b044ed4cedb9b21",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOn-10.pdf",
+        "sha256": "968f7f9b6fe3afbc278ef99480d175999b84bc0a4e1524fa6a2eab5d64295c49",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOn-11.pdf",
+        "sha256": "4e3cbe28aef5bce8dddc231a3d663dfd184240476b917b53b77b534d024f603f",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOff-00.pdf",
+        "sha256": "f31ae38d06bdcfaee46a6b5b82d093c63b9d59a6a294458a2851c930d2c0a9ed",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOff-01.pdf",
+        "sha256": "43819707381c216cf35a2c9977ab8338d96f5d3b6b8ad1986062e56666d5bb99",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOff-10.pdf",
+        "sha256": "83777f002d9b2b553414ca87cf696442dc2df64af5a93779f96cbf7e301eca79",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AnyOff-11.pdf",
+        "sha256": "8051834355177a687f176eeed84b71789158a8dddc4d4e03eb810e6bc9a1aeea",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOff-00.pdf",
+        "sha256": "c9efde4d66674c1ed3ce7cc467b056b243d18345b000512a12624d160de7d69a",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOff-01.pdf",
+        "sha256": "ca7f09338b722f3ca0af7c635ad6b922988809ea7f9e32bc2d3b7c39cca12681",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOff-10.pdf",
+        "sha256": "575a08652f497697f282345398ea6a74f717e3b78578b14e225e8644856d02ba",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/form-AllOff-11.pdf",
+        "sha256": "ca1ce3695bb8a361b101de95ebcbf1172973ed292814a40b4391a994d1acb385",
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-duplicate-catalog.pdf",
+        "sha256": "ac42b485d2979d7d818d76aa44190c81c5f1087c53320a53e8bf73a682f34042",
+        "cohort": "representative",
+        "representativeGroup": "duplicate-ref",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-duplicate-on-off.pdf",
+        "sha256": "764ea698823f55df6fdd0e431a36a0ad9c155e98c32877e09beec4087960be10",
+        "cohort": "representative",
+        "representativeGroup": "duplicate-ref",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-cycle-self-members.pdf",
+        "sha256": "764b2fd2d4a301b633bec950514cd70a82766a9c5a0acd2b406a3f1016decc54",
+        "cohort": "representative",
+        "representativeGroup": "cycles",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-inherited-grandparent-0.pdf",
+        "sha256": "5bdb4412c156de619a06e69b209d35e543229185326e58d3e56856e05955d362",
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-inherited-grandparent-1.pdf",
+        "sha256": "a82d7ceb0a21ba09358b09acfbcdf52a61b57e03105f0ceb6e8609e316f1edb5",
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-inherited-shared-pages-0.pdf",
+        "sha256": "efe4ba761bc9ba0a6398f63ae320dd13786eebc13a344446f7f63b19e4398836",
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            },
+            {
+              "page": 2,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            },
+            {
+              "page": 2,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-inherited-local-shadow-1.pdf",
+        "sha256": "9a5e70110613a22c5476b5440fb8345b3a16656ccd73cf3cf63ab87dd6f6219d",
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-image-OCG-00.pdf",
+        "sha256": "45bf3c376ed76e13d39204bc6ec72793e2a2bd80f5c8d11c17098a05165f16a4",
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-image-OCG-11.pdf",
+        "sha256": "0d70f73537d47895f9e56dd10722eafae529e99ab5c131d47f727f1cce500b45",
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-image-AnyOn-01.pdf",
+        "sha256": "38e61b27538926e850046b3c5e21d7621ddfb54a300cb672f9d505592e84c429",
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-image-AllOn-11.pdf",
+        "sha256": "f1cdedc70c8b1605eae50eef655ba68d048e78c16b688d7519f319bbd361426a",
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-image-AnyOff-01.pdf",
+        "sha256": "0352a5e1ccccdd7879966bbf09ca5ea6e0461b80ca803846f44aa2ed07f07b81",
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-image-AllOff-00.pdf",
+        "sha256": "c322f8b5675ee76cedfd147dbb1b0745442f921486d39bf4398560964a5c4505",
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-raw-indirect-P-0.pdf",
+        "sha256": "5d0eb7bb9f8a8c38821ee08a5460d27f5db65eca983dc4db08e2692ec55aef48",
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-raw-indirect-Type-1.pdf",
+        "sha256": "6a015029ba856d79a25326981610e1698201f71e04cac7f11063e845984c2011",
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-raw-indirect-OCG-Type-0.pdf",
+        "sha256": "f73da52d5bb14bd63aa90a2c661fd5ce96810933022791a82c9b70223c51f34c",
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/new-raw-indirect-BaseState-1.pdf",
+        "sha256": "722bb3bdd412fe75a1a4f8e7e4b1c84c00098b373a0dee8cbf98ec523fe4865e",
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/supp-page-escaped-Ox43.pdf",
+        "sha256": "f8ea961ab9404063fca47b8b04403afedc40288b749f790350ed86d10cb38426",
+        "cohort": "representative",
+        "representativeGroup": "escaped-page-tag",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/supp-page-escaped-x4FC.pdf",
+        "sha256": "0f9dbf5a80d413f2f1c3b6bcb81d0b56e81b599c2587097b141d2614e6543c5b",
+        "cohort": "representative",
+        "representativeGroup": "escaped-page-tag",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      },
+      {
+        "file": "ocg/supp-page-escaped-x4fx43.pdf",
+        "sha256": "865fe8db60eacc37b4f1ec8d52120d1cbe865acc5ffd616c462fccfddd843071",
+        "cohort": "representative",
+        "representativeGroup": "escaped-page-tag",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "fixtures": [
+    {
+      "file": "encrypted/encrypted-r2-open.pdf",
+      "category": "encrypted",
+      "bytes": 897,
+      "sha256": "c2c0980bba892379f7fd1c2c26eb23044cc570327e9fd400c87c08553fc14425",
+      "expectation": {
+        "revision": "R2",
+        "variant": "open",
+        "permissionsValue": -4,
+        "expectedText": "R2 fixture",
+        "finishAcceptance": "reject-permissions-not-null",
+        "attempts": {
+          "omitted": {
+            "result": "PasswordException",
+            "code": 1
+          },
+          "empty": {
+            "result": "PasswordException",
+            "code": 1
+          },
+          "wrong": {
+            "result": "PasswordException",
+            "code": 2
+          },
+          "correct": {
+            "result": "OPEN",
+            "permissions": [
+              4,
+              8,
+              16,
+              32,
+              256,
+              512,
+              1024,
+              2048
+            ]
+          },
+          "owner": {
+            "result": "OPEN",
+            "permissions": [
+              4,
+              8,
+              16,
+              32,
+              256,
+              512,
+              1024,
+              2048
+            ]
+          }
+        }
+      }
+    },
+    {
+      "file": "encrypted/encrypted-r2-restricted.pdf",
+      "category": "encrypted",
+      "bytes": 898,
+      "sha256": "fab73fc6c94fbc5d9ed5eaf0215ad33c6fd58de71bc30fca92cd1be198cd92b9",
+      "expectation": {
+        "revision": "R2",
+        "variant": "restricted",
+        "permissionsValue": -64,
+        "expectedText": "R2 fixture",
+        "finishAcceptance": "reject-permissions-not-null",
+        "attempts": {
+          "omitted": {
+            "result": "OPEN",
+            "permissions": [
+              256,
+              512,
+              1024,
+              2048
+            ]
+          },
+          "empty": {
+            "result": "OPEN",
+            "permissions": [
+              256,
+              512,
+              1024,
+              2048
+            ]
+          },
+          "wrong": {
+            "result": "PasswordException",
+            "code": 2
+          },
+          "correct": {
+            "result": "OPEN",
+            "permissions": [
+              256,
+              512,
+              1024,
+              2048
+            ]
+          },
+          "owner": {
+            "result": "OPEN",
+            "permissions": [
+              256,
+              512,
+              1024,
+              2048
+            ]
+          }
+        }
+      }
+    },
+    {
+      "file": "encrypted/encrypted-r6-open.pdf",
+      "category": "encrypted",
+      "bytes": 1361,
+      "sha256": "df27b1073dbc5b4c98e27755fdcc0052068a762c8fb9ad74f65b3412c6125b56",
+      "expectation": {
+        "revision": "R6",
+        "variant": "open",
+        "permissionsValue": -4,
+        "expectedText": "R6 fixture open",
+        "finishAcceptance": "reject-permissions-not-null",
+        "attempts": {
+          "omitted": {
+            "result": "PasswordException",
+            "code": 1
+          },
+          "empty": {
+            "result": "PasswordException",
+            "code": 1
+          },
+          "wrong": {
+            "result": "PasswordException",
+            "code": 2
+          },
+          "correct": {
+            "result": "OPEN",
+            "permissions": [
+              4,
+              8,
+              16,
+              32,
+              256,
+              512,
+              1024,
+              2048
+            ]
+          },
+          "owner": {
+            "result": "OPEN",
+            "permissions": [
+              4,
+              8,
+              16,
+              32,
+              256,
+              512,
+              1024,
+              2048
+            ]
+          }
+        }
+      }
+    },
+    {
+      "file": "encrypted/encrypted-r6-restricted.pdf",
+      "category": "encrypted",
+      "bytes": 1380,
+      "sha256": "774e4b1050ee8bf79e167a53643c1fb627acd53240984fbbc4581cc6ef02b694",
+      "expectation": {
+        "revision": "R6",
+        "variant": "restricted",
+        "permissionsValue": -3904,
+        "expectedText": "R6 fixture restricted",
+        "finishAcceptance": "reject-permissions-not-null",
+        "attempts": {
+          "omitted": {
+            "result": "OPEN",
+            "permissions": []
+          },
+          "empty": {
+            "result": "OPEN",
+            "permissions": []
+          },
+          "wrong": {
+            "result": "PasswordException",
+            "code": 2
+          },
+          "correct": {
+            "result": "OPEN",
+            "permissions": []
+          },
+          "owner": {
+            "result": "OPEN",
+            "permissions": []
+          }
+        }
+      }
+    },
+    {
+      "file": "damage/truncated-half.pdf",
+      "category": "damage",
+      "bytes": 297,
+      "sha256": "4599115b60c4e4a7651d77ef4967e88933e71f4d14c8932e82b496702cfdd12c",
+      "expectation": {
+        "pdfjs": "InvalidPDFException",
+        "open": false
+      }
+    },
+    {
+      "file": "damage/xref-offset-all-9.pdf",
+      "category": "damage",
+      "bytes": 595,
+      "sha256": "223e92970c9f16eb09b98ad2d40049f9aa3376004a18741872c65efee4ffd6f7",
+      "expectation": {
+        "pdfjs": "OPEN",
+        "pages": 1,
+        "recovery": true
+      }
+    },
+    {
+      "file": "damage/malformed-contents.pdf",
+      "category": "damage",
+      "bytes": 602,
+      "sha256": "aecaaedf4b6be1a50591117d6e8ac8eae3a4db65ab25bb7e03927eba18057ac3",
+      "expectation": {
+        "pdfjs": "OPEN",
+        "pages": 1,
+        "warningIncludes": "Unknown command"
+      }
+    },
+    {
+      "file": "background/empty-contents.pdf",
+      "category": "background",
+      "bytes": 455,
+      "sha256": "4ead6f4df85665295065258f5410e0fa73c0929671e60d217c84f87d18a9f034",
+      "expectation": {
+        "contentsKind": "empty-array",
+        "streamCount": 0
+      }
+    },
+    {
+      "file": "background/single-stream.pdf",
+      "category": "background",
+      "bytes": 575,
+      "sha256": "39f68ee0b357d0aeca698c8f869242ca95ba000f500b9273830f281dddc49b13",
+      "expectation": {
+        "contentsKind": "single-reference",
+        "streamCount": 1
+      }
+    },
+    {
+      "file": "background/multiple-streams.pdf",
+      "category": "background",
+      "bytes": 576,
+      "sha256": "6a1ddd287652f29d1f8f8043e8cdd6097647a2e4470e6da175cf176062d5eb3f",
+      "expectation": {
+        "contentsKind": "reference-array",
+        "streamCount": 2
+      }
+    },
+    {
+      "file": "background/malformed-contents-type.pdf",
+      "category": "background",
+      "bytes": 427,
+      "sha256": "a044d62045a1b54b25c721394fc46d1f7e8a67543679d3d5dc28c9dfa52affad",
+      "expectation": {
+        "contentsKind": "non-stream-reference",
+        "streamCount": 0
+      }
+    },
+    {
+      "file": "risk/graphics-state-imbalance.pdf",
+      "category": "risk",
+      "bytes": 581,
+      "sha256": "35e86b5924ccf325b409ff7bb3ad76e8117237dcc1a8950f52860c1f6c80fd30",
+      "expectation": {
+        "risk": "unbalanced-q-Q",
+        "q": 2,
+        "Q": 1
+      }
+    },
+    {
+      "file": "risk/tagged-structure.pdf",
+      "category": "risk",
+      "bytes": 908,
+      "sha256": "27d2a6ae1d5f21bb37f2f1eac0865b04365795a9c6da30411e70d9be70632730",
+      "expectation": {
+        "risk": "tagged-pdf",
+        "catalogKeys": [
+          "MarkInfo",
+          "StructTreeRoot"
+        ]
+      }
+    },
+    {
+      "file": "risk/dangerous-actions.pdf",
+      "category": "risk",
+      "bytes": 986,
+      "sha256": "fbde441cd1a345dd7c134b60399d618521982883b69829ed59d3715ddd343642",
+      "expectation": {
+        "risk": "active-content",
+        "catalogKeys": [
+          "OpenAction",
+          "Names.JavaScript"
+        ],
+        "annotationActions": [
+          "Launch"
+        ]
+      }
+    },
+    {
+      "file": "removal/removal-structures.pdf",
+      "category": "removal",
+      "bytes": 5202,
+      "sha256": "85ee688709c0182e2b0023da0f1d97506d40317f12c4a795bd7ea54e6d623136",
+      "expectation": {
+        "catalogKeys": [
+          "Outlines",
+          "Names",
+          "Dests",
+          "PageLabels",
+          "ViewerPreferences",
+          "Metadata",
+          "AcroForm",
+          "AF"
+        ],
+        "namesKeys": [
+          "EmbeddedFiles",
+          "Dests",
+          "JavaScript"
+        ],
+        "annotationSubtypes": [
+          "Link",
+          "Text",
+          "FreeText",
+          "Highlight",
+          "Ink",
+          "Stamp",
+          "Widget",
+          "FileAttachment",
+          "Square",
+          "Circle",
+          "Popup",
+          "Line",
+          "Polygon",
+          "Caret",
+          "Redact"
+        ],
+        "annotationRelationships": [
+          "Popup.Parent",
+          "Text.IRT"
+        ],
+        "linkKinds": [
+          "URI",
+          "direct-destination",
+          "named-destination"
+        ],
+        "embeddedSentinel": "PDF finish embedded attachment sentinel",
+        "xmpSentinel": "<pdf:Keywords>remove-me</pdf:Keywords>"
+      }
+    },
+    {
+      "file": "appearance/identity.pdf",
+      "category": "appearance",
+      "bytes": 889,
+      "sha256": "13cb62328e8a89158e19c463f6e50e20cf4b8858fce0f52381945b4f4c5f66ec",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          100,
+          20
+        ],
+        "matrix": null,
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/scaled-bbox.pdf",
+      "category": "appearance",
+      "bytes": 887,
+      "sha256": "cd554ef2c0d6b48764fd555e3e949f0649f66dbb82949a6c1edb4eee78439390",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          50,
+          10
+        ],
+        "matrix": null,
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/offset-bbox.pdf",
+      "category": "appearance",
+      "bytes": 893,
+      "sha256": "08586ec334378339d91bb729b352c2c269ee068d993b0aba99f9dc15ee869c09",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          10,
+          20,
+          110,
+          40
+        ],
+        "matrix": null,
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/scaled-matrix.pdf",
+      "category": "appearance",
+      "bytes": 911,
+      "sha256": "4e25aadc16a753832d76b94ed1ea225166aae4ff5486279f00922d80857ce973",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          100,
+          20
+        ],
+        "matrix": [
+          2,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/translated-matrix.pdf",
+      "category": "appearance",
+      "bytes": 913,
+      "sha256": "85b4fdd4646a880487c01bffafd26a2bb7fd2d2402e1040706df0b025b302afc",
+      "expectation": {
+        "supported": true,
+        "bbox": [
+          0,
+          0,
+          100,
+          20
+        ],
+        "matrix": [
+          1,
+          0,
+          0,
+          1,
+          30,
+          40
+        ],
+        "pixelOracle": {
+          "width": 300,
+          "height": 300,
+          "bluePixels": 2000,
+          "blueBox": [
+            100,
+            180,
+            199,
+            199
+          ],
+          "pdfjsSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b",
+          "popplerSha256": "ab80b4ec04286b9a480cc9e16f943258ef1faf20c68573a4df6d103d9810033b"
+        }
+      }
+    },
+    {
+      "file": "appearance/singular-matrix.pdf",
+      "category": "appearance",
+      "bytes": 911,
+      "sha256": "19986941ffd25afe9201f4e28460dad7eae798aeea2da320dbe7e167f59faf9a",
+      "expectation": {
+        "supported": false,
+        "reason": "degenerate appearance transform"
+      }
+    },
+    {
+      "file": "relationships/attachment-popup.pdf",
+      "category": "relationships",
+      "bytes": 1533,
+      "sha256": "984b092759a87ce3bc30374dc2576400af87ad19c49365c5ef718ffdbdbe308a",
+      "expectation": {
+        "attachmentSentinel": "PDF finish attachment popup sentinel",
+        "sourceAnnotationSubtypes": [
+          "FileAttachment",
+          "Popup",
+          "Text",
+          "Popup",
+          "FreeText"
+        ],
+        "attachmentOnlyAnnotationSubtypes": [
+          "Text",
+          "Popup",
+          "FreeText"
+        ]
+      }
+    },
+    {
+      "file": "ordinary/named-properties.pdf",
+      "category": "ordinary",
+      "bytes": 585,
+      "sha256": "44d5d5c09e1d24aa96076f2a07c03513d344b371f25d293b5f36fe1e13a7097d",
+      "expectation": {
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "markedContent": "/Span /TextInfo BDC",
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "04ce6cfbce82aad25e57dc2c640efdad56a16de829925daa0fdbaf473c9a101b"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "04ce6cfbce82aad25e57dc2c640efdad56a16de829925daa0fdbaf473c9a101b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ordinary/no-resources.pdf",
+      "category": "ordinary",
+      "bytes": 420,
+      "sha256": "c7eae4731a7115f819bef5cd7824987da71fef963c7d1b1f10d7c510a768a529",
+      "expectation": {
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "resources": "omitted",
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "cdbf6c0880cfbeebfa8480444fef83685e70091bf1f23a5e8a71564d1f8be33a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "cdbf6c0880cfbeebfa8480444fef83685e70091bf1f23a5e8a71564d1f8be33a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/on.pdf",
+      "category": "ocg",
+      "bytes": 644,
+      "sha256": "35cda4797274dfcc87738a36b6b1e1836cef2b0563fd5d9d3be5ac8563883d90",
+      "expectation": {
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/xobject-off.pdf",
+      "category": "ocg",
+      "bytes": 814,
+      "sha256": "06d112158cbf39322c28992eb7818cdef18b1ad1fc4917501467b65d565d689a",
+      "expectation": {
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/xobject-on.pdf",
+      "category": "ocg",
+      "bytes": 815,
+      "sha256": "9f495db7a89d6413e877488c3196fcc6eb75d366db7338b639fe8eef01431ed3",
+      "expectation": {
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/balanced-state.pdf",
+      "category": "ocg",
+      "bytes": 652,
+      "sha256": "1b51823204485a24942ab7f182da47a9fde2ccd579d6fd57891f8d95c847cde9",
+      "expectation": {
+        "cohort": "allowed",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/lexical-decoy.pdf",
+      "category": "ocg",
+      "bytes": 689,
+      "sha256": "8c8c937c6a7a1cff5b118b8dc065522ff48443a34e4270fbd2f0ce94e451e5c5",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      }
+    },
+    {
+      "file": "ocg/state-leak.pdf",
+      "category": "ocg",
+      "bytes": 646,
+      "sha256": "3fe60b30e0d36cc2332000a50f2b402288408520d8bf157654a7e50d90ecb5b3",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      }
+    },
+    {
+      "file": "ocg/path-leak.pdf",
+      "category": "ocg",
+      "bytes": 630,
+      "sha256": "38832014f9d63c47fd34ba304dd03d91b2ef5ee0c0d2db534da852837eb702b7",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      }
+    },
+    {
+      "file": "ocg/ocg-off-original.pdf",
+      "category": "ocg",
+      "bytes": 638,
+      "sha256": "dc951e2c18523b4e37b1fd07421fc09283fd7b6d2f67afb797ef05d33bd2f6af",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      }
+    },
+    {
+      "file": "ocg/incoming-path.pdf",
+      "category": "ocg",
+      "bytes": 796,
+      "sha256": "14f52bb31eecd0753407370b93bc5f3ff9d1a722a7c494ab4d7cafe2885da0d6",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "allow"
+        }
+      }
+    },
+    {
+      "file": "ocg/usage-viewstate-off.pdf",
+      "category": "ocg",
+      "bytes": 863,
+      "sha256": "abf7c0cdda4202944da44f0d6fac7bbd343a846a88fb59889601bc2cae92e3d6",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v10-OCG-Usage-key"
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-single-AllOff-1.pdf",
+      "category": "ocg",
+      "bytes": 692,
+      "sha256": "e4b526bd9dad3dae822f728a3898f75e99018181869b15e755849e3ffb43b4ab",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "single-ref-negative-policy"
+        }
+      }
+    },
+    {
+      "file": "ocg/unlisted-off.pdf",
+      "category": "ocg",
+      "bytes": 665,
+      "sha256": "72f2d2a6c5ce72679c9e5707b6baa2af58506bdc6d7d6f809c6524ea63220804",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "ON-OFF-outside-registry-or-bad-array"
+        }
+      }
+    },
+    {
+      "file": "ocg/extra-marked-indirect-AnyOn-00.pdf",
+      "category": "ocg",
+      "bytes": 698,
+      "sha256": "18ae5a0df2670c4f93e749a840ce988693863a69aadc7a9d6293fc6889a54c74",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "indirect-array-or-unsupported-membership"
+        }
+      }
+    },
+    {
+      "file": "ocg/extra-form-indirect-AnyOn-00.pdf",
+      "category": "ocg",
+      "bytes": 863,
+      "sha256": "5a8f061eb5b5d1f92bb188b70be67a51fef40c41db78a89198b032f710cdb86f",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "indirect-array-or-unsupported-membership"
+        }
+      }
+    },
+    {
+      "file": "ocg/new-annot-Link-OCG-0.pdf",
+      "category": "ocg",
+      "bytes": 1043,
+      "sha256": "5a99469a97d9a89358694aa829c7b4184faf94fd4ebc924a3ff847ba2b3d849d",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:OC-outside-page-direct-XObject"
+        }
+      }
+    },
+    {
+      "file": "ocg/supp-pending-clip-nonzero-empty.pdf",
+      "category": "ocg",
+      "bytes": 807,
+      "sha256": "4da6e14f0535acb741698a2a7b5330dd6fd5786d7c41bc8edc7435f03caac716",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12-7:pending-clipping-at-exit"
+        }
+      }
+    },
+    {
+      "file": "ocg/supp-form-incoming-text.pdf",
+      "category": "ocg",
+      "bytes": 981,
+      "sha256": "aa836834792f9c84ceedc2987d8f1104c5de1b1e6aa8fbff71183587aac28af6",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12-8:OFF-Do-in-text"
+        }
+      }
+    },
+    {
+      "file": "ocg/grammar-empty-unused-registry.pdf",
+      "category": "ocg",
+      "bytes": 577,
+      "sha256": "529dcd545f62d7b6dc6f5f2e2456bd070a0fdde49c9bd38084071e53b27e8c3b",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "empty-or-bad-registry"
+        }
+      }
+    },
+    {
+      "file": "ocg/grammar-orphan-empty-OCMD-without-catalog.pdf",
+      "category": "ocg",
+      "bytes": 564,
+      "sha256": "a9494f2e85665db80e7222465a42d67b99681f3e1f56f7a42e7975600b221d0e",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:OC-object-without-catalog"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-type3-page-true-1.pdf",
+      "category": "ocg",
+      "bytes": 1074,
+      "sha256": "a4718041019e9f525182c8acf964db1b1f1cee8bd745fdfad7c38f3f1147c44a",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-type3-page-true-0.pdf",
+      "category": "ocg",
+      "bytes": 1074,
+      "sha256": "328886f315026c475cf70a81d133dfcd97a80c0438405542d1710fabe2d899fa",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-ext-font-true-0.pdf",
+      "category": "ocg",
+      "bytes": 1060,
+      "sha256": "4b0dc33710eb7b6fe03aaff636d26b34dade080d551e42bab04656fdbabdfbb5",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-ext-font-true-1.pdf",
+      "category": "ocg",
+      "bytes": 1061,
+      "sha256": "881ad3d02dcf9301e832f49cf86826c938670ed89484f92e04e33d4f4f46da4b",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-type3-internal-false-0.pdf",
+      "category": "ocg",
+      "bytes": 1051,
+      "sha256": "d10b4664df27c6e4376c73cb651a7146b7aa7eb0228c87375d7f82351af1a827",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-type3-internal-true-0.pdf",
+      "category": "ocg",
+      "bytes": 1061,
+      "sha256": "a8a1a031021f88cf6ae1926e3c76ec8ffb2c74b43739d17e1d539b38ea59d041",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-type3-internal-false-1.pdf",
+      "category": "ocg",
+      "bytes": 1051,
+      "sha256": "3b0f9727a23ff7626722cf78084154c03257927be74ef8c85729b90e60372ba9",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-type3-internal-true-1.pdf",
+      "category": "ocg",
+      "bytes": 1061,
+      "sha256": "fc79643a59a2f76aef985b9977c859d5d504664f2595cce9167621bb5e0de38a",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v13:reachable-Type3"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-widget-shared-own-OC-0.pdf",
+      "category": "ocg",
+      "bytes": 1181,
+      "sha256": "be018ef6265674e90d67c6f21df61da8923c7150712c3e6d3fffc92e73fe5d3d",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Annots:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-widget-shared-own-OC-1.pdf",
+      "category": "ocg",
+      "bytes": 1179,
+      "sha256": "ad6686620f1cad39ee7b16f37dcd8c0dd825799fbbf1e6449d7bd2e295224cdf",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Annots:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-dual-SMask-0.pdf",
+      "category": "ocg",
+      "bytes": 1062,
+      "sha256": "9f2e9fd1455d5eb95990e6465a5901bcf925f2fef05fd86953816d91f6e12ec5",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.ExtGState:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-dual-SMask-1.pdf",
+      "category": "ocg",
+      "bytes": 1061,
+      "sha256": "1458480d6c2a4cf4585d1ebd059dd03036e0ba8cb596880ef089b80f78132c5a",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.ExtGState:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-dual-Pattern-0.pdf",
+      "category": "ocg",
+      "bytes": 1275,
+      "sha256": "31885b69146b1adb5da46b97a35874b9f16cf657545017932f3cbda26bb80a26",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.Pattern:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-dual-Pattern-1.pdf",
+      "category": "ocg",
+      "bytes": 1276,
+      "sha256": "942bb59a30541d1e2c515f8324567dd7b7cb59e2564c2766b526436e34bff5ae",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.Resources.Pattern:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-dual-nestedForm-0.pdf",
+      "category": "ocg",
+      "bytes": 1208,
+      "sha256": "808e60468ffded25e66db9a86331d85095c85cc4cc49c4ceed02330e77c9fece",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.XObject.Wrapper.Resources:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/r11-dual-nestedForm-1.pdf",
+      "category": "ocg",
+      "bytes": 1208,
+      "sha256": "6698ca370dca8adc40698ff71bf15804b38072cb67e88bbff290c86221be6cae",
+      "expectation": {
+        "cohort": "excluded",
+        "preflight": {
+          "allowed": false,
+          "reason": "v12:page.XObject.Wrapper.Resources:OC"
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOn-00.pdf",
+      "category": "ocg",
+      "bytes": 687,
+      "sha256": "dc43be4efa99f4ff21a6a0da9f06fa9d4045be96fc9b0bb3a74a9bec4e1b1ce5",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOn-01.pdf",
+      "category": "ocg",
+      "bytes": 689,
+      "sha256": "77b003094ebe18da5481be9299cc2d992371b88a7c3a793ab54cccb12fde19f4",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOn-10.pdf",
+      "category": "ocg",
+      "bytes": 689,
+      "sha256": "d7981c1a139400003bb63e15b0a6ce2351cf237ca31194eb5621b78eff994537",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOn-11.pdf",
+      "category": "ocg",
+      "bytes": 687,
+      "sha256": "46854852b10ff4d4e366a2eb8f97cca10f6e89047c95a0598d799969d000dfd3",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOn-00.pdf",
+      "category": "ocg",
+      "bytes": 687,
+      "sha256": "2b29e6f29b8d63f687c9ed0ee23dc4efab238ddb35cd1444267db24d91f94019",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOn-01.pdf",
+      "category": "ocg",
+      "bytes": 689,
+      "sha256": "25aed803a041679fc7c61c4f5d5eec122f80b1b977da6930fc2598e5aeda8026",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOn-10.pdf",
+      "category": "ocg",
+      "bytes": 689,
+      "sha256": "0859efc5bfe3762392b30e0710b1e032ac4267d0a4b2f0e11730836df6b45a16",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOn-11.pdf",
+      "category": "ocg",
+      "bytes": 686,
+      "sha256": "c44150f0a7d8a64264a607e4fd675f49ea3224d883c2d8379de0a7fe6b7bd870",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOff-00.pdf",
+      "category": "ocg",
+      "bytes": 688,
+      "sha256": "7bc132f762f9f8eb36cf6d58efb05438b90259c647c59cf686ab7f7317da30c5",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOff-01.pdf",
+      "category": "ocg",
+      "bytes": 691,
+      "sha256": "b4c7f043848f9cb9afa22dfc29d2cd240a75c3fe02c023ba644f977aa93defbf",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOff-10.pdf",
+      "category": "ocg",
+      "bytes": 691,
+      "sha256": "908aaf1939ca4d72da061b904d33a544616c8bfc3ab69911ca8d4491755023c9",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AnyOff-11.pdf",
+      "category": "ocg",
+      "bytes": 687,
+      "sha256": "7253c86b9cf4cbce85d49d701c4171e4cae1cbe5a491096457eae4210fe1ca25",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOff-00.pdf",
+      "category": "ocg",
+      "bytes": 688,
+      "sha256": "9c74f1d3b33626a962b14811cfbfed4aa618c2fc5322a0aae16ab3a8190fe7ff",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOff-01.pdf",
+      "category": "ocg",
+      "bytes": 691,
+      "sha256": "557e81723123e0c60cc0e3040c35980665decb4b968a49bde1eb49a00b608b31",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOff-10.pdf",
+      "category": "ocg",
+      "bytes": 691,
+      "sha256": "a8b97ea2c1ec0514ccb18b15fbe1fa904e9dd97ac1b74421d7f87e85285af4a3",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/marked-AllOff-11.pdf",
+      "category": "ocg",
+      "bytes": 687,
+      "sha256": "8a514b9c879cb8a09ae8e040b23f45d73dfd242f197a4f800e07be2a651072ce",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOn-00.pdf",
+      "category": "ocg",
+      "bytes": 850,
+      "sha256": "a90b209bdf9ec2e4b7a7f157f4223f0b7d23692f2dcfce93ee1309d47e8eb756",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOn-01.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "7c5c9f792834f2d1bed8dfdbedb857b23b71cbd1aa0351d8ab80f9ec151a0a8c",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOn-10.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "529038b25a4c13249ca66f17811fcfcdccbf555734e21d75b8714dfa9dc23b00",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOn-11.pdf",
+      "category": "ocg",
+      "bytes": 851,
+      "sha256": "a1b391874b2ea895b060d9233c0dbb241c36025f158c553e81252b43184a4482",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOn-00.pdf",
+      "category": "ocg",
+      "bytes": 851,
+      "sha256": "895bb9605388e481a58cdeddb4beed5eb068d669814debcd84847ef196dfff7d",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOn-01.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "3a8354435aa6aafb601595e9c725eb83754a44eda42641af1b044ed4cedb9b21",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOn-10.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "968f7f9b6fe3afbc278ef99480d175999b84bc0a4e1524fa6a2eab5d64295c49",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOn-11.pdf",
+      "category": "ocg",
+      "bytes": 851,
+      "sha256": "4e3cbe28aef5bce8dddc231a3d663dfd184240476b917b53b77b534d024f603f",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOff-00.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "f31ae38d06bdcfaee46a6b5b82d093c63b9d59a6a294458a2851c930d2c0a9ed",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOff-01.pdf",
+      "category": "ocg",
+      "bytes": 853,
+      "sha256": "43819707381c216cf35a2c9977ab8338d96f5d3b6b8ad1986062e56666d5bb99",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOff-10.pdf",
+      "category": "ocg",
+      "bytes": 853,
+      "sha256": "83777f002d9b2b553414ca87cf696442dc2df64af5a93779f96cbf7e301eca79",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AnyOff-11.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "8051834355177a687f176eeed84b71789158a8dddc4d4e03eb810e6bc9a1aeea",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOff-00.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "c9efde4d66674c1ed3ce7cc467b056b243d18345b000512a12624d160de7d69a",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOff-01.pdf",
+      "category": "ocg",
+      "bytes": 853,
+      "sha256": "ca7f09338b722f3ca0af7c635ad6b922988809ea7f9e32bc2d3b7c39cca12681",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOff-10.pdf",
+      "category": "ocg",
+      "bytes": 853,
+      "sha256": "575a08652f497697f282345398ea6a74f717e3b78578b14e225e8644856d02ba",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/form-AllOff-11.pdf",
+      "category": "ocg",
+      "bytes": 852,
+      "sha256": "ca1ce3695bb8a361b101de95ebcbf1172973ed292814a40b4391a994d1acb385",
+      "expectation": {
+        "cohort": "direct-array-regression",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-duplicate-catalog.pdf",
+      "category": "ocg",
+      "bytes": 668,
+      "sha256": "ac42b485d2979d7d818d76aa44190c81c5f1087c53320a53e8bf73a682f34042",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "duplicate-ref",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-duplicate-on-off.pdf",
+      "category": "ocg",
+      "bytes": 666,
+      "sha256": "764ea698823f55df6fdd0e431a36a0ad9c155e98c32877e09beec4087960be10",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "duplicate-ref",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-cycle-self-members.pdf",
+      "category": "ocg",
+      "bytes": 670,
+      "sha256": "764b2fd2d4a301b633bec950514cd70a82766a9c5a0acd2b406a3f1016decc54",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "cycles",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-inherited-grandparent-0.pdf",
+      "category": "ocg",
+      "bytes": 685,
+      "sha256": "5bdb4412c156de619a06e69b209d35e543229185326e58d3e56856e05955d362",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-inherited-grandparent-1.pdf",
+      "category": "ocg",
+      "bytes": 686,
+      "sha256": "a82d7ceb0a21ba09358b09acfbcdf52a61b57e03105f0ceb6e8609e316f1edb5",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-inherited-shared-pages-0.pdf",
+      "category": "ocg",
+      "bytes": 822,
+      "sha256": "efe4ba761bc9ba0a6398f63ae320dd13786eebc13a344446f7f63b19e4398836",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            },
+            {
+              "page": 2,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            },
+            {
+              "page": 2,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-inherited-local-shadow-1.pdf",
+      "category": "ocg",
+      "bytes": 663,
+      "sha256": "9a5e70110613a22c5476b5440fb8345b3a16656ccd73cf3cf63ab87dd6f6219d",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "inherited-resources",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-image-OCG-00.pdf",
+      "category": "ocg",
+      "bytes": 995,
+      "sha256": "45bf3c376ed76e13d39204bc6ec72793e2a2bd80f5c8d11c17098a05165f16a4",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-image-OCG-11.pdf",
+      "category": "ocg",
+      "bytes": 995,
+      "sha256": "0d70f73537d47895f9e56dd10722eafae529e99ab5c131d47f727f1cce500b45",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-image-AnyOn-01.pdf",
+      "category": "ocg",
+      "bytes": 1018,
+      "sha256": "38e61b27538926e850046b3c5e21d7621ddfb54a300cb672f9d505592e84c429",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-image-AllOn-11.pdf",
+      "category": "ocg",
+      "bytes": 1017,
+      "sha256": "f1cdedc70c8b1605eae50eef655ba68d048e78c16b688d7519f319bbd361426a",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-image-AnyOff-01.pdf",
+      "category": "ocg",
+      "bytes": 1020,
+      "sha256": "0352a5e1ccccdd7879966bbf09ca5ea6e0461b80ca803846f44aa2ed07f07b81",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-image-AllOff-00.pdf",
+      "category": "ocg",
+      "bytes": 1018,
+      "sha256": "c322f8b5675ee76cedfd147dbb1b0745442f921486d39bf4398560964a5c4505",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "image-OC",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "20755ad97241eed0df5722fb2a01620e1f67be7c62b009a11a309a16201aa093"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-raw-indirect-P-0.pdf",
+      "category": "ocg",
+      "bytes": 698,
+      "sha256": "5d0eb7bb9f8a8c38821ee08a5460d27f5db65eca983dc4db08e2692ec55aef48",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-raw-indirect-Type-1.pdf",
+      "category": "ocg",
+      "bytes": 700,
+      "sha256": "6a015029ba856d79a25326981610e1698201f71e04cac7f11063e845984c2011",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-raw-indirect-OCG-Type-0.pdf",
+      "category": "ocg",
+      "bytes": 700,
+      "sha256": "f73da52d5bb14bd63aa90a2c661fd5ce96810933022791a82c9b70223c51f34c",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/new-raw-indirect-BaseState-1.pdf",
+      "category": "ocg",
+      "bytes": 694,
+      "sha256": "722bb3bdd412fe75a1a4f8e7e4b1c84c00098b373a0dee8cbf98ec523fe4865e",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "raw-type-boundaries",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "69aad151b00084ed779374a0d19f81a0c3ff64f268c3662022a3d688bee4c1e6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/supp-page-escaped-Ox43.pdf",
+      "category": "ocg",
+      "bytes": 808,
+      "sha256": "f8ea961ab9404063fca47b8b04403afedc40288b749f790350ed86d10cb38426",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "escaped-page-tag",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/supp-page-escaped-x4FC.pdf",
+      "category": "ocg",
+      "bytes": 808,
+      "sha256": "0f9dbf5a80d413f2f1c3b6bcb81d0b56e81b599c2587097b141d2614e6543c5b",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "escaped-page-tag",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "ocg/supp-page-escaped-x4fx43.pdf",
+      "category": "ocg",
+      "bytes": 810,
+      "sha256": "865fe8db60eacc37b4f1ec8d52120d1cbe865acc5ffd616c462fccfddd843071",
+      "expectation": {
+        "cohort": "representative",
+        "representativeGroup": "escaped-page-tag",
+        "preflight": {
+          "allowed": true,
+          "reason": "allow"
+        },
+        "pixelOracle": {
+          "poppler": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ],
+          "pdfjs": [
+            {
+              "page": 1,
+              "width": 200,
+              "height": 200,
+              "sha256": "1439513bc5a20bc9b43d240593413d949d7774d5601f949b63eeca7f61defb0a"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

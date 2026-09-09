@@ -27,8 +27,8 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   const baseProgressSource = read("node_modules/@base-ui/react/progress/root/ProgressRoot.mjs");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
-  // S1 removes the same two pages from the 15 P1b progress consumers.
-  assert.equal(consumers.length, 13);
+  // S1 removed two pages; U4-3 adds the PDF finish operation log.
+  assert.equal(consumers.length, 14);
   assert.match(source, /entry\.id === activeLogId \|\| Boolean\(entry\.stageKey && entry\.stageKey === activeStageKey\)/);
   assert.match(source, /isCurrent && status === "running" \? LoaderCircle : Circle/);
   assert.match(source, /className=\{isCurrent && status === "running" \? "animate-spin" : ""\}/);

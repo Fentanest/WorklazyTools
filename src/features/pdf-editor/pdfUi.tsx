@@ -1,8 +1,8 @@
-import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ResultCard, formatBytes } from "../../components/ui";
-import { buttonVariants } from "../../components/ui/button";
+import { Button, buttonVariants } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { FileShareButton } from "../../components/FileShareButton";
 import { useAppLanguage } from "../../i18n/routing";
@@ -10,22 +10,31 @@ import type { PdfWorkerResult } from "./types";
 import { featureMessage } from "../../i18n/featureMessages";
 import { cn } from "../../lib/utils";
 
+export { normalizeOutputName } from "./outputName.ts";
+
 export interface DownloadResult {
   url: string;
   fileName: string;
   size: number;
   warnings: string[];
+  dispose?: () => void | Promise<void>;
 }
 
 export function useDownloadResult() {
   const [result, setResult] = useState<DownloadResult | null>(null);
   const resultRef = useRef<DownloadResult | null>(null);
   useEffect(() => () => {
-    if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
+    if (resultRef.current) {
+      URL.revokeObjectURL(resultRef.current.url);
+      void resultRef.current.dispose?.();
+    }
   }, []);
 
   const replaceResult = useCallback((next: DownloadResult | null) => {
-    if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
+    if (resultRef.current) {
+      URL.revokeObjectURL(resultRef.current.url);
+      void resultRef.current.dispose?.();
+    }
     resultRef.current = next;
     setResult(next);
   }, []);
@@ -33,11 +42,32 @@ export function useDownloadResult() {
     const blob = new Blob([output.buffer], { type: output.mimeType });
     replaceResult({ url: URL.createObjectURL(blob), fileName: output.fileName, size: blob.size, warnings: output.warnings });
   }, [replaceResult]);
-  const makeBlobResult = useCallback((blob: Blob, fileName: string, warnings: string[] = []) => {
-    replaceResult({ url: URL.createObjectURL(blob), fileName, size: blob.size, warnings });
+  const makeBlobResult = useCallback((blob: Blob, fileName: string, warnings: string[] = [], dispose?: () => void | Promise<void>) => {
+    replaceResult({ url: URL.createObjectURL(blob), fileName, size: blob.size, warnings, dispose });
   }, [replaceResult]);
   const clearResult = useCallback(() => replaceResult(null), [replaceResult]);
   return useMemo(() => ({ result, makeResult, makeBlobResult, clearResult }), [clearResult, makeBlobResult, makeResult, result]);
+}
+
+export function useDownloadResults() {
+  const [results, setResults] = useState<DownloadResult[]>([]);
+  const resultsRef = useRef<DownloadResult[]>([]);
+  const clearResults = useCallback(() => {
+    for (const result of resultsRef.current) {
+      URL.revokeObjectURL(result.url);
+      void result.dispose?.();
+    }
+    resultsRef.current = [];
+    setResults([]);
+  }, []);
+  useEffect(() => clearResults, [clearResults]);
+  const makeBlobResults = useCallback((items: Array<Omit<DownloadResult, "url" | "size"> & { blob: Blob }>) => {
+    clearResults();
+    const next = items.map(({ blob, ...item }) => ({ ...item, url: URL.createObjectURL(blob), size: blob.size }));
+    resultsRef.current = next;
+    setResults(next);
+  }, [clearResults]);
+  return useMemo(() => ({ results, makeBlobResults, clearResults }), [clearResults, makeBlobResults, results]);
 }
 
 export function PdfDownloadCard({ result, title, compact = false }: { result: DownloadResult; title?: string; compact?: boolean }) {
@@ -69,9 +99,6 @@ export function PdfDownloadCard({ result, title, compact = false }: { result: Do
 export function PdfError({ message }: { message: string }) {
   const language = useAppLanguage();
   if (!message) return null;
-  return <div className="mt-4 flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-destructive" data-testid="pdf-error" role="alert"><AlertTriangle className="shrink-0" size={19} /><div className="flex flex-col"><strong className="text-sm">{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span className="mt-1 text-sm leading-relaxed text-muted-foreground">{message}</span></div></div>;
-}
-
-export function normalizeOutputName(value: string, fallback: string) {
-  return value.trim().replace(/[\\/:*?"<>|]+/g, "-") || fallback;
+  const displayLoadFailure = message === featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable");
+  return <div className="mt-4 flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-destructive" data-testid="pdf-error" role="alert"><AlertTriangle className="shrink-0" size={19} /><div className="flex flex-col"><strong className="text-sm">{featureMessage(language, "pdf.messages.pdfUi.unableToContinue")}</strong><span className="mt-1 text-sm leading-relaxed text-muted-foreground">{message}</span>{displayLoadFailure && <Button className="mt-3 w-fit rounded-xl text-foreground hover:text-foreground focus-visible:text-foreground" type="button" variant="outline" data-testid="pdf-display-reload" onClick={() => window.location.reload()}><RefreshCw size={16} />{featureMessage(language, "pdf.messages.pdfPreview.refreshPage")}</Button>}</div></div>;
 }
