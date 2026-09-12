@@ -12,7 +12,7 @@ const languages = ["ko", "en"];
 const { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } = await import("../src/app/seo.ts");
 
 const toolRoutes = [
-  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-editor", "hwp-editor", "office-editor", "video-studio", "audio-studio",
+  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "hwp-editor", "office-editor", "video-studio", "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "document-redactor", "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
 ];

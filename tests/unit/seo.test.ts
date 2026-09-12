@@ -4,7 +4,7 @@ import test from "node:test";
 import { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts";
 
 const toolRoutes = [
-  "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-generator", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
+  "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-generator", "/tools/document-compare", "/tools/pdf-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
   "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
   "/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
@@ -23,6 +23,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/qr-studio/bulk": "QR 일괄 생성 | Excel·CSV 행별 PNG·ZIP·라벨 PDF",
       "/tools/data-converter": "표 데이터 변환기 | CSV·JSON·HTML 상호 변환",
       "/tools/document-compare": "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
+      "/tools/pdf-compare": "PDF 파일 비교 | 페이지 화면·추출 텍스트 차이",
       "/tools/excel-compare": "Excel 파일 비교 - XLSX·XLSM·XLS·XLSB·CSV Diff",
       "/tools/excel-cleaner": "Excel 데이터 정리 - XLSX·XLS·CSV 클리너",
       "/tools/document-generator": "DOCX 문서 일괄 생성 | Excel·CSV 행별 문서 만들기",
@@ -38,6 +39,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/qr-studio/bulk": "Bulk QR Generator | Excel & CSV to PNG, ZIP and Label PDF",
       "/tools/data-converter": "Table Data Converter | Convert CSV, JSON & HTML",
       "/tools/document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
+      "/tools/pdf-compare": "PDF Compare | Visual and Extracted Text Differences",
       "/tools/excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
       "/tools/excel-cleaner": "Excel Data Cleaner | Clean XLSX, XLS & CSV Files",
       "/tools/document-generator": "Bulk DOCX Generator | Excel & CSV to Documents",
@@ -83,7 +85,7 @@ test("PDF finish aliases retain distinct metadata and canonicalize to the finish
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {
-  for (const [route, expectedCount] of [["/tools/document-redactor", 3], ["/tools/document-generator", 3], ["/tools/document-compare", 3], ["/tools/office-editor", 5]] as const) {
+  for (const [route, expectedCount] of [["/tools/document-redactor", 3], ["/tools/document-generator", 3], ["/tools/document-compare", 3], ["/tools/pdf-compare", 3], ["/tools/office-editor", 5]] as const) {
     const koreanFaq = getSeoDefinition("ko", route).faq;
     const englishFaq = getSeoDefinition("en", route).faq;
     assert.equal(koreanFaq?.length, expectedCount);

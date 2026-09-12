@@ -23,6 +23,7 @@ const PdfEditorPage = lazy(() => import("../features/pdf-editor/PdfEditorPage").
 const HwpEditorPage = lazy(() => import("../features/hwp-editor/HwpEditorPage").then((module) => ({ default: module.HwpEditorPage })));
 const DocumentComparePage = lazy(() => import("../features/document-compare/DocumentComparePage").then((module) => ({ default: module.DocumentComparePage })));
 const DocumentCompareResultPage = lazy(() => import("../features/document-compare/DocumentCompareResultPage").then((module) => ({ default: module.DocumentCompareResultPage })));
+const PdfComparePage = lazy(() => import("../features/pdf-compare/PdfComparePage").then((module) => ({ default: module.PdfComparePage })));
 const ExcelComparePage = lazy(() => import("../features/excel-compare/ExcelComparePage").then((module) => ({ default: module.ExcelComparePage })));
 const ExcelCleanerPage = lazy(() => import("../features/excel-cleaner/ExcelCleanerPage").then((module) => ({ default: module.ExcelCleanerPage })));
 const DocumentGeneratorPage = lazy(() => import("../features/document-generator/DocumentGeneratorPage").then((module) => ({ default: module.DocumentGeneratorPage })));
@@ -70,6 +71,7 @@ export function App() {
             <Route index element={<LazyToolRoute label="Document compare"><DocumentComparePage /></LazyToolRoute>} />
             <Route path="results/:pairNumber" element={<LazyToolRoute label="Document comparison results"><DocumentCompareResultPage /></LazyToolRoute>} />
           </Route>
+          <Route path="tools/pdf-compare" element={<LazyToolRoute label="PDF compare"><PdfComparePage /></LazyToolRoute>} />
           <Route path="tools/word-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
           <Route path="tools/hwp-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
           <Route path="tools/hwp-editor" element={<KoreanOnlyRoute><LazyToolRoute label="HWP editor"><HwpEditorPage /></LazyToolRoute></KoreanOnlyRoute>} />

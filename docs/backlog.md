@@ -4,7 +4,7 @@
 
 ## UI 시각 기준선 재설정
 
-- **U6 개인정보 가리기 기준선 7장 부재** — U7의 `VISUAL_ONLY=document-generator` 기준선 생성·비교에서 새 U7 6장은 diff 0이었지만, 전역 inventory 검사가 이전 U6 `document-redactor` 기준선 7장 부재로 exit 1이었다. U7 기준을 넓혀 만들거나 검사를 완화하지 않고, `ui-theme-rebaseline-procedure-20260909.md`의 전체 기준 재설정 단계에서 실제 U6 상태를 다시 캡처·검수한다. 근거: `/tmp/worklazy-u7-final/visual-baseline-u7.log`, `/tmp/worklazy-u7-final/visual-compare-u7.log`. — Codx
+- **U6 개인정보 가리기 기준선 7장 부재** — U7의 `VISUAL_ONLY=document-generator`와 U8의 `VISUAL_ONLY=pdf-compare` 기준선 생성·비교에서 각 소유 범위 6장은 diff 0이었지만, 전역 inventory 검사가 이전 U6 `document-redactor` 기준선 7장 부재로 계속 exit 1이었다. U7·U8 기준을 넓혀 만들거나 검사를 완화하지 않고, `ui-theme-rebaseline-procedure-20260909.md`의 전체 기준 재설정 단계에서 실제 U6 상태를 다시 캡처·검수한다. 근거: `/tmp/worklazy-u7-final/visual-baseline-u7.log`, `/tmp/worklazy-u7-final/visual-compare-u7.log`, `/tmp/worklazy-u8-final/09-visual-baseline-owner.log`, `/tmp/worklazy-u8-final/10-visual-compare-owner.log`. — Codx
 
 ## Excel 비교 — 중복키·머리글 후속
 

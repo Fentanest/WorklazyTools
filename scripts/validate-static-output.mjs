@@ -11,7 +11,7 @@ if (!rhwpCoreVersion || rhwpCoreVersion !== rhwpEditorVersion) throw new Error("
 const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/stickers.manifest.json", "utf8"));
 
 const routes = [
-  "", "tools", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare",
+  "", "tools", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
@@ -22,7 +22,7 @@ const routes = [
   "about", "privacy", "terms", "contact", "licenses",
 ];
 const socialSlugByRoute = {
-  "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-generator": "document-generator", "tools/document-compare": "document-compare", "tools/pdf-editor": "pdf-tools",
+  "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-generator": "document-generator", "tools/document-compare": "document-compare", "tools/pdf-compare": "pdf-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
   "tools/pdf-editor/finish": "pdf-finish", "tools/pdf-editor/page-numbers": "pdf-page-numbers", "tools/pdf-editor/header-footer": "pdf-header-footer", "tools/pdf-editor/watermark": "pdf-watermark", "tools/pdf-editor/stamp": "pdf-stamp",
   "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",
@@ -80,7 +80,7 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk", "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
+  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk", "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
       ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/excel-compare"
@@ -91,6 +91,8 @@ for (const route of routes) {
         ? language === "ko" ? "어떤 양식을 사용할 수 있나요?" : "Which templates can I use?"
       : route === "tools/document-compare"
         ? language === "ko" ? "DOC와 DOCX를 서로 비교할 수 있나요?" : "Can I compare DOC with DOCX?"
+      : route === "tools/pdf-compare"
+        ? language === "ko" ? "PDF의 모든 차이를 찾을 수 있나요?" : "Can this find every difference in a PDF?"
         : route === "tools/video-studio"
           ? language === "ko" ? "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?" : "Can I apply one group's video ranges to other groups?"
         : route === "tools/text-merger"

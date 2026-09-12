@@ -75,7 +75,7 @@ try {
   }
 
   await page.goto(`${koBaseUrl}/tools`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .ui-tool-card").length === 22);
+  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .ui-tool-card").length === 23);
   const grid = await page.$eval(".all-tools-grid", (element) => ({ columns: getComputedStyle(element).gridTemplateColumns.split(" ").length, width: element.getBoundingClientRect().width }));
   if (grid.columns !== 4 || grid.width < 900) throw new Error(`Tool grid is not four columns: ${JSON.stringify(grid)}`);
   const categoryOverview = await page.evaluate(() => ({
@@ -94,7 +94,7 @@ try {
     iconAccent: card.querySelector("[data-accent]")?.getAttribute("data-accent"),
     href: card.getAttribute("href"),
   })));
-  if (toolCards.length !== 22 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== `ui-accent-${card.iconAccent}`)) {
+  if (toolCards.length !== 23 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== `ui-accent-${card.iconAccent}`)) {
     throw new Error(`Tool card link or accent contract failed: ${JSON.stringify(toolCards)}`);
   }
   await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
@@ -170,7 +170,7 @@ try {
     };
   });
   if (mobileNavigationSheet.role !== "dialog" || mobileNavigationSheet.modal !== "true" || mobileNavigationSheet.label !== "바로가기"
-    || mobileNavigationSheet.title !== "어떤 작업을 할까요?" || !mobileNavigationSheet.overlay || mobileNavigationSheet.links !== 23
+    || mobileNavigationSheet.title !== "어떤 작업을 할까요?" || !mobileNavigationSheet.overlay || mobileNavigationSheet.links !== 24
     || mobileNavigationSheet.top < -1 || mobileNavigationSheet.bottom > 845 || mobileNavigationSheet.overflowY !== "hidden"
     || mobileNavigationSheet.listOverflowY !== "auto" || !mobileNavigationSheet.listScrollable || mobileNavigationSheet.pageOverflow > 1) {
     throw new Error(`Mobile navigation sheet semantics or clipping failed: ${JSON.stringify(mobileNavigationSheet)}`);
@@ -400,7 +400,7 @@ try {
   const social = await page.evaluate(() => ({ card: document.querySelector('meta[name="twitter:card"]')?.content, image: document.querySelector('meta[property="og:image"]')?.content }));
   if (social.card !== "summary_large_image" || !social.image?.endsWith("/social/tools/pdf-convert-ko.png")) throw new Error(`Tool-specific social metadata is incomplete: ${JSON.stringify(social)}`);
 
-  const englishRoutes = ["/en/", "/en/tools/", "/en/tools/excel-merger", "/en/tools/excel-compare", "/en/tools/excel-cleaner", "/en/tools/document-generator", "/en/tools/document-compare", "/en/tools/office-editor", "/en/tools/pdf-editor", "/en/tools/pdf-editor/convert", "/en/tools/audio-studio", "/en/tools/image-studio", "/en/tools/text-merger", "/en/tools/text-tools", "/en/tools/text-formatter", "/en/tools/work-calculator", "/en/tools/timezone-calculator", "/en/tools/payroll-calculator", "/en/tools/image-privacy", "/en/tools/security-tools", "/en/tools/qr-studio", "/en/tools/data-converter", "/en/privacy", "/en/terms"];
+  const englishRoutes = ["/en/", "/en/tools/", "/en/tools/excel-merger", "/en/tools/excel-compare", "/en/tools/excel-cleaner", "/en/tools/document-generator", "/en/tools/document-compare", "/en/tools/pdf-compare", "/en/tools/office-editor", "/en/tools/pdf-editor", "/en/tools/pdf-editor/convert", "/en/tools/audio-studio", "/en/tools/image-studio", "/en/tools/text-merger", "/en/tools/text-tools", "/en/tools/text-formatter", "/en/tools/work-calculator", "/en/tools/timezone-calculator", "/en/tools/payroll-calculator", "/en/tools/image-privacy", "/en/tools/security-tools", "/en/tools/qr-studio", "/en/tools/data-converter", "/en/privacy", "/en/terms"];
   for (const route of englishRoutes) {
     await page.goto(`${baseUrl}${route}`, { waitUntil: "networkidle0" });
     const localized = await page.evaluate(() => ({
@@ -413,7 +413,7 @@ try {
   }
   await page.goto(`${baseUrl}/en/tools/`, { waitUntil: "networkidle0" });
   const englishToolCount = await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.length);
-  if (englishToolCount !== 21) throw new Error(`English tool catalog should hide HWP editor: ${englishToolCount}`);
+  if (englishToolCount !== 22) throw new Error(`English tool catalog should hide HWP editor: ${englishToolCount}`);
   await page.goto(`${baseUrl}/en/tools/hwp-editor`, { waitUntil: "networkidle0" });
   if (new URL(page.url()).pathname !== "/en/tools") throw new Error(`English HWP editor was not hidden: ${page.url()}`);
 

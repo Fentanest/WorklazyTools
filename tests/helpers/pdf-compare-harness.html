@@ -1,0 +1,9 @@
+<!doctype html><html><head><title>PDF comparison engine harness</title></head><body><main id="preview"></main><script type="module">
+import { comparePdfPairs, loadSelectedPreview } from '/src/features/pdf-compare/engine.ts';
+import { PdfCompareSession } from '/src/features/pdf-compare/session.ts';
+import { writePairReport, writeComparisonReports } from '/src/features/pdf-compare/report.ts';
+import { openComparisonPdf } from '/src/features/pdf-compare/runtime.ts';
+import pdfDisplayUrl from 'pdfjs-dist/build/pdf.mjs?url';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+window.pdfCompare = { pdfDisplayUrl, pdfWorkerUrl, openComparisonPdf, comparePdfPairs, loadSelectedPreview, PdfCompareSession, writePairReport, writeComparisonReports };
+</script></body></html>

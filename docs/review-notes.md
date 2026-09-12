@@ -2,6 +2,20 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-13
+
+### U8 PDF 비교 구현·검수·최종 통합 판정 (Codx)
+
+여러 전후 PDF 쌍, 쪽 번호 기본 대응과 페이지를 한 번만 쓰는 수동 대응, 추가·삭제 쪽, 렌더 픽셀·추출 텍스트 차이, 선택 미리보기·overlay, 쌍별 XLSX와 2개 이상 ZIP을 브라우저 안에서 처리하도록 구현했다. 입력·threshold·대응·좌우 교체·쌍 추가/삭제는 이전 결과를 즉시 무효화한다. 최초 독립 검수에서 지연 중인 보고서가 좌우 교체 뒤 내려받아지고 재실행 중 옛 결과가 남는 두 결함을 재현했으며, export/run generation과 abort·URL 해제를 같은 UI 수명주기에 묶은 R4에서 원 지연 probe 두 건 모두 늦은 다운로드·URL·anchor click 0, 재실행 중 옛 결과·다운로드 0을 독립 확인했다. 정상 재실행 XLSX는 현재 방향 `changed-word.pdf / normal-ascii.pdf`, 취소 부분 XLSX는 완료 5·취소 1·미확인 194였다. core 7파일은 이 수리에서 바뀌지 않았다.
+
+최종 production build와 정적 77페이지, unit **543/543**, utilities, recovery **159건**, PDF finish oracle(preflight87·허용56·제외31·양 renderer SHA56), bundle 측정을 통과했다. Utility production smoke가 관찰한 외부 HTTP(S) **131건은 모두 실행 전에 차단된 외부 요청**이다. 합성 PDF를 입력한 전용 U8 QA와 R4 독립 probe의 외부 HTTP(S)는 **0건**이었다. 두 수치를 같은 실행의 전후 변화나 추적 실행으로 합치지 않는다.
+
+Production 요청 graph의 첫 두 시도는 page 단위 interception이라 worker 요청을 보지 못해 expected1/actual0으로 실패했다. Service Worker를 막은 새 context 단위 interception으로 바로잡은 실행에서는 초기 route·entry·CSS·lazy page 의존성과, 입력 뒤 renderer entry 1·renderer worker 1·compare worker 1을 확인해 PDF 공급 중복 0으로 판정했다. 제품 worker 누락으로 확대하지 않았고 실패 로그를 보존했다. 번들 schema3 기준 SHA `4caaa9c6…`, 다섯 상한 null·override `{}`·multiplier1을 유지했다. gzip 실측은 entry **322625**, U8 route **12394**, shared **2230654**, app **6708916**, CSS **39395B**다.
+
+U8 소유 시각 기준선 initial/bottom **6장**은 생성 뒤 같은 `VISUAL_ONLY=pdf-compare`로 다시 비교되어 U8 diff 실패가 없었다. 두 명령은 캡처 6/6 뒤 기존 U6 document-redactor 기준선 **7장 부재**를 검사하는 전역 집합 단언에서만 exit1이었다. 누락7을 만들거나 검사를 완화하지 않고 UI 전체 재기준화 backlog를 유지한다. R3 17장 actual 화면은 JSX/style 동일성이 확인된 R4에 재사용했다.
+
+Stage3의 같은 환경·같은 입력 반복은 차이0이고 canvas 기하·scale/DPI는 DPR 독립이었다. 별도 엄격 cross-DPR 글꼴 픽셀 불변 실험은 pixelCount **3913/3973**으로 실패했으며 제품 보장으로 채택하지 않았다. 화면에는 현재 브라우저 렌더 결과를 비교하므로 화면 배율·기기·가용 글꼴에 따라 차이율이 달라질 수 있다는 한계를 추출 순서/정확성 한계와 별도 문장으로 표시한다. 이 실패를 stage3 전체 PASS로 바꾸지 않는다. 근거는 `/tmp/worklazy-u8-stage3-core/`, `/tmp/worklazy-u8-ui-fix/`, `/tmp/worklazy-u8-ui-review-r4/`, `/tmp/worklazy-u8-final/`이다. — Codx
+
 ## 2026-09-09
 
 ### U6 P0 검사기 재검토·부분 채택 (Codx)

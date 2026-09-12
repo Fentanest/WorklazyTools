@@ -76,6 +76,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "DOCX와 HWP를 비교할 수 있나요?", answer: "불가능합니다. 분석 전에 해당 쌍을 차단하므로 Word 문서끼리, HWP 문서끼리 짝지어 주세요." },
       { question: "DOC도 Word 변경 추적 파일을 만들 수 있나요?", answer: "아닙니다. 두 파일이 모두 DOCX인 문서 쌍에만 적용됩니다." },
     ],
+    "/tools/pdf-compare": [
+      { question: "PDF의 모든 차이를 찾을 수 있나요?", answer: "화면은 같은 PDF 렌더 설정의 픽셀 차이를 비교하고, 텍스트는 PDF에 저장된 추출 순서를 따릅니다. 두 결과를 함께 확인해야 하며 문서 내용의 동일성을 판정하지 않습니다." },
+      { question: "페이지가 추가되거나 순서가 바뀌면 어떻게 되나요?", answer: "처음에는 물리 쪽 번호로 대응합니다. 추가·삭제 페이지를 확인하고 필요한 경우 각 페이지를 한 번만 쓰도록 수동 대응한 뒤 다시 비교할 수 있습니다." },
+      { question: "PDF 파일이 서버로 전송되나요?", answer: "아니요. PDF 열기, 페이지 렌더링, 텍스트 추출과 보고서 생성은 현재 브라우저에서 처리하며 원본 파일은 변경하지 않습니다." },
+    ],
     "/tools/office-editor": [
       { question: "처음 실행 용량이 큰 이유는 무엇인가요?", answer: "오피스 프로그램과 글꼴·리소스를 브라우저에 저장해야 하기 때문입니다. 다음 실행부터는 저장된 파일을 재사용할 수 있습니다." },
       { question: "파일을 놓으면 바로 열리나요?", answer: "지원 파일 한 개를 놓으면 집중 편집 화면 이동, 편집기 준비와 문서 열기가 자동으로 이어집니다." },
@@ -150,6 +155,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Can I compare DOCX with HWP?", answer: "No. The pair is rejected before analysis. Pair Word files together and HWP files together." },
       { question: "Does tracked Word output work for DOC?", answer: "No. It is limited to pairs where both files are DOCX." },
     ],
+    "/tools/pdf-compare": [
+      { question: "Can this find every difference in a PDF?", answer: "Visual results compare pixels under the same PDF render settings, while text results follow the PDF's stored extraction order. Review both; the tool does not determine document equivalence." },
+      { question: "What happens when pages are inserted or reordered?", answer: "Pages initially match by physical page number. Review added or deleted pages, then optionally assign each page at most once in manual mapping and compare again." },
+      { question: "Are PDF files uploaded to a server?", answer: "No. Opening PDFs, rendering pages, extracting text, and creating reports happen in the current browser without modifying the source files." },
+    ],
     "/tools/office-editor": [
       { question: "Why is the first start large?", answer: "A browser build of the office suite and its fonts and resources must be stored locally. Later starts can reuse the cache." },
       { question: "Does dropping a file open it automatically?", answer: "Yes. Dropping one supported file moves to the focused workspace, prepares the editor and opens the document in one flow." },
@@ -200,6 +210,7 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/excel-cleaner": "excel-cleaner",
   "/tools/document-generator": "document-generator",
   "/tools/document-compare": "document-compare",
+  "/tools/pdf-compare": "pdf-compare",
   "/tools/pdf-editor": "pdf-tools",
   "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
   "/tools/pdf-editor/pdf-to-image": "pdf-to-image",
@@ -273,6 +284,11 @@ export const seoByPath: Record<string, SeoDefinition> = {
       name: "Document Compare",
       featureList: ["DOCX·DOC Word 문서 비교", "HWP·HWPX 한글 문서 비교", "문단 이동·분할·병합 판정", "표 구조 변경 비교", "머리말·꼬리말·메모 비교", "Excel 비교 보고서", "DOCX 전용 Word 변경 추적"],
     },
+  },
+  "/tools/pdf-compare": {
+    title: "PDF 파일 비교 | 페이지 화면·추출 텍스트 차이",
+    description: "여러 수정 전후 PDF 쌍을 쪽 번호 또는 수동 대응으로 비교하고 페이지별 렌더 픽셀, 추출 텍스트 차이와 XLSX·ZIP 보고서를 확인하세요.",
+    application: { name: "PDF Compare", featureList: ["여러 PDF 쌍", "쪽 번호·수동 페이지 대응", "페이지 렌더 픽셀 비교", "추출 텍스트 비교", "추가·삭제 페이지", "쌍별 XLSX·다중 ZIP"] },
   },
   "/tools/pdf-editor": {
     title: "PDF 도구 | 페이지 편집·병합·변환·OCR",
@@ -432,6 +448,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "document-generator": "Bulk DOCX Generator | Excel & CSV to Documents",
   "pdf-editor": "PDF Tools | Edit, Merge, Convert & OCR PDFs",
   "document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
+  "pdf-compare": "PDF Compare | Visual and Extracted Text Differences",
   "hwp-editor": "HWP Editor | Edit HWP & HWPX Documents",
   "office-editor": "Browser Office Editor | Edit DOCX, XLSX & PPTX",
   "video-studio": "Video Studio | Trim, Join & Extract Audio",
@@ -457,6 +474,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/excel-compare": { title: "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files", description: "Check a suggested header, compare Excel and CSV pairs by position, keys or reconciliation rules, and download a nine-sheet XLSX report.", application: { name: "Excel Compare", featureList: ["XLSX, XLSM, XLS, XLSB, SpreadsheetML and CSV", "Suggested header selection and manual changes", "Position, key and reconciliation matching", "Grouped left and right rows for duplicate keys", "Formula and cached-value comparison", "XLSX and XLSM formatting comparison", "Nine-sheet report per pair", "ZIP for multiple successful pairs"] } },
   "/tools/excel-cleaner": { title: "Excel Data Cleaner | Clean XLSX, XLS & CSV Files", description: "Apply 28 ordered structure, text, row-filter, and value-conversion rules to Excel and CSV files, then download cleaned XLSX, CSV, reports, and ZIP results.", application: { name: "Excel Data Cleaner", featureList: ["Multiple Excel and CSV files", "13 structure rules", "7 text rules", "3 row-filter rules", "5 value-conversion rules", "Formula-reference updates and safe fallback", "XLSX, CSV, and ZIP results"] } },
   "/tools/document-generator": { title: "Bulk DOCX Generator | Excel & CSV to Documents", description: "Replace simple variables in one DOCX template with displayed values from each Excel or CSV row, then download documents, a ZIP and an XLSX report.", application: { name: "Bulk DOCX Generator", featureList: ["Simple DOCX variables", "Multiple Excel and CSV files", "Sheet and header-row selection", "Sample DOCX", "Sequential row generation", "Individual files, ZIP and XLSX reports"] } },
+  "/tools/pdf-compare": { title: "PDF Compare | Visual and Extracted Text Differences", description: "Compare before-and-after PDF pairs by page, inspect rendered pixel and extracted-text differences, and download XLSX or ZIP reports in your browser.", application: { name: "PDF Compare", featureList: ["Multiple PDF pairs", "Page-number and manual mapping", "Rendered pixel comparison", "Extracted text comparison", "Added and deleted pages", "XLSX and ZIP reports"] } },
   "/tools/qr-studio/bulk": { title: "Bulk QR Generator | Excel & CSV to PNG, ZIP and Label PDF", description: "Create text, email, telephone, SMS, Wi-Fi, vCard or web QR codes from Excel and CSV rows, verify every final PNG, and export ZIP, label PDF and XLSX reports.", application: { name: "Bulk QR Generator", featureList: ["Excel and CSV row mapping", "Seven standard payload types", "Header templates", "Logo and transparent PNG", "Read-back verification", "Incremental ZIP", "A4 and Letter label PDF", "XLSX manifest and failures"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
@@ -474,7 +492,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
 };
 
 const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
-  "/tools/excel-merger": "excel-merger", "/tools/excel-compare": "excel-compare", "/tools/excel-cleaner": "excel-cleaner", "/tools/document-compare": "document-compare", "/tools/pdf-editor": "pdf-editor",
+  "/tools/excel-merger": "excel-merger", "/tools/excel-compare": "excel-compare", "/tools/excel-cleaner": "excel-cleaner", "/tools/document-compare": "document-compare", "/tools/pdf-compare": "pdf-compare", "/tools/pdf-editor": "pdf-editor",
   "/tools/hwp-editor": "hwp-editor", "/tools/office-editor": "office-editor", "/tools/video-studio": "video-studio",
   "/tools/audio-studio": "audio-studio", "/tools/image-studio": "image-studio", "/tools/text-tools": "text-tools",
   "/tools/text-merger": "text-merger",
