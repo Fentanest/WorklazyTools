@@ -69,6 +69,7 @@ export const toolCategories: ToolCategoryDefinition[] = [
 ];
 
 export const tools: ToolDefinition[] = [
+  { id: "document-redactor", category: "security-share", path: "/tools/document-redactor", title: "개인정보 마스킹", shortTitle: "개인정보 마스킹", description: "PDF와 이미지에서 직접 선택한 영역을 검정으로 가리고 새 사본으로 저장합니다.", eyebrow: "문서 개인정보", accent: "violet", icon: LockKeyhole, highlights: [{icon: Scissors, label: "직접 영역 선택"}, {icon: Files, label: "모든 PDF 페이지 재생성"}, {icon: Images, label: "이미지 PNG 저장"}, {icon: FileSearch2, label: "결과 다시 확인"}], status: "available" },
   {
     id: "excel-merger",
     category: "documents",

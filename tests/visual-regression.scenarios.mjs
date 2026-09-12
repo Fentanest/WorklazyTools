@@ -42,6 +42,7 @@ const interactionProfiles = Object.freeze([enDarkDesktop]);
 const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, koLightMobile320, enLightMobile320]);
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
+  "document-redactor",
   "text-formatter",
   "work-calculator",
   "payroll-calculator",
@@ -158,6 +159,18 @@ const bottomScenarioFor = (route) => {
 };
 
 const interactionDefinitions = Object.freeze({
+  "document-redactor": Object.freeze({
+    stateId: "interaction-manual-mask",
+    fixture: {kind: "generated-png", fileName: "visual-redactor.png", width: 320, height: 220},
+    actions: [
+      {type: "wait-enabled", selector: "[data-tool-page='document-redactor'] input[type='file']"},
+      {type: "upload", selector: "[data-tool-page='document-redactor'] input[type='file']"},
+      {type: "wait-canvas", selector: ".redactor-preview-canvas"},
+      {type: "click", selector: ".redactor-toolbar button", elementIndex: 2},
+      {type: "wait", selector: ".redactor-mask"},
+    ],
+    assertSelector: ".redactor-mask",
+  }),
   "excel-merger": Object.freeze({
     stateId: "interaction-sheet-selection",
     profiles: Object.freeze([enDarkDesktop, enDarkMobile, koDarkMobile]),

@@ -83,3 +83,7 @@
 - **HWP 편집기 iframe 접근성 위반 4노드** — 벤더 rhwp Studio 내부(`#sb-message` 대비 3.54 · `#style-name`·`#font-lang`·`#font-name` 는 title 만으로 라벨). `4d0bae9` 에서도 동일 검출(`/tmp/worklazy-s0/deploy/logs/baseline-findings-full.log`). `public/vendor/**` 라 저장소에서 수정 불가 — 선택지: ① 상류(rhwp) 이슈 제기 ② 접근성 게이트에서 벤더 iframe 을 목적·소유자 명시 예외로 분리(광역 wildcard 금지). S2-H ③ 에서 결정. — Claude
 - **모바일 하단 탭 라벨 대비 3.06**(`.bottom-tab > span`, `#909098`/`#fbfbfd`, 12px bold, 기준 4.5) — P2 셸 스타일, S0 diff 무관. 색 토큰 1개 조정 + 시각 기준선 갱신. 접근성 하네스가 mobile viewport 를 재지 않아 게이트에 안 걸렸다 — S2-H ③ 페이지·viewport 등록 확장과 함께. — Claude
 - **없는 경로의 인앱 NotFound 뷰 부재** — 정적 `404.html`(noindex)·HTTP 404 는 정상이나 앱 기동 후 React Router 가 홈을 렌더한다(`4d0bae9` 동일). SEO 영향 없음(HTTP 404 유지). 제품 결정 필요: 홈 폴백 유지 vs ko/en NotFound 뷰 신설(신설 시 「현지화·SEO·AdSense 동시 검토」·시각 회귀 추가). — Claude
+## U6 검수에서 확인한 공용 UI 후속
+
+- **EN320 동의 배너의 오른쪽 동작 잘림** — 320px에서 `Accept and continue` 버튼 right 381.97px, viewport 320px이며 문서 가로 스크롤로 복구되지 않는다. U6와 기존 PDF Merge에서 같은 geometry라 U6 회귀가 아니다. UI v3에서 버튼 줄바꿈·세로 배치를 포함해 공용 배너 경계를 고친다. 근거 `/tmp/worklazy-u6-preflight/final-ui-review/inherited-comparison.json`.
+- **고정 데스크톱 언어 스위처의 배경 의존 대비** — U6 결과 화면의 안정 axe에서 기존 translucent LanguageSwitcher 대비 1건이 남았다. UI v3에서 이 공용 control의 실제 배경별 대비를 고정한다. U6에서 전역 스위처 색을 임의 변경하지 않는다.

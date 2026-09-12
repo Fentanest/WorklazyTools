@@ -19,6 +19,7 @@ export interface SeoDefinition {
 
 const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDefinition["faq"]>>> = {
   ko: {
+    "/tools/document-redactor": [{"question": "개인정보를 자동으로 찾아 주나요?", "answer": "아니요. 가릴 영역을 직접 선택해야 합니다. 선택하지 않은 위치의 개인정보는 남을 수 있으므로 결과를 다시 확인하세요."}, {"question": "PDF의 텍스트와 서명은 유지되나요?", "answer": "모든 페이지를 이미지로 재생성하므로 검색·복사 가능한 텍스트, 전자서명, 양식과 링크는 유지되지 않습니다. 원본 파일은 변경하지 않습니다."}, {"question": "해상도와 파일 크기는 어떻게 되나요?", "answer": "PDF는 선택한 해상도로 저장하며 원본보다 파일이 커질 수 있습니다. 메모리 한도를 넘으면 처리를 중단합니다. 이미지 결과는 PNG입니다."}],
     "/tools/excel-merger": [
       { question: "XLSX 수식과 서식을 따로 보존할 수 있나요?", answer: "가능합니다. XLSX 수식 보존과 서식 보존을 현재 화면에서 각각 선택할 수 있으며 추가 파일을 준비하지 않습니다." },
       { question: "XLS 수식과 서식을 따로 보존할 수 있나요?", answer: "가능합니다. XLS 수식 보존과 XLS 서식 보존을 각각 선택할 수 있으며, 둘 중 하나만 켜도 정밀 변환 화면으로 이동합니다." },
@@ -87,6 +88,7 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
     ],
   },
   en: {
+    "/tools/document-redactor": [{"question": "Are private details detected automatically?", "answer": "No. Select every area yourself. Private details outside those areas may remain, so review the output."}, {"question": "Does the PDF keep text and signatures?", "answer": "Every page is rasterized. Searchable and selectable text, digital signatures, forms and links are not preserved. The original file is unchanged."}, {"question": "How do resolution and file size change?", "answer": "PDF output uses the selected resolution and may be larger than the original. Processing stops at memory limits. Image output is PNG."}],
     "/tools/excel-merger": [
       { question: "Can XLSX formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate XLSX switches on the current screen and require no additional files." },
       { question: "Can XLS formulas and formatting be preserved independently?", answer: "Yes. Formula and formatting preservation are separate switches, and either one opens the higher-fidelity conversion workspace." },
@@ -182,6 +184,7 @@ export const socialImages = {
 } as const;
 
 const socialImageSlugByPath: Record<string, string> = {
+  "/tools/document-redactor": "document-redactor",
   "/tools/excel-merger": "excel-merger",
   "/tools/excel-compare": "excel-compare",
   "/tools/excel-cleaner": "excel-cleaner",
@@ -214,6 +217,7 @@ const socialImageSlugByPath: Record<string, string> = {
 };
 
 export const seoByPath: Record<string, SeoDefinition> = {
+  "/tools/document-redactor": {title: "개인정보 마스킹 | PDF·이미지 영역 가리기", description: "PDF와 JPG·PNG·WebP 이미지의 영역을 직접 검정으로 가리고 새 사본을 저장하세요. 원본은 변경하지 않으며 PDF의 모든 페이지를 이미지로 재생성합니다.", application: {name: "개인정보 마스킹", featureList: ["직접 영역 선택", "검정 픽셀 마스킹", "모든 PDF 페이지 재생성", "PNG 이미지 저장", "결과 확인"]}},
   "/": {
     title: "무료 문서·PDF·비디오·이미지 업무 도구 | Worklazy Tools",
     description: "설치와 로그인 없이 문서·미디어 편집, 텍스트·데이터 변환, 일정·급여 계산과 보안 도구를 실행하세요. 입력은 브라우저에서 처리합니다.",
@@ -405,6 +409,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
 };
 
 const englishToolTitles: Record<keyof typeof enTools.items, string> = {
+  "document-redactor": "Document Redaction | Mask PDF and Image Areas",
   "excel-merger": "Excel Merger | Combine Excel & CSV Files",
   "excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
   "excel-cleaner": "Excel Data Cleaner | Clean XLSX, XLS & CSV Files",
@@ -428,6 +433,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
 };
 
 const englishPageSeo: Record<string, SeoDefinition> = {
+  "/tools/document-redactor": {title: "Document Redaction | Mask PDF and Image Areas", description: "Cover selected PDF, JPG, PNG and WebP areas with black masks and save a new copy. Original files remain unchanged; every PDF page is rasterized.", application: {name: "Document Redaction", featureList: ["Manual area selection", "Solid black pixel masks", "Rasterize every PDF page", "PNG image output", "Review results"]}},
   "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
   "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with separate formula and formatting controls for XLSX and XLS input.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "Independent XLSX formula and formatting preservation", "Independent XLS formula and formatting preservation", "Encrypted input and output"] } },

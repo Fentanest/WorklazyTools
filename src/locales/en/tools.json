@@ -11,6 +11,7 @@
     "security-share": { "label": "Privacy & sharing", "shortLabel": "Privacy & sharing", "description": "Protect metadata, create strong passwords and share with QR codes." }
   },
   "items": {
+    "document-redactor": {"title": "Document Redaction", "shortTitle": "Document redaction", "description": "Cover selected areas in PDFs and images with solid black masks and save new copies.", "eyebrow": "DOCUMENT PRIVACY", "highlights": ["Manual area selection", "Rasterize every PDF page", "Save images as PNG", "Review the output"]},
     "excel-merger": { "title": "Excel Merger", "shortTitle": "Excel merger", "description": "Combine multiple Excel and CSV files into one organized workbook.", "eyebrow": "SPREADSHEETS", "highlights": ["One sheet per source", "Append rows", "Join columns", "Blank areas & passwords"] },
     "excel-compare": { "title": "Excel Compare", "shortTitle": "Excel compare", "description": "Check a suggested header, compare Excel or CSV pairs, and review both source-row groups for each duplicate key.", "eyebrow": "SPREADSHEET COMPARISON", "highlights": ["Suggested header selection", "Position & key matching", "Grouped duplicate keys", "Reconciliation", "Excel report per pair"] },
     "excel-cleaner": { "title": "Excel Data Cleaner", "shortTitle": "Excel cleaner", "description": "Apply an ordered pipeline of 28 cleanup rules to Excel and CSV files and export XLSX, CSV, and reports.", "eyebrow": "SPREADSHEET CLEANUP", "highlights": ["13 structure rules", "7 text rules", "8 filter & value rules", "Multiple files & reports"] },

@@ -7,6 +7,7 @@ import type { PdfTextCell, PdfTextDocument, PdfTextLine, PdfTextPage, WorkerProg
 import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage } from "../../i18n/featureMessages";
 import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from "../../utils/cooperativeCancel.ts";
+import { waitWithAbort, settleOwnedPdfLoad } from "../../utils/pdfOwnedDocument.ts";
 import { waitForPdfRender } from "./pdfRenderLifecycle";
 
 type PdfDisplayModule = typeof import("pdfjs-dist");
@@ -55,11 +56,9 @@ export async function openOwnedPdfDocument(
     isImageDecoderSupported: false,
   });
   try {
-    const document = await waitWithAbort(loadingTask.promise, signal, "PDF loading cancelled");
-    throwIfAborted(signal, "PDF loading cancelled");
+    const { document } = await settleOwnedPdfLoad(loadingTask, signal);
     return { document, loadingTask };
   } catch (error) {
-    try { await loadingTask.destroy(); } catch { /* A failed owned load has no reusable resources. */ }
     if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
     throw normalizePdfOpenError(error, language);
   }
@@ -94,24 +93,7 @@ const TESSERACT_BASE_URL = new URL(
   new URL(import.meta.env.BASE_URL, window.location.origin),
 ).href;
 
-function waitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal, canceledMessage = "PDF loading cancelled") {
-  throwIfAborted(signal, canceledMessage);
-  if (!signal) return promise;
-  return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(new DOMException(canceledMessage, "AbortError"));
-    signal.addEventListener("abort", abort, { once: true });
-    promise.then(
-      (value) => {
-        signal.removeEventListener("abort", abort);
-        resolve(value);
-      },
-      (reason) => {
-        signal.removeEventListener("abort", abort);
-        reject(reason);
-      },
-    );
-  });
-}
+
 
 export async function getPdfDocument(file: File, language: AppLanguage = "ko", signal?: AbortSignal) {
   throwIfAborted(signal, "PDF loading cancelled");

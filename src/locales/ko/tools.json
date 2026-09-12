@@ -11,6 +11,7 @@
     "security-share": { "label": "보안·공유", "shortLabel": "보안·공유", "description": "개인정보를 보호하고 안전한 비밀번호와 공유용 QR을 만듭니다." }
   },
   "items": {
+    "document-redactor": {"title": "개인정보 마스킹", "shortTitle": "개인정보 마스킹", "description": "PDF와 이미지에서 직접 선택한 영역을 검정으로 가리고 새 사본으로 저장합니다.", "eyebrow": "문서 개인정보", "highlights": ["직접 영역 선택", "모든 PDF 페이지 재생성", "이미지 PNG 저장", "결과 다시 확인"]},
     "excel-merger": { "title": "Excel Merger", "shortTitle": "Excel 병합", "description": "여러 Excel 파일과 CSV를 원하는 방식으로 하나의 파일에 정리합니다.", "eyebrow": "스프레드시트", "highlights": ["시트별 병합", "세로 병합", "가로 병합", "빈 영역·암호"] },
     "excel-compare": { "title": "Excel Compare", "shortTitle": "Excel 비교", "description": "머리글 후보를 확인한 뒤 Excel·CSV 파일 쌍의 값·수식·서식 차이와 중복 키의 좌우 원본 행을 비교합니다.", "eyebrow": "스프레드시트 비교", "highlights": ["머리글 후보 선택", "위치·키 비교", "중복 키 좌우 묶음", "회계 대사", "쌍별 Excel 보고서"] },
     "excel-cleaner": { "title": "Excel Data Cleaner", "shortTitle": "Excel 정리", "description": "Excel·CSV 파일에 28종 규칙을 순서대로 적용하고 새 XLSX·CSV와 처리 보고서를 만듭니다.", "eyebrow": "스프레드시트 정리", "highlights": ["구조 규칙 13종", "텍스트 규칙 7종", "필터·값 변환 8종", "다중 파일·보고서"] },

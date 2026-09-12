@@ -103,7 +103,7 @@ export function OperationProgress({
       </Button>
 
       {expanded && (
-        <ol ref={logRef} className="ui-operation-log" aria-live="polite" aria-relevant="additions text">
+        <ol ref={logRef} className="ui-operation-log" aria-label={`${displayTitle} · ${t("progress.logs", { count: logs.length })}`} aria-live="polite" aria-relevant="additions text" tabIndex={0}>
           {logs.map((entry) => {
             const isCurrent = entry.id === activeLogId || Boolean(entry.stageKey && entry.stageKey === activeStageKey);
             const Icon = entry.status === "success" ? CheckCircle2 : entry.status === "error" ? AlertCircle : isCurrent && status === "running" ? LoaderCircle : Circle;

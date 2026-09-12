@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -13,7 +14,7 @@ const { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } = await i
 const toolRoutes = [
   "excel-merger", "excel-compare", "excel-cleaner", "document-compare", "pdf-editor", "hwp-editor", "office-editor", "video-studio", "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
-  "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
+  "document-redactor", "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
 ];
 const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
@@ -31,7 +32,7 @@ for (const language of languages) {
     const routeUrl = absolute(language, route);
     const canonicalRoute = canonicalSeoPath(`/${route}`).replace(/^\//, "");
     const canonical = absolute(language, canonicalRoute);
-    const html = renderPage(sourceHtml, page, canonical);
+    const html = route === "tools/document-redactor" ? renderRedactorPage(sourceHtml, page, canonical) : renderPage(sourceHtml, page, canonical);
     const directory = path.join(outputDirectory, language, route);
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, "index.html"), html);
@@ -261,3 +262,17 @@ function absolute(language, route) { return new URL(`${language}/${route ? `${ro
 function ensureTrailingSlash(value) { return value.endsWith("/") ? value : `${value}/`; }
 function escapeHtml(value) { return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
 function escapeXml(value) { return escapeHtml(value).replaceAll("'", "&apos;"); }
+
+function renderRedactorPage(template, page, canonical) {
+  let html = renderPage(template, page, canonical)
+    .replace(/<meta\s+name="google-adsense-account"[^>]*>/g, '')
+    .replace(/<link\s+rel="manifest"[^>]*>/g, '');
+  const hashes = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
+    .filter(([, attrs]) => !/\bsrc=|application\/ld\+json/.test(attrs))
+    .map(([, , text]) => "'sha256-" + createHash('sha256').update(text).digest('base64') + "'");
+  const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
+    .map(([, text]) => "'sha256-" + createHash('sha256').update(text).digest('base64') + "'");
+  const policy = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' " + hashes.join(' ') +
+    "; style-src 'self' " + styles.join(' ') + "; style-src-attr 'none'; connect-src 'self'; img-src 'self' blob: data:; font-src 'self' blob:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'";
+  return html.replace(/<head>/, '<head>\n<meta http-equiv="Content-Security-Policy" content="' + policy + '" />\n<meta name="worklazy-redactor-isolation" content="document-scope" />');
+}

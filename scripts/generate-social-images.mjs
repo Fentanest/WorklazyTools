@@ -5,6 +5,7 @@ import puppeteer from "puppeteer-core";
 const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
+  tool("document-redactor", "#7554d8", "문서 개인정보", "개인정보 마스킹", "직접 영역 선택 · PDF · 이미지", "Document privacy", "Document Redaction", "Manual masks · PDF · images"),
   tool("excel-merger", "#22a65a", "문서·스프레드시트", "Excel 병합기", "여러 파일 · 시트별 · 세로 · 가로 병합", "Documents & spreadsheets", "Excel Merger", "Combine files · sheets · rows · columns"),
   tool("excel-compare", "#22a65a", "스프레드시트 비교", "Excel 파일 비교", "위치 · 키 · 회계 대사 · 쌍별 보고서", "Spreadsheet comparison", "Excel Compare", "Position · keys · reconciliation · reports"),
   tool("excel-cleaner", "#22a65a", "스프레드시트 정리", "Excel 데이터 정리", "28종 규칙 · 수식 보호 · XLSX·CSV 보고서", "Spreadsheet cleanup", "Excel Data Cleaner", "28 rules · formula safety · XLSX & CSV reports"),
@@ -42,22 +43,27 @@ const browser = await puppeteer.launch({
   headless: true,
   args: ["--no-sandbox", "--disable-setuid-sandbox"],
 });
+let generatedCount = 0;
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
-  for (const item of tools) {
+  const requestedSlug = process.env.WORKLAZY_SOCIAL_SLUG;
+  const selected = requestedSlug ? tools.filter(item => item.slug === requestedSlug) : tools;
+  if (!selected.length) throw new Error("Unknown social image slug");
+  for (const item of selected) {
     for (const language of ["ko", "en"]) {
       const copy = item[language];
       const outputPath = path.join(outputDirectory, `${item.slug}-${language}.png`);
       await page.setContent(renderSvg({ ...copy, accent: item.accent, language }), { waitUntil: "load" });
       await page.screenshot({ path: outputPath, type: "png", clip: { x: 0, y: 0, width: 1200, height: 630 } });
+      generatedCount++;
     }
   }
 } finally {
   await browser.close();
 }
 
-console.log(`Generated ${tools.length * 2} localized social images in ${outputDirectory}`);
+console.log(`Generated ${generatedCount} localized social images in ${outputDirectory}`);
 
 function tool(slug, accent, koCategory, koTitle, koSubtitle, enCategory, enTitle, enSubtitle) {
   return {

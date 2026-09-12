@@ -1446,5 +1446,88 @@
         { "q": "Are originals changed or files uploaded?", "a": "No. Processing happens in the current browser tab and only new result files are downloaded." }
       ]
     }
+  },
+  "documentRedactor": {
+    "title": "Redact private information",
+    "description": "Cover sensitive areas in PDFs and images with black rectangles and create new files. Processing stays in this browser.",
+    "preparing": "Preparing the isolated document tools.",
+    "document": "Document {{number}}",
+    "pages": "pages",
+    "remove": "Remove",
+    "files": {
+      "title": "Choose documents",
+      "description": "Add multiple PDF, JPG, PNG, or static WebP files.",
+      "label": "Documents to redact",
+      "hint": "PDF, JPG, PNG, or static WebP · processed only in this browser",
+      "pdfHint": "PDF · processed only in this browser",
+      "limits": "Limits before you begin: 20 files · 32 MiB each · 64 MiB total · 100 pages per PDF · 200 pages total · 16 MP images · 1,000 areas per file",
+      "imageUnavailable": "This browser cannot safely verify image orientation, so only PDFs are available."
+    },
+    "editor": {
+      "title": "Edit redaction areas",
+      "description": "Add black rectangles to each page. Drag to move or resize them, or use the number fields and arrow keys. Shift+Arrow moves by 10.",
+      "previous": "Previous page",
+      "next": "Next page",
+      "zoom": "Zoom",
+      "source": "View source",
+      "result": "View result",
+      "canvas": "Redaction area editor",
+      "mask": "Redaction area",
+      "add": "Add area",
+      "undo": "Undo",
+      "redo": "Redo",
+      "x": "Left X",
+      "y": "Top Y",
+      "w": "Width",
+      "h": "Height"
+    },
+    "output": {
+      "title": "Review output",
+      "description": "Each document needs at least one area. Every page, including pages without areas, is recreated as a new raster page.",
+      "dpi": "Output resolution",
+      "dpiNotice": "Every PDF page is recreated in a new PDF containing PNG raster images only. Text search and copy, signatures, forms, links, and original metadata are not preserved. Higher resolution uses more memory, and DPI is never lowered automatically when a size limit is reached.",
+      "confirm": "I reviewed the pages without areas and the output summary, and I am ready to create new files.",
+      "run": "Create redacted files",
+      "cancel": "Cancel"
+    },
+    "summary": {
+      "title": "Pages without areas",
+      "page": "Document {{document}} · page {{page}}",
+      "allMasked": "Every page has an area."
+    },
+    "progress": {
+      "file": "Processing document {{current}} of {{total}}",
+      "reading": "Reading document · {{page}}/{{pages}}",
+      "rendering": "Preparing page · {{page}}/{{pages}}",
+      "encoding": "Applying black areas · {{page}}/{{pages}}",
+      "verifying": "Verifying result · {{page}}/{{pages}}",
+      "saving": "Creating result · {{page}}/{{pages}}",
+      "zip": "Creating ZIP · {{page}}/{{pages}}",
+      "done": "Processing finished. Completed results remain available below.",
+      "title": "Document processing progress"
+    },
+    "results": {
+      "title": "Completed results",
+      "name": "Result file name",
+      "download": "Download",
+      "preview": "Review result",
+      "zip": "Create results ZIP",
+      "downloadZip": "Download ZIP"
+    },
+    "errors": {
+      "cancelled": "The operation was canceled. Completed results remain available.",
+      "busy": "Wait for the current operation to settle.",
+      "unsupported": "This file format is not supported.",
+      "damaged": "The document structure could not be read. Check the file.",
+      "encrypted": "Password-protected PDFs cannot be processed.",
+      "xfa": "XFA form PDFs cannot be processed.",
+      "dimensions": "The image or page dimensions cannot be processed.",
+      "limit": "The browser processing limit was exceeded. Use fewer files or a lower resolution.",
+      "no-masks": "Add at least one redaction area to this document.",
+      "invalid-masks": "Check the position and size of the redaction areas.",
+      "verification": "The result could not be verified, so it was not provided.",
+      "not-ready": "The isolated document tools could not be prepared. Reload the page.",
+      "invalid-name": "Enter a safe PDF or PNG file name."
+    }
   }
 }

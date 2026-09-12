@@ -11,9 +11,9 @@ import {
 } from "../visual-regression.scenarios.mjs";
 
 test("visual regression scenario manifest covers every available tool and state contract", () => {
-  assert.equal(availableToolRoutes.length, 20);
+  assert.equal(availableToolRoutes.length, 21);
   const availableToolIds = new Set(availableToolRoutes.map(({ toolId }) => toolId));
-  assert.equal(availableToolIds.size, 20);
+  assert.equal(availableToolIds.size, 21);
 
   const requiredFields = [
     "scenarioId",
@@ -61,7 +61,7 @@ test("visual regression scenario manifest covers every available tool and state 
   const bottomToolIds = new Set(bottomScenarios.map(({ toolId }) => toolId));
   assert.deepEqual(initialToolIds, availableToolIds);
   assert.deepEqual(bottomToolIds, availableToolIds);
-  assert.equal(bottomScenarios.length, 20);
+  assert.equal(bottomScenarios.length, 21);
   assert.ok(bottomScenarios.every(({ profiles }) => profiles.every(({ viewport }) => viewport === "mobile")));
   assert.ok(bottomScenarios.every(({ bottomTargetSelector }) => Boolean(bottomTargetSelector)));
 
@@ -83,9 +83,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 246);
-  assert.equal(qaCaptureScenarios.length, 80);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 628);
+  assert.equal(names.length, 253);
+  assert.equal(qaCaptureScenarios.length, 83);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 652);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));

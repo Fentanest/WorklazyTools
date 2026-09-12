@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./app/App";
+import { installRedactorNavigation, isRedactorDocument, isRedactorPath } from "./app/redactorIsolation";
 import { installChunkRecovery } from "./app/chunkRecovery";
 import "./i18n/config";
 import { registerServiceWorker } from "./pwa/registerServiceWorker";
@@ -10,6 +11,7 @@ import "./styles/tailwind.css";
 import "./styles/global.css";
 
 const basePath = import.meta.env.BASE_URL === "/" ? undefined : import.meta.env.BASE_URL.replace(/\/$/, "");
+installRedactorNavigation();
 installChunkRecovery();
 
 function MountedApp() {
@@ -25,4 +27,4 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>,
 );
 
-registerServiceWorker();
+if (!isRedactorDocument() && !isRedactorPath(location.pathname)) registerServiceWorker();

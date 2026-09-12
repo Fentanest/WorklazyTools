@@ -1,3 +1,4 @@
+import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
 import {
   CircleHelp,
   Grid2X2,
@@ -38,6 +39,9 @@ export function AppShell() {
   const { tools } = useToolCatalog();
   const location = useLocation();
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
+  const redactorActive = isRedactorPath(location.pathname);
+  const redactorDocument = isRedactorDocument();
+  useEffect(() => { if (import.meta.env.PROD && redactorActive !== redactorDocument) window.location.replace(window.location.href); }, [redactorActive, redactorDocument]);
   const videoStudioActive = normalizedPath === "/tools/video-studio";
   const officeEditorAppActive = normalizedPath === "/tools/office-editor/app";
   const excelPreserveActive = normalizedPath === "/tools/excel-merger/xls-preserve";
@@ -66,8 +70,8 @@ export function AppShell() {
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} language={language} />
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
       <ExcelPreserveIsolationBoundary active={excelPreserveActive} isolationDocument={excelIsolationDocument} language={language} />
-      <AnalyticsLoader disabled={(videoStudioActive && !videoIsolationDocument) || officeEditorAppActive || excelPreserveActive} />
-      {!videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && <AdSenseLoader />}
+      {!redactorActive && !redactorDocument && <AnalyticsLoader disabled={(videoStudioActive && !videoIsolationDocument) || officeEditorAppActive || excelPreserveActive} />}
+      {!redactorActive && !redactorDocument && !videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand brand-image-link" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
           <img className="brand-logo" width={320} height={64} src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
@@ -126,8 +130,8 @@ export function AppShell() {
 
       <nav className="desktop-language-switcher" aria-label={t("language.switchLabel")}><LanguageSwitcher /></nav>
 
-      <main className="main-content" id="main-content">
-        <RouteErrorBoundary><Outlet /></RouteErrorBoundary>
+      <main className={`main-content${redactorActive ? " redactor-main-content" : ""}`} id="main-content">
+        <RouteErrorBoundary>{(!redactorActive || redactorDocument) && <Outlet />}</RouteErrorBoundary>
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
           <nav aria-label={t("footer.policyLabel")}>

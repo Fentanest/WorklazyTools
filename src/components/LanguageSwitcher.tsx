@@ -1,3 +1,4 @@
+import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -18,6 +19,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
     const destination = nextLanguage === "en" && currentPath === "/tools/hwp-editor"
       ? localizedPath(nextLanguage, "/tools")
       : localizedPath(nextLanguage, currentPath);
+    if (isRedactorDocument() || isRedactorPath(location.pathname)) { window.location.assign(`${destination}${location.search}${location.hash}`); return; }
     navigate(`${destination}${location.search}${location.hash}`);
   };
 

@@ -34,6 +34,7 @@ const TextFormatterPage = lazy(() => import("../features/text-formatter/TextForm
 const WorkCalculatorPage = lazy(() => import("../features/work-calculator/WorkCalculatorPage").then((module) => ({ default: module.WorkCalculatorPage })));
 const TimezoneCalculatorPage = lazy(() => import("../features/timezone-calculator/TimezoneCalculatorPage").then((module) => ({ default: module.TimezoneCalculatorPage })));
 const PayrollCalculatorPage = lazy(() => import("../features/payroll-calculator/PayrollCalculatorPage").then((module) => ({ default: module.PayrollCalculatorPage })));
+const DocumentRedactorPage = lazy(() => import("../features/document-redactor/DocumentRedactorPage").then(module => ({default: module.DocumentRedactorPage})));
 const ImagePrivacyPage = lazy(() => import("../features/image-privacy/ImagePrivacyPage").then((module) => ({ default: module.ImagePrivacyPage })));
 const SecurityToolsPage = lazy(() => import("../features/security-tools/SecurityToolsPage").then((module) => ({ default: module.SecurityToolsPage })));
 const QrStudioPage = lazy(() => import("../features/qr-studio/QrStudioPage").then((module) => ({ default: module.QrStudioPage })));
@@ -81,6 +82,7 @@ export function App() {
           <Route path="tools/work-calculator" element={<LazyToolRoute label="Workday Calculator"><WorkCalculatorPage /></LazyToolRoute>} />
           <Route path="tools/timezone-calculator" element={<LazyToolRoute label="World Time Planner"><TimezoneCalculatorPage /></LazyToolRoute>} />
           <Route path="tools/payroll-calculator" element={<LazyToolRoute label="Payroll Calculator"><PayrollCalculatorPage /></LazyToolRoute>} />
+          <Route path="tools/document-redactor" element={<LazyToolRoute label="Document redaction"><DocumentRedactorPage /></LazyToolRoute>} />
           <Route path="tools/image-privacy" element={<LazyToolRoute label="Photo Metadata Remover"><ImagePrivacyPage /></LazyToolRoute>} />
           <Route path="tools/security-tools" element={<LazyToolRoute label="Password Generator"><SecurityToolsPage /></LazyToolRoute>} />
           <Route path="tools/qr-studio" element={<QrRoute mode="create" />} />
@@ -96,6 +98,7 @@ export function App() {
           <Route path="work-calculator" element={<LocalizedNavigate to="/tools/work-calculator" />} />
           <Route path="timezone-calculator" element={<LocalizedNavigate to="/tools/timezone-calculator" />} />
           <Route path="payroll-calculator" element={<LocalizedNavigate to="/tools/payroll-calculator" />} />
+          <Route path="document-redactor" element={<LocalizedNavigate to="/tools/document-redactor" />} />
           <Route path="image-privacy" element={<LocalizedNavigate to="/tools/image-privacy" />} />
           <Route path="security-tools" element={<LocalizedNavigate to="/tools/security-tools" />} />
           <Route path="qr-studio" element={<LocalizedNavigate to="/tools/qr-studio" />} />

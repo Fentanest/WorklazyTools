@@ -220,6 +220,8 @@ input:focus-visible {
   margin-left: 280px;
   padding: 0 32px;
 }
+.redactor-main-content { min-height: calc(100vh + 12rem); display: flex; flex-direction: column; }
+.redactor-main-content > .global-footer { margin-top: auto; }
 
 .page { width: min(1180px, 100%); margin: 0 auto; padding: 48px 0 52px; }
 .standard-page,
@@ -472,6 +474,7 @@ input:focus-visible {
 .ui-operation-current-message { height: 32px; display: -webkit-box; margin: 8px 1px 0; overflow: hidden; color: var(--label-secondary); font-size: 14px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .ui-operation-log-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-top: 5px; padding: 8px 0 3px; color: var(--label-tertiary); background: transparent; border: 0; border-top: 1px solid var(--separator); font-size: 13px; font-weight: 750; cursor: pointer; }
 .ui-operation-log { height: 176px; min-height: 176px; display: flex; flex-direction: column; gap: 7px; margin: 9px 0 0; padding: 2px 8px 2px 2px; overflow-x: hidden; overflow-y: scroll; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-color: rgba(118,118,128,.38) transparent; scrollbar-width: thin; list-style: none; }
+.ui-operation-log:focus-visible { border-radius: 8px; outline: 2px solid var(--ring); outline-offset: 2px; }
 .ui-operation-log::-webkit-scrollbar { width: 6px; }
 .ui-operation-log::-webkit-scrollbar-track { background: transparent; }
 .ui-operation-log::-webkit-scrollbar-thumb { min-height: 28px; border-radius: 999px; background: rgba(118,118,128,.38); }

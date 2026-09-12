@@ -1,3 +1,4 @@
+import { assertRedactorStatic } from "./redactor-static-contract.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -16,7 +17,7 @@ const routes = [
   "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
   "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
   "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
-  "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
+  "tools/document-redactor", "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/qr-studio/bulk", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
 ];
@@ -27,6 +28,7 @@ const socialSlugByRoute = {
   "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",
   "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-merger": "text-merger", "tools/text-tools": "text-tools",
   "tools/text-formatter": "code-formatter", "tools/work-calculator": "workday-calculator", "tools/timezone-calculator": "world-time-planner",
+  "tools/document-redactor": "document-redactor",
   "tools/payroll-calculator": "payroll-calculator", "tools/image-privacy": "photo-metadata-remover", "tools/security-tools": "password-generator",
   "tools/qr-studio": "qr-studio", "tools/qr-studio/bulk": "qr-bulk", "tools/data-converter": "table-data-converter",
 };
@@ -36,6 +38,7 @@ for (const route of routes) {
   if (language === "en" && route === "tools/hwp-editor") continue;
   const filePath = path.join("dist", language, route, "index.html");
   const html = await fs.readFile(filePath, "utf8");
+  if (route === "tools/document-redactor") assertRedactorStatic(html);
   const required = [
     "<title>",
     'name="description"',
@@ -50,12 +53,18 @@ for (const route of routes) {
     'name="twitter:image"',
     'type="application/ld+json"',
     'class="seo-static-fallback"',
-    'name="google-adsense-account"',
-    'rel="manifest"',
     'rel="apple-touch-icon"',
   ];
   for (const marker of required) {
     if (!html.includes(marker)) throw new Error(`${filePath} is missing ${marker}`);
+  }
+  if (route === "tools/document-redactor") {
+    if (html.includes('name="google-adsense-account"')) throw new Error(`${filePath} must not include the AdSense account marker.`);
+    if (html.includes('rel="manifest"')) throw new Error(`${filePath} must not include the web app manifest.`);
+  } else if (!html.includes('name="google-adsense-account"')) {
+    throw new Error(`${filePath} is missing name="google-adsense-account"`);
+  } else if (!html.includes('rel="manifest"')) {
+    throw new Error(`${filePath} is missing rel="manifest"`);
   }
   const socialSlug = socialSlugByRoute[route];
   if (socialSlug) {

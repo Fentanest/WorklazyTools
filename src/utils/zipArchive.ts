@@ -1,4 +1,4 @@
-import { BlobReader, type BlobWriter, ZipWriter } from "@zip.js/zip.js";
+import { BlobReader, type BlobWriter, type Reader, ZipWriter } from "@zip.js/zip.js";
 
 import {
   reserveSafeFileName,
@@ -37,16 +37,24 @@ export interface IncrementalZipArchiveWriter {
   discard(): Promise<void>;
 }
 
+export interface ZipArchiveOptions {
+  useWebWorkers?: boolean;
+  readerFactory?: (blob: Blob) => Reader<Blob>;
+}
+
 export function createIncrementalZipArchiveWriter(
   writable: WritableStream | BlobWriter,
   signal?: AbortSignal,
+  options: ZipArchiveOptions = {},
 ): IncrementalZipArchiveWriter {
   const names = new SafeZipEntryPathRegistry();
+  const readerFactory = options.readerFactory ?? ((blob: Blob) => new BlobReader(blob));
   const zipWriter = new ZipWriter(writable, {
     bufferedWrite: false,
     dataDescriptor: true,
     level: 0,
     signal,
+    useWebWorkers: options.useWebWorkers,
     zip64: true,
   });
   let closed = false;
@@ -56,11 +64,12 @@ export function createIncrementalZipArchiveWriter(
       if (closed) throw new Error("ZIP_WRITER_CLOSED");
       if (signal?.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
       const entryPath = reserveSafeZipEntryPath(validateSafeZipEntryPath(fileName), names);
-      await zipWriter.add(entryPath, new BlobReader(blob), {
+      await zipWriter.add(entryPath, readerFactory(blob), {
         bufferedWrite: false,
         dataDescriptor: true,
         level: 0,
         signal,
+        useWebWorkers: options.useWebWorkers,
         zip64: true,
         useUnicodeFileNames: true,
         onprogress: (loaded) => onProgress?.(loaded),
@@ -85,10 +94,11 @@ export async function writeZipArchive(
   signal?: AbortSignal,
   onProgress?: (progress: ZipArchiveProgress) => void,
   onFinalizing?: () => void,
+  options?: ZipArchiveOptions,
 ) {
   const names = new SafeFileNameRegistry();
   files.forEach((file) => reserveSafeFileName(file.fileName, names));
-  const zipWriter = createIncrementalZipArchiveWriter(writable, signal);
+  const zipWriter = createIncrementalZipArchiveWriter(writable, signal, options);
   let completedBytes = 0;
   const totalBytes = Math.max(1, files.reduce((sum, file) => sum + file.blob.size, 0));
 

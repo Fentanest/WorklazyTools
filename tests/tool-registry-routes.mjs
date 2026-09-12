@@ -51,7 +51,7 @@ export const expectedToolIds = Object.freeze([
   "excel-merger", "excel-compare", "excel-cleaner", "pdf-editor", "document-compare",
   "hwp-editor", "office-editor", "video-studio", "audio-studio", "image-studio",
   "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator",
-  "payroll-calculator", "image-privacy", "security-tools", "qr-studio", "data-converter",
+  "document-redactor", "payroll-calculator", "image-privacy", "security-tools", "qr-studio", "data-converter",
 ]);
 
 export function assertToolRoutes(routes, expected = expectedToolIds) {

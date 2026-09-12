@@ -10,7 +10,7 @@ export function chunkRetryKey(location: Pick<Location, "pathname" | "search">) {
 export function installChunkRecovery() {
   window.addEventListener("vite:preloadError", () => {
     // Document preparation owns reloads on these pages, including video COI.
-    if (document.querySelector('meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"], meta[name="worklazy-video-isolation"]')) return;
+    if (document.querySelector('meta[name="worklazy-redactor-isolation"], meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"], meta[name="worklazy-video-isolation"]')) return;
     try {
       const key = chunkRetryKey(window.location);
       if (sessionStorage.getItem(key)) return;

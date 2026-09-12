@@ -27,13 +27,14 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   const baseProgressSource = read("node_modules/@base-ui/react/progress/root/ProgressRoot.mjs");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
-  // S1 removed two pages; U4-3 adds the PDF finish operation log.
-  assert.equal(consumers.length, 14);
+  // S1 removed two pages; U4-3 adds PDF finish and U6 adds document redaction.
+  assert.equal(consumers.length, 15);
   assert.match(source, /entry\.id === activeLogId \|\| Boolean\(entry\.stageKey && entry\.stageKey === activeStageKey\)/);
   assert.match(source, /isCurrent && status === "running" \? LoaderCircle : Circle/);
   assert.match(source, /className=\{isCurrent && status === "running" \? "animate-spin" : ""\}/);
   assert.match(source, /className="ui-operation-log-progress">\{entry\.progress\}%<\/b>/);
   assert.match(source, /<ol[\s\S]*?className="ui-operation-log"[\s\S]*?aria-live="polite"[\s\S]*?key=\{entry\.id\}/);
+  assert.match(source, /className="ui-operation-log"[\s\S]*?aria-label=[\s\S]*?tabIndex=\{0\}/);
   assert.match(source, /<Progress[\s\S]*?className="ui-operation-progress-track[\s\S]*?value=\{progress\}[\s\S]*?aria-label=\{message\}/);
   assert.match(progressSource, /ProgressPrimitive\.Root[\s\S]*?value=\{value\}/);
   assert.match(baseProgressSource, /'aria-valuenow': clampedValue/);

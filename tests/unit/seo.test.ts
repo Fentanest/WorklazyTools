@@ -9,7 +9,7 @@ const toolRoutes = [
   "/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
   "/tools/text-formatter", "/tools/work-calculator", "/tools/timezone-calculator", "/tools/payroll-calculator",
-  "/tools/image-privacy", "/tools/security-tools", "/tools/qr-studio", "/tools/qr-studio/bulk", "/tools/data-converter",
+  "/tools/document-redactor", "/tools/image-privacy", "/tools/security-tools", "/tools/qr-studio", "/tools/qr-studio/bulk", "/tools/data-converter",
 ];
 
 test("tool metadata keeps a distinct identity in Korean and English", () => {
@@ -81,7 +81,7 @@ test("PDF finish aliases retain distinct metadata and canonicalize to the finish
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {
-  for (const [route, expectedCount] of [["/tools/document-compare", 3], ["/tools/office-editor", 5]] as const) {
+  for (const [route, expectedCount] of [["/tools/document-redactor", 3], ["/tools/document-compare", 3], ["/tools/office-editor", 5]] as const) {
     const koreanFaq = getSeoDefinition("ko", route).faq;
     const englishFaq = getSeoDefinition("en", route).faq;
     assert.equal(koreanFaq?.length, expectedCount);
