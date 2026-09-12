@@ -2,6 +2,10 @@
 
 종결된 작업 묶음에서 살아남은 후속 항목을 여기에 남긴다(「작업지시서 관리」 규칙). 항목마다 배경이 된 작업과 판단 근거를 한 줄로 병기한다.
 
+## UI 시각 기준선 재설정
+
+- **U6 개인정보 가리기 기준선 7장 부재** — U7의 `VISUAL_ONLY=document-generator` 기준선 생성·비교에서 새 U7 6장은 diff 0이었지만, 전역 inventory 검사가 이전 U6 `document-redactor` 기준선 7장 부재로 exit 1이었다. U7 기준을 넓혀 만들거나 검사를 완화하지 않고, `ui-theme-rebaseline-procedure-20260909.md`의 전체 기준 재설정 단계에서 실제 U6 상태를 다시 캡처·검수한다. 근거: `/tmp/worklazy-u7-final/visual-baseline-u7.log`, `/tmp/worklazy-u7-final/visual-compare-u7.log`. — Codx
+
 ## Excel 비교 — 중복키·머리글 후속
 
 - **BL01 · 마지막 더보기 소진 뒤 초점 목적지 — 낮은 우선순위(P3)** — 151행 중복 목록을 키보드로 펼친 뒤 마지막 50개를 불러오면 버튼이 DOM에서 사라지고 초점이 `BODY`로 이동했다(ko/en × light/dark **4/4**). `/ko/tools/excel-compare/`에서 151행 동일 키 CSV 두 파일 → 키 비교 → 중복 목록 → 마지막 더보기를 Tab·Enter로 실행해 재현한다. 다음 Tab의 목적지와 완료 안내 정책을 별도 접근성 계약으로 정한다. — Codx

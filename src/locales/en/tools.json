@@ -32,5 +32,7 @@
     "security-tools": { "title": "Password Generator", "shortTitle": "Password generator", "description": "Generate passwords with operating-system cryptographic randomness and estimate pattern-based guessing difficulty.", "eyebrow": "SECURITY", "highlights": ["Secure randomness", "Strength analysis", "Crack-time estimate", "Up to 64 characters"] },
     "qr-studio": { "title": "QR Studio", "shortTitle": "QR studio", "description": "Create QR codes from text or table rows, export PNG, ZIP and label PDF results, or scan with a camera or image.", "eyebrow": "QR CREATE · BULK · SCAN", "highlights": ["Create QR codes", "Bulk table rows", "Camera & image scan", "PNG, ZIP & label PDF"] },
     "data-converter": { "title": "Table Data Converter", "shortTitle": "Table data converter", "description": "Convert CSV, JSON and HTML tables and export the result as a file or to the clipboard.", "eyebrow": "TABLE DATA CONVERSION", "highlights": ["CSV", "JSON", "HTML tables", "Browser conversion"] }
+  ,
+    "document-generator": {"title":"Bulk DOCX Generator","shortTitle":"DOCX generator","description":"Create a new DOCX for each Excel or CSV row from one template, then save reports and a ZIP.","eyebrow":"DOCUMENT AUTOMATION","highlights":["DOCX template variables","Multiple Excel and CSV files","One DOCX per row","Sample and result reports"]}
   }
 }

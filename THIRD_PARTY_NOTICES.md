@@ -23,6 +23,9 @@ resolved dependency versions.
 | `exceljs` 4.4.0 | MIT | XLSX/CSV processing · <https://github.com/exceljs/exceljs> |
 | `fabric` 7.4.0 | MIT | Interactive canvas editing · <https://github.com/fabricjs/fabric.js> |
 | `gifenc` 1.0.3 | MIT | GIF encoding · <https://github.com/mattdesl/gifenc> |
+| `docxtemplater` 3.69.3 | MIT | Free Core DOCX scalar templating · <https://github.com/open-xml-templating/docxtemplater> |
+| `pizzip` 3.2.0 | MIT option | DOCX ZIP preservation · <https://github.com/open-xml-templating/pizzip> |
+| `@xmldom/xmldom` 0.9.12 | MIT | Template XML namespace validation · <https://github.com/xmldom/xmldom> |
 | `change-case` | MIT | Text case conversion |
 | `sql-formatter`, `fast-xml-parser` | MIT | SQL and XML formatting/validation |
 | `date-fns`, `luxon` | MIT | Calendar and IANA timezone calculations |

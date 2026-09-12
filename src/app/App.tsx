@@ -25,6 +25,7 @@ const DocumentComparePage = lazy(() => import("../features/document-compare/Docu
 const DocumentCompareResultPage = lazy(() => import("../features/document-compare/DocumentCompareResultPage").then((module) => ({ default: module.DocumentCompareResultPage })));
 const ExcelComparePage = lazy(() => import("../features/excel-compare/ExcelComparePage").then((module) => ({ default: module.ExcelComparePage })));
 const ExcelCleanerPage = lazy(() => import("../features/excel-cleaner/ExcelCleanerPage").then((module) => ({ default: module.ExcelCleanerPage })));
+const DocumentGeneratorPage = lazy(() => import("../features/document-generator/DocumentGeneratorPage").then((module) => ({ default: module.DocumentGeneratorPage })));
 const VideoStudioPage = lazy(() => import("../features/video-studio/VideoStudioPage").then((module) => ({ default: module.VideoStudioPage })));
 const AudioStudioPage = lazy(() => import("../features/audio-studio/AudioStudioPage").then((module) => ({ default: module.AudioStudioPage })));
 const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioPage").then((module) => ({ default: module.ImageStudioPage })));
@@ -54,6 +55,7 @@ export function App() {
           <Route path="tools/excel-merger/xls-preserve" element={<ToolReady><ExcelMergerPage /></ToolReady>} />
           <Route path="tools/excel-compare" element={<LazyToolRoute label="Excel compare"><ExcelComparePage /></LazyToolRoute>} />
           <Route path="tools/excel-cleaner" element={<LazyToolRoute label="Excel data cleaner"><ExcelCleanerPage /></LazyToolRoute>} />
+          <Route path="tools/document-generator" element={<LazyToolRoute label="Document generator"><DocumentGeneratorPage /></LazyToolRoute>} />
           <Route path="tools/pdf-editor" element={<PdfRoute mode="organize" />} />
           <Route path="tools/pdf-editor/split" element={<LocalizedNavigate to="/tools/pdf-editor" />} />
           <Route path="tools/pdf-editor/image-to-pdf" element={<PdfRoute mode="image-to-pdf" />} />
@@ -99,6 +101,7 @@ export function App() {
           <Route path="timezone-calculator" element={<LocalizedNavigate to="/tools/timezone-calculator" />} />
           <Route path="payroll-calculator" element={<LocalizedNavigate to="/tools/payroll-calculator" />} />
           <Route path="document-redactor" element={<LocalizedNavigate to="/tools/document-redactor" />} />
+          <Route path="document-generator" element={<LocalizedNavigate to="/tools/document-generator" />} />
           <Route path="image-privacy" element={<LocalizedNavigate to="/tools/image-privacy" />} />
           <Route path="security-tools" element={<LocalizedNavigate to="/tools/security-tools" />} />
           <Route path="qr-studio" element={<LocalizedNavigate to="/tools/qr-studio" />} />

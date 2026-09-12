@@ -49,6 +49,15 @@ try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1360, height: 940, deviceScaleFactor: 1 });
     page.setDefaultTimeout(240_000);
+    const interceptedExternalRequests = [];
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (["http:", "https:"].includes(url.protocol) && url.origin !== new URL(baseUrl).origin) {
+        interceptedExternalRequests.push(request.url());
+        void request.abort("blockedbyclient");
+      } else void request.continue();
+    });
     await page.evaluateOnNewDocument(() => {
       localStorage.setItem("worklazy_privacy_consent", "granted");
       globalThis.__excelCleanerRevokedUrls = [];
@@ -233,6 +242,7 @@ try {
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
     console.log(JSON.stringify({
       initial,
+      externalHttpRequestsBlockedBeforeExecution: interceptedExternalRequests.length,
       ruleOrderAfterDrag: order,
       actionGeometry,
       exact,

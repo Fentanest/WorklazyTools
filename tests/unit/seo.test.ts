@@ -4,7 +4,7 @@ import test from "node:test";
 import { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts";
 
 const toolRoutes = [
-  "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
+  "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-generator", "/tools/document-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
   "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
   "/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
@@ -25,6 +25,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/document-compare": "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
       "/tools/excel-compare": "Excel 파일 비교 - XLSX·XLSM·XLS·XLSB·CSV Diff",
       "/tools/excel-cleaner": "Excel 데이터 정리 - XLSX·XLS·CSV 클리너",
+      "/tools/document-generator": "DOCX 문서 일괄 생성 | Excel·CSV 행별 문서 만들기",
       "/tools/office-editor": "브라우저 오피스 편집기 - DOCX·XLSX·PPTX 온라인 편집",
       "/tools/text-merger": "텍스트 병합 | 직접 입력·TXT 파일 순서대로 합치기",
     },
@@ -39,6 +40,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
       "/tools/excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
       "/tools/excel-cleaner": "Excel Data Cleaner | Clean XLSX, XLS & CSV Files",
+      "/tools/document-generator": "Bulk DOCX Generator | Excel & CSV to Documents",
       "/tools/office-editor": "Browser Office Editor | Edit DOCX, XLSX & PPTX",
       "/tools/text-merger": "Text Merger | Combine Pasted Text & TXT Files",
     },
@@ -81,7 +83,7 @@ test("PDF finish aliases retain distinct metadata and canonicalize to the finish
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {
-  for (const [route, expectedCount] of [["/tools/document-redactor", 3], ["/tools/document-compare", 3], ["/tools/office-editor", 5]] as const) {
+  for (const [route, expectedCount] of [["/tools/document-redactor", 3], ["/tools/document-generator", 3], ["/tools/document-compare", 3], ["/tools/office-editor", 5]] as const) {
     const koreanFaq = getSeoDefinition("ko", route).faq;
     const englishFaq = getSeoDefinition("en", route).faq;
     assert.equal(koreanFaq?.length, expectedCount);

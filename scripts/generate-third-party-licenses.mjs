@@ -54,6 +54,7 @@ for (const [packagePath, lockMetadata] of productionPackages) {
     .sort((left, right) => left.localeCompare(right));
   sections.push("", "=".repeat(78), `${metadata.name || packagePath.slice(13)} ${metadata.version || lockMetadata.version || ""}`.trim());
   sections.push(`Declared license: ${formatLicense(metadata.license || lockMetadata.license || "Not declared")}`);
+  if (metadata.name === "pizzip") sections.push("Worklazy Tools uses PizZip under its MIT license option.");
   if (metadata.homepage) sections.push(`Homepage: ${metadata.homepage}`);
   if (!noticeFiles.length) {
     sections.push("No top-level license/notice text was present in the installed package. Consult the package source and metadata above.");
@@ -101,6 +102,9 @@ function buildRootNotices() {
     `| \`exceljs\` ${versionOf("exceljs")} | MIT | XLSX/CSV processing · <https://github.com/exceljs/exceljs> |`,
     `| \`fabric\` ${versionOf("fabric")} | MIT | Interactive canvas editing · <https://github.com/fabricjs/fabric.js> |`,
     `| \`gifenc\` ${versionOf("gifenc")} | MIT | GIF encoding · <https://github.com/mattdesl/gifenc> |`,
+    `| \`docxtemplater\` ${versionOf("docxtemplater")} | MIT | Free Core DOCX scalar templating · <https://github.com/open-xml-templating/docxtemplater> |`,
+    `| \`pizzip\` ${versionOf("pizzip")} | MIT option | DOCX ZIP preservation · <https://github.com/open-xml-templating/pizzip> |`,
+    `| \`@xmldom/xmldom\` ${versionOf("@xmldom/xmldom")} | MIT | Template XML namespace validation · <https://github.com/xmldom/xmldom> |`,
     "| `change-case` | MIT | Text case conversion |",
     "| `sql-formatter`, `fast-xml-parser` | MIT | SQL and XML formatting/validation |",
     "| `date-fns`, `luxon` | MIT | Calendar and IANA timezone calculations |",

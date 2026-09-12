@@ -13,8 +13,8 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
   const source = read("src/components/ToolGuide.tsx");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<ToolGuide"));
 
-  // S1 removes the unreachable Word/HWP pages from the 22 P1b consumers.
-  assert.equal(consumers.length, 20);
+  // S1 removes the unreachable Word/HWP pages; U7 adds document generation.
+  assert.equal(consumers.length, 21);
   assert.match(source, /<Card as="section"[\s\S]*?aria-labelledby="tool-guide-title"/);
   assert.match(source, /data-ui-component="tool-guide"[\s\S]*?className="ui-tool-guide-heading"[\s\S]*?t\("guide\.eyebrow"\)[\s\S]*?<h2 id="tool-guide-title"/);
   assert.match(source, /className="ui-tool-guide-grid"[\s\S]*?<Card as="article"[\s\S]*?block\.paragraphs[\s\S]*?block\.items/);
@@ -27,8 +27,8 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   const baseProgressSource = read("node_modules/@base-ui/react/progress/root/ProgressRoot.mjs");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
-  // S1 removed two pages; U4-3 adds PDF finish and U6 adds document redaction.
-  assert.equal(consumers.length, 15);
+  // S1 removed two pages; U4-3, U6 and U7 add scoped consumers.
+  assert.equal(consumers.length, 16);
   assert.match(source, /entry\.id === activeLogId \|\| Boolean\(entry\.stageKey && entry\.stageKey === activeStageKey\)/);
   assert.match(source, /isCurrent && status === "running" \? LoaderCircle : Circle/);
   assert.match(source, /className=\{isCurrent && status === "running" \? "animate-spin" : ""\}/);

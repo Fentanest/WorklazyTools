@@ -37,6 +37,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "CSV 원문 보존과 안전 모드는 무엇이 다른가요?", answer: "원문 보존은 값을 바꾸지 않고 위험 선행 문자를 경고하며 안전하다고 표현하지 않습니다. 안전 모드는 해당 값 앞에 작은따옴표를 붙입니다." },
       { question: "파일과 결과가 서버로 전송되나요?", answer: "아니요. 파일 읽기, 규칙 적용과 XLSX·CSV·ZIP 생성은 현재 브라우저에서 처리되며 원본 파일은 변경하지 않습니다." },
     ],
+    "/tools/document-generator": [
+      { question: "어떤 양식을 사용할 수 있나요?", answer: "반복·조건 없이 {이름} 형태의 단순 변수를 넣은 일반 DOCX 양식을 사용할 수 있습니다. DOCM, 암호 문서와 이미지 삽입 태그는 지원하지 않습니다." },
+      { question: "수식 셀도 문서에 넣을 수 있나요?", answer: "스프레드시트에 저장된 계산 결과만 사용합니다. 계산 결과가 없거나 실제 오류인 셀의 행은 실패로 기록합니다." },
+      { question: "파일과 결과가 서버로 전송되나요?", answer: "아니요. 양식 확인, 표 데이터 읽기와 DOCX·ZIP·보고서 생성은 현재 브라우저에서 처리합니다." },
+    ],
     "/tools/pdf-editor": [
       { question: "여러 페이지 범위는 어떻게 선택하나요?", answer: "편집할 결과 범위를 고르고 페이지 체크박스를 누르세요. 연속 문서는 페이지 뒤의 나누기 위치를 정해 범위를 한 번에 만들 수 있고, 숫자 입력으로 비연속 페이지와 사용자 지정 순서도 선택할 수 있습니다." },
       { question: "완성된 PDF나 ZIP은 어디에서 받나요?", answer: "오른쪽 출력 작업 영역에서 진행 상황을 확인하고 완료된 파일을 바로 내려받을 수 있습니다. 모바일에서는 화면 아래의 출력 작업 버튼을 누르세요." },
@@ -105,6 +110,11 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Can I clean an Excel file that contains formulas?", answer: "Same-sheet ordinary A1 references in XLSX and XLSM are updated for row deletion and column deletion, insertion, and reordering. Other formulas require complete stored results and confirmation before becoming values." },
       { question: "How do original-text and safe CSV modes differ?", answer: "Original-text mode preserves values and warns about risky leading characters; it is not represented as safe. Safe mode prefixes affected values with an apostrophe." },
       { question: "Are files or results sent to a server?", answer: "No. Reading files, applying rules, and creating XLSX, CSV, and ZIP results happen in the current browser without modifying originals." },
+    ],
+    "/tools/document-generator": [
+      { question: "Which templates can I use?", answer: "Use a standard DOCX with simple {name} variables and no loops or conditions. DOCM, encrypted documents and image insertion tags are unsupported." },
+      { question: "Can formula cells be inserted?", answer: "Only calculation results saved in the spreadsheet are used. Rows with missing cached results or real cell errors fail." },
+      { question: "Are files or results sent to a server?", answer: "No. Template inspection, table reading and DOCX, ZIP and report generation happen in the current browser." },
     ],
     "/tools/pdf-editor": [
       { question: "How do I select multiple page ranges?", answer: "Choose the output range to edit and use the page checkboxes. For a continuous document, mark split positions after pages to build the ranges at once. Number entry remains available for non-contiguous pages and custom ordering." },
@@ -188,6 +198,7 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/excel-merger": "excel-merger",
   "/tools/excel-compare": "excel-compare",
   "/tools/excel-cleaner": "excel-cleaner",
+  "/tools/document-generator": "document-generator",
   "/tools/document-compare": "document-compare",
   "/tools/pdf-editor": "pdf-tools",
   "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
@@ -249,6 +260,11 @@ export const seoByPath: Record<string, SeoDefinition> = {
       name: "Excel Data Cleaner",
       featureList: ["Excel·CSV 다중 파일", "구조 규칙 13종", "텍스트 규칙 7종", "행 필터 3종", "값 변환 5종", "수식 참조 갱신·안전 강등", "XLSX·CSV·ZIP 결과"],
     },
+  },
+  "/tools/document-generator": {
+    title: "DOCX 문서 일괄 생성 | Excel·CSV 행별 문서 만들기",
+    description: "DOCX 양식의 단순 변수를 Excel·CSV 각 행의 표시값으로 바꾸고 개별 문서, ZIP과 XLSX 결과 보고서를 브라우저에서 만드세요.",
+    application: { name: "DOCX 문서 일괄 생성", featureList: ["DOCX 단순 변수", "Excel·CSV 여러 파일", "시트·머리글 행 선택", "샘플 DOCX", "행별 순차 생성", "개별·ZIP·XLSX 보고서"] },
   },
   "/tools/document-compare": {
     title: "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
@@ -413,6 +429,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "excel-merger": "Excel Merger | Combine Excel & CSV Files",
   "excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
   "excel-cleaner": "Excel Data Cleaner | Clean XLSX, XLS & CSV Files",
+  "document-generator": "Bulk DOCX Generator | Excel & CSV to Documents",
   "pdf-editor": "PDF Tools | Edit, Merge, Convert & OCR PDFs",
   "document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
   "hwp-editor": "HWP Editor | Edit HWP & HWPX Documents",
@@ -439,6 +456,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with separate formula and formatting controls for XLSX and XLS input.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "Independent XLSX formula and formatting preservation", "Independent XLS formula and formatting preservation", "Encrypted input and output"] } },
   "/tools/excel-compare": { title: "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files", description: "Check a suggested header, compare Excel and CSV pairs by position, keys or reconciliation rules, and download a nine-sheet XLSX report.", application: { name: "Excel Compare", featureList: ["XLSX, XLSM, XLS, XLSB, SpreadsheetML and CSV", "Suggested header selection and manual changes", "Position, key and reconciliation matching", "Grouped left and right rows for duplicate keys", "Formula and cached-value comparison", "XLSX and XLSM formatting comparison", "Nine-sheet report per pair", "ZIP for multiple successful pairs"] } },
   "/tools/excel-cleaner": { title: "Excel Data Cleaner | Clean XLSX, XLS & CSV Files", description: "Apply 28 ordered structure, text, row-filter, and value-conversion rules to Excel and CSV files, then download cleaned XLSX, CSV, reports, and ZIP results.", application: { name: "Excel Data Cleaner", featureList: ["Multiple Excel and CSV files", "13 structure rules", "7 text rules", "3 row-filter rules", "5 value-conversion rules", "Formula-reference updates and safe fallback", "XLSX, CSV, and ZIP results"] } },
+  "/tools/document-generator": { title: "Bulk DOCX Generator | Excel & CSV to Documents", description: "Replace simple variables in one DOCX template with displayed values from each Excel or CSV row, then download documents, a ZIP and an XLSX report.", application: { name: "Bulk DOCX Generator", featureList: ["Simple DOCX variables", "Multiple Excel and CSV files", "Sheet and header-row selection", "Sample DOCX", "Sequential row generation", "Individual files, ZIP and XLSX reports"] } },
   "/tools/qr-studio/bulk": { title: "Bulk QR Generator | Excel & CSV to PNG, ZIP and Label PDF", description: "Create text, email, telephone, SMS, Wi-Fi, vCard or web QR codes from Excel and CSV rows, verify every final PNG, and export ZIP, label PDF and XLSX reports.", application: { name: "Bulk QR Generator", featureList: ["Excel and CSV row mapping", "Seven standard payload types", "Header templates", "Logo and transparent PNG", "Read-back verification", "Incremental ZIP", "A4 and Letter label PDF", "XLSX manifest and failures"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Convert JPG & PNG Images to PDF | Worklazy Tools", description: "Reorder JPG and PNG images and combine them into one browser-generated PDF with A4 fit or original-size pages.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "Convert PDF Pages to PNG or JPG | Worklazy Tools", description: "Render PDF pages as PNG or JPG images at your chosen resolution and download them together as a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },

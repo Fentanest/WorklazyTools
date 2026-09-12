@@ -77,9 +77,14 @@ try {
       };
     });
     const client = await page.createCDPSession();
+    const interceptedExternalRequests = [];
     await page.setRequestInterception(true);
     page.on("request", (request) => {
-      if (request.url().includes("excelCompare.worker")) setTimeout(() => request.continue(), 250);
+      const url = new URL(request.url());
+      if (["http:", "https:"].includes(url.protocol) && url.origin !== new URL(baseUrl).origin) {
+        interceptedExternalRequests.push(request.url());
+        void request.abort("blockedbyclient");
+      } else if (request.url().includes("excelCompare.worker")) setTimeout(() => request.continue(), 250);
       else void request.continue();
     });
     const pageErrors = [];
@@ -279,6 +284,7 @@ try {
       multiSummaries,
       zipEntries: archiveNames,
       isolation,
+      externalHttpRequestsBlockedBeforeExecution: interceptedExternalRequests.length,
       replacementRevokedAfterAnchorRemoval: previousReportUrl,
       integrityFailures,
       pairAssignment: { namesBeforeSwap, namesAfterSwap, overflowRejected: 2 },
@@ -357,7 +363,9 @@ async function assertHeaderSelectionFlow(browser, files) {
   page.setDefaultTimeout(180_000);
   await page.setRequestInterception(true);
   page.on("request", (request) => {
-    if (request.url().includes("excelCompare.worker")) setTimeout(() => request.continue(), 250);
+    const url = new URL(request.url());
+    if (["http:", "https:"].includes(url.protocol) && url.origin !== new URL(baseUrl).origin) void request.abort("blockedbyclient");
+    else if (request.url().includes("excelCompare.worker")) setTimeout(() => request.continue(), 250);
     else void request.continue();
   });
   await page.evaluateOnNewDocument(() => {

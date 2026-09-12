@@ -43,6 +43,7 @@ const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, ko
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
   "document-redactor",
+  "document-generator",
   "text-formatter",
   "work-calculator",
   "payroll-calculator",
@@ -802,7 +803,9 @@ export const visualRegressionScenarios = Object.freeze([
 
 export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDefinitions).sort());
 
-export const interactionNotApplicableReasons = Object.freeze({});
+export const interactionNotApplicableReasons = Object.freeze({
+  "document-generator": "Its multi-file DOCX/XLSX generation states use the dedicated synthetic U7 UI harness because the generic visual fixture DSL cannot express the paired template and data inputs.",
+});
 
 const QA_STATE_TYPES = new Set(["initial", "bottom", "interaction"]);
 
