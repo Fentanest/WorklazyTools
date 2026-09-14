@@ -1,39 +1,322 @@
 {
   "index": {
-    "eyebrow": "ALL TOOLS", "title": "All tools", "description": "Choose a category or search for the feature you need.",
-    "searchPlaceholder": "Search tools and features", "searchLabel": "Search tools", "categoryLabel": "Tool categories", "all": "All", "emptyTitle": "No matching tools", "emptyDescription": "Try another search term or category."
+    "eyebrow": "ALL TOOLS",
+    "title": "All tools",
+    "description": "Choose a category or search for the feature you need.",
+    "searchPlaceholder": "Search tools and features",
+    "searchLabel": "Search tools",
+    "categoryLabel": "Tool categories",
+    "all": "All",
+    "emptyTitle": "No matching tools",
+    "emptyDescription": "Try another search term or category."
   },
   "categories": {
-    "documents": { "label": "Documents & spreadsheets", "shortLabel": "Documents", "description": "Edit, compare, merge and convert business documents." },
-    "media": { "label": "Images, video & audio", "shortLabel": "Media", "description": "Edit images, video and audio directly in your browser." },
-    "text-data": { "label": "Text & data", "shortLabel": "Text & data", "description": "Clean up text, code and tabular data." },
-    "work": { "label": "Dates, work & payroll", "shortLabel": "Work calculators", "description": "Plan work dates, time zones and Korean payroll." },
-    "security-share": { "label": "Privacy & sharing", "shortLabel": "Privacy & sharing", "description": "Protect metadata, create strong passwords and share with QR codes." }
+    "documents": {
+      "label": "Documents & spreadsheets",
+      "shortLabel": "Documents",
+      "description": "Edit, compare, merge and convert business documents."
+    },
+    "media": {
+      "label": "Images, video & audio",
+      "shortLabel": "Media",
+      "description": "Edit images, video and audio directly in your browser."
+    },
+    "text-data": {
+      "label": "Text & data",
+      "shortLabel": "Text & data",
+      "description": "Clean up text, code and tabular data."
+    },
+    "work": {
+      "label": "Dates, work & payroll",
+      "shortLabel": "Work calculators",
+      "description": "Plan work dates, time zones and Korean payroll."
+    },
+    "security-share": {
+      "label": "Privacy & sharing",
+      "shortLabel": "Privacy & sharing",
+      "description": "Protect metadata, create strong passwords and share with QR codes."
+    }
   },
   "items": {
-    "document-redactor": {"title": "Document Redaction", "shortTitle": "Document redaction", "description": "Cover selected areas in PDFs and images with solid black masks and save new copies.", "eyebrow": "DOCUMENT PRIVACY", "highlights": ["Manual area selection", "Rasterize every PDF page", "Save images as PNG", "Review the output"]},
-    "excel-merger": { "title": "Excel Merger", "shortTitle": "Excel merger", "description": "Combine multiple Excel and CSV files into one organized workbook.", "eyebrow": "SPREADSHEETS", "highlights": ["One sheet per source", "Append rows", "Join columns", "Blank areas & passwords"] },
-    "excel-compare": { "title": "Excel Compare", "shortTitle": "Excel compare", "description": "Check a suggested header, compare Excel or CSV pairs, and review both source-row groups for each duplicate key.", "eyebrow": "SPREADSHEET COMPARISON", "highlights": ["Suggested header selection", "Position & key matching", "Grouped duplicate keys", "Reconciliation", "Excel report per pair"] },
-    "excel-cleaner": { "title": "Excel Data Cleaner", "shortTitle": "Excel cleaner", "description": "Apply an ordered pipeline of 28 cleanup rules to Excel and CSV files and export XLSX, CSV, and reports.", "eyebrow": "SPREADSHEET CLEANUP", "highlights": ["13 structure rules", "7 text rules", "8 filter & value rules", "Multiple files & reports"] },
-    "pdf-editor": { "title": "PDF Tools", "shortTitle": "PDF tools", "description": "Edit, merge and extract PDF pages, convert images and office formats, or run browser OCR.", "eyebrow": "PDF EDIT & CONVERT", "highlights": ["Checkbox & continuous ranges", "Image conversion", "DOCX & TXT", "XLSX & OCR"] },
-    "document-compare": { "title": "Document Compare", "shortTitle": "Document compare", "description": "Compare text, tables and formatting in DOCX, DOC, HWP and HWPX files with one consistent method.", "eyebrow": "DOCUMENT COMPARISON", "highlights": ["Word & HWP together", "Moves & paragraph splits", "Excel report", "Multiple comparisons"] },
-    "pdf-compare": { "title": "PDF Compare", "shortTitle": "PDF compare", "description": "Compare rendered pages and extracted text across multiple before-and-after PDF pairs.", "eyebrow": "PDF COMPARISON", "highlights": ["Multiple file pairs", "Page visual comparison", "Extracted text comparison", "Report per pair"] },
-    "hwp-editor": { "title": "HWP Editor", "shortTitle": "HWP editor", "description": "Edit HWP and HWPX documents in the official rhwp Studio.", "eyebrow": "HANGUL DOCUMENTS", "highlights": ["HWP, HWPX & HML", "Full document editor", "Formatting & objects", "Password documents"] },
-    "office-editor": { "title": "Browser Office Editor", "shortTitle": "Office editor", "description": "Drop a file to prepare a full-screen LibreOffice-based Writer, Calc or Impress workspace automatically.", "eyebrow": "BROWSER OFFICE", "highlights": ["Drop to start", "Full-screen editing", "Korean fallback font", "Browser processing"] },
-    "video-studio": { "title": "Video Studio", "shortTitle": "Video studio", "description": "Trim, join and export unlimited videos in up to 10 groups, or create GIF, MP3 and AAC results.", "eyebrow": "VIDEO EDITING", "highlights": ["Unlimited files, 10 groups", "Fast lossless trimming", "Copy ranges across groups", "Individual files or ZIP", "Audio stream controls"] },
-    "audio-studio": { "title": "Audio Studio", "shortTitle": "Audio studio", "description": "Edit selected waveform regions, transform pitch or tone, and export the result as WAV or MP3.", "eyebrow": "AUDIO EDITING", "highlights": ["Detailed waveform", "Region editing", "Pitch & robot effects", "WAV & MP3"] },
-    "image-studio": { "title": "Image Studio", "shortTitle": "Image studio", "description": "Mosaic or blur selected regions, retouch and draw, resize image content or the canvas, and export at exact pixel dimensions.", "eyebrow": "IMAGE EDITING", "highlights": ["Region mosaic & blur", "Photo & drawing editor", "Image & canvas resize", "Exact export size", "Shape & sticker layers", "Collages & GIFs"] },
-    "text-merger": { "title": "Text Merger", "shortTitle": "Text merger", "description": "Combine pasted text and TXT files in any order with your chosen separator.", "eyebrow": "TEXT PRODUCTIVITY", "highlights": ["Pasted text", "TXT files", "Unified reordering", "Copy & download"] },
-    "text-tools": { "title": "Text Tools", "shortTitle": "Text cleanup", "description": "Clean whitespace and line breaks, convert letter case and review common Korean writing patterns.", "eyebrow": "TEXT PRODUCTIVITY", "highlights": ["Whitespace cleanup", "Duplicate line removal", "Case conversion", "Korean writing guide"] },
-    "text-formatter": { "title": "Code Formatter", "shortTitle": "Code formatter", "description": "Validate and format JSON, SQL and XML with indentation or minification.", "eyebrow": "DEVELOPMENT & DATA", "highlights": ["JSON", "SQL", "XML", "Syntax errors"] },
-    "work-calculator": { "title": "Korean Workday Calculator", "shortTitle": "Workdays & leave", "description": "Calculate workdays excluding South Korean holidays and estimate statutory annual leave.", "eyebrow": "KOREAN WORK SCHEDULES", "highlights": ["Business days", "Substitute holidays", "Hire-date basis", "Fiscal-year basis"] },
-    "timezone-calculator": { "title": "World Time Planner", "shortTitle": "World time", "description": "Pin cities on a world map, compare local times and find overlapping working hours.", "eyebrow": "GLOBAL COLLABORATION", "highlights": ["World map pins", "Daylight saving time", "Working-hour overlap", "44 major cities"] },
-    "payroll-calculator": { "title": "Korean Payroll Calculator", "shortTitle": "Korean payroll", "description": "Estimate weekly holiday pay, monthly take-home pay and statutory severance under South Korean rules.", "eyebrow": "KOREAN PAYROLL", "highlights": ["Weekly holiday pay", "Take-home pay", "Four social insurances", "Severance pay"] },
-    "image-privacy": { "title": "Photo Metadata Remover", "shortTitle": "Photo metadata remover", "description": "Inspect and remove hidden GPS, camera and capture-time EXIF data from JPG, PNG and WebP files.", "eyebrow": "PHOTO METADATA", "highlights": ["Inspect metadata", "Remove GPS", "JPG, PNG & WebP", "Browser processing"] },
-    "security-tools": { "title": "Password Generator", "shortTitle": "Password generator", "description": "Generate passwords with operating-system cryptographic randomness and estimate pattern-based guessing difficulty.", "eyebrow": "SECURITY", "highlights": ["Secure randomness", "Strength analysis", "Crack-time estimate", "Up to 64 characters"] },
-    "qr-studio": { "title": "QR Studio", "shortTitle": "QR studio", "description": "Create QR codes from text or table rows, export PNG, ZIP and label PDF results, or scan with a camera or image.", "eyebrow": "QR CREATE · BULK · SCAN", "highlights": ["Create QR codes", "Bulk table rows", "Camera & image scan", "PNG, ZIP & label PDF"] },
-    "data-converter": { "title": "Table Data Converter", "shortTitle": "Table data converter", "description": "Convert CSV, JSON and HTML tables and export the result as a file or to the clipboard.", "eyebrow": "TABLE DATA CONVERSION", "highlights": ["CSV", "JSON", "HTML tables", "Browser conversion"] }
-  ,
-    "document-generator": {"title":"Bulk DOCX Generator","shortTitle":"DOCX generator","description":"Create a new DOCX for each Excel or CSV row from one template, then save reports and a ZIP.","eyebrow":"DOCUMENT AUTOMATION","highlights":["DOCX template variables","Multiple Excel and CSV files","One DOCX per row","Sample and result reports"]}
+    "document-redactor": {
+      "title": "Document Redaction",
+      "shortTitle": "Document redaction",
+      "description": "Cover selected areas in PDFs and images with solid black masks and save new copies.",
+      "eyebrow": "DOCUMENT PRIVACY",
+      "highlights": [
+        "Manual area selection",
+        "Rasterize every PDF page",
+        "Save images as PNG",
+        "Review the output"
+      ]
+    },
+    "excel-merger": {
+      "title": "Excel Merger",
+      "shortTitle": "Excel merger",
+      "description": "Combine multiple Excel and CSV files into one organized workbook.",
+      "eyebrow": "SPREADSHEETS",
+      "highlights": [
+        "One sheet per source",
+        "Append rows",
+        "Join columns",
+        "Blank areas & passwords"
+      ]
+    },
+    "excel-compare": {
+      "title": "Excel Compare",
+      "shortTitle": "Excel compare",
+      "description": "Check a suggested header, compare Excel or CSV pairs, and review both source-row groups for each duplicate key.",
+      "eyebrow": "SPREADSHEET COMPARISON",
+      "highlights": [
+        "Suggested header selection",
+        "Position & key matching",
+        "Grouped duplicate keys",
+        "Reconciliation",
+        "Excel report per pair"
+      ]
+    },
+    "excel-cleaner": {
+      "title": "Excel Data Cleaner",
+      "shortTitle": "Excel cleaner",
+      "description": "Apply an ordered pipeline of 28 cleanup rules to Excel and CSV files and export XLSX, CSV, and reports.",
+      "eyebrow": "SPREADSHEET CLEANUP",
+      "highlights": [
+        "13 structure rules",
+        "7 text rules",
+        "8 filter & value rules",
+        "Multiple files & reports"
+      ]
+    },
+    "pdf-editor": {
+      "title": "PDF Tools",
+      "shortTitle": "PDF tools",
+      "description": "Edit, merge and extract PDF pages, convert images and office formats, or run browser OCR.",
+      "eyebrow": "PDF EDIT & CONVERT",
+      "highlights": [
+        "Checkbox & continuous ranges",
+        "Image conversion",
+        "DOCX & TXT",
+        "XLSX & OCR"
+      ]
+    },
+    "document-compare": {
+      "title": "Document Compare",
+      "shortTitle": "Document compare",
+      "description": "Compare text, tables and formatting in DOCX, DOC, HWP and HWPX files with one consistent method.",
+      "eyebrow": "DOCUMENT COMPARISON",
+      "highlights": [
+        "Word & HWP together",
+        "Moves & paragraph splits",
+        "Excel report",
+        "Multiple comparisons"
+      ]
+    },
+    "pdf-compare": {
+      "title": "PDF Compare",
+      "shortTitle": "PDF compare",
+      "description": "Compare rendered pages and extracted text across multiple before-and-after PDF pairs.",
+      "eyebrow": "PDF COMPARISON",
+      "highlights": [
+        "Multiple file pairs",
+        "Page visual comparison",
+        "Extracted text comparison",
+        "Report per pair"
+      ]
+    },
+    "hwp-editor": {
+      "title": "HWP Editor",
+      "shortTitle": "HWP editor",
+      "description": "Edit HWP and HWPX documents in the official rhwp Studio.",
+      "eyebrow": "HANGUL DOCUMENTS",
+      "highlights": [
+        "HWP, HWPX & HML",
+        "Full document editor",
+        "Formatting & objects",
+        "Password documents"
+      ]
+    },
+    "office-editor": {
+      "title": "Browser Office Editor",
+      "shortTitle": "Office editor",
+      "description": "Drop a file to prepare a full-screen LibreOffice-based Writer, Calc or Impress workspace automatically.",
+      "eyebrow": "BROWSER OFFICE",
+      "highlights": [
+        "Drop to start",
+        "Full-screen editing",
+        "Korean fallback font",
+        "Browser processing"
+      ]
+    },
+    "video-studio": {
+      "title": "Video Studio",
+      "shortTitle": "Video studio",
+      "description": "Trim, join and export unlimited videos in up to 10 groups, or create GIF, MP3 and AAC results.",
+      "eyebrow": "VIDEO EDITING",
+      "highlights": [
+        "Unlimited files, 10 groups",
+        "Fast lossless trimming",
+        "Copy ranges across groups",
+        "Individual files or ZIP",
+        "Audio stream controls"
+      ]
+    },
+    "audio-studio": {
+      "title": "Audio Studio",
+      "shortTitle": "Audio studio",
+      "description": "Edit selected waveform regions, transform pitch or tone, and export the result as WAV or MP3.",
+      "eyebrow": "AUDIO EDITING",
+      "highlights": [
+        "Detailed waveform",
+        "Region editing",
+        "Pitch & robot effects",
+        "WAV & MP3"
+      ]
+    },
+    "image-studio": {
+      "title": "Image Studio",
+      "shortTitle": "Image studio",
+      "description": "Mosaic or blur selected regions, retouch and draw, resize image content or the canvas, and export at exact pixel dimensions.",
+      "eyebrow": "IMAGE EDITING",
+      "highlights": [
+        "Region mosaic & blur",
+        "Photo & drawing editor",
+        "Image & canvas resize",
+        "Exact export size",
+        "Shape & sticker layers",
+        "Collages & GIFs"
+      ]
+    },
+    "text-merger": {
+      "title": "Text Merger",
+      "shortTitle": "Text merger",
+      "description": "Combine pasted text and TXT files in any order with your chosen separator.",
+      "eyebrow": "TEXT PRODUCTIVITY",
+      "highlights": [
+        "Pasted text",
+        "TXT files",
+        "Unified reordering",
+        "Copy & download"
+      ]
+    },
+    "text-tools": {
+      "title": "Text Tools",
+      "shortTitle": "Text cleanup",
+      "description": "Clean whitespace and line breaks, convert letter case and review common Korean writing patterns.",
+      "eyebrow": "TEXT PRODUCTIVITY",
+      "highlights": [
+        "Whitespace cleanup",
+        "Duplicate line removal",
+        "Case conversion",
+        "Korean writing guide"
+      ]
+    },
+    "text-formatter": {
+      "title": "Code Formatter",
+      "shortTitle": "Code formatter",
+      "description": "Validate and format JSON, SQL and XML with indentation or minification.",
+      "eyebrow": "DEVELOPMENT & DATA",
+      "highlights": [
+        "JSON",
+        "SQL",
+        "XML",
+        "Syntax errors"
+      ]
+    },
+    "work-calculator": {
+      "title": "Korean Workday Calculator",
+      "shortTitle": "Workdays & leave",
+      "description": "Calculate workdays excluding South Korean holidays and estimate statutory annual leave.",
+      "eyebrow": "KOREAN WORK SCHEDULES",
+      "highlights": [
+        "Business days",
+        "Substitute holidays",
+        "Hire-date basis",
+        "Fiscal-year basis"
+      ]
+    },
+    "timezone-calculator": {
+      "title": "World Time Planner",
+      "shortTitle": "World time",
+      "description": "Pin cities on a world map, compare local times and find overlapping working hours.",
+      "eyebrow": "GLOBAL COLLABORATION",
+      "highlights": [
+        "World map pins",
+        "Daylight saving time",
+        "Working-hour overlap",
+        "44 major cities"
+      ]
+    },
+    "payroll-calculator": {
+      "title": "Korean Payroll Calculator",
+      "shortTitle": "Korean payroll",
+      "description": "Estimate weekly holiday pay, monthly take-home pay and statutory severance under South Korean rules.",
+      "eyebrow": "KOREAN PAYROLL",
+      "highlights": [
+        "Weekly holiday pay",
+        "Take-home pay",
+        "Four social insurances",
+        "Severance pay"
+      ]
+    },
+    "image-privacy": {
+      "title": "Photo Metadata Remover",
+      "shortTitle": "Photo metadata remover",
+      "description": "Inspect and remove hidden GPS, camera and capture-time EXIF data from JPG, PNG and WebP files.",
+      "eyebrow": "PHOTO METADATA",
+      "highlights": [
+        "Inspect metadata",
+        "Remove GPS",
+        "JPG, PNG & WebP",
+        "Browser processing"
+      ]
+    },
+    "security-tools": {
+      "title": "Password Generator",
+      "shortTitle": "Password generator",
+      "description": "Generate passwords with operating-system cryptographic randomness and estimate pattern-based guessing difficulty.",
+      "eyebrow": "SECURITY",
+      "highlights": [
+        "Secure randomness",
+        "Strength analysis",
+        "Crack-time estimate",
+        "Up to 64 characters"
+      ]
+    },
+    "qr-studio": {
+      "title": "QR Studio",
+      "shortTitle": "QR studio",
+      "description": "Create QR codes from text or table rows, export PNG, ZIP and label PDF results, or scan with a camera or image.",
+      "eyebrow": "QR CREATE · BULK · SCAN",
+      "highlights": [
+        "Create QR codes",
+        "Bulk table rows",
+        "Camera & image scan",
+        "PNG, ZIP & label PDF"
+      ]
+    },
+    "data-converter": {
+      "title": "Table Data Converter",
+      "shortTitle": "Table data converter",
+      "description": "Convert CSV, JSON and HTML tables and export the result as a file or to the clipboard.",
+      "eyebrow": "TABLE DATA CONVERSION",
+      "highlights": [
+        "CSV",
+        "JSON",
+        "HTML tables",
+        "Browser conversion"
+      ]
+    },
+    "document-generator": {
+      "title": "Template-based Bulk Document Generator",
+      "shortTitle": "Word Mail Merge",
+      "description": "Replace variables in a Word template with Excel data to automatically generate hundreds of individual documents at once.",
+      "eyebrow": "DOCUMENT AUTOMATION",
+      "highlights": [
+        "DOCX template variables",
+        "Multiple Excel and CSV files",
+        "One DOCX per row",
+        "Sample and result reports"
+      ]
+    }
   }
 }
