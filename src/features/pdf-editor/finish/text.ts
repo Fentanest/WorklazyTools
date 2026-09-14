@@ -64,7 +64,7 @@ export type LayoutWarning = "horizontal-overflow" | "vertical-overflow";
 
 export type TextLayoutResult =
   | { ok: false; error: LayoutError; ellipsisWidth?: number }
-  | { ok: true; runs: LayoutRun[]; warnings: LayoutWarning[]; lineHeight: number; ellipsisWidth: number };
+  | { ok: true; runs: LayoutRun[]; warnings: LayoutWarning[]; lineHeight: number; ellipsisWidth: number; size: number };
 
 export interface PageMargins {
   top: number;
@@ -220,7 +220,7 @@ export function layoutTextLinesPreserve(input: {
       : region.y + (visible.length - index - 1) * lineHeight;
     return { ...run, x, y };
   });
-  return { ok: true, runs, warnings: [...warnings], lineHeight, ellipsisWidth };
+  return { ok: true, runs, warnings: [...warnings], lineHeight, ellipsisWidth, size: fitted };
 }
 
 export function layoutTextLines(input: {
@@ -266,7 +266,7 @@ export function layoutTextLines(input: {
       : region.y + (visible.length - index - 1) * lineHeight;
     return { ...run, x, y };
   });
-  return { ok: true, runs, warnings: [...warnings], lineHeight, ellipsisWidth };
+  return { ok: true, runs, warnings: [...warnings], lineHeight, ellipsisWidth, size };
 }
 
 export function createSixTextRegions(pageWidth: number, pageHeight: number, margins: PageMargins): SixTextRegion[] {

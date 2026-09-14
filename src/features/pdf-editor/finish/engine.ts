@@ -710,7 +710,7 @@ function createPageDecorationPlan(
     warnings: layout.warnings,
     textRotation: anchor.textRotation,
     viewport,
-    fontSize: options.fontSize,
+    fontSize: preserveFilename ? layout.size : options.fontSize,
     color: options.color,
     opacity: options.opacity ?? PDF_FINISH_OUTPUT_OPACITY,
   };

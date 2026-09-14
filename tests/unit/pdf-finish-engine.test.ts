@@ -861,3 +861,33 @@ test("filename policy handles long Korean names with the supported font asset", 
   const preservedBytes = await run(`${koreanBase}${koreanBase}.pdf`, { limit: null });
   assert.ok(preservedBytes.byteLength > limitedBytes.byteLength, "preserved long Korean header keeps more content than the truncated one");
 });
+
+test("filename preservation draws at the fitted size so the run stays inside its cell", async () => {
+  const baseName = "averylongfilenameindeed-for-preservation-check";
+  const file = await fixture(`${baseName}.pdf`);
+  const deco = {
+    template: "{filename}",
+    region: "top-center" as const,
+    fontSize: 10,
+    color: "#112233",
+    margin: 18,
+    startNumber: 1,
+    startPage: 1,
+    excludeCover: false,
+    filenamePolicy: { limit: null },
+  };
+  const [output] = await finishPdfFiles({
+    files: [{ key: "preserve", file, selection: selection(1, "1") }],
+    options: { ...deco, textDecorations: [deco] },
+    locale: "en-US",
+  });
+  const decorated = await PDFDocument.load(await output.blob.arrayBuffer(), { updateMetadata: false });
+  const streams = decodedPageStreams(decorated, 0).join("\n");
+  const drawnSize = Number((streams.match(/\/Helvetica-[A-Za-z0-9]+ ([0-9.]+) Tf/) ?? [])[1]);
+  assert.ok(Number.isFinite(drawnSize) && drawnSize < 10, "shrunk run is drawn at the fitted size, not the configured size");
+  assert.ok(streams.toLowerCase().includes(Buffer.from(baseName, "latin1").toString("hex")), "full filename is drawn without truncation");
+  const atX = Number((streams.match(/1 0 0 1 ([0-9.]+) [0-9.]+ Tm/) ?? [])[1]);
+  // Top-center column on a 400pt page with 18pt margins starts at x=139.33;
+  // a centered run must start right of the region origin.
+  assert.ok(Number.isFinite(atX) && atX > 139.33, "centered run keeps the region-relative alignment");
+});
