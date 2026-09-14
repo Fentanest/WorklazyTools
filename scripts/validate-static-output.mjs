@@ -15,7 +15,9 @@ const routes = [
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
-  "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/audio-studio", "tools/image-studio",
+  "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio", "tools/audio-studio", "tools/audio-studio/trim", "tools/image-studio",
+  "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark",
+  "tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr",
   "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/document-redactor", "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/qr-studio/bulk", "tools/data-converter",
@@ -26,7 +28,10 @@ const socialSlugByRoute = {
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
   "tools/pdf-editor/finish": "pdf-finish", "tools/pdf-editor/page-numbers": "pdf-page-numbers", "tools/pdf-editor/header-footer": "pdf-header-footer", "tools/pdf-editor/watermark": "pdf-watermark", "tools/pdf-editor/stamp": "pdf-stamp",
   "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",
-  "tools/audio-studio": "audio-studio", "tools/image-studio": "image-studio", "tools/text-merger": "text-merger", "tools/text-tools": "text-tools",
+  "tools/video-studio/trim": "video-studio-trim", "tools/video-studio/merge": "video-studio-merge", "tools/video-studio/extract-audio": "video-studio-extract-audio",
+  "tools/audio-studio": "audio-studio", "tools/audio-studio/trim": "audio-studio-trim", "tools/image-studio": "image-studio",
+  "tools/image-studio/resize": "image-studio-resize", "tools/image-studio/mosaic": "image-studio-mosaic", "tools/image-studio/watermark": "image-studio-watermark",
+  "tools/pdf-editor/merge": "pdf-editor-merge", "tools/pdf-editor/split": "pdf-editor-split", "tools/pdf-editor/delete": "pdf-editor-delete", "tools/pdf-editor/rotate": "pdf-editor-rotate", "tools/pdf-editor/ocr": "pdf-editor-ocr", "tools/text-merger": "text-merger", "tools/text-tools": "text-tools",
   "tools/text-formatter": "code-formatter", "tools/work-calculator": "workday-calculator", "tools/timezone-calculator": "world-time-planner",
   "tools/document-redactor": "document-redactor",
   "tools/payroll-calculator": "payroll-calculator", "tools/image-privacy": "photo-metadata-remover", "tools/security-tools": "password-generator",
@@ -73,14 +78,14 @@ for (const route of routes) {
     const image = await fs.stat(path.join("dist", socialPath));
     if (image.size < 10_000) throw new Error(`${socialPath} is missing or unexpectedly small.`);
   }
-  if (route === "tools/video-studio") {
-    if (!html.includes('name="worklazy-video-isolation"') || !html.includes('data-worklazy-video-isolation') || !html.includes('./coi-serviceworker.js')) {
+  if (["tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio"].includes(route)) {
+    if (!html.includes('name="worklazy-video-isolation"') || !html.includes('data-worklazy-video-isolation') || !html.includes('coi-serviceworker.js')) {
       throw new Error(`${filePath} is missing the document-scoped video isolation bootstrap.`);
     }
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk", "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
+  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk", "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp", "tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr", "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio", "tools/audio-studio/trim"].includes(route)) {
     const expectedQuestion = route === "tools/excel-merger"
       ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
       : route === "tools/excel-compare"
@@ -99,6 +104,30 @@ for (const route of routes) {
           ? language === "ko" ? "직접 입력을 TXT 파일 사이에 놓을 수 있나요?" : "Can pasted text be placed between TXT files?"
         : route === "tools/qr-studio/bulk"
           ? language === "ko" ? "어떤 표 파일에서 QR을 일괄 생성할 수 있나요?" : "Which table files can create QR codes in bulk?"
+        : route === "tools/pdf-editor/merge"
+          ? language === "ko" ? "여러 PDF를 순서대로 합칠 수 있나요?" : "Can I combine multiple PDFs in order?"
+        : route === "tools/pdf-editor/split"
+          ? language === "ko" ? "PDF를 원하는 구간으로 나눌 수 있나요?" : "Can I cut a PDF into the sections I want?"
+        : route === "tools/pdf-editor/delete"
+          ? language === "ko" ? "삭제할 페이지만 골라 뺄 수 있나요?" : "Can I remove only the pages I choose?"
+        : route === "tools/pdf-editor/rotate"
+          ? language === "ko" ? "일부 페이지만 회전할 수 있나요?" : "Can I rotate only some pages?"
+        : route === "tools/pdf-editor/ocr"
+          ? language === "ko" ? "PDF 전체를 검색 가능한 파일로 만들 수 있나요?" : "Can I make the whole PDF searchable?"
+        : route === "tools/image-studio/resize"
+          ? language === "ko" ? "원하는 픽셀 크기로 저장할 수 있나요?" : "Can I save at an exact pixel size?"
+        : route === "tools/image-studio/mosaic"
+          ? language === "ko" ? "선택한 부분만 모자이크할 수 있나요?" : "Can I mosaic only a selected area?"
+        : route === "tools/image-studio/watermark"
+          ? language === "ko" ? "글자를 그림에 바로 넣을 수 있나요?" : "Can I place text directly on the picture?"
+        : route === "tools/video-studio/trim"
+          ? language === "ko" ? "영상 구간을 골라 MP4로 저장할 수 있나요?" : "Can I save a video section as MP4?"
+        : route === "tools/video-studio/merge"
+          ? language === "ko" ? "여러 영상을 하나로 합칠 수 있나요?" : "Can I join several videos into one?"
+        : route === "tools/video-studio/extract-audio"
+          ? language === "ko" ? "영상에서 소리만 MP3로 저장할 수 있나요?" : "Can I save only the sound as MP3?"
+        : route === "tools/audio-studio/trim"
+          ? language === "ko" ? "오디오 구간을 골라 저장할 수 있나요?" : "Can I pick an audio section and save it?"
         : route === "tools/pdf-editor/header-footer"
           ? language === "ko" ? "머리글과 바닥글에 어떤 정보를 넣을 수 있나요?" : "What can I put in a header or footer?"
         : route === "tools/pdf-editor/watermark"

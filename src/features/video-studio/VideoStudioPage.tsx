@@ -117,7 +117,7 @@ interface DownloadableVideoOutput {
 }
 
 interface WritableVideoFileHandle {
-  createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }>;
+  createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void>; abort: () => Promise<void> }>;
 }
 
 interface WritableVideoDirectoryHandle {
@@ -130,7 +130,10 @@ type DirectoryPickerWindow = Window & {
 
 const GROUP_IDS = VIDEO_GROUP_IDS;
 
-export function VideoStudioPage() {
+import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
+import { videoDirectDirty, type VideoDirectPreset } from "./videoDirect";
+import { useVideoDirect } from "./videoDirectLifecycle";
+export function VideoStudioPage({ preset }: { preset?: VideoDirectPreset }) {
   const language = useAppLanguage();
   const videoPage = featureResource<VideoPageCopy>(language, "video.page");
   const audioStudioPath = useLocalizedPath("/tools/audio-studio");
@@ -274,6 +277,7 @@ export function VideoStudioPage() {
       const queuedProbe = probeQueueRef.current.then(() => probeVideoMetadata(item.file, controller.signal, language));
       probeQueueRef.current = queuedProbe.then(() => undefined, () => undefined);
       const metadata = await queuedProbe;
+      if (controller.signal.aborted) return;
       setItems((current) => current.map((candidate) => {
         if (candidate.id !== itemId) return candidate;
         const keepBrowserMetadata = candidate.metadataSource === "browser" && candidate.duration > 0;
@@ -353,8 +357,29 @@ export function VideoStudioPage() {
     if (session) void releaseVideoResultStorageSession(session);
   };
 
-  const appendVideoOutput = async (output: VideoWorkerOutput) => {
+  const probeResumeGeneration = useRef(0);
+  useEffect(() => () => { probeResumeGeneration.current += 1; }, []);
+  const direct = useVideoDirect(preset, videoDirectDirty({ items, status: progress.status, probing: items.some(item => item.probing || item.frameRateProbeStatus === "running"), outputs: videoOutputs }), next => {
+    activeController.current?.abort();
+    activeController.current = undefined;
+    const resumeIds = [...probeControllers.current.keys()];
+    const generation = ++probeResumeGeneration.current;
+    probeControllers.current.forEach(controller => controller.abort());
+    probeControllers.current.clear();
+    if (resumeIds.length) void probeQueueRef.current.then(() => { if (generation === probeResumeGeneration.current) resumeIds.forEach(id => { void probeItem(id, true); }); });
+    setItems(current => current.map(item => item.probing || item.frameRateProbeStatus === "running" ? { ...item, probing: false, frameRateProbeStatus: undefined } : item));
+    clearVideoOutputs();
+    setLastResult("");
+    progress.reset();
+    setAllGroupsOneFile(next?.allGroupsOneFile ?? false);
+    setGroupSettings(current => Object.fromEntries(Object.entries(current).map(([group, settings]) => [group, { ...settings, outputMode: next?.outputMode ?? "individual" }])) as Record<VideoGroupId, GroupSettings>);
+    setOutputFormat(next?.outputFormat ?? "mp4");
+    setAudioMode(next?.audioMode ?? "copy");
+  });
+  const appendVideoOutput = async (output: VideoWorkerOutput, signal?: AbortSignal) => {
+    if (signal?.aborted) return;
     const blob = await resolveVideoResultFile(output);
+    if (signal?.aborted) return;
     const next = {
       id: createId(),
       fileName: output.fileName,
@@ -376,23 +401,35 @@ export function VideoStudioPage() {
   const saveOutputsToFolder = async () => {
     const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
     if (!picker || !videoOutputsRef.current.length) return;
+    const controller = new AbortController();
+    activeController.current = controller;
+    let writable: Awaited<ReturnType<WritableVideoFileHandle["createWritable"]>> | undefined;
+    const abort = () => { void writable?.abort().catch(() => undefined); };
+    controller.signal.addEventListener("abort", abort, { once: true });
     try {
       const directory = await picker.call(window);
+      if (controller.signal.aborted) return;
       progress.start(featureMessage(language, "video.messages.VideoStudioPage.savingResultsToTheSelectedFolder"));
       for (let index = 0; index < videoOutputsRef.current.length; index += 1) {
         const output = videoOutputsRef.current[index];
         progress.update(Math.round((index / videoOutputsRef.current.length) * 100), featureMessage(language, "video.messages.VideoStudioPage.saving", { p0: index + 1, p1: videoOutputsRef.current.length, p2: output.fileName }));
         const fileHandle = await directory.getFileHandle(output.fileName, { create: true });
-        const writable = await fileHandle.createWritable();
+        if (controller.signal.aborted) return;
+        writable = await fileHandle.createWritable();
+        if (controller.signal.aborted) { await writable.abort(); return; }
         await writable.write(output.blob);
+        if (controller.signal.aborted) return;
         await writable.close();
+        writable = undefined;
       }
+      if (controller.signal.aborted) return;
       progress.succeed(featureMessage(language, "video.messages.VideoStudioPage.savedResultsToTheSelectedFolder", { p0: videoOutputsRef.current.length }));
       setLastResult(featureMessage(language, "video.messages.VideoStudioPage.savedResultsToTheSelectedFolder", { p0: videoOutputsRef.current.length }));
     } catch (error) {
+      if (controller.signal.aborted) return;
       if (error instanceof DOMException && error.name === "AbortError") return;
       progress.fail(featureMessage(language, "video.messages.VideoStudioPage.unableToSaveResultsToTheSelectedFolder"));
-    }
+    } finally { controller.signal.removeEventListener("abort", abort); if (activeController.current === controller) activeController.current = undefined; }
   };
 
   const createZipArchive = async () => {
@@ -410,6 +447,7 @@ export function VideoStudioPage() {
         resultStorageRef.current,
       );
       const archive = await resolveVideoResultFile(result);
+      if (controller.signal.aborted) return;
       if (result.data.kind === "opfs") archiveEntriesRef.current.add(result.data.entryName);
       downloadBlob(archive, result.fileName);
       progress.succeed(featureMessage(language, "video.messages.VideoStudioPage.created", { p0: result.fileName }));
@@ -417,7 +455,7 @@ export function VideoStudioPage() {
     } catch (error) {
       progress.fail(error instanceof DOMException && error.name === "AbortError" ? featureMessage(language, "video.messages.VideoStudioPage.zipCreationWasCanceled") : toUserFacingVideoError(error, language));
     } finally {
-      const session = resultStorageRef.current;
+      const session = activeController.current === controller ? resultStorageRef.current : undefined;
       if (session) {
         const keepEntries = [...opfsEntryNames(videoOutputsRef.current), ...archiveEntriesRef.current];
         await cleanupPartialVideoResults(session, keepEntries).catch(() => undefined);
@@ -593,14 +631,16 @@ export function VideoStudioPage() {
         throw new DOMException(featureMessage(language, "video.messages.VideoStudioPage.videoProcessingWasCanceled"), "AbortError");
       }
       resultStorageRef.current = resultStorage;
-      const result = await task(controller, appendVideoOutput, resultStorage);
+      const result = await task(controller, output => appendVideoOutput(output, controller.signal), resultStorage);
+      if (controller.signal.aborted) return;
       setLastResult(featureMessage(language, "video.messages.VideoStudioPage.allResultsAreReady", { p0: result.outputCount, p1: result.warnings.length ? ` ${result.warnings[0]}` : "" }));
       progress.succeed(featureMessage(language, "video.messages.VideoStudioPage.resultsCreated", { p0: result.outputCount }));
     } catch (error) {
+      if (controller.signal.aborted && activeController.current !== controller) return;
       progress.fail(error instanceof DOMException && error.name === "AbortError" ? featureMessage(language, "video.messages.VideoStudioPage.videoProcessingWasCanceled") : toUserFacingVideoError(error, language));
       if (videoOutputsRef.current.length) setLastResult(featureMessage(language, "video.messages.VideoStudioPage.resultsCompletedAndCanBeDownloadedIndividuallyBelow", { p0: videoOutputsRef.current.length }));
     } finally {
-      const session = resultStorageRef.current;
+      const session = activeController.current === controller ? resultStorageRef.current : undefined;
       if (session) {
         await cleanupPartialVideoResults(session, opfsEntryNames(videoOutputsRef.current)).catch(() => undefined);
         if (!videoOutputsRef.current.length) {
@@ -658,6 +698,8 @@ export function VideoStudioPage() {
 
   return (
     <UtilityPage toolId="video-studio" className="video-studio-page">
+      <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
+      {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? ({ trim: "비디오 자르기", merge: "비디오 합치기", "extract-audio": "비디오 음원 추출" })[direct.acceptedPreset.purpose] : ({ trim: "Trim video", merge: "Merge videos", "extract-audio": "Extract audio from video" })[direct.acceptedPreset.purpose]} description={language === "ko" ? (direct.acceptedPreset.purpose === "merge" ? "그룹 번호와 카드 순서대로 모든 그룹을 하나의 파일로 저장하세요." : "카드에서 저장할 구간의 시작과 끝을 조정하세요.") : (direct.acceptedPreset.purpose === "merge" ? "Save all groups as one file in group number and card order." : "Adjust each card’s start and end to choose the range to save.")} />}
       <PageHeader eyebrow="VIDEO STUDIO" title={featureMessage(language, "video.messages.VideoStudioPage.videoStudio")} description={featureMessage(language, "video.messages.VideoStudioPage.keepAddingVideosWithoutAFileCountLimit")}>
         <PrivacyBanner compact />
       </PageHeader>

@@ -25,7 +25,7 @@ import {
   type PdfFinishWarningCode,
 } from "./finish/engine.ts";
 import { isThumbnailDisabled, createPageSelection, displayNumber, toggleThumbnailPage, type PageParity, type PageSelectionState } from "./finish/selection.ts";
-import { expandTokens } from "./finish/tokens.ts";
+import { expandTokens, parseFilenameLimit, applyFilenameLimit } from "./finish/tokens.ts";
 import type { FinishRegion } from "./finish/geometry.ts";
 import { createWatermarkPlacements, type PdfWatermarkSettings, type WatermarkContentKind, type WatermarkLayer, type WatermarkPattern, type WatermarkRegion } from "./finish/watermark.ts";
 import { commitStamp, createStampHistory, redoStamp, undoStamp, type NormalizedStamp } from "./finish/stamp.ts";
@@ -42,6 +42,7 @@ interface FinishFormState {
   fontSize: string;
   color: string;
   margin: string;
+  filenameLimit: string;
 }
 
 interface FinishSource {
@@ -50,7 +51,11 @@ interface FinishSource {
   pageCount: number;
 }
 
-type FinishPreviewFormState = Omit<FinishFormState, "fontSize" | "margin"> & { fontSize: number; margin: number };
+type FinishPreviewFormState = Omit<FinishFormState, "fontSize" | "margin" | "filenameLimit"> & {
+  fontSize: number;
+  margin: number;
+  filenamePolicy: { limit: number | null } | undefined;
+};
 
 interface FinishCopy {
   tabsLabel: string;
@@ -75,6 +80,10 @@ interface FinishCopy {
   fontSize: string;
   color: string;
   margin: string;
+  filenameLimit: string;
+  filenameLimitHelp: string;
+  filenameLimitError: string;
+  filenameLimitUnsupported: string;
   watermark: {
     contentType: string;
     text: string;
@@ -211,10 +220,10 @@ interface FinishCopy {
 }
 
 const DEFAULT_FORMS: Record<ImplementedFinishTab, FinishFormState> = {
-  "page-numbers": { template: "{page} / {pages}", region: "bottom-center", fontSize: "10", color: "#34343a", margin: "24" },
-  "header-footer": { template: "{filename} · {date}", region: "top-center", fontSize: "10", color: "#34343a", margin: "24" },
-  watermark: { template: "CONFIDENTIAL", region: "center", fontSize: "36", color: "#8b3f55", margin: "24" },
-  stamp: { template: "", region: "center", fontSize: "10", color: "#34343a", margin: "0" },
+  "page-numbers": { template: "{page} / {pages}", region: "bottom-center", fontSize: "10", color: "#34343a", margin: "24", filenameLimit: "" },
+  "header-footer": { template: "{filename} · {date}", region: "top-center", fontSize: "10", color: "#34343a", margin: "24", filenameLimit: "" },
+  watermark: { template: "CONFIDENTIAL", region: "center", fontSize: "36", color: "#8b3f55", margin: "24", filenameLimit: "" },
+  stamp: { template: "", region: "center", fontSize: "10", color: "#34343a", margin: "0", filenameLimit: "" },
 };
 
 function initialStamp(aspect = 2): NormalizedStamp {
@@ -337,6 +346,14 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const watermarkOffsetX = numericInput(watermark.offsetX);
   const watermarkOffsetY = numericInput(watermark.offsetY);
   const validLowerBound = Number.isSafeInteger(startingPage) && startingPage >= 1;
+  const segmenterSupported = typeof Intl.Segmenter === "function";
+  const headerFilenameParsed = parseFilenameLimit(forms["header-footer"].filenameLimit);
+  const headerFilenamePolicy = headerFilenameParsed.valid ? { limit: headerFilenameParsed.limit } : undefined;
+  const headerFilenameError = !headerFilenameParsed.valid
+    ? copy.filenameLimitError
+    : headerFilenameParsed.limit !== null && !segmenterSupported
+      ? copy.filenameLimitUnsupported
+      : "";
   const lowerBound = useMemo(
     () => validLowerBound ? { startPage: startingPage, excludeCover } : null,
     [excludeCover, startingPage, validLowerBound],
@@ -614,16 +631,20 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     : undefined;
   const textDecorations = (["page-numbers", "header-footer"] as const)
     .filter((tab) => enabled[tab])
-    .map((tab) => ({
-      ...forms[tab],
-      region: forms[tab].region as FinishRegion,
-      fontSize: numericInput(forms[tab].fontSize),
-      margin: numericInput(forms[tab].margin),
-      startNumber: startingNumber,
-      startPage: startingPage,
-      excludeCover,
-      opacity: 0.9,
-    }));
+    .map((tab) => {
+      const { filenameLimit: _filenameLimit, ...rest } = forms[tab];
+      return {
+        ...rest,
+        region: forms[tab].region as FinishRegion,
+        fontSize: numericInput(forms[tab].fontSize),
+        margin: numericInput(forms[tab].margin),
+        ...(tab === "header-footer" && headerFilenamePolicy ? { filenamePolicy: headerFilenamePolicy } : {}),
+        startNumber: startingNumber,
+        startPage: startingPage,
+        excludeCover,
+        opacity: 0.9,
+      };
+    });
   const baseForm = enabled.watermark ? watermarkForm : DEFAULT_FORMS["page-numbers"];
   const finishOptions = {
     template: baseForm.template,
@@ -656,9 +677,11 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     gap: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkGap) || watermarkGap < 0 || watermarkGap > 2_000) ? copy.fieldErrors.gap : "",
     offsetX: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkOffsetX) || watermarkOffsetX < -2_000 || watermarkOffsetX > 2_000) ? copy.fieldErrors.offset : "",
     offsetY: watermarkActive && watermark.pattern === "tile" && (!Number.isFinite(watermarkOffsetY) || watermarkOffsetY < -2_000 || watermarkOffsetY > 2_000) ? copy.fieldErrors.offset : "",
-  }), [copy.fieldErrors, fontSize, form.template, margin, stampActive, stampImage, stampImageStatus, startingNumber, validLowerBound, watermark.content, watermark.image, watermark.pattern, watermarkActive, watermarkGap, watermarkOffsetX, watermarkOffsetY, watermarkOpacity, watermarkRotation, watermarkSize]);
+    filenameLimit: activeTab === "header-footer" ? headerFilenameError : "",
+  }), [copy.fieldErrors, fontSize, form.template, margin, stampActive, stampImage, stampImageStatus, startingNumber, validLowerBound, watermark.content, watermark.image, watermark.pattern, watermarkActive, watermarkGap, watermarkOffsetX, watermarkOffsetY, watermarkOpacity, watermarkRotation, watermarkSize, activeTab, headerFilenameError]);
   const baseFieldError = enabled[activeTab] ? Object.values(baseFieldErrors).find(Boolean) ?? "" : "";
   const combinedFieldError = baseFieldError
+    || (enabled["header-footer"] && headerFilenameError ? headerFilenameError : "")
     || (!Number.isSafeInteger(startingNumber) ? copy.fieldErrors.startNumber : "")
     || (!validLowerBound ? copy.fieldErrors.startPage : "")
     || (textDecorations.some(({ fontSize: size }) => !Number.isFinite(size) || size < 6 || size > 72) ? copy.fieldErrors.fontSize : "")
@@ -861,6 +884,9 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                   <UtilityField>{copy.margin}<UtilityInput data-testid="pdf-finish-margin" type="number" min={0} max={144} step={1} value={form.margin} disabled={locked} aria-invalid={!!fieldErrors.margin || undefined} aria-describedby={fieldErrors.margin ? `${tabPanelId}-margin-error` : undefined} onChange={(event) => updateForm("margin", event.target.value)} />{fieldErrors.margin && <span id={`${tabPanelId}-margin-error`} className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.margin}</span>}</UtilityField>
                   {(!watermarkActive || watermark.content === "text") && <UtilityField>{copy.color}<UtilityInput data-testid="pdf-finish-color" className="p-1" type="color" value={form.color} disabled={locked} onChange={(event) => updateForm("color", event.target.value)} /></UtilityField>}
                 </div>}
+                {activeTab === "header-footer" && !stampActive && !watermarkActive && <div className="mt-5 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">
+                  <UtilityField>{copy.filenameLimit}<UtilityInput data-testid="pdf-finish-filename-limit" type="text" inputMode="numeric" autoComplete="off" placeholder="" value={forms["header-footer"].filenameLimit} disabled={locked} aria-invalid={!!fieldErrors.filenameLimit || undefined} aria-describedby={`${tabPanelId}-filename-limit-help${fieldErrors.filenameLimit ? ` ${tabPanelId}-filename-limit-error` : ""}`} onChange={(event) => updateForm("filenameLimit", event.target.value)} /><span id={`${tabPanelId}-filename-limit-help`} className="text-xs leading-relaxed text-muted-foreground">{copy.filenameLimitHelp}</span>{fieldErrors.filenameLimit && <span id={`${tabPanelId}-filename-limit-error`} data-testid="pdf-finish-filename-limit-error" className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.filenameLimit}</span>}</UtilityField>
+                </div>}
                 {watermarkActive && <div className="mt-5 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1" data-pdf-watermark-owned>
                   <UtilityField>{copy.watermark.rotation}<UtilityInput data-testid="pdf-watermark-rotation" type="number" min={-180} max={180} step={1} value={watermark.rotation} disabled={locked} aria-invalid={!!fieldErrors.rotation || undefined} onChange={(event) => updateWatermark("rotation", event.target.value)} />{fieldErrors.rotation && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.rotation}</span>}</UtilityField>
                   <UtilityField>{copy.watermark.opacity}<UtilityInput data-testid="pdf-watermark-opacity" type="number" min={0.01} max={1} step={0.01} value={watermark.opacity} disabled={locked} aria-invalid={!!fieldErrors.opacity || undefined} onChange={(event) => updateWatermark("opacity", event.target.value)} />{fieldErrors.opacity && <span className="text-xs leading-relaxed text-destructive" role="alert">{fieldErrors.opacity}</span>}</UtilityField>
@@ -937,7 +963,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                 <div className="mb-4 flex items-center gap-2 text-violet-700 dark:text-violet-300"><SquareDashed size={18} /><h2 id={`${tabPanelId}-preview-title`} className="font-heading text-base font-medium text-foreground">{stampActive ? copy.stamp.previewTitle : copy.previewTitle}</h2></div>
                 <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{stampActive ? copy.stamp.previewDescription : copy.previewDescription}</p>
                 {!enabled[activeTab] && <p className="mb-3 text-xs leading-relaxed text-muted-foreground" data-testid="pdf-finish-excluded-draft" data-pdf-finish-owned>{copy.excludedDraft}</p>}
-                <FinishPreview file={file} pageIndex={Math.max(0, (selection.exactPages[0] ?? 1) - 1)} language={language} form={{ ...form, fontSize: Number.isFinite(fontSize) ? fontSize : 10, margin: Number.isFinite(margin) ? margin : 24 }} startNumber={Number.isSafeInteger(startingNumber) ? startingNumber : 1} startPage={validLowerBound ? startingPage : 1} excludeCover={excludeCover} pageCount={pageCount} copy={copy} lifecycleSignal={fileLifecycleControllerRef.current?.signal} onRenderingChange={updatePreviewing} watermark={watermarkActive ? { ...watermark, rotation: watermarkRotation, opacity: watermarkOpacity, sizePercent: watermarkSize, gap: watermarkGap, offsetX: watermarkOffsetX, offsetY: watermarkOffsetY } : undefined} stamp={stampActive && stampImage && stampImageStatus === "ready" ? { image: stampImage, placement: stampHistory.present, onCommit: updateStampPlacement } : undefined} locked={locked} />
+                <FinishPreview file={file} pageIndex={Math.max(0, (selection.exactPages[0] ?? 1) - 1)} language={language} form={{ template: form.template, region: form.region, color: form.color, fontSize: Number.isFinite(fontSize) ? fontSize : 10, margin: Number.isFinite(margin) ? margin : 24, filenamePolicy: activeTab === "header-footer" ? headerFilenamePolicy : undefined }} startNumber={Number.isSafeInteger(startingNumber) ? startingNumber : 1} startPage={validLowerBound ? startingPage : 1} excludeCover={excludeCover} pageCount={pageCount} copy={copy} lifecycleSignal={fileLifecycleControllerRef.current?.signal} onRenderingChange={updatePreviewing} watermark={watermarkActive ? { ...watermark, rotation: watermarkRotation, opacity: watermarkOpacity, sizePercent: watermarkSize, gap: watermarkGap, offsetX: watermarkOffsetX, offsetY: watermarkOffsetY } : undefined} stamp={stampActive && stampImage && stampImageStatus === "ready" ? { image: stampImage, placement: stampHistory.present, onCommit: updateStampPlacement } : undefined} locked={locked} />
                 {!stampActive && <UtilityNotice className="mt-3" tone="warning" data-testid="pdf-finish-preview-disclaimer" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.previewDisclaimer}</UtilityNotice>}
                 {preflight.status === "checking" && <UtilityNotice className="mt-3" tone="warning" role="status" data-testid="pdf-finish-preflight-checking" data-pdf-watermark-owned={watermarkActive || undefined}>{copy.preflightChecking}</UtilityNotice>}
                 {preflight.status === "ready" && <span className="sr-only" data-testid="pdf-finish-preflight-ready">ready</span>}
@@ -1049,10 +1075,14 @@ function FinishPreview({ file, pageIndex, language, form, startNumber, startPage
   const physicalPage = pageIndex + 1;
   let page = physicalPage;
   try { page = displayNumber(physicalPage, startNumber, { startPage, excludeCover }); } catch { /* Invalid fields are reported by the form. */ }
+  const filenameBase = file.name.replace(/\.pdf$/iu, "");
+  const previewFilename = form.filenamePolicy && form.filenamePolicy.limit !== null
+    ? (applyFilenameLimit(filenameBase, form.filenamePolicy.limit) ?? filenameBase)
+    : filenameBase;
   const overlay = expandTokens(form.template, {
     page,
     pages: pageCount,
-    filename: file.name.replace(/\.pdf$/iu, ""),
+    filename: previewFilename,
     date: new Date(),
     locale: language === "ko" ? "ko-KR" : "en-US",
   }).text;

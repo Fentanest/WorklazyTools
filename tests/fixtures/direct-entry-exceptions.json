@@ -1,0 +1,103 @@
+[
+  {
+    "path": "/tools/hwp-editor",
+    "locales": [
+      "en"
+    ],
+    "purpose": "unavailable",
+    "owner": "hwp-editor",
+    "static": false,
+    "fallback": "/en/tools"
+  },
+  {
+    "path": "/tools/document-compare/results/:pairNumber",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "session-result",
+    "owner": "document-compare",
+    "static": false,
+    "indexable": false
+  },
+  {
+    "path": "/tools/office-editor/app",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "isolated-workspace",
+    "owner": "office-editor",
+    "indexable": false
+  },
+  {
+    "path": "/tools/excel-merger/xls-preserve",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "isolated-preservation",
+    "owner": "excel-merger",
+    "indexable": false
+  },
+  {
+    "path": "/tools/word-compare",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "retired-redirect",
+    "owner": "document-compare",
+    "redirectTarget": "/tools/document-compare"
+  },
+  {
+    "path": "/tools/hwp-compare",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "retired-redirect",
+    "owner": "document-compare",
+    "redirectTarget": "/tools/document-compare"
+  },
+  {
+    "path": "/tools/pdf-editor/page-numbers",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "finish-alias",
+    "owner": "pdf-finish",
+    "canonical": "/tools/pdf-editor/finish"
+  },
+  {
+    "path": "/tools/pdf-editor/header-footer",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "finish-alias",
+    "owner": "pdf-finish",
+    "canonical": "/tools/pdf-editor/finish"
+  },
+  {
+    "path": "/tools/pdf-editor/watermark",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "finish-alias",
+    "owner": "pdf-finish",
+    "canonical": "/tools/pdf-editor/finish"
+  },
+  {
+    "path": "/tools/pdf-editor/stamp",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "purpose": "finish-alias",
+    "owner": "pdf-finish",
+    "canonical": "/tools/pdf-editor/finish"
+  }
+]

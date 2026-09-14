@@ -416,8 +416,9 @@ export async function extractPdfText(
   onProgress?: WorkerProgress,
   selectedPageIndexes?: number[],
   language: AppLanguage = "ko",
+  signal?: AbortSignal,
 ): Promise<ExtractPdfTextResult> {
-  const document = await getPdfDocument(file, language);
+  const document = await getPdfDocument(file, language, signal);
   const pages: PdfTextPage[] = [];
   const sourcePageIndexes = selectedPageIndexes?.length
     ? [...new Set(selectedPageIndexes)].filter((index) => index >= 0 && index < document.numPages)
@@ -426,8 +427,8 @@ export async function extractPdfText(
   onProgress?.(2, featureMessage(language, "pdf.messages.pdfPreview.readingEmbeddedPdfTextAndCoordinates"));
   for (let index = 0; index < sourcePageIndexes.length; index += 1) {
     const pageNumber = sourcePageIndexes[index] + 1;
-    const page = await document.getPage(pageNumber);
-    const content = await page.getTextContent();
+    const page = await waitWithAbort(document.getPage(pageNumber), signal);
+    const content = await waitWithAbort(page.getTextContent(), signal);
     pages.push(layoutPdfItems(pageNumber, (content.items as unknown[]).filter(isTextItem)));
     onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, featureMessage(language, "pdf.messages.pdfPreview.embeddedTextAnalyzedForPage", { p0: index + 1, p1: sourcePageIndexes.length, p2: pageNumber }));
   }
@@ -440,14 +441,16 @@ export async function extractPdfText(
   const ocrPdfBuffers: ArrayBuffer[] = [];
 
   if (ocrTargets.length) {
-    const { createWorker } = await import("tesseract.js");
+    const { createWorker } = await waitWithAbort(import("tesseract.js"), signal);
+    throwIfAborted(signal);
     let activePage = 0;
     onProgress?.(19, featureMessage(language, "pdf.messages.pdfPreview.preparingTheBundledKoreanAndEnglishOcrModels"));
-    const ocrWorker = await createWorker(["kor", "eng"], undefined, {
+    const workerPromise = createWorker(["kor", "eng"], undefined, {
       workerPath: `${TESSERACT_BASE_URL}worker.min.js`,
       corePath: `${TESSERACT_BASE_URL}core/`,
       langPath: `${TESSERACT_BASE_URL}lang/`,
       logger: (message) => {
+        if (signal?.aborted) return;
         if (message.status === "recognizing text") {
           const value = 22 + ((activePage + message.progress) / ocrTargets.length) * 68;
           onProgress?.(value, featureMessage(language, "pdf.messages.pdfPreview.recognizingText", { p0: activePage + 1, p1: ocrTargets.length, p2: Math.round(message.progress * 100) }));
@@ -456,31 +459,44 @@ export async function extractPdfText(
         }
       },
     });
+    void workerPromise.then(worker => { if (signal?.aborted) void worker.terminate(); }, () => undefined);
+    const ocrWorker = await waitWithAbort(workerPromise, signal);
+    let termination: Promise<unknown> | undefined;
+    const terminate = () => { termination ??= ocrWorker.terminate(); return termination; };
+    const abort = () => { void terminate(); };
+    signal?.addEventListener("abort", abort, { once: true });
     try {
+      throwIfAborted(signal);
       for (activePage = 0; activePage < ocrTargets.length; activePage += 1) {
         const pageIndex = ocrTargets[activePage];
         const sourcePageNumber = sourcePageIndexes[pageIndex] + 1;
         onProgress?.(22 + (activePage / ocrTargets.length) * 68, featureMessage(language, "pdf.messages.pdfPreview.renderingPageForOcr", { p0: activePage + 1, p1: ocrTargets.length, p2: sourcePageNumber }));
-        const canvas = await renderPageForOcr(document, sourcePageNumber, language);
-        const recognized = await ocrWorker.recognize(
+        const canvas = await renderPageForOcr(document, sourcePageNumber, language, signal);
+        try {
+        const recognized = await waitWithAbort(ocrWorker.recognize(
           canvas,
           searchablePdf ? { pdfTitle: file.name, pdfTextOnly: false } : {},
           { text: true, blocks: true, pdf: searchablePdf },
-        );
+        ), signal);
+        throwIfAborted(signal);
         pages[pageIndex] = layoutOcrPage(sourcePageNumber, recognized.data);
         if (searchablePdf && recognized.data.pdf) {
           const bytes = Uint8Array.from(recognized.data.pdf);
           ocrPdfBuffers.push(bytes.buffer);
         }
+        } finally {
         canvas.width = 1;
         canvas.height = 1;
+        }
         await yieldToBrowser();
       }
     } finally {
-      await ocrWorker.terminate();
+      signal?.removeEventListener("abort", abort);
+      await terminate();
     }
   }
 
+  throwIfAborted(signal);
   const characterCount = pages.reduce((total, page) => total + page.lines.reduce((sum, line) => sum + line.text.length, 0), 0);
   return {
     document: { sourceName: file.name, pages, characterCount },
@@ -489,14 +505,14 @@ export async function extractPdfText(
   };
 }
 
-async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number, language: AppLanguage) {
-  const page = await document.getPage(pageNumber);
+async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number, language: AppLanguage, signal?: AbortSignal) {
+  const page = await waitWithAbort(document.getPage(pageNumber), signal);
   const natural = page.getViewport({ scale: 1 });
   const mobileDevice = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 760;
   const requestedScale = mobileDevice ? 1.8 : 2.4;
   const pixelLimit = mobileDevice ? 8_000_000 : 12_000_000;
   const limitedScale = Math.min(requestedScale, Math.sqrt(pixelLimit / (natural.width * natural.height)));
-  return renderPageForExport(document, pageNumber, limitedScale, language);
+  return renderPageForExport(document, pageNumber, limitedScale, language, signal);
 }
 
 async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number, language: AppLanguage, signal?: AbortSignal) {

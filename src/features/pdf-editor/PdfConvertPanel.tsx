@@ -1,5 +1,5 @@
 import { FileOutput, Languages, ScanText, Wifi } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { UtilityInput, UtilityNotice } from "../../components/UtilitySurface";
@@ -18,7 +18,10 @@ import { featureMessage } from "../../i18n/featureMessages";
 
 type OutputFormat = "docx" | "xlsx" | "txt" | "searchable-pdf";
 
-export function PdfConvertPanel() {
+import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
+import { pdfConvertDirty, type PdfConvertPreset } from "./pdfConvertDirect";
+import { usePdfConvert } from "./pdfConvertDirectLifecycle";
+export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const language = useAppLanguage();
     const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -31,31 +34,67 @@ export function PdfConvertPanel() {
   const operation = useOperationProgress();
   const download = useDownloadResult();
 
+  const pendingInputs = useRef<File[]>([]);
+  const inputTask = useRef<Promise<void>>(Promise.resolve());
+  const inputHandler = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
+  const resumeGeneration = useRef(0);
+  const activeController = useRef<AbortController | undefined>(undefined);
+  const direct = usePdfConvert(preset, pdfConvertDirty({ file, loading, status: operation.status, result: download.result }), next => {
+    const resume = pendingInputs.current;
+    const generation = ++resumeGeneration.current;
+    activeController.current?.abort();
+    if (resume.length) void inputTask.current.then(() => { if (generation === resumeGeneration.current) void inputHandler.current?.(resume); });
+    setLoading(false);
+    operation.reset();
+    download.clearResult();
+    setError("");
+    setFormat(next?.format ?? "docx");
+    setPageRange(next?.pageRange ?? "");
+    if (!next || next.purpose === "convert") setOcrMode(next?.ocrMode ?? "auto");
+  });
+  useEffect(() => () => { resumeGeneration.current += 1; activeController.current?.abort(); }, []);
   useEffect(() => () => { if (file) void releasePdf(file); }, [file]);
 
-  const setInput = async (files: File[]) => {
+  const acquireInput = async (files: File[]) => {
     const next = files.at(-1);
     if (!next || next === file) return;
+    activeController.current?.abort();
+    pendingInputs.current = [next];
+    const controller = new AbortController();
+    activeController.current = controller;
     setLoading(true);
     setError("");
     download.clearResult();
     operation.start(featureMessage(language, "pdf.messages.PdfConvertPanel.checkingPagesAndSecuritySettingsIn", { p0: next.name }));
     try {
-      const inspected = await inspectPdf(next, language);
+      const inspected = await inspectPdf(next, language, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setFile(next);
       setPageCount(inspected.pageCount);
       setPageRange("");
       setOutputName(`${next.name.replace(/\.pdf$/i, "")}-${featureMessage(language, "pdf.messages.PdfConvertPanel.converted")}`);
       operation.succeed(featureMessage(language, "pdf.messages.PdfConvertPanel.pagesAreReadyToConvert", { p0: inspected.pageCount }));
     } catch (reason) {
+      if (controller.signal.aborted) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfConvertPanel.unableToReadThePdf");
       setError(message);
       operation.fail(message);
-    } finally { setLoading(false); }
+    } finally { if (activeController.current === controller) { setLoading(false); pendingInputs.current = []; } }
   };
+
+  const setInput = (files: File[]) => {
+    const task = acquireInput(files);
+    inputTask.current = task;
+    return task;
+  };
+  inputHandler.current = setInput;
 
   const convert = async () => {
     if (!file) return;
+    activeController.current?.abort();
+    const controller = new AbortController();
+    activeController.current = controller;
+    const update = (...args: Parameters<typeof operation.update>) => { if (!controller.signal.aborted) operation.update(...args); };
     setError("");
     download.clearResult();
     const searchable = format === "searchable-pdf";
@@ -63,21 +102,24 @@ export function PdfConvertPanel() {
     try {
       const selectedPageIndexes = pageRange.trim() ? parsePageRange(pageRange, pageCount, language) : undefined;
       const selectedPageCount = selectedPageIndexes?.length || pageCount;
-      const extracted = await extractPdfText(file, searchable ? "all" : ocrMode, searchable, operation.update, selectedPageIndexes, language);
+      const extracted = await extractPdfText(file, searchable ? "all" : ocrMode, searchable, update, selectedPageIndexes, language, controller.signal);
       if (searchable) {
         if (extracted.ocrPdfBuffers.length !== selectedPageCount) throw new Error(featureMessage(language, "pdf.messages.PdfConvertPanel.searchablePdfDataCouldNotBeCreatedFor"));
-        operation.update(91, featureMessage(language, "pdf.messages.PdfConvertPanel.combiningPagesWithOcrTextLayers"));
-        const output = await combineOcrPdfPages(extracted.ocrPdfBuffers, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazySearchablePdf")), (value, message) => operation.update(91 + value * 0.08, message), language);
+        update(91, featureMessage(language, "pdf.messages.PdfConvertPanel.combiningPagesWithOcrTextLayers"));
+        const output = await combineOcrPdfPages(extracted.ocrPdfBuffers, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazySearchablePdf")), (value, message) => update(91 + value * 0.08, message), language, controller.signal);
+        if (controller.signal.aborted) return;
         download.makeResult(output);
       } else {
         if (!extracted.document.characterCount) throw new Error(featureMessage(language, "pdf.messages.PdfConvertPanel.noTextWasExtractedEnableAutomaticOcrFor"));
-        operation.update(91, featureMessage(language, "pdf.messages.PdfConvertPanel.buildingAStructureFromCharacters", { p0: extracted.document.characterCount.toLocaleString(), p1: format.toUpperCase() }));
-        const output = await textDocumentToOffice(extracted.document, format, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazyPdfConversion")), (value, message) => operation.update(91 + value * 0.08, message), language);
+        update(91, featureMessage(language, "pdf.messages.PdfConvertPanel.buildingAStructureFromCharacters", { p0: extracted.document.characterCount.toLocaleString(), p1: format.toUpperCase() }));
+        const output = await textDocumentToOffice(extracted.document, format, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazyPdfConversion")), (value, message) => update(91 + value * 0.08, message), language, controller.signal);
         if (extracted.ocrPageCount) output.warnings.push(featureMessage(language, "pdf.messages.PdfConvertPanel.pagesUsedKoreanAndEnglishOcrResults", { p0: extracted.ocrPageCount }));
+        if (controller.signal.aborted) return;
         download.makeResult(output);
       }
       operation.succeed(searchable ? featureMessage(language, "pdf.messages.PdfConvertPanel.createdASearchablePdfWithSelectableText") : featureMessage(language, "pdf.messages.PdfConvertPanel.createdTheFile", { p0: format.toUpperCase() }));
     } catch (reason) {
+      if (controller.signal.aborted) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfConvertPanel.unableToCompleteThePdfConversion");
       setError(message);
       operation.fail(message);
@@ -89,6 +131,8 @@ export function PdfConvertPanel() {
 
   return (
     <>
+      <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
+      {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "PDF OCR" : "PDF 변환") : (direct.acceptedPreset.purpose === "ocr" ? "Make a searchable PDF" : "Convert a PDF")} description={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "모든 페이지에 문자 인식을 적용하여 검색 가능한 PDF를 만드세요." : "PDF를 DOCX 등 다른 형식으로 저장하세요.") : (direct.acceptedPreset.purpose === "ocr" ? "Recognize text on all pages and create a searchable PDF." : "Save a PDF as DOCX or another format.")} />}
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfConvertPanel.convertTextOrScannedPdfsToDocxXlsx")} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">

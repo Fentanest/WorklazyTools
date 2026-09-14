@@ -32,7 +32,10 @@ interface EvaluatedRangeRow extends RangeRow {
   error: string;
 }
 
-export function PdfOrganizePanel() {
+import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
+import { pdfOrganizeDirty, type PdfOrganizePreset } from "./pdfOrganizeDirect";
+import { usePdfOrganize } from "./pdfOrganizeDirectLifecycle";
+export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   const language = useAppLanguage();
   const [sources, setSources] = useState<PdfSourceFile[]>([]);
   const [pages, setPages] = useState<PdfPageItem[]>([]);
@@ -64,6 +67,32 @@ export function PdfOrganizePanel() {
   const download = useDownloadResult();
   const locked = inspecting || operation.status === "running";
 
+  const pendingInputs = useRef<File[]>([]);
+  const inputTask = useRef<Promise<void>>(Promise.resolve());
+  const inputHandler = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
+  const resumeGeneration = useRef(0);
+  const activeController = useRef<AbortController | undefined>(undefined);
+  const focusAfterLoad = useRef<"delete" | "rotate" | undefined>(undefined);
+  const direct = usePdfOrganize(preset, pdfOrganizeDirty({ sources, pages, inspecting, status: operation.status, result: download.result }), next => {
+    const resume = pendingInputs.current;
+    const generation = ++resumeGeneration.current;
+    activeController.current?.abort();
+    if (resume.length) void inputTask.current.then(() => { if (generation === resumeGeneration.current) void inputHandler.current?.(resume); });
+    setInspecting(false);
+    operation.reset();
+    download.clearResult();
+    setError("");
+    setOutputMode(next?.outputMode ?? "merged");
+    setQuickSplitOpen(next?.quickSplit ?? false);
+    if (next?.purpose === "split" && pages.length) setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange(pages.map((_, index) => index)) }]);
+    focusAfterLoad.current = next?.postLoadFocus;
+  });
+  useEffect(() => () => { resumeGeneration.current += 1; activeController.current?.abort(); }, []);
+  useEffect(() => {
+    if (locked || !pages.length || !focusAfterLoad.current) return;
+    const target = gridRef.current?.querySelector<HTMLButtonElement>(`[data-page-action="${focusAfterLoad.current}"]`);
+    if (target) { target.focus(); focusAfterLoad.current = undefined; }
+  }, [locked, pages.length, direct.acceptedPreset]);
   useEffect(() => { sourcesRef.current = sources; }, [sources]);
   useEffect(() => () => { sourcesRef.current.forEach((source) => { void releasePdf(source.file); }); }, []);
 
@@ -176,10 +205,14 @@ export function PdfOrganizePanel() {
   const rangePageCount = groupMembership.size;
   const resultFileCount = outputMode === "merged" ? (selectedPages.length ? 1 : 0) : outputMode === "ranges" ? (rangesValid ? rangeRows.length : 0) : selectedPages.length;
 
-  const handleFiles = async (nextFiles: File[]) => {
+  const acquireInput = async (nextFiles: File[]) => {
     const incoming = nextFiles.filter((file) => !sources.some((source) => source.file === file));
     if (!incoming.length) return;
     setError("");
+    activeController.current?.abort();
+    pendingInputs.current = incoming;
+    const controller = new AbortController();
+    activeController.current = controller;
     setInspecting(true);
     download.clearResult();
     operation.start(featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesInPdfs", { p0: incoming.length }));
@@ -190,26 +223,37 @@ export function PdfOrganizePanel() {
         const file = incoming[index];
         if (!file.name.toLowerCase().endsWith(".pdf")) throw new Error(featureMessage(language, "pdf.messages.PdfOrganizePanel.onlyPdfFilesCanBeAdded", { p0: file.name }));
         operation.update(8 + (index / incoming.length) * 82, featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesIn", { p0: index + 1, p1: incoming.length, p2: file.name }));
-        const inspected = await inspectPdf(file, language, { requirePdfLibCompatibility: true });
+        const inspected = await inspectPdf(file, language, { requirePdfLibCompatibility: true, signal: controller.signal });
         const sourceId = createLocalId("pdf");
         addedSources.push({ id: sourceId, file, pageCount: inspected.pageCount });
         for (let pageIndex = 0; pageIndex < inspected.pageCount; pageIndex += 1) {
           addedPages.push({ id: createLocalId("page"), sourceId, sourceName: file.name, sourcePageIndex: pageIndex, rotation: 0 });
         }
       }
+      if (controller.signal.aborted) return;
+      focusAfterLoad.current = direct.acceptedPreset?.postLoadFocus;
       setSources((current) => [...current, ...addedSources]);
       setPages((current) => [...current, ...addedPages]);
+      if (direct.acceptedPreset?.purpose === "split") setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange([...pages, ...addedPages].map((_, index) => index)) }]);
       setSelectedPageIds((current) => new Set([...current, ...addedPages.map((page) => page.id)]));
       operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.addedAndSelectedAllPages", { p0: addedPages.length }));
     } catch (reason) {
       addedSources.forEach((source) => { void releasePdf(source.file); });
+      if (controller.signal.aborted) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfOrganizePanel.unableToReadThePdfFiles");
       setError(message);
       operation.fail(message);
     } finally {
-      setInspecting(false);
+      if (activeController.current === controller) { setInspecting(false); pendingInputs.current = []; }
     }
   };
+
+  const handleFiles = (files: File[]) => {
+    const task = acquireInput(files);
+    inputTask.current = task;
+    return task;
+  };
+  inputHandler.current = handleFiles;
 
   const removeSource = (index: number) => {
     if (locked) return;
@@ -225,6 +269,10 @@ export function PdfOrganizePanel() {
   };
 
   const exportPdf = async () => {
+    activeController.current?.abort();
+    const controller = new AbortController();
+    activeController.current = controller;
+    const update = (...args: Parameters<typeof operation.update>) => { if (!controller.signal.aborted) operation.update(...args); };
     setError("");
     download.clearResult();
     operation.start(featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingSelectedPagesOrderAndRotations"));
@@ -237,10 +285,11 @@ export function PdfOrganizePanel() {
           ? await imagesToPdf(await mapWithConcurrency(selectedPages, 4, async (page, index) => {
             const source = sources.find((candidate) => candidate.id === page.sourceId);
             if (!source) throw new Error(featureMessage(language, "pdf.messages.PdfOrganizePanel.theSourcePageCouldNotBeFound"));
-            operation.update(5 + (index / selectedPages.length) * 55, featureMessage(language, "pdf.messages.PdfOrganizePanel.renderingCompressedPage", { p0: index + 1, p1: selectedPages.length }));
-            return renderPdfPageAsJpeg(source.file, page.sourcePageIndex, page.rotation, language);
-          }), "image", archiveName, operation.update, language, { watermarkText, pageNumbers, imagesAlreadyNormalized: true })
-          : await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, operation.update, language, { watermarkText, pageNumbers });
+            update(5 + (index / selectedPages.length) * 55, featureMessage(language, "pdf.messages.PdfOrganizePanel.renderingCompressedPage", { p0: index + 1, p1: selectedPages.length }));
+            return renderPdfPageAsJpeg(source.file, page.sourcePageIndex, page.rotation, language, controller.signal);
+          }), "image", archiveName, update, language, { watermarkText, pageNumbers, imagesAlreadyNormalized: true }, controller.signal)
+          : await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, update, language, { watermarkText, pageNumbers }, controller.signal);
+        if (controller.signal.aborted) return;
         download.makeResult(output);
         operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.createdOnePdfFromSelectedPages", { p0: selectedPages.length }));
         return;
@@ -257,10 +306,12 @@ export function PdfOrganizePanel() {
           return { fileName: `${archiveName}-${String(position).padStart(3, "0")}`, pages: [toPagePlan(page)] };
         });
       }
-      const output = await exportPdfGroups(sourceFiles, groups, archiveName, operation.update, language, { watermarkText, pageNumbers });
-      download.makeResult(output);
+      const output = await exportPdfGroups(sourceFiles, groups, archiveName, update, language, { watermarkText, pageNumbers }, controller.signal);
+      if (controller.signal.aborted) return;
+        download.makeResult(output);
       operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.createdPdfsAndPackedThemIntoAZip", { p0: groups.length }));
     } catch (reason) {
+      if (controller.signal.aborted) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfOrganizePanel.unableToCreateThePdfOutput");
       setError(message);
       operation.fail(message);
@@ -442,6 +493,8 @@ export function PdfOrganizePanel() {
 
   return (
     <>
+      <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
+      {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? ({ merge: "PDF 합치기", split: "PDF 나누기", delete: "PDF 페이지 삭제", rotate: "PDF 페이지 회전" })[direct.acceptedPreset.purpose] : ({ merge: "Merge PDFs", split: "Split a PDF", delete: "Delete PDF pages", rotate: "Rotate PDF pages" })[direct.acceptedPreset.purpose]} description={language === "ko" ? ({ merge: "출력 설정에서 선택한 페이지를 하나의 PDF로 저장하세요.", split: "페이지 사이의 나누기 위치를 선택하세요. 선택 전에는 모든 페이지가 하나의 범위로 유지됩니다.", delete: "PDF를 넣고 첫 페이지의 삭제 버튼에서 지울 페이지를 선택하세요. 자동으로 삭제하지 않습니다.", rotate: "PDF를 넣고 첫 페이지의 회전 버튼에서 방향을 조정하세요. 자동으로 회전하지 않습니다." })[direct.acceptedPreset.purpose] : ({ merge: "Save the selected pages as one PDF using the output settings.", split: "Choose boundaries between pages. All pages stay in one range until you choose a boundary.", delete: "Add a PDF, then use the first page’s delete button. No pages are deleted automatically.", rotate: "Add a PDF, then use the first page’s rotate button. No pages are rotated automatically." })[direct.acceptedPreset.purpose]} />}
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPdfs")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.loadEveryPageFromMultiplePdfsIntoOne")} className="[&_.ui-step-number]:bg-violet-700 [&_.ui-step-number]:shadow-violet-700/20">

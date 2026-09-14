@@ -922,6 +922,10 @@
       "fontSize": "글자 크기 (6–72 pt)",
       "color": "글자 색상",
       "margin": "페이지 여백 (0–144 pt)",
+      "filenameLimit": "파일명 글자 수 제한 (1–1000, 비워 두면 제한 없음)",
+      "filenameLimitHelp": "지정한 글자 수 이상인 파일명은 앞부분과 말줄임(…)으로 줄입니다. 비워 두면 줄이지 않고 셀 너비에 맞춰 글자를 작게 표시할 수 있습니다. PDF에서 긴 문구는 더 작게 표시될 수 있습니다.",
+      "filenameLimitError": "1부터 1000까지의 정수를 입력하거나 비워 두세요.",
+      "filenameLimitUnsupported": "이 브라우저에서는 글자 단위 나누기를 지원하지 않아 숫자 제한을 사용할 수 없습니다.",
       "watermark": {
         "contentType": "워터마크 종류",
         "text": "텍스트",

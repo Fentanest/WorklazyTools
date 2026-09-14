@@ -66,6 +66,54 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "도장이나 서명 이미지를 여러 페이지의 같은 위치에 넣을 수 있나요?", answer: "네. PNG 또는 JPEG 이미지를 미리보기에서 옮기고 크기를 조절한 뒤, 선택한 모든 페이지의 같은 상대 위치에 넣을 수 있습니다." },
       { question: "이 기능으로 전자서명이나 디지털 서명을 만들 수 있나요?", answer: "아니요. 이 기능은 PDF에 도장 또는 서명 이미지만 넣으며, 인증서 기반 전자서명이나 암호학적 디지털 서명을 만들지 않습니다." },
     ],
+    "/tools/pdf-editor/merge": [
+      { question: "여러 PDF를 순서대로 합칠 수 있나요?", answer: "네. 파일을 순서대로 놓고 하나의 PDF로 합친 뒤 출력 영역에서 내려받으세요." },
+      { question: "합친 파일이 서버로 전송되나요?", answer: "아니요. 합치기와 저장은 현재 브라우저에서 처리됩니다." },
+    ],
+    "/tools/pdf-editor/split": [
+      { question: "PDF를 원하는 구간으로 나눌 수 있나요?", answer: "네. 나누기 위치를 정해 범위별로 자르고 필요한 구간만 저장하세요." },
+      { question: "처음 열면 범위가 비어 있나요?", answer: "아니요. 전체 페이지가 들어오는 최초 범위 하나가 먼저 들어 있습니다." },
+    ],
+    "/tools/pdf-editor/delete": [
+      { question: "삭제할 페이지만 골라 뺄 수 있나요?", answer: "네. 삭제할 페이지를 선택하고 나머지를 하나의 PDF로 저장하세요." },
+      { question: "열자마자 자동으로 삭제되나요?", answer: "아니요. 첫 페이지 삭제 안내부터 시작하며 자동으로 지우지 않습니다." },
+    ],
+    "/tools/pdf-editor/rotate": [
+      { question: "일부 페이지만 회전할 수 있나요?", answer: "네. 회전할 페이지를 골라 방향을 바로잡은 뒤 저장하세요." },
+      { question: "열자마자 자동으로 회전되나요?", answer: "아니요. 첫 페이지 회전 안내부터 시작하며 자동으로 돌리지 않습니다." },
+    ],
+    "/tools/pdf-editor/ocr": [
+      { question: "PDF 전체를 검색 가능한 파일로 만들 수 있나요?", answer: "네. 전체 페이지를 한국어·영어 OCR로 읽어 검색 가능한 PDF를 만듭니다." },
+      { question: "페이지를 따로 지정해야 하나요?", answer: "아니요. 별도 설정 없이 전체 범위를 처리합니다." },
+    ],
+    "/tools/image-studio/resize": [
+      { question: "원하는 픽셀 크기로 저장할 수 있나요?", answer: "네. 크기 패널에서 픽셀 크기를 지정한 뒤 저장하세요." },
+      { question: "이 화면은 크기 패널이 바로 열리나요?", answer: "네. 크기 조절 목적의 시작 상태로 열립니다." },
+    ],
+    "/tools/image-studio/mosaic": [
+      { question: "선택한 부분만 모자이크할 수 있나요?", answer: "네. 가릴 영역을 선택해 모자이크를 적용하세요." },
+      { question: "이 화면은 효과 패널이 바로 열리나요?", answer: "네. 모자이크 목적의 시작 상태로 열립니다." },
+    ],
+    "/tools/image-studio/watermark": [
+      { question: "글자를 그림에 바로 넣을 수 있나요?", answer: "네. 텍스트 패널에서 글자를 넣고 저장하세요." },
+      { question: "열자마자 그림이 자동으로 들어가나요?", answer: "아니요. 자동으로 삽입하지 않습니다." },
+    ],
+    "/tools/video-studio/trim": [
+      { question: "영상 구간을 골라 MP4로 저장할 수 있나요?", answer: "네. 구간을 선택한 뒤 MP4 출력을 확인하세요." },
+      { question: "합치기와 설정이 섞이나요?", answer: "아니요. 자르기 목적의 시작 상태로 열립니다." },
+    ],
+    "/tools/video-studio/merge": [
+      { question: "여러 영상을 하나로 합칠 수 있나요?", answer: "네. 그룹 순서대로 합쳐 하나의 MP4로 저장하세요." },
+      { question: "자르기 설정이 그대로 오나요?", answer: "아니요. 합치기 목적의 시작 상태로 열립니다." },
+    ],
+    "/tools/video-studio/extract-audio": [
+      { question: "영상에서 소리만 MP3로 저장할 수 있나요?", answer: "네. 음원 추출 목적의 시작 상태로 열리며 구간 안내부터 시작합니다." },
+      { question: "영상 화면도 함께 저장되나요?", answer: "아니요. 소리만 MP3로 저장합니다." },
+    ],
+    "/tools/audio-studio/trim": [
+      { question: "오디오 구간을 골라 저장할 수 있나요?", answer: "네. 파일을 연 뒤 구간을 선택하고 필요한 부분만 저장하세요." },
+      { question: "열자마자 자동으로 처리되나요?", answer: "아니요. 자동으로 처리하지 않습니다." },
+    ],
     "/tools/text-merger": [
       { question: "직접 입력을 TXT 파일 사이에 놓을 수 있나요?", answer: "가능합니다. 직접 입력과 TXT 파일은 같은 카드 목록에 추가되며 드래그하거나 위·아래 버튼으로 자유롭게 순서를 바꿀 수 있습니다." },
       { question: "붙여넣은 글이나 TXT 파일이 서버로 전송되나요?", answer: "아니요. 내용은 현재 브라우저에서만 읽고 병합하며 서버나 브라우저 저장소에 보관하지 않습니다." },
@@ -145,6 +193,54 @@ const faqByLanguageAndPath: Record<AppLanguage, Record<string, NonNullable<SeoDe
       { question: "Can I place a stamp or signature image in the same position on multiple pages?", answer: "Yes. Move and resize a PNG or JPEG image in the preview, then place it at the same relative position on every selected page." },
       { question: "Does this create an electronic or cryptographic digital signature?", answer: "No. This feature only inserts a stamp or signature image into the PDF. It does not create a certificate-based electronic or cryptographic digital signature." },
     ],
+    "/tools/pdf-editor/merge": [
+      { question: "Can I combine multiple PDFs in order?", answer: "Yes. Arrange the files in order, merge them into one PDF, then download it from the output area." },
+      { question: "Are merged files uploaded to a server?", answer: "No. Merging and saving happen in the current browser." },
+    ],
+    "/tools/pdf-editor/split": [
+      { question: "Can I cut a PDF into the sections I want?", answer: "Yes. Mark split positions, cut the file by ranges, and save only the sections you need." },
+      { question: "Is the range empty when I first open it?", answer: "No. One initial range covering every page is already present." },
+    ],
+    "/tools/pdf-editor/delete": [
+      { question: "Can I remove only the pages I choose?", answer: "Yes. Select the pages to delete and save the rest as one PDF." },
+      { question: "Does anything get deleted automatically on open?", answer: "No. It starts with first-page delete guidance and deletes nothing automatically." },
+    ],
+    "/tools/pdf-editor/rotate": [
+      { question: "Can I rotate only some pages?", answer: "Yes. Choose the pages to rotate, correct their orientation, then save." },
+      { question: "Does anything rotate automatically on open?", answer: "No. It starts with first-page rotate guidance and rotates nothing automatically." },
+    ],
+    "/tools/pdf-editor/ocr": [
+      { question: "Can I make the whole PDF searchable?", answer: "Yes. Every page is read with Korean and English OCR to create a searchable PDF." },
+      { question: "Do I need to specify pages?", answer: "No. The full range is processed without extra settings." },
+    ],
+    "/tools/image-studio/resize": [
+      { question: "Can I save at an exact pixel size?", answer: "Yes. Set the pixel size in the size panel, then save." },
+      { question: "Does this screen open the size panel directly?", answer: "Yes. It opens in the resize starting state." },
+    ],
+    "/tools/image-studio/mosaic": [
+      { question: "Can I mosaic only a selected area?", answer: "Yes. Select the area to cover and apply the mosaic effect." },
+      { question: "Does this screen open the effect panel directly?", answer: "Yes. It opens in the mosaic starting state." },
+    ],
+    "/tools/image-studio/watermark": [
+      { question: "Can I place text directly on the picture?", answer: "Yes. Add the text in the text panel and save." },
+      { question: "Is anything inserted automatically on open?", answer: "No. Nothing is inserted automatically." },
+    ],
+    "/tools/video-studio/trim": [
+      { question: "Can I save a video section as MP4?", answer: "Yes. Select the section, then check the MP4 output." },
+      { question: "Are merge settings mixed in?", answer: "No. It opens in the trim starting state." },
+    ],
+    "/tools/video-studio/merge": [
+      { question: "Can I join several videos into one?", answer: "Yes. Join them in group order and save one MP4." },
+      { question: "Do trim settings carry over?", answer: "No. It opens in the merge starting state." },
+    ],
+    "/tools/video-studio/extract-audio": [
+      { question: "Can I save only the sound as MP3?", answer: "Yes. It opens in the audio-extraction starting state with section guidance." },
+      { question: "Is the video picture saved together?", answer: "No. Only the sound is saved as MP3." },
+    ],
+    "/tools/audio-studio/trim": [
+      { question: "Can I pick an audio section and save it?", answer: "Yes. Open the file, select the section, and save only that part." },
+      { question: "Does anything process automatically on open?", answer: "No. Nothing is processed automatically." },
+    ],
     "/tools/text-merger": [
       { question: "Can pasted text be placed between TXT files?", answer: "Yes. Pasted text and TXT files share one card list and can be reordered freely by dragging or with the up and down buttons." },
       { question: "Are pasted text or TXT files sent to a server?", answer: "No. Content is read and merged only in the current browser and is not kept on a server or in browser storage." },
@@ -220,6 +316,18 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/pdf-editor/header-footer": "pdf-header-footer",
   "/tools/pdf-editor/watermark": "pdf-watermark",
   "/tools/pdf-editor/stamp": "pdf-stamp",
+  "/tools/pdf-editor/merge": "pdf-editor-merge",
+  "/tools/pdf-editor/split": "pdf-editor-split",
+  "/tools/pdf-editor/delete": "pdf-editor-delete",
+  "/tools/pdf-editor/rotate": "pdf-editor-rotate",
+  "/tools/pdf-editor/ocr": "pdf-editor-ocr",
+  "/tools/image-studio/resize": "image-studio-resize",
+  "/tools/image-studio/mosaic": "image-studio-mosaic",
+  "/tools/image-studio/watermark": "image-studio-watermark",
+  "/tools/video-studio/trim": "video-studio-trim",
+  "/tools/video-studio/merge": "video-studio-merge",
+  "/tools/video-studio/extract-audio": "video-studio-extract-audio",
+  "/tools/audio-studio/trim": "audio-studio-trim",
   "/tools/hwp-editor": "hwp-editor",
   "/tools/office-editor": "office-editor",
   "/tools/video-studio": "video-studio",
@@ -337,6 +445,66 @@ export const seoByPath: Record<string, SeoDefinition> = {
     title: "PDF 도장·서명 이미지 넣기 - 여러 페이지 같은 위치",
     description: "PNG·JPEG 도장이나 서명 이미지를 PDF 미리보기에서 옮기고 비율을 유지해 크기를 조절한 뒤 선택한 페이지에 넣으세요.",
     application: { name: "PDF 도장·서명 이미지", featureList: ["PNG·JPEG 이미지", "직접 이동·크기 조절", "고정 비율", "선택 페이지 적용", "같은 상대 위치", "실행 취소·다시 실행"] },
+  },
+  "/tools/pdf-editor/merge": {
+    title: "PDF 합치기 - 여러 PDF를 순서대로 하나로",
+    description: "여러 PDF를 순서대로 합쳐 하나의 PDF로 저장하세요. 페이지를 확인하고 출력 영역에서 바로 내려받으세요.",
+    application: { name: "PDF 합치기", featureList: ["여러 PDF 합치기", "페이지 순서 확인", "병합 출력", "브라우저 처리"] },
+  },
+  "/tools/pdf-editor/split": {
+    title: "PDF 나누기 - 범위별로 자르기",
+    description: "PDF에서 나누기 위치를 정해 범위별로 자르고 필요한 구간만 저장하세요. 전체 페이지가 들어오는 최초 범위를 유지합니다.",
+    application: { name: "PDF 나누기", featureList: ["나누기 위치 선택", "범위별 저장", "최초 전체 범위", "브라우저 처리"] },
+  },
+  "/tools/pdf-editor/delete": {
+    title: "PDF 페이지 삭제 - 원하는 페이지만 빼기",
+    description: "PDF에서 삭제할 페이지를 고르고 나머지를 하나의 PDF로 저장하세요. 파일을 열면 첫 페이지 삭제 안내부터 시작합니다.",
+    application: { name: "PDF 페이지 삭제", featureList: ["페이지 선택 삭제", "나머지 병합 저장", "첫 작업 안내", "자동 삭제 없음"] },
+  },
+  "/tools/pdf-editor/rotate": {
+    title: "PDF 페이지 회전 - 원하는 페이지만 돌리기",
+    description: "PDF에서 회전할 페이지를 고르고 방향을 바로잡아 저장하세요. 파일을 열면 첫 페이지 회전 안내부터 시작합니다.",
+    application: { name: "PDF 페이지 회전", featureList: ["페이지 선택 회전", "向き 바로잡기", "첫 작업 안내", "자동 회전 없음"] },
+  },
+  "/tools/pdf-editor/ocr": {
+    title: "PDF OCR - 검색 가능한 PDF 만들기",
+    description: "PDF 전체 페이지를 한국어·영어 OCR로 읽어 검색 가능한 PDF를 만드세요. 별도 설정 없이 전체 범위를 처리합니다.",
+    application: { name: "PDF OCR", featureList: ["전체 페이지 OCR", "한국어·영어", "검색 가능한 PDF", "브라우저 처리"] },
+  },
+  "/tools/image-studio/resize": {
+    title: "이미지 크기 조절 - 원하는 픽셀 크기로",
+    description: "이미지 크기를 원하는 픽셀 크기로 조절하고 저장하세요. 편집 화면의 크기 패널이 바로 열립니다.",
+    application: { name: "이미지 크기 조절", featureList: ["픽셀 크기 지정", "비율 유지", "크기 패널 바로 열기", "브라우저 처리"] },
+  },
+  "/tools/image-studio/mosaic": {
+    title: "이미지 모자이크 - 선택 영역 가리기",
+    description: "이미지에서 가릴 영역을 선택해 모자이크를 적용하세요. 효과 패널이 바로 열립니다.",
+    application: { name: "이미지 모자이크", featureList: ["선택 영역 모자이크", "효과 패널 바로 열기", "브라우저 처리"] },
+  },
+  "/tools/image-studio/watermark": {
+    title: "이미지 워터마크 - 글자 넣기",
+    description: "이미지에 글자 워터마크를 넣고 저장하세요. 텍스트 패널이 바로 열리며 자동으로 그림을 넣지 않습니다.",
+    application: { name: "이미지 워터마크", featureList: ["글자 워터마크", "텍스트 패널 바로 열기", "자동 삽입 없음", "브라우저 처리"] },
+  },
+  "/tools/video-studio/trim": {
+    title: "비디오 자르기 - 구간 선택해 MP4로",
+    description: "영상에서 필요한 구간을 골라 MP4로 저장하세요. 구간 안내부터 시작하며 그룹 안내를 확인하세요.",
+    application: { name: "비디오 자르기", featureList: ["구간 선택", "MP4 저장", "구간 안내", "브라우저 처리"] },
+  },
+  "/tools/video-studio/merge": {
+    title: "비디오 합치기 - 여러 영상을 하나로",
+    description: "여러 영상을 순서대로 합쳐 하나의 MP4로 저장하세요. 그룹 안내부터 시작합니다.",
+    application: { name: "비디오 합치기", featureList: ["여러 영상 합치기", "그룹 순서", "MP4 저장", "브라우저 처리"] },
+  },
+  "/tools/video-studio/extract-audio": {
+    title: "비디오 음원 추출 - MP3로 저장",
+    description: "영상에서 소리만 빼내 MP3로 저장하세요. 구간 안내부터 시작합니다.",
+    application: { name: "비디오 음원 추출", featureList: ["음원 추출", "MP3 저장", "구간 안내", "브라우저 처리"] },
+  },
+  "/tools/audio-studio/trim": {
+    title: "오디오 자르기 - 구간 선택해 저장",
+    description: "오디오 파일에서 구간을 고르고 필요한 부분만 저장하세요. 파일 입문 뒤 구간 선택이 바로 켜집니다.",
+    application: { name: "오디오 자르기", featureList: ["구간 선택", "선택 구간 저장", "자동 처리 없음", "브라우저 처리"] },
   },
   "/tools/hwp-editor": {
     title: "HWP·HWPX 문서 편집기 - 무료 온라인 HWP 편집",
@@ -484,6 +652,18 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/pdf-editor/header-footer": { title: "Add PDF Headers & Footers | Worklazy Tools", description: "Add custom headers and footers with filename, date, page-number tokens, position, size, and color controls.", application: { name: "PDF Headers and Footers", featureList: ["Filename token", "Batch-start date", "Page-number tokens", "Six positions", "Size and color", "Overlay preview"] } },
   "/tools/pdf-editor/watermark": { title: "Add Text or Image Watermarks to PDF | Worklazy Tools", description: "Add text, PNG, or JPEG watermarks in front of or behind PDF content with rotation, opacity, sizing, and repeated tile controls.", application: { name: "PDF Watermark", featureList: ["Vector text", "PNG and JPEG images", "Background and foreground layers", "Single and repeated placement", "Rotation and opacity", "Overlay preview"] } },
   "/tools/pdf-editor/stamp": { title: "Add Stamp or Signature Images to PDF | Worklazy Tools", description: "Move and resize a PNG or JPEG stamp or signature image in the PDF preview, then place it at the same relative position on selected pages.", application: { name: "PDF Stamp and Signature Image", featureList: ["PNG and JPEG images", "Direct move and resize", "Fixed aspect ratio", "Selected-page placement", "Same relative position", "Undo and redo"] } },
+  "/tools/pdf-editor/merge": { title: "Merge PDFs | Combine Multiple PDFs in Order", description: "Combine multiple PDFs in order into one PDF and download it from the output area.", application: { name: "Merge PDFs", featureList: ["Combine multiple PDFs", "Check page order", "Merged output", "Browser processing"] } },
+  "/tools/pdf-editor/split": { title: "Split PDF | Cut by Ranges", description: "Mark split positions in a PDF, cut it by ranges and save only the sections you need.", application: { name: "Split PDF", featureList: ["Split positions", "Save by range", "Initial full range", "Browser processing"] } },
+  "/tools/pdf-editor/delete": { title: "Delete PDF Pages | Remove Selected Pages", description: "Choose pages to delete from a PDF and save the rest as one PDF.", application: { name: "Delete PDF Pages", featureList: ["Select pages to delete", "Save the rest merged", "First-task guidance", "No automatic deletion"] } },
+  "/tools/pdf-editor/rotate": { title: "Rotate PDF Pages | Fix Selected Pages", description: "Choose pages to rotate in a PDF and save them with corrected orientation.", application: { name: "Rotate PDF Pages", featureList: ["Select pages to rotate", "Correct orientation", "First-task guidance", "No automatic rotation"] } },
+  "/tools/pdf-editor/ocr": { title: "PDF OCR | Make a Searchable PDF", description: "Read every PDF page with Korean and English OCR and create a searchable PDF.", application: { name: "PDF OCR", featureList: ["Full-page OCR", "Korean and English", "Searchable PDF", "Browser processing"] } },
+  "/tools/image-studio/resize": { title: "Resize Image | Save at Exact Pixel Size", description: "Resize an image to an exact pixel size and save it.", application: { name: "Resize Image", featureList: ["Exact pixel size", "Keep aspect ratio", "Size panel opens directly", "Browser processing"] } },
+  "/tools/image-studio/mosaic": { title: "Image Mosaic | Cover a Selected Area", description: "Select an area in an image and apply a mosaic effect.", application: { name: "Image Mosaic", featureList: ["Selected-area mosaic", "Effect panel opens directly", "Browser processing"] } },
+  "/tools/image-studio/watermark": { title: "Image Watermark | Add Text", description: "Add a text watermark to an image and save it. No objects are inserted automatically.", application: { name: "Image Watermark", featureList: ["Text watermark", "Text panel opens directly", "No automatic insertion", "Browser processing"] } },
+  "/tools/video-studio/trim": { title: "Trim Video | Save a Section as MP4", description: "Pick a section of a video and save it as MP4.", application: { name: "Trim Video", featureList: ["Section selection", "MP4 output", "Section guidance", "Browser processing"] } },
+  "/tools/video-studio/merge": { title: "Join Videos | Combine into One MP4", description: "Combine multiple videos in order into one MP4.", application: { name: "Join Videos", featureList: ["Combine multiple videos", "Group order", "MP4 output", "Browser processing"] } },
+  "/tools/video-studio/extract-audio": { title: "Extract Audio from Video | Save as MP3", description: "Take only the sound from a video and save it as MP3.", application: { name: "Extract Audio from Video", featureList: ["Audio extraction", "MP3 output", "Section guidance", "Browser processing"] } },
+  "/tools/audio-studio/trim": { title: "Trim Audio | Save a Selected Section", description: "Pick a section of an audio file and save only that part.", application: { name: "Trim Audio", featureList: ["Section selection", "Save selection", "No automatic processing", "Browser processing"] } },
   "/about": { title: "About | Worklazy Tools", description: "Learn how Worklazy Tools processes documents and media in the browser and where each tool's compatibility boundaries apply." },
   "/privacy": { title: "Privacy Policy | Worklazy Tools", description: "Read how local file processing, Google and Naver Analytics, advertising and cookies are handled by Worklazy Tools." },
   "/terms": { title: "Terms of Use | Worklazy Tools", description: "Review the conditions, supported scope, user responsibilities and limitations for Worklazy Tools browser utilities." },

@@ -1,6 +1,6 @@
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
-import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -53,32 +53,53 @@ const EDITOR_WORK_MAX_DIMENSION = 4096;
 const EDITOR_EXPORT_MAX_DIMENSION = 8192;
 const EDITOR_PANEL_STORAGE_KEY = "worklazy:image-editor-panel-collapsed";
 
-export function ImageStudioPage() {
-  const { t } = useTranslation("features");
+import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
+import { imageDirectDirty, type ImageDirectPreset } from "./imageDirect";
+import { useImageDirect } from "./imageDirectLifecycle";
+interface ImageEditorDirectHandle { apply: (preset?: ImageDirectPreset) => void; cancel: () => void }
+export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
+  const { t, i18n } = useTranslation("features");
   const [tab, setTab] = useState<StudioTab>("editor");
   const progress = useOperationProgress();
   const activeController = useRef<AbortController | undefined>(undefined);
 
+  const language = i18n.language === "en" ? "en" : "ko";
+  const [visited, setVisited] = useState<Set<StudioTab>>(() => new Set(["editor"]));
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [otherDirty, setOtherDirty] = useState<Record<string, boolean>>({});
+  const [resultReset, setResultReset] = useState(0);
+  const editorHandle = useRef<ImageEditorDirectHandle | undefined>(undefined);
+  const reportOtherDirty = useCallback((tab: string, value: boolean) => setOtherDirty(current => current[tab] === value ? current : { ...current, [tab]: value }), []);
+  const direct = useImageDirect(preset, editorDirty || Object.values(otherDirty).some(Boolean) || progress.status === "running", next => {
+    activeController.current?.abort();
+    activeController.current = undefined;
+    progress.reset();
+    setResultReset(value => value + 1);
+    editorHandle.current?.apply(next);
+    setTab("editor");
+  });
   useEffect(() => () => activeController.current?.abort(), []);
 
   return (
     <UtilityPage toolId="image-studio" className="image-studio-page">
+      <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
+      {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? ({ resize: "이미지 크기 조정", mosaic: "이미지 모자이크", watermark: "이미지 워터마크" })[direct.acceptedPreset.purpose] : ({ resize: "Resize an image", mosaic: "Mosaic an image", watermark: "Watermark an image" })[direct.acceptedPreset.purpose]} description={language === "ko" ? ({ resize: "이미지를 넣고 크기 패널에서 치수를 조정하세요.", mosaic: "이미지를 넣고 효과를 적용할 영역을 지정하세요.", watermark: "이미지를 넣고 텍스트를 입력한 뒤 직접 추가하세요. 자동으로 삽입하지 않습니다." })[direct.acceptedPreset.purpose] : ({ resize: "Add an image and adjust its dimensions in the size panel.", mosaic: "Add an image and select the area for the mosaic effect.", watermark: "Add an image, enter text, and add it when ready. Text is not inserted automatically." })[direct.acceptedPreset.purpose]} />}
       <PageHeader eyebrow="IMAGE STUDIO" title={t("image.title")} description={t("image.description")}>
         <PrivacyBanner compact />
       </PageHeader>
       <Card as="nav" className="studio-tabs mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0 max-[620px]:grid-cols-2" aria-label={t("image.tabs.label")} data-testid="image-studio-tabs">
         {([
           ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],
-        ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} aria-pressed={tab === value} data-state={tab === value ? "active" : "inactive"} onClick={() => { activeController.current?.abort(); activeController.current = undefined; setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
+        ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} aria-pressed={tab === value} data-state={tab === value ? "active" : "inactive"} onClick={() => { activeController.current?.abort(); activeController.current = undefined; editorHandle.current?.cancel(); setVisited(current => new Set([...current, value])); setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
       </Card>
 
       <UtilityNotice className="image-format-notice mb-2"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("image.heic")}</span></UtilityNotice>
       {(tab === "batch" || tab === "collage" || tab === "gif") && <UtilityNotice className="image-worker-notice mb-2"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("image.offscreen")}</span></UtilityNotice>}
 
-      {tab === "editor" && <ImageEditor />}
-      {tab === "batch" && <BatchImagePanel progress={progress} controllerRef={activeController} />}
-      {tab === "collage" && <CollagePanel progress={progress} controllerRef={activeController} />}
-      {tab === "gif" && <GifPanel progress={progress} controllerRef={activeController} />}
+      <div hidden={tab !== "editor"} data-image-owner="editor"><ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} /></div>
+      {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
+      {visited.has("collage") && <div hidden={tab !== "collage"} data-image-owner="collage"><CollagePanel progress={progress} controllerRef={activeController} active={tab === "collage"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
+      {visited.has("gif") && <div hidden={tab !== "gif"} data-image-owner="gif"><GifPanel progress={progress} controllerRef={activeController} active={tab === "gif"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
 
       <OperationProgress {...progress} accent="sky" title={t("image.log")} />
       {progress.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" variant="secondary" type="button" onClick={() => activeController.current?.abort()}>{t("image.cancel")}</Button></div>}
@@ -145,7 +166,18 @@ interface EditorHistorySnapshot {
   outputMultiplier: number;
 }
 
-function ImageEditor() {
+function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const acceptedPresetRef = useRef(preset);
+  acceptedPresetRef.current = preset;
+  const editController = useRef<AbortController | undefined>(undefined);
+  const pendingImageFile = useRef<File | undefined>(undefined);
+  const loadImageTask = useRef<Promise<void>>(Promise.resolve());
+  const loadImageHandler = useRef<((file?: File) => Promise<void>) | undefined>(undefined);
+  const resumeImageGeneration = useRef(0);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const emptyReadyHistoryLength = useRef<number | undefined>(undefined);
   const { t } = useTranslation("features");
   const canvasElement = useRef<HTMLCanvasElement>(null);
   const stageElement = useRef<HTMLDivElement>(null);
@@ -219,6 +251,26 @@ function ImageEditor() {
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
   cropRatioRef.current = cropRatio;
 
+  const applyDirectPreset = (next?: ImageDirectPreset) => {
+    const resume = pendingImageFile.current;
+    const generation = ++resumeImageGeneration.current;
+    editController.current?.abort();
+    if (resume) void loadImageTask.current.then(() => { if (generation === resumeImageGeneration.current) void loadImageHandler.current?.(resume); });
+    editController.current = undefined;
+    setLoadingImage(false);
+    setRegionEffectBusy(false);
+    regionEffectBusyRef.current = false;
+    setStickerBusy(false);
+    setActivePanel(next?.panel ?? "select");
+    setInteractionMode(next?.interactionMode ?? "select");
+    interactionModeRef.current = next?.interactionMode ?? "select";
+    if (next?.purpose === "mosaic") setRegionEffect(next.regionEffect);
+    if (next?.purpose === "watermark") setText(next.text);
+  };
+  handleRef.current = { apply: applyDirectPreset, cancel: () => { editController.current?.abort(); setLoadingImage(false); setRegionEffectBusy(false); regionEffectBusyRef.current = false; setStickerBusy(false); } };
+  useLayoutEffect(() => { applyDirectPreset(preset); }, [preset]);
+  useLayoutEffect(() => { onDirty(imageDirectDirty({ file, historyLength: historyState.length, emptyReadyHistoryLength: emptyReadyHistoryLength.current ?? historyState.length, regionEffectBusy, stickerBusy, status: loadingImage ? "running" : "idle", result: false, otherTabHasInput: false, otherTabHasResult: false, otherTabRunning: false })); }, [file, historyState.length, regionEffectBusy, stickerBusy, loadingImage, onDirty]);
+  useEffect(() => () => { resumeImageGeneration.current += 1; editController.current?.abort(); }, []);
   const updateOutputMultiplier = useCallback((value: number) => {
     const normalized = Math.max(Number.EPSILON, Number.isFinite(value) ? value : 1);
     outputMultiplierRef.current = normalized;
@@ -768,6 +820,7 @@ function ImageEditor() {
       }
     });
     pushSnapshot(true, true);
+    emptyReadyHistoryLength.current ??= historyRef.current.length;
     window.requestAnimationFrame(syncCanvasDisplay);
     return () => {
       window.clearTimeout(snapshotTimerRef.current);
@@ -806,11 +859,17 @@ function ImageEditor() {
     if (interactionMode !== "effect") clearEffectSelection();
   }, [clearCropSelection, clearEffectSelection, interactionMode]);
 
-  const loadFile = async (next?: File) => {
+  const acquireImage = async (next?: File) => {
     if (!next || !canvas.current) return;
+    editController.current?.abort();
+    const controller = new AbortController();
+    editController.current = controller;
+    pendingImageFile.current = next;
+    setLoadingImage(true);
     const url = URL.createObjectURL(next);
     try {
-      const image = await FabricImage.fromURL(url);
+      const image = await FabricImage.fromURL(url, { signal: controller.signal });
+      if (controller.signal.aborted) { image.dispose(); URL.revokeObjectURL(url); return; }
       const instance = canvas.current;
       restoringRef.current = true;
       clearRegionSelection();
@@ -835,6 +894,13 @@ function ImageEditor() {
       setInteractionMode("select");
       interactionModeRef.current = "select";
       setActivePanel("select");
+      const approved = acceptedPresetRef.current;
+      if (approved) {
+        setActivePanel(approved.panel);
+        setInteractionMode(approved.interactionMode);
+        interactionModeRef.current = approved.interactionMode;
+        if (approved.purpose === "mosaic") setRegionEffect(approved.regionEffect);
+      }
       syncDimensionControls(900, 600);
       applyEditorInteractivity(instance, image, "select", true);
       instance.requestRenderAll();
@@ -845,9 +911,12 @@ function ImageEditor() {
     } catch {
       restoringRef.current = false;
       URL.revokeObjectURL(url);
-      setEditorError(t("image.common.failed"));
-    }
+      if (!controller.signal.aborted) setEditorError(t("image.common.failed"));
+    } finally { if (editController.current === controller) { setLoadingImage(false); pendingImageFile.current = undefined; } }
   };
+
+  const loadFile = (file?: File) => { const task = acquireImage(file); loadImageTask.current = task; return task; };
+  loadImageHandler.current = loadFile;
 
   const newBlankCanvas = () => {
     const instance = canvas.current;
@@ -878,7 +947,7 @@ function ImageEditor() {
 
   useClipboardImages((images) => {
     if (canvas.current?.getObjects().length && !window.confirm(t("image.editor.confirm"))) return;
-    void loadFile(images.at(-1));
+    if (activeRef.current) void loadFile(images.at(-1));
   });
 
   const dropOnPreview = (event: DragEvent<HTMLDivElement>) => {
@@ -1018,6 +1087,9 @@ function ImageEditor() {
     const selection = effectSelection;
     const overlay = effectOverlay.current;
     if (!instance || !image || !file || !selection || selection.width < 10 || selection.height < 10 || regionEffectBusyRef.current) return;
+    editController.current?.abort();
+    const controller = new AbortController();
+    editController.current = controller;
     regionEffectBusyRef.current = true;
     setRegionEffectBusy(true);
     setEditorError("");
@@ -1029,7 +1101,8 @@ function ImageEditor() {
       instance.discardActiveObject();
       instance.renderAll();
       // Region effects sample the immutable source photo. They do not compound prior effects or rasterize drawing/text layers.
-      const sourceImage = await FabricImage.fromURL(image.getSrc());
+      const sourceImage = await FabricImage.fromURL(image.getSrc(), { signal: controller.signal });
+      if (controller.signal.aborted) { sourceImage.dispose(); return; }
       const sourceElement = sourceImage.getElement();
       const sourceWidth = (sourceElement as HTMLImageElement).naturalWidth || sourceElement.width;
       const sourceHeight = (sourceElement as HTMLImageElement).naturalHeight || sourceElement.height;
@@ -1059,6 +1132,7 @@ function ImageEditor() {
         effectedContext.fill();
         effectedContext.restore();
         const blob = await canvasToBlob(effected, "image/png");
+        if (controller.signal.aborted) return;
         effectUrl = URL.createObjectURL(blob);
       } finally {
         effected.width = 1;
@@ -1066,7 +1140,8 @@ function ImageEditor() {
       }
       if (!effectUrl) throw new Error("The browser could not create the effect image.");
       regionEffectUrls.current.add(effectUrl);
-      effectImage = await FabricImage.fromURL(effectUrl);
+      effectImage = await FabricImage.fromURL(effectUrl, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       const effectObject = effectImage as EditorFabricObject;
       effectObject.worklazyRole = "region-effect";
       effectObject.worklazyAnchorX = pixelRegion.bounds.left + pixelRegion.bounds.width / 2 - image.cropX - image.width / 2;
@@ -1095,6 +1170,7 @@ function ImageEditor() {
         regionEffectUrls.current.delete(effectUrl);
         URL.revokeObjectURL(effectUrl);
       }
+      if (controller.signal.aborted) return;
       if (overlay && !instance.getObjects().includes(overlay)) instance.add(overlay);
       effectOverlay.current = overlay;
       setEditorError(t("image.editor.effectError"));
@@ -1102,13 +1178,13 @@ function ImageEditor() {
       window.requestAnimationFrame(updateRegionLabelPosition);
     } finally {
       restoringRef.current = false;
-      regionEffectBusyRef.current = false;
-      setRegionEffectBusy(false);
+      if (editController.current === controller) { regionEffectBusyRef.current = false; setRegionEffectBusy(false); }
     }
   }, [baseLocked, clearEffectSelection, effectSelection, file, pushSnapshot, regionEffect, regionEffectStrength, syncSelectedObject, t, updateRegionLabelPosition]);
 
   useEffect(() => {
     const handleEditorShortcut = (event: KeyboardEvent) => {
+      if (!activeRef.current) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
       if (interactionModeRef.current === "crop" && event.key === "Escape") {
@@ -1192,18 +1268,22 @@ function ImageEditor() {
 
   const addSticker = async (sticker: ImageStudioSticker) => {
     if (stickerBusy) return;
+    editController.current?.abort();
+    const controller = new AbortController();
+    editController.current = controller;
     setStickerBusy(true);
     setEditorError("");
     try {
-      const image = await FabricImage.fromURL(getImageStudioStickerUrl(sticker));
+      const image = await FabricImage.fromURL(getImageStudioStickerUrl(sticker), { signal: controller.signal });
+      if (controller.signal.aborted) { image.dispose(); return; }
       const scale = 150 / Math.max(1, image.width, image.height);
       (image as EditorFabricObject).worklazyRole = "sticker";
       image.set({ left: 120, top: 120, scaleX: scale, scaleY: scale });
       addObject(image);
     } catch {
-      setEditorError(t("image.editor.stickerError"));
+      if (!controller.signal.aborted) setEditorError(t("image.editor.stickerError"));
     } finally {
-      setStickerBusy(false);
+      if (editController.current === controller) setStickerBusy(false);
     }
   };
 
@@ -1228,11 +1308,15 @@ function ImageEditor() {
       .sort((left, right) => instance.getObjects().indexOf(left) - instance.getObjects().indexOf(right));
     if (!originals.length) return;
     if (instance.getActiveObject() instanceof ActiveSelection) instance.discardActiveObject();
+    editController.current?.abort();
+    const controller = new AbortController();
+    editController.current = controller;
     restoringRef.current = true;
     const clones: FabricObject[] = [];
     try {
       for (const original of originals) {
-        const clone = await original.clone();
+        const clone = await (original.constructor as typeof FabricObject).fromObject(original.toObject(), { signal: controller.signal }) as FabricObject;
+        if (controller.signal.aborted) { clone.dispose(); throw new DOMException("Cancelled", "AbortError"); }
         util.applyTransformToObject(clone, util.multiplyTransformMatrices([1, 0, 0, 1, 24, 24], original.calcTransformMatrix()));
         clone.setCoords();
         instance.add(clone);
@@ -1241,7 +1325,7 @@ function ImageEditor() {
       enforceEditorLayerInvariant(instance, baseImage.current);
     } catch {
       if (clones.length) instance.remove(...clones);
-      setEditorError(t("image.editor.duplicateError"));
+      if (!controller.signal.aborted) setEditorError(t("image.editor.duplicateError"));
       return;
     } finally {
       restoringRef.current = false;
@@ -1424,12 +1508,16 @@ function ImageEditor() {
     if (!instance || !serialized) return;
     const snapshot = JSON.parse(serialized) as EditorHistorySnapshot;
     window.clearTimeout(snapshotTimerRef.current);
+    editController.current?.abort();
+    const controller = new AbortController();
+    editController.current = controller;
     restoringRef.current = true;
     try {
       const dimensionsChanged = instance.getWidth() !== snapshot.width || instance.getHeight() !== snapshot.height;
       const preservedViewport = [...instance.viewportTransform] as TMat2D;
+      await instance.loadFromJSON(snapshot.canvas, undefined, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       instance.setDimensions({ width: snapshot.width, height: snapshot.height });
-      await instance.loadFromJSON(snapshot.canvas);
       baseImage.current = instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && (object as EditorFabricObject).worklazyRole === "base")
         ?? instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && !(object as EditorFabricObject).worklazyRole);
       setBrightness(snapshot.brightness); setContrast(snapshot.contrast); setHue(snapshot.hue);
@@ -1458,6 +1546,8 @@ function ImageEditor() {
       setHistoryState({ index, length: historyRef.current.length });
       syncSelectedObject();
       window.requestAnimationFrame(syncCanvasDisplay);
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
     } finally {
       window.clearTimeout(snapshotTimerRef.current);
       restoringRef.current = false;
@@ -2217,7 +2307,7 @@ function installEditorViewportGestures({
 
   const handleKeyDown = (event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null;
-    if (event.code !== "Space" || target?.closest("input, textarea, select, [contenteditable='true']") || !pointerOverCanvas) return;
+    if (!upperCanvas.getClientRects().length || event.code !== "Space" || target?.closest("input, textarea, select, [contenteditable='true']") || !pointerOverCanvas) return;
     event.preventDefault();
     spacePressed = true;
     stage?.classList.add("is-pan-ready");

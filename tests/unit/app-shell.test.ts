@@ -12,10 +12,10 @@ const appShellSource = read("src/components/AppShell.tsx");
 test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect ownership", () => {
   assert.match(appShellSource, /<RouteSeo \/>[\s\S]*?<VideoIsolationBoundary[\s\S]*?<OfficeIsolationBoundary[\s\S]*?<ExcelPreserveIsolationBoundary[\s\S]*?<AnalyticsLoader[\s\S]*?<AdSenseLoader \/>/);
   assert.match(appShellSource, /!videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument/);
-  assert.match(appShellSource, /normalizedPath === "\/tools\/video-studio"/);
+  assert.match(appShellSource, /isVideoDirectPath\(location\.pathname/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/office-editor\/app"/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/excel-merger\/xls-preserve"/);
-  assert.match(appShellSource, /target\.pathname = localizedPath\(language, "\/tools\/video-studio\/"\)/);
+  assert.match(appShellSource, /videoParentAssetUrl\(window\.location\.pathname/);
   assert.match(appShellSource, /target\.pathname = localizedPath\(language, "\/tools\/office-editor\/app\/"\)/);
   assert.match(appShellSource, /target\.pathname = localizedPath\(language, "\/tools\/excel-merger\/xls-preserve\/"\)/);
   assert.match(appShellSource, /<aside className="sidebar glass-panel"/);

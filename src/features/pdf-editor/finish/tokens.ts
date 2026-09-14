@@ -42,6 +42,40 @@ export function filenameBaseName(filename: string): string {
   return filename.replace(/\.pdf$/i, "");
 }
 
+export const FILENAME_LIMIT_MIN = 1;
+export const FILENAME_LIMIT_MAX = 1000;
+
+export type ParsedFilenameLimit =
+  | { valid: true; limit: number | null }
+  | { valid: false };
+
+export function parseFilenameLimit(raw: string): ParsedFilenameLimit {
+  const trimmed = raw.trim();
+  if (!trimmed) return { valid: true, limit: null };
+  if (!/^\d+$/.test(trimmed)) return { valid: false };
+  const limit = Number(trimmed);
+  if (!Number.isSafeInteger(limit) || limit < FILENAME_LIMIT_MIN || limit > FILENAME_LIMIT_MAX) return { valid: false };
+  return { valid: true, limit };
+}
+
+export function segmentGraphemes(text: string): string[] | null {
+  if (typeof Intl.Segmenter !== "function") return null;
+  return [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)].map(({ segment }) => segment);
+}
+
+export function truncateFilenameByGraphemes(base: string, limit: number): string | null {
+  const clusters = segmentGraphemes(base);
+  if (!clusters) return null;
+  if (clusters.length < limit) return base;
+  if (limit <= 1) return "…";
+  return `${clusters.slice(0, limit - 1).join("")}…`;
+}
+
+export function applyFilenameLimit(base: string, limit: number | null): string | null {
+  if (limit === null) return base;
+  return truncateFilenameByGraphemes(base, limit);
+}
+
 export function captureTokenValues(input: CaptureTokenValuesInput): CapturedTokenValues {
   const captured = input.clock();
   if (!(captured instanceof Date) || Number.isNaN(captured.getTime())) throw new RangeError("invalid-clock-value");

@@ -16,11 +16,12 @@ import {
   tokenPageCount,
   type PageSelectionState,
 } from "./selection.ts";
-import { filenameBaseName } from "./tokens.ts";
+import { filenameBaseName, truncateFilenameByGraphemes, FILENAME_LIMIT_MAX, FILENAME_LIMIT_MIN } from "./tokens.ts";
 import {
   createSixTextRegions,
   decideDocumentFont,
   layoutTextLines,
+  layoutTextLinesPreserve,
   preprocessText,
   type LayoutRun,
   type PreparedText,
@@ -163,6 +164,13 @@ export interface PdfFinishTextDecorationOptions {
   startPage: number;
   excludeCover: boolean;
   opacity?: number;
+  // Header-footer filename policy marker. Absent = legacy width ellipsis;
+  // { limit: null } = fit the filename cell without character truncation;
+  // { limit: 1..1000 } = grapheme truncation, then width fit.
+  // Only the header decoration carries it; base inheritance, fallback and
+  // watermark copies never propagate it, so page-number and watermark
+  // filename tokens keep their existing behavior.
+  filenamePolicy?: { limit: number | null };
 }
 
 export interface PdfFinishDecorationOptions extends Omit<PdfFinishTextDecorationOptions, "region"> {
@@ -298,7 +306,19 @@ function baseTextOptions(options: PdfFinishDecorationOptions): PdfFinishTextDeco
   };
 }
 
+function validateFilenamePolicy(options: PdfFinishDecorationOptions) {
+  for (const decoration of [options, ...(options.textDecorations ?? [])]) {
+    const policy = decoration.filenamePolicy;
+    if (policy === undefined) continue;
+    if (policy.limit !== null
+      && (!Number.isSafeInteger(policy.limit) || policy.limit < FILENAME_LIMIT_MIN || policy.limit > FILENAME_LIMIT_MAX)) {
+      throw new PdfFinishEngineError("invalid-field", { field: "template" });
+    }
+  }
+}
+
 function validateOptions(options: PdfFinishDecorationOptions) {
+  validateFilenamePolicy(options);
   for (const decoration of [options, ...(options.textDecorations ?? [])]) {
     if (!Number.isFinite(decoration.fontSize) || decoration.fontSize < 6 || decoration.fontSize > 72) throw new PdfFinishEngineError("invalid-field", { field: "fontSize" });
     if (!Number.isFinite(decoration.margin) || decoration.margin < 0 || decoration.margin > 144) throw new PdfFinishEngineError("invalid-field", { field: "margin" });
@@ -439,6 +459,15 @@ async function defaultLoadFontAsset(signal?: AbortSignal) {
   }
 }
 
+function policyFilename(fileName: string, options: PdfFinishTextDecorationOptions): string {
+  const base = filenameBaseName(fileName);
+  const policy = options.filenamePolicy;
+  if (!policy || policy.limit === null) return base;
+  const truncated = truncateFilenameByGraphemes(base, policy.limit);
+  if (truncated === null) throw new PdfFinishEngineError("invalid-field", { field: "template" });
+  return truncated;
+}
+
 function preparePages(file: PdfFinishInputFile, options: PdfFinishTextDecorationOptions, locale: string, batchDate: Date) {
   const totalPages = tokenPageCount(file.selection.totalPages);
   return file.selection.exactPages.map((physicalPage): PreparedPage => ({
@@ -446,7 +475,7 @@ function preparePages(file: PdfFinishInputFile, options: PdfFinishTextDecoration
     prepared: preprocessText(options.template, {
       page: displayNumber(physicalPage, options.startNumber, options),
       pages: totalPages,
-      filename: filenameBaseName(file.file.name),
+      filename: policyFilename(file.file.name, options),
       date: batchDate,
       locale,
     }),
@@ -646,14 +675,24 @@ function createPageDecorationPlan(
   }
   const region = regions.find((candidate) => candidate.region === options.region);
   if (!region || !anchor) return { code: "invalid-layout", field: "fontSize", fileKey: source.key, physicalPage };
-  const layout = layoutTextLines({
-    lines: prepared.lines,
-    size: options.fontSize,
-    region: region.box,
-    alignment: region.alignment,
-    vertical: region.vertical,
-    font,
-  });
+  const preserveFilename = options.filenamePolicy !== undefined && options.template.includes("{filename}");
+  const layout = preserveFilename
+    ? layoutTextLinesPreserve({
+      lines: prepared.lines,
+      size: options.fontSize,
+      region: region.box,
+      alignment: region.alignment,
+      vertical: region.vertical,
+      font,
+    })
+    : layoutTextLines({
+      lines: prepared.lines,
+      size: options.fontSize,
+      region: region.box,
+      alignment: region.alignment,
+      vertical: region.vertical,
+      font,
+    });
   if (!layout.ok) {
     return {
       code: layout.error === "narrow-region" ? "narrow-region" : "invalid-layout",

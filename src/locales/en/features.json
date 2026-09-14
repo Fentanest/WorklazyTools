@@ -922,6 +922,10 @@
       "fontSize": "Font size (6–72 pt)",
       "color": "Text color",
       "margin": "Page margin (0–144 pt)",
+      "filenameLimit": "Filename character limit (1–1000, empty means no limit)",
+      "filenameLimitHelp": "Filenames at or above the limit are shortened to the leading characters plus an ellipsis (…). Empty keeps the full name and may render smaller to fit the cell. Long phrases may appear smaller in the PDF.",
+      "filenameLimitError": "Enter an integer from 1 to 1000, or leave it empty.",
+      "filenameLimitUnsupported": "This browser does not support grapheme segmentation, so a numeric limit cannot be used here.",
       "watermark": {
         "contentType": "Watermark type",
         "text": "Text",

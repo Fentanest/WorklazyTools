@@ -1,0 +1,378 @@
+[
+  {
+    "path": "/tools/pdf-editor/merge",
+    "purpose": "merge",
+    "owner": "pdf-organize",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/merge",
+    "readySelector": "[data-direct-purpose=\"merge\"]",
+    "postLoadAssertions": {
+      "outputMode": "merged"
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/merge",
+      "en": "/en/tools/pdf-editor/merge",
+      "x-default": "/en/tools/pdf-editor/merge"
+    },
+    "socialSlug": "pdf-editor-merge"
+  },
+  {
+    "path": "/tools/pdf-editor/split",
+    "purpose": "split",
+    "owner": "pdf-organize",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/split",
+    "readySelector": "[data-direct-purpose=\"split\"]",
+    "postLoadAssertions": {
+      "outputMode": "ranges",
+      "quickSplit": true,
+      "automaticSplits": 0
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/split",
+      "en": "/en/tools/pdf-editor/split",
+      "x-default": "/en/tools/pdf-editor/split"
+    },
+    "socialSlug": "pdf-editor-split"
+  },
+  {
+    "path": "/tools/pdf-editor/delete",
+    "purpose": "delete",
+    "owner": "pdf-organize",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/delete",
+    "readySelector": "[data-direct-purpose=\"delete\"]",
+    "postLoadAssertions": {
+      "postLoadFocus": "delete",
+      "automaticDeletes": 0
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/delete",
+      "en": "/en/tools/pdf-editor/delete",
+      "x-default": "/en/tools/pdf-editor/delete"
+    },
+    "socialSlug": "pdf-editor-delete"
+  },
+  {
+    "path": "/tools/pdf-editor/rotate",
+    "purpose": "rotate",
+    "owner": "pdf-organize",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/rotate",
+    "readySelector": "[data-direct-purpose=\"rotate\"]",
+    "postLoadAssertions": {
+      "postLoadFocus": "rotate",
+      "automaticRotations": 0
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/rotate",
+      "en": "/en/tools/pdf-editor/rotate",
+      "x-default": "/en/tools/pdf-editor/rotate"
+    },
+    "socialSlug": "pdf-editor-rotate"
+  },
+  {
+    "path": "/tools/pdf-editor/ocr",
+    "purpose": "ocr",
+    "owner": "pdf-convert",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/ocr",
+    "readySelector": "[data-direct-purpose=\"ocr\"]",
+    "postLoadAssertions": {
+      "format": "searchable-pdf",
+      "pageRange": "",
+      "ocrScope": "all"
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/ocr",
+      "en": "/en/tools/pdf-editor/ocr",
+      "x-default": "/en/tools/pdf-editor/ocr"
+    },
+    "socialSlug": "pdf-editor-ocr"
+  },
+  {
+    "path": "/tools/pdf-editor/convert",
+    "purpose": "convert",
+    "owner": "pdf-convert",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/convert",
+    "readySelector": "[data-direct-purpose=\"convert\"]",
+    "postLoadAssertions": {
+      "format": "docx",
+      "ocrMode": "auto"
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/convert",
+      "en": "/en/tools/pdf-editor/convert",
+      "x-default": "/en/tools/pdf-editor/convert"
+    },
+    "socialSlug": "pdf-convert"
+  },
+  {
+    "path": "/tools/image-studio/resize",
+    "purpose": "resize",
+    "owner": "image-studio",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/image-studio/resize",
+    "readySelector": "[data-direct-purpose=\"resize\"]",
+    "postLoadAssertions": {
+      "tab": "editor",
+      "panel": "size",
+      "interactionMode": "select"
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/image-studio/resize",
+      "en": "/en/tools/image-studio/resize",
+      "x-default": "/en/tools/image-studio/resize"
+    },
+    "socialSlug": "image-studio-resize"
+  },
+  {
+    "path": "/tools/image-studio/mosaic",
+    "purpose": "mosaic",
+    "owner": "image-studio",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/image-studio/mosaic",
+    "readySelector": "[data-direct-purpose=\"mosaic\"]",
+    "postLoadAssertions": {
+      "tab": "editor",
+      "panel": "effect",
+      "interactionMode": "effect",
+      "regionEffect": "mosaic"
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/image-studio/mosaic",
+      "en": "/en/tools/image-studio/mosaic",
+      "x-default": "/en/tools/image-studio/mosaic"
+    },
+    "socialSlug": "image-studio-mosaic"
+  },
+  {
+    "path": "/tools/image-studio/watermark",
+    "purpose": "watermark",
+    "owner": "image-studio",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/image-studio/watermark",
+    "readySelector": "[data-direct-purpose=\"watermark\"]",
+    "postLoadAssertions": {
+      "tab": "editor",
+      "panel": "text",
+      "text": "",
+      "automaticObjects": 0
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/image-studio/watermark",
+      "en": "/en/tools/image-studio/watermark",
+      "x-default": "/en/tools/image-studio/watermark"
+    },
+    "socialSlug": "image-studio-watermark"
+  },
+  {
+    "path": "/tools/video-studio/trim",
+    "purpose": "trim",
+    "owner": "video-studio",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/video-studio/trim",
+    "readySelector": "[data-direct-purpose=\"trim\"]",
+    "postLoadAssertions": {
+      "allGroupsOneFile": false,
+      "outputMode": "individual",
+      "outputFormat": "mp4",
+      "audioMode": "copy"
+    },
+    "isolation": "video",
+    "hreflang": {
+      "ko": "/ko/tools/video-studio/trim",
+      "en": "/en/tools/video-studio/trim",
+      "x-default": "/en/tools/video-studio/trim"
+    },
+    "socialSlug": "video-studio-trim"
+  },
+  {
+    "path": "/tools/video-studio/merge",
+    "purpose": "merge",
+    "owner": "video-studio",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/video-studio/merge",
+    "readySelector": "[data-direct-purpose=\"merge\"]",
+    "postLoadAssertions": {
+      "allGroupsOneFile": true,
+      "outputMode": "individual",
+      "outputFormat": "mp4",
+      "audioMode": "copy"
+    },
+    "isolation": "video",
+    "hreflang": {
+      "ko": "/ko/tools/video-studio/merge",
+      "en": "/en/tools/video-studio/merge",
+      "x-default": "/en/tools/video-studio/merge"
+    },
+    "socialSlug": "video-studio-merge"
+  },
+  {
+    "path": "/tools/video-studio/extract-audio",
+    "purpose": "extract-audio",
+    "owner": "video-studio",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/video-studio/extract-audio",
+    "readySelector": "[data-direct-purpose=\"extract-audio\"]",
+    "postLoadAssertions": {
+      "allGroupsOneFile": false,
+      "outputMode": "individual",
+      "outputFormat": "mp3",
+      "audioMode": "copy",
+      "videoStreams": 0
+    },
+    "isolation": "video",
+    "hreflang": {
+      "ko": "/ko/tools/video-studio/extract-audio",
+      "en": "/en/tools/video-studio/extract-audio",
+      "x-default": "/en/tools/video-studio/extract-audio"
+    },
+    "socialSlug": "video-studio-extract-audio"
+  },
+  {
+    "path": "/tools/audio-studio/trim",
+    "purpose": "trim",
+    "owner": "audio-studio",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/audio-studio/trim",
+    "readySelector": "[data-direct-purpose=\"trim\"]",
+    "postLoadAssertions": {
+      "exportSelectionAfterDecode": true,
+      "automaticProcessing": 0
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/audio-studio/trim",
+      "en": "/en/tools/audio-studio/trim",
+      "x-default": "/en/tools/audio-studio/trim"
+    },
+    "socialSlug": "audio-studio-trim"
+  },
+  {
+    "path": "/tools/excel-merger",
+    "purpose": "merge",
+    "owner": "excel-merger",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/excel-merger",
+    "readySelector": "[data-tool-page=\"excel-merger\"]",
+    "postLoadAssertions": {
+      "existingBase": true
+    },
+    "isolation": "standard",
+    "hreflang": {
+      "ko": "/ko/tools/excel-merger",
+      "en": "/en/tools/excel-merger",
+      "x-default": "/en/tools/excel-merger"
+    },
+    "socialSlug": "excel-merger"
+  }
+]

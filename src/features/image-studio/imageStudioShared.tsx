@@ -11,12 +11,12 @@ import type { ImageOutputFormat, ImageWorkerResult } from "./types";
 
 export const RASTER_IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
 
-export interface ProcessPanelProps { progress: ReturnType<typeof useOperationProgress>; controllerRef: React.MutableRefObject<AbortController | undefined>; }
+export interface ProcessPanelProps { progress: ReturnType<typeof useOperationProgress>; controllerRef: React.MutableRefObject<AbortController | undefined>; active?: boolean; onDirty?: (tab: string, dirty: boolean) => void; resetResults?: number; }
 
 export async function runPanelTask(controllerRef: ProcessPanelProps["controllerRef"], progress: ProcessPanelProps["progress"], task: (controller: AbortController) => Promise<ImageWorkerResult>, success: string, t: TFunction<"features">) {
   const controller = new AbortController(); controllerRef.current = controller; progress.start(t("image.batch.prepare"));
-  try { const result = await task(controller); downloadWorkerResult(result); progress.succeed(success); }
-  catch (error) { progress.fail(normalizePanelError(error, t)); }
+  try { const result = await task(controller); if (controller.signal.aborted) return; downloadWorkerResult(result); progress.succeed(success); }
+  catch (error) { if (controller.signal.aborted) return; progress.fail(normalizePanelError(error, t)); }
   finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
 }
 
@@ -34,12 +34,15 @@ export function ClipboardHint({ mode }: { mode: "replace" | "append" }) {
   return <div className="clipboard-image-hint mt-2 flex items-center gap-2 text-[13px] leading-relaxed text-muted-foreground"><ClipboardPaste className="shrink-0 text-sky-700 dark:text-sky-300" size={15} /><span>{t("image.common.clipboard", { action: mode === "replace" ? t("image.common.replace") : t("image.common.append") })}</span></div>;
 }
 
-export function useClipboardImages(onImages: (files: File[]) => void) {
+export function useClipboardImages(onImages: (files: File[]) => void, active = true) {
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const { t } = useTranslation("features");
   const callbackRef = useRef(onImages);
   useEffect(() => { callbackRef.current = onImages; }, [onImages]);
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
+      if (!activeRef.current) return;
       const target = event.target;
       if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true'], [role='textbox']")) return;
       const pasted = Array.from(event.clipboardData?.items || [])

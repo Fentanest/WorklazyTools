@@ -1,3 +1,5 @@
+import type { PdfOrganizePreset } from "./pdfOrganizeDirect";
+import type { PdfConvertPreset } from "./pdfConvertDirect";
 import { BadgeCheck, FileImage, FileOutput, ImageDown, Layers3 } from "lucide-react";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
@@ -39,7 +41,9 @@ const navigation = [
 ] as const;
 
 type PdfEditorPageProps =
-  | { mode: Exclude<PdfToolMode, "finish">; finishPreset?: never }
+  | { mode: "organize"; organizePreset?: PdfOrganizePreset; finishPreset?: never }
+  | { mode: "convert"; convertPreset?: PdfConvertPreset; finishPreset?: never }
+  | { mode: "image-to-pdf" | "pdf-to-image"; finishPreset?: never }
   | { mode: "finish"; finishPreset: PdfFinishPreset };
 
 export function PdfEditorPage(props: PdfEditorPageProps) {
@@ -56,14 +60,14 @@ export function PdfEditorPage(props: PdfEditorPageProps) {
 
         <PdfModeNavigation mode={mode} labels={page.navigation} ariaLabel={featureMessage(language, "pdf.messages.PdfEditorPage.pdfTools")} language={language} />
 
-        {mode === "organize" && <PdfOrganizePanel />}
+        {mode === "organize" && <PdfOrganizePanel preset={props.organizePreset} />}
         {mode === "finish" && (
           <Suspense fallback={<div className="tool-route-loading min-h-[420px]" role="status">{featureMessage(language, "pdf.messages.PdfEditorPage.loadingFinish")}</div>}>
             <ToolReady><PdfFinishPanel preset={props.finishPreset} /></ToolReady>
           </Suspense>
         )}
         {(mode === "image-to-pdf" || mode === "pdf-to-image") && <PdfImagePanel direction={mode} />}
-        {mode === "convert" && <PdfConvertPanel />}
+        {mode === "convert" && <PdfConvertPanel preset={props.convertPreset} />}
 
         <PdfGuide mode={mode} />
       </div>

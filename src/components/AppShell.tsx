@@ -1,3 +1,4 @@
+import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
 import {
   CircleHelp,
@@ -42,9 +43,11 @@ export function AppShell() {
   const redactorActive = isRedactorPath(location.pathname);
   const redactorDocument = isRedactorDocument();
   useEffect(() => { if (import.meta.env.PROD && redactorActive !== redactorDocument) window.location.replace(window.location.href); }, [redactorActive, redactorDocument]);
-  const videoStudioActive = normalizedPath === "/tools/video-studio";
+  const videoStudioActive = isVideoDirectPath(location.pathname, import.meta.env.BASE_URL);
   const officeEditorAppActive = normalizedPath === "/tools/office-editor/app";
   const excelPreserveActive = normalizedPath === "/tools/excel-merger/xls-preserve";
+  const [videoControllerReady, setVideoControllerReady] = useState(false);
+  const [videoIsolationFailed, setVideoIsolationFailed] = useState(false);
   const videoIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-video-isolation"]'));
   const officeIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-office-isolation"]'));
   const excelIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-excel-preserve-isolation"]'));
@@ -67,7 +70,7 @@ export function AppShell() {
     <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
       <div className="app-shell">
       <RouteSeo />
-      <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} language={language} />
+      <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} onReady={setVideoControllerReady} onFailed={setVideoIsolationFailed} />
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
       <ExcelPreserveIsolationBoundary active={excelPreserveActive} isolationDocument={excelIsolationDocument} language={language} />
       {!redactorActive && !redactorDocument && <AnalyticsLoader disabled={(videoStudioActive && !videoIsolationDocument) || officeEditorAppActive || excelPreserveActive} />}
@@ -131,7 +134,8 @@ export function AppShell() {
       <nav className="desktop-language-switcher" aria-label={t("language.switchLabel")}><LanguageSwitcher /></nav>
 
       <main className={`main-content${redactorActive ? " redactor-main-content" : ""}`} id="main-content">
-        <RouteErrorBoundary>{(!redactorActive || redactorDocument) && <Outlet />}</RouteErrorBoundary>
+        <RouteErrorBoundary>{(!redactorActive || redactorDocument) && (!videoStudioActive || !import.meta.env.PROD || videoIsolationDocument && videoControllerReady) && <Outlet />}</RouteErrorBoundary>
+        {import.meta.env.PROD && videoStudioActive && !videoControllerReady && <div className="tool-route-loading min-h-[420px]" role="status">{videoIsolationFailed ? (language === "ko" ? "비디오 도구를 준비하지 못했습니다. 페이지를 새로고침해 다시 시도하세요." : "The video tool could not start. Refresh the page to try again.") : t("status.loadingTool", { tool: "Video Studio" })}</div>}
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
           <nav aria-label={t("footer.policyLabel")}>
@@ -202,18 +206,32 @@ export function AppShell() {
   );
 }
 
-function VideoIsolationBoundary({ active, isolationDocument, language }: { active: boolean; isolationDocument: boolean; language: "ko" | "en" }) {
+function VideoIsolationBoundary({ active, isolationDocument, onReady, onFailed }: { active: boolean; isolationDocument: boolean; onReady: (ready: boolean) => void; onFailed: (failed: boolean) => void }) {
+  // A language-only SPA change keeps the original document/controller and all input state.
+  const [workerUrl] = useState(() => videoParentAssetUrl(window.location.pathname, import.meta.env.BASE_URL, window.location.origin, "coi-serviceworker.js").href);
   useEffect(() => {
     if (!import.meta.env.PROD) return;
-    if (active && !isolationDocument) {
-      const target = new URL(window.location.href);
-      target.pathname = localizedPath(language, "/tools/video-studio/");
-      window.location.replace(target.href);
-      return;
-    }
-    if (!active && isolationDocument) window.location.replace(window.location.href);
-  }, [active, isolationDocument, language]);
-
+    if (active !== isolationDocument) { window.location.replace(window.location.href); return; }
+    if (!active) return;
+    if (!navigator.serviceWorker) { onFailed(true); return; }
+    let disposed = false;
+    let watchedWorker: ServiceWorker | null = null;
+    const check = () => {
+      if (disposed) return;
+      if (navigator.serviceWorker.controller?.scriptURL === workerUrl) {
+        if (window.crossOriginIsolated) onReady(true);
+        else window.location.reload();
+      } else if (watchedWorker?.state === "activated") window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", check);
+    void navigator.serviceWorker.register(workerUrl, { scope: new URL("./", workerUrl).href }).then(registration => {
+      if (disposed) return;
+      watchedWorker = registration.active ?? registration.installing ?? registration.waiting;
+      watchedWorker?.addEventListener("statechange", check);
+      check();
+    }).catch(() => { if (!disposed) onFailed(true); });
+    return () => { disposed = true; navigator.serviceWorker.removeEventListener("controllerchange", check); watchedWorker?.removeEventListener("statechange", check); };
+  }, [active, isolationDocument, onReady, onFailed, workerUrl]);
   return null;
 }
 

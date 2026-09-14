@@ -725,3 +725,139 @@ test("watermark corner anchors preserve a complete word instead of borrowing hea
   assert.ok(long.warnings.includes("horizontal-overflow"), "genuinely oversized text retains the existing overflow warning");
   await long.dispose();
 });
+
+test("filename policy rejects out-of-contract limits before touching documents", async () => {
+  const file = await fixture("policy.pdf");
+  const base = {
+    template: "{filename}",
+    region: "top-center" as const,
+    fontSize: 10,
+    color: "#112233",
+    margin: 18,
+    startNumber: 1,
+    startPage: 1,
+    excludeCover: false,
+  };
+  for (const limit of [0, 1001, 1.5, Number.NaN]) {
+    await assert.rejects(
+      preflightPdfFiles({
+        files: [{ key: "policy", file, selection: selection(3, "1") }],
+        options: { ...base, textDecorations: [{ ...base, filenamePolicy: { limit: limit as number } }] },
+        locale: "en-US",
+      }),
+      (reason: unknown) => reason instanceof PdfFinishEngineError && reason.code === "invalid-field",
+    );
+  }
+});
+
+test("filename policy truncates header tokens, preserves full names on null, and leaves legacy ellipsis intact", async () => {
+  const longName = "averylongfilenameindeed-for-preservation-check.pdf";
+  const baseName = "averylongfilenameindeed-for-preservation-check";
+  const header = (filenamePolicy?: { limit: number | null }) => ({
+    template: "{filename}",
+    region: "top-center" as const,
+    fontSize: 10,
+    color: "#112233",
+    margin: 18,
+    startNumber: 1,
+    startPage: 1,
+    excludeCover: false,
+    ...(filenamePolicy ? { filenamePolicy } : {}),
+  });
+  const run = async (fileName: string, filenamePolicy?: { limit: number | null }) => {
+    const file = await fixture(fileName);
+    const [output] = await finishPdfFiles({
+      files: [{ key: "policy", file, selection: selection(3, "1") }],
+      options: { ...header(), textDecorations: [header(filenamePolicy)] },
+      locale: "en-US",
+    });
+    const decorated = await PDFDocument.load(await output.blob.arrayBuffer(), { updateMetadata: false });
+    return decodedPageStreams(decorated, 0).join("\n");
+  };
+  const hex = (text: string) => Buffer.from(text, "latin1").toString("hex");
+  const limited = await run(longName, { limit: 8 });
+  assert.ok(limited.toLowerCase().includes(`${hex("averylo")}85`), "truncated filename stem is drawn");
+  assert.ok(!limited.toLowerCase().includes(hex(baseName)), "full filename is not drawn under a numeric limit");
+  const preserved = await run(longName, { limit: null });
+  assert.ok(preserved.toLowerCase().includes(hex(baseName)), "null policy draws the full filename without character truncation");
+  const legacy = await run(longName);
+  assert.ok(!legacy.toLowerCase().includes(hex(baseName)), "legacy path still shortens an overflowing filename");
+});
+
+test("filename policy on the header decoration does not change page-number tokens", async () => {
+  const file = await fixture("averylongfilenameindeed.pdf");
+  const [output] = await finishPdfFiles({
+    files: [{ key: "policy", file, selection: selection(3, "1-2") }],
+    options: {
+      template: "P{page}/{pages}",
+      region: "bottom-right",
+      fontSize: 10,
+      color: "#112233",
+      margin: 18,
+      startNumber: 1,
+      startPage: 1,
+      excludeCover: false,
+      textDecorations: [
+        {
+          template: "P{page}/{pages}",
+          region: "bottom-right" as const,
+          fontSize: 10,
+          color: "#112233",
+          margin: 18,
+          startNumber: 1,
+          startPage: 1,
+          excludeCover: false,
+        },
+        {
+          template: "{filename}",
+          region: "top-center" as const,
+          fontSize: 10,
+          color: "#112233",
+          margin: 18,
+          startNumber: 1,
+          startPage: 1,
+          excludeCover: false,
+          filenamePolicy: { limit: 5 },
+        },
+      ],
+    },
+    locale: "en-US",
+  });
+  const decorated = await PDFDocument.load(await output.blob.arrayBuffer(), { updateMetadata: false });
+  const streams = decodedPageStreams(decorated, 0).join("\n").toLowerCase();
+  assert.ok(streams.includes(`${Buffer.from("aver", "latin1").toString("hex")}85`), "header filename token is truncated to N-1 clusters plus ellipsis");
+});
+
+test("filename policy handles long Korean names with the supported font asset", async () => {
+  // Glyph-backed success expectation applies to Hangul syllables covered by
+  // the Noto asset; ZWJ emoji segmentation stays a unit-level contract and is
+  // not promoted to a PDF success expectation here.
+  const fontBytes = await fs.readFile(path.join(repositoryRoot, "public/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf"));
+  const loadFontAsset = async () => fontBytes.buffer.slice(fontBytes.byteOffset, fontBytes.byteOffset + fontBytes.byteLength) as ArrayBuffer;
+  const koreanBase = "2026년3분기실적보고서최종확정본배포용";
+  const header = (filenamePolicy?: { limit: number | null }) => ({
+    template: "{filename}",
+    region: "top-center" as const,
+    fontSize: 10,
+    color: "#112233",
+    margin: 18,
+    startNumber: 1,
+    startPage: 1,
+    excludeCover: false,
+    ...(filenamePolicy ? { filenamePolicy } : {}),
+  });
+  const run = async (fileName: string, filenamePolicy?: { limit: number | null }) => {
+    const file = await fixture(fileName);
+    const [output] = await finishPdfFiles({
+      files: [{ key: "korean", file, selection: selection(3, "1") }],
+      options: { ...header(), textDecorations: [header(filenamePolicy)] },
+      locale: "ko-KR",
+      loadFontAsset,
+    });
+    return output.blob.arrayBuffer();
+  };
+  const limitedBytes = await run(`${koreanBase}.pdf`, { limit: 6 });
+  assert.ok(limitedBytes.byteLength > 1_000, "truncated Korean header produces a real output");
+  const preservedBytes = await run(`${koreanBase}${koreanBase}.pdf`, { limit: null });
+  assert.ok(preservedBytes.byteLength > limitedBytes.byteLength, "preserved long Korean header keeps more content than the truncated one");
+});

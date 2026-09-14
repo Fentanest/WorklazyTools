@@ -162,6 +162,67 @@ function fitWithEllipsis(text: string, width: number, font: TextFontProbe, size:
   return `${characters.slice(0, low).join("")}…`;
 }
 
+export function layoutTextLinesPreserve(input: {
+  lines: readonly string[];
+  size: number;
+  region: TextRegionBox;
+  alignment: TextAlignment;
+  vertical: TextVerticalAlignment;
+  font: TextFontProbe;
+}): TextLayoutResult {
+  // Filename preservation boundary: never truncates with an ellipsis.
+  // Keeps the configured size when the original lines fit; otherwise finds
+  // a smaller finite positive size fitting the whole original text.
+  // Already-truncated runs are never remeasured as success, and no
+  // arbitrary minimum size is re-truncated. Existing calls are unchanged.
+  const { lines, size, region, alignment, vertical, font } = input;
+  const values = [size, region.x, region.y, region.width, region.height];
+  if (values.some((value) => !Number.isFinite(value)) || size <= 0 || region.width <= 0 || region.height < 0) {
+    return { ok: false, error: "invalid-layout" };
+  }
+  const fitsAt = (candidate: number) => {
+    if (!Number.isFinite(candidate) || candidate <= 0) return false;
+    for (const line of lines) {
+      const width = font.widthOfTextAtSize(line, candidate);
+      if (!Number.isFinite(width) || width < 0 || width > region.width) return false;
+    }
+    return true;
+  };
+  let fitted = size;
+  if (!fitsAt(fitted)) {
+    let low = 0;
+    let high = size;
+    for (let step = 0; step < 64; step += 1) {
+      const middle = (low + high) / 2;
+      if (!Number.isFinite(middle) || middle <= 0) break;
+      if (fitsAt(middle)) low = middle;
+      else high = middle;
+    }
+    if (!Number.isFinite(low) || low <= 0 || !fitsAt(low)) return { ok: false, error: "narrow-region" };
+    fitted = low;
+  }
+  const lineHeight = fitted * 1.2;
+  const ellipsisWidth = font.widthOfTextAtSize("…", fitted);
+  if (!Number.isFinite(ellipsisWidth) || ellipsisWidth < 0) return { ok: false, error: "invalid-layout" };
+  const warnings = new Set<LayoutWarning>();
+  const measured = lines.map((text, index) => ({ text, width: font.widthOfTextAtSize(text, fitted), sourceLine: index + 1 }));
+  const maximumLines = Math.max(0, Math.floor((region.height + Number.EPSILON * 16) / lineHeight));
+  const visible = measured.slice(0, maximumLines);
+  if (visible.length < measured.length) warnings.add("vertical-overflow");
+  const runs = visible.map((run, index) => {
+    const x = alignment === "left"
+      ? region.x
+      : alignment === "center"
+        ? region.x + (region.width - run.width) / 2
+        : region.x + region.width - run.width;
+    const y = vertical === "top"
+      ? region.y + region.height - fitted - index * lineHeight
+      : region.y + (visible.length - index - 1) * lineHeight;
+    return { ...run, x, y };
+  });
+  return { ok: true, runs, warnings: [...warnings], lineHeight, ellipsisWidth };
+}
+
 export function layoutTextLines(input: {
   lines: readonly string[];
   size: number;

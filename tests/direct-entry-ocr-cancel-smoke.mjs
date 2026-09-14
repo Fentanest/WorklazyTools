@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import {chromium} from 'playwright';
+const base=process.env.TEST_BASE_URL||'http://127.0.0.1:4199',out=process.env.DIRECT_ENTRY_OUTPUT||'/tmp/worklazy-u9-core/browser';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});const c=await b.newContext();await c.addInitScript(()=>{const NativeWorker=Worker;window.__workers=[];window.Worker=class extends NativeWorker{constructor(url,options){super(url,options);const entry={url:String(url),terminated:false};window.__workers.push(entry);const terminate=this.terminate.bind(this);this.terminate=()=>{entry.terminated=true;terminate();};}};});const p=await c.newPage();p.setDefaultTimeout(60000);const errors=[];p.on('pageerror',e=>errors.push(e.message));
+try{
+ await p.goto(`${base}/en/tools/pdf-editor/ocr/`);await p.locator('[data-direct-purpose=ocr]').waitFor();await p.locator('input[type=file]').setInputFiles(path.join(out,'input.pdf'));await p.locator('.pdf-page-card').nth(2).waitFor();await p.getByRole('button',{name:'Create OCR PDF',exact:true}).click();
+ await p.waitForFunction(()=>window.__workers.some(w=>w.url.startsWith('blob:')));
+ await p.evaluate(()=>{history.pushState({},'','/en/tools/pdf-editor/convert/');dispatchEvent(new PopStateEvent('popstate'));});await p.locator('[data-testid=direct-entry-confirm][open]').waitFor();await p.locator('[data-testid=direct-entry-accept]').click();
+ await p.waitForFunction(()=>window.__workers.some(w=>w.url.startsWith('blob:')&&w.terminated),null,{timeout:120000});
+ assert.equal(await p.locator('.pdf-page-card').count(),3);assert.equal(await p.locator('[data-testid=pdf-download]').count(),0);await p.waitForTimeout(500);assert.equal(await p.locator('[data-testid=pdf-download]').count(),0);assert.equal(await p.locator('[role=radio][aria-checked=true]').first().innerText(),'DOCX\nParagraphs');
+ const workers=await p.evaluate(()=>window.__workers);await fs.writeFile(path.join(out,'ocr-cancel-report.json'),JSON.stringify({workers,errors,pages:3,lateResult:0},null,2));assert.deepEqual(errors,[]);console.log('OCR owner worker terminated; selected PDF retained; no stale result');
+}finally{await b.close();}

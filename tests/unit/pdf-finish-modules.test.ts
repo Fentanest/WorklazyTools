@@ -27,12 +27,17 @@ import {
   estimatePreflightOutputWarning,
   estimateRasterOutputWarning,
   expandTokens,
+  filenameBaseName,
   formatCanonicalRange,
   formatDatePattern,
   isThumbnailDisabled,
   layoutTextLines,
+  layoutTextLinesPreserve,
   measureBatchResources,
   measureCanvas,
+  parseFilenameLimit,
+  truncateFilenameByGraphemes,
+  applyFilenameLimit,
   parseRange,
   preprocessText,
   RASTER_OUTPUT_BYTES_PER_PIXEL,
@@ -919,4 +924,63 @@ test("layout accepts injected width behavior without coupling to a PDF draw call
   assert.ok(result.ok);
   assert.equal(result.runs[0].text, "AB…");
   assert.equal(result.runs[0].width, 30);
+});
+
+test("filename limit parser keeps blank/trimmed/N1/N1000/leading-zero contracts and rejects non-integers", () => {
+  assert.deepEqual(parseFilenameLimit(""), { valid: true, limit: null });
+  assert.deepEqual(parseFilenameLimit("   "), { valid: true, limit: null });
+  assert.deepEqual(parseFilenameLimit("007"), { valid: true, limit: 7 });
+  assert.deepEqual(parseFilenameLimit("  42  "), { valid: true, limit: 42 });
+  assert.deepEqual(parseFilenameLimit("1"), { valid: true, limit: 1 });
+  assert.deepEqual(parseFilenameLimit("1000"), { valid: true, limit: 1000 });
+  assert.deepEqual(parseFilenameLimit("1.5"), { valid: false });
+  assert.deepEqual(parseFilenameLimit("1e3"), { valid: false });
+  assert.deepEqual(parseFilenameLimit("12px"), { valid: false });
+  assert.deepEqual(parseFilenameLimit("0"), { valid: false });
+  assert.deepEqual(parseFilenameLimit("1001"), { valid: false });
+  assert.deepEqual(parseFilenameLimit("-3"), { valid: false });
+  assert.deepEqual(parseFilenameLimit("+7"), { valid: false });
+  assert.deepEqual(parseFilenameLimit("NaN"), { valid: false });
+});
+
+test("filename truncation follows N-1/N/N+1 grapheme boundaries without normalizing input", () => {
+  assert.equal(truncateFilenameByGraphemes("ABCDE", 4), "ABC…");
+  assert.equal(truncateFilenameByGraphemes("ABCD", 4), "ABC…");
+  assert.equal(truncateFilenameByGraphemes("ABC", 4), "ABC");
+  assert.equal(truncateFilenameByGraphemes("anything", 1), "…");
+  assert.equal(truncateFilenameByGraphemes("A👨‍👩‍👧‍👦BC", 3), "A👨‍👩‍👧‍👦…");
+  assert.equal(truncateFilenameByGraphemes("A👨‍👩‍👧‍👦BC", 6), "A👨‍👩‍👧‍👦BC");
+  assert.equal(truncateFilenameByGraphemes("가나다", 2), "가…");
+  assert.equal(truncateFilenameByGraphemes("가나다", 4), "가나다");
+  // Combining jamo stays one grapheme: ᄀ + ᅡ + 나 + 다, N2 keeps the first cluster whole.
+  assert.equal(truncateFilenameByGraphemes("가나다", 2), "가…");
+  assert.equal(applyFilenameLimit("report", null), "report");
+  assert.equal(filenameBaseName("Report.PDF"), "Report");
+  assert.equal(filenameBaseName("Report.pdf"), "Report");
+  assert.equal(filenameBaseName("my.report.Pdf"), "my.report");
+  assert.equal(filenameBaseName("plain"), "plain");
+  // No Unicode normalization: NFD input keeps its code points.
+  const decomposed = "é".normalize("NFD");
+  assert.equal(filenameBaseName(`${decomposed}.pdf`).length, decomposed.length);
+});
+
+test("filename preservation layout keeps the configured size on fit and shrinks without ellipsis on overflow", () => {
+  const fixedWidthFont: TextFontProbe = {
+    encodeText: () => undefined,
+    widthOfTextAtSize: (text, size) => [...text].length * size,
+  };
+  const region = { x: 0, y: 0, width: 100, height: 120 };
+  const fitting = layoutTextLinesPreserve({ lines: ["ABCD"], size: 10, region, alignment: "left", vertical: "top", font: fixedWidthFont });
+  assert.ok(fitting.ok);
+  assert.equal(fitting.runs[0].text, "ABCD");
+  assert.deepEqual(fitting.warnings, []);
+  const shrinking = layoutTextLinesPreserve({ lines: ["ABCDEFGHIJKL"], size: 10, region, alignment: "left", vertical: "top", font: fixedWidthFont });
+  assert.ok(shrinking.ok);
+  assert.equal(shrinking.runs[0].text, "ABCDEFGHIJKL");
+  assert.ok(!shrinking.runs[0].text.includes("…"));
+  assert.ok(shrinking.lineHeight < 12);
+  for (const run of shrinking.runs) assert.ok(run.width <= region.width);
+  // Tri-state boundary: legacy ellipsis still truncates the same input.
+  const legacy = layoutTextLines({ lines: ["ABCDEFGHIJKL"], size: 10, region, alignment: "left", vertical: "top", font: fixedWidthFont });
+  assert.ok(legacy.ok && legacy.runs[0].text.includes("…"));
 });

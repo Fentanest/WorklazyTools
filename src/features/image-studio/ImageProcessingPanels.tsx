@@ -1,6 +1,6 @@
 import { ArrowDownToLine, ArrowUpToLine, Download, GripVertical, ImageIcon, LayoutGrid, Sparkles, Trash2 } from "lucide-react";
 import Sortable from "sortablejs";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { UtilityField, UtilityInput, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
@@ -30,7 +30,7 @@ import {
 } from "./imageStudioShared";
 import type { CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
 
-export function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) {
+export function BatchImagePanel({ progress, controllerRef, active = true, onDirty, resetResults }: ProcessPanelProps) {
   const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
   const [mode, setMode] = useState<"fit-width" | "contain" | "cover" | "original">("fit-width");
@@ -43,8 +43,10 @@ export function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) 
   const [watermarkFile, setWatermarkFile] = useState<File>();
   const [watermarkPosition, setWatermarkPosition] = useState<WatermarkPosition>("bottom-right");
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.7);
+  useLayoutEffect(() => onDirty?.("batch", files.length > 0 || Boolean(watermarkFile)), [files.length, watermarkFile, onDirty]);
+  void resetResults;
 
-  useClipboardImages((images) => setFiles((current) => [...current, ...images]));
+  useClipboardImages((images) => setFiles((current) => [...current, ...images]), active);
 
   const execute = async () => {
     if (!files.length) return;
@@ -53,9 +55,10 @@ export function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) 
     try {
       const watermarkImage = await serializeWatermark(watermarkFile);
       const result = await batchProcessImages(files, { mode, width, height, format, quality, background: transparentBackground ? "transparent" : "#ffffff", watermarkText, watermarkPosition, watermarkOpacity, watermarkImage }, t("image.batch.archive"), progress.update, controller.signal, i18n.language === "en" ? "en" : "ko");
+      if (controller.signal.aborted) return;
       downloadWorkerResult(result);
       progress.succeed(t("image.batch.done", { count: files.length }));
-    } catch (error) { progress.fail(normalizePanelError(error, t)); }
+    } catch (error) { if (controller.signal.aborted) return; progress.fail(normalizePanelError(error, t)); }
     finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
   };
 
@@ -67,7 +70,7 @@ export function BatchImagePanel({ progress, controllerRef }: ProcessPanelProps) 
     <div className="mt-4 flex justify-end max-[620px]:block" data-testid="image-batch-action"><div className="w-full max-w-[310px] max-[620px]:max-w-none"><PrimaryButton accent="sky" disabled={!files.length} loading={progress.status === "running"} onClick={() => void execute()}><Download size={18} /> {t("image.batch.download")}</PrimaryButton></div></div>
   </UtilitySectionCard>;
 }
-export function CollagePanel({ progress, controllerRef }: ProcessPanelProps) {
+export function CollagePanel({ progress, controllerRef, active = true, onDirty, resetResults }: ProcessPanelProps) {
   const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
   const [layout, setLayout] = useState<CollageOptions["layout"]>("vertical");
@@ -77,7 +80,9 @@ export function CollagePanel({ progress, controllerRef }: ProcessPanelProps) {
   const [background, setBackground] = useState("#ffffff");
   const [transparentBackground, setTransparentBackground] = useState(false);
   const [format, setFormat] = useState<ImageOutputFormat>("png");
-  useClipboardImages((images) => setFiles((current) => [...current, ...images]));
+  useClipboardImages((images) => setFiles((current) => [...current, ...images]), active);
+  useLayoutEffect(() => onDirty?.("collage", files.length > 0), [files.length, onDirty]);
+  void resetResults;
   const outputBackground = transparentBackground ? "transparent" : background;
   const language = i18n.language === "en" ? "en" : "ko";
   const execute = async () => runPanelTask(controllerRef, progress, async (controller) => buildCollage(files, { layout, columns, width, gap, background: outputBackground, format, quality: 0.92 }, t("image.collage.file"), progress.update, controller.signal, language), t("image.collage.done"), t);
@@ -164,7 +169,7 @@ function CollagePreview({ files, options, onFiles }: { files: File[]; options: C
   );
 }
 
-export function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
+export function GifPanel({ progress, controllerRef, active = true, onDirty, resetResults }: ProcessPanelProps) {
   const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
   const [delays, setDelays] = useState<number[]>([]);
@@ -172,6 +177,8 @@ export function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
   const [delay, setDelay] = useState(500);
   const [colors, setColors] = useState(192);
   const [preview, setPreview] = useState<{ url: string; fileName: string }>();
+  useLayoutEffect(() => onDirty?.("gif", files.length > 0 || Boolean(preview)), [files.length, preview, onDirty]);
+  useEffect(() => { setPreview(undefined); }, [resetResults]);
   const frameListRef = useRef<HTMLDivElement>(null);
   const language = i18n.language === "en" ? "en" : "ko";
   const replaceFiles = useCallback((next: File[]) => {
@@ -185,7 +192,7 @@ export function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
     setFiles((current) => [...current, ...filtered]);
     setDelays((current) => [...current, ...filtered.map(() => Math.max(20, delay))]);
   }, [delay]);
-  useClipboardImages(appendFiles);
+  useClipboardImages(appendFiles, active);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
   useEffect(() => {
     const list = frameListRef.current;
@@ -222,9 +229,10 @@ export function GifPanel({ progress, controllerRef }: ProcessPanelProps) {
     try {
       const result = await buildAnimatedGif(files, { width, delay: Math.max(20, delay), delays: delays.map((value) => Math.max(20, value)), qualityColors: colors }, t("image.gif.file"), progress.update, controller.signal, language);
       if (preview) URL.revokeObjectURL(preview.url);
+      if (controller.signal.aborted) return;
       setPreview({ url: URL.createObjectURL(new Blob([result.buffer], { type: result.mimeType })), fileName: result.fileName });
       progress.succeed(t("image.gif.done"));
-    } catch (error) { progress.fail(normalizePanelError(error, t)); }
+    } catch (error) { if (controller.signal.aborted) return; progress.fail(normalizePanelError(error, t)); }
     finally { if (controllerRef.current === controller) controllerRef.current = undefined; }
   };
   return <UtilitySectionCard title={t("image.gif.title")} description={t("image.gif.description")}>

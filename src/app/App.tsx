@@ -1,3 +1,5 @@
+import type { PdfOrganizePreset } from "../features/pdf-editor/pdfOrganizeDirect";
+import type { PdfConvertPreset } from "../features/pdf-editor/pdfConvertDirect";
 import { lazy, Suspense, useLayoutEffect } from "react";
 import { Outlet, Route, Routes, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -58,10 +60,14 @@ export function App() {
           <Route path="tools/excel-cleaner" element={<LazyToolRoute label="Excel data cleaner"><ExcelCleanerPage /></LazyToolRoute>} />
           <Route path="tools/document-generator" element={<LazyToolRoute label="Document generator"><DocumentGeneratorPage /></LazyToolRoute>} />
           <Route path="tools/pdf-editor" element={<PdfRoute mode="organize" />} />
-          <Route path="tools/pdf-editor/split" element={<LocalizedNavigate to="/tools/pdf-editor" />} />
+          <Route path="tools/pdf-editor/merge" element={<PdfRoute mode="organize" organizePreset={{ purpose: "merge", outputMode: "merged", quickSplit: false }} />} />
+<Route path="tools/pdf-editor/split" element={<PdfRoute mode="organize" organizePreset={{ purpose: "split", outputMode: "ranges", quickSplit: true }} />} />
+<Route path="tools/pdf-editor/delete" element={<PdfRoute mode="organize" organizePreset={{ purpose: "delete", outputMode: "merged", quickSplit: false, postLoadFocus: "delete" }} />} />
+<Route path="tools/pdf-editor/rotate" element={<PdfRoute mode="organize" organizePreset={{ purpose: "rotate", outputMode: "merged", quickSplit: false, postLoadFocus: "rotate" }} />} />
           <Route path="tools/pdf-editor/image-to-pdf" element={<PdfRoute mode="image-to-pdf" />} />
           <Route path="tools/pdf-editor/pdf-to-image" element={<PdfRoute mode="pdf-to-image" />} />
-          <Route path="tools/pdf-editor/convert" element={<PdfRoute mode="convert" />} />
+          <Route path="tools/pdf-editor/convert" element={<PdfRoute mode="convert" convertPreset={{ purpose: "convert", format: "docx", pageRange: "", ocrMode: "auto" }} />} />
+          <Route path="tools/pdf-editor/ocr" element={<PdfRoute mode="convert" convertPreset={{ purpose: "ocr", format: "searchable-pdf", pageRange: "" }} />} />
           <Route path="tools/pdf-editor/finish" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
           <Route path="tools/pdf-editor/page-numbers" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
           <Route path="tools/pdf-editor/header-footer" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "header-footer" }} />} />
@@ -78,8 +84,15 @@ export function App() {
           <Route path="tools/office-editor" element={<LazyToolRoute label="Office editor"><OfficeEditorPage /></LazyToolRoute>} />
           <Route path="tools/office-editor/app" element={<LazyToolRoute label="Office editor workspace"><OfficeEditorAppPage /></LazyToolRoute>} />
           <Route path="tools/video-studio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage /></LazyToolRoute>} />
+          <Route path="tools/video-studio/trim" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "trim", allGroupsOneFile: false, outputMode: "individual", outputFormat: "mp4", audioMode: "copy" }} /></LazyToolRoute>} />
+          <Route path="tools/video-studio/merge" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "merge", allGroupsOneFile: true, outputMode: "individual", outputFormat: "mp4", audioMode: "copy" }} /></LazyToolRoute>} />
+          <Route path="tools/video-studio/extract-audio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "extract-audio", allGroupsOneFile: false, outputMode: "individual", outputFormat: "mp3", audioMode: "copy" }} /></LazyToolRoute>} />
           <Route path="tools/audio-studio" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage /></LazyToolRoute>} />
+          <Route path="tools/audio-studio/trim" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage preset={{ purpose: "trim" }} /></LazyToolRoute>} />
           <Route path="tools/image-studio" element={<LazyToolRoute label="Image Studio"><ImageStudioPage /></LazyToolRoute>} />
+          <Route path="tools/image-studio/resize" element={<LazyToolRoute label="Image Studio"><ImageStudioPage preset={{ purpose: "resize", tab: "editor", panel: "size", interactionMode: "select" }} /></LazyToolRoute>} />
+          <Route path="tools/image-studio/mosaic" element={<LazyToolRoute label="Image Studio"><ImageStudioPage preset={{ purpose: "mosaic", tab: "editor", panel: "effect", interactionMode: "effect", regionEffect: "mosaic" }} /></LazyToolRoute>} />
+          <Route path="tools/image-studio/watermark" element={<LazyToolRoute label="Image Studio"><ImageStudioPage preset={{ purpose: "watermark", tab: "editor", panel: "text", interactionMode: "select", text: "" }} /></LazyToolRoute>} />
           <Route path="tools/text-merger" element={<LazyToolRoute label="Text Merger"><TextMergerPage /></LazyToolRoute>} />
           <Route path="tools/text-tools" element={<LazyToolRoute label="Text Tools"><TextToolsPage /></LazyToolRoute>} />
           <Route path="tools/text-formatter" element={<LazyToolRoute label="Formatter"><TextFormatterPage /></LazyToolRoute>} />
@@ -141,7 +154,9 @@ function KoreanOnlyRoute({ children }: { children: React.ReactNode }) {
 }
 
 type PdfRouteProps =
-  | { mode: Exclude<PdfToolMode, "finish">; finishPreset?: never }
+  | { mode: "organize"; organizePreset?: PdfOrganizePreset; finishPreset?: never }
+  | { mode: "convert"; convertPreset?: PdfConvertPreset; finishPreset?: never }
+  | { mode: "image-to-pdf" | "pdf-to-image"; finishPreset?: never }
   | { mode: "finish"; finishPreset: PdfFinishPreset };
 
 function PdfRoute(props: PdfRouteProps) {

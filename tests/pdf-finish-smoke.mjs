@@ -1319,7 +1319,22 @@ async function assertLazyChunks(runtimeRequests) {
   const thumbnailWorker = assets.find((name) => /^pdfThumbnailRender\.worker-.+\.js$/u.test(name));
   assert.ok(editorChunk && thumbnailWorker, "PDF editor and thumbnail worker chunks must exist");
   const displayUrl = `/assets/${displayAssets[0]}`;
-  for (const asset of [editorChunk, thumbnailWorker]) {
+  // Vite hoists shared ?url constants into a shared dependency chunk (seen:
+  // pdfRenderLifecycle), so the runtime URL is asserted through the editor
+  // chunk's transitive static import map instead of a single-file string.
+  // Baseline 9fa435a already splits this way; the shared-runtime contract is unchanged.
+  const editorSource = await fs.readFile(path.join(assetsDirectory, editorChunk), "utf8");
+  const mapMatch = editorSource.match(/__vite__mapDeps=\(i,m=__vite__mapDeps,d=\(m\.f\|\|\(m\.f=\[(.*?)\]/su);
+  const reachable = new Set([editorChunk]);
+  if (mapMatch) for (const entry of mapMatch[1].split(",")) {
+    const name = entry.trim().replace(/^"|"$/g, "");
+    if (name.endsWith(".js")) reachable.add(path.basename(name));
+  }
+  const reachableSources = await Promise.all([...reachable].map(async (name) => {
+    try { return await fs.readFile(path.join(assetsDirectory, name), "utf8"); } catch { return ""; }
+  }));
+  assert.ok(reachableSources.some((source) => source.includes(displayUrl)), `${editorChunk} must reach the shared PDF display runtime through its static import graph`);
+  for (const asset of [thumbnailWorker]) {
     const source = await fs.readFile(path.join(assetsDirectory, asset), "utf8");
     assert.ok(source.includes(displayUrl), `${asset} must reference the shared PDF display runtime`);
   }
