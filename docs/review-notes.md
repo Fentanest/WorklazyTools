@@ -2758,7 +2758,7 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - 라이선스 산출물은 owner 생성기가 lockfile의 production package를 정렬해 다시 만들었다. 섹션은 728→731개이며 추가는 docxtemplater 3.69.3, pizzip 3.2.0과 그 pako 2.2.0, 교체는 `@xmldom/xmldom` 0.9.11→0.9.12이고 그 밖의 제거는 0이다. PizZip의 MIT 선택 문구와 세 직접 의존 고지도 생성기 입력에 추가했다.
 - canonical baseline `4caaa9c6…`, 기본 5상한 null, overrides `{}`, multiplier 1의 등록 graph 계측은 exit 0이었다. gzip은 entry 321,518B, affected route 546,784B, shared 2,217,089B, app 6,693,956B, CSS 39,220B이고 baseline 대비 증분은 각각 22,241B, 546,784B, 244,346B, 850,241B, 1,533B이다. 직전 U6 release와 비교하면 entry +3,194B, app +550,429B, shared +272,897B, CSS +47B이며, 새 U7 route 546,784B는 기존 redactor route와 서로 빼지 않는다. 용량 상한 해제는 inventory·귀속 검사 면제로 쓰지 않았다.
 
-## 2026-09-14 — U9 D3 통합·PDF 파일명 제한 구현 판정 (Codx)
+## 2026-09-14 — U9 D3 통합·PDF 파일명 제한 구현 판정 (Muse)
 
 - **U9 D3**: `9fa435a` 기준에 `/tmp/worklazy-u9-impl` 코어 오버레이(14 tracked + 36 overlay)를 적용했다. SEO ko/en·FAQ·소셜 12종, 소셜 PNG 24장, 정적 검증기 직접 진입 등록, `scripts/audit-direct-entry.mjs`(496 소스·60 경로문자열·14행·10예외, 음성대조 2종 exit 1 확인), 전체 계약(`--core` 없이 exit 0)을 추가했다. 계약 fixture의 `pdf-editor-convert` slug는 정본의 기존 slug 유지 예외에 맞춰 `pdf-convert`로 정정했다.
 - **U9 검증**: `test:static` 통과(164 문서), `test:unit` 551/551(계약 당시), registry 23, core/QA browser smoke 9 PASS exit 0. 프로덕션 빌드의 광고·분석 요청은 의도된 동작이므로 외부요청 0 단언은 `VITE_LOCAL_QA=1` 빌드에서 분리 검증했다. 번들 5종은 상한 해제 상태로 계측만 기록했다(app +877,294B, U6~U8 귀속).
