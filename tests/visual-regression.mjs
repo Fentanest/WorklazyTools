@@ -100,20 +100,35 @@ try {
   const browserVersions = new Set();
   await runWithConcurrency(captureBatches, concurrency.value, async (batch) => {
     let browser;
-    try {
+    const captureTimeoutMs = readPositiveInteger("VISUAL_CAPTURE_TIMEOUT_MS", 600_000);
+    const relaunchBatchBrowser = async () => {
+      if (browser) {
+        browsers.delete(browser);
+        try { await browser.close(); } catch { /* A wedged browser may not close cleanly. */ }
+      }
       browser = await launchLocaleBrowser(batch.locale);
       browsers.add(browser);
       browserVersions.add(await browser.version());
+    };
+    try {
+      await relaunchBatchBrowser();
       for (const { capture, index } of batch.entries) {
+        const startedAt = Date.now();
+        console.log(`[start] ${capture.name}`);
         try {
-          const result = await captureAndCompare(capture, browser);
+          const result = await runWithTimeout(
+            captureAndCompare(capture, browser),
+            captureTimeoutMs,
+            `${capture.name}: capture exceeded ${captureTimeoutMs}ms without settling`,
+          );
           if (result) failures.set(index, result);
         } catch (error) {
           failures.set(index, error instanceof Error ? error.message : String(error));
+          await relaunchBatchBrowser();
         } finally {
           completedIndexes.add(index);
           completed = completedIndexes.size;
-          console.log(`[${completed}/${captures.length}] ${capture.name}`);
+          console.log(`[${completed}/${captures.length}] ${capture.name} (${Date.now() - startedAt}ms)`);
         }
       }
     } catch (error) {
@@ -228,8 +243,24 @@ function buildCaptureBatches(matrix, maxCapturesPerBrowser) {
   return batches;
 }
 
-async function runWithConcurrency(items, limit, task) {
-  let nextIndex = 0;
+function readPositiveInteger(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer.`);
+  return value;
+}
+
+function runWithTimeout(promise, timeoutMs, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    timer.unref?.();
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function runWithConcurrency(items, limit, task) {  let nextIndex = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (nextIndex < items.length) {
       const index = nextIndex;
@@ -305,8 +336,15 @@ async function captureAndCompare(capture, browser) {
     });
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
-    const captureUrl = new URL(`/${capture.locale}${capture.scenario.path}`, baseUrl);
-    await page.goto(captureUrl.href, { waitUntil: "networkidle0" });
+    // Static localized pages live in directories; without the trailing slash
+    // the preview server falls back to the root landing document instead of
+    // the tool page, so the ready selector can never match.
+    const scenarioPath = capture.scenario.path.endsWith("/") || capture.scenario.path.includes("?")
+      ? capture.scenario.path
+      : `${capture.scenario.path}/`;
+    const captureUrl = new URL(`/${capture.locale}${scenarioPath}`, baseUrl);
+    if (capture.scenario.bypassCsp) await page.setBypassCSP(true);
+    await page.goto(captureUrl.href, { waitUntil: capture.scenario.navigationWaitUntil ?? "networkidle0" });
     await page.waitForSelector(capture.scenario.readySelector, { visible: true });
     await applyScenarioFixture(page, capture.scenario.fixture);
     await performScenarioActions(page, capture.scenario.actions, capture.scenario.fixture);
@@ -315,6 +353,18 @@ async function captureAndCompare(capture, browser) {
     const environment = await page.evaluate(async (fontFamily) => {
       const loadedFaces = document.fonts ? await document.fonts.load(`16px "${fontFamily}"`, "Worklazy 시각 기준") : [];
       if (document.fonts?.ready) await document.fonts.ready;
+      // The sample above resolves as soon as ITS glyphs load; body glyphs may
+      // still stream (4.6MB OTF). A screenshot taken mid-swap renders fallback
+      // metrics and shifts wrapping run to run. Wait for the whole queue.
+      if (document.fonts && document.fonts.status === "loading") {
+        await new Promise((resolve) => {
+          const done = () => {
+            document.fonts.removeEventListener("loadingdone", done);
+            resolve(undefined);
+          };
+          document.fonts.addEventListener("loadingdone", done);
+        });
+      }
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       return {
         language: navigator.language,

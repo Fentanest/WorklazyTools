@@ -78,10 +78,18 @@ const scenario = (definition) => Object.freeze({
   assertSelector: DEFAULT_READY_SELECTOR,
   bottomTargetSelector: null,
   localeNotApplicableReason: null,
+  navigationWaitUntil: "networkidle0",
+  bypassCsp: false,
   ...definition,
   profiles: Object.freeze([...definition.profiles]),
   actions: Object.freeze([...(definition.actions ?? [])].map((action) => Object.freeze(action))),
 });
+
+// The redactor serves a strict document CSP (verified by test:static) and
+// preloads its fixed runtime on mount, so networkidle0 never settles and the
+// stability stylesheet is CSP-blocked. These scenarios navigate on "load"
+// (readySelector, fonts, and settle still gate) and bypass CSP in the TEST
+// browser only; production artifacts are unchanged.
 
 const indexScenarios = [
   scenario({
@@ -117,6 +125,10 @@ const defaultFixtureFor = (toolId) => toolId === "security-tools"
 const initialScenarioFor = (route) => {
   const koreanOnly = route.toolId === "hwp-editor";
   const migrated = migratedToolIds.has(route.toolId);
+  const redactor = route.toolId === "document-redactor";
+  // The redactor shell mounts before its content paints; gating on the shell
+  // alone screenshots an empty container. The file input proves content paint.
+  const contentSelector = redactor ? `[data-tool-page='${route.toolId}'] input[type='file']` : null;
   return scenario({
     scenarioId: `${route.id}--initial`,
     routeId: route.id,
@@ -130,15 +142,18 @@ const initialScenarioFor = (route) => {
       ? "English is product-level N/A. Korean keeps paired desktop/light and mobile/dark coverage; the redirect has its own scenario."
       : "Representative pairwise coverage retains both locales, themes, and viewports without the eight-way full product.",
     fixture: defaultFixtureFor(route.toolId),
-    readySelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
-    assertSelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    readySelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
+    assertSelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
+    ...(redactor ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   });
 };
 
 const bottomScenarioFor = (route) => {
   const koreanOnly = route.toolId === "hwp-editor";
   const migrated = migratedToolIds.has(route.toolId);
+  const redactor = route.toolId === "document-redactor";
+  const contentSelector = redactor ? `[data-tool-page='${route.toolId}'] input[type='file']` : null;
   return scenario({
     scenarioId: `${route.id}--bottom`,
     routeId: route.id,
@@ -153,10 +168,11 @@ const bottomScenarioFor = (route) => {
       : "The clearance contract is mobile-only; KO/dark and EN/light retain both locales and themes while avoiding redundant desktop captures.",
     fixture: defaultFixtureFor(route.toolId),
     actions: [{ type: "scroll-bottom" }],
-    readySelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
-    assertSelector: migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR,
+    readySelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
+    assertSelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
     bottomTargetSelector: migrated ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR,
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
+    ...(redactor ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   });
 };
 
@@ -165,7 +181,9 @@ const interactionDefinitions = Object.freeze({
     stateId: "interaction-manual-mask",
     fixture: {kind: "generated-png", fileName: "visual-redactor.png", width: 320, height: 220},
     actions: [
-      {type: "wait-enabled", selector: "[data-tool-page='document-redactor'] input[type='file']"},
+      // wait-enabled asserts HTMLButtonElement; the file target is an <input>,
+      // so visibility is the correct gate here.
+      {type: "wait", selector: "[data-tool-page='document-redactor'] input[type='file']"},
       {type: "upload", selector: "[data-tool-page='document-redactor'] input[type='file']"},
       {type: "wait-canvas", selector: ".redactor-preview-canvas"},
       {type: "click", selector: ".redactor-toolbar button", elementIndex: 2},
@@ -621,6 +639,7 @@ const interactionScenariosFor = (route) => {
     readySelector: definition.readySelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
     assertSelector: definition.assertSelector,
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
+    ...(route.toolId === "document-redactor" ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   }));
 };
 
