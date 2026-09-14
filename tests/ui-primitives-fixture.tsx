@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Button } from "../src/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../src/components/ui/card";
 import { Progress, ProgressIndicator, ProgressLabel, ProgressTrack, ProgressValue } from "../src/components/ui/progress";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "../src/components/ui/sheet";
 import { Switch } from "../src/components/ui/switch";
 import { Toggle } from "../src/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "../src/components/ui/toggle-group";
@@ -84,6 +85,73 @@ function CardDemo() {
   );
 }
 
+function SheetDemo() {
+  const [open, setOpen] = React.useState(false);
+  const [reject, setReject] = React.useState(false);
+  const [items, setItems] = React.useState(["one", "two", "three"]);
+  const [triggerGone, setTriggerGone] = React.useState(false);
+  const [mounted, setMounted] = React.useState(true);
+  const [nested, setNested] = React.useState(false);
+  const [disabledSecond, setDisabledSecond] = React.useState(false);
+  return (
+    <section data-testid="fixture-sheet">
+      <button data-testid="sheet-mount-toggle" type="button" onClick={() => setMounted((value) => !value)}>mount</button>
+      <button data-testid="sheet-reject-toggle" type="button" onClick={() => setReject((value) => !value)}>reject:{reject ? "on" : "off"}</button>
+      <button data-testid="sheet-trigger-toggle" type="button" onClick={() => setTriggerGone((value) => !value)}>trigger</button>
+      <button data-testid="sheet-disable-second" type="button" onClick={() => setDisabledSecond((value) => !value)}>disable</button>
+      {mounted && (
+        <Sheet
+          open={open}
+          onOpenChange={(next) => {
+            if (!next && reject) return;
+            setOpen(next);
+          }}
+        >
+          {!triggerGone && (
+            <SheetTrigger data-testid="sheet-open-trigger" render={<button type="button">Open sheet</button>} />
+          )}
+          <SheetContent data-testid="sheet-dialog" side="left" aria-label="Demo sheet">
+            <SheetTitle>Demo</SheetTitle>
+            <SheetDescription>Drawer contract fixture.</SheetDescription>
+            <ToggleGroup data-testid="sheet-removal-group" multiple defaultValue={["one"]} aria-label="removable">
+              {items.map((item) => (
+                <ToggleGroupItem
+                  key={item}
+                  data-testid={`sheet-item-${item}`}
+                  value={item}
+                  disabled={item === "two" && disabledSecond}
+                >
+                  Item {item}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {items.map((item) => (
+              <button
+                key={item}
+                data-testid={`sheet-remove-${item}`}
+                type="button"
+                onClick={() => setItems((current) => current.filter((entry) => entry !== item))}
+              >
+                Remove {item}
+              </button>
+            ))}
+            <button data-testid="sheet-open-nested" type="button" onClick={() => setNested(true)}>Nested</button>
+            <SheetClose data-testid="sheet-close-button" render={<button type="button">Close sheet</button>} />
+            {nested && (
+              <Sheet open={nested} onOpenChange={setNested}>
+                <SheetContent data-testid="sheet-nested-dialog" side="right" aria-label="Nested sheet">
+                  <SheetTitle>Nested</SheetTitle>
+                  <SheetClose data-testid="sheet-nested-close" render={<button type="button">Close nested</button>} />
+                </SheetContent>
+              </Sheet>
+            )}
+          </SheetContent>
+        </Sheet>
+      )}
+    </section>
+  );
+}
+
 function App() {
   return (
     <main>
@@ -92,6 +160,7 @@ function App() {
       <ToggleDemo />
       <ProgressDemo />
       <CardDemo />
+      <SheetDemo />
     </main>
   );
 }
