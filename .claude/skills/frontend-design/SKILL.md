@@ -14,10 +14,11 @@ Guidance for visual design when building new UI or reshaping an existing one.
 
 - Use only for new screens, new design reviews, or approved design changes upon explicit user request.
 - Do not automatically redesign existing UI when fixing alignment or bugs.
-- Claude is responsible for design/review; Codex (Sol) is responsible for approved implementation only.
+- Claude remains the coordinator and auditor; Astra handles technical plan review and implementation verification. The assigned implementer (GPT 5.6 Sol or Muse Spark 1.3) handles authorized implementation only.
 - Gemini discovering this skill does not grant it product implementation authority.
+- Parallel implementers follow the ownership, worktree, shared-token/component, and integration rules in PROJECT_RULES.md; this skill does not allow competing edits to shared design files.
 - Prioritize existing themes, design tokens, components, and approved drafts. Do not force new color palettes or fonts.
-- The planning/implementation process described here does not supersede the strict !plan! conditions and explicit user approval required for product implementation.
+- Both `!계획!` and `!계획만!` use the plan review and rebuttal procedure in PROJECT_RULES.md. `!계획만!` stops after canonicalizing the plan and leaves implementation pending until a later explicit implementation instruction. An approved design, resumed session, or fork is not that instruction. The normal 1+1 review checkpoint is not a maximum; substantive additional rebuttal rounds remain allowed under the common policy.
 - If an approved design already exists, do not repeat the aesthetic planning phase.
 - Do not execute unrelated full-screen or full-regression tests under the pretext of design review.
 
@@ -39,7 +40,7 @@ Work in two passes. First, brainstorm a short design plan based on the client's 
 - Layout: a layout concept. Include alignment guidance.
 - Principles: the high-level guidance for the design.
 
-Then review that plan against the brief before building. Present the plan and obtain explicit user approval (!plan! requirement) before writing the code.
+Then review that plan against the brief. Follow the mode and implementation authorization in PROJECT_RULES.md. With `!계획만!`, complete the necessary review/rebuttal and canonical plan, report implementation pending, and stop before building. A later explicit implementation instruction may authorize the existing plan without an unnecessary new planning cycle.
 
 When writing the code, be careful of structuring your CSS selector specificities to avoid classes that cancel each other out.
 
