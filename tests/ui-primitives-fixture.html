@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Primitive Fixture</title>
+    <script>
+      try {
+        var stored = window.localStorage.getItem("worklazy-theme");
+        if (["light-coral", "dark-coral", "light-mint", "dark-mint"].indexOf(stored) !== -1) {
+          document.documentElement.setAttribute("data-theme", stored);
+        } else {
+          document.documentElement.setAttribute("data-theme", "light-coral");
+        }
+      } catch (error) { document.documentElement.setAttribute("data-theme", "light-coral"); }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./ui-primitives-fixture.tsx"></script>
+  </body>
+</html>

@@ -17,13 +17,15 @@ import { Card } from "./ui/card";
 import { Switch } from "./ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
+const PRIMARY_BUTTON_CLASSES =
+  "bg-primary text-primary-foreground shadow-md hover:bg-[color-mix(in_oklch,var(--primary)82%,black)] focus-visible:border-ring focus-visible:ring-ring/30";
 const accentButtonClasses = {
-  green: "bg-green-700 text-white shadow-md shadow-green-700/20 hover:bg-green-800 focus-visible:border-green-700 focus-visible:ring-green-700/30",
-  blue: "bg-blue-700 text-white shadow-md shadow-blue-700/20 hover:bg-blue-800 focus-visible:border-blue-700 focus-visible:ring-blue-700/30",
-  violet: "bg-violet-700 text-white shadow-md shadow-violet-700/20 hover:bg-violet-800 focus-visible:border-violet-700 focus-visible:ring-violet-700/30",
-  orange: "bg-orange-700 text-white shadow-md shadow-orange-700/20 hover:bg-orange-800 focus-visible:border-orange-700 focus-visible:ring-orange-700/30",
-  pink: "bg-pink-700 text-white shadow-md shadow-pink-700/20 hover:bg-pink-800 focus-visible:border-pink-700 focus-visible:ring-pink-700/30",
-  sky: "bg-sky-700 text-white shadow-md shadow-sky-700/20 hover:bg-sky-800 focus-visible:border-sky-700 focus-visible:ring-sky-700/30",
+  green: PRIMARY_BUTTON_CLASSES,
+  blue: PRIMARY_BUTTON_CLASSES,
+  violet: PRIMARY_BUTTON_CLASSES,
+  orange: PRIMARY_BUTTON_CLASSES,
+  pink: PRIMARY_BUTTON_CLASSES,
+  sky: PRIMARY_BUTTON_CLASSES,
 } satisfies Record<ToolAccent, string>;
 
 const accentSoftClasses = {

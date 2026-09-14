@@ -24,7 +24,6 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
 test("OperationProgress keeps W-D stage rows, active spinner, percentages, and progress semantics", () => {
   const source = read("src/components/OperationProgress.tsx");
   const progressSource = read("src/components/ui/progress.tsx");
-  const baseProgressSource = read("node_modules/@base-ui/react/progress/root/ProgressRoot.mjs");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
   // S1 removed two pages; U4-3, U6 and U7 add scoped consumers.
@@ -36,8 +35,13 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   assert.match(source, /<ol[\s\S]*?className="ui-operation-log"[\s\S]*?aria-live="polite"[\s\S]*?key=\{entry\.id\}/);
   assert.match(source, /className="ui-operation-log"[\s\S]*?aria-label=[\s\S]*?tabIndex=\{0\}/);
   assert.match(source, /<Progress[\s\S]*?className="ui-operation-progress-track[\s\S]*?value=\{progress\}[\s\S]*?aria-label=\{message\}/);
-  assert.match(progressSource, /ProgressPrimitive\.Root[\s\S]*?value=\{value\}/);
-  assert.match(baseProgressSource, /'aria-valuenow': clampedValue/);
+  // Product behavior instead of library internals: the self-implemented
+  // progressbar exposes the same value contract without Base UI.
+  assert.match(progressSource, /role="progressbar"/);
+  assert.match(progressSource, /"aria-valuenow": normalized/);
+  assert.match(progressSource, /Math\.min\(max, Math\.max\(min, value\)\)/);
+  assert.match(progressSource, /normalized === null \? \{\} : \{ "aria-valuenow": normalized \}/);
+  assert.ok(!progressSource.includes("@base-ui/react"), "progress must not depend on Base UI");
   for (const declaration of ["progressIndicatorClasses", "progressStateClasses"]) {
     const block = source.match(new RegExp(`const ${declaration} = \\{([\\s\\S]*?)\\n\\} satisfies`))?.[1];
     assert.ok(block, `${declaration} declaration is missing`);
@@ -62,13 +66,15 @@ test("ToolCard keeps a link root, analytics behavior, and all six accent identit
 
 test("LanguageSwitcher keeps its public prop and KO/EN group toggle accessibility", () => {
   const source = read("src/components/LanguageSwitcher.tsx");
-  const toggleGroupSource = read("node_modules/@base-ui/react/toggle-group/ToggleGroup.mjs");
-  const toggleSource = read("node_modules/@base-ui/react/toggle/Toggle.mjs");
+  const toggleGroupSource = read("src/components/ui/toggle-group.tsx");
+  const toggleSource = read("src/components/ui/toggle.tsx");
 
   assert.match(source, /export function LanguageSwitcher\(\{ compact = false \}: \{ compact\?: boolean \}\)/);
   assert.match(source, /<ToggleGroup[\s\S]*?value=\{\[language\]\}[\s\S]*?aria-label=\{t\("language\.switchLabel"\)\}/);
   assert.match(source, /\(\["ko", "en"\] as const\)\.map/);
   assert.match(source, /<ToggleGroupItem[\s\S]*?value=\{item\}[\s\S]*?className=\{language === item \? "ui-selected" : ""\}/);
-  assert.match(toggleGroupSource, /role: 'group'/);
-  assert.match(toggleSource, /'aria-pressed': pressed/);
+  // Product behavior instead of library internals.
+  assert.match(toggleGroupSource, /role: "group"/);
+  assert.match(toggleSource, /"aria-pressed": pressed/);
+  assert.ok(!toggleGroupSource.includes("@base-ui/react") && !toggleSource.includes("@base-ui/react"), "toggle primitives must not depend on Base UI");
 });
