@@ -22,6 +22,7 @@ import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { AppInstallControl } from "./AppInstallControl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
+import { ThemeCycleButton } from "./ThemeCycleButton";
 import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
@@ -112,6 +113,7 @@ export function AppShell() {
             <span className="nav-icon accent-blue"><MessageSquarePlus size={18} /></span>
             <span>{t("footer.feedback")}</span>
           </a>
+          <ThemeCycleButton />
         </div>
       </aside>
 
@@ -121,6 +123,7 @@ export function AppShell() {
         </NavLink>
         <div className="mobile-header-actions">
           <AppInstallControl />
+          <ThemeCycleButton compact />
           <SheetTrigger
             id="mobile-navigation-trigger"
             render={<button className="icon-button" type="button" aria-label={t("navigation.openMenu")} />}

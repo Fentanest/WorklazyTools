@@ -1,5 +1,14 @@
 {
   "language": { "ko": "한국어", "en": "English", "switchLabel": "언어 선택" },
+  "theme": {
+    "switchTo": "테마를 {{theme}}(으)로 변경",
+    "names": {
+      "light-coral": "라이트 코랄",
+      "dark-coral": "다크 코랄",
+      "light-mint": "라이트 민트",
+      "dark-mint": "다크 민트"
+    }
+  },
   "landing": {
     "eyebrow": "WORKLAZY TOOLS",
     "titlePrimary": "Choose your language",
