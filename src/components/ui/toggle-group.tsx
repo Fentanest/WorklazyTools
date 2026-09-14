@@ -139,8 +139,10 @@ function ToggleGroup({
     }
     const order = groupOrder().filter((entry) => entry !== itemValue && itemElements.current.has(entry));
     const wasTabStop = focusValue === itemValue;
+    const removedNode = itemElements.current.get(itemValue);
+    const hadDomFocus = !!removedNode && removedNode.ownerDocument.activeElement === removedNode;
     itemElements.current.delete(itemValue);
-    if (!wasTabStop) return;
+    if (!wasTabStop && !hadDomFocus) return;
     // Keep focus near the removed item: next enabled sibling, else previous.
     const removedIndex = groupOrder().indexOf(itemValue);
     const candidates = [...order.slice(Math.max(0, removedIndex)), ...order.slice(0, Math.max(0, removedIndex))];
