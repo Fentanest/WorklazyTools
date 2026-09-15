@@ -352,6 +352,21 @@ const interactionDefinitions = Object.freeze({
       assertSelector: "[data-testid='document-result-view']",
     }),
     Object.freeze({
+      stateId: "interaction-docx-long-result",
+      actions: [
+        { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 0, fixture: { kind: "base64-file", path: "fixtures/document-result-long-before.docx.b64", fileName: "visual-long-before.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } },
+        { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 1, fixture: { kind: "base64-file", path: "fixtures/document-result-long-after.docx.b64", fileName: "visual-long-after.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } },
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 1 },
+        { type: "click", selector: "[data-testid='document-output-options'] [role='switch']", elementIndex: 2 },
+        { type: "wait-enabled", selector: "[data-testid='document-action-bar'] [data-ui-component='primary-button']" },
+        { type: "click", selector: "[data-testid='document-action-bar'] [data-ui-component='primary-button']" },
+        { type: "wait", selector: "[data-testid='document-result-card']", timeoutMs: 240_000 },
+        { type: "click", selector: "[data-testid='document-view-result']" },
+        { type: "wait", selector: "[data-testid='document-result-view']", timeoutMs: 240_000 },
+      ],
+      assertSelector: "[data-testid='document-result-view']",
+    }),
+    Object.freeze({
       stateId: "interaction-hwp-result",
       actions: [
         { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 0, fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-before.hwp", mimeType: "application/x-hwp" } },

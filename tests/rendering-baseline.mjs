@@ -15,6 +15,7 @@ const runsPerPage = readInteger("RENDER_RUNS", 3);
 const settleTimeMs = readInteger("RENDER_SETTLE_MS", 3_000);
 export const targets = Object.freeze([
   { id: "home", path: "/ko", readySelector: ".home-page .hero" },
+  { id: "document-result", path: "/ko/tools/document-compare", readySelector: "[data-testid='document-action-bar']", scenario: "document-result" },
   { id: "document-compare", path: "/ko/tools/document-compare", readySelector: '[data-tool-page="document-compare"]' },
   { id: "pdf-editor", path: "/ko/tools/pdf-editor", readySelector: '[data-tool-page="pdf-editor"]' },
   { id: "pdf-finish", path: "/ko/tools/pdf-editor/finish", readySelector: "[data-testid='pdf-finish-ready']" },
@@ -123,6 +124,28 @@ export async function runRenderingBaseline() {
             .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/removal/removal-structures.pdf"));
           await page.locator("[data-testid='pdf-finish-structure-summary']").click();
           await page.locator("[data-testid='pdf-finish-link-preservation']").waitFor();
+        }
+        if (target.scenario === "document-result") {
+          const { runEntryFlow, synthesizeDocumentPair } = await import("./document-result-entry.mjs");
+          const files = synthesizeDocumentPair();
+          const toFiles = (entries) => entries.map((entry) => ({ name: entry.name, mimeType: entry.mimeType, buffer: entry.buffer }));
+          await runEntryFlow(page, "ko", { before: toFiles(files.before), after: toFiles(files.after) }, {});
+          // The measured phase is the result mount only: step back to the
+          // entry through the client-side back link (keeps the session), reset
+          // the observers so input-phase metrics do not leak in, then open
+          // pair 1 as the measured navigation.
+          await page.locator("[data-testid='document-result-back']").click();
+          await page.waitForFunction(() => !location.pathname.includes("/results/")
+            && document.querySelectorAll("[data-testid='document-result-card']").length === 2);
+          await page.evaluate(() => {
+            const metrics = globalThis.__worklazyRenderingMetrics;
+            metrics.cls = 0;
+            metrics.lcp = 0;
+            metrics.longTasks = [];
+            metrics.layoutShifts = [];
+          });
+          await page.locator("[data-testid='document-view-result']").nth(0).click();
+          await page.locator("[data-testid='document-result-view']").waitFor({ state: "visible" });
         }
         await page.waitForTimeout(settleTimeMs);
         const sample = await page.evaluate(() => {

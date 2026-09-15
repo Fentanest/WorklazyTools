@@ -83,9 +83,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 265);
-  assert.equal(qaCaptureScenarios.length, 87);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 684);
+  assert.equal(names.length, 266);
+  assert.equal(qaCaptureScenarios.length, 88);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 692);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -113,11 +113,11 @@ test("visual regression scenario manifest covers every available tool and state 
   assert.equal(b2QaScenarios.flatMap(({ profiles }) => profiles).length, 108);
   assert.deepEqual(new Set(b2QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
   const b3QaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["document-compare", "excel-cleaner"].includes(toolId));
-  assert.equal(b3QaScenarios.length, 10);
-  assert.equal(b3QaScenarios.flatMap(({ profiles }) => profiles).length, 80);
+  assert.equal(b3QaScenarios.length, 11);
+  assert.equal(b3QaScenarios.flatMap(({ profiles }) => profiles).length, 88);
   assert.deepEqual(new Set(b3QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
   assert.deepEqual(new Set(b3QaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
-    "interaction-toggle-on", "interaction-toggle-off", "interaction-docx-result", "interaction-hwp-result",
+    "interaction-toggle-on", "interaction-toggle-off", "interaction-docx-result", "interaction-docx-long-result", "interaction-hwp-result",
     "interaction-rule", "interaction-result",
   ]));
   const b4QaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["excel-merger", "excel-compare", "qr-studio"].includes(toolId));
