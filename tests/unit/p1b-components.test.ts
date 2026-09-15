@@ -42,11 +42,14 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   assert.match(progressSource, /Math\.min\(max, Math\.max\(min, value\)\)/);
   assert.match(progressSource, /normalized === null \? \{\} : \{ "aria-valuenow": normalized \}/);
   assert.ok(!progressSource.includes("@base-ui/react"), "progress must not depend on Base UI");
-  for (const declaration of ["progressIndicatorClasses", "progressStateClasses"]) {
-    const block = source.match(new RegExp(`const ${declaration} = \\{([\\s\\S]*?)\\n\\} satisfies`))?.[1];
-    assert.ok(block, `${declaration} declaration is missing`);
-    for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) assert.match(block, new RegExp(`\\n  ${accent}:`));
-  }
+  // W4 single primary: the per-tool indicator/state tables are gone. The bar
+  // uses the shared primary token and the state tile its hue family on every
+  // tool; only the error red is per-state.
+  assert.doesNotMatch(source, /progressIndicatorClasses|progressStateClasses|ui-accent-/);
+  assert.match(source, /const PROGRESS_INDICATOR_CLASS = "bg-primary"/);
+  assert.match(source, /const PROGRESS_STATE_CLASS = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950\/70 dark:text-indigo-300"/);
+  assert.match(source, /status === "error" \? "bg-red-700" : PROGRESS_INDICATOR_CLASS/);
+  assert.doesNotMatch(source, /accent\??: ToolAccent|accent,/);
 });
 
 test("ToolCard keeps a link root, single category accent, h3 title, and capped tags", () => {

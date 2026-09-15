@@ -170,7 +170,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
             <PrimaryButton accent="violet" disabled={!file || loading || operation.status === "running"} loading={operation.status === "running"} onClick={convert}><ScanText size={18} /> {format === "searchable-pdf" ? featureMessage(language, "pdf.messages.PdfConvertPanel.createOcrPdf") : featureMessage(language, "pdf.messages.PdfConvertPanel.convertTo", { p0: format.toUpperCase() })}</PrimaryButton>
             <p className="mx-0.5 mt-3 text-center text-sm leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfConvertPanel.pdfsMayNotContainOriginalParagraphOrTable")}</p>
           </Card>
-          <OperationProgress {...operation} accent="violet" title={featureMessage(language, "pdf.messages.PdfConvertPanel.pdfConversionOcrLog")} />
+          <OperationProgress {...operation} title={featureMessage(language, "pdf.messages.PdfConvertPanel.pdfConversionOcrLog")} />
         </aside>
       </div>
       <PdfError message={error} />

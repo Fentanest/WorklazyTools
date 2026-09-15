@@ -235,7 +235,10 @@ function SheetContent({
   overlayClassName,
   ...props
 }: React.DialogHTMLAttributes<HTMLDialogElement> & {
-  side?: "top" | "right" | "bottom" | "left";
+  // "center" is the W4 centered-modal side for former Base UI dialog
+  // consumers: the dialog becomes a flex centering context and the panel
+  // carries consumer sizing. Drawer sides keep their exact geometry.
+  side?: "top" | "right" | "bottom" | "left" | "center";
   showCloseButton?: boolean;
   overlayClassName?: string;
 }) {
@@ -389,7 +392,9 @@ function SheetContent({
         role="dialog"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="fixed inset-0 z-50 m-0 h-full w-full max-w-none bg-transparent p-0"
+        className={side === "center"
+          ? "fixed inset-0 z-50 m-0 flex h-full w-full max-w-none items-center justify-center bg-transparent p-4"
+          : "fixed inset-0 z-50 m-0 h-full w-full max-w-none bg-transparent p-0"}
         {...dialogProps}
       >
         <SheetOverlay className={overlayClassName} />

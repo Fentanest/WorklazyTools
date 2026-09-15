@@ -728,7 +728,6 @@ export function ExcelMergerPage() {
             progress={operation.progress}
             message={operation.message}
             logs={operation.logs}
-            accent="green"
             title={t("excel.progressTitle")}
           />
         </aside>
@@ -738,7 +737,6 @@ export function ExcelMergerPage() {
 
       {result && (
         <ResultCard
-          accent="green"
           title={t("excel.result.title")}
           message={t("excel.result.message", { fileCount: result.fileCount, sheetCount: result.sheetCount, outputCount: result.outputSheetCount, encrypted: result.encrypted ? t("excel.result.encrypted") : "" })}
         >

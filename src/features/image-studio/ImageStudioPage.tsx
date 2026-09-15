@@ -101,7 +101,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       {visited.has("collage") && <div hidden={tab !== "collage"} data-image-owner="collage"><CollagePanel progress={progress} controllerRef={activeController} active={tab === "collage"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("gif") && <div hidden={tab !== "gif"} data-image-owner="gif"><GifPanel progress={progress} controllerRef={activeController} active={tab === "gif"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
 
-      <OperationProgress {...progress} accent="sky" title={t("image.log")} />
+      <OperationProgress {...progress} title={t("image.log")} />
       {progress.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" variant="secondary" type="button" onClick={() => activeController.current?.abort()}>{t("image.cancel")}</Button></div>}
 
       <ToolGuide

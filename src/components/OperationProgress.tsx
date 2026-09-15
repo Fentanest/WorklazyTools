@@ -4,29 +4,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { OperationLogEntry, OperationStatus } from "../hooks/useOperationProgress";
-import type { ToolAccent } from "../app/toolRegistry";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Progress, ProgressIndicator } from "./ui/progress";
 
-const progressIndicatorClasses = {
-  green: "bg-green-700",
-  blue: "bg-blue-700",
-  violet: "bg-violet-700",
-  orange: "bg-orange-700",
-  pink: "bg-pink-700",
-  sky: "bg-sky-700",
-} satisfies Record<ToolAccent, string>;
-
-const progressStateClasses = {
-  green: "bg-green-50 text-green-700 dark:bg-green-950/70 dark:text-green-300",
-  blue: "bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300",
-  violet: "bg-violet-50 text-violet-700 dark:bg-violet-950/70 dark:text-violet-300",
-  orange: "bg-orange-50 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300",
-  pink: "bg-pink-50 text-pink-700 dark:bg-pink-950/70 dark:text-pink-300",
-  sky: "bg-sky-50 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
-} satisfies Record<ToolAccent, string>;
+// Single primary progress treatment (W4): the bar uses the shared primary
+// token and the state tile its hue family on every tool; only the error state
+// keeps its own semantic red. The indigo tile scale matches the primary hue
+// closely enough to read on light and dark surfaces (the raw primary token
+// is too dark for dark-surface text). Per-tool accent progress is gone.
+const PROGRESS_INDICATOR_CLASS = "bg-primary";
+const PROGRESS_STATE_CLASS = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300";
 
 export function OperationProgress({
   status,
@@ -35,7 +24,6 @@ export function OperationProgress({
   logs,
   activeLogId,
   activeStageKey,
-  accent,
   title,
   compact = false,
 }: {
@@ -45,7 +33,6 @@ export function OperationProgress({
   logs: OperationLogEntry[];
   activeLogId?: number;
   activeStageKey?: string;
-  accent: ToolAccent;
   title?: string;
   compact?: boolean;
 }) {
@@ -73,11 +60,11 @@ export function OperationProgress({
     <Card
       as="section"
       data-ui-component="operation-progress"
-      className={`ui-operation-progress ui-accent-${accent} ui-status-${status}${compact ? " ui-compact" : ""} gap-0 rounded-3xl border p-4 py-4 shadow-md ring-0`}
+      className={`ui-operation-progress ui-status-${status}${compact ? " ui-compact" : ""} gap-0 rounded-3xl border p-4 py-4 shadow-md ring-0`}
       aria-label={displayTitle}
     >
       <div className="ui-operation-progress-heading">
-        <span className={cn("ui-operation-state-icon", status === "error" ? "bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300" : progressStateClasses[accent])}><StateIcon className={status === "running" ? "animate-spin" : ""} size={17} /></span>
+        <span className={cn("ui-operation-state-icon", status === "error" ? "bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300" : PROGRESS_STATE_CLASS)}><StateIcon className={status === "running" ? "animate-spin" : ""} size={17} /></span>
         <div>
           <small className="text-muted-foreground">{displayTitle}</small>
           <strong>{stateLabel}</strong>
@@ -92,7 +79,7 @@ export function OperationProgress({
       >
         <ProgressIndicator
           render={<span />}
-          className={cn("block h-full rounded-full", status === "error" ? "bg-red-700" : progressIndicatorClasses[accent])}
+          className={cn("block h-full rounded-full", status === "error" ? "bg-red-700" : PROGRESS_INDICATOR_CLASS)}
         />
       </Progress>
       <p className="ui-operation-current-message" aria-live="polite">{message}</p>

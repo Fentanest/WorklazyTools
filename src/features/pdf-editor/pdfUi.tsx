@@ -86,7 +86,7 @@ export function PdfDownloadCard({ result, title, compact = false }: { result: Do
     );
   }
   return (
-    <ResultCard accent="violet" title={displayTitle} message={featureMessage(language, "pdf.messages.pdfUi.thisFileWasCreatedInYourBrowserDownload")}>
+    <ResultCard title={displayTitle} message={featureMessage(language, "pdf.messages.pdfUi.thisFileWasCreatedInYourBrowserDownload")}>
       <a className={cn(buttonVariants({ size: "lg" }), "mt-3 w-fit max-w-full rounded-xl bg-violet-700 px-3 font-bold text-white shadow-md shadow-violet-700/20 hover:bg-violet-800")} data-testid="pdf-download" href={result.url} download={result.fileName}>
         <Download size={16} /><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{result.fileName}</span><small className="border-l border-white/25 pl-2 text-xs text-white/75">{formatBytes(result.size)}</small>
       </a>

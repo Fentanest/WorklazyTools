@@ -37,23 +37,10 @@ const accentSoftClasses = {
   sky: "bg-sky-50 text-sky-800 dark:bg-sky-950/70 dark:text-sky-300",
 } satisfies Record<ToolAccent, string>;
 
-const accentDraggingClasses = {
-  green: "border-green-600 bg-green-50/80 dark:border-green-500 dark:bg-green-950/40",
-  blue: "border-blue-600 bg-blue-50/80 dark:border-blue-500 dark:bg-blue-950/40",
-  violet: "border-violet-600 bg-violet-50/80 dark:border-violet-500 dark:bg-violet-950/40",
-  orange: "border-orange-600 bg-orange-50/80 dark:border-orange-500 dark:bg-orange-950/40",
-  pink: "border-pink-600 bg-pink-50/80 dark:border-pink-500 dark:bg-pink-950/40",
-  sky: "border-sky-600 bg-sky-50/80 dark:border-sky-500 dark:bg-sky-950/40",
-} satisfies Record<ToolAccent, string>;
-
-const accentResultClasses = {
-  green: "border-green-200 bg-green-50/70 dark:border-green-900 dark:bg-green-950/35",
-  blue: "border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/35",
-  violet: "border-violet-200 bg-violet-50/70 dark:border-violet-900 dark:bg-violet-950/35",
-  orange: "border-orange-200 bg-orange-50/70 dark:border-orange-900 dark:bg-orange-950/35",
-  pink: "border-pink-200 bg-pink-50/70 dark:border-pink-900 dark:bg-pink-950/35",
-  sky: "border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/35",
-} satisfies Record<ToolAccent, string>;
+// Single primary drag treatment (W4): the drop target border feedback uses
+// the shared primary on every tool. The icon tile above keeps its category
+// tint from accentSoftClasses, which is a badge, not a control.
+const DROP_TARGET_DRAGGING_CLASSES = "border-primary bg-primary/10";
 
 export function PageHeader({ eyebrow, title, description, children }: {
   eyebrow: string;
@@ -214,7 +201,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
         data-ui-part="drop-target"
         className={cn(
           "relative min-h-28 flex-row items-center gap-3 overflow-visible rounded-4xl border border-dashed border-border bg-muted/40 p-4 shadow-none ring-0 transition-[border-color,background-color,transform] max-[620px]:flex-wrap max-[620px]:items-start",
-          dragging && ["scale-[.995]", accentDraggingClasses[accent]],
+          dragging && ["scale-[.995]", DROP_TARGET_DRAGGING_CLASSES],
           disabled && "cursor-not-allowed opacity-50",
         )}
         onDragEnter={(event) => { event.preventDefault(); if (!disabled) setDragging(true); }}
@@ -277,16 +264,15 @@ export function PrimaryButton({ children, disabled = false, loading = false, onC
   );
 }
 
-export function ResultCard({ title, message, accent = "blue", children }: {
+export function ResultCard({ title, message, children }: {
   title: string;
   message: string;
-  accent?: ToolAccent;
   children?: ReactNode;
 }) {
   const { t } = useTranslation("common");
   return (
-    <Card as="section" data-ui-component="result-card" className={cn(`ui-result-card ui-accent-${accent}`, "grid grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-4xl border p-6 shadow-sm ring-0", accentResultClasses[accent])} aria-live="polite">
-      <span className={cn("ui-result-icon rounded-2xl", accentButtonClasses[accent])}><Check size={24} /></span>
+    <Card as="section" data-ui-component="result-card" className={cn("ui-result-card", "grid grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-4xl border border-border bg-card p-6 shadow-sm ring-0")} aria-live="polite">
+      <span className={cn("ui-result-icon rounded-2xl", PRIMARY_BUTTON_CLASSES)}><Check size={24} /></span>
       <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{t("status.complete")}</p><h2 className="font-heading font-medium">{title}</h2><p>{message}</p>{children}</div>
     </Card>
   );

@@ -174,7 +174,7 @@ export function HwpEditorPage() {
           )}
         </SectionCard>
 
-        <OperationProgress {...progress} accent="orange" title="HWP 편집기 로그" />
+        <OperationProgress {...progress} title="HWP 편집기 로그" />
       </>}
 
       <SectionCard step={2} title="문서 편집기" description={documentOpen ? `${documentName || "문서"} · ${pageCount}페이지` : "편집기가 준비되면 파일을 선택하거나 편집기 안의 파일 → 열기를 이용하세요."} className={documentOpen ? "!m-0 flex h-full flex-col !gap-0 overflow-hidden !rounded-2xl !border-0 !bg-card !p-0 shadow-xl [backdrop-filter:none] [&>.ui-section-heading]:hidden max-[820px]:!rounded-none" : "!mt-0 mb-[15px]"}>

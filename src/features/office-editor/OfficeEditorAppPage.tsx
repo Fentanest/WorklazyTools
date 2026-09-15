@@ -219,7 +219,7 @@ export function OfficeEditorAppPage() {
       {state === "downloading" && <Button className="min-h-10 rounded-xl font-bold" type="button" variant="secondary" onClick={() => controllerRef.current?.abort()}>{L("취소", "Cancel")}</Button>}
     </div>
 
-    <div className={cn(focusMode && "mb-2 shrink-0")} hidden={focusMode && state === "editing"} data-testid="office-progress-region"><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} accent="violet" title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
+    <div className={cn(focusMode && "mb-2 shrink-0")} hidden={focusMode && state === "editing"} data-testid="office-progress-region"><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
     {error && <UtilityNotice className={cn("mb-2 shrink-0", !focusMode && "mb-0")} tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div className="flex flex-col"><strong>{L("편집기를 준비하지 못했습니다.", "Could not prepare the editor.")}</strong><span>{error}</span></div></UtilityNotice>}
     <div
       className={cn(

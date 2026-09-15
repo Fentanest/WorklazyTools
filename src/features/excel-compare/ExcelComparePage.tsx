@@ -1,5 +1,5 @@
 import { BlobWriter } from "@zip.js/zip.js";
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { AlertCircle, ArrowLeftRight, ChevronDown, ChevronUp, Download, FileSpreadsheet, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -310,7 +310,7 @@ export function ExcelComparePage() {
 
       <div data-testid="excel-compare-actions"><PrimaryButton accent="green" disabled={!ready} loading={operation.status === "running"} onClick={() => void run()}><FileSpreadsheet size={18} /> {t("features:excelCompare.actions.compare", { count: pairs.length })}</PrimaryButton></div>
       {operation.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" data-testid="excel-compare-cancel" variant="destructive" type="button" onClick={() => controllerRef.current?.abort()}><X size={16} /> {t("features:excelCompare.actions.cancel")}</Button></div>}
-      <OperationProgress {...operation} accent="green" title={t("features:excelCompare.progress.title")} />
+      <OperationProgress {...operation} title={t("features:excelCompare.progress.title")} />
 
       {(completed.length > 0 || failed.length > 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title" onFocusCapture={(event) => scheduleResultFocusVisibility(event.target)}>
         <div><p className="text-xs font-extrabold tracking-[.08em] text-green-700 uppercase dark:text-green-300">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })}</p></div>
@@ -446,23 +446,20 @@ function DuplicateValue({ value, row, side, sideLabel, t }: {
   const preview = `${characters.slice(0, VALUE_PREVIEW_CODE_POINT_LIMIT).join("")}…`;
   return <div className="mt-1 grid gap-2">
     <span className="block whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="excel-duplicate-value-preview">{preview}</span>
-    <DialogPrimitive.Root>
-      <DialogPrimitive.Trigger
+    <Sheet>
+      <SheetTrigger
         render={<Button className="min-h-11 w-fit rounded-xl" data-excel-result-focus="" data-testid="excel-full-value-trigger" data-side={side} variant="secondary" type="button" />}
         aria-label={t("features:excelCompare.results.fullValueButtonLabel", { side: sideLabel, row })}
-      >{t("features:excelCompare.results.fullValue")}</DialogPrimitive.Trigger>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm" />
-        <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 flex max-h-[min(80vh,720px)] w-[min(680px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-3xl border border-border bg-popover p-5 text-popover-foreground shadow-2xl" data-testid="excel-full-value-dialog">
-          <DialogPrimitive.Title className="pr-12 font-heading text-xl font-medium">{t("features:excelCompare.results.fullValue")}</DialogPrimitive.Title>
-          <DialogPrimitive.Description className="mt-1 text-sm text-muted-foreground">{t("features:excelCompare.results.fullValueDescription", { side: sideLabel, row })}</DialogPrimitive.Description>
-          <pre className="mt-4 min-h-16 overflow-auto whitespace-pre-wrap rounded-2xl border border-border bg-muted/40 p-3 font-sans text-sm [overflow-wrap:anywhere]">{value}</pre>
-          <DialogPrimitive.Close render={<Button className="mt-4 min-h-11 self-end rounded-xl" variant="secondary" type="button" />}>
-            {t("common:actions.close")}
-          </DialogPrimitive.Close>
-        </DialogPrimitive.Popup>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+      >{t("features:excelCompare.results.fullValue")}</SheetTrigger>
+      <SheetContent side="center" overlayClassName="bg-black/45 backdrop-blur-sm" className="max-h-[min(80vh,720px)] w-[min(680px,calc(100vw-32px))] flex-col rounded-3xl border border-border bg-popover p-5 text-popover-foreground shadow-2xl" data-testid="excel-full-value-dialog">
+        <SheetTitle className="pr-12 font-heading text-xl font-medium">{t("features:excelCompare.results.fullValue")}</SheetTitle>
+        <SheetDescription className="mt-1">{t("features:excelCompare.results.fullValueDescription", { side: sideLabel, row })}</SheetDescription>
+        <pre className="mt-4 min-h-16 overflow-auto whitespace-pre-wrap rounded-2xl border border-border bg-muted/40 p-3 font-sans text-sm [overflow-wrap:anywhere]">{value}</pre>
+        <SheetClose render={<Button className="mt-4 min-h-11 self-end rounded-xl" variant="secondary" type="button" />}>
+          {t("common:actions.close")}
+        </SheetClose>
+      </SheetContent>
+    </Sheet>
   </div>;
 }
 
