@@ -522,7 +522,7 @@ function keepResultFocusVisible(target: HTMLElement) {
     }
   }
 
-  const headerBottom = fixedChromeBoundary(".mobile-header", "bottom");
+  const headerBottom = fixedChromeBoundary(".app-topbar", "bottom");
   const tabsTop = fixedChromeBoundary(".bottom-tabs", "top");
   const targetRect = target.getBoundingClientRect();
   const verticalDelta = headerBottom !== undefined && targetRect.top < headerBottom + FOCUS_VISIBILITY_GAP

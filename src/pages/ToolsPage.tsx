@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import { type ToolAccent, type ToolCategoryId } from "../app/toolRegistry";
+import { matchTools } from "../app/toolSearch";
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
 import { PageHeader } from "../components/ui";
@@ -21,26 +22,24 @@ export function ToolsPage() {
   const activeCategory: CategoryFilter = isToolCategory(requestedCategory) ? requestedCategory : "all";
   const normalizedQuery = query.trim().toLowerCase();
 
-  const groupedTools = useMemo(() => toolCategories
-    .filter((category) => activeCategory === "all" || category.id === activeCategory)
-    .map((category) => ({
-      category,
-      tools: tools.filter((tool) => {
-        if (tool.category !== category.id) return false;
-        if (!normalizedQuery) return true;
-        const searchText = [
-          tool.title,
-          tool.shortTitle,
-          tool.description,
-          tool.eyebrow,
-          category.label,
-          category.shortLabel,
-          ...tool.highlights.map((highlight) => highlight.label),
-        ].join(" ").toLowerCase();
-        return searchText.includes(normalizedQuery);
-      }),
-    }))
-    .filter((group) => group.tools.length > 0), [activeCategory, normalizedQuery, toolCategories, tools]);
+  const groupedTools = useMemo(() => {
+    const categoryById = new Map(toolCategories.map((category) => [category.id, category]));
+    const matched = new Set(matchTools(
+      tools.map((tool) => ({
+        ...tool,
+        categoryLabel: categoryById.get(tool.category)?.label ?? "",
+        categoryShortLabel: categoryById.get(tool.category)?.shortLabel ?? "",
+      })),
+      query,
+    ).map((tool) => tool.id));
+    return toolCategories
+      .filter((category) => activeCategory === "all" || category.id === activeCategory)
+      .map((category) => ({
+        category,
+        tools: tools.filter((tool) => tool.category === category.id && matched.has(tool.id)),
+      }))
+      .filter((group) => group.tools.length > 0);
+  }, [activeCategory, query, toolCategories, tools]);
 
   const visibleToolCount = groupedTools.reduce((count, group) => count + group.tools.length, 0);
   const selectCategory = (category: CategoryFilter) => {
@@ -55,8 +54,8 @@ export function ToolsPage() {
       <PageHeader eyebrow={t("tools:index.eyebrow")} title={t("tools:index.title")} description={t("tools:index.description")} />
       <div className="tool-search">
         <Search size={19} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("tools:index.searchPlaceholder")} aria-label={t("tools:index.searchLabel")} />
-        {normalizedQuery && <span className="tool-search-count">{t("common:format.tools", { count: visibleToolCount })}</span>}
+        <input data-testid="tools-search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("tools:index.searchPlaceholder")} aria-label={t("tools:index.searchLabel")} />
+        {normalizedQuery && <span data-testid="tools-search-status" role="status" aria-atomic="true" className="tool-search-count">{t("common:format.tools", { count: visibleToolCount })}</span>}
       </div>
 
       <div className="tool-category-filter" aria-label={t("tools:index.categoryLabel")}>
@@ -83,7 +82,7 @@ export function ToolsPage() {
 
       <PrivacyBanner compact />
 
-      <div className="tool-category-groups" aria-live="polite">
+      <div className="tool-category-groups">
         {groupedTools.map(({ category, tools: categoryTools }) => {
           const Icon = category.icon;
           return (

@@ -17,7 +17,7 @@ export function UtilityPage({ toolId, children, className, flush = false }: { to
       data-tool-page={toolId}
       className={cn(
         "mx-auto w-full max-w-[1030px]",
-        !flush && "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(84px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
+        !flush && "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(104px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
         className,
       )}
     >

@@ -4,7 +4,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { localizedPath, storeLanguage, stripLanguagePrefix, type AppLanguage } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+
+const LANGUAGE_OPTIONS = ["ko", "en"] as const;
+
+function normalizeToolPath(pathname: string): string {
+  return pathname.replace(/\/+$/, "") || "/";
+}
 
 export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation("common");
@@ -15,7 +20,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   const selectLanguage = (nextLanguage: AppLanguage) => {
     if (nextLanguage === language) return;
     storeLanguage(nextLanguage);
-    const currentPath = stripLanguagePrefix(location.pathname);
+    const currentPath = normalizeToolPath(stripLanguagePrefix(location.pathname));
     const destination = nextLanguage === "en" && currentPath === "/tools/hwp-editor"
       ? localizedPath(nextLanguage, "/tools")
       : localizedPath(nextLanguage, currentPath);
@@ -24,26 +29,21 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   };
 
   return (
-    <ToggleGroup
+    <select
       data-ui-component="language-switcher"
       className={`ui-language-switcher${compact ? " ui-compact" : ""}`}
-      value={[language]}
-      onValueChange={(nextLanguages) => {
-        const nextLanguage = nextLanguages.at(-1) as AppLanguage | undefined;
-        if (nextLanguage !== undefined) selectLanguage(nextLanguage);
-      }}
       aria-label={t("language.switchLabel")}
-      spacing={0}
+      value={language}
+      onChange={(event) => {
+        const nextLanguage = event.target.value;
+        if (nextLanguage === "ko" || nextLanguage === "en") selectLanguage(nextLanguage);
+      }}
     >
-      {(["ko", "en"] as const).map((item) => (
-        <ToggleGroupItem
-          key={item}
-          value={item}
-          className={language === item ? "ui-selected" : ""}
-        >
+      {LANGUAGE_OPTIONS.map((item) => (
+        <option key={item} value={item}>
           {item.toUpperCase()}
-        </ToggleGroupItem>
+        </option>
       ))}
-    </ToggleGroup>
+    </select>
   );
 }

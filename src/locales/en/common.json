@@ -1,5 +1,10 @@
 {
   "language": { "ko": "한국어", "en": "English", "switchLabel": "Choose language" },
+  "search": {
+    "label": "Search all tools",
+    "placeholder": "Search tools or features",
+    "results": "{{count}} tools"
+  },
   "theme": {
     "switchTo": "Switch to {{theme}}",
     "names": {
@@ -30,7 +35,7 @@
     "chooseTask": "What would you like to do?",
     "close": "Close",
     "primaryLabel": "Primary navigation",
-    "mobileLabel": "Mobile navigation"
+    "mobileLabel": "Mobile navigation", "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar", "github": "GitHub", "toolGroups": {"documents": "Documents", "media": "Media", "other": "Other"}
   },
   "footer": {
     "service": "About the service",

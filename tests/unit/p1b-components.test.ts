@@ -64,15 +64,14 @@ test("ToolCard keeps a link root, analytics behavior, and all six accent identit
   }
 });
 
-test("LanguageSwitcher keeps its public prop and KO/EN group toggle accessibility", () => {
+test("LanguageSwitcher keeps its public prop and KO/EN native select accessibility", () => {
   const source = read("src/components/LanguageSwitcher.tsx");
   const toggleGroupSource = read("src/components/ui/toggle-group.tsx");
   const toggleSource = read("src/components/ui/toggle.tsx");
 
   assert.match(source, /export function LanguageSwitcher\(\{ compact = false \}: \{ compact\?: boolean \}\)/);
-  assert.match(source, /<ToggleGroup[\s\S]*?value=\{\[language\]\}[\s\S]*?aria-label=\{t\("language\.switchLabel"\)\}/);
-  assert.match(source, /\(\["ko", "en"\] as const\)\.map/);
-  assert.match(source, /<ToggleGroupItem[\s\S]*?value=\{item\}[\s\S]*?className=\{language === item \? "ui-selected" : ""\}/);
+  assert.match(source, /<select[\s\S]*?data-ui-component="language-switcher"[\s\S]*?aria-label=\{t\("language\.switchLabel"\)\}[\s\S]*?value=\{language\}/);
+  assert.match(source, /const LANGUAGE_OPTIONS = \["ko", "en"\] as const/);
   // Product behavior instead of library internals.
   assert.match(toggleGroupSource, /role: "group"/);
   assert.match(toggleSource, /"aria-pressed": pressed/);

@@ -386,6 +386,7 @@ function SheetContent({
         ref={dialogRef}
         data-slot="sheet-content"
         data-side={side}
+        role="dialog"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         className="fixed inset-0 z-50 m-0 h-full w-full max-w-none bg-transparent p-0"

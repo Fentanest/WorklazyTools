@@ -46,23 +46,40 @@ try {
   if (!analyticsBootstrap.google || !analyticsBootstrap.naver || analyticsBootstrap.malformedCommands) {
     throw new Error(`Analytics bootstrap is incomplete or uses malformed gtag commands: ${JSON.stringify(analyticsBootstrap)}`);
   }
-  const languageSwitcher = await page.$eval(".ui-language-switcher", (group) => ({
-    tagName: group.tagName,
-    role: group.getAttribute("role"),
-    label: group.getAttribute("aria-label") || "",
-    values: Array.from(group.querySelectorAll("button"), (button) => ({ text: button.textContent?.trim(), pressed: button.getAttribute("aria-pressed") })),
+  const languageSwitcher = await page.$eval("select[data-ui-component='language-switcher']", (select) => ({
+    tagName: select.tagName,
+    name: select.getAttribute("name"),
+    label: select.getAttribute("aria-label") || "",
+    value: select.value,
+    options: Array.from(select.querySelectorAll("option"), (option) => ({ value: option.value, text: option.textContent?.trim() })),
   }));
-  if (languageSwitcher.tagName !== "DIV" || languageSwitcher.role !== "group" || !languageSwitcher.label
-    || JSON.stringify(languageSwitcher.values) !== JSON.stringify([{ text: "KO", pressed: "true" }, { text: "EN", pressed: "false" }])) {
-    throw new Error(`Language switcher accessibility contract failed: ${JSON.stringify(languageSwitcher)}`);
+  if (languageSwitcher.tagName !== "SELECT" || !languageSwitcher.label
+    || languageSwitcher.value !== "ko"
+    || JSON.stringify(languageSwitcher.options) !== JSON.stringify([{ value: "ko", text: "KO" }, { value: "en", text: "EN" }])) {
+    throw new Error(`Language switcher native select contract failed: ${JSON.stringify(languageSwitcher)}`);
   }
-  await page.focus('.desktop-language-switcher .ui-language-switcher button[aria-pressed="true"]');
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("Space");
+  await page.goto(`${koBaseUrl}/tools/hwp-editor/?category=documents&q=pdf#sample`, { waitUntil: "networkidle0" });
+  await page.$eval("select[data-ui-component='language-switcher']", (select) => {
+    select.value = "en";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   await page.waitForFunction(() => location.pathname.startsWith("/en") && document.documentElement.lang === "en"
-    && document.querySelector('.desktop-language-switcher .ui-language-switcher button:nth-child(2)')?.getAttribute("aria-pressed") === "true");
-  await page.click(".desktop-language-switcher .ui-language-switcher button:first-child");
-  await page.waitForFunction(() => location.pathname.startsWith("/ko") && document.documentElement.lang === "ko");
+    && document.querySelector("select[data-ui-component='language-switcher']")?.value === "en");
+  if (!page.url().includes("category=documents") || !page.url().includes("q=pdf") || !page.url().includes("#sample")) {
+    throw new Error(`Language switch lost search or hash: ${page.url()}`);
+  }
+  const storedLanguage = await page.evaluate(() => localStorage.getItem("worklazy_lang"));
+  if (storedLanguage !== "en") throw new Error(`Language storage was not updated: ${storedLanguage}`);
+  // Native select keyboard: focus, ArrowDown to Korean, Enter commits.
+  await page.$eval("select[data-ui-component='language-switcher']", (select) => select.focus());
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => location.pathname.startsWith("/ko") && document.documentElement.lang === "ko"
+    && document.querySelector("select[data-ui-component='language-switcher']")?.value === "ko");
+  if (await page.evaluate(() => document.activeElement?.getAttribute("data-ui-component")) !== "language-switcher") {
+    throw new Error("Language select did not keep focus after keyboard change.");
+  }
+  await page.goto(`${koBaseUrl}`, { waitUntil: "networkidle0" });
   const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
   const homeFeedback = await page.$eval(".hero-feedback", (element) => ({
@@ -97,8 +114,9 @@ try {
   if (toolCards.length !== 23 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== `ui-accent-${card.iconAccent}`)) {
     throw new Error(`Tool card link or accent contract failed: ${JSON.stringify(toolCards)}`);
   }
-  await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
-  await page.waitForFunction(() => window.matchMedia("(prefers-color-scheme: dark)").matches && document.querySelector('.tool-category-filter button[aria-pressed="true"]'));
+  // Manual theme drives color; OS brightness must not (covered by ui-theme-surfaces).
+  await page.locator(".app-topbar .theme-cycle").click();
+  await page.waitForFunction(() => document.documentElement.getAttribute("data-theme") === "dark-coral");
   const darkSelectedContrast = await page.$eval('.tool-category-filter button[aria-pressed="true"]', (element) => {
     const toRgb = (color) => {
       const canvas = document.createElement("canvas");
@@ -123,10 +141,20 @@ try {
   if (darkSelectedContrast < 4.5) throw new Error(`Selected tool category contrast is below 4.5:1 in dark mode: ${darkSelectedContrast}`);
   await page.click('.tool-category-filter button[aria-label^="이미지·영상·오디오"]');
   await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 3);
-  await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
   await page.click(".tool-category-filter button:first-child");
-  await page.type('.tool-search input[aria-label="도구 검색"]', "비밀번호");
+  await page.type("[data-testid='tools-search-input']", "비밀번호");
   await page.waitForFunction(() => document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 1 && document.querySelector(".tool-category-heading h2")?.textContent === "보안·공유");
+  const searchStatus = await page.$eval("[data-testid='tools-search-status']", (element) => ({
+    role: element.getAttribute("role"),
+    atomic: element.getAttribute("aria-atomic"),
+    text: element.textContent || "",
+  }));
+  if (searchStatus.role !== "status" || searchStatus.atomic !== "true" || !searchStatus.text.includes("1")) {
+    throw new Error(`Tool search status contract failed: ${JSON.stringify(searchStatus)}`);
+  }
+  if ((await page.$$eval(".tool-category-groups[aria-live]", (elements) => elements.length)) !== 0) {
+    throw new Error("Tool groups container must not carry a live region.");
+  }
   await page.setViewport({ width: 390, height: 844 });
   await page.goto(`${koBaseUrl}/tools`, { waitUntil: "networkidle0" });
   await page.waitForSelector(".all-tools-grid .ui-tool-card");
@@ -144,15 +172,18 @@ try {
   await page.waitForFunction(() => document.activeElement instanceof HTMLElement && Boolean(document.activeElement.closest('[data-slot="sheet-content"]')));
   await page.waitForFunction(() => {
     const sheet = document.querySelector('[data-slot="sheet-content"]');
+    const panel = sheet?.querySelector('[data-slot="sheet-panel"]');
     const list = sheet?.querySelector('.sheet-tool-list');
-    if (!(sheet instanceof HTMLElement) || !(list instanceof HTMLElement)) return false;
-    const rect = sheet.getBoundingClientRect();
-    return rect.left >= 9 && rect.right <= window.innerWidth - 9 && rect.top >= 9
+    if (!(panel instanceof HTMLElement) || !(list instanceof HTMLElement)) return false;
+    const rect = panel.getBoundingClientRect();
+    return rect.left >= 9 && rect.left <= 11 && rect.top >= 9 && rect.top <= 11
+      && rect.width <= Math.min(360, window.innerWidth - 20) + 1
       && rect.bottom <= window.innerHeight - 9 && list.scrollHeight > list.clientHeight;
   });
   const mobileNavigationSheet = await page.$eval('[data-slot="sheet-content"]', (sheet) => {
-    const rect = sheet.getBoundingClientRect();
-    const style = getComputedStyle(sheet);
+    const panel = sheet.querySelector('[data-slot="sheet-panel"]');
+    const rect = panel instanceof HTMLElement ? panel.getBoundingClientRect() : { top: 0, bottom: 0, left: 0, width: 0 };
+    const style = panel instanceof HTMLElement ? getComputedStyle(panel) : null;
     const list = sheet.querySelector('.sheet-tool-list');
     return {
       role: sheet.getAttribute("role"),
@@ -163,7 +194,7 @@ try {
       links: sheet.querySelectorAll(".sheet-tool-item").length,
       top: rect.top,
       bottom: rect.bottom,
-      overflowY: style.overflowY,
+      overflowY: style?.overflowY,
       listOverflowY: list ? getComputedStyle(list).overflowY : "",
       listScrollable: list instanceof HTMLElement && list.scrollHeight > list.clientHeight,
       pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -171,21 +202,40 @@ try {
   });
   if (mobileNavigationSheet.role !== "dialog" || mobileNavigationSheet.modal !== "true" || mobileNavigationSheet.label !== "바로가기"
     || mobileNavigationSheet.title !== "어떤 작업을 할까요?" || !mobileNavigationSheet.overlay || mobileNavigationSheet.links !== 24
-    || mobileNavigationSheet.top < -1 || mobileNavigationSheet.bottom > 845 || mobileNavigationSheet.overflowY !== "hidden"
-    || mobileNavigationSheet.listOverflowY !== "auto" || !mobileNavigationSheet.listScrollable || mobileNavigationSheet.pageOverflow > 1) {
-    throw new Error(`Mobile navigation sheet semantics or clipping failed: ${JSON.stringify(mobileNavigationSheet)}`);
+    || mobileNavigationSheet.top < -1 || mobileNavigationSheet.bottom > 845 || mobileNavigationSheet.listOverflowY !== "auto" || !mobileNavigationSheet.listScrollable || mobileNavigationSheet.pageOverflow > 1) {
+    throw new Error(`Mobile navigation drawer semantics or clipping failed: ${JSON.stringify(mobileNavigationSheet)}`);
   }
+  const tabbables = await page.$$eval(
+    '[data-slot="sheet-content"] button:not([disabled]), [data-slot="sheet-content"] a[href]',
+    (elements) => elements.filter((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }).map((element) => element.textContent?.trim().slice(0, 24) || element.tagName),
+  );
+  if (tabbables.length < 2) throw new Error("Drawer has no tabbable controls to wrap.");
+  const firstTabbable = await page.evaluate(() => {
+    const dialog = document.querySelector("[data-testid='sheet-dialog'], [data-slot='sheet-content']");
+    const items = [...(dialog?.querySelectorAll("button:not([disabled]), a[href]") ?? [])].filter((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    return (items[0]?.textContent ?? "").trim().slice(0, 24);
+  });
   await page.$eval('[data-slot="sheet-content"] .sheet-tool-item:last-child', (element) => element.focus());
   await page.keyboard.press("Tab");
-  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "닫기");
+  await page.waitForFunction((expected) => (document.activeElement?.textContent ?? "").trim().slice(0, 24) === expected, {}, firstTabbable);
   await page.keyboard.down("Shift");
   await page.keyboard.press("Tab");
   await page.keyboard.up("Shift");
-  await page.waitForFunction(() => document.activeElement?.matches('[data-slot="sheet-content"] .sheet-tool-item:last-child'));
+  await page.waitForFunction(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement && active.closest("[data-slot='sheet-content']") !== null;
+  });
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector('[data-slot="sheet-content"]'));
   await page.waitForFunction(() => document.activeElement?.id === "mobile-navigation-trigger");
-  await page.waitForSelector(".app-install-button");
+  await page.click("#mobile-navigation-trigger");
+  await page.waitForSelector("[data-slot='sheet-content'] .sheet-install .app-install-button");
   await page.evaluate(() => {
     window.__installPromptCalls = 0;
     window.__installChoiceResolved = false;
@@ -199,10 +249,10 @@ try {
     });
     window.dispatchEvent(event);
   });
-  await page.click(".app-install-button");
+  await page.click("[data-slot='sheet-content'] .sheet-install .app-install-button");
   await page.waitForFunction(() => window.__installPromptCalls === 1 && window.__installChoiceResolved);
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.click(".app-install-button");
+  await page.click("[data-slot='sheet-content'] .sheet-install .app-install-button");
   await page.waitForSelector(".install-sheet");
   const installFallback = await page.$eval(".install-sheet", (element) => element.textContent || "");
   if (!installFallback.includes("홈 화면에 추가") || !installFallback.includes("브라우저 메뉴")) throw new Error(`Mobile install fallback is incomplete: ${installFallback}`);

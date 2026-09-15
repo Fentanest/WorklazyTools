@@ -1,5 +1,10 @@
 {
   "language": { "ko": "한국어", "en": "English", "switchLabel": "언어 선택" },
+  "search": {
+    "label": "전체 도구 검색",
+    "placeholder": "도구 이름이나 기능 검색",
+    "results": "{{count}}개의 도구"
+  },
   "theme": {
     "switchTo": "테마를 {{theme}}(으)로 변경",
     "names": {
@@ -30,7 +35,7 @@
     "chooseTask": "어떤 작업을 할까요?",
     "close": "닫기",
     "primaryLabel": "주요 내비게이션",
-    "mobileLabel": "모바일 내비게이션"
+    "mobileLabel": "모바일 내비게이션", "collapseSidebar": "사이드바 접기", "expandSidebar": "사이드바 펼치기", "github": "GitHub", "toolGroups": {"documents": "문서", "media": "미디어", "other": "기타"}
   },
   "footer": {
     "service": "서비스 소개",
