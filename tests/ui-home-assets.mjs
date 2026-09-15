@@ -27,27 +27,30 @@ const EXPECTED = {
     cards: 23, accent: "도구에게", after: " 맡기세요.",
     kicker: "작지만 유용한 업무 도구",
     description: "문서와 데이터부터 이미지·영상까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 고르면 복잡한 작업이 간단해집니다.",
-    trust: "파일 업로드 없음 / 모든 작업은 내 브라우저에서 처리됩니다.",
+    trustTitle: "파일 업로드 없음",
+    trustBody: "모든 작업은 내 브라우저에서 처리됩니다.",
     firstCard: "document-redactor",
   },
   en: {
     cards: 22, accent: "the tedious file work.", after: "",
     kicker: "Small tools for everyday work",
     description: "From documents and data to images and video, no installation or sign-in is needed. Choose a tool to make complex tasks simpler.",
-    trust: "No file uploads / Everything is processed in your browser.",
+    trustTitle: "No file uploads",
+    trustBody: "Everything is processed in your browser.",
     firstCard: "document-redactor",
   },
 };
 
 // Independent copy of the .home-hero slot table (see global.css and
-// HeroPicture.tsx HERO_SIZES): two columns at and above 1440px with a fixed
-// 540px slot, stacked full-width below. Computed from layout width
+// HeroPicture.tsx HERO_SIZES): two equal columns at and above 1440px over a
+// 1520px-capped page, stacked full-width below. Computed from layout width
 // (clientWidth), never 100vw, so a vertical scrollbar cannot shift the
 // expectation. The stacked terms subtract the 2px hero border on top of main
 // padding and hero padding.
 function expectedSlot(clientWidth) {
-  if (clientWidth >= 1440) return 540;
-  if (clientWidth > 1020) return clientWidth - 280 - 64 - 80 - 2;
+  if (clientWidth > 1855) return 700;
+  if (clientWidth >= 1440) return (clientWidth - 456) / 2;
+  if (clientWidth > 1020) return clientWidth - 272 - 64 - 80 - 2;
   if (clientWidth > 820) return clientWidth - 250 - 48 - 80 - 2;
   if (clientWidth > 620) return clientWidth - 32 - 56 - 2;
   return clientWidth - 24 - 44 - 2;
@@ -90,9 +93,21 @@ try {
       assert.ok(heading.replace(/\s+/g, " ").includes(`${expected.accent}${expected.after}`.trim()), `heading accent placement broke: ${heading}`);
       assert.equal(await page.locator(".hero-kicker").innerText(), expected.kicker);
       assert.equal(await page.locator(".home-hero .hero-content > p").innerText(), expected.description);
-      assert.ok((await page.locator(".hero-trust").innerText()).includes(expected.trust));
+      const trust = await page.locator(".hero-trust").evaluate((node) => ({
+        title: node.querySelector("strong")?.textContent ?? "",
+        body: node.querySelector("small")?.textContent ?? "",
+      }));
+      assert.equal(trust.title, expected.trustTitle);
+      assert.equal(trust.body, expected.trustBody);
       const browseHref = await page.locator(".home-hero .primary-link").getAttribute("href");
       assert.ok(browseHref?.endsWith(`/${language}/tools`), `browse CTA target broke: ${browseHref}`);
+      const ctaBox = await page.locator(".home-hero .primary-link").evaluate((node) => {
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        return { wrap: style.whiteSpace, width: Math.round(rect.width) };
+      });
+      assert.equal(ctaBox.wrap, "nowrap", "CTA text must never wrap");
+      assert.ok(ctaBox.width >= 150, `CTA narrower than 150px: ${ctaBox.width}`);
       passed.push(`${language} hero copy, accent span, and CTA`);
 
       // Card census: every catalog tool in registry order plus exactly one
@@ -108,15 +123,16 @@ try {
       assert.ok(firstHref?.includes(expected.firstCard), `registry order broke: ${firstHref}`);
       passed.push(`${language} card census ${expected.cards}+privacy in registry order`);
 
-      // Card DOM contract: single link root, h3 title, at most 3 tags,
-      // decorative nodes hidden from assistive tech.
+      // Card DOM contract: single link root, h3 title, at most 3 plain tags in
+      // the bottom row with the arrow, decorative nodes hidden.
       const cards = await page.locator(".home-tool-grid a.ui-tool-card").evaluateAll((nodes) => nodes.map((card) => ({
         nested: card.querySelectorAll("a, button").length,
         title: card.querySelector(":scope > .ui-tool-card-copy > h3")?.textContent ?? null,
         h2: card.querySelectorAll("h2").length,
-        tags: card.querySelectorAll(":scope > .ui-tool-highlights > span").length,
+        tags: card.querySelectorAll(":scope > .ui-tool-card-foot .ui-tool-highlights > span").length,
+        tagIcons: card.querySelectorAll(":scope > .ui-tool-card-foot .ui-tool-highlights svg").length,
         iconHidden: card.querySelector(":scope > .ui-tool-card-top > span[data-accent]")?.getAttribute("aria-hidden"),
-        arrowHidden: card.querySelector(":scope > .ui-tool-card-top > .ui-card-arrow")?.getAttribute("aria-hidden"),
+        arrowHidden: card.querySelector(":scope > .ui-tool-card-foot > .ui-card-arrow")?.getAttribute("aria-hidden"),
       })));
       assert.equal(cards.length, expected.cards);
       for (const card of cards) {
@@ -124,10 +140,11 @@ try {
         assert.ok(card.title && card.title.length > 0, "card title must be an h3");
         assert.equal(card.h2, 0, "card must not carry an h2 inside section h2 context");
         assert.ok(card.tags >= 1 && card.tags <= 3, `card shows 1-3 tags, got ${card.tags}`);
+        assert.equal(card.tagIcons, 0, "tags stay neutral gray without icons");
         assert.equal(card.iconHidden, "true");
         assert.equal(card.arrowHidden, "true");
       }
-      passed.push(`${language} card DOM: link root, h3, <=3 tags, hidden decor`);
+      passed.push(`${language} card DOM: link root, h3, <=3 plain tags, bottom arrow`);
 
       // Picture: AVIF first, WebP second, decoded img fallback with fixed
       // intrinsic size, one family at a time.
@@ -177,7 +194,7 @@ try {
 
       // Slot-vs-sizes: measured picture slot matches the layout table within
       // 1px, and the picked candidate is never smaller than the slot.
-      for (const width of [1440, 1439, 1280, 1100, 1000, 900, 820, 621, 620, 390]) {
+      for (const width of [1920, 1856, 1855, 1440, 1439, 1100, 820, 621, 620, 390]) {
         await sweep.setViewportSize({ width, height: 900 });
         await sweep.waitForTimeout(250);
         const measured = await sweep.evaluate(() => ({

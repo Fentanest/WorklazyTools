@@ -65,10 +65,12 @@ test("ToolCard keeps a link root, single category accent, h3 title, and capped t
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
   assert.match(source, /toolIconAccentClasses\[accent\]/);
   // Section-h2 context: card titles are h3, visible tags cap at 3 while the
-  // registry keeps the full highlight list, decor stays hidden.
+  // registry keeps the full highlight list, decor stays hidden. Tags are
+  // plain neutral labels (no icons); the arrow lives in the bottom row.
   assert.match(source, /<h3>\{tool\.title\}<\/h3>/);
-  assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(/);
+  assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(\(item\) => <span key=\{item\.label\}>\{item\.label\}<\/span>\)/);
   assert.ok(!/<h2>\{tool\.title\}<\/h2>/.test(source), "card title must not be an h2");
+  assert.match(source, /<div className="ui-tool-card-foot">[\s\S]*?<span className="ui-card-arrow" aria-hidden="true">/);
   for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) {
     assert.match(registry, new RegExp(`accent: "${accent}"`));
     assert.match(accentStyles, new RegExp(`\\n  ${accent}:`));

@@ -23,7 +23,7 @@ export function HomePage() {
           <p>{t("home.description")}</p>
           <div className="hero-actions">
             <Link className="primary-link" to={localizedPath(language, "/tools")}>{t("home.browse")} <ArrowRight size={18} aria-hidden="true" /></Link>
-            <div className="hero-trust"><LockKeyhole size={16} aria-hidden="true" /> {t("home.noUpload")}</div>
+            <div className="hero-trust"><LockKeyhole size={18} aria-hidden="true" /><span><strong>{t("home.noUploadTitle")}</strong><small>{t("home.noUploadBody")}</small></span></div>
           </div>
           <div className="hero-feedback">
             <MessageSquarePlus size={17} aria-hidden="true" />
@@ -36,7 +36,7 @@ export function HomePage() {
 
       <section className="home-section" aria-labelledby="home-tools-heading">
         <div className="mb-[17px] flex items-end justify-between px-[5px]">
-          <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">TOOLS</p><h2 id="home-tools-heading" className="m-0 text-[25px] font-bold tracking-[-.045em]">{t("home.availableTitle")}</h2></div>
+          <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">TOOLS</p><h2 id="home-tools-heading" className="m-0 text-[28px] font-bold tracking-[-.045em]">{t("home.availableTitle")}</h2></div>
           <Link className="flex items-center gap-1.5 text-[15px] font-bold text-primary" to={localizedPath(language, "/tools")}>{t("actions.viewAll")} <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
         <div className="tool-grid home-tool-grid">
@@ -46,7 +46,7 @@ export function HomePage() {
       </section>
 
       <section className="home-how" aria-labelledby="home-how-heading">
-        <div className="mb-[17px] flex items-end justify-between px-[5px]"><div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">HOW IT WORKS</p><h2 id="home-how-heading" className="m-0 text-[25px] font-bold tracking-[-.045em]">{t("home.howTitle")}</h2></div></div>
+        <div className="mb-[17px] flex items-end justify-between px-[5px]"><div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">HOW IT WORKS</p><h2 id="home-how-heading" className="m-0 text-[28px] font-bold tracking-[-.045em]">{t("home.howTitle")}</h2></div></div>
         <div className="home-how-grid">
           <div><span><FileUp size={20} aria-hidden="true" /></span><strong>{t("home.steps.selectTitle")}</strong><p>{t("home.steps.selectDescription")}</p></div>
           <div><span><ScanSearch size={20} aria-hidden="true" /></span><strong>{t("home.steps.processTitle")}</strong><p>{t("home.steps.processDescription")}</p></div>

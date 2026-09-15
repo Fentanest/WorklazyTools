@@ -1,5 +1,5 @@
 import { ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CONSENT_EVENT, getPrivacyConsent, initializeGoogleConsentMode, setPrivacyConsent, type PrivacyConsent } from "./privacyConsent";
@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 export function PrivacyConsentBanner() {
   const { t } = useTranslation("common");
   const [consent, setConsent] = useState<PrivacyConsent>(() => getPrivacyConsent());
+  const bannerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     initializeGoogleConsentMode();
@@ -16,9 +17,30 @@ export function PrivacyConsentBanner() {
     return () => window.removeEventListener(CONSENT_EVENT, handleChange);
   }, []);
 
+  // Reserve content space while the fixed banner is visible so it never
+  // covers tool cards or the footer. The height is measured live because the
+  // banner wraps differently per viewport and language.
+  useEffect(() => {
+    if (consent !== "unset") return;
+    const update = () => {
+      const height = bannerRef.current?.offsetHeight ?? 0;
+      if (height > 0) {
+        document.body.setAttribute("data-consent-banner", "visible");
+        document.documentElement.style.setProperty("--consent-banner-height", `${Math.ceil(height) + 24}px`);
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      document.body.removeAttribute("data-consent-banner");
+      document.documentElement.style.removeProperty("--consent-banner-height");
+    };
+  }, [consent]);
+
   if (consent !== "unset") return null;
   return (
-    <aside className="privacy-consent glass-panel" aria-labelledby="privacy-consent-title">
+    <aside ref={bannerRef} className="privacy-consent glass-panel" aria-labelledby="privacy-consent-title">
       <ShieldCheck size={22} />
       <div>
         <strong id="privacy-consent-title">{t("consent.title")}</strong>

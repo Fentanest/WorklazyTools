@@ -46,17 +46,19 @@ function srcSet(family: HeroFamily, codec: "avif" | "webp"): string {
   return WIDTHS.map((width) => `${assetUrl(family, width, codec)} ${width}w`).join(", ");
 }
 
-// Slot math mirrors .home-hero in global.css exactly: two columns at and
-// above 1440px with a fixed 540px slot (about half of the 1180px page),
-// stacked full-width below (page width minus main padding minus hero padding
-// minus the 2px hero border per breakpoint). A collapsed sidebar only affects
-// stacked widths below 1440px; the fixed desktop slot is unaffected.
+// Slot math mirrors .home-hero in global.css exactly: two equal columns at
+// and above 1440px over a 1520px-capped page, i.e. slot = (min(1520,
+// vw-272-64) - 80 - 40) / 2, capped at 700px; stacked full-width below
+// (page width minus main padding minus hero padding minus the 2px hero
+// border per breakpoint). A collapsed sidebar only affects stacked widths
+// below 1440px; the capped desktop slot is unaffected.
 export const HERO_SIZES =
   "(max-width: 620px) calc(100vw - 24px - 44px - 2px), " +
   "(max-width: 820px) calc(100vw - 32px - 56px - 2px), " +
   "(max-width: 1020px) calc(100vw - 250px - 48px - 80px - 2px), " +
-  "(max-width: 1439px) calc(100vw - 280px - 64px - 80px - 2px), " +
-  "540px";
+  "(max-width: 1439px) calc(100vw - 272px - 64px - 80px - 2px), " +
+  "(max-width: 1855px) calc((100vw - 456px) / 2), " +
+  "700px";
 
 // Decorative brand art: meaningful copy lives in the hero text, the mint
 // asset's Korean brush lettering is source artwork and not translated.

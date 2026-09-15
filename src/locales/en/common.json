@@ -72,7 +72,8 @@
     "titleAfter": "",
     "description": "From documents and data to images and video, no installation or sign-in is needed. Choose a tool to make complex tasks simpler.",
     "browse": "Explore tools",
-    "noUpload": "No file uploads / Everything is processed in your browser.",
+    "noUploadTitle": "No file uploads",
+    "noUploadBody": "Everything is processed in your browser.",
     "feedback": {
       "description": "For feature suggestions or bug reports, please use GitHub Issues.",
       "action": "Open GitHub Issues"

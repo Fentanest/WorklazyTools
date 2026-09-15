@@ -72,7 +72,8 @@
     "titleAfter": " 맡기세요.",
     "description": "문서와 데이터부터 이미지·영상까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 고르면 복잡한 작업이 간단해집니다.",
     "browse": "도구 둘러보기",
-    "noUpload": "파일 업로드 없음 / 모든 작업은 내 브라우저에서 처리됩니다.",
+    "noUploadTitle": "파일 업로드 없음",
+    "noUploadBody": "모든 작업은 내 브라우저에서 처리됩니다.",
     "feedback": {
       "description": "기능 개선 제안이나 버그 문의는 GitHub Issues를 이용해 주세요.",
       "action": "GitHub Issues 열기"
