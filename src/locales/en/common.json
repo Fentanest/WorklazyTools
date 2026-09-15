@@ -64,12 +64,13 @@
     "removed": "Cleared when the tab closes"
   },
   "home": {
-    "kicker": "Small, useful tools for work",
+    "kicker": "Small tools for everyday work",
     "titleBefore": "Let the tools handle",
     "titleAccent": "the tedious file work.",
-    "description": "Handle documents, media, text, calculations and privacy tasks without installing software or signing in. Choose a tool and the work stays in your browser.",
+    "titleAfter": "",
+    "description": "From documents and data to images and video, no installation or sign-in is needed. Choose a tool to make complex tasks simpler.",
     "browse": "Explore tools",
-    "noUpload": "No work-file uploads",
+    "noUpload": "No file uploads / Everything is processed in your browser.",
     "feedback": {
       "description": "For feature suggestions or bug reports, please use GitHub Issues.",
       "action": "Open GitHub Issues"

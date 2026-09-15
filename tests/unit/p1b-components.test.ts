@@ -49,15 +49,23 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   }
 });
 
-test("ToolCard keeps a link root, analytics behavior, and all six accent identities", () => {
+test("ToolCard keeps a link root, single category accent, h3 title, and capped tags", () => {
   const source = read("src/components/ToolCard.tsx");
   const accentStyles = read("src/components/toolAccentStyles.ts");
   const registry = read("src/app/toolRegistry.ts");
 
-  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{tool\.accent\}/);
+  // Single category mapping (W2): the card inherits its category color, never
+  // a per-tool accent. W3 keeps the mapping and adds the card DOM contract.
+  assert.match(source, /const accent = toolCategories\.find\(\(category\) => category\.id === tool\.category\)\?\.accent/);
+  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{accent\}/);
   assert.match(source, /to=\{tool\.path\}/);
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
-  assert.match(source, /toolIconAccentClasses\[tool\.accent\]/);
+  assert.match(source, /toolIconAccentClasses\[accent\]/);
+  // Section-h2 context: card titles are h3, visible tags cap at 3 while the
+  // registry keeps the full highlight list, decor stays hidden.
+  assert.match(source, /<h3>\{tool\.title\}<\/h3>/);
+  assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(/);
+  assert.ok(!/<h2>\{tool\.title\}<\/h2>/.test(source), "card title must not be an h2");
   for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) {
     assert.match(registry, new RegExp(`accent: "${accent}"`));
     assert.match(accentStyles, new RegExp(`\\n  ${accent}:`));

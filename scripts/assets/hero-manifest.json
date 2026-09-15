@@ -1,0 +1,148 @@
+{
+  "encoder": "Version: ImageMagick 6.9.12-98 Q16 x86_64 18038 https://legacy.imagemagick.org",
+  "magickThreadLimit": "1",
+  "webpQuality": "82",
+  "avifQuality": "50",
+  "budgets": {
+    "avifMaxBytes": 51200,
+    "webpMaxBytes": 163840
+  },
+  "sources": {
+    "coral": {
+      "file": "scripts/assets/hero-coral.png",
+      "sha256": "72bede556d4ff35ba28b420d8cdbbeca94cdcb28b1092b26d3d74cff07cc0707",
+      "bytes": 1034201,
+      "width": 1672,
+      "height": 941
+    },
+    "mint": {
+      "file": "scripts/assets/hero-mint.png",
+      "sha256": "08786731f65a900098aa341c1302c214157c73ee80a40e611c836a401941760a",
+      "bytes": 1207181,
+      "width": 1672,
+      "height": 941
+    }
+  },
+  "outputs": [
+    {
+      "family": "coral",
+      "width": 480,
+      "codec": "webp",
+      "file": "public/assets/hero/coral-480.webp",
+      "sha256": "29218ec2ae17b3f0ad67e954a31c7cedaa40559a2aac23a4380b4e39b4db036f",
+      "bytes": 27602,
+      "height": 270,
+      "command": "convert scripts/assets/hero-coral.png -strip -resize 480x -quality 82 public/assets/hero/coral-480.webp"
+    },
+    {
+      "family": "coral",
+      "width": 480,
+      "codec": "avif",
+      "file": "public/assets/hero/coral-480.avif",
+      "sha256": "b588e60195a23673c01d11b812738df3e136e0ee512b601db87e08208d7c45ff",
+      "bytes": 13150,
+      "height": 270,
+      "command": "convert scripts/assets/hero-coral.png -strip -resize 480x -quality 50 public/assets/hero/coral-480.avif"
+    },
+    {
+      "family": "coral",
+      "width": 960,
+      "codec": "webp",
+      "file": "public/assets/hero/coral-960.webp",
+      "sha256": "1829164e44a1339eb5b897d9fd23e3a1a0cc855210d81e0843da1adf187b807b",
+      "bytes": 71546,
+      "height": 540,
+      "command": "convert scripts/assets/hero-coral.png -strip -resize 960x -quality 82 public/assets/hero/coral-960.webp"
+    },
+    {
+      "family": "coral",
+      "width": 960,
+      "codec": "avif",
+      "file": "public/assets/hero/coral-960.avif",
+      "sha256": "cc1e5a7ed5382ec82122466cfee86174df8370f20f7e6c235cfa49a4d5303915",
+      "bytes": 21944,
+      "height": 540,
+      "command": "convert scripts/assets/hero-coral.png -strip -resize 960x -quality 50 public/assets/hero/coral-960.avif"
+    },
+    {
+      "family": "coral",
+      "width": 1440,
+      "codec": "webp",
+      "file": "public/assets/hero/coral-1440.webp",
+      "sha256": "f24af16d9fe6bc4d351904f2afa7634e40778c8543e517dca971187ecda43adb",
+      "bytes": 131898,
+      "height": 810,
+      "command": "convert scripts/assets/hero-coral.png -strip -resize 1440x -quality 82 public/assets/hero/coral-1440.webp"
+    },
+    {
+      "family": "coral",
+      "width": 1440,
+      "codec": "avif",
+      "file": "public/assets/hero/coral-1440.avif",
+      "sha256": "8c183933279ab65eda885eed4cb30ac7f60e11671c6dee4419720b29e820583b",
+      "bytes": 32916,
+      "height": 810,
+      "command": "convert scripts/assets/hero-coral.png -strip -resize 1440x -quality 50 public/assets/hero/coral-1440.avif"
+    },
+    {
+      "family": "mint",
+      "width": 480,
+      "codec": "webp",
+      "file": "public/assets/hero/mint-480.webp",
+      "sha256": "cb33c1ba53dcb1cb5097eb3045b6cca25ad79c7b5845d4d93405d34b4e41e438",
+      "bytes": 30572,
+      "height": 270,
+      "command": "convert scripts/assets/hero-mint.png -strip -resize 480x -quality 82 public/assets/hero/mint-480.webp"
+    },
+    {
+      "family": "mint",
+      "width": 480,
+      "codec": "avif",
+      "file": "public/assets/hero/mint-480.avif",
+      "sha256": "8e4e3717374523e778b651b7ddffe3d25bc4d1a4453707e0cfae432005602a21",
+      "bytes": 13493,
+      "height": 270,
+      "command": "convert scripts/assets/hero-mint.png -strip -resize 480x -quality 50 public/assets/hero/mint-480.avif"
+    },
+    {
+      "family": "mint",
+      "width": 960,
+      "codec": "webp",
+      "file": "public/assets/hero/mint-960.webp",
+      "sha256": "1a8fc8c73c5f4f071875271a635263f7dc57e37b43eff85dc9afa0bde73d097f",
+      "bytes": 79102,
+      "height": 540,
+      "command": "convert scripts/assets/hero-mint.png -strip -resize 960x -quality 82 public/assets/hero/mint-960.webp"
+    },
+    {
+      "family": "mint",
+      "width": 960,
+      "codec": "avif",
+      "file": "public/assets/hero/mint-960.avif",
+      "sha256": "f21288330867dfdb965309b1a6d32e567b4f96449a4c66e4667ec360f19334fb",
+      "bytes": 27319,
+      "height": 540,
+      "command": "convert scripts/assets/hero-mint.png -strip -resize 960x -quality 50 public/assets/hero/mint-960.avif"
+    },
+    {
+      "family": "mint",
+      "width": 1440,
+      "codec": "webp",
+      "file": "public/assets/hero/mint-1440.webp",
+      "sha256": "5d34d20f07046e88079d24d97ff0a01dac4ba11b6d6ea35992f56776e1ef15e8",
+      "bytes": 147218,
+      "height": 810,
+      "command": "convert scripts/assets/hero-mint.png -strip -resize 1440x -quality 82 public/assets/hero/mint-1440.webp"
+    },
+    {
+      "family": "mint",
+      "width": 1440,
+      "codec": "avif",
+      "file": "public/assets/hero/mint-1440.avif",
+      "sha256": "16ed8fa80e532cd1bd5a3cca998875e2f92da655073a4d0eef62350f676f1a12",
+      "bytes": 35641,
+      "height": 810,
+      "command": "convert scripts/assets/hero-mint.png -strip -resize 1440x -quality 50 public/assets/hero/mint-1440.avif"
+    }
+  ]
+}
