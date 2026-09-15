@@ -34,7 +34,7 @@ import {
   WalletCards,
 } from "lucide-react";
 
-export type ToolAccent = "green" | "blue" | "violet" | "orange" | "pink" | "sky";
+export type ToolAccent = "green" | "blue" | "violet" | "orange" | "pink" | "sky" | "coral";
 export type ToolCategoryId = "documents" | "media" | "text-data" | "work" | "security-share";
 
 export interface ToolCategoryDefinition {
@@ -150,7 +150,7 @@ export const tools: ToolDefinition[] = [
     shortTitle: "PDF 도구",
     description: "PDF 페이지를 편집·병합·범위별 추출하고 이미지·DOCX·XLSX·TXT로 변환하거나 브라우저 OCR을 실행합니다.",
     eyebrow: "PDF 편집·변환",
-    accent: "violet",
+    accent: "coral",
     icon: FileStack,
     highlights: [
       { icon: Files, label: "편집·범위 추출" },
@@ -186,7 +186,7 @@ export const tools: ToolDefinition[] = [
     shortTitle: "PDF 비교",
     description: "여러 PDF 파일 쌍의 페이지별 화면과 추출 텍스트 차이를 비교합니다.",
     eyebrow: "PDF 비교",
-    accent: "violet",
+    accent: "coral",
     icon: FileSearch2,
     highlights: [
       { icon: Files, label: "여러 파일 쌍" },
@@ -204,7 +204,7 @@ export const tools: ToolDefinition[] = [
     shortTitle: "HWP 편집",
     description: "HWP·HWPX 문서를 공식 rhwp Studio에서 편집하고 다시 HWP·HWPX로 저장합니다.",
     eyebrow: "한글 문서",
-    accent: "orange",
+    accent: "blue",
     icon: ScanText,
     highlights: [
       { icon: FileText, label: "HWP·HWPX·HML" },
@@ -259,7 +259,7 @@ export const tools: ToolDefinition[] = [
     shortTitle: "오디오 스튜디오",
     description: "오디오 파형에서 구간을 편집하거나 피치·음색을 변조하고 WAV·MP3로 저장합니다.",
     eyebrow: "오디오 편집",
-    accent: "violet",
+    accent: "orange",
     icon: AudioWaveform,
     highlights: [
       { icon: AudioWaveform, label: "고해상도 파형" },

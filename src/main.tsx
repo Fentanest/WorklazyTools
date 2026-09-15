@@ -9,6 +9,7 @@ import "./i18n/config";
 import { registerServiceWorker } from "./pwa/registerServiceWorker";
 import "./styles/tailwind.css";
 import "./styles/global.css";
+import "./styles/worklazy-theme.css";
 
 const basePath = import.meta.env.BASE_URL === "/" ? undefined : import.meta.env.BASE_URL.replace(/\/$/, "");
 installRedactorNavigation();

@@ -25,6 +25,21 @@
       #startup-help button { padding: .75rem 1.25rem; border: 1px solid #555; border-radius: .5rem; color: #222; background: #fff; font: inherit; cursor: pointer; }
     </style>
     <script>
+      // Apply the persisted WorklazyTools theme before first paint to avoid a flash.
+      (function () {
+        try {
+          var stored = localStorage.getItem("worklazy-theme");
+          var theme = stored === "light-coral" || stored === "dark-coral" || stored === "light-mint" || stored === "dark-mint"
+            ? stored
+            : "light-coral";
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme.indexOf("dark-") === 0 ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light-coral";
+        }
+      })();
+    </script>
+    <script>
       (function () {
         var mounted = false;
         var failed = false;

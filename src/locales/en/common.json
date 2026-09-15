@@ -23,6 +23,22 @@
     "primaryLabel": "Primary navigation",
     "mobileLabel": "Mobile navigation"
   },
+  "brand": {
+    "tagline": "Complex work,\nsimpler and smarter."
+  },
+  "topbar": {
+    "searchPlaceholder": "Search tools (e.g. PDF, Excel, merge)",
+    "searchLabel": "Search tools",
+    "toggleSidebar": "Toggle sidebar",
+    "githubLabel": "View on GitHub"
+  },
+  "theme": {
+    "label": "Change theme",
+    "light-coral": "Light Coral",
+    "dark-coral": "Dark Coral",
+    "light-mint": "Light Mint",
+    "dark-mint": "Dark Mint"
+  },
   "footer": {
     "service": "About the service",
     "privacy": "Privacy Policy",
@@ -61,6 +77,9 @@
       "action": "Open GitHub Issues"
     },
     "availableTitle": "Tools you can use now",
+    "availableSubtitle": "Start your most-used tools quickly.",
+    "localTitle": "Safe local processing",
+    "localDescription": "Files are never uploaded to a server. Everything runs safely in your browser.",
     "howTitle": "How your files are handled",
     "steps": {
       "selectTitle": "1. Choose files", "selectDescription": "Choose the documents you want to work with in your browser's file picker.",

@@ -1,5 +1,5 @@
 import { LayoutGrid, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
@@ -15,11 +15,17 @@ type CategoryFilter = "all" | ToolCategoryId;
 export function ToolsPage() {
   const { t } = useTranslation(["tools", "common"]);
   const { toolCategories, tools } = useToolCatalog();
-  const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const requestedCategory = searchParams.get("category");
   const activeCategory: CategoryFilter = isToolCategory(requestedCategory) ? requestedCategory : "all";
   const normalizedQuery = query.trim().toLowerCase();
+
+  // Keep the top-bar search (?q=) and the in-page search box in sync.
+  useEffect(() => {
+    const externalQuery = searchParams.get("q") ?? "";
+    setQuery((current) => (current === externalQuery ? current : externalQuery));
+  }, [searchParams]);
 
   const groupedTools = useMemo(() => toolCategories
     .filter((category) => activeCategory === "all" || category.id === activeCategory)
@@ -113,6 +119,7 @@ const categoryActiveClasses = {
   orange: "bg-orange-700",
   pink: "bg-pink-700",
   sky: "bg-sky-700",
+  coral: "bg-red-700",
 } satisfies Record<ToolAccent, string>;
 
 const categoryIconClasses = {
@@ -122,6 +129,7 @@ const categoryIconClasses = {
   orange: "bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300",
   pink: "bg-pink-100 text-pink-700 dark:bg-pink-950/70 dark:text-pink-300",
   sky: "bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
+  coral: "bg-red-100 text-red-700 dark:bg-red-950/70 dark:text-red-300",
 } satisfies Record<ToolAccent, string>;
 
 function isToolCategory(value: string | null): value is ToolCategoryId {

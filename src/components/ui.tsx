@@ -24,6 +24,7 @@ const accentButtonClasses = {
   orange: "bg-orange-700 text-white shadow-md shadow-orange-700/20 hover:bg-orange-800 focus-visible:border-orange-700 focus-visible:ring-orange-700/30",
   pink: "bg-pink-700 text-white shadow-md shadow-pink-700/20 hover:bg-pink-800 focus-visible:border-pink-700 focus-visible:ring-pink-700/30",
   sky: "bg-sky-700 text-white shadow-md shadow-sky-700/20 hover:bg-sky-800 focus-visible:border-sky-700 focus-visible:ring-sky-700/30",
+  coral: "bg-red-700 text-white shadow-md shadow-red-700/20 hover:bg-red-800 focus-visible:border-red-700 focus-visible:ring-red-700/30",
 } satisfies Record<ToolAccent, string>;
 
 const accentSoftClasses = {
@@ -33,6 +34,7 @@ const accentSoftClasses = {
   orange: "bg-orange-50 text-orange-800 dark:bg-orange-950/70 dark:text-orange-300",
   pink: "bg-pink-50 text-pink-800 dark:bg-pink-950/70 dark:text-pink-300",
   sky: "bg-sky-50 text-sky-800 dark:bg-sky-950/70 dark:text-sky-300",
+  coral: "bg-red-50 text-red-800 dark:bg-red-950/70 dark:text-red-300",
 } satisfies Record<ToolAccent, string>;
 
 const accentDraggingClasses = {
@@ -42,6 +44,7 @@ const accentDraggingClasses = {
   orange: "border-orange-600 bg-orange-50/80 dark:border-orange-500 dark:bg-orange-950/40",
   pink: "border-pink-600 bg-pink-50/80 dark:border-pink-500 dark:bg-pink-950/40",
   sky: "border-sky-600 bg-sky-50/80 dark:border-sky-500 dark:bg-sky-950/40",
+  coral: "border-red-600 bg-red-50/80 dark:border-red-500 dark:bg-red-950/40",
 } satisfies Record<ToolAccent, string>;
 
 const accentResultClasses = {
@@ -51,6 +54,7 @@ const accentResultClasses = {
   orange: "border-orange-200 bg-orange-50/70 dark:border-orange-900 dark:bg-orange-950/35",
   pink: "border-pink-200 bg-pink-50/70 dark:border-pink-900 dark:bg-pink-950/35",
   sky: "border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/35",
+  coral: "border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/35",
 } satisfies Record<ToolAccent, string>;
 
 export function PageHeader({ eyebrow, title, description, children }: {

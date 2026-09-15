@@ -2,21 +2,28 @@ import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
 import {
   CircleHelp,
+  Github,
   Grid2X2,
   Home,
   LockKeyhole,
   Menu,
   MessageSquarePlus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  SunMoon,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { GITHUB_ISSUES_URL } from "../constants/links";
 import { localizedPath, stripLanguagePrefix } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
 import { useToolCatalog } from "../i18n/useToolCatalog";
+import { useWorklazyTheme } from "../hooks/useWorklazyTheme";
+import { cn } from "../lib/utils";
 import { AdSenseLoader } from "./AdSenseLoader";
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { AppInstallControl } from "./AppInstallControl";
@@ -28,6 +35,8 @@ import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { toolIconAccentClasses } from "./toolAccentStyles";
 
+const GITHUB_REPO_URL = GITHUB_ISSUES_URL.replace(/\/issues\/?$/, "");
+
 const primaryNavigation = [
   { to: "/", labelKey: "navigation.home", icon: Home, end: true },
   { to: "/tools", labelKey: "navigation.allTools", icon: Grid2X2, end: true },
@@ -35,9 +44,11 @@ const primaryNavigation = [
 ];
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { t } = useTranslation("common");
   const language = useAppLanguage();
-  const { tools } = useToolCatalog();
+  const { toolCategories, tools } = useToolCatalog();
+  const { theme, cycleTheme } = useWorklazyTheme();
   const location = useLocation();
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
   const redactorActive = isRedactorPath(location.pathname);
@@ -66,9 +77,14 @@ export function AppShell() {
     return () => mobileViewport.removeEventListener("change", closeAtDesktop);
   }, []);
 
+  const toggleSidebar = () => {
+    if (window.matchMedia("(max-width: 820px)").matches) setMobileMenuOpen(true);
+    else setSidebarCollapsed((collapsed) => !collapsed);
+  };
+
   return (
     <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
-      <div className="app-shell">
+      <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed")}>
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} onReady={setVideoControllerReady} onFailed={setVideoIsolationFailed} />
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
@@ -76,8 +92,13 @@ export function AppShell() {
       {!redactorActive && !redactorDocument && <AnalyticsLoader disabled={(videoStudioActive && !videoIsolationDocument) || officeEditorAppActive || excelPreserveActive} />}
       {!redactorActive && !redactorDocument && !videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
-        <NavLink className="brand brand-image-link" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
-          <img className="brand-logo" width={320} height={64} src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
+        <NavLink className="brand-card" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
+          <span className="brand-card-row">
+            <span className="brand-mark" aria-hidden="true">W</span>
+            <span className="brand-name">Worklazy Tools</span>
+          </span>
+          <span className="brand-side-pill">CLIENT SIDE</span>
+          <span className="brand-tagline">{t("brand.tagline")}</span>
         </NavLink>
 
         <nav className="sidebar-nav">
@@ -88,28 +109,34 @@ export function AppShell() {
             ))}
           </div>
 
-          <div className="nav-group">
-            <p className="nav-caption">{t("navigation.tools")}</p>
-            {tools.map((tool) => {
-              const Icon = tool.icon;
-              return (
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`} key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar", language)}>
-                  <span className={`nav-icon accent-${tool.accent}`}><Icon size={18} /></span>
-                  <span>{tool.shortTitle}</span>
-                </NavLink>
-              );
-            })}
-          </div>
+          {toolCategories.map((category) => {
+            const categoryTools = tools.filter((tool) => tool.category === category.id);
+            if (!categoryTools.length) return null;
+            return (
+              <div className="nav-group" key={category.id}>
+                <p className="nav-caption">{category.shortLabel}</p>
+                {categoryTools.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <NavLink className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`} key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar", language)}>
+                      <span className={cn("nav-icon", toolIconAccentClasses[tool.accent])}><Icon size={17} /></span>
+                      <span>{tool.shortTitle}</span>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
-          <div className="local-processing-mini">
+          <div className="sidebar-assure">
             <LockKeyhole size={16} />
             <span>{t("privacy.mini").split("\n").map((line, index) => <span key={line}>{index > 0 && <br />}{line}</span>)}</span>
           </div>
           <NavItem {...primaryNavigation[2]} language={language} label={t(primaryNavigation[2].labelKey as never)} />
           <a className="sidebar-link" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
-            <span className="nav-icon accent-blue"><MessageSquarePlus size={18} /></span>
+            <span className={cn("nav-icon", toolIconAccentClasses.blue)}><MessageSquarePlus size={17} /></span>
             <span>{t("footer.feedback")}</span>
           </a>
         </div>
@@ -131,9 +158,8 @@ export function AppShell() {
         </div>
       </header>
 
-      <nav className="desktop-language-switcher" aria-label={t("language.switchLabel")}><LanguageSwitcher /></nav>
-
       <main className={`main-content${redactorActive ? " redactor-main-content" : ""}`} id="main-content">
+        <TopBar theme={theme} onCycleTheme={cycleTheme} onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
         <RouteErrorBoundary>{(!redactorActive || redactorDocument) && (!videoStudioActive || !import.meta.env.PROD || videoIsolationDocument && videoControllerReady) && <Outlet />}</RouteErrorBoundary>
         {import.meta.env.PROD && videoStudioActive && !videoControllerReady && <div className="tool-route-loading min-h-[420px]" role="status">{videoIsolationFailed ? (language === "ko" ? "비디오 도구를 준비하지 못했습니다. 페이지를 새로고침해 다시 시도하세요." : "The video tool could not start. Refresh the page to try again.") : t("status.loadingTool", { tool: "Video Studio" })}</div>}
         <footer className="global-footer">
@@ -203,6 +229,74 @@ export function AppShell() {
       </SheetContent>
       </div>
     </Sheet>
+  );
+}
+
+function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed }: {
+  theme: string;
+  onCycleTheme: () => void;
+  onToggleSidebar: () => void;
+  sidebarCollapsed: boolean;
+}) {
+  const { t } = useTranslation("common");
+  const language = useAppLanguage();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const CollapseIcon = sidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const submitSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    const next = new URLSearchParams();
+    if (query.trim()) next.set("q", query.trim());
+    const search = next.toString();
+    navigate(`${localizedPath(language, "/tools")}${search ? `?${search}` : ""}`);
+    trackToolOpen("topbar-search", "topbar", language);
+  };
+
+  return (
+    <div className="wl-topbar">
+      <button type="button" className="wl-icon-button" onClick={onToggleSidebar} aria-label={t("topbar.toggleSidebar")}>
+        <CollapseIcon size={20} />
+      </button>
+      <form className="wl-search" role="search" onSubmit={submitSearch}>
+        <Search size={18} aria-hidden="true" />
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("topbar.searchPlaceholder")}
+          aria-label={t("topbar.searchLabel")}
+        />
+        <kbd>Ctrl + K</kbd>
+      </form>
+      <LanguageSwitcher compact />
+      <button
+        type="button"
+        className="wl-icon-button wl-theme-button"
+        onClick={onCycleTheme}
+        aria-label={t("theme.label")}
+        title={`${t("theme.label")}: ${t(`theme.${theme}` as never)}`}
+      >
+        <SunMoon size={19} />
+        <span className="wl-theme-dot" aria-hidden="true" />
+      </button>
+      <a className="wl-icon-button wl-github-button" href={GITHUB_REPO_URL} target="_blank" rel="noreferrer" aria-label={t("topbar.githubLabel")}>
+        <Github size={19} />
+      </a>
+    </div>
   );
 }
 
@@ -280,7 +374,7 @@ function NavItem({ to, label, icon: Icon, language }: NavItemProps) {
   const active = currentPath === to;
   return (
     <Link className={`sidebar-link${active ? " active" : ""}`} aria-current={active ? "page" : undefined} to={localizedPath(language, to)}>
-      <span className="nav-icon"><Icon size={18} /></span>
+      <span className="nav-icon nav-icon-plain"><Icon size={17} /></span>
       <span>{label}</span>
     </Link>
   );

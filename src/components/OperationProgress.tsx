@@ -17,6 +17,7 @@ const progressIndicatorClasses = {
   orange: "bg-orange-700",
   pink: "bg-pink-700",
   sky: "bg-sky-700",
+  coral: "bg-red-700",
 } satisfies Record<ToolAccent, string>;
 
 const progressStateClasses = {
@@ -26,6 +27,7 @@ const progressStateClasses = {
   orange: "bg-orange-50 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300",
   pink: "bg-pink-50 text-pink-700 dark:bg-pink-950/70 dark:text-pink-300",
   sky: "bg-sky-50 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
+  coral: "bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300",
 } satisfies Record<ToolAccent, string>;
 
 export function OperationProgress({
