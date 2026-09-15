@@ -114,6 +114,9 @@ export const pages = Object.freeze([
   { id: "hwp-editor", path: "/ko/tools/hwp-editor", readySelector: 'iframe[title="rhwp HWP 문서 편집기"]' },
   { id: "home-mobile-ko", path: "/ko", viewport: { width: 412, height: 839 } },
   { id: "tools-mobile-ko", path: "/ko/tools", viewport: { width: 412, height: 839 } },
+  { id: "document-result-ko-1920-light", path: "/ko/tools/document-compare", viewport: { width: 1920, height: 1080 }, colorScheme: "light", locale: "ko-KR", setup: "document-result", readySelector: "[data-testid='document-result-view']" },
+  { id: "document-result-en-320-light", path: "/en/tools/document-compare", viewport: { width: 320, height: 844 }, colorScheme: "light", locale: "en-US", setup: "document-result", readySelector: "[data-testid='document-result-view']" },
+  { id: "document-result-en-1920-dark", path: "/en/tools/document-compare", viewport: { width: 1920, height: 1080 }, colorScheme: "dark", locale: "en-US", setup: "document-result", readySelector: "[data-testid='document-result-view']" },
   ...["ko", "en"].flatMap((language) => ["light", "dark"].flatMap((colorScheme) => [
     { id: `excel-compare-duplicates-${language}-${colorScheme}-desktop`, path: `/${language}/tools/excel-compare`, language, colorScheme, setup: "excel-duplicates" },
     { id: `excel-compare-duplicates-${language}-${colorScheme}-mobile`, path: `/${language}/tools/excel-compare`, language, colorScheme, viewport: { width: 390, height: 844 }, setup: "excel-duplicates" },
@@ -350,10 +353,18 @@ export async function runAccessibilityAudit() {
         locale: target.locale ?? (target.language === "en" ? "en-US" : "ko-KR"),
         timezoneId: "Asia/Seoul",
       });
-      await context.addInitScript((language) => {
+      await context.addInitScript(({ language, colorScheme }) => {
         localStorage.setItem("worklazy_privacy_consent", "denied");
         if (language) localStorage.setItem("worklazy_lang", language);
-      }, target.language);
+        // W5 shared theme fixture: sparse colorScheme resolves to the default
+        // family (dark -> dark-coral, else light-coral). Only the theme key is
+        // seeded; locale and consent stay under this harness's control.
+        try {
+          window.localStorage.setItem("worklazy-theme", colorScheme === "dark" ? "dark-coral" : "light-coral");
+        } catch {
+          // Storage blocked: assertThemeFixture reports the mismatch.
+        }
+      }, { language: target.language, colorScheme: target.colorScheme ?? "light" });
 
       const page = await context.newPage();
       let displayAssetRequests = 0;
@@ -370,6 +381,7 @@ export async function runAccessibilityAudit() {
       });
       await page.goto(new URL(target.path, baseUrl).href, { waitUntil: "networkidle" });
       if (target.setup === "excel-duplicates") await prepareExcelDuplicateResult(page);
+      if (target.setup === "document-result") await prepareDocumentResult(page, target);
       if (target.readySelector) await page.locator(target.readySelector).waitFor({ state: "visible" });
       await page.addStyleTag({
         content: "*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important;caret-color:transparent!important;scroll-behavior:auto!important}",
@@ -454,6 +466,11 @@ export async function runAccessibilityAudit() {
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       });
       if (target.id.startsWith("pdf-stamp")) stampContrast = await measureStampNoticeContrast(page);
+      const { assertThemeFixture } = await import("./ui-theme-fixture.mjs");
+      await assertThemeFixture(page, {
+        theme: target.colorScheme ?? "light",
+        locale: target.locale ?? (target.path.startsWith("/en") ? "en-US" : "ko-KR"),
+      });
       const builder = new AxeBuilder({ page });
       if (target.ownedSelector) builder.include(target.ownedSelector);
       const exceptions = accessibilityExceptions.filter(({ pageId }) => pageId === target.id);
@@ -625,6 +642,23 @@ export async function runAccessibilityAudit() {
   }
 }
 
+async function prepareDocumentResult(page, target) {
+  const { runEntryFlow, synthesizeDocumentPair } = await import("./document-result-entry.mjs");
+  const language = target.language ?? (target.path.startsWith("/en") ? "en" : "ko");
+  const files = synthesizeDocumentPair();
+  const toFiles = (entries) => entries.map((entry) => ({ name: entry.name, mimeType: entry.mimeType, buffer: entry.buffer }));
+  // The audit lands on the entry page; run the shared entry flow, then leave
+  // the audit on pair 1's result (the change-carrying state) via client-side
+  // navigation so the in-memory session survives.
+  await runEntryFlow(page, language, { before: toFiles(files.before), after: toFiles(files.after) }, {});
+  await page.locator("[data-testid='document-result-back']").click();
+  await page.waitForFunction(() => !location.pathname.includes("/results/")
+    && document.querySelectorAll("[data-testid='document-result-card']").length === 2, null, { timeout: 30_000 });
+  await page.locator("[data-testid='document-view-result']").nth(0).click();
+  await page.waitForFunction(() => location.pathname.includes("/results/1")
+    && document.querySelector("[data-testid='document-result-view']"), null, { timeout: 30_000 });
+}
+
 async function prepareExcelDuplicateResult(page) {
   const input = page.locator('[data-testid="excel-compare-page"] input[type="file"]');
   await input.setInputFiles({
@@ -724,6 +758,11 @@ export async function measureTextPixelContrast(locator, target, backgroundPath) 
   await locator.evaluate((element) => element.style.setProperty("color", "transparent", "important"));
   let screenshot;
   try {
+    await locator.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    // Center the target first: axe leaves the page scrolled anywhere, and a
+    // target resting behind a fixed overlay (consent banner, sticky topbar)
+    // would contaminate the background sample with overlay pixels.
+    await locator.evaluate((element) => element.scrollIntoView({ block: "center", inline: "center" }));
     await locator.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     screenshot = await locator.screenshot({ animations: "disabled" });
   } finally {

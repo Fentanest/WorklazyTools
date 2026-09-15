@@ -1033,7 +1033,7 @@ async function testWordCompare(page, fixtures, tempDir) {
   if (await page.$$('[data-testid="document-page-view"] [role="columnheader"]').then((items) => items.length) !== 2) {
     throw new Error("Full before/after document page columns were not rendered.");
   }
-  const documentFlow = await page.$$eval('[data-testid="document-page-view"] [role="row"]', (items) => items.map((item) => ({
+  const documentFlow = await page.$$eval('[data-testid="document-page-view"] [role="row"][data-document-kind]', (items) => items.map((item) => ({
     table: item.hasAttribute("data-table-block"),
     blockCount: item.querySelectorAll("[role='cell']").length,
     height: Math.round(item.getBoundingClientRect().height),
@@ -1058,24 +1058,24 @@ async function testWordCompare(page, fixtures, tempDir) {
   if (!await page.$('[data-diff-kind="deleted"]') || !await page.$('[data-diff-kind="added"]')) {
     throw new Error("Inline deleted/inserted highlights were not rendered in the web comparison.");
   }
-  const firstComparedParagraph = await page.$eval('[data-testid="document-page-view"] [role="row"] p', (element) => element.textContent || "");
+  const firstComparedParagraph = await page.$eval('[data-testid="document-page-view"] [role="row"][data-document-kind] p', (element) => element.textContent || "");
   if (!firstComparedParagraph.startsWith("1. ")) throw new Error(`Word list label was not rendered in the web view: ${firstComparedParagraph}`);
   const hasCommentTab = await page.$$eval('[data-testid="document-result-toolbar"] [data-ui-component="segmented-control"] button', (buttons) => buttons.some((button) => button.textContent === "메모"));
   if (hasCommentTab) throw new Error("The standalone comment tab was not removed.");
-  await page.waitForSelector('[data-testid="document-page-view"] [role="row"] [data-comment-kind]');
-  const commentParagraphLocations = await page.$$eval('[data-testid="document-page-view"] [role="row"]:has([data-comment-kind]) [data-testid="document-block-meta"] small', (items) => items.map((item) => item.textContent || ""));
+  await page.waitForSelector('[data-testid="document-page-view"] [role="row"][data-document-kind] [data-comment-kind]');
+  const commentParagraphLocations = await page.$$eval('[data-testid="document-page-view"] [role="row"][data-document-kind]:has([data-comment-kind]) [data-testid="document-block-meta"] small', (items) => items.map((item) => item.textContent || ""));
   if (!commentParagraphLocations.every((location) => location.startsWith("본문 2번째 문단"))) {
     throw new Error(`Comments were not shown at their anchored paragraph: ${commentParagraphLocations.join(", ")}`);
   }
 
-  const allContentRowCount = await page.$$('[data-testid="document-page-view"] [role="row"]').then((items) => items.length);
+  const allContentRowCount = await page.$$('[data-testid="document-page-view"] [role="row"][data-document-kind]').then((items) => items.length);
   const fullContentToggle = await page.$('[data-testid="document-result-toolbar"] button[aria-label="내용 전체"]');
   if (!fullContentToggle) throw new Error("Full-content toggle was not rendered on the document tab.");
   await fullContentToggle.evaluate((button) => button.click());
-  await page.waitForFunction((previousCount) => document.querySelectorAll("[data-testid='document-page-view'] [role='row']").length < previousCount, {}, allContentRowCount);
-  const filteredKinds = await page.$$eval('[data-testid="document-page-view"] [role="row"]', (items) => items.map((item) => ({ kind: item.getAttribute("data-document-kind"), table: item.hasAttribute("data-table-block") })));
+  await page.waitForFunction((previousCount) => document.querySelectorAll("[data-testid='document-page-view'] [role='row'][data-document-kind]").length < previousCount, {}, allContentRowCount);
+  const filteredKinds = await page.$$eval('[data-testid="document-page-view"] [role="row"][data-document-kind]', (items) => items.map((item) => ({ kind: item.getAttribute("data-document-kind"), table: item.hasAttribute("data-table-block") })));
   if (filteredKinds.some(({ kind }) => kind === "unchanged")) throw new Error("Unchanged paragraphs remained after disabling full content.");
-  if (!await page.$('[data-testid="document-page-view"] [role="row"] [data-comment-kind]')) throw new Error("A changed paragraph's comment was hidden by the change filter.");
+  if (!await page.$('[data-testid="document-page-view"] [role="row"][data-document-kind] [data-comment-kind]')) throw new Error("A changed paragraph's comment was hidden by the change filter.");
   if (!filteredKinds.some(({ table }) => table)) throw new Error("The changed table was hidden by the change filter.");
   const backHref = await page.$eval('[data-testid="document-result-back"]', (link) => link.getAttribute("href"));
   await page.$eval('[data-testid="document-result-back"]', (link) => {

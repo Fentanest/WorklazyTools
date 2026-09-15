@@ -157,7 +157,7 @@ export function HwpEditorPage() {
     <UtilityPage
       toolId="hwp-editor"
       flush={documentOpen}
-      className={documentOpen ? "fixed inset-y-0 right-0 left-[280px] z-20 m-0 flex h-dvh w-auto max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[1020px]:left-[250px] max-[820px]:inset-x-0 max-[820px]:top-[72px] max-[820px]:z-[60] max-[820px]:h-[calc(100dvh-72px)] max-[820px]:p-0 max-[820px]:[&~.global-footer]:hidden" : undefined}
+      className={documentOpen ? "fixed inset-y-0 right-0 left-[280px] z-20 m-0 flex h-dvh w-auto max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[1020px]:left-[250px] max-[820px]:inset-x-0 max-[820px]:top-[var(--wl-header-height)] max-[820px]:z-[60] max-[820px]:h-[calc(100dvh-var(--wl-header-height))] max-[820px]:p-0 max-[820px]:[&~.global-footer]:hidden" : undefined}
     >
       {!documentOpen && <>
         <PageHeader eyebrow="HWP EDITOR" title="HWP·HWPX 문서 편집" description="공식 rhwp Studio의 메뉴·도구 모음·서식·표 편집 기능을 그대로 사용하고 다시 HWP·HWPX로 저장하세요.">
@@ -174,7 +174,7 @@ export function HwpEditorPage() {
           )}
         </SectionCard>
 
-        <OperationProgress {...progress} accent="orange" title="HWP 편집기 로그" />
+        <OperationProgress {...progress} title="HWP 편집기 로그" />
       </>}
 
       <SectionCard step={2} title="문서 편집기" description={documentOpen ? `${documentName || "문서"} · ${pageCount}페이지` : "편집기가 준비되면 파일을 선택하거나 편집기 안의 파일 → 열기를 이용하세요."} className={documentOpen ? "!m-0 flex h-full flex-col !gap-0 overflow-hidden !rounded-2xl !border-0 !bg-card !p-0 shadow-xl [backdrop-filter:none] [&>.ui-section-heading]:hidden max-[820px]:!rounded-none" : "!mt-0 mb-[15px]"}>

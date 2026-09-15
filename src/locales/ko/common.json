@@ -1,5 +1,19 @@
 {
   "language": { "ko": "한국어", "en": "English", "switchLabel": "언어 선택" },
+  "search": {
+    "label": "전체 도구 검색",
+    "placeholder": "도구 이름이나 기능 검색",
+    "results": "{{count}}개의 도구"
+  },
+  "theme": {
+    "switchTo": "테마를 {{theme}}(으)로 변경",
+    "names": {
+      "light-coral": "라이트 코랄",
+      "dark-coral": "다크 코랄",
+      "light-mint": "라이트 민트",
+      "dark-mint": "다크 민트"
+    }
+  },
   "landing": {
     "eyebrow": "WORKLAZY TOOLS",
     "titlePrimary": "Choose your language",
@@ -21,7 +35,7 @@
     "chooseTask": "어떤 작업을 할까요?",
     "close": "닫기",
     "primaryLabel": "주요 내비게이션",
-    "mobileLabel": "모바일 내비게이션"
+    "mobileLabel": "모바일 내비게이션", "collapseSidebar": "사이드바 접기", "expandSidebar": "사이드바 펼치기", "github": "GitHub", "toolGroups": {"documents": "문서", "media": "미디어", "other": "기타"}
   },
   "footer": {
     "service": "서비스 소개",
@@ -52,10 +66,11 @@
   "home": {
     "kicker": "작지만 유용한 업무 도구",
     "titleBefore": "귀찮은 파일 작업은",
-    "titleAccent": "도구에게 맡기세요.",
-    "description": "문서와 미디어부터 텍스트·계산·보안 도구까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 고르면 나머지는 브라우저 안에서 안전하게 처리됩니다.",
+    "titleAccent": "도구에게",
+    "titleAfter": " 맡기세요.",
+    "description": "문서와 데이터부터 이미지·영상까지, 설치도 로그인도 필요 없습니다. 필요한 도구를 고르면 복잡한 작업이 간단해집니다.",
     "browse": "도구 둘러보기",
-    "noUpload": "작업 파일 업로드 없음",
+    "noUpload": "파일 업로드 없음 / 모든 작업은 내 브라우저에서 처리됩니다.",
     "feedback": {
       "description": "기능 개선 제안이나 버그 문의는 GitHub Issues를 이용해 주세요.",
       "action": "GitHub Issues 열기"

@@ -460,7 +460,7 @@ export function QrBulkPanel() {
       </SectionCard>
     </>}
 
-    <OperationProgress {...operation} accent="blue" title={t("features:qr.bulk.progress.title")} />
+    <OperationProgress {...operation} title={t("features:qr.bulk.progress.title")} />
 
     {(results.length > 0 || failures.length > 0) && <div data-testid="qr-bulk-results"><SectionCard title={t("features:qr.bulk.results.title")} description={t("features:qr.bulk.results.summary", { success: results.length, failed: failures.length })}>
       <div className="flex flex-wrap gap-3">

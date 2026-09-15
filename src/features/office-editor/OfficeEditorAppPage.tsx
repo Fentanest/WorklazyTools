@@ -192,7 +192,7 @@ export function OfficeEditorAppPage() {
       "mx-auto w-full max-w-[1440px]",
       focusMode
         ? "fixed inset-y-0 right-0 left-[280px] z-20 m-0 flex h-dvh w-auto max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[1020px]:left-[250px] max-[820px]:inset-0 max-[820px]:z-[60] max-[820px]:p-0"
-        : "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(84px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
+        : "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(104px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
     )}
     onDragEnter={(event) => { if (event.dataTransfer.types.includes("Files") && !busy) { event.preventDefault(); setDragging(true); } }}
     onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = busy ? "none" : "copy"; } }}
@@ -219,7 +219,7 @@ export function OfficeEditorAppPage() {
       {state === "downloading" && <Button className="min-h-10 rounded-xl font-bold" type="button" variant="secondary" onClick={() => controllerRef.current?.abort()}>{L("취소", "Cancel")}</Button>}
     </div>
 
-    <div className={cn(focusMode && "mb-2 shrink-0")} hidden={focusMode && state === "editing"} data-testid="office-progress-region"><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} accent="violet" title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
+    <div className={cn(focusMode && "mb-2 shrink-0")} hidden={focusMode && state === "editing"} data-testid="office-progress-region"><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
     {error && <UtilityNotice className={cn("mb-2 shrink-0", !focusMode && "mb-0")} tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div className="flex flex-col"><strong>{L("편집기를 준비하지 못했습니다.", "Could not prepare the editor.")}</strong><span>{error}</span></div></UtilityNotice>}
     <div
       className={cn(

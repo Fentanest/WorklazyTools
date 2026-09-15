@@ -24,7 +24,6 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
 test("OperationProgress keeps W-D stage rows, active spinner, percentages, and progress semantics", () => {
   const source = read("src/components/OperationProgress.tsx");
   const progressSource = read("src/components/ui/progress.tsx");
-  const baseProgressSource = read("node_modules/@base-ui/react/progress/root/ProgressRoot.mjs");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
   // S1 removed two pages; U4-3, U6 and U7 add scoped consumers.
@@ -36,39 +35,56 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   assert.match(source, /<ol[\s\S]*?className="ui-operation-log"[\s\S]*?aria-live="polite"[\s\S]*?key=\{entry\.id\}/);
   assert.match(source, /className="ui-operation-log"[\s\S]*?aria-label=[\s\S]*?tabIndex=\{0\}/);
   assert.match(source, /<Progress[\s\S]*?className="ui-operation-progress-track[\s\S]*?value=\{progress\}[\s\S]*?aria-label=\{message\}/);
-  assert.match(progressSource, /ProgressPrimitive\.Root[\s\S]*?value=\{value\}/);
-  assert.match(baseProgressSource, /'aria-valuenow': clampedValue/);
-  for (const declaration of ["progressIndicatorClasses", "progressStateClasses"]) {
-    const block = source.match(new RegExp(`const ${declaration} = \\{([\\s\\S]*?)\\n\\} satisfies`))?.[1];
-    assert.ok(block, `${declaration} declaration is missing`);
-    for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) assert.match(block, new RegExp(`\\n  ${accent}:`));
-  }
+  // Product behavior instead of library internals: the self-implemented
+  // progressbar exposes the same value contract without Base UI.
+  assert.match(progressSource, /role="progressbar"/);
+  assert.match(progressSource, /"aria-valuenow": normalized/);
+  assert.match(progressSource, /Math\.min\(max, Math\.max\(min, value\)\)/);
+  assert.match(progressSource, /normalized === null \? \{\} : \{ "aria-valuenow": normalized \}/);
+  assert.ok(!progressSource.includes("@base-ui/react"), "progress must not depend on Base UI");
+  // W4 single primary: the per-tool indicator/state tables are gone. The bar
+  // uses the shared primary token and the state tile its hue family on every
+  // tool; only the error red is per-state.
+  assert.doesNotMatch(source, /progressIndicatorClasses|progressStateClasses|ui-accent-/);
+  assert.match(source, /const PROGRESS_INDICATOR_CLASS = "bg-primary"/);
+  assert.match(source, /const PROGRESS_STATE_CLASS = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950\/70 dark:text-indigo-300"/);
+  assert.match(source, /status === "error" \? "bg-red-700" : PROGRESS_INDICATOR_CLASS/);
+  assert.doesNotMatch(source, /accent\??: ToolAccent|accent,/);
 });
 
-test("ToolCard keeps a link root, analytics behavior, and all six accent identities", () => {
+test("ToolCard keeps a link root, single category accent, h3 title, and capped tags", () => {
   const source = read("src/components/ToolCard.tsx");
   const accentStyles = read("src/components/toolAccentStyles.ts");
   const registry = read("src/app/toolRegistry.ts");
 
-  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{tool\.accent\}/);
+  // Single category mapping (W2): the card inherits its category color, never
+  // a per-tool accent. W3 keeps the mapping and adds the card DOM contract.
+  assert.match(source, /const accent = toolCategories\.find\(\(category\) => category\.id === tool\.category\)\?\.accent/);
+  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{accent\}/);
   assert.match(source, /to=\{tool\.path\}/);
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
-  assert.match(source, /toolIconAccentClasses\[tool\.accent\]/);
+  assert.match(source, /toolIconAccentClasses\[accent\]/);
+  // Section-h2 context: card titles are h3, visible tags cap at 3 while the
+  // registry keeps the full highlight list, decor stays hidden.
+  assert.match(source, /<h3>\{tool\.title\}<\/h3>/);
+  assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(/);
+  assert.ok(!/<h2>\{tool\.title\}<\/h2>/.test(source), "card title must not be an h2");
   for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) {
     assert.match(registry, new RegExp(`accent: "${accent}"`));
     assert.match(accentStyles, new RegExp(`\\n  ${accent}:`));
   }
 });
 
-test("LanguageSwitcher keeps its public prop and KO/EN group toggle accessibility", () => {
+test("LanguageSwitcher keeps its public prop and KO/EN native select accessibility", () => {
   const source = read("src/components/LanguageSwitcher.tsx");
-  const toggleGroupSource = read("node_modules/@base-ui/react/toggle-group/ToggleGroup.mjs");
-  const toggleSource = read("node_modules/@base-ui/react/toggle/Toggle.mjs");
+  const toggleGroupSource = read("src/components/ui/toggle-group.tsx");
+  const toggleSource = read("src/components/ui/toggle.tsx");
 
   assert.match(source, /export function LanguageSwitcher\(\{ compact = false \}: \{ compact\?: boolean \}\)/);
-  assert.match(source, /<ToggleGroup[\s\S]*?value=\{\[language\]\}[\s\S]*?aria-label=\{t\("language\.switchLabel"\)\}/);
-  assert.match(source, /\(\["ko", "en"\] as const\)\.map/);
-  assert.match(source, /<ToggleGroupItem[\s\S]*?value=\{item\}[\s\S]*?className=\{language === item \? "ui-selected" : ""\}/);
-  assert.match(toggleGroupSource, /role: 'group'/);
-  assert.match(toggleSource, /'aria-pressed': pressed/);
+  assert.match(source, /<select[\s\S]*?data-ui-component="language-switcher"[\s\S]*?aria-label=\{t\("language\.switchLabel"\)\}[\s\S]*?value=\{language\}/);
+  assert.match(source, /const LANGUAGE_OPTIONS = \["ko", "en"\] as const/);
+  // Product behavior instead of library internals.
+  assert.match(toggleGroupSource, /role: "group"/);
+  assert.match(toggleSource, /"aria-pressed": pressed/);
+  assert.ok(!toggleGroupSource.includes("@base-ui/react") && !toggleSource.includes("@base-ui/react"), "toggle primitives must not depend on Base UI");
 });

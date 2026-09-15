@@ -22,14 +22,15 @@ test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect owne
   assert.match(appShellSource, /<nav className="bottom-tabs glass-bar"/);
 });
 
-test("AppShell delegates the mobile modal and focus trap to the shadcn Base UI sheet", () => {
+test("AppShell delegates the mobile modal and focus trap to the self-implemented sheet", () => {
   const sheetSource = read("src/components/ui/sheet.tsx");
-  assert.match(sheetSource, /Dialog as SheetPrimitive/);
+  assert.match(sheetSource, /dialog\.showModal\(\)/);
   assert.match(sheetSource, /<SheetOverlay className=\{overlayClassName\} \/>/);
   assert.match(appShellSource, /<Sheet open=\{mobileMenuOpen\} onOpenChange=\{setMobileMenuOpen\}/);
   assert.match(appShellSource, /<SheetTrigger[\s\S]*?id="mobile-navigation-trigger"/);
-  assert.match(appShellSource, /<SheetContent[\s\S]*?side="bottom"[\s\S]*?overlayClassName="sheet-backdrop z-\[80\]"/);
+  assert.match(appShellSource, /<SheetContent[\s\S]*?side="left"[\s\S]*?overlayClassName="sheet-backdrop z-\[80\]"/);
   assert.match(appShellSource, /<SheetClose[\s\S]*?navigation\.close/);
+  assert.ok(!sheetSource.includes("@base-ui/react"), "sheet must not depend on Base UI");
   assert.doesNotMatch(appShellSource, /document\.addEventListener\("keydown"|event\.key === "Tab"/);
 });
 

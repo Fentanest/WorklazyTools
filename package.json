@@ -54,7 +54,6 @@
     "test:static": "node scripts/validate-static-output.mjs"
   },
   "dependencies": {
-    "@base-ui/react": "^1.7.0",
     "@ffmpeg/core": "0.12.10",
     "@ffmpeg/core-mt": "0.12.10",
     "@ffmpeg/ffmpeg": "0.12.15",
@@ -104,7 +103,6 @@
     "react-i18next": "^17.0.11",
     "react-router-dom": "^7.1.1",
     "readable-stream": "^3.6.2",
-    "shadcn": "4.20.1",
     "sortablejs": "^1.15.7",
     "sql-formatter": "^15.8.2",
     "tailwind-merge": "^3.6.0",

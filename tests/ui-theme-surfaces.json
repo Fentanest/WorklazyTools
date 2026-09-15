@@ -1,0 +1,7 @@
+[
+  { "id": "body", "route": "/tools", "locales": ["ko", "en"], "viewports": ["desktop", "mobile"], "selector": "body", "properties": ["background-color"] },
+  { "id": "heading", "route": "/tools", "locales": ["ko", "en"], "viewports": ["desktop", "mobile"], "selector": "main h1", "properties": ["color"] },
+  { "id": "card", "route": "/tools", "locales": ["ko"], "viewports": ["desktop"], "selector": ".ui-tool-card", "properties": ["background-color", "border-color"] },
+  { "id": "sidebar", "route": "/tools", "locales": ["ko"], "viewports": ["desktop"], "selector": ".sidebar", "properties": ["background-color"] },
+  { "id": "home-hero", "route": "/", "locales": ["ko", "en"], "viewports": ["desktop", "mobile"], "selector": ".home-page .hero", "properties": ["background-color", "color"] }
+]

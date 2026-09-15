@@ -90,7 +90,7 @@ export function DocumentCompareResultPage({
   const changedPages = areaPages.filter((item) => item.kind !== "unchanged").length;
 
   return (
-    <UtilityPage toolId="document-compare-result">
+    <UtilityPage toolId="document-compare-result" className="min-[821px]:max-w-[1480px]">
       <div className="mb-4"><Button render={<Link to={localizedBasePath} data-testid="document-result-back" />} variant="ghost" className="rounded-xl px-0 font-bold text-blue-700 hover:bg-blue-500/10 hover:text-blue-800 dark:text-blue-300"><ArrowLeft size={16} /> {L("전체 비교 결과", "All comparison results")}</Button></div>
       <PageHeader
         eyebrow={`PAIR ${pair.pairNumber} OF ${results.length}`}
@@ -104,9 +104,9 @@ export function DocumentCompareResultPage({
       </PageHeader>
       <PrivacyBanner compact />
 
-      <Card as="section" className="mt-3 gap-0 overflow-visible rounded-4xl border border-border p-5 shadow-md" data-testid="document-result-view">
+      <Card as="section" className="mt-3 gap-0 overflow-visible rounded-4xl border border-border p-5 shadow-md" data-testid="document-result-view" key={`${pair.pairNumber}-${resultTab}-${showFullContent}`}>
         <ComparisonSummary result={pair.result} />
-        <div className="flex items-center justify-between gap-4 max-[720px]:flex-col max-[720px]:items-stretch [&_[data-ui-component=segmented-control]]:min-w-[380px] max-[720px]:[&_[data-ui-component=segmented-control]]:min-w-0 max-[720px]:[&_[data-ui-component=segmented-control]_button]:min-w-0 max-[720px]:[&_[data-ui-component=segmented-control]_button]:whitespace-normal max-[720px]:[&_[data-ui-component=segmented-control]_button]:px-2 max-[720px]:[&_[data-ui-component=segmented-control]_button]:leading-tight" data-testid="document-result-toolbar">
+        <div className="flex items-center justify-between gap-4 max-[1200px]:flex-col max-[1200px]:items-stretch [&_[data-ui-component=segmented-control]]:min-w-[380px] max-[1200px]:[&_[data-ui-component=segmented-control]]:min-w-0 max-[1200px]:[&_[data-ui-component=segmented-control]_button]:min-w-0 max-[1200px]:[&_[data-ui-component=segmented-control]_button]:whitespace-normal max-[1200px]:[&_[data-ui-component=segmented-control]_button]:px-2 max-[1200px]:[&_[data-ui-component=segmented-control]_button]:leading-tight" data-testid="document-result-toolbar">
           <SegmentedControl
             label={L("문서 영역", "Document area")}
             value={resultTab}
@@ -134,9 +134,9 @@ export function DocumentCompareResultPage({
         {pair.result.warnings.map((warning) => <UtilityNotice className="mt-3" key={warning}><Info className="mt-0.5 shrink-0" size={14} /> {warning}</UtilityNotice>)}
       </Card>
 
-      <nav className="mt-3.5 flex items-center justify-between" aria-label={L("다른 문서 쌍 비교 결과", "Other document-pair results")}>
-        {previous ? <Button render={<Link to={`${localizedBasePath}/results/${previous.pairNumber}`} />} variant="secondary" className="rounded-xl font-bold text-blue-700 dark:text-blue-300"><ArrowLeft size={15} /> {L(`${previous.pairNumber}번 비교`, `Comparison ${previous.pairNumber}`)}</Button> : <span />}
-        {next && <Button render={<Link to={`${localizedBasePath}/results/${next.pairNumber}`} />} variant="secondary" className="rounded-xl font-bold text-blue-700 dark:text-blue-300">{L(`${next.pairNumber}번 비교`, `Comparison ${next.pairNumber}`)} <ArrowRight size={15} /></Button>}
+      <nav className="mt-3.5 flex flex-wrap items-center justify-between gap-y-2" aria-label={L("다른 문서 쌍 비교 결과", "Other document-pair results")}>
+        {previous ? <Button render={<Link to={`${localizedBasePath}/results/${previous.pairNumber}`} />} variant="secondary" className="min-w-0 rounded-xl font-bold text-blue-700 max-[720px]:whitespace-normal dark:text-blue-300"><ArrowLeft size={15} /> {L(`${previous.pairNumber}번 비교`, `Comparison ${previous.pairNumber}`)}</Button> : <span />}
+        {next && <Button render={<Link to={`${localizedBasePath}/results/${next.pairNumber}`} />} variant="secondary" className="min-w-0 rounded-xl font-bold text-blue-700 max-[720px]:whitespace-normal dark:text-blue-300">{L(`${next.pairNumber}번 비교`, `Comparison ${next.pairNumber}`)} <ArrowRight size={15} /></Button>}
       </nav>
       {footer}
     </UtilityPage>
@@ -158,7 +158,7 @@ function ComparisonSummary({ result }: { result: WordCompareResult }) {
 function DiffLegend({ showComments }: { showComments: boolean }) {
   const language = useAppLanguage();
   return (
-    <div className="mt-3 flex items-center justify-end gap-3.5 overflow-x-auto text-xs text-muted-foreground max-[720px]:justify-start" aria-label={language === "en" ? "Change legend" : "변경 표시 안내"}>
+      <div className="mt-3 flex items-center justify-end gap-3.5 overflow-x-auto text-xs text-muted-foreground max-[720px]:justify-start" role="region" aria-label={language === "en" ? "Change legend" : "변경 표시 안내"} tabIndex={0}>
       <span className="inline-flex items-center"><i className="rounded-md bg-blue-500/10 px-1.5 py-1 text-blue-800 line-through not-italic dark:text-blue-300">{language === "en" ? "Deleted content" : "삭제된 내용"}</i></span>
       <span className="inline-flex items-center"><i className="rounded-md bg-red-500/10 px-1.5 py-1 font-extrabold text-red-700 not-italic dark:text-red-300">{language === "en" ? "Added content" : "추가된 내용"}</i></span>
       <span className="inline-flex items-center"><i className="rounded-md bg-violet-500/10 px-1.5 py-1 text-violet-700 not-italic dark:text-violet-300">{language === "en" ? "Formatting changed" : "서식 변경"}</i></span>
@@ -203,11 +203,18 @@ function DocumentPageComparison({ beforeName, afterName, items, tables }: {
   if (!items.length) return <div className="mt-3 grid min-h-32 place-items-center content-center gap-2 rounded-2xl border border-dashed border-border text-muted-foreground" data-testid="document-empty-result"><TextSearch size={22} /><strong className="text-sm">{language === "en" ? "There is no content to compare in this area." : "이 영역에는 비교할 내용이 없습니다."}</strong></div>;
 
   return (
-    <div className="mt-2.5 overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-slate-200 dark:bg-slate-800" data-testid="document-page-scroll">
-      {!!changedIndexes.length && <nav className="sticky top-2 z-[4] mx-auto mb-2.5 flex w-max max-w-[calc(100%-20px)] items-center gap-2 rounded-2xl border border-border bg-background/85 p-1.5 shadow-lg backdrop-blur-xl" aria-label={language === "en" ? "Navigate changes" : "변경 내용 이동"}><Button variant="secondary" className="rounded-xl" type="button" onClick={() => goToChange(-1)} disabled={currentChange === 0}><ArrowLeft size={14} /> {language === "en" ? "Previous change" : "이전 변경"}</Button><span className="min-w-14 text-center font-bold text-muted-foreground">{currentChange < 0 ? `– / ${changedIndexes.length}` : `${currentChange + 1} / ${changedIndexes.length}`}</span><Button variant="secondary" className="rounded-xl" type="button" onClick={() => goToChange(1)} disabled={currentChange === changedIndexes.length - 1}>{language === "en" ? "Next change" : "다음 변경"} <ArrowRight size={14} /></Button></nav>}
+    <div className="mt-2.5 grid grid-cols-[minmax(0,1fr)_156px] items-start gap-x-3 max-[1599px]:grid-cols-[minmax(0,1fr)_52px] max-[1599px]:gap-x-2 max-[820px]:grid-cols-1" data-testid="document-page-scroll">
+      {!!changedIndexes.length && <nav className="sticky top-[80px] col-start-2 row-start-1 flex flex-col items-stretch gap-2 self-start max-[820px]:static max-[820px]:col-start-1 max-[820px]:row-start-1 max-[820px]:grid max-[820px]:grid-cols-[minmax(0,1fr)_44px_minmax(0,1fr)] max-[820px]:items-center" data-testid="document-change-rail" aria-label={language === "en" ? "Navigate changes" : "변경 내용 이동"}>
+        <Button variant="secondary" className="min-w-0 justify-center rounded-xl max-[820px]:whitespace-normal max-[820px]:leading-[1.3]" type="button" onClick={() => goToChange(-1)} disabled={currentChange === 0} aria-label={language === "en" ? "Previous change" : "이전 변경"} title={language === "en" ? "Previous change" : "이전 변경"}><ArrowLeft size={14} aria-hidden="true" /> <span className="min-[821px]:max-[1599px]:hidden">{language === "en" ? "Previous" : "이전"}</span></Button>
+        <span className="min-w-0 text-center text-[13px] font-extrabold text-muted-foreground max-[820px]:col-start-2">{currentChange < 0 ? `– / ${changedIndexes.length}` : `${currentChange + 1} / ${changedIndexes.length}`}</span>
+        <Button variant="secondary" className="min-w-0 justify-center rounded-xl max-[820px]:whitespace-normal max-[820px]:leading-[1.3]" type="button" onClick={() => goToChange(1)} disabled={currentChange === changedIndexes.length - 1} aria-label={language === "en" ? "Next change" : "다음 변경"} title={language === "en" ? "Next change" : "다음 변경"}><span className="min-[821px]:max-[1599px]:hidden">{language === "en" ? "Next" : "다음"}</span> <ArrowRight size={14} aria-hidden="true" /></Button>
+      </nav>}
+      <div className="col-start-1 row-start-1 min-w-0 overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-slate-200 focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--wl-focus)] max-[820px]:col-start-1 max-[820px]:row-start-2 dark:bg-slate-800" role="region" aria-label={language === "en" ? "Side-by-side document scroll area" : "수정 전후 문서 가로 스크롤 영역"} tabIndex={0}>
       <div className="grid min-w-[940px] grid-cols-2 gap-x-[22px] p-5 text-[#1d1d1f]" role="table" data-testid="document-page-view" aria-label={language === "en" ? "Full before-and-after document comparison" : "수정 전후 문서 전체 비교"}>
+        <div role="row" className="col-span-full grid grid-cols-2 gap-x-[22px]">
         <div className="sticky top-0 z-[3] flex min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#d5d5da] bg-white/[.97] px-9 py-3 shadow-[0_-3px_14px_rgba(35,38,45,.08)]" role="columnheader" data-document-side="before"><span className="shrink-0 rounded-md bg-[#efeff2] px-1.5 py-1 text-xs font-extrabold text-[#606066]">{language === "en" ? "Before" : "수정 전"}</span><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">{beforeName}</strong></div>
         <div className="sticky top-0 z-[3] flex min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#d5d5da] bg-white/[.97] px-9 py-3 shadow-[0_-3px_14px_rgba(35,38,45,.08)]" role="columnheader" data-document-side="after"><span className="shrink-0 rounded-md bg-[#efeff2] px-1.5 py-1 text-xs font-extrabold text-[#606066]">{language === "en" ? "After" : "수정 후"}</span><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">{afterName}</strong></div>
+        </div>
         {items.map((item, index) => {
           const table = item.blockType === "table" && item.tableIndex !== undefined
             ? tables.find((candidate) => candidate.index === item.tableIndex)
@@ -219,6 +226,7 @@ function DocumentPageComparison({ beforeName, afterName, items, tables }: {
           </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
@@ -237,13 +245,13 @@ function DocumentBlock({ item, side, table, first, last }: {
   if (table) {
     const tableMissing = side === "before" ? table.beforeIndex === null : table.afterIndex === null;
     return (
-      <article className={documentBlockClasses(item, side, tableMissing, first, last, true)} data-document-side={side} data-document-kind={item.kind} data-missing={tableMissing || undefined} role="cell">
+      <div className={documentBlockClasses(item, side, tableMissing, first, last, true)} data-document-side={side} data-document-kind={item.kind} data-missing={tableMissing || undefined} role="cell">
         <div className={documentMetadataClasses(item)} data-testid="document-block-meta">
           <small className="sr-only">{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
           {(item.kind !== "unchanged" || item.moved) && <span className="rounded-md bg-[#f0f0f3]/90 px-1.5 py-1 text-xs font-extrabold text-[#57575e]">{changeKindLabel(item.kind, language)}{item.moved && item.kind !== "moved" ? ` · ${language === "en" ? "Moved" : "이동"}` : ""}</span>}
         </div>
         <DocumentTable table={table} side={side} />
-      </article>
+      </div>
     );
   }
   const isMissing = !location && !text;
@@ -251,7 +259,7 @@ function DocumentBlock({ item, side, table, first, last }: {
     || (side === "after" && (item.kind === "added" || item.kind === "changed"));
 
   return (
-    <article className={documentBlockClasses(item, side, isMissing, first, last, false)} data-document-side={side} data-document-kind={item.kind} data-document-section={item.section} data-missing={isMissing || undefined} role="cell">
+    <div className={documentBlockClasses(item, side, isMissing, first, last, false)} data-document-side={side} data-document-kind={item.kind} data-document-section={item.section} data-missing={isMissing || undefined} role="cell">
       <div className={documentMetadataClasses(item)} data-testid="document-block-meta">
         <small className="sr-only">{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
         {(item.kind !== "unchanged" || item.moved) && <span className="rounded-md bg-[#f0f0f3]/90 px-1.5 py-1 text-xs font-extrabold text-[#57575e]">{changeKindLabel(item.kind, language)}{item.moved && item.kind !== "moved" ? ` · ${language === "en" ? "Moved" : "이동"}` : ""}</span>}
@@ -264,7 +272,7 @@ function DocumentBlock({ item, side, table, first, last }: {
             : text || "\u00a0"}
         </p>}
       <InlineComments comments={item.comments ?? []} side={side} />
-    </article>
+    </div>
   );
 }
 

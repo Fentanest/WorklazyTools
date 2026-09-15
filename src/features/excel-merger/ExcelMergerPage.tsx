@@ -523,7 +523,7 @@ export function ExcelMergerPage() {
               </UtilityField>
             )}
             {entries.length > 0 && (
-              <div className="hidden items-center gap-2 rounded-xl border border-green-700/30 bg-green-50 px-3 py-2 text-sm font-bold text-green-900 shadow-sm max-[620px]:sticky max-[620px]:top-[calc(72px+env(safe-area-inset-top))] max-[620px]:z-10 max-[620px]:mt-3 max-[620px]:flex dark:border-green-300/40 dark:bg-green-950/90 dark:text-green-200" data-testid="excel-mobile-sheet-summary" role="status">
+              <div className="hidden items-center gap-2 rounded-xl border border-green-700/30 bg-green-50 px-3 py-2 text-sm font-bold text-green-900 shadow-sm max-[620px]:sticky max-[620px]:top-[calc(var(--wl-header-height)+env(safe-area-inset-top))] max-[620px]:z-10 max-[620px]:mt-3 max-[620px]:flex dark:border-green-300/40 dark:bg-green-950/90 dark:text-green-200" data-testid="excel-mobile-sheet-summary" role="status">
                 <FileSpreadsheet size={16} aria-hidden="true" />
                 <span>{t("excel.sheetList.mobileSummary", { files: entries.length, sheets: selectedSheetCount })}</span>
               </div>
@@ -728,7 +728,6 @@ export function ExcelMergerPage() {
             progress={operation.progress}
             message={operation.message}
             logs={operation.logs}
-            accent="green"
             title={t("excel.progressTitle")}
           />
         </aside>
@@ -738,7 +737,6 @@ export function ExcelMergerPage() {
 
       {result && (
         <ResultCard
-          accent="green"
           title={t("excel.result.title")}
           message={t("excel.result.message", { fileCount: result.fileCount, sheetCount: result.sheetCount, outputCount: result.outputSheetCount, encrypted: result.encrypted ? t("excel.result.encrypted") : "" })}
         >

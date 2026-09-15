@@ -1,5 +1,19 @@
 {
   "language": { "ko": "한국어", "en": "English", "switchLabel": "Choose language" },
+  "search": {
+    "label": "Search all tools",
+    "placeholder": "Search tools or features",
+    "results": "{{count}} tools"
+  },
+  "theme": {
+    "switchTo": "Switch to {{theme}}",
+    "names": {
+      "light-coral": "Light Coral",
+      "dark-coral": "Dark Coral",
+      "light-mint": "Light Mint",
+      "dark-mint": "Dark Mint"
+    }
+  },
   "landing": {
     "eyebrow": "WORKLAZY TOOLS",
     "titlePrimary": "Choose your language",
@@ -21,7 +35,7 @@
     "chooseTask": "What would you like to do?",
     "close": "Close",
     "primaryLabel": "Primary navigation",
-    "mobileLabel": "Mobile navigation"
+    "mobileLabel": "Mobile navigation", "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar", "github": "GitHub", "toolGroups": {"documents": "Documents", "media": "Media", "other": "Other"}
   },
   "footer": {
     "service": "About the service",
@@ -50,12 +64,13 @@
     "removed": "Cleared when the tab closes"
   },
   "home": {
-    "kicker": "Small, useful tools for work",
+    "kicker": "Small tools for everyday work",
     "titleBefore": "Let the tools handle",
     "titleAccent": "the tedious file work.",
-    "description": "Handle documents, media, text, calculations and privacy tasks without installing software or signing in. Choose a tool and the work stays in your browser.",
+    "titleAfter": "",
+    "description": "From documents and data to images and video, no installation or sign-in is needed. Choose a tool to make complex tasks simpler.",
     "browse": "Explore tools",
-    "noUpload": "No work-file uploads",
+    "noUpload": "No file uploads / Everything is processed in your browser.",
     "feedback": {
       "description": "For feature suggestions or bug reports, please use GitHub Issues.",
       "action": "Open GitHub Issues"

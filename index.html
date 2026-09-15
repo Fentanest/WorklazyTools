@@ -2,6 +2,25 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var themes = ["light-coral", "dark-coral", "light-mint", "dark-mint"];
+        var backgrounds = { "light-coral": "#f2f6fa", "dark-coral": "#10171e", "light-mint": "#f2f6fa", "dark-mint": "#0d181e" };
+        var theme = "light-coral";
+        try {
+          var stored = window.localStorage.getItem("worklazy-theme");
+          if (themes.indexOf(stored) !== -1) theme = stored;
+        } catch (error) { /* Storage blocked: keep the default theme. */ }
+        document.documentElement.setAttribute("data-theme", theme);
+        try {
+          var dark = theme.indexOf("dark-") === 0;
+          var scheme = dark ? "dark" : "light";
+          document.documentElement.style.colorScheme = scheme;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", backgrounds[theme]);
+        } catch (error) { /* Non-critical theme metadata. */ }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
@@ -9,8 +28,7 @@
     />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="google-adsense-account" content="ca-pub-8940087269746960" />
-    <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2f6fa" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Worklazy" />

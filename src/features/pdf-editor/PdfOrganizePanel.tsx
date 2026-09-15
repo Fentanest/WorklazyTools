@@ -605,7 +605,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
                   {operation.status === "running" ? creatingLabel : operation.status === "error" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.retryOutput") : createLabel}
                 </PrimaryButton>
                 <p className="mx-0.5 mt-3 text-center text-sm leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.passwordProtectedPdfsRequireAnUnlockedCopy")}</p>
-                <OperationProgress {...operation} compact accent="violet" title={featureMessage(language, "pdf.messages.PdfOrganizePanel.pdfEditExtractLog")} />
+                <OperationProgress {...operation} compact title={featureMessage(language, "pdf.messages.PdfOrganizePanel.pdfEditExtractLog")} />
                 <PdfError message={error} />
                 {download.result && <div ref={downloadResultRef}><PdfDownloadCard result={download.result} compact /></div>}
               </div>

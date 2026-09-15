@@ -8,22 +8,24 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const read = (relativePath: string) => fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8");
 const uiSource = read("src/components/ui.tsx");
 
-test("SegmentedControl keeps group and pressed semantics through the Base UI toggle group", () => {
-  const toggleGroupSource = read("node_modules/@base-ui/react/toggle-group/ToggleGroup.mjs");
-  const toggleSource = read("node_modules/@base-ui/react/toggle/Toggle.mjs");
+test("SegmentedControl keeps group and pressed semantics in the self-implemented toggle group", () => {
+  const toggleGroupSource = read("src/components/ui/toggle-group.tsx");
+  const toggleSource = read("src/components/ui/toggle.tsx");
 
-  assert.match(toggleGroupSource, /role: 'group'/);
-  assert.match(toggleSource, /'aria-pressed': pressed/);
+  assert.match(toggleGroupSource, /role: "group"/);
+  assert.match(toggleSource, /"aria-pressed": pressed/);
+  assert.ok(!toggleGroupSource.includes("@base-ui/react") && !toggleSource.includes("@base-ui/react"), "toggle primitives must not depend on Base UI");
   assert.match(uiSource, /<ToggleGroup[\s\S]*?value=\{\[value\]\}[\s\S]*?aria-label=\{label\}/);
   assert.match(uiSource, /if \(nextValue !== undefined\) onChange\(nextValue\)/);
   assert.equal(fs.existsSync(path.join(repositoryRoot, "src/components/ui/tabs.tsx")), false);
 });
 
 test("ToggleRow keeps a labelled native button switch with described checked and disabled state", () => {
-  const switchSource = read("node_modules/@base-ui/react/switch/root/SwitchRoot.mjs");
+  const switchSource = read("src/components/ui/switch.tsx");
 
-  assert.match(switchSource, /role: 'switch'/);
-  assert.match(switchSource, /'aria-checked': checked/);
+  assert.match(switchSource, /role: "switch"/);
+  assert.match(switchSource, /"aria-checked": checked/);
+  assert.ok(!switchSource.includes("@base-ui/react"), "switch must not depend on Base UI");
   assert.match(uiSource, /<label[\s\S]*?htmlFor=\{controlId\}[\s\S]*?<strong[^>]*>\{label\}<\/strong>[\s\S]*?<Switch/);
   assert.match(uiSource, /<Switch[\s\S]*?id=\{controlId\}[\s\S]*?checked=\{checked\}[\s\S]*?onCheckedChange=[\s\S]*?aria-label=\{label\}[\s\S]*?aria-describedby=\{description \? descriptionId : undefined\}[\s\S]*?disabled=\{disabled\}[\s\S]*?nativeButton[\s\S]*?render=\{<button type="button" \/>\}/);
   assert.match(uiSource, /data-ui-part="toggle-switch"/);
@@ -51,11 +53,19 @@ test("the eight adapters preserve their structural and live-region contracts", (
   assert.doesNotMatch(uiSource, /export function NavigationRow/);
 });
 
-test("all accent adapters explicitly cover the six public ToolAccent values", () => {
+test("accent adapters keep six category tints for badges, single primary for controls", () => {
   const accents = ["green", "blue", "violet", "orange", "pink", "sky"];
-  for (const declaration of ["accentButtonClasses", "accentSoftClasses", "accentDraggingClasses", "accentResultClasses"]) {
+  for (const declaration of ["accentButtonClasses", "accentSoftClasses"]) {
     const block = uiSource.match(new RegExp(`const ${declaration} = \\{([\\s\\S]*?)\\n\\} satisfies`))?.[1];
     assert.ok(block, `${declaration} declaration is missing`);
     for (const accent of accents) assert.match(block, new RegExp(`\\n  ${accent}:`));
   }
+  // W4 single primary: per-tool drag/result surface tables are gone. The drop
+  // target drag feedback is one shared primary treatment; the icon tile keeps
+  // its category tint, which is a badge, not a control.
+  assert.doesNotMatch(uiSource, /accentDraggingClasses|accentResultClasses/);
+  assert.match(uiSource, /DROP_TARGET_DRAGGING_CLASSES = "border-primary bg-primary\/10"/);
+  assert.match(uiSource, /dragging && \["scale-\[\.995\]", DROP_TARGET_DRAGGING_CLASSES\]/);
+  for (const accent of accents) assert.match(uiSource, new RegExp(`^  ${accent}: PRIMARY_BUTTON_CLASSES,$`, "m"));
+  assert.match(uiSource, /const PRIMARY_BUTTON_CLASSES =\n  "bg-primary text-primary-foreground/);
 });

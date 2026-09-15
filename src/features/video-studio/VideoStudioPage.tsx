@@ -847,7 +847,7 @@ export function VideoStudioPage({ preset }: { preset?: VideoDirectPreset }) {
         </UtilitySectionCard>
       )}
 
-      <OperationProgress {...progress} accent="pink" title={featureMessage(language, "video.messages.VideoStudioPage.videoProcessingLog")} />
+      <OperationProgress {...progress} title={featureMessage(language, "video.messages.VideoStudioPage.videoProcessingLog")} />
       {progress.status === "running" && <div className="mt-2 flex justify-end"><Button type="button" variant="secondary" onClick={() => activeController.current?.abort()}>{featureMessage(language, "video.messages.VideoStudioPage.cancel")}</Button></div>}
       {lastResult && <UtilityNotice tone="success" role="status" className="mt-[13px]" data-testid="video-result-status"><Download size={18} /><span>{lastResult}</span></UtilityNotice>}
 
