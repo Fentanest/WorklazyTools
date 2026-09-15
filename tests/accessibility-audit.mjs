@@ -353,10 +353,18 @@ export async function runAccessibilityAudit() {
         locale: target.locale ?? (target.language === "en" ? "en-US" : "ko-KR"),
         timezoneId: "Asia/Seoul",
       });
-      await context.addInitScript((language) => {
+      await context.addInitScript(({ language, colorScheme }) => {
         localStorage.setItem("worklazy_privacy_consent", "denied");
         if (language) localStorage.setItem("worklazy_lang", language);
-      }, target.language);
+        // W5 shared theme fixture: sparse colorScheme resolves to the default
+        // family (dark -> dark-coral, else light-coral). Only the theme key is
+        // seeded; locale and consent stay under this harness's control.
+        try {
+          window.localStorage.setItem("worklazy-theme", colorScheme === "dark" ? "dark-coral" : "light-coral");
+        } catch {
+          // Storage blocked: assertThemeFixture reports the mismatch.
+        }
+      }, { language: target.language, colorScheme: target.colorScheme ?? "light" });
 
       const page = await context.newPage();
       let displayAssetRequests = 0;
@@ -458,6 +466,11 @@ export async function runAccessibilityAudit() {
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       });
       if (target.id.startsWith("pdf-stamp")) stampContrast = await measureStampNoticeContrast(page);
+      const { assertThemeFixture } = await import("./ui-theme-fixture.mjs");
+      await assertThemeFixture(page, {
+        theme: target.colorScheme ?? "light",
+        locale: target.locale ?? (target.path.startsWith("/en") ? "en-US" : "ko-KR"),
+      });
       const builder = new AxeBuilder({ page });
       if (target.ownedSelector) builder.include(target.ownedSelector);
       const exceptions = accessibilityExceptions.filter(({ pageId }) => pageId === target.id);
@@ -745,6 +758,11 @@ export async function measureTextPixelContrast(locator, target, backgroundPath) 
   await locator.evaluate((element) => element.style.setProperty("color", "transparent", "important"));
   let screenshot;
   try {
+    await locator.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    // Center the target first: axe leaves the page scrolled anywhere, and a
+    // target resting behind a fixed overlay (consent banner, sticky topbar)
+    // would contaminate the background sample with overlay pixels.
+    await locator.evaluate((element) => element.scrollIntoView({ block: "center", inline: "center" }));
     await locator.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     screenshot = await locator.screenshot({ animations: "disabled" });
   } finally {

@@ -35,6 +35,7 @@ if (selectedTargetIds.length && (new Set(selectedTargetIds).size !== selectedTar
 export function installRenderingObservers() {
   localStorage.setItem("worklazy_privacy_consent", "granted");
   localStorage.setItem("worklazy_lang", "ko");
+  localStorage.setItem("worklazy-theme", "light-coral");
   const metrics = globalThis.__worklazyRenderingMetrics = { cls: 0, lcp: 0, longTasks: [], layoutShifts: [] };
   const rect = (value) => Object.fromEntries(["x", "y", "width", "height", "top", "right", "bottom", "left"].map((key) => [key, value[key]]));
   const element = (node) => node ? {
@@ -119,6 +120,8 @@ export async function runRenderingBaseline() {
         await session.send("Network.setCacheDisabled", { cacheDisabled: true });
         await page.goto(new URL(target.path, baseUrl).href, { waitUntil: "networkidle" });
         await page.locator(target.readySelector).waitFor({ state: "visible" });
+        const { assertThemeFixture } = await import("./ui-theme-fixture.mjs");
+        await assertThemeFixture(page, { theme: "light", locale: "ko-KR" });
         if (target.scenario === "pdf-structure-editing") {
           await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']")
             .setInputFiles(path.join(repositoryRoot, "tests/fixtures/pdf-finish/removal/removal-structures.pdf"));

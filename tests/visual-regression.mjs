@@ -313,7 +313,7 @@ async function captureAndCompare(capture, browser) {
   const externalRequests = [];
   try {
     const localeEnvironment = config.environment.locales[capture.locale];
-    page.setDefaultTimeout(60_000);
+    page.setDefaultTimeout(readPositiveInteger("VISUAL_NAV_TIMEOUT_MS", 60_000));
     await page.setBypassServiceWorker(true);
     await page.setViewport(capture.viewport);
     await page.emulateTimezone(config.environment.timezone);
@@ -325,10 +325,18 @@ async function captureAndCompare(capture, browser) {
       { name: "prefers-color-scheme", value: capture.theme },
       { name: "prefers-reduced-motion", value: config.animation.prefersReducedMotion },
     ]);
-    await page.evaluateOnNewDocument((locale, consent) => {
+    await page.evaluateOnNewDocument((locale, consent, theme) => {
       localStorage.setItem("worklazy_privacy_consent", consent);
       localStorage.setItem("worklazy_lang", locale);
-    }, capture.locale, consentValue);
+      // W5 shared theme fixture: sparse profile themes resolve to the default
+      // family (dark -> dark-coral, else light-coral). Only the theme key is
+      // seeded; locale and consent stay under this harness's control.
+      try {
+        window.localStorage.setItem("worklazy-theme", theme === "dark" ? "dark-coral" : "light-coral");
+      } catch {
+        // Storage blocked: assertThemeFixture reports the mismatch.
+      }
+    }, capture.locale, consentValue, capture.theme);
     page.on("request", (request) => {
       const url = new URL(request.url());
       const allowed = url.origin === new URL(baseUrl).origin || ["data:", "blob:"].includes(url.protocol);
@@ -405,6 +413,8 @@ async function captureAndCompare(capture, browser) {
     }
     if (pageErrors.length) throw new Error(`Page errors: ${pageErrors.join(" | ")}`);
     if (externalRequests.length) throw new Error(`External requests attempted: ${externalRequests.join(" | ")}`);
+    const { assertThemeFixture } = await import("./ui-theme-fixture.mjs");
+    await assertThemeFixture(page, { theme: capture.theme, locale: capture.locale });
 
     const actualBuffer = await page.screenshot({ type: "png", captureBeyondViewport: false });
     if (captureDirectory) {

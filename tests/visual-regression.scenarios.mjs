@@ -495,8 +495,8 @@ const interactionDefinitions = Object.freeze({
       stateId: "interaction-batch-mode",
       actions: [
         { type: "click", selector: "[data-testid='image-studio-tabs'] button:nth-child(2)" },
-        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-batch-a.png", width: 320, height: 220 } },
-        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-batch-b.png", width: 280, height: 240 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", elementIndex: 1, fixture: { kind: "generated-png", fileName: "visual-batch-a.png", width: 320, height: 220 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", elementIndex: 1, fixture: { kind: "generated-png", fileName: "visual-batch-b.png", width: 280, height: 240 } },
         { type: "wait", selector: "[data-ui-component='file-list'] li:nth-child(2)" },
         { type: "scroll-into-view", selector: ".image-settings-grid", offset: -88 },
       ],
@@ -506,8 +506,8 @@ const interactionDefinitions = Object.freeze({
       stateId: "interaction-collage-mode",
       actions: [
         { type: "click", selector: "[data-testid='image-studio-tabs'] button:nth-child(3)" },
-        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-collage-a.png", width: 320, height: 220 } },
-        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-collage-b.png", width: 280, height: 240 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", elementIndex: 1, fixture: { kind: "generated-png", fileName: "visual-collage-a.png", width: 320, height: 220 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", elementIndex: 1, fixture: { kind: "generated-png", fileName: "visual-collage-b.png", width: 280, height: 240 } },
         { type: "wait-canvas", selector: ".collage-preview-stage canvas" },
         { type: "scroll-into-view", selector: ".collage-preview-panel", offset: -88 },
       ],
@@ -517,8 +517,8 @@ const interactionDefinitions = Object.freeze({
       stateId: "interaction-gif-mode",
       actions: [
         { type: "click", selector: "[data-testid='image-studio-tabs'] button:nth-child(4)" },
-        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-gif-a.png", width: 320, height: 220 } },
-        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", fixture: { kind: "generated-png", fileName: "visual-gif-b.png", width: 280, height: 240 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", elementIndex: 1, fixture: { kind: "generated-png", fileName: "visual-gif-a.png", width: 320, height: 220 } },
+        { type: "upload", selector: "[data-tool-page='image-studio'] input[type='file']", elementIndex: 1, fixture: { kind: "generated-png", fileName: "visual-gif-b.png", width: 280, height: 240 } },
         { type: "wait", selector: ".gif-frame-row:nth-child(2)" },
         { type: "scroll-into-view", selector: ".gif-frame-list", offset: -88 },
       ],
