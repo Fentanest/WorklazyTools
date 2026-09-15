@@ -46,17 +46,17 @@ function srcSet(family: HeroFamily, codec: "avif" | "webp"): string {
   return WIDTHS.map((width) => `${assetUrl(family, width, codec)} ${width}w`).join(", ");
 }
 
-// Slot math mirrors .home-hero in global.css exactly: stacked full-width
-// below 1280px (page width minus main padding minus hero padding minus the
-// 2px hero border per breakpoint), fixed 460px slot at and above. A collapsed
-// sidebar only affects stacked widths below 1280px; the fixed desktop slot
-// is unaffected.
+// Slot math mirrors .home-hero in global.css exactly: two columns at and
+// above 1440px with a fixed 540px slot (about half of the 1180px page),
+// stacked full-width below (page width minus main padding minus hero padding
+// minus the 2px hero border per breakpoint). A collapsed sidebar only affects
+// stacked widths below 1440px; the fixed desktop slot is unaffected.
 export const HERO_SIZES =
   "(max-width: 620px) calc(100vw - 24px - 44px - 2px), " +
   "(max-width: 820px) calc(100vw - 32px - 56px - 2px), " +
   "(max-width: 1020px) calc(100vw - 250px - 48px - 80px - 2px), " +
-  "(max-width: 1279px) calc(100vw - 280px - 64px - 80px - 2px), " +
-  "460px";
+  "(max-width: 1439px) calc(100vw - 280px - 64px - 80px - 2px), " +
+  "540px";
 
 // Decorative brand art: meaningful copy lives in the hero text, the mint
 // asset's Korean brush lettering is source artwork and not translated.

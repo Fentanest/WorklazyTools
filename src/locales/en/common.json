@@ -2,7 +2,8 @@
   "language": { "ko": "한국어", "en": "English", "switchLabel": "Choose language" },
   "search": {
     "label": "Search all tools",
-    "placeholder": "Search tools or features",
+    "placeholder": "Search tools. (e.g., PDF, Excel, merge)",
+    "shortcut": "Ctrl + K",
     "results": "{{count}} tools"
   },
   "theme": {
@@ -26,6 +27,7 @@
   },
   "navigation": {
     "browse": "Explore",
+    "brandTagline": "Complex work, made simpler and smarter.",
     "tools": "Tools",
     "home": "Home",
     "allTools": "All tools",

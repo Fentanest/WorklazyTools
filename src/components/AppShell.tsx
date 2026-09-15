@@ -140,9 +140,14 @@ export function AppShell() {
         </a>
       </header>
       <aside className="sidebar glass-panel" id="desktop-sidebar" data-testid="desktop-sidebar" aria-label={t("navigation.primaryLabel")}>
-        <NavLink className="brand brand-image-link" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
-          <img className="brand-logo" width={320} height={64} src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
-        </NavLink>
+        <div className="sidebar-brand-panel">
+          <NavLink className="sidebar-brand" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
+            <span className="sidebar-brand-mark" aria-hidden="true">W</span>
+            <span className="sidebar-brand-word">Worklazy Tools</span>
+            <span className="sidebar-brand-badge" aria-hidden="true">CLIENT SIDE</span>
+          </NavLink>
+          <p className="sidebar-brand-tagline">{t("navigation.brandTagline")}</p>
+        </div>
 
         <nav className="sidebar-nav">
           <div className="nav-group">

@@ -27,7 +27,7 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
     <Card
       as={Link}
       data-ui-component="tool-card"
-      className={cn(`ui-tool-card ui-accent-${accent}${featured ? " ui-featured" : ""}`, "gap-0 rounded-4xl border bg-card p-5 py-5 shadow-md ring-0")}
+      className={cn(`ui-tool-card ui-accent-${accent}${featured ? " ui-featured" : ""}`, "gap-0 rounded-2xl border bg-card p-5 py-5 shadow-sm ring-0")}
       to={tool.path}
       onClick={() => trackToolOpen(tool.id, featured ? "home_card" : "tools_card", language)}
     >

@@ -40,12 +40,13 @@ const EXPECTED = {
 };
 
 // Independent copy of the .home-hero slot table (see global.css and
-// HeroPicture.tsx HERO_SIZES): stacked full-width below 1280px, fixed 460px
-// slot at and above. Computed from layout width (clientWidth), never 100vw,
-// so a vertical scrollbar cannot shift the expectation. The stacked terms
-// subtract the 2px hero border on top of main padding and hero padding.
+// HeroPicture.tsx HERO_SIZES): two columns at and above 1440px with a fixed
+// 540px slot, stacked full-width below. Computed from layout width
+// (clientWidth), never 100vw, so a vertical scrollbar cannot shift the
+// expectation. The stacked terms subtract the 2px hero border on top of main
+// padding and hero padding.
 function expectedSlot(clientWidth) {
-  if (clientWidth >= 1280) return 460;
+  if (clientWidth >= 1440) return 540;
   if (clientWidth > 1020) return clientWidth - 280 - 64 - 80 - 2;
   if (clientWidth > 820) return clientWidth - 250 - 48 - 80 - 2;
   if (clientWidth > 620) return clientWidth - 32 - 56 - 2;
@@ -176,7 +177,7 @@ try {
 
       // Slot-vs-sizes: measured picture slot matches the layout table within
       // 1px, and the picked candidate is never smaller than the slot.
-      for (const width of [1440, 1280, 1279, 1100, 1000, 900, 820, 621, 620, 390]) {
+      for (const width of [1440, 1439, 1280, 1100, 1000, 900, 820, 621, 620, 390]) {
         await sweep.setViewportSize({ width, height: 900 });
         await sweep.waitForTimeout(250);
         const measured = await sweep.evaluate(() => ({

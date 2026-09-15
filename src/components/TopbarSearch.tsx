@@ -172,6 +172,7 @@ export function TopbarSearch({ id }: { id?: string }) {
         }}
         onKeyDown={onInputKeyDown}
       />
+      {!query && <kbd className="topbar-search-kbd" aria-hidden="true">{t("search.shortcut")}</kbd>}
       {showPopup && !composing && (
         <div className="topbar-search-popup" role="presentation">
           <ul role="listbox" id={listId} aria-label={t("search.label")}>

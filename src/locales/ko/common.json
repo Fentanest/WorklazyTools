@@ -2,7 +2,8 @@
   "language": { "ko": "한국어", "en": "English", "switchLabel": "언어 선택" },
   "search": {
     "label": "전체 도구 검색",
-    "placeholder": "도구 이름이나 기능 검색",
+    "placeholder": "도구를 검색해보세요. (예: PDF, Excel, 병합)",
+    "shortcut": "Ctrl + K",
     "results": "{{count}}개의 도구"
   },
   "theme": {
@@ -26,6 +27,7 @@
   },
   "navigation": {
     "browse": "둘러보기",
+    "brandTagline": "복잡한 작업을 더 간단하게, 더 스마트하게.",
     "tools": "도구",
     "home": "홈",
     "allTools": "모든 도구",
