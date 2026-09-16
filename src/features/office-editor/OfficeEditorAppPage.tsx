@@ -23,6 +23,7 @@ export function OfficeEditorAppPage() {
  const L = (ko: string, en: string) => language === "en" ? en : ko;
  const landingPath = useLocalizedPath("/tools/office-editor");
  const [file, setFile] = useState<File>();
+ const latestFileRef = useRef<File | undefined>(undefined);
  const [state, setState] = useState<EditorState>("idle");
  const [error, setError] = useState<string>();
  const [elapsed, setElapsed] = useState(0);
@@ -77,7 +78,7 @@ export function OfficeEditorAppPage() {
 
  const start = async (requestedFile = file) => {
   if (!canvasRef.current) return;
-  if (requestedFile) setFile(requestedFile);
+  if (requestedFile) { setFile(requestedFile); latestFileRef.current = requestedFile; }
   setError(undefined);
   setState("downloading");
   const controller = new AbortController();
@@ -85,6 +86,7 @@ export function OfficeEditorAppPage() {
   assetUiRef.current = { fileNumber: 0, percent: -1 };
   operation.start(L("편집에 필요한 파일을 확인하고 있습니다.", "Checking files required for editing."));
   try {
+   if (!window.isSecureContext) throw new Error("insecure-context");
    if (!crossOriginIsolated || typeof SharedArrayBuffer === "undefined") throw new Error("isolation-required");
    const assetBaseUrl = await prepareOfficeAssets(({ loaded, total, fileNumber, fileCount, cached }) => {
     const percent = Math.max(2, Math.min(80, Math.round((loaded / Math.max(1, total)) * 80)));
@@ -103,7 +105,7 @@ export function OfficeEditorAppPage() {
    runtimeRef.current = runtime;
    setState("ready");
    operation.update(92, L("편집 화면을 준비했습니다. 문서를 선택해 주세요.", "The editor is ready. Choose a document."));
-   if (requestedFile) await openFile(requestedFile, runtime);
+   if (latestFileRef.current) await openFile(latestFileRef.current, runtime);
    else operation.succeed(L("편집 화면을 사용할 수 있습니다.", "The editor is ready to use."));
   } catch (reason) {
    const message = editorError(reason, language);
@@ -116,7 +118,7 @@ export function OfficeEditorAppPage() {
  };
 
  const openFile = async (nextFile: File, runtime = runtimeRef.current) => {
-  setFile(nextFile);
+  setFile(nextFile); latestFileRef.current = nextFile;
   setError(undefined);
   if (!runtime) return;
   setState("opening");
@@ -166,9 +168,10 @@ export function OfficeEditorAppPage() {
    return;
   }
   if (state === "editing" && !window.confirm(L("현재 문서의 변경 내용을 저장했는지 확인해 주세요. 다른 문서를 여시겠어요?", "Make sure you saved changes to the current document. Open another document?"))) return;
+  setFile(nextFile); latestFileRef.current = nextFile;
   const runtime = runtimeRef.current;
   if (runtime) void openFile(nextFile, runtime);
-  else void start(nextFile);
+  else if (state === "idle" || state === "error") void start(nextFile);
  };
 
  useEffect(() => {
@@ -211,7 +214,7 @@ export function OfficeEditorAppPage() {
    )}
    data-testid="office-app-toolbar"
  >
-   <Button render={<Link to={landingPath} />} className="min-h-10 rounded-xl font-bold" variant="secondary">{L("편집기 안내", "Editor guide")}</Button>
+   <Button render={<Link to={`${landingPath}?guide=1`} />} className="min-h-10 rounded-xl font-bold" variant="secondary">{L("편집기 안내", "Editor guide")}</Button>
    {file && <span className="flex min-w-0 flex-1 items-center gap-2 text-primary max-[620px]:col-span-full max-[620px]:justify-start " data-testid="office-toolbar-document"><FileText className="shrink-0" size={17} /><span className="flex min-w-0 flex-col gap-0.5"><strong className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground">{file.name}</strong><small className="max-w-[520px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground">{state === "editing" ? L("브라우저에서 편집 중", "Editing in this browser") : operation.message}</small></span></span>}
    <label className={cn("relative inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-secondary px-3 text-sm font-bold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-muted", busy && "cursor-not-allowed opacity-50")}><FileUp size={15} /> {file ? L("다른 파일 열기", "Open another file") : L("파일 선택", "Choose file")}<input className="sr-only" data-testid="office-file-picker" type="file" accept={OFFICE_ACCEPT} disabled={busy} onChange={(event) => { const selected = event.target.files?.[0]; event.currentTarget.value = ""; if (selected) chooseFile(selected); }} /></label>
    {state === "error" && file ? <Button className="min-h-10 rounded-xl bg-primary font-bold text-white hover:bg-primary" disabled={busy} onClick={() => { const runtime = runtimeRef.current; if (runtime) void openFile(file, runtime); else void start(file); }}>{L("다시 시도", "Try again")}</Button> : null}
@@ -220,7 +223,7 @@ export function OfficeEditorAppPage() {
   </div>
 
   <div className={cn(focusMode && "mb-2 shrink-0")} hidden={focusMode && state === "editing"} data-testid="office-progress-region"><OperationProgress status={operation.status} progress={operation.progress} message={state === "preparing" || state === "opening" ? `${operation.message} · ${L(`${elapsed}초 경과`, `${elapsed}s elapsed`)}` : operation.message} logs={operation.logs} accent="coral" title={L("오피스 편집기 준비 상태", "Office editor preparation")} /></div>
-  {error && <UtilityNotice className={cn("mb-2 shrink-0", !focusMode && "mb-0")} tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div className="flex flex-col"><strong>{L("편집기를 준비하지 못했습니다.", "Could not prepare the editor.")}</strong><span>{error}</span></div></UtilityNotice>}
+  {error && <UtilityNotice className={cn("mb-2 shrink-0", !focusMode && "mb-0")} kind="error" role="alert"><div className="flex flex-col"><strong>{L("편집기를 준비하지 못했습니다.", "Could not prepare the editor.")}</strong><span>{error}</span></div></UtilityNotice>}
   <div
    className={cn(
     "relative mt-[13px] min-h-[680px] overflow-hidden rounded-2xl border border-border bg-[#303035] shadow-lg max-[820px]:min-h-[max(560px,calc(100vh-260px))] max-[820px]:rounded-xl max-[620px]:min-h-[max(500px,calc(100vh-330px))]",
@@ -251,9 +254,10 @@ function formatBytes(bytes: number) {
 }
 
 function editorError(reason: unknown, language: "ko" | "en") {
- if (reason instanceof DOMException && reason.name === "AbortError") return language === "en" ? "Preparation was cancelled." : "편집기 준비를 취소했습니다.";
+ if (reason instanceof DOMException && reason.name === "AbortError") return language === "en" ? "Preparation was cancelled. Press Try again to restart." : "준비를 취소했습니다. 다시 준비하려면 재시도를 눌러 주세요.";
  const code = reason instanceof Error ? reason.message : String(reason);
- if (code === "isolation-required") return language === "en" ? "This browser session cannot start the editor. Reload this workspace in a current Chrome or Edge browser." : "현재 브라우저 환경에서 편집기를 시작할 수 없습니다. 최신 Chrome 또는 Edge에서 이 작업 화면을 다시 열어 주세요.";
+if (code === "insecure-context") return language === "en" ? "The editor cannot be started in this environment. A secure connection (HTTPS or port forwarding) is required." : "현재 접속 환경에서는 편집기를 실행할 수 없습니다. 신뢰 가능한 HTTPS 환경이나 서버 포트 전달이 필요합니다.";
+ if (code === "isolation-required") return language === "en" ? "The editor cannot be started in this environment. Cross-origin isolation headers (COOP/COEP) are required." : "현재 접속 환경에서는 편집기를 실행할 수 없습니다. 브라우저 격리 헤더(COOP/COEP)가 필요합니다.";
  if (code === "cache-unavailable") return language === "en" ? "Browser storage is unavailable. Allow site storage and retry." : "브라우저 저장 공간을 사용할 수 없습니다. 사이트 저장을 허용한 뒤 다시 시도해 주세요.";
  if (code === "asset-download-failed") return language === "en" ? "Required editor files could not be downloaded. Check the connection and available storage, then retry." : "필요한 편집 파일을 내려받지 못했습니다. 인터넷 연결과 저장 공간을 확인한 뒤 다시 시도해 주세요.";
  if (code === "office-operation-timeout") return language === "en" ? "Preparation took longer than expected. Keep this tab open and try again." : "준비 시간이 예상보다 길어 중단했습니다. 이 탭을 유지한 채 다시 시도해 주세요.";

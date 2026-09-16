@@ -159,7 +159,7 @@ export function DocumentGeneratorPage() {
       <FileDropZone label={tr('features:documentGenerator.files.template')} hint={tr('features:documentGenerator.files.templateHint')} accept={DOCX_ACCEPT} files={templateFile?[templateFile]:[]} onFiles={replaceTemplate} disabled={busy}/>
       <div className="mt-4"><FileDropZone label={tr('features:documentGenerator.files.data')} hint={tr('features:documentGenerator.files.dataHint')} accept={DATA_ACCEPT} multiple files={dataFiles} onFiles={replaceData} disabled={busy}/></div>
       <UtilityNotice className="mt-3">{tr('features:documentGenerator.files.limits')}</UtilityNotice>
-      {sourceFailures.length>0&&<UtilityNotice className="mt-3" tone="error" role="alert"><ul>{sourceFailures.map(item=><li key={item.index}>{tr('features:documentGenerator.document', {number:item.index+1})}: {generatorMessage(item.code as never,language)}</li>)}</ul></UtilityNotice>}
+      {sourceFailures.length>0&&<UtilityNotice className="mt-3" kind="error" role="alert"><ul>{sourceFailures.map(item=><li key={item.index}>{tr('features:documentGenerator.document', {number:item.index+1})}: {generatorMessage(item.code as never,language)}</li>)}</ul></UtilityNotice>}
       {templateVariables.length>0&&<p className="mt-3 text-sm"><strong>{tr('features:documentGenerator.variables')}:</strong> {templateVariables.join(', ')}</p>}
     </UtilitySectionCard>
 
@@ -188,7 +188,7 @@ export function DocumentGeneratorPage() {
       <div className="mt-4 flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={busy||!snapshot.attempt} onClick={()=>void exportManifest('attempt')}><Download size={16}/>{tr('features:documentGenerator.results.latestManifest')}</Button><Button type="button" variant="secondary" disabled={busy||!successfulRows} onClick={()=>void exportManifest('results')}><Download size={16}/>{tr('features:documentGenerator.results.resultManifest')}</Button>{successfulRows>=2&&<Button type="button" disabled={busy} onClick={()=>void createZip()}><Package size={16}/>{tr('features:documentGenerator.results.zip')}</Button>}</div>
       {zip&&zipAttemptId===snapshot.resultAttemptId&&<a className="mt-3 inline-flex items-center gap-2 font-bold text-primary underline dark:text-primary" href={zip.url} download="generated-documents.zip"><Download size={16}/>{tr('features:documentGenerator.results.downloadZip')}</a>}
     </UtilitySectionCard>}
-    {message&&<UtilityNotice tone="error" role="alert">{message}</UtilityNotice>}
+    {message&&<UtilityNotice kind="error" role="alert">{message}</UtilityNotice>}
     <ToolGuide title={tr('features:documentGenerator.title')} description={guide.description} blocks={guide.blocks as import("../../components/ToolGuide").GuideBlock[]} faq={(guide.faq || []).map((item: any)=>({question:item.q,answer:item.a}))}/>
   </UtilityPage>;
 }

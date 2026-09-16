@@ -92,7 +92,7 @@ export function TimezoneCalculatorPage() {
           <UtilityField><span>{t("timezone.time")}</span><UtilityInput type="time" value={time} onChange={(event) => setTime(event.target.value)} /></UtilityField>
         </div>
         <div className="mt-2.5 flex justify-end"><Button type="button" variant="secondary" size="lg" className="rounded-xl font-bold" onClick={useCurrentTime}><LocateFixed size={16} /> {t("timezone.current")}</Button></div>
-        {!base.isValid && <UtilityNotice className="mt-3" tone="error" role="alert">{t("timezone.invalid")}</UtilityNotice>}
+        {!base.isValid && <UtilityNotice className="mt-3" kind="error" role="alert">{t("timezone.invalid")}</UtilityNotice>}
         {daylightSavingAdjusted && <UtilityNotice className="mt-[9px]" role="status">{t("timezone.adjusted", { time: base.toFormat("HH:mm") })}</UtilityNotice>}
       </UtilitySectionCard>
 

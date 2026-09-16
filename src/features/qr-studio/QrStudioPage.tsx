@@ -309,7 +309,7 @@ export function QrStudioPage({ initialMode = "create" }: { initialMode?: QrMode 
               </div>
             )}
           </div>
-          <UtilityNotice className="mt-3"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("qr.compatibility")}</span></UtilityNotice>
+          <UtilityNotice className="mt-3">{t("qr.compatibility")}</UtilityNotice>
         </>
       ) : <QrBulkPanel />}
 

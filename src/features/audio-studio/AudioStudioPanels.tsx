@@ -43,7 +43,7 @@ export function VoiceEffectPanel({ busy, selectionAvailable, voicePreset, effect
     <input className="w-full [accent-color:var(--color-violet-700)]" type="range" min={-12} max={12} step={1} disabled={busy || voicePreset === "robot"} value={effectivePitch} onChange={(event) => onPitch(Number(event.target.value))} />
     <output className="text-right text-primary tabular-nums dark:text-primary">{voicePreset === "robot" ? "—" : `${effectivePitch> 0 ? "+" : ""}${effectivePitch}`}</output>
    </label>
-   <UtilityNotice className="mt-3 bg-primary/10 text-muted-foreground"><AlertTriangle className="mt-0.5 shrink-0 text-primary dark:text-primary" size={16} /><span>{t("audio.voice.notice")}</span></UtilityNotice>
+   <UtilityNotice className="mt-3" kind="info">{t("audio.voice.notice")}</UtilityNotice>
    <div className="audio-voice-effect-actions mt-3 flex justify-end gap-2 max-[620px]:grid max-[620px]:grid-cols-1">
     <Button type="button" className="audio-effect-preview-button min-h-[42px] rounded-xl max-[620px]:w-full" variant="secondary" size="lg" disabled={busy || !selectionAvailable} onClick={onPreview}><Headphones size={17} /> {t("audio.voice.preview")}</Button>
     <div className="min-w-[190px] max-[620px]:w-full"><PrimaryButton accent="violet" disabled={busy || !selectionAvailable} loading={busy} onClick={onApply}><WandSparkles size={17} /> {t("audio.voice.apply")}</PrimaryButton></div>
@@ -72,7 +72,7 @@ export function AudioExportPanel({ format, bitrate, busy, selectionDuration, exp
     {format === "mp3" && <UtilityField><span>{t("audio.bitrate")}</span><UtilitySelect className="h-[42px]" value={bitrate} onChange={(event) => onBitrate(Number(event.target.value) as 128 | 192 | 256 | 320)}><option value={128}>128 kbps</option><option value={192}>192 kbps · {t("audio.recommended")}</option><option value={256}>256 kbps</option><option value={320}>320 kbps</option></UtilitySelect></UtilityField>}
    </div>
    <ToggleRow label={t("audio.selectionOnly")} description={selectionDuration === undefined ? undefined : formatAudioTime(selectionDuration)} checked={exportSelection} onChange={onExportSelection} disabled={selectionDuration === undefined} />
-   {format === "mp3" && <UtilityNotice className="mt-3"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("audio.offline")}</span></UtilityNotice>}
+   {format === "mp3" && <UtilityNotice className="mt-3">{t("audio.offline")}</UtilityNotice>}
    <div className="mt-4 flex justify-end max-[620px]:[&_[data-ui-component=primary-button]]:w-full" data-testid="audio-export-actions"><PrimaryButton accent="violet" disabled={busy} loading={busy} onClick={onExport}><Download size={18} /> {t("audio.export", { format: format.toUpperCase() })}</PrimaryButton></div>
   </UtilitySectionCard>
  );

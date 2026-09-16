@@ -1,6 +1,7 @@
 import { FileEdit, FileSpreadsheet, MonitorUp, Presentation, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -19,7 +20,17 @@ const OFFICE_EXTENSIONS = new Set(["docx", "doc", "odt", "xlsx", "xls", "ods", "
 export function OfficeEditorPage() {
  const language = useAppLanguage();
  const L = (ko: string, en: string) => language === "en" ? en : ko;
+
+
+
  const appPath = useLocalizedPath("/tools/office-editor/app/");
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    if (location.search !== "?guide=1") {
+      navigate(appPath, { replace: true });
+    }
+  }, [navigate, appPath, location.search]);
  const downloadSize = formatBytes(OFFICE_DOWNLOAD_BYTES);
  const [handoffBusy, setHandoffBusy] = useState(false);
  const [handoffError, setHandoffError] = useState<string>();
@@ -60,7 +71,7 @@ export function OfficeEditorPage() {
    <div className="mt-3.5 grid gap-2" data-testid="office-landing-drop">
     <FileDropZone files={[]} onFiles={openDroppedFile} accept={OFFICE_ACCEPT} hint={L("파일을 놓으면 준비부터 문서 열기까지 자동으로 진행합니다.", "Drop a file to prepare the editor and open it automatically.")} accent="coral" disabled={handoffBusy} />
     <small className="text-center text-xs text-muted-foreground">{handoffBusy ? L("집중 편집 화면으로 이동하는 중…", "Opening the focused editor workspace…") : L("DOCX·DOC·ODT·XLSX·XLS·ODS·PPTX·PPT·ODP · 한 파일", "DOCX, DOC, ODT, XLSX, ODS, PPTX, PPT or ODP · one file")}</small>
-    {handoffError && <UtilityNotice className="justify-center text-center" tone="error" role="alert">{handoffError}</UtilityNotice>}
+    {handoffError && <UtilityNotice className="justify-center text-center" kind="error" role="alert">{handoffError}</UtilityNotice>}
    </div>
   </UtilitySectionCard>
 

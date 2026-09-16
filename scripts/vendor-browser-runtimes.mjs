@@ -136,3 +136,17 @@ async function matchesAsset(filePath, asset) {
 function ensureTrailingSlash(value) {
   return value.endsWith("/") ? value : `${value}/`;
 }
+
+await copyPdfJsAssets();
+
+async function copyPdfJsAssets() {
+  const source = path.join(projectRoot, "node_modules", "pdfjs-dist");
+  const packageMetadata = JSON.parse(await fs.readFile(path.join(source, "package.json"), "utf8"));
+  const destination = path.join(publicVendorRoot, "pdfjs", packageMetadata.version);
+  await fs.rm(destination, { recursive: true, force: true });
+  
+  await fs.cp(path.join(source, "cmaps"), path.join(destination, "cmaps"), { recursive: true });
+  await fs.cp(path.join(source, "standard_fonts"), path.join(destination, "standard_fonts"), { recursive: true });
+  await fs.cp(path.join(source, "wasm"), path.join(destination, "wasm"), { recursive: true });
+  await fs.cp(path.join(source, "image_decoders"), path.join(destination, "image_decoders"), { recursive: true });
+}

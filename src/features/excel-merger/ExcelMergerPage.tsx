@@ -487,8 +487,8 @@ export function ExcelMergerPage() {
               onFiles={handleFiles}
               accent="green"
             />
-            <UtilityNotice className="mt-3"><Info className="mt-0.5 shrink-0" size={15} /><span>{t(preserveLegacyXls ? "excel.steps.files.preserveNotice" : "excel.steps.files.notice")}</span></UtilityNotice>
-            {fileNotice && <UtilityNotice className="mt-2" role="status"><AlertCircle className="mt-0.5 shrink-0" size={15} /><span>{fileNotice}</span></UtilityNotice>}
+            <UtilityNotice className="mt-3" kind="warning">{t(preserveLegacyXls ? "excel.steps.files.preserveNotice" : "excel.steps.files.notice")}</UtilityNotice>
+            {fileNotice && <UtilityNotice className="mt-2" role="status">{fileNotice}</UtilityNotice>}
             <ExcelFileList
               entries={entries}
               onRemove={removeFile}
@@ -536,7 +536,7 @@ export function ExcelMergerPage() {
               onSetAll={setAllSheetsForFile}
               t={t}
             />
-            {entries.length > 0 && !inspecting && selectedSheetCount === 0 && <UtilityNotice className="mt-2" data-testid="excel-sheet-required" role="status"><AlertCircle className="mt-0.5 shrink-0" size={15} /><span>{t("excel.sheetSelection.required")}</span></UtilityNotice>}
+            {entries.length > 0 && !inspecting && selectedSheetCount === 0 && <UtilityNotice className="mt-2" data-testid="excel-sheet-required" role="status">{t("excel.sheetSelection.required")}</UtilityNotice>}
           </UtilitySectionCard>
 
           <UtilitySectionCard step={3} title={t("excel.steps.mode.title")} description={t("excel.steps.mode.description")}>
@@ -552,10 +552,7 @@ export function ExcelMergerPage() {
                 ]}
               />
             </div>
-            <UtilityNotice className="mt-3" tone="success">
-              <Info className="mt-0.5 shrink-0" size={17} />
-              <span>{t(`excel.modeHelp.${mergeMode}`)}</span>
-            </UtilityNotice>
+            <UtilityNotice className="mt-3" kind="info">{t(`excel.modeHelp.${mergeMode}`)}</UtilityNotice>
           </UtilitySectionCard>
 
           <UtilitySectionCard step={4} title={t("excel.steps.output.title")} description={t("excel.steps.output.description")}>
@@ -596,7 +593,7 @@ export function ExcelMergerPage() {
                     disabled={precisionPreparing || loading}
                   />
                 </div>
-                <UtilityNotice className="mt-2"><Info className="mt-0.5 shrink-0" size={15} /><span>{t("excel.xlsPreserve.reloadNotice")}</span></UtilityNotice>
+                <UtilityNotice className="mt-2" kind="warning">{t("excel.xlsPreserve.reloadNotice")}</UtilityNotice>
               </Card>
 
               <Card as="section" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" data-testid="excel-settings-category">
@@ -734,7 +731,7 @@ export function ExcelMergerPage() {
         </aside>
       </div>
 
-      {error && <UtilityNotice className="mt-4" data-testid="excel-merge-error" tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div className="flex flex-col"><strong>{t("excel.failed")}</strong><span>{error}</span></div></UtilityNotice>}
+      {error && <UtilityNotice className="mt-4" data-testid="excel-merge-error" kind="error" role="alert"><div className="flex flex-col"><strong>{t("excel.failed")}</strong><span>{error}</span></div></UtilityNotice>}
 
       {result && (
         <ResultCard

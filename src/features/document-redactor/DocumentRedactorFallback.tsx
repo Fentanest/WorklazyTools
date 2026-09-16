@@ -12,7 +12,7 @@ export function DocumentRedactorFallback() {
         <h1 className="text-2xl font-extrabold">{c.title}</h1>
         <p className="mt-2 text-muted-foreground">{c.description}</p>
       </header>
-      <UtilityNotice tone="error" role="alert">
+      <UtilityNotice kind="error" role="alert">
         {c.errors["not-ready"]}
       </UtilityNotice>
       {c.guide && (
@@ -23,7 +23,7 @@ export function DocumentRedactorFallback() {
           faq={(c.guide.faq || []).map((item: {q: string, a: string}) => ({ question: item.q, answer: item.a }))}
         >
           {c.guide.fallbackNotice && (
-            <UtilityNotice className="mb-4" tone="warning">
+            <UtilityNotice className="mb-4" kind="warning">
               {c.guide.fallbackNotice}
             </UtilityNotice>
           )}

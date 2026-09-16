@@ -1,3 +1,4 @@
+import { createLocalId } from "../../lib/utils";
 export type QrBulkStorageKind = "opfs" | "memory";
 
 export interface QrBulkResultStorage {
@@ -18,7 +19,7 @@ export async function inspectQrBulkStorage(): Promise<QrBulkStorageCapability> {
   try {
     if (!navigator.storage?.getDirectory) throw new Error("OPFS_UNAVAILABLE");
     const root = await navigator.storage.getDirectory();
-    const probe = `.worklazy-qr-probe-${crypto.randomUUID()}`;
+    const probe = `.worklazy-qr-probe-${createLocalId()}`;
     await root.getDirectoryHandle(probe, { create: true });
     await root.removeEntry(probe, { recursive: true });
     return { kind: "opfs", availableBytes };
@@ -31,7 +32,7 @@ export async function createQrBulkResultStorage(kind: QrBulkStorageKind): Promis
   if (kind === "memory") return createMemoryStorage();
   const root = await navigator.storage.getDirectory();
   const parent = await root.getDirectoryHandle("worklazy-qr-bulk", { create: true });
-  const runName = `run-${crypto.randomUUID()}`;
+  const runName = `run-${createLocalId()}`;
   const run = await parent.getDirectoryHandle(runName, { create: true });
   let cleared = false;
   return {

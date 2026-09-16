@@ -1,3 +1,4 @@
+import { createLocalId } from "../../../lib/utils";
 import { MEMORY_RESULT_LIMIT_BYTES, checkMemoryResultRegistration } from "./canvasPolicy.ts";
 
 const STORAGE_ROOT = "worklazy-pdf-finish-results-v1";
@@ -41,7 +42,7 @@ export async function createPdfFinishResultStore(options: {
     try {
       const storageRoot = await storage.getDirectory();
       const root = await storageRoot.getDirectoryHandle(STORAGE_ROOT, { create: true });
-      const sessionName = `session-${options.id ?? crypto.randomUUID()}`;
+      const sessionName = `session-${options.id ?? createLocalId()}`;
       const session = await root.getDirectoryHandle(sessionName, { create: true });
       return opfsStore(root, session, sessionName);
     } catch {

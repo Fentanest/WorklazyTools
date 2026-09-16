@@ -7,6 +7,7 @@ import type {
 } from "react";
 
 import { cn } from "../lib/utils";
+import { Info, AlertTriangle, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { SectionCard } from "./ui";
 
 export const pairedEditorClassName = "h-80 min-h-80 max-h-80 flex-none resize-none";
@@ -73,26 +74,73 @@ export function UtilityField({ children, className, ...props }: ComponentProps<"
   return <label {...props} className={cn("flex min-w-0 flex-col gap-1.5 text-[13px] font-bold text-muted-foreground", className)}>{children}</label>;
 }
 
-export function UtilityNotice({ children, className, tone = "warning", role, ...props }: {
-  children: ReactNode;
-  className?: string;
-  tone?: "warning" | "error" | "success";
+export type NoticeKind = "info" | "progress" | "success" | "warning" | "error";
+
+export function UtilityNotice({
+  kind = "info",
+  title,
+  children,
+  icon,
+  actions,
+  density = "normal",
+  announce = "off",
+  role,
+  className,
+  id,
+  "data-testid": testId,
+  tone,
+  ...props
+}: {
+  kind?: NoticeKind;
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  icon?: React.ReactNode;
+  actions?: React.ReactNode;
+  density?: "compact" | "normal";
+  announce?: "off" | "polite" | "assertive";
   role?: "alert" | "status";
-} & Omit<ComponentProps<"div">, "children" | "className" | "role">) {
+  className?: string;
+  id?: string;
+  "data-testid"?: string;
+  tone?: "warning" | "error" | "success" | "info" | "progress";
+} & Omit<React.ComponentProps<"div">, "title" | "children" | "id" | "className" | "role">) {
+  const actualKind = tone ? (tone as NoticeKind) : kind;
+  
+  let DefaultIcon = Info;
+  if (actualKind === "warning") DefaultIcon = AlertTriangle;
+  else if (actualKind === "error") DefaultIcon = AlertCircle;
+  else if (actualKind === "success") DefaultIcon = CheckCircle2;
+  else if (actualKind === "progress") DefaultIcon = Loader2;
+
   return (
     <div
-      data-slot="notice"
-      role={role}
+      id={id}
+      data-testid={testId}
       {...props}
       className={cn(
-        "flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm leading-relaxed",
-        tone === "warning" && "bg-amber-500/10 text-amber-800 dark:text-amber-300",
-        tone === "error" && "bg-destructive/10 text-destructive",
-        tone === "success" && "bg-green-500/10 text-green-800 dark:text-green-300",
-        className,
+        "relative w-full rounded-2xl border bg-primary/5 text-sm text-muted-foreground border-primary/10",
+        density === "compact" ? "px-3 py-2" : "px-4 py-3",
+        className
       )}
+      role={role || (announce === "off" ? undefined : (announce === "assertive" ? "alert" : "status"))}
+      aria-live={announce === "off" ? undefined : announce}
     >
-      {children}
+      <div className="flex items-start gap-3">
+        <div className={cn("mt-0.5 shrink-0", 
+          actualKind === "error" && "text-destructive",
+          actualKind === "warning" && "text-amber-500",
+          actualKind === "success" && "text-green-500",
+          actualKind === "info" && "text-primary",
+          actualKind === "progress" && "text-primary animate-spin"
+        )}>
+          {icon ?? <DefaultIcon size={18} />}
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          {title && <h5 className="font-medium text-primary">{title}</h5>}
+          <div className="leading-relaxed">{children}</div>
+          {actions && <div className="mt-3 flex flex-wrap gap-2">{actions}</div>}
+        </div>
+      </div>
     </div>
   );
 }

@@ -52,6 +52,10 @@ export async function openOwnedPdfDocument(
     password: "",
     enableXfa: true,
     useSystemFonts: true,
+    cMapUrl: "/vendor/pdfjs/6.2.108/cmaps/",
+    cMapPacked: true,
+    standardFontDataUrl: "/vendor/pdfjs/6.2.108/standard_fonts/",
+    wasmUrl: "/vendor/pdfjs/6.2.108/wasm/",
     isOffscreenCanvasSupported: false,
     isImageDecoderSupported: false,
   });
@@ -118,8 +122,10 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko", s
     password: "",
     enableXfa: true,
     useSystemFonts: true,
-    // PDF.js의 내부 OffscreenCanvas/ImageDecoder 경로는 일부 Chromium·GPU 조합에서
-    // 오류 없이 흰 캔버스를 돌려주는 경우가 있어 썸네일은 호환성 경로를 사용합니다.
+    cMapUrl: "/vendor/pdfjs/6.2.108/cmaps/",
+    cMapPacked: true,
+    standardFontDataUrl: "/vendor/pdfjs/6.2.108/standard_fonts/",
+    wasmUrl: "/vendor/pdfjs/6.2.108/wasm/",
     isOffscreenCanvasSupported: false,
     isImageDecoderSupported: false,
   });

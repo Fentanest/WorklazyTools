@@ -93,8 +93,8 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
         ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} aria-pressed={tab === value} data-state={tab === value ? "active" : "inactive"} onClick={() => { activeController.current?.abort(); activeController.current = undefined; editorHandle.current?.cancel(); setVisited(current => new Set([...current, value])); setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
       </Card>
 
-      <UtilityNotice className="image-format-notice mb-2"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("image.heic")}</span></UtilityNotice>
-      {(tab === "batch" || tab === "collage" || tab === "gif") && <UtilityNotice className="image-worker-notice mb-2"><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("image.offscreen")}</span></UtilityNotice>}
+      <UtilityNotice className="image-format-notice mb-2">{t("image.heic")}</UtilityNotice>
+      {(tab === "batch" || tab === "collage" || tab === "gif") && <UtilityNotice className="image-worker-notice mb-2">{t("image.offscreen")}</UtilityNotice>}
 
       <div hidden={tab !== "editor"} data-image-owner="editor"><ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} /></div>
       {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
@@ -1628,7 +1628,7 @@ function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; 
   return (
     <UtilitySectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
       <FileDropZone files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
-      {editorError && <UtilityNotice tone="error" role="alert" className="mt-3">{editorError}</UtilityNotice>}
+      {editorError && <UtilityNotice kind="error" role="alert" className="mt-3">{editorError}</UtilityNotice>}
       <ClipboardHint mode="replace" />
       <div className="editor-source-actions mt-2 flex items-center justify-between gap-2.5"><Button type="button" className="rounded-xl" variant="secondary" onClick={newBlankCanvas}><ImageIcon size={16} /> {t("image.editor.blank")}</Button>{file && <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground">{t("image.editor.editing", { name: file.name })}</span>}</div>
       <ImageEditorToolbar

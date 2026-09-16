@@ -504,7 +504,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
 
           {!!pages.length && (
             <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.editAndSelectPages")} description={outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.defineEachOutputRangeThenDragRotateOr") : featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseOutputPagesInTheCurrentOrderThen")} className="overflow-visible ">
-              <UtilityNotice className="mb-4 bg-primary/10 text-muted-foreground"><Info className="mt-0.5 shrink-0 text-primary " size={15} /><span>{outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.numberBadgesShowWhichOutputRangesIncludeA") : featureMessage(language, "pdf.messages.PdfOrganizePanel.deselectingExcludesAPageFromThisOutputDeleting")}</span></UtilityNotice>
+              <UtilityNotice className="mb-4 bg-primary/10 text-muted-foreground">{outputMode === "ranges" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.numberBadgesShowWhichOutputRangesIncludeA") : featureMessage(language, "pdf.messages.PdfOrganizePanel.deselectingExcludesAPageFromThisOutputDeleting")}</UtilityNotice>
               {outputMode !== "ranges" && (
                 <div className="pdf-selection-toolbar mb-3 flex items-center justify-between gap-2.5 rounded-xl bg-muted p-2 max-[620px]:flex-col max-[620px]:items-stretch">
                   <div className="flex items-center gap-1 max-[620px]:justify-between">

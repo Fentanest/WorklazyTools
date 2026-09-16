@@ -34,8 +34,8 @@ export function ImagePrivacyPage() {
   };
   return <UtilityPage toolId="image-privacy">
     <PageHeader eyebrow="IMAGE PRIVACY" title={t("imagePrivacy.title")} description={t("imagePrivacy.description")}><PrivacyBanner compact /></PageHeader>
-    <UtilitySectionCard title={t("imagePrivacy.select")} description={t("imagePrivacy.selectHelp")}><FileDropZone files={files} onFiles={selectFiles} accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple hint={t("imagePrivacy.hint")} accent="sky" /><div className="mt-3"><UtilityNotice><AlertTriangle className="mt-0.5 shrink-0" size={16} /><span>{t("imagePrivacy.compatibility")}</span></UtilityNotice></div><div className="mt-4 flex justify-end max-[620px]:[&_[data-ui-component=primary-button]]:w-full"><PrimaryButton accent="sky" disabled={!files.length} loading={busy} onClick={() => void execute()}><ShieldCheck size={18} /> {t("imagePrivacy.execute")}</PrimaryButton></div></UtilitySectionCard>
-    {error && <UtilityNotice className="mb-3.5" tone="error" role="alert">{error}</UtilityNotice>}
+    <UtilitySectionCard title={t("imagePrivacy.select")} description={t("imagePrivacy.selectHelp")}><FileDropZone files={files} onFiles={selectFiles} accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple hint={t("imagePrivacy.hint")} accent="sky" /><div className="mt-3"><UtilityNotice>{t("imagePrivacy.compatibility")}</UtilityNotice></div><div className="mt-4 flex justify-end max-[620px]:[&_[data-ui-component=primary-button]]:w-full"><PrimaryButton accent="sky" disabled={!files.length} loading={busy} onClick={() => void execute()}><ShieldCheck size={18} /> {t("imagePrivacy.execute")}</PrimaryButton></div></UtilitySectionCard>
+    {error && <UtilityNotice className="mb-3.5" kind="error" role="alert">{error}</UtilityNotice>}
     {result && <UtilitySectionCard
       title={t("imagePrivacy.result")}
       description={t("imagePrivacy.found", { count: result.items.reduce<number>((sum, item) => sum + item.metadata.foundCount, 0) })}

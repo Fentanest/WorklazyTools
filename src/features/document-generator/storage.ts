@@ -1,3 +1,4 @@
+import { createLocalId } from "../../lib/utils";
 import { GeneratorError } from './errors.ts';
 export const GENERATOR_MEMORY_LIMIT = 200 * 1024 * 1024;
 export interface GeneratorStorage {
@@ -38,7 +39,7 @@ export interface GeneratorStoragePlatform {
 export async function createGeneratorStorage(platform: GeneratorStoragePlatform | undefined = globalThis.navigator?.storage): Promise<GeneratorStorage> {
   let parent: FileSystemDirectoryHandle;
   let run: FileSystemDirectoryHandle;
-  const runName = `run-${crypto.randomUUID()}`;
+  const runName = `run-${createLocalId()}`;
   const estimate = await platform?.estimate?.().catch(() => undefined);
   try {
     if (!platform?.getDirectory) return createGeneratorMemoryStorage();

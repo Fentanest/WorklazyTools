@@ -166,7 +166,7 @@ export function DocumentComparePage() {
             renderAccessory={passwordAccessory}
           />
         </div>
-        {pairingError && <UtilityNotice className="mt-3.5" tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={17} /><span className="flex min-w-0 flex-col"><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small className="mt-1 text-muted-foreground">{pairingError}</small></span></UtilityNotice>}
+        {pairingError && <UtilityNotice className="mt-3.5" kind="error" role="alert"><span className="flex min-w-0 flex-col"><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small className="mt-1 text-muted-foreground">{pairingError}</small></span></UtilityNotice>}
         {!pairingError && session.beforeFiles.length > 0 && <DocumentPairingPreview beforeFiles={session.beforeFiles} afterFiles={session.afterFiles} language={language} />}
       </UtilitySectionCard>
 
@@ -199,7 +199,7 @@ export function DocumentComparePage() {
         </SectionCard>
       </div>
 
-      <UtilityNotice className="mt-4 border border-primary/20 bg-primary/10 text-primary"><Info className="mt-0.5 shrink-0" size={16} /><span className="flex min-w-0 flex-col"><strong>{L("파일 형식에 맞는 비교 기능을 자동으로 준비합니다.", "The appropriate comparison support is prepared automatically.")}</strong><small className="mt-1 text-[13px] text-muted-foreground">{L("처음 필요한 파일을 받는 동안에도 진행률과 현재 단계를 표시하며, 문서는 브라우저 안에서 처리합니다.", "Progress and the current step remain visible during the first download, and documents are processed in your browser.")}</small></span></UtilityNotice>
+      <UtilityNotice className="mt-4" kind="info"><span className="flex min-w-0 flex-col"><strong>{L("파일 형식에 맞는 비교 기능을 자동으로 준비합니다.", "The appropriate comparison support is prepared automatically.")}</strong><small className="mt-1 text-[13px] text-muted-foreground">{L("처음 필요한 파일을 받는 동안에도 진행률과 현재 단계를 표시하며, 문서는 브라우저 안에서 처리합니다.", "Progress and the current step remain visible during the first download, and documents are processed in your browser.")}</small></span></UtilityNotice>
       <Card className="mt-4 flex-row items-center justify-between gap-5 overflow-visible rounded-3xl border border-border p-4 shadow-md max-[620px]:flex-col max-[620px]:items-stretch" data-testid="document-action-bar">
         <div className="flex min-w-0 flex-1 items-center gap-2.5"><TextSearch className="shrink-0 text-primary" size={20} /><span className="flex min-w-0 flex-1 flex-col [writing-mode:horizontal-tb]" data-testid="document-action-copy"><strong className="text-sm [writing-mode:horizontal-tb]">{ready ? L(`${session.beforeFiles.length}개 문서 쌍을 비교할 준비가 됐어요.`, `${session.beforeFiles.length} document pairs are ready.`) : pairingError ? L("양쪽 파일 개수를 맞춰 주세요.", "Use the same number of files on both sides.") : !hasOutput ? L("결과 형식을 하나 이상 선택해 주세요.", "Select at least one output format.") : L("수정 전·후 문서를 선택해 주세요.", "Choose before and after documents.")}</strong><small className="mt-1 text-[13px] text-muted-foreground [writing-mode:horizontal-tb]">{L("HWP 암호는 해당 파일 아래 입력란에서만 사용됩니다.", "HWP passwords are used only for their selected files.")}</small></span></div>
         <div className="flex w-[190px] shrink-0 flex-col gap-2 [&_[data-ui-component=primary-button]]:w-full max-[620px]:w-full"><PrimaryButton accent="blue" disabled={!ready || Boolean(pairingError)} loading={loading} onClick={() => void runComparison()}>{loading ? L(`${operation.progress}% 비교 중`, `Comparing ${operation.progress}%`) : session.beforeFiles.length ? L(`${session.beforeFiles.length}개 문서 쌍 비교`, `Compare ${session.beforeFiles.length} document pairs`) : L("문서 쌍 비교", "Compare document pairs")}</PrimaryButton>
@@ -207,7 +207,7 @@ export function DocumentComparePage() {
         </div>
       </Card>
       <OperationProgress status={operation.status} progress={operation.progress} message={operation.message} logs={operation.logs} accent="blue" title={L("문서 비교 진행 상황", "Document comparison progress")} />
-      {error && !pairingError && <UtilityNotice className="mt-3" tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><span className="flex flex-col"><strong>{L("비교하지 못했습니다.", "Comparison failed.")}</strong><span>{error}</span></span></UtilityNotice>}
+      {error && !pairingError && <UtilityNotice className="mt-3" kind="error" role="alert"><span className="flex flex-col"><strong>{L("비교하지 못했습니다.", "Comparison failed.")}</strong><span>{error}</span></span></UtilityNotice>}
 
       {session.results.length > 0 && <section className="mt-6" data-testid="document-results" aria-live="polite">
         <div className="mb-3"><p className="text-xs font-extrabold tracking-[.08em] text-green-700 uppercase dark:text-green-300">{L("작업 완료", "Complete")}</p><h2 className="mt-1 font-heading text-2xl font-medium">{L(`${session.results.length}개 문서 쌍의 결과`, `Results for ${session.results.length} document pairs`)}</h2><p className="mt-2 text-sm text-muted-foreground">{L("지원되는 결과를 문서 쌍별로 열 수 있습니다.", "Open the supported outputs for each document pair.")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></div>

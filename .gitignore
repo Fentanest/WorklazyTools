@@ -20,3 +20,4 @@ docs/jobs/
 .codex/
 dummyfortest/
 tests/visual-artifacts/
+public/vendor/pdfjs/

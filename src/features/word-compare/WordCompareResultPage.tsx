@@ -131,7 +131,7 @@ export function DocumentCompareResultPage({
           tables={pair.result.tables}
         />
 
-        {pair.result.warnings.map((warning) => <UtilityNotice className="mt-3" key={warning}><Info className="mt-0.5 shrink-0" size={14} /> {warning}</UtilityNotice>)}
+        {pair.result.warnings.map((warning) => <UtilityNotice className="mt-3" key={warning}>{warning}</UtilityNotice>)}
       </Card>
 
       <nav className="mt-3.5 flex flex-wrap items-center justify-between gap-y-2" aria-label={L("다른 문서 쌍 비교 결과", "Other document-pair results")}>

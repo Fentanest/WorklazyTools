@@ -620,10 +620,10 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
         <PrivacyBanner compact />
       </PageHeader>
 
-      {audioFailure && <UtilityNotice tone="error" role="alert">{audioFailure}</UtilityNotice>}
+      {audioFailure && <UtilityNotice kind="error" role="alert">{audioFailure}</UtilityNotice>}
       <UtilitySectionCard step={1} title={t("audio.select")} description={t("audio.selectHelp")} className="">
         <FileDropZone files={files} onFiles={handleFiles} accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hint={t("audio.hint")} accent="violet" />
-        <UtilityNotice className="mt-3 bg-primary/10 text-muted-foreground"><AlertTriangle className="mt-0.5 shrink-0 text-primary dark:text-primary" size={16} /><span>{t("audio.compatibility")}</span></UtilityNotice>
+        <UtilityNotice className="mt-3" kind="info">{t("audio.compatibility")}</UtilityNotice>
         {document && (
           <Card className="audio-file-summary mt-3 min-w-0 flex-row items-center gap-2.5 overflow-visible rounded-2xl border border-primary/20 bg-primary/10 p-3 py-3 text-primary shadow-none ring-0  dark:bg-primary/10 dark:text-primary">
             <FileAudio2 className="shrink-0" size={21} />
@@ -693,7 +693,7 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
 
       <OperationProgress {...progress} accent="orange" title={t("audio.log")} />
       {busy && <div className="mt-2 flex justify-end"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => { cancelDecode(); activeControllerRef.current?.abort(); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</Button></div>}
-      {lastResult && <UtilityNotice className="mt-3" tone="success" role="status" data-testid="audio-result"><FileAudio2 className="mt-0.5 shrink-0" size={18} /><span>{lastResult}</span></UtilityNotice>}
+      {lastResult && <UtilityNotice className="mt-3" kind="success" role="status" data-testid="audio-result"><FileAudio2 className="mt-0.5 shrink-0" size={18} /><span>{lastResult}</span></UtilityNotice>}
 
       <ToolGuide
         title={t("audio.guide.title")}
