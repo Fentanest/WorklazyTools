@@ -16,7 +16,7 @@ export function UtilityPage({ toolId, children, className, flush = false }: { to
     <div
       data-tool-page={toolId}
       className={cn(
-        "mx-auto w-full max-w-[1030px]",
+        "mx-auto w-full max-w-[var(--tool-content-max-width,1180px)]",
         !flush && "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(104px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
         className,
       )}

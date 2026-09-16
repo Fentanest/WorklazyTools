@@ -151,7 +151,7 @@ export function DocumentGeneratorPage() {
   const attemptIsPublished = snapshot.attempt?.id === snapshot.resultAttemptId;
   const progressRows = snapshot.attempt?.rows ?? [];
   const selectedRow = plan?.rows.find(row=>row.id===sampleRow);
-  const guide = tr('features:documentGenerator.guide', {returnObjects:true}) as unknown as {intro:string;steps:Array<{title:string;description:string}>;faq:Array<{q:string;a:string}>};
+  const guide = tr('features:documentGenerator.guide', {returnObjects:true}) as any;
 
   return <UtilityPage toolId="document-generator">
     <PageHeader eyebrow={tr('features:documentGenerator.eyebrow')} title={tr('features:documentGenerator.title')} description={tr('features:documentGenerator.description')} />
@@ -189,7 +189,7 @@ export function DocumentGeneratorPage() {
       {zip&&zipAttemptId===snapshot.resultAttemptId&&<a className="mt-3 inline-flex items-center gap-2 font-bold text-blue-700 underline dark:text-blue-300" href={zip.url} download="generated-documents.zip"><Download size={16}/>{tr('features:documentGenerator.results.downloadZip')}</a>}
     </UtilitySectionCard>}
     {message&&<UtilityNotice tone="error" role="alert">{message}</UtilityNotice>}
-    <ToolGuide title={tr('features:documentGenerator.title')} description={guide.intro} blocks={guide.steps.map(step=>({title:step.title,paragraphs:[step.description]}))} faq={guide.faq.map(item=>({question:item.q,answer:item.a}))}/>
+    <ToolGuide title={tr('features:documentGenerator.title')} description={guide.description} blocks={guide.blocks as any} faq={(guide.faq || []).map((item: any)=>({question:item.q,answer:item.a}))}/>
   </UtilityPage>;
 }
 

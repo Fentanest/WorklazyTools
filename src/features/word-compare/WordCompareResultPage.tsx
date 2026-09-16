@@ -78,7 +78,7 @@ export function DocumentCompareResultPage({
         <Card as="section" className="min-h-72 place-items-center content-center gap-0 rounded-4xl border border-border p-8 text-center shadow-sm" data-testid="document-expired-result">
           <TextSearch className="text-blue-700 dark:text-blue-300" size={27} />
           <h2 className="mt-3 font-heading text-lg font-medium">{L("문서를 다시 선택해 주세요.", "Choose the documents again.")}</h2>
-          <p className="mt-2 mb-4 max-w-lg text-sm leading-relaxed text-muted-foreground">{L("페이지를 새로고침했거나 탭을 다시 연 경우, 문서 보호를 위해 이전 비교 내용은 남아 있지 않습니다.", "After a reload or reopened tab, the previous comparison is discarded to protect your documents.")}</p>
+          <p className="mt-2 mb-4 max-w-lg text-sm leading-relaxed text-muted-foreground">{L("페이지를 새로고침했거나 탭을 다시 연 경우, 문서 보호를 위해 이전 비교 내용은 남아 있지 않습니다.", "After a reload or reopened tab, the previous comparison is discarded to protect your documents.")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>
           <Button render={<Link to={localizedBasePath} />} variant="secondary" className="rounded-xl font-bold"><ArrowLeft size={15} /> {L(`${toolLabel}로 돌아가기`, `Back to ${toolLabel}`)}</Button>
         </Card>
       </UtilityPage>

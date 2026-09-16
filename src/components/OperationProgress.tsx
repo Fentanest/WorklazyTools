@@ -11,23 +11,23 @@ import { Card } from "./ui/card";
 import { Progress, ProgressIndicator } from "./ui/progress";
 
 const progressIndicatorClasses = {
-  green: "bg-green-700",
-  blue: "bg-blue-700",
-  violet: "bg-violet-700",
-  orange: "bg-orange-700",
-  pink: "bg-pink-700",
-  sky: "bg-sky-700",
-  coral: "bg-red-700",
+  green: "bg-primary",
+  blue: "bg-primary",
+  violet: "bg-primary",
+  orange: "bg-primary",
+  pink: "bg-primary",
+  sky: "bg-primary",
+  coral: "bg-primary",
 } satisfies Record<ToolAccent, string>;
 
 const progressStateClasses = {
-  green: "bg-green-50 text-green-700 dark:bg-green-950/70 dark:text-green-300",
-  blue: "bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300",
-  violet: "bg-violet-50 text-violet-700 dark:bg-violet-950/70 dark:text-violet-300",
-  orange: "bg-orange-50 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300",
-  pink: "bg-pink-50 text-pink-700 dark:bg-pink-950/70 dark:text-pink-300",
-  sky: "bg-sky-50 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
-  coral: "bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300",
+  green: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",
+  blue: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",
+  violet: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",
+  orange: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",
+  pink: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",
+  sky: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",
+  coral: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",
 } satisfies Record<ToolAccent, string>;
 
 export function OperationProgress({

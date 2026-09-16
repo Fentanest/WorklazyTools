@@ -324,7 +324,7 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 
 .page { width: min(1180px, 100%); margin: 0 auto; padding: 48px 0 52px; }
 .standard-page,
-.tool-page { width: min(1030px, 100%); padding-top: 61px; }
+.tool-page { width: min(var(--tool-content-max-width, 1180px), 100%); padding-top: 61px; margin: 0 auto; }
 
 .page-enter { animation: page-in .42s cubic-bezier(.2, .8, .2, 1) both; }
 @keyframes page-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }

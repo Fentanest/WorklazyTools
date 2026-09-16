@@ -698,8 +698,8 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
       <ToolGuide
         title={t("audio.guide.title")}
         description={t("audio.guide.description")}
-        blocks={(t("audio.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
-        faq={(t("audio.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
+        blocks={t("audio.guide.blocks", { returnObjects: true }) as any}
+        faq={(t("audio.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
       />
       </div>
     </UtilityPage>

@@ -19,3 +19,4 @@ __pycache__/
 docs/jobs/
 .codex/
 dummyfortest/
+tests/visual-artifacts/

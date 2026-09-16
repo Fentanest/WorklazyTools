@@ -11,24 +11,29 @@
     "emptyDescription": "다른 검색어나 카테고리를 선택해 보세요."
   },
   "categories": {
+    "spreadsheets": {
+      "label": "엑셀·표",
+      "shortLabel": "엑셀·표",
+      "description": "엑셀과 표 데이터를 정리·비교·병합합니다."
+    },
     "documents": {
-      "label": "문서·스프레드시트",
-      "shortLabel": "문서",
-      "description": "문서를 편집·비교·병합하고 필요한 형식으로 변환합니다."
+      "label": "문서·PDF",
+      "shortLabel": "문서·PDF",
+      "description": "문서를 편집·비교·생성하고 필요한 형식으로 변환합니다."
     },
     "media": {
       "label": "이미지·영상·오디오",
-      "shortLabel": "미디어",
+      "shortLabel": "이미지·영상",
       "description": "이미지와 영상, 오디오를 브라우저에서 직접 편집합니다."
     },
     "text-data": {
-      "label": "텍스트·데이터",
-      "shortLabel": "텍스트·데이터",
-      "description": "텍스트와 코드, 표 데이터를 읽기 좋은 형태로 정리합니다."
+      "label": "텍스트·코드",
+      "shortLabel": "텍스트·코드",
+      "description": "텍스트와 코드 데이터를 읽기 좋은 형태로 정리합니다."
     },
     "work": {
-      "label": "일정·근무·급여",
-      "shortLabel": "업무 계산",
+      "label": "날짜·계산",
+      "shortLabel": "날짜·계산",
       "description": "업무 일정과 근무일, 시차와 급여를 간편하게 계산합니다."
     },
     "security-share": {
@@ -39,9 +44,9 @@
   },
   "items": {
     "document-redactor": {
-      "title": "개인정보 마스킹",
-      "shortTitle": "개인정보 마스킹",
-      "description": "PDF와 이미지에서 직접 선택한 영역을 검정으로 가리고 새 사본으로 저장합니다.",
+      "title": "개인정보 가리기",
+      "shortTitle": "개인정보 가리기",
+      "description": "PDF·이미지에서 가릴 부분을 직접 골라 새 파일로 저장합니다.",
       "eyebrow": "문서 개인정보",
       "highlights": [
         "직접 영역 선택",
@@ -51,9 +56,9 @@
       ]
     },
     "excel-merger": {
-      "title": "Excel Merger",
+      "title": "Excel 병합",
       "shortTitle": "Excel 병합",
-      "description": "여러 Excel 파일과 CSV를 원하는 방식으로 하나의 파일에 정리합니다.",
+      "description": "여러 엑셀 파일의 시트나 표를 한 파일로 모읍니다.",
       "eyebrow": "스프레드시트",
       "highlights": [
         "시트별 병합",
@@ -63,9 +68,9 @@
       ]
     },
     "excel-compare": {
-      "title": "Excel Compare",
+      "title": "Excel 비교",
       "shortTitle": "Excel 비교",
-      "description": "머리글 후보를 확인한 뒤 Excel·CSV 파일 쌍의 값·수식·서식 차이와 중복 키의 좌우 원본 행을 비교합니다.",
+      "description": "두 엑셀 파일의 다른 값을 찾고 비교 보고서를 만듭니다.",
       "eyebrow": "스프레드시트 비교",
       "highlights": [
         "머리글 후보 선택",
@@ -76,9 +81,9 @@
       ]
     },
     "excel-cleaner": {
-      "title": "Excel Data Cleaner",
+      "title": "Excel 정리",
       "shortTitle": "Excel 정리",
-      "description": "Excel·CSV 파일에 28종 규칙을 순서대로 적용하고 새 XLSX·CSV와 처리 보고서를 만듭니다.",
+      "description": "공백·중복·불필요한 행과 열을 정리해 새 파일로 저장합니다.",
       "eyebrow": "스프레드시트 정리",
       "highlights": [
         "구조 규칙 13종",
@@ -88,9 +93,9 @@
       ]
     },
     "pdf-editor": {
-      "title": "PDF Tools",
+      "title": "PDF 도구",
       "shortTitle": "PDF 도구",
-      "description": "PDF 페이지를 편집·병합·범위별 추출하고 이미지·DOCX·XLSX·TXT로 변환하거나 브라우저 OCR을 실행합니다.",
+      "description": "PDF를 합치고 순서를 바꾸거나, 필요한 페이지만 따로 저장합니다.",
       "eyebrow": "PDF 편집·변환",
       "highlights": [
         "체크 선택·연속 분할",
@@ -100,9 +105,9 @@
       ]
     },
     "document-compare": {
-      "title": "Document Compare",
+      "title": "문서 비교",
       "shortTitle": "문서 비교",
-      "description": "DOCX·DOC와 HWP·HWPX 문서의 본문·표·서식 변경을 같은 기준으로 비교합니다.",
+      "description": "워드·한글 문서의 수정 전후를 비교해 바뀐 부분을 확인합니다.",
       "eyebrow": "문서 비교",
       "highlights": [
         "Word·HWP 통합",
@@ -112,9 +117,9 @@
       ]
     },
     "pdf-compare": {
-      "title": "PDF Compare",
+      "title": "PDF 비교",
       "shortTitle": "PDF 비교",
-      "description": "여러 PDF 파일 쌍의 페이지별 화면과 추출 텍스트 차이를 비교합니다.",
+      "description": "두 PDF의 페이지 화면과 글자 내용을 비교합니다.",
       "eyebrow": "PDF 비교",
       "highlights": [
         "여러 파일 쌍",
@@ -124,9 +129,9 @@
       ]
     },
     "hwp-editor": {
-      "title": "HWP Editor",
+      "title": "HWP 편집",
       "shortTitle": "HWP 편집",
-      "description": "HWP·HWPX 문서를 공식 rhwp Studio에서 편집하고 다시 HWP·HWPX로 저장합니다.",
+      "description": "HWP·HWPX 문서를 열고 내용을 수정한 뒤 저장합니다.",
       "eyebrow": "한글 문서",
       "highlights": [
         "HWP·HWPX·HML",
@@ -136,9 +141,9 @@
       ]
     },
     "office-editor": {
-      "title": "Browser Office Editor",
+      "title": "오피스 편집기",
       "shortTitle": "오피스 편집기",
-      "description": "파일을 놓으면 LibreOffice 기반 전체 화면을 자동으로 준비해 Writer·Calc·Impress 문서를 편집합니다.",
+      "description": "문서·스프레드시트·발표 자료를 브라우저에서 편집합니다.",
       "eyebrow": "브라우저 오피스",
       "highlights": [
         "드롭 자동 시작",
@@ -148,9 +153,9 @@
       ]
     },
     "video-studio": {
-      "title": "Video Studio",
+      "title": "비디오 스튜디오",
       "shortTitle": "비디오 스튜디오",
-      "description": "영상 수 제한 없이 최대 10개 그룹으로 편집하고 영상·오디오 스트림을 원하는 방식으로 변환합니다.",
+      "description": "영상의 필요한 구간을 자르고 파일 형식을 바꿉니다.",
       "eyebrow": "비디오 편집",
       "highlights": [
         "무제한 추가·10개 그룹",
@@ -161,9 +166,9 @@
       ]
     },
     "audio-studio": {
-      "title": "Audio Studio",
+      "title": "오디오 스튜디오",
       "shortTitle": "오디오 스튜디오",
-      "description": "오디오 파형에서 선택한 구간을 편집하고 피치·음색 효과를 적용한 뒤 WAV·MP3로 저장합니다.",
+      "description": "소리의 필요한 구간을 편집하고 음성 효과를 적용합니다.",
       "eyebrow": "오디오 편집",
       "highlights": [
         "고해상도 파형",
@@ -173,9 +178,9 @@
       ]
     },
     "image-studio": {
-      "title": "Image Studio",
+      "title": "이미지 스튜디오",
       "shortTitle": "이미지 스튜디오",
-      "description": "선택 영역 모자이크·블러, 사진 보정과 자유 그리기를 한 편집기에서 사용하고 이미지·캔버스·출력 크기를 따로 지정합니다.",
+      "description": "이미지 크기를 바꾸고 필요한 부분을 가리거나 보정합니다.",
       "eyebrow": "이미지 편집",
       "highlights": [
         "영역 모자이크·블러",
@@ -187,9 +192,9 @@
       ]
     },
     "text-merger": {
-      "title": "Text Merger",
+      "title": "텍스트 병합",
       "shortTitle": "텍스트 병합",
-      "description": "직접 입력한 텍스트와 TXT 파일을 원하는 순서와 구분자로 하나로 합칩니다.",
+      "description": "붙여넣은 글과 TXT 파일을 원하는 순서로 합칩니다.",
       "eyebrow": "텍스트 생산성",
       "highlights": [
         "직접 입력",
@@ -199,9 +204,9 @@
       ]
     },
     "text-tools": {
-      "title": "Text Tools",
+      "title": "텍스트 정돈",
       "shortTitle": "텍스트 정돈",
-      "description": "공백·줄바꿈을 정리하고 케이스 변환과 로컬 한국어 문장 검사를 실행합니다.",
+      "description": "공백·줄바꿈·중복 줄을 정리해 필요한 글만 깔끔하게 만듭니다.",
       "eyebrow": "텍스트 생산성",
       "highlights": [
         "공백·줄 정돈",
@@ -211,9 +216,9 @@
       ]
     },
     "text-formatter": {
-      "title": "Code Formatter",
+      "title": "코드 포맷터",
       "shortTitle": "코드 포맷터",
-      "description": "JSON·SQL·XML 문법을 검사하고 들여쓰기 또는 한 줄 형식으로 정돈합니다.",
+      "description": "JSON·SQL·XML의 줄과 들여쓰기를 읽기 좋게 정리합니다.",
       "eyebrow": "개발·데이터",
       "highlights": [
         "JSON",
@@ -223,9 +228,9 @@
       ]
     },
     "work-calculator": {
-      "title": "Workday Calculator",
+      "title": "영업일·연차",
       "shortTitle": "영업일·연차",
-      "description": "대한민국 공휴일을 제외한 영업일과 입사일·회계연도 기준 연차를 계산합니다.",
+      "description": "날짜 사이의 영업일과 입력 조건에 따른 예상 연차를 계산합니다.",
       "eyebrow": "근무 일정",
       "highlights": [
         "영업일",
@@ -235,9 +240,9 @@
       ]
     },
     "timezone-calculator": {
-      "title": "World Time Planner",
+      "title": "글로벌 시차",
       "shortTitle": "글로벌 시차",
-      "description": "세계지도에서 도시를 선택해 현지 시각과 모두가 근무 중인 글로벌 회의 시간대를 찾습니다.",
+      "description": "여러 도시의 현지 시각과 함께 일할 수 있는 시간대를 확인합니다.",
       "eyebrow": "글로벌 협업",
       "highlights": [
         "세계지도 도시 핀",
@@ -247,9 +252,9 @@
       ]
     },
     "payroll-calculator": {
-      "title": "Payroll Calculator",
+      "title": "급여 계산",
       "shortTitle": "급여 계산",
-      "description": "주휴수당·월 실수령액·퇴직금을 최신 기준으로 브라우저에서 간이 계산합니다.",
+      "description": "입력한 근무·급여 조건으로 수당·실수령액·퇴직금을 간이 계산합니다.",
       "eyebrow": "급여·노무",
       "highlights": [
         "주휴수당",
@@ -259,9 +264,9 @@
       ]
     },
     "image-privacy": {
-      "title": "Photo Metadata Remover",
+      "title": "사진 메타데이터 제거",
       "shortTitle": "사진 메타데이터 제거",
-      "description": "JPG·PNG·WebP에 숨은 GPS·촬영 기기·시각 정보(EXIF)를 확인하고 제거합니다.",
+      "description": "사진 파일에 담긴 촬영 위치·기기·시각 정보를 확인하고 지웁니다.",
       "eyebrow": "사진 메타데이터",
       "highlights": [
         "숨은 정보 확인",
@@ -271,9 +276,9 @@
       ]
     },
     "security-tools": {
-      "title": "Password Generator",
+      "title": "비밀번호 생성기",
       "shortTitle": "비밀번호 생성기",
-      "description": "운영체제의 보안 난수로 비밀번호를 만들고 패턴 기반 추측 난이도를 확인합니다.",
+      "description": "길이와 문자 종류를 정해 비밀번호를 만들고 추측 난이도를 확인합니다.",
       "eyebrow": "보안 도구",
       "highlights": [
         "보안 난수 생성",
@@ -283,9 +288,9 @@
       ]
     },
     "qr-studio": {
-      "title": "QR Studio",
+      "title": "QR 스튜디오",
       "shortTitle": "QR 스튜디오",
-      "description": "URL·텍스트 QR을 만들거나 표 파일의 각 행을 PNG·ZIP·라벨 PDF로 일괄 생성하고 카메라·사진에서 코드를 읽습니다.",
+      "description": "링크·텍스트로 QR을 만들거나 카메라·사진에서 읽습니다.",
       "eyebrow": "QR 생성·일괄·스캔",
       "highlights": [
         "QR 생성",
@@ -295,9 +300,9 @@
       ]
     },
     "data-converter": {
-      "title": "Table Data Converter",
+      "title": "표 데이터 변환기",
       "shortTitle": "표 데이터 변환기",
-      "description": "CSV·JSON·HTML 표 데이터를 서로 변환하고 파일 또는 클립보드로 내보냅니다.",
+      "description": "CSV·JSON·HTML 표 데이터를 필요한 형식으로 바꿉니다.",
       "eyebrow": "표 데이터 변환",
       "highlights": [
         "CSV",
@@ -307,9 +312,9 @@
       ]
     },
     "document-generator": {
-      "title": "템플릿 기반 문서 대량 생성기",
-      "shortTitle": "워드 메일머지",
-      "description": "워드 템플릿의 변수를 엑셀 데이터로 치환하여 한 번에 수많은 개별 문서를 자동으로 완성합니다.",
+      "title": "워드 일괄 생성",
+      "shortTitle": "워드 일괄 생성",
+      "description": "엑셀 목록을 워드 양식에 채워 여러 문서를 한 번에 만듭니다.",
       "eyebrow": "문서 자동화",
       "highlights": [
         "DOCX 템플릿 변수 매핑",

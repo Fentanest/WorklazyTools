@@ -145,6 +145,6 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
 function PdfGuide({ mode }: { mode: PdfToolMode }) {
   const language = useAppLanguage();
   const page = featureResource<PdfPageCopy>(language, "pdf.page");
-  const guide = page.guides[mode === "convert" ? "convert" : "standard"];
-  return <ToolGuide title={guide.title} description={guide.description} blocks={guide.blocks} faq={guide.faq} />;
+  const guide = featureResource<any>(language, "pdfEditor.guide") as any;
+  return <ToolGuide title={guide.title} description={guide.description} blocks={guide.blocks as any} faq={(guide.faq || []).map((item: any) => ({ question: item.q, answer: item.a }))} />;
 }

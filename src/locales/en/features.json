@@ -11,7 +11,43 @@
     "moveUp": "Move {{name}} up",
     "moveDown": "Move {{name}} down",
     "remove": "Remove {{name}}",
-    "dropToAdd": "Drop to add {{side}} documents"
+    "dropToAdd": "Drop to add {{side}} documents",
+    "guide": {
+      "title": " 사용 안내",
+      "description": "워드·한글 문서의 수정 전후를 비교해 글·표·서식에서 달라진 부분을 확인합니다.",
+      "blocks": [
+        {
+          "title": "이런 때 쓰세요",
+          "items": [
+            "수정된 보고서에서 바뀐 부분을 찾을 때",
+            "여러 검토본을 원본과 비교할 때",
+            "문서 내용의 누락이나 추가를 확인할 때."
+          ]
+        },
+        {
+          "title": "사용 순서",
+          "items": [
+            "수정 전·수정 후 파일을 각각 넣습니다",
+            "비교할 파일 연결과 순서를 확인합니다",
+            "비교를 실행합니다",
+            "결과 화면에서 원본·수정본과 변경 목록을 함께 확인합니다",
+            "필요한 결과를 저장합니다."
+          ]
+        },
+        {
+          "title": "결과와 주의",
+          "paragraphs": [
+            "변경 표시가 실제 의미의 변경인지 원문을 함께 읽어 확인하세요. 파일 내부의 구조나 서식 차이 때문에 표시가 생길 수도 있습니다. 같은 유형의 내용이 반복되면 자동 대응이 어려운 부분이 있을 수 있습니다."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "워드와 한글 파일 모두 사용할 수 있나요?",
+          "a": "지원하는 워드·한글 파일을 선택해 비교할 수 있습니다. 열 수 있는 형식과 파일별 제한은 선택 영역의 지원 안내를 확인하세요."
+        }
+      ]
+    }
   },
   "security": {
     "title": "Password Generator",
@@ -56,34 +92,34 @@
       "years_one": "About {{count}} year"
     },
     "guide": {
-      "title": "Password generator guide",
-      "description": "Passwords use secure randomness supplied by your operating system and are not sent to a server.",
+      "title": "비밀번호 생성기 안내",
+      "description": "운영체제가 제공하는 보안 난수 기능으로 만들며 비밀번호를 서버에 보내지 않습니다.",
       "blocks": [
         {
-          "title": "Long and unique",
-          "text": "Use a different password of at least 16 characters for each service and keep it in a password manager."
+          "title": "길고 고유하게",
+          "text": "사이트마다 서로 다른 16자 이상의 비밀번호를 사용하고 비밀번호 관리자에 보관하는 것이 좋습니다."
         },
         {
-          "title": "Strength score",
-          "text": "The score considers common words, repetition, sequences and estimated guesses. It cannot check breach history or multi-factor authentication."
+          "title": "강도 점수",
+          "text": "흔한 단어·반복·연속 문자 같은 패턴과 예상 추측 횟수를 바탕으로 계산합니다. 유출 여부나 계정의 다중 인증 상태까지 확인하지는 않습니다."
         },
         {
-          "title": "Estimated cracking time",
-          "text": "This comparison assumes a leaked password hash and 10 billion guesses per second. Actual time depends heavily on how a service stores passwords and protects accounts."
+          "title": "예상 해독 시간",
+          "text": "저장된 비밀번호 해시가 유출되어 공격자가 초당 100억 회 대입할 수 있다고 가정한 비교값입니다. 사이트의 저장 방식과 보안 설정에 따라 실제 시간은 크게 달라집니다."
         }
       ],
       "faq": [
         {
-          "q": "Is the generated password saved?",
-          "a": "No. It disappears when you leave this page."
+          "q": "생성한 비밀번호가 저장되나요?",
+          "a": "아니요. 현재 화면을 벗어나면 사라집니다."
         },
         {
-          "q": "Is the estimated cracking time a guarantee?",
-          "a": "No. It is a comparison estimate. Rate limits, password storage and multi-factor authentication change real attack conditions."
+          "q": "예상 해독 시간이 실제 보안 시간을 뜻하나요?",
+          "a": "아니요. 비밀번호끼리 강도를 비교하기 위한 가정값입니다. 로그인 횟수 제한, 비밀번호 저장 방식과 다중 인증에 따라 실제 공격 조건은 달라집니다."
         },
         {
-          "q": "Is a copied password safe?",
-          "a": "Other apps may read the clipboard. After use, copy something else to overwrite it."
+          "q": "복사한 비밀번호는 안전한가요?",
+          "a": "클립보드에는 다른 앱이 접근할 수 있으므로 사용 후 다른 내용을 복사해 덮어쓰는 것이 좋습니다."
         }
       ]
     }
@@ -107,26 +143,26 @@
     "sqlSort": "SQL formatting",
     "xmlCheck": "XML syntax validation",
     "guide": {
-      "title": "Formatter guide",
-      "description": "Your text is parsed only in the current browser.",
+      "title": "포맷터 사용 안내",
+      "description": "입력한 글은 브라우저의 별도 작업 공간에서만 해석됩니다.",
       "blocks": [
         {
-          "title": "Finding errors",
-          "text": "JSON and XML report detected error locations. SQL is arranged around its statement structure."
+          "title": "오류 확인",
+          "text": "JSON과 XML은 오류가 발견된 위치를 표시하고 SQL은 문장의 구성 요소를 기준으로 줄과 들여쓰기를 정돈합니다."
         },
         {
-          "title": "Minifying",
-          "text": "Characters and spaces inside quoted strings are preserved; only unnecessary structural whitespace and line breaks are removed."
+          "title": "한 줄로 축소",
+          "text": "따옴표 안의 글자와 공백은 유지하고, 데이터 구조를 표시하는 데 불필요한 공백과 줄바꿈만 줄입니다."
         }
       ],
       "faq": [
         {
-          "q": "Does this run SQL?",
-          "a": "No. It formats text without connecting to a database."
+          "q": "SQL을 실행하나요?",
+          "a": "아니요. 데이터베이스 연결 없이 텍스트만 정리합니다."
         },
         {
-          "q": "Does it repair invalid JSON?",
-          "a": "No. To avoid silently changing data, it reports the error instead."
+          "q": "잘못된 JSON도 자동 복구하나요?",
+          "a": "데이터가 달라지는 일을 막기 위해 임의 복구하지 않고 오류를 표시합니다."
         }
       ]
     }
@@ -151,26 +187,26 @@
     "convert": "Convert table data",
     "summary": "{{rows}} rows × {{columns}} columns",
     "guide": {
-      "title": "Table conversion guide",
-      "description": "Files and text are handled only in the current browser.",
+      "title": "표 데이터 변환 안내",
+      "description": "파일과 텍스트는 브라우저의 별도 작업 공간에서 처리합니다.",
       "blocks": [
         {
           "title": "CSV",
-          "text": "The first row becomes column names. Quoted cells containing commas or line breaks follow standard CSV quoting rules."
+          "text": "첫 행을 열 이름으로 사용하며 따옴표, 쉼표와 줄바꿈이 포함된 셀은 표준 CSV 따옴표 규칙으로 해석합니다."
         },
         {
-          "title": "JSON & HTML",
-          "text": "All keys in a JSON object array become columns. For HTML tables, the first row becomes the header."
+          "title": "JSON·HTML",
+          "text": "JSON 객체 배열의 모든 키를 열로 모으고 HTML 표는 첫 번째 행을 머리글로 사용합니다."
         }
       ],
       "faq": [
         {
-          "q": "Can it handle large CSV files?",
-          "a": "Processing runs separately within your browser's memory limit. Hundreds of thousands of rows may take time depending on file size and device memory."
+          "q": "대용량 CSV도 되나요?",
+          "a": "브라우저 메모리 한도 안에서 별도 작업으로 처리합니다. 수십만 행은 파일 크기와 기기 메모리에 따라 시간이 걸릴 수 있습니다."
         },
         {
-          "q": "Are scripts inside HTML executed?",
-          "a": "No. Only table-cell text is extracted; the input HTML is never inserted into the page or executed."
+          "q": "HTML 안의 스크립트도 실행되나요?",
+          "a": "아니요. 표 셀의 텍스트만 추출하며 입력 HTML을 화면에 삽입하거나 실행하지 않습니다."
         }
       ]
     }
@@ -231,38 +267,31 @@
     "downloadName": "merged-text.txt",
     "clear": "Clear all",
     "guide": {
-      "title": "Text merger guide",
-      "description": "Added text and file contents remain in the current browser.",
+      "title": "텍스트 병합 사용 안내",
+      "description": "직접 입력한 글과 TXT 파일을 한 목록에 모아 하나의 텍스트로 합칩니다.",
       "blocks": [
         {
-          "title": "Pasted text and files in one list",
-          "text": "Pasted-text cards and TXT-file cards share one list. Drag them or use the up and down buttons to arrange both types in any order."
+          "title": "이런 때 쓰세요",
+          "items": [
+            "여러 메모를 한 파일로 모을 때",
+            "TXT 파일 사이에 안내 문장을 넣을 때",
+            "나뉜 목록을 정해진 순서로 연결할 때."
+          ]
         },
         {
-          "title": "Separators and empty content",
-          "text": "Insert a line break, blank line, space, comma or custom text between items. Excluding empty text and trimming edges affect only the merged result, not the original cards."
-        },
-        {
-          "title": "Editing TXT files",
-          "text": "Load UTF-8 TXT files and edit their content directly in a card. Edited cards are marked, the original files are unchanged, and the result downloads as a new TXT file."
+          "title": "사용 순서",
+          "items": [
+            "직접 입력이나 TXT 파일을 추가합니다",
+            "카드의 순서를 정합니다",
+            "각 글 사이에 넣을 줄바꿈·공백·구분 문자를 고릅니다",
+            "병합 결과를 확인하고 복사하거나 TXT로 저장합니다."
+          ]
         }
       ],
       "faq": [
         {
-          "q": "Are pasted text or TXT files uploaded?",
-          "a": "No. Content is not sent to a server or saved in browser storage. It is merged only on the current page."
-        },
-        {
-          "q": "Can pasted text be placed between TXT files?",
-          "a": "Yes. Every item uses the same list, so pasted text and TXT files can be mixed in any order."
-        },
-        {
-          "q": "Does editing loaded TXT content change the original file?",
-          "a": "No. Only the current card and merged result change. The original file remains untouched."
-        },
-        {
-          "q": "Which TXT encoding is supported?",
-          "a": "UTF-8 TXT files are supported. If text looks corrupted, save the original as UTF-8 and load it again."
+          "q": "직접 쓴 문장을 파일 사이에 넣을 수 있나요?",
+          "a": "네. 직접 입력 카드와 TXT 파일 카드를 같은 목록에서 원하는 순서로 배치할 수 있습니다."
         }
       ]
     }
@@ -296,26 +325,31 @@
     "places": "{{count}} occurrences",
     "empty": "No issues were found by the current rules.",
     "guide": {
-      "title": "Browser text-tools guide",
-      "description": "Text is handled only in the current browser tab.",
+      "title": "텍스트 정돈 사용 안내",
+      "description": "붙여넣은 글의 공백·줄바꿈·중복 줄을 선택한 방식으로 정리합니다.",
       "blocks": [
         {
-          "title": "Cleanup",
-          "text": "Whitespace and line-break cleanup applies only the selected rules; it does not interpret meaning."
+          "title": "이런 때 쓰세요",
+          "items": [
+            "복사한 문장에 불필요한 줄바꿈이 많을 때",
+            "목록의 중복 줄을 정리할 때",
+            "영문 이름의 표기 방식을 맞출 때."
+          ]
         },
         {
-          "title": "Korean guide",
-          "text": "This is a quick helper for frequently mistyped Korean spellings and spacing patterns, not a complete dictionary-based proofreader."
+          "title": "사용 순서",
+          "items": [
+            "원문을 붙여넣습니다",
+            "공백 정리·줄바꿈 합치기 등 필요한 동작을 고릅니다",
+            "결과와 원문을 비교합니다",
+            "결과를 복사해 사용합니다."
+          ]
         }
       ],
       "faq": [
         {
-          "q": "Is my document text saved?",
-          "a": "No. Input is not stored on a server or in browser storage."
-        },
-        {
-          "q": "Should I apply every suggestion?",
-          "a": "No. Korean has contextual exceptions, so compare each suggestion with the original."
+          "q": "글의 내용이나 뜻까지 고쳐주나요?",
+          "a": "공백·줄 정리는 선택한 규칙을 적용하는 작업입니다. 문장의 뜻을 이해해 다시 쓰는 기능은 아닙니다."
         }
       ]
     }
@@ -350,26 +384,26 @@
     "leaveResult": "Estimated leave accrued",
     "leaveNote": "This estimate assumes perfect attendance and at least 80% attendance where required. First-year monthly leave and fiscal-year reconciliation depend on company policy and actual attendance.",
     "guide": {
-      "title": "South Korean workday assumptions",
-      "description": "Holiday and leave results are estimates for planning.",
+      "title": "근무일 계산 기준",
+      "description": "공휴일 정보와 연차 결과는 일정 계획을 위한 참고값입니다.",
       "blocks": [
         {
-          "title": "Public holidays",
-          "text": "Includes fixed-date holidays, Lunar New Year, Chuseok, Buddha's Birthday and statutory substitute holidays. Selected confirmed election and temporary holidays are maintained by year; add company closures manually."
+          "title": "공휴일",
+          "text": "양력 공휴일과 설·추석·부처님오신날, 대체공휴일을 계산합니다. 확정된 일부 선거일·임시공휴일도 연도별 목록에 반영하며 회사 휴무일은 직접 추가하세요."
         },
         {
-          "title": "Annual leave",
-          "text": "Uses the basic structure of South Korea's Labor Standards Act. Actual grants may differ with attendance and a company's fiscal-year policy."
+          "title": "연차",
+          "text": "근로기준법상 기본 발생 구조를 적용하지만 회사의 회계연도 운영과 근태 정산 방식에 따라 실제 부여일수가 달라질 수 있습니다."
         }
       ],
       "faq": [
         {
-          "q": "Are temporary holidays included automatically?",
-          "a": "Confirmed dates maintained in the yearly list are included. Add newly announced dates that are not yet listed and company-only closures manually."
+          "q": "임시공휴일도 자동 반영되나요?",
+          "a": "연도별 목록에 반영된 확정 공휴일은 자동 계산합니다. 최근 정부 발표가 아직 반영되지 않았거나 회사만 쉬는 날은 직접 추가해 주세요."
         },
         {
-          "q": "Is this the same as leave paid on termination?",
-          "a": "No. Termination settlement should also check leave accrued by hire date and leave already used."
+          "q": "퇴사 시 정산 연차와 같나요?",
+          "a": "아니요. 퇴사 정산은 입사일 기준 발생분과 회사에서 사용한 일수를 함께 확인해야 합니다."
         }
       ]
     }
@@ -424,26 +458,26 @@
     "healthSource": "2026 Health Insurance rates",
     "taxSource": "National Tax Service withholding table",
     "guide": {
-      "title": "Korean payroll estimate guide",
-      "description": "This does not replace an official payslip, filing or statutory settlement.",
+      "title": "간이 급여 계산 안내",
+      "description": "실제 급여명세서와 법정 정산을 대체하지 않습니다.",
       "blocks": [
         {
-          "title": "Take-home pay",
-          "text": "Estimates Korean social insurance and monthly income tax from taxable monthly salary and dependents. The employer's reported standard monthly income, non-taxable items and withholding choice may change the result."
+          "title": "실수령액",
+          "text": "식대 같은 비과세 수당을 제외한 월 과세 대상 급여와 부양가족 수로 사회보험과 월 소득세를 추정합니다. 회사의 신고 기준소득월액, 비과세 항목과 원천징수 비율에 따라 달라질 수 있습니다."
         },
         {
-          "title": "Severance",
-          "text": "Includes wages in the final three months and 3/12 of annual bonuses and unused-leave pay. Enter all calendar days in the three-month period. Cases where ordinary wage exceeds calculated average wage need separate review."
+          "title": "퇴직금",
+          "text": "퇴직 전 3개월 임금과 최근 1년 상여·연차수당의 3/12를 반영합니다. 3개월 총 일수에는 휴일을 포함한 달력상 날짜 수를 입력합니다. 산출 평균임금이 통상임금보다 낮은 경우 등은 별도 확인이 필요합니다."
         }
       ],
       "faq": [
         {
-          "q": "Is the salary I enter saved?",
-          "a": "No. Every value is calculated only in the current page state and browser memory."
+          "q": "입력한 연봉이 저장되나요?",
+          "a": "아니요. 모든 값은 현재 화면 상태와 브라우저 메모리에서만 계산합니다."
         },
         {
-          "q": "Can I use this for a tax filing?",
-          "a": "No. It is an estimate. Confirm actual withholding and severance with your employer or the relevant South Korean authority."
+          "q": "세금 신고에 사용해도 되나요?",
+          "a": "아니요. 참고용 예상치이며 실제 원천징수와 퇴직금은 회사 급여 담당자 또는 관계 기관에서 확인하세요."
         }
       ]
     }
@@ -471,34 +505,30 @@
     "fileFound": "{{count}} hidden fields",
     "readError": "The photo file could not be read.",
     "guide": {
-      "title": "Privacy check before sharing photos",
-      "description": "The original and result are handled only in the current browser.",
+      "title": "사진 메타데이터 제거 사용 안내",
+      "description": "사진에 보이는 내용이 아니라 파일 안에 담긴 촬영 위치·기기·시각 같은 정보를 확인하고 제거합니다.",
       "blocks": [
         {
-          "title": "What is EXIF?",
-          "text": "A camera or phone may store extra data such as device details, date and GPS location inside the photo file, even though it is not visible in the image."
+          "title": "이런 때 쓰세요",
+          "items": [
+            "사진을 공개하기 전에 촬영 위치 정보를 확인할 때",
+            "촬영 기기나 시각 정보를 포함하지 않은 사본이 필요할 때."
+          ]
         },
         {
-          "title": "How removal works",
-          "text": "Instead of copying the original file structure, the browser redraws only the pixels and saves a new JPG, PNG or WebP file. Extra data such as EXIF is left behind."
-        },
-        {
-          "title": "Image quality",
-          "text": "JPG and WebP are re-encoded, so quality and file size may change slightly. PNG is saved without lossy compression."
+          "title": "사용 순서",
+          "items": [
+            "지원되는 사진 파일을 넣습니다",
+            "확인된 숨은 정보를 읽습니다",
+            "제거한 결과 파일을 저장합니다",
+            "결과의 정보와 사진 방향·모양을 확인합니다."
+          ]
         }
       ],
       "faq": [
         {
-          "q": "Does this modify the original photo?",
-          "a": "No. You download a new copy with hidden data removed."
-        },
-        {
-          "q": "What is metadata?",
-          "a": "It is information attached to a file in addition to its visible content. This tool inspects EXIF fields including GPS, device and capture time."
-        },
-        {
-          "q": "Is HEIC supported?",
-          "a": "No. JPG, PNG and WebP are supported; HEIC and HEIF are not."
+          "q": "사진 속 얼굴이나 글자도 지워지나요?",
+          "a": "아닙니다. 촬영 정보처럼 파일 안에 담긴 숨은 정보를 다루는 도구입니다. 사진에 보이는 내용은 이미지 편집이나 개인정보 가리기에서 작업하세요."
         }
       ]
     }
@@ -724,30 +754,30 @@
       ]
     },
     "guide": {
-      "title": "QR code guide",
-      "description": "Generated content, camera frames and scanned images are not sent to an external server.",
+      "title": "QR 코드 사용 안내",
+      "description": "생성 내용, 카메라 프레임과 스캔 이미지는 외부 서버에 전송되지 않습니다.",
       "blocks": [
         {
-          "title": "Center logo",
-          "text": "The code uses high error correction and puts white padding behind the logo. A complex logo may reduce recognition in some cameras."
+          "title": "중앙 로고",
+          "text": "높은 오류 복원 수준을 사용하고 로고 뒤에 흰 여백을 넣습니다. 로고가 너무 복잡하면 일부 카메라에서 인식률이 떨어질 수 있습니다."
         },
         {
-          "title": "Live camera",
-          "text": "After permission is granted on HTTPS, the rear camera is preferred. Camera access and analysis stop immediately after a QR code is found."
+          "title": "실시간 카메라",
+          "text": "보안 연결(HTTPS)에서 사용자 허용을 받은 뒤 후면 카메라를 우선 사용합니다. QR을 찾으면 즉시 카메라와 분석 작업을 종료합니다."
         },
         {
-          "title": "Photo scanning",
-          "text": "Large images are reduced to at most 2200px in the browser, and inverted light/dark colors are also tested."
+          "title": "사진 스캔",
+          "text": "큰 이미지는 브라우저 안에서 최대 2200px로 축소한 뒤 밝고 어두운 색을 뒤집는 방식까지 시도해 QR을 찾습니다."
         }
       ],
       "faq": [
         {
-          "q": "Does this check whether a QR URL is safe?",
-          "a": "No. It displays the QR data but cannot guarantee that a linked site is safe."
+          "q": "QR URL의 안전성도 검사하나요?",
+          "a": "아니요. QR 데이터를 표시할 뿐 연결된 사이트의 안전성을 보증하지 않습니다."
         },
         {
-          "q": "When is camera permission used?",
-          "a": "Permission is requested only after you press Scan with camera. Camera tracks stop on success, when turned off, when the tab changes or when you leave the page."
+          "q": "카메라 권한은 언제 사용하나요?",
+          "a": "카메라로 스캔 버튼을 누른 경우에만 권한을 요청합니다. 스캔 완료, 카메라 끄기, 탭 전환 또는 페이지 종료 시 카메라 트랙을 즉시 중지합니다."
         }
       ]
     }
@@ -808,34 +838,34 @@
       "help": "Select pins to compare times. After zooming, drag the map to move around."
     },
     "guide": {
-      "title": "World time-map guide",
-      "description": "The map and city coordinates are bundled with the site; your selection is not sent outside the browser.",
+      "title": "세계 시차 지도 사용 안내",
+      "description": "지도와 도시 좌표는 사이트에 포함되어 있으며 선택 정보는 브라우저 밖으로 전송되지 않습니다.",
       "blocks": [
         {
-          "title": "Map and city selection",
-          "text": "Select up to six cities with pins or search. After zooming, drag the map to inspect pins in crowded regions."
+          "title": "지도와 도시 선택",
+          "text": "핀 또는 도시 검색을 이용해 최대 6개 도시를 선택할 수 있습니다. 확대 후에는 지도를 드래그해 밀집된 지역의 핀을 확인하세요."
         },
         {
-          "title": "Daylight saving time",
-          "text": "Transitions differ between cities such as New York, London and Sydney. Offsets use the IANA rules for the selected date."
+          "title": "서머타임",
+          "text": "뉴욕·런던·시드니 등은 전환일이 서로 다릅니다. 선택한 날짜의 국제 표준 도시 시간대(IANA) 규칙으로 UTC와의 시차를 계산합니다."
         },
         {
-          "title": "Meeting suggestions",
-          "text": "Only 30-minute slots when every selected city is between 09:00 and 18:00 are shown."
+          "title": "회의 추천",
+          "text": "30분 단위로 모든 선택 도시가 현지 09:00~18:00인 구간만 표시합니다."
         }
       ],
       "faq": [
         {
-          "q": "Does the map contact an external map server?",
-          "a": "No. A Natural Earth world map and city coordinates are deployed as static assets with the site."
+          "q": "지도 사용 중 외부 지도 서버에 접속하나요?",
+          "a": "아니요. Natural Earth 기반 세계지도와 도시 좌표를 정적 자산으로 함께 배포합니다."
         },
         {
-          "q": "Can I click anywhere to find its time zone?",
-          "a": "No. Select a major-city pin or search result with a registered IANA time zone."
+          "q": "지도 아무 곳이나 눌러 시간대를 찾을 수 있나요?",
+          "a": "아니요. 현재는 공식 시간대 정보가 등록된 주요 도시 핀과 검색 결과만 선택할 수 있습니다."
         },
         {
-          "q": "Are public holidays included?",
-          "a": "No. This tool compares time zones and local working hours only."
+          "q": "공휴일도 반영되나요?",
+          "a": "이 도구는 시차와 현지 업무시간만 비교하며 국가별 공휴일은 반영하지 않습니다."
         }
       ]
     }
@@ -1025,104 +1055,48 @@
       "encrypted": " The output password was applied."
     },
     "guide": {
-      "title": "Excel merge guide",
-      "description": "Understanding format-specific formula and formatting settings and merge layouts helps produce the expected result.",
+      "title": "Excel 병합 사용 안내",
+      "description": "여러 엑셀 파일을 시트별로 모으거나, 표를 아래 또는 옆으로 이어 붙입니다.",
       "blocks": [
         {
-          "title": "Supported file formats",
-          "paragraphs": [
-            "You can combine XLSX, XLS, XLSB, XLSM and CSV files. The result is always XLSX."
-          ],
+          "title": "이런 때 쓰세요",
           "items": [
-            "XLSX: preserve formulas and common cell formatting independently",
-            "XLS: standard mode converts values and basic structure; formulas and formatting can be selected independently for higher fidelity",
-            "XLSB and XLSM: values and basic sheet structure are converted",
-            "CSV: handled as one table of values",
-            "XLSM macros are not retained"
+            "부서별 자료를 한 파일로 취합할 때",
+            "월별 목록을 길게 합칠 때",
+            "나뉜 표를 정해진 방향으로 붙일 때."
           ]
         },
         {
-          "title": "XLSX formula and formatting settings",
+          "title": "준비할 것",
           "paragraphs": [
-            "Formula preservation and formatting preservation for XLSX input are independent. Turning formulas off copies stored calculation results. Turning formatting off omits cell appearance, row and column layout, and merged regions. These settings apply to the current files without an extra download or page reload."
+            "합칠 엑셀·CSV 파일과 포함할 시트."
           ]
         },
         {
-          "title": "XLS formula and formatting settings",
-          "paragraphs": [
-            "Turning on either XLS formula or formatting preservation opens the same merge interface with the browser conditions needed to convert XLS into a compatible XLSX structure first. The first actual XLS selection downloads about 250 MB of additional files and later tasks can reuse them. Turning both options off returns to the standard screen. A screen transition clears selected files."
-          ]
-        },
-        {
-          "title": "Choosing sheets",
-          "paragraphs": [
-            "After adding files, choose all sheets, a shared position rule, or a custom selection for each file."
-          ],
+          "title": "사용 순서",
           "items": [
-            "2: second sheet from every file",
-            "-3: sheets one through three",
-            "3-: third through last sheet",
-            "1,3,5 or 2-4: multiple positions and ranges"
+            "파일을 추가하고 합칠 시트를 고릅니다.",
+            "결과에 들어갈 파일·시트 순서를 확인합니다.",
+            "병합 방식을 고릅니다. 시트별은 시트를 모으고, 세로는 아래로, 가로는 옆으로 붙입니다.",
+            "수식·서식 등 유지할 옵션과 화면의 지원 안내를 확인한 뒤 병합합니다.",
+            "결과를 열어 시트 수·행 수·열 위치가 기대한 대로인지 확인합니다."
           ]
         },
         {
-          "title": "Choosing a merge layout",
+          "title": "결과와 주의",
           "paragraphs": [
-            "Separate sheets keeps each source sheet. Vertical appends rows; horizontal appends columns."
-          ],
-          "items": [
-            "Different structures: separate sheets",
-            "Same columns, such as monthly records: vertical",
-            "Same rows, such as category records: horizontal"
-          ]
-        },
-        {
-          "title": "Formulas, passwords and verification",
-          "paragraphs": [
-            "When formulas are preserved, relative references are adjusted as rows or columns move in vertical and horizontal merges. Input and output passwords remain only in browser memory during the task. Password-protected legacy XLS may need an unlocked copy before preservation conversion.",
-            "Charts, images, external connections, pivots and some advanced table objects can be omitted or simplified. Review important output in Excel."
-          ]
-        },
-        {
-          "title": "Trimming empty areas",
-          "paragraphs": [
-            "Ending trim excludes unused space after content. Consecutive-empty removal scans the completed output and removes middle groups that meet the threshold."
-          ],
-          "items": [
-            "Rows and columns can be selected independently",
-            "Whitespace-only cells count as empty",
-            "Groups shorter than the threshold remain"
+            "새 XLSX 파일을 만듭니다. 매크로와 지원 범위를 벗어나는 기능은 유지되지 않을 수 있으므로 원본을 보관하세요. 가로 병합을 고객번호 같은 기준으로 자동 연결하는 기능으로 혼동하지 마세요."
           ]
         }
       ],
       "faq": [
         {
-          "q": "Can XLSX formulas and formatting be preserved separately?",
-          "a": "Yes. Turn formula and formatting preservation on or off independently under XLSX input. Neither option needs an extra download or page reload."
+          "q": "시트별·세로·가로 중 무엇을 고르면 되나요?",
+          "a": "각 시트를 따로 남겨 한 파일에 모으려면 시트별, 같은 구조의 목록을 아래로 늘리려면 세로, 표를 옆에 붙이려면 가로를 고르세요."
         },
         {
-          "q": "Can XLS formulas and formatting be preserved separately?",
-          "a": "Yes. Turn on only the options you need under XLS input. Either option opens the matching preservation screen, and the first XLS selection prepares about 250 MB of additional files."
-        },
-        {
-          "q": "Why does changing XLS preservation reload the page?",
-          "a": "The browser conditions required for higher-fidelity XLS conversion must be prepared safely. Selected files are cleared when preservation is first enabled or both options are disabled, so review the notice before switching."
-        },
-        {
-          "q": "Are CSV formulas and styles preserved?",
-          "a": "No. CSV stores plain values only. The combined result uses XLSX so it can hold richer spreadsheet features."
-        },
-        {
-          "q": "Can XLSB and XLSM files be merged?",
-          "a": "Yes, but values and basic sheets are converted to XLSX. XLS preservation applies only to the legacy XLS format, and XLSM macros are excluded."
-        },
-        {
-          "q": "Can I select the same sheet position from every file?",
-          "a": "Yes. Enter 2 for every second sheet. Rules such as -3, 3-, 1,3,5 and 2-4 also work."
-        },
-        {
-          "q": "Can encrypted Excel files be merged?",
-          "a": "Supported Office encryption can be unlocked locally with the password. For high-fidelity preservation of a password-protected legacy XLS, use an unlocked copy."
+          "q": "가로 병합이 같은 고객끼리 자동으로 맞춰주나요?",
+          "a": "가로 병합은 표를 옆으로 붙이는 방식입니다. 같은 고객이나 사번을 기준으로 맞춰야 한다면 먼저 행 순서를 확인하세요. 두 목록의 차이를 확인하려는 목적이라면 엑셀 비교의 기준 항목 비교를 검토하세요."
         }
       ]
     }
@@ -1296,62 +1270,62 @@
       "generic": "An error occurred while processing audio."
     },
     "guide": {
-      "title": "Audio waveform editing guide",
-      "description": "Selected audio and edit data remain in the current browser and are not sent to an external server.",
+      "title": "오디오 파형 편집 안내",
+      "description": "선택한 오디오와 편집 데이터는 외부 서버로 전송하지 않고 현재 브라우저 안에서만 처리합니다.",
       "blocks": [
         {
-          "title": "Selecting a waveform region",
-          "text": "Drag the waveform to create a purple selection. Move it, resize its handles, or enter start and end values with 1ms precision."
+          "title": "파형 구간 선택",
+          "text": "파형을 드래그하면 보라색 선택 영역이 생깁니다. 영역 전체를 옮기거나 양쪽 손잡이를 조절하고, 시작·종료 초 입력으로 1ms 단위 값을 지정할 수 있습니다."
         },
         {
-          "title": "Sample-level editing",
-          "text": "Mute sets selected samples to zero; Cut and Delete pull later samples forward. Paste inserts the memory clip at the red playback cursor."
+          "title": "샘플 단위 편집",
+          "text": "음소거는 선택 샘플을 0으로 바꾸고, 잘라내기와 삭제는 뒤 샘플을 앞으로 당깁니다. 붙여넣기는 현재 빨간 재생 커서 위치에 메모리 클립을 삽입합니다."
         },
         {
-          "title": "Selected-region voice effects",
-          "text": "Lower, higher and childlike presets shift pitch while preserving duration; Robot applies fast amplitude modulation. Preview only the selected region before applying it, and a short crossfade softens each boundary."
+          "title": "선택 구간 음성 효과",
+          "text": "낮은 톤·높은 톤·어린 목소리는 원래 길이를 유지하면서 피치를 바꾸고, 로봇은 진폭을 빠르게 변조합니다. 적용 전 선택 구간만 미리 들을 수 있으며 경계에는 짧은 크로스페이드를 넣습니다."
         },
         {
-          "title": "Keyboard shortcuts",
-          "text": "Outside input fields, Space toggles playback. Ctrl+Z or Cmd+Z undoes; Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y redo."
+          "title": "키보드 단축키",
+          "text": "입력 칸 밖에서는 Space로 재생·일시정지하고, Ctrl+Z 또는 macOS의 Cmd+Z로 실행 취소합니다. Ctrl+Shift+Z·Cmd+Shift+Z·Ctrl+Y·Cmd+Y는 다시 실행입니다."
         },
         {
-          "title": "Undo and memory",
-          "text": "Decoded PCM samples are retained per channel. History is limited automatically to at most 12 states and roughly 256MB, and is cleared with a new file."
+          "title": "실행 취소와 메모리",
+          "text": "편집을 위해 압축을 푼 음성 샘플(PCM)을 채널별로 보관합니다. 실행 취소 기록은 파일 크기에 맞춰 최대 12단계, 약 256MB 한도 안에서 자동 제한하며 새 파일을 열면 모두 해제합니다."
         },
         {
-          "title": "WAV and MP3",
-          "text": "WAV creates a compatible 16-bit uncompressed file quickly. Audio processing for MP3 export and pitch effects is prepared on first use, and the same editing screen avoids repeating that setup when possible."
+          "title": "WAV와 MP3",
+          "text": "WAV는 호환성이 높은 16비트 비압축 음성으로 빠르게 만듭니다. MP3 저장과 피치 효과에 필요한 오디오 처리 기능은 처음 사용할 때 준비되며, 같은 편집 화면에서는 다시 준비하는 시간을 줄입니다."
         },
         {
-          "title": "Browser file support",
-          "text": "Modern browsers normally open MP3 and WAV. M4A, AAC and OGG depend on operating-system and browser codec support."
+          "title": "브라우저의 파일 지원",
+          "text": "MP3와 WAV는 일반적인 최신 브라우저에서 열 수 있습니다. M4A·AAC·OGG는 운영체제와 브라우저가 파일 안의 음성 압축 방식을 지원할 때 편집할 수 있습니다."
         }
       ],
       "faq": [
         {
-          "q": "Is audio uploaded to a server?",
-          "a": "No. Opening, sample editing, preview and conversion all run in the current browser."
+          "q": "오디오가 서버로 업로드되나요?",
+          "a": "아니요. 파일 열기, 샘플 편집, 파형 미리보기와 결과 변환은 현재 브라우저에서만 실행됩니다."
         },
         {
-          "q": "Do lower and higher tone presets change gender?",
-          "a": "No. They do not identify or transform a person's gender; they only alter the selected region's pitch and tone."
+          "q": "낮은 톤과 높은 톤이 성별을 바꾸나요?",
+          "a": "아니요. 사람의 성별을 판별하거나 변환하지 않고 선택 구간의 피치와 음색만 바꾸는 효과입니다."
         },
         {
-          "q": "Where does Paste insert audio?",
-          "a": "At the current red playback cursor after you click or play through the waveform."
+          "q": "붙여넣기는 어디에 들어가나요?",
+          "a": "파형을 클릭하거나 재생해 이동한 빨간 재생 커서의 현재 시각에 삽입됩니다."
         },
         {
-          "q": "Why do long files use so much memory?",
-          "a": "Compressed audio must be decoded to uncompressed per-channel samples, while preview data and undo states are also retained."
+          "q": "왜 긴 파일은 메모리를 많이 사용하나요?",
+          "a": "압축된 음성도 편집할 때는 채널별 비압축 샘플로 풀어야 하고, 파형 재생용 데이터와 실행 취소 상태도 함께 보관하기 때문입니다."
         },
         {
-          "q": "Can MP3 export work offline?",
-          "a": "It may work if the encoder was cached before. On a first visit with no connection, use WAV instead."
+          "q": "MP3가 오프라인에서 바로 만들어지나요?",
+          "a": "이전에 인코더가 캐시되었다면 가능할 수 있습니다. 처음 방문한 완전한 오프라인 상태에서는 WAV를 사용해 주세요."
         },
         {
-          "q": "Does export overwrite the original?",
-          "a": "No. The original remains unchanged and a new WAV or MP3 is downloaded."
+          "q": "편집 결과가 원본을 덮어쓰나요?",
+          "a": "아니요. 원본 파일은 수정하지 않으며 WAV 또는 MP3 새 파일로 내려받습니다."
         }
       ]
     }
@@ -1661,50 +1635,50 @@
       "failed": "Image processing failed."
     },
     "guide": {
-      "title": "Browser image-editing guide",
-      "description": "Original images and edited results are not uploaded to an external processing server.",
+      "title": "브라우저 이미지 편집 안내",
+      "description": "원본 이미지와 편집 결과는 외부 작업 서버로 업로드하지 않습니다.",
       "blocks": [
         {
-          "title": "Unified image editor",
-          "text": "Open a photo or blank canvas and use adjustments, drawing, text, shapes and searchable stickers in one history. Resize all content or just the canvas, and choose exact export dimensions. Use the mouse wheel to zoom, drag while holding Space to pan, or use two fingers on mobile to zoom and pan."
+          "title": "통합 이미지 편집",
+          "text": "사진을 열거나 빈 캔버스에서 시작해 보정, 그리기, 텍스트, 도형과 검색 가능한 스티커를 한 작업 기록 안에서 사용합니다. 전체 내용이나 캔버스 크기를 따로 바꾸고 내보낼 픽셀 크기도 지정할 수 있습니다. 마우스 휠로 확대하고 Space를 누른 채 드래그해 이동하며, 모바일에서는 두 손가락으로 확대·이동할 수 있습니다."
         },
         {
-          "title": "Region mosaic and blur",
-          "text": "Drag over an area of the photo and adjust the effect strength. Effects use the original photo, so the last effect is visible where regions overlap and separately drawn lines or text are not affected. For sensitive information, prefer a strong mosaic over a weak blur and inspect the result at full size before downloading."
+          "title": "영역 모자이크·블러",
+          "text": "사진에서 가릴 영역을 드래그하고 효과 강도를 조절할 수 있습니다. 효과는 원본 사진을 기준으로 적용되므로 영역이 겹치면 마지막 효과가 보이며, 별도로 그린 선·텍스트에는 적용되지 않습니다. 민감정보는 낮은 강도의 블러보다 강한 모자이크를 권장하며, 다운로드 전에 확대해 가림 상태를 확인하세요."
         },
         {
-          "title": "Batch processing",
-          "text": "Add files or clipboard images, resize and watermark them, then bundle the results in a ZIP."
+          "title": "일괄 처리",
+          "text": "여러 파일과 클립보드 이미지를 추가해 크기 변경과 워터마크를 적용하고 ZIP으로 묶습니다."
         },
         {
-          "title": "Collages and GIF",
-          "text": "A scaled preview uses the same layout calculation as export. GIF's 256-color limit may simplify subtle gradients."
+          "title": "콜라주와 GIF",
+          "text": "실제 출력 계산과 같은 축소 미리보기를 제공하며 GIF는 256색 제한으로 색 변화가 단순화될 수 있습니다."
         }
       ],
       "faq": [
         {
-          "q": "Are images sent to a server?",
-          "a": "No. They are processed only in the current browser."
+          "q": "이미지가 서버로 전송되나요?",
+          "a": "아니요. 현재 브라우저 안에서만 처리합니다."
         },
         {
-          "q": "Does this modify my originals?",
-          "a": "No. Every result is downloaded as a new file."
+          "q": "원본 파일이 바뀌나요?",
+          "a": "아니요. 모든 결과는 새 파일로 내려받습니다."
         },
         {
-          "q": "Can content concealed with mosaic or blur be recovered?",
-          "a": "The downloaded PNG, JPG or WebP has the effect applied to the original photo pixels, so the previous pixels are not retained in that file. Before downloading, the current editing session can still undo the effect."
+          "q": "모자이크나 블러로 가린 내용을 복구할 수 있나요?",
+          "a": "다운로드한 PNG·JPG·WebP 파일은 효과가 원본 사진 픽셀에 반영되어 가린 영역의 이전 픽셀이 남지 않습니다. 다만 다운로드 전 편집 세션에서는 실행 취소로 효과 적용 전 상태로 돌아갈 수 있습니다."
         },
         {
-          "q": "Which formats are supported?",
-          "a": "Input supports JPG, PNG and WebP, not HEIC or HEIF. Output supports PNG, JPG, WebP and GIF."
+          "q": "지원 형식은 무엇인가요?",
+          "a": "입력은 JPG, PNG, WebP이며 HEIC·HEIF는 지원하지 않습니다. 출력은 PNG, JPG, WebP와 GIF입니다."
         },
         {
-          "q": "Can I keep transparency?",
-          "a": "PNG and WebP keep transparency; JPG turns it white."
+          "q": "투명 배경을 유지할 수 있나요?",
+          "a": "PNG·WebP는 투명도를 유지하며 JPG는 흰색으로 처리합니다."
         },
         {
-          "q": "Why can large images stop?",
-          "a": "Browsers and devices have canvas and memory limits. Reduce output dimensions or file count."
+          "q": "대용량 이미지가 중단되는 이유는 무엇인가요?",
+          "a": "브라우저와 기기의 캔버스·메모리 한도 때문입니다. 출력 크기나 파일 수를 줄여 주세요."
         }
       ]
     }
@@ -3113,42 +3087,44 @@
       "PROCESSING_FAILED": "The files could not be compared. Check that they are supported and not damaged."
     },
     "guide": {
-      "title": "Excel comparison and reconciliation guide",
-      "description": "Learn how to create new reports without modifying your source files and review the support limits.",
+      "title": "Excel 비교 사용 안내",
+      "description": "엑셀 파일을 두 개씩 연결해 바뀐 내용이나 서로 맞지 않는 항목을 찾습니다.",
       "blocks": [
         {
-          "title": "Header rows and comparison methods",
-          "text": "A suggested header is selected when a file opens. If description, filter, or summary rows come first, choose the row with the actual column names. For a table without headers, add a column-name row at the top. Position mode aligns columns before rows. Key mode uses composite keys and a duplicate policy. The left and right lists in a duplicate-key row each follow their source order; items on the same line are not matched to each other. Add a secondary key or choose occurrence order when you need a matching rule. Reconciliation combines amount, date, and partner rules with optional 1:N and N:1 sums."
+          "title": "이런 때 쓰세요",
+          "items": [
+            "수정 전후 자료를 비교할 때",
+            "사번·주문번호별로 두 목록을 대조할 때",
+            "금액·날짜·거래처가 맞는 거래를 확인할 때."
+          ]
         },
         {
-          "title": "Large files and cancellation",
-          "text": "The two Excel files in the current pair are read, the selected sheets are compared, and memory is released when that pair finishes. Desktop browsers are more reliable for large files, and you can cancel at any time."
+          "title": "준비할 것",
+          "paragraphs": [
+            "비교할 왼쪽·오른쪽 파일. 열 이름이 있는 행과 기준 항목을 확인해 두세요."
+          ]
         },
         {
-          "title": "Reports and privacy",
-          "text": "Each pair produces Summary, Parameters, Matched, Changed, Added, Removed, Duplicates, Ambiguous, and Errors sheets. Files and cell values are not sent to an external processing server."
+          "title": "사용 순서",
+          "items": [
+            "비교할 파일 두 개를 한 쌍으로 넣습니다. 여러 쌍을 비교할 때는 파일 쌍을 추가합니다.",
+            "각 파일에서 사용할 시트와 열 이름이 있는 행을 확인합니다. 위에 제목이나 설명이 있으면 실제 열 이름이 있는 행으로 바꿉니다.",
+            "목적에 맞는 비교 방식을 고릅니다.",
+            "비교를 실행하고 결과 필터에서 변경·추가·삭제·중복 등을 확인합니다.",
+            "필요한 보고서를 저장합니다. 자동으로 연결하지 못한 항목은 원본을 함께 확인합니다."
+          ]
+        },
+        {
+          "title": "쉽게 이해하는 예",
+          "paragraphs": [
+            "이름의 순서가 바뀐 직원 목록은 이름보다 고유한 사번을 기준으로 비교하는 편이 목적에 맞습니다. `키`는 이처럼 같은 대상을 찾을 때 사용하는 기준 항목이라는 뜻입니다."
+          ]
         }
       ],
       "faq": [
         {
-          "q": "What if the suggested header is not the actual column-name row?",
-          "a": "Choose the row with the actual column names in each file's header-row field. Comparison starts after that row. For a table without headers, add a column-name row at the top and select the file again."
-        },
-        {
-          "q": "How are multiple rows with the same key shown?",
-          "a": "Each duplicate key counts as one result row with separate collapsible lists for the left and right source rows. Items on the same line are not matched automatically; use a secondary key or occurrence order to change the matching rule."
-        },
-        {
-          "q": "Are XLS and XLSB cell formats compared?",
-          "a": "No. Values, display values, formulas, stored results, and merged cells are compared, but XLS and XLSB cell-format differences are excluded."
-        },
-        {
-          "q": "Is a formula without a stored result an error?",
-          "a": "No. The formula can still be compared. Missing stored and display values are recorded separately, and the browser does not recalculate formulas."
-        },
-        {
-          "q": "Are files uploaded to a server?",
-          "a": "No. Selected files and generated reports are processed in this browser, and source files are not modified."
+          "q": "어떤 비교 방식을 골라야 하나요?",
+          "a": "비슷한 표의 수정 전후를 확인하려면 행·열 맞추기, 순서가 다른 목록에서 같은 대상을 찾으려면 기준 항목 비교, 거래 금액·날짜를 맞추려면 거래 내역 맞추기를 선택하세요."
         }
       ]
     }
@@ -3281,34 +3257,38 @@
       "rule": "Rule ID: {{id}}"
     },
     "guide": {
-      "title": "Excel Data Cleaner guide",
-      "description": "Review the order of all 28 rules, formula and CSV policies, and large-file limits.",
+      "title": "Excel 데이터 정리 사용 안내",
+      "description": "엑셀 자료에 필요한 정리 규칙을 순서대로 적용하고 새 파일과 처리 보고서를 만듭니다.",
       "blocks": [
         {
-          "title": "28 rules in order",
-          "text": "Combine 13 structure, 7 text, 3 row-filter, and 5 value-conversion rules, up to 100 rules. On a merged sheet, unmerge or unmerge-and-fill must come before row or column structure changes."
+          "title": "이런 때 쓰세요",
+          "items": [
+            "외부에서 받은 목록의 공백이나 형식을 맞출 때",
+            "불필요한 행·열을 정리할 때",
+            "반복되는 자료 정리를 같은 순서로 수행할 때."
+          ]
         },
         {
-          "title": "Formulas and conversion failures",
-          "text": "Only ordinary same-sheet A1 references in XLSX and XLSM have coordinates updated. Other formulas become stored values after confirmation, and a missing stored value blocks the run. Failed value conversions keep the source value and appear in Error Rows."
+          "title": "사용 순서",
+          "items": [
+            "파일을 넣고 정리할 시트와 열 이름이 있는 행을 고릅니다.",
+            "필요한 규칙을 추가합니다. 처음에는 한 가지 규칙으로 시작해 결과를 확인하는 편이 좋습니다.",
+            "규칙은 위에서 아래로 실행됩니다. 순서와 각 규칙의 설정을 확인합니다.",
+            "수식·병합된 셀·출력 형식 관련 안내를 확인하고 실행합니다.",
+            "정리한 자료뿐 아니라 변경 요약·오류·제외된 행도 확인합니다."
+          ]
         },
         {
-          "title": "Results, memory, and privacy",
-          "text": "Each XLSX includes cleaned sheets plus Change Summary, Processing Rules, Error Rows, and Excluded Rows. Full copies are not retained per stage, and error and excluded buffers are capped at 100,000 rows each. Files are not sent to an external processing server."
+          "title": "예시",
+          "paragraphs": [
+            "`서울`, ` 서울 `처럼 앞뒤 공백 때문에 다른 값으로 보이는 자료라면 공백 정리를 먼저 하고, 그 뒤 중복 정리를 적용할지 판단하세요. 규칙 순서에 따라 결과가 달라질 수 있습니다."
+          ]
         }
       ],
       "faq": [
         {
-          "q": "Are unselected sheets and XLSM macros preserved?",
-          "a": "No. Unselected sheets are omitted and XLSM macros are removed. The cleaner does not silently retain content whose references cannot be guaranteed after cleaning."
-        },
-        {
-          "q": "Is original-text CSV mode safe?",
-          "a": "It is not represented as safe. It preserves source text and warns about risky leading characters. Safe mode prefixes those values with an apostrophe."
-        },
-        {
-          "q": "Are originals changed or files uploaded?",
-          "a": "No. Processing happens in the current browser tab and only new result files are downloaded."
+          "q": "어떤 규칙부터 골라야 하나요?",
+          "a": "해결하려는 문제 하나부터 고르세요. 예를 들어 공백이 문제라면 공백 정리만 먼저 적용해 보고, 중복이나 행 삭제 규칙을 추가하세요."
         }
       ]
     }
@@ -3394,6 +3374,42 @@
       "verification": "The result could not be verified, so it was not provided.",
       "not-ready": "The isolated document tools could not be prepared. Reload the page.",
       "invalid-name": "Enter a safe PDF or PNG file name."
+    },
+    "guide": {
+      "title": "문서 개인정보 가리기 사용 안내",
+      "description": "PDF나 이미지의 이름·전화번호·주소 같은 부분을 직접 골라 검정색으로 가린 새 파일을 만듭니다.",
+      "blocks": [
+        {
+          "title": "이런 때 쓰세요",
+          "items": [
+            "증빙자료를 외부에 보내기 전 일부 정보를 가릴 때",
+            "영수증·계약 자료의 연락처나 계좌번호를 가릴 때",
+            "캡처에서 공개하면 안 되는 글자를 가릴 때."
+          ]
+        },
+        {
+          "title": "사용 순서",
+          "items": [
+            "파일을 추가하고 가릴 문서와 페이지를 고릅니다.",
+            "`영역 추가`를 눌러 검정 사각형을 만듭니다. 글자가 남지 않도록 위치와 크기를 조절합니다. 다음 페이지로 이동하며 필요한 부분을 모두 확인합니다.",
+            "`가린 표시가 없는 페이지` 목록을 확인합니다. 표시가 없다는 것은 자동으로 안전하다고 판정했다는 뜻이 아닙니다.",
+            "출력 해상도와 출력 시 바뀌는 내용을 읽고, 확인 항목에 체크한 뒤 `가린 파일 만들기`를 누릅니다.",
+            "`결과 확인`과 다운로드한 파일을 다시 열어 모든 페이지를 확인합니다. 원본이 아니라 결과 파일을 선택해 공유하세요."
+          ]
+        },
+        {
+          "title": "먼저 알아두세요",
+          "paragraphs": [
+            "이 도구는 개인정보를 자동으로 찾아주지 않습니다. 가릴 부분은 사용자가 직접 선택해야 합니다. 파일 이름이나 가리지 않은 페이지에도 정보가 남을 수 있습니다."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "주민등록번호나 전화번호를 자동으로 찾아 가려주나요?",
+          "a": "아니요. 페이지를 직접 확인하고 가릴 영역을 지정해야 합니다. 검정 표시를 하지 않은 부분은 결과에 보일 수 있습니다."
+        }
+      ]
     }
   },
   "documentGenerator": {
@@ -3466,37 +3482,40 @@
       "canceled": "Canceled"
     },
     "guide": {
-      "intro": "Map Word template {variables} to Excel data to bulk generate new DOCX documents per row, just like Mail Merge.",
-      "steps": [
-        {
-          "title": "Prepare Template",
-          "description": "In your DOCX file, wrap the changing parts in braces like {Applicant} or {Date}."
-        },
-        {
-          "title": "Connect Data",
-          "description": "Upload your XLSX/CSV data. Match the Excel header row to your template variables, or set aliases manually."
-        },
-        {
-          "title": "Set Filename",
-          "description": "Name your output files dynamically. Using {Applicant}_OfferLetter.docx will name each file based on the row data."
-        },
-        {
-          "title": "Preview & Generate",
-          "description": "Create a sample to preview the result, then generate all documents and download them as a ZIP archive."
-        }
-      ],
       "faq": [
         {
-          "q": "Can I use formula cells?",
-          "a": "Only saved calculation results are used. Rows with missing cached results or real cell errors fail."
+          "q": "빈 칸이 있으면 어떻게 되나요?",
+          "a": "연결한 열의 값이 비어 있으면 해당 자리가 빈 내용으로 들어갈 수 있습니다. 필요한 열 자체가 연결되지 않은 것은 다른 문제로, 연결을 고쳐야 합니다. 샘플에서 필수 값이 빠지지 않았는지 확인하세요. 완전히 빈 행은 생성 대상에서 제외됩니다."
         },
         {
-          "q": "Does cancel remove completed files?",
-          "a": "No. Completed files remain, while the current and unstarted rows are identified in the report."
+          "q": "메일을 자동으로 보내주는 기능인가요?",
+          "a": "아닙니다. 문서 파일을 만드는 기능입니다. `메일머지`라는 이름으로 알려진 방식이지만 이메일을 발송하지 않습니다."
+        }
+      ],
+      "title": "워드 일괄 생성 사용 안내",
+      "description": "워드 양식과 엑셀 목록을 넣으면, 사람별·항목별 문서를 한 번에 만들 수 있습니다.",
+      "blocks": [
+        {
+          "title": "이런 때 쓰세요",
+          "items": [
+            "직원별 교육 안내문을 만들 때",
+            "고객별 확인 문서를 만들 때",
+            "같은 양식에 이름·부서·날짜만 바꾼 문서를 여러 개 만들 때."
+          ]
         },
         {
-          "q": "Can it create PDF or HWP files?",
-          "a": "No. This release accepts standard DOCX templates and creates DOCX results only."
+          "title": "사용 순서",
+          "items": [
+            "엑셀의 열과 양식의 항목을 연결합니다. 양식에 `{이름}`이라고 적었다면 이름 데이터가 들어 있는 열을 연결합니다.",
+            "파일 이름을 정하고 문서 하나를 먼저 확인합니다. 파일 이름 규칙을 지정하고 검사한 뒤 `문서 1개 먼저 만들기`를 실행하세요.",
+            "전체 문서를 만든 뒤 결과를 저장합니다."
+          ]
+        },
+        {
+          "title": "이 도구가 하는 일",
+          "paragraphs": [
+            "글을 새로 작성하는 AI 도구가 아닙니다. 미리 만든 워드 양식의 바뀔 부분에 엑셀의 값을 넣습니다."
+          ]
         }
       ]
     }

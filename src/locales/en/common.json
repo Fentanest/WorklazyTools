@@ -1,5 +1,9 @@
 {
-  "language": { "ko": "한국어", "en": "English", "switchLabel": "Choose language" },
+  "language": {
+    "ko": "한국어",
+    "en": "English",
+    "switchLabel": "Choose language"
+  },
   "search": {
     "label": "Search all tools",
     "placeholder": "Search tools. (e.g., PDF, Excel, merge)",
@@ -7,13 +11,18 @@
     "results": "{{count}} tools"
   },
   "theme": {
-    "switchTo": "Switch to {{theme}}",
+    "label": "Change theme",
+    "switchTo": "Next theme: {{theme}}",
     "names": {
       "light-coral": "Light Coral",
       "dark-coral": "Dark Coral",
       "light-mint": "Light Mint",
       "dark-mint": "Dark Mint"
-    }
+    },
+    "light-coral": "Light Coral",
+    "dark-coral": "Dark Coral",
+    "light-mint": "Light Mint",
+    "dark-mint": "Dark Mint"
   },
   "landing": {
     "eyebrow": "WORKLAZY TOOLS",
@@ -37,7 +46,15 @@
     "chooseTask": "What would you like to do?",
     "close": "Close",
     "primaryLabel": "Primary navigation",
-    "mobileLabel": "Mobile navigation", "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar", "github": "GitHub", "toolGroups": {"documents": "Documents", "media": "Media", "other": "Other"}
+    "mobileLabel": "Mobile navigation",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "github": "GitHub",
+    "toolGroups": {
+      "documents": "Documents",
+      "media": "Media",
+      "other": "Other"
+    }
   },
   "brand": {
     "tagline": "Complex work,\nsimpler and smarter."
@@ -47,20 +64,6 @@
     "searchLabel": "Search tools",
     "toggleSidebar": "Toggle sidebar",
     "githubLabel": "View on GitHub"
-  },
-  "theme": {
-    "label": "Change theme",
-    "switchTo": "Next theme: {{theme}}",
-    "names": {
-      "light-coral": "Light Coral",
-      "dark-coral": "Dark Coral",
-      "light-mint": "Light Mint",
-      "dark-mint": "Dark Mint"
-    },
-    "light-coral": "Light Coral",
-    "dark-coral": "Dark Coral",
-    "light-mint": "Light Mint",
-    "dark-mint": "Dark Mint"
   },
   "footer": {
     "service": "About the service",
@@ -101,21 +104,30 @@
       "description": "For feature suggestions or bug reports, please use GitHub Issues.",
       "action": "Open GitHub Issues"
     },
-    "availableTitle": "Tools you can use now",
-    "availableSubtitle": "Start your most-used tools quickly.",
+    "availableTitle": "Ready-to-use tools",
+    "availableSubtitle": "Pick a tool and start working right away.",
     "localTitle": "Safe local processing",
     "localDescription": "Files are never uploaded to a server. Everything runs safely in your browser.",
     "howTitle": "How your files are handled",
     "steps": {
-      "selectTitle": "1. Choose files", "selectDescription": "Choose the documents you want to work with in your browser's file picker.",
-      "processTitle": "2. Process locally", "processDescription": "See progress and logs while your files remain on your device.",
-      "saveTitle": "3. Save the result", "saveDescription": "Review the result created by your browser and download it to your device."
+      "selectTitle": "1. Choose files",
+      "selectDescription": "Choose the documents you want to work with in your browser's file picker.",
+      "processTitle": "2. Process locally",
+      "processDescription": "See progress and logs while your files remain on your device.",
+      "saveTitle": "3. Save the result",
+      "saveDescription": "Review the result created by your browser and download it to your device."
     }
   },
   "files": {
-    "generic": "File", "selectOrDrop": "{{label}}: {{action}} or drop", "select": "select", "add": "add more",
-    "selected": "{{count}} files selected", "keepAdding": "you can keep adding files", "dropHere": "Drop files here",
-    "added": "Added to the list", "remove": "Remove {{name}}"
+    "generic": "File",
+    "selectOrDrop": "{{label}}: {{action}} or drop",
+    "select": "select",
+    "add": "add more",
+    "selected": "{{count}} files selected",
+    "keepAdding": "you can keep adding files",
+    "dropHere": "Drop files here",
+    "added": "Added to the list",
+    "remove": "Remove {{name}}"
   },
   "actions": {
     "selectFile": "Choose files",
@@ -151,7 +163,22 @@
     "failed": "Failed",
     "loadingTool": "Loading {{tool}}…"
   },
-  "progress": { "title":"Progress", "running":"Processing", "success":"Complete", "needsAttention":"Needs attention", "logs":"{{count}} log entries", "seconds":"{{value}}s", "minutesSeconds":"{{minutes}}m {{seconds}}s" },
-  "guide": { "eyebrow":"Guide", "faq":"Frequently asked questions" },
-  "format": { "characters": "{{count}} characters", "files": "{{count}} files", "tools": "{{count}} tools" }
+  "progress": {
+    "title": "Progress",
+    "running": "Processing",
+    "success": "Complete",
+    "needsAttention": "Needs attention",
+    "logs": "{{count}} log entries",
+    "seconds": "{{value}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  },
+  "guide": {
+    "eyebrow": "Guide",
+    "faq": "Frequently asked questions"
+  },
+  "format": {
+    "characters": "{{count}} characters",
+    "files": "{{count}} files",
+    "tools": "{{count}} tools"
+  }
 }

@@ -18,6 +18,8 @@ export function ToolGuide({ title, description, blocks, faq }: {
   description: string;
   blocks: GuideBlock[];
   faq: GuideFaq[];
+  children?: React.ReactNode;
+
 }) {
   const { t } = useTranslation("common");
   return (

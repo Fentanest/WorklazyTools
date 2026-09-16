@@ -263,8 +263,8 @@ export function TextMergerPage() {
       <ToolGuide
         title={t("features:textMerger.guide.title")}
         description={t("features:textMerger.guide.description")}
-        blocks={(t("features:textMerger.guide.blocks", { returnObjects: true }) as Array<{ title: string; text: string }>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
-        faq={(t("features:textMerger.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map((item) => ({ question: item.q, answer: item.a }))}
+        blocks={t("features:textMerger.guide.blocks", { returnObjects: true }) as any}
+        faq={(t("features:textMerger.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
       />
     </UtilityPage>
   );

@@ -1,4 +1,4 @@
-import { ArrowRight, Download, ExternalLink, FileUp, LockKeyhole, MessageSquarePlus, ScanSearch, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Download, ExternalLink, FileUp, LockKeyhole, MessageSquarePlus, ScanSearch, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -8,29 +8,46 @@ import { useWorklazyTheme } from "../hooks/useWorklazyTheme";
 import { localizedPath } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
 import { useToolCatalog } from "../i18n/useToolCatalog";
+import { cn } from "../lib/utils";
 
-/** Home grid order mirrors the design mockups (newui/). */
-const FEATURED_TOOL_IDS = [
+const HOME_TOOL_IDS_KO = [
+  "pdf-editor",
   "excel-merger",
   "excel-compare",
   "excel-cleaner",
-  "pdf-editor",
+  "image-studio",
+  "document-redactor",
   "document-compare",
   "hwp-editor",
-  "image-studio",
-  "video-studio",
-  "audio-studio",
-  "office-editor",
+  "text-tools",
   "qr-studio",
-];
+  "video-studio",
+] as const;
+
+const HOME_TOOL_IDS_EN = [
+  "pdf-editor",
+  "excel-merger",
+  "excel-compare",
+  "excel-cleaner",
+  "image-studio",
+  "document-redactor",
+  "document-compare",
+  "office-editor",
+  "text-tools",
+  "qr-studio",
+  "video-studio",
+] as const;
 
 export function HomePage() {
   const { t } = useTranslation("common");
   const language = useAppLanguage();
   const { tools } = useToolCatalog();
   const { theme } = useWorklazyTheme();
+  
   const heroArt = `${import.meta.env.BASE_URL}${theme.includes("mint") ? "hero-mint.png" : "hero-coral.png"}`;
-  const featuredTools = FEATURED_TOOL_IDS
+  
+  const targetIds = language === "ko" ? HOME_TOOL_IDS_KO : HOME_TOOL_IDS_EN;
+  const featuredTools = targetIds
     .map((id) => tools.find((tool) => tool.id === id))
     .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool));
 
@@ -69,15 +86,17 @@ export function HomePage() {
         </div>
         <div className="tool-grid">
           {featuredTools.map((tool) => <ToolCard key={tool.id} tool={tool} featured />)}
-          <div className="ui-tool-card wl-local-card">
-            <div className="ui-tool-card-top">
-              <span className="grid place-items-center rounded-2xl" style={{ width: 46, height: 46, color: "var(--brand-on-bg)", background: "var(--brand-soft)" }}><ShieldCheck size={24} /></span>
+          <Link to={localizedPath(language, "/tools")} className="ui-tool-card flex h-full flex-col justify-between hover:bg-muted/50 transition-colors">
+            <div className="ui-tool-card-top flex items-center justify-between w-full">
+              <span className="grid place-items-center rounded-2xl" style={{ width: 46, height: 46, color: "var(--brand-on-bg)", background: "var(--brand-soft)" }}>
+                <ArrowRight size={24} aria-hidden="true" />
+              </span>
             </div>
             <div className="ui-tool-card-copy">
-              <h2>{t("home.localTitle")}</h2>
-              <p>{t("home.localDescription")}</p>
+              <h2>{language === "ko" ? "전체 도구 보기" : "View All Tools"}</h2>
+              <p>{language === "ko" ? "문서·이미지·텍스트·계산 등 모든 도구를 살펴보세요." : "Browse all tools for documents, media, text, and calculations."}</p>
             </div>
-          </div>
+          </Link>
         </div>
       </section>
 
@@ -89,7 +108,6 @@ export function HomePage() {
           <div><span><Download size={20} /></span><strong>{t("home.steps.saveTitle")}</strong><p>{t("home.steps.saveDescription")}</p></div>
         </div>
       </section>
-
     </div>
   );
 }

@@ -26,8 +26,8 @@ export function SecurityToolsPage() {
       : t("security.adviceMedium")
     : "";
   const strengthLevels = t("security.levels", { returnObjects: true }) as string[];
-  const guideBlocks = (t("security.guide.blocks", { returnObjects: true }) as Array<{ title: string; text: string }>).map((block) => ({ title: block.title, paragraphs: [block.text] }));
-  const guideFaq = (t("security.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map((item) => ({ question: item.q, answer: item.a }));
+  const guideBlocks = t("security.guide.blocks", { returnObjects: true }) as any;
+  const guideFaq = (t("security.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }));
   const formatCrackTime = (seconds: number) => {
     if (!Number.isFinite(seconds) || seconds >= 100 * 365 * 24 * 60 * 60) return t("security.time.century");
     if (seconds < 1) return t("security.time.underSecond");

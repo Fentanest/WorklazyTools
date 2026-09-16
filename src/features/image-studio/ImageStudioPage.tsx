@@ -107,8 +107,8 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <ToolGuide
         title={t("image.guide.title")}
         description={t("image.guide.description")}
-        blocks={(t("image.guide.blocks", { returnObjects: true }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
-        faq={(t("image.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
+        blocks={t("image.guide.blocks", { returnObjects: true }) as any}
+        faq={(t("image.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
       />
     </UtilityPage>
   );
@@ -1715,7 +1715,7 @@ function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; 
             >{t("image.editor.regionSize", { width: Math.round(floatingRegionSelection.width), height: Math.round(floatingRegionSelection.height) })}</span>}
             {stageDragging && <span className="image-preview-drop-hint absolute inset-2 z-20 grid place-items-center rounded-xl border-2 border-dashed border-sky-600/50 bg-sky-50/95 p-4 text-sm font-extrabold text-sky-700 backdrop-blur-sm dark:bg-sky-950/95 dark:text-sky-300">{t("image.editor.drop")}</span>}
           </div>
-          <p id="image-editor-canvas-keyboard-help" className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("image.editor.canvasKeyboardHelp")}</p>
+          <p id="image-editor-canvas-keyboard-help" className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("image.editor.canvasKeyboardHelp")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>
         </div>
         <ImageEditorPanel
           activePanel={activePanel}

@@ -11,30 +11,35 @@
     "emptyDescription": "Try another search term or category."
   },
   "categories": {
+    "spreadsheets": {
+      "label": "Excel & Spreadsheets",
+      "shortLabel": "Spreadsheets",
+      "description": "Merge, compare, and clean Excel and table data."
+    },
     "documents": {
-      "label": "Documents & spreadsheets",
+      "label": "Documents & PDF",
       "shortLabel": "Documents",
-      "description": "Edit, compare, merge and convert business documents."
+      "description": "Edit, compare, generate, and convert documents."
     },
     "media": {
-      "label": "Images, video & audio",
+      "label": "Image, Video & Audio",
       "shortLabel": "Media",
-      "description": "Edit images, video and audio directly in your browser."
+      "description": "Edit images, videos, and audio directly in your browser."
     },
     "text-data": {
-      "label": "Text & data",
-      "shortLabel": "Text & data",
-      "description": "Clean up text, code and tabular data."
+      "label": "Text & Code",
+      "shortLabel": "Text & Code",
+      "description": "Format and organize text and code data for readability."
     },
     "work": {
-      "label": "Dates, work & payroll",
-      "shortLabel": "Work calculators",
-      "description": "Plan work dates, time zones and Korean payroll."
+      "label": "Dates & Calculators",
+      "shortLabel": "Calculators",
+      "description": "Calculate workdays, time zones, and payroll easily."
     },
     "security-share": {
-      "label": "Privacy & sharing",
-      "shortLabel": "Privacy & sharing",
-      "description": "Protect metadata, create strong passwords and share with QR codes."
+      "label": "Security & Sharing",
+      "shortLabel": "Security",
+      "description": "Protect privacy and generate secure passwords or QR codes."
     }
   },
   "items": {

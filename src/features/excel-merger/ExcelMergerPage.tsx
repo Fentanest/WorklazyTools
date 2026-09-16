@@ -691,7 +691,7 @@ export function ExcelMergerPage() {
                 <PasswordField label={t("excel.protect.password")} value={outputPassword} onChange={setOutputPassword} visible={showOutputPassword} onVisibilityChange={setShowOutputPassword} toggleLabel={t("excel.protect.toggle")} />
                 <PasswordField label={t("excel.protect.confirm")} value={outputPasswordConfirm} onChange={setOutputPasswordConfirm} visible={showOutputPassword} toggleLabel={t("excel.protect.toggle")} />
                 {outputPasswordConfirm && outputPasswordMismatch && <p className="col-span-full text-sm font-bold text-destructive">{t("excel.protect.mismatch")}</p>}
-                <p className="col-span-full flex items-start gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="mt-0.5 shrink-0" size={13} /> {t("excel.protect.warning")}</p>
+                <p className="col-span-full flex items-start gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="mt-0.5 shrink-0" size={13} /> {t("excel.protect.warning")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>
               </div>
             )}
           </UtilitySectionCard>
@@ -752,7 +752,7 @@ export function ExcelMergerPage() {
         title={t("excel.guide.title")}
         description={t("excel.guide.description")}
         blocks={t("excel.guide.blocks", { returnObjects: true }) as Array<{ title: string; paragraphs: string[]; items?: string[] }>}
-        faq={(t("excel.guide.faq", { returnObjects: true }) as Array<{ q: string; a: string }>).map(({ q, a }) => ({ question: q, answer: a }))}
+        faq={(t("excel.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
       />
       {preserveLegacyXls && <canvas ref={converterCanvasRef} id="qtcanvas" className="pointer-events-none fixed size-px opacity-0" aria-hidden="true" />}
       </div>
