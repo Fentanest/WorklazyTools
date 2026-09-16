@@ -13,7 +13,7 @@ export interface GuideFaq {
   answer: string;
 }
 
-export function ToolGuide({ title, description, blocks, faq }: {
+export function ToolGuide({ title, description, blocks, faq, children }: {
   title: string;
   description: string;
   blocks: GuideBlock[];
@@ -36,6 +36,7 @@ export function ToolGuide({ title, description, blocks, faq }: {
           </Card>
         ))}
       </div>
+      {children}
       <div className="ui-tool-faq">
         <h2>{t("guide.faq")}</h2>
         {faq.map((item) => (

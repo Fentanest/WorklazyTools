@@ -107,7 +107,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <ToolGuide
         title={t("image.guide.title")}
         description={t("image.guide.description")}
-        blocks={t("image.guide.blocks", { returnObjects: true }) as any}
+        blocks={t("image.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]}
         faq={(t("image.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
       />
     </UtilityPage>

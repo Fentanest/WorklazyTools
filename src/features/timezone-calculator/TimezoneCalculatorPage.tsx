@@ -148,7 +148,7 @@ export function TimezoneCalculatorPage() {
       <ToolGuide
         title={t("timezone.guide.title")}
         description={t("timezone.guide.description")}
-        blocks={t("timezone.guide.blocks", { returnObjects: true }) as any}
+        blocks={t("timezone.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]}
         faq={(t("timezone.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
       />
     </UtilityPage>

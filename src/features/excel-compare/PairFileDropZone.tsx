@@ -45,8 +45,8 @@ export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled
     <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple disabled={disabled} onChange={(event) => { void handleChange(event); }} />
     <Card
       className={cn(
-        "relative min-h-32 items-center justify-center gap-2 overflow-visible rounded-2xl border border-dashed border-green-700/45 bg-green-500/5 px-4 py-5 text-center shadow-none transition-[border-color,background-color,box-shadow] dark:border-green-300/50",
-        dragging && "border-green-700 bg-green-500/15 ring-3 ring-green-700/20 dark:border-green-300",
+        "relative min-h-32 items-center justify-center gap-2 overflow-visible rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-5 text-center shadow-none transition-[border-color,background-color,box-shadow] ",
+        dragging && "border-primary bg-primary/15 ring-3 ring-primary/20 dark:border-primary",
         disabled && "cursor-not-allowed opacity-50",
       )}
       data-testid="excel-pair-drop-zone"
@@ -63,10 +63,10 @@ export function PairFileDropZone({ label, hint, accept, files, onFiles, disabled
       }}
       onDrop={(event) => { void handleDrop(event); }}
     >
-      <span className="grid size-11 place-items-center rounded-full bg-green-500/15 text-green-800 dark:text-green-300">{files.length ? <FilePlus2 size={24} /> : <UploadCloud size={24} />}</span>
+      <span className="grid size-11 place-items-center rounded-full bg-primary/15 text-primary dark:text-primary">{files.length ? <FilePlus2 size={24} /> : <UploadCloud size={24} />}</span>
       <div className="grid gap-1" aria-live="polite"><strong className="text-sm">{files.length ? t("files.selected", { count: files.length }) : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
       <Button className="min-h-11 rounded-xl" variant="secondary" type="button" disabled={disabled} onClick={() => inputRef.current?.click()}>{t("actions.selectFile")}</Button>
-      {files.length > 0 && <em className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-green-700 px-2 py-1 text-[11px] font-bold text-white not-italic" key={files.length}><Check size={12} /> {t("files.added")}</em>}
+      {files.length > 0 && <em className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[11px] font-bold text-white not-italic" key={files.length}><Check size={12} /> {t("files.added")}</em>}
     </Card>
   </div>;
 }

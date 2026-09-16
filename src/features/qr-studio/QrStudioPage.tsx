@@ -260,7 +260,7 @@ export function QrStudioPage({ initialMode = "create" }: { initialMode?: QrMode 
               <UtilityField className="col-span-full"><span>{t("qr.logo")}</span><UtilityInput className="h-auto min-h-10 py-1.5 file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-bold" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogo(event.target.files?.[0])} /></UtilityField>
             </div>
           </UtilitySectionCard>
-          <UtilitySectionCard title={t("qr.preview")}><div className="grid min-h-[300px] place-items-center rounded-2xl border border-border bg-muted/45 p-4" data-testid="qr-preview" data-ready={qrReady}><canvas className="block h-auto max-h-[360px] max-w-full rounded-xl bg-white shadow-sm" ref={canvasRef} /></div>{error && <p className="mt-2 text-sm font-bold text-destructive" data-testid="qr-error" role="alert">{error}</p>}<div className="mt-3 flex flex-wrap gap-2"><PrimaryButton accent="blue" disabled={!qrReady} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <Button className="min-h-11 rounded-xl" type="button" variant="secondary" disabled={!qrReady} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</Button>}</div></UtilitySectionCard>
+          <UtilitySectionCard title={t("qr.preview")}><div className="grid aspect-square w-full place-items-center rounded-2xl border border-border bg-muted/45 p-4" data-testid="qr-preview" data-ready={qrReady}><canvas className="block h-full w-full object-contain max-w-full rounded-xl bg-white shadow-sm" ref={canvasRef} /></div>{error && <p className="mt-2 text-sm font-bold text-destructive" data-testid="qr-error" role="alert">{error}</p>}<div className="mt-3 flex flex-wrap gap-2"><PrimaryButton accent="blue" disabled={!qrReady} onClick={download}><Download size={18} /> {t("qr.download")}</PrimaryButton>{typeof navigator.share === "function" && <Button className="min-h-11 rounded-xl" type="button" variant="secondary" disabled={!qrReady} onClick={shareQr}><Share2 size={17} /> {t("qr.share")}</Button>}</div></UtilitySectionCard>
         </div>
       ) : mode === "scan" ? (
         <>
@@ -324,7 +324,7 @@ export function QrStudioPage({ initialMode = "create" }: { initialMode?: QrMode 
       <ToolGuide
         title={t(mode === "bulk" ? "qr.bulkGuide.title" : "qr.guide.title")}
         description={t(mode === "bulk" ? "qr.bulkGuide.description" : "qr.guide.description")}
-        blocks={(t(mode === "bulk" ? "qr.bulkGuide.blocks" : "qr.guide.blocks", { returnObjects: true, Header: "{{Header}}" }) as Array<{title:string;text:string}>).map((item) => ({ title: item.title, paragraphs: [item.text] }))}
+        blocks={t(mode === "bulk" ? "qr.bulkGuide.blocks" : "qr.guide.blocks", { returnObjects: true, Header: "{{Header}}" }) as import("../../components/ToolGuide").GuideBlock[]}
         faq={(t(mode === "bulk" ? "qr.bulkGuide.faq" : "qr.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
       />
       </div>

@@ -97,15 +97,21 @@
       "blocks": [
         {
           "title": "길고 고유하게",
-          "text": "사이트마다 서로 다른 16자 이상의 비밀번호를 사용하고 비밀번호 관리자에 보관하는 것이 좋습니다."
+          "paragraphs": [
+            "사이트마다 서로 다른 16자 이상의 비밀번호를 사용하고 비밀번호 관리자에 보관하는 것이 좋습니다."
+          ]
         },
         {
           "title": "강도 점수",
-          "text": "흔한 단어·반복·연속 문자 같은 패턴과 예상 추측 횟수를 바탕으로 계산합니다. 유출 여부나 계정의 다중 인증 상태까지 확인하지는 않습니다."
+          "paragraphs": [
+            "흔한 단어·반복·연속 문자 같은 패턴과 예상 추측 횟수를 바탕으로 계산합니다. 유출 여부나 계정의 다중 인증 상태까지 확인하지는 않습니다."
+          ]
         },
         {
           "title": "예상 해독 시간",
-          "text": "저장된 비밀번호 해시가 유출되어 공격자가 초당 100억 회 대입할 수 있다고 가정한 비교값입니다. 사이트의 저장 방식과 보안 설정에 따라 실제 시간은 크게 달라집니다."
+          "paragraphs": [
+            "저장된 비밀번호 해시가 유출되어 공격자가 초당 100억 회 대입할 수 있다고 가정한 비교값입니다. 사이트의 저장 방식과 보안 설정에 따라 실제 시간은 크게 달라집니다."
+          ]
         }
       ],
       "faq": [
@@ -148,11 +154,15 @@
       "blocks": [
         {
           "title": "오류 확인",
-          "text": "JSON과 XML은 오류가 발견된 위치를 표시하고 SQL은 문장의 구성 요소를 기준으로 줄과 들여쓰기를 정돈합니다."
+          "paragraphs": [
+            "JSON과 XML은 오류가 발견된 위치를 표시하고 SQL은 문장의 구성 요소를 기준으로 줄과 들여쓰기를 정돈합니다."
+          ]
         },
         {
           "title": "한 줄로 축소",
-          "text": "따옴표 안의 글자와 공백은 유지하고, 데이터 구조를 표시하는 데 불필요한 공백과 줄바꿈만 줄입니다."
+          "paragraphs": [
+            "따옴표 안의 글자와 공백은 유지하고, 데이터 구조를 표시하는 데 불필요한 공백과 줄바꿈만 줄입니다."
+          ]
         }
       ],
       "faq": [
@@ -192,11 +202,15 @@
       "blocks": [
         {
           "title": "CSV",
-          "text": "첫 행을 열 이름으로 사용하며 따옴표, 쉼표와 줄바꿈이 포함된 셀은 표준 CSV 따옴표 규칙으로 해석합니다."
+          "paragraphs": [
+            "첫 행을 열 이름으로 사용하며 따옴표, 쉼표와 줄바꿈이 포함된 셀은 표준 CSV 따옴표 규칙으로 해석합니다."
+          ]
         },
         {
           "title": "JSON·HTML",
-          "text": "JSON 객체 배열의 모든 키를 열로 모으고 HTML 표는 첫 번째 행을 머리글로 사용합니다."
+          "paragraphs": [
+            "JSON 객체 배열의 모든 키를 열로 모으고 HTML 표는 첫 번째 행을 머리글로 사용합니다."
+          ]
         }
       ],
       "faq": [
@@ -389,11 +403,15 @@
       "blocks": [
         {
           "title": "공휴일",
-          "text": "양력 공휴일과 설·추석·부처님오신날, 대체공휴일을 계산합니다. 확정된 일부 선거일·임시공휴일도 연도별 목록에 반영하며 회사 휴무일은 직접 추가하세요."
+          "paragraphs": [
+            "양력 공휴일과 설·추석·부처님오신날, 대체공휴일을 계산합니다. 확정된 일부 선거일·임시공휴일도 연도별 목록에 반영하며 회사 휴무일은 직접 추가하세요."
+          ]
         },
         {
           "title": "연차",
-          "text": "근로기준법상 기본 발생 구조를 적용하지만 회사의 회계연도 운영과 근태 정산 방식에 따라 실제 부여일수가 달라질 수 있습니다."
+          "paragraphs": [
+            "근로기준법상 기본 발생 구조를 적용하지만 회사의 회계연도 운영과 근태 정산 방식에 따라 실제 부여일수가 달라질 수 있습니다."
+          ]
         }
       ],
       "faq": [
@@ -463,11 +481,15 @@
       "blocks": [
         {
           "title": "실수령액",
-          "text": "식대 같은 비과세 수당을 제외한 월 과세 대상 급여와 부양가족 수로 사회보험과 월 소득세를 추정합니다. 회사의 신고 기준소득월액, 비과세 항목과 원천징수 비율에 따라 달라질 수 있습니다."
+          "paragraphs": [
+            "식대 같은 비과세 수당을 제외한 월 과세 대상 급여와 부양가족 수로 사회보험과 월 소득세를 추정합니다. 회사의 신고 기준소득월액, 비과세 항목과 원천징수 비율에 따라 달라질 수 있습니다."
+          ]
         },
         {
           "title": "퇴직금",
-          "text": "퇴직 전 3개월 임금과 최근 1년 상여·연차수당의 3/12를 반영합니다. 3개월 총 일수에는 휴일을 포함한 달력상 날짜 수를 입력합니다. 산출 평균임금이 통상임금보다 낮은 경우 등은 별도 확인이 필요합니다."
+          "paragraphs": [
+            "퇴직 전 3개월 임금과 최근 1년 상여·연차수당의 3/12를 반영합니다. 3개월 총 일수에는 휴일을 포함한 달력상 날짜 수를 입력합니다. 산출 평균임금이 통상임금보다 낮은 경우 등은 별도 확인이 필요합니다."
+          ]
         }
       ],
       "faq": [
@@ -731,15 +753,21 @@
       "blocks": [
         {
           "title": "Column mapping and templates",
-          "text": "QR content is required. File names, labels and groups can use fixed column numbers or {{Header}} templates. A duplicated header referenced by a template is rejected before creation."
+          "paragraphs": [
+            "QR content is required. File names, labels and groups can use fixed column numbers or {{Header}} templates. A duplicated header referenced by a template is rejected before creation."
+          ]
         },
         {
           "title": "Read-back checks and limits",
-          "text": "The final PNG, including its logo or transparent background, is decoded and accepted only when it matches the source. Limits are 50 MB input, 2,000,000 selected cells, 5,000 rows and 500 MB estimated output."
+          "paragraphs": [
+            "The final PNG, including its logo or transparent background, is decoded and accepted only when it matches the source. Limits are 50 MB input, 2,000,000 selected cells, 5,000 rows and 500 MB estimated output."
+          ]
         },
         {
           "title": "Result files",
-          "text": "Download PNG files individually or put two or more into an incremental ZIP. A4 or Letter label PDFs and an XLSX report with separate successful and failed rows are also available."
+          "paragraphs": [
+            "Download PNG files individually or put two or more into an incremental ZIP. A4 or Letter label PDFs and an XLSX report with separate successful and failed rows are also available."
+          ]
         }
       ],
       "faq": [
@@ -759,15 +787,21 @@
       "blocks": [
         {
           "title": "중앙 로고",
-          "text": "높은 오류 복원 수준을 사용하고 로고 뒤에 흰 여백을 넣습니다. 로고가 너무 복잡하면 일부 카메라에서 인식률이 떨어질 수 있습니다."
+          "paragraphs": [
+            "높은 오류 복원 수준을 사용하고 로고 뒤에 흰 여백을 넣습니다. 로고가 너무 복잡하면 일부 카메라에서 인식률이 떨어질 수 있습니다."
+          ]
         },
         {
           "title": "실시간 카메라",
-          "text": "보안 연결(HTTPS)에서 사용자 허용을 받은 뒤 후면 카메라를 우선 사용합니다. QR을 찾으면 즉시 카메라와 분석 작업을 종료합니다."
+          "paragraphs": [
+            "보안 연결(HTTPS)에서 사용자 허용을 받은 뒤 후면 카메라를 우선 사용합니다. QR을 찾으면 즉시 카메라와 분석 작업을 종료합니다."
+          ]
         },
         {
           "title": "사진 스캔",
-          "text": "큰 이미지는 브라우저 안에서 최대 2200px로 축소한 뒤 밝고 어두운 색을 뒤집는 방식까지 시도해 QR을 찾습니다."
+          "paragraphs": [
+            "큰 이미지는 브라우저 안에서 최대 2200px로 축소한 뒤 밝고 어두운 색을 뒤집는 방식까지 시도해 QR을 찾습니다."
+          ]
         }
       ],
       "faq": [
@@ -843,15 +877,21 @@
       "blocks": [
         {
           "title": "지도와 도시 선택",
-          "text": "핀 또는 도시 검색을 이용해 최대 6개 도시를 선택할 수 있습니다. 확대 후에는 지도를 드래그해 밀집된 지역의 핀을 확인하세요."
+          "paragraphs": [
+            "핀 또는 도시 검색을 이용해 최대 6개 도시를 선택할 수 있습니다. 확대 후에는 지도를 드래그해 밀집된 지역의 핀을 확인하세요."
+          ]
         },
         {
           "title": "서머타임",
-          "text": "뉴욕·런던·시드니 등은 전환일이 서로 다릅니다. 선택한 날짜의 국제 표준 도시 시간대(IANA) 규칙으로 UTC와의 시차를 계산합니다."
+          "paragraphs": [
+            "뉴욕·런던·시드니 등은 전환일이 서로 다릅니다. 선택한 날짜의 국제 표준 도시 시간대(IANA) 규칙으로 UTC와의 시차를 계산합니다."
+          ]
         },
         {
           "title": "회의 추천",
-          "text": "30분 단위로 모든 선택 도시가 현지 09:00~18:00인 구간만 표시합니다."
+          "paragraphs": [
+            "30분 단위로 모든 선택 도시가 현지 09:00~18:00인 구간만 표시합니다."
+          ]
         }
       ],
       "faq": [
@@ -1275,31 +1315,45 @@
       "blocks": [
         {
           "title": "파형 구간 선택",
-          "text": "파형을 드래그하면 보라색 선택 영역이 생깁니다. 영역 전체를 옮기거나 양쪽 손잡이를 조절하고, 시작·종료 초 입력으로 1ms 단위 값을 지정할 수 있습니다."
+          "paragraphs": [
+            "파형을 드래그하면 보라색 선택 영역이 생깁니다. 영역 전체를 옮기거나 양쪽 손잡이를 조절하고, 시작·종료 초 입력으로 1ms 단위 값을 지정할 수 있습니다."
+          ]
         },
         {
           "title": "샘플 단위 편집",
-          "text": "음소거는 선택 샘플을 0으로 바꾸고, 잘라내기와 삭제는 뒤 샘플을 앞으로 당깁니다. 붙여넣기는 현재 빨간 재생 커서 위치에 메모리 클립을 삽입합니다."
+          "paragraphs": [
+            "음소거는 선택 샘플을 0으로 바꾸고, 잘라내기와 삭제는 뒤 샘플을 앞으로 당깁니다. 붙여넣기는 현재 빨간 재생 커서 위치에 메모리 클립을 삽입합니다."
+          ]
         },
         {
           "title": "선택 구간 음성 효과",
-          "text": "낮은 톤·높은 톤·어린 목소리는 원래 길이를 유지하면서 피치를 바꾸고, 로봇은 진폭을 빠르게 변조합니다. 적용 전 선택 구간만 미리 들을 수 있으며 경계에는 짧은 크로스페이드를 넣습니다."
+          "paragraphs": [
+            "낮은 톤·높은 톤·어린 목소리는 원래 길이를 유지하면서 피치를 바꾸고, 로봇은 진폭을 빠르게 변조합니다. 적용 전 선택 구간만 미리 들을 수 있으며 경계에는 짧은 크로스페이드를 넣습니다."
+          ]
         },
         {
           "title": "키보드 단축키",
-          "text": "입력 칸 밖에서는 Space로 재생·일시정지하고, Ctrl+Z 또는 macOS의 Cmd+Z로 실행 취소합니다. Ctrl+Shift+Z·Cmd+Shift+Z·Ctrl+Y·Cmd+Y는 다시 실행입니다."
+          "paragraphs": [
+            "입력 칸 밖에서는 Space로 재생·일시정지하고, Ctrl+Z 또는 macOS의 Cmd+Z로 실행 취소합니다. Ctrl+Shift+Z·Cmd+Shift+Z·Ctrl+Y·Cmd+Y는 다시 실행입니다."
+          ]
         },
         {
           "title": "실행 취소와 메모리",
-          "text": "편집을 위해 압축을 푼 음성 샘플(PCM)을 채널별로 보관합니다. 실행 취소 기록은 파일 크기에 맞춰 최대 12단계, 약 256MB 한도 안에서 자동 제한하며 새 파일을 열면 모두 해제합니다."
+          "paragraphs": [
+            "편집을 위해 압축을 푼 음성 샘플(PCM)을 채널별로 보관합니다. 실행 취소 기록은 파일 크기에 맞춰 최대 12단계, 약 256MB 한도 안에서 자동 제한하며 새 파일을 열면 모두 해제합니다."
+          ]
         },
         {
           "title": "WAV와 MP3",
-          "text": "WAV는 호환성이 높은 16비트 비압축 음성으로 빠르게 만듭니다. MP3 저장과 피치 효과에 필요한 오디오 처리 기능은 처음 사용할 때 준비되며, 같은 편집 화면에서는 다시 준비하는 시간을 줄입니다."
+          "paragraphs": [
+            "WAV는 호환성이 높은 16비트 비압축 음성으로 빠르게 만듭니다. MP3 저장과 피치 효과에 필요한 오디오 처리 기능은 처음 사용할 때 준비되며, 같은 편집 화면에서는 다시 준비하는 시간을 줄입니다."
+          ]
         },
         {
           "title": "브라우저의 파일 지원",
-          "text": "MP3와 WAV는 일반적인 최신 브라우저에서 열 수 있습니다. M4A·AAC·OGG는 운영체제와 브라우저가 파일 안의 음성 압축 방식을 지원할 때 편집할 수 있습니다."
+          "paragraphs": [
+            "MP3와 WAV는 일반적인 최신 브라우저에서 열 수 있습니다. M4A·AAC·OGG는 운영체제와 브라우저가 파일 안의 음성 압축 방식을 지원할 때 편집할 수 있습니다."
+          ]
         }
       ],
       "faq": [
@@ -1640,19 +1694,27 @@
       "blocks": [
         {
           "title": "통합 이미지 편집",
-          "text": "사진을 열거나 빈 캔버스에서 시작해 보정, 그리기, 텍스트, 도형과 검색 가능한 스티커를 한 작업 기록 안에서 사용합니다. 전체 내용이나 캔버스 크기를 따로 바꾸고 내보낼 픽셀 크기도 지정할 수 있습니다. 마우스 휠로 확대하고 Space를 누른 채 드래그해 이동하며, 모바일에서는 두 손가락으로 확대·이동할 수 있습니다."
+          "paragraphs": [
+            "사진을 열거나 빈 캔버스에서 시작해 보정, 그리기, 텍스트, 도형과 검색 가능한 스티커를 한 작업 기록 안에서 사용합니다. 전체 내용이나 캔버스 크기를 따로 바꾸고 내보낼 픽셀 크기도 지정할 수 있습니다. 마우스 휠로 확대하고 Space를 누른 채 드래그해 이동하며, 모바일에서는 두 손가락으로 확대·이동할 수 있습니다."
+          ]
         },
         {
           "title": "영역 모자이크·블러",
-          "text": "사진에서 가릴 영역을 드래그하고 효과 강도를 조절할 수 있습니다. 효과는 원본 사진을 기준으로 적용되므로 영역이 겹치면 마지막 효과가 보이며, 별도로 그린 선·텍스트에는 적용되지 않습니다. 민감정보는 낮은 강도의 블러보다 강한 모자이크를 권장하며, 다운로드 전에 확대해 가림 상태를 확인하세요."
+          "paragraphs": [
+            "사진에서 가릴 영역을 드래그하고 효과 강도를 조절할 수 있습니다. 효과는 원본 사진을 기준으로 적용되므로 영역이 겹치면 마지막 효과가 보이며, 별도로 그린 선·텍스트에는 적용되지 않습니다. 민감정보는 낮은 강도의 블러보다 강한 모자이크를 권장하며, 다운로드 전에 확대해 가림 상태를 확인하세요."
+          ]
         },
         {
           "title": "일괄 처리",
-          "text": "여러 파일과 클립보드 이미지를 추가해 크기 변경과 워터마크를 적용하고 ZIP으로 묶습니다."
+          "paragraphs": [
+            "여러 파일과 클립보드 이미지를 추가해 크기 변경과 워터마크를 적용하고 ZIP으로 묶습니다."
+          ]
         },
         {
           "title": "콜라주와 GIF",
-          "text": "실제 출력 계산과 같은 축소 미리보기를 제공하며 GIF는 256색 제한으로 색 변화가 단순화될 수 있습니다."
+          "paragraphs": [
+            "실제 출력 계산과 같은 축소 미리보기를 제공하며 GIF는 256색 제한으로 색 변화가 단순화될 수 있습니다."
+          ]
         }
       ],
       "faq": [
@@ -3406,10 +3468,39 @@
       ],
       "faq": [
         {
-          "q": "주민등록번호나 전화번호를 자동으로 찾아 가려주나요?",
-          "a": "아니요. 페이지를 직접 확인하고 가릴 영역을 지정해야 합니다. 검정 표시를 하지 않은 부분은 결과에 보일 수 있습니다."
+          "q": "Does it automatically detect and redact personal information like ID or phone numbers?",
+          "a": "No. You must review the pages yourself and specify the areas to redact. Unmarked areas will remain visible in the result."
+        },
+        {
+          "q": "Is the original file modified?",
+          "a": "The original file is not modified and remains safely on your device. Please ensure you share the newly saved result."
+        },
+        {
+          "q": "Are unredacted pages also converted to images?",
+          "a": "Yes. To ensure the entire document is securely processed, all pages are recreated as an image-based PDF."
+        },
+        {
+          "q": "Are search and links retained in the document?",
+          "a": "Because the document is converted to images, text search, selection, copying, existing links, signatures, forms, and metadata are not retained."
+        },
+        {
+          "q": "What is the resolution of the output?",
+          "a": "The document is converted according to the quality option you select (Standard or High Quality)."
+        },
+        {
+          "q": "Are password-protected PDFs supported?",
+          "a": "Password-protected or encrypted PDFs are not supported. Please use an unprotected copy."
+        },
+        {
+          "q": "What happens if I cancel or if it fails?",
+          "a": "If the operation is interrupted, the files are immediately discarded and never leave your device."
+        },
+        {
+          "q": "What should I check in the final result?",
+          "a": "Please review all pages, ensure text edges are fully redacted, and check that the filename does not contain personal information."
         }
-      ]
+      ],
+      "fallbackNotice": "The file processing engine could not be initialized in the current environment. File selection is disabled, but you can view the usage guide and precautions below."
     }
   },
   "documentGenerator": {

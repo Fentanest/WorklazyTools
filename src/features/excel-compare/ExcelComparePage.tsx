@@ -17,53 +17,53 @@ import { inspectExcelCompareFile, runExcelComparePair } from "./excelCompareClie
 import { ExcelCompareInspectionRequests } from "./inspectionRequests.ts";
 import { PairFileDropZone } from "./PairFileDropZone.tsx";
 import {
-  applyInitialInspection,
-  assignPairFiles,
-  mergeExcelCompareInspection,
-  selectManualHeader,
-  selectPairSheet,
-  swapPairSides,
-  type HeaderSelection,
-  type PairState,
+ applyInitialInspection,
+ assignPairFiles,
+ mergeExcelCompareInspection,
+ selectManualHeader,
+ selectPairSheet,
+ swapPairSides,
+ type HeaderSelection,
+ type PairState,
 } from "./pairFiles.ts";
 import { isReconcileConfigValid } from "./reconcileConfig.ts";
 import { assertReportBlobSize } from "./reportIntegrity.ts";
 import {
-  DEFAULT_EXCEL_COMPARE_OPTIONS,
-  type DuplicateKeyPolicy,
-  type ExcelCompareMode,
-  type ExcelComparePairOptions,
-  type ExcelComparePairResult,
-  type ExcelCompareDuplicateRecord,
-  type ExcelCompareRecord,
-  type ExcelCompareStatus,
+ DEFAULT_EXCEL_COMPARE_OPTIONS,
+ type DuplicateKeyPolicy,
+ type ExcelCompareMode,
+ type ExcelComparePairOptions,
+ type ExcelComparePairResult,
+ type ExcelCompareDuplicateRecord,
+ type ExcelCompareRecord,
+ type ExcelCompareStatus,
 } from "./types.ts";
 
 interface CompletedPair {
-  pairId: number;
-  result: ExcelComparePairResult;
-  blob: Blob;
-  url: string;
-  fileName: SafeFileName;
+ pairId: number;
+ result: ExcelComparePairResult;
+ blob: Blob;
+ url: string;
+ fileName: SafeFileName;
 }
 
 interface FailedPair {
-  pairId: number;
-  leftName: string;
-  rightName: string;
-  message: string;
+ pairId: number;
+ leftName: string;
+ rightName: string;
+ message: string;
 }
 
 const STATUSES: ExcelCompareStatus[] = ["matched", "changed", "added", "removed", "duplicate", "ambiguous", "unmatched", "error"];
 const STATUS_DOT_CLASSES: Record<ExcelCompareStatus, string> = {
-  matched: "bg-green-600",
-  changed: "bg-amber-500",
-  added: "bg-blue-600",
-  removed: "bg-rose-500",
-  duplicate: "bg-violet-600",
-  ambiguous: "bg-violet-600",
-  unmatched: "bg-muted-foreground",
-  error: "bg-rose-500",
+ matched: "bg-primary",
+ changed: "bg-amber-500",
+ added: "bg-emerald-600",
+ removed: "bg-rose-500",
+ duplicate: "bg-fuchsia-600",
+ ambiguous: "bg-fuchsia-600",
+ unmatched: "bg-muted-foreground",
+ error: "bg-rose-500",
 };
 const ACCEPT = ".xlsx,.xlsm,.xls,.xlsb,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv";
 const DUPLICATE_LIST_PAGE_SIZE = 50;
@@ -74,648 +74,648 @@ let pendingResultFocusVisibility: AbortController | undefined;
 type LooseT = (key: string, options?: Record<string, unknown>) => string;
 
 export function ExcelComparePage() {
-  const { t, i18n } = useTranslation(["features", "common"]);
-  const translate = t as unknown as LooseT;
-  const language = i18n.language.startsWith("en") ? "en" : "ko";
-  const nextPairId = useRef(2);
-  const operation = useOperationProgress();
-  const controllerRef = useRef<AbortController | undefined>(undefined);
-  const inspectionRequestsRef = useRef(new ExcelCompareInspectionRequests());
-  const objectUrls = useRef<Set<string>>(new Set());
-  const pendingRevokeUrls = useRef<string[]>([]);
-  const [pairs, setPairs] = useState<PairState[]>([newPair(1)]);
-  const [mode, setMode] = useState<ExcelCompareMode>("position");
-  const [normalization, setNormalization] = useState({ ...DEFAULT_EXCEL_COMPARE_OPTIONS });
-  const [completed, setCompleted] = useState<CompletedPair[]>([]);
-  const [failed, setFailed] = useState<FailedPair[]>([]);
-  const [zipResult, setZipResult] = useState<{ url: string; fileName: SafeFileName; size: number }>();
-  const [search, setSearch] = useState("");
-  const [statuses, setStatuses] = useState<Set<ExcelCompareStatus>>(() => new Set(STATUSES));
-  const [visibleLimit, setVisibleLimit] = useState(500);
+ const { t, i18n } = useTranslation(["features", "common"]);
+ const translate = t as unknown as LooseT;
+ const language = i18n.language.startsWith("en") ? "en" : "ko";
+ const nextPairId = useRef(2);
+ const operation = useOperationProgress();
+ const controllerRef = useRef<AbortController | undefined>(undefined);
+ const inspectionRequestsRef = useRef(new ExcelCompareInspectionRequests());
+ const objectUrls = useRef<Set<string>>(new Set());
+ const pendingRevokeUrls = useRef<string[]>([]);
+ const [pairs, setPairs] = useState<PairState[]>([newPair(1)]);
+ const [mode, setMode] = useState<ExcelCompareMode>("position");
+ const [normalization, setNormalization] = useState({ ...DEFAULT_EXCEL_COMPARE_OPTIONS });
+ const [completed, setCompleted] = useState<CompletedPair[]>([]);
+ const [failed, setFailed] = useState<FailedPair[]>([]);
+ const [zipResult, setZipResult] = useState<{ url: string; fileName: SafeFileName; size: number }>();
+ const [search, setSearch] = useState("");
+ const [statuses, setStatuses] = useState<Set<ExcelCompareStatus>>(() => new Set(STATUSES));
+ const [visibleLimit, setVisibleLimit] = useState(500);
 
-  useEffect(() => {
-    const activeUrls = new Set([...completed.map((item) => item.url), ...(zipResult ? [zipResult.url] : [])]);
-    const pending = pendingRevokeUrls.current;
-    pendingRevokeUrls.current = [];
-    pending.forEach((url) => {
-      if (activeUrls.has(url)) return;
-      URL.revokeObjectURL(url);
-      objectUrls.current.delete(url);
+ useEffect(() => {
+  const activeUrls = new Set([...completed.map((item) => item.url), ...(zipResult ? [zipResult.url] : [])]);
+  const pending = pendingRevokeUrls.current;
+  pendingRevokeUrls.current = [];
+  pending.forEach((url) => {
+   if (activeUrls.has(url)) return;
+   URL.revokeObjectURL(url);
+   objectUrls.current.delete(url);
+  });
+ }, [completed, zipResult]);
+
+ useEffect(() => () => {
+  controllerRef.current?.abort();
+  inspectionRequestsRef.current.cancelAll();
+  objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+  objectUrls.current.clear();
+ }, []);
+
+ useEffect(() => {
+  const keepFocusedResultVisible = () => scheduleResultFocusVisibility(document.activeElement);
+  window.addEventListener("resize", keepFocusedResultVisible);
+  return () => window.removeEventListener("resize", keepFocusedResultVisible);
+ }, []);
+
+ const updatePair = (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => {
+  setPairs((current) => current.map((pair) => pair.id !== id ? pair : typeof update === "function" ? update(pair) : { ...pair, ...update }));
+ };
+
+ const selectFile = async (pairId: number, side: "left" | "right", file: File | undefined) => {
+  const errorKey = `${side}Error` as const;
+  const inspectingKey = `${side}Inspecting` as const;
+  inspectionRequestsRef.current.cancel(pairId, side);
+  updatePair(pairId, (pair) => resetPairFile(pair, side, file));
+  if (!file) return;
+  const request = inspectionRequestsRef.current.begin(pairId, side, file);
+  try {
+   const inspection = await inspectExcelCompareFile(file, language, request.controller.signal, [1], true);
+   if (!inspectionRequestsRef.current.isCurrent(request)) return;
+   updatePair(pairId, (pair) => {
+    if (pair[side] !== file) return pair;
+    return applyInitialInspection(pair, side, inspection);
+   });
+  } catch (error) {
+   if (inspectionRequestsRef.current.isCurrent(request)) {
+    updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [errorKey]: safeError(error, translate) } : pair);
+   }
+  } finally {
+   if (inspectionRequestsRef.current.finish(request)) {
+    updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
+   }
+  }
+ };
+
+ const refreshHeader = async (pairId: number, side: "left" | "right", file: File, headerRow: number) => {
+  const request = inspectionRequestsRef.current.begin(pairId, side, file);
+  const inspectingKey = `${side}Inspecting` as const;
+  updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: true } : pair);
+  try {
+   const next = await inspectExcelCompareFile(file, language, request.controller.signal, [headerRow], false);
+   if (!inspectionRequestsRef.current.isCurrent(request)) return;
+   updatePair(pairId, (current) => {
+    const inspectionKey = `${side}Inspection` as const;
+    const inspection = current[inspectionKey];
+    return current[side] === file && inspection
+     ? { ...current, [inspectionKey]: mergeExcelCompareInspection(inspection, next) }
+     : current;
+   });
+  } catch {
+   // The initial inspection already owns the user-facing file error.
+  } finally {
+   if (inspectionRequestsRef.current.finish(request)) {
+    updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
+   }
+  }
+ };
+
+ const changeSheet = (pairId: number, side: "left" | "right", sheetName: string) => {
+  updatePair(pairId, (pair) => selectPairSheet(pair, side, sheetName));
+ };
+
+ const changeHeaderInput = (pairId: number, side: "left" | "right", value: string) => {
+  updatePair(pairId, side === "left" ? { leftHeaderInput: value } : { rightHeaderInput: value });
+ };
+
+ const commitHeader = (pairId: number, side: "left" | "right") => {
+  const pair = pairs.find((item) => item.id === pairId);
+  const file = pair?.[side];
+  const sheet = pair ? selectedSheet(pair, side) : undefined;
+  if (!pair || !file || !sheet) return;
+  const input = side === "left" ? pair.leftHeaderInput : pair.rightHeaderInput;
+  const row = Number(input);
+  const maximumRow = Math.max(1, sheet.rowCount);
+  if (!Number.isInteger(row) || row < 1 || row> maximumRow) {
+   changeHeaderInput(pairId, side, String(side === "left" ? pair.leftHeaderRow : pair.rightHeaderRow));
+   return;
+  }
+  const cached = sheet.headerRows.some((header) => header.row === row);
+  updatePair(pairId, (current) => current[side] === file ? selectManualHeader(current, side, row) : current);
+  if (!cached) void refreshHeader(pairId, side, file, row);
+ };
+
+ const addPair = () => setPairs((current) => [...current, newPair(nextPairId.current++)]);
+ const removePair = (id: number) => {
+  inspectionRequestsRef.current.cancelPair(id);
+  setPairs((current) => current.length === 1 ? current : current.filter((pair) => pair.id !== id));
+ };
+ const cleanupResults = () => {
+  pendingRevokeUrls.current.push(...completed.map((item) => item.url), ...(zipResult ? [zipResult.url] : []));
+  setCompleted([]);
+  setFailed([]);
+  setZipResult(undefined);
+ };
+
+ const ready = pairs.length> 0 && pairs.every((pair) => pairConfigured(pair, mode)) && pairs.some((pair) => pairReady(pair, mode));
+
+ const run = async () => {
+  if (!ready || operation.status === "running") return;
+  cleanupResults();
+  const controller = new AbortController();
+  controllerRef.current = controller;
+  const names = new SafeFileNameRegistry();
+  const successes: CompletedPair[] = [];
+  const failures: FailedPair[] = [];
+  operation.start(t("features:excelCompare.progress.starting", { count: pairs.length }));
+  for (let index = 0; index < pairs.length; index += 1) {
+   const pair = pairs[index];
+   if (controller.signal.aborted) break;
+   const options = pairOptions(pair, mode, normalization);
+   try {
+    const result = await runExcelComparePair(pair.left!, pair.right!, options, language, controller.signal, ({ progress, phase }) => {
+     const overall = Math.round(((index + progress / 100) / pairs.length) * 92);
+     operation.updateCurrent(overall, t(`features:excelCompare.progress.${phase ?? "COMPARING"}` as never, { current: index + 1, total: pairs.length }));
     });
-  }, [completed, zipResult]);
+    const fileName = createUniqueSafeFileName(`${fileStem(pair.left!.name)}-vs-${fileStem(pair.right!.name)}.xlsx`, names, `comparison-${index + 1}.xlsx`);
+    const blob = new Blob([result.reportBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    assertReportBlobSize(blob, result.reportByteLength);
+    result.reportBuffer = new ArrayBuffer(0);
+    const url = keepObjectUrl(URL.createObjectURL(blob), objectUrls);
+    const item = { pairId: pair.id, result, blob, url, fileName };
+    successes.push(item);
+    setCompleted([...successes]);
+   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") break;
+    const failure = { pairId: pair.id, leftName: pair.left!.name, rightName: pair.right!.name, message: safeError(error, translate) };
+    failures.push(failure);
+    setFailed([...failures]);
+   }
+  }
+  if (controller.signal.aborted) {
+   operation.fail(t("features:excelCompare.progress.canceled"));
+   controllerRef.current = undefined;
+   return;
+  }
+  if (successes.length>= 2) {
+   operation.update(94, t("features:excelCompare.progress.ZIPPING"));
+   try {
+    const writer = new BlobWriter("application/zip");
+    await writeZipArchive(successes.map((item) => ({ fileName: item.fileName, blob: item.blob })), writer, controller.signal);
+    const blob = await writer.getData();
+    const fileName = createUniqueSafeFileName("worklazy-excel-comparisons.zip", names, "comparisons.zip");
+    const url = keepObjectUrl(URL.createObjectURL(blob), objectUrls);
+    setZipResult({ url, fileName, size: blob.size });
+   } catch (error) {
+    failures.push({ pairId: -1, leftName: "", rightName: "", message: safeError(error, translate) });
+    setFailed([...failures]);
+   }
+  }
+  operation.succeed(t("features:excelCompare.progress.complete", { success: successes.length, failed: failures.length }));
+  controllerRef.current = undefined;
+ };
 
-  useEffect(() => () => {
-    controllerRef.current?.abort();
-    inspectionRequestsRef.current.cancelAll();
-    objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
-    objectUrls.current.clear();
-  }, []);
+ const toggleStatus = (status: ExcelCompareStatus) => {
+  setVisibleLimit(500);
+  setStatuses((current) => {
+   const next = new Set(current);
+   if (next.has(status)) next.delete(status); else next.add(status);
+   return next;
+  });
+ };
 
-  useEffect(() => {
-    const keepFocusedResultVisible = () => scheduleResultFocusVisibility(document.activeElement);
-    window.addEventListener("resize", keepFocusedResultVisible);
-    return () => window.removeEventListener("resize", keepFocusedResultVisible);
-  }, []);
+ const resultRows = useMemo(() => {
+  const query = search.normalize("NFC").toLocaleLowerCase(language);
+  return completed.flatMap((item, pairIndex) => item.result.records
+   .map((record, recordIndex) => ({ item, pairIndex, record, recordIndex }))
+   .filter(({ record }) => statuses.has(record.status))
+   .filter(({ record }) => !query || recordSearchText(record, language).includes(query)));
+ }, [completed, language, search, statuses]);
+ const duplicateCount = useMemo(() => completed.reduce((total, item) => total + item.result.summary.duplicate, 0), [completed]);
 
-  const updatePair = (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => {
-    setPairs((current) => current.map((pair) => pair.id !== id ? pair : typeof update === "function" ? update(pair) : { ...pair, ...update }));
-  };
+ return (
+  <UtilityPage toolId="excel-compare">
+   <div className="contents" data-testid="excel-compare-page">
+   <PageHeader eyebrow="EXCEL COMPARE" title={t("features:excelCompare.title")} description={t("features:excelCompare.description")} />
 
-  const selectFile = async (pairId: number, side: "left" | "right", file: File | undefined) => {
-    const errorKey = `${side}Error` as const;
-    const inspectingKey = `${side}Inspecting` as const;
-    inspectionRequestsRef.current.cancel(pairId, side);
-    updatePair(pairId, (pair) => resetPairFile(pair, side, file));
-    if (!file) return;
-    const request = inspectionRequestsRef.current.begin(pairId, side, file);
-    try {
-      const inspection = await inspectExcelCompareFile(file, language, request.controller.signal, [1], true);
-      if (!inspectionRequestsRef.current.isCurrent(request)) return;
-      updatePair(pairId, (pair) => {
-        if (pair[side] !== file) return pair;
-        return applyInitialInspection(pair, side, inspection);
-      });
-    } catch (error) {
-      if (inspectionRequestsRef.current.isCurrent(request)) {
-        updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [errorKey]: safeError(error, translate) } : pair);
-      }
-    } finally {
-      if (inspectionRequestsRef.current.finish(request)) {
-        updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
-      }
-    }
-  };
+   <UtilitySectionCard step={1} title={t("features:excelCompare.pairs.title")} description={t("features:excelCompare.pairs.description")}>
+    <div className="grid gap-3" data-testid="excel-compare-pair-list">
+     {pairs.map((pair, index) => <PairCard key={pair.id} pair={pair} index={index} mode={mode} busy={operation.status === "running"} t={translate} updatePair={updatePair} selectFile={selectFile} changeSheet={changeSheet} changeHeaderInput={changeHeaderInput} commitHeader={commitHeader} removePair={removePair} canRemove={pairs.length> 1} />)}
+    </div>
+    <Button className="mt-3 min-h-11 self-start rounded-xl border-primary/50 px-4 font-bold text-primary shadow-sm hover:border-primary! hover:bg-primary/10! focus-visible:border-primary! focus-visible:ring-primary/30! dark:border-primary/60 dark:text-primary dark:hover:border-primary! dark:hover:bg-primary/10!" data-testid="excel-add-pair" variant="outline" type="button" onClick={addPair} disabled={operation.status === "running"}><Plus size={17} /> {t("features:excelCompare.pairs.add")}</Button>
+   </UtilitySectionCard>
 
-  const refreshHeader = async (pairId: number, side: "left" | "right", file: File, headerRow: number) => {
-    const request = inspectionRequestsRef.current.begin(pairId, side, file);
-    const inspectingKey = `${side}Inspecting` as const;
-    updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: true } : pair);
-    try {
-      const next = await inspectExcelCompareFile(file, language, request.controller.signal, [headerRow], false);
-      if (!inspectionRequestsRef.current.isCurrent(request)) return;
-      updatePair(pairId, (current) => {
-        const inspectionKey = `${side}Inspection` as const;
-        const inspection = current[inspectionKey];
-        return current[side] === file && inspection
-          ? { ...current, [inspectionKey]: mergeExcelCompareInspection(inspection, next) }
-          : current;
-      });
-    } catch {
-      // The initial inspection already owns the user-facing file error.
-    } finally {
-      if (inspectionRequestsRef.current.finish(request)) {
-        updatePair(pairId, (pair) => pair[side] === file ? { ...pair, [inspectingKey]: false } : pair);
-      }
-    }
-  };
+   <UtilitySectionCard step={2} title={t("features:excelCompare.method.title")} description={t("features:excelCompare.method.description")}>
+    <div className="grid grid-cols-3 gap-2 max-[720px]:grid-cols-1" data-testid="excel-compare-mode-grid" role="radiogroup" aria-label={t("features:excelCompare.method.title")}>
+     {(["position", "key", "reconcile"] as ExcelCompareMode[]).map((value) => { const selected = mode === value; return <button type="button" role="radio" aria-checked={selected} data-selected={selected || undefined} className={`min-h-20 rounded-2xl border p-3 text-left outline-none transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/30 dark:hover:border-primary/70 ${selected ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/25 dark:border-primary dark:bg-primary/70 dark:ring-primary/30" : "border-border bg-muted/45 text-foreground"}`} key={value} onClick={() => setMode(value)}><strong className="block text-sm">{t(`features:excelCompare.method.${value}` as never)}</strong><small className="mt-1 block text-xs leading-relaxed text-muted-foreground">{t(`features:excelCompare.method.${value}Description` as never)}</small></button>; })}
+    </div>
+   </UtilitySectionCard>
 
-  const changeSheet = (pairId: number, side: "left" | "right", sheetName: string) => {
-    updatePair(pairId, (pair) => selectPairSheet(pair, side, sheetName));
-  };
+   <UtilitySectionCard step={3} title={t("features:excelCompare.options.title")} description={t("features:excelCompare.options.description")}>
+    <NormalizationOptions value={normalization} onChange={setNormalization} t={translate} />
+   </UtilitySectionCard>
 
-  const changeHeaderInput = (pairId: number, side: "left" | "right", value: string) => {
-    updatePair(pairId, side === "left" ? { leftHeaderInput: value } : { rightHeaderInput: value });
-  };
+   <UtilitySectionCard title={t("features:excelCompare.support.title")} description={t("features:excelCompare.support.description")}>
+    <SupportTable t={translate} />
+   </UtilitySectionCard>
 
-  const commitHeader = (pairId: number, side: "left" | "right") => {
-    const pair = pairs.find((item) => item.id === pairId);
-    const file = pair?.[side];
-    const sheet = pair ? selectedSheet(pair, side) : undefined;
-    if (!pair || !file || !sheet) return;
-    const input = side === "left" ? pair.leftHeaderInput : pair.rightHeaderInput;
-    const row = Number(input);
-    const maximumRow = Math.max(1, sheet.rowCount);
-    if (!Number.isInteger(row) || row < 1 || row > maximumRow) {
-      changeHeaderInput(pairId, side, String(side === "left" ? pair.leftHeaderRow : pair.rightHeaderRow));
-      return;
-    }
-    const cached = sheet.headerRows.some((header) => header.row === row);
-    updatePair(pairId, (current) => current[side] === file ? selectManualHeader(current, side, row) : current);
-    if (!cached) void refreshHeader(pairId, side, file, row);
-  };
+   <div data-testid="excel-compare-actions"><PrimaryButton accent="green" disabled={!ready} loading={operation.status === "running"} onClick={() => void run()}><FileSpreadsheet size={18} /> {t("features:excelCompare.actions.compare", { count: pairs.length })}</PrimaryButton></div>
+   {operation.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" data-testid="excel-compare-cancel" variant="destructive" type="button" onClick={() => controllerRef.current?.abort()}><X size={16} /> {t("features:excelCompare.actions.cancel")}</Button></div>}
+   <OperationProgress {...operation} accent="green" title={t("features:excelCompare.progress.title")} />
 
-  const addPair = () => setPairs((current) => [...current, newPair(nextPairId.current++)]);
-  const removePair = (id: number) => {
-    inspectionRequestsRef.current.cancelPair(id);
-    setPairs((current) => current.length === 1 ? current : current.filter((pair) => pair.id !== id));
-  };
-  const cleanupResults = () => {
-    pendingRevokeUrls.current.push(...completed.map((item) => item.url), ...(zipResult ? [zipResult.url] : []));
-    setCompleted([]);
-    setFailed([]);
-    setZipResult(undefined);
-  };
+   {(completed.length> 0 || failed.length> 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title" onFocusCapture={(event) => scheduleResultFocusVisibility(event.target)}>
+    <div><p className="text-xs font-extrabold tracking-[.08em] text-primary uppercase dark:text-primary">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></div>
+    <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="excel-report-downloads">
+     {completed.map((item, index) => <Button render={<a href={item.url} download={item.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left" key={item.pairId}><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{item.fileName} · {formatBytes(item.blob.size)}</small></span></Button>)}
+     {zipResult && <Button render={<a href={zipResult.url} download={zipResult.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left"><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.zip")}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{zipResult.fileName} · {formatBytes(zipResult.size)}</small></span></Button>}
+    </div>
+    {completed.length> 0 && <p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.results.downloadCheck")}</p>}
+    {failed.map((item) => <UtilityNotice className="mt-2" data-testid="excel-compare-error" tone="error" role="alert" key={`${item.pairId}-${item.leftName}`}><AlertCircle className="mt-0.5 shrink-0" size={16} /><span className="flex flex-col"><strong>{item.leftName && item.rightName ? `${item.leftName} ↔ ${item.rightName}` : t("features:excelCompare.results.zip")}</strong>{item.message}</span></UtilityNotice>)}
+    {duplicateCount> 0 && <UtilityNotice className="mt-3" data-testid="excel-duplicate-guidance"><AlertCircle className="mt-0.5 shrink-0" size={16} /><span><strong className="block">{t("features:excelCompare.results.duplicateCount", { count: duplicateCount })}</strong><span className="mt-1 block text-sm">{t("features:excelCompare.results.duplicateGuidance")}</span></span></UtilityNotice>}
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+     <div className="flex flex-wrap gap-1.5" data-testid="excel-status-filters" role="group" aria-label={t("features:excelCompare.results.filters")}>
+      {STATUSES.map((status) => { const selected = statuses.has(status); return <Button type="button" size="sm" variant="outline" data-status={status} aria-pressed={selected} className={`rounded-full ${selected ? "border-primary/60 bg-primary/10 text-foreground dark:border-primary/60" : "opacity-55"}`} key={status} onClick={() => toggleStatus(status)}><span className={`size-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />{t(`features:excelCompare.status.${status}` as never)}</Button>; })}
+     </div>
+     <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-xl border border-input bg-background px-3 text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20" data-testid="excel-result-search"><Search size={16} /><span className="sr-only">{t("features:excelCompare.results.search")}</span><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground max-[620px]:text-base" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleLimit(500); }} placeholder={t("features:excelCompare.results.search")} /></label>
+    </div>
+    <div className="mt-3 overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" data-testid="excel-result-scroll-region" role="region" aria-label={t("features:excelCompare.results.tableRegion")} tabIndex={0}>
+     <table className="w-full min-w-[1040px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left" data-testid="excel-result-table"><thead><tr><th className="min-w-14 whitespace-nowrap">{t("features:excelCompare.results.pair")}</th><th className="min-w-24 whitespace-nowrap">{t("features:excelCompare.results.state")}</th><th className="min-w-20 whitespace-nowrap">{t("features:excelCompare.results.location")}</th><th className="min-w-32 whitespace-nowrap">{t("features:excelCompare.results.key")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.left")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.right")}</th><th className="min-w-28 whitespace-nowrap">{t("features:excelCompare.results.reason")}</th></tr></thead><tbody>
+      {resultRows.slice(0, visibleLimit).map(({ item, pairIndex, record, recordIndex }) => <ResultRow item={item} pairIndex={pairIndex} record={record} recordIndex={recordIndex} t={translate} key={resultRowKey(item.pairId, record, recordIndex)} />)}
+     </tbody></table>
+     {!resultRows.length && <p className="p-4 text-center text-sm text-muted-foreground">{t("features:excelCompare.results.empty")}</p>}
+    </div>
+    {resultRows.length> visibleLimit && <Button className="mt-3 min-h-11 rounded-xl" data-excel-result-focus="" data-testid="excel-result-show-more" variant="secondary" type="button" onClick={(event) => {
+     setVisibleLimit((current) => current + 500);
+     scheduleResultFocusVisibility(event.currentTarget);
+    }}>{t("features:excelCompare.results.showMore", { remaining: resultRows.length - visibleLimit })}</Button>}
+   </Card>}
 
-  const ready = pairs.length > 0 && pairs.every((pair) => pairConfigured(pair, mode)) && pairs.some((pair) => pairReady(pair, mode));
-
-  const run = async () => {
-    if (!ready || operation.status === "running") return;
-    cleanupResults();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    const names = new SafeFileNameRegistry();
-    const successes: CompletedPair[] = [];
-    const failures: FailedPair[] = [];
-    operation.start(t("features:excelCompare.progress.starting", { count: pairs.length }));
-    for (let index = 0; index < pairs.length; index += 1) {
-      const pair = pairs[index];
-      if (controller.signal.aborted) break;
-      const options = pairOptions(pair, mode, normalization);
-      try {
-        const result = await runExcelComparePair(pair.left!, pair.right!, options, language, controller.signal, ({ progress, phase }) => {
-          const overall = Math.round(((index + progress / 100) / pairs.length) * 92);
-          operation.updateCurrent(overall, t(`features:excelCompare.progress.${phase ?? "COMPARING"}` as never, { current: index + 1, total: pairs.length }));
-        });
-        const fileName = createUniqueSafeFileName(`${fileStem(pair.left!.name)}-vs-${fileStem(pair.right!.name)}.xlsx`, names, `comparison-${index + 1}.xlsx`);
-        const blob = new Blob([result.reportBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        assertReportBlobSize(blob, result.reportByteLength);
-        result.reportBuffer = new ArrayBuffer(0);
-        const url = keepObjectUrl(URL.createObjectURL(blob), objectUrls);
-        const item = { pairId: pair.id, result, blob, url, fileName };
-        successes.push(item);
-        setCompleted([...successes]);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") break;
-        const failure = { pairId: pair.id, leftName: pair.left!.name, rightName: pair.right!.name, message: safeError(error, translate) };
-        failures.push(failure);
-        setFailed([...failures]);
-      }
-    }
-    if (controller.signal.aborted) {
-      operation.fail(t("features:excelCompare.progress.canceled"));
-      controllerRef.current = undefined;
-      return;
-    }
-    if (successes.length >= 2) {
-      operation.update(94, t("features:excelCompare.progress.ZIPPING"));
-      try {
-        const writer = new BlobWriter("application/zip");
-        await writeZipArchive(successes.map((item) => ({ fileName: item.fileName, blob: item.blob })), writer, controller.signal);
-        const blob = await writer.getData();
-        const fileName = createUniqueSafeFileName("worklazy-excel-comparisons.zip", names, "comparisons.zip");
-        const url = keepObjectUrl(URL.createObjectURL(blob), objectUrls);
-        setZipResult({ url, fileName, size: blob.size });
-      } catch (error) {
-        failures.push({ pairId: -1, leftName: "", rightName: "", message: safeError(error, translate) });
-        setFailed([...failures]);
-      }
-    }
-    operation.succeed(t("features:excelCompare.progress.complete", { success: successes.length, failed: failures.length }));
-    controllerRef.current = undefined;
-  };
-
-  const toggleStatus = (status: ExcelCompareStatus) => {
-    setVisibleLimit(500);
-    setStatuses((current) => {
-      const next = new Set(current);
-      if (next.has(status)) next.delete(status); else next.add(status);
-      return next;
-    });
-  };
-
-  const resultRows = useMemo(() => {
-    const query = search.normalize("NFC").toLocaleLowerCase(language);
-    return completed.flatMap((item, pairIndex) => item.result.records
-      .map((record, recordIndex) => ({ item, pairIndex, record, recordIndex }))
-      .filter(({ record }) => statuses.has(record.status))
-      .filter(({ record }) => !query || recordSearchText(record, language).includes(query)));
-  }, [completed, language, search, statuses]);
-  const duplicateCount = useMemo(() => completed.reduce((total, item) => total + item.result.summary.duplicate, 0), [completed]);
-
-  return (
-    <UtilityPage toolId="excel-compare">
-      <div className="contents" data-testid="excel-compare-page">
-      <PageHeader eyebrow="EXCEL COMPARE" title={t("features:excelCompare.title")} description={t("features:excelCompare.description")} />
-
-      <UtilitySectionCard step={1} title={t("features:excelCompare.pairs.title")} description={t("features:excelCompare.pairs.description")}>
-        <div className="grid gap-3" data-testid="excel-compare-pair-list">
-          {pairs.map((pair, index) => <PairCard key={pair.id} pair={pair} index={index} mode={mode} busy={operation.status === "running"} t={translate} updatePair={updatePair} selectFile={selectFile} changeSheet={changeSheet} changeHeaderInput={changeHeaderInput} commitHeader={commitHeader} removePair={removePair} canRemove={pairs.length > 1} />)}
-        </div>
-        <Button className="mt-3 min-h-11 self-start rounded-xl border-green-700/50 px-4 font-bold text-green-800 shadow-sm hover:border-green-700! hover:bg-green-500/10! focus-visible:border-green-700! focus-visible:ring-green-700/30! dark:border-green-300/60 dark:text-green-300 dark:hover:border-green-300! dark:hover:bg-green-400/10!" data-testid="excel-add-pair" variant="outline" type="button" onClick={addPair} disabled={operation.status === "running"}><Plus size={17} /> {t("features:excelCompare.pairs.add")}</Button>
-      </UtilitySectionCard>
-
-      <UtilitySectionCard step={2} title={t("features:excelCompare.method.title")} description={t("features:excelCompare.method.description")}>
-        <div className="grid grid-cols-3 gap-2 max-[720px]:grid-cols-1" data-testid="excel-compare-mode-grid" role="radiogroup" aria-label={t("features:excelCompare.method.title")}>
-          {(["position", "key", "reconcile"] as ExcelCompareMode[]).map((value) => { const selected = mode === value; return <button type="button" role="radio" aria-checked={selected} data-selected={selected || undefined} className={`min-h-20 rounded-2xl border p-3 text-left outline-none transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-green-700/60 focus-visible:ring-3 focus-visible:ring-green-700/30 dark:hover:border-green-300/70 ${selected ? "border-green-700 bg-green-50 text-foreground ring-2 ring-green-700/25 dark:border-green-300 dark:bg-green-950/70 dark:ring-green-300/30" : "border-border bg-muted/45 text-foreground"}`} key={value} onClick={() => setMode(value)}><strong className="block text-sm">{t(`features:excelCompare.method.${value}` as never)}</strong><small className="mt-1 block text-xs leading-relaxed text-muted-foreground">{t(`features:excelCompare.method.${value}Description` as never)}</small></button>; })}
-        </div>
-      </UtilitySectionCard>
-
-      <UtilitySectionCard step={3} title={t("features:excelCompare.options.title")} description={t("features:excelCompare.options.description")}>
-        <NormalizationOptions value={normalization} onChange={setNormalization} t={translate} />
-      </UtilitySectionCard>
-
-      <UtilitySectionCard title={t("features:excelCompare.support.title")} description={t("features:excelCompare.support.description")}>
-        <SupportTable t={translate} />
-      </UtilitySectionCard>
-
-      <div data-testid="excel-compare-actions"><PrimaryButton accent="green" disabled={!ready} loading={operation.status === "running"} onClick={() => void run()}><FileSpreadsheet size={18} /> {t("features:excelCompare.actions.compare", { count: pairs.length })}</PrimaryButton></div>
-      {operation.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" data-testid="excel-compare-cancel" variant="destructive" type="button" onClick={() => controllerRef.current?.abort()}><X size={16} /> {t("features:excelCompare.actions.cancel")}</Button></div>}
-      <OperationProgress {...operation} accent="green" title={t("features:excelCompare.progress.title")} />
-
-      {(completed.length > 0 || failed.length > 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title" onFocusCapture={(event) => scheduleResultFocusVisibility(event.target)}>
-        <div><p className="text-xs font-extrabold tracking-[.08em] text-green-700 uppercase dark:text-green-300">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></div>
-        <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="excel-report-downloads">
-          {completed.map((item, index) => <Button render={<a href={item.url} download={item.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left" key={item.pairId}><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{item.fileName} · {formatBytes(item.blob.size)}</small></span></Button>)}
-          {zipResult && <Button render={<a href={zipResult.url} download={zipResult.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left"><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.zip")}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{zipResult.fileName} · {formatBytes(zipResult.size)}</small></span></Button>}
-        </div>
-        {completed.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.results.downloadCheck")}</p>}
-        {failed.map((item) => <UtilityNotice className="mt-2" data-testid="excel-compare-error" tone="error" role="alert" key={`${item.pairId}-${item.leftName}`}><AlertCircle className="mt-0.5 shrink-0" size={16} /><span className="flex flex-col"><strong>{item.leftName && item.rightName ? `${item.leftName} ↔ ${item.rightName}` : t("features:excelCompare.results.zip")}</strong>{item.message}</span></UtilityNotice>)}
-        {duplicateCount > 0 && <UtilityNotice className="mt-3" data-testid="excel-duplicate-guidance"><AlertCircle className="mt-0.5 shrink-0" size={16} /><span><strong className="block">{t("features:excelCompare.results.duplicateCount", { count: duplicateCount })}</strong><span className="mt-1 block text-sm">{t("features:excelCompare.results.duplicateGuidance")}</span></span></UtilityNotice>}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5" data-testid="excel-status-filters" role="group" aria-label={t("features:excelCompare.results.filters")}>
-            {STATUSES.map((status) => { const selected = statuses.has(status); return <Button type="button" size="sm" variant="outline" data-status={status} aria-pressed={selected} className={`rounded-full ${selected ? "border-green-700/60 bg-green-500/10 text-foreground dark:border-green-300/60" : "opacity-55"}`} key={status} onClick={() => toggleStatus(status)}><span className={`size-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />{t(`features:excelCompare.status.${status}` as never)}</Button>; })}
-          </div>
-          <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-xl border border-input bg-background px-3 text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20" data-testid="excel-result-search"><Search size={16} /><span className="sr-only">{t("features:excelCompare.results.search")}</span><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground max-[620px]:text-base" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleLimit(500); }} placeholder={t("features:excelCompare.results.search")} /></label>
-        </div>
-        <div className="mt-3 overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" data-testid="excel-result-scroll-region" role="region" aria-label={t("features:excelCompare.results.tableRegion")} tabIndex={0}>
-          <table className="w-full min-w-[1040px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left" data-testid="excel-result-table"><thead><tr><th className="min-w-14 whitespace-nowrap">{t("features:excelCompare.results.pair")}</th><th className="min-w-24 whitespace-nowrap">{t("features:excelCompare.results.state")}</th><th className="min-w-20 whitespace-nowrap">{t("features:excelCompare.results.location")}</th><th className="min-w-32 whitespace-nowrap">{t("features:excelCompare.results.key")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.left")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.right")}</th><th className="min-w-28 whitespace-nowrap">{t("features:excelCompare.results.reason")}</th></tr></thead><tbody>
-            {resultRows.slice(0, visibleLimit).map(({ item, pairIndex, record, recordIndex }) => <ResultRow item={item} pairIndex={pairIndex} record={record} recordIndex={recordIndex} t={translate} key={resultRowKey(item.pairId, record, recordIndex)} />)}
-          </tbody></table>
-          {!resultRows.length && <p className="p-4 text-center text-sm text-muted-foreground">{t("features:excelCompare.results.empty")}</p>}
-        </div>
-        {resultRows.length > visibleLimit && <Button className="mt-3 min-h-11 rounded-xl" data-excel-result-focus="" data-testid="excel-result-show-more" variant="secondary" type="button" onClick={(event) => {
-          setVisibleLimit((current) => current + 500);
-          scheduleResultFocusVisibility(event.currentTarget);
-        }}>{t("features:excelCompare.results.showMore", { remaining: resultRows.length - visibleLimit })}</Button>}
-      </Card>}
-
-      <ToolGuide title={t("features:excelCompare.guide.title")} description={t("features:excelCompare.guide.description")} blocks={t("features:excelCompare.guide.blocks", { returnObjects: true }) as any} faq={(t("features:excelCompare.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))} />
-      </div>
-    </UtilityPage>
-  );
+   <ToolGuide title={t("features:excelCompare.guide.title")} description={t("features:excelCompare.guide.description")} blocks={t("features:excelCompare.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]} faq={(t("features:excelCompare.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))} />
+   </div>
+  </UtilityPage>
+ );
 }
 
 function ResultRow({ item, pairIndex, record, t }: {
-  item: CompletedPair;
-  pairIndex: number;
-  record: ExcelCompareRecord;
-  recordIndex: number;
-  t: LooseT;
+ item: CompletedPair;
+ pairIndex: number;
+ record: ExcelCompareRecord;
+ recordIndex: number;
+ t: LooseT;
 }) {
-  if (record.status === "duplicate") {
-    return <tr data-status={record.status} data-testid="excel-duplicate-row">
-      <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
-      <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t("features:excelCompare.status.duplicate")}</span></td>
-      <td className="min-w-20 whitespace-nowrap"><span className="sr-only">{t("features:excelCompare.results.groupedLocation")}</span><span aria-hidden="true">—</span></td>
-      <td className="min-w-32 max-w-56 [overflow-wrap:anywhere]">{record.displayKey}</td>
-      <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="left" t={t} /></td>
-      <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="right" t={t} /></td>
-      <td className="min-w-28 whitespace-nowrap">{reasonText(record.reason, t)}</td>
-    </tr>;
-  }
-  return <tr data-status={record.status}>
-    <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
-    <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t(`features:excelCompare.status.${record.status}`)}</span></td>
-    <td className="min-w-20 whitespace-nowrap">{locationText(record.leftRow, record.rightRow, record.leftColumn, record.rightColumn)}</td>
-    <td className="min-w-32 [overflow-wrap:anywhere]">{record.displayKey}</td>
-    <td className="min-w-64 [overflow-wrap:anywhere]">{record.leftValue}</td>
-    <td className="min-w-64 [overflow-wrap:anywhere]">{record.rightValue}</td>
-    <td className="min-w-28 whitespace-nowrap">{reasonText(record.reason, t)}</td>
+ if (record.status === "duplicate") {
+  return <tr data-status={record.status} data-testid="excel-duplicate-row">
+   <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
+   <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t("features:excelCompare.status.duplicate")}</span></td>
+   <td className="min-w-20 whitespace-nowrap"><span className="sr-only">{t("features:excelCompare.results.groupedLocation")}</span><span aria-hidden="true">—</span></td>
+   <td className="min-w-32 max-w-56 [overflow-wrap:anywhere]">{record.displayKey}</td>
+   <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="left" t={t} /></td>
+   <td className="min-w-64 align-top"><DuplicateSideList pairId={item.pairId} record={record} side="right" t={t} /></td>
+   <td className="min-w-28 whitespace-nowrap">{reasonText(record.reason, t)}</td>
   </tr>;
+ }
+ return <tr data-status={record.status}>
+  <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
+  <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t(`features:excelCompare.status.${record.status}`)}</span></td>
+  <td className="min-w-20 whitespace-nowrap">{locationText(record.leftRow, record.rightRow, record.leftColumn, record.rightColumn)}</td>
+  <td className="min-w-32 [overflow-wrap:anywhere]">{record.displayKey}</td>
+  <td className="min-w-64 [overflow-wrap:anywhere]">{record.leftValue}</td>
+  <td className="min-w-64 [overflow-wrap:anywhere]">{record.rightValue}</td>
+  <td className="min-w-28 whitespace-nowrap">{reasonText(record.reason, t)}</td>
+ </tr>;
 }
 
 function DuplicateSideList({ pairId, record, side, t }: {
-  pairId: number;
-  record: ExcelCompareDuplicateRecord;
-  side: "left" | "right";
-  t: LooseT;
+ pairId: number;
+ record: ExcelCompareDuplicateRecord;
+ side: "left" | "right";
+ t: LooseT;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(DUPLICATE_LIST_PAGE_SIZE);
-  const contentId = useId();
-  const rows = side === "left" ? record.leftRows : record.rightRows;
-  const values = side === "left" ? record.leftValues : record.rightValues;
-  const sideLabel = t(`features:excelCompare.results.side.${side}`);
-  if (!rows.length) return <span data-testid="excel-duplicate-empty" data-side={side}>{t(`features:excelCompare.results.no${capitalize(side)}Rows`)}</span>;
+ const [expanded, setExpanded] = useState(false);
+ const [visibleCount, setVisibleCount] = useState(DUPLICATE_LIST_PAGE_SIZE);
+ const contentId = useId();
+ const rows = side === "left" ? record.leftRows : record.rightRows;
+ const values = side === "left" ? record.leftValues : record.rightValues;
+ const sideLabel = t(`features:excelCompare.results.side.${side}`);
+ if (!rows.length) return <span data-testid="excel-duplicate-empty" data-side={side}>{t(`features:excelCompare.results.no${capitalize(side)}Rows`)}</span>;
 
-  const shown = Math.min(visibleCount, rows.length);
-  const remaining = rows.length - shown;
-  const toggleKey = expanded ? `hide${capitalize(side)}Rows` : `show${capitalize(side)}Rows`;
-  return <div data-testid="excel-duplicate-side" data-side={side}>
-    <Button
-      className="min-h-11 w-full justify-between rounded-xl px-3 text-left"
-      data-excel-result-focus=""
-      data-testid="excel-duplicate-toggle"
-      data-side={side}
-      variant="outline"
-      type="button"
-      aria-controls={contentId}
-      aria-expanded={expanded}
-      onClick={(event) => {
-        setExpanded((current) => !current);
-        if (expanded) setVisibleCount(DUPLICATE_LIST_PAGE_SIZE);
-        scheduleResultFocusVisibility(event.currentTarget);
-      }}
-    >
-      <span>{t(`features:excelCompare.results.${toggleKey}`, { count: rows.length })}</span>
-      {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
-    </Button>
-    {expanded && <div className="mt-2" data-testid="excel-duplicate-list" data-side={side} id={contentId}>
-      <ol className="grid gap-2">
-        {rows.slice(0, shown).map((row, index) => <li className="rounded-xl border border-border bg-muted/35 p-2.5" key={`${pairId}:${record.key}:${side}:${row}:${index}`}>
-          <span className="block text-xs font-bold text-muted-foreground">{t("features:excelCompare.results.sourceRow", { row })}</span>
-          <DuplicateValue value={values[index]} row={row} side={side} sideLabel={sideLabel} t={t} />
-        </li>)}
-      </ol>
-      {remaining > 0 && <Button
-        className="mt-2 min-h-11 w-full rounded-xl"
-        data-excel-result-focus=""
-        data-testid="excel-duplicate-show-more"
-        data-side={side}
-        variant="secondary"
-        type="button"
-        onClick={(event) => {
-          setVisibleCount((current) => current + DUPLICATE_LIST_PAGE_SIZE);
-          scheduleResultFocusVisibility(event.currentTarget);
-        }}
-      >{t("features:excelCompare.results.showMoreRows", { count: Math.min(DUPLICATE_LIST_PAGE_SIZE, remaining), remaining })}</Button>}
-    </div>}
-  </div>;
+ const shown = Math.min(visibleCount, rows.length);
+ const remaining = rows.length - shown;
+ const toggleKey = expanded ? `hide${capitalize(side)}Rows` : `show${capitalize(side)}Rows`;
+ return <div data-testid="excel-duplicate-side" data-side={side}>
+  <Button
+   className="min-h-11 w-full justify-between rounded-xl px-3 text-left"
+   data-excel-result-focus=""
+   data-testid="excel-duplicate-toggle"
+   data-side={side}
+   variant="outline"
+   type="button"
+   aria-controls={contentId}
+   aria-expanded={expanded}
+   onClick={(event) => {
+    setExpanded((current) => !current);
+    if (expanded) setVisibleCount(DUPLICATE_LIST_PAGE_SIZE);
+    scheduleResultFocusVisibility(event.currentTarget);
+   }}
+ >
+   <span>{t(`features:excelCompare.results.${toggleKey}`, { count: rows.length })}</span>
+   {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+  </Button>
+  {expanded && <div className="mt-2" data-testid="excel-duplicate-list" data-side={side} id={contentId}>
+   <ol className="grid gap-2">
+    {rows.slice(0, shown).map((row, index) => <li className="rounded-xl border border-border bg-muted/35 p-2.5" key={`${pairId}:${record.key}:${side}:${row}:${index}`}>
+     <span className="block text-xs font-bold text-muted-foreground">{t("features:excelCompare.results.sourceRow", { row })}</span>
+     <DuplicateValue value={values[index]} row={row} side={side} sideLabel={sideLabel} t={t} />
+    </li>)}
+   </ol>
+   {remaining> 0 && <Button
+    className="mt-2 min-h-11 w-full rounded-xl"
+    data-excel-result-focus=""
+    data-testid="excel-duplicate-show-more"
+    data-side={side}
+    variant="secondary"
+    type="button"
+    onClick={(event) => {
+     setVisibleCount((current) => current + DUPLICATE_LIST_PAGE_SIZE);
+     scheduleResultFocusVisibility(event.currentTarget);
+    }}
+  >{t("features:excelCompare.results.showMoreRows", { count: Math.min(DUPLICATE_LIST_PAGE_SIZE, remaining), remaining })}</Button>}
+  </div>}
+ </div>;
 }
 
 function DuplicateValue({ value, row, side, sideLabel, t }: {
-  value: string;
-  row: number;
-  side: "left" | "right";
-  sideLabel: string;
-  t: LooseT;
+ value: string;
+ row: number;
+ side: "left" | "right";
+ sideLabel: string;
+ t: LooseT;
 }) {
-  const characters = Array.from(value);
-  if (!characters.length) return <span className="mt-1 block text-sm text-muted-foreground">{t("features:excelCompare.results.emptyValue")}</span>;
-  if (characters.length <= VALUE_PREVIEW_CODE_POINT_LIMIT) return <span className="mt-1 block whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</span>;
-  const preview = `${characters.slice(0, VALUE_PREVIEW_CODE_POINT_LIMIT).join("")}…`;
-  return <div className="mt-1 grid gap-2">
-    <span className="block whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="excel-duplicate-value-preview">{preview}</span>
-    <Sheet>
-      <SheetTrigger
-        render={<Button className="min-h-11 w-fit rounded-xl" data-excel-result-focus="" data-testid="excel-full-value-trigger" data-side={side} variant="secondary" type="button" />}
-        aria-label={t("features:excelCompare.results.fullValueButtonLabel", { side: sideLabel, row })}
-      >{t("features:excelCompare.results.fullValue")}</SheetTrigger>
-      <SheetContent side="center" overlayClassName="bg-black/45 backdrop-blur-sm" className="max-h-[min(80vh,720px)] w-[min(680px,calc(100vw-32px))] flex-col rounded-3xl border border-border bg-popover p-5 text-popover-foreground shadow-2xl" data-testid="excel-full-value-dialog">
-        <SheetTitle className="pr-12 font-heading text-xl font-medium">{t("features:excelCompare.results.fullValue")}</SheetTitle>
-        <SheetDescription className="mt-1">{t("features:excelCompare.results.fullValueDescription", { side: sideLabel, row })}</SheetDescription>
-        <pre className="mt-4 min-h-16 overflow-auto whitespace-pre-wrap rounded-2xl border border-border bg-muted/40 p-3 font-sans text-sm [overflow-wrap:anywhere]">{value}</pre>
-        <SheetClose render={<Button className="mt-4 min-h-11 self-end rounded-xl" variant="secondary" type="button" />}>
-          {t("common:actions.close")}
-        </SheetClose>
-      </SheetContent>
-    </Sheet>
-  </div>;
+ const characters = Array.from(value);
+ if (!characters.length) return <span className="mt-1 block text-sm text-muted-foreground">{t("features:excelCompare.results.emptyValue")}</span>;
+ if (characters.length <= VALUE_PREVIEW_CODE_POINT_LIMIT) return <span className="mt-1 block whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</span>;
+ const preview = `${characters.slice(0, VALUE_PREVIEW_CODE_POINT_LIMIT).join("")}…`;
+ return <div className="mt-1 grid gap-2">
+  <span className="block whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="excel-duplicate-value-preview">{preview}</span>
+  <Sheet>
+   <SheetTrigger
+    render={<Button className="min-h-11 w-fit rounded-xl" data-excel-result-focus="" data-testid="excel-full-value-trigger" data-side={side} variant="secondary" type="button" />}
+    aria-label={t("features:excelCompare.results.fullValueButtonLabel", { side: sideLabel, row })}
+  >{t("features:excelCompare.results.fullValue")}</SheetTrigger>
+   <SheetContent side="center" overlayClassName="bg-black/45 backdrop-blur-sm" className="max-h-[min(80vh,720px)] w-[min(680px,calc(100vw-32px))] flex-col rounded-3xl border border-border bg-popover p-5 text-popover-foreground shadow-2xl" data-testid="excel-full-value-dialog">
+    <SheetTitle className="pr-12 font-heading text-xl font-medium">{t("features:excelCompare.results.fullValue")}</SheetTitle>
+    <SheetDescription className="mt-1">{t("features:excelCompare.results.fullValueDescription", { side: sideLabel, row })}</SheetDescription>
+    <pre className="mt-4 min-h-16 overflow-auto whitespace-pre-wrap rounded-2xl border border-border bg-muted/40 p-3 font-sans text-sm [overflow-wrap:anywhere]">{value}</pre>
+    <SheetClose render={<Button className="mt-4 min-h-11 self-end rounded-xl" variant="secondary" type="button" />}>
+     {t("common:actions.close")}
+    </SheetClose>
+   </SheetContent>
+  </Sheet>
+ </div>;
 }
 
 function scheduleResultFocusVisibility(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement) || !target.matches("[data-excel-result-focus]")) return;
-  pendingResultFocusVisibility?.abort();
-  pendingResultFocusVisibility = undefined;
-  if (!target.matches(":focus-visible")) return;
+ if (!(target instanceof HTMLElement) || !target.matches("[data-excel-result-focus]")) return;
+ pendingResultFocusVisibility?.abort();
+ pendingResultFocusVisibility = undefined;
+ if (!target.matches(":focus-visible")) return;
 
-  const controller = new AbortController();
-  pendingResultFocusVisibility = controller;
-  const stop = () => {
-    controller.abort();
-    if (pendingResultFocusVisibility === controller) pendingResultFocusVisibility = undefined;
-  };
-  const stopForScrollKey = (event: KeyboardEvent) => {
-    if (["ArrowDown", "ArrowUp", "End", "Home", "PageDown", "PageUp", " "].includes(event.key)) stop();
-  };
-  window.addEventListener("pointerdown", stop, { passive: true, signal: controller.signal });
-  window.addEventListener("touchmove", stop, { passive: true, signal: controller.signal });
-  window.addEventListener("wheel", stop, { passive: true, signal: controller.signal });
-  window.addEventListener("keydown", stopForScrollKey, { signal: controller.signal });
+ const controller = new AbortController();
+ pendingResultFocusVisibility = controller;
+ const stop = () => {
+  controller.abort();
+  if (pendingResultFocusVisibility === controller) pendingResultFocusVisibility = undefined;
+ };
+ const stopForScrollKey = (event: KeyboardEvent) => {
+  if (["ArrowDown", "ArrowUp", "End", "Home", "PageDown", "PageUp", " "].includes(event.key)) stop();
+ };
+ window.addEventListener("pointerdown", stop, { passive: true, signal: controller.signal });
+ window.addEventListener("touchmove", stop, { passive: true, signal: controller.signal });
+ window.addEventListener("wheel", stop, { passive: true, signal: controller.signal });
+ window.addEventListener("keydown", stopForScrollKey, { signal: controller.signal });
 
-  const keepVisible = () => {
-    if (controller.signal.aborted || !target.isConnected || document.activeElement !== target || !target.matches(":focus-visible")) {
-      stop();
-      return false;
-    }
-    keepResultFocusVisible(target);
-    return true;
-  };
+ const keepVisible = () => {
+  if (controller.signal.aborted || !target.isConnected || document.activeElement !== target || !target.matches(":focus-visible")) {
+   stop();
+   return false;
+  }
+  keepResultFocusVisible(target);
+  return true;
+ };
+ if (!keepVisible()) return;
+ requestAnimationFrame(() => {
   if (!keepVisible()) return;
   requestAnimationFrame(() => {
-    if (!keepVisible()) return;
-    requestAnimationFrame(() => {
-      keepVisible();
-      stop();
-    });
+   keepVisible();
+   stop();
   });
+ });
 }
 
 function keepResultFocusVisible(target: HTMLElement) {
-  const scrollRegion = target.closest<HTMLElement>('[data-testid="excel-result-scroll-region"]');
-  if (scrollRegion) {
-    const targetRect = target.getBoundingClientRect();
-    const regionRect = scrollRegion.getBoundingClientRect();
-    const visibleLeft = regionRect.left + scrollRegion.clientLeft + FOCUS_VISIBILITY_GAP;
-    const visibleRight = visibleLeft + scrollRegion.clientWidth - FOCUS_VISIBILITY_GAP * 2;
-    const availableWidth = Math.max(0, visibleRight - visibleLeft);
-    const horizontalDelta = targetRect.width > availableWidth
-      ? targetRect.left - visibleLeft
-      : targetRect.left < visibleLeft
-        ? targetRect.left - visibleLeft
-        : targetRect.right > visibleRight ? targetRect.right - visibleRight : 0;
-    if (Math.abs(horizontalDelta) >= FOCUS_SCROLL_TOLERANCE) {
-      scrollRegion.scrollBy({ left: horizontalDelta, behavior: "instant" });
-    }
-  }
-
-  const headerBottom = fixedChromeBoundary(".app-topbar", "bottom");
-  const tabsTop = fixedChromeBoundary(".bottom-tabs", "top");
+ const scrollRegion = target.closest<HTMLElement>('[data-testid="excel-result-scroll-region"]');
+ if (scrollRegion) {
   const targetRect = target.getBoundingClientRect();
-  const verticalDelta = headerBottom !== undefined && targetRect.top < headerBottom + FOCUS_VISIBILITY_GAP
-    ? targetRect.top - headerBottom - FOCUS_VISIBILITY_GAP
-    : tabsTop !== undefined && targetRect.bottom > tabsTop - FOCUS_VISIBILITY_GAP
-      ? targetRect.bottom - tabsTop + FOCUS_VISIBILITY_GAP
-      : 0;
-  if (Math.abs(verticalDelta) >= FOCUS_SCROLL_TOLERANCE) {
-    window.scrollBy({ top: verticalDelta, behavior: "instant" });
+  const regionRect = scrollRegion.getBoundingClientRect();
+  const visibleLeft = regionRect.left + scrollRegion.clientLeft + FOCUS_VISIBILITY_GAP;
+  const visibleRight = visibleLeft + scrollRegion.clientWidth - FOCUS_VISIBILITY_GAP * 2;
+  const availableWidth = Math.max(0, visibleRight - visibleLeft);
+  const horizontalDelta = targetRect.width> availableWidth
+   ? targetRect.left - visibleLeft
+   : targetRect.left < visibleLeft
+    ? targetRect.left - visibleLeft
+    : targetRect.right> visibleRight ? targetRect.right - visibleRight : 0;
+  if (Math.abs(horizontalDelta)>= FOCUS_SCROLL_TOLERANCE) {
+   scrollRegion.scrollBy({ left: horizontalDelta, behavior: "instant" });
   }
+ }
+
+ const headerBottom = fixedChromeBoundary(".app-topbar", "bottom");
+ const tabsTop = fixedChromeBoundary(".bottom-tabs", "top");
+ const targetRect = target.getBoundingClientRect();
+ const verticalDelta = headerBottom !== undefined && targetRect.top < headerBottom + FOCUS_VISIBILITY_GAP
+  ? targetRect.top - headerBottom - FOCUS_VISIBILITY_GAP
+  : tabsTop !== undefined && targetRect.bottom> tabsTop - FOCUS_VISIBILITY_GAP
+   ? targetRect.bottom - tabsTop + FOCUS_VISIBILITY_GAP
+   : 0;
+ if (Math.abs(verticalDelta)>= FOCUS_SCROLL_TOLERANCE) {
+  window.scrollBy({ top: verticalDelta, behavior: "instant" });
+ }
 }
 
 function fixedChromeBoundary(selector: string, edge: "bottom" | "top") {
-  const element = document.querySelector<HTMLElement>(selector);
-  if (!element) return undefined;
-  const style = window.getComputedStyle(element);
-  const rect = element.getBoundingClientRect();
-  if (style.position !== "fixed" || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0
-    || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.top >= window.innerHeight) return undefined;
-  return rect[edge];
+ const element = document.querySelector<HTMLElement>(selector);
+ if (!element) return undefined;
+ const style = window.getComputedStyle(element);
+ const rect = element.getBoundingClientRect();
+ if (style.position !== "fixed" || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0
+  || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.top>= window.innerHeight) return undefined;
+ return rect[edge];
 }
 
 function recordSearchText(record: ExcelCompareRecord, language: string) {
-  const fields = record.status === "duplicate"
-    ? [record.displayKey, ...record.leftRows.map(String), ...record.rightRows.map(String), ...record.leftValues, ...record.rightValues]
-    : [record.displayKey, record.leftValue, record.rightValue, record.change, record.reason];
-  return fields.join(" ").normalize("NFC").toLocaleLowerCase(language);
+ const fields = record.status === "duplicate"
+  ? [record.displayKey, ...record.leftRows.map(String), ...record.rightRows.map(String), ...record.leftValues, ...record.rightValues]
+  : [record.displayKey, record.leftValue, record.rightValue, record.change, record.reason];
+ return fields.join(" ").normalize("NFC").toLocaleLowerCase(language);
 }
 
 function resultRowKey(pairId: number, record: ExcelCompareRecord, recordIndex: number) {
-  return record.status === "duplicate"
-    ? `${pairId}:duplicate:${record.key}`
-    : `${pairId}:record:${recordIndex}`;
+ return record.status === "duplicate"
+  ? `${pairId}:duplicate:${record.key}`
+  : `${pairId}:record:${recordIndex}`;
 }
 
 function capitalize(value: "left" | "right") { return value === "left" ? "Left" : "Right"; }
 
 function PairCard({ pair, index, mode, busy, t, updatePair, selectFile, changeSheet, changeHeaderInput, commitHeader, removePair, canRemove }: {
-  pair: PairState; index: number; mode: ExcelCompareMode; busy: boolean; t: LooseT;
-  updatePair: (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => void;
-  selectFile: (id: number, side: "left" | "right", file: File | undefined) => Promise<void>;
-  changeSheet: (id: number, side: "left" | "right", sheetName: string) => void;
-  changeHeaderInput: (id: number, side: "left" | "right", value: string) => void;
-  commitHeader: (id: number, side: "left" | "right") => void;
-  removePair: (id: number) => void; canRemove: boolean;
+ pair: PairState; index: number; mode: ExcelCompareMode; busy: boolean; t: LooseT;
+ updatePair: (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => void;
+ selectFile: (id: number, side: "left" | "right", file: File | undefined) => Promise<void>;
+ changeSheet: (id: number, side: "left" | "right", sheetName: string) => void;
+ changeHeaderInput: (id: number, side: "left" | "right", value: string) => void;
+ commitHeader: (id: number, side: "left" | "right") => void;
+ removePair: (id: number) => void; canRemove: boolean;
 }) {
-  const headerGuidanceBaseId = useId();
-  const leftHeaders = headersFor(pair, "left");
-  const rightHeaders = headersFor(pair, "right");
-  const inspectionBusy = pair.leftInspecting || pair.rightInspecting;
-  const addFiles = async (files: File[]) => {
-    const assignment = assignPairFiles({ left: pair.left, right: pair.right }, files);
-    updatePair(pair.id, { unassignedFileCount: assignment.unassignedFiles.length });
-    const selections: Array<Promise<void>> = [];
-    if (!pair.left && assignment.left) selections.push(selectFile(pair.id, "left", assignment.left));
-    if (!pair.right && assignment.right) selections.push(selectFile(pair.id, "right", assignment.right));
-    await Promise.all(selections);
-  };
-  return <Card as="article" className="gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-pair">
-    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5"><span className="grid size-8 place-items-center rounded-full bg-green-700 text-sm font-extrabold text-white">{index + 1}</span><div className="min-w-0"><strong className="block text-sm">{t("features:excelCompare.pairs.pair", { number: index + 1 })}</strong><small className="mt-0.5 block text-xs text-muted-foreground">{t("features:excelCompare.pairs.pairHint")}</small></div><div className="flex items-center gap-1.5"><Button className="size-11 rounded-xl border-green-700/60 text-green-800 shadow-sm hover:border-green-700! hover:bg-green-500/10! focus-visible:border-green-700! focus-visible:ring-green-700/30! dark:border-green-300/70 dark:text-green-300 dark:hover:border-green-300! dark:hover:bg-green-400/10!" data-testid="excel-pair-swap" variant="outline" size="icon-lg" type="button" disabled={busy || inspectionBusy} onClick={() => updatePair(pair.id, swapPairSides)} aria-label={t("features:excelCompare.pairs.swap")}><ArrowLeftRight size={19} /></Button>{canRemove && <Button className="size-11 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive" variant="ghost" size="icon-lg" type="button" disabled={busy} onClick={() => removePair(pair.id)} aria-label={t("features:excelCompare.pairs.remove", { number: index + 1 })}><Trash2 size={18} /></Button>}</div></div>
-    <PairFileDropZone label={t("features:excelCompare.pairs.dropLabel")} hint={t("features:excelCompare.pairs.fileHint")} accept={ACCEPT} files={[pair.left, pair.right].filter((file): file is File => Boolean(file))} onFiles={addFiles} disabled={busy} />
-    {pair.unassignedFileCount > 0 && <UtilityNotice className="mt-2" data-testid="excel-pair-overflow" role="status"><AlertCircle className="mt-0.5 shrink-0" size={15} /> {t("features:excelCompare.pairs.overflow", { count: pair.unassignedFileCount })}</UtilityNotice>}
-    <div className="mt-3 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1" data-testid="excel-pair-files">
-      {(["left", "right"] as const).map((side) => {
-        const selection = headerSelectionFor(pair, side);
-        const guidanceId = `${headerGuidanceBaseId}-${side}-header-guidance`;
-        const helpId = `${headerGuidanceBaseId}-${side}-header-help`;
-        const announcement = pair[`${side}HeaderAnnouncement`];
-        return <div className="min-w-0 rounded-2xl border border-border bg-muted/35 p-3" key={side}>
-        <p className="mb-2 text-xs font-extrabold tracking-wide text-muted-foreground uppercase">{t(`features:excelCompare.pairs.${side}` as never)}</p>
-        {pair[side] && <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl bg-background p-2 ring-1 ring-border" data-testid="excel-selected-file"><FileSpreadsheet className="text-green-700 dark:text-green-300" size={16} /><span className="min-w-0"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{pair[side]!.name}</strong><small className="block text-xs text-muted-foreground">{formatBytes(pair[side]!.size)}</small></span><Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void selectFile(pair.id, side, undefined)} aria-label={t("common:files.remove", { name: pair[side]!.name })}><X size={15} /></Button></div>}
-        {pair[`${side}Error`] && <p className="mt-2 flex items-start gap-1.5 text-sm font-bold text-destructive" data-testid="excel-file-error"><AlertCircle className="mt-0.5 shrink-0" size={14} /> {pair[`${side}Error`]}</p>}
-        {pair[`${side}Inspection`] && <div className="mt-3 grid grid-cols-[minmax(0,1fr)_92px] gap-2" data-testid="excel-sheet-fields">
-          <UtilityField><span>{t("features:excelCompare.pairs.sheet")}</span><UtilitySelect value={pair[`${side}Sheet`]} onChange={(event) => changeSheet(pair.id, side, event.target.value)}>{pair[`${side}Inspection`]!.sheets.map((sheet) => <option key={sheet.name}>{sheet.name}</option>)}</UtilitySelect></UtilityField>
-          <UtilityField><span>{t("features:excelCompare.pairs.headerRow")}</span><UtilityInput type="number" min={1} max={selectedSheet(pair, side)?.rowCount || 1} value={pair[`${side}HeaderInput`]} aria-describedby={`${guidanceId} ${helpId}`} onChange={(event) => changeHeaderInput(pair.id, side, event.target.value)} onBlur={() => commitHeader(pair.id, side)} /></UtilityField>
-          <p className="col-span-full text-xs font-medium text-foreground" data-testid="excel-header-guidance" data-source={selection.source} id={guidanceId}>{headerGuidanceText(selection, t)}</p>
-          <p className="col-span-full text-xs text-muted-foreground" data-testid="excel-header-help" id={helpId}>{t("features:excelCompare.pairs.headerHelp")}</p>
-          <p className="col-span-full text-xs text-muted-foreground">{formatLabel(pair[`${side}Inspection`]!.format, pair[`${side}Inspection`]!.supportsStyleComparison, t)}</p>
-          {announcement && <span className="sr-only" data-testid="excel-header-status" role="status" aria-live="polite">{headerGuidanceText(announcement, t)}</span>}
-        </div>}
-      </div>;
-      })}
-    </div>
-    {mode === "key" && pair.leftInspection && pair.rightInspection && <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3" data-testid="excel-pair-mode-options">
-      <h3 className="mb-3 font-heading text-base font-medium">{t("features:excelCompare.key.title")}</h3>
-      <div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"><ColumnPicker label={t("features:excelCompare.key.leftPrimary")} headers={leftHeaders} value={pair.primaryLeft} onChange={(value) => updatePair(pair.id, { primaryLeft: value })} /><ColumnPicker label={t("features:excelCompare.key.rightPrimary")} headers={rightHeaders} value={pair.primaryRight} onChange={(value) => updatePair(pair.id, { primaryRight: value })} /></div>
-      <UtilityField className="mt-3"><span>{t("features:excelCompare.key.duplicatePolicy")}</span><UtilitySelect value={pair.duplicatePolicy} onChange={(event) => updatePair(pair.id, { duplicatePolicy: event.target.value as DuplicateKeyPolicy })}><option value="secondary">{t("features:excelCompare.key.secondary")}</option><option value="occurrence">{t("features:excelCompare.key.occurrence")}</option><option value="error">{t("features:excelCompare.key.error")}</option></UtilitySelect></UtilityField>
-      {pair.duplicatePolicy === "secondary" && <div className="mt-3 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"><ColumnPicker label={t("features:excelCompare.key.leftSecondary")} headers={leftHeaders} value={pair.secondaryLeft} onChange={(value) => updatePair(pair.id, { secondaryLeft: value })} /><ColumnPicker label={t("features:excelCompare.key.rightSecondary")} headers={rightHeaders} value={pair.secondaryRight} onChange={(value) => updatePair(pair.id, { secondaryRight: value })} /></div>}
+ const headerGuidanceBaseId = useId();
+ const leftHeaders = headersFor(pair, "left");
+ const rightHeaders = headersFor(pair, "right");
+ const inspectionBusy = pair.leftInspecting || pair.rightInspecting;
+ const addFiles = async (files: File[]) => {
+  const assignment = assignPairFiles({ left: pair.left, right: pair.right }, files);
+  updatePair(pair.id, { unassignedFileCount: assignment.unassignedFiles.length });
+  const selections: Array<Promise<void>> = [];
+  if (!pair.left && assignment.left) selections.push(selectFile(pair.id, "left", assignment.left));
+  if (!pair.right && assignment.right) selections.push(selectFile(pair.id, "right", assignment.right));
+  await Promise.all(selections);
+ };
+ return <Card as="article" className="gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-pair">
+  <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5"><span className="grid size-8 place-items-center rounded-full bg-primary text-sm font-extrabold text-white">{index + 1}</span><div className="min-w-0"><strong className="block text-sm">{t("features:excelCompare.pairs.pair", { number: index + 1 })}</strong><small className="mt-0.5 block text-xs text-muted-foreground">{t("features:excelCompare.pairs.pairHint")}</small></div><div className="flex items-center gap-1.5"><Button className="size-11 rounded-xl border-primary/60 text-primary shadow-sm hover:border-primary! hover:bg-primary/10! focus-visible:border-primary! focus-visible:ring-primary/30! dark:border-primary/70 dark:text-primary dark:hover:border-primary! dark:hover:bg-primary/10!" data-testid="excel-pair-swap" variant="outline" size="icon-lg" type="button" disabled={busy || inspectionBusy} onClick={() => updatePair(pair.id, swapPairSides)} aria-label={t("features:excelCompare.pairs.swap")}><ArrowLeftRight size={19} /></Button>{canRemove && <Button className="size-11 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive" variant="ghost" size="icon-lg" type="button" disabled={busy} onClick={() => removePair(pair.id)} aria-label={t("features:excelCompare.pairs.remove", { number: index + 1 })}><Trash2 size={18} /></Button>}</div></div>
+  <PairFileDropZone label={t("features:excelCompare.pairs.dropLabel")} hint={t("features:excelCompare.pairs.fileHint")} accept={ACCEPT} files={[pair.left, pair.right].filter((file): file is File => Boolean(file))} onFiles={addFiles} disabled={busy} />
+  {pair.unassignedFileCount> 0 && <UtilityNotice className="mt-2" data-testid="excel-pair-overflow" role="status"><AlertCircle className="mt-0.5 shrink-0" size={15} /> {t("features:excelCompare.pairs.overflow", { count: pair.unassignedFileCount })}</UtilityNotice>}
+  <div className="mt-3 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1" data-testid="excel-pair-files">
+   {(["left", "right"] as const).map((side) => {
+    const selection = headerSelectionFor(pair, side);
+    const guidanceId = `${headerGuidanceBaseId}-${side}-header-guidance`;
+    const helpId = `${headerGuidanceBaseId}-${side}-header-help`;
+    const announcement = pair[`${side}HeaderAnnouncement`];
+    return <div className="min-w-0 rounded-2xl border border-border bg-muted/35 p-3" key={side}>
+    <p className="mb-2 text-xs font-extrabold tracking-wide text-muted-foreground uppercase">{t(`features:excelCompare.pairs.${side}` as never)}</p>
+    {pair[side] && <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl bg-background p-2 ring-1 ring-border" data-testid="excel-selected-file"><FileSpreadsheet className="text-primary dark:text-primary" size={16} /><span className="min-w-0"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{pair[side]!.name}</strong><small className="block text-xs text-muted-foreground">{formatBytes(pair[side]!.size)}</small></span><Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void selectFile(pair.id, side, undefined)} aria-label={t("common:files.remove", { name: pair[side]!.name })}><X size={15} /></Button></div>}
+    {pair[`${side}Error`] && <p className="mt-2 flex items-start gap-1.5 text-sm font-bold text-destructive" data-testid="excel-file-error"><AlertCircle className="mt-0.5 shrink-0" size={14} /> {pair[`${side}Error`]}</p>}
+    {pair[`${side}Inspection`] && <div className="mt-3 grid grid-cols-[minmax(0,1fr)_92px] gap-2" data-testid="excel-sheet-fields">
+     <UtilityField><span>{t("features:excelCompare.pairs.sheet")}</span><UtilitySelect value={pair[`${side}Sheet`]} onChange={(event) => changeSheet(pair.id, side, event.target.value)}>{pair[`${side}Inspection`]!.sheets.map((sheet) => <option key={sheet.name}>{sheet.name}</option>)}</UtilitySelect></UtilityField>
+     <UtilityField><span>{t("features:excelCompare.pairs.headerRow")}</span><UtilityInput type="number" min={1} max={selectedSheet(pair, side)?.rowCount || 1} value={pair[`${side}HeaderInput`]} aria-describedby={`${guidanceId} ${helpId}`} onChange={(event) => changeHeaderInput(pair.id, side, event.target.value)} onBlur={() => commitHeader(pair.id, side)} /></UtilityField>
+     <p className="col-span-full text-xs font-medium text-foreground" data-testid="excel-header-guidance" data-source={selection.source} id={guidanceId}>{headerGuidanceText(selection, t)}</p>
+     <p className="col-span-full text-xs text-muted-foreground" data-testid="excel-header-help" id={helpId}>{t("features:excelCompare.pairs.headerHelp")}</p>
+     <p className="col-span-full text-xs text-muted-foreground">{formatLabel(pair[`${side}Inspection`]!.format, pair[`${side}Inspection`]!.supportsStyleComparison, t)}</p>
+     {announcement && <span className="sr-only" data-testid="excel-header-status" role="status" aria-live="polite">{headerGuidanceText(announcement, t)}</span>}
     </div>}
-    {mode === "reconcile" && pair.leftInspection && pair.rightInspection && <ReconcileOptions pair={pair} leftHeaders={leftHeaders} rightHeaders={rightHeaders} updatePair={updatePair} t={t} />}
-  </Card>;
+   </div>;
+   })}
+  </div>
+  {mode === "key" && pair.leftInspection && pair.rightInspection && <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3" data-testid="excel-pair-mode-options">
+   <h3 className="mb-3 font-heading text-base font-medium">{t("features:excelCompare.key.title")}</h3>
+   <div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"><ColumnPicker label={t("features:excelCompare.key.leftPrimary")} headers={leftHeaders} value={pair.primaryLeft} onChange={(value) => updatePair(pair.id, { primaryLeft: value })} /><ColumnPicker label={t("features:excelCompare.key.rightPrimary")} headers={rightHeaders} value={pair.primaryRight} onChange={(value) => updatePair(pair.id, { primaryRight: value })} /></div>
+   <UtilityField className="mt-3"><span>{t("features:excelCompare.key.duplicatePolicy")}</span><UtilitySelect value={pair.duplicatePolicy} onChange={(event) => updatePair(pair.id, { duplicatePolicy: event.target.value as DuplicateKeyPolicy })}><option value="secondary">{t("features:excelCompare.key.secondary")}</option><option value="occurrence">{t("features:excelCompare.key.occurrence")}</option><option value="error">{t("features:excelCompare.key.error")}</option></UtilitySelect></UtilityField>
+   {pair.duplicatePolicy === "secondary" && <div className="mt-3 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"><ColumnPicker label={t("features:excelCompare.key.leftSecondary")} headers={leftHeaders} value={pair.secondaryLeft} onChange={(value) => updatePair(pair.id, { secondaryLeft: value })} /><ColumnPicker label={t("features:excelCompare.key.rightSecondary")} headers={rightHeaders} value={pair.secondaryRight} onChange={(value) => updatePair(pair.id, { secondaryRight: value })} /></div>}
+  </div>}
+  {mode === "reconcile" && pair.leftInspection && pair.rightInspection && <ReconcileOptions pair={pair} leftHeaders={leftHeaders} rightHeaders={rightHeaders} updatePair={updatePair} t={t} />}
+ </Card>;
 }
 
 function ColumnPicker({ label, headers, value, onChange }: { label: string; headers: string[]; value: number[]; onChange: (value: number[]) => void }) {
-  return <fieldset className="min-w-0"><legend className="mb-1.5 text-xs font-bold text-muted-foreground">{label}</legend><div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-border bg-background p-2">{headers.map((header, index) => { const column = index + 1; const selected = value.includes(column); return <Button key={`${column}-${header}`} type="button" size="sm" variant="outline" aria-pressed={selected} className={`max-w-full rounded-lg ${selected ? "border-green-700 bg-green-500/10 dark:border-green-300" : ""}`} onClick={() => onChange(selected ? value.filter((item) => item !== column) : [...value, column].sort((a, b) => a - b))}><span className="font-mono text-xs">{columnLabel(column)}</span><span className="overflow-hidden text-ellipsis">{header}</span></Button>; })}</div></fieldset>;
+ return <fieldset className="min-w-0"><legend className="mb-1.5 text-xs font-bold text-muted-foreground">{label}</legend><div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-border bg-background p-2">{headers.map((header, index) => { const column = index + 1; const selected = value.includes(column); return <Button key={`${column}-${header}`} type="button" size="sm" variant="outline" aria-pressed={selected} className={`max-w-full rounded-lg ${selected ? "border-primary bg-primary/10 dark:border-primary" : ""}`} onClick={() => onChange(selected ? value.filter((item) => item !== column) : [...value, column].sort((a, b) => a - b))}><span className="font-mono text-xs">{columnLabel(column)}</span><span className="overflow-hidden text-ellipsis">{header}</span></Button>; })}</div></fieldset>;
 }
 
 function ReconcileOptions({ pair, leftHeaders, rightHeaders, updatePair, t }: { pair: PairState; leftHeaders: string[]; rightHeaders: string[]; updatePair: (id: number, update: Partial<PairState>) => void; t: LooseT }) {
-  const update = (key: keyof PairState["reconcile"], value: number | boolean | undefined) => updatePair(pair.id, { reconcile: { ...pair.reconcile, [key]: value } });
-  const updateOptionalPair = (
-    leftKey: "leftDateColumn" | "leftPartnerColumn",
-    rightKey: "rightDateColumn" | "rightPartnerColumn",
-    side: "left" | "right",
-    rawValue: string,
-  ) => {
-    if (!rawValue) {
-      updatePair(pair.id, { reconcile: { ...pair.reconcile, [leftKey]: undefined, [rightKey]: undefined } });
-      return;
-    }
-    const counterpartHeaders = side === "left" ? rightHeaders : leftHeaders;
-    if (!counterpartHeaders.length) {
-      updatePair(pair.id, { reconcile: { ...pair.reconcile, [leftKey]: undefined, [rightKey]: undefined } });
-      return;
-    }
-    const ownKey = side === "left" ? leftKey : rightKey;
-    const counterpartKey = side === "left" ? rightKey : leftKey;
-    updatePair(pair.id, { reconcile: {
-      ...pair.reconcile,
-      [ownKey]: Number(rawValue),
-      [counterpartKey]: pair.reconcile[counterpartKey] ?? 1,
-    } });
-  };
-  const amountFields = [
-    ["leftAmountColumn", "leftAmount", leftHeaders], ["rightAmountColumn", "rightAmount", rightHeaders],
-  ] as const;
-  const optionalFields = [
-    ["leftDateColumn", "rightDateColumn", "left", "leftDate", leftHeaders],
-    ["leftDateColumn", "rightDateColumn", "right", "rightDate", rightHeaders],
-    ["leftPartnerColumn", "rightPartnerColumn", "left", "leftPartner", leftHeaders],
-    ["leftPartnerColumn", "rightPartnerColumn", "right", "rightPartner", rightHeaders],
-  ] as const;
-  const dateUnused = pair.reconcile.leftDateColumn === undefined;
-  return <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3" data-testid="excel-pair-mode-options"><h3 className="mb-3 font-heading text-base font-medium">{t("features:excelCompare.reconcile.title")}</h3><div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1" data-testid="excel-reconcile-grid">
-    {amountFields.map(([key, label, headers]) => <UtilityField key={key} data-reconcile-field={key}><span>{t(`features:excelCompare.reconcile.${label}` as never)}</span><UtilitySelect value={pair.reconcile[key]} onChange={(event) => update(key, Number(event.target.value))}>{headers.map((header, index) => <option value={index + 1} key={`${index}-${header}`}>{columnLabel(index + 1)} · {header}</option>)}</UtilitySelect></UtilityField>)}
-    {optionalFields.map(([leftKey, rightKey, side, label, headers]) => {
-      const key = side === "left" ? leftKey : rightKey;
-      return <UtilityField key={key} data-reconcile-field={key}><span>{t(`features:excelCompare.reconcile.${label}` as never)}</span><UtilitySelect value={pair.reconcile[key] ?? ""} onChange={(event) => updateOptionalPair(leftKey, rightKey, side, event.target.value)}><option value="">{t("features:excelCompare.reconcile.unused")}</option>{headers.map((header, index) => <option value={index + 1} key={`${index}-${header}`}>{columnLabel(index + 1)} · {header}</option>)}</UtilitySelect></UtilityField>;
-    })}
-  </div><div className="mt-3 grid grid-cols-2 gap-3 max-[620px]:grid-cols-1" data-testid="excel-number-options"><UtilityField><span>{t("features:excelCompare.reconcile.dateTolerance")}</span><UtilityInput type="number" min={0} disabled={dateUnused} value={pair.reconcile.dateToleranceDays} onChange={(event) => update("dateToleranceDays", Math.max(0, Number(event.target.value) || 0))} /></UtilityField><UtilityField><span>{t("features:excelCompare.reconcile.roundingUnit")}</span><UtilityInput type="number" min="0.000001" step="0.01" value={pair.reconcile.roundingUnit} onChange={(event) => update("roundingUnit", Math.max(0.000001, Number(event.target.value) || 0.01))} /></UtilityField></div><div className="mt-2"><ToggleRow label={t("features:excelCompare.reconcile.grouped")} description={t("features:excelCompare.reconcile.groupedDescription")} checked={pair.reconcile.allowGroupedMatches} onChange={(checked) => update("allowGroupedMatches", checked)} /></div></div>;
+ const update = (key: keyof PairState["reconcile"], value: number | boolean | undefined) => updatePair(pair.id, { reconcile: { ...pair.reconcile, [key]: value } });
+ const updateOptionalPair = (
+  leftKey: "leftDateColumn" | "leftPartnerColumn",
+  rightKey: "rightDateColumn" | "rightPartnerColumn",
+  side: "left" | "right",
+  rawValue: string,
+ ) => {
+  if (!rawValue) {
+   updatePair(pair.id, { reconcile: { ...pair.reconcile, [leftKey]: undefined, [rightKey]: undefined } });
+   return;
+  }
+  const counterpartHeaders = side === "left" ? rightHeaders : leftHeaders;
+  if (!counterpartHeaders.length) {
+   updatePair(pair.id, { reconcile: { ...pair.reconcile, [leftKey]: undefined, [rightKey]: undefined } });
+   return;
+  }
+  const ownKey = side === "left" ? leftKey : rightKey;
+  const counterpartKey = side === "left" ? rightKey : leftKey;
+  updatePair(pair.id, { reconcile: {
+   ...pair.reconcile,
+   [ownKey]: Number(rawValue),
+   [counterpartKey]: pair.reconcile[counterpartKey] ?? 1,
+  } });
+ };
+ const amountFields = [
+  ["leftAmountColumn", "leftAmount", leftHeaders], ["rightAmountColumn", "rightAmount", rightHeaders],
+ ] as const;
+ const optionalFields = [
+  ["leftDateColumn", "rightDateColumn", "left", "leftDate", leftHeaders],
+  ["leftDateColumn", "rightDateColumn", "right", "rightDate", rightHeaders],
+  ["leftPartnerColumn", "rightPartnerColumn", "left", "leftPartner", leftHeaders],
+  ["leftPartnerColumn", "rightPartnerColumn", "right", "rightPartner", rightHeaders],
+ ] as const;
+ const dateUnused = pair.reconcile.leftDateColumn === undefined;
+ return <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3" data-testid="excel-pair-mode-options"><h3 className="mb-3 font-heading text-base font-medium">{t("features:excelCompare.reconcile.title")}</h3><div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1" data-testid="excel-reconcile-grid">
+  {amountFields.map(([key, label, headers]) => <UtilityField key={key} data-reconcile-field={key}><span>{t(`features:excelCompare.reconcile.${label}` as never)}</span><UtilitySelect value={pair.reconcile[key]} onChange={(event) => update(key, Number(event.target.value))}>{headers.map((header, index) => <option value={index + 1} key={`${index}-${header}`}>{columnLabel(index + 1)} · {header}</option>)}</UtilitySelect></UtilityField>)}
+  {optionalFields.map(([leftKey, rightKey, side, label, headers]) => {
+   const key = side === "left" ? leftKey : rightKey;
+   return <UtilityField key={key} data-reconcile-field={key}><span>{t(`features:excelCompare.reconcile.${label}` as never)}</span><UtilitySelect value={pair.reconcile[key] ?? ""} onChange={(event) => updateOptionalPair(leftKey, rightKey, side, event.target.value)}><option value="">{t("features:excelCompare.reconcile.unused")}</option>{headers.map((header, index) => <option value={index + 1} key={`${index}-${header}`}>{columnLabel(index + 1)} · {header}</option>)}</UtilitySelect></UtilityField>;
+  })}
+ </div><div className="mt-3 grid grid-cols-2 gap-3 max-[620px]:grid-cols-1" data-testid="excel-number-options"><UtilityField><span>{t("features:excelCompare.reconcile.dateTolerance")}</span><UtilityInput type="number" min={0} disabled={dateUnused} value={pair.reconcile.dateToleranceDays} onChange={(event) => update("dateToleranceDays", Math.max(0, Number(event.target.value) || 0))} /></UtilityField><UtilityField><span>{t("features:excelCompare.reconcile.roundingUnit")}</span><UtilityInput type="number" min="0.000001" step="0.01" value={pair.reconcile.roundingUnit} onChange={(event) => update("roundingUnit", Math.max(0.000001, Number(event.target.value) || 0.01))} /></UtilityField></div><div className="mt-2"><ToggleRow label={t("features:excelCompare.reconcile.grouped")} description={t("features:excelCompare.reconcile.groupedDescription")} checked={pair.reconcile.allowGroupedMatches} onChange={(checked) => update("allowGroupedMatches", checked)} /></div></div>;
 }
 
 function NormalizationOptions({ value, onChange, t }: { value: typeof DEFAULT_EXCEL_COMPARE_OPTIONS; onChange: (value: typeof DEFAULT_EXCEL_COMPARE_OPTIONS) => void; t: LooseT }) {
-  const toggles = ["trimWhitespace", "collapseWhitespace", "normalizeLineBreaks", "ignoreCase", "unicodeNfc", "stripNumberSymbols", "numericStrings", "ignoreDateDisplayFormat", "blankEqualsEmpty", "blankEqualsZero", "compareDisplayValues", "compareFormatting"] as const;
-  return <><div className="grid grid-cols-2 divide-y divide-border max-[720px]:grid-cols-1 [&_[data-ui-component=toggle-row]]:min-h-[45px]">{toggles.map((key) => <ToggleRow key={key} label={t(`features:excelCompare.options.${key}` as never)} description={key === "numericStrings" ? t("features:excelCompare.options.numericStringsDescription") : key === "blankEqualsZero" ? t("features:excelCompare.options.blankEqualsZeroDescription") : undefined} checked={value[key]} onChange={(checked) => onChange({ ...value, [key]: checked })} />)}</div><div className="mt-3 grid grid-cols-3 gap-3 max-[720px]:grid-cols-1" data-testid="excel-number-options"><UtilityField><span>{t("features:excelCompare.options.formulaMode")}</span><UtilitySelect value={value.formulaMode} onChange={(event) => onChange({ ...value, formulaMode: event.target.value as typeof value.formulaMode })}><option value="formula">{t("features:excelCompare.options.formula")}</option><option value="cached">{t("features:excelCompare.options.cached")}</option><option value="both">{t("features:excelCompare.options.both")}</option></UtilitySelect></UtilityField><UtilityField><span>{t("features:excelCompare.options.absoluteTolerance")}</span><UtilityInput type="number" min={0} step="any" value={value.absoluteTolerance} onChange={(event) => onChange({ ...value, absoluteTolerance: Math.max(0, Number(event.target.value) || 0) })} /></UtilityField><UtilityField><span>{t("features:excelCompare.options.relativeTolerance")}</span><UtilityInput type="number" min={0} step="0.0001" value={value.relativeTolerance} onChange={(event) => onChange({ ...value, relativeTolerance: Math.max(0, Number(event.target.value) || 0) })} /></UtilityField></div></>;
+ const toggles = ["trimWhitespace", "collapseWhitespace", "normalizeLineBreaks", "ignoreCase", "unicodeNfc", "stripNumberSymbols", "numericStrings", "ignoreDateDisplayFormat", "blankEqualsEmpty", "blankEqualsZero", "compareDisplayValues", "compareFormatting"] as const;
+ return <><div className="grid grid-cols-2 divide-y divide-border max-[720px]:grid-cols-1 [&_[data-ui-component=toggle-row]]:min-h-[45px]">{toggles.map((key) => <ToggleRow key={key} label={t(`features:excelCompare.options.${key}` as never)} description={key === "numericStrings" ? t("features:excelCompare.options.numericStringsDescription") : key === "blankEqualsZero" ? t("features:excelCompare.options.blankEqualsZeroDescription") : undefined} checked={value[key]} onChange={(checked) => onChange({ ...value, [key]: checked })} />)}</div><div className="mt-3 grid grid-cols-3 gap-3 max-[720px]:grid-cols-1" data-testid="excel-number-options"><UtilityField><span>{t("features:excelCompare.options.formulaMode")}</span><UtilitySelect value={value.formulaMode} onChange={(event) => onChange({ ...value, formulaMode: event.target.value as typeof value.formulaMode })}><option value="formula">{t("features:excelCompare.options.formula")}</option><option value="cached">{t("features:excelCompare.options.cached")}</option><option value="both">{t("features:excelCompare.options.both")}</option></UtilitySelect></UtilityField><UtilityField><span>{t("features:excelCompare.options.absoluteTolerance")}</span><UtilityInput type="number" min={0} step="any" value={value.absoluteTolerance} onChange={(event) => onChange({ ...value, absoluteTolerance: Math.max(0, Number(event.target.value) || 0) })} /></UtilityField><UtilityField><span>{t("features:excelCompare.options.relativeTolerance")}</span><UtilityInput type="number" min={0} step="0.0001" value={value.relativeTolerance} onChange={(event) => onChange({ ...value, relativeTolerance: Math.max(0, Number(event.target.value) || 0) })} /></UtilityField></div></>;
 }
 
 function SupportTable({ t }: { t: LooseT }) {
-  const rows = [
-    ["XLSX", "○", "○", "○", "○", "○", "○"], ["XLSM", "○", "○", "○", "○", "○*", "○"],
-    ["XLS (BIFF8)", "○", "○", "○", "○", "×", "○"], ["XLSB", "○", "○", "○", "○", "×", "○"],
-    ["SpreadsheetML .xls", "○", "○", "○", "○", "×", "○"], ["CSV", "○", "—", "—", "—", "—", "—"],
-  ];
-  return <div data-testid="excel-support-table"><div className="overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" role="region" aria-label={t("features:excelCompare.support.title")} tabIndex={0}><table className="w-full min-w-[680px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td:not(:first-child)]:text-center [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th:not(:first-child)]:text-center"><thead><tr>{["format", "value", "display", "formula", "cache", "style", "merge"].map((key) => <th key={key}>{t(`features:excelCompare.support.${key}` as never)}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`}>{cell}</td>)}</tr>)}</tbody></table></div><p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.support.note")}</p></div>;
+ const rows = [
+  ["XLSX", "○", "○", "○", "○", "○", "○"], ["XLSM", "○", "○", "○", "○", "○*", "○"],
+  ["XLS (BIFF8)", "○", "○", "○", "○", "×", "○"], ["XLSB", "○", "○", "○", "○", "×", "○"],
+  ["SpreadsheetML .xls", "○", "○", "○", "○", "×", "○"], ["CSV", "○", "—", "—", "—", "—", "—"],
+ ];
+ return <div data-testid="excel-support-table"><div className="overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" role="region" aria-label={t("features:excelCompare.support.title")} tabIndex={0}><table className="w-full min-w-[680px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td:not(:first-child)]:text-center [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th:not(:first-child)]:text-center"><thead><tr>{["format", "value", "display", "formula", "cache", "style", "merge"].map((key) => <th key={key}>{t(`features:excelCompare.support.${key}` as never)}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`}>{cell}</td>)}</tr>)}</tbody></table></div><p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.support.note")}</p></div>;
 }
 
 function newPair(id: number): PairState {
-  return { id, leftInspecting: false, rightInspecting: false, leftSheet: "", rightSheet: "", leftHeaderRow: 1, rightHeaderRow: 1, leftHeaderInput: "1", rightHeaderInput: "1", leftHeaderSelections: {}, rightHeaderSelections: {}, primaryLeft: [1], primaryRight: [1], secondaryLeft: [], secondaryRight: [], duplicatePolicy: "error", reconcile: { leftAmountColumn: 1, rightAmountColumn: 1, leftDateColumn: 2, rightDateColumn: 2, leftPartnerColumn: 3, rightPartnerColumn: 3, dateToleranceDays: 0, allowGroupedMatches: false, roundingUnit: 0.01 }, unassignedFileCount: 0 };
+ return { id, leftInspecting: false, rightInspecting: false, leftSheet: "", rightSheet: "", leftHeaderRow: 1, rightHeaderRow: 1, leftHeaderInput: "1", rightHeaderInput: "1", leftHeaderSelections: {}, rightHeaderSelections: {}, primaryLeft: [1], primaryRight: [1], secondaryLeft: [], secondaryRight: [], duplicatePolicy: "error", reconcile: { leftAmountColumn: 1, rightAmountColumn: 1, leftDateColumn: 2, rightDateColumn: 2, leftPartnerColumn: 3, rightPartnerColumn: 3, dateToleranceDays: 0, allowGroupedMatches: false, roundingUnit: 0.01 }, unassignedFileCount: 0 };
 }
 
 function pairOptions(pair: PairState, mode: ExcelCompareMode, normalization: typeof DEFAULT_EXCEL_COMPARE_OPTIONS): ExcelComparePairOptions {
-  return { mode, left: { sheetName: pair.leftSheet, headerRow: pair.leftHeaderRow }, right: { sheetName: pair.rightSheet, headerRow: pair.rightHeaderRow }, normalization, key: mode === "key" ? { leftColumns: pair.primaryLeft, rightColumns: pair.primaryRight, secondaryLeftColumns: pair.secondaryLeft, secondaryRightColumns: pair.secondaryRight, duplicatePolicy: pair.duplicatePolicy } : undefined, reconcile: mode === "reconcile" ? pair.reconcile : undefined };
+ return { mode, left: { sheetName: pair.leftSheet, headerRow: pair.leftHeaderRow }, right: { sheetName: pair.rightSheet, headerRow: pair.rightHeaderRow }, normalization, key: mode === "key" ? { leftColumns: pair.primaryLeft, rightColumns: pair.primaryRight, secondaryLeftColumns: pair.secondaryLeft, secondaryRightColumns: pair.secondaryRight, duplicatePolicy: pair.duplicatePolicy } : undefined, reconcile: mode === "reconcile" ? pair.reconcile : undefined };
 }
 
 function pairReady(pair: PairState, mode: ExcelCompareMode) {
-  if (pair.leftInspecting || pair.rightInspecting || !pair.left || !pair.right || !pair.leftInspection || !pair.rightInspection || pair.leftError || pair.rightError || !pair.leftSheet || !pair.rightSheet) return false;
-  const leftSheet = selectedSheet(pair, "left");
-  const rightSheet = selectedSheet(pair, "right");
-  const leftHeaders = headersFor(pair, "left");
-  const rightHeaders = headersFor(pair, "right");
-  if (!leftSheet || !rightSheet || leftHeaders.length === 0 || rightHeaders.length === 0
-    || pair.leftHeaderInput !== String(pair.leftHeaderRow) || pair.rightHeaderInput !== String(pair.rightHeaderRow)
-    || pair.leftHeaderRow < 1 || pair.leftHeaderRow > Math.max(1, leftSheet.rowCount)
-    || pair.rightHeaderRow < 1 || pair.rightHeaderRow > Math.max(1, rightSheet.rowCount)) return false;
-  if (mode === "key") return pair.primaryLeft.length > 0 && pair.primaryLeft.length === pair.primaryRight.length
-    && validColumns(pair.primaryLeft, leftHeaders) && validColumns(pair.primaryRight, rightHeaders)
-    && (pair.duplicatePolicy !== "secondary" || (pair.secondaryLeft.length === pair.secondaryRight.length
-      && validColumns(pair.secondaryLeft, leftHeaders) && validColumns(pair.secondaryRight, rightHeaders)));
-  if (mode === "reconcile") return isReconcileConfigValid(pair.reconcile)
-    && validColumns([pair.reconcile.leftAmountColumn, pair.reconcile.leftDateColumn, pair.reconcile.leftPartnerColumn], leftHeaders)
-    && validColumns([pair.reconcile.rightAmountColumn, pair.reconcile.rightDateColumn, pair.reconcile.rightPartnerColumn], rightHeaders);
-  return true;
+ if (pair.leftInspecting || pair.rightInspecting || !pair.left || !pair.right || !pair.leftInspection || !pair.rightInspection || pair.leftError || pair.rightError || !pair.leftSheet || !pair.rightSheet) return false;
+ const leftSheet = selectedSheet(pair, "left");
+ const rightSheet = selectedSheet(pair, "right");
+ const leftHeaders = headersFor(pair, "left");
+ const rightHeaders = headersFor(pair, "right");
+ if (!leftSheet || !rightSheet || leftHeaders.length === 0 || rightHeaders.length === 0
+  || pair.leftHeaderInput !== String(pair.leftHeaderRow) || pair.rightHeaderInput !== String(pair.rightHeaderRow)
+  || pair.leftHeaderRow < 1 || pair.leftHeaderRow> Math.max(1, leftSheet.rowCount)
+  || pair.rightHeaderRow < 1 || pair.rightHeaderRow> Math.max(1, rightSheet.rowCount)) return false;
+ if (mode === "key") return pair.primaryLeft.length> 0 && pair.primaryLeft.length === pair.primaryRight.length
+  && validColumns(pair.primaryLeft, leftHeaders) && validColumns(pair.primaryRight, rightHeaders)
+  && (pair.duplicatePolicy !== "secondary" || (pair.secondaryLeft.length === pair.secondaryRight.length
+   && validColumns(pair.secondaryLeft, leftHeaders) && validColumns(pair.secondaryRight, rightHeaders)));
+ if (mode === "reconcile") return isReconcileConfigValid(pair.reconcile)
+  && validColumns([pair.reconcile.leftAmountColumn, pair.reconcile.leftDateColumn, pair.reconcile.leftPartnerColumn], leftHeaders)
+  && validColumns([pair.reconcile.rightAmountColumn, pair.reconcile.rightDateColumn, pair.reconcile.rightPartnerColumn], rightHeaders);
+ return true;
 }
 
 function pairConfigured(pair: PairState, mode: ExcelCompareMode) {
-  if (pair.leftInspecting || pair.rightInspecting) return false;
-  if (!pair.left || !pair.right) return false;
-  if (pair.leftError || pair.rightError) return true;
-  return pairReady(pair, mode);
+ if (pair.leftInspecting || pair.rightInspecting) return false;
+ if (!pair.left || !pair.right) return false;
+ if (pair.leftError || pair.rightError) return true;
+ return pairReady(pair, mode);
 }
 
 function selectedSheet(pair: PairState, side: "left" | "right") { return pair[`${side}Inspection`]?.sheets.find((sheet) => sheet.name === pair[`${side}Sheet`]); }
 function headersFor(pair: PairState, side: "left" | "right") { const sheet = selectedSheet(pair, side); const row = sheet?.headerRows.find((item) => item.row === pair[`${side}HeaderRow`]); return row?.values ?? []; }
-function validColumns(columns: Array<number | undefined>, headers: string[]) { return columns.every((column) => column === undefined || (Number.isInteger(column) && column >= 1 && column <= headers.length)); }
+function validColumns(columns: Array<number | undefined>, headers: string[]) { return columns.every((column) => column === undefined || (Number.isInteger(column) && column>= 1 && column <= headers.length)); }
 function headerSelectionFor(pair: PairState, side: "left" | "right"): HeaderSelection { return pair[`${side}HeaderSelections`][pair[`${side}Sheet`]] ?? { row: pair[`${side}HeaderRow`], source: "fallback" }; }
 function headerGuidanceText(selection: HeaderSelection, t: LooseT) { return selection.source === "manual" ? t("features:excelCompare.pairs.headerManual", { row: selection.row }) : selection.source === "suggested" ? t("features:excelCompare.pairs.headerSuggested", { row: selection.row }) : t("features:excelCompare.pairs.headerNotFound"); }
-function columnLabel(column: number) { let value = column; let result = ""; while (value > 0) { value -= 1; result = String.fromCharCode(65 + value % 26) + result; value = Math.floor(value / 26); } return result; }
+function columnLabel(column: number) { let value = column; let result = ""; while (value> 0) { value -= 1; result = String.fromCharCode(65 + value % 26) + result; value = Math.floor(value / 26); } return result; }
 function fileStem(name: string) { return name.replace(/\.[^.]+$/u, ""); }
 function keepObjectUrl(url: string, ref: { current: Set<string> }) { ref.current.add(url); return url; }
 function locationText(leftRow: number | null, rightRow: number | null, leftColumn: number | null, rightColumn: number | null) { return `L ${leftRow ?? "–"}:${leftColumn ?? "–"} · R ${rightRow ?? "–"}:${rightColumn ?? "–"}`; }
@@ -724,6 +724,6 @@ function reasonText(reason: string, t: LooseT) { return reason.split("+").map((c
 function safeError(error: unknown, t: LooseT) { const code = error && typeof error === "object" && "code" in error ? String(error.code) : "PROCESSING_FAILED"; return t(`features:excelCompare.error.${code}`, { defaultValue: t("features:excelCompare.error.PROCESSING_FAILED") }); }
 
 function resetPairFile(pair: PairState, side: "left" | "right", file: File | undefined): PairState {
-  if (side === "left") return { ...pair, left: file, leftInspection: undefined, leftInspecting: Boolean(file), leftError: undefined, leftSheet: "", leftHeaderRow: 1, leftHeaderInput: "1", leftHeaderSelections: {}, leftHeaderAnnouncement: undefined };
-  return { ...pair, right: file, rightInspection: undefined, rightInspecting: Boolean(file), rightError: undefined, rightSheet: "", rightHeaderRow: 1, rightHeaderInput: "1", rightHeaderSelections: {}, rightHeaderAnnouncement: undefined };
+ if (side === "left") return { ...pair, left: file, leftInspection: undefined, leftInspecting: Boolean(file), leftError: undefined, leftSheet: "", leftHeaderRow: 1, leftHeaderInput: "1", leftHeaderSelections: {}, leftHeaderAnnouncement: undefined };
+ return { ...pair, right: file, rightInspection: undefined, rightInspecting: Boolean(file), rightError: undefined, rightSheet: "", rightHeaderRow: 1, rightHeaderInput: "1", rightHeaderSelections: {}, rightHeaderAnnouncement: undefined };
 }

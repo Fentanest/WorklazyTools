@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { type ToolAccent, type ToolCategoryId } from "../app/toolRegistry";
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
+import { getToolIconTone } from "../components/toolAccentStyles";
 import { PageHeader } from "../components/ui";
 import { useToolCatalog } from "../i18n/useToolCatalog";
 import { cn } from "../lib/utils";
@@ -75,7 +76,7 @@ export function ToolsPage() {
           return (
             <button
               type="button"
-              className={cn(activeCategory === category.id && [categoryActiveClasses[category.accent], "text-white shadow-lg [&_small]:bg-white/20 [&_small]:text-inherit"])}
+              className={cn(activeCategory === category.id && "bg-[var(--brand)] text-white shadow-lg [&_small]:bg-white/20 [&_small]:text-inherit")}
               aria-label={`${category.label} ${t("common:format.tools", { count })}`}
               aria-pressed={activeCategory === category.id}
               key={category.id}
@@ -95,7 +96,7 @@ export function ToolsPage() {
           return (
             <section className="tool-category-section" key={category.id} aria-labelledby={`tool-category-${category.id}`}>
               <header className="tool-category-heading">
-                <span className={cn("grid size-[42px] place-items-center rounded-[13px]", categoryIconClasses[category.accent])}><Icon size={20} /></span>
+                <span className="grid size-[42px] place-items-center rounded-[13px] tone-icon-badge" data-icon-tone={category.id === "spreadsheets" ? "sheets" : category.id === "media" ? "media" : category.id === "documents" ? "documents" : "utility"}><Icon size={20} /></span>
                 <span><h2 id={`tool-category-${category.id}`}>{category.label}</h2><p>{category.description}</p></span>
                 <b>{t("common:format.tools", { count: categoryTools.length })}</b>
               </header>

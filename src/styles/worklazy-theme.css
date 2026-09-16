@@ -523,8 +523,6 @@
 .home-section-link { display: inline-flex; align-items: center; gap: 5px; color: var(--brand-on-bg); font-size: 14.5px; font-weight: 800; white-space: nowrap; }
 .home-section-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .ui-tool-card { min-height: 0; padding: 20px; border-radius: 20px !important; border-color: color-mix(in srgb, var(--separator) 55%, transparent); }
-.ui-tool-card::before { opacity: 0.4; width: 190px; height: 190px; right: -80px; bottom: -100px; }
-.ui-tool-card.ui-accent-coral::before { background: radial-gradient(circle, rgba(232, 80, 47, 0.16), transparent 68%); }
 .ui-tool-card:hover { transform: translateY(-3px); }
 .ui-tool-card-top > span:first-child { width: 46px; height: 46px; border-radius: 14px; }
 .ui-card-arrow { width: 34px; height: 34px; }
@@ -668,4 +666,70 @@ input:focus-visible {
     letter-spacing: -0.03em;
   }
 }
+}
+
+/* Tool Icon 4-Tone Palette */
+:root,
+:root[data-theme="light-coral"] {
+  --tool-icon-documents-fg: #B85F4D;
+  --tool-icon-documents-bg: #F9E8E1;
+  --tool-icon-sheets-fg: #587B6C;
+  --tool-icon-sheets-bg: #E8F0EA;
+  --tool-icon-media-fg: #A96572;
+  --tool-icon-media-bg: #F5E7EB;
+  --tool-icon-utility-fg: #947340;
+  --tool-icon-utility-bg: #F5EEDB;
+}
+:root[data-theme="dark-coral"] {
+  --tool-icon-documents-fg: #E8A08B;
+  --tool-icon-documents-bg: #3B2924;
+  --tool-icon-sheets-fg: #9BBDA9;
+  --tool-icon-sheets-bg: #28382F;
+  --tool-icon-media-fg: #D5A0AA;
+  --tool-icon-media-bg: #3B2930;
+  --tool-icon-utility-fg: #D6B477;
+  --tool-icon-utility-bg: #3A3122;
+}
+:root[data-theme="light-mint"] {
+  --tool-icon-documents-fg: #317D6E;
+  --tool-icon-documents-bg: #E2F1EB;
+  --tool-icon-sheets-fg: #617D57;
+  --tool-icon-sheets-bg: #EBF1E4;
+  --tool-icon-media-fg: #477D88;
+  --tool-icon-media-bg: #E5F0F2;
+  --tool-icon-utility-fg: #8C7945;
+  --tool-icon-utility-bg: #F3EEDC;
+}
+:root[data-theme="dark-mint"] {
+  --tool-icon-documents-fg: #87CEB8;
+  --tool-icon-documents-bg: #243D34;
+  --tool-icon-sheets-fg: #B1CAA0;
+  --tool-icon-sheets-bg: #303B28;
+  --tool-icon-media-fg: #91C5CC;
+  --tool-icon-media-bg: #263940;
+  --tool-icon-utility-fg: #D0BF8C;
+  --tool-icon-utility-bg: #3B3423;
+}
+
+[data-icon-tone="documents"] {
+  --tone-fg: var(--tool-icon-documents-fg);
+  --tone-bg: var(--tool-icon-documents-bg);
+}
+[data-icon-tone="sheets"] {
+  --tone-fg: var(--tool-icon-sheets-fg);
+  --tone-bg: var(--tool-icon-sheets-bg);
+}
+[data-icon-tone="media"] {
+  --tone-fg: var(--tool-icon-media-fg);
+  --tone-bg: var(--tool-icon-media-bg);
+}
+[data-icon-tone="utility"] {
+  --tone-fg: var(--tool-icon-utility-fg);
+  --tone-bg: var(--tool-icon-utility-bg);
+}
+
+.tone-icon-badge {
+  color: var(--tone-fg) !important;
+  background: var(--tone-bg) !important;
+  transition: all 0.2s;
 }

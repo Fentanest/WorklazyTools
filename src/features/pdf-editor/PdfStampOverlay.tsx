@@ -124,7 +124,7 @@ export function PdfStampOverlay({
 
   return (
     <div
-      className="absolute touch-none select-none rounded-md bg-white/10 shadow-sm outline-solid outline-2 outline-violet-600 focus-visible:ring-3 focus-visible:ring-violet-600/40"
+      className="absolute touch-none select-none rounded-md bg-white/10 shadow-sm outline-solid outline-2 outline-primary focus-visible:ring-3 focus-visible:ring-primary/40"
       data-testid="pdf-stamp-overlay"
       data-pdf-stamp-owned
       data-stamp-cx={draft.cx}
@@ -147,7 +147,7 @@ export function PdfStampOverlay({
     >
       <img src={imageUrl} alt="" draggable={false} className="pointer-events-none block h-full w-full object-contain" />
       <span
-        className="absolute -right-2.5 -bottom-2.5 block size-6 rounded-full border-2 border-white bg-violet-700 shadow-sm"
+        className="absolute -right-2.5 -bottom-2.5 block size-6 rounded-full border-2 border-white bg-primary shadow-sm"
         data-testid="pdf-stamp-resize-handle"
         data-stamp-resize
         aria-hidden="true"

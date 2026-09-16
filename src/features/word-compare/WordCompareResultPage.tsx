@@ -76,7 +76,7 @@ export function DocumentCompareResultPage({
       <UtilityPage toolId="document-compare-result">
         <PageHeader eyebrow={eyebrow} title={L("비교 결과를 다시 열 수 없어요.", "This comparison result is no longer available.")} description={L("비교 결과는 현재 브라우저 탭에서만 유지됩니다.", "Comparison results remain only in the current browser tab.")} />
         <Card as="section" className="min-h-72 place-items-center content-center gap-0 rounded-4xl border border-border p-8 text-center shadow-sm" data-testid="document-expired-result">
-          <TextSearch className="text-blue-700 dark:text-blue-300" size={27} />
+          <TextSearch className="text-primary" size={27} />
           <h2 className="mt-3 font-heading text-lg font-medium">{L("문서를 다시 선택해 주세요.", "Choose the documents again.")}</h2>
           <p className="mt-2 mb-4 max-w-lg text-sm leading-relaxed text-muted-foreground">{L("페이지를 새로고침했거나 탭을 다시 연 경우, 문서 보호를 위해 이전 비교 내용은 남아 있지 않습니다.", "After a reload or reopened tab, the previous comparison is discarded to protect your documents.")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>
           <Button render={<Link to={localizedBasePath} />} variant="secondary" className="rounded-xl font-bold"><ArrowLeft size={15} /> {L(`${toolLabel}로 돌아가기`, `Back to ${toolLabel}`)}</Button>
@@ -91,7 +91,7 @@ export function DocumentCompareResultPage({
 
   return (
     <UtilityPage toolId="document-compare-result" className="min-[821px]:max-w-[1480px]">
-      <div className="mb-4"><Button render={<Link to={localizedBasePath} data-testid="document-result-back" />} variant="ghost" className="rounded-xl px-0 font-bold text-blue-700 hover:bg-blue-500/10 hover:text-blue-800 dark:text-blue-300"><ArrowLeft size={16} /> {L("전체 비교 결과", "All comparison results")}</Button></div>
+      <div className="mb-4"><Button render={<Link to={localizedBasePath} data-testid="document-result-back" />} variant="ghost" className="rounded-xl px-0 font-bold text-primary hover:bg-primary/10"><ArrowLeft size={16} /> {L("전체 비교 결과", "All comparison results")}</Button></div>
       <PageHeader
         eyebrow={`PAIR ${pair.pairNumber} OF ${results.length}`}
         title={L(`${pair.pairNumber}번 문서 비교`, `Document comparison ${pair.pairNumber}`)}
@@ -135,8 +135,8 @@ export function DocumentCompareResultPage({
       </Card>
 
       <nav className="mt-3.5 flex flex-wrap items-center justify-between gap-y-2" aria-label={L("다른 문서 쌍 비교 결과", "Other document-pair results")}>
-        {previous ? <Button render={<Link to={`${localizedBasePath}/results/${previous.pairNumber}`} />} variant="secondary" className="min-w-0 rounded-xl font-bold text-blue-700 max-[720px]:whitespace-normal dark:text-blue-300"><ArrowLeft size={15} /> {L(`${previous.pairNumber}번 비교`, `Comparison ${previous.pairNumber}`)}</Button> : <span />}
-        {next && <Button render={<Link to={`${localizedBasePath}/results/${next.pairNumber}`} />} variant="secondary" className="min-w-0 rounded-xl font-bold text-blue-700 max-[720px]:whitespace-normal dark:text-blue-300">{L(`${next.pairNumber}번 비교`, `Comparison ${next.pairNumber}`)} <ArrowRight size={15} /></Button>}
+        {previous ? <Button render={<Link to={`${localizedBasePath}/results/${previous.pairNumber}`} />} variant="secondary" className="min-w-0 rounded-xl font-bold text-primary max-[720px]:whitespace-normal"><ArrowLeft size={15} /> {L(`${previous.pairNumber}번 비교`, `Comparison ${previous.pairNumber}`)}</Button> : <span />}
+        {next && <Button render={<Link to={`${localizedBasePath}/results/${next.pairNumber}`} />} variant="secondary" className="min-w-0 rounded-xl font-bold text-primary max-[720px]:whitespace-normal">{L(`${next.pairNumber}번 비교`, `Comparison ${next.pairNumber}`)} <ArrowRight size={15} /></Button>}
       </nav>
       {footer}
     </UtilityPage>

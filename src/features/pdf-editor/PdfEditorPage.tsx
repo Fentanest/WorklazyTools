@@ -52,7 +52,7 @@ export function PdfEditorPage(props: PdfEditorPageProps) {
   const page = featureResource<PdfPageCopy>(language, "pdf.page");
   const definition = page.modes[mode];
   return (
-    <UtilityPage toolId="pdf-editor" className={`max-w-[1180px]${mode === "organize" ? " max-[820px]:pb-[calc(170px+env(safe-area-inset-bottom))]" : ""}`}>
+    <UtilityPage toolId="pdf-editor" className={`max-w-none${mode === "organize" ? " max-[820px]:pb-[calc(170px+env(safe-area-inset-bottom))]" : ""}`}>
       <div className="pdf-tool-page" data-pdf-mode={mode}>
         <PageHeader eyebrow={definition.eyebrow} title={definition.title} description={definition.description}>
           <PrivacyBanner compact />
@@ -129,7 +129,7 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
               end={item.mode === "organize"}
               data-active={selected || undefined}
               data-pdf-nav-mode={item.mode}
-              className={`flex min-h-[43px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-bold outline-none transition-[color,background-color,box-shadow] focus-visible:ring-3 focus-visible:ring-violet-700/30 ${selected ? "bg-card text-violet-700 shadow-sm dark:text-violet-300" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
+              className={`flex min-h-[43px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-bold outline-none transition-[color,background-color,box-shadow] focus-visible:ring-3 focus-visible:ring-primary/30 ${selected ? "bg-card text-primary shadow-sm dark:text-primary" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
             >
               <Icon size={17} /><span>{labels[item.mode]}</span>
             </NavLink>
@@ -145,6 +145,6 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
 function PdfGuide({ mode }: { mode: PdfToolMode }) {
   const language = useAppLanguage();
   const page = featureResource<PdfPageCopy>(language, "pdf.page");
-  const guide = featureResource<any>(language, "pdfEditor.guide") as any;
-  return <ToolGuide title={guide.title} description={guide.description} blocks={guide.blocks as any} faq={(guide.faq || []).map((item: any) => ({ question: item.q, answer: item.a }))} />;
+  const guide = page.guides[mode === "convert" ? "convert" : "standard"];
+  return <ToolGuide title={guide.title} description={guide.description} blocks={guide.blocks} faq={guide.faq} />;
 }

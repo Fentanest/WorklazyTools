@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Eye, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { FileDropZone, PrimaryButton } from '../../components/ui';
 import { OperationProgress } from '../../components/OperationProgress';
+import { ToolGuide } from '../../components/ToolGuide';
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from '../../components/UtilitySurface';
 import { Button } from '../../components/ui/button';
 import { resources } from '../../i18n/resources';
@@ -82,7 +83,13 @@ export function DocumentRedactorPage() {
   const rename=(item:UiResult,name:string)=>{try{const info=client.current!.renameResult(item.info.id,name);setResults(old=>({...old,[info.fileId]:{...old[info.fileId],info}}));revokeZip();return true;}catch(error){setNotice(c.errors[safeError(error).code]);return false;}};
   const totalUnmasked=inputs.flatMap((value,i)=>unmaskedPages(histories[value.id]?.present??{},value.pages.length).map(page=>c.summary.page.replace('{{document}}',String(i+1)).replace('{{page}}',String(page+1))));
 
-  if(fatal)return <UtilityPage toolId="document-redactor"><UtilityNotice tone="error" role="alert">{c.errors['not-ready']}</UtilityNotice></UtilityPage>;
+  if(fatal) return (
+    <UtilityPage toolId="document-redactor">
+      <header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1></header>
+      <UtilityNotice tone="error" role="alert">{c.errors['not-ready']}</UtilityNotice>
+      {c.guide && <ToolGuide title={c.guide.title} description={c.guide.description} blocks={c.guide.blocks as import("../../components/ToolGuide").GuideBlock[]} faq={(c.guide.faq || []).map((item: {q: string, a: string})=>({question:item.q,answer:item.a}))}>{c.guide.fallbackNotice && <UtilityNotice className="mt-4" tone="warning">{c.guide.fallbackNotice}</UtilityNotice>}</ToolGuide>}
+    </UtilityPage>
+  );
   return <UtilityPage toolId="document-redactor"><header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1><p className="mt-2 text-muted-foreground">{c.description} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></header>
     <UtilitySectionCard title={c.files.title} description={c.files.description}>{ready?<div className="redactor-file-picker"><FileDropZone label={c.files.label} hint={imageEnabled?c.files.hint:c.files.pdfHint} accept={imageEnabled?'application/pdf,image/jpeg,image/png,image/webp':'application/pdf'} multiple files={files} onFiles={replaceInputs} disabled={busy}/></div>:<p role="status">{c.preparing}</p>}<UtilityNotice>{c.files.limits}</UtilityNotice>{ready&&!imageEnabled&&<UtilityNotice tone="warning">{c.files.imageUnavailable}</UtilityNotice>}
       {failures.length>0&&<UtilityNotice className="text-red-800 dark:text-red-300" tone="error"><ul>{failures.map((f,i)=><li key={i}>{c.document.replace('{{number}}',String(f.index+1))}: {c.errors[f.code]}</li>)}</ul></UtilityNotice>}
@@ -105,5 +112,7 @@ export function DocumentRedactorPage() {
 <input data-testid="redactor-confirm" type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} disabled={busy}/>{c.output.confirm}</label><div data-testid="redactor-run"><PrimaryButton accent="violet" disabled={selecting||!inputs.length||inputs.some(value=>countMasks(histories[value.id]?.present??{})===0)||!confirmed} loading={running} onClick={()=>void runExport()}>{c.output.run}</PrimaryButton></div>{running&&<Button className="bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-950/70 dark:text-red-300 dark:hover:bg-red-950" data-testid="redactor-cancel" type="button" variant="destructive" onClick={()=>{abort.current?.abort();client.current?.cancel()}}>{c.output.cancel}</Button>}<OperationProgress {...operation} accent="violet" title={c.progress.title}/>
     </UtilitySectionCard></>}
     {(Object.keys(results).length>0||jobFailures.length>0)&&<UtilitySectionCard title={c.results.title}><ul className="redactor-results">{inputs.map((value,i)=>results[value.id]&&<li key={value.id}><span>{c.document.replace('{{number}}',String(i+1))}</span><UtilityInput disabled={busy} key={results[value.id].info.name} aria-label={c.results.name} defaultValue={results[value.id].info.name} onBlur={e=>{if(!rename(results[value.id],e.target.value))e.target.value=results[value.id].info.name}}/><a className="redactor-download" href={results[value.id].url} download={results[value.id].info.name}><Download size={16}/>{c.results.download}</a><Button disabled={busy} type="button" variant="secondary" onClick={()=>{setFileId(value.id);setPageIndex(0);setResultMode(true)}}>{c.results.preview}</Button></li>)}</ul>{jobFailures.length>0&&<UtilityNotice tone="error"><ul>{jobFailures.map((f,i)=><li key={i}>{c.document.replace('{{number}}',String(f.index+1))}: {c.errors[f.code]}</li>)}</ul></UtilityNotice>}{Object.keys(results).length>=2&&<><Button type="button" onClick={()=>void createZip()} disabled={busy}>{c.results.zip}</Button>{zipUrl&&<a className="redactor-download" href={zipUrl} download="redacted-results.zip"><Download size={16}/>{c.results.downloadZip}</a>}</>}</UtilitySectionCard>}
-    {notice&&<UtilityNotice tone="error" role="alert">{notice}</UtilityNotice>}</UtilityPage>;
+    {notice&&<UtilityNotice tone="error" role="alert">{notice}</UtilityNotice>}
+      {c.guide && <ToolGuide title={c.guide.title} description={c.guide.description} blocks={c.guide.blocks as import("../../components/ToolGuide").GuideBlock[]} faq={(c.guide.faq || []).map((item: {q: string, a: string})=>({question:item.q,answer:item.a}))} />}
+    </UtilityPage>;
 }

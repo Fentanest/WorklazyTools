@@ -5,7 +5,7 @@ import type { ToolDefinition } from "../app/toolRegistry";
 import { useAppLanguage } from "../i18n/routing";
 import { cn } from "../lib/utils";
 import { trackToolOpen } from "./AnalyticsLoader";
-import { toolIconAccentClasses } from "./toolAccentStyles";
+import { getToolIconTone } from "./toolAccentStyles";
 import { Card } from "./ui/card";
 
 interface ToolCardProps {
@@ -21,12 +21,12 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
     <Card
       as={Link}
       data-ui-component="tool-card"
-      className={cn(`ui-tool-card ui-accent-${tool.accent}${featured ? " ui-featured" : ""}`, "gap-0 border bg-card p-5 py-5 shadow-md ring-0")}
+      className={cn(`group ui-tool-card ui-accent-${tool.accent}${featured ? " ui-featured" : ""}`, "gap-0 border bg-card p-5 py-5 shadow-md ring-0")}
       to={tool.path}
       onClick={() => trackToolOpen(tool.id, featured ? "home_card" : "tools_card", language)}
     >
       <div className="ui-tool-card-top">
-        <span className={cn("grid place-items-center rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,.65)]", toolIconAccentClasses[tool.accent])} data-accent={tool.accent}><Icon size={24} /></span>
+        <span className={cn("grid place-items-center rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,.65)] tone-icon-badge")} data-icon-tone={getToolIconTone(tool.id)}><Icon size={24} /></span>
         <span className="ui-card-arrow"><ArrowRight size={18} /></span>
       </div>
       <div className="ui-tool-card-copy">

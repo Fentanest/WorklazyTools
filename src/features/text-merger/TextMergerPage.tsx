@@ -191,14 +191,14 @@ export function TextMergerPage() {
               return (
                 <Card
                   as="article"
-                  className={cn("gap-0 rounded-2xl border border-border bg-card/60 py-0 transition-[opacity,border-color,transform] dark:bg-card", draggedId === item.id && "scale-[.995] border-blue-500/40 opacity-50")}
+                  className={cn("gap-0 rounded-2xl border border-border bg-card/60 py-0 transition-[opacity,border-color,transform] dark:bg-card", draggedId === item.id && "scale-[.995] border-primary/40 opacity-50")}
                   data-testid="text-merger-item"
                   key={item.id}
                   onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
                   onDrop={(event) => dropOnItem(event, item.id)}
                 >
                   <header className="grid min-h-[58px] grid-cols-[auto_auto_auto_minmax(120px,1fr)_auto_auto] items-center gap-2 px-2.5 py-2 max-[620px]:grid-cols-[auto_auto_minmax(0,1fr)_auto] max-[620px]:gap-[7px]">
-                    <span className="grid size-7 place-items-center rounded-lg bg-blue-500/10 text-[13px] font-extrabold text-blue-700 dark:text-blue-300">{index + 1}</span>
+                    <span className="grid size-7 place-items-center rounded-lg bg-primary/10 text-[13px] font-extrabold text-primary ">{index + 1}</span>
                     <Button
                       className="h-8 w-7 cursor-grab rounded-lg p-0 text-muted-foreground active:cursor-grabbing"
                       variant="ghost"
@@ -209,7 +209,7 @@ export function TextMergerPage() {
                       onDragStart={(event) => { setDraggedId(item.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); }}
                       onDragEnd={() => setDraggedId(null)}
                     ><GripVertical size={18} /></Button>
-                    <span className={cn("inline-flex min-h-7 items-center gap-1 rounded-full px-2 text-xs font-extrabold whitespace-nowrap max-[620px]:col-start-3 max-[620px]:row-start-1 max-[620px]:justify-self-start", item.source === "direct" ? "bg-blue-500/10 text-blue-700 dark:text-blue-300" : "bg-violet-500/10 text-violet-700 dark:text-violet-300")} data-testid="text-merger-source"><FileText size={15} /> {t(`features:textMerger.${item.source === "direct" ? "directBadge" : "fileBadge"}`)}</span>
+                    <span className={cn("inline-flex min-h-7 items-center gap-1 rounded-full px-2 text-xs font-extrabold whitespace-nowrap max-[620px]:col-start-3 max-[620px]:row-start-1 max-[620px]:justify-self-start", item.source === "direct" ? "bg-primary/10 text-primary " : "bg-primary/10 text-primary ")} data-testid="text-merger-source"><FileText size={15} /> {t(`features:textMerger.${item.source === "direct" ? "directBadge" : "fileBadge"}`)}</span>
                     <label className="min-w-0 max-[620px]:col-span-full max-[620px]:row-start-2">
                       <span className="sr-only">{t("features:textMerger.nameLabel")}</span>
                       <UtilityInput className="h-[34px] border-transparent bg-transparent px-2 font-bold hover:border-border hover:bg-background focus-visible:bg-background" value={item.name} onChange={(event) => updateItem(item.id, { name: event.target.value })} />
@@ -224,11 +224,11 @@ export function TextMergerPage() {
                   {expanded ? (
                     <div className="pr-2.5 pb-2.5 pl-[76px] max-[620px]:pr-[62px] max-[620px]:pl-2.5" data-testid="text-merger-editor">
                       <UtilityTextarea className="min-h-[135px] rounded-xl p-3 text-sm leading-relaxed" value={item.content} onChange={(event) => updateItem(item.id, { content: event.target.value })} placeholder={t("features:textMerger.inputPlaceholder")} aria-label={t("features:textMerger.contentLabel", { name: item.name })} />
-                      <Button className="ml-auto mt-[7px] h-auto rounded-md p-0 text-[13px] font-bold text-blue-700 dark:text-blue-300" variant="link" type="button" onClick={() => toggleExpanded(item.id)}>{t("features:textMerger.collapse")}</Button>
+                      <Button className="ml-auto mt-[7px] h-auto rounded-md p-0 text-[13px] font-bold text-primary " variant="link" type="button" onClick={() => toggleExpanded(item.id)}>{t("features:textMerger.collapse")}</Button>
                     </div>
                   ) : (
                     <Button className="mx-2.5 mb-2.5 ml-[76px] min-h-[46px] w-[calc(100%-86px)] justify-between rounded-xl px-3 py-2.5 text-left font-normal text-muted-foreground max-[620px]:mr-[62px] max-[620px]:ml-2.5 max-[620px]:w-[calc(100%-72px)]" variant="secondary" type="button" onClick={() => toggleExpanded(item.id)} data-testid="text-merger-preview">
-                      <span className="overflow-hidden text-ellipsis whitespace-nowrap">{preview(item.content) || t("features:textMerger.emptyPreview")}</span><b className="shrink-0 text-[13px] text-blue-700 dark:text-blue-300">{t("features:textMerger.editContent")}</b>
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap">{preview(item.content) || t("features:textMerger.emptyPreview")}</span><b className="shrink-0 text-[13px] text-primary ">{t("features:textMerger.editContent")}</b>
                     </Button>
                   )}
                 </Card>
@@ -263,7 +263,7 @@ export function TextMergerPage() {
       <ToolGuide
         title={t("features:textMerger.guide.title")}
         description={t("features:textMerger.guide.description")}
-        blocks={t("features:textMerger.guide.blocks", { returnObjects: true }) as any}
+        blocks={t("features:textMerger.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]}
         faq={(t("features:textMerger.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
       />
     </UtilityPage>

@@ -33,7 +33,8 @@ import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { toolIconAccentClasses } from "./toolAccentStyles";
+import { getToolIconTone } from "./toolAccentStyles";
+import { DocumentRedactorFallback } from "../features/document-redactor/DocumentRedactorFallback";
 
 const GITHUB_REPO_URL = GITHUB_ISSUES_URL.replace(/\/issues\/?$/, "");
 
@@ -135,7 +136,7 @@ export function AppShell() {
                   const Icon = tool.icon;
                   return (
                     <NavLink className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`} key={tool.id} to={tool.path} onClick={() => trackToolOpen(tool.id, "sidebar", language)}>
-                      <span className={cn("nav-icon", toolIconAccentClasses[tool.accent])}><Icon size={17} /></span>
+                      <span className={cn("nav-icon tone-icon-badge")} data-icon-tone={getToolIconTone(tool.id)}><Icon size={17} /></span>
                       <span>{tool.shortTitle}</span>
                     </NavLink>
                   );
@@ -152,7 +153,7 @@ export function AppShell() {
           </div>
           <NavItem {...primaryNavigation[2]} language={language} label={t(primaryNavigation[2].labelKey as never)} />
           <a className="sidebar-link" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
-            <span className={cn("nav-icon", toolIconAccentClasses.blue)}><MessageSquarePlus size={17} /></span>
+            <span className={cn("nav-icon tone-icon-badge")} data-icon-tone="utility"><MessageSquarePlus size={17} /></span>
             <span>{t("footer.feedback")}</span>
           </a>
         </div>
@@ -176,7 +177,10 @@ export function AppShell() {
 
       <main className={`main-content${redactorActive ? " redactor-main-content" : ""}`} id="main-content">
         <TopBar theme={theme} onCycleTheme={cycleTheme} onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <RouteErrorBoundary>{(!redactorActive || redactorDocument) && (!videoStudioActive || !import.meta.env.PROD || videoIsolationDocument && videoControllerReady) && <Outlet />}</RouteErrorBoundary>
+        <RouteErrorBoundary>
+          {(!redactorActive || redactorDocument) && (!videoStudioActive || !import.meta.env.PROD || videoIsolationDocument && videoControllerReady) && <Outlet />}
+          {redactorActive && !redactorDocument && <DocumentRedactorFallback />}
+        </RouteErrorBoundary>
         {import.meta.env.PROD && videoStudioActive && !videoControllerReady && <div className="tool-route-loading min-h-[420px]" role="status">{videoIsolationFailed ? (language === "ko" ? "비디오 도구를 준비하지 못했습니다. 페이지를 새로고침해 다시 시도하세요." : "The video tool could not start. Refresh the page to try again.") : t("status.loadingTool", { tool: "Video Studio" })}</div>}
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
@@ -232,13 +236,13 @@ export function AppShell() {
             const Icon = tool.icon;
             return (
               <NavLink className="sheet-tool-item" to={tool.path} key={tool.id} onClick={() => trackToolOpen(tool.id, "mobile_sheet", language)}>
-                <span className={`grid size-[43px] shrink-0 place-items-center rounded-[13px] shadow-[inset_0_1px_1px_rgba(255,255,255,.65)] ${toolIconAccentClasses[tool.accent]}`}><Icon size={22} /></span>
+                <span className="grid size-[43px] shrink-0 place-items-center rounded-[13px] shadow-[inset_0_1px_1px_rgba(255,255,255,.65)] tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} /></span>
                 <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
               </NavLink>
             );
           })}
           <a className="sheet-tool-item" href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer">
-            <span className={`grid size-[43px] shrink-0 place-items-center rounded-[13px] shadow-[inset_0_1px_1px_rgba(255,255,255,.65)] ${toolIconAccentClasses.blue}`}><MessageSquarePlus size={22} /></span>
+            <span className="grid size-[43px] shrink-0 place-items-center rounded-[13px] shadow-[inset_0_1px_1px_rgba(255,255,255,.65)] tone-icon-badge" data-icon-tone="utility"><MessageSquarePlus size={22} /></span>
             <span><strong>{t("footer.feedback")}</strong><small>{t("footer.feedbackDescription")}</small></span>
           </a>
         </div>

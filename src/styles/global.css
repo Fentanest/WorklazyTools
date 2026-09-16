@@ -322,9 +322,9 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 .redactor-main-content { min-height: calc(100vh + 12rem); display: flex; flex-direction: column; }
 .redactor-main-content > .global-footer { margin-top: auto; }
 
-.page { width: min(1180px, 100%); margin: 0 auto; padding: 48px 0 52px; }
+.page { width: 100%; margin: 0 auto; padding: 48px 0 52px; }
 .standard-page,
-.tool-page { width: min(var(--tool-content-max-width, 1180px), 100%); padding-top: 61px; margin: 0 auto; }
+.tool-page { width: 100%; max-width: none; padding-top: 61px; margin: 0 auto; }
 
 .page-enter { animation: page-in .42s cubic-bezier(.2, .8, .2, 1) both; }
 @keyframes page-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
@@ -526,13 +526,6 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
   border: 1px solid rgba(255,255,255,.8);
   background: var(--bg-elevated);
 }
-.ui-tool-card::before { content: ""; position: absolute; width: 230px; height: 230px; right: -100px; bottom: -120px; border-radius: 50%; opacity: .75; filter: blur(1px); }
-.ui-tool-card.ui-accent-green::before { background: radial-gradient(circle, rgba(32,177,90,.18), transparent 68%); }
-.ui-tool-card.ui-accent-blue::before { background: radial-gradient(circle, rgba(0,122,255,.18), transparent 68%); }
-.ui-tool-card.ui-accent-violet::before { background: radial-gradient(circle, rgba(139,92,246,.18), transparent 68%); }
-.ui-tool-card.ui-accent-orange::before { background: radial-gradient(circle, rgba(245,139,0,.18), transparent 68%); }
-.ui-tool-card.ui-accent-pink::before { background: radial-gradient(circle, rgba(255,55,95,.18), transparent 68%); }
-.ui-tool-card.ui-accent-sky::before { background: radial-gradient(circle, rgba(21,155,215,.18), transparent 68%); }
 .ui-tool-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,.98); box-shadow: 0 24px 58px rgba(52,55,70,.11); }
 .ui-tool-card-top { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; }
 .ui-card-arrow { width: 35px; height: 35px; display: grid; place-items: center; color: var(--label-tertiary); background: var(--bg-muted); border-radius: 50%; transition: transform .2s ease, color .2s ease; }
@@ -1075,3 +1068,4 @@ body[data-consent-banner="visible"] .main-content {
     padding-bottom: calc(var(--wl-bottom-nav-height) + 8px + env(safe-area-inset-bottom) + var(--consent-banner-height, 140px));
   }
 }
+
