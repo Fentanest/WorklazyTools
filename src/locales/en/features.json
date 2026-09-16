@@ -2485,6 +2485,7 @@
         "recognizingText": "[{{p0}}/{{p1}}] Recognizing text… {{p2}}%",
         "renderingPageForOcr": "[{{p0}}/{{p1}}] Rendering page {{p2}} for OCR…",
         "unableToRenderThePdfPageImage": "Unable to render the PDF page image.",
+        "imageDecodingFailed": "Failed to decode embedded images (CCITT/JBIG2) in the PDF. The image decoder may not have loaded correctly.",
         "unableToCreateTheImageFile": "Unable to create the image file.",
         "preparingOcr": "Preparing OCR · {{p0}}",
         "thisPdfIsPasswordProtectedTryAgainWith": "This PDF is password-protected. Try again with an unlocked copy.",

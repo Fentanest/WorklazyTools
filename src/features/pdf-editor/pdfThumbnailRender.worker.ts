@@ -2,6 +2,7 @@
 
 import pdfDisplayUrl from "pdfjs-dist/build/pdf.mjs?url";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { getPdfWorkerOptions } from "./pdfConfig";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -45,9 +46,8 @@ worker.onmessage = async (event: MessageEvent<{ file: File; pageIndex: number; t
     loadingTask = getDocument({
       data: new Uint8Array(buffer),
       password: "",
-      enableXfa: true,
       ownerDocument: { fonts: worker.fonts } as unknown as Document,
-      useSystemFonts: true,
+      ...getPdfWorkerOptions(),
       isOffscreenCanvasSupported: false,
       isImageDecoderSupported: false,
       CanvasFactory: OffscreenCanvasFactory,

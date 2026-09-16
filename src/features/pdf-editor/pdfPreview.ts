@@ -9,6 +9,7 @@ import { featureMessage } from "../../i18n/featureMessages";
 import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from "../../utils/cooperativeCancel.ts";
 import { waitWithAbort, settleOwnedPdfLoad } from "../../utils/pdfOwnedDocument.ts";
 import { waitForPdfRender } from "./pdfRenderLifecycle";
+import { getPdfWorkerOptions, withImageDecodeCheck } from "./pdfConfig";
 
 type PdfDisplayModule = typeof import("pdfjs-dist");
 
@@ -50,12 +51,7 @@ export async function openOwnedPdfDocument(
   const loadingTask = pdfDisplayModule.getDocument({
     data: source,
     password: "",
-    enableXfa: true,
-    useSystemFonts: true,
-    cMapUrl: "/vendor/pdfjs/6.2.108/cmaps/",
-    cMapPacked: true,
-    standardFontDataUrl: "/vendor/pdfjs/6.2.108/standard_fonts/",
-    wasmUrl: "/vendor/pdfjs/6.2.108/wasm/",
+    ...getPdfWorkerOptions(),
     isOffscreenCanvasSupported: false,
     isImageDecoderSupported: false,
   });
@@ -120,12 +116,7 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko", s
   const loadingTask = getDocument({
     data: new Uint8Array(buffer),
     password: "",
-    enableXfa: true,
-    useSystemFonts: true,
-    cMapUrl: "/vendor/pdfjs/6.2.108/cmaps/",
-    cMapPacked: true,
-    standardFontDataUrl: "/vendor/pdfjs/6.2.108/standard_fonts/",
-    wasmUrl: "/vendor/pdfjs/6.2.108/wasm/",
+    ...getPdfWorkerOptions(),
     isOffscreenCanvasSupported: false,
     isImageDecoderSupported: false,
   });
@@ -400,7 +391,12 @@ export async function renderPdfPageAsJpeg(file: File, pageIndex: number, additio
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
   const renderTask = page.render({ canvas, canvasContext: context, viewport });
-  await waitForPdfRender(renderTask, page, { signal });
+  const { failedImages } = await withImageDecodeCheck(() => waitForPdfRender(renderTask, page, { signal }));
+  if (failedImages.length > 0) {
+    canvas.width = 1;
+    canvas.height = 1;
+    throw new Error(featureMessage(language, "pdf.messages.pdfPreview.imageDecodingFailed") ?? `이미지 디코딩에 실패했습니다 (${failedImages.join(", ")}).`);
+  }
   const blob = await canvasToBlob(canvas, "image/jpeg", 0.78, language);
   throwIfAborted(signal);
   canvas.width = 1; canvas.height = 1;
@@ -530,7 +526,12 @@ async function renderPageForExport(document: PDFDocumentProxy, pageNumber: numbe
   const context = canvas.getContext("2d", { alpha: false });
   if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToRenderThePdfPageImage"));
   const renderTask = page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" });
-  await waitForPdfRender(renderTask, page, { signal });
+  const { failedImages } = await withImageDecodeCheck(() => waitForPdfRender(renderTask, page, { signal }));
+  if (failedImages.length > 0) {
+    canvas.width = 1;
+    canvas.height = 1;
+    throw new Error(featureMessage(language, "pdf.messages.pdfPreview.imageDecodingFailed") ?? `이미지 디코딩에 실패했습니다 (${failedImages.join(", ")}). CCITT/JBIG2 디코더가 로드되지 않았을 수 있습니다.`);
+  }
   return canvas;
 }
 

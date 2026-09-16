@@ -2479,6 +2479,7 @@
         "recognizingText": "[{{p0}}/{{p1}}] OCR 인식 중… {{p2}}%",
         "renderingPageForOcr": "[{{p0}}/{{p1}}] {{p2}}페이지 OCR용 이미지 생성 중…",
         "unableToRenderThePdfPageImage": "PDF 페이지 이미지를 만들 수 없습니다.",
+        "imageDecodingFailed": "PDF 내부 이미지(CCITT/JBIG2) 디코딩에 실패했습니다. 이미지 디코더가 정상적으로 로드되지 않았을 수 있습니다.",
         "unableToCreateTheImageFile": "이미지 파일을 만들지 못했습니다.",
         "preparingOcr": "OCR 준비 중 · {{p0}}",
         "thisPdfIsPasswordProtectedTryAgainWith": "암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.",
