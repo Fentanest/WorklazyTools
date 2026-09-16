@@ -93,6 +93,22 @@ export function AppShell() {
       {!redactorActive && !redactorDocument && !videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand-card" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
+          <svg
+            className="brand-panel-art"
+            viewBox="0 0 264 144"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <polygon
+              points="244,0 264,0 264,44 164,144 116,144"
+              fill="var(--brand-facet-back)"
+            />
+            <polygon
+              points="264,44 264,144 164,144"
+              fill="var(--brand-facet-front)"
+            />
+          </svg>
           <span className="brand-card-row">
             <span className="brand-mark" aria-hidden="true">W</span>
             <span className="brand-name">Worklazy Tools</span>

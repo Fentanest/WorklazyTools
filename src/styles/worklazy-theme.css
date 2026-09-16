@@ -22,6 +22,27 @@
   --hero-bg: linear-gradient(118deg, #fff9f6 0%, #ffeee6 58%, #ffd9cb 100%);
   --hero-decor: rgba(232, 80, 47, 0.12);
   --hero-border: rgba(255, 255, 255, 0.8);
+  --bg: #f2f2f7;
+  --bg-elevated: rgba(255, 255, 255, 0.78);
+  --bg-solid: #ffffff;
+  --bg-muted: rgba(118, 118, 128, 0.08);
+  --label: #18181b;
+  --label-secondary: #69696f;
+  --label-tertiary: #909098;
+  --separator: rgba(60, 60, 67, 0.13);
+  --glass-border: rgba(255, 255, 255, 0.68);
+  --glass-shadow: 0 18px 50px rgba(54, 54, 72, 0.08), 0 2px 8px rgba(54, 54, 72, 0.04);
+  --card-shadow: 0 18px 48px rgba(58, 58, 74, 0.065), 0 1px 2px rgba(58, 58, 74, 0.04);
+  --blue-soft: rgba(0, 122, 255, 0.12);
+  --green: #20b15a;
+  --green-soft: rgba(32, 177, 90, 0.12);
+  --orange-soft: rgba(245, 139, 0, 0.12);
+  --pink-soft: rgba(255, 55, 95, 0.12);
+  --sky: #159bd7;
+  --sky-soft: rgba(21, 155, 215, 0.12);
+  --success: #159947;
+  --brand-facet-back: rgba(255, 255, 255, 0.12);
+  --brand-facet-front: rgba(255, 255, 255, 0.22);
 }
 
 :root[data-theme="light-mint"] {
@@ -38,6 +59,27 @@
   --hero-bg: linear-gradient(118deg, #f7fcf9 0%, #e6f5ed 58%, #cdeedb 100%);
   --hero-decor: rgba(12, 155, 108, 0.12);
   --hero-border: rgba(255, 255, 255, 0.8);
+  --bg: #f2f2f7;
+  --bg-elevated: rgba(255, 255, 255, 0.78);
+  --bg-solid: #ffffff;
+  --bg-muted: rgba(118, 118, 128, 0.08);
+  --label: #18181b;
+  --label-secondary: #69696f;
+  --label-tertiary: #909098;
+  --separator: rgba(60, 60, 67, 0.13);
+  --glass-border: rgba(255, 255, 255, 0.68);
+  --glass-shadow: 0 18px 50px rgba(54, 54, 72, 0.08), 0 2px 8px rgba(54, 54, 72, 0.04);
+  --card-shadow: 0 18px 48px rgba(58, 58, 74, 0.065), 0 1px 2px rgba(58, 58, 74, 0.04);
+  --blue-soft: rgba(0, 122, 255, 0.12);
+  --green: #20b15a;
+  --green-soft: rgba(32, 177, 90, 0.12);
+  --orange-soft: rgba(245, 139, 0, 0.12);
+  --pink-soft: rgba(255, 55, 95, 0.12);
+  --sky: #159bd7;
+  --sky-soft: rgba(21, 155, 215, 0.12);
+  --success: #159947;
+  --brand-facet-back: rgba(255, 255, 255, 0.12);
+  --brand-facet-front: rgba(255, 255, 255, 0.22);
 }
 
 :root[data-theme="dark-coral"] {
@@ -54,6 +96,8 @@
   --hero-bg: linear-gradient(118deg, #171114 0%, #251210 58%, #33120b 100%);
   --hero-decor: rgba(255, 110, 84, 0.16);
   --hero-border: rgba(255, 255, 255, 0.09);
+  --brand-facet-back: rgba(0, 0, 0, 0.15);
+  --brand-facet-front: rgba(255, 110, 84, 0.15);
   --bg: #0d1117;
   --bg-elevated: rgba(30, 35, 44, 0.78);
   --bg-solid: #1a2029;
@@ -89,6 +133,8 @@
   --hero-bg: linear-gradient(118deg, #07110d 0%, #0a2018 58%, #0d2f21 100%);
   --hero-decor: rgba(61, 213, 152, 0.15);
   --hero-border: rgba(255, 255, 255, 0.09);
+  --brand-facet-back: rgba(0, 0, 0, 0.15);
+  --brand-facet-front: rgba(61, 213, 152, 0.15);
   --bg: #08120e;
   --bg-elevated: rgba(24, 38, 31, 0.78);
   --bg-solid: #14231c;
@@ -154,27 +200,17 @@
   background: linear-gradient(135deg, var(--brandcard-1), var(--brandcard-2));
   box-shadow: 0 14px 30px color-mix(in srgb, var(--brandcard-2) 45%, transparent);
 }
-.brand-card::before {
-  content: "";
-  position: absolute;
-  top: -70%;
-  right: -28%;
-  width: 95%;
-  height: 240%;
-  transform: rotate(24deg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.02));
-  pointer-events: none;
-}
+.brand-card::before,
 .brand-card::after {
-  content: "";
+  display: none;
+}
+.brand-panel-art {
   position: absolute;
-  top: -70%;
-  right: 6%;
-  width: 34%;
-  height: 240%;
-  transform: rotate(24deg);
-  background: rgba(0, 0, 0, 0.1);
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+  z-index: 0;
 }
 .brand-card-row {
   position: relative;
@@ -240,7 +276,6 @@
   box-shadow: none;
 }
 .sidebar-link.active::before { display: none; }
-.sidebar-link.active .nav-icon { color: var(--brand-on-bg); background: var(--brand-soft); }
 .nav-icon { width: 30px; height: 30px; border-radius: 9px; }
 .nav-icon-plain { color: var(--label-secondary); background: var(--bg-muted); }
 .nav-icon.accent-coral { color: #d63a1f; background: rgba(232, 80, 47, 0.12); }
