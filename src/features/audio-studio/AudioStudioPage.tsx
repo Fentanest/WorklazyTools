@@ -691,7 +691,7 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
 
       {document && <AudioExportPanel format={exportFormat} bitrate={mp3Bitrate} busy={busy} selectionDuration={selection ? selectionDuration : undefined} exportSelection={exportSelection} onFormat={setExportFormat} onBitrate={setMp3Bitrate} onExportSelection={setExportSelection} onExport={() => void exportAudio()} />}
 
-      <OperationProgress {...progress} title={t("audio.log")} />
+      <OperationProgress {...progress} accent="orange" title={t("audio.log")} />
       {busy && <div className="mt-2 flex justify-end"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => { cancelDecode(); activeControllerRef.current?.abort(); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</Button></div>}
       {lastResult && <UtilityNotice className="mt-3" tone="success" role="status" data-testid="audio-result"><FileAudio2 className="mt-0.5 shrink-0" size={18} /><span>{lastResult}</span></UtilityNotice>}
 

@@ -39,6 +39,29 @@
     "primaryLabel": "주요 내비게이션",
     "mobileLabel": "모바일 내비게이션", "collapseSidebar": "사이드바 접기", "expandSidebar": "사이드바 펼치기", "github": "GitHub", "toolGroups": {"documents": "문서", "media": "미디어", "other": "기타"}
   },
+  "brand": {
+    "tagline": "복잡한 작업을\n더 간단하게, 더 스마트하게."
+  },
+  "topbar": {
+    "searchPlaceholder": "도구를 검색해보세요. (예: PDF, Excel, 병합)",
+    "searchLabel": "도구 검색",
+    "toggleSidebar": "사이드바 접기/펼치기",
+    "githubLabel": "GitHub에서 보기"
+  },
+  "theme": {
+    "label": "테마 변경",
+    "switchTo": "다음 테마: {{theme}}",
+    "names": {
+      "light-coral": "라이트 코랄",
+      "dark-coral": "다크 코랄",
+      "light-mint": "라이트 민트",
+      "dark-mint": "다크 민트"
+    },
+    "light-coral": "라이트 코랄",
+    "dark-coral": "다크 코랄",
+    "light-mint": "라이트 민트",
+    "dark-mint": "다크 민트"
+  },
   "footer": {
     "service": "서비스 소개",
     "privacy": "개인정보처리방침",
@@ -79,6 +102,9 @@
       "action": "GitHub Issues 열기"
     },
     "availableTitle": "지금 바로 사용할 도구",
+    "availableSubtitle": "자주 사용하는 도구를 빠르게 시작해보세요.",
+    "localTitle": "안전한 로컬 처리",
+    "localDescription": "파일이 서버로 업로드되지 않습니다. 모든 작업은 내 브라우저에서 안전하게 처리됩니다.",
     "howTitle": "파일은 이렇게 처리됩니다",
     "steps": {
       "selectTitle": "1. 파일 선택", "selectDescription": "브라우저의 파일 선택 창에서 작업할 문서를 고릅니다.",

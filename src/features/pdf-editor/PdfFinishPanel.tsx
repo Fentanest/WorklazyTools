@@ -979,7 +979,7 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
                   <PrimaryButton accent="violet" disabled={!batchSelection.files.length || !!fieldError || !!(selectionEvaluation.error || batchSelection.error) || preflightBlocked || locked} loading={operation.status === "running"} onClick={() => void execute()}>{operation.status !== "running" && <FileCheck2 size={18} />}{operation.status === "running" ? copy.creating : operation.status === "error" ? copy.retry : copy.create}</PrimaryButton>
                   {operation.status === "running" && <Button type="button" variant="outline" className="mt-2 min-h-11 w-full rounded-xl text-destructive" data-testid="pdf-finish-cancel" onClick={() => controllerRef.current?.abort()}><X size={17} />{copy.cancel}</Button>}
                 </div>
-                <OperationProgress {...operation} compact title={copy.progressTitle} />
+                <OperationProgress {...operation} compact accent="coral" title={copy.progressTitle} />
                 {download.results.map((result) => <PdfDownloadCard key={result.url} compact result={result} title={copy.ready} />)}
               </Card>
             </aside>

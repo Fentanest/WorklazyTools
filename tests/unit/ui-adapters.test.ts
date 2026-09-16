@@ -53,19 +53,11 @@ test("the eight adapters preserve their structural and live-region contracts", (
   assert.doesNotMatch(uiSource, /export function NavigationRow/);
 });
 
-test("accent adapters keep six category tints for badges, single primary for controls", () => {
-  const accents = ["green", "blue", "violet", "orange", "pink", "sky"];
-  for (const declaration of ["accentButtonClasses", "accentSoftClasses"]) {
+test("accent adapters keep seven tool tints for badges, buttons, and surfaces", () => {
+  const accents = ["green", "blue", "violet", "orange", "pink", "sky", "coral"];
+  for (const declaration of ["accentButtonClasses", "accentSoftClasses", "accentDraggingClasses", "accentResultClasses"]) {
     const block = uiSource.match(new RegExp(`const ${declaration} = \\{([\\s\\S]*?)\\n\\} satisfies`))?.[1];
     assert.ok(block, `${declaration} declaration is missing`);
     for (const accent of accents) assert.match(block, new RegExp(`\\n  ${accent}:`));
   }
-  // W4 single primary: per-tool drag/result surface tables are gone. The drop
-  // target drag feedback is one shared primary treatment; the icon tile keeps
-  // its category tint, which is a badge, not a control.
-  assert.doesNotMatch(uiSource, /accentDraggingClasses|accentResultClasses/);
-  assert.match(uiSource, /DROP_TARGET_DRAGGING_CLASSES = "border-primary bg-primary\/10"/);
-  assert.match(uiSource, /dragging && \["scale-\[\.995\]", DROP_TARGET_DRAGGING_CLASSES\]/);
-  for (const accent of accents) assert.match(uiSource, new RegExp(`^  ${accent}: PRIMARY_BUTTON_CLASSES,$`, "m"));
-  assert.match(uiSource, /const PRIMARY_BUTTON_CLASSES =\n  "bg-primary text-primary-foreground/);
 });

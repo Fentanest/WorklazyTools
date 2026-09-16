@@ -103,7 +103,7 @@ function ImagesToPdf() {
             <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-violet-700 dark:text-violet-300"><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfImagePanel.outputFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} onChange={(event) => setOutputName(event.target.value)} /><small className="text-xs text-muted-foreground">.pdf</small></label>
             <PrimaryButton accent="violet" disabled={!files.length || operation.status === "running"} loading={operation.status === "running"} onClick={exportPdf}><FileImage size={18} /> {featureMessage(language, "pdf.messages.PdfImagePanel.createPdf")}</PrimaryButton>
           </Card>
-          <OperationProgress {...operation} title={featureMessage(language, "pdf.messages.PdfImagePanel.imageConversionLog")} />
+          <OperationProgress {...operation} accent="coral" title={featureMessage(language, "pdf.messages.PdfImagePanel.imageConversionLog")} />
         </aside>
       </div>
       <PdfError message={error} />
@@ -185,7 +185,7 @@ function PdfToImages() {
             <dl className="my-5"><SummaryRow label={featureMessage(language, "pdf.messages.PdfImagePanel.pages")} value={pageCount} /><SummaryRow label={featureMessage(language, "pdf.messages.PdfImagePanel.output")} value="ZIP" /></dl>
             <PrimaryButton accent="violet" disabled={!file || loading || operation.status === "running"} loading={operation.status === "running"} onClick={convert}><Images size={18} /> {featureMessage(language, "pdf.messages.PdfImagePanel.createImageZip")}</PrimaryButton>
           </Card>
-          <OperationProgress {...operation} title={featureMessage(language, "pdf.messages.PdfImagePanel.pdfImageConversionLog")} />
+          <OperationProgress {...operation} accent="coral" title={featureMessage(language, "pdf.messages.PdfImagePanel.pdfImageConversionLog")} />
         </aside>
       </div>
       <PdfError message={error} />

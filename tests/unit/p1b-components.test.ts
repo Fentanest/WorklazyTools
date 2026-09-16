@@ -42,36 +42,35 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   assert.match(progressSource, /Math\.min\(max, Math\.max\(min, value\)\)/);
   assert.match(progressSource, /normalized === null \? \{\} : \{ "aria-valuenow": normalized \}/);
   assert.ok(!progressSource.includes("@base-ui/react"), "progress must not depend on Base UI");
-  // W4 single primary: the per-tool indicator/state tables are gone. The bar
-  // uses the shared primary token and the state tile its hue family on every
-  // tool; only the error red is per-state.
-  assert.doesNotMatch(source, /progressIndicatorClasses|progressStateClasses|ui-accent-/);
-  assert.match(source, /const PROGRESS_INDICATOR_CLASS = "bg-primary"/);
-  assert.match(source, /const PROGRESS_STATE_CLASS = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950\/70 dark:text-indigo-300"/);
-  assert.match(source, /status === "error" \? "bg-red-700" : PROGRESS_INDICATOR_CLASS/);
-  assert.doesNotMatch(source, /accent\??: ToolAccent|accent,/);
+  // Merged 4-theme shell: per-tool indicator/state tables are back with seven
+  // accents (coral included). The bar and state tile follow the tool accent;
+  // only the error red stays per-state.
+  assert.match(source, /progressIndicatorClasses/);
+  assert.match(source, /progressStateClasses/);
+  assert.match(source, /ui-accent-\$\{accent\}/);
+  assert.match(source, /accent: ToolAccent/);
+  assert.match(source, /\n  coral: "bg-red-700",/);
+  assert.match(source, /ui-status-\$\{status\}/);
 });
 
-test("ToolCard keeps a link root, single category accent, h3 title, and capped tags", () => {
+test("ToolCard keeps a link root, per-tool accent, h2 title, and capped tags", () => {
   const source = read("src/components/ToolCard.tsx");
   const accentStyles = read("src/components/toolAccentStyles.ts");
   const registry = read("src/app/toolRegistry.ts");
 
-  // Single category mapping (W2): the card inherits its category color, never
-  // a per-tool accent. W3 keeps the mapping and adds the card DOM contract.
-  assert.match(source, /const accent = toolCategories\.find\(\(category\) => category\.id === tool\.category\)\?\.accent/);
-  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{accent\}/);
+  // Merged 4-theme shell: the card inherits its per-tool accent (seven
+  // accents including coral), shared with the sidebar icon tokens.
+  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{tool\.accent\}/);
   assert.match(source, /to=\{tool\.path\}/);
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
-  assert.match(source, /toolIconAccentClasses\[accent\]/);
-  // Section-h2 context: card titles are h3, visible tags cap at 3 while the
-  // registry keeps the full highlight list, decor stays hidden. Tags are
-  // plain neutral labels (no icons); the arrow lives in the bottom row.
-  assert.match(source, /<h3>\{tool\.title\}<\/h3>/);
-  assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(\(item\) => <span key=\{item\.label\}>\{item\.label\}<\/span>\)/);
-  assert.ok(!/<h2>\{tool\.title\}<\/h2>/.test(source), "card title must not be an h2");
-  assert.match(source, /<div className="ui-tool-card-foot">[\s\S]*?<span className="ui-card-arrow" aria-hidden="true">/);
-  for (const accent of ["green", "blue", "violet", "orange", "pink", "sky"]) {
+  assert.match(source, /toolIconAccentClasses\[tool\.accent\]/);
+  assert.match(source, /data-accent=\{tool\.accent\}/);
+  // Card titles are h2; visible tags cap at 3 with icons while the registry
+  // keeps the full highlight list; the arrow lives in the top row.
+  assert.match(source, /<h2>\{tool\.title\}<\/h2>/);
+  assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(\(item\) => \{/);
+  assert.match(source, /<span className="ui-card-arrow"><ArrowRight size=\{18\} \/><\/span>/);
+  for (const accent of ["green", "blue", "violet", "orange", "pink", "sky", "coral"]) {
     assert.match(registry, new RegExp(`accent: "${accent}"`));
     assert.match(accentStyles, new RegExp(`\\n  ${accent}:`));
   }

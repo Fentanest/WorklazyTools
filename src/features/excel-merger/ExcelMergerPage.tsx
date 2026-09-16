@@ -724,6 +724,7 @@ export function ExcelMergerPage() {
             {!loading && !result && outputPasswordMissing && <p className="mt-2 text-center text-xs font-bold text-destructive">{t("excel.summary.outputPassword")}</p>}
           </Card>
           <OperationProgress
+            accent="green"
             status={operation.status}
             progress={operation.progress}
             message={operation.message}

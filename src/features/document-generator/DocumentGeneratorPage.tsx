@@ -178,7 +178,7 @@ export function DocumentGeneratorPage() {
 
     {plan&&<UtilitySectionCard title={tr('features:documentGenerator.run.title')} description={tr('features:documentGenerator.run.description')}>
       <div className="flex flex-wrap gap-2"><PrimaryButton accent="blue" disabled={busy} onClick={()=>void generate()}><Play size={17}/>{tr('features:documentGenerator.run.start')}</PrimaryButton>{snapshot.state!=='idle'&&<Button type="button" variant="destructive" onClick={()=>client.cancel()}><X size={17}/>{tr('features:documentGenerator.run.cancel')}</Button>}<Button type="button" variant="secondary" disabled={busy} onClick={()=>void resetAll()}><RotateCcw size={17}/>{tr('features:documentGenerator.run.reset')}</Button></div>
-      <OperationProgress {...operation} title={tr('features:documentGenerator.progress.title')}/>
+      <OperationProgress {...operation} accent="blue" title={tr('features:documentGenerator.progress.title')}/>
       {snapshot.attempt?.fallback&&<UtilityNotice className="mt-3">{tr('features:documentGenerator.progress.memoryFallback')}</UtilityNotice>}
     </UtilitySectionCard>}
 

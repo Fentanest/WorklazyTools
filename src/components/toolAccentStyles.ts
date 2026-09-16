@@ -7,4 +7,5 @@ export const toolIconAccentClasses = {
   orange: "bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300",
   pink: "bg-pink-100 text-pink-700 dark:bg-pink-950/70 dark:text-pink-300",
   sky: "bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
+  coral: "bg-gradient-to-br from-red-50 to-orange-100 text-red-700 dark:from-red-950/70 dark:to-orange-900/40 dark:text-red-300",
 } satisfies Record<ToolAccent, string>;

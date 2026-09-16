@@ -310,7 +310,7 @@ export function ExcelComparePage() {
 
       <div data-testid="excel-compare-actions"><PrimaryButton accent="green" disabled={!ready} loading={operation.status === "running"} onClick={() => void run()}><FileSpreadsheet size={18} /> {t("features:excelCompare.actions.compare", { count: pairs.length })}</PrimaryButton></div>
       {operation.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" data-testid="excel-compare-cancel" variant="destructive" type="button" onClick={() => controllerRef.current?.abort()}><X size={16} /> {t("features:excelCompare.actions.cancel")}</Button></div>}
-      <OperationProgress {...operation} title={t("features:excelCompare.progress.title")} />
+      <OperationProgress {...operation} accent="green" title={t("features:excelCompare.progress.title")} />
 
       {(completed.length > 0 || failed.length > 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title" onFocusCapture={(event) => scheduleResultFocusVisibility(event.target)}>
         <div><p className="text-xs font-extrabold tracking-[.08em] text-green-700 uppercase dark:text-green-300">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })}</p></div>

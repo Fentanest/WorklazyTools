@@ -1,8 +1,7 @@
-import { ArrowUpRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import type { ToolAccent, ToolDefinition } from "../app/toolRegistry";
-import { toolCategories } from "../app/toolRegistry";
+import type { ToolDefinition } from "../app/toolRegistry";
 import { useAppLanguage } from "../i18n/routing";
 import { cn } from "../lib/utils";
 import { trackToolOpen } from "./AnalyticsLoader";
@@ -14,36 +13,32 @@ interface ToolCardProps {
   featured?: boolean;
 }
 
-const FALLBACK_ACCENT: ToolAccent = "blue";
-
 export function ToolCard({ tool, featured = false }: ToolCardProps) {
   const Icon = tool.icon;
   const language = useAppLanguage();
-  // Single category mapping: the card inherits its category color, never a
-  // per-tool accent.
-  const accent = toolCategories.find((category) => category.id === tool.category)?.accent ?? FALLBACK_ACCENT;
 
   return (
     <Card
       as={Link}
       data-ui-component="tool-card"
-      className={cn(`ui-tool-card ui-accent-${accent}${featured ? " ui-featured" : ""}`, "gap-0 rounded-2xl border bg-card p-5 py-5 shadow-sm ring-0")}
+      className={cn(`ui-tool-card ui-accent-${tool.accent}${featured ? " ui-featured" : ""}`, "gap-0 border bg-card p-5 py-5 shadow-md ring-0")}
       to={tool.path}
       onClick={() => trackToolOpen(tool.id, featured ? "home_card" : "tools_card", language)}
     >
       <div className="ui-tool-card-top">
-        <span className={cn("grid size-12 place-items-center rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,.65)]", toolIconAccentClasses[accent])} data-accent={accent} aria-hidden="true"><Icon size={29} /></span>
+        <span className={cn("grid place-items-center rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,.65)]", toolIconAccentClasses[tool.accent])} data-accent={tool.accent}><Icon size={24} /></span>
+        <span className="ui-card-arrow"><ArrowRight size={18} /></span>
       </div>
       <div className="ui-tool-card-copy">
-        <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{tool.eyebrow}</p>
-        <h3>{tool.title}</h3>
+        {!featured && <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{tool.eyebrow}</p>}
+        <h2>{tool.title}</h2>
         <p>{tool.description}</p>
       </div>
-      <div className="ui-tool-card-foot">
-        <div className="ui-tool-highlights">
-          {tool.highlights.slice(0, 3).map((item) => <span key={item.label}>{item.label}</span>)}
-        </div>
-        <span className="ui-card-arrow" aria-hidden="true"><ArrowUpRight size={20} /></span>
+      <div className="ui-tool-highlights">
+        {tool.highlights.slice(0, 3).map((item) => {
+          const HighlightIcon = item.icon;
+          return <span key={item.label}><HighlightIcon size={13} /> {item.label}</span>;
+        })}
       </div>
     </Card>
   );

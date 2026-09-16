@@ -206,7 +206,7 @@ export function DocumentComparePage() {
           {loading && <Button type="button" variant="secondary" className="h-11 rounded-xl font-bold" onClick={() => comparisonControllerRef.current?.abort()}>{L("비교 취소", "Cancel comparison")}</Button>}
         </div>
       </Card>
-      <OperationProgress status={operation.status} progress={operation.progress} message={operation.message} logs={operation.logs} title={L("문서 비교 진행 상황", "Document comparison progress")} />
+      <OperationProgress status={operation.status} progress={operation.progress} message={operation.message} logs={operation.logs} accent="blue" title={L("문서 비교 진행 상황", "Document comparison progress")} />
       {error && !pairingError && <UtilityNotice className="mt-3" tone="error" role="alert"><AlertCircle className="mt-0.5 shrink-0" size={19} /><span className="flex flex-col"><strong>{L("비교하지 못했습니다.", "Comparison failed.")}</strong><span>{error}</span></span></UtilityNotice>}
 
       {session.results.length > 0 && <section className="mt-6" data-testid="document-results" aria-live="polite">
