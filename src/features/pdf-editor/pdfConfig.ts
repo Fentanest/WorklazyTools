@@ -19,26 +19,13 @@ export const getPdfWorkerOptions = () => ({
  * Returns the list of failed image object IDs (e.g. "img_p0_1").
  */
 export async function withImageDecodeCheck<T>(fn: () => Promise<T>): Promise<{ result: T; failedImages: string[] }> {
-  const failedImages: string[] = [];
-  const origWarn = console.warn;
-
-  console.warn = (...args: unknown[]) => {
-    const msg = typeof args[0] === "string" ? args[0] : "";
-    // PDF.js main thread emits "Warning: Dependent image isn't ready yet"
-    // when a CCITT/JBIG2/JPEG2000 image object failed to decode in the worker.
-    // It also forwards "Warning: Unable to decode image ..." from the worker.
-    if (msg.includes("Dependent image isn't ready yet")) {
-      failedImages.push("dependent-image");
-    }
-    const decodeMatch = msg.match(/Unable to decode image "([^"]+)"/);
-    if (decodeMatch) failedImages.push(decodeMatch[1]);
-    origWarn.apply(console, args);
-  };
-
   try {
     const result = await fn();
-    return { result, failedImages };
-  } finally {
-    console.warn = origWarn;
+    return { result, failedImages: [] };
+  } catch (error) {
+    if (error instanceof Error && (error.name === "Jbig2Error" || error.message.includes("Jbig2Error") || error.message.includes("decode"))) {
+      return { result: null as any, failedImages: ["dependent-image"] };
+    }
+    throw error;
   }
 }

@@ -951,7 +951,6 @@
         "a": "PDF output uses the selected resolution and may be larger than the original. Processing stops at memory limits. Image output is PNG."
       }
     },
-    "fallbackNotice": "The file processing engine could not be initialized in the current environment. File selection is disabled, but you can view the usage guide and precautions below.",
     "pathFaqs": {
       "/tools/document-redactor": [
         "faq_8",

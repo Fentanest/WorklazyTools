@@ -19,6 +19,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { useAppliedTheme, getSemanticColors } from "../../theme";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -77,6 +78,7 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
   const customPitchRef = useRef(0);
   const [effectPreviewUrl, setEffectPreviewUrl] = useState("");
   const [lastResult, setLastResult] = useState("");
+  const theme = useAppliedTheme();
   const [audioFailure, setAudioFailure] = useState("");
   const progress = useOperationProgress();
   const documentReady = Boolean(document);
@@ -84,6 +86,7 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | undefined>(undefined);
   const regionsRef = useRef<RegionsPlugin | undefined>(undefined);
+  const dragSelectionCleanupRef = useRef<(() => void) | undefined>(undefined);
   const selectionRef = useRef<AudioSelection | undefined>(undefined);
   const loopRef = useRef(false);
   const previewUrlRef = useRef("");
@@ -138,13 +141,36 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
       regions.addRegion({
         start: next.start,
         end: next.end,
-        color: "rgba(139, 92, 246, 0.22)",
+        color: getSemanticColors().region,
         drag: true,
         resize: true,
         minLength: MIN_SELECTION_SECONDS,
       });
     }
   }, [commitSelection]);
+
+
+  useEffect(() => {
+    const wavesurfer = wavesurferRef.current;
+    const regions = regionsRef.current;
+    if (!wavesurfer || !regions) return;
+    const colors = getSemanticColors();
+    wavesurfer.setOptions({ waveColor: colors.wave, progressColor: colors.progress, cursorColor: colors.cursor });
+    
+    // Update existing regions
+    regions.getRegions().forEach(region => {
+      region.setOptions({ color: colors.region });
+    });
+    
+    // Update drag selection color
+    dragSelectionCleanupRef.current?.();
+    dragSelectionCleanupRef.current = regions.enableDragSelection({
+      color: colors.region,
+      drag: true,
+      resize: true,
+      minLength: MIN_SELECTION_SECONDS,
+    }, 4);
+  }, [theme]);
 
   useEffect(() => {
     const container = waveformContainerRef.current;
@@ -162,9 +188,9 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
       wavesurfer = WaveSurfer.create({
         container,
         height: 190,
-        waveColor: "#b7a5f8",
-        progressColor: "#7c4dff",
-        cursorColor: "#ff375f",
+        waveColor: getSemanticColors().wave,
+        progressColor: getSemanticColors().progress,
+        cursorColor: getSemanticColors().cursor,
         cursorWidth: 2,
         barWidth: 2,
         barGap: 1,
@@ -185,8 +211,8 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
     wavesurferRef.current = wavesurfer;
     regionsRef.current = regions;
     const activeRegions = regions;
-    const disableDragSelection = regions.enableDragSelection({
-      color: "rgba(139, 92, 246, 0.22)",
+    dragSelectionCleanupRef.current = regions.enableDragSelection({
+      color: getSemanticColors().region,
       drag: true,
       resize: true,
       minLength: MIN_SELECTION_SECONDS,
@@ -218,7 +244,7 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
       setAudioFailure(t("audio.status.waveOpen"));
     });
     return () => {
-      disableDragSelection();
+      dragSelectionCleanupRef.current?.();
       unsubscribeCreated();
       unsubscribeUpdated();
       unsubscribeRegionOut();

@@ -26,8 +26,6 @@ export function SecurityToolsPage() {
       : t("security.adviceMedium")
     : "";
   const strengthLevels = t("security.levels", { returnObjects: true }) as string[];
-  const guideBlocks = t("security.guide.blocks", { returnObjects: true }) as any;
-  const guideFaq = (t("security.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }));
   const formatCrackTime = (seconds: number) => {
     if (!Number.isFinite(seconds) || seconds >= 100 * 365 * 24 * 60 * 60) return t("security.time.century");
     if (seconds < 1) return t("security.time.underSecond");
@@ -50,7 +48,7 @@ export function SecurityToolsPage() {
     <UtilitySectionCard title={t("security.generateTitle")}>
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-2xl border border-input bg-muted p-2.5 text-primary" data-testid="password-output"><KeyRound size={22} /><UtilityInput className="border-0 bg-transparent px-2 font-mono text-base ring-0 focus-visible:ring-0" value={password} onChange={(event) => setPassword(event.target.value)} aria-label={t("security.passwordLabel")} /><Button variant="secondary" size="icon" className="rounded-xl text-primary" type="button" aria-label={t("security.copyLabel")} onClick={() => void copyPassword()}><Copy size={18} /></Button></div>
       <span className="sr-only" aria-live="polite">{copied ? t("security.copied") : ""}</span>
-      <label className="my-[15px] flex flex-col gap-2 text-[13px] text-muted-foreground"><span>{t("security.length", { count: length })}</span><input className="accent-violet-700" type="range" min={8} max={64} value={length} onChange={(event) => setLength(Number(event.target.value))} /></label>
+      <label className="my-[15px] flex flex-col gap-2 text-[13px] text-muted-foreground"><span>{t("security.length", { count: length })}</span><input className="[accent-color:var(--brand)]" type="range" min={8} max={64} value={length} onChange={(event) => setLength(Number(event.target.value))} /></label>
       <div className="mb-3.5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border p-px max-[620px]:grid-cols-1" data-testid="password-options"><ToggleRow label={t("security.upper")} checked={upper} onChange={setUpper} /><ToggleRow label={t("security.lower")} checked={lower} onChange={setLower} /><ToggleRow label={t("security.number")} checked={number} onChange={setNumber} /><ToggleRow label={t("security.symbol")} checked={symbol} onChange={setSymbol} /></div>
       <PrimaryButton accent="blue" disabled={!charsetSize} onClick={regenerate}><RefreshCw size={18} /> {t("security.regenerate")}</PrimaryButton>
     </UtilitySectionCard>
@@ -64,5 +62,5 @@ export function SecurityToolsPage() {
 }
 
 function Metric({ icon, label, value, help }: { icon: React.ReactNode; label: string; value: string; help: string }) {
-  return <article className="min-w-0 rounded-2xl bg-blue-50 p-[15px] text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{icon}<span className="mt-3 block text-[13px] font-bold text-muted-foreground">{label}</span><strong className="mt-1 block [overflow-wrap:anywhere] text-xl tracking-[-.04em] text-foreground">{value}</strong><small className="mt-2 block text-xs font-medium leading-relaxed text-muted-foreground">{help}</small></article>;
+  return <article className="min-w-0 rounded-2xl bg-primary/10 p-[15px] text-primary">{icon}<span className="mt-3 block text-[13px] font-bold text-muted-foreground">{label}</span><strong className="mt-1 block [overflow-wrap:anywhere] text-xl tracking-[-.04em] text-foreground">{value}</strong><small className="mt-2 block text-xs font-medium leading-relaxed text-muted-foreground">{help}</small></article>;
 }

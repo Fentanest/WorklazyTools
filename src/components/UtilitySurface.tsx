@@ -122,7 +122,9 @@ export function UtilityNotice({
         density === "compact" ? "px-3 py-2" : "px-4 py-3",
         className
       )}
-      role={role || (announce === "off" ? undefined : (announce === "assertive" ? "alert" : "status"))}
+      data-slot="notice"
+      data-ui-component="UtilityNotice"
+      role={role || (announce !== "off" ? (announce === "assertive" ? "alert" : "status") : (actualKind === "error" || actualKind === "warning" ? "alert" : (actualKind === "progress" || actualKind === "success" ? "status" : undefined)))}
       aria-live={announce === "off" ? undefined : announce}
     >
       <div className="flex items-start gap-3">

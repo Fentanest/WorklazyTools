@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/patch-pdfjs.mjs",
     "dev": "node scripts/apply-dependency-patches.mjs && node scripts/vendor-browser-runtimes.mjs && node scripts/vendor-image-studio-assets.mjs && vite",
     "prepare": "node scripts/apply-dependency-patches.mjs",
     "icons:generate": "node scripts/generate-app-icons.mjs",
@@ -84,6 +85,7 @@
     "fast-xml-parser": "^5.10.1",
     "gifenc": "1.0.3",
     "i18next": "^26.3.6",
+    "jsdom": "^29.1.1",
     "jsqr": "^1.4.0",
     "jszip": "^3.10.1",
     "legacy-word-doc-reader": "github:Alpaq92/JSDoc#821695a884e0c0bb8592a635d9524bb3e116cd67",

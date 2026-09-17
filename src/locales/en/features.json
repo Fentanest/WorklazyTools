@@ -2625,7 +2625,8 @@
       "verification": "The result could not be verified, so it was not provided.",
       "not-ready": "The isolated document tools could not be prepared. Reload the page.",
       "invalid-name": "Enter a safe PDF or PNG file name."
-    }
+    },
+    "fallbackNotice": "The file processing engine could not be initialized in the current environment. File selection is disabled, but you can view the usage guide and precautions below."
   },
   "documentGenerator": {
     "eyebrow": "Word Mail Merge",

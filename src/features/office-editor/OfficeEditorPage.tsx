@@ -27,7 +27,8 @@ export function OfficeEditorPage() {
   const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
-    if (location.search !== "?guide=1") {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get("guide") !== "1") {
       navigate(appPath, { replace: true });
     }
   }, [navigate, appPath, location.search]);

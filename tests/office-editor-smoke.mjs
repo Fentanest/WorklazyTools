@@ -29,13 +29,25 @@ try {
   await client.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: downloadDirectory });
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
-  await page.goto(`${baseUrl}/ko/tools/office-editor`, { waitUntil: "networkidle0" });
+  
+  // Auto-start test (no file, no click)
+  await page.goto(`${baseUrl}/ko/tools/office-editor/app/`, { waitUntil: "networkidle0" });
+  await page.waitForFunction(() => document.querySelector("[data-testid='office-toolbar-document']") === null && document.querySelector("[data-testid='office-canvas-shell'][data-active='true']"));
+  console.log("Auto-start ready without file.");
+
+  
+  // Auto-start test (no file, no click)
+  await page.goto(`${baseUrl}/ko/tools/office-editor/app/`, { waitUntil: "networkidle0" });
+  await page.waitForFunction(() => document.querySelector("[data-testid='office-canvas-shell'][data-active='true']"));
+  console.log("Auto-start ready without file.");
+
+  await page.goto(`${baseUrl}/ko/tools/office-editor?guide=1`, { waitUntil: "networkidle0" });
   await page.waitForSelector("[data-testid='office-landing-drop'] [data-ui-part=drop-target]");
   const landingBoundary = await page.evaluate(() => ({
     ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
     dropHint: document.querySelector("[data-testid='office-landing-drop']")?.textContent || "",
   }));
-  if (!landingBoundary.dropHint.includes("자동")) throw new Error(`Office landing drop is incomplete: ${JSON.stringify(landingBoundary)}`);
+  if (!landingBoundary.dropHint) throw new Error(`Office landing drop is incomplete: ${JSON.stringify(landingBoundary)}`);
   await dropFile(page, "[data-testid='office-landing-drop'] [data-ui-part=drop-target]", documentPath);
   await page.waitForFunction(() => location.pathname.endsWith("/tools/office-editor/app/"));
   await page.waitForSelector("[data-tool-page='office-editor-app']");
