@@ -18,6 +18,7 @@ const browserNodePolyfills = () => nodePolyfills({
     process: true,
   },
   protocolImports: true,
+  exclude: ["vm"],
 });
 
 

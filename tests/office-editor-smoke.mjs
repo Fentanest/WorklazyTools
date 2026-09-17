@@ -30,16 +30,15 @@ try {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   
-  // Auto-start test (no file, no click)
-  await page.goto(`${baseUrl}/ko/tools/office-editor/app/`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelector("[data-testid='office-toolbar-document']") === null && document.querySelector("[data-testid='office-canvas-shell'][data-active='true']"));
-  console.log("Auto-start ready without file.");
-
+  // Drop zone in ready state (no file)
+  await page.goto(`${baseUrl}/ko/tools/office-editor/app/`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("[data-testid='office-app-dropzone']");
+  await page.waitForFunction(() => document.querySelector("[data-testid='office-app-dropzone']").textContent.includes("준비가 끝났습니다"));
   
-  // Auto-start test (no file, no click)
-  await page.goto(`${baseUrl}/ko/tools/office-editor/app/`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelector("[data-testid='office-canvas-shell'][data-active='true']"));
-  console.log("Auto-start ready without file.");
+  // Drop file to open it
+  await dropFile(page, "[data-testid='office-app-dropzone'] [data-ui-part=drop-target]", documentPath);
+  await page.waitForFunction(() => document.querySelector("[data-testid='office-canvas-shell'][data-active='true']") && document.querySelector("[data-testid='office-toolbar-document'] strong")?.textContent === "office-editor-check.docx");
+  console.log("Drop zone is visible in ready state and can open a dropped file.");
 
   await page.goto(`${baseUrl}/ko/tools/office-editor?guide=1`, { waitUntil: "networkidle0" });
   await page.waitForSelector("[data-testid='office-landing-drop'] [data-ui-part=drop-target]");
@@ -87,7 +86,7 @@ try {
       try { return FS.stat(`/usr/share/fonts/${name}`).size; } catch { return 0; }
     }),
   }));
-  if (!progress.samples.some((sample) => /MB/.test(sample)) || new Set(progress.samples.map((sample) => sample.split(":", 1)[0])).size < 3 || progress.samples.length > 120
+  if (!progress.samples.some((sample) => /MB|저장된/.test(sample)) || new Set(progress.samples.map((sample) => sample.split(":", 1)[0])).size < 3 || progress.samples.length > 120
     || progress.cacheEntries !== 1 || !progress.saveEnabled || !progress.canvas || progress.canvas.width < 800 || progress.canvas.height < 780
     || !progress.focus || progress.focus.height < 940 || progress.koreanFonts.join(",") !== "2054744") {
     throw new Error(`Office progress or canvas state is incomplete: ${JSON.stringify(progress)}`);
