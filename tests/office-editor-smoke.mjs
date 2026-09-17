@@ -39,6 +39,10 @@ try {
   await dropFile(page, "[data-testid='office-app-dropzone'] [data-ui-part=drop-target]", documentPath);
   await page.waitForFunction(() => document.querySelector("[data-testid='office-canvas-shell'][data-active='true']") && document.querySelector("[data-testid='office-toolbar-document'] strong")?.textContent === "office-editor-check.docx");
   console.log("Drop zone is visible in ready state and can open a dropped file.");
+  await new Promise(r => setTimeout(r, 500));
+  const topBarExists = await page.evaluate(() => !!document.querySelector(".wl-topbar"));
+  if (topBarExists) throw new Error("TopBar should be hidden in Office Editor mode.");
+  console.log("TopBar is hidden in editor mode.");
 
   await page.goto(`${baseUrl}/ko/tools/office-editor?guide=1`, { waitUntil: "networkidle0" });
   await page.waitForSelector("[data-testid='office-landing-drop'] [data-ui-part=drop-target]");

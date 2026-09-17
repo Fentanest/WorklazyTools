@@ -14,7 +14,10 @@ import {
   SunMoon,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+
+export const FocusModeContext = createContext<(mode: "standard" | "editor") => void>(() => {});
+export function useFocusMode() { return useContext(FocusModeContext); }
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -45,6 +48,12 @@ const primaryNavigation = [
 ];
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState<"standard" | "editor">("standard");
+  useEffect(() => {
+    const onFocus = (e: any) => setFocusMode(e.detail);
+    window.addEventListener("worklazy-focus", onFocus);
+    return () => window.removeEventListener("worklazy-focus", onFocus);
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { t } = useTranslation("common");
   const language = useAppLanguage();
@@ -84,8 +93,9 @@ export function AppShell() {
   };
 
   return (
-    <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
-      <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed")}>
+    <FocusModeContext.Provider value={setFocusMode}>
+      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
+      <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed", focusMode === "editor" && "editor-mode")}>
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} onReady={setVideoControllerReady} onFailed={setVideoIsolationFailed} />
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
@@ -175,8 +185,9 @@ export function AppShell() {
         </div>
       </header>
 
+      {focusMode !== "editor" && <TopBar theme={theme} onCycleTheme={cycleTheme} onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />}
+
       <main className={`main-content${redactorActive ? " redactor-main-content" : ""}`} id="main-content">
-        <TopBar theme={theme} onCycleTheme={cycleTheme} onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
         <RouteErrorBoundary>
           {(!redactorActive || redactorDocument) && (!videoStudioActive || !import.meta.env.PROD || videoIsolationDocument && videoControllerReady) && <Outlet />}
           {redactorActive && !redactorDocument && <DocumentRedactorFallback />}
@@ -249,6 +260,7 @@ export function AppShell() {
       </SheetContent>
       </div>
     </Sheet>
+    </FocusModeContext.Provider>
   );
 }
 

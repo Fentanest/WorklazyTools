@@ -1069,3 +1069,10 @@ body[data-consent-banner="visible"] .main-content {
   }
 }
 
+
+.app-shell.editor-mode .main-content {
+  padding-top: 0;
+}
+.app-shell.editor-mode .wl-topbar {
+  display: none;
+}

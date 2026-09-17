@@ -1,5 +1,6 @@
+import { useFocusMode } from "../../components/AppShell";
 import { AlertCircle, Download, FileText, FileUp, Save } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -46,6 +47,25 @@ export function OfficeEditorAppPage() {
   const [error, setError] = useState<string>();
   const [elapsed, setElapsed] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
+
+  const resetDrag = useCallback(() => {
+    dragDepth.current = 0;
+    setDragging(false);
+  }, []);
+
+  useEffect(() => {
+    const onWindowLeave = (e: DragEvent) => {
+      if (e.relatedTarget === null) resetDrag();
+    };
+    window.addEventListener("dragleave", onWindowLeave);
+    window.addEventListener("drop", resetDrag);
+    return () => {
+      window.removeEventListener("dragleave", onWindowLeave);
+      window.removeEventListener("drop", resetDrag);
+    };
+  }, [resetDrag]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<OfficeRuntime | undefined>(undefined);
   const runtimeTaintedRef = useRef(false);
@@ -311,40 +331,56 @@ export function OfficeEditorAppPage() {
     state === "opening" ||
     state === "saving" ||
     (state === "error" && runtimeTaintedRef.current && !runtimeRef.current);
+  useEffect(() => {
+    if (dropDisabled) resetDrag();
+  }, [dropDisabled, resetDrag]);
   const focusMode = state === "editing" || state === "saving";
+  const setAppFocusMode = (mode: string) => window.dispatchEvent(new CustomEvent("worklazy-focus", { detail: mode }));
+  useEffect(() => {
+    setAppFocusMode(focusMode ? "editor" : "standard");
+    return () => { setAppFocusMode("standard"); };
+  }, [focusMode, setAppFocusMode]);
+
   return (
     <div
       data-tool-page="office-editor-app"
       data-focus-mode={focusMode ? "true" : "false"}
       className={cn(
-        "mx-auto w-full max-w-[1440px]",
+        "mx-auto w-full max-w-[1440px] relative",
         focusMode
           ? "fixed inset-y-0 right-0 left-[280px] z-20 m-0 flex h-dvh w-auto max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[1020px]:left-[250px] max-[820px]:inset-0 max-[820px]:z-[60] max-[820px]:p-0"
           : "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(104px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
       )}
-      onDragEnter={(event) => {
-        if (event.dataTransfer.types.includes("Files") && !dropDisabled) {
-          event.preventDefault();
-          setDragging(true);
+      onDragEnterCapture={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        dragDepth.current++;
+        if (!dropDisabled) setDragging(true);
+      }}
+      onDragLeaveCapture={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        dragDepth.current--;
+        if (dragDepth.current <= 0 || !event.relatedTarget) resetDrag();
+      }}
+      onDragOverCapture={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        if (dragDepth.current === 0) {
+          dragDepth.current = 1;
+          if (!dropDisabled) setDragging(true);
         }
+      }}
+      onDropCapture={(event) => {
+        if (event.dataTransfer.types.includes("Files")) resetDrag();
       }}
       onDragOver={(event) => {
-        if (event.dataTransfer.types.includes("Files")) {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = dropDisabled ? "none" : "copy";
-        }
-      }}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-          setDragging(false);
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = dropDisabled ? "none" : "copy";
       }}
       onDrop={(event) => {
-        if ((event.target as Element).closest('[data-ui-part="drop-target"]'))
-          return;
+        if (!event.dataTransfer.types.includes("Files")) return;
+        if ((event.target as Element).closest('[data-ui-part="drop-target"]')) return;
         event.preventDefault();
-        setDragging(false);
-        if (!dropDisabled && event.dataTransfer.files[0])
-          chooseFile(event.dataTransfer.files[0]);
+        if (!dropDisabled && event.dataTransfer.files[0]) chooseFile(event.dataTransfer.files[0]);
       }}
     >
       <div
@@ -549,11 +585,11 @@ export function OfficeEditorAppPage() {
       </div>
       {dragging && !dropDisabled && (
         <div
-          className="pointer-events-none fixed inset-y-4 right-4 left-[296px] z-80 grid place-items-center content-center gap-2.5 rounded-[20px] border-[3px] border-dashed border-[#b496ff] bg-[rgba(54,37,82,.88)] text-white max-[1020px]:left-[266px] max-[820px]:inset-2 max-[820px]:rounded-[14px] [&_svg]:text-[#c8b3ff]"
+          className="pointer-events-none absolute inset-2 z-80 grid place-items-center content-center gap-2.5 rounded-3xl border-3 border-dashed border-primary/50 bg-background/90 text-foreground shadow-2xl backdrop-blur-sm"
           data-testid="office-drop-overlay"
         >
-          <FileUp size={32} />
-          <strong>
+          <FileUp size={36} className="text-primary" />
+          <strong className="text-lg">
             {L("여기에 놓아 문서 열기", "Drop to open the document")}
           </strong>
         </div>
