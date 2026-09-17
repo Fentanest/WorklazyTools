@@ -15,15 +15,13 @@ export function DocumentRedactorFallback() {
       <UtilityNotice kind="error" role="alert">
         {c.errors["not-ready"]}
       </UtilityNotice>
-      (
-        <ToolGuideWrapper slug="documentRedactor">
-          {c.fallbackNotice && (
-            <UtilityNotice className="mb-4" kind="warning">
-              {c.fallbackNotice}
-            </UtilityNotice>
-          )}
-        </ToolGuideWrapper>
-      )}
+      <ToolGuideWrapper slug="documentRedactor">
+        {c.fallbackNotice && (
+          <UtilityNotice className="mb-4" kind="warning">
+            {c.fallbackNotice}
+          </UtilityNotice>
+        )}
+      </ToolGuideWrapper>
     </UtilityPage>
   );
 }
