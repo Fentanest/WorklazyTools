@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { FileDropZone, FileList, PageHeader, PrimaryButton, SectionCard } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { UtilityPage } from "../../components/UtilitySurface";
@@ -201,22 +201,7 @@ export function HwpEditorPage() {
         {documentOpen && <RhwpVersionNotice mode="editor" compact />}
       </SectionCard>
 
-      {!documentOpen && <ToolGuide
-        title="브라우저 HWP 편집 안내"
-        description="Worklazy Tools에 포함된 공식 rhwp Studio가 별도 변환 서버 없이 브라우저 안에서 문서를 열고 편집·저장합니다."
-        blocks={[
-          { title: "편집 기능", paragraphs: ["글자 입력과 선택, 실행 취소·다시 실행, 글꼴·크기·강조·정렬·줄 간격, 표·그림·도형·수식·각주·미주·책갈피, 찾기와 문서 비교 등 현재 rhwp Studio에 활성화된 기능을 그대로 제공합니다."] },
-          { title: "저장 형식", paragraphs: ["편집 결과는 HWP와 HWPX로 내려받을 수 있습니다. XML 기반 한글 문서 형식인 HML 저장은 원본 구조가 공식 저장 조건을 만족할 때만 활성화되며, PDF는 편집기의 파일 메뉴에서 브라우저 인쇄 기능을 이용합니다."] },
-          { title: "공식 편집기 업데이트", paragraphs: ["Worklazy Tools는 rhwp 내부 코드를 수정하지 않습니다. 공식 릴리스의 버전과 커밋·파일 해시를 고정해 이 사이트에 포함하며, 새 버전은 실제 문서 열기·편집·저장 회귀 테스트를 통과한 뒤 교체합니다."] },
-        ]}
-        faq={[
-          { question: "문서가 변환 서버로 업로드되나요?", answer: "아니요. 파일 바이트는 같은 Worklazy Tools 배포물에 포함된 rhwp 편집기로 브라우저 MessageChannel을 통해 전달됩니다. 편집기 실행 파일과 WASM·글꼴도 외부 rhwp 사이트가 아니라 이 사이트에서 받습니다." },
-          { question: "암호 문서는 어떻게 여나요?", answer: "파일을 선택한 뒤 rhwp 편집기에서 표시하는 암호 입력 창을 사용하세요. 암호 역시 브라우저의 편집기 실행 공간에서만 사용됩니다." },
-          { question: "한글 프로그램의 모든 기능과 같나요?", answer: "아닙니다. 화면에는 현재 upstream rhwp Studio가 구현하고 활성화한 기능만 표시됩니다. 비활성 메뉴와 아직 upstream에 없는 기능을 Worklazy Tools가 임의로 구현하지는 않습니다." },
-          { question: "편집한 파일을 다시 HWP로 받을 수 있나요?", answer: "가능합니다. HWP 저장 시 공식 직렬화와 재열기 검증을 통과한 뒤 다운로드합니다. HWPX 저장도 함께 제공합니다." },
-          { question: "편집 중 화면을 닫으면 어떻게 되나요?", answer: "공식 Studio는 브라우저 저장 공간을 이용한 복구 기능을 제공할 수 있지만, 중요한 작업은 중간중간 파일로 내려받아 별도 보관하는 것이 안전합니다." },
-        ]}
-      />}
+      {!documentOpen && <ToolGuideWrapper slug="hwpEditor" />}
       {!documentOpen && <RhwpVersionNotice mode="editor" />}
     </UtilityPage>
   );

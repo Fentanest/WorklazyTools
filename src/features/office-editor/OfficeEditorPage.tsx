@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { FileDropZone, formatBytes, PageHeader } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -77,34 +77,7 @@ export function OfficeEditorPage() {
 
   <Card className="flex items-start gap-2.5 rounded-2xl border-primary/20 bg-primary/10 p-3.5 text-primary shadow-none dark:text-primary"><ShieldCheck className="mt-0.5 shrink-0" size={16} /><span className="flex flex-col gap-0.5"><strong className="text-[13px] text-foreground">{L("문서는 현재 브라우저 안에서만 열고 저장합니다.", "Documents are opened and saved only in your current browser.")}</strong><small className="text-xs leading-relaxed text-muted-foreground">{L("매크로 실행과 외부 문서 갱신은 열 때 차단합니다. 중요한 문서는 저장한 파일을 원래 프로그램에서도 확인하세요.", "Macro execution and external document updates are blocked on open. Verify important saved files in their original application.")}</small></span></Card>
 
-  <ToolGuide
-   title={L("브라우저 오피스 편집기 안내", "Browser office editor guide")}
-   description={L("LibreOffice를 브라우저에서 실행하는 대용량 편집 기능입니다.", "This large editor runs LibreOffice in your browser.")}
-   blocks={language === "en" ? [
-    { title: "One-step opening", paragraphs: ["Drop or choose one supported file to move to the focused workspace, prepare the editor, and open the document automatically."] },
-    { title: "First download", paragraphs: [`The first start downloads about ${downloadSize}, including a Korean fallback font. A byte-based progress bar and current step are shown, and the files are cached for later visits.`] },
-    { title: "Compatibility", paragraphs: ["Writer, Calc, and Impress formats are supported. A Korean fallback font is included, but pagination and advanced Microsoft Office features can still render differently."] },
-    { title: "Privacy and safety", paragraphs: ["A file dropped on this guide page is held briefly in browser storage only to cross into the focused workspace, then removed immediately. Macros and external document updates are disabled when it opens."] },
-    { title: "Saving", paragraphs: ["Save downloads a copy using the current filename. The output container is checked before the browser offers it for download."] },
-   ] : [
-    { title: "한 번에 열기", paragraphs: ["지원 파일 한 개를 놓거나 선택하면 집중 작업 화면 이동, 편집기 준비와 문서 열기를 자동으로 이어서 실행합니다."] },
-    { title: "최초 다운로드", paragraphs: [`처음 시작할 때 한글 대체 글꼴을 포함해 약 ${downloadSize}를 내려받습니다. 실제 바이트 기준 진행률과 현재 단계를 표시하고 다음 방문을 위해 브라우저에 보관합니다.`] },
-    { title: "호환성", paragraphs: ["Writer, Calc, Impress 형식과 한글 대체 글꼴을 지원하지만 페이지 나눔과 복잡한 Microsoft Office 기능은 다르게 표시될 수 있습니다."] },
-    { title: "개인정보와 안전", paragraphs: ["안내 화면에 놓은 파일은 집중 작업 화면으로 넘기는 동안만 브라우저 저장 공간에 보관하고 가져온 즉시 삭제합니다. 문서를 열 때 매크로 실행과 외부 문서 갱신은 차단합니다."] },
-    { title: "저장", paragraphs: ["저장을 누르면 현재 파일 이름으로 사본을 내려받습니다. 브라우저가 다운로드를 제공하기 전에 출력 파일 구조를 확인합니다."] },
-   ]}
-   faq={language === "en" ? [
-    { question: "Why is the first start large?", answer: "A browser build of the office suite and its fonts and resources must be stored locally. Later starts can reuse the cache." },
-    { question: "Does Korean text display correctly?", answer: "A Korean fallback font is bundled. Documents that require proprietary fonts can still have different line breaks or spacing." },
-    { question: "Is this an official Microsoft Office web app?", answer: "No. It is a LibreOffice-based browser editor and compatibility can differ from Microsoft Office." },
-    { question: "Are HWP files supported here?", answer: "Use the dedicated HWP editor for HWP/HWPX files. This editor focuses on Writer, Calc, and Impress formats." },
-   ] : [
-    { question: "처음 실행 용량이 큰 이유는 무엇인가요?", answer: "오피스 프로그램과 글꼴·리소스를 브라우저에 저장해야 하기 때문입니다. 다음 실행부터는 저장된 파일을 재사용할 수 있습니다." },
-    { question: "한글 글꼴도 표시되나요?", answer: "한글 대체 글꼴을 함께 제공합니다. 전용 상용 글꼴이 필요한 문서는 줄바꿈이나 글자 간격이 원본과 다를 수 있습니다." },
-    { question: "Microsoft의 공식 웹 오피스인가요?", answer: "아닙니다. LibreOffice 기반 브라우저 편집기이며 Microsoft Office와 호환성 차이가 있을 수 있습니다." },
-    { question: "HWP도 여기서 편집할 수 있나요?", answer: "HWP/HWPX는 전용 HWP 편집기를 이용하세요. 이 편집기는 Writer·Calc·Impress 형식에 초점을 둡니다." },
-   ]}
-  />
+  <ToolGuideWrapper slug="officeEditor" />
  </UtilityPage>;
 }
 

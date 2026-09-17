@@ -5,7 +5,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "re
 import { NavLink } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityPage } from "../../components/UtilitySurface";
 import { PageHeader } from "../../components/ui";
 import { ToolReady } from "../../components/RouteErrorBoundary";
@@ -146,5 +146,5 @@ function PdfGuide({ mode }: { mode: PdfToolMode }) {
   const language = useAppLanguage();
   const page = featureResource<PdfPageCopy>(language, "pdf.page");
   const guide = page.guides[mode === "convert" ? "convert" : "standard"];
-  return <ToolGuide title={guide.title} description={guide.description} blocks={guide.blocks} faq={guide.faq} />;
+  return <ToolGuideWrapper slug={mode === "convert" ? "pdfEditor.convert" : "pdfEditor.standard"} />;
 }

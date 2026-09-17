@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { OperationProgress } from '../../components/OperationProgress';
-import { ToolGuide } from '../../components/ToolGuide';
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { FileDropZone, PageHeader, PrimaryButton, formatBytes } from '../../components/ui';
 import { Button } from '../../components/ui/button';
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from '../../components/UtilitySurface';
@@ -189,7 +189,7 @@ export function DocumentGeneratorPage() {
       {zip&&zipAttemptId===snapshot.resultAttemptId&&<a className="mt-3 inline-flex items-center gap-2 font-bold text-primary underline dark:text-primary" href={zip.url} download="generated-documents.zip"><Download size={16}/>{tr('features:documentGenerator.results.downloadZip')}</a>}
     </UtilitySectionCard>}
     {message&&<UtilityNotice kind="error" role="alert">{message}</UtilityNotice>}
-    <ToolGuide title={tr('features:documentGenerator.title')} description={guide.description} blocks={guide.blocks as import("../../components/ToolGuide").GuideBlock[]} faq={(guide.faq || []).map((item: any)=>({question:item.q,answer:item.a}))}/>
+    <ToolGuideWrapper slug="documentGenerator" />
   </UtilityPage>;
 }
 

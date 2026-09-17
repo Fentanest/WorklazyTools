@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { PageHeader, PrimaryButton } from "../../components/ui";
 import { Button } from "../../components/ui/button";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import {
   pairedEditorClassName,
   UtilityNotice,
@@ -75,7 +75,7 @@ export function TextToolsPage() {
         {ruleCount > 0 && <p className="mt-3.5 flex items-center gap-2 text-sm font-bold text-green-700 dark:text-green-300" data-testid="text-inspection-summary"><CheckCheck size={16} /> {t("features:textTools.summary", { rules: ruleCount, findings: findings.length })}</p>}
         <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="text-findings">{findings.map((finding) => <article className="rounded-xl border border-border bg-muted p-3" key={finding.id}><div className="flex items-center gap-2 text-sm"><strong className="text-red-700 line-through dark:text-red-300">{finding.before}</strong><span>→</span><b className="text-green-700 dark:text-green-300">{finding.after}</b></div><p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{finding.label} · {t("features:textTools.places", { count: finding.count })}</p></article>)}{ruleCount > 0 && !findings.length && <p className="col-span-full rounded-xl bg-muted p-5 text-center text-sm text-muted-foreground">{t("features:textTools.empty")}</p>}</div>
       </UtilitySectionCard>
-      <ToolGuide title={t("features:textTools.guide.title")} description={t("features:textTools.guide.description")} blocks={t("features:textTools.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]} faq={(t("features:textTools.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))} />
+      <ToolGuideWrapper slug="textTools" />
     </UtilityPage>
   );
 }

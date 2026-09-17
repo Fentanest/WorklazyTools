@@ -24,7 +24,7 @@ import { useLocation } from "react-router-dom";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { FileShareButton } from "../../components/FileShareButton";
 import { OperationProgress } from "../../components/OperationProgress";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
 import {
   FileDropZone,
@@ -745,12 +745,7 @@ export function ExcelMergerPage() {
         </ResultCard>
       )}
 
-      <ToolGuide
-        title={t("excel.guide.title")}
-        description={t("excel.guide.description")}
-        blocks={t("excel.guide.blocks", { returnObjects: true }) as Array<{ title: string; paragraphs: string[]; items?: string[] }>}
-        faq={(t("excel.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
-      />
+      <ToolGuideWrapper slug="excel" />
       {preserveLegacyXls && <canvas ref={converterCanvasRef} id="qtcanvas" className="pointer-events-none fixed size-px opacity-0" aria-hidden="true" />}
       </div>
     </UtilityPage>

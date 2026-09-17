@@ -28,7 +28,7 @@ import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { FileDropZone, PageHeader, ToggleRow, formatBytes } from "../../components/ui";
 import { Button } from "../../components/ui/button";
@@ -695,12 +695,7 @@ export function AudioStudioPage({ preset }: { preset?: AudioDirectPreset }) {
       {busy && <div className="mt-2 flex justify-end"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => { cancelDecode(); activeControllerRef.current?.abort(); progress.fail(t("audio.status.cancelled")); }}><LoaderCircle size={16} /> {t("audio.cancel")}</Button></div>}
       {lastResult && <UtilityNotice className="mt-3" kind="success" role="status" data-testid="audio-result"><FileAudio2 className="mt-0.5 shrink-0" size={18} /><span>{lastResult}</span></UtilityNotice>}
 
-      <ToolGuide
-        title={t("audio.guide.title")}
-        description={t("audio.guide.description")}
-        blocks={t("audio.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]}
-        faq={(t("audio.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
-      />
+      <ToolGuideWrapper slug="audio" />
       </div>
     </UtilityPage>
   );

@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
 import { FileDropZone, PageHeader, PrimaryButton, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
 import { Button } from "../../components/ui/button";
@@ -882,12 +882,7 @@ export function VideoStudioPage({ preset }: { preset?: VideoDirectPreset }) {
         </UtilitySectionCard>
       )}
 
-      <ToolGuide
-        title={featureMessage(language, "video.messages.VideoStudioPage.browserVideoProcessingGuide")}
-        description={featureMessage(language, "video.messages.VideoStudioPage.videoFilesAreProcessedInAnIsolatedWorkspace")}
-        blocks={videoPage.guide.blocks}
-        faq={videoPage.guide.faq}
-      />
+      <ToolGuideWrapper slug="video.page" />
     </UtilityPage>
   );
 }

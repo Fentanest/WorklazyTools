@@ -16,7 +16,7 @@ import { type ChangeEvent, type DragEvent, useMemo, useRef, useState } from "rea
 import { useTranslation } from "react-i18next";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { PageHeader, PrimaryButton, ToggleRow } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -260,12 +260,7 @@ export function TextMergerPage() {
         </div>
       </UtilitySectionCard>
 
-      <ToolGuide
-        title={t("features:textMerger.guide.title")}
-        description={t("features:textMerger.guide.description")}
-        blocks={t("features:textMerger.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]}
-        faq={(t("features:textMerger.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
-      />
+      <ToolGuideWrapper slug="textMerger" />
     </UtilityPage>
   );
 }

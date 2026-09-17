@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { PageHeader } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import {
   UtilityField,
   UtilityInput,
@@ -145,12 +145,7 @@ export function TimezoneCalculatorPage() {
         {meetingSlots.length ? <div className="grid gap-1.5">{meetingSlots.map((slot) => <div className="grid grid-cols-[auto_160px_minmax(0,1fr)] items-center gap-[9px] rounded-xl bg-sky-500/10 p-2.5 text-sky-700 max-[620px]:grid-cols-[auto_minmax(0,1fr)] dark:text-sky-300" key={slot.key}><Clock3 size={18} /><strong className="text-sm text-foreground">{slot.base}</strong><span className="min-w-0 text-xs leading-5 text-muted-foreground max-[620px]:col-span-full">{slot.locals.join(" · ")}</span></div>)}</div> : <p className="m-0 rounded-xl bg-muted p-[22px] text-center text-sm text-muted-foreground">{t("timezone.noMeeting")}</p>}
       </UtilitySectionCard>
 
-      <ToolGuide
-        title={t("timezone.guide.title")}
-        description={t("timezone.guide.description")}
-        blocks={t("timezone.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]}
-        faq={(t("timezone.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
-      />
+      <ToolGuideWrapper slug="timezone" />
     </UtilityPage>
   );
 }

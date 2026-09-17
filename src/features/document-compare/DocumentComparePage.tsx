@@ -6,7 +6,7 @@ import { FileShareButton } from "../../components/FileShareButton";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { PageHeader, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -223,30 +223,7 @@ export function DocumentComparePage() {
         </Card>)}</div>
       </section>}
 
-      <ToolGuide
-        title={L("문서 비교 사용 안내", "Document comparison guide")}
-        description={L("Word와 HWP 문서 계열을 한 화면에서 비교하되 서로 다른 계열의 잘못된 조합은 차단합니다.", "Compare Word and HWP document families in one tool while blocking invalid cross-family pairs.")}
-        blocks={language === "en" ? [
-          { title: "Supported pairs", paragraphs: ["DOCX and DOC can be compared with each other. HWP and HWPX can be compared with each other. A Word file cannot be paired with an HWP file."] },
-          { title: "How matching works", paragraphs: ["The same alignment rules handle empty paragraphs, nearby edits, paragraph splits or merges, and moved paragraphs for every supported format."] },
-          { title: "Tracked Word output", paragraphs: ["Tracked output is limited to DOCX pairs. By default, existing revision authors are preserved. Turn on Use one revision author to accept existing revisions first, assign new tracked changes to the name you enter, preserve existing comments, and use that name only for comments newly added to the revised document."] },
-          { title: "Items to verify", paragraphs: ["Exact page layout, drawing objects, calculated fields, review data, and complex nested tables may differ from desktop office applications."] },
-        ] : [
-          { title: "지원 조합", paragraphs: ["DOCX와 DOC는 서로 비교할 수 있고, HWP와 HWPX도 서로 비교할 수 있습니다. Word 문서와 HWP 문서를 한 쌍으로 비교할 수는 없습니다."] },
-          { title: "문단 대응 방식", paragraphs: ["모든 지원 형식에 같은 정렬 규칙을 적용해 빈 문단, 가까운 문구 수정, 문단 분할·병합과 문단 이동을 구분합니다."] },
-          { title: "Word 변경 추적", paragraphs: ["DOCX 문서 쌍에서만 변경 추적 파일을 만듭니다. 기본값에서는 기존 변경 내용의 작성자를 보존합니다. 작성자 통일을 켜면 기존 변경 내용을 먼저 수락한 뒤 새 변경 기록을 입력한 이름으로 통일하며, 기존 메모는 유지하고 수정 후 문서에 새로 추가된 메모만 같은 이름을 사용합니다."] },
-          { title: "확인이 필요한 항목", paragraphs: ["정확한 페이지 배치, 도형, 계산 필드, 검토 기록과 복잡한 중첩 표는 데스크톱 오피스 프로그램의 결과와 다를 수 있습니다."] },
-        ]}
-        faq={language === "en" ? [
-          { question: "Can I compare DOC with DOCX?", answer: "Yes. Both belong to the Word family, so either order is supported." },
-          { question: "Can I compare DOCX with HWP?", answer: "No. The pair is rejected before analysis. Pair Word files together and HWP files together." },
-          { question: "Does tracked Word output work for DOC?", answer: "No. It is limited to pairs where both files are DOCX." },
-        ] : [
-          { question: "DOC와 DOCX를 서로 비교할 수 있나요?", answer: "가능합니다. 둘 다 Word 계열이므로 어느 쪽 순서든 비교할 수 있습니다." },
-          { question: "DOCX와 HWP를 비교할 수 있나요?", answer: "불가능합니다. 분석 전에 해당 쌍을 차단하므로 Word 문서끼리, HWP 문서끼리 짝지어 주세요." },
-          { question: "DOC도 Word 변경 추적 파일을 만들 수 있나요?", answer: "아닙니다. 두 파일이 모두 DOCX인 문서 쌍에만 적용됩니다." },
-        ]}
-      />
+      <ToolGuideWrapper slug="documentCompare" />
       <RhwpVersionNotice mode="compare" />
     </UtilityPage>
   );

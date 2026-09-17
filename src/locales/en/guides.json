@@ -1,0 +1,1382 @@
+{
+  "documentCompare": {
+    "title": "Usage Guide",
+    "description": "Compare Word and Hangul (HWP) documents before and after revisions to check for changes in text, tables, and formatting.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "Finding changes in a revised report",
+          "Comparing multiple drafts against the original",
+          "Checking for missing or added document content."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Add the pre-revision and post-revision files respectively.",
+          "Check the file mapping and order for comparison.",
+          "Run the comparison.",
+          "Review the original and revised versions along with the list of changes on the result screen.",
+          "Save the desired results."
+        ]
+      },
+      {
+        "title": "Results and Precautions",
+        "paragraphs": [
+          "Read the original text alongside the change indicators to verify if it represents an actual meaning change. Indicators might appear due to internal structure or formatting differences. Automated handling may be difficult if similar types of content repeat."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Can I use both Word and Hangul files?",
+        "a": "You can select and compare supported Word and Hangul files. Check the support guide in the selection area for openable formats and file-specific limitations."
+      },
+      "faq_1": {
+        "q": "Can I compare DOC with DOCX?",
+        "a": "Yes. Both belong to the Word family, so either order is supported."
+      },
+      "faq_2": {
+        "q": "Can I compare DOCX with HWP?",
+        "a": "No. The pair is rejected before analysis. Pair Word files together and HWP files together."
+      },
+      "faq_3": {
+        "q": "Does tracked Word output work for DOC?",
+        "a": "No. It is limited to pairs where both files are DOCX."
+      }
+    },
+    "pathFaqs": {
+      "/tools/document-compare": [
+        "faq_1",
+        "faq_2",
+        "faq_3"
+      ]
+    }
+  },
+  "security": {
+    "title": "Password Generator Guide",
+    "description": "Created using the secure random number function provided by the operating system, and passwords are not sent to the server.",
+    "blocks": [
+      {
+        "title": "Long and Unique",
+        "paragraphs": [
+          "It is recommended to use different passwords of at least 16 characters for each site and store them in a password manager."
+        ]
+      },
+      {
+        "title": "Strength Score",
+        "paragraphs": [
+          "Calculated based on estimated guess attempts and patterns like common words, repetitions, and sequential characters. It does not check for leaks or the multi-factor authentication status of the account."
+        ]
+      },
+      {
+        "title": "Estimated Crack Time",
+        "paragraphs": [
+          "A comparative value assuming a stored password hash is leaked and an attacker can attempt 10 billion guesses per second. Actual time varies greatly depending on the site's storage method and security settings."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Are the generated passwords saved?",
+        "a": "No. They disappear once you leave the current screen."
+      },
+      "faq_1": {
+        "q": "Does the estimated crack time mean actual security time?",
+        "a": "No. It is a hypothetical value to compare the strength between passwords. Actual attack conditions vary based on login attempt limits, password storage methods, and multi-factor authentication."
+      },
+      "faq_2": {
+        "q": "Are copied passwords safe?",
+        "a": "Since other apps can access the clipboard, it is recommended to copy and overwrite it with something else after use."
+      }
+    }
+  },
+  "formatter": {
+    "title": "Formatter Usage Guide",
+    "description": "Entered text is processed only in the browser's separate workspace.",
+    "blocks": [
+      {
+        "title": "Error Checking",
+        "paragraphs": [
+          "JSON and XML show the location where errors are found, and SQL arranges lines and indentation based on statement components."
+        ]
+      },
+      {
+        "title": "Minify to One Line",
+        "paragraphs": [
+          "Maintains text and spaces inside quotes, and only reduces unnecessary spaces and line breaks that are not required for the data structure."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Does it execute SQL?",
+        "a": "No. It only formats text without a database connection."
+      },
+      "faq_1": {
+        "q": "Does it auto-recover invalid JSON?",
+        "a": "To prevent data alteration, it shows the error without arbitrarily recovering it."
+      }
+    }
+  },
+  "converter": {
+    "title": "Table Data Conversion Guide",
+    "description": "Files and text are processed in the browser's separate workspace.",
+    "blocks": [
+      {
+        "title": "CSV",
+        "paragraphs": [
+          "Uses the first row as column names, and interprets cells with quotes, commas, and line breaks using standard CSV quote rules."
+        ]
+      },
+      {
+        "title": "JSON / HTML",
+        "paragraphs": [
+          "Gathers all keys from a JSON object array into columns, and HTML tables use the first row as headers."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Are large CSV files supported?",
+        "a": "Processed as a separate task within the browser's memory limit. Hundreds of thousands of rows may take time depending on file size and device memory."
+      },
+      "faq_1": {
+        "q": "Are scripts inside HTML executed?",
+        "a": "No. It only extracts text from table cells and does not insert or execute the input HTML on the screen."
+      }
+    }
+  },
+  "textMerger": {
+    "title": "Text Merger Usage Guide",
+    "description": "Gathers manually entered text and TXT files into one list and merges them into a single text.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "Consolidating multiple notes into one file",
+          "Inserting guide sentences between TXT files",
+          "Connecting separated lists in a specific order."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Add manual input or TXT files.",
+          "Determine the order of the cards.",
+          "Choose the line break, space, or separator character to insert between each text.",
+          "Check the merged result and copy it or save it as a TXT file."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Can I insert manually written sentences between files?",
+        "a": "Yes. You can place manual input cards and TXT file cards in any desired order within the same list."
+      },
+      "faq_1": {
+        "q": "Can pasted text be placed between TXT files?",
+        "a": "Yes. Pasted text and TXT files share one card list and can be reordered freely by dragging or with the up and down buttons."
+      },
+      "faq_2": {
+        "q": "Are pasted text or TXT files sent to a server?",
+        "a": "No. Content is read and merged only in the current browser and is not kept on a server or in browser storage."
+      },
+      "faq_3": {
+        "q": "Does editing loaded TXT content change the original file?",
+        "a": "No. Only the card and merged result change. The original TXT file remains untouched."
+      }
+    },
+    "pathFaqs": {
+      "/tools/text-merger": [
+        "faq_1",
+        "faq_2",
+        "faq_3"
+      ]
+    }
+  },
+  "textTools": {
+    "title": "Text Tools Usage Guide",
+    "description": "Cleans up spaces, line breaks, and duplicate lines in pasted text according to the selected method.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "When copied text has many unnecessary line breaks",
+          "Removing duplicate lines from a list",
+          "Standardizing the formatting of English names."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Paste the original text.",
+          "Choose the necessary actions, such as space cleanup or line break merging.",
+          "Compare the result with the original text.",
+          "Copy and use the result."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Does it also fix the content or meaning of the text?",
+        "a": "Space and line cleanup applies selected rules. It is not a feature that understands the meaning and rewrites sentences."
+      }
+    }
+  },
+  "work": {
+    "title": "Working Day Calculation Criteria",
+    "description": "Public holiday information and annual leave results are reference values for schedule planning.",
+    "blocks": [
+      {
+        "title": "Public Holidays",
+        "paragraphs": [
+          "Calculates solar public holidays, Seollal, Chuseok, Buddha's Birthday, and substitute holidays. Fixed election days and temporary holidays are also reflected in the yearly list. Please manually add company holidays."
+        ]
+      },
+      {
+        "title": "Annual Leave",
+        "paragraphs": [
+          "Applies the basic accrual structure under the Labor Standards Act, but the actual granted days may vary depending on the company's fiscal year operation and time-and-attendance settlement methods."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Are temporary holidays automatically reflected?",
+        "a": "Confirmed public holidays reflected in the yearly list are automatically calculated. If recent government announcements are not yet reflected, or if it's a company-specific day off, please add it manually."
+      },
+      "faq_1": {
+        "q": "Is the final leave settlement upon resignation identical?",
+        "a": "No. Resignation settlements require checking both the accrued leave based on the joining date and the number of days used at the company."
+      }
+    }
+  },
+  "payroll": {
+    "title": "Simple Payroll Calculator Guide",
+    "description": "Does not replace actual payslips and statutory settlements.",
+    "blocks": [
+      {
+        "title": "Net Pay",
+        "paragraphs": [
+          "Estimates social insurance and monthly income tax based on the monthly taxable salary (excluding non-taxable allowances like meals) and the number of dependents. It may vary depending on the company's reported standard monthly income, non-taxable items, and withholding rates."
+        ]
+      },
+      {
+        "title": "Severance Pay",
+        "paragraphs": [
+          "Reflects the wages of the 3 months before retirement and 3/12 of the recent year's bonuses and annual leave allowances. The total number of days for 3 months includes calendar dates including holidays. Separate verification is needed if the calculated average wage is lower than the ordinary wage."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Is the entered salary saved?",
+        "a": "No. All values are calculated only in the current screen state and browser memory."
+      },
+      "faq_1": {
+        "q": "Can I use it for tax reporting?",
+        "a": "No. It is an estimated value for reference, and actual withholding and severance pay should be verified with the company's payroll manager or relevant authorities."
+      }
+    }
+  },
+  "imagePrivacy": {
+    "title": "Photo Metadata Remover Guide",
+    "description": "Check and remove hidden details like capture location, device, and time embedded inside the file, rather than the visible content of the photo.",
+    "blocks": [
+      {
+        "title": "Use it when",
+        "items": [
+          "Checking capture location details before sharing a photo publicly.",
+          "You need a copy that doesn't include the camera device or capture time."
+        ]
+      },
+      {
+        "title": "How to use",
+        "items": [
+          "Choose JPG, PNG, or WebP photos.",
+          "Press 'Inspect and remove metadata'.",
+          "Review the detected capture details and save the cleaned photo.",
+          "Check the orientation and appearance of the saved photo."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Which photo formats are supported?",
+        "a": "JPG, PNG and WebP are supported; HEIC and HEIF are not. Files with either a .jpg or .jpeg extension are accepted. Convert HEIC or HEIF photos to a supported format before selecting them."
+      },
+      "faq_1": {
+        "q": "Are faces or text in the photo also erased?",
+        "a": "No. This tool handles hidden information embedded inside the file, like capture details. To redact visible content in a photo, use image editing or the document redactor."
+      }
+    }
+  },
+  "qr": {
+    "title": "QR Code Usage Guide",
+    "description": "Generated content, camera frames, and scanned images are not sent to external servers.",
+    "blocks": [
+      {
+        "title": "Center Logo",
+        "paragraphs": [
+          "Uses a high error correction level and adds a white margin behind the logo. If the logo is too complex, the recognition rate may drop on some cameras."
+        ]
+      },
+      {
+        "title": "Real-time Camera",
+        "paragraphs": [
+          "Prioritizes the rear camera after obtaining user permission over a secure connection (HTTPS). When a QR is found, it immediately stops the camera and analysis operations."
+        ]
+      },
+      {
+        "title": "Photo Scan",
+        "paragraphs": [
+          "Large images are downscaled to a maximum of 2200px within the browser, and it also attempts to find the QR by inverting bright and dark colors."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Does it also check the safety of the QR URL?",
+        "a": "No. It merely displays the QR data and does not guarantee the safety of the linked site."
+      },
+      "faq_1": {
+        "q": "When is the camera permission used?",
+        "a": "Permission is requested only when the scan via camera button is pressed. The camera track is immediately stopped upon scan completion, turning off the camera, switching tabs, or closing the page."
+      },
+      "faq_2": {
+        "q": "Which table files can create QR codes in bulk?",
+        "a": "It reads XLSX, XLSM, XLS, XLSB, SpreadsheetML XLS and CSV files, then creates one QR code for every data row in the selected sheet."
+      },
+      "faq_3": {
+        "q": "Are generated QR codes checked for readability?",
+        "a": "Yes. The final PNG, including a logo or transparent background, is decoded again and accepted only when it exactly matches the original payload."
+      },
+      "faq_4": {
+        "q": "Are tables or QR results uploaded to a server?",
+        "a": "No. Table reading, QR creation, ZIP, label PDF and report generation happen in the current browser without modifying the source file."
+      }
+    },
+    "pathFaqs": {
+      "/tools/qr-studio/bulk": [
+        "faq_2",
+        "faq_3",
+        "faq_4"
+      ]
+    }
+  },
+  "timezone": {
+    "title": "World Time Zone Map Usage Guide",
+    "description": "The map and city coordinates are included in the site, and selection information is not transmitted outside the browser.",
+    "blocks": [
+      {
+        "title": "Map and City Selection",
+        "paragraphs": [
+          "You can select up to 6 cities using pins or city search. After zooming in, drag the map to check pins in dense areas."
+        ]
+      },
+      {
+        "title": "Daylight Saving Time (DST)",
+        "paragraphs": [
+          "Cities like New York, London, and Sydney have different transition dates. The time difference with UTC is calculated using the International standard city time zone (IANA) rules for the selected date."
+        ]
+      },
+      {
+        "title": "Meeting Recommendations",
+        "paragraphs": [
+          "Displays only the intervals (in 30-minute increments) where all selected cities are within their local 09:00~18:00."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Does it connect to an external map server while using the map?",
+        "a": "No. The Natural Earth-based world map and city coordinates are distributed together as static assets."
+      },
+      "faq_1": {
+        "q": "Can I tap anywhere on the map to find a time zone?",
+        "a": "No. Currently, you can only select major city pins registered with official time zone information and search results."
+      },
+      "faq_2": {
+        "q": "Are public holidays reflected?",
+        "a": "This tool only compares time differences and local business hours, and does not reflect country-specific public holidays."
+      }
+    }
+  },
+  "excel": {
+    "title": "Excel Merger Usage Guide",
+    "description": "Gathers multiple Excel files by sheet, or concatenates tables downwards or sideways.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "Consolidating departmental data into one file",
+          "Merging monthly lists vertically",
+          "Attaching divided tables in a specific direction."
+        ]
+      },
+      {
+        "title": "What to Prepare",
+        "paragraphs": [
+          "Excel or CSV files to merge and the sheets to include."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Add files and select the sheets to merge.",
+          "Check the order of files and sheets that will be in the result.",
+          "Choose a merging method. 'By Sheet' collects sheets, 'Vertical' appends downwards, and 'Horizontal' appends sideways.",
+          "Review options to maintain formulas and formatting, and the support guide on the screen, before merging.",
+          "Open the result and check if the number of sheets, rows, and column positions are as expected."
+        ]
+      },
+      {
+        "title": "Results and Precautions",
+        "paragraphs": [
+          "Creates a new XLSX file. Features beyond macros and the supported range may not be maintained, so keep the original. Do not confuse horizontal merging with features that automatically link data based on criteria like customer ID."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Can XLSX formulas and formatting be preserved independently?",
+        "a": "Yes. Formula and formatting preservation are separate XLSX switches on the current screen and require no additional files."
+      },
+      "faq_1": {
+        "q": "Can XLS formulas and formatting be preserved independently?",
+        "a": "Yes. Formula and formatting preservation are separate switches, and either one opens the higher-fidelity conversion workspace."
+      },
+      "faq_2": {
+        "q": "Does preservation retain every XLS feature perfectly?",
+        "a": "It prioritizes formulas and common cell formatting, but charts, external links, macros and some advanced objects can differ. Verify important output in Excel."
+      }
+    },
+    "pathFaqs": {
+      "/tools/excel-merger": [
+        "faq_0",
+        "faq_1",
+        "faq_2"
+      ]
+    }
+  },
+  "audio": {
+    "title": "Audio Waveform Editing Guide",
+    "description": "Selected audio and editing data are not transmitted to an external server and are processed only within the current browser.",
+    "blocks": [
+      {
+        "title": "Waveform Selection",
+        "paragraphs": [
+          "Dragging the waveform creates a purple selection area. You can move the entire area, adjust the handles on both sides, and specify values down to 1ms by entering the start and end seconds."
+        ]
+      },
+      {
+        "title": "Sample-level Editing",
+        "paragraphs": [
+          "Mute changes selected samples to 0, and Cut and Delete pull trailing samples forward. Paste inserts the memory clip at the current red playback cursor position."
+        ]
+      },
+      {
+        "title": "Voice Effects for Selected Section",
+        "paragraphs": [
+          "Low Pitch, High Pitch, and Child Voice change the pitch while maintaining the original length, and Robot rapidly modulates the amplitude. You can preview the selected section before applying, and short crossfades are added at the boundaries."
+        ]
+      },
+      {
+        "title": "Keyboard Shortcuts",
+        "paragraphs": [
+          "Outside input fields, use Space to Play/Pause, and Ctrl+Z or Cmd+Z (on macOS) to Undo. Ctrl+Shift+Z, Cmd+Shift+Z, Ctrl+Y, or Cmd+Y are for Redo."
+        ]
+      },
+      {
+        "title": "Undo and Memory",
+        "paragraphs": [
+          "Uncompressed voice samples (PCM) for editing are kept per channel. The Undo history is automatically limited to a maximum of 12 steps and an approx. 256MB limit depending on file size, and is cleared when a new file is opened."
+        ]
+      },
+      {
+        "title": "WAV and MP3",
+        "paragraphs": [
+          "WAV creates highly compatible 16-bit uncompressed audio quickly. Audio processing features needed for MP3 saving and pitch effects are prepared on first use, reducing preparation time on the same editing screen."
+        ]
+      },
+      {
+        "title": "Browser File Support",
+        "paragraphs": [
+          "MP3 and WAV can be opened in general modern browsers. M4A, AAC, and OGG can be edited when the operating system and browser support the audio compression method in the file."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Is audio uploaded to the server?",
+        "a": "No. Opening files, editing samples, waveform previews, and resulting conversions are executed solely in the current browser."
+      },
+      "faq_1": {
+        "q": "Do low pitch and high pitch change gender?",
+        "a": "No. It is an effect that changes only the pitch and timbre of the selected section without determining or changing a person's gender."
+      },
+      "faq_2": {
+        "q": "Where does Paste get inserted?",
+        "a": "It gets inserted at the current time of the red playback cursor, positioned by clicking or playing the waveform."
+      },
+      "faq_3": {
+        "q": "Why do long files use a lot of memory?",
+        "a": "Because even compressed audio must be decompressed into uncompressed samples per channel for editing, and waveform playback data and Undo states are also kept."
+      },
+      "faq_4": {
+        "q": "Is MP3 created immediately offline?",
+        "a": "It might be possible if the encoder was cached previously. For your first visit in a completely offline state, please use WAV."
+      },
+      "faq_5": {
+        "q": "Do editing results overwrite the original?",
+        "a": "No. The original file is not modified, and you download a new WAV or MP3 file."
+      },
+      "faq_6": {
+        "q": "Can I pick an audio section and save it?",
+        "a": "Yes. Open the file, select the section, and save only that part."
+      },
+      "faq_7": {
+        "q": "Does anything process automatically on open?",
+        "a": "No. Nothing is processed automatically."
+      }
+    },
+    "pathFaqs": {
+      "/tools/audio-studio/trim": [
+        "faq_6",
+        "faq_7"
+      ]
+    }
+  },
+  "image": {
+    "title": "Browser Image Editing Guide",
+    "description": "Original images and editing results are not uploaded to external processing servers.",
+    "blocks": [
+      {
+        "title": "Integrated Image Editing",
+        "paragraphs": [
+          "Open a photo or start with a blank canvas to use adjustments, drawing, text, shapes, and searchable stickers within one work history. You can change the entire content or canvas size separately and specify the export pixel size. Zoom in with the mouse wheel, drag while pressing Space to move, and use two fingers to zoom and move on mobile."
+        ]
+      },
+      {
+        "title": "Area Mosaic / Blur",
+        "paragraphs": [
+          "You can drag areas to obscure in the photo and adjust the effect intensity. The effect applies based on the original photo, so if areas overlap, the last effect is visible. It does not apply to separately drawn lines or text. For sensitive information, a strong mosaic is recommended over a low-intensity blur. Before downloading, zoom in to check the obscured state."
+        ]
+      },
+      {
+        "title": "Batch Processing",
+        "paragraphs": [
+          "Add multiple files and clipboard images to apply resizing and watermarks, and bundle them into a ZIP."
+        ]
+      },
+      {
+        "title": "Collage and GIF",
+        "paragraphs": [
+          "Provides downscaled previews equal to the actual output calculation, and GIFs may have simplified color changes due to the 256-color limit."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Are images sent to the server?",
+        "a": "No. They are processed only within the current browser."
+      },
+      "faq_1": {
+        "q": "Is the original file changed?",
+        "a": "No. All results are downloaded as new files."
+      },
+      "faq_2": {
+        "q": "Can I recover contents obscured by mosaic or blur?",
+        "a": "For downloaded PNG, JPG, or WebP files, the effects are embedded into the original photo pixels, leaving no previous pixels of the obscured areas. However, during the editing session before downloading, you can revert to the pre-effect state using Undo."
+      },
+      "faq_3": {
+        "q": "What formats are supported?",
+        "a": "Inputs are JPG, PNG, and WebP; HEIC and HEIF are not supported. Outputs are PNG, JPG, WebP, and GIF."
+      },
+      "faq_4": {
+        "q": "Can I keep the transparent background?",
+        "a": "PNG and WebP maintain transparency, whereas JPG treats it as white."
+      },
+      "faq_5": {
+        "q": "Why does processing large images stop?",
+        "a": "Due to browser and device canvas/memory limits. Please reduce the output size or the number of files."
+      },
+      "faq_6": {
+        "q": "Can I save at an exact pixel size?",
+        "a": "Yes. Set the pixel size in the size panel, then save."
+      },
+      "faq_7": {
+        "q": "Does this screen open the size panel directly?",
+        "a": "Yes. It opens in the resize starting state."
+      },
+      "faq_8": {
+        "q": "Can I mosaic only a selected area?",
+        "a": "Yes. Select the area to cover and apply the mosaic effect."
+      },
+      "faq_9": {
+        "q": "Does this screen open the effect panel directly?",
+        "a": "Yes. It opens in the mosaic starting state."
+      },
+      "faq_10": {
+        "q": "Can I place text directly on the picture?",
+        "a": "Yes. Add the text in the text panel and save."
+      },
+      "faq_11": {
+        "q": "Is anything inserted automatically on open?",
+        "a": "No. Nothing is inserted automatically."
+      }
+    },
+    "pathFaqs": {
+      "/tools/image-studio/resize": [
+        "faq_6",
+        "faq_7"
+      ],
+      "/tools/image-studio/mosaic": [
+        "faq_8",
+        "faq_9"
+      ],
+      "/tools/image-studio/watermark": [
+        "faq_10",
+        "faq_11"
+      ]
+    }
+  },
+  "video.page": {
+    "blocks": [
+      {
+        "title": "Adding files and group outputs",
+        "paragraphs": [
+          "Open the file picker or drop files repeatedly to append videos. Arrange them in up to 10 groups; each group can export individually or concatenate selected ranges. Results appear as they finish, and ZIP creation is optional. MP3 and AAC results can be sent directly to Audio Studio in a new tab."
+        ]
+      },
+      {
+        "title": "Passthrough and trim accuracy",
+        "paragraphs": [
+          "Passthrough is fast and lossless because it avoids re-encoding. The first audio track can be copied, removed, or converted. Incompatible source audio reports an error rather than changing quality silently. Trim starts may move to a nearby keyframe, and videos with different codecs or dimensions cannot be concatenated without re-encoding."
+        ]
+      },
+      {
+        "title": "Bitrate and sample rate",
+        "paragraphs": [
+          "Bitrate is data stored per second; higher values generally increase quality and file size. Sample rate is how often audio is sampled per second. Choose a preset or enter a custom value."
+        ]
+      },
+      {
+        "title": "Synchronized playback and split fullscreen",
+        "paragraphs": [
+          "Play videos in a group together and move them with one playhead. Split fullscreen lets you compare the group on one screen while listening to one selected video. Start and end ranges from one group can be applied at once to videos in the same card positions in other groups."
+        ]
+      },
+      {
+        "title": "Large sources and output limits",
+        "paragraphs": [
+          "Large source videos are not copied into memory all at once. Completed results and ZIP files are kept as temporary files in supported browsers, with the existing memory path used automatically when that is unavailable. Oversized passthrough estimates are reported before processing."
+        ]
+      },
+      {
+        "title": "Input compatibility",
+        "paragraphs": [
+          "MP4, MOV, and WebM usually preview in current browsers. If MKV or AVI preview fails, the tool separately reads duration and dimensions for numeric trimming, but not every internal compression format is guaranteed."
+        ]
+      },
+      {
+        "title": "Using multiple CPU cores",
+        "paragraphs": [
+          "Supported browsers process videos with multiple CPU cores. When this is unavailable, the tool automatically uses a functionally equivalent single-thread compatibility mode."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Can I save a video section as MP4?",
+        "a": "Yes. Select the section, then check the MP4 output."
+      },
+      "faq_1": {
+        "q": "Are merge settings mixed in?",
+        "a": "No. It opens in the trim starting state."
+      },
+      "faq_2": {
+        "q": "Can I join several videos into one?",
+        "a": "Yes. Join them in group order and save one MP4."
+      },
+      "faq_3": {
+        "q": "Do trim settings carry over?",
+        "a": "No. It opens in the merge starting state."
+      },
+      "faq_4": {
+        "q": "Can I save only the sound as MP3?",
+        "a": "Yes. It opens in the audio-extraction starting state with section guidance."
+      },
+      "faq_5": {
+        "q": "Is the video picture saved together?",
+        "a": "No. Only the sound is saved as MP3."
+      },
+      "faq_6": {
+        "q": "Can I apply one group's video ranges to other groups?",
+        "a": "Yes. Choose the target groups to copy start and end times between videos in the same card positions. If a target ends before the copied end time, its end point is set to the end of that video; if it also ends before the copied start time, it is left unchanged."
+      },
+      "faq_7": {
+        "question": "Is remaining time for the whole job?",
+        "answer": "It is recalculated from the recent speed of the current video and encoding stage. A new input or final concat stage starts a fresh estimate.",
+        "q": "Is remaining time for the whole job?",
+        "a": "It is recalculated from the recent speed of the current video and encoding stage. A new input or final concat stage starts a fresh estimate."
+      },
+      "faq_8": {
+        "question": "Do MKV and AVI always work?",
+        "answer": "No. When a browser cannot preview a file, the tool can often read its duration and dimensions separately, but unsupported compression combinations are not guaranteed.",
+        "q": "Do MKV and AVI always work?",
+        "a": "No. When a browser cannot preview a file, the tool can often read its duration and dimensions separately, but unsupported compression combinations are not guaranteed."
+      }
+    },
+    "pathFaqs": {
+      "/tools/video-studio/trim": [
+        "faq_0",
+        "faq_1"
+      ],
+      "/tools/video-studio/merge": [
+        "faq_2",
+        "faq_3"
+      ],
+      "/tools/video-studio/extract-audio": [
+        "faq_4",
+        "faq_5"
+      ],
+      "/tools/video-studio": [
+        "faq_6"
+      ]
+    },
+    "title": "Browser Video Processing Guide",
+    "description": "Video files are processed within this browser without being uploaded to an external conversion server."
+  },
+  "excelCompare": {
+    "title": "Excel Compare Usage Guide",
+    "description": "Pairs two Excel files to find changed contents or mismatched items.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "Comparing data before and after revisions",
+          "Matching two lists by employee ID or order number",
+          "Checking transactions where amounts, dates, and vendors match."
+        ]
+      },
+      {
+        "title": "What to Prepare",
+        "paragraphs": [
+          "The left and right files to compare. Identify the row with column names and the key columns beforehand."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Add two files to compare as a pair. To compare multiple pairs, add more file pairs.",
+          "Check the sheet to use and the row with column names in each file. If there is a title or description above, change it to the actual row containing column names.",
+          "Select a comparison method suitable for your purpose.",
+          "Run the comparison and check for changes, additions, deletions, and duplicates in the result filters.",
+          "Save necessary reports. For items that could not be linked automatically, review the original files."
+        ]
+      },
+      {
+        "title": "Easy to Understand Example",
+        "paragraphs": [
+          "For an employee list where the order of names has changed, it is better to compare based on unique employee IDs rather than names. A 'Key' refers to this kind of reference column used to find the same target."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Which comparison method should I choose?",
+        "a": "To check pre/post revisions of similar tables, select Row/Column Matching. To find the same targets in lists with different orders, select Key Column Comparison. To match transaction amounts and dates, select Transaction Matching."
+      },
+      "faq_1": {
+        "q": "Which Excel formats can I compare?",
+        "a": "You can compare XLSX, XLSM, XLS, XLSB, SpreadsheetML XLS and CSV files. XLS and XLSB support values and formulas, but formatting differences are excluded."
+      },
+      "faq_2": {
+        "q": "What if the selected header suggestion is not the actual column-name row?",
+        "a": "Choose the actual column-name row in each file's header-row field. Comparison starts after that row. A table without headers needs a column-name row added at the top."
+      },
+      "faq_3": {
+        "q": "Are comparison files uploaded to a server?",
+        "a": "No. Reading, comparison and report generation happen in the current browser, and file contents are not sent to a server."
+      },
+      "faq_4": {
+        "q": "Can I compare multiple file pairs at once?",
+        "a": "Yes. Each pair can use its own sheets and matching rules. Every successful pair gets a nine-sheet XLSX report, and two or more successful pairs also get a ZIP."
+      },
+      "faq_5": {
+        "q": "How are multiple rows with the same key shown?",
+        "a": "Each duplicate key counts as one result row with independent lists of its left and right source rows. Items on the same line are not matched automatically."
+      }
+    },
+    "pathFaqs": {
+      "/tools/excel-compare": [
+        "faq_1",
+        "faq_2",
+        "faq_3",
+        "faq_4",
+        "faq_5"
+      ]
+    }
+  },
+  "excelCleaner": {
+    "title": "Excel Data Cleaner Usage Guide",
+    "description": "Applies necessary cleaning rules in order to Excel data and creates a new file and processing report.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "Formatting or fixing spaces in lists received from outside",
+          "Cleaning up unnecessary rows and columns",
+          "Performing repetitive data cleanup in the same order."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Add a file and select the sheet to clean and the row with column names.",
+          "Add necessary rules. It is good to start with one rule to check the result first.",
+          "Rules run from top to bottom. Check the order and settings of each rule.",
+          "Review information about formulas, merged cells, and output formats, then run.",
+          "Check the cleaned data as well as the change summary, errors, and excluded rows."
+        ]
+      },
+      {
+        "title": "Example",
+        "paragraphs": [
+          "If data looks different due to leading/trailing spaces like `Seoul` and ` Seoul `, apply Space Cleanup first, and then decide whether to apply Duplicate Cleanup. The result may vary depending on the rule order."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Which rule should I pick first?",
+        "a": "Pick one problem you want to solve. For example, if spacing is an issue, apply Space Cleanup first, and then add rules for duplicates or row deletion."
+      },
+      "faq_1": {
+        "q": "Can I clean an Excel file that contains formulas?",
+        "a": "Same-sheet ordinary A1 references in XLSX and XLSM are updated for row deletion and column deletion, insertion, and reordering. Other formulas require complete stored results and confirmation before becoming values."
+      },
+      "faq_2": {
+        "q": "How do original-text and safe CSV modes differ?",
+        "a": "Original-text mode preserves values and warns about risky leading characters; it is not represented as safe. Safe mode prefixes affected values with an apostrophe."
+      },
+      "faq_3": {
+        "q": "Are files or results sent to a server?",
+        "a": "No. Reading files, applying rules, and creating XLSX, CSV, and ZIP results happen in the current browser without modifying originals."
+      }
+    },
+    "pathFaqs": {
+      "/tools/excel-cleaner": [
+        "faq_1",
+        "faq_2",
+        "faq_3"
+      ]
+    }
+  },
+  "documentRedactor": {
+    "title": "Document Redactor Usage Guide",
+    "description": "Creates a new file by manually selecting and blacking out parts like names, phone numbers, and addresses in PDFs or images.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "Obscuring some information before sending evidence externally",
+          "Redacting contacts or account numbers in receipts or contracts",
+          "Covering text that shouldn't be revealed in captures."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Add a file and select the document and pages to redact.",
+          "Press 'Add Area' to create a black rectangle. Adjust its position and size so no text is left. Move to the next page and check all necessary parts.",
+          "Check the 'Pages without redacted marks' list. No marks does not mean it is automatically determined to be safe.",
+          "Read about the output resolution and what changes upon output, check the confirmation items, and press 'Create Redacted File'.",
+          "Check 'View Results' and re-open the downloaded file to verify all pages. Share the resulting file, not the original."
+        ]
+      },
+      {
+        "title": "Good to Know",
+        "paragraphs": [
+          "This tool does not automatically find personal information. The user must manually select the areas to redact. Information may remain in the file name or unredacted pages."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Does it automatically detect and redact personal information like ID or phone numbers?",
+        "a": "No. You must review the pages yourself and specify the areas to redact. Unmarked areas will remain visible in the result."
+      },
+      "faq_1": {
+        "q": "Is the original file modified?",
+        "a": "The original file is not modified and remains safely on your device. Please ensure you share the newly saved result."
+      },
+      "faq_2": {
+        "q": "Are unredacted pages also converted to images?",
+        "a": "Yes. To ensure the entire document is securely processed, all pages are recreated as an image-based PDF."
+      },
+      "faq_3": {
+        "q": "Are search and links retained in the document?",
+        "a": "Because the document is converted to images, text search, selection, copying, existing links, signatures, forms, and metadata are not retained."
+      },
+      "faq_4": {
+        "q": "What is the resolution of the output?",
+        "a": "The document is converted according to the quality option you select (Standard or High Quality)."
+      },
+      "faq_5": {
+        "q": "Are password-protected PDFs supported?",
+        "a": "Password-protected or encrypted PDFs are not supported. Please use an unprotected copy."
+      },
+      "faq_6": {
+        "q": "What happens if I cancel or if it fails?",
+        "a": "If the operation is interrupted, the files are immediately discarded and never leave your device."
+      },
+      "faq_7": {
+        "q": "What should I check in the final result?",
+        "a": "Please review all pages, ensure text edges are fully redacted, and check that the filename does not contain personal information."
+      },
+      "faq_8": {
+        "q": "Are private details detected automatically?",
+        "a": "No. Select every area yourself. Private details outside those areas may remain, so review the output."
+      },
+      "faq_9": {
+        "q": "Does the PDF keep text and signatures?",
+        "a": "Every page is rasterized. Searchable and selectable text, digital signatures, forms and links are not preserved. The original file is unchanged."
+      },
+      "faq_10": {
+        "q": "How do resolution and file size change?",
+        "a": "PDF output uses the selected resolution and may be larger than the original. Processing stops at memory limits. Image output is PNG."
+      }
+    },
+    "fallbackNotice": "The file processing engine could not be initialized in the current environment. File selection is disabled, but you can view the usage guide and precautions below.",
+    "pathFaqs": {
+      "/tools/document-redactor": [
+        "faq_8",
+        "faq_9",
+        "faq_10"
+      ]
+    }
+  },
+  "documentGenerator": {
+    "faq": {
+      "faq_0": {
+        "q": "What happens if there are blanks?",
+        "a": "If the value in a linked column is empty, that space may become empty content. If the required column itself is not linked, that's a different issue and the connection must be fixed. Make sure required values are not missing in the sample. Completely blank rows are excluded from generation."
+      },
+      "faq_1": {
+        "q": "Does this feature automatically send emails?",
+        "a": "No. It is a feature for creating document files. It's known as 'Mail Merge', but it does not send emails."
+      },
+      "faq_2": {
+        "q": "Which templates can I use?",
+        "a": "Use a standard DOCX with simple {name} variables and no loops or conditions. DOCM, encrypted documents and image insertion tags are unsupported."
+      },
+      "faq_3": {
+        "q": "Can formula cells be inserted?",
+        "a": "Only calculation results saved in the spreadsheet are used. Rows with missing cached results or real cell errors fail."
+      },
+      "faq_4": {
+        "q": "Are files or results sent to a server?",
+        "a": "No. Template inspection, table reading and DOCX, ZIP and report generation happen in the current browser."
+      }
+    },
+    "title": "Word Batch Generator Usage Guide",
+    "description": "Insert a Word template and an Excel list to generate documents per person or per item at once.",
+    "blocks": [
+      {
+        "title": "Use Cases",
+        "items": [
+          "Creating training guides per employee",
+          "Generating confirmation documents for each customer",
+          "Creating multiple documents where only name, department, and date change in the same template."
+        ]
+      },
+      {
+        "title": "How to Use",
+        "items": [
+          "Link Excel columns with template items. If you wrote `{Name}` in the template, link it to the column containing name data.",
+          "Set the file name and check one document first. Specify file naming rules, verify them, and run 'Create 1 Document First'.",
+          "Generate all documents and save the results."
+        ]
+      },
+      {
+        "title": "What This Tool Does",
+        "paragraphs": [
+          "It is not an AI tool that writes new text. It inserts Excel values into the changeable parts of a pre-made Word template."
+        ]
+      }
+    ],
+    "pathFaqs": {
+      "/tools/document-generator": [
+        "faq_2",
+        "faq_3",
+        "faq_4"
+      ]
+    }
+  },
+  "pdfCompare": {
+    "title": "PDF comparison guide",
+    "description": "Place before and after PDFs in pairs, then inspect visual and extracted-text differences page by page.",
+    "blocks": [
+      {
+        "title": "Notice",
+        "paragraphs": [
+          "Comparison is performed within the browser."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Can this find every difference in a PDF?",
+        "a": "Visual results compare pixels under the same PDF render settings, while text results follow the PDF's stored extraction order. Review both; the tool does not determine document equivalence."
+      },
+      "faq_1": {
+        "q": "What happens when pages are inserted or reordered?",
+        "a": "Pages initially match by physical page number. Review added or deleted pages, then optionally assign each page at most once in manual mapping and compare again."
+      },
+      "faq_2": {
+        "q": "Are PDF files uploaded to a server?",
+        "a": "No. Opening PDFs, rendering pages, extracting text, and creating reports happen in the current browser without modifying the source files."
+      }
+    },
+    "pathFaqs": {
+      "/tools/pdf-compare": [
+        "faq_0",
+        "faq_1",
+        "faq_2"
+      ]
+    }
+  },
+  "officeEditor": {
+    "title": "Browser office editor guide",
+    "description": "This large editor runs LibreOffice in your browser.",
+    "blocks": [
+      {
+        "title": "One-step opening",
+        "paragraphs": [
+          "Drop or choose one supported file to move to the focused workspace, prepare the editor, and open the document automatically."
+        ]
+      },
+      {
+        "title": "First download",
+        "paragraphs": [
+          "The first start downloads about 33 MB, including a Korean fallback font. A byte-based progress bar and current step are shown, and the files are cached for later visits."
+        ]
+      },
+      {
+        "title": "Closing editor",
+        "paragraphs": [
+          "Pressing the 'Close' button destroys the editing view and the virtual filesystem instance safely, returning you to this menu."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Why is the first start large?",
+        "a": "A browser build of the office suite and its fonts and resources must be stored locally. Later starts can reuse the cache."
+      },
+      "faq_1": {
+        "q": "Does dropping a file open it automatically?",
+        "a": "Yes. Dropping one supported file moves to the focused workspace, prepares the editor and opens the document in one flow."
+      },
+      "faq_2": {
+        "q": "Does it include a Korean font?",
+        "a": "A Korean fallback font is included, though documents requiring proprietary fonts can have different spacing or line breaks."
+      },
+      "faq_3": {
+        "q": "Is this an official Microsoft Office web app?",
+        "a": "No. It is a LibreOffice-based browser editor and compatibility can differ from Microsoft Office."
+      },
+      "faq_4": {
+        "q": "Are HWP files supported here?",
+        "a": "Use the dedicated HWP editor for HWP/HWPX files. This editor focuses on Writer, Calc, and Impress formats."
+      }
+    },
+    "pathFaqs": {
+      "/tools/office-editor": [
+        "faq_0",
+        "faq_1",
+        "faq_2",
+        "faq_3",
+        "faq_4"
+      ]
+    }
+  },
+  "pdfEditor.standard": {
+    "title": "Using the browser PDF tools",
+    "description": "Selected files stay in this browser's memory and are not uploaded to a processing server. Keep your originals and review every downloaded result.",
+    "blocks": [
+      {
+        "title": "Page-level editing",
+        "paragraphs": [
+          "Drag previews to reorder pages and remove unwanted pages. For PDFs by range, choose a range in the output workspace on the right and use page checkboxes, or quickly split the document between pages.",
+          "If a source page is already rotated, your rotation is added to its existing orientation so the exported page matches the preview."
+        ]
+      },
+      {
+        "title": "Local processing and file lifetime",
+        "paragraphs": [
+          "PDFs, images, and download links live in browser memory. Refreshing or closing the tab clears the current selection and any undownloaded result.",
+          "The site, advertising, and OCR model assets may use ordinary network requests, but your work files are not sent to a conversion server."
+        ]
+      },
+      {
+        "title": "Protected PDFs and signatures",
+        "paragraphs": [
+          "Password-protected PDFs are not supported. Use a legitimately unlocked copy provided by the document owner.",
+          "Merging, rotating, splitting, or rebuilding a PDF invalidates existing digital signatures. Forms, bookmarks, links, attachments, and advanced objects may not survive page copying."
+        ]
+      },
+      {
+        "title": "Quality and performance",
+        "paragraphs": [
+          "Reordering and extracting pages normally copies original PDF pages rather than rasterizing them. Image conversion and searchable OCR PDFs render pages at the selected resolution.",
+          "More pages and higher resolution increase processing time, memory use, and output size. Previews render lazily at lower resolution to keep long documents responsive."
+        ]
+      }
+    ],
+    "faq": {
+      "0": {
+        "question": "Are files uploaded to a server?",
+        "answer": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests.",
+        "q": "Are files uploaded to a server?",
+        "a": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests."
+      },
+      "1": {
+        "question": "Can I process a password-protected PDF?",
+        "answer": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy.",
+        "q": "Can I process a password-protected PDF?",
+        "a": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy."
+      },
+      "2": {
+        "question": "Does it work on mobile?",
+        "answer": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited.",
+        "q": "Does it work on mobile?",
+        "a": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited."
+      },
+      "3": {
+        "question": "Does rotation reduce PDF quality?",
+        "answer": "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages.",
+        "q": "Does rotation reduce PDF quality?",
+        "a": "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages."
+      },
+      "4": {
+        "question": "How do I select multiple page ranges?",
+        "answer": "Choose the output range in the output workspace on the right and use each page checkbox. For a continuous document, mark split positions after pages to build all ranges at once. Number entry remains available for non-contiguous pages and custom ordering.",
+        "q": "How do I select multiple page ranges?",
+        "a": "Choose the output range in the output workspace on the right and use each page checkbox. For a continuous document, mark split positions after pages to build all ranges at once. Number entry remains available for non-contiguous pages and custom ordering."
+      },
+      "5": {
+        "question": "Where do I download the finished PDF or ZIP?",
+        "answer": "Follow progress and download the completed file in the output workspace. On mobile, open it from the output button at the bottom of the screen.",
+        "q": "Where do I download the finished PDF or ZIP?",
+        "a": "Follow progress and download the completed file in the output workspace. On mobile, open it from the output button at the bottom of the screen."
+      },
+      "6": {
+        "question": "Can it perfectly restore Word or Excel structure?",
+        "answer": "Usually not. PDFs often lack the original paragraph and table structure, so the output is an editable reconstruction based on coordinates and spacing.",
+        "q": "Can it perfectly restore Word or Excel structure?",
+        "a": "Usually not. PDFs often lack the original paragraph and table structure, so the output is an editable reconstruction based on coordinates and spacing."
+      },
+      "7": {
+        "question": "Why is the first OCR run slower?",
+        "answer": "The browser must download language data for Korean and English recognition. Later runs can start faster while that data remains cached.",
+        "q": "Why is the first OCR run slower?",
+        "a": "The browser must download language data for Korean and English recognition. Later runs can start faster while that data remains cached."
+      },
+      "faq_0": {
+        "q": "How do I select multiple page ranges?",
+        "a": "Choose the output range to edit and use the page checkboxes. For a continuous document, mark split positions after pages to build the ranges at once. Number entry remains available for non-contiguous pages and custom ordering."
+      },
+      "faq_1": {
+        "q": "Where do I download the finished PDF or ZIP?",
+        "a": "Follow progress and download the completed file in the output workspace on the right. On mobile, open it from the output button at the bottom of the screen."
+      },
+      "faq_2": {
+        "q": "Can page numbers be added only to selected pages?",
+        "a": "Yes. Use a page range and parity filter, or choose the exact physical pages with the thumbnail checkboxes."
+      },
+      "faq_3": {
+        "q": "Can I add Korean headers and dates?",
+        "a": "Yes. Text can include Korean plus filename and date tokens. The full Noto font is embedded when the content requires it."
+      },
+      "faq_4": {
+        "q": "Can numbering start at 1 on page 2 after a cover?",
+        "a": "Yes. Enable cover exclusion and set the starting page and number. Numbering still follows the physical page order across skipped pages."
+      },
+      "faq_5": {
+        "q": "What can I put in a header or footer?",
+        "a": "Combine custom text with tokens for the page number, total pages, filename, and the date captured when the batch starts."
+      },
+      "faq_6": {
+        "q": "Can headers contain Korean text?",
+        "a": "Yes. The full Noto font is embedded when Korean is present, and the result warns that this can increase the file size."
+      },
+      "faq_7": {
+        "q": "Can I add both text and image watermarks to a PDF?",
+        "a": "Yes. Choose text or a PNG or JPEG image, then place it once or repeat it across each selected page."
+      },
+      "faq_8": {
+        "q": "Can a watermark appear behind the document content?",
+        "a": "Yes. Choose a background or foreground layer. Complex layers, tags, or graphics state trigger a warning and require confirmation before continuing."
+      },
+      "faq_9": {
+        "q": "Can I place a stamp or signature image in the same position on multiple pages?",
+        "a": "Yes. Move and resize a PNG or JPEG image in the preview, then place it at the same relative position on every selected page."
+      },
+      "faq_10": {
+        "q": "Does this create an electronic or cryptographic digital signature?",
+        "a": "No. This feature only inserts a stamp or signature image into the PDF. It does not create a certificate-based electronic or cryptographic digital signature."
+      },
+      "faq_11": {
+        "q": "Can I combine multiple PDFs in order?",
+        "a": "Yes. Arrange the files in order, merge them into one PDF, then download it from the output area."
+      },
+      "faq_12": {
+        "q": "Are merged files uploaded to a server?",
+        "a": "No. Merging and saving happen in the current browser."
+      },
+      "faq_13": {
+        "q": "Can I cut a PDF into the sections I want?",
+        "a": "Yes. Mark split positions, cut the file by ranges, and save only the sections you need."
+      },
+      "faq_14": {
+        "q": "Is the range empty when I first open it?",
+        "a": "No. One initial range covering every page is already present."
+      },
+      "faq_15": {
+        "q": "Can I remove only the pages I choose?",
+        "a": "Yes. Select the pages to delete and save the rest as one PDF."
+      },
+      "faq_16": {
+        "q": "Does anything get deleted automatically on open?",
+        "a": "No. It starts with first-page delete guidance and deletes nothing automatically."
+      },
+      "faq_17": {
+        "q": "Can I rotate only some pages?",
+        "a": "Yes. Choose the pages to rotate, correct their orientation, then save."
+      },
+      "faq_18": {
+        "q": "Does anything rotate automatically on open?",
+        "a": "No. It starts with first-page rotate guidance and rotates nothing automatically."
+      },
+      "faq_19": {
+        "q": "Can I make the whole PDF searchable?",
+        "a": "Yes. Every page is read with Korean and English OCR to create a searchable PDF."
+      },
+      "faq_20": {
+        "q": "Do I need to specify pages?",
+        "a": "No. The full range is processed without extra settings."
+      }
+    },
+    "pathFaqs": {
+      "/tools/pdf-editor": [
+        "faq_0",
+        "faq_1"
+      ],
+      "/tools/pdf-editor/finish": [
+        "faq_2",
+        "faq_3"
+      ],
+      "/tools/pdf-editor/page-numbers": [
+        "faq_2",
+        "faq_4"
+      ],
+      "/tools/pdf-editor/header-footer": [
+        "faq_5",
+        "faq_6"
+      ],
+      "/tools/pdf-editor/watermark": [
+        "faq_7",
+        "faq_8"
+      ],
+      "/tools/pdf-editor/stamp": [
+        "faq_9",
+        "faq_10"
+      ],
+      "/tools/pdf-editor/merge": [
+        "faq_11",
+        "faq_12"
+      ],
+      "/tools/pdf-editor/split": [
+        "faq_13",
+        "faq_14"
+      ],
+      "/tools/pdf-editor/delete": [
+        "faq_15",
+        "faq_16"
+      ],
+      "/tools/pdf-editor/rotate": [
+        "faq_17",
+        "faq_18"
+      ],
+      "/tools/pdf-editor/ocr": [
+        "faq_19",
+        "faq_20"
+      ]
+    }
+  },
+  "pdfEditor.convert": {
+    "title": "PDF text conversion and browser OCR",
+    "description": "Selected files stay in this browser's memory and are not uploaded to a processing server. Keep your originals and review every downloaded result.",
+    "blocks": [
+      {
+        "title": "Text PDFs and scanned PDFs",
+        "paragraphs": [
+          "Text PDFs contain selectable characters, so extraction is fast and accurate. Scanned PDFs store each page like a photo and require OCR.",
+          "Automatic OCR runs Korean and English recognition only on pages with little usable embedded text. A drawing or photo with no text may correctly produce an empty result."
+        ]
+      },
+      {
+        "title": "DOCX and XLSX conversion limits",
+        "paragraphs": [
+          "PDFs often preserve positions rather than the original paragraphs, tables, and cells. DOCX reconstructs lines as paragraphs, while XLSX estimates cells from spacing.",
+          "Complex tables, columns, vertical text, footnotes, formulas, fonts, and formatting may not be reproduced exactly. Treat the output as an editable draft and compare it with the source."
+        ]
+      },
+      {
+        "title": "OCR data and privacy",
+        "paragraphs": [
+          "Korean and English OCR and its language data are served from the same GitHub Pages deployment. No external OCR server or CDN receives your document pages.",
+          "OCR cannot start on a first offline visit or when the required OCR data is not cached. Reopen the site online after clearing storage, using private browsing, or running low on browser storage."
+        ]
+      },
+      {
+        "title": "Large documents",
+        "paragraphs": [
+          "OCR renders and recognizes pages one at a time, so it takes longer than embedded-text extraction. For 50+ pages, close heavy tabs and keep enough memory and power available.",
+          "Mobile operating systems may close memory-intensive tabs, so long documents are generally more reliable on a desktop browser."
+        ]
+      }
+    ],
+    "faq": {
+      "faq_0": {
+        "q": "Are files uploaded to a server?",
+        "a": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests."
+      },
+      "faq_1": {
+        "q": "Can I process a password-protected PDF?",
+        "a": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy."
+      },
+      "faq_2": {
+        "q": "Does it work on mobile?",
+        "a": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited."
+      },
+      "faq_3": {
+        "q": "Does rotation reduce PDF quality?",
+        "a": "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages."
+      },
+      "faq_4": {
+        "q": "Can it perfectly restore Word or Excel structure?",
+        "a": "Usually not. PDFs often lack the original paragraph and table structure, so the output is an editable reconstruction based on coordinates and spacing."
+      },
+      "faq_5": {
+        "q": "Why is the first OCR run slower?",
+        "a": "The browser must download language data for Korean and English recognition. Later runs can start faster while that data remains cached."
+      }
+    }
+  }
+}

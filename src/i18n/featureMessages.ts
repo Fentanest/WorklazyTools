@@ -15,6 +15,13 @@ export function featureMessage(language: AppLanguage, key: string, values: Featu
   return message;
 }
 
+
+export function featureMessageOrDefault(language: AppLanguage, key: string, values: FeatureMessageValues | null | undefined, defaultValue: string) {
+  const template = featureResource<unknown>(language, key);
+  if (typeof template !== "string") return defaultValue;
+  return featureMessage(language, key, values || {});
+}
+
 export function featureResource<T>(language: AppLanguage, key: string): T {
   const resources = language === "ko" ? koFeatures : enFeatures;
   return key.split(".").reduce<unknown>((value, segment) => (

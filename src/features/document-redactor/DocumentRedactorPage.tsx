@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Eye, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { FileDropZone, PrimaryButton } from '../../components/ui';
 import { OperationProgress } from '../../components/OperationProgress';
-import { ToolGuide } from '../../components/ToolGuide';
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from '../../components/UtilitySurface';
 import { Button } from '../../components/ui/button';
 import { resources } from '../../i18n/resources';
@@ -87,7 +87,7 @@ export function DocumentRedactorPage() {
     <UtilityPage toolId="document-redactor">
       <header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1></header>
       <UtilityNotice kind="error" role="alert">{c.errors['not-ready']}</UtilityNotice>
-      {c.guide && <ToolGuide title={c.guide.title} description={c.guide.description} blocks={c.guide.blocks as import("../../components/ToolGuide").GuideBlock[]} faq={(c.guide.faq || []).map((item: {q: string, a: string})=>({question:item.q,answer:item.a}))}>{c.guide.fallbackNotice && <UtilityNotice className="mt-4" kind="warning">{c.guide.fallbackNotice}</UtilityNotice>}</ToolGuide>}
+      {c.guide && <ToolGuideWrapper slug="documentRedactor">{c.guide.fallbackNotice && <UtilityNotice className="mt-4" kind="warning">{c.guide.fallbackNotice}</UtilityNotice>}</ToolGuideWrapper>}
     </UtilityPage>
   );
   return <UtilityPage toolId="document-redactor"><header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1><p className="mt-2 text-muted-foreground">{c.description} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></header>
@@ -113,6 +113,6 @@ export function DocumentRedactorPage() {
     </UtilitySectionCard></>}
     {(Object.keys(results).length>0||jobFailures.length>0)&&<UtilitySectionCard title={c.results.title}><ul className="redactor-results">{inputs.map((value,i)=>results[value.id]&&<li key={value.id}><span>{c.document.replace('{{number}}',String(i+1))}</span><UtilityInput disabled={busy} key={results[value.id].info.name} aria-label={c.results.name} defaultValue={results[value.id].info.name} onBlur={e=>{if(!rename(results[value.id],e.target.value))e.target.value=results[value.id].info.name}}/><a className="redactor-download" href={results[value.id].url} download={results[value.id].info.name}><Download size={16}/>{c.results.download}</a><Button disabled={busy} type="button" variant="secondary" onClick={()=>{setFileId(value.id);setPageIndex(0);setResultMode(true)}}>{c.results.preview}</Button></li>)}</ul>{jobFailures.length>0&&<UtilityNotice kind="error"><ul>{jobFailures.map((f,i)=><li key={i}>{c.document.replace('{{number}}',String(f.index+1))}: {c.errors[f.code]}</li>)}</ul></UtilityNotice>}{Object.keys(results).length>=2&&<><Button type="button" onClick={()=>void createZip()} disabled={busy}>{c.results.zip}</Button>{zipUrl&&<a className="redactor-download" href={zipUrl} download="redacted-results.zip"><Download size={16}/>{c.results.downloadZip}</a>}</>}</UtilitySectionCard>}
     {notice&&<UtilityNotice kind="error" role="alert">{notice}</UtilityNotice>}
-      {c.guide && <ToolGuide title={c.guide.title} description={c.guide.description} blocks={c.guide.blocks as import("../../components/ToolGuide").GuideBlock[]} faq={(c.guide.faq || []).map((item: {q: string, a: string})=>({question:item.q,answer:item.a}))} />}
+      {c.guide && <ToolGuideWrapper slug="documentRedactor" />}
     </UtilityPage>;
 }

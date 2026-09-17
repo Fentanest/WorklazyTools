@@ -7,7 +7,7 @@ import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionC
 import { PageHeader, PrimaryButton, SegmentedControl } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { resolveFeatureMessage } from "../../i18n/featureMessages";
 
 const QrBulkPanel = lazy(() => import("./QrBulkPanel").then((module) => ({ default: module.QrBulkPanel })));
@@ -321,12 +321,7 @@ export function QrStudioPage({ initialMode = "create" }: { initialMode?: QrMode 
           { Icon: FileText, label: t("qr.bulkCapabilities.labels") },
         ].map(({ Icon, label }) => <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground" key={label}><Icon size={17} />{label}</span>)}</div>
         : <div className="mt-4 flex flex-wrap gap-2">{[{ Icon: QrCode, label: t("qr.capabilities.recovery") }, { Icon: ImagePlus, label: t("qr.capabilities.logo") }, { Icon: Camera, label: t("qr.capabilities.camera") }, { Icon: ScanLine, label: t("qr.capabilities.photo") }].map(({ Icon, label }) => <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground" key={label}><Icon size={17} />{label}</span>)}</div>}
-      <ToolGuide
-        title={t(mode === "bulk" ? "qr.bulkGuide.title" : "qr.guide.title")}
-        description={t(mode === "bulk" ? "qr.bulkGuide.description" : "qr.guide.description")}
-        blocks={t(mode === "bulk" ? "qr.bulkGuide.blocks" : "qr.guide.blocks", { returnObjects: true, Header: "{{Header}}" }) as import("../../components/ToolGuide").GuideBlock[]}
-        faq={(t(mode === "bulk" ? "qr.bulkGuide.faq" : "qr.guide.faq", { returnObjects: true }) as Array<{q:string;a:string}>).map((item) => ({ question: item.q, answer: item.a }))}
-      />
+      <ToolGuideWrapper slug="qr" />
       </div>
     </UtilityPage>
   );

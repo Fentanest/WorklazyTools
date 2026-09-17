@@ -1,7 +1,7 @@
 import { useAppLanguage } from "../../i18n/routing";
 import { resources } from "../../i18n/resources";
 import { UtilityPage, UtilityNotice } from "../../components/UtilitySurface";
-import { ToolGuide, type GuideBlock } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 
 export function DocumentRedactorFallback() {
   const language = useAppLanguage();
@@ -16,18 +16,13 @@ export function DocumentRedactorFallback() {
         {c.errors["not-ready"]}
       </UtilityNotice>
       {c.guide && (
-        <ToolGuide
-          title={c.guide.title}
-          description={c.guide.description}
-          blocks={c.guide.blocks as GuideBlock[]}
-          faq={(c.guide.faq || []).map((item: {q: string, a: string}) => ({ question: item.q, answer: item.a }))}
-        >
+        <ToolGuideWrapper slug="documentRedactor">
           {c.guide.fallbackNotice && (
             <UtilityNotice className="mb-4" kind="warning">
               {c.guide.fallbackNotice}
             </UtilityNotice>
           )}
-        </ToolGuide>
+        </ToolGuideWrapper>
       )}
     </UtilityPage>
   );

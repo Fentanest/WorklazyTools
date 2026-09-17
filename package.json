@@ -51,7 +51,8 @@
     "test:pdf-finish": "node tests/pdf-finish-smoke.mjs && node tests/pdf-finish-lifecycle-smoke.mjs && node --experimental-strip-types tests/pdf-watermark-golden.mjs && node --experimental-strip-types tests/pdf-stamp-golden.mjs && node --experimental-strip-types tests/pdf-structure-golden.mjs && node --experimental-strip-types tests/pdf-finish-combined-golden.mjs",
     "test:pdf-raster-benchmark": "node tests/pdf-raster-benchmark.mjs",
     "test:pdf-watermark-performance": "node tests/pdf-watermark-performance.mjs",
-    "test:static": "node scripts/validate-static-output.mjs"
+    "test:static": "node scripts/validate-static-output.mjs",
+    "test:i18n": "node scripts/validate-i18n.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "0.12.10",

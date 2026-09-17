@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { PageHeader, PrimaryButton, ToggleRow } from "../../components/ui";
 import { Button } from "../../components/ui/button";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityInput, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { generatePassword } from "./securityPassword";
 import { strengthChecker } from "./securityStrength";
@@ -59,7 +59,7 @@ export function SecurityToolsPage() {
       <div className="mt-3.5 grid grid-cols-2 gap-2.5 max-[620px]:grid-cols-1"><Metric icon={<Shield />} label={t("security.guessDifficulty")} value={`${guessBits.toFixed(1)} bit`} help={t("security.guessHelp")} /><Metric icon={<ShieldCheck />} label={t("security.crackTime")} value={formatCrackTime(strength.crackTimes.offlineFastHashingXPerSecond.seconds)} help={t("security.crackHelp")} /></div>
       {strengthAdvice && <p className="mt-3 rounded-xl bg-amber-500/10 px-3.5 py-3 text-[13px] leading-relaxed text-amber-800 dark:text-amber-300">{strengthAdvice}</p>}
     </UtilitySectionCard>
-    <ToolGuide title={t("security.guide.title")} description={t("security.guide.description")} blocks={guideBlocks} faq={guideFaq} />
+    <ToolGuideWrapper slug="security" />
   </UtilityPage>;
 }
 

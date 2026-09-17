@@ -5,7 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
 import { PageHeader, PrimaryButton, ToggleRow, formatBytes } from "../../components/ui";
 import { Button } from "../../components/ui/button";
@@ -339,7 +339,7 @@ export function ExcelComparePage() {
     }}>{t("features:excelCompare.results.showMore", { remaining: resultRows.length - visibleLimit })}</Button>}
    </Card>}
 
-   <ToolGuide title={t("features:excelCompare.guide.title")} description={t("features:excelCompare.guide.description")} blocks={t("features:excelCompare.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]} faq={(t("features:excelCompare.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))} />
+   <ToolGuideWrapper slug="excelCompare" />
    </div>
   </UtilityPage>
  );

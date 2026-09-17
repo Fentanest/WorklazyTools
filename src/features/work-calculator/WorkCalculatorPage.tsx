@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { PageHeader, SegmentedControl } from "../../components/ui";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import {
  UtilityField,
  UtilityInput,
@@ -46,7 +46,7 @@ export function WorkCalculatorPage() {
   </>}
   {businessState.error && mode === "business" && <UtilityNotice kind="error" role="alert">{businessState.error}</UtilityNotice>}
   {leaveState.error && mode === "leave" && <UtilityNotice kind="error" role="alert">{leaveState.error}</UtilityNotice>}
-  <ToolGuide title={t("work.guide.title")} description={t("work.guide.description")} blocks={t("work.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]} faq={(t("work.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))} />
+  <ToolGuideWrapper slug="work" />
  </UtilityPage>;
 }
 

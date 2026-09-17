@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { FileDropZone, PageHeader, PrimaryButton, SegmentedControl, ToggleRow } from "../../components/ui";
 import { Button } from "../../components/ui/button";
@@ -104,12 +104,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <OperationProgress {...progress} accent="sky" title={t("image.log")} />
       {progress.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" variant="secondary" type="button" onClick={() => activeController.current?.abort()}>{t("image.cancel")}</Button></div>}
 
-      <ToolGuide
-        title={t("image.guide.title")}
-        description={t("image.guide.description")}
-        blocks={t("image.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]}
-        faq={(t("image.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))}
-      />
+      <ToolGuideWrapper slug="image" />
     </UtilityPage>
   );
 }

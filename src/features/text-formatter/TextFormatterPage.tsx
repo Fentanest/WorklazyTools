@@ -6,7 +6,7 @@ import type { SqlLanguage } from "sql-formatter";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { PageHeader, PrimaryButton, SegmentedControl } from "../../components/ui";
 import { Button } from "../../components/ui/button";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import {
   pairedEditorClassName,
   UtilityField,
@@ -80,7 +80,7 @@ export function TextFormatterPage() {
       </div>
       <div className="mt-[11px] flex flex-wrap items-center gap-2" data-testid="formatter-actions"><PrimaryButton accent="violet" loading={busy} disabled={!input} onClick={() => execute("pretty")}><WandSparkles size={18} /> {t("features:formatter.pretty")}</PrimaryButton><Button variant="secondary" size="lg" className="rounded-xl font-bold" type="button" disabled={!input || busy} onClick={() => execute("minify")}><Minimize2 size={17} /> {t("features:formatter.minify")}</Button></div>
       <div className="my-3.5 flex flex-wrap items-center gap-2" aria-label={t("features:formatter.settings")}><span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-2 text-[13px] font-bold text-muted-foreground"><Braces size={17} /> {t("features:formatter.jsonCheck")}</span><span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-2 text-[13px] font-bold text-muted-foreground"><Database size={17} /> {t("features:formatter.sqlSort")}</span><span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-2 text-[13px] font-bold text-muted-foreground"><CodeXml size={17} /> {t("features:formatter.xmlCheck")}</span></div>
-      <ToolGuide title={t("features:formatter.guide.title")} description={t("features:formatter.guide.description")} blocks={t("features:formatter.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]} faq={(t("features:formatter.guide.faq", { returnObjects: true }) as any[] || []).map((item: any) => ({ question: item.q, answer: item.a }))} />
+      <ToolGuideWrapper slug="formatter" />
     </UtilityPage>
   );
 }

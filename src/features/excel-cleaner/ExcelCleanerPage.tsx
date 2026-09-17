@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OperationProgress } from "../../components/OperationProgress";
-import { ToolGuide } from "../../components/ToolGuide";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { FileDropZone, PageHeader, SegmentedControl, ToggleRow, formatBytes } from "../../components/ui";
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect, UtilityTextarea } from "../../components/UtilitySurface";
 import { Button } from "../../components/ui/button";
@@ -269,7 +269,7 @@ export function ExcelCleanerPage() {
         {failures.map((item) => <UtilityNotice className="mt-2" kind="error" role="alert" key={`${item.fileName}-${item.message}`}><span className="flex flex-col"><strong>{item.fileName}</strong>{item.message}</span></UtilityNotice>)}
       </Card>}
 
-      <ToolGuide title={t("features:excelCleaner.guide.title")} description={t("features:excelCleaner.guide.description")} blocks={t("features:excelCleaner.guide.blocks", { returnObjects: true }) as import("../../components/ToolGuide").GuideBlock[]} faq={(t("features:excelCleaner.guide.faq", { returnObjects: true }) as unknown as Array<{ q: string; a: string }>).map((item) => ({ question: item.q, answer: item.a }))} />
+      <ToolGuideWrapper slug="excelCleaner" />
     </div>
   </UtilityPage>;
 
