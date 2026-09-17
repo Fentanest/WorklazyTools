@@ -30,6 +30,7 @@ export function OfficeEditorAppPage() {
  const [dragging, setDragging] = useState(false);
  const canvasRef = useRef<HTMLCanvasElement>(null);
  const runtimeRef = useRef<OfficeRuntime | undefined>(undefined);
+ const runtimeTaintedRef = useRef(false);
  const controllerRef = useRef<AbortController | undefined>(undefined);
  const assetUiRef = useRef({ fileNumber: 0, percent: -1 });
  const pendingFileCheckedRef = useRef(false);
