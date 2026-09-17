@@ -415,15 +415,17 @@ for (const route of routes) {
 }
 if (!sitemap.includes('xmlns:xhtml=') || !sitemap.includes('hreflang="x-default"')) throw new Error("sitemap.xml is missing multilingual alternate links.");
 
-const [koreanFeatures, englishFeatures] = await Promise.all([
+const [koreanFeatures, englishFeatures, koreanGuides, englishGuides] = await Promise.all([
   fs.readFile("src/locales/ko/features.json", "utf8"),
   fs.readFile("src/locales/en/features.json", "utf8"),
+  fs.readFile("src/locales/ko/guides.json", "utf8"),
+  fs.readFile("src/locales/en/guides.json", "utf8"),
 ]);
 for (const forbidden of ["광고 스크립트를 불러오지", "광고 실행 환경", "FFmpeg", "오디오 Worker", "브라우저 실행 구성요소", "OCR WebAssembly", "ZIP Worker", "does not load advertising scripts", "ad execution", "analysis worker", "audio worker", "OCR runtime", "separate worker", "ZIP worker"]) {
-  if (koreanFeatures.includes(forbidden) || englishFeatures.includes(forbidden)) throw new Error(`User-facing feature copy exposes implementation state: ${forbidden}`);
+  if (koreanFeatures.includes(forbidden) || englishFeatures.includes(forbidden) || koreanGuides.includes(forbidden) || englishGuides.includes(forbidden)) throw new Error(`User-facing feature copy exposes implementation state: ${forbidden}`);
 }
-if (!koreanFeatures.includes("JPG·PNG·WebP를 지원하며 HEIC·HEIF는 지원하지 않습니다")
-  || !englishFeatures.includes("JPG, PNG and WebP are supported; HEIC and HEIF are not")) {
+if (!koreanGuides.includes("JPG·PNG·WebP를 지원하며 HEIC·HEIF는 지원하지 않습니다")
+  || !englishGuides.includes("JPG, PNG and WebP are supported; HEIC and HEIF are not")) {
   throw new Error("Photo metadata FAQ does not match the supported JPG, PNG and WebP inputs.");
 }
 const [koreanPages, englishPages] = await Promise.all([
