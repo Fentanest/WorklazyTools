@@ -308,9 +308,15 @@
         "a": "JPG, PNG and WebP are supported; HEIC and HEIF are not. Files with either a .jpg or .jpeg extension are accepted. Convert HEIC or HEIF photos to a supported format before selecting them."
       },
       "faq_1": {
-        "q": "Are faces or text in the photo also erased?",
-        "a": "No. This tool handles hidden information embedded inside the file, like capture details. To redact visible content in a photo, use image editing or the document redactor."
+        "q": "Which photo formats are supported?",
+        "a": "JPG, PNG and WebP are supported; HEIC and HEIF are not. Both .jpg and .jpeg extensions are accepted."
       }
+    },
+    "pathFaqs": {
+      "/tools/image-privacy": [
+        "faq_0",
+        "faq_1"
+      ]
     }
   },
   "qr": {

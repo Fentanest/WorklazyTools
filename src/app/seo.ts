@@ -423,7 +423,7 @@ const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
   "/tools/text-merger": "text-merger",
   "/tools/text-formatter": "text-formatter", "/tools/work-calculator": "work-calculator", "/tools/timezone-calculator": "timezone-calculator",
   "/tools/payroll-calculator": "payroll-calculator", "/tools/image-privacy": "image-privacy", "/tools/security-tools": "security-tools",
-  "/tools/qr-studio": "qr-studio", "/tools/data-converter": "data-converter",
+  "/tools/qr-studio": "qr-studio", "/tools/data-converter": "data-converter", "/tools/document-generator": "document-generator", "/tools/document-redactor": "document-redactor",
 };
 
 export function getSeoDefinition(language: AppLanguage, pathname: string): SeoDefinition {
