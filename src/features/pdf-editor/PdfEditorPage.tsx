@@ -29,7 +29,6 @@ interface PdfGuideCopy {
 interface PdfPageCopy {
   modes: Record<PdfToolMode, { eyebrow: string; title: string; description: string }>;
   navigation: Record<PdfToolMode, string>;
-  guides: { standard: PdfGuideCopy; convert: PdfGuideCopy };
 }
 
 const navigation = [
@@ -145,6 +144,5 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
 function PdfGuide({ mode }: { mode: PdfToolMode }) {
   const language = useAppLanguage();
   const page = featureResource<PdfPageCopy>(language, "pdf.page");
-  const guide = page.guides[mode === "convert" ? "convert" : "standard"];
   return <ToolGuideWrapper slug={mode === "convert" ? "pdfEditor.convert" : "pdfEditor.standard"} />;
 }

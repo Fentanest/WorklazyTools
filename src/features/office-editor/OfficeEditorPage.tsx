@@ -58,7 +58,7 @@ export function OfficeEditorPage() {
   </PageHeader>
   <PrivacyBanner compact />
 
-  <UtilitySectionCard title={L("데스크톱형 오피스 화면", "Desktop-style office workspace")} description={L(`편집할 파일을 선택한 뒤에만 대용량 자산을 내려받습니다. 첫 준비에는 약 ${downloadSize}의 저장 공간과 안정적인 인터넷 연결이 필요합니다.`, `Large assets download only after you choose a file to edit. Initial setup needs about ${downloadSize} of storage and a stable connection.`)}>
+  <UtilitySectionCard title={L("데스크톱형 오피스 화면", "Desktop-style office workspace")} description={L(`편집 화면에 진입하면 편집에 필요한 대용량 자산을 먼저 내려받습니다. 첫 준비에는 약 ${downloadSize}의 저장 공간과 안정적인 인터넷 연결이 필요합니다.`, `Large assets download automatically when you enter the workspace. Initial setup needs about ${downloadSize} of storage and a stable connection.`)}>
    <div className="mt-4 grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1" data-testid="office-format-grid">
     <FormatCard icon={<FileEdit size={23} />} name="Writer" extensions="DOCX · DOC · ODT" />
     <FormatCard icon={<FileSpreadsheet size={23} />} name="Calc" extensions="XLSX · XLS · ODS" />

@@ -50,7 +50,10 @@ export async function launchOfficeRuntime(
   };
 
   await loadClassicScript(new URL("soffice.js", assetBaseUrl).href);
-  const port = await globalThis.Module.uno_main;
+  const port = await Promise.race([
+    globalThis.Module.uno_main,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("office-operation-timeout")), 30000))
+  ]);
   if (!port) throw new Error("office-start-failed");
   const waiters = new Map<string, Array<{ resolve: () => void; reject: (reason: Error) => void }>>();
   const received = new Set<string>();
@@ -138,8 +141,9 @@ function loadClassicScript(url: string) {
     const script = document.createElement("script");
     script.src = url;
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("office-start-failed"));
+    let timer = setTimeout(() => reject(new Error("office-operation-timeout")), 30000);
+    script.onload = () => { clearTimeout(timer); resolve(); };
+    script.onerror = () => { clearTimeout(timer); reject(new Error("office-start-failed")); };
     document.body.appendChild(script);
   });
 }

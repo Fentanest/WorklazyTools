@@ -101,6 +101,7 @@ export function OfficeEditorAppPage() {
    setState("preparing");
    setElapsed(0);
    operation.update(84, L("편집 화면을 준비하고 있습니다. 잠시만 기다려 주세요.", "Preparing the editor. Please wait."));
+   runtimeTaintedRef.current = true;
    const runtime = await launchOfficeRuntime(canvasRef.current, assetBaseUrl, OFFICE_EDITOR_FONT_ASSETS.map((asset) => asset.name));
    runtimeRef.current = runtime;
    setState("ready");
@@ -217,7 +218,7 @@ export function OfficeEditorAppPage() {
    <Button render={<Link to={`${landingPath}?guide=1`} />} className="min-h-10 rounded-xl font-bold" variant="secondary">{L("편집기 안내", "Editor guide")}</Button>
    {file && <span className="flex min-w-0 flex-1 items-center gap-2 text-primary max-[620px]:col-span-full max-[620px]:justify-start " data-testid="office-toolbar-document"><FileText className="shrink-0" size={17} /><span className="flex min-w-0 flex-col gap-0.5"><strong className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground">{file.name}</strong><small className="max-w-[520px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground">{state === "editing" ? L("브라우저에서 편집 중", "Editing in this browser") : operation.message}</small></span></span>}
    <label className={cn("relative inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-secondary px-3 text-sm font-bold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-muted", busy && "cursor-not-allowed opacity-50")}><FileUp size={15} /> {file ? L("다른 파일 열기", "Open another file") : L("파일 선택", "Choose file")}<input className="sr-only" data-testid="office-file-picker" type="file" accept={OFFICE_ACCEPT} disabled={busy} onChange={(event) => { const selected = event.target.files?.[0]; event.currentTarget.value = ""; if (selected) chooseFile(selected); }} /></label>
-   {state === "error" && file ? <Button className="min-h-10 rounded-xl bg-primary font-bold text-white hover:bg-primary" disabled={busy} onClick={() => { const runtime = runtimeRef.current; if (runtime) void openFile(file, runtime); else void start(file); }}>{L("다시 시도", "Try again")}</Button> : null}
+   {state === "error" ? <Button className="min-h-10 rounded-xl bg-primary font-bold text-white hover:bg-primary" disabled={busy} onClick={() => { const runtime = runtimeRef.current; if (runtime && file) void openFile(file, runtime); else if (runtimeTaintedRef.current) window.location.reload(); else void start(file); }}>{runtimeTaintedRef.current && !runtimeRef.current ? L("페이지 새로고침", "Reload Page") : L("다시 시도", "Try again")}</Button> : null}
    <Button className="min-h-10 rounded-xl bg-primary font-bold text-white hover:bg-primary" data-testid="office-save" type="button" disabled={state !== "editing"} onClick={() => void save()}><Save size={15} /> {L("저장 및 다운로드", "Save and download")}</Button>
    {state === "downloading" && <Button className="min-h-10 rounded-xl font-bold" type="button" variant="secondary" onClick={() => controllerRef.current?.abort()}>{L("취소", "Cancel")}</Button>}
   </div>
