@@ -17,7 +17,7 @@ export interface SeoDefinition {
   };
 }
 
-import { getFaqsForPath } from "../i18n/guideData";
+import { getFaqsForPath } from "../i18n/guideData.ts";
 
 export interface SocialImageDefinition {
   path: string;
