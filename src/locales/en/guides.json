@@ -2110,7 +2110,7 @@
   },
   "hwpEditor": {
     "title": "09. Edit Hangul Document",
-    "description": "",
+    "description": "Load the official rhwp Studio editor in your browser to modify HWP documents without transmitting files externally.",
     "blocks": [
       {
         "title": "Keep the original and double-check the saved file",
@@ -2139,7 +2139,7 @@
   },
   "video": {
     "title": "12. Edit/Convert Video",
-    "description": "",
+    "description": "Video files are processed within this browser without being uploaded to an external conversion server.",
     "blocks": [
       {
         "title": "Should I choose quick copy or re-encode when exporting?",
