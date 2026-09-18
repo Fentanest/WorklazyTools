@@ -561,8 +561,8 @@
     }
   },
   "excel": {
-    "title": "Excel 병합",
-    "description": "여러 Excel 파일과 CSV를 브라우저 안에서 하나의 XLSX로 안전하게 합치세요.",
+    "title": "엑셀 시트·자료 합치기",
+    "description": "여러 엑셀 파일과 CSV의 시트나 자료를 브라우저 안에서 하나의 XLSX로 안전하게 병합하세요.",
     "ready": "브라우저에서 바로 사용",
     "defaultName": "병합_결과.xlsx",
     "unsupportedFiles": "지원하지 않는 파일을 제외했습니다: {{files}}",

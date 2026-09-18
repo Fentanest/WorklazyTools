@@ -102,11 +102,11 @@ export const seoByPath: Record<string, SeoDefinition> = {
     description: "문서·미디어 편집부터 텍스트, 데이터, 일정, 급여, 보안, QR 도구까지 브라우저에서 무료로 실행하세요.",
   },
   "/tools/excel-merger": {
-    title: "Excel 파일 병합 - XLSX·XLS·XLSB·XLSM·CSV 합치기",
-    description: "여러 XLSX, XLS, XLSB, XLSM, CSV 파일을 하나의 XLSX로 병합하세요. XLSX와 XLS의 수식·서식을 각각 선택해 보존하고 암호 입출력을 지원합니다.",
+    title: "엑셀 시트 합치기·자료 병합 - Excel(XLSX·CSV) 파일 모으기",
+    description: "여러 엑셀 파일의 시트나 자료를 하나의 XLSX로 합치기(병합)하세요. XLSX와 XLS의 수식·서식을 각각 선택해 보존하고 암호 입출력을 지원합니다.",
     application: {
-      name: "Excel 병합",
-      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "시트별·세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 수식·서식 개별 보존", "XLS 수식·서식 개별 보존", "암호화 파일 입출력"],
+      name: "엑셀 시트 합치기·자료 병합",
+      featureList: ["XLSX·XLS·XLSB·XLSM·CSV 병합", "엑셀 시트 합치기", "세로·가로 병합", "끝 여백 정리", "중간의 연속 빈 행·열 삭제", "XLSX 수식·서식 개별 보존", "XLS 수식·서식 개별 보존", "암호화 파일 입출력"],
     },
   },
   "/tools/excel-compare": {

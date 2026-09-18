@@ -56,12 +56,12 @@
       ]
     },
     "excel-merger": {
-      "title": "Excel 병합",
-      "shortTitle": "Excel 병합",
-      "description": "여러 엑셀 파일의 시트나 표를 한 파일로 모읍니다.",
+      "title": "엑셀 시트·자료 병합",
+      "shortTitle": "엑셀 병합",
+      "description": "여러 엑셀 파일의 시트나 자료를 하나의 문서로 합칩니다.",
       "eyebrow": "스프레드시트",
       "highlights": [
-        "시트별 병합",
+        "시트·자료 모으기",
         "세로 병합",
         "가로 병합",
         "빈 영역·암호"
