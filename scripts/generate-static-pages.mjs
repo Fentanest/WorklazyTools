@@ -11,7 +11,7 @@ const sourceHtml = await fs.readFile(path.join(outputDirectory, "index.html"), "
 const siteUrl = ensureTrailingSlash(process.env.VITE_SITE_URL || "https://worklazy.net/");
 const languages = ["ko", "en"];
 const { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition, toolSlugByPath } = await import("../src/app/seo.ts");
-const { getGuideData, toolToGuideKey } = await import("../src/i18n/guideData.ts");
+const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData.ts");
 
 const toolRoutes = [
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "hwp-editor", "office-editor", "video-studio", "audio-studio",
@@ -119,7 +119,7 @@ function makePage(language, route) {
   let blocks = [];
   const slug = toolSlugByPath[pathname] || Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/")) && toolSlugByPath[Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/"))];
   if (slug) {
-    const guideKey = toolToGuideKey[slug] || slug;
+    const guideKey = getGuideKeyForPath(slug, pathname);
     const guide = getGuideData(language, guideKey);
     blocks = [...(guide.blocks || []), ...(guide.pathBlocks?.[pathname] || [])];
   }

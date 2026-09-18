@@ -41,6 +41,15 @@ import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/
 import { getToolIconTone } from "./toolAccentStyles";
 import { DocumentRedactorFallback } from "../features/document-redactor/DocumentRedactorFallback";
 
+
+function isAdFreePath(pathname: string) {
+  const p = stripLanguagePrefix(pathname);
+  return p.startsWith("/tools/hwp-editor") || 
+         p.startsWith("/tools/document-compare") || 
+         p.startsWith("/tools/pdf-compare") || 
+         p.startsWith("/tools/pdf-editor");
+}
+
 const GITHUB_REPO_URL = GITHUB_ISSUES_URL.replace(/\/issues\/?$/, "");
 
 const primaryNavigation = [
@@ -52,9 +61,6 @@ export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusMode, setFocusMode] = useState<"standard" | "editor">("standard");
   useEffect(() => {
-    setAdIneligible("focusMode", focusMode === "editor");
-  }, [focusMode]);
-  useEffect(() => {
     const onFocus = (e: any) => setFocusMode(e.detail);
     window.addEventListener("worklazy-focus", onFocus);
     return () => window.removeEventListener("worklazy-focus", onFocus);
@@ -65,10 +71,12 @@ export function AppShell() {
   const { toolCategories, tools } = useToolCatalog();
   const { theme, cycleTheme } = useWorklazyTheme();
   const location = useLocation();
+  const adFree = isAdFreePath(location.pathname);
   useEffect(() => {
-    const isResult = location.pathname.includes("/tools/document-compare/results");
-    setAdIneligible("noContentResult", isResult);
-  }, [location.pathname]);
+    if (adFree && document.querySelector("script[data-worklazy-adsense]")) {
+      window.location.replace(window.location.href);
+    }
+  }, [adFree]);
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
   const redactorActive = isRedactorPath(location.pathname);
   const redactorDocument = isRedactorDocument();
@@ -110,7 +118,7 @@ export function AppShell() {
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
       <ExcelPreserveIsolationBoundary active={excelPreserveActive} isolationDocument={excelIsolationDocument} language={language} />
       {!redactorActive && !redactorDocument && <AnalyticsLoader disabled={(videoStudioActive && !videoIsolationDocument) || officeEditorAppActive || excelPreserveActive} />}
-      {!redactorActive && !redactorDocument && !videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && <AdSenseLoader />}
+      {!redactorActive && !redactorDocument && !videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && !adFree && <AdSenseLoader />}
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand-card" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
           <svg

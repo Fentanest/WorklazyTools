@@ -23,7 +23,7 @@
     "vendor:qr-font": "node scripts/vendor-qr-label-font.mjs",
     "vendor:rhwp:prune": "node scripts/prune-rhwp-vendor.mjs 0.8.4",
     "vendor:image-studio": "node scripts/vendor-image-studio-assets.mjs",
-    "prebuild": "node scripts/apply-dependency-patches.mjs && node scripts/validate-rhwp-vendor.mjs && node scripts/vendor-browser-runtimes.mjs && node scripts/vendor-image-studio-assets.mjs && node scripts/vendor-qr-label-font.mjs && node scripts/generate-third-party-licenses.mjs",
+    "prebuild": "npm run test:guides && node scripts/apply-dependency-patches.mjs && node scripts/validate-rhwp-vendor.mjs && node scripts/vendor-browser-runtimes.mjs && node scripts/vendor-image-studio-assets.mjs && node scripts/vendor-qr-label-font.mjs && node scripts/generate-third-party-licenses.mjs",
     "build": "tsc -b && vite build && node --experimental-strip-types scripts/generate-static-pages.mjs",
     "preview": "vite preview",
     "test:recovery": "node tests/blank-page-recovery-smoke.mjs",
@@ -53,7 +53,8 @@
     "test:pdf-raster-benchmark": "node tests/pdf-raster-benchmark.mjs",
     "test:pdf-watermark-performance": "node tests/pdf-watermark-performance.mjs",
     "test:static": "node scripts/validate-static-output.mjs",
-    "test:i18n": "node scripts/validate-i18n.mjs"
+    "test:i18n": "node scripts/validate-i18n.mjs",
+    "test:guides": "node --experimental-strip-types scripts/validate-guides.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "0.12.10",

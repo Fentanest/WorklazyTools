@@ -29,7 +29,7 @@ const guidesMap: Record<AppLanguage, Record<string, any>> = {
 
 export function getGuideData(language: AppLanguage, slug: string): ToolGuideDefinition {
   // we fallback to 'en' if slug doesn't exist in current lang, but for guide data we might strictly want it
-  const guide = guidesMap[language]?.[slug] || guidesMap["en"]?.[slug];
+  const guide = guidesMap[language]?.[slug];
   if (!guide) {
     throw new Error(`Guide data not found for slug: ${slug}`);
   }
@@ -94,10 +94,24 @@ export const toolToGuideKey: Record<string, string> = {
   "document-generator": "documentGenerator"
 };
 
+export function getGuideKeyForPath(slug: string, path: string): string {
+  if (path === "/tools/pdf-editor/convert" || path === "/tools/pdf-editor/ocr") return "pdfEditor.convert";
+  return toolToGuideKey[slug] || slug;
+}
+
 export function getFaqsForPath(language: AppLanguage, slug: string, path: string): { question: string, answer: string }[] {
-  const guideKey = toolToGuideKey[slug] || slug;
+  const guideKey = getGuideKeyForPath(slug, path);
   const guide = getGuideData(language, guideKey);
-  const faqIds = guide.pathFaqs?.[path];
+  let faqIds = guide.pathFaqs?.[path];
+  if (!faqIds && guide.pathFaqs) {
+    for (const p of Object.keys(guide.pathFaqs)) {
+      const regexStr = "^" + p.replace(/:[^/]+/g, "[^/]+") + "$";
+      if (new RegExp(regexStr).test(path)) {
+        faqIds = guide.pathFaqs[p];
+        break;
+      }
+    }
+  }
   
   if (faqIds && faqIds.length > 0) {
     return faqIds.map(id => {

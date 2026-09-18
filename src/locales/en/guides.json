@@ -71,9 +71,7 @@
       "/tools/document-compare": [
         "faq_1",
         "faq_2",
-        "faq_3"
-      ],
-      "/tools/document-compare/results/:pairNumber": [
+        "faq_3",
         "new_faq_4",
         "new_faq_5"
       ]
@@ -174,7 +172,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Show an example of minified/indented versions of the same JSON, and explain that spaces inside strings are content. Do not create a \"Syntax Check Passed = Safe to Execute\" badge."
+          "Indentation makes JSON structures easier to read. Spaces within quotes are part of the value and should be distinguished from formatting spaces. A successful format or syntax check does not guarantee safe execution. If you need to execute the code, review it in a separate test environment after verifying permissions and impact."
         ]
       }
     ],
@@ -223,13 +221,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "CSV Example:",
-          "Product,Quantity",
-          "Note,3",
-          "Pen,5",
-          "JSON Example:",
-          "[{\"Product\":\"Note\",\"Quantity\":\"3\"},{\"Product\":\"Pen\",\"Quantity\":\"5\"}]",
-          "This example is a conceptual illustration using string values. Whether numeric types are actually inferred will be confirmed by running the current converter before posting."
+          "In this example, values are shown as strings. Check the converted output before using it in another program."
         ]
       }
     ],
@@ -283,7 +275,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Card order: Manual input \"1. Morning Meeting\" → morning.txt → Manual input \"2. Afternoon Meeting\" → afternoon.txt. Show the result of selecting a blank line as a delimiter."
+          "Review the merged list on the right to ensure the order and content are correct before downloading."
         ]
       }
     ],
@@ -1208,7 +1200,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example data: Left has 10 P-01 / 20 P-02, Right has 25 P-02 / 10 P-01. By linking based on the product code, even with a different order, you can read that P-01 has the same quantity and P-02 has changed. Create an actual fixture to verify it matches the report before posting as a screen example."
+          "Example data: Left has 10 P-01 / 20 P-02, Right has 25 P-02 / 10 P-01. By linking based on the product code, even with a different order, you can easily verify that P-01 has the same quantity and P-02 has changed."
         ]
       }
     ],
@@ -1864,7 +1856,9 @@
     "pathFaqs": {
       "/tools/pdf-editor": [
         "faq_0",
-        "faq_1"
+        "faq_1",
+        "new_faq_0",
+        "new_faq_1"
       ],
       "/tools/pdf-editor/finish": [
         "faq_2",
@@ -1912,8 +1906,7 @@
         {
           "title": "How do I merge application forms and attachments in a specific order?",
           "paragraphs": [
-            "Add applications, supporting documents, and guides in the order of submission. Check not only the file sequence but also the page order and orientation of each file before saving as a single PDF. Once multiple documents are merged, advanced features like bookmarks, form fields, and links may not be identical to the originals, so be sure to double-check the results.",
-            "Split PDF"
+            "Add applications, supporting documents, and guides in the order of submission. Check not only the file sequence but also the page order and orientation of each file before saving as a single PDF. Once multiple documents are merged, advanced features like bookmarks, form fields, and links may not be identical to the originals, so be sure to double-check the results."
           ]
         }
       ],
@@ -1921,8 +1914,7 @@
         {
           "title": "Is splitting pages different from cropping margins?",
           "paragraphs": [
-            "If you only need pages 2-4 from a file, select that range; for non-consecutive pages like 1 and 5, select the required pages manually. When creating multiple ranges, ensure the output file names and page structures for each range are as desired.",
-            "Delete PDF Pages"
+            "If you only need pages 2-4 from a file, select that range; for non-consecutive pages like 1 and 5, select the required pages manually. When creating multiple ranges, ensure the output file names and page structures for each range are as desired."
           ]
         }
       ],
@@ -1930,8 +1922,7 @@
         {
           "title": "What if I only want to redact personal info instead of deleting the whole page?",
           "paragraphs": [
-            "Use page deletion to remove unnecessary pages from a document. If you only want to hide a name or contact information on a single page, use the personal information redaction tool instead. Confirm the pages to be deleted and check the order of the remaining pages.",
-            "Rotate PDF"
+            "Use page deletion to remove unnecessary pages from a document. If you only want to hide a name or contact information on a single page, use the personal information redaction tool instead. Confirm the pages to be deleted and check the order of the remaining pages."
           ]
         }
       ],
@@ -1939,8 +1930,7 @@
         {
           "title": "Can I save the on-screen rotation directly to the output PDF?",
           "paragraphs": [
-            "Select horizontally scanned pages and rotate them to a readable orientation. If only some pages have a different orientation, select just those pages. Reopen the saved PDF to verify that the rotation was applied correctly.",
-            "Image to PDF"
+            "Select horizontally scanned pages and rotate them to a readable orientation. If only some pages have a different orientation, select just those pages. Reopen the saved PDF to verify that the rotation was applied correctly."
           ]
         }
       ],
@@ -1948,8 +1938,7 @@
         {
           "title": "How can I fit multiple photos sequentially into an A4 size PDF?",
           "paragraphs": [
-            "Add photos in the order they should be read, then choose whether to fit them to A4 size or use the original image dimensions. If vertical and horizontal photos are mixed, check the orientation and margins. Simply combining photos into a PDF does not make the text in the photos searchable.",
-            "PDF to Image"
+            "Add photos in the order they should be read, then choose whether to fit them to A4 size or use the original image dimensions. If vertical and horizontal photos are mixed, check the orientation and margins. Simply combining photos into a PDF does not make the text in the photos searchable."
           ]
         }
       ],
@@ -1966,8 +1955,7 @@
         {
           "title": "Will tables and line breaks be preserved when converting PDF to Word?",
           "paragraphs": [
-            "Consider DOCX for text-focused re-editing, XLSX for tweaking tables, or TXT if you only need unformatted text. Since PDF paragraphs and cells are estimated by coordinates, complex tables or multi-column documents may have a different structure than the original. Always double-check dates, amounts, and table rows and columns against the original text.",
-            "PDF OCR"
+            "Consider DOCX for text-focused re-editing, XLSX for tweaking tables, or TXT if you only need unformatted text. Since PDF paragraphs and cells are estimated by coordinates, complex tables or multi-column documents may have a different structure than the original. Always double-check dates, amounts, and table rows and columns against the original text."
           ]
         }
       ],
@@ -1975,8 +1963,7 @@
         {
           "title": "Why can't I search for words in a scanned PDF?",
           "paragraphs": [
-            "Use OCR when you want to find words in scanned documents where text cannot be selected. After processing, try actually searching for a few common body words and numbers. Recognition may be inaccurate in blurry or skewed originals, so do not blindly rely on automatic recognition results for names, dates, or amounts.",
-            "Finish PDF"
+            "Use OCR when you want to find words in scanned documents where text cannot be selected. After processing, try actually searching for a few common body words and numbers. Recognition may be inaccurate in blurry or skewed originals, so do not blindly rely on automatic recognition results for names, dates, or amounts."
           ]
         }
       ],
@@ -1984,8 +1971,7 @@
         {
           "title": "Can I apply both page numbers and watermarks to multiple PDFs at the same time?",
           "paragraphs": [
-            "You can apply page numbers, headers, watermarks, and stamps simultaneously. Check one page first to ensure the positions of each mark do not overlap or cover the main text. When processing multiple files, be aware that page sizes and orientations may vary between files.",
-            "Page Numbers"
+            "You can apply page numbers, headers, watermarks, and stamps simultaneously. Check one page first to ensure the positions of each mark do not overlap or cover the main text. When processing multiple files, be aware that page sizes and orientations may vary between files."
           ]
         }
       ],
@@ -1993,8 +1979,7 @@
         {
           "title": "How do I skip the cover and start numbering from page 1 on the main content?",
           "paragraphs": [
-            "If the first page of the PDF is a cover, the file's page number and the printed body number may differ. Verify the starting page for the marks and the starting value for the numbers separately. For long documents, check the numbers on the first, middle, and last pages before saving.",
-            "Header & Footer"
+            "If the first page of the PDF is a cover, the file's page number and the printed body number may differ. Verify the starting page for the marks and the starting value for the numbers separately. For long documents, check the numbers on the first, middle, and last pages before saving."
           ]
         }
       ],
@@ -2002,8 +1987,7 @@
         {
           "title": "How do I place the filename and date in the exact same spot on every PDF?",
           "paragraphs": [
-            "You can insert repeating content such as document names, dates, and page numbers. Check the preview to ensure the text does not overlap with the main body or existing page numbers. For marks that insert automatic values, use only the formats provided on the screen.",
-            "PDF Watermark"
+            "You can insert repeating content such as document names, dates, and page numbers. Check the preview to ensure the text does not overlap with the main body or existing page numbers. For marks that insert automatic values, use only the formats provided on the screen."
           ]
         }
       ],

@@ -1,4 +1,4 @@
-type EligibilitySource = "routeError" | "focusMode" | "noContentResult" | "routePending";
+type EligibilitySource = "routeError" | "routePending";
 
 const eligibilityFlags = new Set<EligibilitySource>();
 

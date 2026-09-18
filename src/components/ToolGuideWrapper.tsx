@@ -31,13 +31,39 @@ function InnerToolGuide({ slug, children }: { slug: string; children?: ReactNode
   if (!path.startsWith("/")) path = "/" + path;
   if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
 
-  const pathFaqs = data.pathFaqs?.[path];
-  const faqs = pathFaqs && pathFaqs.length > 0
-    ? pathFaqs.map(id => data.faq[id]).filter(Boolean).map(item => ({ question: item.q, answer: item.a }))
+  let matchedPathFaqs = data.pathFaqs?.[path];
+  if (!matchedPathFaqs) {
+    // Try to match dynamic paths, e.g. /tools/document-compare/results/1 to /tools/document-compare/results/:pairNumber
+    if (data.pathFaqs) {
+      for (const p of Object.keys(data.pathFaqs)) {
+        const regexStr = "^" + p.replace(/:[^/]+/g, "[^/]+") + "$";
+        if (new RegExp(regexStr).test(path)) {
+          matchedPathFaqs = data.pathFaqs[p];
+          break;
+        }
+      }
+    }
+  }
+
+  const faqs = matchedPathFaqs && matchedPathFaqs.length > 0
+    ? matchedPathFaqs.map(id => {
+        const item = data.faq[id];
+        if (!item) throw new Error(`Missing FAQ ID '${id}' for path '${path}' in guide '${slug}'`);
+        return { question: item.q, answer: item.a };
+      })
     : Object.values(data.faq).map(item => ({ question: item.q, answer: item.a }));
-  
-  const pathBlocks = data.pathBlocks?.[path] || [];
-  const combinedBlocks = [...data.blocks, ...pathBlocks];
+
+  let matchedPathBlocks = data.pathBlocks?.[path] || [];
+  if (!data.pathBlocks?.[path] && data.pathBlocks) {
+    for (const p of Object.keys(data.pathBlocks)) {
+      const regexStr = "^" + p.replace(/:[^/]+/g, "[^/]+") + "$";
+      if (new RegExp(regexStr).test(path)) {
+        matchedPathBlocks = data.pathBlocks[p] || [];
+        break;
+      }
+    }
+  }
+  const combinedBlocks = [...data.blocks, ...matchedPathBlocks];
   
   return (
     <ToolGuide
