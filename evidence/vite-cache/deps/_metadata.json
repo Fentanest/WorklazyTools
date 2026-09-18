@@ -1,0 +1,43 @@
+{
+  "hash": "c505ac78",
+  "configHash": "2cd2c9de",
+  "lockfileHash": "3a310d19",
+  "browserHash": "54146737",
+  "optimized": {
+    "@zip.js/zip.js": {
+      "src": "../../../node_modules/@zip.js/zip.js/index.js",
+      "file": "@zip__js_zip__js.js",
+      "fileHash": "ae311b26",
+      "needsInterop": false
+    },
+    "exceljs": {
+      "src": "../../../node_modules/exceljs/dist/exceljs.min.js",
+      "file": "exceljs.js",
+      "fileHash": "de6f8500",
+      "needsInterop": true
+    },
+    "jszip": {
+      "src": "../../../node_modules/jszip/dist/jszip.min.js",
+      "file": "jszip.js",
+      "fileHash": "d3abaab6",
+      "needsInterop": true
+    },
+    "tesseract.js": {
+      "src": "../../../node_modules/tesseract.js/src/index.js",
+      "file": "tesseract__js.js",
+      "fileHash": "1049810b",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "zip-reader-YA4FT6BJ": {
+      "file": "zip-reader-YA4FT6BJ.js"
+    },
+    "chunk-5C6BLAQG": {
+      "file": "chunk-5C6BLAQG.js"
+    },
+    "chunk-VUNV25KB": {
+      "file": "chunk-VUNV25KB.js"
+    }
+  }
+}

@@ -1,0 +1,310 @@
+{
+  "excel-merger": {
+    "menu": "엑셀 병합",
+    "title": "엑셀 파일 합치기·시트 병합 | Worklazy Tools",
+    "h1": "엑셀 파일·시트 합치기",
+    "description": "여러 엑셀 파일의 시트나 자료를 하나의 XLSX로 합치기(병합)하세요. 수식·서식을 보존하고 암호 입출력을 지원합니다.",
+    "h2": "여러 시트를 한 파일에 모으는 것과 한 시트로 이어 붙이는 것은 어떻게 다른가요?"
+  },
+  "excel-compare": {
+    "menu": "엑셀 비교",
+    "title": "엑셀 파일 비교 - 값·수식·기준 항목별 차이 | Worklazy Tools",
+    "h1": "엑셀 파일·데이터 비교",
+    "description": "Excel·CSV 파일 쌍을 위치나 키 기준으로 비교하세요. 값·수식·서식 차이를 XLSX 보고서로 확인할 수 있습니다.",
+    "h2": "행 순서가 달라도 같은 사번을 기준으로 비교할 수 있나요?"
+  },
+  "excel-cleaner": {
+    "menu": "엑셀 정리",
+    "title": "엑셀 데이터 정리 - 공백·빈 행·중복 정리 | Worklazy Tools",
+    "h1": "엑셀 데이터 일괄 정리",
+    "description": "Excel·CSV 파일에 공백 제거, 빈 행 삭제, 중복 정리 등 28종 규칙을 순서대로 적용하여 데이터를 깔끔하게 정리하세요.",
+    "h2": "공백 정리와 중복 제거 중 무엇을 먼저 해야 하나요?"
+  },
+  "document-generator": {
+    "menu": "워드 메일머지",
+    "title": "워드 문서 일괄 생성 - 엑셀 명단으로 메일머지 | Worklazy Tools",
+    "h1": "워드 문서 일괄 생성",
+    "description": "워드 템플릿의 변수를 엑셀 데이터로 치환하여 한 번에 수많은 개별 문서를 자동으로 완성하세요.",
+    "h2": "엑셀 명단으로 이름이 다른 워드 문서를 한 번에 만들려면?"
+  },
+  "document-compare": {
+    "menu": "문서 비교",
+    "title": "워드·한글 문서 비교 - 수정 전후 차이 확인 | Worklazy Tools",
+    "h1": "워드·한글 문서 비교",
+    "description": "DOCX·DOC 또는 HWP·HWPX 문서의 문단·표·서식 차이를 비교하고 변경된 내용을 쉽게 확인하세요.",
+    "h2": "워드와 한글 파일을 서로 비교할 수 있나요?"
+  },
+  "pdf-compare": {
+    "menu": "PDF 비교",
+    "title": "PDF 파일 비교 - 화면·텍스트 변경사항 확인 | Worklazy Tools",
+    "h1": "PDF 파일 차이 비교",
+    "description": "여러 수정 전후 PDF 쌍을 비교하여 페이지별 렌더 픽셀 및 추출 텍스트 차이를 파악하세요.",
+    "h2": "수정본에 표지가 추가되면 어느 페이지끼리 비교해야 하나요?"
+  },
+  "pdf-editor": {
+    "menu": "PDF 편집",
+    "title": "PDF 페이지 편집 - 순서 변경·병합·분할 | Worklazy Tools",
+    "h1": "PDF 파일 편집·변환",
+    "description": "PDF 페이지를 병합, 추출, 변환하거나 한국어·영어 OCR을 통해 다양한 문서 형식으로 만드세요.",
+    "h2": "본문 글자를 고치는 작업과 페이지를 정리하는 작업은 어떻게 다른가요?"
+  },
+  "hwp-editor": {
+    "menu": "한글 편집",
+    "title": "한글 파일 편집 - HWP·HWPX 온라인 편집 | Worklazy Tools",
+    "h1": "온라인 한글 문서 편집",
+    "description": "HWP와 HWPX 문서를 브라우저에서 바로 열어 본문과 서식을 편집하고 저장하세요.",
+    "h2": "저장한 한글 파일의 줄바꿈과 표가 달라지면 무엇을 확인해야 하나요?"
+  },
+  "office-editor": {
+    "menu": "오피스 편집",
+    "title": "온라인 문서 편집 - Word·Excel·PowerPoint | Worklazy Tools",
+    "h1": "온라인 오피스 문서 편집",
+    "description": "Word, Excel, PowerPoint 문서를 브라우저에서 간편하게 편집하고 저장할 수 있습니다.",
+    "h2": "문서를 편집한 뒤 결과 파일은 어떻게 저장하나요?"
+  },
+  "video-studio": {
+    "menu": "동영상 편집",
+    "title": "온라인 동영상 편집 - 자르기·합치기·변환 | Worklazy Tools",
+    "h1": "온라인 동영상 편집",
+    "description": "영상 자르기, 이어붙이기, 음원 추출을 지원합니다. 브라우저에서 빠르고 간편하게 영상을 편집하세요.",
+    "h2": "빠른 복사와 다시 변환하기 중 무엇을 골라야 하나요?"
+  },
+  "audio-studio": {
+    "menu": "오디오 편집",
+    "title": "온라인 오디오 편집 - 음소거·피치 조절 | Worklazy Tools",
+    "h1": "온라인 오디오 편집",
+    "description": "오디오 파형에서 구간을 자르고 음소거, 복사, 붙여넣기를 하거나 피치 조절 효과를 적용하세요.",
+    "h2": "오디오 삭제와 음소거는 결과 길이가 어떻게 다른가요?"
+  },
+  "image-studio": {
+    "menu": "사진 편집",
+    "title": "온라인 사진 편집 - 자르기·그리기·콜라주 | Worklazy Tools",
+    "h1": "온라인 사진 편집",
+    "description": "사진 크기 조절, 자르기, 모자이크, 필터 적용 및 자유 그리기 기능을 제공하는 다목적 사진 편집기입니다.",
+    "h2": "이미지 크기와 캔버스 크기는 어떻게 다른가요?"
+  },
+  "text-merger": {
+    "menu": "텍스트 병합",
+    "title": "텍스트 파일 합치기 - TXT·메모 순서대로 병합 | Worklazy Tools",
+    "h1": "텍스트 파일 일괄 합치기",
+    "description": "여러 TXT 파일을 원하는 순서대로 정렬하고 줄바꿈이나 쉼표 등의 구분자로 하나로 합치세요.",
+    "h2": "TXT 파일 사이에 직접 쓴 제목을 넣을 수 있나요?"
+  },
+  "text-tools": {
+    "menu": "텍스트 정돈",
+    "title": "텍스트 정리 - 줄바꿈·공백·중복 줄 제거 | Worklazy Tools",
+    "h1": "텍스트 줄바꿈·공백 제거",
+    "description": "불필요한 공백과 줄바꿈, 중복 줄을 제거하고 대소문자 변환 및 한국어 문장 검사를 실행하세요.",
+    "h2": "목록의 줄바꿈까지 없애도 되나요?"
+  },
+  "text-formatter": {
+    "menu": "코드 포맷터",
+    "title": "JSON·SQL·XML 포맷터 - 정렬·들여쓰기 | Worklazy Tools",
+    "h1": "JSON·SQL·XML 포맷터",
+    "description": "JSON, SQL, XML 텍스트의 문법 오류를 확인하고 읽기 좋게 들여쓰기하여 깔끔하게 정돈하세요.",
+    "h2": "SQL을 정리하면 실제 실행 오류도 확인되나요?"
+  },
+  "work-calculator": {
+    "menu": "영업일 계산",
+    "title": "영업일·연차 계산기 - 휴일·산정 기준 확인 | Worklazy Tools",
+    "h1": "영업일 및 연차 계산기",
+    "description": "주말과 대한민국 법정 공휴일을 제외한 정확한 영업일과 입사일 기준 예상 연차를 계산하세요.",
+    "h2": "회사만 쉬는 날을 영업일 계산에 반영하려면?"
+  },
+  "timezone-calculator": {
+    "menu": "시차 계산",
+    "title": "시차 계산기 - 도시별 시간·회의 시간 비교 | Worklazy Tools",
+    "h1": "세계지도 시차 계산기",
+    "description": "세계지도에서 도시를 선택해 국제 표준 시간대와 서머타임을 반영한 현지 시각 및 회의 시간을 비교하세요.",
+    "h2": "회의 날짜에 따라 뉴욕과 서울의 시차가 달라지나요?"
+  },
+  "payroll-calculator": {
+    "menu": "급여 계산",
+    "title": "월급 실수령액·주휴수당·퇴직금 간이 계산기 | Worklazy Tools",
+    "h1": "실수령액·퇴직금 계산기",
+    "description": "최신 사회보험 기준으로 주휴수당, 월급 실수령액과 법정 퇴직금을 간편하게 계산하세요.",
+    "h2": "간이 계산과 급여명세서의 금액이 다른 이유는 무엇인가요?"
+  },
+  "document-redactor": {
+    "menu": "개인정보 가리기",
+    "title": "PDF·이미지 개인정보 가리기 - 직접 영역 선택 | Worklazy Tools",
+    "h1": "PDF·이미지 개인정보 가리기",
+    "description": "PDF와 이미지 파일에서 민감한 개인정보 영역을 검정색으로 가리고 안전하게 사본을 저장하세요.",
+    "h2": "가린 결과를 공유하기 전에 무엇을 확인해야 하나요?"
+  },
+  "image-privacy": {
+    "menu": "위치정보 삭제",
+    "title": "사진 위치정보 삭제 - EXIF·GPS 확인 및 제거 | Worklazy Tools",
+    "h1": "사진 메타데이터·위치정보 삭제",
+    "description": "사진에 숨겨진 GPS 위치 및 촬영 기기 정보(EXIF)를 확인하고 완전히 삭제하세요.",
+    "h2": "촬영정보를 지우면 사진에 보이는 주소도 없어지나요?"
+  },
+  "security-tools": {
+    "menu": "비밀번호 생성",
+    "title": "비밀번호 생성기 - 무작위 생성·강도 확인 | Worklazy Tools",
+    "h1": "안전한 비밀번호 생성기",
+    "description": "보안 난수를 기반으로 무작위 비밀번호를 생성하고, 예상 해독 시간과 패턴으로 안전성을 측정하세요.",
+    "h2": "예상 해독 시간은 실제 보안 보장 시간인가요?"
+  },
+  "qr-studio": {
+    "menu": "QR 스튜디오",
+    "title": "QR 코드 만들기·읽기 - 로고 삽입·사진 스캔 | Worklazy Tools",
+    "h1": "QR 코드 만들기 및 스캔",
+    "description": "URL, 텍스트 등으로 QR 코드를 만들거나 카메라 및 사진 업로드로 기존 QR 코드를 스캔하세요.",
+    "h2": "사진 속 QR 코드의 링크는 어디서 확인하나요?"
+  },
+  "data-converter": {
+    "menu": "데이터 변환",
+    "title": "CSV·JSON·HTML 표 변환기 | Worklazy Tools",
+    "h1": "CSV·JSON·HTML 데이터 변환기",
+    "description": "CSV 파일, JSON 배열, HTML 표 데이터를 브라우저 환경에서 자유롭게 변환하고 저장하세요.",
+    "h2": "JSON을 CSV로 바꾸면 열 이름은 어떻게 정해지나요?"
+  },
+  "pdf-editor/merge": {
+    "menu": "PDF 합치기",
+    "title": "PDF 합치기 - 여러 파일을 순서대로 병합 | Worklazy Tools",
+    "h1": "여러 PDF 파일 합치기",
+    "description": "여러 개의 PDF 문서를 원하는 순서대로 합쳐 하나의 PDF 파일로 간편하게 저장하세요.",
+    "h2": "서류와 첨부자료를 원하는 순서로 합치려면?"
+  },
+  "pdf-editor/split": {
+    "menu": "PDF 분할",
+    "title": "PDF 분할·페이지 추출 - 필요한 구간 저장 | Worklazy Tools",
+    "h1": "PDF 페이지 범위 분할",
+    "description": "PDF 파일에서 원하는 범위를 선택하여 자르고, 필요한 구간만 따로 저장하세요.",
+    "h2": "페이지를 나누는 것과 여백을 자르는 것은 다른가요?"
+  },
+  "pdf-editor/delete": {
+    "menu": "PDF 페이지 삭제",
+    "title": "PDF 페이지 삭제 - 불필요한 쪽 제거 | Worklazy Tools",
+    "h1": "PDF 특정 페이지 삭제",
+    "description": "PDF에서 불필요한 페이지를 직접 선택해 삭제한 뒤, 나머지 페이지를 하나의 문서로 저장하세요.",
+    "h2": "페이지 전체가 아니라 일부 개인정보만 가리고 싶다면?"
+  },
+  "pdf-editor/rotate": {
+    "menu": "PDF 회전",
+    "title": "PDF 회전 저장 - 페이지 방향 바꾸기 | Worklazy Tools",
+    "h1": "PDF 페이지 방향 회전",
+    "description": "방향이 잘못된 PDF 페이지를 선택하여 올바른 방향으로 회전시키고 저장하세요.",
+    "h2": "화면에서 돌린 방향을 결과 PDF에 저장할 수 있나요?"
+  },
+  "pdf-editor/image-to-pdf": {
+    "menu": "사진을 PDF로",
+    "title": "사진 PDF 변환 - JPG·PNG를 한 파일로 | Worklazy Tools",
+    "h1": "사진(JPG·PNG)을 PDF로 변환",
+    "description": "여러 장의 JPG, PNG 이미지를 나열하고 하나의 깔끔한 PDF 파일로 묶어 변환하세요.",
+    "h2": "여러 사진을 순서대로 A4 PDF에 넣으려면?"
+  },
+  "pdf-editor/pdf-to-image": {
+    "menu": "PDF를 이미지로",
+    "title": "PDF JPG·PNG 변환 - 페이지별 이미지 저장 | Worklazy Tools",
+    "h1": "PDF 페이지를 이미지(JPG·PNG)로 변환",
+    "description": "PDF의 모든 페이지를 고해상도 PNG 또는 JPG 이미지로 변환하여 ZIP 파일로 한 번에 다운로드하세요.",
+    "h2": "PNG와 JPG 중 어떤 형식으로 저장해야 하나요?"
+  },
+  "pdf-editor/convert": {
+    "menu": "PDF 파일 변환",
+    "title": "PDF 워드·엑셀 변환 - DOCX·XLSX·TXT | Worklazy Tools",
+    "h1": "PDF를 워드·엑셀·텍스트로 변환",
+    "description": "원하는 PDF 페이지를 OCR 기술을 이용해 DOCX, XLSX, TXT 파일로 변환하세요.",
+    "h2": "PDF를 워드로 바꾸면 표와 줄바꿈이 그대로 유지되나요?"
+  },
+  "pdf-editor/ocr": {
+    "menu": "PDF OCR",
+    "title": "PDF OCR - 스캔 문서를 검색 가능한 PDF로 | Worklazy Tools",
+    "h1": "검색 가능한 PDF (OCR) 만들기",
+    "description": "스캔된 PDF 문서를 한국어 및 영어 OCR로 분석하여 텍스트 검색이 가능한 PDF로 변환하세요.",
+    "h2": "스캔 PDF에서 단어 검색이 안 되는 이유는 무엇인가요?"
+  },
+  "pdf-editor/finish": {
+    "menu": "PDF 워터마크·번호",
+    "title": "PDF 페이지 번호·워터마크·도장 넣기 | Worklazy Tools",
+    "h1": "PDF 페이지 번호 및 워터마크 추가",
+    "description": "여러 PDF에 페이지 번호, 머리글, 바닥글, 워터마크 및 도장 이미지를 일괄 적용하세요.",
+    "h2": "여러 PDF에 번호와 워터마크를 함께 적용할 수 있나요?"
+  },
+  "pdf-editor/page-numbers": {
+    "menu": "PDF 번호 매기기",
+    "title": "PDF 페이지 번호 넣기 - 표지 제외·시작 번호 | Worklazy Tools",
+    "h1": "PDF 페이지 번호 넣기",
+    "description": "표지를 제외하거나 시작 번호를 지정하여 PDF에 원하는 형식의 페이지 번호를 삽입하세요.",
+    "h2": "표지를 제외하고 본문부터 1쪽으로 번호를 매기려면?"
+  },
+  "pdf-editor/header-footer": {
+    "menu": "PDF 머리글/바닥글",
+    "title": "PDF 머리글·바닥글 넣기 - 파일명·날짜 | Worklazy Tools",
+    "h1": "PDF 머리글·바닥글 삽입",
+    "description": "PDF 파일명, 날짜, 페이지 번호 등의 문구를 원하는 위치에 머리글이나 바닥글로 추가하세요.",
+    "h2": "PDF마다 파일명과 날짜를 같은 위치에 넣으려면?"
+  },
+  "pdf-editor/watermark": {
+    "menu": "PDF 워터마크",
+    "title": "PDF 워터마크 넣기 - 글자·이미지 표시 | Worklazy Tools",
+    "h1": "PDF 텍스트·이미지 워터마크 넣기",
+    "description": "PDF 문서의 배경이나 전면에 텍스트 또는 이미지 워터마크를 반복 배치하고 투명도를 조절하세요.",
+    "h2": "본문을 가리지 않고 대외비 문구를 넣으려면?"
+  },
+  "pdf-editor/stamp": {
+    "menu": "PDF 도장 삽입",
+    "title": "PDF 도장·서명 이미지 넣기 | Worklazy Tools",
+    "h1": "PDF에 서명 및 도장 이미지 넣기",
+    "description": "서명이나 도장 이미지를 PDF에 자유롭게 배치하고 크기를 조절하여 여러 페이지에 한 번에 적용하세요.",
+    "h2": "도장 이미지를 넣으면 인증된 전자서명이 되나요?"
+  },
+  "image-studio/resize": {
+    "menu": "사진 크기 조절",
+    "title": "사진 크기 조절 - 이미지 픽셀·비율 변경 | Worklazy Tools",
+    "h1": "사진 픽셀 크기 조절",
+    "description": "이미지 비율을 유지하면서 원하는 정확한 픽셀 크기로 사진 크기를 조절하고 저장하세요.",
+    "h2": "사진 비율을 유지하면서 픽셀 크기를 줄이려면?"
+  },
+  "image-studio/mosaic": {
+    "menu": "사진 모자이크",
+    "title": "사진 모자이크 - 원하는 영역 직접 가리기 | Worklazy Tools",
+    "h1": "사진 특정 영역 모자이크 처리",
+    "description": "사진에서 가리고 싶은 개인정보나 민감한 영역을 선택해 모자이크 효과를 적용하세요.",
+    "h2": "모자이크할 영역은 직접 지정해야 하나요?"
+  },
+  "image-studio/watermark": {
+    "menu": "사진 워터마크",
+    "title": "사진 워터마크 넣기 - 글자·출처 표시 | Worklazy Tools",
+    "h1": "사진 텍스트 워터마크 넣기",
+    "description": "사진에 텍스트 워터마크를 입력하여 저작권 표시나 출처 문구를 쉽게 추가하세요.",
+    "h2": "사진에 이름이나 출처 문구를 넣으려면?"
+  },
+  "video-studio/trim": {
+    "menu": "동영상 자르기",
+    "title": "동영상 자르기 - 필요한 구간을 MP4로 | Worklazy Tools",
+    "h1": "동영상 구간 자르기",
+    "description": "영상 파일에서 필요한 특정 구간만 선택하여 불필요한 부분을 잘라내고 MP4로 저장하세요.",
+    "h2": "빠른 복사로 자른 시작점이 달라질 수 있나요?"
+  },
+  "video-studio/merge": {
+    "menu": "동영상 합치기",
+    "title": "동영상 합치기 - 여러 영상을 하나로 | Worklazy Tools",
+    "h1": "여러 동영상 하나로 합치기",
+    "description": "여러 개의 영상 파일을 순서대로 배열하여 하나의 MP4 동영상 파일로 합치세요.",
+    "h2": "크기나 비율이 다른 영상을 합치면 무엇을 확인해야 하나요?"
+  },
+  "video-studio/extract-audio": {
+    "menu": "음원 추출",
+    "title": "동영상 음원 추출 - MP4를 MP3로 | Worklazy Tools",
+    "h1": "동영상에서 오디오(MP3) 추출",
+    "description": "영상 파일에서 소리만 따로 추출하여 고음질 MP3 형식의 오디오 파일로 저장하세요.",
+    "h2": "영상 파일에서 필요한 구간의 소리만 저장하려면?"
+  },
+  "audio-studio/trim": {
+    "menu": "오디오 자르기",
+    "title": "MP3·오디오 자르기 - 필요한 구간 저장 | Worklazy Tools",
+    "h1": "오디오·MP3 구간 자르기",
+    "description": "오디오나 녹음 파일에서 필요한 구간을 선택하여 원하는 부분만 잘라 저장하세요.",
+    "h2": "녹음 앞뒤의 불필요한 구간을 잘라 저장하려면?"
+  },
+  "qr-studio/bulk": {
+    "menu": "QR 일괄 생성",
+    "title": "QR 코드 일괄 생성 - 엑셀·CSV로 대량 생성 | Worklazy Tools",
+    "h1": "엑셀·CSV로 QR 코드 대량 생성",
+    "description": "엑셀(Excel)이나 CSV 데이터 목록을 이용하여 한 번에 수많은 QR 코드를 일괄 생성하세요.",
+    "h2": "엑셀 목록의 각 행을 QR 코드로 만들려면?"
+  }
+}

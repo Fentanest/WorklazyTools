@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>Drag Test</title></head>
+<body>
+  <div id="parent" style="padding: 50px; background: lightblue;">
+    Parent
+    <div id="child" style="padding: 50px; background: lightgreen;">Child</div>
+  </div>
+  <script>
+    const parent = document.getElementById('parent');
+    const child = document.getElementById('child');
+    let depth = 0;
+    parent.addEventListener('dragenter', e => { e.preventDefault(); depth++; console.log('enter', depth); });
+    parent.addEventListener('dragleave', e => { depth--; console.log('leave', depth); });
+    child.addEventListener('dragenter', e => { e.preventDefault(); });
+  </script>
+</body>
+</html>

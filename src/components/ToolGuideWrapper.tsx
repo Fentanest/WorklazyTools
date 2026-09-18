@@ -26,11 +26,15 @@ function InnerToolGuide({ slug, children }: { slug: string; children?: ReactNode
   const location = useLocation();
   const { i18n } = useTranslation();
   
-  const faqs = Object.values(data.faq).map(item => ({ question: item.q, answer: item.a }));
-  
   let path = location.pathname.replace(new RegExp(`^/(${i18n.language}|en|ko)`), "");
   if (!path) path = "/";
   if (!path.startsWith("/")) path = "/" + path;
+  if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+
+  const pathFaqs = data.pathFaqs?.[path];
+  const faqs = pathFaqs && pathFaqs.length > 0
+    ? pathFaqs.map(id => data.faq[id]).filter(Boolean).map(item => ({ question: item.q, answer: item.a }))
+    : Object.values(data.faq).map(item => ({ question: item.q, answer: item.a }));
   
   const pathBlocks = data.pathBlocks?.[path] || [];
   const combinedBlocks = [...data.blocks, ...pathBlocks];

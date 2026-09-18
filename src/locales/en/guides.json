@@ -37,7 +37,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: Two composite DOCXs where the submission date of the same notice is changed from \"October 1\" to \"October 5\" and only one cell in the department table is modified. Show where to check body changes and table changes respectively."
+          "Example: Prepare two DOCX files where the submission date of a notice is changed from \"October 1\" to \"October 5\" and only one cell in the department table is modified. On the result screen, you can distinctly check the changes made to the body text and the table structure."
         ]
       }
     ],
@@ -118,7 +118,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Do not post actual usable passwords in example screenshots. Show only composite values for the UI before and after changing length/allowed characters."
+          "It is recommended not to test with passwords you actually use for your accounts. Adjust the length and allowed character options to see how secure patterns are generated."
         ]
       }
     ],
@@ -1367,7 +1367,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Review example: A composite document where only the contact info on one page is redacted, leaving the same info in the signature block on the last page. Shows that \"redacting in one place ≠ automatic total removal\"."
+          "Document review precaution: Redacting personal information (e.g., contact details) on a specific page does not automatically remove the same information from signature blocks or other sections. Check the entire document and manually designate all areas to be redacted."
         ]
       }
     ],
@@ -1514,7 +1514,7 @@
           "Sales Team",
           "Seo-yeon Lee",
           "Operations Team",
-          "If the file naming rule is set to {Name}_Notice.docx, the target results are Min-su Kim_Notice.docx and Seo-yeon Lee_Notice.docx respectively. Do not state that this default file name is set automatically. Example files will be provided as downloads after verifying with the actual generation engine."
+          "For example, if you set the file naming rule to {Name}_Notice.docx, files will be created individually like 'Min-su Kim_Notice.docx' and 'Seo-yeon Lee_Notice.docx'. Try generating one document as a test to see if you get the desired output."
         ]
       }
     ],
@@ -1546,7 +1546,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: The original is 3 pages without a cover, the revision is a new cover + 3 body pages. A diagram showing that page 1 of the original must correspond to page 2 of the revision to compare the same content. Since the current guide explicitly supports manual matching, verify the linking method in the actual UI before posting."
+          "Example: If the original is 3 pages without a cover and the revision has 4 pages (a new cover + 3 body pages), you must link page 1 of the original to page 2 of the revision for an accurate comparison. If the structures differ, use the manual matching feature to align the pages correctly."
         ]
       }
     ],
@@ -2077,7 +2077,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Task selection cards: \"Combine 3 submission documents into one\" → Merge, \"Only pages 2-4 of a contract\" → Split/Extract, \"Pages to PNG\" → Image, \"Search words in a scanned copy\" → OCR. Use composite examples instead of real documents."
+          "Common task examples: Try \"Combine 3 submission documents into one\" → Merge feature, \"Save only pages 2-4 of a contract\" → Split/Extract feature, \"Convert entire pages to PNG\" → Image conversion, \"Search words in a scanned document\" → OCR feature."
         ]
       }
     ],
@@ -2106,7 +2106,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Add 4 items under \"Check before submission\" below the existing guide: Page count / Where tables break on the next page / Substitute fonts and line breaks / Actual save format. Add case images only if validated composite HWP/HWPX are available."
+          "Four items to check before submission: 1. Changes in the total page count, 2. Where tables break across pages, 3. Line breaks affected by unsupported substitute fonts, 4. Whether the final saved file format matches your requirements."
         ]
       }
     ],

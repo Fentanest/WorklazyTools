@@ -28,6 +28,8 @@ import { useToolCatalog } from "../i18n/useToolCatalog";
 import { useWorklazyTheme } from "../hooks/useWorklazyTheme";
 import { cn } from "../lib/utils";
 import { AdSenseLoader } from "./AdSenseLoader";
+import { setAdIneligible } from "../app/adEligibility";
+
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { AppInstallControl } from "./AppInstallControl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -60,6 +62,10 @@ export function AppShell() {
   const { toolCategories, tools } = useToolCatalog();
   const { theme, cycleTheme } = useWorklazyTheme();
   const location = useLocation();
+  useEffect(() => {
+    const isResult = location.pathname.includes("/tools/document-compare/results");
+    setAdIneligible("noContentResult", isResult);
+  }, [location.pathname]);
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
   const redactorActive = isRedactorPath(location.pathname);
   const redactorDocument = isRedactorDocument();

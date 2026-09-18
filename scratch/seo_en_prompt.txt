@@ -1,0 +1,14 @@
+You are an expert English SEO Copywriter. I have a JSON file `scratch/full_seo_ko.json` containing Korean SEO metadata for 44 tool paths.
+Your task is to translate and adapt this into English, saving the result to `scratch/full_seo_en.json`.
+
+CRITICAL INSTRUCTIONS:
+- Do NOT literally translate Korean SEO keywords into awkward English (e.g., do not write "Combine Excel Files Sheet Merge"). 
+- Use natural, professional English SaaS terminology (e.g., "Excel Merger", "Compare Excel Files").
+- Maintain the same JSON structure and keys (`menu`, `title`, `h1`, `description`, `h2`).
+- `menu` should be short (e.g. "Excel Merger").
+- `title` should be SEO friendly (e.g. "Excel Merger | Combine & Merge Spreadsheets | Worklazy Tools").
+- `h1` should be a clear heading (e.g. "Merge Excel Files").
+- `description` should be 1-2 sentences explaining input and output.
+- `h2` is a user question. Translate it naturally (e.g. "What is the difference between merging into one file and appending to one sheet?").
+
+Format your output as a valid JSON file and use the `write_to_file` tool to save it to `/home/better0101/projects/worklazytools/scratch/full_seo_en.json`. Reply when done.

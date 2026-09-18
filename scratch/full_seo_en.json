@@ -1,0 +1,310 @@
+{
+  "excel-merger": {
+    "menu": "Excel Merger",
+    "title": "Excel Merger - Combine Files & Merge Sheets | Worklazy Tools",
+    "h1": "Merge Excel Files and Sheets",
+    "description": "Combine multiple Excel files or sheets into a single XLSX file. Preserves formulas and formatting, and supports password-protected files.",
+    "h2": "What is the difference between merging into one file and appending to one sheet?"
+  },
+  "excel-compare": {
+    "menu": "Excel Compare",
+    "title": "Compare Excel Files - Find Differences in Values & Formulas | Worklazy Tools",
+    "h1": "Compare Excel Files and Data",
+    "description": "Compare pairs of Excel or CSV files by position or key columns. View differences in values, formulas, and formatting in an XLSX report.",
+    "h2": "Can I compare files using Employee ID even if the row order is different?"
+  },
+  "excel-cleaner": {
+    "menu": "Excel Cleaner",
+    "title": "Excel Data Cleaner - Remove Spaces, Blank Rows & Duplicates | Worklazy Tools",
+    "h1": "Batch Clean Excel Data",
+    "description": "Apply 28 different rules such as removing spaces, blank rows, and duplicates to clean up your Excel and CSV files systematically.",
+    "h2": "Should I remove spaces or duplicates first?"
+  },
+  "document-generator": {
+    "menu": "Word Mail Merge",
+    "title": "Batch Word Document Generator - Excel to Word Mail Merge | Worklazy Tools",
+    "h1": "Batch Generate Word Documents",
+    "description": "Automatically generate multiple individualized Word documents at once by replacing template variables with your Excel data.",
+    "h2": "How do I create multiple Word documents with different names using an Excel list?"
+  },
+  "document-compare": {
+    "menu": "Document Compare",
+    "title": "Compare Word & HWP Documents - Track Changes | Worklazy Tools",
+    "h1": "Compare Word and HWP Documents",
+    "description": "Compare DOCX, DOC, HWP, or HWPX documents to easily identify differences in paragraphs, tables, and formatting.",
+    "h2": "Can I compare a Word document with an HWP file?"
+  },
+  "pdf-compare": {
+    "menu": "PDF Compare",
+    "title": "Compare PDF Files - Check Visual & Text Differences | Worklazy Tools",
+    "h1": "Compare PDF File Differences",
+    "description": "Compare original and revised PDF pairs to identify page-by-page rendering differences and extracted text changes.",
+    "h2": "If a cover page is added to the revised version, which pages should I compare?"
+  },
+  "pdf-editor": {
+    "menu": "PDF Editor",
+    "title": "PDF Editor - Reorder, Merge, Split & Convert | Worklazy Tools",
+    "h1": "Edit and Convert PDF Files",
+    "description": "Merge, extract, and convert PDF pages, or use Korean and English OCR to transform them into various document formats.",
+    "h2": "What is the difference between editing text in a document and organizing pages?"
+  },
+  "hwp-editor": {
+    "menu": "HWP Editor",
+    "title": "HWP Editor - Edit HWP & HWPX Online | Worklazy Tools",
+    "h1": "Online HWP Document Editor",
+    "description": "Open, edit, and save HWP and HWPX documents directly in your browser with formatting support.",
+    "h2": "What should I check if the line breaks and tables change in the saved HWP file?"
+  },
+  "office-editor": {
+    "menu": "Office Editor",
+    "title": "Online Office Editor - Word, Excel & PowerPoint | Worklazy Tools",
+    "h1": "Online Office Document Editor",
+    "description": "Easily view, edit, and save Word, Excel, and PowerPoint documents directly in your web browser.",
+    "h2": "How do I save the final file after editing the document?"
+  },
+  "video-studio": {
+    "menu": "Video Studio",
+    "title": "Online Video Editor - Trim, Merge & Convert | Worklazy Tools",
+    "h1": "Online Video Editor",
+    "description": "Trim, merge, and extract audio from videos. Quickly and easily edit your videos directly in your browser.",
+    "h2": "Should I choose quick copy or re-encode when exporting?"
+  },
+  "audio-studio": {
+    "menu": "Audio Studio",
+    "title": "Online Audio Editor - Mute, Trim & Pitch Shift | Worklazy Tools",
+    "h1": "Online Audio Editor",
+    "description": "Cut, mute, copy, and paste sections of an audio waveform, or apply pitch adjustment effects to your recordings.",
+    "h2": "What is the difference in output length between deleting and muting audio?"
+  },
+  "image-studio": {
+    "menu": "Photo Editor",
+    "title": "Online Photo Editor - Crop, Draw & Collage | Worklazy Tools",
+    "h1": "Online Photo Editor",
+    "description": "A versatile photo editor providing image resizing, cropping, mosaic, filtering, and free-hand drawing features.",
+    "h2": "What is the difference between image size and canvas size?"
+  },
+  "text-merger": {
+    "menu": "Text Merger",
+    "title": "Merge Text Files - Combine TXT & Notes | Worklazy Tools",
+    "h1": "Batch Merge Text Files",
+    "description": "Order multiple TXT files and combine them into a single file using custom separators like line breaks or commas.",
+    "h2": "Can I insert custom titles between the merged TXT files?"
+  },
+  "text-tools": {
+    "menu": "Text Cleaner",
+    "title": "Text Cleaner - Remove Line Breaks & Spaces | Worklazy Tools",
+    "h1": "Remove Line Breaks and Spaces",
+    "description": "Remove unnecessary spaces, line breaks, and duplicate lines. Also supports case conversion and Korean grammar checks.",
+    "h2": "Is it okay to remove line breaks within a list?"
+  },
+  "text-formatter": {
+    "menu": "Code Formatter",
+    "title": "JSON, SQL & XML Formatter - Align & Indent | Worklazy Tools",
+    "h1": "JSON, SQL, and XML Formatter",
+    "description": "Check syntax errors and beautifully indent JSON, SQL, and XML text to make your code neat and readable.",
+    "h2": "Does formatting SQL also check for execution errors?"
+  },
+  "work-calculator": {
+    "menu": "Business Days",
+    "title": "Business Day & PTO Calculator - Working Days | Worklazy Tools",
+    "h1": "Business Day and PTO Calculator",
+    "description": "Calculate exact business days excluding weekends and Korean public holidays, and estimate PTO based on your start date.",
+    "h2": "How do I include company-specific holidays in the business day calculation?"
+  },
+  "timezone-calculator": {
+    "menu": "Timezone Converter",
+    "title": "Timezone Converter - Compare World & Meeting Times | Worklazy Tools",
+    "h1": "World Map Timezone Converter",
+    "description": "Select cities on the world map to compare local times and meeting schedules, automatically accounting for UTC and Daylight Saving Time.",
+    "h2": "Does the time difference between New York and Seoul change depending on the meeting date?"
+  },
+  "payroll-calculator": {
+    "menu": "Payroll Calculator",
+    "title": "Salary, Holiday Pay & Severance Calculator | Worklazy Tools",
+    "h1": "Net Salary and Severance Calculator",
+    "description": "Easily estimate net monthly salary, weekly holiday pay, and legal severance pay based on the latest social insurance rates.",
+    "h2": "Why is the estimated amount different from my actual payslip?"
+  },
+  "document-redactor": {
+    "menu": "Redact Document",
+    "title": "Redact PDF & Images - Blackout Private Info | Worklazy Tools",
+    "h1": "Redact Personal Info from PDF and Images",
+    "description": "Safely blackout sensitive personal information on PDF and image files, and save the redacted copies securely.",
+    "h2": "What should I double-check before sharing the redacted file?"
+  },
+  "image-privacy": {
+    "menu": "Remove EXIF",
+    "title": "Remove Photo Location - Delete EXIF & GPS Data | Worklazy Tools",
+    "h1": "Delete Photo Metadata and Location",
+    "description": "View and completely remove hidden GPS coordinates and camera device information (EXIF) from your photos.",
+    "h2": "Does removing metadata also erase addresses visible in the photo?"
+  },
+  "security-tools": {
+    "menu": "Password Generator",
+    "title": "Password Generator - Secure Random Passwords | Worklazy Tools",
+    "h1": "Secure Password Generator",
+    "description": "Generate random passwords using cryptographically secure numbers, and evaluate their strength with estimated crack times.",
+    "h2": "Is the estimated crack time a guaranteed measure of security?"
+  },
+  "qr-studio": {
+    "menu": "QR Studio",
+    "title": "QR Code Generator & Scanner - Add Logo | Worklazy Tools",
+    "h1": "Create and Scan QR Codes",
+    "description": "Generate QR codes for URLs and text, or scan existing QR codes using your camera or by uploading images.",
+    "h2": "How do I find the link from a QR code inside a photo?"
+  },
+  "data-converter": {
+    "menu": "Data Converter",
+    "title": "CSV, JSON & HTML Table Converter | Worklazy Tools",
+    "h1": "CSV, JSON, and HTML Data Converter",
+    "description": "Freely convert between CSV files, JSON arrays, and HTML table data directly in your browser environment.",
+    "h2": "How are column names determined when converting JSON to CSV?"
+  },
+  "pdf-editor/merge": {
+    "menu": "Merge PDF",
+    "title": "Merge PDF - Combine Multiple Files in Order | Worklazy Tools",
+    "h1": "Merge Multiple PDF Files",
+    "description": "Combine several PDF documents in your preferred order and easily save them as a single PDF file.",
+    "h2": "How do I merge application forms and attachments in a specific order?"
+  },
+  "pdf-editor/split": {
+    "menu": "Split PDF",
+    "title": "Split PDF & Extract Pages - Save Needed Sections | Worklazy Tools",
+    "h1": "Split PDF Page Ranges",
+    "description": "Select specific page ranges to extract from your PDF, and save only the sections you need.",
+    "h2": "Is splitting pages different from cropping margins?"
+  },
+  "pdf-editor/delete": {
+    "menu": "Delete PDF Pages",
+    "title": "Delete PDF Pages - Remove Unwanted Pages | Worklazy Tools",
+    "h1": "Delete Specific PDF Pages",
+    "description": "Select and remove unwanted pages from a PDF, then save the remaining pages as a single document.",
+    "h2": "What if I only want to redact personal info instead of deleting the whole page?"
+  },
+  "pdf-editor/rotate": {
+    "menu": "Rotate PDF",
+    "title": "Rotate PDF - Change Page Orientation | Worklazy Tools",
+    "h1": "Rotate PDF Page Orientation",
+    "description": "Select PDF pages that are facing the wrong way, rotate them to the correct orientation, and save the file.",
+    "h2": "Can I save the on-screen rotation directly to the output PDF?"
+  },
+  "pdf-editor/image-to-pdf": {
+    "menu": "Image to PDF",
+    "title": "Image to PDF - Convert JPG & PNG to PDF | Worklazy Tools",
+    "h1": "Convert Images (JPG/PNG) to PDF",
+    "description": "Arrange multiple JPG or PNG images and combine them into a single, clean PDF file.",
+    "h2": "How can I fit multiple photos sequentially into an A4 size PDF?"
+  },
+  "pdf-editor/pdf-to-image": {
+    "menu": "PDF to Image",
+    "title": "PDF to JPG & PNG - Save Pages as Images | Worklazy Tools",
+    "h1": "Convert PDF Pages to Images (JPG/PNG)",
+    "description": "Convert every page of a PDF into high-resolution PNG or JPG images, and download them all at once in a ZIP file.",
+    "h2": "Should I save the images as PNG or JPG?"
+  },
+  "pdf-editor/convert": {
+    "menu": "Convert PDF",
+    "title": "Convert PDF to Word & Excel - DOCX, XLSX, TXT | Worklazy Tools",
+    "h1": "Convert PDF to Word, Excel, and Text",
+    "description": "Use OCR technology to convert selected PDF pages into editable DOCX, XLSX, or TXT files.",
+    "h2": "Will tables and line breaks be preserved when converting PDF to Word?"
+  },
+  "pdf-editor/ocr": {
+    "menu": "PDF OCR",
+    "title": "PDF OCR - Make Scanned PDFs Searchable | Worklazy Tools",
+    "h1": "Create Searchable PDFs (OCR)",
+    "description": "Analyze scanned PDF documents using Korean and English OCR to transform them into text-searchable PDFs.",
+    "h2": "Why can't I search for words in a scanned PDF?"
+  },
+  "pdf-editor/finish": {
+    "menu": "PDF Finish",
+    "title": "PDF Page Numbers, Watermarks & Stamps | Worklazy Tools",
+    "h1": "Add Page Numbers and Watermarks to PDFs",
+    "description": "Batch apply page numbers, headers, footers, watermarks, and stamp images across multiple PDFs.",
+    "h2": "Can I apply both page numbers and watermarks to multiple PDFs at the same time?"
+  },
+  "pdf-editor/page-numbers": {
+    "menu": "PDF Page Numbers",
+    "title": "Add PDF Page Numbers - Skip Cover & Set Start | Worklazy Tools",
+    "h1": "Add Page Numbers to PDF",
+    "description": "Insert page numbers in your preferred format, with options to skip the cover page or set a custom starting number.",
+    "h2": "How do I skip the cover and start numbering from page 1 on the main content?"
+  },
+  "pdf-editor/header-footer": {
+    "menu": "PDF Header & Footer",
+    "title": "Add PDF Header & Footer - Filename & Date | Worklazy Tools",
+    "h1": "Insert PDF Headers and Footers",
+    "description": "Add text such as filenames, dates, or page numbers to desired header or footer positions in your PDF.",
+    "h2": "How do I place the filename and date in the exact same spot on every PDF?"
+  },
+  "pdf-editor/watermark": {
+    "menu": "PDF Watermark",
+    "title": "Add PDF Watermark - Text & Image Marks | Worklazy Tools",
+    "h1": "Add Text and Image Watermarks to PDF",
+    "description": "Place repeating text or image watermarks in the background or foreground of your PDF, and adjust the transparency.",
+    "h2": "How do I add a 'Confidential' mark without covering the main text?"
+  },
+  "pdf-editor/stamp": {
+    "menu": "PDF Stamp",
+    "title": "Add PDF Stamps & Signatures | Worklazy Tools",
+    "h1": "Insert Signatures and Stamps into PDF",
+    "description": "Freely position and resize signature or stamp images, and apply them across multiple PDF pages at once.",
+    "h2": "Does adding a stamp image make it a certified digital signature?"
+  },
+  "image-studio/resize": {
+    "menu": "Resize Image",
+    "title": "Resize Image - Change Photo Pixels & Ratio | Worklazy Tools",
+    "h1": "Resize Photo Pixels",
+    "description": "Adjust your photos to exact pixel dimensions while maintaining the original aspect ratio.",
+    "h2": "How do I reduce pixel size without distorting the photo's aspect ratio?"
+  },
+  "image-studio/mosaic": {
+    "menu": "Image Mosaic",
+    "title": "Image Mosaic - Blur Specific Areas | Worklazy Tools",
+    "h1": "Apply Mosaic to Specific Photo Areas",
+    "description": "Select and apply a mosaic blur to personal information or sensitive areas you want to hide in a photo.",
+    "h2": "Do I have to manually select the areas to be mosaiced?"
+  },
+  "image-studio/watermark": {
+    "menu": "Image Watermark",
+    "title": "Add Image Watermark - Text & Copyright | Worklazy Tools",
+    "h1": "Add Text Watermark to Photos",
+    "description": "Easily insert text watermarks into your photos to indicate copyright or source information.",
+    "h2": "How do I add my name or source text to a photo?"
+  },
+  "video-studio/trim": {
+    "menu": "Trim Video",
+    "title": "Trim Video - Save Specific Sections as MP4 | Worklazy Tools",
+    "h1": "Trim Video Sections",
+    "description": "Select only the specific sections you need from a video file, cut out the unwanted parts, and save it as an MP4.",
+    "h2": "Can quick copy change the exact starting point of the trimmed video?"
+  },
+  "video-studio/merge": {
+    "menu": "Merge Video",
+    "title": "Merge Video - Combine Multiple Videos | Worklazy Tools",
+    "h1": "Combine Multiple Videos into One",
+    "description": "Arrange several video files in order and merge them into a single MP4 video file.",
+    "h2": "What should I check when merging videos with different resolutions or aspect ratios?"
+  },
+  "video-studio/extract-audio": {
+    "menu": "Extract Audio",
+    "title": "Extract Audio from Video - MP4 to MP3 | Worklazy Tools",
+    "h1": "Extract Audio (MP3) from Video",
+    "description": "Extract only the sound track from a video file and save it as a high-quality MP3 audio file.",
+    "h2": "How do I save the audio from only a specific section of a video?"
+  },
+  "audio-studio/trim": {
+    "menu": "Trim Audio",
+    "title": "Trim Audio & MP3 - Save Needed Sections | Worklazy Tools",
+    "h1": "Trim Audio and MP3 Sections",
+    "description": "Select the specific sections you need from an audio or recording file, cut out the rest, and save the result.",
+    "h2": "How do I trim and save by cutting out the unwanted parts at the beginning and end of a recording?"
+  },
+  "qr-studio/bulk": {
+    "menu": "Bulk QR Generator",
+    "title": "Bulk QR Code Generator - Excel & CSV | Worklazy Tools",
+    "h1": "Batch Generate QR Codes with Excel or CSV",
+    "description": "Create a massive number of QR codes all at once using data lists from Excel or CSV files.",
+    "h2": "How do I turn each row in an Excel list into a separate QR code?"
+  }
+}

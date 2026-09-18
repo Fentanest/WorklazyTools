@@ -1,0 +1,193 @@
+{
+  "/tools/pdf-editor/merge": {
+    "title": "",
+    "paragraphs": [
+      "Combine submission documents into one file",
+      "Add applications, supporting documents, and guides in the order of submission. Check not only the file sequence but also the page order and orientation of each file before saving as a single PDF. Once multiple documents are merged, advanced features like bookmarks, form fields, and links may not be identical to the originals, so be sure to double-check the results.",
+      "Split PDF"
+    ]
+  },
+  "/tools/pdf-editor/split": {
+    "title": "",
+    "paragraphs": [
+      "Separate consecutive and non-consecutive pages",
+      "If you only need pages 2-4 from a file, select that range; for non-consecutive pages like 1 and 5, select the required pages manually. When creating multiple ranges, ensure the output file names and page structures for each range are as desired.",
+      "Delete PDF Pages"
+    ]
+  },
+  "/tools/pdf-editor/delete": {
+    "title": "",
+    "paragraphs": [
+      "Deleting is different from redacting information",
+      "Use page deletion to remove unnecessary pages from a document. If you only want to hide a name or contact information on a single page, use the personal information redaction tool instead. Confirm the pages to be deleted and check the order of the remaining pages.",
+      "Rotate PDF"
+    ]
+  },
+  "/tools/pdf-editor/rotate": {
+    "title": "",
+    "paragraphs": [
+      "Check the orientation saved in the document",
+      "Select horizontally scanned pages and rotate them to a readable orientation. If only some pages have a different orientation, select just those pages. Reopen the saved PDF to verify that the rotation was applied correctly.",
+      "Image to PDF"
+    ]
+  },
+  "/tools/pdf-editor/image-to-pdf": {
+    "title": "",
+    "paragraphs": [
+      "Organize receipt photos into one document",
+      "Add photos in the order they should be read, then choose whether to fit them to A4 size or use the original image dimensions. If vertical and horizontal photos are mixed, check the orientation and margins. Simply combining photos into a PDF does not make the text in the photos searchable.",
+      "PDF to Image"
+    ]
+  },
+  "/tools/pdf-editor/pdf-to-image": {
+    "title": "",
+    "paragraphs": [
+      "Use pages as image files",
+      "Use this when you want to save document pages as PNG or JPG for attachments or image editing. Increasing the resolution can make small text easier to read, but it does not restore details that were absent in the original, and it increases the file size and memory usage. Try converting just the necessary pages first to check the size and clarity.",
+      "Convert PDF Document"
+    ]
+  },
+  "/tools/pdf-editor/convert": {
+    "title": "",
+    "paragraphs": [
+      "Select the right output format for your purpose",
+      "Consider DOCX for text-focused re-editing, XLSX for tweaking tables, or TXT if you only need unformatted text. Since PDF paragraphs and cells are estimated by coordinates, complex tables or multi-column documents may have a different structure than the original. Always double-check dates, amounts, and table rows and columns against the original text.",
+      "PDF OCR"
+    ]
+  },
+  "/tools/pdf-editor/ocr": {
+    "title": "",
+    "paragraphs": [
+      "Make text in photos searchable",
+      "Use OCR when you want to find words in scanned documents where text cannot be selected. After processing, try actually searching for a few common body words and numbers. Recognition may be inaccurate in blurry or skewed originals, so do not blindly rely on automatic recognition results for names, dates, or amounts.",
+      "Finish PDF"
+    ]
+  },
+  "/tools/pdf-editor/finish": {
+    "title": "",
+    "paragraphs": [
+      "Preview before applying multiple marks together",
+      "You can apply page numbers, headers, watermarks, and stamps simultaneously. Check one page first to ensure the positions of each mark do not overlap or cover the main text. When processing multiple files, be aware that page sizes and orientations may vary between files.",
+      "Page Numbers"
+    ]
+  },
+  "/tools/pdf-editor/page-numbers": {
+    "title": "",
+    "paragraphs": [
+      "Consider cover and body numbers separately",
+      "If the first page of the PDF is a cover, the file's page number and the printed body number may differ. Verify the starting page for the marks and the starting value for the numbers separately. For long documents, check the numbers on the first, middle, and last pages before saving.",
+      "Header & Footer"
+    ]
+  },
+  "/tools/pdf-editor/header-footer": {
+    "title": "",
+    "paragraphs": [
+      "Place repetitive information outside the main text",
+      "You can insert repeating content such as document names, dates, and page numbers. Check the preview to ensure the text does not overlap with the main body or existing page numbers. For marks that insert automatic values, use only the formats provided on the screen.",
+      "PDF Watermark"
+    ]
+  },
+  "/tools/pdf-editor/watermark": {
+    "title": "",
+    "paragraphs": [
+      "Create unobtrusive marks",
+      "Use this to add marks indicating the document's purpose, such as 'For Review' or 'Internal Sharing'. Check the opacity, rotation, position, and applied pages, and ensure it does not make tables or small text hard to read. A watermark is not an access restriction or anti-copy feature.",
+      "PDF Stamp & Signature Image"
+    ]
+  },
+  "/tools/pdf-editor/stamp": {
+    "title": "",
+    "paragraphs": [
+      "Adding a stamp image is different from an electronic signature",
+      "Place a prepared PNG or JPG stamp or signature image in the desired location. Check the image's margins, size, orientation, and the actual page where it will be applied. Since this is simply overlaying an image, do not use it as a cryptographic electronic signature to verify the signer's identity or document integrity.",
+      "Resize Image"
+    ]
+  },
+  "/tools/image-studio/resize": {
+    "title": "",
+    "paragraphs": [
+      "When reducing photo size vs. changing margins",
+      "Reducing the pixel dimensions of a photo you want to send is different from changing the canvas around the photo. Choose the size option that fits your purpose and check the results to ensure the aspect ratio is maintained. If file size is important, check both the dimensions and the save format.",
+      "Mosaic Image"
+    ]
+  },
+  "/tools/image-studio/mosaic": {
+    "title": "",
+    "paragraphs": [
+      "Check areas with and without effects",
+      "Manually select the area to obscure and zoom in on the result to verify. If the effect is weak or only part of the text is selected, the content might still be recognizable. Also, check if the same information remains in other parts of the image.",
+      "Image Watermark"
+    ]
+  },
+  "/tools/image-studio/watermark": {
+    "title": "",
+    "paragraphs": [
+      "Choose a readable position for each photo",
+      "Use this to add source or author credits to photos. Ensure the text is readable on both bright and dark backgrounds, and that it doesn't cover important subjects. If applying to multiple images, it is best to check horizontal and vertical photos separately.",
+      "Trim Video"
+    ]
+  },
+  "/tools/video-studio/trim": {
+    "title": "",
+    "paragraphs": [
+      "Leave some extra space before and after, then listen to the start and end",
+      "Set the start and end times for the segment you want to keep, and play it to verify. Since speech might be cut off or an important first scene might be missed, be sure to also check the start and end of the actual saved result. Fast original copying might slightly shift the start point depending on the reference playback scene.",
+      "Merge Video"
+    ]
+  },
+  "/tools/video-studio/merge": {
+    "title": "",
+    "paragraphs": [
+      "Check the actual connected sequence rather than just file names",
+      "Ensure the order of the cards and groups matches your desired output sequence. Files with different sizes, aspect ratios, or audio configurations may require a re-conversion method. After saving, verify that the sound and video transition smoothly at each connection point.",
+      "Extract Audio from Video"
+    ]
+  },
+  "/tools/video-studio/extract-audio": {
+    "title": "",
+    "paragraphs": [
+      "Keep only the sound from a recording",
+      "You can select the required section and save only the audio. The result will not include the video portion. For videos with multiple audio tracks, check the track information currently being processed, and listen to the saved file to ensure it contains the desired language and sound.",
+      "Trim Audio"
+    ]
+  },
+  "/tools/audio-studio/trim": {
+    "title": "",
+    "paragraphs": [
+      "Confirm whether you are keeping or removing the selected section",
+      "After selecting a section on the waveform, check whether the applied action will keep, delete, or mute the selected part. Test with a short segment first and listen to the audio before and after the boundary. Save the desired result before opening the next file.",
+      "Bulk Generate QR"
+    ]
+  },
+  "/tools/qr-studio/bulk": {
+    "title": "",
+    "paragraphs": [
+      "One row in the list becomes one QR code",
+      "Check the address/text and the save name for each row, then select which column to include in the QR content. Cleaning up empty values, duplicate file names, and typos first will reduce the need to regenerate results. For printable labels, print a single sample first to check the content, margins, and size.",
+      "Preserve XLS"
+    ]
+  },
+  "/tools/excel-merger/xls-preserve": {
+    "title": "",
+    "paragraphs": [
+      "Features to preserve and results to verify",
+      "This is the processing screen required to maintain XLS formulas and formatting. Preparation time may take longer than standard pages. Verify the formulas and cell displays of the preserved results in your original software. This feature does not guarantee that macros, charts, or external links will remain completely identical.",
+      "Document Comparison Results"
+    ]
+  },
+  "/tools/document-compare/results/:pairNumber": {
+    "title": "",
+    "paragraphs": [
+      "Read the changes alongside the original text",
+      "Select a list of changes to compare the exact locations in both the original and revised versions side-by-side. Check important items like dates, amounts, and target subjects first, and manually review areas with ambiguous connections or altered table/format structures. Save the results if you need a review record.",
+      "Office Execution Screen"
+    ]
+  },
+  "/tools/office-editor/app/": {
+    "title": "",
+    "paragraphs": [
+      "Brief guide on preparation, file queuing, and save status",
+      "The editing environment is being prepared. If you select a file in advance, it will open once preparation is complete. After preparation, drop or select the file you want to edit. When finished, click Save & Download, and verify that the actual result file has been saved."
+    ]
+  }
+}

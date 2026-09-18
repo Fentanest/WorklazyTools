@@ -97,11 +97,16 @@ export function getFaqsForPath(language: AppLanguage, slug: string, path: string
   try {
     const guideKey = toolToGuideKey[slug] || slug;
     const guide = getGuideData(language, guideKey);
-    const faqIds = guide.pathFaqs?.[path] || [];
-    return faqIds.map(id => {
-      const f = guide.faq[id];
-      return { question: f.q, answer: f.a };
-    });
+    const faqIds = guide.pathFaqs?.[path];
+    
+    if (faqIds && faqIds.length > 0) {
+      return faqIds.map(id => {
+        const f = guide.faq[id];
+        return f ? { question: f.q, answer: f.a } : null;
+      }).filter(Boolean) as { question: string, answer: string }[];
+    }
+    
+    return Object.values(guide.faq).map(item => ({ question: item.q, answer: item.a }));
   } catch {
     return [];
   }
