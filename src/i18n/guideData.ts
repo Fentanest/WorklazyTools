@@ -19,6 +19,7 @@ export interface ToolGuideDefinition {
   blocks: ToolGuideBlock[];
   faq: Record<string, ToolGuideFaq>;
   pathFaqs?: Record<string, string[]>;
+  pathBlocks?: Record<string, ToolGuideBlock[]>;
 }
 
 const guidesMap: Record<AppLanguage, Record<string, any>> = {
@@ -61,7 +62,8 @@ export function getGuideData(language: AppLanguage, slug: string): ToolGuideDefi
     description: guide.description,
     blocks,
     faq,
-    pathFaqs: guide.pathFaqs || {}
+    pathFaqs: guide.pathFaqs || {},
+    pathBlocks: guide.pathBlocks || {}
   };
 }
 

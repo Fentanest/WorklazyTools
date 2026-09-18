@@ -44,9 +44,9 @@
   },
   "items": {
     "document-redactor": {
-      "title": "Document Redaction",
-      "shortTitle": "Document redaction",
-      "description": "Cover selected areas in PDFs and images with solid black masks and save new copies.",
+      "title": "Redact Personal Info from PDF and Images",
+      "shortTitle": "Redact Document",
+      "description": "Safely blackout sensitive personal information on PDF and image files, and save the redacted copies securely.",
       "eyebrow": "DOCUMENT PRIVACY",
       "highlights": [
         "Manual area selection",
@@ -56,9 +56,9 @@
       ]
     },
     "excel-merger": {
-      "title": "Excel Merger",
-      "shortTitle": "Excel merger",
-      "description": "Combine multiple Excel and CSV files into one organized workbook.",
+      "title": "Merge Excel Files and Sheets",
+      "shortTitle": "Excel Merger",
+      "description": "Combine multiple Excel files or sheets into a single XLSX file. Preserves formulas and formatting, and supports password-protected files.",
       "eyebrow": "SPREADSHEETS",
       "highlights": [
         "One sheet per source",
@@ -68,9 +68,9 @@
       ]
     },
     "excel-compare": {
-      "title": "Excel Compare",
-      "shortTitle": "Excel compare",
-      "description": "Check a suggested header, compare Excel or CSV pairs, and review both source-row groups for each duplicate key.",
+      "title": "Compare Excel Files and Data",
+      "shortTitle": "Excel Compare",
+      "description": "Compare pairs of Excel or CSV files by position or key columns. View differences in values, formulas, and formatting in an XLSX report.",
       "eyebrow": "SPREADSHEET COMPARISON",
       "highlights": [
         "Suggested header selection",
@@ -81,9 +81,9 @@
       ]
     },
     "excel-cleaner": {
-      "title": "Excel Data Cleaner",
-      "shortTitle": "Excel cleaner",
-      "description": "Apply an ordered pipeline of 28 cleanup rules to Excel and CSV files and export XLSX, CSV, and reports.",
+      "title": "Batch Clean Excel Data",
+      "shortTitle": "Excel Cleaner",
+      "description": "Apply 28 different rules such as removing spaces, blank rows, and duplicates to clean up your Excel and CSV files systematically.",
       "eyebrow": "SPREADSHEET CLEANUP",
       "highlights": [
         "13 structure rules",
@@ -93,9 +93,9 @@
       ]
     },
     "pdf-editor": {
-      "title": "PDF Tools",
-      "shortTitle": "PDF tools",
-      "description": "Edit, merge and extract PDF pages, convert images and office formats, or run browser OCR.",
+      "title": "Edit and Convert PDF Files",
+      "shortTitle": "PDF Editor",
+      "description": "Merge, extract, and convert PDF pages, or use Korean and English OCR to transform them into various document formats.",
       "eyebrow": "PDF EDIT & CONVERT",
       "highlights": [
         "Checkbox & continuous ranges",
@@ -105,9 +105,9 @@
       ]
     },
     "document-compare": {
-      "title": "Document Compare",
-      "shortTitle": "Document compare",
-      "description": "Compare text, tables and formatting in DOCX, DOC, HWP and HWPX files with one consistent method.",
+      "title": "Compare Word and HWP Documents",
+      "shortTitle": "Document Compare",
+      "description": "Compare DOCX, DOC, HWP, or HWPX documents to easily identify differences in paragraphs, tables, and formatting.",
       "eyebrow": "DOCUMENT COMPARISON",
       "highlights": [
         "Word & HWP together",
@@ -117,9 +117,9 @@
       ]
     },
     "pdf-compare": {
-      "title": "PDF Compare",
-      "shortTitle": "PDF compare",
-      "description": "Compare rendered pages and extracted text across multiple before-and-after PDF pairs.",
+      "title": "Compare PDF File Differences",
+      "shortTitle": "PDF Compare",
+      "description": "Compare original and revised PDF pairs to identify page-by-page rendering differences and extracted text changes.",
       "eyebrow": "PDF COMPARISON",
       "highlights": [
         "Multiple file pairs",
@@ -129,9 +129,9 @@
       ]
     },
     "hwp-editor": {
-      "title": "HWP Editor",
-      "shortTitle": "HWP editor",
-      "description": "Edit HWP and HWPX documents in the official rhwp Studio.",
+      "title": "Online HWP Document Editor",
+      "shortTitle": "HWP Editor",
+      "description": "Open, edit, and save HWP and HWPX documents directly in your browser with formatting support.",
       "eyebrow": "HANGUL DOCUMENTS",
       "highlights": [
         "HWP, HWPX & HML",
@@ -141,9 +141,9 @@
       ]
     },
     "office-editor": {
-      "title": "Browser Office Editor",
-      "shortTitle": "Office editor",
-      "description": "Drop a file to prepare a full-screen LibreOffice-based Writer, Calc or Impress workspace automatically.",
+      "title": "Online Office Document Editor",
+      "shortTitle": "Office Editor",
+      "description": "Easily view, edit, and save Word, Excel, and PowerPoint documents directly in your web browser.",
       "eyebrow": "BROWSER OFFICE",
       "highlights": [
         "Drop to start",
@@ -153,9 +153,9 @@
       ]
     },
     "video-studio": {
-      "title": "Video Studio",
-      "shortTitle": "Video studio",
-      "description": "Trim, join and export unlimited videos in up to 10 groups, or create GIF, MP3 and AAC results.",
+      "title": "Online Video Editor",
+      "shortTitle": "Video Studio",
+      "description": "Trim, merge, and extract audio from videos. Quickly and easily edit your videos directly in your browser.",
       "eyebrow": "VIDEO EDITING",
       "highlights": [
         "Unlimited files, 10 groups",
@@ -166,9 +166,9 @@
       ]
     },
     "audio-studio": {
-      "title": "Audio Studio",
-      "shortTitle": "Audio studio",
-      "description": "Edit selected waveform regions, transform pitch or tone, and export the result as WAV or MP3.",
+      "title": "Online Audio Editor",
+      "shortTitle": "Audio Studio",
+      "description": "Cut, mute, copy, and paste sections of an audio waveform, or apply pitch adjustment effects to your recordings.",
       "eyebrow": "AUDIO EDITING",
       "highlights": [
         "Detailed waveform",
@@ -178,9 +178,9 @@
       ]
     },
     "image-studio": {
-      "title": "Image Studio",
-      "shortTitle": "Image studio",
-      "description": "Mosaic or blur selected regions, retouch and draw, resize image content or the canvas, and export at exact pixel dimensions.",
+      "title": "Online Photo Editor",
+      "shortTitle": "Photo Editor",
+      "description": "A versatile photo editor providing image resizing, cropping, mosaic, filtering, and free-hand drawing features.",
       "eyebrow": "IMAGE EDITING",
       "highlights": [
         "Region mosaic & blur",
@@ -192,9 +192,9 @@
       ]
     },
     "text-merger": {
-      "title": "Text Merger",
-      "shortTitle": "Text merger",
-      "description": "Combine pasted text and TXT files in any order with your chosen separator.",
+      "title": "Batch Merge Text Files",
+      "shortTitle": "Text Merger",
+      "description": "Order multiple TXT files and combine them into a single file using custom separators like line breaks or commas.",
       "eyebrow": "TEXT PRODUCTIVITY",
       "highlights": [
         "Pasted text",
@@ -204,9 +204,9 @@
       ]
     },
     "text-tools": {
-      "title": "Text Tools",
-      "shortTitle": "Text cleanup",
-      "description": "Clean whitespace and line breaks, convert letter case and review common Korean writing patterns.",
+      "title": "Remove Line Breaks and Spaces",
+      "shortTitle": "Text Cleaner",
+      "description": "Remove unnecessary spaces, line breaks, and duplicate lines. Also supports case conversion and Korean grammar checks.",
       "eyebrow": "TEXT PRODUCTIVITY",
       "highlights": [
         "Whitespace cleanup",
@@ -216,9 +216,9 @@
       ]
     },
     "text-formatter": {
-      "title": "Code Formatter",
-      "shortTitle": "Code formatter",
-      "description": "Validate and format JSON, SQL and XML with indentation or minification.",
+      "title": "JSON, SQL, and XML Formatter",
+      "shortTitle": "Code Formatter",
+      "description": "Check syntax errors and beautifully indent JSON, SQL, and XML text to make your code neat and readable.",
       "eyebrow": "DEVELOPMENT & DATA",
       "highlights": [
         "JSON",
@@ -228,9 +228,9 @@
       ]
     },
     "work-calculator": {
-      "title": "Korean Workday Calculator",
-      "shortTitle": "Workdays & leave",
-      "description": "Calculate workdays excluding South Korean holidays and estimate statutory annual leave.",
+      "title": "Business Day and PTO Calculator",
+      "shortTitle": "Business Days",
+      "description": "Calculate exact business days excluding weekends and Korean public holidays, and estimate PTO based on your start date.",
       "eyebrow": "KOREAN WORK SCHEDULES",
       "highlights": [
         "Business days",
@@ -240,9 +240,9 @@
       ]
     },
     "timezone-calculator": {
-      "title": "World Time Planner",
-      "shortTitle": "World time",
-      "description": "Pin cities on a world map, compare local times and find overlapping working hours.",
+      "title": "World Map Timezone Converter",
+      "shortTitle": "Timezone Converter",
+      "description": "Select cities on the world map to compare local times and meeting schedules, automatically accounting for UTC and Daylight Saving Time.",
       "eyebrow": "GLOBAL COLLABORATION",
       "highlights": [
         "World map pins",
@@ -252,9 +252,9 @@
       ]
     },
     "payroll-calculator": {
-      "title": "Korean Payroll Calculator",
-      "shortTitle": "Korean payroll",
-      "description": "Estimate weekly holiday pay, monthly take-home pay and statutory severance under South Korean rules.",
+      "title": "Net Salary and Severance Calculator",
+      "shortTitle": "Payroll Calculator",
+      "description": "Easily estimate net monthly salary, weekly holiday pay, and legal severance pay based on the latest social insurance rates.",
       "eyebrow": "KOREAN PAYROLL",
       "highlights": [
         "Weekly holiday pay",
@@ -264,9 +264,9 @@
       ]
     },
     "image-privacy": {
-      "title": "Photo Metadata Remover",
-      "shortTitle": "Photo metadata remover",
-      "description": "Inspect and remove hidden GPS, camera and capture-time EXIF data from JPG, PNG and WebP files.",
+      "title": "Delete Photo Metadata and Location",
+      "shortTitle": "Remove EXIF",
+      "description": "View and completely remove hidden GPS coordinates and camera device information (EXIF) from your photos.",
       "eyebrow": "PHOTO METADATA",
       "highlights": [
         "Inspect metadata",
@@ -276,9 +276,9 @@
       ]
     },
     "security-tools": {
-      "title": "Password Generator",
-      "shortTitle": "Password generator",
-      "description": "Generate passwords with operating-system cryptographic randomness and estimate pattern-based guessing difficulty.",
+      "title": "Secure Password Generator",
+      "shortTitle": "Password Generator",
+      "description": "Generate random passwords using cryptographically secure numbers, and evaluate their strength with estimated crack times.",
       "eyebrow": "SECURITY",
       "highlights": [
         "Secure randomness",
@@ -288,9 +288,9 @@
       ]
     },
     "qr-studio": {
-      "title": "QR Studio",
-      "shortTitle": "QR studio",
-      "description": "Create QR codes from text or table rows, export PNG, ZIP and label PDF results, or scan with a camera or image.",
+      "title": "Create and Scan QR Codes",
+      "shortTitle": "QR Studio",
+      "description": "Generate QR codes for URLs and text, or scan existing QR codes using your camera or by uploading images.",
       "eyebrow": "QR CREATE · BULK · SCAN",
       "highlights": [
         "Create QR codes",
@@ -300,9 +300,9 @@
       ]
     },
     "data-converter": {
-      "title": "Table Data Converter",
-      "shortTitle": "Table data converter",
-      "description": "Convert CSV, JSON and HTML tables and export the result as a file or to the clipboard.",
+      "title": "CSV, JSON, and HTML Data Converter",
+      "shortTitle": "Data Converter",
+      "description": "Freely convert between CSV files, JSON arrays, and HTML table data directly in your browser environment.",
       "eyebrow": "TABLE DATA CONVERSION",
       "highlights": [
         "CSV",
@@ -312,9 +312,9 @@
       ]
     },
     "document-generator": {
-      "title": "Template-based Bulk Document Generator",
+      "title": "Batch Generate Word Documents",
       "shortTitle": "Word Mail Merge",
-      "description": "Replace variables in a Word template with Excel data to automatically generate hundreds of individual documents at once.",
+      "description": "Automatically generate multiple individualized Word documents at once by replacing template variables with your Excel data.",
       "eyebrow": "DOCUMENT AUTOMATION",
       "highlights": [
         "DOCX template variables",

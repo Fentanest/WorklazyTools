@@ -1,6 +1,6 @@
 {
   "documentCompare": {
-    "title": "Usage Guide",
+    "title": "Document Compare Usage Guide",
     "description": "Compare Word and Hangul (HWP) documents before and after revisions to check for changes in text, tables, and formatting.",
     "blocks": [
       {
@@ -26,6 +26,19 @@
         "paragraphs": [
           "Read the original text alongside the change indicators to verify if it represents an actual meaning change. Indicators might appear due to internal structure or formatting differences. Automated handling may be difficult if similar types of content repeat."
         ]
+      },
+      {
+        "title": "Can I compare a Word document with an HWP file?",
+        "paragraphs": [
+          "When revising reports or notices multiple times, it is easy to miss what has changed. Document Compare highlights the differences in text, tables, and formatting between two versions to help you locate areas for review. Connect Word documents with Word documents, and Hangul documents with Hangul documents.",
+          "Select Web Comparison to read the changed parts immediately, or Excel Report to organize a review list. If both files are DOCX, you can also generate a Track Changes result to view in Word. Because change indicators do not judge the business significance of the document, please read them alongside the original text."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: Two composite DOCXs where the submission date of the same notice is changed from \"October 1\" to \"October 5\" and only one cell in the department table is modified. Show where to check body changes and table changes respectively."
+        ]
       }
     ],
     "faq": {
@@ -44,6 +57,14 @@
       "faq_3": {
         "q": "Does tracked Word output work for DOC?",
         "a": "No. It is limited to pairs where both files are DOCX."
+      },
+      "new_faq_4": {
+        "q": "Can the exact same text be marked as a change?",
+        "a": "Formatting or internal document structure might have changed. Read the marked section along with the original and check if it's a comparison that includes formatting changes."
+      },
+      "new_faq_5": {
+        "q": "Do I have to read every single difference?",
+        "a": "First, look at the list of additions, deletions, and modifications, and prioritize important details like dates, amounts, and subjects. Also check if you have selected table comparison and other document areas."
       }
     },
     "pathFaqs": {
@@ -51,6 +72,17 @@
         "faq_1",
         "faq_2",
         "faq_3"
+      ]
+    },
+    "pathBlocks": {
+      "/tools/document-compare/results/:pairNumber": [
+        {
+          "title": "Read the changes alongside the original text",
+          "paragraphs": [
+            "Select a list of changes to compare the exact locations in both the original and revised versions side-by-side. Check important items like dates, amounts, and target subjects first, and manually review areas with ambiguous connections or altered table/format structures. Save the results if you need a review record.",
+            "Office Execution Screen"
+          ]
+        }
       ]
     }
   },
@@ -75,6 +107,19 @@
         "paragraphs": [
           "A comparative value assuming a stored password hash is leaked and an attacker can attempt 10 billion guesses per second. Actual time varies greatly depending on the site's storage method and security settings."
         ]
+      },
+      {
+        "title": "Is the estimated crack time a guaranteed measure of security?",
+        "paragraphs": [
+          "Generate a password after checking the length and character types allowed by the site you intend to use. Keep the generated value separate from passwords you reuse elsewhere, and check if it is successfully registered on the intended site.",
+          "The strength score and estimated crack time are comparative values based on set assumptions. It does not mean the result has been scanned to see if the account was leaked, if login attempts are restricted, or if other protection measures are in place. Do not write the actual passwords you use in bug reports or examples."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Do not post actual usable passwords in example screenshots. Show only composite values for the UI before and after changing length/allowed characters."
+        ]
       }
     ],
     "faq": {
@@ -89,6 +134,14 @@
       "faq_2": {
         "q": "Are copied passwords safe?",
         "a": "Since other apps can access the clipboard, it is recommended to copy and overwrite it with something else after use."
+      },
+      "new_faq_3": {
+        "q": "Does a high score mean it's confirmed not to be leaked?",
+        "a": "No. It is the result of analyzing the pattern of the entered string. It is not a feature that queries leaked accounts or databases."
+      },
+      "new_faq_4": {
+        "q": "Can I see the generated password again if I close the page?",
+        "a": "This tool does not store generation history. Before closing the page, save the chosen value in a secure storage method that you use."
       }
     }
   },
@@ -107,6 +160,19 @@
         "paragraphs": [
           "Maintains text and spaces inside quotes, and only reduces unnecessary spaces and line breaks that are not required for the data structure."
         ]
+      },
+      {
+        "title": "Does formatting SQL also check for execution errors?",
+        "paragraphs": [
+          "It breaks down long strings of JSON, SQL, or XML with line breaks and indentation to make them easier to read. If an error is displayed, check the quotes, brackets, or delimiters at that location. It does not arbitrarily change invalid values to make them look like normal data.",
+          "SQL formatting does not connect to a database. Even if it is nicely formatted, it does not confirm whether the actual tables/columns exist or if the command is safe to execute. Do not share business connection details or authentication keys as examples."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Show an example of minified/indented versions of the same JSON, and explain that spaces inside strings are content. Do not create a \"Syntax Check Passed = Safe to Execute\" badge."
+        ]
       }
     ],
     "faq": {
@@ -117,6 +183,14 @@
       "faq_1": {
         "q": "Does it auto-recover invalid JSON?",
         "a": "To prevent data alteration, it shows the error without arbitrarily recovering it."
+      },
+      "new_faq_2": {
+        "q": "Does a well-formatted SQL statement mean it's safe to execute?",
+        "a": "No. This tool only organizes text layout. The execution results and the risk of data modification must be evaluated separately in the actual database environment you use."
+      },
+      "new_faq_3": {
+        "q": "Does it automatically fix JSON errors?",
+        "a": "It points out errors without arbitrarily changing the data. Check the structure of the original, modify it, and format it again."
       }
     }
   },
@@ -135,6 +209,25 @@
         "paragraphs": [
           "Gathers all keys from a JSON object array into columns, and HTML tables use the first row as headers."
         ]
+      },
+      {
+        "title": "How are column names determined when converting JSON to CSV?",
+        "paragraphs": [
+          "Use this to turn a CSV saved in Excel into JSON to pass to a program, or to create an HTML table to embed in a webpage. This tool does not rewrite the table's content; it simply converts the same data into a different display format.",
+          "Ensure that the column names in the first row, like 'Name' or 'Quantity', are clear. Since some cells might contain commas or line breaks, it is better to check the number of rows/columns and cell contents in the conversion result rather than simply splitting the CSV by commas in Notepad."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "CSV Example:",
+          "Product,Quantity",
+          "Note,3",
+          "Pen,5",
+          "JSON Example:",
+          "[{\"Product\":\"Note\",\"Quantity\":\"3\"},{\"Product\":\"Pen\",\"Quantity\":\"5\"}]",
+          "This example is a conceptual illustration using string values. Whether numeric types are actually inferred will be confirmed by running the current converter before posting."
+        ]
       }
     ],
     "faq": {
@@ -145,6 +238,14 @@
       "faq_1": {
         "q": "Are scripts inside HTML executed?",
         "a": "No. It only extracts text from table cells and does not insert or execute the input HTML on the screen."
+      },
+      "new_faq_2": {
+        "q": "Are Excel's colors and formulas transferred too?",
+        "a": "This is a data conversion between CSV, JSON, and HTML tables. Do not use it as a tool to transfer the cell formatting, formulas, or charts of an Excel workbook exactly as they are."
+      },
+      "new_faq_3": {
+        "q": "What should I check if Korean characters are garbled?",
+        "a": "Check the character encoding settings used to read the CSV and how the original file was saved. First, look at the preview before conversion to see if the Korean characters and delimiters are read correctly."
       }
     }
   },
@@ -168,6 +269,19 @@
           "Choose the line break, space, or separator character to insert between each text.",
           "Check the merged result and copy it or save it as a TXT file."
         ]
+      },
+      {
+        "title": "Can I insert custom titles between the merged TXT files?",
+        "paragraphs": [
+          "Put meeting notes, various TXT files, and custom-written sentences into the same list and set their order. Adding a blank line between each card separates paragraphs, and specifying a custom delimiter makes the boundaries of the data easy to recognize.",
+          "Since this task gathers content without modifying it, it does not automatically summarize the conclusions of different documents or combine sentences with the same meaning. Check the final result to ensure titles are not duplicated and that the end of one sentence doesn't stick directly to the start of the next."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Card order: Manual input \"1. Morning Meeting\" → morning.txt → Manual input \"2. Afternoon Meeting\" → afternoon.txt. Show the result of selecting a blank line as a delimiter."
+        ]
       }
     ],
     "faq": {
@@ -186,6 +300,14 @@
       "faq_3": {
         "q": "Does editing loaded TXT content change the original file?",
         "a": "No. Only the card and merged result change. The original TXT file remains untouched."
+      },
+      "new_faq_4": {
+        "q": "There are too many blank lines between files.",
+        "a": "Check if the line breaks at the end of the original text and the selected delimiter were inserted together. Apply the options to trim leading/trailing spaces and exclude empty text only when necessary."
+      },
+      "new_faq_5": {
+        "q": "Will it naturally rewrite sentences to connect them?",
+        "a": "No. It connects the entered text using the specified order and delimiters. You must manually check the phrasing and content by looking at the results."
       }
     },
     "pathFaqs": {
@@ -216,12 +338,36 @@
           "Compare the result with the original text.",
           "Copy and use the result."
         ]
+      },
+      {
+        "title": "Is it okay to remove line breaks within a list?",
+        "paragraphs": [
+          "If sentences copied from a PDF are broken at every line, you can use Merge Line Breaks. On the other hand, removing all line breaks from data where each line is an item, like a contact list, will destroy the boundaries between items.",
+          "Removing duplicate lines also requires caution if the same product name refers to different transactions. Apply one necessary task, compare the original with the result, and ensure the list count and spacing are as intended."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: The sentence \"Please check",
+          "the report.\" can be a target for Merge Line Breaks, but \"Seoul",
+          "Busan",
+          "Daegu\" is a list that must maintain item boundaries. Ensure the actual combination result regarding whitespace processing matches the example sentences."
+        ]
       }
     ],
     "faq": {
       "faq_0": {
         "q": "Does it also fix the content or meaning of the text?",
         "a": "Space and line cleanup applies selected rules. It is not a feature that understands the meaning and rewrites sentences."
+      },
+      "new_faq_1": {
+        "q": "Does it also find duplicate sentences with the same meaning?",
+        "a": "This is not a tool for comparing the meaning of sentences. It applies fixed text rules, so you must manually judge whether sentences with different expressions have the same meaning."
+      },
+      "new_faq_2": {
+        "q": "What is Change English Case used for?",
+        "a": "It is used to format multiple words into conventions like camelCase or snake_case. Before applying it to people's names or document titles, verify the result to ensure it is the desired formatting."
       }
     }
   },
@@ -240,6 +386,19 @@
         "paragraphs": [
           "Applies the basic accrual structure under the Labor Standards Act, but the actual granted days may vary depending on the company's fiscal year operation and time-and-attendance settlement methods."
         ]
+      },
+      {
+        "title": "How do I include company-specific holidays in the business day calculation?",
+        "paragraphs": [
+          "Distinguish between the total days between two dates on a calendar and the number of business days excluding weekends and public holidays. Days off specific to the company, like a founding anniversary or departmental holiday, must be added manually as custom holidays.",
+          "Leave calculations are reference results based on the entered reference date and calculation method. Generated leave is different from the remaining leave after usage, so always verify the actual remaining days against the company's usage records. It's also best to check if newly designated holidays are reflected before calculating."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: Show how the number of business days changes when one company holiday is added to the same date range. Do not assign arbitrary dates to actual public holidays for use in examples."
+        ]
       }
     ],
     "faq": {
@@ -250,6 +409,14 @@
       "faq_1": {
         "q": "Is the final leave settlement upon resignation identical?",
         "a": "No. Resignation settlements require checking both the accrued leave based on the joining date and the number of days used at the company."
+      },
+      "new_faq_2": {
+        "q": "The results for the hire date basis and fiscal year basis are different.",
+        "a": "This is because the reference periods used to group and calculate leave are different. Confirm the standard your company uses first, and check the generation, usage, and settlement histories separately."
+      },
+      "new_faq_3": {
+        "q": "Are the displayed leave days the ones I have left?",
+        "a": "The reference value calculated for generation structure is different from the remaining balance after usage. Verify with your actual usage history and company settlement standards."
       }
     }
   },
@@ -268,6 +435,19 @@
         "paragraphs": [
           "Reflects the wages of the 3 months before retirement and 3/12 of the recent year's bonuses and annual leave allowances. The total number of days for 3 months includes calendar dates including holidays. Separate verification is needed if the calculated average wage is lower than the ordinary wage."
         ]
+      },
+      {
+        "title": "Why is the estimated amount different from my actual payslip?",
+        "paragraphs": [
+          "Monthly salary, taxable income, and non-taxable allowances might not be the same values. Read the guide for each input field, enter the appropriate amounts, and then review the resulting insurance and tax items separately.",
+          "These results are simplified calculations based on input conditions. They may differ from your actual pay slip due to the company's reported amounts, applied standards, actual attendance, and settlement methods. If the difference is significant, do not just look at the calculation result; check the input amounts, dependents, base date, and each deduction item on your slip together."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Display the actual applied year / update date / input assumptions / excluded items under \"Standards used for calculation\" below the results. Do not hardcode legal figures and tax rates in the manuscript; fetch them from verified calculation data."
+        ]
       }
     ],
     "faq": {
@@ -278,6 +458,14 @@
       "faq_1": {
         "q": "Can I use it for tax reporting?",
         "a": "No. It is an estimated value for reference, and actual withholding and severance pay should be verified with the company's payroll manager or relevant authorities."
+      },
+      "new_faq_2": {
+        "q": "Is the calculation wrong if it differs slightly from my pay slip?",
+        "a": "First, check if the entered salary base and the taxable/non-taxable/deduction items on the actual slip match. This tool's simplified calculation cannot reflect the reporting and settlement differences of every company."
+      },
+      "new_faq_3": {
+        "q": "Can I use these results as the basis for final company settlement?",
+        "a": "These are reference values for preliminary checking. Actual payroll and severance settlements must be processed by checking work records and applied standards."
       }
     }
   },
@@ -300,6 +488,19 @@
           "Review the detected capture details and save the cleaned photo.",
           "Check the orientation and appearance of the saved photo."
         ]
+      },
+      {
+        "title": "Does removing metadata also erase addresses visible in the photo?",
+        "paragraphs": [
+          "Even if an address is not visible in the photo, shooting locations and device information may be stored inside the file. This tool checks the shooting data of JPG, PNG, and WebP files and creates a copy with the information cleaned up. HEIC and HEIF are not currently supported.",
+          "Faces, names, and addresses directly captured in the photo are not obscured by this process. Handle such content with image editing or personal info redaction. After saving the new photo, check not only the shooting data but also the orientation, color, and quality, and avoid confusing the copy with the original when sharing."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Do not use real GPS coordinates or device owner names when creating examples. Distinguish between \"visible information / hidden information\" in two columns to help users choose the right tool."
+        ]
       }
     ],
     "faq": {
@@ -310,6 +511,14 @@
       "faq_1": {
         "q": "Which photo formats are supported?",
         "a": "JPG, PNG and WebP are supported; HEIC and HEIF are not. Both .jpg and .jpeg extensions are accepted."
+      },
+      "new_faq_2": {
+        "q": "Can the orientation or size of the photo change after removal?",
+        "a": "You must re-verify the display orientation and file size while creating the new copy. Open the saved photo to check if it looks as desired, and keep the original separately."
+      },
+      "new_faq_3": {
+        "q": "If it says there is no shooting data, does it mean the photo has no personal information?",
+        "a": "Not at all. Visible faces, addresses, and license plates are independent of shooting data. You must manually check the photo itself as well."
       }
     },
     "pathFaqs": {
@@ -340,6 +549,19 @@
         "paragraphs": [
           "Large images are downscaled to a maximum of 2200px within the browser, and it also attempts to find the QR by inverting bright and dark colors."
         ]
+      },
+      {
+        "title": "How do I find the link from a QR code inside a photo?",
+        "paragraphs": [
+          "Enter the link or sentence to embed in the QR and check the preview. If there's a typo in the link, the QR will lead to the wrong address even if generated successfully. After changing the logo and color, it's best to rescan it at the actual size and against the intended background.",
+          "The reading feature shows the content inside the QR; it does not judge the safety of the linked site. Verify the address and destination before opening the link. For QRs to be printed, please check them with a printed sample on paper as well."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Review sequence: Check spelling of input address → Generate PNG → Scan with phone → Scan at actual print size and background. Retain the bulk auto-redecoding validation but do not expand it to a guarantee of scanning in all environments."
+        ]
       }
     ],
     "faq": {
@@ -362,6 +584,14 @@
       "faq_4": {
         "q": "Are tables or QR results uploaded to a server?",
         "a": "No. Table reading, QR creation, ZIP, label PDF and report generation happen in the current browser without modifying the source file."
+      },
+      "new_faq_5": {
+        "q": "Can I change the address inside the QR after making it?",
+        "a": "The generated image contains the content from when it was made. If the content changes, you must create and replace it with a new QR image. Do not instruct that this tool provides redirection management features for linked servers."
+      },
+      "new_faq_6": {
+        "q": "It scans well on the screen, but poorly on the printout.",
+        "a": "Check if it was printed too small, or if margins, backgrounds, or logos overlap with the code. Print a sample at the actual intended size and scan it multiple times."
       }
     },
     "pathFaqs": {
@@ -369,6 +599,17 @@
         "faq_2",
         "faq_3",
         "faq_4"
+      ]
+    },
+    "pathBlocks": {
+      "/tools/qr-studio/bulk": [
+        {
+          "title": "How do I turn each row in an Excel list into a separate QR code?",
+          "paragraphs": [
+            "Check the address/text and the save name for each row, then select which column to include in the QR content. Cleaning up empty values, duplicate file names, and typos first will reduce the need to regenerate results. For printable labels, print a single sample first to check the content, margins, and size.",
+            "Preserve XLS"
+          ]
+        }
       ]
     }
   },
@@ -393,6 +634,19 @@
         "paragraphs": [
           "Displays only the intervals (in 30-minute increments) where all selected cities are within their local 09:00~18:00."
         ]
+      },
+      {
+        "title": "Does the time difference between New York and Seoul change depending on the meeting date?",
+        "paragraphs": [
+          "When scheduling an overseas meeting, select the date along with the cities. Areas using Daylight Saving Time may have changing time differences depending on the season, and evening in one region might be the next morning in another.",
+          "When meeting options appear, read the local dates and times for each city together. The recommended slots are the results of comparing preset local business hours on the screen, and do not account for the actual work schedules of the companies involved or national public holidays."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example sentence format: \"Seoul: [Month] [Day] [Time] / Other City: [Month] [Day] [Time]\". Use actual selection results instead of fixed time difference numbers, and separately indicate cities with different dates."
+        ]
       }
     ],
     "faq": {
@@ -407,6 +661,14 @@
       "faq_2": {
         "q": "Are public holidays reflected?",
         "a": "This tool only compares time differences and local business hours, and does not reflect country-specific public holidays."
+      },
+      "new_faq_3": {
+        "q": "Is it an error if no overlapping times appear?",
+        "a": "The designated business hours may not simultaneously overlap across all selected cities. Check the number of cities or the meeting date, and negotiate available times separately with the participants."
+      },
+      "new_faq_4": {
+        "q": "Are public holidays also recommended as business hours?",
+        "a": "This tool compares time differences and local business hours, but does not reflect national public holidays. Check the holiday status of each region before confirming the meeting."
       }
     }
   },
@@ -443,6 +705,19 @@
         "paragraphs": [
           "Creates a new XLSX file. Features beyond macros and the supported range may not be maintained, so keep the original. Do not confuse horizontal merging with features that automatically link data based on criteria like customer ID."
         ]
+      },
+      {
+        "title": "What is the difference between merging into one file and appending to one sheet?",
+        "paragraphs": [
+          "If you want to gather data by department into one file but view each table separately, choose merge by sheet. To stack lists with the same columns vertically, use vertical merge. To combine tables with the same row order side-by-side, use horizontal merge.",
+          "Horizontal merge is not a feature for looking up customer numbers or employee IDs to link the same person. If the row order of the two tables differs, incorrect values may be placed side-by-side, so always check the data order first. After saving the result, check the number of sheets, the first and last rows, and a few key formulas."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: Leaving January and February data in separate tabs is merge by sheet; appending transaction details of the same columns downward is vertical merge. Horizontal merge assumes the row order of both datasets is identical. Do not state that the header row is automatically kept only once."
+        ]
       }
     ],
     "faq": {
@@ -457,6 +732,14 @@
       "faq_2": {
         "q": "Does preservation retain every XLS feature perfectly?",
         "a": "It prioritizes formulas and common cell formatting, but charts, external links, macros and some advanced objects can differ. Verify important output in Excel."
+      },
+      "new_faq_3": {
+        "q": "Should I use merge or compare?",
+        "a": "Choose merge to combine multiple datasets into one file, and Excel Compare to find what has changed between two datasets."
+      },
+      "new_faq_4": {
+        "q": "What should I check in the merged result?",
+        "a": "First, check the order of files and sheets, repeated column header rows, missing rows, and the references and displayed values of formulas. Keep the original files stored separately until result verification is complete."
       }
     },
     "pathFaqs": {
@@ -464,6 +747,17 @@
         "faq_0",
         "faq_1",
         "faq_2"
+      ]
+    },
+    "pathBlocks": {
+      "/tools/excel-merger/xls-preserve": [
+        {
+          "title": "Features to preserve and results to verify",
+          "paragraphs": [
+            "This is the processing screen required to maintain XLS formulas and formatting. Preparation time may take longer than standard pages. Verify the formulas and cell displays of the preserved results in your original software. This feature does not guarantee that macros, charts, or external links will remain completely identical.",
+            "Document Comparison Results"
+          ]
+        }
       ]
     }
   },
@@ -474,13 +768,13 @@
       {
         "title": "Waveform Selection",
         "paragraphs": [
-          "Dragging the waveform creates a purple selection area. You can move the entire area, adjust the handles on both sides, and specify values down to 1ms by entering the start and end seconds."
+          "Dragging the waveform creates a selection area. You can move the entire area, adjust the handles on both sides, and specify values down to 1ms by entering the start and end seconds."
         ]
       },
       {
         "title": "Sample-level Editing",
         "paragraphs": [
-          "Mute changes selected samples to 0, and Cut and Delete pull trailing samples forward. Paste inserts the memory clip at the current red playback cursor position."
+          "Mute changes selected samples to 0, and Cut and Delete pull trailing samples forward. Paste inserts the memory clip at the current playback position."
         ]
       },
       {
@@ -512,6 +806,19 @@
         "paragraphs": [
           "MP3 and WAV can be opened in general modern browsers. M4A, AAC, and OGG can be edited when the operating system and browser support the audio compression method in the file."
         ]
+      },
+      {
+        "title": "What is the difference in output length between deleting and muting audio?",
+        "paragraphs": [
+          "Drag to select the required section on the waveform and play it first. Delete/Cut removes the selected section and pulls the remaining audio forward. Mute leaves the length of the section intact and only silences that part.",
+          "If it's a recording that needs to match a video's length, the difference between mute and delete is crucial. Paste inserts audio at the playback position, so check your cursor location. Before saving, listen to the areas before and after the editing boundaries to ensure they don't cut off awkwardly."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: Deleting the middle 3 seconds of a 20-second recording reduces the total length, while muting the same part maintains the total length. Post after confirming with the actual implementation of selected section processing."
+        ]
       }
     ],
     "faq": {
@@ -525,7 +832,7 @@
       },
       "faq_2": {
         "q": "Where does Paste get inserted?",
-        "a": "It gets inserted at the current time of the red playback cursor, positioned by clicking or playing the waveform."
+        "a": "It gets inserted at the current time of the playback position, set by clicking or playing the waveform."
       },
       "faq_3": {
         "q": "Why do long files use a lot of memory?",
@@ -546,12 +853,31 @@
       "faq_7": {
         "q": "Does anything process automatically on open?",
         "a": "No. Nothing is processed automatically."
+      },
+      "new_faq_8": {
+        "q": "Does a small waveform mean the sound is quiet?",
+        "a": "The waveform helps you locate positions and sections, but it doesn't tell you about the listening environment. Play the selected section yourself to judge."
+      },
+      "new_faq_9": {
+        "q": "How do I make sure my edits don't disappear?",
+        "a": "Save the required results as WAV or MP3. Opening a new file clears the existing edit history and clipboard, so verify your results before switching to another file."
       }
     },
     "pathFaqs": {
       "/tools/audio-studio/trim": [
         "faq_6",
         "faq_7"
+      ]
+    },
+    "pathBlocks": {
+      "/tools/audio-studio/trim": [
+        {
+          "title": "How do I trim and save by cutting out the unwanted parts at the beginning and end of a recording?",
+          "paragraphs": [
+            "After selecting a section on the waveform, check whether the applied action will keep, delete, or mute the selected part. Test with a short segment first and listen to the audio before and after the boundary. Save the desired result before opening the next file.",
+            "Bulk Generate QR"
+          ]
+        }
       ]
     }
   },
@@ -581,6 +907,19 @@
         "title": "Collage and GIF",
         "paragraphs": [
           "Provides downscaled previews equal to the actual output calculation, and GIFs may have simplified color changes due to the 256-color limit."
+        ]
+      },
+      {
+        "title": "What is the difference between image size and canvas size?",
+        "paragraphs": [
+          "Changing the horizontal and vertical pixels alters the size of the image itself, while changing the canvas size alters the workspace around the photo. Decide first whether you want to send a smaller photo or add margins to fit a specific ratio.",
+          "To remove part of the content, use crop; to blur sensitive areas, use region effects; to insert text or a logo, select the corresponding editing tool. After saving, check the resulting image again to ensure it is the desired size and that no parts meant to be hidden or cropped are left."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: Explain shrinking a 1600px wide photo to 800px side-by-side with keeping the photo as is and adding margins to a square canvas. Do not mislead users into thinking it has automatic crop/background removal features."
         ]
       }
     ],
@@ -632,6 +971,14 @@
       "faq_11": {
         "q": "Is anything inserted automatically on open?",
         "a": "No. Nothing is inserted automatically."
+      },
+      "new_faq_12": {
+        "q": "Does making a small photo bigger make it clearer?",
+        "a": "Simply increasing the pixel size does not restore details that weren't in the original. Check the text and edges after enlarging."
+      },
+      "new_faq_13": {
+        "q": "Is all personal information safe just by applying a mosaic?",
+        "a": "You must manually verify the intensity of the effect and the covered area. If your goal is to clearly obscure text in a document, consider the Personal Information Redaction tool and its result verification procedure."
       }
     },
     "pathFaqs": {
@@ -646,6 +993,35 @@
       "/tools/image-studio/watermark": [
         "faq_10",
         "faq_11"
+      ]
+    },
+    "pathBlocks": {
+      "/tools/image-studio/resize": [
+        {
+          "title": "How do I reduce pixel size without distorting the photo's aspect ratio?",
+          "paragraphs": [
+            "Reducing the pixel dimensions of a photo you want to send is different from changing the canvas around the photo. Choose the size option that fits your purpose and check the results to ensure the aspect ratio is maintained. If file size is important, check both the dimensions and the save format.",
+            "Mosaic Image"
+          ]
+        }
+      ],
+      "/tools/image-studio/mosaic": [
+        {
+          "title": "Do I have to manually select the areas to be mosaiced?",
+          "paragraphs": [
+            "Manually select the area to obscure and zoom in on the result to verify. If the effect is weak or only part of the text is selected, the content might still be recognizable. Also, check if the same information remains in other parts of the image.",
+            "Image Watermark"
+          ]
+        }
+      ],
+      "/tools/image-studio/watermark": [
+        {
+          "title": "How do I add my name or source text to a photo?",
+          "paragraphs": [
+            "Use this to add source or author credits to photos. Ensure the text is readable on both bright and dark backgrounds, and that it doesn't cover important subjects. If applying to multiple images, it is best to check horizontal and vertical photos separately.",
+            "Trim Video"
+          ]
+        }
       ]
     }
   },
@@ -754,7 +1130,36 @@
       ]
     },
     "title": "Browser Video Processing Guide",
-    "description": "Video files are processed within this browser without being uploaded to an external conversion server."
+    "description": "Video files are processed within this browser without being uploaded to an external conversion server.",
+    "pathBlocks": {
+      "/tools/video-studio/trim": [
+        {
+          "title": "Can quick copy change the exact starting point of the trimmed video?",
+          "paragraphs": [
+            "Set the start and end times for the segment you want to keep, and play it to verify. Since speech might be cut off or an important first scene might be missed, be sure to also check the start and end of the actual saved result. Fast original copying might slightly shift the start point depending on the reference playback scene.",
+            "Merge Video"
+          ]
+        }
+      ],
+      "/tools/video-studio/merge": [
+        {
+          "title": "What should I check when merging videos with different resolutions or aspect ratios?",
+          "paragraphs": [
+            "Ensure the order of the cards and groups matches your desired output sequence. Files with different sizes, aspect ratios, or audio configurations may require a re-conversion method. After saving, verify that the sound and video transition smoothly at each connection point.",
+            "Extract Audio from Video"
+          ]
+        }
+      ],
+      "/tools/video-studio/extract-audio": [
+        {
+          "title": "How do I save the audio from only a specific section of a video?",
+          "paragraphs": [
+            "You can select the required section and save only the audio. The result will not include the video portion. For videos with multiple audio tracks, check the track information currently being processed, and listen to the saved file to ensure it contains the desired language and sound.",
+            "Trim Audio"
+          ]
+        }
+      ]
+    }
   },
   "excelCompare": {
     "title": "Excel Compare Usage Guide",
@@ -789,6 +1194,19 @@
         "paragraphs": [
           "For an employee list where the order of names has changed, it is better to compare based on unique employee IDs rather than names. A 'Key' refers to this kind of reference column used to find the same target."
         ]
+      },
+      {
+        "title": "Can I compare files using Employee ID even if the row order is different?",
+        "paragraphs": [
+          "Compare similar tables before and after revisions by matching rows and columns. For lists with different orders, use a reference item like an employee ID or product code that can identify the same target. To verify transactions with matching amounts, dates, and clients, use the transaction matching feature.",
+          "Changes in the results indicate that the values of connected items are different. Duplicate or ambiguously connected items are not definitively incorrect data; they simply mean it's difficult to uniquely identify the same target. For such items, check the original and secondary criteria together."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example data: Left has 10 P-01 / 20 P-02, Right has 25 P-02 / 10 P-01. By linking based on the product code, even with a different order, you can read that P-01 has the same quantity and P-02 has changed. Create an actual fixture to verify it matches the report before posting as a screen example."
+        ]
       }
     ],
     "faq": {
@@ -815,6 +1233,14 @@
       "faq_5": {
         "q": "How are multiple rows with the same key shown?",
         "a": "Each duplicate key counts as one result row with independent lists of its left and right source rows. Items on the same line are not matched automatically."
+      },
+      "new_faq_6": {
+        "q": "Can I use names as the reference item?",
+        "a": "If the same name can appear multiple times, first look for values that can uniquely identify the item, such as employee IDs or order numbers. Also, review duplicate lists for results connected only by name."
+      },
+      "new_faq_7": {
+        "q": "What if there are far more changed items than expected?",
+        "a": "First, check if the sheets and column header rows to be compared match, and whether the display format or spacing of dates and numbers differ. Manually compare a few rows of the original before drastically changing the tolerance."
       }
     },
     "pathFaqs": {
@@ -854,6 +1280,19 @@
         "paragraphs": [
           "If data looks different due to leading/trailing spaces like `Seoul` and ` Seoul `, apply Space Cleanup first, and then decide whether to apply Duplicate Cleanup. The result may vary depending on the rule order."
         ]
+      },
+      {
+        "title": "Should I remove spaces or duplicates first?",
+        "paragraphs": [
+          "The same name doesn't always mean the same person, and the same product name with a different order number could be a different transaction. Decide which columns will be used as criteria for identical data before applying duplicate cleanup or row deletion.",
+          "Try applying just one rule with a minor change first, like whitespace cleanup. Since rules are executed from top to bottom, the result of cleaning up whitespace followed by removing duplicates can differ from the reverse order. Check not only the result file but also the changed or excluded items in the processing report."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: \"Seoul \" and \"Seoul\" can become the same value after whitespace cleanup. However, if \"0012\" and \"12\" are product codes, they might be different values, so do not apply number conversion first."
+        ]
       }
     ],
     "faq": {
@@ -872,6 +1311,14 @@
       "faq_3": {
         "q": "Are files or results sent to a server?",
         "a": "No. Reading files, applying rules, and creating XLSX, CSV, and ZIP results happen in the current browser without modifying originals."
+      },
+      "new_faq_4": {
+        "q": "I want to keep the leading zeros in the codes.",
+        "a": "Distinguish between numbers for calculation and employee IDs, product codes, or phone numbers. Check the relevant column before applying number conversion, and verify a sample of the result to see if the leading zeros remain."
+      },
+      "new_faq_5": {
+        "q": "The number of rows in the cleaned file decreased.",
+        "a": "Check the selected rules, such as delete empty rows, remove duplicates, or filters. Don't just compare the row counts of the original and the result; also look at the reasons for exclusion in the processing report."
       }
     },
     "pathFaqs": {
@@ -908,6 +1355,19 @@
         "title": "Good to Know",
         "paragraphs": [
           "This tool does not automatically find personal information. The user must manually select the areas to redact. Information may remain in the file name or unredacted pages."
+        ]
+      },
+      {
+        "title": "What should I double-check before sharing the redacted file?",
+        "paragraphs": [
+          "This tool does not automatically find personal information for you. Manually check if the same contact details or names are repeated on other pages, tables, or headers. A page without redaction marks is not guaranteed to be safe.",
+          "Once the result is generated, all pages of the PDF are re-saved as images. Search, text selection, existing signatures, form fields, and links will not be maintained, so ensure this method fits your submission purpose first. When sharing, choose the new result file, not the original, and ensure the file name does not contain sensitive information."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Review example: A composite document where only the contact info on one page is redacted, leaving the same info in the signature block on the last page. Shows that \"redacting in one place ≠ automatic total removal\"."
         ]
       }
     ],
@@ -955,6 +1415,14 @@
       "faq_10": {
         "q": "How do resolution and file size change?",
         "a": "PDF output uses the selected resolution and may be larger than the original. Processing stops at memory limits. Image output is PNG."
+      },
+      "new_faq_11": {
+        "q": "How is it different from removing hidden info in photos?",
+        "a": "Personal Info Redaction allows you to select and obscure visible parts of documents or images. Removing photo metadata deals with information like shooting location and device stored inside the file. Choose the tool that fits your purpose."
+      },
+      "new_faq_12": {
+        "q": "What should I check before sharing?",
+        "a": "Check if it is the new result file, if all pages have been reviewed, if no text remains around the edges of the black marks, and if the file name is free of personal information."
       }
     },
     "pathFaqs": {
@@ -986,6 +1454,18 @@
       "faq_4": {
         "q": "Are files or results sent to a server?",
         "a": "No. Template inspection, table reading and DOCX, ZIP and report generation happen in the current browser."
+      },
+      "new_faq_5": {
+        "q": "The Excel column name is Customer Name and the template says {Name}.",
+        "a": "Connect the Customer Name column to the Name field in the template. In the connection name input field, specify the name without curly braces. Check the sample after accurately mapping the template and columns."
+      },
+      "new_faq_6": {
+        "q": "If the preview table is correct, can I generate all the documents right away?",
+        "a": "The preview table is a step to confirm the values to be inserted. Open the sample DOCX in your actual document program to check line breaks, tables, dates, amounts, and file names before generating everything."
+      },
+      "new_faq_7": {
+        "q": "Is an empty value the same as having no mapped field?",
+        "a": "No. An empty value in a mapped column can result in blank content, but not mapping a required column is an issue that must be fixed. Check the sample to ensure no required values are missing."
       }
     },
     "title": "Word Batch Generator Usage Guide",
@@ -1012,6 +1492,30 @@
         "paragraphs": [
           "It is not an AI tool that writes new text. It inserts Excel values into the changeable parts of a pre-made Word template."
         ]
+      },
+      {
+        "title": "How do I create multiple Word documents with different names using an Excel list?",
+        "paragraphs": [
+          "If you find yourself copying the same notice and changing the name and department every time, try marking the placeholders in a Word template and connecting an Excel list. This tool creates DOCX files by filling the template with list values without you having to rewrite text or send emails.",
+          "In the Word template, write a pair of curly braces where the values should go, like {Name} for the name and {Department} for the department. In the first row of Excel, write column names like Name and Department, and input the data from the second row onwards. After selecting the files, map each column to a template field, and generate one document first to check the layout, numbers, and dates."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Word Template:",
+          "Hello, {Name}.",
+          "Department: {Department}",
+          "Please check the training schedule.",
+          "Excel List:",
+          "Name",
+          "Department",
+          "Min-su Kim",
+          "Sales Team",
+          "Seo-yeon Lee",
+          "Operations Team",
+          "If the file naming rule is set to {Name}_Notice.docx, the target results are Min-su Kim_Notice.docx and Seo-yeon Lee_Notice.docx respectively. Do not state that this default file name is set automatically. Example files will be provided as downloads after verifying with the actual generation engine."
+        ]
       }
     ],
     "pathFaqs": {
@@ -1031,6 +1535,19 @@
         "paragraphs": [
           "Comparison is performed within the browser."
         ]
+      },
+      {
+        "title": "If a cover page is added to the revised version, which pages should I compare?",
+        "paragraphs": [
+          "A PDF's text information and the visual appearance of its pages can differ. Text comparison checks the differences in the extracted text from the PDF, while visual comparison checks the differences in how the pages are drawn. Since scanned documents like photos might not have extractable text, do not assume the content is the same based solely on text results.",
+          "First, ensure that pages containing the same content are linked. If a cover page was added to the revision, subsequent pages might be shifted by one. Match the pages, run the comparison again, and review the locations of changed numbers, dates, signatures, and tables alongside the original text."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: The original is 3 pages without a cover, the revision is a new cover + 3 body pages. A diagram showing that page 1 of the original must correspond to page 2 of the revision to compare the same content. Since the current guide explicitly supports manual matching, verify the linking method in the actual UI before posting."
+        ]
       }
     ],
     "faq": {
@@ -1045,6 +1562,14 @@
       "faq_2": {
         "q": "Are PDF files uploaded to a server?",
         "a": "No. Opening PDFs, rendering pages, extracting text, and creating reports happen in the current browser without modifying the source files."
+      },
+      "new_faq_3": {
+        "q": "If the text result from a scanned PDF is empty, does it mean there is no content?",
+        "a": "No. If the text shapes are embedded in an image, there might be no text for the PDF to extract. Check the visual comparison, and if you need searchable text, use the PDF OCR tool separately."
+      },
+      "new_faq_4": {
+        "q": "What should I check first if all pages look different?",
+        "a": "First, check if the comparison pages are out of sync due to added covers, deleted pages, or order changes. If differences persist after matching the pages, check the size, orientation, and actual body text."
       }
     },
     "pathFaqs": {
@@ -1060,7 +1585,7 @@
     "description": "This large editor runs LibreOffice in your browser.",
     "blocks": [
       {
-        "title": "One-step opening",
+        "title": "How do I save the final file after editing the document?",
         "paragraphs": [
           "Drop or choose one supported file to move to the focused workspace, prepare the editor, and open the document automatically."
         ]
@@ -1075,6 +1600,19 @@
         "title": "Closing editor",
         "paragraphs": [
           "Pressing the 'Close' button destroys the editing view and the virtual filesystem instance safely, returning you to this menu."
+        ]
+      },
+      {
+        "title": "You can select a file even before preparation is complete",
+        "paragraphs": [
+          "When you open the page, the browser prepares the Office editing environment. Initially, it may take some time to download the program and fonts, but from the next launch, you can reuse the saved program files. While checking the progress guide, select or drop the file you want to edit.",
+          "Once ready, the selected document will open. While editing the document, use the editor's menus and save tools instead of the site's search bar. When finished, please receive the result file via Save & Download. Reopen the downloaded file to verify fonts, pagination, and formula results before sharing."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Short status guide: \"Preparing editing environment — You can select a file in advance.\" / \"Preparation complete — Drop the file to edit.\" / \"Opening document\" / \"Downloaded the saved file.\" Connect the displays to the actual statuses."
         ]
       }
     ],
@@ -1098,6 +1636,18 @@
       "faq_4": {
         "q": "Are HWP files supported here?",
         "a": "Use the dedicated HWP editor for HWP/HWPX files. This editor focuses on Writer, Calc, and Impress formats."
+      },
+      "new_faq_5": {
+        "q": "Will I have to download the program files again next time?",
+        "a": "You can reuse them if the necessary program files remain in your browser. If you clear site data or use a different device/browser, it may need to be prepared again."
+      },
+      "new_faq_6": {
+        "q": "Is the result exactly the same as Word, Excel, or PowerPoint?",
+        "a": "Since it is a LibreOffice-based editing environment, there may be differences in fonts, line breaks, and advanced features. Always verify important results in your original program as well."
+      },
+      "new_faq_7": {
+        "q": "How do I know if saving is complete?",
+        "a": "Along with the completion notice, check whether the browser actually downloaded the result file. Just seeing the document on the screen does not mean the file save process is finished."
       }
     },
     "pathFaqs": {
@@ -1107,6 +1657,16 @@
         "faq_2",
         "faq_3",
         "faq_4"
+      ]
+    },
+    "pathBlocks": {
+      "/tools/office-editor/app/": [
+        {
+          "title": "Brief guide on preparation, file queuing, and save status",
+          "paragraphs": [
+            "The editing environment is being prepared. If you select a file in advance, it will open once preparation is complete. After preparation, drop or select the file you want to edit. When finished, click Save & Download, and verify that the actual result file has been saved."
+          ]
+        }
       ]
     }
   },
@@ -1322,6 +1882,125 @@
         "faq_19",
         "faq_20"
       ]
+    },
+    "pathBlocks": {
+      "/tools/pdf-editor/merge": [
+        {
+          "title": "How do I merge application forms and attachments in a specific order?",
+          "paragraphs": [
+            "Add applications, supporting documents, and guides in the order of submission. Check not only the file sequence but also the page order and orientation of each file before saving as a single PDF. Once multiple documents are merged, advanced features like bookmarks, form fields, and links may not be identical to the originals, so be sure to double-check the results.",
+            "Split PDF"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/split": [
+        {
+          "title": "Is splitting pages different from cropping margins?",
+          "paragraphs": [
+            "If you only need pages 2-4 from a file, select that range; for non-consecutive pages like 1 and 5, select the required pages manually. When creating multiple ranges, ensure the output file names and page structures for each range are as desired.",
+            "Delete PDF Pages"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/delete": [
+        {
+          "title": "What if I only want to redact personal info instead of deleting the whole page?",
+          "paragraphs": [
+            "Use page deletion to remove unnecessary pages from a document. If you only want to hide a name or contact information on a single page, use the personal information redaction tool instead. Confirm the pages to be deleted and check the order of the remaining pages.",
+            "Rotate PDF"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/rotate": [
+        {
+          "title": "Can I save the on-screen rotation directly to the output PDF?",
+          "paragraphs": [
+            "Select horizontally scanned pages and rotate them to a readable orientation. If only some pages have a different orientation, select just those pages. Reopen the saved PDF to verify that the rotation was applied correctly.",
+            "Image to PDF"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/image-to-pdf": [
+        {
+          "title": "How can I fit multiple photos sequentially into an A4 size PDF?",
+          "paragraphs": [
+            "Add photos in the order they should be read, then choose whether to fit them to A4 size or use the original image dimensions. If vertical and horizontal photos are mixed, check the orientation and margins. Simply combining photos into a PDF does not make the text in the photos searchable.",
+            "PDF to Image"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/pdf-to-image": [
+        {
+          "title": "Should I save the images as PNG or JPG?",
+          "paragraphs": [
+            "Use this when you want to save document pages as PNG or JPG for attachments or image editing. Increasing the resolution can make small text easier to read, but it does not restore details that were absent in the original, and it increases the file size and memory usage. Try converting just the necessary pages first to check the size and clarity.",
+            "Convert PDF Document"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/convert": [
+        {
+          "title": "Will tables and line breaks be preserved when converting PDF to Word?",
+          "paragraphs": [
+            "Consider DOCX for text-focused re-editing, XLSX for tweaking tables, or TXT if you only need unformatted text. Since PDF paragraphs and cells are estimated by coordinates, complex tables or multi-column documents may have a different structure than the original. Always double-check dates, amounts, and table rows and columns against the original text.",
+            "PDF OCR"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/ocr": [
+        {
+          "title": "Why can't I search for words in a scanned PDF?",
+          "paragraphs": [
+            "Use OCR when you want to find words in scanned documents where text cannot be selected. After processing, try actually searching for a few common body words and numbers. Recognition may be inaccurate in blurry or skewed originals, so do not blindly rely on automatic recognition results for names, dates, or amounts.",
+            "Finish PDF"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/finish": [
+        {
+          "title": "Can I apply both page numbers and watermarks to multiple PDFs at the same time?",
+          "paragraphs": [
+            "You can apply page numbers, headers, watermarks, and stamps simultaneously. Check one page first to ensure the positions of each mark do not overlap or cover the main text. When processing multiple files, be aware that page sizes and orientations may vary between files.",
+            "Page Numbers"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/page-numbers": [
+        {
+          "title": "How do I skip the cover and start numbering from page 1 on the main content?",
+          "paragraphs": [
+            "If the first page of the PDF is a cover, the file's page number and the printed body number may differ. Verify the starting page for the marks and the starting value for the numbers separately. For long documents, check the numbers on the first, middle, and last pages before saving.",
+            "Header & Footer"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/header-footer": [
+        {
+          "title": "How do I place the filename and date in the exact same spot on every PDF?",
+          "paragraphs": [
+            "You can insert repeating content such as document names, dates, and page numbers. Check the preview to ensure the text does not overlap with the main body or existing page numbers. For marks that insert automatic values, use only the formats provided on the screen.",
+            "PDF Watermark"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/watermark": [
+        {
+          "title": "How do I add a 'Confidential' mark without covering the main text?",
+          "paragraphs": [
+            "Use this to add marks indicating the document's purpose, such as 'For Review' or 'Internal Sharing'. Check the opacity, rotation, position, and applied pages, and ensure it does not make tables or small text hard to read. A watermark is not an access restriction or anti-copy feature.",
+            "PDF Stamp & Signature Image"
+          ]
+        }
+      ],
+      "/tools/pdf-editor/stamp": [
+        {
+          "title": "Does adding a stamp image make it a certified digital signature?",
+          "paragraphs": [
+            "Place a prepared PNG or JPG stamp or signature image in the desired location. Check the image's margins, size, orientation, and the actual page where it will be applied. Since this is simply overlaying an image, do not use it as a cryptographic electronic signature to verify the signer's identity or document integrity.",
+            "Resize Image"
+          ]
+        }
+      ]
     }
   },
   "pdfEditor.convert": {
@@ -1381,6 +2060,93 @@
       "faq_5": {
         "q": "Why is the first OCR run slower?",
         "a": "The browser must download language data for Korean and English recognition. Later runs can start faster while that data remains cached."
+      }
+    }
+  },
+  "pdfEditor": {
+    "title": "05. PDF Tools",
+    "description": "",
+    "blocks": [
+      {
+        "title": "What is the difference between editing text in a document and organizing pages?",
+        "paragraphs": [
+          "Use page editing to merge submission files into one or keep only the necessary pages. This is not for rewriting text content, but for organizing the sequence, structure, and orientation of pages.",
+          "Choose PDF to Image to use pages like photos, or Image to PDF to bind multiple photos into one document. Use Document Conversion to bring PDF text into an editable document, or OCR to add searchable text to scanned documents. Always compare the result with the original text after conversion."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Task selection cards: \"Combine 3 submission documents into one\" → Merge, \"Only pages 2-4 of a contract\" → Split/Extract, \"Pages to PNG\" → Image, \"Search words in a scanned copy\" → OCR. Use composite examples instead of real documents."
+        ]
+      }
+    ],
+    "faq": {
+      "new_faq_0": {
+        "q": "Can I edit the PDF body text directly in page editing?",
+        "a": "This screen handles page sequencing, deletion, rotation, extraction, and finishing marks. To rewrite the body text, you must edit the conversion result or the original document file in a separate editor."
+      },
+      "new_faq_1": {
+        "q": "Are Image Conversion and OCR the same feature?",
+        "a": "Image Conversion saves the visible appearance of pages as PNG or JPG, while OCR reads the shapes of text in an image to treat them as text data. We do not advise using OCR to restore text that disappeared during conversion."
+      }
+    }
+  },
+  "hwpEditor": {
+    "title": "09. Edit Hangul Document",
+    "description": "",
+    "blocks": [
+      {
+        "title": "Keep the original and double-check the saved file",
+        "paragraphs": [
+          "You can use this to quickly open a Hangul document and edit sentences or tables. Edit text, tables, and formatting within the supported range of the browser editor, and save a new file.",
+          "The fonts or complex objects used in the original document may be displayed differently. For documents to be submitted, reopen the saved file in the actual program you will use to check page counts, line breaks, table clipping, and image placements. It is best to keep important originals separately without overwriting them."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Add 4 items under \"Check before submission\" below the existing guide: Page count / Where tables break on the next page / Substitute fonts and line breaks / Actual save format. Add case images only if validated composite HWP/HWPX are available."
+        ]
+      }
+    ],
+    "faq": {
+      "new_faq_0": {
+        "q": "How is it different from the Office Editor?",
+        "a": "This tool is specifically provided for Hangul documents like HWP and HWPX. To edit DOCX, XLSX, or PPTX, please select the Office Editor."
+      },
+      "new_faq_1": {
+        "q": "If it looks good on the screen, can I submit it right away?",
+        "a": "Reopen and check the saved file. The line breaks and page layouts you saw in the browser might differ from those in the final program you use."
+      }
+    }
+  },
+  "video": {
+    "title": "12. Edit/Convert Video",
+    "description": "",
+    "blocks": [
+      {
+        "title": "Should I choose quick copy or re-encode when exporting?",
+        "paragraphs": [
+          "The direct copy method is fast because it doesn't recompress the video, but the start point may snap to the nearest reference playback scene. If you need to start more precisely at a designated moment, or change the size, rotation, or compatible format, consider the re-conversion method.",
+          "When merging multiple videos, you must check not only the order but also whether the aspect ratios, resolutions, and audio configurations match. After saving the result, play the beginning, connection points, and end to ensure the video and audio transition as intended."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Example: Keeping 00:30~01:10 from a meeting recording. Explain the meaning of quick copy vs. re-conversion, but do not promise exact performance/quality numbers across all files."
+        ]
+      }
+    ],
+    "faq": {
+      "new_faq_0": {
+        "q": "Can an MP4 fail to play on other devices?",
+        "a": "MP4 is just a container format, and the internal video/audio compression methods can differ. Try playing the result on the intended device, and check the compatibility settings provided on the screen."
+      },
+      "new_faq_1": {
+        "q": "Why does the remaining time suddenly change?",
+        "a": "Processing speed can vary when moving to the next video or the final merging stage. Check not only the estimated time displayed but also the current processing stage and progress logs."
       }
     }
   }
