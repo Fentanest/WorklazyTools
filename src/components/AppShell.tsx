@@ -52,6 +52,9 @@ export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusMode, setFocusMode] = useState<"standard" | "editor">("standard");
   useEffect(() => {
+    setAdIneligible("focusMode", focusMode === "editor");
+  }, [focusMode]);
+  useEffect(() => {
     const onFocus = (e: any) => setFocusMode(e.detail);
     window.addEventListener("worklazy-focus", onFocus);
     return () => window.removeEventListener("worklazy-focus", onFocus);

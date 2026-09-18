@@ -117,15 +117,11 @@ function makePage(language, route) {
   const socialImage = getSocialImageDefinition(language, pathname);
   
   let blocks = [];
-  try {
-    const slug = toolSlugByPath[pathname] || Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/")) && toolSlugByPath[Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/"))];
-    if (slug) {
-      const guideKey = toolToGuideKey[slug] || slug;
-      const guide = getGuideData(language, guideKey);
-      blocks = [...(guide.blocks || []), ...(guide.pathBlocks?.[pathname] || [])];
-    }
-  } catch (e) {
-    // ignore
+  const slug = toolSlugByPath[pathname] || Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/")) && toolSlugByPath[Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/"))];
+  if (slug) {
+    const guideKey = toolToGuideKey[slug] || slug;
+    const guide = getGuideData(language, guideKey);
+    blocks = [...(guide.blocks || []), ...(guide.pathBlocks?.[pathname] || [])];
   }
 
   return {

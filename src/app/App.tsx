@@ -5,6 +5,7 @@ import { Outlet, Route, Routes, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { ToolReady } from "../components/RouteErrorBoundary";
+import { setAdIneligible } from "./adEligibility";
 import { AppShell } from "../components/AppShell";
 import { ExcelMergerPage } from "../features/excel-merger/ExcelMergerPage";
 import { DocumentCompareSessionProvider } from "../features/document-compare/documentCompareSession";
@@ -159,17 +160,27 @@ type PdfRouteProps =
   | { mode: "image-to-pdf" | "pdf-to-image"; finishPreset?: never }
   | { mode: "finish"; finishPreset: PdfFinishPreset };
 
-function PdfRoute(props: PdfRouteProps) {
+function ToolRouteLoading({ tool }: { tool: string }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: "PDF Tools" })}</div>}><ToolReady><PdfEditorPage {...props} /></ToolReady></Suspense>;
+  useLayoutEffect(() => {
+    setAdIneligible("routePending", true);
+    return () => setAdIneligible("routePending", false);
+  }, []);
+  return <div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool })}</div>;
+}
+
+function PdfRoute(props: PdfRouteProps) {
+
+  const { t } = useTranslation("common");
+  return <Suspense fallback={<ToolRouteLoading tool="PDF Tools" />}><ToolReady><PdfEditorPage {...props} /></ToolReady></Suspense>;
 }
 
 function QrRoute({ mode }: { mode: QrMode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: "QR Studio" })}</div>}><ToolReady><QrStudioPage initialMode={mode} /></ToolReady></Suspense>;
+  return <Suspense fallback={<ToolRouteLoading tool="QR Studio" />}><ToolReady><QrStudioPage initialMode={mode} /></ToolReady></Suspense>;
 }
 
 function LazyToolRoute({ label, children }: { label: string; children: React.ReactNode }) {
   const { t } = useTranslation("common");
-  return <Suspense fallback={<div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: label })}</div>}><ToolReady>{children}</ToolReady></Suspense>;
+  return <Suspense fallback={<ToolRouteLoading tool={label} />}><ToolReady>{children}</ToolReady></Suspense>;
 }

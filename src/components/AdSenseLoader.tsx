@@ -22,7 +22,7 @@ export function AdSenseLoader() {
   }, []);
 
   useEffect(() => {
-    if (!import.meta.env.PROD || isLocalQaBuild || consent !== "granted" || ineligible || document.querySelector("script[data-worklazy-adsense]")) return;
+    if (!import.meta.env.PROD || isLocalQaBuild || consent !== "granted" || ineligible || isAdIneligible() || document.querySelector("script[data-worklazy-adsense]")) return;
     const script = document.createElement("script");
     script.async = true;
     script.crossOrigin = "anonymous";

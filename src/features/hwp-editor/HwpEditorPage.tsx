@@ -30,6 +30,12 @@ export function HwpEditorPage() {
   const progress = useOperationProgress();
   const file = files[0];
 
+  const setFocusMode = useFocusMode();
+  useEffect(() => {
+    setFocusMode(documentOpen ? "editor" : "standard");
+    return () => setFocusMode("standard");
+  }, [documentOpen, setFocusMode]);
+
   useEffect(() => {
     let disposed = false;
     const initialize = async () => {

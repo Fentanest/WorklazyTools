@@ -72,15 +72,18 @@
         "faq_1",
         "faq_2",
         "faq_3"
+      ],
+      "/tools/document-compare/results/:pairNumber": [
+        "new_faq_4",
+        "new_faq_5"
       ]
     },
     "pathBlocks": {
       "/tools/document-compare/results/:pairNumber": [
         {
-          "title": "Read the changes alongside the original text",
+          "title": "Reading change marks alongside the original text",
           "paragraphs": [
-            "Select a list of changes to compare the exact locations in both the original and revised versions side-by-side. Check important items like dates, amounts, and target subjects first, and manually review areas with ambiguous connections or altered table/format structures. Save the results if you need a review record.",
-            "Office Execution Screen"
+            "Select a change from the list to view the corresponding location in both the original and revised documents simultaneously. Prioritize important details such as dates, amounts, and subjects. Manually review areas where the connection is ambiguous or where the table or formatting structure has changed. If you need a review record, save the results."
           ]
         }
       ]
@@ -152,7 +155,7 @@
       {
         "title": "Error Checking",
         "paragraphs": [
-          "JSON and XML show the location where errors are found, and SQL arranges lines and indentation based on statement components."
+          "Indentation makes the JSON structure easier to read. Spaces inside quotes are part of the value and should be distinguished from formatting spaces. Note that a successful syntax check or formatting does not guarantee that the code will execute safely. Always verify the safety by testing."
         ]
       },
       {
@@ -207,7 +210,7 @@
       {
         "title": "JSON / HTML",
         "paragraphs": [
-          "Gathers all keys from a JSON object array into columns, and HTML tables use the first row as headers."
+          "This is a basic structural example using string values. For number or date formats included in your files, run the converter and check the preview to see how they are inferred and displayed."
         ]
       },
       {
@@ -1176,7 +1179,7 @@
       {
         "title": "What to Prepare",
         "paragraphs": [
-          "The left and right files to compare. Identify the row with column names and the key columns beforehand."
+          "Example scenario: The left file lists 10 P-01 / 20 P-02 items, while the right lists 25 P-02 / 10 P-01. By matching based on the product code, you can accurately determine that P-01 remains unchanged and P-02's quantity has changed, even if the row order is completely different."
         ]
       },
       {
@@ -1701,6 +1704,19 @@
           "Reordering and extracting pages normally copies original PDF pages rather than rasterizing them. Image conversion and searchable OCR PDFs render pages at the selected resolution.",
           "More pages and higher resolution increase processing time, memory use, and output size. Previews render lazily at lower resolution to keep long documents responsive."
         ]
+      },
+      {
+        "title": "What is the difference between editing text in a document and organizing pages?",
+        "paragraphs": [
+          "Use page editing to merge submission files into one or keep only the necessary pages. This is not for rewriting text content, but for organizing the sequence, structure, and orientation of pages.",
+          "Choose PDF to Image to use pages like photos, or Image to PDF to bind multiple photos into one document. Use Document Conversion to bring PDF text into an editable document, or OCR to add searchable text to scanned documents. Always compare the result with the original text after conversion."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Common task examples: Try \"Combine 3 submission documents into one\" → Merge feature, \"Save only pages 2-4 of a contract\" → Split/Extract feature, \"Convert entire pages to PNG\" → Image conversion, \"Search words in a scanned document\" → OCR feature."
+        ]
       }
     ],
     "faq": {
@@ -1835,6 +1851,14 @@
       "faq_20": {
         "q": "Do I need to specify pages?",
         "a": "No. The full range is processed without extra settings."
+      },
+      "new_faq_0": {
+        "q": "Can I edit the PDF body text directly in page editing?",
+        "a": "This screen handles page sequencing, deletion, rotation, extraction, and finishing marks. To rewrite the body text, you must edit the conversion result or the original document file in a separate editor."
+      },
+      "new_faq_1": {
+        "q": "Are Image Conversion and OCR the same feature?",
+        "a": "Image Conversion saves the visible appearance of pages as PNG or JPG, while OCR reads the shapes of text in an image to treat them as text data. We do not advise using OCR to restore text that disappeared during conversion."
       }
     },
     "pathFaqs": {
@@ -2034,6 +2058,19 @@
           "OCR renders and recognizes pages one at a time, so it takes longer than embedded-text extraction. For 50+ pages, close heavy tabs and keep enough memory and power available.",
           "Mobile operating systems may close memory-intensive tabs, so long documents are generally more reliable on a desktop browser."
         ]
+      },
+      {
+        "title": "What is the difference between editing text in a document and organizing pages?",
+        "paragraphs": [
+          "Use page editing to merge submission files into one or keep only the necessary pages. This is not for rewriting text content, but for organizing the sequence, structure, and orientation of pages.",
+          "Choose PDF to Image to use pages like photos, or Image to PDF to bind multiple photos into one document. Use Document Conversion to bring PDF text into an editable document, or OCR to add searchable text to scanned documents. Always compare the result with the original text after conversion."
+        ]
+      },
+      {
+        "title": "Examples and Selection Help",
+        "paragraphs": [
+          "Common task examples: Try \"Combine 3 submission documents into one\" → Merge feature, \"Save only pages 2-4 of a contract\" → Split/Extract feature, \"Convert entire pages to PNG\" → Image conversion, \"Search words in a scanned document\" → OCR feature."
+        ]
       }
     ],
     "faq": {
@@ -2060,28 +2097,7 @@
       "faq_5": {
         "q": "Why is the first OCR run slower?",
         "a": "The browser must download language data for Korean and English recognition. Later runs can start faster while that data remains cached."
-      }
-    }
-  },
-  "pdfEditor": {
-    "title": "05. PDF Tools",
-    "description": "",
-    "blocks": [
-      {
-        "title": "What is the difference between editing text in a document and organizing pages?",
-        "paragraphs": [
-          "Use page editing to merge submission files into one or keep only the necessary pages. This is not for rewriting text content, but for organizing the sequence, structure, and orientation of pages.",
-          "Choose PDF to Image to use pages like photos, or Image to PDF to bind multiple photos into one document. Use Document Conversion to bring PDF text into an editable document, or OCR to add searchable text to scanned documents. Always compare the result with the original text after conversion."
-        ]
       },
-      {
-        "title": "Examples and Selection Help",
-        "paragraphs": [
-          "Common task examples: Try \"Combine 3 submission documents into one\" → Merge feature, \"Save only pages 2-4 of a contract\" → Split/Extract feature, \"Convert entire pages to PNG\" → Image conversion, \"Search words in a scanned document\" → OCR feature."
-        ]
-      }
-    ],
-    "faq": {
       "new_faq_0": {
         "q": "Can I edit the PDF body text directly in page editing?",
         "a": "This screen handles page sequencing, deletion, rotation, extraction, and finishing marks. To rewrite the body text, you must edit the conversion result or the original document file in a separate editor."
