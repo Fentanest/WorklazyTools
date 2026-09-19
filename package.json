@@ -53,6 +53,7 @@
     "test:pdf-raster-benchmark": "node tests/pdf-raster-benchmark.mjs",
     "test:pdf-watermark-performance": "node tests/pdf-watermark-performance.mjs",
     "test:static": "node scripts/validate-static-output.mjs",
+    "test:ads": "node tests/ad-eligibility-smoke.mjs",
     "test:i18n": "node scripts/validate-i18n.mjs",
     "test:guides": "node --experimental-strip-types scripts/validate-guides.mjs"
   },
