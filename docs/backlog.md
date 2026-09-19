@@ -7,9 +7,9 @@
 - **기존 unit 실패 10건** — `document-generator`·`pdf-finish-engine`·`pdf-finish-modules`의 extensionless `src/lib/utils` import 3건, `feature-locales` 1건, `p1b-components` 3건, `seo` 2건, `ui-legacy-isolation` 1건을 소유 영역별로 수리한다. 기준 `29fe72c`와 통합 후보에서 실패 이름이 동일하며 이번 작업의 신규 실패는 아니다. — Codx
 - **PdfComparePage 가이드 미연결** — 정적 가이드 내용은 생성되지만 `PdfComparePage`에 `ToolGuideWrapper`가 없어 런타임 안내가 노출되지 않는다. 별도 UI 연결 작업에서 해결한다. — Codx
 - **Office Editor 랜딩 가이드의 `?guide=1` 한정 노출** — 일반 랜딩은 `/tools/office-editor/app/`으로 즉시 이동하고 편집기에서 안내 링크로 돌아온 `?guide=1`일 때만 랜딩 가이드가 보인다. 의도와 발견 가능성을 별도 판정한다. — Codx
-- **S5 순수 렌더 오류의 광고 잔류 위험** — 실제 404/recovery reload 경로는 검증했지만 문서 교체 없는 후속 React 렌더 오류에서 기존 광고 script가 남는지는 미확인이다. 결정 가능한 주입 경로와 제거 정책을 별도 검토한다. — Muse
+- **S5 순수 렌더 오류의 광고 잔류 위험** — 테스트 전용 렌더 오류 주입으로 같은 문서의 기존 광고 스크립트 태그 잔류 실측은 완료했다. 후속으로 순수 렌더 오류 시 잔류 광고를 제품에서 처리할지 결정한다. — Muse
 - **S10 실제 광고 overlay** — 정확 URL 스텁은 실제 광고 overlay를 만들지 않으므로 모바일 저장·다운로드 버튼과의 겹침을 운영 광고로 확인한다. — Muse
-- **S6 PDF Editor 루트 SPA 이동** — 현재 앱에는 `/tools/pdf-editor/merge`로 가는 직접 SPA 링크가 없어 적용 대상 아님으로 기록됐다. `/tools/pdf-editor` 루트의 내부 전환으로 제외 하위 경로에 들어가는 실제 흐름을 정하고 문서 교체·광고 제거를 검사한다. — Muse
+- **S6 PDF Editor 루트 SPA 이동** — `/tools/pdf-editor/merge` 정확 링크 부재는 확인했고 PDF 루트 전환은 한국어·영어에서 검사했다. 후속으로 제외 하위 경로의 직접 링크가 생기면 해당 전환을 추가 검사한다. — Muse
 - **AdSense 계정 설정 확인** — 계정의 페이지 제외 목록에 광고 전면 제외 4경로군과 격리 경로가 포함됐는지, 사이트 수준 Auto ads 설정과 실제 노출 표본이 코드 정책과 일치하는지 확인한다. — Muse
 - **Codex worktree 신뢰 등록 정리** — 작업을 위해 `~/.codex/config.toml`에 추가한 `wt-adsense-guides`, `wt-adsense-adtest`, `wt-adsense-integration` 신뢰 등록 3줄은 관련 worktree 작업 종료 뒤 제거한다. — Codx
 
