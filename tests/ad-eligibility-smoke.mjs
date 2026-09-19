@@ -268,7 +268,7 @@ async function scenarioS4(browser, server) {
       return {
         lang: "ko", status: "route-error, script 0, stub 0",
         scripts: obs.scripts, counters: counterSnapshot(tracked.counters),
-        documentCommits: tracked.docCommits, reloads: Math.max(0, tracked.docCommits.length - 1),
+        docCommits: tracked.docCommits, reloads: Math.max(0, tracked.docCommits.length - 1),
         chunk404Count: chunk404, serverRequests: summarizeServerRequests(requests), evidence: shot,
       };
     } finally {
@@ -321,7 +321,7 @@ async function moveToExcluded(browser, server, { lang, target, tag }) {
     detail: {
       lang, from: before.url, to: after.url, status: "1 document commit, script 0, +0 stub",
       scripts: after.scripts, stubAdded: tracked.counters.stub - stubBefore,
-      documentCommits: tracked.docCommits, spaMoves: after.nav, serverRedirects301: redirects,
+      docCommits: tracked.docCommits, spaMoves: after.nav, serverRedirects301: redirects,
       counters: counterSnapshot(tracked.counters), serverRequests: summarizeServerRequests(requests),
     },
   };
@@ -353,7 +353,7 @@ async function scenarioS6S7(browser, server) {
         lang: "ko",
         status: "NOT APPLICABLE — no SPA link to /tools/pdf-editor/merge (covered by S8 direct entry)",
         mergeLinksOnAllowedPage: onTool, mergeLinksOnToolsIndex: onIndex,
-        counters: counterSnapshot(tracked.counters),
+        counters: counterSnapshot(tracked.counters), docCommits: tracked.docCommits,
       };
     } finally {
       await tracked.context.close();
@@ -391,7 +391,7 @@ async function scenarioS6S7(browser, server) {
       return {
         lang: "ko", status: "script 1 re-inserted, tags <= 1",
         scripts: obs.scripts, loads: obs.loads,
-        documentCommits: docCommits, newCommits: docCommits.length - docsBefore,
+        docCommits: docCommits, newCommits: docCommits.length - docsBefore,
         spaMoves: obs.nav, counters: counterSnapshot(counters), evidence: shot,
       };
     } finally {
@@ -457,7 +457,7 @@ async function scenarioS8(browser, server) {
           path: entry.path, finalUrl: obs.url, status: entry.expiredMarker ? "expired notice, script 0" : "script 0, stub 0",
           scripts: obs.scripts, expiredMarkerCount: expired, isolation,
           loading: obs.loading, routeError: obs.routeError, bodyChars: bodyText.trim().length,
-          counters: counterSnapshot(tracked.counters), docs: tracked.docs,
+          counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
           dialogs: tracked.dialogs, pageErrors: tracked.errors.slice(0, 3),
           serverRequests: summarizeServerRequests(server.state.requests.slice(mark)).slice(0, 12), evidence: shot,
         };
@@ -586,10 +586,10 @@ async function scenarioS5(browser, server) {
         attempt1a,
         attempt1b: {
           urlUnchanged: after.url === bulkUrl, scripts: after.scripts, stubTotal: tracked.counters.stub,
-          documentCommits: tracked.docCommits, bulk404s,
+          docCommits: tracked.docCommits, bulk404s,
         },
         residualScriptNote: "no residual ad tag is observable: the recovery reload replaces the document before any boundary renders (residual risk only applies to a hypothetical same-document transition, which the reload precludes)",
-        counters: counterSnapshot(tracked.counters), pageErrors: tracked.errors.slice(0, 3),
+        counters: counterSnapshot(tracked.counters), docCommits: tracked.docCommits, pageErrors: tracked.errors.slice(0, 3),
         serverRequests: summarizeServerRequests(requests), evidence: shotAfter,
       };
     } finally {
