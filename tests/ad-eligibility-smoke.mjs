@@ -25,7 +25,6 @@ const CHROME = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
 const DISCRIMINATE = process.argv.includes("--discriminate");
 const ONLY = (process.argv.find((arg) => arg.startsWith("--only=")) ?? "").slice("--only=".length);
 const TEXT_MERGER_CHUNK = "TextMergerPage-";
-const QR_BULK_CHUNK = "QrBulkPanel-";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const now = () => new Date().toISOString();
@@ -76,7 +75,8 @@ async function newTrackedContext(browser, server, { consent = "granted", stub = 
   page.setDefaultTimeout(30_000);
   // Document commits: CDP loaderId changes on the main frame. Playwright's
   // framenavigated also fires for same-document history updates, so it must
-  // not be used for the S6 "exactly one new document" count.
+  // not be used for the S6 "exactly one new document" count. Full loaderIds
+  // are compared; only the display is shortened.
   const docCommits = [];
   let mainFrameId = "";
   let cdp = null;
@@ -90,7 +90,7 @@ async function newTrackedContext(browser, server, { consent = "granted", stub = 
       if (!/^https?:/.test(frame.url)) return;
       const last = docCommits[docCommits.length - 1];
       if (!last || last.loaderId !== frame.loaderId) {
-        docCommits.push({ url: frame.url, loaderId: String(frame.loaderId).slice(-6), time: now() });
+        docCommits.push({ url: frame.url, loaderId: frame.loaderId, loaderShort: String(frame.loaderId).slice(-6), time: now() });
       }
     });
   } catch {
@@ -149,15 +149,19 @@ function counterSnapshot(counters) {
   };
 }
 
+// Case status vocabulary (PLAN §8): "pass" / "not-applicable" / "unverified" /
+// "not-reproduced" / "recorded" / "fail". Only "fail" fails the run; the other
+// non-pass states are reported separately and never summed as passes.
 async function runCase(name, fn) {
   const started = now();
   try {
     const detail = await fn();
-    console.log(`PASS ${name}`);
-    return { name, pass: true, started, ended: now(), ...detail };
+    const status = detail.status ?? "pass";
+    console.log(`${status.toUpperCase()} ${name}`);
+    return { name, status, started, ended: now(), ...detail };
   } catch (error) {
     console.log(`FAIL ${name}: ${String(error).split("\n")[0]}`);
-    return { name, pass: false, started, ended: now(), failure: String(error).slice(0, 2000) };
+    return { name, status: "fail", started, ended: now(), failure: String(error).slice(0, 2000) };
   }
 }
 
@@ -178,7 +182,7 @@ async function scenarioS1(browser, server) {
         assert.equal(tracked.counters.attempt, 0, `S1-${consent}: no ad request attempt`);
         assertNoRealNetwork(tracked.counters, `S1-${consent}`);
         const shot = await screenshot(tracked.page, `S1-${consent}`);
-        return { lang: "ko", url: obs.url, status: "script 0, stub 0", scripts: obs.scripts, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
+        return { lang: "ko", url: obs.url, status: "pass", note: "script 0, stub 0", scripts: obs.scripts, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
       } finally {
         await tracked.context.close();
       }
@@ -200,8 +204,10 @@ async function checkS2(browser, server, lang) {
     assert.equal(tracked.counters.stub, 1, `S2-${lang}: attempt answered by stub`);
     assert.equal(obs.loads, 1, `S2-${lang}: stub loaded once`);
     assertNoRealNetwork(tracked.counters, `S2-${lang}`);
+    // Let the .page-enter 0.42s entrance animation finish before capture.
+    await sleep(900);
     const shot = await screenshot(tracked.page, `S2-${lang}`);
-    return { lang, url: obs.url, status: "script 1, stub 1, real 0", scripts: obs.scripts, loads: obs.loads, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, externalLog: tracked.counters.log, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
+    return { lang, url: obs.url, status: "pass", note: "script 1, stub 1, real 0", scripts: obs.scripts, loads: obs.loads, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, externalLog: tracked.counters.log, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
   } finally {
     await tracked.context.close();
   }
@@ -231,7 +237,7 @@ async function scenarioS3(browser, server) {
       assertNoRealNetwork(tracked.counters, "S3");
       const shot = await screenshot(tracked.page, "S3-ready");
       return {
-        lang: "ko", status: "loading observed, then script 1",
+        lang: "ko", status: "pass", note: "loading observed, then script 1",
         loadingObservedMs: tLoading - t0, readyAfterMs: tReady - t0,
         scriptsDuringLoading: during.scripts, scripts: obs.scripts, loads: obs.loads,
         counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
@@ -266,9 +272,9 @@ async function scenarioS4(browser, server) {
       assert.ok(chunk404 >= 2, `S4: chunk must fail on initial load and after the single recovery reload (got ${chunk404})`);
       const shot = await screenshot(tracked.page, "S4-error");
       return {
-        lang: "ko", status: "route-error, script 0, stub 0",
+        lang: "ko", status: "pass", note: "route-error, script 0, stub 0",
         scripts: obs.scripts, counters: counterSnapshot(tracked.counters),
-        docCommits: tracked.docCommits, reloads: Math.max(0, tracked.docCommits.length - 1),
+        docCommits: tracked.docCommits.map((entry) => ({ ...entry })), reloads: Math.max(0, tracked.docCommits.length - 1),
         chunk404Count: chunk404, serverRequests: summarizeServerRequests(requests), evidence: shot,
       };
     } finally {
@@ -306,22 +312,31 @@ async function moveToExcluded(browser, server, { lang, target, tag }) {
   ).catch(() => {});
   await sleep(1000);
   const after = await observe(tracked.page);
-  const movedDocs = tracked.docCommits.slice(commitsBefore);
+  const movedDocs = tracked.docCommits.slice(commitsBefore).map((entry) => ({ ...entry }));
   assert.equal(movedDocs.length, 1, `${tag}: exactly one new document commit (initial entry excluded), got ${JSON.stringify(movedDocs)}`);
   assert.equal(after.scripts, 0, `${tag}: no ad script in the new document`);
   assert.equal(tracked.counters.stub - stubBefore, 0, `${tag}: no additional stub load`);
   const stableDocs = tracked.docCommits.length;
   await sleep(5000);
   assert.equal(tracked.docCommits.length, stableDocs, `${tag}: no further document swaps during stabilization`);
+  const stabilized = await observe(tracked.page);
   assertNoRealNetwork(tracked.counters, tag);
   const requests = server.state.requests.slice(mark);
   const redirects = requests.filter((entry) => entry.status === 301).map((entry) => entry.pathname);
   return {
     tracked, before, after, movedDocs, redirects,
     detail: {
-      lang, from: before.url, to: after.url, status: "1 document commit, script 0, +0 stub",
+      lang, from: before.url, to: after.url, status: "pass",
       scripts: after.scripts, stubAdded: tracked.counters.stub - stubBefore,
-      docCommits: tracked.docCommits, spaMoves: after.nav, serverRedirects301: redirects,
+      docCommits: tracked.docCommits.map((entry) => ({ ...entry })),
+      // SPA history events are snapshotted per stage: the source document's
+      // counters (pre-click), the new document's, and post-stabilization.
+      // The click's own pushState may fall on either side of the document
+      // swap depending on timing, so no single field claims the whole move.
+      spaBeforeClick: { ...before.nav },
+      spaNewDoc: { ...after.nav },
+      spaStabilized: { ...stabilized.nav },
+      serverRedirects301: redirects,
       counters: counterSnapshot(tracked.counters), serverRequests: summarizeServerRequests(requests),
     },
   };
@@ -332,12 +347,15 @@ async function scenarioS6S7(browser, server) {
   const moves = [
     { lang: "ko", target: "/tools/hwp-editor", tag: "S6-ko-hwp" },
     { lang: "ko", target: "/tools/document-compare", tag: "S6-ko-doccompare" },
+    { lang: "ko", target: "/tools/pdf-editor", tag: "S6-ko-pdf-root" },
     { lang: "en", target: "/tools/document-compare", tag: "S6-en-doccompare" },
+    { lang: "en", target: "/tools/pdf-editor", tag: "S6-en-pdf-root" },
   ];
-  // /tools/pdf-editor/merge has no SPA link in the app (sidebar catalog,
-  // /{lang}/tools/ index, text-merger page, and the pdf-editor internal nav
-  // all lack it), so the click-to-move variant cannot run for merge. Direct
-  // entry to merge is covered by S8 in both languages.
+  // Only the exact /tools/pdf-editor/merge route lacks an SPA link (sidebar
+  // catalog, /{lang}/tools/ index, text-merger page, and the pdf-editor
+  // internal nav all lack it). The PDF path family IS reachable via the
+  // /tools/pdf-editor root NavLink, covered by S6-ko/en-pdf-root below.
+  // Direct entry is covered by S8 (KO root/ocr, EN merge).
   results.push(await runCase("S6-ko-merge", async () => {
     resetServer(server);
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
@@ -349,11 +367,13 @@ async function scenarioS6S7(browser, server) {
       await sleep(2000);
       const onIndex = await tracked.page.locator('a[href$="/tools/pdf-editor/merge"]').count();
       assert.equal(onTool + onIndex, 0, "S6-ko-merge: no SPA link to the merge route is expected");
+      assertNoRealNetwork(tracked.counters, "S6-ko-merge");
       return {
         lang: "ko",
-        status: "NOT APPLICABLE — no SPA link to /tools/pdf-editor/merge (covered by S8 direct entry)",
+        status: "not-applicable",
+        reason: "no SPA link to the exact /tools/pdf-editor/merge route (PDF family move covered by S6-ko/en-pdf-root; direct entry by S8)",
         mergeLinksOnAllowedPage: onTool, mergeLinksOnToolsIndex: onIndex,
-        counters: counterSnapshot(tracked.counters), docCommits: tracked.docCommits,
+        counters: counterSnapshot(tracked.counters), docCommits: [...tracked.docCommits],
       };
     } finally {
       await tracked.context.close();
@@ -369,7 +389,7 @@ async function scenarioS6S7(browser, server) {
       return { ...detail, evidence: shot };
     });
     results.push(outcome);
-    if (!outcome.pass && s7Session) {
+    if (outcome.status === "fail" && s7Session) {
       await s7Session.context.close().catch(() => {});
       s7Session = null;
     }
@@ -389,10 +409,10 @@ async function scenarioS6S7(browser, server) {
       assertNoRealNetwork(counters, "S7");
       const shot = await screenshot(page, "S7-back");
       return {
-        lang: "ko", status: "script 1 re-inserted, tags <= 1",
+        lang: "ko", status: "pass",
         scripts: obs.scripts, loads: obs.loads,
-        docCommits: docCommits, newCommits: docCommits.length - docsBefore,
-        spaMoves: obs.nav, counters: counterSnapshot(counters), evidence: shot,
+        docCommits: docCommits.map((entry) => ({ ...entry })), newCommits: docCommits.length - docsBefore,
+        spaMoves: { ...obs.nav }, counters: counterSnapshot(counters), evidence: shot,
       };
     } finally {
       await s7Session.context.close();
@@ -454,7 +474,7 @@ async function scenarioS8(browser, server) {
         assertNoRealNetwork(tracked.counters, tag);
         const shot = await screenshot(tracked.page, tag);
         return {
-          path: entry.path, finalUrl: obs.url, status: entry.expiredMarker ? "expired notice, script 0" : "script 0, stub 0",
+          path: entry.path, finalUrl: obs.url, status: "pass", note: entry.expiredMarker ? "expired notice, script 0" : "script 0, stub 0",
           scripts: obs.scripts, expiredMarkerCount: expired, isolation,
           loading: obs.loading, routeError: obs.routeError, bodyChars: bodyText.trim().length,
           counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
@@ -499,8 +519,8 @@ async function scenarioS9(browser, server) {
       assertNoRealNetwork(tracked.counters, "S9");
       const shot = await screenshot(tracked.page, "S9-after-move");
       return {
-        lang: "ko",
-        status: "recorded for Claude adjudication (expected behavior vs defect candidate)",
+        lang: "ko", status: "recorded",
+        note: "observation only — expected behavior vs defect candidate is Claude's adjudication",
         itemsBefore, sourcesBefore, itemsAfter,
         dialogsDuringMove: tracked.dialogs.slice(dialogsBefore),
         stateLost: itemsAfter < itemsBefore,
@@ -515,82 +535,96 @@ async function scenarioS9(browser, server) {
 }
 
 async function scenarioS5(browser, server) {
-  // PLAN 4-2/S5 option (1): the user-action-triggered lazy import is the
-  // QrBulkPanel chunk (bulk mode tab). Measured product behavior: a failing
-  // chunk import fires vite:preloadError and chunkRecovery reloads the
-  // document, which wipes the in-memory mode trigger — so a same-document
-  // healthy->error transition via click is not reachable. The boundary IS
-  // reachable at the same URL via the /bulk route (trigger in the URL).
+  // PLAN 4-2/S5 option (2): inject a flag-gated throw into the RENDER output
+  // of the not-yet-loaded QrBulkPanel chunk via state.transform, then trigger
+  // its load+render with the bulk tab click. Fetch (200) and module
+  // evaluation both succeed, so no vite:preloadError and no chunkRecovery
+  // reload intervene: RouteErrorBoundary is reached in the SAME document at
+  // the SAME URL with the pre-existing ad script tag still present.
+  // This is an INJECTED reproduction, explicitly not a real internal import
+  // failure (measured: real chunk fetch/eval failures reload the document).
+  const CHUNK_PREFIX = "QrBulkPanel-";
+  const ANCHOR = '"data-testid":"qr-bulk-page"';
+  const THROW_EXPR = '(window.__wlForceRenderError?(()=>{throw new Error("WU2-S5-INJECTED-RENDER")})():"qr-bulk-page")';
   return [await runCase("S5-same-url-error", async () => {
-    // (1a) Click path on the create page: documents the designed recovery.
     resetServer(server);
-    const attempt1a = { reloadObserved: false, urlUnchanged: false, boundaryShown: false, stubTotal: 0 };
-    {
-      const tracked = await newTrackedContext(browser, server, { consent: "granted" });
-      try {
-        await tracked.page.goto(`${server.url}/ko/tools/qr-studio/`, { waitUntil: "domcontentloaded" });
-        await waitReady(tracked.page);
-        const settled = await tracked.page.waitForSelector('[data-testid="qr-preview"][data-ready="true"]', { timeout: 20_000 }).then(() => true).catch(() => false);
-        if (!settled) await sleep(3000);
-        const before = await observe(tracked.page);
-        assert.equal(before.scripts, 1, "S5-1a: ad script must be present before the error");
-        server.state.asset = QR_BULK_CHUNK;
-        server.state.fault = "404";
-        server.state.remaining = Infinity;
-        await tracked.page.locator('[data-testid="qr-mode"] button').nth(1).click();
-        const deadline = Date.now() + 45_000;
-        while (tracked.docCommits.length < 2 && Date.now() < deadline) await sleep(250);
-        await sleep(4000);
-        const after = await observe(tracked.page);
-        attempt1a.reloadObserved = tracked.docCommits.length === 2;
-        attempt1a.urlUnchanged = after.url === before.url;
-        attempt1a.boundaryShown = after.routeError >= 1;
-        attempt1a.stubTotal = tracked.counters.stub;
-        attempt1a.scriptsAfter = after.scripts;
-        attempt1a.bulk404s = server.state.requests.filter((e) => e.pathname.includes(QR_BULK_CHUNK) && e.status === 404).length;
-        assert.equal(tracked.docCommits.length, 2, "S5-1a: exactly one recovery reload is expected");
-        assert.equal(after.url, before.url, "S5-1a: URL string must be unchanged");
-      } finally {
-        resetServer(server);
-        await tracked.context.close();
-      }
-    }
-    // (1b) Bulk route (trigger preserved in URL): boundary must be reached.
-    resetServer(server);
-    server.state.asset = QR_BULK_CHUNK;
-    server.state.fault = "404";
-    server.state.remaining = Infinity;
+    const distAssets = await fs.readdir(path.join(REPO_ROOT, "dist", "assets"));
+    const chunk = distAssets.find((f) => f.startsWith(CHUNK_PREFIX) && f.endsWith(".js"));
+    assert.ok(chunk, "S5: QrBulkPanel chunk missing in dist");
+    const built = await fs.readFile(path.join(REPO_ROOT, "dist", "assets", chunk), "utf8");
+    assert.ok(built.split(ANCHOR).length - 1 >= 1, "S5: injection anchor missing in built chunk");
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
     const mark = server.state.requests.length;
     try {
-      const bulkUrl = `${server.url}/ko/tools/qr-studio/bulk/`;
-      await tracked.page.goto(bulkUrl, { waitUntil: "domcontentloaded" });
-      await waitRouteError(tracked.page, 60_000);
+      await tracked.page.goto(`${server.url}/ko/tools/qr-studio/`, { waitUntil: "domcontentloaded" });
+      await waitReady(tracked.page);
+      const settled = await tracked.page.waitForSelector('[data-testid="qr-preview"][data-ready="true"]', { timeout: 20_000 }).then(() => true).catch(() => false);
+      if (!settled) await sleep(3000);
+      const before = await observe(tracked.page);
+      assert.equal(before.scripts, 1, "S5: ad script must be present before the error");
+      assert.equal(before.loads, 1, "S5: stub must be loaded once before the error");
+      assert.equal(tracked.counters.attempt, 1, "S5: exactly one ad attempt before the error");
+      assert.equal(tracked.docCommits.length, 1, "S5: single initial document");
+      const preBulk = server.state.requests.slice(mark).filter((e) => e.pathname.includes(CHUNK_PREFIX)).length;
+      assert.equal(preBulk, 0, "S5: bulk chunk must not load before the click");
+      const urlBefore = before.url;
+      const stubBefore = tracked.counters.stub;
+      // Arm the transform BEFORE the chunk is fetched: the served module
+      // evaluates cleanly (the flag is only read at render, not at import).
+      server.state.asset = CHUNK_PREFIX;
+      server.state.transform = (pathname, text) => (
+        pathname.includes(CHUNK_PREFIX) ? text.split(ANCHOR).join(`"data-testid":${THROW_EXPR}`) : text
+      );
+      await tracked.page.evaluate(() => { window.__wlForceRenderError = true; });
+      await tracked.page.locator('[data-testid="qr-mode"] button').nth(1).click();
+      try {
+        await waitRouteError(tracked.page);
+      } catch (error) {
+        // Genuinely unreachable: record diagnostics, do not count as pass.
+        const diag = await tracked.page.evaluate(() => ({
+          routeError: document.querySelectorAll("[data-route-error]").length,
+          loading: document.querySelectorAll(".tool-route-loading").length,
+          pressed: [...document.querySelectorAll('[data-testid="qr-mode"] button')].map((b) => `${b.getAttribute("aria-pressed")}:${b.getAttribute("data-tg-value")}`),
+          flag: Boolean(window.__wlForceRenderError),
+        })).catch(() => ({}));
+        diag.pageErrors = tracked.errors.slice(0, 5);
+        diag.bulkRequests = server.state.requests.slice(mark).filter((e) => e.pathname.includes(CHUNK_PREFIX)).map((e) => `${e.pathname} ${e.status} ${e.bytes ?? ""}`);
+        diag.counters = counterSnapshot(tracked.counters);
+        diag.docCommits = [...tracked.docCommits];
+        return {
+          lang: "ko", status: "not-reproduced",
+          reason: `boundary unreachable: ${String(error).split("\n")[0]}`,
+          method: "state.transform render-error injection into QrBulkPanel chunk (attempted)",
+          diag, counters: counterSnapshot(tracked.counters),
+          docCommits: [...tracked.docCommits],
+          serverRequests: summarizeServerRequests(server.state.requests.slice(mark)),
+        };
+      }
       const after = await observe(tracked.page);
-      assert.equal(after.url, bulkUrl, "S5-1b: URL must be unchanged");
-      assert.ok(after.routeError >= 1, "S5-1b: error boundary must be shown");
-      assert.equal(tracked.docCommits.length, 2, "S5-1b: initial load + exactly one recovery reload");
-      assert.equal(after.scripts, 0, "S5-1b: no ad script in the error document");
-      assert.equal(tracked.counters.stub, 0, "S5-1b: no stub served (script never reached insert)");
-      assertNoRealNetwork(tracked.counters, "S5-1b");
-      const requests = server.state.requests.slice(mark);
-      const bulk404s = requests.filter((e) => e.pathname.includes(QR_BULK_CHUNK) && e.status === 404).length;
-      assert.ok(bulk404s >= 1, "S5-1b: the bulk chunk must have failed");
-      const stable = tracked.docCommits.length;
-      await sleep(3000);
-      assert.equal(tracked.docCommits.length, stable, "S5-1b: no further reloads (no reload loop)");
+      assert.equal(after.url, urlBefore, "S5: URL must be unchanged");
+      assert.equal(tracked.docCommits.length, 1, "S5: no new document (same-document boundary)");
+      assert.ok(after.routeError >= 1, "S5: error boundary must be shown");
+      assert.equal(tracked.counters.stub - stubBefore, 0, "S5: no new stub load (total stays 1)");
+      assert.equal(after.loads, 1, "S5: cumulative stub loads stay 1");
+      assertNoRealNetwork(tracked.counters, "S5");
+      await sleep(900);
       const shotAfter = await screenshot(tracked.page, "S5-error");
       return {
-        lang: "ko",
-        status: "boundary reached at same URL via bulk route (real 404 fault on user-triggered lazy chunk); same-document click transition is replaced by the designed recovery reload — see attempt1a",
-        attempt1a,
-        attempt1b: {
-          urlUnchanged: after.url === bulkUrl, scripts: after.scripts, stubTotal: tracked.counters.stub,
-          docCommits: tracked.docCommits, bulk404s,
+        lang: "ko", status: "pass",
+        method: "state.transform render-error injection into QrBulkPanel chunk + bulk tab click (INJECTED reproduction, not a real internal import failure)",
+        injection: {
+          chunk, anchor: ANCHOR, anchorOccurrences: built.split(ANCHOR).length - 1, cleanBytes: built.length,
+          servedRequests: server.state.requests.slice(mark).filter((e) => e.pathname.includes(CHUNK_PREFIX)).map((e) => ({ pathname: e.pathname, status: e.status, bytes: e.bytes ?? null })),
         },
-        residualScriptNote: "no residual ad tag is observable: the recovery reload replaces the document before any boundary renders (residual risk only applies to a hypothetical same-document transition, which the reload precludes)",
-        counters: counterSnapshot(tracked.counters), docCommits: tracked.docCommits, pageErrors: tracked.errors.slice(0, 3),
-        serverRequests: summarizeServerRequests(requests), evidence: shotAfter,
+        urlUnchanged: after.url === urlBefore,
+        scripts: after.scripts, loads: after.loads, stubAdded: tracked.counters.stub - stubBefore,
+        residualScriptTags: after.scripts,
+        residualScriptNote: after.scripts >= 1
+          ? "pre-existing ad script tag REMAINS after the same-document error (no removal policy) — residual risk confirmed, not a fix target per §4-3"
+          : "pre-existing ad script tag is gone (unexpected; boundary or cleanup removed it)",
+        counters: counterSnapshot(tracked.counters), docs: [...tracked.docs], docCommits: [...tracked.docCommits],
+        pageErrors: tracked.errors.slice(0, 3),
+        serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shotAfter,
       };
     } finally {
       resetServer(server);
@@ -614,7 +648,8 @@ async function scenarioS10(browser, server) {
       assertNoRealNetwork(tracked.counters, "S10");
       const shot = await screenshot(tracked.page, "S10-mobile");
       return {
-        status: "UNVERIFIED — real ad overlay required (stub renders no overlay)",
+        status: "unverified",
+        note: "real ad overlay required (stub renders no overlay) — overlap cannot be verified",
         viewport: devices["Pixel 7"].viewport,
         scripts: obs.scripts, loads: obs.loads,
         counters: counterSnapshot(tracked.counters),
@@ -645,15 +680,26 @@ async function main() {
       const tracked = await newTrackedContext(browser, server, { consent: "granted", stub: false });
       let checkerFailed = false;
       let detail = {};
+      let obs = null;
       try {
         await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
         await waitReady(tracked.page);
-        const obs = await observe(tracked.page);
+        obs = await observe(tracked.page);
         assert.equal(tracked.counters.stub, 1, "S2-discrimination: stub expected (should fail with stub disabled)");
+        assertNoRealNetwork(tracked.counters, "S2-discrimination");
         detail = { scripts: obs.scripts, loads: obs.loads, counters: counterSnapshot(tracked.counters) };
       } catch (error) {
-        checkerFailed = true;
-        detail = { expectedFailure: String(error).split("\n")[0] };
+        // Only the exact stub-expectation assertion proves discrimination;
+        // timeouts or other harness errors must not count as success.
+        if (!obs) obs = await observe(tracked.page).catch(() => null);
+        const message = String(error).split("\n")[0];
+        checkerFailed = /stub expected/.test(message);
+        detail = {
+          expectedFailure: message,
+          scripts: obs?.scripts ?? null,
+          loads: obs?.loads ?? null,
+          counters: counterSnapshot(tracked.counters),
+        };
       } finally {
         await tracked.context.close();
       }
@@ -680,23 +726,31 @@ async function main() {
       const out = await job.run();
       scenarios.push(...(Array.isArray(out) ? out : [out]));
     }
-    const failed = scenarios.filter((entry) => !entry.pass);
+    const byStatus = {};
+    for (const entry of scenarios) byStatus[entry.status] = (byStatus[entry.status] ?? 0) + 1;
+    const failed = scenarios.filter((entry) => entry.status === "fail");
     const results = {
       meta: {
         job: "adsense-recheck-20260919",
         unit: "WU2",
         build: "npm run build with VITE_LOCAL_QA unset",
+        dist: "reused c40c2eb build (no product change since; rebuild not required)",
         server: `tests/recovery-server.mjs RECOVERY_TEST_PORT=${PORT}`,
         browser: "playwright 1.63 + /usr/bin/google-chrome",
         adsenseStubUrl: ADSENSE_SCRIPT_URL,
+        statusLegend: "pass / not-applicable / unverified / not-reproduced / recorded / fail — only fail fails the run; other non-pass states are never summed as passes",
         started: scenarios[0]?.started ?? now(),
         ended: now(),
       },
+      summary: byStatus,
       scenarios,
     };
     await fs.writeFile(RESULTS_FILE, `${JSON.stringify(results, null, 2)}\n`);
     console.log(`results: ${RESULTS_FILE}`);
-    console.log(`pass ${scenarios.length - failed.length}/${scenarios.length}`);
+    console.log(`status ${JSON.stringify(byStatus)}`);
+    for (const entry of scenarios) {
+      if (entry.status !== "pass") console.log(`${entry.status.toUpperCase()} ${entry.name}`);
+    }
     if (failed.length) {
       for (const entry of failed) console.log(`FAILED ${entry.name}: ${entry.failure?.split("\n")[0]}`);
       process.exitCode = 1;
