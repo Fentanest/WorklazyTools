@@ -54,8 +54,10 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "scripts/validate-static-output.mjs", // Owner: static isolation-page absence assertions.
     "src/components/AdSenseLoader.tsx", // Owner: the sole script creator.
     "src/components/AppShell.tsx", // Owner: the sole route-level render gate.
+    "tests/ad-eligibility-smoke.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
     "tests/excel-cleaner-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/excel-compare-smoke.mjs", // Owner: standard-route presence assertion.
+    "tests/helpers/ad-stub.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
     "tests/new-tools-smoke.mjs", // Owner: video-isolation absence and request assertions.
     "tests/office-editor-smoke.mjs", // Owner: office-isolation absence assertion.
     "tests/control-geometry-smoke.mjs", // Owner: local QA control-geometry and tracking-absence assertions.
