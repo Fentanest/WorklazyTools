@@ -113,6 +113,9 @@ export function getFaqsForPath(language: AppLanguage, slug: string, path: string
     }
   }
   
+  // A configured route must render only its explicit, non-empty selection.
+  // Routes without a pathFaqs entry intentionally fall back to every FAQ;
+  // validate-guides rejects empty selections so they cannot trigger that fallback.
   if (faqIds && faqIds.length > 0) {
     return faqIds.map(id => {
       const f = guide.faq[id];

@@ -1836,14 +1836,6 @@
         "q": "Does anything rotate automatically on open?",
         "a": "No. It starts with first-page rotate guidance and rotates nothing automatically."
       },
-      "faq_19": {
-        "q": "Can I make the whole PDF searchable?",
-        "a": "Yes. Every page is read with Korean and English OCR to create a searchable PDF."
-      },
-      "faq_20": {
-        "q": "Do I need to specify pages?",
-        "a": "No. The full range is processed without extra settings."
-      },
       "new_faq_0": {
         "q": "Can I edit the PDF body text directly in page editing?",
         "a": "This screen handles page sequencing, deletion, rotation, extraction, and finishing marks. To rewrite the body text, you must edit the conversion result or the original document file in a separate editor."
@@ -1895,10 +1887,6 @@
       "/tools/pdf-editor/rotate": [
         "faq_17",
         "faq_18"
-      ],
-      "/tools/pdf-editor/ocr": [
-        "faq_19",
-        "faq_20"
       ]
     },
     "pathBlocks": {
@@ -1956,14 +1944,6 @@
           "title": "Will tables and line breaks be preserved when converting PDF to Word?",
           "paragraphs": [
             "Consider DOCX for text-focused re-editing, XLSX for tweaking tables, or TXT if you only need unformatted text. Since PDF paragraphs and cells are estimated by coordinates, complex tables or multi-column documents may have a different structure than the original. Always double-check dates, amounts, and table rows and columns against the original text."
-          ]
-        }
-      ],
-      "/tools/pdf-editor/ocr": [
-        {
-          "title": "Why can't I search for words in a scanned PDF?",
-          "paragraphs": [
-            "Use OCR when you want to find words in scanned documents where text cannot be selected. After processing, try actually searching for a few common body words and numbers. Recognition may be inaccurate in blurry or skewed originals, so do not blindly rely on automatic recognition results for names, dates, or amounts."
           ]
         }
       ],
@@ -2082,6 +2062,14 @@
         "q": "Why is the first OCR run slower?",
         "a": "The browser must download language data for Korean and English recognition. Later runs can start faster while that data remains cached."
       },
+      "faq_19": {
+        "q": "Can I make the whole PDF searchable?",
+        "a": "Yes. Every page is read with Korean and English OCR to create a searchable PDF."
+      },
+      "faq_20": {
+        "q": "Do I need to specify pages?",
+        "a": "No. The full range is processed without extra settings."
+      },
       "new_faq_0": {
         "q": "Can I edit the PDF body text directly in page editing?",
         "a": "This screen handles page sequencing, deletion, rotation, extraction, and finishing marks. To rewrite the body text, you must edit the conversion result or the original document file in a separate editor."
@@ -2090,6 +2078,28 @@
         "q": "Are Image Conversion and OCR the same feature?",
         "a": "Image Conversion saves the visible appearance of pages as PNG or JPG, while OCR reads the shapes of text in an image to treat them as text data. We do not advise using OCR to restore text that disappeared during conversion."
       }
+    },
+    "pathFaqs": {
+      "/tools/pdf-editor/convert": [
+        "faq_0",
+        "faq_1",
+        "faq_2",
+        "faq_4"
+      ],
+      "/tools/pdf-editor/ocr": [
+        "faq_19",
+        "faq_20"
+      ]
+    },
+    "pathBlocks": {
+      "/tools/pdf-editor/ocr": [
+        {
+          "title": "Why can't I search for words in a scanned PDF?",
+          "paragraphs": [
+            "Use OCR when you want to find words in scanned documents where text cannot be selected. After processing, try actually searching for a few common body words and numbers. Recognition may be inaccurate in blurry or skewed originals, so do not blindly rely on automatic recognition results for names, dates, or amounts."
+          ]
+        }
+      ]
     }
   },
   "hwpEditor": {
