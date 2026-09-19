@@ -12,6 +12,10 @@
 - **S6 PDF Editor 루트 SPA 이동** — `/tools/pdf-editor/merge` 정확 링크 부재는 확인했고 PDF 루트 전환은 한국어·영어에서 검사했다. 후속으로 제외 하위 경로의 직접 링크가 생기면 해당 전환을 추가 검사한다. — Muse
 - **AdSense 계정 설정 확인** — 계정의 페이지 제외 목록에 광고 전면 제외 4경로군과 격리 경로가 포함됐는지, 사이트 수준 Auto ads 설정과 실제 노출 표본이 코드 정책과 일치하는지 확인한다. — Muse
 - **Codex worktree 신뢰 등록 정리** — 작업을 위해 `~/.codex/config.toml`에 추가한 `wt-adsense-guides`, `wt-adsense-adtest`, `wt-adsense-integration` 신뢰 등록 3줄은 관련 worktree 작업 종료 뒤 제거한다. — Codx
+- **S9 광고 제외 경로 이동의 로컬 상태 유실** — 광고 허용 경로에서 제외 경로로 이동하면 전체 문서 교체로 도구 로컬 상태가 유실되고 경고·취소 흐름이 없다. SPA 이탈과 동일한 설계 동작으로 판정했지만 경고 UX 도입 여부와 전역 메모리 상태를 가진 도구의 추가 위험은 후속 검토한다. — Claude 판정 / Codx 관찰
+- **데스크톱 `.bottom-tabs` 노출 가능성** — `.bottom-tabs`는 `@media (max-width: 820px)` 밖의 규칙이 없어 문서 끝에 비스타일 링크로 노출될 가능성이 fullPage 캡처에서 관찰됐다. 기준 `29fe72c`·운영 `a946a0b`와 CSS가 동일해 이번 변경과 무관하며, 실제 데스크톱 뷰포트에서 확인한 뒤 처리한다. — Claude 판정 / Codx 관찰
+- **광고 스모크 빌드 출처 메타데이터 오기** — `tests/ad-eligibility-smoke.mjs`가 결과 메타데이터를 `reused c40c2eb build`로 하드코딩해 실제 빌드가 `cd53c2a`인 통합 실행 JSON에도 그대로 남았다. 검사 판정에는 영향이 없으며, 실행 시 실제 HEAD와 빌드 출처를 기록하도록 정정한다. — Codx (Astra 최종 검수 소견)
+- **광고 스모크 판별·네트워크 단언 보강** — 판별 모드는 `stub expected` 메시지 문자열만으로 기대 실패를 인정하고 AssertionError 타입·`code`를 검사하지 않는다. S5 `not-reproduced` 분기와 판별 성공 경로에는 `assertNoRealNetwork` 호출도 없으므로 함께 보강한다. — Codx (Astra 최종 검수 소견)
 
 ## UI 시각 기준선 재설정
 
