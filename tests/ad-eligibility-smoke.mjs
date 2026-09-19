@@ -178,7 +178,7 @@ async function scenarioS1(browser, server) {
         assert.equal(tracked.counters.attempt, 0, `S1-${consent}: no ad request attempt`);
         assertNoRealNetwork(tracked.counters, `S1-${consent}`);
         const shot = await screenshot(tracked.page, `S1-${consent}`);
-        return { lang: "ko", url: obs.url, status: "script 0, stub 0", scripts: obs.scripts, counters: counterSnapshot(tracked.counters), docs: tracked.docs, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
+        return { lang: "ko", url: obs.url, status: "script 0, stub 0", scripts: obs.scripts, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
       } finally {
         await tracked.context.close();
       }
@@ -201,7 +201,7 @@ async function checkS2(browser, server, lang) {
     assert.equal(obs.loads, 1, `S2-${lang}: stub loaded once`);
     assertNoRealNetwork(tracked.counters, `S2-${lang}`);
     const shot = await screenshot(tracked.page, `S2-${lang}`);
-    return { lang, url: obs.url, status: "script 1, stub 1, real 0", scripts: obs.scripts, loads: obs.loads, counters: counterSnapshot(tracked.counters), docs: tracked.docs, externalLog: tracked.counters.log, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
+    return { lang, url: obs.url, status: "script 1, stub 1, real 0", scripts: obs.scripts, loads: obs.loads, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, externalLog: tracked.counters.log, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
   } finally {
     await tracked.context.close();
   }
@@ -234,7 +234,7 @@ async function scenarioS3(browser, server) {
         lang: "ko", status: "loading observed, then script 1",
         loadingObservedMs: tLoading - t0, readyAfterMs: tReady - t0,
         scriptsDuringLoading: during.scripts, scripts: obs.scripts, loads: obs.loads,
-        counters: counterSnapshot(tracked.counters), docs: tracked.docs,
+        counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
         serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot,
       };
     } finally {
@@ -505,7 +505,7 @@ async function scenarioS9(browser, server) {
         dialogsDuringMove: tracked.dialogs.slice(dialogsBefore),
         stateLost: itemsAfter < itemsBefore,
         newUrl: after.url, scripts: after.scripts,
-        counters: counterSnapshot(tracked.counters), docs: tracked.docs,
+        counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
         serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot,
       };
     } finally {
@@ -610,10 +610,15 @@ async function scenarioS10(browser, server) {
       await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
       await waitReady(tracked.page);
       const buttons = await tracked.page.locator("main button").allInnerTexts();
+      const obs = await observe(tracked.page);
+      assertNoRealNetwork(tracked.counters, "S10");
       const shot = await screenshot(tracked.page, "S10-mobile");
       return {
         status: "UNVERIFIED — real ad overlay required (stub renders no overlay)",
         viewport: devices["Pixel 7"].viewport,
+        scripts: obs.scripts, loads: obs.loads,
+        counters: counterSnapshot(tracked.counters),
+        docs: tracked.docs, docCommits: tracked.docCommits,
         mainButtons: buttons.map((text) => text.trim().slice(0, 40)).filter(Boolean).slice(0, 12),
         evidence: shot,
       };
