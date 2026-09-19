@@ -3,6 +3,7 @@ dist/
 *.tsbuildinfo
 .DS_Store
 coverage/
+evidence/
 public/vendor/pyodide/
 public/vendor/tesseract/
 public/tools/video-studio/runtime/
