@@ -123,6 +123,13 @@ export function validateGuidesData({ guidesData, appRoutes, expectations = faqEx
   const errors = [];
   const routeSet = new Set(appRoutes.map(normalizeRoute));
   const addError = (message) => errors.push(message);
+  const faqConnectionsByGuide = new Map();
+  for (const [route, expectation] of Object.entries(expectations)) {
+    const guideKey = getGuideKeyForPath(expectation.slug, route);
+    const connections = faqConnectionsByGuide.get(guideKey) || [];
+    connections.push({ route, slug: expectation.slug });
+    faqConnectionsByGuide.set(guideKey, connections);
+  }
 
   for (const lang of ["ko", "en"]) {
     const guides = guidesData[lang];
@@ -184,6 +191,17 @@ export function validateGuidesData({ guidesData, appRoutes, expectations = faqEx
       const guide = guides[guideKey];
       if (!guide || !guide.title?.trim() || !guide.description?.trim() || !Array.isArray(guide.blocks) || guide.blocks.length === 0) {
         addError(`[${lang}] Route '${route}' resolves to incomplete guide '${guideKey}' for slug '${slug}'`);
+      }
+    }
+
+    for (const [guideKey, connections] of faqConnectionsByGuide) {
+      if (connections.length < 2) continue;
+      const guide = guides[guideKey];
+      for (const { route } of connections) {
+        const ids = guide?.pathFaqs?.[route];
+        if (!Array.isArray(ids) || ids.length === 0) {
+          addError(`[${lang}] Explicit pathFaqs required for shared guide key '${guideKey}' at route '${route}'`);
+        }
       }
     }
 

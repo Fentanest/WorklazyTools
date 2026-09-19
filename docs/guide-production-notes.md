@@ -5,6 +5,7 @@
 - A route listed in `pathFaqs` renders only the FAQ IDs in that route's selection.
 - Every configured selection must contain at least one ID. `scripts/validate-guides.mjs` rejects empty selections.
 - A route without a `pathFaqs` entry falls back to every FAQ in the resolved guide.
+- A guide key with two or more validated `(slug, route)` FAQ connections requires a non-empty explicit `pathFaqs` selection for every connected route.
 - `/tools/pdf-editor/convert` and `/tools/pdf-editor/ocr` always require explicit selections in `pdfEditor.convert`.
 
 ## Removed production notes

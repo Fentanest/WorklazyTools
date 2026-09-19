@@ -46,6 +46,18 @@ test("removing a selected required FAQ is reflected in validation", () => {
   assert.ok(validate(guides).some((error) => error.includes("Required FAQ missing") && error.includes("/tools/pdf-editor/ocr")));
 });
 
+test("a shared guide key requires an explicit selection for every route", () => {
+  const guides = structuredClone(currentGuides);
+  delete guides.en["pdfEditor.convert"].pathFaqs["/tools/pdf-editor/convert"];
+  assert.ok(validate(guides).some((error) => error.includes("Explicit pathFaqs required for shared guide key 'pdfEditor.convert' at route '/tools/pdf-editor/convert'")));
+});
+
+test("a guide key with one validated route may use the full FAQ fallback", () => {
+  const guides = structuredClone(currentGuides);
+  delete guides.en.excelCompare.pathFaqs["/tools/excel-compare"];
+  assert.deepEqual(validate(guides), []);
+});
+
 test("a path typo and an empty selection both fail", () => {
   const guides = structuredClone(currentGuides);
   guides.ko.textMerger.pathFaqs["/tools/text-merger-typo"] = ["faq_0"];
@@ -55,9 +67,18 @@ test("a path typo and an empty selection both fail", () => {
   assert.ok(errors.some((error) => error.includes("must not be empty") && error.includes("/tools/text-merger")));
 });
 
-test("normal user cautions and short sentences ending in quotes or numbers are negative controls", () => {
-  const guides = structuredClone(currentGuides);
-  guides.ko.textMerger.blocks.find((block) => Array.isArray(block.paragraphs)).paragraphs.unshift("결과를 저장하기 전에 다시 확인하세요.", "이 기능은 원본을 바꾸지 않습니다.", "표시값은 참고용이므로 그대로 믿지 마세요.", "항목 이름은 “보고서”", "최대 개수는 12");
-  fixtureParagraphs(guides).unshift("Check the saved result before sharing it.", 'The label is "Report"', "The maximum is 12");
-  assert.deepEqual(validate(guides), []);
+test("normal user cautions and short sentences ending in quotes or numbers are negative controls", async (t) => {
+  const controls = {
+    ko: ["결과를 저장하기 전에 다시 확인하세요.", "이 기능은 원본을 바꾸지 않습니다.", "표시값은 참고용이므로 그대로 믿지 마세요.", "항목 이름은 “보고서”", "최대 개수는 12"],
+    en: ["Check the saved result before sharing it.", 'The label is "Report"', "The maximum is 12"],
+  };
+  for (const [lang, sentences] of Object.entries(controls)) {
+    for (const sentence of sentences) {
+      await t.test(`${lang}: ${sentence}`, () => {
+        const guides = structuredClone(currentGuides);
+        guides[lang].textMerger.blocks.find((block) => Array.isArray(block.paragraphs)).paragraphs.push(sentence);
+        assert.deepEqual(validate(guides), []);
+      });
+    }
+  }
 });
