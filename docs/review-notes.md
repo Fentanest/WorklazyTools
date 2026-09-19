@@ -2,6 +2,17 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-20
+
+### AdSense 재검토 통합 판정 (Claude 판정)
+
+- **배포 #116 실패 원인:** `/tools/pdf-editor/ocr`이 `pdfEditor.convert` 가이드를 사용하면서 OCR 필수 질문을 선택하지 않은 것이 `test:static` 실패 원인이다. FAQPage 자체의 부재가 아니라 경로별 선택 누락이며, OCR FAQ 2개를 convert 소유로 이관하고 OCR·convert 각각의 명시 선택을 고정하는 방식으로 해결한다고 Claude가 판정했다. 정적 본문·JSON-LD·런타임 DOM의 한·영 4조합 일치를 실측했다. — Codx
+- **unit 10건 귀속:** 기준 `29fe72c`에서 실패한 같은 7개 파일을 독립 재실행한 결과와 통합 후보의 전체 unit 실패 이름이 정확히 일치한다. 통합 후보는 547개 중 537개 통과·10개 실패이며, `document-generator`·`pdf-finish-engine`·`pdf-finish-modules`의 `ERR_MODULE_NOT_FOUND` 3건, `feature-locales` 1건, `p1b-components` 3건, `seo` 2건, `ui-legacy-isolation` 1건이다. Claude는 이를 이번 변경과 무관한 기존 실패로 판정했고 신규 실패는 0이다. — Codx
+- **S5 대체 검증과 잔류 위험:** 사용자 동작 지연 import의 404는 recovery reload를 일으키므로 정상 광고가 이미 삽입된 같은 문서에서 오류 경계로 전환하는 원 시나리오를 직접 재현하지 못했다. `/tools/qr-studio/bulk`의 동일 URL에서 실제 404, 1회 reload 뒤 오류 경계, 광고 script/stub 0, 추가 reload 0을 확인한 대체 검증은 채택하되, reload를 거치지 않는 순수 React 렌더 오류에서 기존 광고가 잔류할 위험은 미확인으로 남긴다고 Claude가 판정했다. — Muse
+- **S9 상태 유실:** 파일을 고른 허용 경로에서 광고 제외 경로로 이동하면 전체 문서가 교체되어 메모리 상태가 사라지고, 현재 별도 경고·취소 흐름은 없다. Claude는 이를 이번 범위의 결함이 아니라 현행 설계 동작으로 판정했다. — Muse
+- **광고 전면 제외 유지:** PDF 편집기군, HWP 편집기, 문서/PDF 비교, 격리 Office·XLS·Video·Redactor 경로의 광고 전면 제외를 유지하고 수익화 범위를 넓히지 않는다고 Claude가 판정했다. 직접 진입과 문서 교체 표본에서 제외 경로의 script/stub 0을 확인했다. — Muse
+- **검사기의 명시 선택 규칙:** OCR과 convert처럼 공유 가이드 키를 쓰는 경로는 `pathFaqs` 키와 비어 있지 않은 선택을 명시해야 하며, 누락·빈 선택은 실패한다. 전체 FAQ fallback은 명시 선택 의무가 없는 경로에만 허용한다는 규칙을 Claude가 판정했고 삭제·빈 배열 음성 검사를 추가했다. — Codx
+
 ## 2026-09-13
 
 ### U8 PDF 비교 구현·검수·최종 통합 판정 (Codx)

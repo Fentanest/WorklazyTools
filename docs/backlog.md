@@ -2,6 +2,17 @@
 
 종결된 작업 묶음에서 살아남은 후속 항목을 여기에 남긴다(「작업지시서 관리」 규칙). 항목마다 배경이 된 작업과 판단 근거를 한 줄로 병기한다.
 
+## AdSense 재검토 후속 (2026-09-20)
+
+- **기존 unit 실패 10건** — `document-generator`·`pdf-finish-engine`·`pdf-finish-modules`의 extensionless `src/lib/utils` import 3건, `feature-locales` 1건, `p1b-components` 3건, `seo` 2건, `ui-legacy-isolation` 1건을 소유 영역별로 수리한다. 기준 `29fe72c`와 통합 후보에서 실패 이름이 동일하며 이번 작업의 신규 실패는 아니다. — Codx
+- **PdfComparePage 가이드 미연결** — 정적 가이드 내용은 생성되지만 `PdfComparePage`에 `ToolGuideWrapper`가 없어 런타임 안내가 노출되지 않는다. 별도 UI 연결 작업에서 해결한다. — Codx
+- **Office Editor 랜딩 가이드의 `?guide=1` 한정 노출** — 일반 랜딩은 `/tools/office-editor/app/`으로 즉시 이동하고 편집기에서 안내 링크로 돌아온 `?guide=1`일 때만 랜딩 가이드가 보인다. 의도와 발견 가능성을 별도 판정한다. — Codx
+- **S5 순수 렌더 오류의 광고 잔류 위험** — 실제 404/recovery reload 경로는 검증했지만 문서 교체 없는 후속 React 렌더 오류에서 기존 광고 script가 남는지는 미확인이다. 결정 가능한 주입 경로와 제거 정책을 별도 검토한다. — Muse
+- **S10 실제 광고 overlay** — 정확 URL 스텁은 실제 광고 overlay를 만들지 않으므로 모바일 저장·다운로드 버튼과의 겹침을 운영 광고로 확인한다. — Muse
+- **S6 PDF Editor 루트 SPA 이동** — 현재 앱에는 `/tools/pdf-editor/merge`로 가는 직접 SPA 링크가 없어 적용 대상 아님으로 기록됐다. `/tools/pdf-editor` 루트의 내부 전환으로 제외 하위 경로에 들어가는 실제 흐름을 정하고 문서 교체·광고 제거를 검사한다. — Muse
+- **AdSense 계정 설정 확인** — 계정의 페이지 제외 목록에 광고 전면 제외 4경로군과 격리 경로가 포함됐는지, 사이트 수준 Auto ads 설정과 실제 노출 표본이 코드 정책과 일치하는지 확인한다. — Muse
+- **Codex worktree 신뢰 등록 정리** — 작업을 위해 `~/.codex/config.toml`에 추가한 `wt-adsense-guides`, `wt-adsense-adtest`, `wt-adsense-integration` 신뢰 등록 3줄은 관련 worktree 작업 종료 뒤 제거한다. — Codx
+
 ## UI 시각 기준선 재설정
 
 - **U6 개인정보 가리기 기준선 7장 부재** — U7의 `VISUAL_ONLY=document-generator`와 U8의 `VISUAL_ONLY=pdf-compare` 기준선 생성·비교에서 각 소유 범위 6장은 diff 0이었지만, 전역 inventory 검사가 이전 U6 `document-redactor` 기준선 7장 부재로 계속 exit 1이었다. U7·U8 기준을 넓혀 만들거나 검사를 완화하지 않고, `ui-theme-rebaseline-procedure-20260909.md`의 전체 기준 재설정 단계에서 실제 U6 상태를 다시 캡처·검수한다. 근거: `/tmp/worklazy-u7-final/visual-baseline-u7.log`, `/tmp/worklazy-u7-final/visual-compare-u7.log`, `/tmp/worklazy-u8-final/09-visual-baseline-owner.log`, `/tmp/worklazy-u8-final/10-visual-compare-owner.log`. — Codx
