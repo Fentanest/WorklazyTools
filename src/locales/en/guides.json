@@ -37,7 +37,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: Prepare two DOCX files where the submission date of a notice is changed from \"October 1\" to \"October 5\" and only one cell in the department table is modified. On the result screen, you can distinctly check the changes made to the body text and the table structure."
+          "When one document changes a submission date and a department-table cell, review both the body-text differences and the table differences on the result screen. Check every reported change against the original documents before using the comparison result."
         ]
       }
     ],
@@ -344,10 +344,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: The sentence \"Please check",
-          "the report.\" can be a target for Merge Line Breaks, but \"Seoul",
-          "Busan",
-          "Daegu\" is a list that must maintain item boundaries. Ensure the actual combination result regarding whitespace processing matches the example sentences."
+          "A line break in the middle of a sentence can be merged into a space, while a list of city names should keep each item on its own line. Preview part of the result first and choose the method that fits sentences or lists."
         ]
       }
     ],
@@ -392,7 +389,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: Show how the number of business days changes when one company holiday is added to the same date range. Do not assign arbitrary dates to actual public holidays for use in examples."
+          "Adding a company holiday as a custom holiday changes the business-day count even for the same date range. Add company-specific days off manually and distinguish them from official public holidays when checking the result."
         ]
       }
     ],
@@ -494,7 +491,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Do not use real GPS coordinates or device owner names when creating examples. Distinguish between \"visible information / hidden information\" in two columns to help users choose the right tool."
+          "You can inspect and remove hidden metadata such as GPS coordinates and device-owner information. Names, addresses, or numbers visibly shown in the picture are not hidden metadata and require separate image editing."
         ]
       }
     ],
@@ -601,8 +598,7 @@
         {
           "title": "How do I turn each row in an Excel list into a separate QR code?",
           "paragraphs": [
-            "Check the address/text and the save name for each row, then select which column to include in the QR content. Cleaning up empty values, duplicate file names, and typos first will reduce the need to regenerate results. For printable labels, print a single sample first to check the content, margins, and size.",
-            "Preserve XLS"
+            "Check the address/text and the save name for each row, then select which column to include in the QR content. Cleaning up empty values, duplicate file names, and typos first will reduce the need to regenerate results. For printable labels, print a single sample first to check the content, margins, and size."
           ]
         }
       ]
@@ -711,7 +707,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: Leaving January and February data in separate tabs is merge by sheet; appending transaction details of the same columns downward is vertical merge. Horizontal merge assumes the row order of both datasets is identical. Do not state that the header row is automatically kept only once."
+          "Use merge by sheet to keep January and February data on separate tabs, or vertical merge to append transactions with the same columns. Horizontal merge assumes matching row order; check row alignment and repeated header rows in the saved result."
         ]
       }
     ],
@@ -749,8 +745,7 @@
         {
           "title": "Features to preserve and results to verify",
           "paragraphs": [
-            "This is the processing screen required to maintain XLS formulas and formatting. Preparation time may take longer than standard pages. Verify the formulas and cell displays of the preserved results in your original software. This feature does not guarantee that macros, charts, or external links will remain completely identical.",
-            "Document Comparison Results"
+            "This is the processing screen required to maintain XLS formulas and formatting. Preparation time may take longer than standard pages. Verify the formulas and cell displays of the preserved results in your original software. This feature does not guarantee that macros, charts, or external links will remain completely identical."
           ]
         }
       ]
@@ -812,7 +807,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: Deleting the middle 3 seconds of a 20-second recording reduces the total length, while muting the same part maintains the total length. Post after confirming with the actual implementation of selected section processing."
+          "Deleting a selected section shortens the recording, while muting it keeps the total duration. Before saving, confirm which action applies to the selection and listen around both edit boundaries."
         ]
       }
     ],
@@ -869,8 +864,7 @@
         {
           "title": "How do I trim and save by cutting out the unwanted parts at the beginning and end of a recording?",
           "paragraphs": [
-            "After selecting a section on the waveform, check whether the applied action will keep, delete, or mute the selected part. Test with a short segment first and listen to the audio before and after the boundary. Save the desired result before opening the next file.",
-            "Bulk Generate QR"
+            "After selecting a section on the waveform, check whether the applied action will keep, delete, or mute the selected part. Test with a short segment first and listen to the audio before and after the boundary. Save the desired result before opening the next file."
           ]
         }
       ]
@@ -914,7 +908,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: Explain shrinking a 1600px wide photo to 800px side-by-side with keeping the photo as is and adding margins to a square canvas. Do not mislead users into thinking it has automatic crop/background removal features."
+          "Shrinking a 1600px photo to 800px changes the image itself, while adding margins to a square canvas keeps the photo and changes its surroundings. This tool supports cropping and region effects, but it does not automatically crop subjects or remove backgrounds."
         ]
       }
     ],
@@ -995,8 +989,7 @@
         {
           "title": "How do I reduce pixel size without distorting the photo's aspect ratio?",
           "paragraphs": [
-            "Reducing the pixel dimensions of a photo you want to send is different from changing the canvas around the photo. Choose the size option that fits your purpose and check the results to ensure the aspect ratio is maintained. If file size is important, check both the dimensions and the save format.",
-            "Mosaic Image"
+            "Reducing the pixel dimensions of a photo you want to send is different from changing the canvas around the photo. Choose the size option that fits your purpose and check the results to ensure the aspect ratio is maintained. If file size is important, check both the dimensions and the save format."
           ]
         }
       ],
@@ -1004,8 +997,7 @@
         {
           "title": "Do I have to manually select the areas to be mosaiced?",
           "paragraphs": [
-            "Manually select the area to obscure and zoom in on the result to verify. If the effect is weak or only part of the text is selected, the content might still be recognizable. Also, check if the same information remains in other parts of the image.",
-            "Image Watermark"
+            "Manually select the area to obscure and zoom in on the result to verify. If the effect is weak or only part of the text is selected, the content might still be recognizable. Also, check if the same information remains in other parts of the image."
           ]
         }
       ],
@@ -1013,8 +1005,7 @@
         {
           "title": "How do I add my name or source text to a photo?",
           "paragraphs": [
-            "Use this to add source or author credits to photos. Ensure the text is readable on both bright and dark backgrounds, and that it doesn't cover important subjects. If applying to multiple images, it is best to check horizontal and vertical photos separately.",
-            "Trim Video"
+            "Use this to add source or author credits to photos. Ensure the text is readable on both bright and dark backgrounds, and that it doesn't cover important subjects. If applying to multiple images, it is best to check horizontal and vertical photos separately."
           ]
         }
       ]
@@ -1131,8 +1122,7 @@
         {
           "title": "Can quick copy change the exact starting point of the trimmed video?",
           "paragraphs": [
-            "Set the start and end times for the segment you want to keep, and play it to verify. Since speech might be cut off or an important first scene might be missed, be sure to also check the start and end of the actual saved result. Fast original copying might slightly shift the start point depending on the reference playback scene.",
-            "Merge Video"
+            "Set the start and end times for the segment you want to keep, and play it to verify. Since speech might be cut off or an important first scene might be missed, be sure to also check the start and end of the actual saved result. Fast original copying might slightly shift the start point depending on the reference playback scene."
           ]
         }
       ],
@@ -1140,8 +1130,7 @@
         {
           "title": "What should I check when merging videos with different resolutions or aspect ratios?",
           "paragraphs": [
-            "Ensure the order of the cards and groups matches your desired output sequence. Files with different sizes, aspect ratios, or audio configurations may require a re-conversion method. After saving, verify that the sound and video transition smoothly at each connection point.",
-            "Extract Audio from Video"
+            "Ensure the order of the cards and groups matches your desired output sequence. Files with different sizes, aspect ratios, or audio configurations may require a re-conversion method. After saving, verify that the sound and video transition smoothly at each connection point."
           ]
         }
       ],
@@ -1149,8 +1138,7 @@
         {
           "title": "How do I save the audio from only a specific section of a video?",
           "paragraphs": [
-            "You can select the required section and save only the audio. The result will not include the video portion. For videos with multiple audio tracks, check the track information currently being processed, and listen to the saved file to ensure it contains the desired language and sound.",
-            "Trim Audio"
+            "You can select the required section and save only the audio. The result will not include the video portion. For videos with multiple audio tracks, check the track information currently being processed, and listen to the saved file to ensure it contains the desired language and sound."
           ]
         }
       ]
@@ -1286,7 +1274,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: \"Seoul \" and \"Seoul\" can become the same value after whitespace cleanup. However, if \"0012\" and \"12\" are product codes, they might be different values, so do not apply number conversion first."
+          "Whitespace cleanup can make \"Seoul \" and \"Seoul\" the same value. Product codes such as \"0012\" and \"12\" may be intentionally different, so review identifier columns before applying number conversion."
         ]
       }
     ],
@@ -1541,7 +1529,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Example: If the original is 3 pages without a cover and the revision has 4 pages (a new cover + 3 body pages), you must link page 1 of the original to page 2 of the revision for an accurate comparison. If the structures differ, use the manual matching feature to align the pages correctly."
+          "If a revision adds a cover, the first body page may need to be matched with page 2 instead of page 1. When document structures differ, use manual page matching and verify that each pair contains corresponding content before comparing."
         ]
       }
     ],
@@ -1607,7 +1595,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Short status guide: \"Preparing editing environment — You can select a file in advance.\" / \"Preparation complete — Drop the file to edit.\" / \"Opening document\" / \"Downloaded the saved file.\" Connect the displays to the actual statuses."
+          "You can select a file while the editing environment is preparing, but wait until preparation is complete before opening it. Follow the current opening and download status, then reopen the saved file to verify the result."
         ]
       }
     ],
@@ -1934,8 +1922,7 @@
         {
           "title": "Should I save the images as PNG or JPG?",
           "paragraphs": [
-            "Use this when you want to save document pages as PNG or JPG for attachments or image editing. Increasing the resolution can make small text easier to read, but it does not restore details that were absent in the original, and it increases the file size and memory usage. Try converting just the necessary pages first to check the size and clarity.",
-            "Convert PDF Document"
+            "Use this when you want to save document pages as PNG or JPG for attachments or image editing. Increasing the resolution can make small text easier to read, but it does not restore details that were absent in the original, and it increases the file size and memory usage. Try converting just the necessary pages first to check the size and clarity."
           ]
         }
       ],
@@ -1975,8 +1962,7 @@
         {
           "title": "How do I add a 'Confidential' mark without covering the main text?",
           "paragraphs": [
-            "Use this to add marks indicating the document's purpose, such as 'For Review' or 'Internal Sharing'. Check the opacity, rotation, position, and applied pages, and ensure it does not make tables or small text hard to read. A watermark is not an access restriction or anti-copy feature.",
-            "PDF Stamp & Signature Image"
+            "Use this to add marks indicating the document's purpose, such as 'For Review' or 'Internal Sharing'. Check the opacity, rotation, position, and applied pages, and ensure it does not make tables or small text hard to read. A watermark is not an access restriction or anti-copy feature."
           ]
         }
       ],
@@ -1984,8 +1970,7 @@
         {
           "title": "Does adding a stamp image make it a certified digital signature?",
           "paragraphs": [
-            "Place a prepared PNG or JPG stamp or signature image in the desired location. Check the image's margins, size, orientation, and the actual page where it will be applied. Since this is simply overlaying an image, do not use it as a cryptographic electronic signature to verify the signer's identity or document integrity.",
-            "Resize Image"
+            "Place a prepared PNG or JPG stamp or signature image in the desired location. Check the image's margins, size, orientation, and the actual page where it will be applied. Since this is simply overlaying an image, do not use it as a cryptographic electronic signature to verify the signer's identity or document integrity."
           ]
         }
       ]
@@ -2128,35 +2113,6 @@
       "new_faq_1": {
         "q": "If it looks good on the screen, can I submit it right away?",
         "a": "Reopen and check the saved file. The line breaks and page layouts you saw in the browser might differ from those in the final program you use."
-      }
-    }
-  },
-  "video": {
-    "title": "12. Edit/Convert Video",
-    "description": "Video files are processed within this browser without being uploaded to an external conversion server.",
-    "blocks": [
-      {
-        "title": "Should I choose quick copy or re-encode when exporting?",
-        "paragraphs": [
-          "The direct copy method is fast because it doesn't recompress the video, but the start point may snap to the nearest reference playback scene. If you need to start more precisely at a designated moment, or change the size, rotation, or compatible format, consider the re-conversion method.",
-          "When merging multiple videos, you must check not only the order but also whether the aspect ratios, resolutions, and audio configurations match. After saving the result, play the beginning, connection points, and end to ensure the video and audio transition as intended."
-        ]
-      },
-      {
-        "title": "Examples and Selection Help",
-        "paragraphs": [
-          "Example: Keeping 00:30~01:10 from a meeting recording. Explain the meaning of quick copy vs. re-conversion, but do not promise exact performance/quality numbers across all files."
-        ]
-      }
-    ],
-    "faq": {
-      "new_faq_0": {
-        "q": "Can an MP4 fail to play on other devices?",
-        "a": "MP4 is just a container format, and the internal video/audio compression methods can differ. Try playing the result on the intended device, and check the compatibility settings provided on the screen."
-      },
-      "new_faq_1": {
-        "q": "Why does the remaining time suddenly change?",
-        "a": "Processing speed can vary when moving to the next video or the final merging stage. Check not only the estimated time displayed but also the current processing stage and progress logs."
       }
     }
   }

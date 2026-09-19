@@ -2,6 +2,49 @@ import { assertRedactorStatic } from "./redactor-static-contract.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { JSDOM } from "jsdom";
+import faqExpectations from "./static-faq-expectations.json" with { type: "json" };
+
+function collectTypedNodes(value, type, result = []) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectTypedNodes(item, type, result));
+  } else if (value && typeof value === "object") {
+    if (value["@type"] === type || (Array.isArray(value["@type"]) && value["@type"].includes(type))) result.push(value);
+    Object.values(value).forEach((item) => collectTypedNodes(item, type, result));
+  }
+  return result;
+}
+
+export function assertStaticFaqHtml(html, { filePath = "static output", expectedQuestion }) {
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+  const faqPages = [];
+  for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+    try {
+      collectTypedNodes(JSON.parse(script.textContent || "null"), "FAQPage", faqPages);
+    } catch {
+      // Other static-output checks own malformed non-FAQ structured data.
+    }
+  }
+  if (faqPages.length === 0) throw new Error(`${filePath}: FAQPage JSON-LD 없음`);
+
+  const jsonQuestions = faqPages.flatMap((page) => Array.isArray(page.mainEntity) ? page.mainEntity : [])
+    .filter((entity) => entity && entity["@type"] === "Question" && typeof entity.name === "string")
+    .map((entity) => entity.name.trim());
+  if (!jsonQuestions.includes(expectedQuestion)) {
+    throw new Error(`${filePath}: 필수 질문 누락: ${expectedQuestion}`);
+  }
+
+  const bodyQuestions = [...document.querySelectorAll("main.seo-static-fallback > section > h3")]
+    .map((heading) => heading.textContent?.trim() || "");
+  const normalized = (questions) => [...new Set(questions)].sort();
+  if (JSON.stringify(normalized(bodyQuestions)) !== JSON.stringify(normalized(jsonQuestions))) {
+    throw new Error(`${filePath}: 본문 FAQ와 JSON-LD 불일치`);
+  }
+}
+
+async function main() {
 
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
@@ -85,62 +128,8 @@ for (const route of routes) {
   } else if (html.includes('data-worklazy-video-isolation')) {
     throw new Error(`${filePath} must not load the video isolation service worker.`);
   }
-  if (["tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare", "tools/office-editor", "tools/video-studio", "tools/text-merger", "tools/qr-studio/bulk", "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp", "tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr", "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio", "tools/audio-studio/trim"].includes(route)) {
-    const expectedQuestion = route === "tools/excel-merger"
-      ? language === "ko" ? "XLSX 수식과 서식을 따로 보존할 수 있나요?" : "Can XLSX formulas and formatting be preserved independently?"
-      : route === "tools/excel-compare"
-        ? language === "ko" ? "어떤 Excel 형식을 비교할 수 있나요?" : "Which Excel formats can I compare?"
-      : route === "tools/excel-cleaner"
-        ? language === "ko" ? "수식이 있는 Excel 파일도 정리할 수 있나요?" : "Can I clean an Excel file that contains formulas?"
-      : route === "tools/document-generator"
-        ? language === "ko" ? "어떤 양식을 사용할 수 있나요?" : "Which templates can I use?"
-      : route === "tools/document-compare"
-        ? language === "ko" ? "DOC와 DOCX를 서로 비교할 수 있나요?" : "Can I compare DOC with DOCX?"
-      : route === "tools/pdf-compare"
-        ? language === "ko" ? "PDF의 모든 차이를 찾을 수 있나요?" : "Can this find every difference in a PDF?"
-        : route === "tools/video-studio"
-          ? language === "ko" ? "한 그룹의 영상 구간을 다른 그룹에도 적용할 수 있나요?" : "Can I apply one group's video ranges to other groups?"
-        : route === "tools/text-merger"
-          ? language === "ko" ? "직접 입력을 TXT 파일 사이에 놓을 수 있나요?" : "Can pasted text be placed between TXT files?"
-        : route === "tools/qr-studio/bulk"
-          ? language === "ko" ? "어떤 표 파일에서 QR을 일괄 생성할 수 있나요?" : "Which table files can create QR codes in bulk?"
-        : route === "tools/pdf-editor/merge"
-          ? language === "ko" ? "여러 PDF를 순서대로 합칠 수 있나요?" : "Can I combine multiple PDFs in order?"
-        : route === "tools/pdf-editor/split"
-          ? language === "ko" ? "PDF를 원하는 구간으로 나눌 수 있나요?" : "Can I cut a PDF into the sections I want?"
-        : route === "tools/pdf-editor/delete"
-          ? language === "ko" ? "삭제할 페이지만 골라 뺄 수 있나요?" : "Can I remove only the pages I choose?"
-        : route === "tools/pdf-editor/rotate"
-          ? language === "ko" ? "일부 페이지만 회전할 수 있나요?" : "Can I rotate only some pages?"
-        : route === "tools/pdf-editor/ocr"
-          ? language === "ko" ? "PDF 전체를 검색 가능한 파일로 만들 수 있나요?" : "Can I make the whole PDF searchable?"
-        : route === "tools/image-studio/resize"
-          ? language === "ko" ? "원하는 픽셀 크기로 저장할 수 있나요?" : "Can I save at an exact pixel size?"
-        : route === "tools/image-studio/mosaic"
-          ? language === "ko" ? "선택한 부분만 모자이크할 수 있나요?" : "Can I mosaic only a selected area?"
-        : route === "tools/image-studio/watermark"
-          ? language === "ko" ? "글자를 그림에 바로 넣을 수 있나요?" : "Can I place text directly on the picture?"
-        : route === "tools/video-studio/trim"
-          ? language === "ko" ? "영상 구간을 골라 MP4로 저장할 수 있나요?" : "Can I save a video section as MP4?"
-        : route === "tools/video-studio/merge"
-          ? language === "ko" ? "여러 영상을 하나로 합칠 수 있나요?" : "Can I join several videos into one?"
-        : route === "tools/video-studio/extract-audio"
-          ? language === "ko" ? "영상에서 소리만 MP3로 저장할 수 있나요?" : "Can I save only the sound as MP3?"
-        : route === "tools/audio-studio/trim"
-          ? language === "ko" ? "오디오 구간을 골라 저장할 수 있나요?" : "Can I pick an audio section and save it?"
-        : route === "tools/pdf-editor/header-footer"
-          ? language === "ko" ? "머리글과 바닥글에 어떤 정보를 넣을 수 있나요?" : "What can I put in a header or footer?"
-        : route === "tools/pdf-editor/watermark"
-          ? language === "ko" ? "PDF에 텍스트와 이미지 워터마크를 모두 넣을 수 있나요?" : "Can I add both text and image watermarks to a PDF?"
-        : route === "tools/pdf-editor/stamp"
-          ? language === "ko" ? "도장이나 서명 이미지를 여러 페이지의 같은 위치에 넣을 수 있나요?" : "Can I place a stamp or signature image in the same position on multiple pages?"
-        : route.startsWith("tools/pdf-editor/")
-          ? language === "ko" ? "페이지 번호를 원하는 페이지에만 넣을 수 있나요?" : "Can page numbers be added only to selected pages?"
-          : language === "ko" ? "처음 실행 용량이 큰 이유는 무엇인가요?" : "Why is the first start large?";
-    if (!html.includes('"@type":"FAQPage"') || !html.includes(expectedQuestion)) {
-      throw new Error(`${filePath} is missing its localized static FAQ and FAQPage metadata.`);
-    }
-  }
+  const faqExpectation = faqExpectations[`/${route}`];
+  if (faqExpectation) assertStaticFaqHtml(html, { filePath, expectedQuestion: faqExpectation[language] });
   if (html.includes("#/")) throw new Error(`${filePath} still contains a hash route.`);
   if (["tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
     const canonicalRoute = "tools/pdf-editor/finish";
@@ -460,3 +449,8 @@ for (const item of await fs.readdir("dist", { recursive: true, withFileTypes: tr
   recoveryPages++;
 }
 console.log(`Static output validation passed: localized pages, hreflang metadata, self-hosted browser runtimes, ads.txt, robots.txt and sitemap.xml. Startup recovery: ${recoveryPages} documents.`);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main();
+}
