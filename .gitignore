@@ -4,6 +4,9 @@ dist/
 .DS_Store
 coverage/
 evidence/
+scratch/
+/patch_*.py
+/test-drag.html
 public/vendor/pyodide/
 public/vendor/tesseract/
 public/tools/video-studio/runtime/
