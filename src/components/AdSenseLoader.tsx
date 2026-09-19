@@ -17,6 +17,11 @@ export function AdSenseLoader() {
 
   useEffect(() => {
     const handleEligibility = () => setIneligible(isAdIneligible());
+    // Reconcile on subscribe: routePending is set in a layout effect, so the
+    // dispatch can fire before this passive subscription attaches. Without
+    // this, a missed "pending" event leaves stale local state and the insert
+    // effect below never re-runs for pre-consented users on lazy routes.
+    handleEligibility();
     window.addEventListener("wl-ad-eligibility-changed", handleEligibility);
     return () => window.removeEventListener("wl-ad-eligibility-changed", handleEligibility);
   }, []);
