@@ -1,7 +1,0 @@
-2026-09-07 · Codx
-
-- 준비 중 1차 보고의 오프라인 archive 아래 `probes/lifecycle.mjs`를 추가 대조하려 했으나 해당 보조 사본이 없어 FileNotFoundError가 났다. 지시서의 원본 `/tmp/worklazy-u4-2-review/probes/lifecycle.mjs`는 존재한다. 그 파일에서 출력 root 1줄만 바꾼 실행 사본을 만들었고 정규화 diff 0B, 원본 시작·종료 SHA 동일이다. 원본 mtime/ctime은 00:10:43 UTC로 sol 실행 로그 00:32:17보다 이르다. 별도의 변경 전 원본 SHA 증명은 남아 있지 않으므로 역사적 무수정 판정은 현존 원본·시각·sol 기록의 대조 범위다.
-- 추가 baseline oracle capture를 current에서 기본 모드로 실행해 main 소스 보호 assertion에 막혔다(`logs/baseline-recapture.log`). 기본 capture는 main과 같은 client를 요구한다. 단언이나 제품 파일을 고치지 않고 f56dc68 previous 사본에서 원 명령을 실행해 성공했다(`logs/baseline-recapture-previous.log`). required current compare는 최초부터 성공했다. 최종 run_browser_checks.py는 올바른 previous를 지정한다.
-- main 커밋의 bundle meter는 schema 1이며 `modules`가 없다. 초기 dist 비교기가 schema 2를 가정해 KeyError를 냈다. 새 main 측정의 81파일 경로·SHA·bytes·gzip와 5종 metrics가 canonical schema 2 baseline과 정확히 같음을 먼저 단언한 후 그 metadata를 index 청크 식별에만 사용했다. 현재 제품 게이트는 원래부터 schema 2 baseline을 사용한다. fixbase→current 모듈 변화 비교는 두 번의 새 schema 2 측정값만 사용한다.
-- production SHA 비교는 처음부터 일치했지만 Python gzip과 저장소의 Node gzipSync 결과는 이 환경에서 다르다. 압축 구현이 다른 비교로 실패한 뒤 저장소와 같은 Node gzipSync로 production 3사본을 다시 계산해 각 81파일의 SHA/gzip 일치를 확인했다. gzip oracle을 Python 값으로 바꾸거나 측정값을 덮어쓰지 않았다. 최종 probe는 Node 계산값을 사용한다.
-- 의도적 mutant의 unit exit 1(18 PASS/4 FAIL)은 요구된 음성 대조다. 제품 unit·tsc·build·static·PDF/Excel 스모크·current legacy compare에는 실패가 없다. 빌드는 모두 직렬이며 NODE_OPTIONS=--max-old-space-size=4096이다.

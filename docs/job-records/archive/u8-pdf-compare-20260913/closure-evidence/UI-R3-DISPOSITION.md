@@ -1,9 +1,0 @@
-# U8 R3 visual disposition — Codx
-
-Gemini Pro same conversation b4c3120d / session99581 exit0, nonempty3,157-char response; actual17/17 fixedPNG views, missing0, hashes unchanged. root matched five source/build input aggregate e5fcd18a… and recorded actual HTML/entry/CSS/route/worker bytes/SHA before delegation. Initial/boundary, desktop results and actual mobile/light/dark interaction views are accepted for the stated **R3 visual/layout scope**.
-
-Confirmed new U8 821px dropzone overlap was repaired locally by the pair grid breakpoint, with actual EN320/821/999/1000 label/button nonintersection evidence and Gemini view. Dark captures now use real prefers-color-scheme; earlier class/localStorage dark filenames were invalid dark evidence and remain preserved. Essential-only consent closes the banner; this does not grant analytics/ad consent. Sidebar infringement in the initial Gemini report was unsupported, not a global product bug subsequently repaired. No AppShell/global CSS fix was made.
-
-Gemini observed current-environment rendering and extraction limitations, partial-state distinction, visible mobile controls and lack of clipping in the selected captures. No all-site/complete accessibility/physical-device or server/backend claim follows; application remains browser-only. Keyboard execution is Sol's browser evidence, not Gemini's image execution.
-
-**Behavioral acceptance is still blocked separately.** Independent /tmp/worklazy-u8-ui-review/REPORT.md reproduced obsolete report download after swap and old results during rerun. Astra is repairing asynchronous ownership with Sol stopped. These17 pictures do not prove those races absent. Reuse R3 visual scope after repair only if content/style/covered render states are unchanged; verify altered state behavior and any new affected view on the actual new source/build. Do not call U8 final accepted/deployed yet.
