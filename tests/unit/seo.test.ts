@@ -15,36 +15,36 @@ const toolRoutes = [
 test("tool metadata keeps a distinct identity in Korean and English", () => {
   const expected = {
     ko: {
-      "/tools/video-studio": "비디오 스튜디오 | 영상 자르기·이어붙이기·음원 추출",
-      "/tools/audio-studio": "오디오 스튜디오 | 파형 편집·구간 자르기·피치 조절",
-      "/tools/image-studio": "이미지 스튜디오 | 사진 편집·모자이크·콜라주·GIF",
-      "/tools/image-privacy": "사진 메타데이터 제거 | EXIF·GPS 확인 및 삭제",
-      "/tools/qr-studio": "QR 스튜디오 | QR 코드 만들기·카메라 스캔",
-      "/tools/qr-studio/bulk": "QR 일괄 생성 | Excel·CSV 행별 PNG·ZIP·라벨 PDF",
-      "/tools/data-converter": "표 데이터 변환기 | CSV·JSON·HTML 상호 변환",
-      "/tools/document-compare": "Word·HWP 문서 비교 - DOCX·DOC·HWP·HWPX Diff",
-      "/tools/pdf-compare": "PDF 파일 비교 | 페이지 화면·추출 텍스트 차이",
-      "/tools/excel-compare": "Excel 파일 비교 - XLSX·XLSM·XLS·XLSB·CSV Diff",
-      "/tools/excel-cleaner": "Excel 데이터 정리 - XLSX·XLS·CSV 클리너",
-      "/tools/document-generator": "워드 메일머지 | 템플릿 기반 문서 대량 생성기",
-      "/tools/office-editor": "브라우저 오피스 편집기 - DOCX·XLSX·PPTX 온라인 편집",
-      "/tools/text-merger": "텍스트 병합 | 직접 입력·TXT 파일 순서대로 합치기",
+      "/tools/video-studio": "온라인 동영상 편집 - 자르기·합치기·변환 | Worklazy Tools",
+      "/tools/audio-studio": "온라인 오디오 편집 - 음소거·피치 조절 | Worklazy Tools",
+      "/tools/image-studio": "온라인 사진 편집 - 자르기·그리기·콜라주 | Worklazy Tools",
+      "/tools/image-privacy": "사진 위치정보 삭제 - EXIF·GPS 확인 및 제거 | Worklazy Tools",
+      "/tools/qr-studio": "QR 코드 만들기·읽기 - 로고 삽입·사진 스캔 | Worklazy Tools",
+      "/tools/qr-studio/bulk": "QR 코드 일괄 생성 - 엑셀·CSV로 대량 생성 | Worklazy Tools",
+      "/tools/data-converter": "CSV·JSON·HTML 표 변환기 | Worklazy Tools",
+      "/tools/document-compare": "워드·한글 문서 비교 - 수정 전후 차이 확인 | Worklazy Tools",
+      "/tools/pdf-compare": "PDF 파일 비교 - 화면·텍스트 변경사항 확인 | Worklazy Tools",
+      "/tools/excel-compare": "엑셀 파일 비교 - 값·수식·기준 항목별 차이 | Worklazy Tools",
+      "/tools/excel-cleaner": "엑셀 데이터 정리 - 공백·빈 행·중복 정리 | Worklazy Tools",
+      "/tools/document-generator": "워드 문서 일괄 생성 - 엑셀 명단으로 메일머지 | Worklazy Tools",
+      "/tools/office-editor": "온라인 문서 편집 - Word·Excel·PowerPoint | Worklazy Tools",
+      "/tools/text-merger": "텍스트 파일 합치기 - TXT·메모 순서대로 병합 | Worklazy Tools",
     },
     en: {
-      "/tools/video-studio": "Video Studio | Trim, Join & Extract Audio",
-      "/tools/audio-studio": "Audio Studio | Waveform Editing, Trimming & Pitch",
-      "/tools/image-studio": "Image Studio | Edit Photos, Mosaic, Collage & GIF",
-      "/tools/image-privacy": "Photo Metadata Remover | Inspect & Remove EXIF and GPS",
-      "/tools/qr-studio": "QR Studio | Create & Scan QR Codes",
-      "/tools/qr-studio/bulk": "Bulk QR Generator | Excel & CSV to PNG, ZIP and Label PDF",
-      "/tools/data-converter": "Table Data Converter | Convert CSV, JSON & HTML",
-      "/tools/document-compare": "Document Compare | Compare DOCX, DOC, HWP & HWPX",
+      "/tools/video-studio": "Online Video Editor - Trim, Merge & Convert | Worklazy Tools",
+      "/tools/audio-studio": "Online Audio Editor - Mute, Trim & Pitch Shift | Worklazy Tools",
+      "/tools/image-studio": "Online Photo Editor - Crop, Draw & Collage | Worklazy Tools",
+      "/tools/image-privacy": "Remove Photo Location - Delete EXIF & GPS Data | Worklazy Tools",
+      "/tools/qr-studio": "QR Code Generator & Scanner - Add Logo | Worklazy Tools",
+      "/tools/qr-studio/bulk": "Bulk QR Code Generator - Excel & CSV | Worklazy Tools",
+      "/tools/data-converter": "CSV, JSON & HTML Table Converter | Worklazy Tools",
+      "/tools/document-compare": "Compare Word & HWP Documents - Track Changes | Worklazy Tools",
       "/tools/pdf-compare": "PDF Compare | Visual and Extracted Text Differences",
       "/tools/excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
       "/tools/excel-cleaner": "Excel Data Cleaner | Clean XLSX, XLS & CSV Files",
       "/tools/document-generator": "Word Mail Merge | Template-based Bulk Document Generator",
-      "/tools/office-editor": "Browser Office Editor | Edit DOCX, XLSX & PPTX",
-      "/tools/text-merger": "Text Merger | Combine Pasted Text & TXT Files",
+      "/tools/office-editor": "Online Office Editor - Word, Excel & PowerPoint | Worklazy Tools",
+      "/tools/text-merger": "Merge Text Files - Combine TXT & Notes | Worklazy Tools",
     },
   } as const;
 
@@ -85,11 +85,12 @@ test("PDF finish aliases retain distinct metadata and canonicalize to the finish
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {
-  for (const [route, expectedCount] of [["/tools/document-redactor", 3], ["/tools/document-generator", 3], ["/tools/document-compare", 3], ["/tools/pdf-compare", 3], ["/tools/office-editor", 5]] as const) {
+  for (const [route, expectedCount] of [["/tools/document-redactor", 3], ["/tools/document-generator", 3], ["/tools/document-compare", 5], ["/tools/pdf-compare", 3], ["/tools/office-editor", 5]] as const) {
     const koreanFaq = getSeoDefinition("ko", route).faq;
     const englishFaq = getSeoDefinition("en", route).faq;
     assert.equal(koreanFaq?.length, expectedCount);
     assert.equal(englishFaq?.length, expectedCount);
+    assert.equal(koreanFaq?.length, englishFaq?.length);
     assert.ok(koreanFaq?.every((item) => item.question && item.answer));
     assert.ok(englishFaq?.every((item) => item.question && item.answer));
   }
@@ -109,7 +110,7 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     assert.equal(excelCleanerFaq?.length, 3);
     assert.ok(excelCleanerFaq?.every((item) => item.question && item.answer));
     const pdfFaq = getSeoDefinition(language, "/tools/pdf-editor").faq;
-    assert.equal(pdfFaq?.length, 2);
+    assert.equal(pdfFaq?.length, 4);
     assert.ok(pdfFaq?.every((item) => item.question && item.answer));
     const videoFaq = getSeoDefinition(language, "/tools/video-studio").faq;
     assert.equal(videoFaq?.length, 1);
@@ -118,5 +119,8 @@ test("new document tools expose matching Korean and English static FAQs", () => 
     const qrBulkFaq = getSeoDefinition(language, "/tools/qr-studio/bulk").faq;
     assert.equal(qrBulkFaq?.length, 3);
     assert.ok(qrBulkFaq?.every((item) => item.question && item.answer));
+  }
+  for (const route of ["/tools/text-merger", "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/pdf-editor", "/tools/video-studio", "/tools/qr-studio/bulk"] as const) {
+    assert.equal(getSeoDefinition("ko", route).faq?.length, getSeoDefinition("en", route).faq?.length, `${route} FAQ counts differ between ko and en`);
   }
 });
