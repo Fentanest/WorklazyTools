@@ -4,8 +4,8 @@
 
 ## AdSense 재검토 후속 (2026-09-20)
 
-- **기존 unit 실패 10건** — `document-generator`·`pdf-finish-engine`·`pdf-finish-modules`의 extensionless `src/lib/utils` import 3건, `feature-locales` 1건, `p1b-components` 3건, `seo` 2건, `ui-legacy-isolation` 1건을 소유 영역별로 수리한다. 기준 `29fe72c`와 통합 후보에서 실패 이름이 동일하며 이번 작업의 신규 실패는 아니다. — Codx
-- **PdfComparePage 가이드 미연결** — 정적 가이드 내용은 생성되지만 `PdfComparePage`에 `ToolGuideWrapper`가 없어 런타임 안내가 노출되지 않는다. 별도 UI 연결 작업에서 해결한다. — Codx
+- **기존 unit 실패 10건 중 6건 완료·4건 이월** — extensionless import 3건, 승인된 SEO·FAQ 현 데이터 2건, Excel 비교 가이드 내용 검사 이관 1건은 `adsense-followup-20260920`에서 해소했다. 이름이 같은 `p1b-components` 3건과 `ui-legacy-isolation` 1건은 기대값을 바꾸지 않고 `adsense-followup2` 계획으로 이월한다. — Muse/Codx
+- **완료 — PdfComparePage 가이드 미연결** — `PdfComparePage`에 기존 `pdfCompare` 가이드를 연결해 한·영 사용법 안내와 FAQ 3개를 런타임에 표시한다. — Codx
 - **Office Editor 랜딩 가이드의 `?guide=1` 한정 노출** — 일반 랜딩은 `/tools/office-editor/app/`으로 즉시 이동하고 편집기에서 안내 링크로 돌아온 `?guide=1`일 때만 랜딩 가이드가 보인다. 의도와 발견 가능성을 별도 판정한다. — Codx
 - **S5 순수 렌더 오류의 광고 잔류 위험** — 테스트 전용 렌더 오류 주입으로 같은 문서의 기존 광고 스크립트 태그 잔류 실측은 완료했다. 후속으로 순수 렌더 오류 시 잔류 광고를 제품에서 처리할지 결정한다. — Muse
 - **S10 실제 광고 overlay** — 정확 URL 스텁은 실제 광고 overlay를 만들지 않으므로 모바일 저장·다운로드 버튼과의 겹침을 운영 광고로 확인한다. — Muse
@@ -13,9 +13,9 @@
 - **AdSense 계정 설정 확인** — 계정의 페이지 제외 목록에 광고 전면 제외 4경로군과 격리 경로가 포함됐는지, 사이트 수준 Auto ads 설정과 실제 노출 표본이 코드 정책과 일치하는지 확인한다. — Muse
 - **Codex worktree 신뢰 등록 정리** — 작업을 위해 `~/.codex/config.toml`에 추가한 `wt-adsense-guides`, `wt-adsense-adtest`, `wt-adsense-integration` 신뢰 등록 3줄은 관련 worktree 작업 종료 뒤 제거한다. — Codx
 - **S9 광고 제외 경로 이동의 로컬 상태 유실** — 광고 허용 경로에서 제외 경로로 이동하면 전체 문서 교체로 도구 로컬 상태가 유실되고 경고·취소 흐름이 없다. SPA 이탈과 동일한 설계 동작으로 판정했지만 경고 UX 도입 여부와 전역 메모리 상태를 가진 도구의 추가 위험은 후속 검토한다. — Claude 판정 / Codx 관찰
-- **데스크톱 `.bottom-tabs` 노출 가능성** — `.bottom-tabs`는 `@media (max-width: 820px)` 밖의 규칙이 없어 문서 끝에 비스타일 링크로 노출될 가능성이 fullPage 캡처에서 관찰됐다. 기준 `29fe72c`·운영 `a946a0b`와 CSS가 동일해 이번 변경과 무관하며, 실제 데스크톱 뷰포트에서 확인한 뒤 처리한다. — Claude 판정 / Codx 관찰
-- **광고 스모크 빌드 출처 메타데이터 오기** — `tests/ad-eligibility-smoke.mjs`가 결과 메타데이터를 `reused c40c2eb build`로 하드코딩해 실제 빌드가 `cd53c2a`인 통합 실행 JSON에도 그대로 남았다. 검사 판정에는 영향이 없으며, 실행 시 실제 HEAD와 빌드 출처를 기록하도록 정정한다. — Codx (Astra 최종 검수 소견)
-- **광고 스모크 판별·네트워크 단언 보강** — 판별 모드는 `stub expected` 메시지 문자열만으로 기대 실패를 인정하고 AssertionError 타입·`code`를 검사하지 않는다. S5 `not-reproduced` 분기와 판별 성공 경로에는 `assertNoRealNetwork` 호출도 없으므로 함께 보강한다. — Codx (Astra 최종 검수 소견)
+- **완료 — 데스크톱 `.bottom-tabs` 노출** — 전역 기본값을 `display: none`으로 두고 기존 모바일 미디어 쿼리의 3열 `display: grid`를 유지했다. 통합 production 화면에서 1365×900 숨김과 412×839 3열 표시를 재확인했다. — Codx
+- **완료 — 광고 스모크 빌드 출처 메타데이터 오기** — 하드코딩 문구를 제거하고 실행 시점의 `runHead`와 `distMtime`을 구분해 기록한다. — Muse
+- **완료 — 광고 스모크 판별·네트워크 단언 보강** — 기대 실패의 타입·코드·정확한 메시지를 함께 검사하고 S5·판별 경로에서도 네트워크 단언을 독립 실행하며 실패 결과의 계수를 보존한다. — Muse
 
 ## UI 시각 기준선 재설정
 
