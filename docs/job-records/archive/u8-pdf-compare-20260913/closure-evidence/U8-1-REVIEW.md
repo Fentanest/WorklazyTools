@@ -1,0 +1,24 @@
+# U8-1 independent acceptance — Codx, 2026-09-13
+
+**PASS for stage1. No blocking defect found in the specified scope. Stage2 sole-writer handoff may proceed; this is not final integration or publication approval.**
+
+Source: `/tmp/worklazy-u8-impl`, base/HEAD `1df3c2e50edeb010272d82f15f279c1355f9f8ab`. Read current PROJECT_RULES, AGENTS assignment, complete canonical U8 instruction, prepared review task, scoped-verification and relevant Playwright skill, author REPORT/API-HANDOFF. Reviewed all seven new core files and scoped test assertions. Author tracked diff against U7 is empty; additions are the seven core and six tests plus explicitly excluded temporary documentation/evidence/dependency link. No product/commit/push/deployment writes performed. All reviewer writes remained under this review directory.
+
+## Identity and reuse
+
+`start-identity.json`: all 57 source-freeze entries match, including product7/test6/shared inputs9/dependencies5/corpus21/artifacts9. Actual author status and HEAD recorded. `end-identity.json`: HEAD, status and all 22 product/test/shared hashes unchanged; independently executed copy product/shared files match freeze. Current source uses existing owned PDF helper and diffText, no sequence aligner or new PDF.js supplier; results persist compact strings/diff/summary, selected minimal items/canvases release explicitly.
+
+Reused actual accessible author evidence, not rerun: unit-final 5/5; scoped tsc; golden-oracle-final-02 16 scenarios/22 pages with normal and historical strings separately asserted, independent per-side selected canvas hashes matching actual rendering; smoke-final owned load/text/render/worker/late/session/partial checks and XLSX3+ZIP2 reopen; four actual product mutants rejected plus actual post-yield abort-check mutant expected exit1; scoped production harness/worker build; Poppler current corpus self12 pixel0 and mutations5 nonzero. Inspected original logs/results/test assertions and checked source/input/artifact identity. Historical extraction accuracy remains 0/3; stage0 accepted visuals are prior feasibility evidence, not new product mutation proof. Retained nonfinal golden-04 and prior oracle setup failure are not reused as passing final runs. Final smoke predates only test HTML independent URL exports; these do not change product or smoke execution. No full author suite duplicated.
+
+## New independent execution
+
+1. `node /tmp/worklazy-u8-core-review/probe.mjs > /tmp/worklazy-u8-core-review/probe.log 2>&1` — exit0, Node22.17.1 and Chromium153.0.8010.12. Existing Playwright library drives the copied engine harness; no new installation or UI/visual suite. Vite cache stays here. Actual second-page PDF.js text extraction was held permanently pending, rather than eventually resolving as in author's test. Abort returns within a 5-second guard, both owned documents destroy, completed page remains complete, active page canceled, untouched page unknown; progress exactly [0,1]. This distinguishes cleanup that incorrectly waits for unresolved extraction. Second engine sample compares differently sized blank PDFs: pageSizeChanged=true and pixelCount=0 coexist, both availability flags false, textComparison=unavailable. Actual product reports for both samples saved as `independent-partial.xlsx` and `independent-size.xlsx`. Results: `probe-results.json`.
+2. `python3 /tmp/worklazy-u8-core-review/reopen.py` — exit0. Independent ZIP/XML parser reopens both newly produced XLSX files without author's ExcelJS reader. Partial rows retain Complete/Canceled/Unknown; incomplete metrics remain blank and partial=true. Size-only row retains size=true, pixel count0 and No text to compare; no formula nodes. Exact inspected cells: `reopen-results.json`.
+
+No new source-linked blocker found. Ownership cancellation/late publication, raw str+hasEOL/independent availability, common bounded scale/opaque RGB, physical/manual mappings, unavailable/unknown report states and safe existing export helpers agree with the stage1 contract in the reviewed source and samples. Render geometry's broader rotation/CropBox/UserUnit and document-size behavior remain deferred, not independently claimed tested here.
+
+## Deferred / not this stage
+
+U8-2 route/UI/ko-en integration, UI invalidation and retained references, mapping editor, selected display, progress/partial flows, SEO/static/ad boundaries and Gemini actual UI visual checks. U8-3 1/20/200-page performance/heap/heartbeat, broader hostile and geometry/encoding/encrypted fixtures, DPR/mobile/theme, complete regression consumers, final build/unit/static and canonical remaining commands, bundle/network inventory and eventual publication. No route exists in this candidate, so UI React review and new visual inspection are not applied at this stage. Preserve the author API null/superseded result and dispose contracts during integration.
+
+Stage1 complete; no further broad audit introduced. Commit/push/deployment: none.
