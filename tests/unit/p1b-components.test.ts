@@ -8,13 +8,41 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const read = (relativePath: string) => fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8");
 const componentFiles = fs.readdirSync(path.join(repositoryRoot, "src/features"), { recursive: true })
   .filter((entry): entry is string => typeof entry === "string" && entry.endsWith(".tsx"));
+const toolAccents = ["green", "blue", "violet", "orange", "pink", "sky", "coral"] as const;
 
 test("ToolGuide keeps its public structure and localized eyebrow through shadcn cards", () => {
   const source = read("src/components/ToolGuide.tsx");
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<ToolGuide"));
+  const expectedConsumers = [
+    "audio-studio/AudioStudioPage.tsx",
+    "data-converter/DataConverterPage.tsx",
+    "document-compare/DocumentComparePage.tsx",
+    "document-generator/DocumentGeneratorPage.tsx",
+    "document-redactor/DocumentRedactorFallback.tsx",
+    "document-redactor/DocumentRedactorPage.tsx",
+    "excel-cleaner/ExcelCleanerPage.tsx",
+    "excel-compare/ExcelComparePage.tsx",
+    "excel-merger/ExcelMergerPage.tsx",
+    "hwp-editor/HwpEditorPage.tsx",
+    "image-privacy/ImagePrivacyPage.tsx",
+    "image-studio/ImageStudioPage.tsx",
+    "office-editor/OfficeEditorPage.tsx",
+    "payroll-calculator/PayrollCalculatorPage.tsx",
+    "pdf-compare/PdfComparePage.tsx",
+    "pdf-editor/PdfEditorPage.tsx",
+    "qr-studio/QrStudioPage.tsx",
+    "security-tools/SecurityToolsPage.tsx",
+    "text-formatter/TextFormatterPage.tsx",
+    "text-merger/TextMergerPage.tsx",
+    "text-tools/TextToolsPage.tsx",
+    "timezone-calculator/TimezoneCalculatorPage.tsx",
+    "video-studio/VideoStudioPage.tsx",
+    "work-calculator/WorkCalculatorPage.tsx",
+  ];
 
-  // S1 removes the unreachable Word/HWP pages; U7 adds document generation.
-  assert.equal(consumers.length, 21);
+  // WU-D adds office-editor/OfficeEditorAppPage.tsx at integration time.
+  assert.equal(consumers.length, expectedConsumers.length);
+  assert.deepEqual(consumers.toSorted(), expectedConsumers);
   assert.match(source, /<Card as="section"[\s\S]*?aria-labelledby="tool-guide-title"/);
   assert.match(source, /data-ui-component="tool-guide"[\s\S]*?className="ui-tool-guide-heading"[\s\S]*?t\("guide\.eyebrow"\)[\s\S]*?<h2 id="tool-guide-title"/);
   assert.match(source, /className="ui-tool-guide-grid"[\s\S]*?<Card as="article"[\s\S]*?block\.paragraphs[\s\S]*?block\.items/);
@@ -42,14 +70,22 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   assert.match(progressSource, /Math\.min\(max, Math\.max\(min, value\)\)/);
   assert.match(progressSource, /normalized === null \? \{\} : \{ "aria-valuenow": normalized \}/);
   assert.ok(!progressSource.includes("@base-ui/react"), "progress must not depend on Base UI");
-  // Merged 4-theme shell: per-tool indicator/state tables are back with seven
-  // accents (coral included). The bar and state tile follow the tool accent;
-  // only the error red stays per-state.
+  // The approved single-primary shell keeps complete seven-accent maps while
+  // reserving red for the error state instead of an individual accent.
   assert.match(source, /progressIndicatorClasses/);
   assert.match(source, /progressStateClasses/);
   assert.match(source, /ui-accent-\$\{accent\}/);
   assert.match(source, /accent: ToolAccent/);
-  assert.match(source, /\n  coral: "bg-red-700",/);
+  const indicatorBlock = source.match(/const progressIndicatorClasses = \{([\s\S]*?)\n\} satisfies/)?.[1];
+  const stateBlock = source.match(/const progressStateClasses = \{([\s\S]*?)\n\} satisfies/)?.[1];
+  assert.ok(indicatorBlock, "progressIndicatorClasses declaration is missing");
+  assert.ok(stateBlock, "progressStateClasses declaration is missing");
+  for (const accent of toolAccents) {
+    assert.ok(indicatorBlock.includes(`\n  ${accent}: "bg-primary",`), `${accent} indicator must use the primary color`);
+    assert.ok(stateBlock.includes(`\n  ${accent}: "bg-[var(--brand-soft)] text-[var(--brand-on-bg)]",`), `${accent} state must use the shared brand colors`);
+  }
+  assert.match(source, /status === "error" \? "bg-red-50 text-red-700 dark:bg-red-950\/70 dark:text-red-300" : progressStateClasses\[accent\]/);
+  assert.match(source, /status === "error" \? "bg-red-700" : progressIndicatorClasses\[accent\]/);
   assert.match(source, /ui-status-\$\{status\}/);
 });
 
@@ -58,19 +94,19 @@ test("ToolCard keeps a link root, per-tool accent, h2 title, and capped tags", (
   const accentStyles = read("src/components/toolAccentStyles.ts");
   const registry = read("src/app/toolRegistry.ts");
 
-  // Merged 4-theme shell: the card inherits its per-tool accent (seven
-  // accents including coral), shared with the sidebar icon tokens.
-  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`ui-tool-card ui-accent-\$\{tool\.accent\}/);
+  // The card retains its seven-accent root while its icon uses a tool-id tone.
+  assert.match(source, /<Card[\s\S]*?as=\{Link\}[\s\S]*?data-ui-component="tool-card"[\s\S]*?className=\{cn\(`group ui-tool-card ui-accent-\$\{tool\.accent\}/);
   assert.match(source, /to=\{tool\.path\}/);
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
-  assert.match(source, /toolIconAccentClasses\[tool\.accent\]/);
-  assert.match(source, /data-accent=\{tool\.accent\}/);
+  assert.match(source, /getToolIconTone\(tool\.id\)/);
+  assert.match(source, /data-icon-tone=\{getToolIconTone\(tool\.id\)\}/);
   // Card titles are h2; visible tags cap at 3 with icons while the registry
   // keeps the full highlight list; the arrow lives in the top row.
   assert.match(source, /<h2>\{tool\.title\}<\/h2>/);
   assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(\(item\) => \{/);
   assert.match(source, /<span className="ui-card-arrow"><ArrowRight size=\{18\} \/><\/span>/);
-  for (const accent of ["green", "blue", "violet", "orange", "pink", "sky", "coral"]) {
+  // Registry/key completeness only; rendered color is covered by UI checks.
+  for (const accent of toolAccents) {
     assert.match(registry, new RegExp(`accent: "${accent}"`));
     assert.match(accentStyles, new RegExp(`\\n  ${accent}:`));
   }
