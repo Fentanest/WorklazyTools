@@ -1582,7 +1582,7 @@
       {
         "title": "Closing editor",
         "paragraphs": [
-          "Pressing the 'Close' button destroys the editing view and the virtual filesystem instance safely, returning you to this menu."
+          "Pressing 'Save and download' downloads the current document and keeps the editor open so you can continue editing."
         ]
       },
       {
@@ -1640,10 +1640,17 @@
         "faq_2",
         "faq_3",
         "faq_4"
+      ],
+      "/tools/office-editor/app": [
+        "faq_0",
+        "faq_1",
+        "faq_2",
+        "faq_3",
+        "faq_4"
       ]
     },
     "pathBlocks": {
-      "/tools/office-editor/app/": [
+      "/tools/office-editor/app": [
         {
           "title": "Brief guide on preparation, file queuing, and save status",
           "paragraphs": [

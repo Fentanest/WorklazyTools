@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 
 import { OperationProgress } from "../../components/OperationProgress";
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { FileDropZone, FileList } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { UtilityNotice } from "../../components/UtilitySurface";
@@ -583,6 +584,7 @@ export function OfficeEditorAppPage() {
           onContextMenu={(event) => event.preventDefault()}
         />
       </div>
+      {!focusMode && <ToolGuideWrapper slug="officeEditor" />}
       {dragging && !dropDisabled && (
         <div
           className="pointer-events-none absolute inset-2 z-80 grid place-items-center content-center gap-2.5 rounded-3xl border-3 border-dashed border-primary/50 bg-background/90 text-foreground shadow-2xl backdrop-blur-sm"
