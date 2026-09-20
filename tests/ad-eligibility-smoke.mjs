@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -149,6 +150,23 @@ function counterSnapshot(counters) {
   };
 }
 
+// Runtime provenance recorded with results (plain record, no further claim).
+async function buildProvenance() {
+  let runHead = "unknown";
+  try {
+    runHead = execSync("git rev-parse --short HEAD", { cwd: REPO_ROOT, encoding: "utf8" }).trim() || "unknown";
+  } catch {
+    // runHead stays "unknown"; recorded as-is.
+  }
+  let distMtime = "unknown";
+  try {
+    distMtime = (await fs.stat(path.join(REPO_ROOT, "dist", "index.html"))).mtime.toISOString();
+  } catch {
+    // distMtime stays "unknown"; recorded as-is.
+  }
+  return { runHead, distMtime };
+}
+
 // Case status vocabulary (PLAN §8): "pass" / "not-applicable" / "unverified" /
 // "not-reproduced" / "recorded" / "fail". Only "fail" fails the run; the other
 // non-pass states are reported separately and never summed as passes.
@@ -161,7 +179,14 @@ async function runCase(name, fn) {
     return { name, status, started, ended: now(), ...detail };
   } catch (error) {
     console.log(`FAIL ${name}: ${String(error).split("\n")[0]}`);
-    return { name, status: "fail", started, ended: now(), failure: String(error).slice(0, 2000) };
+    const failureCounters = error && typeof error === "object" && "counters" in error
+      ? error.counters
+      : undefined;
+    return {
+      name, status: "fail", started, ended: now(),
+      ...(failureCounters !== undefined ? { counters: failureCounters } : {}),
+      failure: String(error).slice(0, 2000),
+    };
   }
 }
 
@@ -591,6 +616,12 @@ async function scenarioS5(browser, server) {
         diag.bulkRequests = server.state.requests.slice(mark).filter((e) => e.pathname.includes(CHUNK_PREFIX)).map((e) => `${e.pathname} ${e.status} ${e.bytes ?? ""}`);
         diag.counters = counterSnapshot(tracked.counters);
         diag.docCommits = [...tracked.docCommits];
+        try {
+          assertNoRealNetwork(tracked.counters, "S5-not-reproduced");
+        } catch (networkError) {
+          networkError.counters = counterSnapshot(tracked.counters);
+          throw networkError;
+        }
         return {
           lang: "ko", status: "not-reproduced",
           reason: `boundary unreachable: ${String(error).split("\n")[0]}`,
@@ -663,8 +694,18 @@ async function scenarioS10(browser, server) {
   })];
 }
 
+const STUB_EXPECTATION_MESSAGE = "S2-discrimination: stub expected (should fail with stub disabled)";
+
+function isExpectedStubFailure(error) {
+  return Boolean(error)
+    && (error instanceof assert.AssertionError || error?.name === "AssertionError")
+    && error?.code === "ERR_ASSERTION"
+    && String(error.message ?? "").includes(STUB_EXPECTATION_MESSAGE);
+}
+
 async function main() {
   await fs.mkdir(ARTIFACT_DIR, { recursive: true });
+  const { runHead, distMtime } = await buildProvenance();
   const server = await startRecoveryServer({ root: "dist", port: PORT });
   console.log(`server: ${server.url}`);
   console.log(`adsense stub: ${ADSENSE_SCRIPT_URL}`);
@@ -678,34 +719,62 @@ async function main() {
       // S2 expectation (stub 1) must FAIL. A failure here proves discrimination.
       resetServer(server);
       const tracked = await newTrackedContext(browser, server, { consent: "granted", stub: false });
-      let checkerFailed = false;
+      let discriminated = false;
       let detail = {};
       let obs = null;
       try {
         await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
         await waitReady(tracked.page);
         obs = await observe(tracked.page);
-        assert.equal(tracked.counters.stub, 1, "S2-discrimination: stub expected (should fail with stub disabled)");
-        assertNoRealNetwork(tracked.counters, "S2-discrimination");
-        detail = { scripts: obs.scripts, loads: obs.loads, counters: counterSnapshot(tracked.counters) };
+        try {
+          assert.equal(tracked.counters.stub, 1, STUB_EXPECTATION_MESSAGE);
+          detail = {
+            unexpectedPass: "stub assertion passed with the stub disabled",
+            scripts: obs?.scripts ?? null,
+            loads: obs?.loads ?? null,
+          };
+        } catch (error) {
+          // Only the exact stub-expectation assertion proves discrimination;
+          // timeouts or other harness errors must not count as success.
+          discriminated = isExpectedStubFailure(error);
+          detail = {
+            expectedFailure: String(error).split("\n")[0],
+            ...(discriminated ? {} : { unexpectedFailureShape: String(error).slice(0, 500) }),
+            scripts: obs?.scripts ?? null,
+            loads: obs?.loads ?? null,
+          };
+        }
       } catch (error) {
-        // Only the exact stub-expectation assertion proves discrimination;
-        // timeouts or other harness errors must not count as success.
+        // Navigation/readiness/observe harness failure: never discrimination.
         if (!obs) obs = await observe(tracked.page).catch(() => null);
-        const message = String(error).split("\n")[0];
-        checkerFailed = /stub expected/.test(message);
+        discriminated = false;
         detail = {
-          expectedFailure: message,
+          harnessFailure: String(error).split("\n")[0],
           scripts: obs?.scripts ?? null,
           loads: obs?.loads ?? null,
-          counters: counterSnapshot(tracked.counters),
         };
       } finally {
         await tracked.context.close();
       }
-      await fs.writeFile(DISCRIMINATION_FILE, `${JSON.stringify({ name: "S2-discrimination", stubDisabled: true, blockingKept: true, discriminated: checkerFailed, ...detail }, null, 2)}\n`);
-      console.log(checkerFailed ? "DISCRIMINATION OK (checker fails without stub)" : "DISCRIMINATION BROKEN (checker passed without stub)");
-      process.exitCode = checkerFailed ? 0 : 1;
+      // Independent of the expected failure: the firewall must still have
+      // allowed no real network. A network failure here never counts as
+      // discrimination success.
+      let networkFailure = null;
+      try {
+        assertNoRealNetwork(tracked.counters, "S2-discrimination");
+      } catch (error) {
+        networkFailure = String(error).split("\n")[0];
+      }
+      const counters4 = {
+        attempt: tracked.counters.attempt,
+        stub: tracked.counters.stub,
+        blocked: tracked.counters.blocked,
+        allowedExternal: tracked.counters.allowedExternal,
+      };
+      discriminated = discriminated && networkFailure === null;
+      await fs.writeFile(DISCRIMINATION_FILE, `${JSON.stringify({ name: "S2-discrimination", stubDisabled: true, blockingKept: true, discriminated, networkFailure, runHead, ...detail, counters: counters4 }, null, 2)}\n`);
+      console.log(discriminated ? "DISCRIMINATION OK (checker fails without stub)" : "DISCRIMINATION BROKEN (checker passed without stub)");
+      process.exitCode = discriminated ? 0 : 1;
       return;
     }
     const jobs = [
@@ -734,7 +803,8 @@ async function main() {
         job: "adsense-recheck-20260919",
         unit: "WU2",
         build: "npm run build with VITE_LOCAL_QA unset",
-        dist: "reused c40c2eb build (no product change since; rebuild not required)",
+        runHead,
+        distMtime,
         server: `tests/recovery-server.mjs RECOVERY_TEST_PORT=${PORT}`,
         browser: "playwright 1.63 + /usr/bin/google-chrome",
         adsenseStubUrl: ADSENSE_SCRIPT_URL,
