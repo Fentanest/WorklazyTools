@@ -1,4 +1,4 @@
-import { createLocalId } from "../../../lib/utils";
+import { createLocalId } from "../../../lib/utils.ts";
 import { MEMORY_RESULT_LIMIT_BYTES, checkMemoryResultRegistration } from "./canvasPolicy.ts";
 
 const STORAGE_ROOT = "worklazy-pdf-finish-results-v1";

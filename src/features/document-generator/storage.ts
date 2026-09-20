@@ -1,4 +1,4 @@
-import { createLocalId } from "../../lib/utils";
+import { createLocalId } from "../../lib/utils.ts";
 import { GeneratorError } from './errors.ts';
 export const GENERATOR_MEMORY_LIMIT = 200 * 1024 * 1024;
 export interface GeneratorStorage {
