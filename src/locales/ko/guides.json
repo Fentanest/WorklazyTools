@@ -1637,10 +1637,17 @@
         "faq_2",
         "faq_3",
         "faq_4"
+      ],
+      "/tools/office-editor/app": [
+        "faq_0",
+        "faq_1",
+        "faq_2",
+        "faq_3",
+        "faq_4"
       ]
     },
     "pathBlocks": {
-      "/tools/office-editor/app/": [
+      "/tools/office-editor/app": [
         {
           "title": "",
           "paragraphs": [
