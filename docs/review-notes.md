@@ -4,6 +4,11 @@
 
 ## 2026-09-20
 
+### AdSense followup2 컴포넌트 계약 판정 (Claude 판정)
+
+- **컴포넌트 규격 테스트 판정:** `p1b-components`의 ToolGuide 소비자 수, OperationProgress 색상, ToolCard 루트·아이콘 단언은 승인된 현행 제품을 놓친 낡은 단언으로 판정해 갱신했다. ToolGuide 구조·현지화 eyebrow, OperationProgress 단계·진행률·접근성, ToolCard 링크·추적·태그 최대 3개·7색 registry, KO/EN switcher 접근성 계약은 유지했다. Excel 정리 checkbox의 `accent-primary`는 Tailwind 유효 utility이므로 제거하지 않고 같은 `accent-color: var(--primary)` 선언을 내는 `[accent-color:var(--primary)]`로 동등 치환했다. — Claude 판정 / Codx 확인
+- **ToolCard 제목 h2/h3 정본 이탈 회부:** 제품 `src/components/ToolCard.tsx`와 테스트는 모두 제목을 `h2`로 고정하지만 정본 `ui-theme-redesign-20260907:159`는 `h3`이며, `c5b64f6`에서 `h3`→`h2` 회귀가 유입됐다. 이번 묶음에서는 제품·테스트를 바꾸지 않고 사용자 결정 대기로 회부한다. — Claude 판정 / Codx 확인
+
 ### AdSense 재검토 통합 판정 (Claude 판정)
 
 - **배포 #116 실패 원인:** `/tools/pdf-editor/ocr`이 `pdfEditor.convert` 가이드를 사용하면서 OCR 필수 질문을 선택하지 않은 것이 `test:static` 실패 원인이다. FAQPage 자체의 부재가 아니라 경로별 선택 누락이며, OCR FAQ 2개를 convert 소유로 이관하고 OCR·convert 각각의 명시 선택을 고정하는 방식으로 해결한다고 Claude가 판정했다. 정적 본문·JSON-LD·런타임 DOM의 한·영 4조합 일치를 실측했다. — Codx

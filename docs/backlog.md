@@ -4,7 +4,9 @@
 
 ## AdSense 재검토 후속 (2026-09-20)
 
-- **기존 unit 실패 10건 중 6건 완료·4건 이월** — extensionless import 3건, 승인된 SEO·FAQ 현 데이터 2건, Excel 비교 가이드 내용 검사 이관 1건은 `adsense-followup-20260920`에서 해소했다. 이름이 같은 `p1b-components` 3건과 `ui-legacy-isolation` 1건은 기대값을 바꾸지 않고 `adsense-followup2` 계획으로 이월한다. — Muse/Codx
+- **완료 — 기존 unit 실패 잔여 4건 해소** — `p1b-components` 3건은 승인된 현행 컴포넌트 계약을 놓친 낡은 단언으로 판정해 갱신했고, `ui-legacy-isolation` 1건은 유효한 Tailwind checkbox utility를 동등한 arbitrary utility로 치환했다. 최종 통합 전체 unit 605/605, 실패 0을 확인했다. — Codx
+- **ToolCard 제목 h2/h3 결정 대기** — 제품과 테스트는 모두 `h2`이나 정본 `ui-theme-redesign-20260907:159`는 `h3`이고 `c5b64f6`에서 회귀가 유입됐다. 제품·테스트 중 어느 계약을 고칠지 사용자 결정을 기다린다. — Claude 판정 / Codx 확인
+- **Muse 새 worktree 부트스트랩 정지 원인 조사** — `wt-followup2-d`에서 신규 `opencode run --dir`이 `bootstrapping … init` 뒤 세션 ID와 stderr 없이 두 차례 정지했다. 5분 초과 1회 재시도 뒤 Sol 인계 절차는 런북에 반영했으며, 다른 worktree 신규 세션은 정상이라 근본 원인은 미확인이다. — Codx
 - **완료 — PdfComparePage 가이드 미연결** — `PdfComparePage`에 기존 `pdfCompare` 가이드를 연결해 한·영 사용법 안내와 FAQ 3개를 런타임에 표시한다. — Codx
 - **Office Editor 랜딩 가이드의 `?guide=1` 한정 노출** — 일반 랜딩은 `/tools/office-editor/app/`으로 즉시 이동하고 편집기에서 안내 링크로 돌아온 `?guide=1`일 때만 랜딩 가이드가 보인다. 의도와 발견 가능성을 별도 판정한다. — Codx
 - **S5 순수 렌더 오류의 광고 잔류 위험** — 테스트 전용 렌더 오류 주입으로 같은 문서의 기존 광고 스크립트 태그 잔류 실측은 완료했다. 후속으로 순수 렌더 오류 시 잔류 광고를 제품에서 처리할지 결정한다. — Muse
