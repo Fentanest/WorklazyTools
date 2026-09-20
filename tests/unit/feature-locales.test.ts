@@ -67,7 +67,7 @@ test("Excel duplicate result copy keeps independent-list, zero-row, dialog, and 
     const text = selected.map((id: string) => `${guide.faq[id].q} ${guide.faq[id].a}`).join("\n");
     assert.match(text, /중복\s*키|duplicate key/i, `${language} selection covers duplicate keys`);
     assert.match(text, /독립된 목록|independent lists/, `${language} selection covers independent lists`);
-    assert.match(text, /자동으로 연결|not matched automatically/, `${language} selection covers no automatic matching`);
+    assert.match(text, /자동으로 연결한 것은 아닙니다|not matched automatically/, `${language} selection covers no automatic matching`);
   }
 });
 
