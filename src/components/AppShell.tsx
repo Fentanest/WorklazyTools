@@ -121,23 +121,18 @@ export function AppShell() {
         const targetPathname = new URL(targetUrl, window.location.href).pathname;
         targetIsAdFree = isAdFreePath(targetPathname);
       } catch {
-        // If URL parsing fails, assume not ad-free and use normal path
         targetIsAdFree = false;
       }
     }
 
     // For ad-free paths: skip history.back() to avoid async document navigation issues
-    // Do immediate full-document navigation instead
     if (targetIsAdFree) {
       guardEntryRef.current = false;
       guardKeyRef.current = null;
-      // Always attempt assign; if targetUrl is missing, fallback to action
       if (targetUrl) {
-        // This is a full-document reload to ensure ads are completely cleared
         window.location.assign(targetUrl);
         return;
       }
-      // Fallback if targetUrl wasn't captured
       action();
       return;
     }
