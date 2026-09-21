@@ -107,12 +107,42 @@ export function AppShell() {
 
   const confirmGuardLeave = useCallback(() => {
     const action = pendingActionRef.current;
+    const targetUrl = pendingTargetRef.current;
     pendingActionRef.current = null;
-    pendingTargetRef.current = null;  // S9: clean up unused ref
+    pendingTargetRef.current = null;
     setGuardOpen(false);
     if (!action) return;
     leavingRef.current = true;
 
+    // Check if destination is an ad-free path
+    let targetIsAdFree = false;
+    if (targetUrl) {
+      try {
+        const targetPathname = new URL(targetUrl, window.location.href).pathname;
+        targetIsAdFree = isAdFreePath(targetPathname);
+      } catch {
+        // If URL parsing fails, assume not ad-free and use normal path
+        targetIsAdFree = false;
+      }
+    }
+
+    // For ad-free paths: skip history.back() to avoid async document navigation issues
+    // Do immediate full-document navigation instead
+    if (targetIsAdFree) {
+      guardEntryRef.current = false;
+      guardKeyRef.current = null;
+      // Always attempt assign; if targetUrl is missing, fallback to action
+      if (targetUrl) {
+        // This is a full-document reload to ensure ads are completely cleared
+        window.location.assign(targetUrl);
+        return;
+      }
+      // Fallback if targetUrl wasn't captured
+      action();
+      return;
+    }
+
+    // For normal paths: use history.back() pathway
     if (guardEntryRef.current) {
       // Remove our same-URL guard entry first so Back from the destination
       // behaves normally, then run the pending navigation once it pops.
@@ -238,9 +268,7 @@ export function AppShell() {
   }, []);
   const adFree = isAdFreePath(location.pathname);
   useEffect(() => {
-    console.log("[S9-DEBUG] adFreeEffect:", { adFree, href: window.location.href, hasAdScript: Boolean(document.querySelector("script[data-worklazy-adsense]")) });
     if (adFree && document.querySelector("script[data-worklazy-adsense]")) {
-      console.log("[S9-DEBUG] adFreeEffect: Replacing document at", window.location.href);
       window.location.replace(window.location.href);
     }
   }, [adFree]);
