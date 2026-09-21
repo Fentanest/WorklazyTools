@@ -538,109 +538,117 @@ async function scenarioS8(browser, server) {
 }
 
 async function scenarioS9(browser, server) {
+  // S9: Unsaved work protection - dialog appears before navigation discards state
+  // Contract:
+  // 1. Upload file to text-merger → attempt navigate to ad-excluded path
+  // 2. Unsaved-work dialog appears BEFORE URL changes
+  // 3. "Stay" button → original URL + state preserved
+  // 4. "Leave" button → destination reached + final doc has 0 ad scripts
+  // 5. No unsaved-work state → dialog does NOT appear (immediate navigation)
   return [await runCase("S9-file-then-move", async () => {
     resetServer(server);
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
     const mark = server.state.requests.length;
     try {
-      // Load tool and open a file (create work state).
+      // Setup: load text-merger and add a file (create unsaved state)
       await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
       await waitReady(tracked.page);
       const sampleFile = path.join(ARTIFACT_DIR, "wu2-sample.txt");
-      await fs.writeFile(sampleFile, "wu2 synthetic line one\nwu2 synthetic line two\n");
+      await fs.writeFile(sampleFile, "test file content for s9\n");
       await tracked.page.locator('input[type="file"]').setInputFiles(sampleFile);
       await tracked.page.waitForFunction(
-        () => document.querySelectorAll('[data-testid="text-merger-item"]').length >= 2,
+        () => document.querySelectorAll('[data-testid="text-merger-item"]').length >= 1,
         { timeout: 15_000 },
       );
       const itemsBefore = await tracked.page.locator('[data-testid="text-merger-item"]').count();
-      const sourcesBefore = await tracked.page.locator('[data-testid="text-merger-source"]').allInnerTexts();
+      const docsBefore = tracked.docCommits.length;
       assert.ok(itemsBefore > 0, "S9-setup: file must be loaded");
 
-      // Attempt to navigate to another tool; expect protection dialog.
-      const moveLink = tracked.page.locator('.sidebar a[href="/ko/tools/document-compare"]').first();
+      // Attempt navigation to ad-excluded path (PDF editor)
+      const moveLink = tracked.page.locator('a[href="/ko/tools/pdf-editor"]').first();
       await moveLink.scrollIntoViewIfNeeded();
-
-      // Capture dialogs that appear during the navigation attempt.
-      const dialogsBefore = tracked.dialogs.length;
-      const navigationAttempted = tracked.page.waitForURL(
-        (url) => !url.pathname.includes("/tools/text-merger"),
-        { timeout: 5_000 }
-      );
-
       await moveLink.click();
 
-      let protectionDialogAppeared = false;
-      let userAction = "none";
+      // Contract 1: Dialog appears BEFORE navigation
+      let dialogAppeared = false;
+      let stayButtonVisible = false;
+      let leaveButtonVisible = false;
 
       try {
-        // Wait briefly to see if a dialog appears.
-        await tracked.page.waitForFunction(
-          () => Boolean(document.querySelector("dialog[open], [role='alertdialog'][open]")),
-          { timeout: 3_000 }
-        ).catch(() => {});
-
-        // Check if protection dialog appeared.
-        const dialogs = await tracked.page.locator("dialog[open], [role='alertdialog']").all();
-        if (dialogs.length > 0) {
-          protectionDialogAppeared = true;
-          // Find and click the "continue" / "proceed" button (if present).
-          const continueBtn = await tracked.page.locator("button:has-text('이동'), button:has-text('이동하기'), button:has-text('proceed'), button:has-text('continue')").first();
-          if (await continueBtn.isVisible().catch(() => false)) {
-            await continueBtn.click();
-            userAction = "proceed";
-          }
-        }
+        await tracked.page.waitForSelector('[role="alertdialog"][data-testid="unsaved-work-dialog"]', { timeout: 3_000 });
+        dialogAppeared = true;
+        stayButtonVisible = await tracked.page.locator('[data-testid="unsaved-stay"]').isVisible().catch(() => false);
+        leaveButtonVisible = await tracked.page.locator('[data-testid="unsaved-leave"]').isVisible().catch(() => false);
       } catch {
-        // No dialog detected (may indicate missing protection).
+        // No dialog (might be expected if Muse's impl not deployed)
       }
 
-      // Wait for navigation to complete or timeout.
+      if (!dialogAppeared) {
+        return {
+          lang: "ko", status: "fail",
+          reason: "Unsaved-work dialog did not appear before navigation attempt",
+          method: "file upload + navigate to ad-excluded path",
+          docCommits: [...tracked.docCommits],
+          serverRequests: summarizeServerRequests(server.state.requests.slice(mark)),
+        };
+      }
+
+      if (!stayButtonVisible || !leaveButtonVisible) {
+        return {
+          lang: "ko", status: "fail",
+          reason: `Dialog appeared but buttons missing: stay=${stayButtonVisible}, leave=${leaveButtonVisible}`,
+          docCommits: [...tracked.docCommits],
+        };
+      }
+
+      // Contract 2: Click "Stay" → URL + state preserved
+      await tracked.page.locator('[data-testid="unsaved-stay"]').click();
+      await sleep(500);
+
+      const urlAfterStay = tracked.page.url();
+      const docsAfterStay = tracked.docCommits.length;
+      const itemsAfterStay = await tracked.page.locator('[data-testid="text-merger-item"]').count();
+
+      assert.ok(urlAfterStay.includes("/tools/text-merger"), "S9: URL must not change after 'stay'");
+      assert.equal(docsAfterStay, docsBefore, "S9: no document navigation after 'stay'");
+      assert.equal(itemsAfterStay, itemsBefore, "S9: file items preserved after 'stay'");
+
+      // Contract 3: Now attempt navigation again and click "Leave"
+      await moveLink.click();
       try {
-        await navigationAttempted;
+        await tracked.page.waitForSelector('[role="alertdialog"][data-testid="unsaved-work-dialog"]', { timeout: 3_000 });
       } catch {
-        // Navigation did not occur (e.g., dialog blocked it).
+        return { lang: "ko", status: "fail", reason: "Dialog did not appear on second navigation attempt" };
+      }
+
+      await tracked.page.locator('[data-testid="unsaved-leave"]').click();
+
+      // Contract 4: Wait for navigation to destination + verify final state
+      try {
+        await tracked.page.waitForURL((url) => url.pathname.includes("/tools/pdf-editor"), { timeout: 10_000 });
+      } catch {
+        return { lang: "ko", status: "fail", reason: "Did not navigate to destination after 'leave'" };
       }
 
       await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
-      await sleep(1000);
+      const finalObs = await observe(tracked.page);
+      const finalDocs = tracked.docCommits.length;
 
-      const after = await observe(tracked.page);
-      const itemsAfter = await tracked.page.locator('[data-testid="text-merger-item"]').count();
-      const stateLost = itemsAfter < itemsBefore;
-
+      assert.equal(finalDocs, docsBefore + 1, "S9: exactly one document navigation after 'leave'");
+      assert.equal(finalObs.scripts, 0, "S9: destination has 0 ad scripts");
       assertNoRealNetwork(tracked.counters, "S9");
-      const shot = await screenshot(tracked.page, "S9-after-move");
 
-      // Determine pass/fail based on contract.
-      let status = "fail";
-      let reason = "";
-
-      if (!protectionDialogAppeared) {
-        status = "fail";
-        reason = "No protection dialog appeared before navigation (S9-contract: must warn before losing state)";
-      } else if (userAction === "proceed" && stateLost) {
-        status = "pass";
-        reason = "Dialog appeared, user proceeded, state was lost (expected)";
-      } else if (userAction === "proceed" && !stateLost && !after.url.includes("/tools/document-compare")) {
-        status = "recorded";
-        reason = "Dialog appeared but navigation did not complete as expected";
-      } else if (userAction === "none" && itemsAfter === itemsBefore && !after.url.includes("/tools/document-compare")) {
-        status = "pass";
-        reason = "Dialog appeared, user did not proceed (assumed cancel), state preserved";
-      }
-
+      const shot = await screenshot(tracked.page, "S9-unsaved-dialog");
       return {
-        lang: "ko", status,
-        note: reason || "S9-contract: warn before state loss, cancel preserves state, proceed loses state",
-        itemsBefore, sourcesBefore, itemsAfter,
-        dialogDetected: protectionDialogAppeared,
-        userAction,
-        stateLost,
-        finalUrl: after.url,
-        scripts: after.scripts,
-        counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
-        serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot,
+        lang: "ko", status: "pass",
+        note: "Dialog blocks navigation, stay preserves, leave navigates to ad-free page",
+        itemsBefore, itemsAfterStay, finalUrl: finalObs.url,
+        docsBefore, docsAfterStay, docsAfterLeave: finalDocs,
+        scripts: finalObs.scripts,
+        counters: counterSnapshot(tracked.counters),
+        docCommits: tracked.docCommits.map((entry) => ({ ...entry })),
+        serverRequests: summarizeServerRequests(server.state.requests.slice(mark)),
+        evidence: shot,
       };
     } finally {
       await tracked.context.close();
