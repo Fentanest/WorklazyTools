@@ -17,6 +17,7 @@ import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
 import { ToolsPage } from "../pages/ToolsPage";
 import { LanguageLandingPage } from "../pages/LanguageLandingPage";
+import { RouteErrorPage } from "../pages/RouteErrorPage";
 import type { PdfFinishPreset, PdfToolMode } from "../features/pdf-editor/types";
 import type { QrMode } from "../features/qr-studio/QrStudioPage";
 import { InvalidLanguageRedirect, LocalizedNavigate, useAppLanguage } from "../i18n/routing";
@@ -52,6 +53,7 @@ export function App() {
     <Routes>
       <Route index element={<LanguageLandingPage />} />
       <Route path=":lang" element={<LanguageLayout />}>
+        <Route path="error" element={<RouteErrorPage />} />
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="tools" element={<ToolsPage />} />

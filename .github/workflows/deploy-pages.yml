@@ -51,6 +51,15 @@ jobs:
           VITE_BASE_PATH: /
           VITE_SITE_URL: https://worklazy.net/
 
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run ad eligibility smoke tests
+        run: npm run test:ads
+
       - name: Validate SEO and AdSense files
         run: npm run test:static
 

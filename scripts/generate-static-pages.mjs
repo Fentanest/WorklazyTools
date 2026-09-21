@@ -22,7 +22,7 @@ const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-ed
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
 const videoChildRoutes = VIDEO_DIRECT_PATHS.slice(1).map(route => route.slice(1));
 const coreDirectRoutes = ["tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr", "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark", "tools/audio-studio/trim"];
-const localizedRoutes = [...coreDirectRoutes, ...videoChildRoutes,"", "tools", ...toolRoutes.map((slug) => `tools/${slug}`), ...pdfRoutes.map((slug) => `tools/${slug}`), ...pageRoutes];
+const localizedRoutes = [...coreDirectRoutes, ...videoChildRoutes,"", "tools", ...toolRoutes.map((slug) => `tools/${slug}`), ...pdfRoutes.map((slug) => `tools/${slug}`), ...pageRoutes, "error"];
 const videoRoute = "tools/video-studio";
 const officeAppRoute = "tools/office-editor/app";
 const excelPreserveRoute = "tools/excel-merger/xls-preserve";
@@ -152,6 +152,8 @@ function renderPage(template, page, canonical) {
     `<link rel="alternate" hreflang="ko" href="${escapeHtml(alternateKo)}" />`,
     `<link rel="alternate" hreflang="en" href="${escapeHtml(alternateEn)}" />`,
     `<link rel="alternate" hreflang="x-default" href="${escapeHtml(alternateEn)}" />`,
+    // D2: Error page must not be indexed.
+    ...(page.route === "error" ? [`<meta name="robots" content="noindex" />`] : []),
     `<meta property="og:locale" content="${locale}" />`,
     `<meta property="og:locale:alternate" content="${page.language === "ko" ? "en_US" : "ko_KR"}" />`,
     `<meta property="og:type" content="website" />`, `<meta property="og:site_name" content="Worklazy Tools" />`,
