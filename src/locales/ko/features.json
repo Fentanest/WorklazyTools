@@ -2343,6 +2343,7 @@
       "emptyValue": "빈 값",
       "showMoreRows": "{{count}}건 더 보기 ({{remaining}}건 남음)",
       "showMoreRows_one": "{{count}}건 더 보기 ({{remaining}}건 남음)",
+      "duplicateListComplete": "총 {{count}}개 항목을 모두 불러왔습니다. 새로 불러온 첫 항목으로 이동했습니다.",
       "fullValue": "전체 값",
       "fullValueButtonLabel": "{{side}} 원본 {{row}}행의 전체 값 열기",
       "fullValueDescription": "{{side}} 원본 {{row}}행의 전체 값입니다.",

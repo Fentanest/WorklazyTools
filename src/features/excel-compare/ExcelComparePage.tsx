@@ -382,10 +382,29 @@ function DuplicateSideList({ pairId, record, side, t }: {
 }) {
  const [expanded, setExpanded] = useState(false);
  const [visibleCount, setVisibleCount] = useState(DUPLICATE_LIST_PAGE_SIZE);
+ const [exhaustedFocusIndex, setExhaustedFocusIndex] = useState<number | null>(null);
+ const [exhaustionAnnouncement, setExhaustionAnnouncement] = useState("");
+ const pendingExhaustion = useRef<{ from: number } | null>(null);
+ const listRef = useRef<HTMLOListElement | null>(null);
  const contentId = useId();
  const rows = side === "left" ? record.leftRows : record.rightRows;
  const values = side === "left" ? record.leftValues : record.rightValues;
  const sideLabel = t(`features:excelCompare.results.side.${side}`);
+ useEffect(() => {
+  const pending = pendingExhaustion.current;
+  if (!pending) return;
+  if (rows.length - Math.min(visibleCount, rows.length) > 0) {
+   pendingExhaustion.current = null;
+   return;
+  }
+  pendingExhaustion.current = null;
+  setExhaustionAnnouncement(t("features:excelCompare.results.duplicateListComplete", { count: rows.length }));
+  setExhaustedFocusIndex(pending.from);
+ }, [rows.length, visibleCount, t]);
+ useEffect(() => {
+  if (exhaustedFocusIndex === null) return;
+  listRef.current?.querySelector<HTMLElement>(`li[data-duplicate-item-index="${exhaustedFocusIndex}"]`)?.focus();
+ }, [exhaustedFocusIndex]);
  if (!rows.length) return <span data-testid="excel-duplicate-empty" data-side={side}>{t(`features:excelCompare.results.no${capitalize(side)}Rows`)}</span>;
 
  const shown = Math.min(visibleCount, rows.length);
@@ -403,16 +422,21 @@ function DuplicateSideList({ pairId, record, side, t }: {
    aria-expanded={expanded}
    onClick={(event) => {
     setExpanded((current) => !current);
-    if (expanded) setVisibleCount(DUPLICATE_LIST_PAGE_SIZE);
+    if (expanded) {
+     setVisibleCount(DUPLICATE_LIST_PAGE_SIZE);
+     setExhaustedFocusIndex(null);
+     setExhaustionAnnouncement("");
+    }
     scheduleResultFocusVisibility(event.currentTarget);
    }}
  >
    <span>{t(`features:excelCompare.results.${toggleKey}`, { count: rows.length })}</span>
    {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
   </Button>
-  {expanded && <div className="mt-2" data-testid="excel-duplicate-list" data-side={side} id={contentId}>
-   <ol className="grid gap-2">
-    {rows.slice(0, shown).map((row, index) => <li className="rounded-xl border border-border bg-muted/35 p-2.5" key={`${pairId}:${record.key}:${side}:${row}:${index}`}>
+   {expanded && <div className="mt-2" data-testid="excel-duplicate-list" data-side={side} id={contentId}>
+    {exhaustionAnnouncement && <p className="sr-only" role="status" data-testid="excel-duplicate-list-status">{exhaustionAnnouncement}</p>}
+    <ol className="grid gap-2" ref={listRef}>
+     {rows.slice(0, shown).map((row, index) => <li className="rounded-xl border border-border bg-muted/35 p-2.5" data-duplicate-item-index={index} tabIndex={exhaustedFocusIndex === index ? -1 : undefined} key={`${pairId}:${record.key}:${side}:${row}:${index}`}>
      <span className="block text-xs font-bold text-muted-foreground">{t("features:excelCompare.results.sourceRow", { row })}</span>
      <DuplicateValue value={values[index]} row={row} side={side} sideLabel={sideLabel} t={t} />
     </li>)}
@@ -425,6 +449,9 @@ function DuplicateSideList({ pairId, record, side, t }: {
     variant="secondary"
     type="button"
     onClick={(event) => {
+     if (remaining <= DUPLICATE_LIST_PAGE_SIZE) {
+      pendingExhaustion.current = { from: shown };
+     }
      setVisibleCount((current) => current + DUPLICATE_LIST_PAGE_SIZE);
      scheduleResultFocusVisibility(event.currentTarget);
     }}

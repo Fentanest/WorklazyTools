@@ -2349,6 +2349,7 @@
       "emptyValue": "Empty value",
       "showMoreRows": "Show {{count}} more ({{remaining}} remaining)",
       "showMoreRows_one": "Show {{count}} more ({{remaining}} remaining)",
+      "duplicateListComplete": "All {{count}} items have been loaded. Moved to the first newly loaded item.",
       "fullValue": "Full value",
       "fullValueButtonLabel": "Open the full value for {{side}} source row {{row}}",
       "fullValueDescription": "Full value for {{side}} source row {{row}}.",
