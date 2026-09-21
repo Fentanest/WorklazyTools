@@ -14,7 +14,7 @@
 - **S6 PDF Editor 루트 SPA 이동** — `/tools/pdf-editor/merge` 정확 링크 부재는 확인했고 PDF 루트 전환은 한국어·영어에서 검사했다. 후속으로 제외 하위 경로의 직접 링크가 생기면 해당 전환을 추가 검사한다. — Muse
 - **AdSense 계정 설정 확인** — 계정의 페이지 제외 목록에 광고 전면 제외 4경로군과 격리 경로가 포함됐는지, 사이트 수준 Auto ads 설정과 실제 노출 표본이 코드 정책과 일치하는지 확인한다. — Muse
 - **Codex worktree 신뢰 등록 정리** — 작업을 위해 `~/.codex/config.toml`에 추가한 `wt-adsense-guides`, `wt-adsense-adtest`, `wt-adsense-integration` 신뢰 등록 3줄은 관련 worktree 작업 종료 뒤 제거한다. — Codx
-- **S9 보호 가드 광고 제외 경로 문서 교체 미완 — 2026-09-21** — 보호 가드가 광고 제외 경로로의 이동을 가로챌 때 전체 문서 교체가 일어나지 않아 이전 화면의 광고 script가 남는다(scripts = 1, 문서 교체 loaderId 변경 0). 원인 후보로 캡처 단계 클릭 리스너의 `pendingTargetRef` 미설정을 고쳤으나 해결되지 않았고 근본 원인 미규명. **이번 배포에서 제외**. 다이얼로그·toolState·도구 연결 등 구현은 `work/adsense-s9-muse-20260921` 브랜치에 보존. 재개 시 확인: `confirmGuardLeave`에서 전체 문서 이동이 실제로 일어나는지, `pendingTargetRef`가 유지되는지, 광고 script 잔류의 동작 경로. — Claude 판정
+- **완료 — S9 보호 가드 광고 제외 경로 문서 교체 — 2026-09-21** — 앱 확인창에서 승인한 동일 이동을 `beforeunload`가 다시 차단한 것이 원인이었다. 승인 intent를 출발 URL·작업 세대에 한정해 재차단을 건너뛰되, 승인 없는 새로고침·닫기 보호는 유지했다. — Claude 판정(Opus) / Codx 확인
 - **완료 — 데스크톱 `.bottom-tabs` 노출** — 전역 기본값을 `display: none`으로 두고 기존 모바일 미디어 쿼리의 3열 `display: grid`를 유지했다. 통합 production 화면에서 1365×900 숨김과 412×839 3열 표시를 재확인했다. — Codx
 - **완료 — 광고 스모크 빌드 출처 메타데이터 오기** — 하드코딩 문구를 제거하고 실행 시점의 `runHead`와 `distMtime`을 구분해 기록한다. — Muse
 - **완료 — 광고 스모크 판별·네트워크 단언 보강** — 기대 실패의 타입·코드·정확한 메시지를 함께 검사하고 S5·판별 경로에서도 네트워크 단언을 독립 실행하며 실패 결과의 계수를 보존한다. — Muse

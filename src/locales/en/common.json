@@ -160,8 +160,7 @@
     "unsavedWorkDescriptionFiles": "You have unsaved work. Moving to another tool may discard your selected files and current progress. Please save what you need first.",
     "unsavedWorkDescriptionEdits": "You have unsaved edits. Moving to another tool may discard your current progress. Please save what you need first.",
     "unsavedStay": "Stay on this page",
-    "unsavedLeave": "Leave this page",
-    "goHome": "Go to Home"
+    "unsavedLeave": "Leave this page"
   },
   "status": {
     "preparing": "Preparing…",
