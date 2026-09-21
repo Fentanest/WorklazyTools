@@ -411,7 +411,7 @@ export function AppShell() {
 
       <header className="mobile-header glass-bar">
         <NavLink className="mobile-brand" to={localizedPath(language, "/")}>
-          <img className="mobile-brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Worklazy Tools" />
+          <img className="mobile-brand-logo" src={`${import.meta.env.BASE_URL}${theme.startsWith("light-") ? "logo-light.svg" : "logo.svg"}`} alt="Worklazy Tools" />
         </NavLink>
         <div className="mobile-header-actions">
           <AppInstallControl />
