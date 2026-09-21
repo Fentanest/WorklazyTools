@@ -296,6 +296,9 @@ function documentBlockClasses(item: WordDocumentViewItem, side: "before" | "afte
 function documentMetadataClasses(item: WordDocumentViewItem) {
   return cn(
     "pointer-events-none absolute top-1.5 right-2 z-[2] flex justify-end",
+    // Narrow viewports: flow the kind badge above the text instead of
+    // overlaying it, so diff text is never covered (a11y-contrast-20260921 C2).
+    "max-[820px]:static max-[820px]:mb-1",
     item.kind === "unchanged" && !item.moved && "hidden",
   );
 }
