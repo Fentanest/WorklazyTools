@@ -10,6 +10,8 @@ import { PNG } from "pngjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
+const languageLocales = Object.freeze({ en: "en-US", ko: "ko-KR" });
+const productDefaultLanguage = await readProductDefaultLanguage();
 const port = readInteger("A11Y_TEST_PORT", 4178);
 const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
 const chromeExecutable = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
@@ -350,7 +352,7 @@ export async function runAccessibilityAudit() {
         deviceScaleFactor: 1,
         colorScheme: target.colorScheme ?? "light",
         reducedMotion: "reduce",
-        locale: target.locale ?? (target.language === "en" ? "en-US" : "ko-KR"),
+        locale: resolveAuditLocale(target),
         timezoneId: "Asia/Seoul",
       });
       await context.addInitScript(({ language, colorScheme }) => {
@@ -469,7 +471,7 @@ export async function runAccessibilityAudit() {
       const { assertThemeFixture } = await import("./ui-theme-fixture.mjs");
       await assertThemeFixture(page, {
         theme: target.colorScheme ?? "light",
-        locale: target.locale ?? (target.path.startsWith("/en") ? "en-US" : "ko-KR"),
+        locale: resolveAuditLocale(target),
       });
       const builder = new AxeBuilder({ page });
       if (target.ownedSelector) builder.include(target.ownedSelector);
@@ -644,7 +646,7 @@ export async function runAccessibilityAudit() {
 
 async function prepareDocumentResult(page, target) {
   const { runEntryFlow, synthesizeDocumentPair } = await import("./document-result-entry.mjs");
-  const language = target.language ?? (target.path.startsWith("/en") ? "en" : "ko");
+  const language = resolveAuditLanguage(target);
   const files = synthesizeDocumentPair();
   const toFiles = (entries) => entries.map((entry) => ({ name: entry.name, mimeType: entry.mimeType, buffer: entry.buffer }));
   // The audit lands on the entry page; run the shared entry flow, then leave
@@ -911,6 +913,31 @@ async function measureRenderedContrast(page, targets) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await runAccessibilityAudit();
+
+export function resolveAuditLanguage(target) {
+  if (target.language !== undefined) return assertSupportedLanguage(target.language, `target ${target.id}`);
+  const pathLanguage = /^\/(ko|en)(?:\/|$)/.exec(target.path)?.[1];
+  return pathLanguage ?? productDefaultLanguage;
+}
+
+export function resolveAuditLocale(target) {
+  return target.locale ?? languageLocales[resolveAuditLanguage(target)];
+}
+
+async function readProductDefaultLanguage() {
+  const sourcePath = path.join(repositoryRoot, "src/i18n/languages.ts");
+  const source = await fs.readFile(sourcePath, "utf8");
+  const declarations = [...source.matchAll(/^\s*export\s+const\s+defaultLanguage\s*:\s*AppLanguage\s*=\s*(["'])([^"'\\]+)\1\s*;\s*$/gm)];
+  if (declarations.length !== 1) {
+    throw new Error(`Expected exactly one literal defaultLanguage declaration in ${sourcePath}; found ${declarations.length}.`);
+  }
+  return assertSupportedLanguage(declarations[0][2], `product default in ${sourcePath}`);
+}
+
+function assertSupportedLanguage(language, source) {
+  if (Object.hasOwn(languageLocales, language)) return language;
+  throw new Error(`Unsupported accessibility audit language ${JSON.stringify(language)} from ${source}.`);
+}
 
 function readInteger(name, fallback) {
   const value = process.env[name];
