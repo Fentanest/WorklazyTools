@@ -18,8 +18,7 @@
   --brand-border: rgba(232, 80, 47, 0.24);
   --brand-glow: rgba(232, 80, 47, 0.32);
   --brandcard-1: #f26744;
-  --brandcard-2: #d63e1f;
-  --hero-bg: linear-gradient(118deg, #fff9f6 0%, #ffeee6 58%, #ffd9cb 100%);
+  --brandcard-2: #d63e1f;  --hero-bg: linear-gradient(118deg, #fff9f6 0%, #ffeee6 58%, #ffd9cb 100%);
   --hero-decor: rgba(232, 80, 47, 0.12);
   --hero-border: rgba(255, 255, 255, 0.8);
   --bg: #f2f2f7;
@@ -27,7 +26,7 @@
   --bg-solid: #ffffff;
   --bg-muted: rgba(118, 118, 128, 0.08);
   --label: #18181b;
-  --label-secondary: #69696f;
+  --label-secondary: #636369;
   --label-tertiary: #909098;
   --separator: rgba(60, 60, 67, 0.13);
   --glass-border: rgba(255, 255, 255, 0.68);
@@ -64,7 +63,7 @@
   --bg-solid: #ffffff;
   --bg-muted: rgba(118, 118, 128, 0.08);
   --label: #18181b;
-  --label-secondary: #69696f;
+  --label-secondary: #636369;
   --label-tertiary: #909098;
   --separator: rgba(60, 60, 67, 0.13);
   --glass-border: rgba(255, 255, 255, 0.68);
@@ -361,7 +360,7 @@
   flex: 0 0 auto;
   padding: 4px 8px;
   border-radius: 7px;
-  color: var(--label-tertiary);
+  color: var(--label-secondary);
   background: var(--bg-solid);
   border: 1px solid var(--separator);
   font-family: inherit;
