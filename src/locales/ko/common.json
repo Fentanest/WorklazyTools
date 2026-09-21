@@ -63,7 +63,8 @@
     "searchPlaceholder": "도구를 검색해보세요. (예: PDF, Excel, 병합)",
     "searchLabel": "도구 검색",
     "toggleSidebar": "사이드바 접기/펼치기",
-    "githubLabel": "GitHub에서 보기"
+    "githubLabel": "GitHub에서 보기",
+    "regionLabel": "상단 도구 표시줄"
   },
   "footer": {
     "service": "서비스 소개",

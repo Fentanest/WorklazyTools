@@ -549,7 +549,7 @@ function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed, onGuar
   };
 
   return (
-    <div className="wl-topbar">
+    <div className="wl-topbar" role="region" aria-label={t("topbar.regionLabel")}>
       <button type="button" className="wl-icon-button" onClick={onToggleSidebar} aria-label={t("topbar.toggleSidebar")}>
         <CollapseIcon size={20} />
       </button>

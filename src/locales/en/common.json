@@ -63,7 +63,8 @@
     "searchPlaceholder": "Search tools (e.g. PDF, Excel, merge)",
     "searchLabel": "Search tools",
     "toggleSidebar": "Toggle sidebar",
-    "githubLabel": "View on GitHub"
+    "githubLabel": "View on GitHub",
+    "regionLabel": "Top utility bar"
   },
   "footer": {
     "service": "About the service",
