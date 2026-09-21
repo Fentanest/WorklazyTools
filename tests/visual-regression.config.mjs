@@ -4,6 +4,7 @@ export const visualRegressionConfig = Object.freeze({
   scenarios: visualRegressionScenarios,
   viewports: Object.freeze([
     Object.freeze({ id: "desktop", width: 1365, height: 900, deviceScaleFactor: 1 }),
+    Object.freeze({ id: "desktop-1920", width: 1920, height: 1080, deviceScaleFactor: 1 }),
     Object.freeze({ id: "mobile", width: 390, height: 844, deviceScaleFactor: 1 }),
     Object.freeze({ id: "mobile-320", width: 320, height: 844, deviceScaleFactor: 1 }),
   ]),

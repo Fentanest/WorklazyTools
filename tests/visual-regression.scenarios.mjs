@@ -12,6 +12,11 @@ const enDarkDesktop = profile("en", "dark", "desktop");
 const enDarkMobile = profile("en", "dark", "mobile");
 const koLightMobile320 = profile("ko", "light", "mobile-320");
 const enLightMobile320 = profile("en", "light", "mobile-320");
+// desktop-1920 is scoped, not multiplied across the suite: one KO/light
+// profile (Korean wrapping is the vertical-drop risk; light is the stable
+// reference) on four layout-distinct surfaces — landing hero, tool index
+// grid, document comparison rail, finish preview rail.
+const koLightDesktop1920 = profile("ko", "light", "desktop-1920");
 
 const fullProfiles = Object.freeze([
   koLightDesktop,
@@ -107,8 +112,8 @@ const indexScenarios = [
     stateType: "initial",
     path: "/",
     kind: "index",
-    profiles: fullProfiles,
-    profileReductionReason: "No reduction: the shared landing surface keeps the full locale, theme, and viewport product.",
+    profiles: [...fullProfiles, koLightDesktop1920],
+    profileReductionReason: "No reduction: the shared landing surface keeps the full locale, theme, and viewport product, plus one KO/light 1920 profile for the full-width hero rail.",
     readySelector: ".home-page .wl-hero",
     assertSelector: ".home-page .wl-hero",
   }),
@@ -119,8 +124,8 @@ const indexScenarios = [
     stateType: "initial",
     path: "/tools?category=media",
     kind: "index",
-    profiles: fullProfiles,
-    profileReductionReason: "No reduction: the shared tool index keeps the full locale, theme, and viewport product.",
+    profiles: [...fullProfiles, koLightDesktop1920],
+    profileReductionReason: "No reduction: the shared tool index keeps the full locale, theme, and viewport product, plus one KO/light 1920 profile for the wide card grid.",
     readySelector: ".tools-index-page .tool-category-section .ui-tool-card",
     assertSelector: ".tools-index-page .tool-category-section .ui-tool-card",
   }),
@@ -377,6 +382,8 @@ const interactionDefinitions = Object.freeze({
     }),
     Object.freeze({
       stateId: "interaction-hwp-result",
+      profiles: Object.freeze([enDarkDesktop, koLightDesktop1920]),
+      profileReductionReason: "EN/dark/desktop retains the established result coverage; one KO/light 1920 profile checks the document rail at wide viewport.",
       actions: [
         { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 0, fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-before.hwp", mimeType: "application/x-hwp" } },
         { type: "upload", selector: "[data-tool-page='document-compare'] input[type='file']", elementIndex: 1, fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-after.hwp", mimeType: "application/x-hwp" } },
@@ -737,8 +744,8 @@ const pdfFinishScenarios = [
     stateType: "finish",
     path: "/tools/pdf-editor/watermark",
     kind: "tool",
-    profiles: fullProfiles,
-    profileReductionReason: "No reduction: watermark controls and preview retain the complete locale, theme, and desktop/mobile product.",
+    profiles: [...fullProfiles, koLightDesktop1920],
+    profileReductionReason: "No reduction: watermark controls and preview retain the complete locale, theme, and desktop/mobile product, plus one KO/light 1920 profile for the preview rail.",
     fixture: { kind: "generated-pdf", fileName: "visual-finish-watermark.pdf", pageCount: 3 },
     actions: [
       { type: "upload", selector: "[data-testid='pdf-finish-ready'] input[type='file']" },
