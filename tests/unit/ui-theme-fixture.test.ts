@@ -2,13 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import vm from "node:vm";
 
-import { assertThemeFixture, installThemeFixture, seedThemeFixture, themeForProfile } from "../ui-theme-fixture.mjs";
+import { assertThemeFixture, colorSchemeForProfile, installThemeFixture, seedThemeFixture, themeForProfile } from "../ui-theme-fixture.mjs";
 
 test("sparse profile themes resolve to the default family only", () => {
   assert.equal(themeForProfile("light"), "light-coral");
   assert.equal(themeForProfile("dark"), "dark-coral");
   assert.throws(() => themeForProfile("mint"), /Unknown visual profile theme/);
-  assert.throws(() => themeForProfile("dark-mint"), /Unknown visual profile theme/);
+});
+
+test("explicit mint profile themes resolve to themselves", () => {
+  assert.equal(themeForProfile("light-mint"), "light-mint");
+  assert.equal(themeForProfile("dark-mint"), "dark-mint");
+  assert.equal(colorSchemeForProfile("light-mint"), "light");
+  assert.equal(colorSchemeForProfile("dark-mint"), "dark");
+  assert.equal(colorSchemeForProfile("light"), "light");
+  assert.equal(colorSchemeForProfile("dark"), "dark");
 });
 
 test("seed stores only the theme key and skips vendor frames", () => {
@@ -38,6 +46,10 @@ test("assertion pins DOM, storage, native scheme, and locale before capture", as
   };
   const dom = await assertThemeFixture(page, { theme: "dark", locale: "ko" });
   assert.equal(dom.theme, "dark-coral");
+  const mintDom = await assertThemeFixture({
+    evaluate: async () => ({ theme: "dark-mint", stored: "dark-mint", scheme: "dark", lang: "en" }),
+  }, { theme: "dark-mint", locale: "en" });
+  assert.equal(mintDom.theme, "dark-mint");
   await assert.rejects(() => assertThemeFixture({
     evaluate: async () => ({ theme: "light-coral", stored: "dark-coral", scheme: "light", lang: "ko" }),
   }, { theme: "dark", locale: "ko" }), /DOM theme differs/);

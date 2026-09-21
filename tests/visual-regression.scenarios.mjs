@@ -17,6 +17,11 @@ const enLightMobile320 = profile("en", "light", "mobile-320");
 // reference) on four layout-distinct surfaces — landing hero, tool index
 // grid, document comparison rail, finish preview rail.
 const koLightDesktop1920 = profile("ko", "light", "desktop-1920");
+// Mint coverage is scoped the same way: one profile per scheme on the two
+// shared index surfaces, which carry the most theme-token surface (hero,
+// sidebar, cards). A full mint product would double the suite.
+const koLightMintDesktop = profile("ko", "light-mint", "desktop");
+const enDarkMintDesktop = profile("en", "dark-mint", "desktop");
 
 const fullProfiles = Object.freeze([
   koLightDesktop,
@@ -112,8 +117,8 @@ const indexScenarios = [
     stateType: "initial",
     path: "/",
     kind: "index",
-    profiles: [...fullProfiles, koLightDesktop1920],
-    profileReductionReason: "No reduction: the shared landing surface keeps the full locale, theme, and viewport product, plus one KO/light 1920 profile for the full-width hero rail.",
+    profiles: [...fullProfiles, koLightDesktop1920, koLightMintDesktop, enDarkMintDesktop],
+    profileReductionReason: "No reduction: the shared landing surface keeps the full locale, theme, and viewport product, plus one KO/light 1920 profile for the full-width hero rail and one mint profile per scheme for the theme family.",
     readySelector: ".home-page .wl-hero",
     assertSelector: ".home-page .wl-hero",
   }),
@@ -124,8 +129,8 @@ const indexScenarios = [
     stateType: "initial",
     path: "/tools?category=media",
     kind: "index",
-    profiles: [...fullProfiles, koLightDesktop1920],
-    profileReductionReason: "No reduction: the shared tool index keeps the full locale, theme, and viewport product, plus one KO/light 1920 profile for the wide card grid.",
+    profiles: [...fullProfiles, koLightDesktop1920, koLightMintDesktop, enDarkMintDesktop],
+    profileReductionReason: "No reduction: the shared tool index keeps the full locale, theme, and viewport product, plus one KO/light 1920 profile for the wide card grid and one mint profile per scheme for the theme family.",
     readySelector: ".tools-index-page .tool-category-section .ui-tool-card",
     assertSelector: ".tools-index-page .tool-category-section .ui-tool-card",
   }),

@@ -11,6 +11,7 @@ import puppeteer from "puppeteer-core";
 import JSZip from "jszip";
 
 import { assertMobileBottomLayout, assertScrollAtBottom } from "./mobile-bottom-assertion.mjs";
+import { colorSchemeForProfile, themeForProfile } from "./ui-theme-fixture.mjs";
 import { configureVisualClock } from "./visual-regression-clock.mjs";
 import { qaCaptureScenarios, qrBulkQaScenarios, visualRegressionConfig as config } from "./visual-regression.config.mjs";
 import {
@@ -321,22 +322,25 @@ async function captureAndCompare(capture, browser) {
     await page.setExtraHTTPHeaders({ "Accept-Language": localeEnvironment.acceptLanguage });
     const client = await page.createCDPSession();
     await client.send("Emulation.setLocaleOverride", { locale: localeEnvironment.browserLocale });
+    const resolvedTheme = themeForProfile(capture.theme);
+    const colorScheme = colorSchemeForProfile(capture.theme);
     await page.emulateMediaFeatures([
-      { name: "prefers-color-scheme", value: capture.theme },
+      { name: "prefers-color-scheme", value: colorScheme },
       { name: "prefers-reduced-motion", value: config.animation.prefersReducedMotion },
     ]);
     await page.evaluateOnNewDocument((locale, consent, theme) => {
       localStorage.setItem("worklazy_privacy_consent", consent);
       localStorage.setItem("worklazy_lang", locale);
-      // W5 shared theme fixture: sparse profile themes resolve to the default
-      // family (dark -> dark-coral, else light-coral). Only the theme key is
-      // seeded; locale and consent stay under this harness's control.
+      // W5 shared theme fixture: the seed stores the resolved theme
+      // (sparse light/dark resolve to the coral default, explicit mint
+      // profiles to themselves). Only the theme key is seeded; locale and
+      // consent stay under this harness's control.
       try {
-        window.localStorage.setItem("worklazy-theme", theme === "dark" ? "dark-coral" : "light-coral");
+        window.localStorage.setItem("worklazy-theme", theme);
       } catch {
         // Storage blocked: assertThemeFixture reports the mismatch.
       }
-    }, capture.locale, consentValue, capture.theme);
+    }, capture.locale, consentValue, resolvedTheme);
     page.on("request", (request) => {
       const url = new URL(request.url());
       const allowed = url.origin === new URL(baseUrl).origin || ["data:", "blob:"].includes(url.protocol);
