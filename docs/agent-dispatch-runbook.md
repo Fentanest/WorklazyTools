@@ -58,7 +58,7 @@ Opus는 첫 위임 전에, Fable은 필요한 경우 읽는다. 같은 환경에
 
 Codex 사용 불가가 명시된 문서·스킬 설치에서는 이 절의 호출·조회·모델 탐색을 실행하지 않는다.
 
-worktree에서 Codex를 실행할 때는 다음 네 가지를 갖춘 뒤 발행한다(2026-09-20 adsense-recheck에서 확인).
+worktree에서 Codex를 실행할 때는 승인된 구현·설치 작업에 한해 다음 네 가지를 갖춘 뒤 발행한다(2026-09-20 adsense-recheck에서 확인). 읽기 전용 검수(제품 수정·커밋 없음)에는 이 준비가 불필요하다.
 
 - `~/.codex/config.toml`의 `[projects."<worktree 절대경로>"] trust_level = "trusted"` 등록. 상위 폴더 등록은 하위 worktree를 덮지 않는다. 미등록이면 worktree의 `.codex/config.toml`이 로드되지 않는다.
 - worktree의 `.codex/config.toml`(git 제외라 자동 복제되지 않음) `writable_roots`에 `<main>/.git`, **`<main>/.git/worktrees/<name>`(정확한 linked gitdir)**, worktree 경로, `/home/<user>/.npm`, 임시 산출물 루트를 넣는다. 부모 `.git`만 넣으면 Codex가 linked gitdir를 별도로 읽기 전용 마운트해 `git add`가 EROFS(exit 128)로 실패한다. 판별은 `findmnt -T <gitdir> -o TARGET,OPTIONS`를 사용한다.
@@ -88,7 +88,7 @@ OpenCode 호스트에서는 `opencode models`의 실제 ID를 확인해 MODEL에
 바로 전 세션이 해당 작업의 마지막 세션임을 확인했고 다른 작업으로 바뀔 여지가 없으면 `-c`를 사용한다. 시각·전역 최신 순서만 믿지 말고 작업 ID·제목·저장소·worktree·내용을 대조한다.
 
     opencode run --dir "$MUSE_WORKTREE" --model "$MODEL" -c \
-      "$PROMPT" > "$SP/muse-out.log" 2> "$SP/muse-err.log"
+      "$PROMPT" < /dev/null > "$SP/muse-out.log" 2> "$SP/muse-err.log"
 
 기존 작업의 특정 세션을 잇거나 여러 작업이 섞여 있으면 기록된 ID를 우선 사용한다. ID가 없으면 아래와 같이 목록을 조회해 해당 작업을 찾는다. 목록 범위가 현재 폴더만이라고 가정하지 않으며, 후보가 모호하면 해당 도구의 세션 열람 기능과 기존 로그에서 내용·경로를 확인한다. 오래된 작업이 안 보인다는 이유만으로 없다고 결론 내리지 않는다.
 
@@ -97,19 +97,19 @@ OpenCode 호스트에서는 `opencode models`의 실제 ID를 확인해 MODEL에
 확인한 ID로 이어간다. 기록된 ID가 있으면 일괄적인 `-c`보다 이 방식이 우선이다.
 
     opencode run --dir "$MUSE_WORKTREE" --model "$MODEL" -s "$SESSION_ID" \
-      "$PROMPT" > "$SP/muse-out.log" 2> "$SP/muse-err.log"
+      "$PROMPT" < /dev/null > "$SP/muse-out.log" 2> "$SP/muse-err.log"
 
 ### 필요한 경우에만 --fork
 
 기존 대화 맥락을 보존한 채 다른 접근·실험·독립 후속을 분리하려면 부모 세션을 지정해 분기한다. 같은 작업의 정상 후속마다 무조건 분기하지 않는다. 구현자 모델을 바꾸거나 기존 결함·계획만 제한을 지우기 위한 분기도 하지 않는다.
 
     opencode run --dir "$MUSE_WORKTREE" --model "$MODEL" -s "$SESSION_ID" --fork \
-      "$PROMPT" > "$SP/muse-out.log" 2> "$SP/muse-err.log"
+      "$PROMPT" < /dev/null > "$SP/muse-out.log" 2> "$SP/muse-err.log"
 
 마지막 세션이 확실한 경우에는 다음도 허용한다. 병렬 환경에서는 위의 ID 지정 방식을 우선한다.
 
     opencode run --dir "$MUSE_WORKTREE" --model "$MODEL" -c --fork \
-      "$PROMPT" > "$SP/muse-out.log" 2> "$SP/muse-err.log"
+      "$PROMPT" < /dev/null > "$SP/muse-out.log" 2> "$SP/muse-err.log"
 
 분기 결과의 실제 자식 ID를 출력·작업 레코드에서 확인해 부모 ID·목적·작업 ID·worktree와 함께 남긴다. 추정한 ID를 쓰지 않는다. 다음 후속은 자식 ID를 `-s`에 전달하며 부모로 잘못 돌아가지 않는다.
 `--fork`는 대화 분기다. Git 브랜치·worktree를 만들거나 파일 상태를 복사·복원하지 않는다. 실제 동시 구현은 공통 병렬 규칙에 따라 별도 브랜치/worktree·소유 범위·자원을 준비한다. 세션의 과거 절대경로와 실제 작업 공간이 다르면 최신 경로를 확인시키고 옛 경로에 쓰지 않게 한다. 도구가 그 작업 공간으로 안전하게 연결하지 못하면 원본 공간에서 대신 구현하지 말고 인계 요약을 통한 새 세션 등 안전한 방식을 사용한다.
@@ -119,7 +119,7 @@ OpenCode 호스트에서는 `opencode models`의 실제 ID를 확인해 MODEL에
 완전히 무관한 작업, 적합한 세션 부재, 손상·도구 제약으로 안전한 재개가 불가능한 경우에만 새 세션을 선택하고 이유를 기록한다. 다음은 구현 허가까지 확인된 새 작업의 형식이다. 세션이 적합하게 남아 있는데 편의상 매번 처음부터 시작하지 않는다.
 
     opencode run --dir "$MUSE_WORKTREE" --model "$MODEL" \
-      "$PROMPT" > "$SP/muse-out.log" 2> "$SP/muse-err.log"
+      "$PROMPT" < /dev/null > "$SP/muse-out.log" 2> "$SP/muse-err.log"
 
 ### 재개·분기의 안전 확인
 
@@ -134,7 +134,8 @@ CLI 옵션 확인 출처: https://opencode.ai/docs/cli/ (2026-09-14 확인). 사
 - `--fork`는 부모 세션의 프로젝트 디렉터리를 물려받는다. **다른 worktree에서 만든 세션을 새 worktree에서 fork하면** 새 경로가 `external_directory`로 판정돼 권한 질문 상태로 헤드리스 실행이 무한 대기한다(로그 0바이트, 프로세스만 생존; `~/.local/share/opencode/log/*.log`에 `asking permission=external_directory`). worktree가 바뀌면 fork 대신 새 세션을 만들고 인계 요약을 프롬프트에 넣는다. 같은 worktree 안의 후속에만 `-s`/`--fork`를 쓴다.
 - 비대화형 `opencode run`은 프로젝트 밖 디렉터리 쓰기를 자동 거부한다. 임시 산출물은 worktree 안 git 제외 폴더(예 `tests/visual-artifacts/<작업>/`)로 지정하고 `/tmp`를 쓰지 않는다. `--auto`로 권한을 풀지 않는다.
 - 첫 턴이 "착수합니다" 같은 상태 보고로 끝날 수 있으므로 프롬프트에 "이번 턴에서 상태 보고로 끝내지 말고 끝까지 수행"을 넣고, 종료 후 `opencode session list --format json`으로 실제 세션 ID(신규/자식)를 기록한다.
-- 새 worktree에서 `opencode run --dir <worktree>`가 `bootstrapping … init` 뒤 5분 넘게 `created id=` 로그 없이 멈추면(err 로그 0바이트) 1회만 재시도하고, 재발하면 Muse 실행을 종료하고(작업트리 변경 0 확인) Sol에게 같은 worktree로 인계한다. 2026-09-20 `wt-followup2-d`에서 2회 재현했으며 원인은 미확인이다. 종료 시 `pgrep -a opencode | grep <worktree>`로 실행파일 기준 PID만 골라 kill한다(`pgrep -f`는 자기 명령줄을 잡아 스크립트가 함께 죽는다).
+- 비대화형 OpenCode/Muse 디스패치는 **항상 `< /dev/null`로 stdin을 닫아 실행**한다(아래 예시 명령 참조). `opencode run`을 stdin이 열린 소켓/파이프인 상태(예: 다른 에이전트의 Bash 백그라운드)로 실행하면, 로그가 `message=init`까지만 찍히고 세션이 생성되지 않은 채 무한 대기한다. 확정된 원인(2026-09-21 07:03~07:12 UTC 실측): 정지한 프로세스는 네트워크 소켓 0개, inotify fd 0개, fd 0(stdin)이 socket이며 epoll에 등록된 상태로 `ep_poll` 대기. 시스템 inotify 여유는 충분했다(max_user_instances 512, 사용 158). 같은 명령에 `< /dev/null`만 붙이자 7초 만에 세션이 생성되고 정상 응답했다. 이전에 기록된 inotify 한도 부족 가설은 이 실측으로 원인에서 배제됐다(한도 상향 자체는 유지해도 무해하나 이 정지의 원인이 아니다).
+- 정지 판별: 5분 넘게 출력 0바이트 + opencode 로그가 `init`에서 멈춤 + 해당 PID의 fd 0이 socket. 이전 "Muse 부트스트랩 정지 시 1회 재시도" 문안은 원인 미확인 재시도라 공통 규칙("수정 가능한 원인을 확인한 경우에만 재시도")과 충돌했으므로 위 사실로 교체한다. 정지가 확인되면 stdin 차단을 적용한 명령으로 1회 재시도하고(원인 확인된 재시도), 그래도 안 되면 Muse 실행을 종료하고(작업트리 변경 0 확인) Sol에게 같은 worktree로 인계한다. 2026-09-20 `wt-followup2-d`의 2회 재현은 이 원인으로 설명된다. 종료 시 `pgrep -a opencode | grep <worktree>`로 실행파일 기준 PID만 골라 kill한다(`pgrep -f`는 자기 명령줄을 잡아 스크립트가 함께 죽는다).
 
 ## Gemini 위임 — agy
 
