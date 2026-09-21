@@ -115,7 +115,17 @@ export function AppShell() {
     leavingRef.current = true;
 
     // S9: For ad-free paths, use full document navigation to clear ad artifacts
-    const finalAction = target && isAdFreePath(target) ? () => window.location.assign(target) : action;
+    let finalAction = action;
+    if (target) {
+      try {
+        const url = new URL(target, window.location.href);
+        if (isAdFreePath(url.pathname)) {
+          finalAction = () => window.location.assign(target);
+        }
+      } catch {
+        // If URL parsing fails, use the original action
+      }
+    }
 
     if (guardEntryRef.current) {
       // Remove our same-URL guard entry first so Back from the destination
