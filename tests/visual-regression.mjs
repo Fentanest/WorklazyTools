@@ -20,6 +20,7 @@ import {
   parseVisualOnly,
   resolveVisualConcurrency,
 } from "./visual-regression-options.mjs";
+import { buildCaptureMatrix, parseVisualShard, selectVisualShard } from "./visual-regression-matrix.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
@@ -42,6 +43,7 @@ const baseUrl = externallyManagedBaseUrl || `http://127.0.0.1:${port}`;
 const chromeExecutable = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
 const concurrency = resolveVisualConcurrency(process.env.VISUAL_CONCURRENCY, os.availableParallelism());
 const visualOnly = parseVisualOnly(process.env.VISUAL_ONLY);
+const visualShard = parseVisualShard(process.env.VISUAL_SHARD);
 const runStartedAt = performance.now();
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -50,12 +52,16 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 
 if (captureOnly && !captureDirectory) throw new Error("Visual capture-only mode requires VISUAL_CAPTURE_DIR.");
 if (captureOnly && updateBaselines) throw new Error("QA captures cannot update the scenario baseline set.");
+// A sharded update would rewrite only its own slice while
+// removeUnexpectedBaselines deletes every baseline outside the slice, so
+// baseline regeneration always runs on the whole unsharded matrix.
+if (updateBaselines && visualShard) throw new Error("VISUAL_SHARD cannot be combined with UPDATE_VISUAL_BASELINES=1; regenerate baselines unsharded.");
 if (qrBulkBaselinesOnly && !updateBaselines) throw new Error("VISUAL_QR_BULK_BASELINES_ONLY is available only while updating baselines.");
 if (captureOnly && qrBulkBaselinesOnly) throw new Error("Capture-only and baseline-only modes cannot be combined.");
 if (qrBulkCaptureOnly && qaCaptureOnly) throw new Error("QR bulk and bundle QA capture-only modes cannot be combined.");
 if (qaCaptureOnly && visualOnly.length === 0) throw new Error("Bundle QA capture-only mode requires VISUAL_ONLY to identify the reviewed routes or tools.");
 
-const baselineNames = buildCaptureMatrix(config.scenarios).map(({ name }) => name);
+const baselineNames = buildCaptureMatrix(config.scenarios, config.viewports).map(({ name }) => name);
 const availableCaptureScenarios = qrBulkCaptureOnly
   ? qrBulkQaScenarios
   : qaCaptureOnly
@@ -71,7 +77,7 @@ if (qaCaptureOnly) {
     throw new Error(`Bundle QA capture selection is missing required state types: ${missingStateTypes.join(", ")}.`);
   }
 }
-const captures = buildCaptureMatrix(captureScenarios);
+const captures = selectVisualShard(buildCaptureMatrix(captureScenarios, config.viewports), visualShard);
 const expectedNames = captures.map(({ name }) => name);
 const captureBatches = buildCaptureBatches(captures, config.environment.maxCapturesPerBrowser);
 const effectiveConcurrency = Math.min(concurrency.value, captureBatches.length);
@@ -200,26 +206,9 @@ console.log(buildRunReport({
   durationMs: performance.now() - runStartedAt,
   effectiveConcurrency,
   filterTerms: visualOnly,
+  shard: visualShard ? `${visualShard.index}/${visualShard.total}` : "all",
   total: captures.length,
 }));
-
-function buildCaptureMatrix(scenarios) {
-  const viewports = new Map(config.viewports.map((viewport) => [viewport.id, viewport]));
-  const matrix = scenarios.flatMap((scenarioDefinition) => scenarioDefinition.profiles.map((profile) => {
-    const viewport = viewports.get(profile.viewport);
-    if (!viewport) throw new Error(`Unknown visual viewport ${profile.viewport} for ${scenarioDefinition.scenarioId}.`);
-    return {
-      scenario: scenarioDefinition,
-      locale: profile.locale,
-      theme: profile.theme,
-      viewport,
-      name: `${scenarioDefinition.routeId}__${scenarioDefinition.stateId}__${profile.locale}__${profile.theme}__${viewport.id}.png`,
-    };
-  }));
-  const names = matrix.map(({ name }) => name);
-  if (new Set(names).size !== names.length) throw new Error("Visual scenario matrix produced duplicate capture names; stateId values must be unique per route.");
-  return matrix;
-}
 
 function buildCaptureBatches(matrix, maxCapturesPerBrowser) {
   const localeEntries = new Map();
@@ -272,7 +261,7 @@ async function runWithConcurrency(items, limit, task) {  let nextIndex = 0;
   await Promise.all(workers);
 }
 
-function buildRunReport({ completed: completedCaptures, concurrency: resolvedConcurrency, durationMs, effectiveConcurrency: activeConcurrency, filterTerms, total }) {
+function buildRunReport({ completed: completedCaptures, concurrency: resolvedConcurrency, durationMs, effectiveConcurrency: activeConcurrency, filterTerms, shard, total }) {
   const durationSeconds = durationMs / 1_000;
   const minutes = Math.floor(durationSeconds / 60);
   const seconds = durationSeconds - minutes * 60;
@@ -280,7 +269,7 @@ function buildRunReport({ completed: completedCaptures, concurrency: resolvedCon
   const concurrencySource = resolvedConcurrency.source === "cpu-default"
     ? `CPU default from ${resolvedConcurrency.availableCpuCount} cores`
     : "VISUAL_CONCURRENCY";
-  return `Visual run report: duration=${minutes}m ${seconds.toFixed(2)}s; captures=${completedCaptures}/${total}; concurrency=${resolvedConcurrency.value} (${concurrencySource}, effective ${activeConcurrency}); filter=${filter}.`;
+  return `Visual run report: duration=${minutes}m ${seconds.toFixed(2)}s; captures=${completedCaptures}/${total}; concurrency=${resolvedConcurrency.value} (${concurrencySource}, effective ${activeConcurrency}); filter=${filter}; shard=${shard}.`;
 }
 
 async function launchLocaleBrowser(locale) {
