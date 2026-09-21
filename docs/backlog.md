@@ -9,12 +9,12 @@
 - **Muse 새 worktree 부트스트랩 정지 원인 조사** — `wt-followup2-d`에서 신규 `opencode run --dir`이 `bootstrapping … init` 뒤 세션 ID와 stderr 없이 두 차례 정지했다. 5분 초과 1회 재시도 뒤 Sol 인계 절차는 런북에 반영했으며, 다른 worktree 신규 세션은 정상이라 근본 원인은 미확인이다. — Codx
 - **완료 — PdfComparePage 가이드 미연결** — `PdfComparePage`에 기존 `pdfCompare` 가이드를 연결해 한·영 사용법 안내와 FAQ 3개를 런타임에 표시한다. — Codx
 - **Office Editor 랜딩 가이드의 `?guide=1` 한정 노출** — 일반 랜딩은 `/tools/office-editor/app/`으로 즉시 이동하고 편집기에서 안내 링크로 돌아온 `?guide=1`일 때만 랜딩 가이드가 보인다. 의도와 발견 가능성을 별도 판정한다. — Codx
-- **S5 순수 렌더 오류의 광고 잔류 위험** — 테스트 전용 렌더 오류 주입으로 같은 문서의 기존 광고 스크립트 태그 잔류 실측은 완료했다. 후속으로 순수 렌더 오류 시 잔류 광고를 제품에서 처리할지 결정한다. — Muse
-- **S10 실제 광고 overlay** — 정확 URL 스텁은 실제 광고 overlay를 만들지 않으므로 모바일 저장·다운로드 버튼과의 겹침을 운영 광고로 확인한다. — Muse
+- **완료 — S5 도구 로딩 실패 시 광고 제외 오류 페이지 이동** — Auto ads 초기화 API 부재 이유로 광고 없는 독립 오류 문서로의 전체 문서 이동으로 구현했다. 첫 시도 1·재로드 1, 최종 광고 0 실측. — Codx
+- **S10 모바일 overlay 이번 범위 제외** — 사용자 판단에 따라 2026-09-21 배포에서 제외. 실제 광고 overlay를 만들려면 정확 URL 스텁이 필요. — Claude 판정
 - **S6 PDF Editor 루트 SPA 이동** — `/tools/pdf-editor/merge` 정확 링크 부재는 확인했고 PDF 루트 전환은 한국어·영어에서 검사했다. 후속으로 제외 하위 경로의 직접 링크가 생기면 해당 전환을 추가 검사한다. — Muse
 - **AdSense 계정 설정 확인** — 계정의 페이지 제외 목록에 광고 전면 제외 4경로군과 격리 경로가 포함됐는지, 사이트 수준 Auto ads 설정과 실제 노출 표본이 코드 정책과 일치하는지 확인한다. — Muse
 - **Codex worktree 신뢰 등록 정리** — 작업을 위해 `~/.codex/config.toml`에 추가한 `wt-adsense-guides`, `wt-adsense-adtest`, `wt-adsense-integration` 신뢰 등록 3줄은 관련 worktree 작업 종료 뒤 제거한다. — Codx
-- **S9 광고 제외 경로 이동의 로컬 상태 유실** — 광고 허용 경로에서 제외 경로로 이동하면 전체 문서 교체로 도구 로컬 상태가 유실되고 경고·취소 흐름이 없다. SPA 이탈과 동일한 설계 동작으로 판정했지만 경고 UX 도입 여부와 전역 메모리 상태를 가진 도구의 추가 위험은 후속 검토한다. — Claude 판정 / Codx 관찰
+- **S9 보호 가드 광고 제외 경로 문서 교체 미완 — 2026-09-21** — 보호 가드가 광고 제외 경로로의 이동을 가로챌 때 전체 문서 교체가 일어나지 않아 이전 화면의 광고 script가 남는다(scripts = 1, 문서 교체 loaderId 변경 0). 원인 후보로 캡처 단계 클릭 리스너의 `pendingTargetRef` 미설정을 고쳤으나 해결되지 않았고 근본 원인 미규명. **이번 배포에서 제외**. 다이얼로그·toolState·도구 연결 등 구현은 `work/adsense-s9-muse-20260921` 브랜치에 보존. 재개 시 확인: `confirmGuardLeave`에서 전체 문서 이동이 실제로 일어나는지, `pendingTargetRef`가 유지되는지, 광고 script 잔류의 동작 경로. — Claude 판정
 - **완료 — 데스크톱 `.bottom-tabs` 노출** — 전역 기본값을 `display: none`으로 두고 기존 모바일 미디어 쿼리의 3열 `display: grid`를 유지했다. 통합 production 화면에서 1365×900 숨김과 412×839 3열 표시를 재확인했다. — Codx
 - **완료 — 광고 스모크 빌드 출처 메타데이터 오기** — 하드코딩 문구를 제거하고 실행 시점의 `runHead`와 `distMtime`을 구분해 기록한다. — Muse
 - **완료 — 광고 스모크 판별·네트워크 단언 보강** — 기대 실패의 타입·코드·정확한 메시지를 함께 검사하고 S5·판별 경로에서도 네트워크 단언을 독립 실행하며 실패 결과의 계수를 보존한다. — Muse
