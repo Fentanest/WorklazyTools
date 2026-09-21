@@ -4,6 +4,16 @@
 
 ## 2026-09-21
 
+### 모바일 셸 결함 2건 — 상단바 오버플로와 라이트 테마 워드마크 (Claude 판정)
+
+- **수평 오버플로 원인:** `src/styles/worklazy-theme.css`의 `@media (max-width: 1020px)`가 `.wl-topbar`에 `margin: 0 -24px`를 주는데 `@media (max-width: 820px)`가 `position`·`left`·`padding`만 재정의하고 `margin`을 되돌리지 않았다. 390px에서 상단바 폭 438px·left −24 → `scrollWidth − clientWidth = 24`. 도입은 `9fd58cf`(09-16 음수 여백) + `4451301`(09-17 static 전환)이며 2026-09-17부터 운영에 노출됐다.
+- **전역 범위 확인:** video-studio·pdf-editor·excel-merger·text-merger의 bottom 모바일 8/8이 페이지 높이(3,499~6,633)와 무관하게 전부 정확히 24px. 도구 본문이 아니라 공유 크롬 요소의 서명이다. 운영 3페이지에서 총괄이 puppeteer로 재현했다.
+- **수정과 검증:** 820px 이하에 `margin: 0` 추가. 총괄 독립 실측 390·900·1365px 전부 overflow 0이고, 900px 구간은 `margin: 0px -24px`가 유지돼 의도된 구간 동작이 보존됐다.
+- **워드마크 원인:** 모바일 브랜드는 텍스트가 아니라 `<img src="logo.svg">`(`AppShell.tsx:414`)이고 SVG 안에 `<text fill="#FFFFFF">Worklazy</text>`가 박혀 있다. 다크 헤더(`rgba(24,27,32,.68)`)에서는 맞고 라이트(`rgba(249,249,252,.72)`)에서만 묻힌다. `<img>`라 CSS로 내부를 칠할 수 없어 테마별 소스 교체를 채택했다. `filter: invert()`는 다른 색까지 뒤집으므로 기각했다.
+- **디자인 보존:** `public/logo-light.svg`는 `logo.svg`와 워드마크 `fill`만 다르고 나머지 바이트가 동일하다. "W" 타일·"Tools" 회색·"CLIENT SIDE" 초록·자간·배치 불변.
+- **총괄 지시의 오류와 구현자 반박 채택:** 총괄은 `LanguageLandingPage.tsx:23`도 교체하라고 지시했으나 전제가 틀렸다. `global.css:132`가 `.language-landing-card > img`에 `background: #111118`을 주어 로고가 양 테마 모두 어두운 타일 위에 놓인다. 구현자가 실측(흰 글자 18.80:1, 다크로 바꾸면 1.06:1)으로 반박했고 총괄이 CSS 원문과 렌더 결과로 확인해 **반박을 채택**했다. 랜딩 미수정이 옳다.
+- **대비 실측(4테마, 390px):** 라이트 coral·mint 16.86:1, 다크 coral·mint 17.26:1. 네 테마 모두 overflow 0. — Claude 판정(Opus) / Muse 구현 / Codx 선행 진단
+
 ### Muse 부트스트랩 정지의 원인 확정 — stdin (Claude 판정)
 
 - **확정 원인:** 비대화형 `opencode run`을 **stdin이 닫히지 않는 소켓/파이프** 상태로 실행하면, 로그가 `message=init`까지만 찍히고 세션이 생성되지 않은 채 무한 대기한다. 다른 에이전트의 Bash 백그라운드에서 띄울 때 재현된다.
