@@ -107,25 +107,11 @@ export function AppShell() {
 
   const confirmGuardLeave = useCallback(() => {
     const action = pendingActionRef.current;
-    const target = pendingTargetRef.current;
     pendingActionRef.current = null;
-    pendingTargetRef.current = null;
+    pendingTargetRef.current = null;  // S9: clean up unused ref
     setGuardOpen(false);
     if (!action) return;
     leavingRef.current = true;
-
-    // S9: For ad-free paths, use full document navigation to clear ad artifacts
-    let finalAction = action;
-    if (target) {
-      try {
-        const url = new URL(target, window.location.href);
-        if (isAdFreePath(url.pathname)) {
-          finalAction = () => window.location.assign(target);
-        }
-      } catch {
-        // If URL parsing fails, use the original action
-      }
-    }
 
     if (guardEntryRef.current) {
       // Remove our same-URL guard entry first so Back from the destination
@@ -133,10 +119,10 @@ export function AppShell() {
       guardEntryRef.current = false;
       guardKeyRef.current = null;
       skipPopRef.current = true;
-      leaveAfterPopRef.current = finalAction;
+      leaveAfterPopRef.current = action;
       window.history.back();
     } else {
-      finalAction();
+      action();
     }
   }, []);
 
@@ -252,7 +238,9 @@ export function AppShell() {
   }, []);
   const adFree = isAdFreePath(location.pathname);
   useEffect(() => {
+    console.log("[S9-DEBUG] adFreeEffect:", { adFree, href: window.location.href, hasAdScript: Boolean(document.querySelector("script[data-worklazy-adsense]")) });
     if (adFree && document.querySelector("script[data-worklazy-adsense]")) {
+      console.log("[S9-DEBUG] adFreeEffect: Replacing document at", window.location.href);
       window.location.replace(window.location.href);
     }
   }, [adFree]);
