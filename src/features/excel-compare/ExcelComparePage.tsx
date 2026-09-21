@@ -325,7 +325,7 @@ export function ExcelComparePage() {
      <div className="flex flex-wrap gap-1.5" data-testid="excel-status-filters" role="group" aria-label={t("features:excelCompare.results.filters")}>
       {STATUSES.map((status) => { const selected = statuses.has(status); return <Button type="button" size="sm" variant="outline" data-status={status} aria-pressed={selected} className={`rounded-full ${selected ? "border-primary/60 bg-primary/10 text-foreground dark:border-primary/60" : "opacity-55"}`} key={status} onClick={() => toggleStatus(status)}><span className={`size-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />{t(`features:excelCompare.status.${status}` as never)}</Button>; })}
      </div>
-     <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-xl border border-input bg-background px-3 text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20" data-testid="excel-result-search"><Search size={16} /><span className="sr-only">{t("features:excelCompare.results.search")}</span><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground max-[620px]:text-base" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleLimit(500); }} placeholder={t("features:excelCompare.results.search")} /></label>
+     <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-xl border border-input bg-background px-3 text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20" data-testid="excel-result-search"><Search size={16} /><span className="sr-only">{t("features:excelCompare.results.search")}</span><input className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground max-[620px]:text-base" data-excel-result-focus="" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleLimit(500); }} placeholder={t("features:excelCompare.results.search")} /></label>
     </div>
     <div className="mt-3 overflow-x-auto rounded-xl border border-border focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" data-testid="excel-result-scroll-region" role="region" aria-label={t("features:excelCompare.results.tableRegion")} tabIndex={0}>
      <table className="w-full min-w-[1040px] border-collapse text-sm [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-left" data-testid="excel-result-table"><thead><tr><th className="min-w-14 whitespace-nowrap">{t("features:excelCompare.results.pair")}</th><th className="min-w-24 whitespace-nowrap">{t("features:excelCompare.results.state")}</th><th className="min-w-20 whitespace-nowrap">{t("features:excelCompare.results.location")}</th><th className="min-w-32 whitespace-nowrap">{t("features:excelCompare.results.key")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.left")}</th><th className="min-w-64 whitespace-nowrap">{t("features:excelCompare.results.right")}</th><th className="min-w-28 whitespace-nowrap">{t("features:excelCompare.results.reason")}</th></tr></thead><tbody>
@@ -502,9 +502,10 @@ function scheduleResultFocusVisibility(target: EventTarget | null) {
 }
 
 function keepResultFocusVisible(target: HTMLElement) {
+ const ringTarget = resolveFocusRingElement(target);
  const scrollRegion = target.closest<HTMLElement>('[data-testid="excel-result-scroll-region"]');
  if (scrollRegion) {
-  const targetRect = target.getBoundingClientRect();
+  const targetRect = ringTarget.getBoundingClientRect();
   const regionRect = scrollRegion.getBoundingClientRect();
   const visibleLeft = regionRect.left + scrollRegion.clientLeft + FOCUS_VISIBILITY_GAP;
   const visibleRight = visibleLeft + scrollRegion.clientWidth - FOCUS_VISIBILITY_GAP * 2;
@@ -521,7 +522,7 @@ function keepResultFocusVisible(target: HTMLElement) {
 
  const headerBottom = topChromeBottom();
  const tabsTop = fixedChromeBoundary(".bottom-tabs", "top") ?? window.innerHeight;
- const targetRect = target.getBoundingClientRect();
+ const targetRect = ringTarget.getBoundingClientRect();
  const verticalDelta = targetRect.top < headerBottom + FOCUS_VISIBILITY_GAP
   ? targetRect.top - headerBottom - FOCUS_VISIBILITY_GAP
   : targetRect.bottom > tabsTop - FOCUS_VISIBILITY_GAP
@@ -530,6 +531,17 @@ function keepResultFocusVisible(target: HTMLElement) {
  if (Math.abs(verticalDelta)>= FOCUS_SCROLL_TOLERANCE) {
   window.scrollBy({ top: verticalDelta, behavior: "instant" });
  }
+}
+
+function resolveFocusRingElement(target: HTMLElement) {
+ // The result search control draws its focus ring on the wrapping <label>
+ // (focus-within:ring) while keyboard focus lands on the inner <input>.
+ // scheduleResultFocusVisibility keeps tracking the focused input (so the
+ // activeElement/isConnected guards hold), but visibility is measured on the
+ // ring element. Other registered controls draw the ring on themselves.
+ const searchRoot = target.closest('[data-testid="excel-result-search"]');
+ if (searchRoot instanceof HTMLElement) return searchRoot;
+ return target;
 }
 
 function topChromeBottom() {
