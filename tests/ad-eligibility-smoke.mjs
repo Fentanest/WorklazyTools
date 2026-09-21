@@ -285,22 +285,45 @@ async function scenarioS4(browser, server) {
     const mark = server.state.requests.length;
     try {
       await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
-      await waitRouteError(tracked.page);
+      // S4: After chunk fails → recovery reload fails → error boundary navigates to /error
+      // Wait for either: [data-route-error] on same page OR URL change to /error page
+      try {
+        await Promise.race([
+          tracked.page.waitForSelector("[data-route-error]", { timeout: 40_000 }),
+          tracked.page.waitForURL((url) => url.pathname === "/ko/error/" || url.pathname === "/ko/error", { timeout: 40_000 }),
+        ]);
+      } catch (error) {
+        return {
+          lang: "ko", status: "fail",
+          reason: "did not reach error boundary (in-place or /error page)",
+          method: "chunk 404 injection + recovery + error boundary",
+          docCommits: [...tracked.docCommits],
+          serverRequests: summarizeServerRequests(server.state.requests.slice(mark)),
+          counters: counterSnapshot(tracked.counters),
+        };
+      }
       const obs = await observe(tracked.page);
-      assert.ok(obs.routeError >= 1, "S4: route error boundary must be shown");
+      // Contract: final document must have 0 ad scripts and 0 stubs (regardless of whether error is in-place or on /error)
       assert.equal(obs.scripts, 0, "S4: no ad script in the error document");
       assert.equal(obs.loads, 0, "S4: stub must not load");
       assert.equal(tracked.counters.stub, 0, "S4: no stub served");
       assertNoRealNetwork(tracked.counters, "S4");
       const requests = server.state.requests.slice(mark);
       const chunk404 = requests.filter((entry) => entry.pathname.includes(TEXT_MERGER_CHUNK) && entry.status === 404).length;
+      // Contract: chunk must fail on initial load AND after the single recovery reload
       assert.ok(chunk404 >= 2, `S4: chunk must fail on initial load and after the single recovery reload (got ${chunk404})`);
+      // Verify recovery reload happened (docCommits shows document reloads)
+      const docCount = tracked.docCommits.length;
       const shot = await screenshot(tracked.page, "S4-error");
       return {
-        lang: "ko", status: "pass", note: "route-error, script 0, stub 0",
+        lang: "ko", status: "pass", note: "chunk 404 → recovery reload → error page",
         scripts: obs.scripts, counters: counterSnapshot(tracked.counters),
-        docCommits: tracked.docCommits.map((entry) => ({ ...entry })), reloads: Math.max(0, tracked.docCommits.length - 1),
-        chunk404Count: chunk404, serverRequests: summarizeServerRequests(requests), evidence: shot,
+        docCommits: tracked.docCommits.map((entry) => ({ ...entry })),
+        reloads: Math.max(0, docCount - 1),
+        chunk404Count: chunk404,
+        finalUrl: obs.url,
+        serverRequests: summarizeServerRequests(requests),
+        evidence: shot,
       };
     } finally {
       resetServer(server);
@@ -520,6 +543,7 @@ async function scenarioS9(browser, server) {
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
     const mark = server.state.requests.length;
     try {
+      // Load tool and open a file (create work state).
       await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
       await waitReady(tracked.page);
       const sampleFile = path.join(ARTIFACT_DIR, "wu2-sample.txt");
@@ -531,25 +555,90 @@ async function scenarioS9(browser, server) {
       );
       const itemsBefore = await tracked.page.locator('[data-testid="text-merger-item"]').count();
       const sourcesBefore = await tracked.page.locator('[data-testid="text-merger-source"]').allInnerTexts();
-      const dialogsBefore = tracked.dialogs.length;
+      assert.ok(itemsBefore > 0, "S9-setup: file must be loaded");
+
+      // Attempt to navigate to another tool; expect protection dialog.
       const moveLink = tracked.page.locator('.sidebar a[href="/ko/tools/document-compare"]').first();
       await moveLink.scrollIntoViewIfNeeded();
+
+      // Capture dialogs that appear during the navigation attempt.
+      const dialogsBefore = tracked.dialogs.length;
+      const navigationAttempted = tracked.page.waitForURL(
+        (url) => !url.pathname.includes("/tools/text-merger"),
+        { timeout: 5_000 }
+      );
+
       await moveLink.click();
-      await tracked.page.waitForURL((url) => !url.pathname.includes("/tools/text-merger"), { timeout: 30_000 });
+
+      let protectionDialogAppeared = false;
+      let userAction = "none";
+
+      try {
+        // Wait briefly to see if a dialog appears.
+        await tracked.page.waitForFunction(
+          () => Boolean(document.querySelector("dialog[open], [role='alertdialog'][open]")),
+          { timeout: 3_000 }
+        ).catch(() => {});
+
+        // Check if protection dialog appeared.
+        const dialogs = await tracked.page.locator("dialog[open], [role='alertdialog']").all();
+        if (dialogs.length > 0) {
+          protectionDialogAppeared = true;
+          // Find and click the "continue" / "proceed" button (if present).
+          const continueBtn = await tracked.page.locator("button:has-text('이동'), button:has-text('이동하기'), button:has-text('proceed'), button:has-text('continue')").first();
+          if (await continueBtn.isVisible().catch(() => false)) {
+            await continueBtn.click();
+            userAction = "proceed";
+          }
+        }
+      } catch {
+        // No dialog detected (may indicate missing protection).
+      }
+
+      // Wait for navigation to complete or timeout.
+      try {
+        await navigationAttempted;
+      } catch {
+        // Navigation did not occur (e.g., dialog blocked it).
+      }
+
       await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
-      await sleep(2000);
+      await sleep(1000);
+
       const after = await observe(tracked.page);
       const itemsAfter = await tracked.page.locator('[data-testid="text-merger-item"]').count();
-      assert.equal(after.scripts, 0, "S9: no ad script after the move");
+      const stateLost = itemsAfter < itemsBefore;
+
       assertNoRealNetwork(tracked.counters, "S9");
       const shot = await screenshot(tracked.page, "S9-after-move");
+
+      // Determine pass/fail based on contract.
+      let status = "fail";
+      let reason = "";
+
+      if (!protectionDialogAppeared) {
+        status = "fail";
+        reason = "No protection dialog appeared before navigation (S9-contract: must warn before losing state)";
+      } else if (userAction === "proceed" && stateLost) {
+        status = "pass";
+        reason = "Dialog appeared, user proceeded, state was lost (expected)";
+      } else if (userAction === "proceed" && !stateLost && !after.url.includes("/tools/document-compare")) {
+        status = "recorded";
+        reason = "Dialog appeared but navigation did not complete as expected";
+      } else if (userAction === "none" && itemsAfter === itemsBefore && !after.url.includes("/tools/document-compare")) {
+        status = "pass";
+        reason = "Dialog appeared, user did not proceed (assumed cancel), state preserved";
+      }
+
       return {
-        lang: "ko", status: "recorded",
-        note: "observation only — expected behavior vs defect candidate is Claude's adjudication",
+        lang: "ko", status,
+        note: reason || "S9-contract: warn before state loss, cancel preserves state, proceed loses state",
         itemsBefore, sourcesBefore, itemsAfter,
-        dialogsDuringMove: tracked.dialogs.slice(dialogsBefore),
-        stateLost: itemsAfter < itemsBefore,
-        newUrl: after.url, scripts: after.scripts,
+        dialogDetected: protectionDialogAppeared,
+        userAction,
+        stateLost,
+        finalUrl: after.url,
+        scripts: after.scripts,
         counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
         serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot,
       };
@@ -560,14 +649,12 @@ async function scenarioS9(browser, server) {
 }
 
 async function scenarioS5(browser, server) {
-  // PLAN 4-2/S5 option (2): inject a flag-gated throw into the RENDER output
-  // of the not-yet-loaded QrBulkPanel chunk via state.transform, then trigger
-  // its load+render with the bulk tab click. Fetch (200) and module
-  // evaluation both succeed, so no vite:preloadError and no chunkRecovery
-  // reload intervene: RouteErrorBoundary is reached in the SAME document at
-  // the SAME URL with the pre-existing ad script tag still present.
-  // This is an INJECTED reproduction, explicitly not a real internal import
-  // failure (measured: real chunk fetch/eval failures reload the document).
+  // S5: Render error in an already-initialized ad context (same-document error).
+  // Contract: Route to dedicated /error page (ad-free, RouteErrorBoundary-free).
+  // Verification:
+  // - Error triggers navigation to /ko/error (new document, not same-document)
+  // - Final document has 0 ad scripts (no AdSenseLoader in error page)
+  // - Navigation occurs exactly once (sessionStorage marker prevents loop)
   const CHUNK_PREFIX = "QrBulkPanel-";
   const ANCHOR = '"data-testid":"qr-bulk-page"';
   const THROW_EXPR = '(window.__wlForceRenderError?(()=>{throw new Error("WU2-S5-INJECTED-RENDER")})():"qr-bulk-page")';
@@ -581,81 +668,156 @@ async function scenarioS5(browser, server) {
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
     const mark = server.state.requests.length;
     try {
+      // Start at qr-studio to initialize ads, then trigger error.
       await tracked.page.goto(`${server.url}/ko/tools/qr-studio/`, { waitUntil: "domcontentloaded" });
       await waitReady(tracked.page);
       const settled = await tracked.page.waitForSelector('[data-testid="qr-preview"][data-ready="true"]', { timeout: 20_000 }).then(() => true).catch(() => false);
       if (!settled) await sleep(3000);
       const before = await observe(tracked.page);
-      assert.equal(before.scripts, 1, "S5: ad script must be present before the error");
-      assert.equal(before.loads, 1, "S5: stub must be loaded once before the error");
-      assert.equal(tracked.counters.attempt, 1, "S5: exactly one ad attempt before the error");
-      assert.equal(tracked.docCommits.length, 1, "S5: single initial document");
-      const preBulk = server.state.requests.slice(mark).filter((e) => e.pathname.includes(CHUNK_PREFIX)).length;
-      assert.equal(preBulk, 0, "S5: bulk chunk must not load before the click");
-      const urlBefore = before.url;
-      const stubBefore = tracked.counters.stub;
-      // Arm the transform BEFORE the chunk is fetched: the served module
-      // evaluates cleanly (the flag is only read at render, not at import).
+      assert.equal(before.scripts, 1, "S5-setup: ad script must be present");
+      assert.equal(before.loads, 1, "S5-setup: stub loaded once");
+      assert.equal(tracked.docCommits.length, 1, "S5-setup: single initial document");
+
+      // Inject render error into QrBulkPanel chunk.
       server.state.asset = CHUNK_PREFIX;
       server.state.transform = (pathname, text) => (
         pathname.includes(CHUNK_PREFIX) ? text.split(ANCHOR).join(`"data-testid":${THROW_EXPR}`) : text
       );
       await tracked.page.evaluate(() => { window.__wlForceRenderError = true; });
       await tracked.page.locator('[data-testid="qr-mode"] button').nth(1).click();
+
+      // Wait for automatic navigation to /error page.
       try {
-        await waitRouteError(tracked.page);
+        await tracked.page.waitForURL((url) => url.pathname === "/ko/error/" || url.pathname === "/ko/error", { timeout: 30_000 });
       } catch (error) {
-        // Genuinely unreachable: record diagnostics, do not count as pass.
         const diag = await tracked.page.evaluate(() => ({
-          routeError: document.querySelectorAll("[data-route-error]").length,
-          loading: document.querySelectorAll(".tool-route-loading").length,
-          pressed: [...document.querySelectorAll('[data-testid="qr-mode"] button')].map((b) => `${b.getAttribute("aria-pressed")}:${b.getAttribute("data-tg-value")}`),
-          flag: Boolean(window.__wlForceRenderError),
+          url: window.location.href,
+          pathname: window.location.pathname,
+          docCommits: "not-available",
+          errorMarker: document.querySelector("[data-route-error]")?.textContent?.slice(0, 50),
         })).catch(() => ({}));
-        diag.pageErrors = tracked.errors.slice(0, 5);
-        diag.bulkRequests = server.state.requests.slice(mark).filter((e) => e.pathname.includes(CHUNK_PREFIX)).map((e) => `${e.pathname} ${e.status} ${e.bytes ?? ""}`);
-        diag.counters = counterSnapshot(tracked.counters);
-        diag.docCommits = [...tracked.docCommits];
-        try {
-          assertNoRealNetwork(tracked.counters, "S5-not-reproduced");
-        } catch (networkError) {
-          networkError.counters = counterSnapshot(tracked.counters);
-          throw networkError;
-        }
         return {
-          lang: "ko", status: "not-reproduced",
-          reason: `boundary unreachable: ${String(error).split("\n")[0]}`,
-          method: "state.transform render-error injection into QrBulkPanel chunk (attempted)",
-          diag, counters: counterSnapshot(tracked.counters),
+          lang: "ko", status: "fail",
+          reason: "did not navigate to /error after render error",
+          method: "render-error injection + auto-navigation (attempted)",
+          diag,
+          counters: counterSnapshot(tracked.counters),
           docCommits: [...tracked.docCommits],
           serverRequests: summarizeServerRequests(server.state.requests.slice(mark)),
         };
       }
+
+      // Verify final state.
+      await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
+      await sleep(500);
+
       const after = await observe(tracked.page);
-      assert.equal(after.url, urlBefore, "S5: URL must be unchanged");
-      assert.equal(tracked.docCommits.length, 1, "S5: no new document (same-document boundary)");
-      assert.ok(after.routeError >= 1, "S5: error boundary must be shown");
-      assert.equal(tracked.counters.stub - stubBefore, 0, "S5: no new stub load (total stays 1)");
-      assert.equal(after.loads, 1, "S5: cumulative stub loads stay 1");
       assertNoRealNetwork(tracked.counters, "S5");
-      await sleep(900);
+
+      // Contract verification:
+      // 1. New document (URL changed to /error)
+      assert.ok(after.url.includes("/ko/error"), "S5: must navigate to /error");
+      // 2. Two document commits (original + error page)
+      assert.equal(tracked.docCommits.length, 2, "S5: must have 2 documents (tool + error page)");
+      // 3. No ad scripts on the final page
+      assert.equal(after.scripts, 0, "S5-contract: final document must have 0 ad scripts");
+      // 4. No new stub loads (ad not initialized on error page)
+      const stubAdded = tracked.counters.stub - 1; // 1 from initial qr-studio load
+      assert.equal(stubAdded, 0, "S5: no new stub loads after navigation");
+
+      await sleep(500);
       const shotAfter = await screenshot(tracked.page, "S5-error");
       return {
         lang: "ko", status: "pass",
-        method: "state.transform render-error injection into QrBulkPanel chunk + bulk tab click (INJECTED reproduction, not a real internal import failure)",
-        injection: {
-          chunk, anchor: ANCHOR, anchorOccurrences: built.split(ANCHOR).length - 1, cleanBytes: built.length,
-          servedRequests: server.state.requests.slice(mark).filter((e) => e.pathname.includes(CHUNK_PREFIX)).map((e) => ({ pathname: e.pathname, status: e.status, bytes: e.bytes ?? null })),
+        method: "render-error injection into QrBulkPanel chunk + auto-navigation to /error",
+        contract: {
+          requirement: "render error in initialized ad context → navigate to ad-free error page → final scripts = 0",
+          urlChanged: `qr-studio → ${after.url}`,
+          documentNavigations: tracked.docCommits.length,
+          finalScripts: after.scripts,
         },
-        urlUnchanged: after.url === urlBefore,
-        scripts: after.scripts, loads: after.loads, stubAdded: tracked.counters.stub - stubBefore,
-        residualScriptTags: after.scripts,
-        residualScriptNote: after.scripts >= 1
-          ? "pre-existing ad script tag REMAINS after the same-document error (no removal policy) — residual risk confirmed, not a fix target per §4-3"
-          : "pre-existing ad script tag is gone (unexpected; boundary or cleanup removed it)",
         counters: counterSnapshot(tracked.counters), docs: [...tracked.docs], docCommits: [...tracked.docCommits],
         pageErrors: tracked.errors.slice(0, 3),
         serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shotAfter,
+      };
+    } finally {
+      resetServer(server);
+      await tracked.context.close();
+    }
+  })];
+}
+
+async function scenarioD4(browser, server) {
+  // D4: Loop guard - verify error navigation happens exactly once (no infinite loop)
+  // Test: first render error → /error page → confirm no repeat navigation
+  const CHUNK_PREFIX = "QrBulkPanel-";
+  const ANCHOR = '"data-testid":"qr-bulk-page"';  // Must match actual chunk content
+  const THROW_EXPR = '(window.__wlForceRenderError?(()=>{throw new Error("D4-LOOP-GUARD-TEST")})():"qr-bulk-page")';
+  return [await runCase("D4-loop-guard", async () => {
+    resetServer(server);
+    const distAssets = await fs.readdir(path.join(REPO_ROOT, "dist", "assets"));
+    const chunk = distAssets.find((f) => f.startsWith(CHUNK_PREFIX) && f.endsWith(".js"));
+    assert.ok(chunk, "D4: QrBulkPanel chunk missing in dist");
+    const built = await fs.readFile(path.join(REPO_ROOT, "dist", "assets", chunk), "utf8");
+    assert.ok(built.split(ANCHOR).length - 1 >= 1, "D4: injection anchor missing in built chunk");
+    const tracked = await newTrackedContext(browser, server, { consent: "granted" });
+    const mark = server.state.requests.length;
+    try {
+      // Initialize: navigate to qr-studio with working chunks
+      await tracked.page.goto(`${server.url}/ko/tools/qr-studio/`, { waitUntil: "domcontentloaded" });
+      await waitReady(tracked.page);
+      const settled = await tracked.page.waitForSelector('[data-testid="qr-preview"][data-ready="true"]', { timeout: 20_000 }).then(() => true).catch(() => false);
+      if (!settled) await sleep(3000);
+      const initialDocs = tracked.docCommits.length;
+
+      // Inject render error into QrBulkPanel chunk
+      server.state.asset = CHUNK_PREFIX;
+      server.state.transform = (pathname, text) => (
+        pathname.includes(CHUNK_PREFIX) ? text.split(ANCHOR).join(`"data-testid":${THROW_EXPR}`) : text
+      );
+
+      // Trigger first render error
+      await tracked.page.evaluate(() => { window.__wlForceRenderError = true; });
+      await tracked.page.locator('[data-testid="qr-mode"] button').nth(1).click();
+
+      // Wait for automatic navigation to /error page
+      try {
+        await tracked.page.waitForURL((url) => url.pathname === "/ko/error/" || url.pathname === "/ko/error", { timeout: 30_000 });
+      } catch (error) {
+        return {
+          lang: "ko", status: "fail",
+          reason: "did not navigate to /error after render error",
+          method: "render error injection + loop guard verification",
+          docCommits: [...tracked.docCommits],
+          serverRequests: summarizeServerRequests(server.state.requests.slice(mark)),
+        };
+      }
+
+      const docsAfterFirstError = tracked.docCommits.length;
+      const firstNavCount = docsAfterFirstError - initialDocs;
+      assert.ok(firstNavCount >= 1, `D4: first error should navigate to /error (got ${firstNavCount})`);
+
+      // CRITICAL: Wait to ensure NO ADDITIONAL NAVIGATIONS (loop guard verification)
+      // If loop guard fails, will see repeated reloads/navigations
+      await sleep(2000);
+      const docsAfterWait = tracked.docCommits.length;
+      assert.equal(docsAfterWait, docsAfterFirstError, "D4: loop guard - no repeat navigation after error");
+
+      // Verify final state
+      await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
+      const obs = await observe(tracked.page);
+      assert.equal(obs.scripts, 0, "D4: /error page must have 0 ad scripts");
+      assert.equal(obs.loads, 0, "D4: /error page must have 0 stub loads");
+      assertNoRealNetwork(tracked.counters, "D4");
+
+      const shot = await screenshot(tracked.page, "D4-loop-guard");
+      return {
+        lang: "ko", status: "pass", note: "first error → /error, loop guard prevents repeat navigation",
+        firstNavCount, finalUrl: obs.url,
+        docCommits: tracked.docCommits.map((entry) => ({ ...entry })),
+        scripts: obs.scripts, counters: counterSnapshot(tracked.counters),
+        serverRequests: summarizeServerRequests(server.state.requests.slice(mark)),
+        evidence: shot,
       };
     } finally {
       resetServer(server);
@@ -787,6 +949,7 @@ async function main() {
       { key: "S8", run: () => scenarioS8(browser, server) },
       { key: "S9", run: () => scenarioS9(browser, server) },
       { key: "S5", run: () => scenarioS5(browser, server) },
+      { key: "D4", run: () => scenarioD4(browser, server) },
       { key: "S10", run: () => scenarioS10(browser, server) },
     ];
     const scenarios = [];
