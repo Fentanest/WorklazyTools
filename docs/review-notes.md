@@ -4,6 +4,24 @@
 
 ## 2026-09-21
 
+### Muse 부트스트랩 정지의 원인 확정 — stdin (Claude 판정)
+
+- **확정 원인:** 비대화형 `opencode run`을 **stdin이 닫히지 않는 소켓/파이프** 상태로 실행하면, 로그가 `message=init`까지만 찍히고 세션이 생성되지 않은 채 무한 대기한다. 다른 에이전트의 Bash 백그라운드에서 띄울 때 재현된다.
+- **실측(2026-09-21 07:03~07:12 UTC, PID 717966):** 8분째 정지한 프로세스는 네트워크 소켓 **0개**, inotify fd **0개**, 열린 fd 22개. 메인 스레드 wchan `ep_poll`, 나머지 전부 `futex_do_wait`. `/proc/<pid>/fd/0` → `socket:[399924370]`이고 `/proc/<pid>/fdinfo/22`의 epoll 대상에 `tfd: 0`이 등록돼 있었다. 즉 stdin을 폴링하며 대기 중이었다.
+- **판별 실험:** 같은 worktree·같은 모델·같은 바이너리에서 `< /dev/null`만 붙이자 **7초 만에** `created id=ses_…`와 정상 응답(`PROBE-A-OK`).
+- **기각한 가설 2건:** (1) `opencode.db` 824MB(event 테이블 642MB) → 실제 DB 사본을 `XDG_DATA_HOME`으로 물려 실행하니 `init`→`created` 248ms. (2) **inotify 인스턴스 한도 고갈** → 한도를 128→512로 올리고 여유 384를 확인한 뒤에도 같은 증상이 그대로 재현됐고, 정지한 프로세스의 inotify fd는 0개였다. 간헐성은 자원 경합이 아니라 **디스패치할 때 stdin을 닫았는지 여부**로 갈렸다. inotify 한도 상향 자체는 무해하나 이 정지의 원인이 아니다.
+- **교훈:** `init`에서 로그가 끊기면 로그로는 알 수 없다. `/proc/<pid>/fd`, `/proc/<pid>/fdinfo/<epollfd>`, 스레드별 `wchan`을 봐야 한다. 상관관계(동시 실행 중인 Chrome 잡)를 인과로 단정한 것이 첫 오진의 원인이다. 런북 반영은 `7fb3290`. — Claude 판정(Opus) / Muse 반영
+
+### 번들 B1 — 정본 전제 무효 판정 (Claude 판정)
+
+- **판정:** `bundle-pdflib-dedup-20260909.md`의 B1("고정 shared 게이트 실패 원인 조사")은 **현재 소스에서 재현 대상이 존재하지 않는다.** 중단이 옳으며, 중단 사유는 "입력 누락"이 아니라 "전제 무효"다.
+- **근거:** 커밋 `0f02458`(2026-09-09 13:27, 사용자 결정)이 기본 번들 상한 5종을 `null`로 만들었다. `compareWithBaseline`의 실패 판정은 `budget.limits[metric] !== null && delta > limit`이므로 5종이 모두 `null`인 지금 `failures`는 항상 빈 배열이다. 정본은 같은 날 **11:17**에 작성됐고 2시간 10분 뒤 그 전제가 사라졌다.
+- **고정 입력 3종도 소실:** `docs/jobs/todo/canon-rounds-20260909/` 폴더 자체가 없고(gitignore라 이력에도 없음), `/tmp/worklazy-canon/sol/candidate-es.json`과 `/tmp/worklazy-u4-mergegate/bundle-full.json`은 재부팅으로 소실됐다. 다만 이를 복구해도 위 이유로 목적을 달성하지 못한다.
+- **기각한 두 우회:** baseline 재생성·추정 복원(고정 입력을 새로 만드는 우회), `BUNDLE_LIMIT_SHARED_JS_GZIP=30720` 주입(사용자가 제거한 상한 부활). 구현자가 둘 다 거부하고 중단한 것은 규칙대로다.
+- **유효하게 남는 사실:** pdf-lib의 main/worker 중복 공급은 실재하고, B0 실측 앱 JS gzip **−154,886B**는 상한과 무관하게 유효하다. `bundle-module-attribution.mjs`의 non-main module 거부로 worker/public이 opaque인 계측 사각지대도 실재한다.
+- **선행 지적:** 2026-09-20 Astra 감사가 이미 "과거 shared 상한 실패를 현행 착수 차단으로 사용하지 않음"이라고 적었다. 이번 판정은 그 지적을 실측으로 확정한 것이며, 그 행을 반영하지 않고 B1을 발주한 것은 총괄의 범위 판단 착오다.
+- **후속:** 착수 여부는 사용자 투자 판단 대상이다(보류 / 계측만 복구 / 전면 진행). 어느 쪽이든 정본의 B1 정의와 B2 진입 조건을 다시 써야 한다. 상세 `docs/jobs/todo/bundle-b1-20260921/B1-JUDGMENT.md`. — Claude 판정(Opus) / Codx 진단
+
 ### AdSense 광고 정책 검사와 S9 광고 제외 경로 상태 (Claude 판정)
 
 - **S5 광고 초기화 안 됨 판정 변경:** S5는 원래 「범위 밖」으로 분류했으나 도구 로딩 오류 시 광고 정책의 최우선 항목이므로 **제품 해결**로 판정 변경했다. 이미 초기화된 Auto ads를 중단하는 공식 API가 없으므로 `stopAds()` 류 가정·CSS 은폐·스크립트 태그 제거만으로의 해결은 기각했다. 대신 광고를 로드하지 않는 독립 오류 문서로의 1회 전체 문서 이동을 채택했다. 실측: 문서 교체 2회(첫 시도 1·재로드 1), 최종 문서 광고 script 0, 오류 직전 stub 1(광고가 실제로 활동 중이던 상태에서의 전환). — Claude

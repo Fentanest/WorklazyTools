@@ -2,11 +2,15 @@
 
 종결된 작업 묶음에서 살아남은 후속 항목을 여기에 남긴다(「작업지시서 관리」 규칙). 항목마다 배경이 된 작업과 판단 근거를 한 줄로 병기한다.
 
+## 번들 다이어트 (2026-09-21)
+
+- **B1/B2/B3 착수 여부 사용자 결정 대기** — 정본 `bundle-pdflib-dedup-20260909.md`의 B1은 전제가 무효다. 커밋 `0f02458`(사용자 결정)이 기본 번들 상한을 모두 `null`로 만들어 정본이 조사 대상으로 삼은 `sharedJsGzip > +30720` 실패가 현재 소스에서 발생할 수 없다. 고정 비교 입력 3종도 소실됐으나 복구해도 목적을 달성하지 못한다. pdf-lib 중복 공급과 B0 실측 앱 JS gzip −154,886B, worker/public 계측 사각지대는 유효하게 남는다. 보류 / 계측만 복구 / 전면 진행 중 선택이 필요하며 어느 쪽이든 정본 재작성이 선행한다. 상세 `docs/jobs/todo/bundle-b1-20260921/B1-JUDGMENT.md`. — Claude 판정(Opus) / Codx 진단
+
 ## AdSense 재검토 후속 (2026-09-20)
 
 - **완료 — 기존 unit 실패 잔여 4건 해소** — `p1b-components` 3건은 승인된 현행 컴포넌트 계약을 놓친 낡은 단언으로 판정해 갱신했고, `ui-legacy-isolation` 1건은 유효한 Tailwind checkbox utility를 동등한 arbitrary utility로 치환했다. 최종 통합 전체 unit 605/605, 실패 0을 확인했다. — Codx
 - **ToolCard 제목 h2/h3 결정 대기** — 제품과 테스트는 모두 `h2`이나 정본 `ui-theme-redesign-20260907:159`는 `h3`이고 `c5b64f6`에서 회귀가 유입됐다. 제품·테스트 중 어느 계약을 고칠지 사용자 결정을 기다린다. — Claude 판정 / Codx 확인
-- **Muse 새 worktree 부트스트랩 정지 원인 조사** — `wt-followup2-d`에서 신규 `opencode run --dir`이 `bootstrapping … init` 뒤 세션 ID와 stderr 없이 두 차례 정지했다. 5분 초과 1회 재시도 뒤 Sol 인계 절차는 런북에 반영했으며, 다른 worktree 신규 세션은 정상이라 근본 원인은 미확인이다. — Codx
+- **완료 — Muse 새 worktree 부트스트랩 정지 원인 조사** — 원인은 stdin이 닫히지 않는 소켓/파이프였다(정지 프로세스의 fd 0이 socket, epoll 등록, `ep_poll` 대기). `< /dev/null`을 붙이면 7초 만에 세션이 생성된다. DB 크기와 inotify 한도 고갈 가설은 모두 기각했다. 런북 반영 `7fb3290`, 상세 `docs/review-notes.md` 2026-09-21. — Claude 판정(Opus) / Muse 반영
 - **완료 — PdfComparePage 가이드 미연결** — `PdfComparePage`에 기존 `pdfCompare` 가이드를 연결해 한·영 사용법 안내와 FAQ 3개를 런타임에 표시한다. — Codx
 - **Office Editor 랜딩 가이드의 `?guide=1` 한정 노출** — 일반 랜딩은 `/tools/office-editor/app/`으로 즉시 이동하고 편집기에서 안내 링크로 돌아온 `?guide=1`일 때만 랜딩 가이드가 보인다. 의도와 발견 가능성을 별도 판정한다. — Codx
 - **완료 — S5 도구 로딩 실패 시 광고 제외 오류 페이지 이동** — Auto ads 초기화 API 부재 이유로 광고 없는 독립 오류 문서로의 전체 문서 이동으로 구현했다. 첫 시도 1·재로드 1, 최종 광고 0 실측. — Codx
