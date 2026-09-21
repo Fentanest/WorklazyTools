@@ -14,7 +14,7 @@ import {
   SunMoon,
   X,
 } from "lucide-react";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 export const FocusModeContext = createContext<(mode: "standard" | "editor") => void>(() => {});
 export function useFocusMode() { return useContext(FocusModeContext); }
@@ -37,6 +37,8 @@ import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
 import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
+import { getUnsavedWorkKind, hasUnsavedWork, isGuardedTarget, subscribeUnsavedWork } from "../app/toolState";
+import { UnsavedWorkDialog } from "./UnsavedWorkDialog";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { getToolIconTone } from "./toolAccentStyles";
 import { DocumentRedactorFallback } from "../features/document-redactor/DocumentRedactorFallback";
@@ -71,6 +73,164 @@ export function AppShell() {
   const { toolCategories, tools } = useToolCatalog();
   const { theme, cycleTheme } = useWorklazyTheme();
   const location = useLocation();
+  const navigate = useNavigate();
+  // S9 unsaved-work guard. The registry is consulted *before* the route
+  // changes so "stay" keeps the tool state untouched. Works for sidebar
+  // links, mobile tabs/sheet, home/tool cards, and in-body links because all
+  // of them render plain anchors.
+  const [, setGuardTick] = useState(0);
+  useEffect(() => subscribeUnsavedWork(() => setGuardTick((tick) => tick + 1)), []);
+  const unsavedActive = hasUnsavedWork();
+  const pendingActionRef = useRef<(() => void) | null>(null);
+  const leaveAfterPopRef = useRef<(() => void) | null>(null);
+  const [guardOpen, setGuardOpen] = useState(false);
+  const guardEntryRef = useRef(false);
+  const guardKeyRef = useRef<string | null>(null);
+  const skipPopRef = useRef(false);
+  // Set while a confirmed "leave" is in flight so the sentinel effect below
+  // neither re-pushes a guard entry nor pops one under the navigation.
+  // Cleared on stay and whenever the pathname actually changes.
+  const leavingRef = useRef(false);
+
+  const closeGuardStay = useCallback(() => {
+    pendingActionRef.current = null;
+    leavingRef.current = false;
+    setGuardOpen(false);
+    if (hasUnsavedWork() && !guardEntryRef.current) {
+      window.history.pushState({ worklazyUnsavedGuard: true }, "", window.location.href);
+      guardEntryRef.current = true;
+      guardKeyRef.current = location.key;
+    }
+  }, [location.key]);
+
+  const confirmGuardLeave = useCallback(() => {
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    setGuardOpen(false);
+    if (!action) return;
+    leavingRef.current = true;
+    if (guardEntryRef.current) {
+      // Remove our same-URL guard entry first so Back from the destination
+      // behaves normally, then run the pending navigation once it pops.
+      guardEntryRef.current = false;
+      guardKeyRef.current = null;
+      skipPopRef.current = true;
+      leaveAfterPopRef.current = action;
+      window.history.back();
+    } else {
+      action();
+    }
+  }, []);
+
+  const requestGuardedNavigate = useCallback((to: string, perform: () => void) => {
+    let target: URL | null = null;
+    try {
+      target = new URL(to, window.location.href);
+    } catch {
+      perform();
+      return;
+    }
+    if (target.origin !== window.location.origin) {
+      perform();
+      return;
+    }
+    const targetStripped = stripLanguagePrefix(target.pathname).replace(/\/+$/, "") || "/";
+    const currentStripped = stripLanguagePrefix(window.location.pathname).replace(/\/+$/, "") || "/";
+    if (targetStripped === currentStripped || !hasUnsavedWork() || !isGuardedTarget(targetStripped)) {
+      perform();
+      return;
+    }
+    pendingActionRef.current = perform;
+    setGuardOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const onClickCapture = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null | undefined;
+      if (!anchor) return;
+      if (anchor.hasAttribute("download")) return;
+      if (anchor.getAttribute("target") === "_blank") return;
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      if (/^(mailto|tel|sms|blob|data|javascript):/i.test(href)) return;
+      let url: URL;
+      try {
+        url = new URL(href, window.location.href);
+      } catch {
+        return;
+      }
+      if (url.origin !== window.location.origin) return;
+      const targetStripped = stripLanguagePrefix(url.pathname).replace(/\/+$/, "") || "/";
+      const currentStripped = stripLanguagePrefix(window.location.pathname).replace(/\/+$/, "") || "/";
+      if (targetStripped === currentStripped) return;
+      if (!hasUnsavedWork() || !isGuardedTarget(targetStripped)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const destination = `${url.pathname}${url.search}${url.hash}`;
+      pendingActionRef.current = () => navigate(destination);
+      setGuardOpen(true);
+    };
+    document.addEventListener("click", onClickCapture, true);
+    return () => document.removeEventListener("click", onClickCapture, true);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!unsavedActive) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [unsavedActive]);
+
+  useEffect(() => {
+    leavingRef.current = false;
+  }, [location.pathname, location.key]);
+
+  useEffect(() => {
+    if (leavingRef.current) return;
+    if (unsavedActive && !guardOpen) {
+      // Keep a guard entry at the top of the stack (also after exempt
+      // same-scope navigations, which push real entries above it) so Back is
+      // always intercepted first and silent removal only ever pops our own
+      // same-URL entry.
+      if (!guardEntryRef.current || guardKeyRef.current !== location.key) {
+        window.history.pushState({ worklazyUnsavedGuard: true }, "", window.location.href);
+        guardEntryRef.current = true;
+        guardKeyRef.current = location.key;
+      }
+    } else if (!unsavedActive && guardEntryRef.current) {
+      guardEntryRef.current = false;
+      guardKeyRef.current = null;
+      skipPopRef.current = true;
+      window.history.back();
+    }
+  }, [unsavedActive, guardOpen, location.key]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (skipPopRef.current) {
+        skipPopRef.current = false;
+        const deferred = leaveAfterPopRef.current;
+        leaveAfterPopRef.current = null;
+        deferred?.();
+        return;
+      }
+      if (!guardEntryRef.current) return;
+      guardEntryRef.current = false;
+      guardKeyRef.current = null;
+      if (hasUnsavedWork()) {
+        pendingActionRef.current = () => {
+          window.history.back();
+        };
+        setGuardOpen(true);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   const adFree = isAdFreePath(location.pathname);
   useEffect(() => {
     if (adFree && document.querySelector("script[data-worklazy-adsense]")) {
@@ -202,7 +362,7 @@ export function AppShell() {
         </div>
       </header>
 
-      {focusMode !== "editor" && <TopBar theme={theme} onCycleTheme={cycleTheme} onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />}
+      {focusMode !== "editor" && <TopBar theme={theme} onCycleTheme={cycleTheme} onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} onGuardedNavigate={requestGuardedNavigate} />}
 
       <main className={`main-content${redactorActive ? " redactor-main-content" : ""}`} id="main-content">
         <RouteErrorBoundary>
@@ -223,6 +383,12 @@ export function AppShell() {
         </footer>
       </main>
       <PrivacyConsentBanner />
+      <UnsavedWorkDialog
+        open={guardOpen}
+        kind={getUnsavedWorkKind()}
+        onStay={closeGuardStay}
+        onLeave={confirmGuardLeave}
+      />
 
       <nav className="bottom-tabs glass-bar" aria-label={t("navigation.mobileLabel")}>
         {primaryNavigation.map((item) => {
@@ -281,11 +447,12 @@ export function AppShell() {
   );
 }
 
-function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed }: {
+function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed, onGuardedNavigate }: {
   theme: string;
   onCycleTheme: () => void;
   onToggleSidebar: () => void;
   sidebarCollapsed: boolean;
+  onGuardedNavigate: (to: string, perform: () => void) => void;
 }) {
   const { t } = useTranslation("common");
   const language = useAppLanguage();
@@ -311,8 +478,11 @@ function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed }: {
     const next = new URLSearchParams();
     if (query.trim()) next.set("q", query.trim());
     const search = next.toString();
-    navigate(`${localizedPath(language, "/tools")}${search ? `?${search}` : ""}`);
-    trackToolOpen("topbar-search", "topbar", language);
+    const to = `${localizedPath(language, "/tools")}${search ? `?${search}` : ""}`;
+    onGuardedNavigate(to, () => {
+      navigate(to);
+      trackToolOpen("topbar-search", "topbar", language);
+    });
   };
 
   return (

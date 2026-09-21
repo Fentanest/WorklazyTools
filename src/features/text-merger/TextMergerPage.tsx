@@ -12,8 +12,10 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { type ChangeEvent, type DragEvent, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { useUnsavedWorkGuard } from "../../app/toolState";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
@@ -54,6 +56,20 @@ export function TextMergerPage() {
   const [readingFiles, setReadingFiles] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  // S9 unsaved-work guard: a selected file or any unsaved edit/output counts
+  // as work. Copying/downloading marks it saved; any later change dirties it
+  // again. Clearing empties the state so the guard turns itself off.
+  const hasFileItems = items.some((item) => item.source === "file");
+  const hasEditedContent = items.some((item) => item.content.trim().length > 0);
+  useUnsavedWorkGuard("text-merger", (hasFileItems || hasEditedContent || output.length > 0) && !saved, {
+    kind: hasFileItems ? "files" : "edits",
+    scopePath: "/tools/text-merger",
+  });
+  useEffect(() => {
+    setSaved(false);
+  }, [items, output]);
 
   const separator = separatorPreset === "custom" ? customSeparator : SEPARATORS[separatorPreset];
   const canMerge = items.some((item) => item.content.trim().length > 0);
@@ -142,6 +158,7 @@ export function TextMergerPage() {
     try {
       await navigator.clipboard.writeText(output);
       setMessage(t("features:textMerger.copied"));
+      setSaved(true);
     } catch {
       setMessage(t("features:textMerger.copyFailed"));
     }
@@ -156,6 +173,7 @@ export function TextMergerPage() {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setSaved(true);
   };
 
   const clearAll = () => {
