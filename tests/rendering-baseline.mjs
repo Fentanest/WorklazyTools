@@ -14,7 +14,7 @@ const reportPath = process.env.RENDER_REPORT_PATH || "/tmp/worklazytools-renderi
 const runsPerPage = readInteger("RENDER_RUNS", 3);
 const settleTimeMs = readInteger("RENDER_SETTLE_MS", 3_000);
 export const targets = Object.freeze([
-  { id: "home", path: "/ko", readySelector: ".home-page .hero" },
+  { id: "home", path: "/ko", readySelector: ".home-page .wl-hero" },
   { id: "document-result", path: "/ko/tools/document-compare", readySelector: "[data-testid='document-action-bar']", scenario: "document-result" },
   { id: "document-compare", path: "/ko/tools/document-compare", readySelector: '[data-tool-page="document-compare"]' },
   { id: "pdf-editor", path: "/ko/tools/pdf-editor", readySelector: '[data-tool-page="pdf-editor"]' },

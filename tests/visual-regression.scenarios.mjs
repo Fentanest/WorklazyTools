@@ -69,6 +69,14 @@ const migratedToolIds = new Set([
 
 const DEFAULT_READY_SELECTOR = ".page:not(.tool-route-loading)";
 const DEFAULT_BOTTOM_TARGET_SELECTOR = ".tool-page > :last-child";
+// The office-editor landing (/tools/office-editor) replaces itself with the
+// workspace (/tools/office-editor/app/), which renders
+// data-tool-page="office-editor-app". Gating initial/bottom captures on the
+// landing attribute would wait on a DOM that is already gone.
+const OFFICE_EDITOR_SELECTOR = "[data-tool-page='office-editor-app']";
+const readySelectorFor = (route, contentSelector) => contentSelector
+  ?? (route.toolId === "office-editor" ? OFFICE_EDITOR_SELECTOR : null)
+  ?? (migratedToolIds.has(route.toolId) ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR);
 const HWP_ENGLISH_NA_REASON = "The HWP editor is intentionally Korean-only; its English URL redirects to /en/tools and is recorded as a separate redirect scenario.";
 
 const scenario = (definition) => Object.freeze({
@@ -101,8 +109,8 @@ const indexScenarios = [
     kind: "index",
     profiles: fullProfiles,
     profileReductionReason: "No reduction: the shared landing surface keeps the full locale, theme, and viewport product.",
-    readySelector: ".home-page .hero",
-    assertSelector: ".home-page .hero",
+    readySelector: ".home-page .wl-hero",
+    assertSelector: ".home-page .wl-hero",
   }),
   scenario({
     scenarioId: "tools-media-filter--initial",
@@ -124,7 +132,6 @@ const defaultFixtureFor = (toolId) => toolId === "security-tools"
 
 const initialScenarioFor = (route) => {
   const koreanOnly = route.toolId === "hwp-editor";
-  const migrated = migratedToolIds.has(route.toolId);
   const redactor = route.toolId === "document-redactor";
   // The redactor shell mounts before its content paints; gating on the shell
   // alone screenshots an empty container. The file input proves content paint.
@@ -142,8 +149,8 @@ const initialScenarioFor = (route) => {
       ? "English is product-level N/A. Korean keeps paired desktop/light and mobile/dark coverage; the redirect has its own scenario."
       : "Representative pairwise coverage retains both locales, themes, and viewports without the eight-way full product.",
     fixture: defaultFixtureFor(route.toolId),
-    readySelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
-    assertSelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
+    readySelector: readySelectorFor(route, contentSelector),
+    assertSelector: readySelectorFor(route, contentSelector),
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
     ...(redactor ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   });
@@ -168,9 +175,11 @@ const bottomScenarioFor = (route) => {
       : "The clearance contract is mobile-only; KO/dark and EN/light retain both locales and themes while avoiding redundant desktop captures.",
     fixture: defaultFixtureFor(route.toolId),
     actions: [{ type: "scroll-bottom" }],
-    readySelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
-    assertSelector: contentSelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
-    bottomTargetSelector: migrated ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR,
+    readySelector: readySelectorFor(route, contentSelector),
+    assertSelector: readySelectorFor(route, contentSelector),
+    bottomTargetSelector: route.toolId === "office-editor"
+      ? `${OFFICE_EDITOR_SELECTOR} > :last-child`
+      : (migrated ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR),
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
     ...(redactor ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   });
