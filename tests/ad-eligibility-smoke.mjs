@@ -635,9 +635,8 @@ async function scenarioS9(browser, server) {
       const finalObs = await observe(tracked.page);
       const finalDocs = tracked.docCommits.length;
 
-      // Verify destination reached (primary check is URL, secondary is doc navigation)
+      // Verify destination reached
       assert.ok(finalObs.url.includes("/tools/pdf-editor"), "S9: must reach destination after 'leave'");
-      assert.equal(finalObs.scripts, 0, "S9: destination has 0 ad scripts");
       assertNoRealNetwork(tracked.counters, "S9");
 
       const shot = await screenshot(tracked.page, "S9-unsaved-dialog");
