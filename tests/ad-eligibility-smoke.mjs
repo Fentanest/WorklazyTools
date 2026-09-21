@@ -635,8 +635,10 @@ async function scenarioS9(browser, server) {
       const finalObs = await observe(tracked.page);
       const finalDocs = tracked.docCommits.length;
 
-      // Verify destination reached
+      // Verify destination reached with full document reload (ad script cleanup)
       assert.ok(finalObs.url.includes("/tools/pdf-editor"), "S9: must reach destination after 'leave'");
+      assert.equal(finalObs.scripts, 0, "S9: destination must have 0 ad scripts (full document reload required)");
+      assert.equal(finalDocs, docsBefore + 1, "S9: must have 1 new document commit (proves full reload, not SPA)");
       assertNoRealNetwork(tracked.counters, "S9");
 
       const shot = await screenshot(tracked.page, "S9-unsaved-dialog");

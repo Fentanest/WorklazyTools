@@ -82,6 +82,7 @@ export function AppShell() {
   useEffect(() => subscribeUnsavedWork(() => setGuardTick((tick) => tick + 1)), []);
   const unsavedActive = hasUnsavedWork();
   const pendingActionRef = useRef<(() => void) | null>(null);
+  const pendingTargetRef = useRef<string | null>(null);  // S9: store target URL for ad-free check
   const leaveAfterPopRef = useRef<(() => void) | null>(null);
   const [guardOpen, setGuardOpen] = useState(false);
   const guardEntryRef = useRef(false);
@@ -94,6 +95,7 @@ export function AppShell() {
 
   const closeGuardStay = useCallback(() => {
     pendingActionRef.current = null;
+    pendingTargetRef.current = null;
     leavingRef.current = false;
     setGuardOpen(false);
     if (hasUnsavedWork() && !guardEntryRef.current) {
@@ -105,20 +107,26 @@ export function AppShell() {
 
   const confirmGuardLeave = useCallback(() => {
     const action = pendingActionRef.current;
+    const target = pendingTargetRef.current;
     pendingActionRef.current = null;
+    pendingTargetRef.current = null;
     setGuardOpen(false);
     if (!action) return;
     leavingRef.current = true;
+
+    // S9: For ad-free paths, use full document navigation to clear ad artifacts
+    const finalAction = target && isAdFreePath(target) ? () => window.location.assign(target) : action;
+
     if (guardEntryRef.current) {
       // Remove our same-URL guard entry first so Back from the destination
       // behaves normally, then run the pending navigation once it pops.
       guardEntryRef.current = false;
       guardKeyRef.current = null;
       skipPopRef.current = true;
-      leaveAfterPopRef.current = action;
+      leaveAfterPopRef.current = finalAction;
       window.history.back();
     } else {
-      action();
+      finalAction();
     }
   }, []);
 
@@ -141,6 +149,7 @@ export function AppShell() {
       return;
     }
     pendingActionRef.current = perform;
+    pendingTargetRef.current = target.href;  // S9: store full URL for ad-free path check
     setGuardOpen(true);
   }, []);
 
