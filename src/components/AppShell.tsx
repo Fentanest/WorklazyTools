@@ -205,6 +205,7 @@ export function AppShell() {
       event.stopPropagation();
       const destination = `${url.pathname}${url.search}${url.hash}`;
       pendingActionRef.current = () => navigate(destination);
+      pendingTargetRef.current = url.href;
       setGuardOpen(true);
     };
     document.addEventListener("click", onClickCapture, true);
