@@ -2,6 +2,8 @@ import { AlertCircle, Download, FileText, Info, LockKeyhole, TextSearch } from "
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useUnsavedWorkGuard } from "../../app/toolState";
+
 import { FileShareButton } from "../../components/FileShareButton";
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -31,6 +33,19 @@ export function DocumentComparePage() {
   const operation = useOperationProgress();
   const comparisonControllerRef = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => comparisonControllerRef.current?.abort(), []);
+
+  // S9 unsaved-work guard: selected files count as work until a report is
+  // saved, everything is removed, or the tool unmounts. Results-page links
+  // stay exempt via the tool scope in AppShell.
+  const [saved, setSaved] = useState(false);
+  const hasCompareFiles = session.beforeFiles.length > 0 || session.afterFiles.length > 0;
+  useUnsavedWorkGuard("document-compare", hasCompareFiles && !saved, {
+    kind: "files",
+    scopePath: "/tools/document-compare",
+  });
+  useEffect(() => {
+    setSaved(false);
+  }, [session.beforeFiles, session.afterFiles, session.results]);
 
   const hasFiles = session.beforeFiles.length > 0 || session.afterFiles.length > 0;
   const countMismatch = hasFiles && session.beforeFiles.length !== session.afterFiles.length;
@@ -216,9 +231,9 @@ export function DocumentComparePage() {
           <div className="grid min-w-0 grid-cols-[minmax(0,auto)_auto_minmax(0,auto)] items-center justify-start gap-2 max-[720px]:grid-cols-1 max-[720px]:gap-1"><strong className="max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.result.beforeName}</strong><span className="text-muted-foreground max-[720px]:hidden">→</span><strong className="max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.result.afterName}</strong><small className="col-span-full text-xs text-muted-foreground max-[720px]:col-span-1">{item.result.changes.length ? L(`${item.result.changes.length}개 변경 발견`, `${item.result.changes.length} changes found`) : L("변경 없음", "No changes")}</small></div>
           <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:col-span-full max-[720px]:grid max-[720px]:grid-cols-2 [&>*]:min-h-9 [&>*]:justify-center">
             {session.webOutput && <Button render={<Link to={`${resultBasePath}/${item.pairNumber}`} data-testid="document-view-result" />} variant="secondary" className="rounded-xl font-bold"><TextSearch size={15} /> {L("웹 비교 보기", "View web comparison")}</Button>}
-            {item.reportUrl && <Button render={<a href={item.reportUrl} download={item.reportFileName} data-testid="document-excel-download" />} className="rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90"><Download size={15} /> {L("Excel 보고서", "Excel report")}</Button>}
+            {item.reportUrl && <Button render={<a href={item.reportUrl} download={item.reportFileName} data-testid="document-excel-download" />} className="rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90" onClick={() => setSaved(true)}><Download size={15} /> {L("Excel 보고서", "Excel report")}</Button>}
             {item.reportUrl && <FileShareButton url={item.reportUrl} fileName={item.reportFileName || L("문서-비교보고서.xlsx", "document-comparison-report.xlsx")} />}
-            {item.trackedUrl && <Button render={<a href={item.trackedUrl} download={item.trackedFileName} data-testid="document-tracked-download" />} className="rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90"><Download size={15} /> {L("Word 변경 추적", "Tracked Word file")}</Button>}
+            {item.trackedUrl && <Button render={<a href={item.trackedUrl} download={item.trackedFileName} data-testid="document-tracked-download" />} className="rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90" onClick={() => setSaved(true)}><Download size={15} /> {L("Word 변경 추적", "Tracked Word file")}</Button>}
           </div>
         </Card>)}</div>
       </section>}

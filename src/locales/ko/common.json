@@ -155,7 +155,13 @@
     "goHome": "홈으로 돌아가기",
     "toolFailed": "도구를 불러오지 못했습니다. 새로고침하면 다시 시도합니다.",
     "retry": "다시 시도",
-    "operationFailed": "작업을 완료하지 못했습니다. 다시 시도하거나 새로고침해 주세요."
+    "operationFailed": "작업을 완료하지 못했습니다. 다시 시도하거나 새로고침해 주세요.",
+    "unsavedWorkTitle": "저장하지 않은 작업이 있습니다",
+    "unsavedWorkDescriptionFiles": "저장하지 않은 작업이 있습니다. 다른 도구로 이동하면 현재 선택한 파일과 작업 내용이 사라질 수 있습니다. 필요한 결과를 먼저 저장해 주세요.",
+    "unsavedWorkDescriptionEdits": "저장하지 않은 편집 내용이 있습니다. 다른 도구로 이동하면 현재 작업 내용이 사라질 수 있습니다. 필요한 결과를 먼저 저장해 주세요.",
+    "unsavedStay": "이 화면에 머무르기",
+    "unsavedLeave": "이동하기",
+    "goHome": "홈으로 돌아가기"
   },
   "status": {
     "preparing": "준비하는 중…",

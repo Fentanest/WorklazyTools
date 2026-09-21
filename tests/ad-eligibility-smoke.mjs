@@ -26,6 +26,7 @@ const CHROME = process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome";
 const DISCRIMINATE = process.argv.includes("--discriminate");
 const ONLY = (process.argv.find((arg) => arg.startsWith("--only=")) ?? "").slice("--only=".length);
 const TEXT_MERGER_CHUNK = "TextMergerPage-";
+const unexpectedDialogEvents = [];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const now = () => new Date().toISOString();
@@ -46,10 +47,19 @@ function summarizeServerRequests(requests) {
   }));
 }
 
-async function newTrackedContext(browser, server, { consent = "granted", stub = true, viewport = null, serviceWorkers = "allow" } = {}) {
+async function newTrackedContext(browser, server, {
+  consent = "granted",
+  stub = true,
+  viewport = null,
+  serviceWorkers = "allow",
+  dialogPolicy = null,
+} = {}) {
   const counters = createCounters();
   const docs = [];
   const dialogs = [];
+  const unexpectedDialogs = [];
+  const guardEvents = [];
+  const pagehideEvents = [];
   const errors = [];
   const context = await browser.newContext({
     locale: "ko-KR",
@@ -59,6 +69,35 @@ async function newTrackedContext(browser, server, { consent = "granted", stub = 
   await installAdFirewall(context, server.url, counters, { stub });
   await context.addInitScript((preset) => {
     window.__wlNav = { push: 0, replace: 0 };
+    window.__wlSmokeDocumentToken = crypto.randomUUID();
+    try {
+      const priorPagehide = window.sessionStorage.getItem("__wlSmokePriorPagehide");
+      if (priorPagehide) {
+        console.debug(`__WL_SMOKE_PAGEHIDE__${priorPagehide}`);
+        window.sessionStorage.removeItem("__wlSmokePriorPagehide");
+      }
+    } catch { /* Console delivery from the source document remains the fallback. */ }
+    const originalShowModal = HTMLDialogElement.prototype.showModal;
+    HTMLDialogElement.prototype.showModal = function (...args) {
+      if (this.dataset.testid === "unsaved-work-dialog") {
+        console.debug(`__WL_SMOKE_GUARD__${JSON.stringify({
+          documentToken: window.__wlSmokeDocumentToken,
+          url: window.location.href,
+        })}`);
+      }
+      return Reflect.apply(originalShowModal, this, args);
+    };
+    window.addEventListener("pagehide", (event) => {
+      const detail = JSON.stringify({
+        documentToken: window.__wlSmokeDocumentToken,
+        url: window.location.href,
+        persisted: event.persisted,
+      });
+      try {
+        window.sessionStorage.setItem("__wlSmokePriorPagehide", detail);
+      } catch { /* The live console event remains the fallback. */ }
+      console.debug(`__WL_SMOKE_PAGEHIDE__${detail}`);
+    });
     for (const name of ["pushState", "replaceState"]) {
       const original = window.history[name].bind(window.history);
       window.history[name] = (...args) => {
@@ -103,12 +142,40 @@ async function newTrackedContext(browser, server, { consent = "granted", stub = 
       if (/^https?:/.test(url)) docs.push({ url, time: now() });
     }
   });
-  page.on("dialog", (dialog) => {
-    dialogs.push({ type: dialog.type(), message: dialog.message(), time: now() });
-    dialog.dismiss().catch(() => {});
+  page.on("console", (message) => {
+    const text = message.text();
+    for (const [prefix, sink] of [["__WL_SMOKE_GUARD__", guardEvents], ["__WL_SMOKE_PAGEHIDE__", pagehideEvents]]) {
+      if (!text.startsWith(prefix)) continue;
+      try {
+        const parsed = JSON.parse(text.slice(prefix.length));
+        if (prefix === "__WL_SMOKE_GUARD__" || !sink.some((entry) => entry.documentToken === parsed.documentToken && entry.url === parsed.url)) {
+          sink.push({ ...parsed, time: now() });
+        }
+      } catch {
+        errors.push(`invalid smoke event: ${prefix}`);
+      }
+    }
+  });
+  page.on("dialog", async (dialog) => {
+    const observed = { type: dialog.type(), message: dialog.message(), time: now() };
+    const decision = dialogPolicy?.({ ...observed, index: dialogs.length }) ?? {};
+    const expected = decision.expected === true;
+    const handling = decision.action === "accept" ? "accept" : "dismiss";
+    const entry = { ...observed, expected, handling };
+    dialogs.push(entry);
+    if (!expected) {
+      unexpectedDialogs.push(entry);
+      unexpectedDialogEvents.push(entry);
+    }
+    try {
+      if (handling === "accept") await dialog.accept();
+      else await dialog.dismiss();
+    } catch (error) {
+      entry.handlingError = String(error).slice(0, 500);
+    }
   });
   page.on("pageerror", (error) => errors.push(String(error).slice(0, 500)));
-  return { context, page, cdp, counters, docs, docCommits, dialogs, errors };
+  return { context, page, cdp, counters, docs, docCommits, dialogs, unexpectedDialogs, guardEvents, pagehideEvents, errors };
 }
 
 async function observe(page) {
@@ -172,8 +239,11 @@ async function buildProvenance() {
 // non-pass states are reported separately and never summed as passes.
 async function runCase(name, fn) {
   const started = now();
+  const unexpectedStart = unexpectedDialogEvents.length;
   try {
     const detail = await fn();
+    const unexpectedDialogs = unexpectedDialogEvents.slice(unexpectedStart);
+    assert.equal(unexpectedDialogs.length, 0, `${name}: unexpected native dialogs ${JSON.stringify(unexpectedDialogs)}`);
     const status = detail.status ?? "pass";
     console.log(`${status.toUpperCase()} ${name}`);
     return { name, status, started, ended: now(), ...detail };
@@ -185,6 +255,7 @@ async function runCase(name, fn) {
     return {
       name, status: "fail", started, ended: now(),
       ...(failureCounters !== undefined ? { counters: failureCounters } : {}),
+      unexpectedDialogs: unexpectedDialogEvents.slice(unexpectedStart),
       failure: String(error).slice(0, 2000),
     };
   }
@@ -537,101 +608,269 @@ async function scenarioS8(browser, server) {
   return results;
 }
 
+async function readS9State(tracked) {
+  return tracked.page.evaluate(() => ({
+    url: window.location.href,
+    documentToken: window.__wlSmokeDocumentToken ?? null,
+    items: document.querySelectorAll('[data-testid="text-merger-item"]').length,
+    scripts: document.querySelectorAll("script[data-worklazy-adsense]").length,
+    stubLoads: window.__wlAdStub?.loads ?? 0,
+  }));
+}
+
+async function setupS9Source(tracked, server, { work = true, ads = true } = {}) {
+  resetServer(server);
+  const requestMark = server.state.requests.length;
+  await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
+  await waitReady(tracked.page);
+  const initial = await readS9State(tracked);
+  assert.equal(initial.scripts, ads ? 1 : 0, "S9 setup: source ad script policy");
+  assert.equal(tracked.counters.stub, ads ? 1 : 0, "S9 setup: source stub policy");
+  if (work) {
+    await tracked.page.locator('input[type="file"]').setInputFiles({
+      name: "synthetic.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("synthetic content\n", "utf8"),
+    });
+    await tracked.page.waitForFunction(
+      () => document.querySelectorAll('[data-testid="text-merger-item"]').length === 2,
+      { timeout: 15_000 },
+    );
+    const fileItem = tracked.page.locator('[data-testid="text-merger-item"]').last();
+    await fileItem.locator('[data-testid="text-merger-preview"]').click();
+    const fileEditor = fileItem.locator('[data-testid="text-merger-editor"] textarea');
+    await fileEditor.fill("synthetic revised content");
+    await fileItem.locator('[data-testid="text-merger-meta"] b').waitFor({ state: "visible" });
+  }
+  return {
+    requestMark,
+    state: await readS9State(tracked),
+    commitCount: tracked.docCommits.length,
+    guardCount: tracked.guardEvents.length,
+    stubCount: tracked.counters.stub,
+  };
+}
+
+async function openS9Guard(tracked, href = "/ko/tools/pdf-editor") {
+  const link = tracked.page.locator(`a[href="${href}"]`).first();
+  await link.scrollIntoViewIfNeeded();
+  await link.click();
+  const dialog = tracked.page.locator('[data-testid="unsaved-work-dialog"][open]');
+  await dialog.waitFor({ state: "visible", timeout: 5_000 });
+  await tracked.page.locator('[data-testid="unsaved-stay"]').waitFor({ state: "visible" });
+  await tracked.page.locator('[data-testid="unsaved-leave"]').waitFor({ state: "visible" });
+  return dialog;
+}
+
+function destinationDocumentRequests(server, requestMark, pathPrefix = "/ko/tools/pdf-editor") {
+  return server.state.requests.slice(requestMark).filter((entry) => (
+    entry.destination === "document" && entry.pathname.startsWith(pathPrefix)
+  ));
+}
+
+async function waitForS9Destination(tracked, pathname, priorCommitCount) {
+  await tracked.page.waitForURL((url) => url.pathname === pathname || url.pathname === `${pathname}/`, { timeout: 30_000 });
+  const deadline = Date.now() + 30_000;
+  while (tracked.docCommits.length < priorCommitCount + 1 && Date.now() < deadline) {
+    await sleep(100);
+  }
+  assert.ok(tracked.docCommits.length >= priorCommitCount + 1, `S9: destination did not commit a new document for ${pathname}`);
+  await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
+  await waitReady(tracked.page);
+}
+
 async function scenarioS9(browser, server) {
-  return [await runCase("S9-file-then-move", async () => {
-    resetServer(server);
+  const results = [];
+
+  results.push(await runCase("S9-T1-stay", async () => {
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
-    const mark = server.state.requests.length;
     try {
-      // Load tool and open a file (create work state).
-      await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
-      await waitReady(tracked.page);
-      const sampleFile = path.join(ARTIFACT_DIR, "wu2-sample.txt");
-      await fs.writeFile(sampleFile, "wu2 synthetic line one\nwu2 synthetic line two\n");
-      await tracked.page.locator('input[type="file"]').setInputFiles(sampleFile);
-      await tracked.page.waitForFunction(
-        () => document.querySelectorAll('[data-testid="text-merger-item"]').length >= 2,
-        { timeout: 15_000 },
-      );
-      const itemsBefore = await tracked.page.locator('[data-testid="text-merger-item"]').count();
-      const sourcesBefore = await tracked.page.locator('[data-testid="text-merger-source"]').allInnerTexts();
-      assert.ok(itemsBefore > 0, "S9-setup: file must be loaded");
+      const before = await setupS9Source(tracked, server);
+      await openS9Guard(tracked);
+      assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T1: confirmation opens exactly once");
+      await tracked.page.locator('[data-testid="unsaved-stay"]').click();
+      await sleep(300);
+      const after = await readS9State(tracked);
+      assert.equal(after.url, before.state.url, "T1: stay preserves URL");
+      assert.equal(after.documentToken, before.state.documentToken, "T1: stay preserves document");
+      assert.equal(tracked.docCommits.length, before.commitCount, "T1: stay creates no document commit");
+      assert.equal(after.items, before.state.items, "T1: stay preserves text items");
+      assert.equal(destinationDocumentRequests(server, before.requestMark).length, 0, "T1: no destination document request");
+      assert.equal(tracked.unexpectedDialogs.length, 0, "T1: no unexpected native dialog");
+      assertNoRealNetwork(tracked.counters, "S9-T1");
+      return { status: "pass", confirmations: 1, items: after.items, docCommits: [...tracked.docCommits], dialogs: tracked.dialogs };
+    } finally {
+      await tracked.context.close();
+    }
+  }));
 
-      // Attempt to navigate to another tool; expect protection dialog.
-      const moveLink = tracked.page.locator('.sidebar a[href="/ko/tools/document-compare"]').first();
-      await moveLink.scrollIntoViewIfNeeded();
+  results.push(await runCase("S9-T2-escape", async () => {
+    const tracked = await newTrackedContext(browser, server, { consent: "granted" });
+    try {
+      const before = await setupS9Source(tracked, server);
+      await openS9Guard(tracked);
+      await tracked.page.keyboard.press("Escape");
+      await tracked.page.locator('[data-testid="unsaved-work-dialog"][open]').waitFor({ state: "hidden" });
+      const after = await readS9State(tracked);
+      assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T2: confirmation opens exactly once");
+      assert.equal(after.url, before.state.url, "T2: Escape preserves URL");
+      assert.equal(after.documentToken, before.state.documentToken, "T2: Escape preserves document");
+      assert.equal(tracked.docCommits.length, before.commitCount, "T2: Escape creates no document commit");
+      assert.equal(after.items, before.state.items, "T2: Escape preserves text items");
+      assert.equal(destinationDocumentRequests(server, before.requestMark).length, 0, "T2: no destination document request");
+      assert.equal(tracked.unexpectedDialogs.length, 0, "T2: no unexpected native dialog");
+      assertNoRealNetwork(tracked.counters, "S9-T2");
+      return { status: "pass", confirmations: 1, items: after.items, docCommits: [...tracked.docCommits], dialogs: tracked.dialogs };
+    } finally {
+      await tracked.context.close();
+    }
+  }));
 
-      // Capture dialogs that appear during the navigation attempt.
-      const dialogsBefore = tracked.dialogs.length;
-      const navigationAttempted = tracked.page.waitForURL(
-        (url) => !url.pathname.includes("/tools/text-merger"),
-        { timeout: 5_000 }
-      );
-
-      await moveLink.click();
-
-      let protectionDialogAppeared = false;
-      let userAction = "none";
-
-      try {
-        // Wait briefly to see if a dialog appears.
-        await tracked.page.waitForFunction(
-          () => Boolean(document.querySelector("dialog[open], [role='alertdialog'][open]")),
-          { timeout: 3_000 }
-        ).catch(() => {});
-
-        // Check if protection dialog appeared.
-        const dialogs = await tracked.page.locator("dialog[open], [role='alertdialog']").all();
-        if (dialogs.length > 0) {
-          protectionDialogAppeared = true;
-          // Find and click the "continue" / "proceed" button (if present).
-          const continueBtn = await tracked.page.locator("button:has-text('이동'), button:has-text('이동하기'), button:has-text('proceed'), button:has-text('continue')").first();
-          if (await continueBtn.isVisible().catch(() => false)) {
-            await continueBtn.click();
-            userAction = "proceed";
-          }
-        }
-      } catch {
-        // No dialog detected (may indicate missing protection).
-      }
-
-      // Wait for navigation to complete or timeout.
-      try {
-        await navigationAttempted;
-      } catch {
-        // Navigation did not occur (e.g., dialog blocked it).
-      }
-
-      await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
-      await sleep(1000);
-
-      const after = await observe(tracked.page);
-      const itemsAfter = await tracked.page.locator('[data-testid="text-merger-item"]').count();
-      const stateLost = itemsAfter < itemsBefore;
-
-      assertNoRealNetwork(tracked.counters, "S9");
-      const shot = await screenshot(tracked.page, "S9-after-move");
-
-      // Protection mechanism not yet implemented — record observations without contract check.
-      let status = "recorded";
-      let reason = "보호 장치 미구현 — 경고·취소 없이 작업 상태가 사라진다. backlog 참조";
-
+  results.push(await runCase("S9-T3-leave", async () => {
+    const tracked = await newTrackedContext(browser, server, { consent: "granted" });
+    try {
+      const before = await setupS9Source(tracked, server);
+      await openS9Guard(tracked);
+      await tracked.page.locator('[data-testid="unsaved-leave"]').click();
+      await waitForS9Destination(tracked, "/ko/tools/pdf-editor", before.commitCount);
+      await tracked.page.locator('[data-testid="pdf-navigation-shell"]').waitFor({ state: "visible" });
+      const after = await readS9State(tracked);
+      const newCommits = tracked.docCommits.slice(before.commitCount);
+      assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T3: confirmation opens exactly once");
+      assert.equal(tracked.unexpectedDialogs.length, 0, "T3: approved leave has no native dialog");
+      assert.equal(newCommits.length, 1, "T3: exactly one new main-frame document");
+      assert.notEqual(after.documentToken, before.state.documentToken, "T3: destination has a new document token");
+      assert.equal(tracked.pagehideEvents.length, 1, "T3: source document emitted pagehide");
+      assert.equal(after.scripts, 0, "T3: destination has no ad script");
+      assert.equal(after.stubLoads, 0, "T3: destination document did not execute the source stub");
+      assert.equal(tracked.counters.stub - before.stubCount, 0, "T3: no destination stub request");
+      assert.equal(await tracked.page.locator("[data-route-error], .tool-route-loading").count(), 0, "T3: destination is ready, not error/loading UI");
+      assert.ok(destinationDocumentRequests(server, before.requestMark).length >= 1, "T3: destination document was requested");
+      assertNoRealNetwork(tracked.counters, "S9-T3");
+      const shot = await screenshot(tracked.page, "S9-T3-leave");
       return {
-        lang: "ko", status,
-        note: reason,
-        itemsBefore, sourcesBefore, itemsAfter,
-        dialogDetected: protectionDialogAppeared,
-        userAction,
-        stateLost,
-        finalUrl: after.url,
-        scripts: after.scripts,
-        counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
-        serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot,
+        status: "pass", confirmations: 1, nativeDialogs: tracked.dialogs,
+        pagehide: tracked.pagehideEvents, sourceDocumentToken: before.state.documentToken,
+        destinationDocumentToken: after.documentToken, newCommits, scripts: after.scripts,
+        stubAdded: tracked.counters.stub - before.stubCount, evidence: shot,
       };
     } finally {
       await tracked.context.close();
     }
-  })];
+  }));
+
+  results.push(await runCase("S9-T4-no-work", async () => {
+    const tracked = await newTrackedContext(browser, server, { consent: "granted" });
+    try {
+      const before = await setupS9Source(tracked, server, { work: false });
+      await tracked.page.locator('a[href="/ko/tools/pdf-editor"]').first().click();
+      await waitForS9Destination(tracked, "/ko/tools/pdf-editor", before.commitCount);
+      const after = await readS9State(tracked);
+      assert.equal(tracked.guardEvents.length - before.guardCount, 0, "T4: no confirmation without work");
+      assert.equal(tracked.docCommits.length - before.commitCount, 1, "T4: exactly one required new document");
+      assert.equal(after.scripts, 0, "T4: destination has no ad script");
+      assert.equal(tracked.unexpectedDialogs.length, 0, "T4: no unexpected native dialog");
+      assertNoRealNetwork(tracked.counters, "S9-T4");
+      return { status: "pass", confirmations: 0, newCommits: tracked.docCommits.slice(before.commitCount), scripts: after.scripts };
+    } finally {
+      await tracked.context.close();
+    }
+  }));
+
+  results.push(await runCase("S9-T5-no-consent", async () => {
+    const tracked = await newTrackedContext(browser, server, { consent: "unset" });
+    try {
+      const before = await setupS9Source(tracked, server, { ads: false });
+      await openS9Guard(tracked);
+      await tracked.page.locator('[data-testid="unsaved-leave"]').click();
+      await waitForS9Destination(tracked, "/ko/tools/pdf-editor", before.commitCount);
+      const after = await readS9State(tracked);
+      assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T5: confirmation is independent of consent");
+      assert.equal(tracked.docCommits.length - before.commitCount, 1, "T5: excluded path keeps full-document policy");
+      assert.equal(after.scripts, 0, "T5: destination has no ad script");
+      assert.equal(tracked.unexpectedDialogs.length, 0, "T5: no unexpected native dialog");
+      assertNoRealNetwork(tracked.counters, "S9-T5");
+      return { status: "pass", confirmations: 1, newCommits: tracked.docCommits.slice(before.commitCount), scripts: after.scripts };
+    } finally {
+      await tracked.context.close();
+    }
+  }));
+
+  results.push(await runCase("S9-T6-retry-double-click", async () => {
+    const retry = await newTrackedContext(browser, server, { consent: "granted" });
+    let retryDetail;
+    try {
+      const before = await setupS9Source(retry, server);
+      await openS9Guard(retry, "/ko/tools/pdf-editor");
+      await retry.page.locator('[data-testid="unsaved-stay"]').click();
+      await openS9Guard(retry, "/ko/tools/document-compare");
+      await retry.page.locator('[data-testid="unsaved-leave"]').click();
+      await waitForS9Destination(retry, "/ko/tools/document-compare", before.commitCount);
+      assert.equal(retry.guardEvents.length - before.guardCount, 2, "T6 retry: each intent opens one confirmation");
+      assert.equal(retry.docCommits.length - before.commitCount, 1, "T6 retry: only approved retry navigates");
+      assert.ok(retry.page.url().includes("/tools/document-compare"), "T6 retry: stale PDF target is not used");
+      assert.equal(retry.unexpectedDialogs.length, 0, "T6 retry: no unexpected native dialog");
+      retryDetail = { target: new URL(retry.page.url()).pathname, newCommits: retry.docCommits.slice(before.commitCount) };
+      assertNoRealNetwork(retry.counters, "S9-T6-retry");
+    } finally {
+      await retry.context.close();
+    }
+
+    const doubled = await newTrackedContext(browser, server, { consent: "granted" });
+    try {
+      const before = await setupS9Source(doubled, server);
+      await openS9Guard(doubled);
+      await doubled.page.locator('[data-testid="unsaved-leave"]').evaluate((button) => {
+        button.click();
+        button.click();
+      });
+      await waitForS9Destination(doubled, "/ko/tools/pdf-editor", before.commitCount);
+      await sleep(500);
+      assert.equal(doubled.docCommits.length - before.commitCount, 1, "T6 double click: one document navigation");
+      assert.ok(doubled.page.url().includes("/tools/pdf-editor"), "T6 double click: approved target is retained");
+      assert.equal(doubled.unexpectedDialogs.length, 0, "T6 double click: no unexpected native dialog");
+      assertNoRealNetwork(doubled.counters, "S9-T6-double");
+      return { status: "pass", retry: retryDetail, doubleClickCommits: doubled.docCommits.slice(before.commitCount), dialogs: doubled.dialogs };
+    } finally {
+      await doubled.context.close();
+    }
+  }));
+
+  results.push(await runCase("S9-T7-unapproved-reload", async () => {
+    const tracked = await newTrackedContext(browser, server, {
+      consent: "granted",
+      dialogPolicy: ({ type, index }) => ({
+        expected: type === "beforeunload" && index < 2,
+        action: index === 0 ? "dismiss" : "accept",
+      }),
+    });
+    try {
+      const before = await setupS9Source(tracked, server);
+      await tracked.page.reload({ waitUntil: "domcontentloaded", timeout: 10_000 }).catch(() => null);
+      await sleep(300);
+      const stayed = await readS9State(tracked);
+      assert.equal(tracked.dialogs.length, 1, "T7: dismiss observes one beforeunload dialog");
+      assert.equal(tracked.dialogs[0].type, "beforeunload", "T7: reload guard is beforeunload");
+      assert.equal(stayed.documentToken, before.state.documentToken, "T7: dismiss preserves document");
+      assert.equal(stayed.items, before.state.items, "T7: dismiss preserves work");
+      assert.equal(tracked.docCommits.length, before.commitCount, "T7: dismiss cancels reload");
+
+      await tracked.page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+      await waitReady(tracked.page);
+      const reloaded = await readS9State(tracked);
+      assert.equal(tracked.dialogs.length, 2, "T7: accept observes a second beforeunload dialog");
+      assert.equal(tracked.dialogs[1].type, "beforeunload", "T7: accepted reload is protected");
+      assert.notEqual(reloaded.documentToken, before.state.documentToken, "T7: accept reloads the document");
+      assert.equal(tracked.docCommits.length - before.commitCount, 1, "T7: accept creates one reload commit");
+      assert.equal(tracked.unexpectedDialogs.length, 0, "T7: explicitly expected dialogs only");
+      assertNoRealNetwork(tracked.counters, "S9-T7");
+      return { status: "pass", dialogs: tracked.dialogs, dismissedTokenPreserved: true, newCommits: tracked.docCommits.slice(before.commitCount) };
+    } finally {
+      await tracked.context.close();
+    }
+  }));
+
+  return results;
 }
 
 async function scenarioS5(browser, server) {
