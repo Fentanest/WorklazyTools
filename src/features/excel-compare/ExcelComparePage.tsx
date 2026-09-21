@@ -519,17 +519,30 @@ function keepResultFocusVisible(target: HTMLElement) {
   }
  }
 
- const headerBottom = fixedChromeBoundary(".app-topbar", "bottom");
- const tabsTop = fixedChromeBoundary(".bottom-tabs", "top");
+ const headerBottom = topChromeBottom();
+ const tabsTop = fixedChromeBoundary(".bottom-tabs", "top") ?? window.innerHeight;
  const targetRect = target.getBoundingClientRect();
- const verticalDelta = headerBottom !== undefined && targetRect.top < headerBottom + FOCUS_VISIBILITY_GAP
+ const verticalDelta = targetRect.top < headerBottom + FOCUS_VISIBILITY_GAP
   ? targetRect.top - headerBottom - FOCUS_VISIBILITY_GAP
-  : tabsTop !== undefined && targetRect.bottom> tabsTop - FOCUS_VISIBILITY_GAP
+  : targetRect.bottom > tabsTop - FOCUS_VISIBILITY_GAP
    ? targetRect.bottom - tabsTop + FOCUS_VISIBILITY_GAP
    : 0;
  if (Math.abs(verticalDelta)>= FOCUS_SCROLL_TOLERANCE) {
   window.scrollBy({ top: verticalDelta, behavior: "instant" });
  }
+}
+
+function topChromeBottom() {
+ // The desktop (.wl-topbar, fixed) and mobile (.mobile-header, fixed) shells never
+ // co-exist as visible: each is display:none/static on the other's breakpoint.
+ // fixedChromeBoundary evaluates a single element, so each selector is checked
+ // separately and the lowest visible bottom wins. No shell -> viewport top (0).
+ let bottom = 0;
+ for (const selector of [".wl-topbar", ".mobile-header"]) {
+  const edge = fixedChromeBoundary(selector, "bottom");
+  if (edge !== undefined) bottom = Math.max(bottom, edge);
+ }
+ return bottom;
 }
 
 function fixedChromeBoundary(selector: string, edge: "bottom" | "top") {
