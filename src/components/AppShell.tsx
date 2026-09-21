@@ -37,7 +37,7 @@ import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
 import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
-import { getUnsavedWorkKind, hasUnsavedWork, isGuardedTarget, subscribeUnsavedWork } from "../app/toolState";
+import { getUnsavedWorkGeneration, getUnsavedWorkKind, hasUnsavedWork, isGuardedTarget, subscribeUnsavedWork } from "../app/toolState";
 import { UnsavedWorkDialog } from "./UnsavedWorkDialog";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { getToolIconTone } from "./toolAccentStyles";
@@ -88,12 +88,18 @@ export function AppShell() {
   const guardEntryRef = useRef(false);
   const guardKeyRef = useRef<string | null>(null);
   const skipPopRef = useRef(false);
+  const leaveApprovedRef = useRef<{
+    targetUrl: string;
+    sourceUrl: string;
+    unsavedGeneration: number;
+  } | null>(null);
   // Set while a confirmed "leave" is in flight so the sentinel effect below
   // neither re-pushes a guard entry nor pops one under the navigation.
   // Cleared on stay and whenever the pathname actually changes.
   const leavingRef = useRef(false);
 
   const closeGuardStay = useCallback(() => {
+    leaveApprovedRef.current = null;
     pendingActionRef.current = null;
     pendingTargetRef.current = null;
     leavingRef.current = false;
@@ -106,6 +112,7 @@ export function AppShell() {
   }, [location.key]);
 
   const confirmGuardLeave = useCallback(() => {
+    if (leavingRef.current) return;
     const action = pendingActionRef.current;
     const targetUrl = pendingTargetRef.current;
     pendingActionRef.current = null;
@@ -130,6 +137,11 @@ export function AppShell() {
       guardEntryRef.current = false;
       guardKeyRef.current = null;
       if (targetUrl) {
+        leaveApprovedRef.current = {
+          targetUrl,
+          sourceUrl: window.location.href,
+          unsavedGeneration: getUnsavedWorkGeneration(),
+        };
         window.location.assign(targetUrl);
         return;
       }
@@ -171,6 +183,7 @@ export function AppShell() {
     }
     pendingActionRef.current = perform;
     pendingTargetRef.current = target.href;  // S9: store full URL for ad-free path check
+    leaveApprovedRef.current = null;
     setGuardOpen(true);
   }, []);
 
@@ -201,6 +214,7 @@ export function AppShell() {
       const destination = `${url.pathname}${url.search}${url.hash}`;
       pendingActionRef.current = () => navigate(destination);
       pendingTargetRef.current = url.href;
+      leaveApprovedRef.current = null;
       setGuardOpen(true);
     };
     document.addEventListener("click", onClickCapture, true);
@@ -210,11 +224,27 @@ export function AppShell() {
   useEffect(() => {
     if (!unsavedActive) return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      const approved = leaveApprovedRef.current;
+      if (
+        approved
+        && approved.sourceUrl === window.location.href
+        && approved.unsavedGeneration === getUnsavedWorkGeneration()
+      ) {
+        return;
+      }
       event.preventDefault();
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [unsavedActive]);
+
+  useEffect(() => {
+    const onPageShow = () => {
+      leaveApprovedRef.current = null;
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   useEffect(() => {
     leavingRef.current = false;
@@ -242,6 +272,7 @@ export function AppShell() {
 
   useEffect(() => {
     const onPopState = () => {
+      leaveApprovedRef.current = null;
       if (skipPopRef.current) {
         skipPopRef.current = false;
         const deferred = leaveAfterPopRef.current;
@@ -256,6 +287,7 @@ export function AppShell() {
         pendingActionRef.current = () => {
           window.history.back();
         };
+        leaveApprovedRef.current = null;
         setGuardOpen(true);
       }
     };

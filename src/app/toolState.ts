@@ -24,9 +24,16 @@ interface StoredRegistration {
 
 const entries = new Map<string, StoredRegistration>();
 const listeners = new Set<() => void>();
+let generation = 0;
 
 function notify(): void {
+  generation += 1;
   for (const listener of listeners) listener();
+}
+
+/** Monotonic identity for the current in-memory unsaved-work registrations. */
+export function getUnsavedWorkGeneration(): number {
+  return generation;
 }
 
 export function setUnsavedWork(toolId: string, registration: UnsavedWorkRegistration): void {
