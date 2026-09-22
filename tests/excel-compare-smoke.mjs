@@ -115,7 +115,7 @@ try {
       ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
       isolated: Boolean(document.querySelector('meta[name="worklazy-video-isolation"], meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"]')),
     }));
-    if (initial.title !== "Excel 비교·대사" || initial.modes !== 3 || initial.supportRows !== 6 || initial.inputCount !== 1
+    if (initial.title !== "Excel 비교" || initial.modes !== 3 || initial.supportRows !== 6 || initial.inputCount !== 1
       || initial.dropZones.length !== 1 || initial.dropZones.some(({ role, fileButtons }) => role !== null || fileButtons !== 1) || !initial.ads || initial.isolated) {
       throw new Error(`Initial Excel comparison UI or standard ad boundary is incomplete: ${JSON.stringify(initial)}`);
     }
