@@ -21,6 +21,21 @@
 - **결정 대기 — 접근성 대비 수정** — 자동 위반 64건(146노드)과 incomplete 판정 실제 결함 514노드. 네 군데 색 문제가 반복 집계된 것이다. `--label-secondary` 한 단계 하향은 육안 차이 없이 다수를 해소하지만, 브랜드 카드 흰 글씨 문제는 코랄을 눈에 띄게 어둡게 해야 해 승인된 테마 변경에 해당한다. 사용자 판단 필요. — Claude 판정 / Codx 판정
 - **접근성 감사기 선행 결함** — `tests/accessibility-audit.mjs`가 `/`를 ko-KR로 추정하나 현행 기본 언어는 `en`이라 첫 페이지에서 감사가 중단된다. 우회 없이는 접근성 검사가 헛돈다. 수정 필요. — Codx
 
+## 스모크 기대값 드리프트 (2026-09-22)
+
+오늘 하루에 발견한 **"검사가 조용히 헛도는" 네 번째·다섯 번째 사례**다. 제품 변경 뒤 검사 기대값이 따라오지 않아 첫 관문에서 막히고, 그 뒤 단언이 아예 실행되지 않는다. 실패가 쌓여도 CI 게이트가 아니라 아무도 보지 않았다.
+
+- **완료 — excel-compare 타이틀 기대값** — `6eff3de`. `"Excel 비교·대사"` → `"Excel 비교"`. 제품이 맞고 검사가 낡았다(`92925e8`, 09-16). 관문 통과 후 **약 25개 단언이 실제로 실행·통과**했다. — Muse 구현 / Claude 판정
+- **완료 — pdf-finish 준비 상태 안내 허용목록** — `3568b42`. alert 0건 기대를 의도된 안내 2건(`pdf-finish-link-preservation`, `pdf-finish-preview-disclaimer`) 명시 허용으로 바꿨다(`cea060b`, 09-08). 그 외 alert는 여전히 실패하고 허용목록 2건이 없어도 실패한다. 관문 통과 후 **약 50개 단언이 실제로 실행·통과**했다. — Muse 구현 / Claude 판정
+- **남음 — excel-compare `assertB4Affordance`(`:243`)** — 검사가 `hover:bg-green-500/10!`를 요구하나 제품은 `eea9b1e`(액센트 정리, main 포함)의 `hover:bg-primary/10!`다. `origin/main`에서도 동일 실패. 제품이 맞고 검사가 낡았다. — Muse 보고 / Claude
+- **남음 — pdf-finish `testFinishWorkflow`(`:663`)** — `[role='alert'].last()`가 글꼴 오류 대신 미리보기 고지를 잡는다. `6fd7c8a`(warning 기본 role=alert, main 포함) 이후 페이지 전역 `.last()` 선택자가 낡았다. `origin/main`에서도 동일 실패. lifecycle·golden 4종은 아직 미실행. — Muse 보고 / Claude
+- **판정 — 배포를 막지 않는다** — 두 스모크는 CI 게이트가 아니며(`deploy-pages.yml`은 build·unit·ads·static·video-hybrid만 강제) `origin/main`에서도 동일하게 실패한다. 즉 현재 운영도 이 검사를 통과한 적이 없다. 검증된 제품 수정을 기존 검사 부패 때문에 붙잡지 않는다. 복구는 별도 작업으로 이어간다. — Claude 판정(Opus)
+
+## 화면 결함·기술 부채 묶음 (2026-09-22)
+
+- **완료 — T8 사이드바 메뉴 경계 잘림**(사용자 직접 신고) — `858af6e`. 박스 겹침이 아니라 클리핑 경계가 행 가운데를 지나는 것이 원인. 단일 여백값으로 3높이를 동시에 만족할 수 없어 `margin-bottom: 8px` + `padding-bottom: 56px` + 하단 페이드 마스크 채택. — Muse 구현 / Claude 감사
+- **잔여 위험 — ZIP 4GiB+ 크기 경계 미실측** — entry 수 경계(65,536)는 통과했으나 크기 경계는 실측하지 않았다. — Codx
+
 ## 모바일 셸 (2026-09-21)
 
 - **완료 — 모바일 수평 오버플로 24px** — `.wl-topbar`의 1020px 이하 `margin: 0 -24px`를 820px 이하 규칙이 되돌리지 않아 390px에서 상단바 폭이 438px이 되고 문서가 24px 넘쳤다. 4개 도구 bottom 모바일 8/8이 전부 24px였고 운영 3페이지에서도 재현됐다. 820px 이하에 `margin: 0`을 추가해 해소했다. 390·900·1365px에서 오버플로 0을 확인했고 900px 구간의 음수 여백은 의도대로 유지된다. — Codx 진단 / Muse 구현 / Claude 감사
@@ -49,10 +64,10 @@
 
 ## Excel 비교 — 중복키·머리글 후속
 
-- **BL01 · 마지막 더보기 소진 뒤 초점 목적지 — 낮은 우선순위(P3)** — 151행 중복 목록을 키보드로 펼친 뒤 마지막 50개를 불러오면 버튼이 DOM에서 사라지고 초점이 `BODY`로 이동했다(ko/en × light/dark **4/4**). `/ko/tools/excel-compare/`에서 151행 동일 키 CSV 두 파일 → 키 비교 → 중복 목록 → 마지막 더보기를 Tab·Enter로 실행해 재현한다. 다음 Tab의 목적지와 완료 안내 정책을 별도 접근성 계약으로 정한다. — Codx
-- **BL02 · 한국어 guide의 긴 시트명 나열 잘림 — 낮은 우선순위(P3)** — Excel 비교 안내 카드의 연속 영문 시트명 문자열이 카드 오른쪽에서 잘리는 상태가 기존 시각 기준선과 S2/S3 캡처에 동일하게 남아 있다. `/ko/tools/excel-compare/` guide를 모바일 폭 390px·dark에서 최하단까지 내려 재현하며, 표현 또는 줄바꿈을 고친 뒤 해당 기준선만 갱신한다. — Codx
-- **BL03 · desktop 결과 컨트롤 상단 부분 가림 — 낮은 우선순위(P3)** — 1365×900 한국어 사용자 1행/B 결과에서 오른쪽 목록을 Enter로 펼친 뒤 toggle rect가 `y=-19.53125..24.46875`, 전후 Tab·Shift+Tab 상태는 `y=0.46875`로 3px 초점 링 여백이 부족했다. 중앙 hit는 보이지만 라벨·링 일부가 잘리며 두 테마 **6상태**가 이전 커밋과 동일하다. `/ko/tools/excel-compare/` 결과에서 오른쪽 toggle을 키보드로 열고 앞뒤로 이동해 재현한다. 고정 shell이 없는 desktop 상단 회피 정책은 UI 재설계 계획에서 정한다. — Codx
-- **BL05 · 결과 검색 입력의 고정 모바일 헤더 가림 — 낮은 우선순위(P3)** — 390×844 결과 준비 단계에서 검색 입력 중앙 가시성은 전체 72상태 중 **71/72**였고, 실제 Tab 진입 시 ko/en `y=44.5/44.53125`, header bottom `63`, 중앙 hit가 `HEADER`였다. `/ko/tools/excel-compare/` 또는 `/en/tools/excel-compare/`에서 결과를 만든 뒤 검색 입력까지 Tab으로 이동해 재현한다. 고정 chrome 회피 범위를 검색 입력까지 넓힐지는 UI 재설계 계획에서 정한다. — Codx
+- **완료 — BL01 마지막 더보기 소진 뒤 초점 목적지** (2026-09-22, `5139c75`. 중복 목록 한정 정책, ko/en 완료 문구 추가) — 151행 중복 목록을 키보드로 펼친 뒤 마지막 50개를 불러오면 버튼이 DOM에서 사라지고 초점이 `BODY`로 이동했다(ko/en × light/dark **4/4**). `/ko/tools/excel-compare/`에서 151행 동일 키 CSV 두 파일 → 키 비교 → 중복 목록 → 마지막 더보기를 Tab·Enter로 실행해 재현한다. 다음 Tab의 목적지와 완료 안내 정책을 별도 접근성 계약으로 정한다. — Codx
+- **종결(수정 없음) — BL02 긴 시트명 잘림** (2026-09-22. `guides.json`에 대상 문자열 0건, 390px·dark 직접 열람 넘침 0. 기존 변경으로 해소) — Excel 비교 안내 카드의 연속 영문 시트명 문자열이 카드 오른쪽에서 잘리는 상태가 기존 시각 기준선과 S2/S3 캡처에 동일하게 남아 있다. `/ko/tools/excel-compare/` guide를 모바일 폭 390px·dark에서 최하단까지 내려 재현하며, 표현 또는 줄바꿈을 고친 뒤 해당 기준선만 갱신한다. — Codx
+- **완료 — BL03 desktop 컨트롤 상단 가림** (2026-09-22, `0899636`. 죽은 `.app-topbar` 셀렉터가 원인. 셸 개별 평가 + 뷰포트 fallback) — 1365×900 한국어 사용자 1행/B 결과에서 오른쪽 목록을 Enter로 펼친 뒤 toggle rect가 `y=-19.53125..24.46875`, 전후 Tab·Shift+Tab 상태는 `y=0.46875`로 3px 초점 링 여백이 부족했다. 중앙 hit는 보이지만 라벨·링 일부가 잘리며 두 테마 **6상태**가 이전 커밋과 동일하다. `/ko/tools/excel-compare/` 결과에서 오른쪽 toggle을 키보드로 열고 앞뒤로 이동해 재현한다. 고정 shell이 없는 desktop 상단 회피 정책은 UI 재설계 계획에서 정한다. — Codx
+- **완료 — BL05 결과 검색 입력 헤더 가림** (2026-09-22, `0cded0d`. 입력이 보정 대상에 미등록이 원인. 활성 요소와 링 측정 분리) — 390×844 결과 준비 단계에서 검색 입력 중앙 가시성은 전체 72상태 중 **71/72**였고, 실제 Tab 진입 시 ko/en `y=44.5/44.53125`, header bottom `63`, 중앙 hit가 `HEADER`였다. `/ko/tools/excel-compare/` 또는 `/en/tools/excel-compare/`에서 결과를 만든 뒤 검색 입력까지 Tab으로 이동해 재현한다. 고정 chrome 회피 범위를 검색 입력까지 넓힐지는 UI 재설계 계획에서 정한다. — Codx
 - **BL06 · Excel cleaner의 오류 셀 재출력 타입 — 중간 우선순위(spreadsheet-core 소비자)** — BL04 부모 `d9c79b7`부터 cleaner 모델은 공용 셀의 `type`을 투영하지 않고 출력도 `value/cachedValue`만으로 작성해 실제 오류 표시값을 일반 문자열로 재출력한다. BL04는 머리글 감지 정확도를 위한 입력 모델 교정이므로 출력 정책까지 넓히지 않았다. 실제 오류와 같은 literal 문자열을 구별해 정리 결과의 오류 셀 타입을 보존할지 별도 출력 계약과 roundtrip oracle로 정한다. — Codx
 
 ## 비디오 스튜디오
@@ -73,13 +88,13 @@
 
 > 두 항목 모두 **U5 파일 정리 선조사(2026-09-05)에서 나왔으나 U5 와 무관하게 성립하는 저장소 결함 후보**다. U5 는 2026-09-06 사용자 결정으로 로드맵에서 드랍됐고, 이 둘만 살려 이관했다. — Claude
 
-- **ZIP 라이브러리 이중 의존 — 단일화 판정 필요** — 이 저장소는 ZIP 라이브러리 **두 개**를 함께 의존한다: `@zip.js/zip.js` 2.9.0(공용 C3 결과 ZIP 경로)과 `jszip` ^3.10.1(PDF `pdf-to-image` 경로가 소비 — `PdfImagePanel.tsx:149-164`). 실측 근거: `grep -n "zip.js\|jszip" package.json`(53행·72행). **두 경로의 한글 파일명 처리와 대용량(zip64) 동작이 갈릴 수 있다.** 두 구현을 같은 입력으로 실측 대조하고 C3 로 단일화할지 판정한다. 단일화되면 번들도 줄어든다 — **2026-09-06 사용자 지시 「QR 번들 무게 축소」와 같은 표면이므로 함께 재는 것이 효율적이다.** — Claude
+- **완료 — ZIP 결과 쓰기 4경로 공통화** (2026-09-22, `aff608b`. DOCX·읽기 3경로는 계약 상이로 제외, ExcelJS 간접 의존은 잔존. unzip·jar 한글 및 65,536 entry ZIP64 통과, 4GiB+ 경계 미실측) — 이 저장소는 ZIP 라이브러리 **두 개**를 함께 의존한다: `@zip.js/zip.js` 2.9.0(공용 C3 결과 ZIP 경로)과 `jszip` ^3.10.1(PDF `pdf-to-image` 경로가 소비 — `PdfImagePanel.tsx:149-164`). 실측 근거: `grep -n "zip.js\|jszip" package.json`(53행·72행). **두 경로의 한글 파일명 처리와 대용량(zip64) 동작이 갈릴 수 있다.** 두 구현을 같은 입력으로 실측 대조하고 C3 로 단일화할지 판정한다. 단일화되면 번들도 줄어든다 — **2026-09-06 사용자 지시 「QR 번들 무게 축소」와 같은 표면이므로 함께 재는 것이 효율적이다.** — Claude
 - **`zipArchive.ts` 유니코드 파일명 옵션 미명시** — `src/utils/zipArchive.ts:49-56` 의 `zipWriter.add(...)` 는 `bufferedWrite`·`dataDescriptor`·`level`·`signal`·`zip64`·`onprogress` 만 넘기고 **`useUnicodeFileNames` 를 명시하지 않아 라이브러리 기본값에 의존**한다. 한글 파일명이 포함된 결과 ZIP 에서 동작이 라이브러리 버전에 따라 바뀔 수 있으므로 방어적으로 명시한다. 완료 기준: 한글 파일명 fixture 로 생성한 ZIP 을 최소 두 해제 도구(예: OS 기본 · `unzip`)에서 이름 보존 확인. — Claude
 
 ## PDF 글꼴 임베드 후속
 
-- **Ghostscript 한글 tofu — pdf-lib OTF descriptor 경계** — S2b QR 글꼴 감량 렌더 대조에서 전체·빌드 타임 subset OTF 모두 Poppler는 정상 렌더했지만 Ghostscript는 원본 전체 OTF부터 한글을 tofu로 표시했다. PDF의 `FontFile2` descriptor에 `OTTO` CFF 스트림이 들어가는 pdf-lib/fontkit 임베드 경계의 기존 결함이며 S2b subset 회귀가 아니다. U4 공용 PDF 글꼴 임베드 경계를 구현할 때 descriptor/stream 조합을 교정하고 GS·Poppler 동시 렌더로 판정한다. — Codx
-- **PDF.js 텍스트 추출이 입력 문자열과 다름 — U4 관련** — 같은 S2b fixture에서 PDF.js는 전체 OTF와 subset OTF 사이 추출 결과는 동일했지만 일부 공백을 `堺`로, shaping 숫자를 한자로 추출하는 기존 오류가 남았다. S2b의 oracle은 전체 대비 불변이고 입력 문자열과의 완전 일치는 범위 밖이다. U4에서 ToUnicode/CMap 생성 경계를 다룰 때 입력 문자열 일치 fixture를 별도 추가한다. — Codx
+- **완료 — Ghostscript 한글 tofu** (2026-09-22, `d5f3112`. CID-keyed CFF 전용 임베더로 해결, 의존성 패치 없음. 총괄 렌더 확인) — S2b QR 글꼴 감량 렌더 대조에서 전체·빌드 타임 subset OTF 모두 Poppler는 정상 렌더했지만 Ghostscript는 원본 전체 OTF부터 한글을 tofu로 표시했다. PDF의 `FontFile2` descriptor에 `OTTO` CFF 스트림이 들어가는 pdf-lib/fontkit 임베드 경계의 기존 결함이며 S2b subset 회귀가 아니다. U4 공용 PDF 글꼴 임베드 경계를 구현할 때 descriptor/stream 조합을 교정하고 GS·Poppler 동시 렌더로 판정한다. — Codx
+- **완료 — PDF 텍스트 추출 불일치** (2026-09-22, `d5f3112`. 원문별 ToUnicode + CID 기준 `/W` 생성. 총괄 왕복 5/5 일치 확인) — 같은 S2b fixture에서 PDF.js는 전체 OTF와 subset OTF 사이 추출 결과는 동일했지만 일부 공백을 `堺`로, shaping 숫자를 한자로 추출하는 기존 오류가 남았다. S2b의 oracle은 전체 대비 불변이고 입력 문자열과의 완전 일치는 범위 밖이다. U4에서 ToUnicode/CMap 생성 경계를 다룰 때 입력 문자열 일치 fixture를 별도 추가한다. — Codx
 
 ## PDF 생성 라이브러리 중복 배포
 
@@ -87,7 +102,7 @@
 
 ## 공용 데스크톱 언어 전환 UI
 
-- **고정 언어 스위처의 스크롤된 콘텐츠 가림 — 기존 P3** — 1365px에서 PDF 마무리 화면을 아래로 스크롤하면 우상단 KO/EN 스위처가 모드 탭의 마지막 라벨 위에 겹친다. `src/styles/global.css`의 fixed 위치는 `76ceecc7`부터 존재하며 U4에서 바뀌지 않았다. 최상단에서는 탭이 보이고 이번 UI 추가 회귀는 아니다. UI 재설계에서 공용 고정 요소의 가림 정책으로 함께 처리한다. 실제 이미지 `/tmp/worklazy-u4-mergegate3/f5-audit/ko-light-1365-combined.png`, Claude 직접 열람 및 Codx source blame 교차. — Codx
+- **종결(재현 불가) — 고정 언어 스위처 가림** (2026-09-22. 독립 fixed 스위처가 현행에 없음. 관찰되는 것은 고정 헤더 아래 정상 통과) — 1365px에서 PDF 마무리 화면을 아래로 스크롤하면 우상단 KO/EN 스위처가 모드 탭의 마지막 라벨 위에 겹친다. `src/styles/global.css`의 fixed 위치는 `76ceecc7`부터 존재하며 U4에서 바뀌지 않았다. 최상단에서는 탭이 보이고 이번 UI 추가 회귀는 아니다. UI 재설계에서 공용 고정 요소의 가림 정책으로 함께 처리한다. 실제 이미지 `/tmp/worklazy-u4-mergegate3/f5-audit/ko-light-1365-combined.png`, Claude 직접 열람 및 Codx source blame 교차. — Codx
 - **PDF 마무리 한국어 제목·탭의 단어 중간 줄바꿈 — U4 cosmetic P3** — 320/821px에서 제목이나 `머리글·바닥글` 탭의 마지막 글자가 다음 줄에 놓인다. 821px 탭 라벨 폭은 77.75px이며 두 줄이다. U4 라벨·4개 탭 구성의 영향이므로 부모 `d3a8d89`와 같다는 이유로 U4 이전 부채라고 부르지 않는다. UI 재설계에서 한국어 줄바꿈·폭 정책으로 묶어 처리한다. 개인정보 안내 pill의 같은 현상은 공용 CSS는 U4 이전이지만 F5 제목의 인접 폭 영향이 있어 정확한 증상 귀속은 미확정이다. P2 도장 공지의 제목 수직 붕괴는 이 항목으로 미루지 않고 U4에서 별도 수리했다. 근거 `/tmp/worklazy-u4-audit3/visual-dom-initial-final/REPORT.md`. — Codx
 
 ## PDF 마무리 확장 동작의 레이아웃 안정성

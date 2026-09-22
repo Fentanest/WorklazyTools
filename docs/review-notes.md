@@ -4,6 +4,19 @@
 
 ## 2026-09-21
 
+### 화면 결함·기술 부채 묶음 정리 (Claude 판정)
+
+정본 `docs/jobs/todo/ui-debt-cleanup-20260922/PLAN.md` v0.3. **v0.1 초안은 Astra R1에서 차단 7건을 받았고 그 지적이 전부 사실이었다.** 총괄이 현행 소스로 대조해 확인한 v0.1의 오류: ① "desktop에 고정 셸 없음" — 실제로는 `.wl-topbar`가 `position: fixed; top: 0` ② BL03·BL05를 같은 원인으로 묶어 전역 `scroll-padding-top` 하나로 해결하려 함 ③ jszip 소비를 "읽기 5곳 이상"으로 오분류(실제 읽기 3·쓰기 5) ④ GS tofu를 "복사만 문제"로 묶어 미수정 정당화. R2에서 추가로 "링 전체 가시성" 계약이 기존 320px 초과 폭 계약과 모순됨을 지적받아 축별 기준으로 정정했다.
+
+- **진짜 원인 2건이 반박 과정에서 드러났다.** `ExcelComparePage.tsx:522`가 현행에 존재하지 않는 `.app-topbar`를 찾고 있어 초점 가시성 보정이 **조용히 무동작**이었다. 실패도 나지 않아 아무도 몰랐다. 그리고 결과 검색 입력은 `data-excel-result-focus` 표식이 없어 보정 대상에서 **아예 제외**돼 있었다. v0.1대로 CSS만 덧댔으면 죽은 코드를 덮었을 것이다.
+- **T3/T4 수정**: `topChromeBottom()`이 `.wl-topbar`와 `.mobile-header`를 각각 평가해 더 아래 경계를 쓰고, 셸 부재 시 뷰포트 상단 0·하단 `innerHeight`로 fallback한다. 검색 입력은 등록하되 `resolveFocusRingElement()`로 **활성 요소 추적(input)과 링 측정(label) 분리**. `--wl-header-height: 104px` 사용은 실측 63/70과 달라 기각. 실측 top 30.47 → 74.47, label 39.5 → 66.75. 화면보다 넓은 요소의 기존 시작 가장자리 분기(`:539-540`)는 보존했다.
+- **T1**: 적용 범위를 BL01 중복 목록 한정으로 결정하고 ko/en 완료 문구를 추가했다.
+- **T6a·T6b는 의존성 패치 없이 해결했다.** pdf-lib을 고치는 대신 `pdfFontEmbed.ts`에 CID-keyed CFF 전용 임베더를 구현하고 그 외 폰트는 기존 경로로 위임한다. 원인: `CustomFontEmbedder.js:122`가 `font.cff`를 보는데 fontkit은 CFF를 `font['CFF ']`로 노출해 CFF OTF가 비-CFF 분기를 타고 CIDFontType2+FontFile2+OTTO가 됐다. 이 폰트는 CID≠GID(22,523개 상이)여서 descriptor 키만 바꾸면 다른 글리프가 선택되므로 콘텐츠 코드→CID→GID와 `/W`·ToUnicode를 함께 정합화했다. **총괄 독립 검증**: 왕복 5/5 일치(`"한글 테스트 2026 파일명.pdf"` 등, 이전에는 공백이 `堺`), PDF 내부 `CIDFontType0`·`CIDFontType0C` 각 1 / `CIDFontType2`·`FontFile2` 0, Ghostscript exit 0·stderr 없음·렌더 이미지 육안 정상.
+- **T2·T5는 고치지 않고 종결했다.** T2의 긴 시트명 나열은 `guides.json`에 0건이고 390px·dark 직접 열람에서 넘침 0. T5의 "독립 fixed 스위처"는 현행에 없으며(스위처는 `.wl-topbar` 자식, `.desktop-language-switcher` 숨김) 관찰되는 것은 static 콘텐츠가 고정 헤더 아래를 지나는 정상 동작이다. **없는 결함을 고치지 않는 것도 결론이다.**
+- **T8(사용자 직접 신고)**: 박스 겹침이 아니라 클리핑 경계가 행 가운데를 지나는 것이 원인이었다. 단일 여백값으로 620·700·900을 동시에 만족할 수 없음을 행 좌표로 증명해 행 높이 정렬안을 기각하고, `margin-bottom: 8px` + `padding-bottom: 56px` + 하단 56px 페이드 마스크 + forced-colors 가드를 택했다. **총괄 확인**: 기하학적으로는 700·900에서 여전히 행이 경계에 걸치나, 페이드로 인해 잘린 단면이 아니라 흐려지며 사라지므로 신고된 "가려짐" 인상이 해소된다. 캡처 직접 열람으로 확인했다.
+- **T7**: 사용자 결과 ZIP 쓰기 4경로를 공용 `zipArchive.ts`로 통합했다. DOCX 패키징과 읽기 3경로는 계약이 달라 범위에서 제외했고, ExcelJS의 간접 JSZip 의존 때문에 앱 import 제거만으로 전체 제거가 보장되지 않는다는 점도 명시했다. `unzip`·`jar` 한글 호환과 65,536 entry ZIP64 경계 통과. **4GiB+ 크기 경계는 미실측 위험으로 남긴다.**
+- 반박 왕복이 없었다면 죽은 셀렉터를 못 찾고 없는 결함을 고쳤을 것이다. — Claude 판정(Opus) / Astra 검토 / Muse·Codx 구현
+
 ### 접근성 대비·랜드마크 수정과 감사기 언어 정합 (Claude 판정)
 
 - **사용자 결정 경계:** 브랜드 카드 흰 글씨(`.brand-name` 3.32:1, `.brand-tagline` 2.87:1)는 **사용자가 기각**했다. 흰 글씨를 유지하려면 코랄을 `rgb(230,101,73)`→`rgb(184,80,58)`까지 내려야 해 브랜드 색이 눈에 띄게 바뀌기 때문이다. 이는 미확인이 아니라 **수용된 부채**이며 이후 감사에서 새 결함으로 보고하지 않는다. 총괄이 diff로 코랄 토큰 값 불변을 확인했다.
