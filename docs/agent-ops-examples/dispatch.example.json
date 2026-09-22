@@ -1,0 +1,11 @@
+{
+  "task_id": "implementation-search-v1",
+  "role": "implementation",
+  "execution": "implementation",
+  "workspace": "/ABSOLUTE/APPROVED/WORKTREE",
+  "prompt_file": "/ABSOLUTE/WORKTREE/docs/jobs/todo/search-instruction.txt",
+  "request_mode": "plan-and-implement",
+  "implementation_authorized": true,
+  "approval_reference": "실제 사용자 승인·정본 경로와 버전으로 대체",
+  "target_digest": "REPLACE_WITH_FIXED_SOURCE_DIGEST"
+}

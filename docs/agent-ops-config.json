@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "project": "WorklazyTools",
+  "policy_version": "2026-09-22",
+  "models": {
+    "gemini": "gemini-3.1-pro",
+    "implementation": "gpt-6-sol",
+    "review": "gpt-6-astra",
+    "research": "gpt-6-luna",
+    "muse_runtime_id": null
+  },
+  "jev": {
+    "model": "jev-latest",
+    "support_probability_floor": 0.8
+  },
+  "review": {
+    "max_tasks": 5,
+    "max_lines": 800,
+    "elapsed_time_trigger": false
+  },
+  "line_count_exclude_globs": [
+    "dist/**",
+    "vendor/**",
+    "public/vendor/**",
+    "**/vendor/**"
+  ],
+  "high_risk_paths": [
+    {
+      "glob": "AGENTS.md",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "CLAUDE.md",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "GEMINI.md",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "PROJECT_RULES.md",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "docs/agent-ops-config.json",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "docs/agent-dispatch-runbook.md",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "scripts/agent_ops.py",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "scripts/codex_direct.py",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "scripts/jev_client.py",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "scripts/gemini_research.py",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "**/*scoped-verification/**",
+      "reason": "agent_authority_or_review_control"
+    },
+    {
+      "glob": "src/**/crypto*",
+      "reason": "sensitive_data"
+    },
+    {
+      "glob": "src/**/encrypt*",
+      "reason": "sensitive_data"
+    },
+    {
+      "glob": "src/**/serialize*",
+      "reason": "output_contract"
+    },
+    {
+      "glob": "src/**/shared/**",
+      "reason": "shared_contract"
+    },
+    {
+      "glob": "package.json",
+      "reason": "dependencies_or_build"
+    },
+    {
+      "glob": "package-lock.json",
+      "reason": "dependencies_or_build"
+    }
+  ]
+}

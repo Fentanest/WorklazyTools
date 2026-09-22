@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "project": "WorklazyTools",
+  "repository": "Fentanest/WorklazyTools",
+  "base_branch": "main",
+  "base_commit": "8552f09015647cea7aabf4d47ff3c206451bc31d",
+  "created_date": "2026-09-22",
+  "delivery": "repo-relative overwrite overlay; files absent from archive must be preserved",
+  "github_modified": false,
+  "secret_material_included": false,
+  "tests": {
+    "command": "python3 -m unittest discover -s tests/agent_ops -v",
+    "count": 85,
+    "status": "passed",
+    "scope": "offline API protocol, local Git/temp fixtures, real Node subprocess invoking fake plugin",
+    "live_typesafe_auth": "not_run; user shell environment is not available here",
+    "live_codex_or_agy": "not_run"
+  },
+  "files": [
+    {
+      "path": ".agents/skills/worklazy-scoped-verification/SKILL.md",
+      "operation": "replace",
+      "bytes": 2729,
+      "sha256": "c5c1757edb7e6535ff16c840f68c540ab45a4da80de65bc9f572d19af42a9327"
+    },
+    {
+      "path": ".claude/skills/worklazy-scoped-verification/SKILL.md",
+      "operation": "replace",
+      "bytes": 2729,
+      "sha256": "c5c1757edb7e6535ff16c840f68c540ab45a4da80de65bc9f572d19af42a9327"
+    },
+    {
+      "path": "AGENTS.md",
+      "operation": "replace",
+      "bytes": 5563,
+      "sha256": "4b478729b534877a8dd96b104b72815760c9e37659d7039c1d3cf7e83ef8f48b"
+    },
+    {
+      "path": "CLAUDE.md",
+      "operation": "replace",
+      "bytes": 5115,
+      "sha256": "f5c350c445cb9fec5107a05d7800b3e8aad3addd59beea48dbd4e1f51c00f36f"
+    },
+    {
+      "path": "GEMINI.md",
+      "operation": "replace",
+      "bytes": 4874,
+      "sha256": "aec7dd4788228f077de2530169a38ee44f1426d9a0ab3371e917f87afeae6fa0"
+    },
+    {
+      "path": "PROJECT_RULES.md",
+      "operation": "replace",
+      "bytes": 21694,
+      "sha256": "ba89ebbf41f5f3f87943070f1116ccc4df5330fc9028464264163222472fe927"
+    },
+    {
+      "path": "docs/AGENT_OPS_MIGRATION.md",
+      "operation": "add",
+      "bytes": 6326,
+      "sha256": "2f4580abba8a5715bc2a8c8f3cdf485b483fb5edf11a786e06fddc045f396988"
+    },
+    {
+      "path": "docs/PUBLISHING_CHECKLIST.md",
+      "operation": "replace",
+      "bytes": 3955,
+      "sha256": "7befcb40b551b03197b368e9e79c5ce0e0a158efb57f4faf4a08ddc617c47ddd"
+    },
+    {
+      "path": "docs/agent-dispatch-runbook.md",
+      "operation": "replace",
+      "bytes": 15394,
+      "sha256": "dae6372edb9b61a5232f4ad654ff37f42f9025c6669621b96a8dd2486bede6e8"
+    },
+    {
+      "path": "docs/agent-ops-config.json",
+      "operation": "add",
+      "bytes": 2201,
+      "sha256": "5834c461e8634849a5f80e051a890f61c2e8ec2ca860d9fa59d2d45fbda3de9b"
+    },
+    {
+      "path": "docs/agent-ops-examples/dispatch.example.json",
+      "operation": "add",
+      "bytes": 449,
+      "sha256": "8db3a0ae939b5652f9e9549b28f21eb41b8da3420f53f20291c6ba3f424f466c"
+    },
+    {
+      "path": "docs/agent-ops-examples/task.example.json",
+      "operation": "add",
+      "bytes": 1081,
+      "sha256": "5472022581a4b32ca4aef764624f83964619fdb3e4efd6227c52fc3871fd6564"
+    },
+    {
+      "path": "docs/agent-ops-guide.md",
+      "operation": "add",
+      "bytes": 11063,
+      "sha256": "98ad37e9a7e660fc76b837cb1e049f14aaab01eef12e0645d47df8ea9795163e"
+    },
+    {
+      "path": "docs/verification-guide.md",
+      "operation": "add",
+      "bytes": 2409,
+      "sha256": "5e5361c73364297d83ce34c99ed6d9d53cf726b084e4413674d043b6637c57c1"
+    },
+    {
+      "path": "scripts/agent_ops.py",
+      "operation": "add",
+      "bytes": 43795,
+      "sha256": "6d719e4a9cc2bffb04da6e443286ee4f249ee0986ab155df7dbb3e3c5fe6bac4"
+    },
+    {
+      "path": "scripts/codex_direct.py",
+      "operation": "add",
+      "bytes": 19946,
+      "sha256": "1e55f83d5235e419396628dac2048a2975a9c14ea063a09883982b0088608aae"
+    },
+    {
+      "path": "scripts/gemini_research.py",
+      "operation": "add",
+      "bytes": 5919,
+      "sha256": "b89e29babbdb41337b46348613d8a2e3ba265af97a061c24d389559ee2bb0f73"
+    },
+    {
+      "path": "scripts/jev_client.py",
+      "operation": "add",
+      "bytes": 8478,
+      "sha256": "e3a44ac7d1dcc13fa89a89695e2d305ba11f2a889c52b2974c0b8ab1213e8e88"
+    },
+    {
+      "path": "tests/agent_ops/test_agent_ops.py",
+      "operation": "add",
+      "bytes": 33071,
+      "sha256": "25d7ed9714393445852165980eee04a6fb429031cc53defb5983b69b8eed91f8"
+    }
+  ],
+  "self_hash_excluded": true
+}

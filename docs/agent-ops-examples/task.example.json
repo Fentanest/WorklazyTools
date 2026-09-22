@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "task_id": "search-empty-input-v1",
+  "batch_id": "search-ui-20260922",
+  "area": "search-ui",
+  "request_mode": "plan-and-implement",
+  "implementation_authorized": true,
+  "base_commit": "REPLACE_WITH_APPROVED_BASE_COMMIT",
+  "approved_plan": {
+    "path": "docs/jobs/todo/search-plan.md",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "start_line": 1,
+    "end_line": 12
+  },
+  "scope_description": "예시: 빈 검색어 오류 처리. 실제 승인된 범위를 적는다.",
+  "requirements": [
+    {
+      "id": "R01",
+      "text": "예시: 빈 입력에서 오류 메시지를 표시하고 후속 검색을 실행하지 않는다.",
+      "evidence": [
+        {
+          "path": "src/search.ts",
+          "start_line": 1,
+          "end_line": 40
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "id": "unit-search",
+      "input_paths": [
+        "src/search.ts",
+        "tests/test_search.py"
+      ],
+      "kind": "unit"
+    }
+  ],
+  "high_risk_reasons": [],
+  "completion_requested": false
+}

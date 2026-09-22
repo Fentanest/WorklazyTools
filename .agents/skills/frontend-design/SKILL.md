@@ -14,7 +14,7 @@ Guidance for visual design when building new UI or reshaping an existing one.
 
 - Use only for new screens, new design reviews, or approved design changes upon explicit user request.
 - Do not automatically redesign existing UI when fixing alignment or bugs.
-- Claude remains the coordinator and auditor; Astra handles technical plan review and implementation verification. The assigned implementer (GPT 5.6 Sol or Muse Spark 1.3) handles authorized implementation only.
+- Claude remains the coordinator and auditor; Astra handles technical plan review and implementation verification. The assigned implementer (GPT 6 Sol or Muse Spark 1.3) handles authorized implementation only.
 - Gemini discovering this skill does not grant it product implementation authority.
 - Parallel implementers follow the ownership, worktree, shared-token/component, and integration rules in PROJECT_RULES.md; this skill does not allow competing edits to shared design files.
 - Prioritize existing themes, design tokens, components, and approved drafts. Do not force new color palettes or fonts.
