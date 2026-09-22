@@ -11,13 +11,11 @@
 
 - **완료 — 대비·랜드마크 수정** — 자동 위반 64→28, `region` 57→0, `color-contrast` 위반 89→72, incomplete 1,858→1,807. 라이트 `--label-secondary` 한 단계 하향 + 미달 tertiary 소비자 4곳 교체(위계 보존), 320px 배지 겹침 수정, 상단바 `role=region`. — Muse 구현 / Claude 감사
 - **기각 — 브랜드 카드 흰 글씨 대비** — 사용자 결정. 코랄을 눈에 띄게 어둡게 해야 하므로 채택하지 않았다. **수용된 부채이며 이후 감사에서 새 결함으로 보고하지 않는다.** 결정이 바뀌면 `docs/jobs/archive/TODO-STATUS-AUDIT-20260920.md` §F를 갱신한다. — Claude 판정
-- **잔여 — `color-contrast` 위반 72노드** — 회색 토큰 범위 밖이며 기각된 브랜드 incomplete를 포함한다. 접근성 감사 종료 코드는 1로 남는다. 추가 수정 여부는 별도 판단. — Claude
 - **완료 — 접근성 감사기 언어 정합** — 루트 `/`를 ko-KR로 가정해 첫 페이지에서 중단되던 것을 제품 기본 언어(`en`)를 읽도록 고쳤다. 선언을 못 찾으면 실패하므로 조용히 어긋나지 않는다. — Codx 구현 / Claude 감사
 
 ## 시각·접근성 (2026-09-21)
 
 - **완료 — 시각 회귀 스위트 복구** — 기준 이미지 249장 재생성(표본 12건 육안 판정 후), 구식 하네스 셀렉터 14건 수정, desktop-1920 viewport 추가(+4), mint family 연결(+4), VISUAL_SHARD 구현. N=274, shard 계약 합집합 274·교집합 0·누락 0·중복 0 총괄 재확인. `src/` 변경 0건. — Muse 구현 / Claude 감사
-- **남은 시각 실패 5건** — video-studio navigation timeout 3건(하네스 `networkidle0` 조건 유력, 같은 URL이 다른 시나리오에서 4.4초 통과), office-editor 진행률 flake 2건. 둘 다 화면은 정상이며 통과로 처리하지 않았다. — Muse / Claude
 - **결정 대기 — 접근성 대비 수정** — 자동 위반 64건(146노드)과 incomplete 판정 실제 결함 514노드. 네 군데 색 문제가 반복 집계된 것이다. `--label-secondary` 한 단계 하향은 육안 차이 없이 다수를 해소하지만, 브랜드 카드 흰 글씨 문제는 코랄을 눈에 띄게 어둡게 해야 해 승인된 테마 변경에 해당한다. 사용자 판단 필요. — Claude 판정 / Codx 판정
 - **접근성 감사기 선행 결함** — `tests/accessibility-audit.mjs`가 `/`를 ko-KR로 추정하나 현행 기본 언어는 `en`이라 첫 페이지에서 감사가 중단된다. 우회 없이는 접근성 검사가 헛돈다. 수정 필요. — Codx
 
@@ -60,7 +58,6 @@
 
 ## UI 시각 기준선 재설정
 
-- **U6 개인정보 가리기 기준선 7장 부재** — U7의 `VISUAL_ONLY=document-generator`와 U8의 `VISUAL_ONLY=pdf-compare` 기준선 생성·비교에서 각 소유 범위 6장은 diff 0이었지만, 전역 inventory 검사가 이전 U6 `document-redactor` 기준선 7장 부재로 계속 exit 1이었다. U7·U8 기준을 넓혀 만들거나 검사를 완화하지 않고, `ui-theme-rebaseline-procedure-20260909.md`의 전체 기준 재설정 단계에서 실제 U6 상태를 다시 캡처·검수한다. 근거: `/tmp/worklazy-u7-final/visual-baseline-u7.log`, `/tmp/worklazy-u7-final/visual-compare-u7.log`, `/tmp/worklazy-u8-final/09-visual-baseline-owner.log`, `/tmp/worklazy-u8-final/10-visual-compare-owner.log`. — Codx
 
 ## Excel 비교 — 중복키·머리글 후속
 
