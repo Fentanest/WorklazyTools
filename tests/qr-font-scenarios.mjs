@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import http from 'node:http';
-import { PDFDocument, PDFRawStream, decodePDFRawStream } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from 'pdf-lib';
 
 export const fontPaths = {
   subset: '/vendor/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/NotoSansKR-Regular.ksx1001.otf',
@@ -11,6 +11,10 @@ export const fontPaths = {
 const pins = {
   subset: {size:931704, sha256:'b84d27a582d3f3e660db728e7913af3061d4e825e93cabdb6802f0ce23a252be'},
   full: {size:4644748, sha256:'69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68'},
+};
+const embeddedPins = {
+  subset: {size:668772, sha256:'26a7a392b6e9d152c7cc7ee54e9ef72f6a0e289594d003d0f391d60241da7b4e'},
+  full: {size:4258285, sha256:'a20956f47e2c51faede90f5134a0aaa7525bef77082c85071f8225476f4a0c90'},
 };
 export const qrFontScenarios = {
   subset: {font:'subset',requests:['subset']},
@@ -43,12 +47,13 @@ export async function assertPinnedQrPdf(bytes, kind, pages) {
   const fonts=[];
   for (const [,object] of document.context.enumerateIndirectObjects()) {
     if (!(object instanceof PDFRawStream)) continue;
+    if (object.dict.get(PDFName.of('Subtype')) !== PDFName.of('CIDFontType0C')) continue;
     const decoded=decodePDFRawStream(object).decode();
-    if (Buffer.from(decoded.subarray(0,4)).toString()==='OTTO') fonts.push(decoded);
+    if (decoded[0]===1 && decoded[1]===0) fonts.push(decoded);
   }
-  assert.equal(fonts.length,1,'Exactly one embedded OTF stream');
+  assert.equal(fonts.length,1,'Exactly one embedded raw CFF stream');
   const embedded={size:fonts[0].length,sha256:createHash('sha256').update(fonts[0]).digest('hex')};
-  assert.deepEqual(embedded,pins[kind]);
+  assert.deepEqual(embedded,embeddedPins[kind]);
   return {pdfBytes:bytes.length,pages:document.getPageCount(),embedded};
 }
 export function assertQrFontRequests(requests, scenario) {
