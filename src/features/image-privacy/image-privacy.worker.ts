@@ -2,7 +2,7 @@
 
 import ExifReader from "exifreader";
 import type { ExpandedTags } from "exifreader";
-import JSZip from "jszip";
+import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
 
 interface PrivacyInput { name: string; type: string; buffer: ArrayBuffer }
 interface Metadata { make: string; model: string; software: string; dateTime: string; latitude: string; longitude: string; orientation: string; foundCount: number }
@@ -18,9 +18,11 @@ self.onmessage = async (event: MessageEvent<{ files: PrivacyInput[]; language?: 
       self.postMessage({ type: "result", items: cleaned.map(({ metadata, sourceName }) => ({ metadata, sourceName })), metadata: only.metadata, buffer, mimeType: only.blob.type, fileName: only.fileName }, [buffer]);
       return;
     }
-    const zip = new JSZip();
-    cleaned.forEach((item, index) => zip.file(`${String(index + 1).padStart(2, "0")}-${item.fileName}`, item.blob));
-    const buffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE", compressionOptions: { level: 6 }, streamFiles: true });
+    const archive = await createZipArchiveBlob(cleaned.map((item, index) => ({
+      fileName: `${String(index + 1).padStart(2, "0")}-${item.fileName}`,
+      blob: item.blob,
+    })), undefined, undefined, undefined, { level: 6 });
+    const buffer = await archive.arrayBuffer();
     const empty: Metadata = { make: "", model: "", software: "", dateTime: "", latitude: "", longitude: "", orientation: "", foundCount: cleaned.reduce((sum, item) => sum + item.metadata.foundCount, 0) };
     self.postMessage({ type: "result", items: cleaned.map(({ metadata, sourceName }) => ({ metadata, sourceName })), metadata: empty, buffer, mimeType: "application/zip", fileName: event.data.language === "en" ? "worklazy-metadata-removed.zip" : "worklazy-메타데이터제거.zip" }, [buffer]);
   } catch {

@@ -1,4 +1,4 @@
-import { BlobReader, type BlobWriter, type Reader, ZipWriter } from "@zip.js/zip.js";
+import { BlobReader, BlobWriter, type Reader, ZipWriter } from "@zip.js/zip.js";
 
 import {
   reserveSafeFileName,
@@ -38,8 +38,28 @@ export interface IncrementalZipArchiveWriter {
 }
 
 export interface ZipArchiveOptions {
+  level?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   useWebWorkers?: boolean;
   readerFactory?: (blob: Blob) => Reader<Blob>;
+}
+
+export async function createZipArchiveBlob(
+  files: Array<{ fileName: string; blob: Blob }>,
+  signal?: AbortSignal,
+  onProgress?: (progress: ZipArchiveProgress) => void,
+  onFinalizing?: () => void,
+  options?: ZipArchiveOptions,
+) {
+  const output = new BlobWriter("application/zip");
+  await writeZipArchive(
+    createSafeZipArchiveSources(files),
+    output,
+    signal,
+    onProgress,
+    onFinalizing,
+    options,
+  );
+  return output.getData();
 }
 
 export function createIncrementalZipArchiveWriter(
@@ -49,10 +69,11 @@ export function createIncrementalZipArchiveWriter(
 ): IncrementalZipArchiveWriter {
   const names = new SafeZipEntryPathRegistry();
   const readerFactory = options.readerFactory ?? ((blob: Blob) => new BlobReader(blob));
+  const level = options.level ?? 0;
   const zipWriter = new ZipWriter(writable, {
     bufferedWrite: false,
     dataDescriptor: true,
-    level: 0,
+    level,
     signal,
     useWebWorkers: options.useWebWorkers,
     zip64: true,
@@ -67,7 +88,7 @@ export function createIncrementalZipArchiveWriter(
       await zipWriter.add(entryPath, readerFactory(blob), {
         bufferedWrite: false,
         dataDescriptor: true,
-        level: 0,
+        level,
         signal,
         useWebWorkers: options.useWebWorkers,
         zip64: true,

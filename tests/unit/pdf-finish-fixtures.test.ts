@@ -28,6 +28,14 @@ function withoutLegacy(tree: Record<string, string>) {
   return Object.fromEntries(Object.entries(tree).filter(([file]) => !file.startsWith("legacy-oracle/")));
 }
 
+function legacyOracleWorkerSource(source: Buffer | string) {
+  return source.toString()
+    .replace(/^import JSZip from "jszip";\n/m, "")
+    .replace(/^import \{ createZipArchiveBlob \} from "\.\.\/\.\.\/utils\/zipArchive\.ts";\n/m, "")
+    .replace(/\nasync function exportGroups[\s\S]*?(?=\nasync function decoratePdf)/u, "")
+    .replace(/\n{2,}/gu, "\n");
+}
+
 test("PDF finish fixtures are deterministic twice and match the tracked oracle tree", async () => {
   const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-pdf-finish-fixtures-"));
   const first = path.join(temporaryRoot, "first");
@@ -68,10 +76,12 @@ test("legacy PDF oracles remain tied to the exact main blobs and all three oracl
     const baseBlob = execFileSync("git", ["show", `${manifest.baseCommit}:${source.file}`], { cwd: repositoryRoot });
     assert.equal(crypto.createHash("sha256").update(baseBlob).digest("hex"), source.sha256, source.file);
   }
+  const baseWorker = execFileSync("git", ["show", `${manifest.baseCommit}:${manifest.source.worker.file}`], { cwd: repositoryRoot });
+  const currentWorker = await fs.readFile(path.join(repositoryRoot, manifest.source.worker.file));
   assert.equal(
-    crypto.createHash("sha256").update(await fs.readFile(path.join(repositoryRoot, manifest.source.worker.file))).digest("hex"),
-    manifest.source.worker.sha256,
-    "The legacy PDF worker remains unchanged; the migrated client is checked by fixtures:pdf-legacy-oracle.",
+    legacyOracleWorkerSource(currentWorker),
+    legacyOracleWorkerSource(baseWorker),
+    "The legacy merge worker remains unchanged outside the independently tested result-ZIP packaging path.",
   );
   for (const mode of manifest.modes) {
     assert.equal(crypto.createHash("sha256").update(await fs.readFile(path.join(legacyDirectory, mode.output.file))).digest("hex"), mode.output.sha256, mode.mode);

@@ -1,6 +1,5 @@
 /// <reference lib="webworker" />
 
-import JSZip from "jszip";
 import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 import type {
@@ -10,6 +9,7 @@ import type {
 } from "./types";
 import { ensurePdfExtension as ensureExtension, normalizePdfRotation as normalizeRotation, pdfBinaryResult as binaryResult, sanitizePdfFileName as sanitizeFileName } from "./pdfShared";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
+import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 let currentLanguage: "ko" | "en" = "ko";
@@ -68,7 +68,7 @@ async function exportGroups(data: {
   if (data.groups.some((group) => !group.pages.length)) throw new PdfWorkerError(featureMessage(currentLanguage, "pdf.messages.pdf.aPdfGroupContainsNoPages"), "EMPTY_GROUP");
   progress(3, featureMessage(currentLanguage, "pdf.messages.pdf.readingSourcePdfs"));
   const sources = await loadSources(data.inputs, 3, 20);
-  const archive = new JSZip();
+  const archiveFiles: Array<{ fileName: string; blob: Blob }> = [];
   for (let groupIndex = 0; groupIndex < data.groups.length; groupIndex += 1) {
     const group = data.groups[groupIndex];
     const output = await createPlannedPdf(sources, group.pages, (pageIndex) => {
@@ -76,14 +76,23 @@ async function exportGroups(data: {
       progress(23 + groupProgress * 62, featureMessage(currentLanguage, "pdf.messages.pdf.buildingPage", { p0: groupIndex + 1, p1: data.groups.length, p2: group.fileName, p3: pageIndex + 1, p4: group.pages.length }));
     });
     await decoratePdf(output, data.options);
-    archive.file(ensureExtension(sanitizeFileName(group.fileName, data.splitPdfFallback), "pdf"), await output.save({ useObjectStreams: true }));
+    archiveFiles.push({
+      fileName: ensureExtension(sanitizeFileName(group.fileName, data.splitPdfFallback), "pdf"),
+      blob: new Blob([await output.save({ useObjectStreams: true })], { type: "application/pdf" }),
+    });
   }
   progress(88, featureMessage(currentLanguage, "pdf.messages.pdf.packingPdfsIntoAZip", { p0: data.groups.length }));
-  const bytes = await archive.generateAsync(
-    { type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } },
-    (metadata) => progress(88 + metadata.percent * 0.1, featureMessage(currentLanguage, "pdf.messages.pdf.compressingZip", { p0: Math.round(metadata.percent) })),
+  const archive = await createZipArchiveBlob(
+    archiveFiles,
+    undefined,
+    ({ loadedBytes, totalBytes }) => {
+      const percent = (loadedBytes / totalBytes) * 100;
+      progress(88 + percent * 0.1, featureMessage(currentLanguage, "pdf.messages.pdf.compressingZip", { p0: Math.round(percent) }));
+    },
+    undefined,
+    { level: 6 },
   );
-  return binaryResult(bytes, ensureExtension(data.archiveName, "zip"), "application/zip", [
+  return binaryResult(await archive.arrayBuffer(), ensureExtension(data.archiveName, "zip"), "application/zip", [
     featureMessage(currentLanguage, "pdf.messages.pdf.editingAPdfInvalidatesItsDigitalSignatures"),
     featureMessage(currentLanguage, "pdf.messages.pdf.formsBookmarksAttachmentsAndSomeAdvancedPdfObjects"),
   ]);
