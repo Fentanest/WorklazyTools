@@ -22,6 +22,18 @@ const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
 const shots = path.resolve(process.env.PDF_FINISH_SHOTS || "/tmp/worklazy-u4-3/shots");
 const runtimeReportPath = process.env.PDF_FINISH_RUNTIME_REPORT ? path.resolve(process.env.PDF_FINISH_RUNTIME_REPORT) : undefined;
 const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-pdf-finish-"));
+
+// Intended informational notices inside the finish panel (cea060b feature set).
+// Both render as role="alert" because UtilityNotice announces warning kind by
+// default; they are guidance, not errors, so they are allowlisted by testid.
+// Any other alert still fails, and the allowlisted notices must actually be
+// present (their absence would mean product drift, not a passing run).
+// Declared up here (not beside assertReadyPreflight) because the module's
+// top-level awaited flow runs before later top-level const initializers.
+const EXPECTED_READY_ALERT_TEST_IDS = [
+  "pdf-finish-link-preservation", // structure.linkNotice: hyperlinks stay active when annotations are removed
+  "pdf-finish-preview-disclaimer", // previewDisclaimer: preview placement is approximate, verify the download
+];
 let server;
 let browser;
 
@@ -603,14 +615,24 @@ async function clearSingleFinishFile(page) {
 }
 
 async function assertReadyPreflight(page, action, label) {
-  const snapshot = await page.locator("[data-testid='pdf-finish-ready']").evaluate((panel) => ({
-    status: panel.getAttribute("data-preflight-status"),
-    alerts: [...panel.querySelectorAll("[role='alert']")].map((element) => element.textContent?.trim()).filter(Boolean),
-    routeErrors: document.querySelectorAll("[data-route-error]").length,
-  }));
+  const snapshot = await page.locator("[data-testid='pdf-finish-ready']").evaluate((panel, expectedTestIds) => {
+    const alerts = [...panel.querySelectorAll("[role='alert']")].map((element) => ({
+      text: element.textContent?.trim() || "",
+      testId: element.getAttribute("data-testid") || element.closest("[data-testid]")?.getAttribute("data-testid") || "",
+    })).filter((alert) => alert.text);
+    return {
+      status: panel.getAttribute("data-preflight-status"),
+      alerts,
+      unexpected: alerts.filter((alert) => !expectedTestIds.includes(alert.testId)),
+      routeErrors: document.querySelectorAll("[data-route-error]").length,
+    };
+  }, EXPECTED_READY_ALERT_TEST_IDS);
   assert.equal(snapshot.status, "ready", `${label} left preflight without a scheduled result`);
   assert.equal(await action.isEnabled(), true, `${label} left the create action disabled`);
-  assert.deepEqual(snapshot.alerts, [], `${label} exposed an unexpected alert`);
+  assert.deepEqual(snapshot.unexpected, [], `${label} exposed an unexpected alert`);
+  for (const testId of EXPECTED_READY_ALERT_TEST_IDS) {
+    assert.ok(snapshot.alerts.some((alert) => alert.testId === testId), `${label} lost the intended guidance ${testId}`);
+  }
   assert.equal(snapshot.routeErrors, 0, `${label} escaped the finish route`);
 }
 
