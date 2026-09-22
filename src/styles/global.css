@@ -210,8 +210,25 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
   opacity: .92;
 }
 
-.sidebar-nav { display: flex; flex: 1; flex-direction: column; gap: 20px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.sidebar-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  margin-bottom: 8px;
+  padding-bottom: 56px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* Fade the bottom edge so a partially scrolled row dissolves instead of
+     looking sliced in half; signals that more items are below. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent 100%);
+}
 .sidebar-nav::-webkit-scrollbar { display: none; }
+@media (forced-colors: active) {
+  .sidebar-nav { -webkit-mask-image: none; mask-image: none; }
+}
 .nav-group { display: flex; flex-direction: column; gap: 3px; }
 .nav-caption { margin: 0 11px 6px; color: var(--label-secondary); font-size: 14px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 
