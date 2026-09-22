@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
 import { applyPalette, GIFEncoder, quantize } from "gifenc";
-import JSZip from "jszip";
 import { calculateCollageLayout, CollageLayoutError } from "./collageLayout";
+import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
 
 import type {
   BatchImageOptions,
@@ -37,7 +37,7 @@ worker.onmessage = async (event: MessageEvent<ImageWorkerRequest>) => {
 
 async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptions, archiveName: string) {
   if (!inputs.length) throw new Error(local("일괄 처리할 이미지가 없습니다.", "There are no images to batch process."));
-  const zip = new JSZip();
+  const archiveFiles: Array<{ fileName: string; blob: Blob }> = [];
   let watermark: ImageBitmap | undefined;
   try {
     if (options.watermarkImage) watermark = await decodeImage(options.watermarkImage);
@@ -54,7 +54,10 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
         drawWatermark(context, size.width, size.height, options, watermark);
         const blob = await canvas.convertToBlob({ type: formatMime(options.format), quality: options.quality });
         const actualFormat = formatFromMime(blob.type, options.format);
-        zip.file(`${String(index + 1).padStart(2, "0")}-${sanitizeName(stripExtension(input.name))}.${formatExtension(actualFormat)}`, blob);
+        archiveFiles.push({
+          fileName: `${String(index + 1).padStart(2, "0")}-${sanitizeName(stripExtension(input.name))}.${formatExtension(actualFormat)}`,
+          blob,
+        });
         canvas.width = 1;
         canvas.height = 1;
       } finally {
@@ -63,11 +66,17 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
       progress(6 + ((index + 1) / inputs.length) * 74, `[${index + 1}/${inputs.length}] ${input.name} ${local("처리 완료", "processed")}`);
     }
     progress(82, local(`${inputs.length}개 결과를 ZIP으로 묶는 중…`, `Bundling ${inputs.length} results into a ZIP…`));
-    const bytes = await zip.generateAsync(
-      { type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } },
-      (metadata) => progress(82 + metadata.percent * 0.17, `${local("ZIP 압축 중…", "Compressing ZIP…")} ${Math.round(metadata.percent)}%`),
+    const archive = await createZipArchiveBlob(
+      archiveFiles,
+      undefined,
+      ({ loadedBytes, totalBytes }) => {
+        const percent = (loadedBytes / totalBytes) * 100;
+        progress(82 + percent * 0.17, `${local("ZIP 압축 중…", "Compressing ZIP…")} ${Math.round(percent)}%`);
+      },
+      undefined,
+      { level: 6 },
     );
-    return binaryResult(bytes, ensureExtension(archiveName, "zip"), "application/zip", []);
+    return binaryResult(await archive.arrayBuffer(), ensureExtension(archiveName, "zip"), "application/zip", []);
   } finally {
     watermark?.close();
   }

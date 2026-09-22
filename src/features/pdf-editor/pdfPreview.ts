@@ -1,4 +1,3 @@
-import JSZip from "jszip";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import pdfDisplayUrl from "pdfjs-dist/build/pdf.mjs?url";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -10,6 +9,7 @@ import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from 
 import { waitWithAbort, settleOwnedPdfLoad } from "../../utils/pdfOwnedDocument.ts";
 import { waitForPdfRender } from "./pdfRenderLifecycle";
 import { getPdfWorkerOptions, withImageDecodeCheck } from "./pdfConfig";
+import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
 
 type PdfDisplayModule = typeof import("pdfjs-dist");
 
@@ -350,7 +350,7 @@ export async function pdfToImageArchive(
   throwIfAborted(signal);
   const document = await getPdfDocument(file, language);
   throwIfAborted(signal);
-  const zip = new JSZip();
+  const archiveFiles: Array<{ fileName: string; blob: Blob }> = [];
   const scale = dpi / 72;
   const baseName = stripExtension(file.name);
   const pageNumbers = selectedPageIndexes?.length ? selectedPageIndexes.map((index) => index + 1) : Array.from({ length: document.numPages }, (_, index) => index + 1);
@@ -361,7 +361,7 @@ export async function pdfToImageArchive(
     const canvas = await renderPageForExport(document, pageNumber, scale, language, signal);
     const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality, language);
     throwIfAborted(signal);
-    zip.file(`${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob);
+    archiveFiles.push({ fileName: `${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob });
     canvas.width = 1;
     canvas.height = 1;
     await yieldToEventLoop();
@@ -369,9 +369,10 @@ export async function pdfToImageArchive(
   }
   throwIfAborted(signal);
   onProgress?.(88, featureMessage(language, "pdf.messages.pdfPreview.compressingConvertedImagesIntoAZipFile"));
-  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, (metadata) => {
-    onProgress?.(88 + metadata.percent * 0.1, featureMessage(language, "pdf.messages.pdfPreview.compressingZip", { p0: Math.round(metadata.percent) }));
-  });
+  const blob = await createZipArchiveBlob(archiveFiles, signal, ({ loadedBytes, totalBytes }) => {
+    const percent = (loadedBytes / totalBytes) * 100;
+    onProgress?.(88 + percent * 0.1, featureMessage(language, "pdf.messages.pdfPreview.compressingZip", { p0: Math.round(percent) }));
+  }, undefined, { level: 6 });
   if (signal) await yieldBeforeResultRegistration(signal);
   return { blob, fileName: `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip` };
 }
