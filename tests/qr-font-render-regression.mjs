@@ -61,6 +61,20 @@ const sample = [
   ["아주 긴 한글 제목 반복 ".repeat(6), "설명 줄바꿈과 말줄임표 검증 ".repeat(10)],
   ["", ""],
 ];
+const expectedSampleText = [
+  ["김민수 서울 강남구 테헤란로 123", "한글 라벨 주소 품목 설명"],
+  ["가나다라마바사아자차카타파하", "상품 A-01 수량 10 가격 ₩12,000"],
+  ["ＡＢＣ１２３ （주） 테스트", "「안내」 · ₩ € $ % … — “배송”"],
+  ["office ffi fi fl AV To 0123", "é café Ångström München"],
+  ["ㄱㄴㄷ 가 한", "가 각 간 한 글"],
+  ["가 나 다 라", "줄바꿈 탭 정리"],
+  [
+    "아주 긴 한글 제목 반복 아주 긴 한글 제목 반복 아주 긴 한…",
+    "설명 줄바꿈과 말줄임표 검증 설명 줄바꿈과 말줄임표 검증 설명 줄바꿈과",
+    "말줄임표 검증 설명 줄바꿈과 말줄임표 검증 설명 줄바꿈과 말줄임표 검…",
+  ],
+  [],
+];
 const grid = (codepoints) => Array.from(
   { length: Math.ceil(codepoints.length / 20) },
   (_, index) => ({
@@ -103,6 +117,13 @@ for (const [fixture, { entries, preset, expectedPages }] of Object.entries(fixtu
       const page = await document.getPage(pageNumber);
       texts.push((await page.getTextContent()).items.map((item) => item.str));
       page.cleanup();
+    }
+    if (fixture === "sample") {
+      assert.deepEqual(
+        texts.flat().filter(Boolean),
+        entries.flatMap((_, index) => expectedSampleText[index % expectedSampleText.length]),
+        `${fixture}/${kind} intended normalization, wrapping, and ellipsis text`,
+      );
     }
     await fs.writeFile(`${prefix}.text.json`, `${JSON.stringify(texts)}\n`);
     records.push({ kind, bytes: data.length, pages: document.numPages, texts });
