@@ -7,6 +7,7 @@ evidence/
 scratch/
 /patch_*.py
 /test-drag.html
+newui/
 public/vendor/pyodide/
 public/vendor/tesseract/
 public/tools/video-studio/runtime/
