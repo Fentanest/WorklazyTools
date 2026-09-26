@@ -52,11 +52,14 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
             continue
         rows = []
         basis_rows = []
+        date_rows = []
         for row in ROWS.finditer(decoded):
             source_row = row.group(0)
             direct_basis_row = receipt_no in ("20090227000244", "20260908000302") and re.search(
                 r"이번보고서|직전보고서|증\s*감|보고서작성기준일", source_row)
-            if NPS.search(source_row) or direct_basis_row:
+            historical_date_row = receipt_no in ("20060124800040", "20081007000289") and re.search(
+                r"2006년\s*02월\s*01일|2008년\s*9월\s*26일|2008년\s*9월\s*29일", source_row)
+            if NPS.search(source_row) or direct_basis_row or historical_date_row:
                 neighborhood = decoded[max(0, row.start() - 1500):min(len(decoded), row.end() + 300)]
                 item = {"cells": [clean(cell, 80) for cell in CELLS.findall(source_row)[:20]],
                              "acodes": ACODES.findall(source_row)[:20],
@@ -69,13 +72,16 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                     rows.append(item)
                 if direct_basis_row and len(basis_rows) < 12:
                     basis_rows.append(item)
-            if len(rows) >= 12 and len(basis_rows) >= 12:
+                if historical_date_row and len(date_rows) < 12:
+                    date_rows.append(item)
+            if len(rows) >= 12 and len(basis_rows) >= 12 and len(date_rows) >= 12:
                 break
         if rows or NPS.search(decoded):
             dates = list(dict.fromkeys(DATES.findall(decoded)))[:20]
             result["files"].append({"xml_sha256": hashlib.sha256(raw).hexdigest(),
                                     "xml_bytes": len(raw), "nps_rows": rows,
                                     "basis_rows": basis_rows,
+                                    "date_rows": date_rows,
                                     "nps_mentions": len(NPS.findall(decoded)),
                                     "date_tokens": [clean(item, 40) for item in dates]})
     result["archive_status"] = "parsed"
