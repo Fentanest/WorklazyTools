@@ -1,0 +1,120 @@
+name: Backfill FolioTrace OpenDART list queue
+
+on:
+  schedule:
+    - cron: '30 19 * * *' # 04:30 Asia/Seoul, after the secondary full-text lanes.
+  workflow_dispatch:
+    inputs:
+      max_listing_pages:
+        description: Maximum OpenDART list pages per run
+        required: true
+        default: '300'
+        type: string
+      max_windows:
+        description: Maximum complete list windows per run
+        required: true
+        default: '20'
+        type: string
+      review_limit:
+        description: Maximum queued source documents to review per run
+        required: true
+        default: '20'
+        type: string
+      overlap_days:
+        description: Incremental overlap days rescanned on each run
+        required: true
+        default: '3'
+        type: string
+      max_queue_entries:
+        description: Maximum queued receipt rows kept in state
+        required: true
+        default: '20000'
+        type: string
+      rehydrate_limit:
+        description: Archived rows to rehydrate for parser-upgrade replay (0 disables)
+        required: true
+        default: '0'
+        type: string
+      auto_rehydrate_limit:
+        description: Stale archived rows rehydrated automatically each run (0 disables)
+        required: true
+        default: '50'
+        type: string
+      validate_only:
+        description: Exercise the lane without writing the data branch
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    if: github.ref == 'refs/heads/main' || inputs.validate_only
+    permissions:
+      contents: write
+    runs-on: [self-hosted, Linux, X64, '235']
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Checkout normalized FolioTrace state
+        uses: actions/checkout@v4
+        with:
+          ref: foliotrace-data
+          path: foliotrace-state
+          fetch-depth: 0
+
+      - name: Verify source revision and source state
+        if: ${{ !inputs.validate_only }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          test -f foliotrace-state/state.json
+
+      - name: List filings through the OpenDART list API
+        id: list
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          EVENT_NAME: ${{ github.event_name }}
+          MAX_LISTING_PAGES: ${{ inputs.max_listing_pages }}
+          MAX_WINDOWS: ${{ inputs.max_windows }}
+          REVIEW_LIMIT: ${{ inputs.review_limit }}
+          OVERLAP_DAYS: ${{ inputs.overlap_days }}
+          MAX_QUEUE_ENTRIES: ${{ inputs.max_queue_entries }}
+          REHYDRATE_LIMIT: ${{ inputs.rehydrate_limit }}
+          AUTO_REHYDRATE_LIMIT: ${{ inputs.auto_rehydrate_limit }}
+          VALIDATE_ONLY: ${{ inputs.validate_only }}
+        run: |
+          args=(--state foliotrace-state/state.json)
+          if [ "$EVENT_NAME" = schedule ]; then
+            args+=(--overlap-days 3 --max-listing-pages 100 --max-windows 15 --review-limit 20 --max-queue-entries 20000 --auto-rehydrate-limit 50)
+          else
+            args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT" --max-queue-entries "$MAX_QUEUE_ENTRIES" --auto-rehydrate-limit "$AUTO_REHYDRATE_LIMIT")
+          fi
+          if [ -n "$REHYDRATE_LIMIT" ] && [ "$REHYDRATE_LIMIT" != 0 ]; then args+=(--rehydrate-limit "$REHYDRATE_LIMIT"); fi
+          if [ "$VALIDATE_ONLY" = true ]; then args+=(--validate-only); fi
+          python3 scripts/foliotrace/run_opendart_secondary.py "${args[@]}"
+
+      - name: Preserve completed OpenDART list windows
+        if: ${{ always() && !inputs.validate_only }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          expected_data=$(git -C foliotrace-state rev-parse HEAD)
+          test "$(git ls-remote origin refs/heads/foliotrace-data | cut -f1)" = "$expected_data"
+          git -C foliotrace-state config user.name 'github-actions[bot]'
+          git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C foliotrace-state add state.json
+          if [ -d foliotrace-state/opendart-secondary-archive ]; then
+            git -C foliotrace-state add opendart-secondary-archive
+          fi
+          if ! git -C foliotrace-state diff --cached --quiet; then
+            git -C foliotrace-state commit -m 'data: advance FolioTrace OpenDART list queue'
+            git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
+          fi
+
+      - name: Require successful OpenDART list batch
+        if: ${{ steps.list.outcome != 'success' }}
+        run: exit 1
