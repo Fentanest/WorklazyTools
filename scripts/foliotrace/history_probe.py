@@ -17,7 +17,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
-NPS = re.compile(r"국민연금|National Pension Service", re.I)
+NPS = re.compile(r"^(?:국민연금(?:관리)?공단|National Pension Service)(?:$|[\s(])", re.I)
+LARGE_HOLDING = re.compile(r"주식\s*등의\s*대량보유")
 RECEIPT = re.compile(r"^\d{14}$")
 CORP = re.compile(r"^\d{8}$")
 
@@ -168,7 +169,7 @@ def scan(client: DartClient, start_year: int, end_year: int, output: Path) -> di
                             raise ProbeError("receipt_date_inconsistent")
                         if report["first_d001_date"] is None or receipt_date < report["first_d001_date"]:
                             report["first_d001_date"] = receipt_date
-                        if NPS.search(str(item.get("flr_nm", ""))):
+                        if NPS.search(str(item.get("flr_nm", "")).strip()) and LARGE_HOLDING.search(str(item.get("report_nm", ""))):
                             row = public_row(item)
                             if not row:
                                 raise ProbeError("nps_identity_missing")
