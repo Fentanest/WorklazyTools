@@ -19,6 +19,7 @@ export type { FolioTracePageProps } from "../contracts";
 
 import "./foliotrace.css";
 import {
+  approxNumber,
   eventRangeOf,
   filterHoldings,
   formatKrw,
@@ -26,7 +27,6 @@ import {
   formatQty,
   holdingStatus,
   sortHoldings,
-  toNumberOrNull,
   topHoldings,
 } from "./holdings";
 import type { QualityFilter, SortKey } from "./holdings";
@@ -152,7 +152,7 @@ const STR = {
     summaryTracked: "Tracked securities",
     summaryPriced: "Priced securities",
     summaryEvents: "Recent filing changes",
-    unavailable: "Not valuable",
+    unavailable: "Valuation unavailable",
     unavailableReasonComplete: "No valid closing prices, so nothing could be valued.",
     unavailableReasonPartial: "Some securities had no price and were excluded from valuation.",
     noHoldings: "No tracked securities.",
@@ -313,7 +313,8 @@ function ReadyView({
 
   const topWeights = useMemo(() => topHoldings(snapshot.holdings), [snapshot.holdings]);
 
-  const maxWeight = Math.max(0, ...topWeights.map((h) => toNumberOrNull(h.portfolioWeightPercent) ?? 0));
+  // Bar widths only: approximate visual sizing, never financial text or ordering.
+  const maxWeight = Math.max(0, ...topWeights.map((h) => approxNumber(h.portfolioWeightPercent)));
 
   const eventRange = useMemo(() => eventRangeOf(snapshot.events), [snapshot.events]);
 
@@ -404,7 +405,8 @@ function ReadyView({
         ) : (
           <ul className="foliotrace-bars">
             {topWeights.map((h) => {
-              const w = toNumberOrNull(h.portfolioWeightPercent) ?? 0;
+              // Approximate ratio for bar sizing only; labels use exact strings.
+              const w = approxNumber(h.portfolioWeightPercent);
               return (
                 <li key={h.stockCode} className="foliotrace-bar-row">
                   <span className="foliotrace-bar-name">

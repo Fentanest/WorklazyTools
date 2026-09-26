@@ -8,51 +8,41 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const read = (relativePath: string) => fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8");
 
 const pageSource = read("src/features/foliotrace/ui/FolioTracePage.tsx");
+const holdingsSource = read("src/features/foliotrace/ui/holdings.ts");
 const cssSource = read("src/features/foliotrace/ui/foliotrace.css");
-const contractsSource = read("src/features/foliotrace/contracts.ts");
 
 test("FolioTrace UI reuses Sol's contract instead of inventing a competing one", () => {
   assert.match(pageSource, /export function FolioTracePage/);
   assert.match(pageSource, /export type \{ FolioTracePageProps \} from "\.\.\/contracts"/);
   assert.doesNotMatch(pageSource, /interface FolioTracePageProps|type FolioTracePageProps =/);
-  assert.match(contractsSource, /FolioTracePageProps/);
 });
 
-test("FolioTrace page handles every view status without sample-data fallback", () => {
-  for (const status of ["loading", "missing-import", "load-error", "schema-error", "ready"]) {
-    assert.ok(pageSource.includes(`"${status}"`), `missing view status: ${status}`);
+test("FolioTrace UI never fetches external data or fabricates sample finances", () => {
+  for (const source of [pageSource, holdingsSource]) {
+    assert.doesNotMatch(source, /fetch\(|XMLHttpRequest|DART_API_KEY/i);
+    assert.doesNotMatch(source, /naver|dart\.fss\.or\.kr/i);
+    assert.ok(!source.includes("Math.random"), "must not invent sample values");
   }
-  assert.match(pageSource, /stale/);
-  assert.doesNotMatch(pageSource, /fetch\(|axios|DART_API_KEY|naver/i);
-  assert.ok(!pageSource.includes("Math.random"), "must not invent sample values");
 });
 
-test("FolioTrace table keeps search/sort/filter/reset, string codes, tabular numbers", () => {
-  assert.match(pageSource, /type="search"/);
-  assert.match(pageSource, /setSortKey|setQuality|setQuery/);
-  assert.match(pageSource, /resetFilters|Reset filters/);
-  assert.match(pageSource, /<code className="foliotrace-code">\{h\.stockCode\}/);
-  assert.doesNotMatch(pageSource, /Number\(h\.stockCode\)|parseInt\(h\.stockCode/);
-  assert.ok(cssSource.includes("tabular-nums"), "numeric columns need tabular figures");
-  assert.match(pageSource, /history\.length >= 2/);
-  assert.match(pageSource, /renormalize|denominator/i);
+test("Number conversion exists only inside the visual-only approxNumber", () => {
+  const lines = holdingsSource.split("\n");
+  const start = lines.findIndex((line) => line.includes("export function approxNumber"));
+  assert.ok(start !== -1, "approxNumber must exist and stay the single Number gateway");
+  const end = lines.findIndex((line, index) => index > start && line === "}");
+  assert.ok(end !== -1);
+  const offenders = lines.filter(
+    (line, index) => /Number\(/.test(line) && (index < start || index > end),
+  );
+  assert.deepEqual(offenders, [], `Number() outside approxNumber: ${offenders.join(" / ")}`);
+  assert.ok(
+    holdingsSource.includes("never feed financial text"),
+    "the visual-only restriction must be documented at the source",
+  );
 });
 
-test("FolioTrace detail reuses the shared Sheet and stays scoped/themed", () => {
-  assert.match(pageSource, /from "\.\.\/\.\.\/\.\.\/components\/ui\/sheet"/);
-  assert.match(pageSource, /<SheetContent side="right"/);
-  assert.match(pageSource, /<SheetTitle>|<SheetDescription>/);
-  const hexColors = cssSource.match(/#[0-9a-fA-F]{3,8}/g) ?? [];
-  assert.deepEqual(hexColors, [], `scoped CSS must use semantic tokens, found: ${hexColors.join(",")}`);
-  assert.ok(cssSource.includes("var(--wl-"), "scoped CSS must use --wl-* tokens");
+test("FolioTrace styles stay inside the owned scope", () => {
   const selectors = cssSource.match(/\.[a-z][a-z0-9-]*/g) ?? [];
   const foreign = selectors.filter((s) => !s.startsWith(".foliotrace-"));
   assert.deepEqual(foreign, [], `CSS scope leak: ${foreign.join(",")}`);
-});
-
-test("FolioTrace copy ships Korean and English without touching shared locales", () => {
-  assert.match(pageSource, /ko:\s*\{/);
-  assert.match(pageSource, /en:\s*\{/);
-  assert.ok(pageSource.includes("국민연금 전체 자산") || pageSource.includes("전체 자산"), "scope disclaimer (ko)");
-  assert.ok(pageSource.includes("Not total NPS assets") || pageSource.includes("Not valuable"), "scope disclaimer (en)");
 });

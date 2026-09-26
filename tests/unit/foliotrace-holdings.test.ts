@@ -3,6 +3,7 @@ import test from "node:test";
 
 import type { FilingEvent, Holding } from "../../src/features/foliotrace/contracts.ts";
 import {
+  approxNumber,
   eventRangeOf,
   filterHoldings,
   formatKrw,
@@ -10,7 +11,6 @@ import {
   formatQty,
   holdingStatus,
   sortHoldings,
-  toNumberOrNull,
   topHoldings,
 } from "../../src/features/foliotrace/ui/holdings.ts";
 
@@ -59,23 +59,94 @@ function event(overrides: Partial<FilingEvent> & { receiptNo: string; receiptDat
   };
 }
 
-test("toNumberOrNull never produces NaN/Infinity and keeps null as null", () => {
-  assert.equal(toNumberOrNull(null), null);
-  assert.equal(toNumberOrNull("70000"), 70000);
-  assert.equal(toNumberOrNull("005930"), 5930);
-  assert.equal(toNumberOrNull("not-a-number"), null);
-  assert.equal(toNumberOrNull("Infinity"), null);
+test("financial display preserves >2^53 decimal strings exactly", () => {
+  // Number("9007199254740993") === 9007199254740992: must not round.
+  assert.equal(formatKrw("9007199254740993", "ko"), "₩9,007,199,254,740,993");
+  assert.equal(formatKrw("9007199254740993", "en"), "₩9,007,199,254,740,993");
+  assert.equal(formatQty("9007199254740993"), "9,007,199,254,740,993");
+  assert.equal(formatPct("9007199254740993"), "9,007,199,254,740,993%");
 });
 
-test("formatters render null as em-dash and never NaN", () => {
+test("financial display preserves fractional digits without rounding", () => {
+  assert.equal(formatKrw("1234567.891", "ko"), "₩1,234,567.891");
+  assert.equal(formatQty("1000.5000"), "1,000.5000");
+  assert.equal(formatPct("12.3456"), "12.3456%");
+  assert.equal(formatPct("6.10"), "6.10%");
+});
+
+test("financial display renders null and non-decimal input as em-dash, never NaN", () => {
   assert.equal(formatKrw(null, "ko"), "—");
   assert.equal(formatPct(null), "—");
   assert.equal(formatQty(null), "—");
+  for (const bad of ["not-a-number", "Infinity", "NaN", "1e5", "", "12,000"]) {
+    assert.equal(formatKrw(bad, "ko"), "—", bad);
+    assert.equal(formatQty(bad), "—", bad);
+    assert.equal(formatPct(bad), "—", bad);
+  }
   const ko = formatKrw("70000000", "ko");
   assert.ok(ko.includes("70,000,000"), `unexpected ko value: ${ko}`);
   assert.ok(!ko.includes("NaN"), `NaN leaked: ${ko}`);
-  assert.equal(formatPct("12.3456"), "12.35%");
-  assert.equal(formatQty("1000.5"), "1,000.5");
+});
+
+test("approxNumber exists only for bar sizing and never throws", () => {
+  assert.equal(approxNumber(null), 0);
+  assert.equal(approxNumber("not-a-number"), 0);
+  assert.ok(approxNumber("10.00") > 0);
+});
+
+test("decimal ordering distinguishes adjacent values above 2^53", () => {
+  const rows = [
+    holding({ stockCode: "lower", estimatedValue: "9007199254740992" }),
+    holding({ stockCode: "upper", estimatedValue: "9007199254740993" }),
+    holding({ stockCode: "top", estimatedValue: "9007199254740993.5" }),
+  ];
+  // A Number-based sort ties the first two; exact decimal sort must not.
+  assert.deepEqual(
+    sortHoldings(rows, "value").map((h) => h.stockCode),
+    ["top", "upper", "lower"],
+  );
+});
+
+test("decimal ordering handles fractions, signs, and leading zeros", () => {
+  const rows = [
+    holding({ stockCode: "frac-short", companyOwnershipPercent: "6.1" }),
+    holding({ stockCode: "frac-long", companyOwnershipPercent: "6.10" }),
+    holding({ stockCode: "frac-more", companyOwnershipPercent: "6.101" }),
+    holding({ stockCode: "padded", companyOwnershipPercent: "006.100" }),
+  ];
+  const sorted = sortHoldings(rows, "ownership").map((h) => h.stockCode);
+  assert.equal(sorted[0], "frac-more");
+  // 6.1 == 6.10 == 006.100: equal keys keep their relative input order.
+  assert.deepEqual(sorted.slice(1), ["frac-short", "frac-long", "padded"]);
+});
+
+test("sortHoldings puts null and non-decimal values last without dropping rows", () => {
+  const rows = [
+    holding({ stockCode: "bad", estimatedValue: "garbage" }),
+    holding({ stockCode: "none", estimatedValue: null }),
+    holding({ stockCode: "big", estimatedValue: "9007199254740993" }),
+    holding({ stockCode: "small", estimatedValue: "1000" }),
+  ];
+  const sorted = sortHoldings(rows, "value").map((h) => h.stockCode);
+  assert.deepEqual(sorted.slice(0, 2), ["big", "small"]);
+  assert.equal(sorted.length, 4);
+  assert.ok(sorted.slice(2).includes("bad") && sorted.slice(2).includes("none"));
+});
+
+test("sortHoldings defaults to value desc and supports receipt desc", () => {
+  const rows = [
+    holding({ stockCode: "small", estimatedValue: "1000", receiptDate: "2026-01-03" }),
+    holding({ stockCode: "none", estimatedValue: null, receiptDate: "2026-01-04" }),
+    holding({ stockCode: "big", estimatedValue: "9000", receiptDate: "2026-01-02" }),
+  ];
+  assert.deepEqual(
+    sortHoldings(rows, "value").map((h) => h.stockCode),
+    ["big", "small", "none"],
+  );
+  assert.deepEqual(
+    sortHoldings(rows, "receipt").map((h) => h.stockCode),
+    ["none", "small", "big"],
+  );
 });
 
 test("holdingStatus prioritizes tracking-exit, then unresolved, then exclusion", () => {
@@ -108,6 +179,10 @@ test("filterHoldings searches names and string codes, preserves leading zeros", 
     filterHoldings(rows, "0059", "all").map((h) => h.stockCode),
     ["005930"],
   );
+  assert.deepEqual(
+    filterHoldings(rows, "005930", "all").map((h) => h.stockCode),
+    ["005930"],
+  );
   assert.equal(filterHoldings(rows, "삼성", "all").length, 1);
   assert.equal(filterHoldings(rows, "  ", "all").length, 2);
   assert.equal(filterHoldings(rows, "no-such-security", "all").length, 0);
@@ -133,27 +208,7 @@ test("filterHoldings quality filters separate priced, unpriced, and exits", () =
   );
 });
 
-test("sortHoldings defaults to value desc with nulls last", () => {
-  const rows = [
-    holding({ stockCode: "small", estimatedValue: "1000", portfolioWeightPercent: "1.00", receiptDate: "2026-01-03" }),
-    holding({ stockCode: "none", estimatedValue: null, portfolioWeightPercent: null, receiptDate: "2026-01-04" }),
-    holding({ stockCode: "big", estimatedValue: "9000", portfolioWeightPercent: "9.00", receiptDate: "2026-01-02" }),
-  ];
-  assert.deepEqual(
-    sortHoldings(rows, "value").map((h) => h.stockCode),
-    ["big", "small", "none"],
-  );
-  assert.deepEqual(
-    sortHoldings(rows, "weight").map((h) => h.stockCode),
-    ["big", "small", "none"],
-  );
-  assert.deepEqual(
-    sortHoldings(rows, "receipt").map((h) => h.stockCode),
-    ["none", "small", "big"],
-  );
-});
-
-test("topHoldings takes the top 8 priced weights in desc order", () => {
+test("topHoldings takes the top 8 priced weights in exact desc order", () => {
   const rows = Array.from({ length: 10 }, (_, i) =>
     holding({ stockCode: `code-${i}`, portfolioWeightPercent: `${i + 1}.00` }),
   );
