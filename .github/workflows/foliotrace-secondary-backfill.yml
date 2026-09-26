@@ -20,6 +20,16 @@ on:
         required: true
         default: true
         type: boolean
+      source_receipt:
+        description: Optional exact receipt to recheck from already discovered source candidates
+        required: false
+        default: ''
+        type: string
+      review_only:
+        description: Reprocess stored source candidates without contacting the full-text search site
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: pages
@@ -50,6 +60,7 @@ jobs:
 
       - name: Check early direct D001 listings separately
         id: early_direct
+        if: ${{ !inputs.review_only }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -60,6 +71,7 @@ jobs:
 
       - name: Search early equity and voting documents
         id: equity
+        if: ${{ !inputs.review_only }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -70,7 +82,7 @@ jobs:
 
       - name: Search pre-2006 equity and voting documents
         id: prior_equity
-        if: ${{ steps.equity.outputs.site_transport != 'true' }}
+        if: ${{ !inputs.review_only && steps.equity.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -81,7 +93,7 @@ jobs:
 
       - name: Search pre-2006 all-content mentions
         id: prior_all
-        if: ${{ steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' }}
+        if: ${{ !inputs.review_only && steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -92,7 +104,7 @@ jobs:
 
       - name: Search bounded DART full-text windows
         id: search
-        if: ${{ steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' && steps.prior_all.outputs.site_transport != 'true' }}
+        if: ${{ !inputs.review_only && steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' && steps.prior_all.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -107,6 +119,21 @@ jobs:
             python3 scripts/foliotrace/run_secondary_lane.py \
               --state foliotrace-state/state.json --max-pages "$MAX_PAGES" --max-windows "$MAX_WINDOWS" --review-limit 20
           fi
+
+      - name: Recheck saved source candidates through OpenDART
+        id: source_review
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          SOURCE_RECEIPT: ${{ inputs.source_receipt }}
+        run: |
+          args=()
+          if [ -n "$SOURCE_RECEIPT" ]; then args+=(--source-receipt "$SOURCE_RECEIPT"); fi
+          for scope in equity prior-equity prior-all all; do
+            python3 scripts/foliotrace/review_sources.py \
+              --state foliotrace-state/state.json --scope "$scope" \
+              --review-limit 20 "${args[@]}"
+          done
 
       - name: Preserve completed secondary windows
         if: ${{ always() && !inputs.validate_only }}
@@ -123,5 +150,5 @@ jobs:
           fi
 
       - name: Require successful secondary search batch
-        if: ${{ steps.early_direct.outcome != 'success' || steps.equity.outcome != 'success' || steps.prior_equity.outcome != 'success' || steps.prior_all.outcome != 'success' || steps.search.outcome != 'success' }}
+        if: ${{ steps.source_review.outcome != 'success' || (!inputs.review_only && (steps.early_direct.outcome != 'success' || steps.equity.outcome != 'success' || steps.prior_equity.outcome != 'success' || steps.prior_all.outcome != 'success' || steps.search.outcome != 'success')) }}
         run: exit 1

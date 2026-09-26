@@ -67,6 +67,21 @@ class SecondaryBackfillTests(unittest.TestCase):
         self.assertEqual(secondary.inspect_source_document(b'<result><status>020</status></result>')["status"],
                          "source_review_pending")
 
+    def test_actual_source_row_shapes_become_unapplied_claims(self):
+        xml = ('<DOC><TR><TD>국민연금관리공단</TD><TD>사업자등록</TD><TD>219-82-01593</TD>'
+               '<TD>본인</TD><TD>2,407,509</TD><TD>2.76</TD><TD>0</TD></TR>'
+               '<TR><TD>최대주주등</TD><TD>국민연금공단</TD><TD>보통주</TD>'
+               '<TD>17,910,781</TD><TD>5.03</TD></TR>'
+               '<TR><TD>최대주주등</TD><TD>국민연금공단</TD><TD>보통주</TD>'
+               '<TD>17,910,781</TD><TD>5.32</TD></TR>'
+               '<TR><TD>국민연금공단</TD><TD>보통주</TD><TD>*****</TD><TD>5.05</TD></TR></DOC>')
+        claims = secondary.extract_source_claims(xml)
+        self.assertEqual([(claim['quantity'], claim['ownership_percent']) for claim in claims],
+                         [('2407509', '2.76'), ('17910781', '5.03'), ('17910781', '5.32')])
+        self.assertTrue(all(claim['basis_date'] is None for claim in claims))
+        self.assertTrue(all(claim['status'] == 'source_context_review_pending' for claim in claims))
+        self.assertEqual(claims[0]['security_kind'], None)
+
     def test_parser_keeps_official_page_identity_and_receipt_metadata(self):
         day = date(2006, 2, 8)
         page = secondary.parse_search_page(result_page([POSCO]), 1, day, day)
@@ -218,6 +233,37 @@ class SecondaryBackfillTests(unittest.TestCase):
             self.assertEqual(result["source_document_requests"], 1)
             self.assertEqual(candidate["review_status"], "source_context_review_pending")
             self.assertEqual(saved["holdings"], {})
+
+    def test_parser_upgrade_refetches_previously_reviewed_candidate_without_search(self):
+        day = date(2006, 2, 8)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('filing.xml', '<DOC>국민연금관리공단 보통주 100</DOC>')
+        answers = {secondary.TERMS[0]: result_page([POSCO]),
+                   secondary.TERMS[1]: result_page([]), secondary.TERMS[2]: result_page([])}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, folio.empty_state())
+            called = []
+            def document(no, _key):
+                called.append(no)
+                return buffer.getvalue()
+            secondary.scan_secondary(path, day, day, fetch=lambda term, *_: answers[term],
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=1,
+                fetch_document=document)
+            saved = folio.read_json(path)
+            candidate = saved['secondary_backfill']['candidates'][f'{POSCO[0]}:{POSCO[1]}']
+            candidate['parser_version'] = 'old-parser'
+            saved['secondary_source_cache'][POSCO[0]]['parser_version'] = 'old-parser'
+            folio.write_json(path, saved)
+            result = secondary.scan_secondary(path, day, day, fetch=lambda *_: self.fail('search refetched'),
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=1,
+                fetch_document=document, source_only=True, source_receipt=POSCO[0])
+            self.assertEqual(result['source_document_requests'], 1)
+            self.assertEqual(result['status'], 'SOURCE_REVIEW_COMPLETE')
+            self.assertEqual(called, [POSCO[0], POSCO[0]])
+            self.assertEqual(folio.read_json(path)['secondary_backfill']['candidates'][
+                f'{POSCO[0]}:{POSCO[1]}']['parser_version'], secondary.SOURCE_PARSER_VERSION)
             self.assertEqual(saved["events"], {})
 
     def test_failed_later_page_does_not_advance_window(self):

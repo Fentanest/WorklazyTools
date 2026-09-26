@@ -20,6 +20,7 @@ import urllib.request
 import zipfile
 import zlib
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -31,6 +32,58 @@ RECEIPT = re.compile(r"^\d{14}$")
 DOCUMENT_KEY = re.compile(r"^\d{14}:\d+$")
 STOCK_CONTEXT = re.compile(r"보통주|우선주|주주|보유|소유|지분|주식|주권|의결권|sharehold|stock|equity|voting", re.I)
 REPORT_CONTEXT = re.compile(r"대량보유|의결권대리행사|주주명부|주식등의|sharehold", re.I)
+SOURCE_PARSER_VERSION = "source-rows-v3"
+SOURCE_ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
+SOURCE_CELLS = re.compile(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", re.I | re.S)
+EXACT_NPS = re.compile(r"^(?:국민연금공단|국민연금관리공단|National Pension Service)$", re.I)
+
+
+def _row_cells(raw: str) -> list[str]:
+    return [" ".join(html.unescape(re.sub(r"<[^>]+>", " ", cell)).split())
+            for cell in SOURCE_CELLS.findall(raw)]
+
+
+def _number(raw: str, maximum=None) -> str | None:
+    value = raw.replace(",", "").strip()
+    if not re.fullmatch(r"(?:0|[1-9]\d*)(?:\.\d+)?", value):
+        return None
+    try:
+        number = Decimal(value)
+    except InvalidOperation:
+        return None
+    if not number.is_finite() or number < 0 or (maximum is not None and number > maximum):
+        return None
+    return format(number, "f")
+
+
+def extract_source_claims(xml: str) -> list[dict]:
+    """Retain row-level numeric leads; no date, issuer, or ratio basis is inferred here."""
+    claims = []
+    for row in SOURCE_ROWS.finditer(xml):
+        cells = _row_cells(row.group(0))
+        positions = [index for index, cell in enumerate(cells) if EXACT_NPS.fullmatch(cell)]
+        if len(positions) != 1:
+            continue
+        index = positions[0]
+        candidate = None
+        if (index + 3 < len(cells) and cells[index + 1] in ("보통주", "우선주")):
+            candidate = (cells[index + 1], cells[index + 2], cells[index + 3], "explicit_stock_class_row")
+        elif (index + 5 < len(cells) and cells[index + 3] == "본인"):
+            candidate = (None, cells[index + 4], cells[index + 5], "owner_total_row")
+        if candidate is None:
+            continue
+        security, quantity, ratio, structure = candidate
+        normalized_quantity, normalized_ratio = _number(quantity), _number(ratio, maximum=100)
+        if normalized_quantity is None or normalized_ratio is None:
+            continue
+        claims.append({"structure": structure, "security_kind": security,
+                       "quantity": normalized_quantity, "ownership_percent": normalized_ratio,
+                       "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
+                       "row_offset": row.start(), "basis_date": None,
+                       "status": "source_context_review_pending"})
+        if len(claims) >= 20:
+            break
+    return claims
 
 
 class SecondarySearchError(RuntimeError):
@@ -214,10 +267,12 @@ def inspect_source_document(payload: bytes):
     try:
         archive = zipfile.ZipFile(io.BytesIO(payload))
     except zipfile.BadZipFile:
-        return {"status": "source_review_pending", "source_sha256": None}
+        return {"status": "source_review_pending", "source_sha256": None,
+                "parser_version": SOURCE_PARSER_VERSION}
     contexts = 0
     mentions = 0
     digests = []
+    claims = []
     for name in archive.namelist():
         if (not name.lower().endswith(".xml") or name.startswith("/") or ".." in Path(name).parts
                 or archive.getinfo(name).file_size > 20_000_000):
@@ -233,6 +288,7 @@ def inspect_source_document(payload: bytes):
                 continue
         if decoded is None:
             continue
+        claims.extend(extract_source_claims(decoded)[:max(0, 20 - len(claims))])
         plain = html.unescape(re.sub(r"<[^>]+>", " ", decoded))
         plain = " ".join(plain.split())
         for term in TERMS:
@@ -241,17 +297,20 @@ def inspect_source_document(payload: bytes):
                 if STOCK_CONTEXT.search(plain[max(0, match.start() - 240):match.end() + 240]):
                     contexts += 1
     if not digests:
-        return {"status": "source_review_pending", "source_sha256": None}
+        return {"status": "source_review_pending", "source_sha256": None,
+                "parser_version": SOURCE_PARSER_VERSION}
     return {"status": "source_context_review_pending" if contexts else
             "source_mention_no_equity_context" if mentions else "source_mention_unverified",
             "source_sha256": hashlib.sha256("".join(digests).encode()).hexdigest(),
+            "parser_version": SOURCE_PARSER_VERSION,
+            "source_claims": claims,
             "source_mention_count": mentions, "equity_context_count": contexts}
 
 
 def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, max_windows=20,
                    fetch=fetch_search_page, read_state=None, write_state=None,
                    key="", review_limit=0, fetch_document=fetch_source_document,
-                   scope="all"):
+                   scope="all", source_only=False, source_receipt=None):
     if read_state is None or write_state is None:
         raise ValueError("state IO required")
     if start > end or max_pages < 1 or max_windows < 1 or not 0 <= review_limit <= 100:
@@ -260,6 +319,8 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         raise ValueError("DART_API_KEY unavailable")
     if scope not in ("all", "equity", "prior-all", "prior-equity"):
         raise ValueError("invalid secondary scope")
+    if source_receipt is not None and (not source_only or not RECEIPT.fullmatch(source_receipt)):
+        raise ValueError("invalid source receipt selection")
     ledger_key = {"all": "secondary_backfill", "equity": "secondary_equity_backfill",
                   "prior-all": "secondary_prior_backfill",
                   "prior-equity": "secondary_prior_equity_backfill"}[scope]
@@ -282,7 +343,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         raise ValueError("secondary search cursor inconsistent")
     pages_used = windows = new_candidates = 0
     required_pages = None
-    while cursor <= end and windows < max_windows and pages_used < max_pages:
+    while not source_only and cursor <= end and windows < max_windows and pages_used < max_pages:
         last = min(cursor + timedelta(days=int(ledger.get("max_window_days") or 7) - 1), end)
         parsed_terms = []
         while True:
@@ -391,12 +452,13 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         def check_source(receipt_no):
             nonlocal source_requests
             check = cache.get(receipt_no)
-            if check is None or check.get("status") in ("source_review_pending", "source_unavailable"):
+            if (check is None or check.get("parser_version") != SOURCE_PARSER_VERSION
+                    or check.get("status") in ("source_review_pending", "source_unavailable")):
                 source_requests += 1
                 try:
                     check = inspect_source_document(fetch_document(receipt_no, key))
                 except (ValueError, RuntimeError, zipfile.BadZipFile):
-                    check = {"status": "source_review_pending"}
+                    check = {"status": "source_review_pending", "parser_version": SOURCE_PARSER_VERSION}
                 if check["status"] != "source_review_pending":
                     cache[receipt_no] = check
             return check
@@ -407,14 +469,22 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 queue_dates.setdefault(document_key, window["from"])
         pending = []
         for document_key, item in ledger["candidates"].items():
-            if (item.get("review_status") == "source_review_pending" and
-                    item.get("last_source_attempt_on") != today):
+            if source_receipt and not document_key.startswith(source_receipt + ":"):
+                continue
+            if ((item.get("review_status") == "source_review_pending" or
+                 item.get("parser_version") != SOURCE_PARSER_VERSION) and
+                    (item.get("last_source_attempt_on") != today or
+                     item.get("parser_version") != SOURCE_PARSER_VERSION)):
                 pending.append((int(item.get("source_attempt_count") or 0),
                                 item["filing_date"], 0, document_key, item))
         for document_key in queue_dates.keys() - ledger["candidates"].keys():
+            if source_receipt and not document_key.startswith(source_receipt + ":"):
+                continue
             previous = noncandidate_reviews.get(document_key, {})
-            if (previous.get("review_status") in (None, "source_review_pending") and
-                    previous.get("last_source_attempt_on") != today):
+            if ((previous.get("review_status") in (None, "source_review_pending") or
+                 previous.get("parser_version") != SOURCE_PARSER_VERSION) and
+                    (previous.get("last_source_attempt_on") != today or
+                     previous.get("parser_version") != SOURCE_PARSER_VERSION)):
                 pending.append((int(previous.get("source_attempt_count") or 0),
                                 queue_dates[document_key], 1, document_key, previous))
         for _, _, priority, document_key, item in sorted(pending):
@@ -433,6 +503,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                     "last_source_attempt_on": today,
                     "source_attempt_count": int(item.get("source_attempt_count") or 0) + 1,
                     "source_sha256": check.get("source_sha256"),
+                    "parser_version": check.get("parser_version"),
                 }
                 noncandidate_reviewed += 1
             reviewed += 1
@@ -443,7 +514,8 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         if reviewed % 10:
             state["revision"] += 1
             write_state(state_path, state)
-    return {"status": "SEARCH_BUDGET_INSUFFICIENT" if required_pages is not None else
+    return {"status": "SOURCE_REVIEW_COMPLETE" if source_only else
+            "SEARCH_BUDGET_INSUFFICIENT" if required_pages is not None else
             "SEARCH_COMPLETE" if cursor > end else "SEARCH_IN_PROGRESS",
             "next_date": ledger["next_date"], "target_date": ledger["target_date"],
             "completed_windows": len(ledger["coverage"]), "windows_this_run": windows,
