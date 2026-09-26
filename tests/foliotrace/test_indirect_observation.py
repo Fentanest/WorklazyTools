@@ -396,6 +396,45 @@ class IndirectObservationTests(unittest.TestCase):
         self.assertEqual({item['reason'] for item in snap['verifiedIndirectObservations']},
                          {'same_basis_bound_compatible', None})
 
+    def test_compatible_lower_and_upper_bounds_keep_tight_lower_not_conflict(self):
+        state = self.setup_with_basis()
+        register_evidence(state, indirect(numeric_kind='lower_bound', ownership_percent='5.00'))
+        register_evidence(state, indirect(source_receipt_no='20260602000002',
+                                          numeric_kind='upper_bound', ownership_percent='7.00'))
+        snap = make_snapshot(state, {})
+        self.assertEqual((snap['holdings'][0]['companyOwnershipPercent'],
+                          snap['holdings'][0]['ownershipNumericKind'], snap['holdings'][0]['tracking']),
+                         ('5.00', 'lower_bound', 'active'))
+        self.assertEqual({item['reason'] for item in snap['verifiedIndirectObservations']},
+                         {None, 'same_basis_bound_compatible'})
+        self.assertEqual(sum(item['appliedToHolding'] for item in snap['verifiedIndirectObservations']), 1)
+
+    def test_new_issuer_with_different_owner_scopes_is_not_arbitrarily_selected(self):
+        state = folio.empty_state()
+        state['universe'][CORP] = {'corp_code': CORP, 'stock_code': STOCK, 'name': '삼성전자'}
+        register_evidence(state, indirect(holder_scope='nps_only',
+                                          basis_date='2026-06-01', ownership_percent='5.05'))
+        register_evidence(state, indirect(source_receipt_no='20260702000001',
+                                          source_filing_date='2026-07-02', basis_date='2026-01-01',
+                                          holder_scope='nps_reporting_group', ownership_percent='8.00'))
+        snap = make_snapshot(state, {})
+        self.assertEqual(snap['holdings'], [])
+        self.assertEqual(len(snap['verifiedIndirectObservations']), 2)
+        self.assertEqual({item['reason'] for item in snap['verifiedIndirectObservations']},
+                         {'comparison_scope_unverified'})
+        self.assertTrue(all(not item['appliedToHolding'] for item in snap['verifiedIndirectObservations']))
+
+    def test_threshold_straddling_compatible_interval_stays_pending(self):
+        state = self.setup_with_basis()
+        register_evidence(state, indirect(numeric_kind='lower_bound', ownership_percent='4.00'))
+        register_evidence(state, indirect(source_receipt_no='20260602000002',
+                                          numeric_kind='upper_bound', ownership_percent='7.00'))
+        snap = make_snapshot(state, {})
+        self.assertEqual(snap['holdings'][0]['companyOwnershipPercent'], '4.80')
+        self.assertEqual({item['reason'] for item in snap['verifiedIndirectObservations']},
+                         {'compatible_interval_unresolved'})
+        self.assertTrue(all(not item['appliedToHolding'] for item in snap['verifiedIndirectObservations']))
+
     def test_incompatible_bound_quarantines_same_basis(self):
         state = self.setup_with_basis()
         register_evidence(state, indirect(numeric_kind='lower_bound', ownership_percent='6.00'))

@@ -280,6 +280,40 @@ def observation_timeline(state):
                                                  "tracking_change": None})
                         previous = selected
                         continue
+            if not exact and len(group) > 1:
+                lowers = [item for item in group if item["numeric_kind"] == "lower_bound"]
+                uppers = [item for item in group if item["numeric_kind"] == "upper_bound"]
+                lower = max((Decimal(item["ownership_percent"]) for item in lowers), default=None)
+                upper = min((Decimal(item["ownership_percent"]) for item in uppers), default=None)
+                if (lower is None or upper is None or lower <= upper):
+                    # Keep the tightest source bound. A crossing interval has no
+                    # single verified tracking status, so it stays visible only
+                    # in the observation list until a more precise fact arrives.
+                    selected_kind = "upper_bound" if upper is not None and upper < 5 else "lower_bound"
+                    selected_value = upper if selected_kind == "upper_bound" else lower
+                    selected = next((item for item in sorted(group, key=lambda row: row["key"])
+                                     if item["numeric_kind"] == selected_kind and
+                                     Decimal(item["ownership_percent"]) == selected_value), None)
+                    if selected is not None and _tracking(selected["ownership_percent"], selected_kind) != "unknown":
+                        old = _tracking(previous["ownership_percent"], previous["numeric_kind"]) if previous else "unknown"
+                        new = _tracking(selected["ownership_percent"], selected_kind)
+                        change = ("tracking-exit" if old == "active" else "tracking-reentry"
+                                  if old == "below-5-percent" else None) if old != new else None
+                        timeline.append({**selected, "status": "verified", "previous_percent": None,
+                                         "percentage_point_change": None, "tracking_change": change})
+                        for other in group:
+                            if other is not selected:
+                                timeline.append({**other, "status": "same_basis_bound_compatible",
+                                                 "previous_percent": None, "percentage_point_change": None,
+                                                 "tracking_change": None})
+                        previous = selected
+                        continue
+                    for item in group:
+                        timeline.append({**item, "status": "compatible_interval_unresolved",
+                                         "previous_percent": None, "percentage_point_change": None,
+                                         "tracking_change": None})
+                    previous = None
+                    continue
             signatures = {(item["numeric_kind"], Decimal(item["ownership_percent"]),
                            Decimal(str(item["quantity"])) if item["quantity"] is not None else None)
                           for item in group}
@@ -321,6 +355,10 @@ def reconcile_indirect(state, holdings):
     for item in timeline:
         by_unit.setdefault(_unit(item), []).append(item)
     holdings_by_corp = {item.get("corp_code"): item for item in holdings}
+    new_corp_units = {}
+    for fact in observations.values():
+        if fact["corp_code"] not in holdings_by_corp and fact["ownership_percent"] is not None and fact["numeric_kind"] != "estimated":
+            new_corp_units.setdefault(fact["corp_code"], set()).add(_unit(fact))
     reasons = {}
     chosen = {}
     chosen_direct = {}
@@ -368,6 +406,8 @@ def reconcile_indirect(state, holdings):
             reason = "estimate_not_applicable"
         elif state.get("universe", {}).get(corp, {}).get("stock_code") != stock or (current and current.get("stock_code") != stock):
             reason = "issuer_identity_unverified"
+        elif not current and len(new_corp_units.get(corp, ())) > 1:
+            reason = "comparison_scope_unverified"
         elif current and current.get("latest_unresolved_receipt"):
             reason = "newer_direct_unresolved"
         elif current and not current_profile:
