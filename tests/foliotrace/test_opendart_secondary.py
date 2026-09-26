@@ -346,6 +346,108 @@ class OpendartListPageTests(unittest.TestCase):
                     fetch_list=lambda _params: no_data(),
                     read_state=folio.read_json, write_state=folio.write_json)
 
+    def test_schedule_workflow_uses_literal_overlap_while_dispatch_uses_input(self):
+        workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / \
+            "foliotrace-opendart-secondary.yml"
+        text = workflow.read_text(encoding="utf-8")
+        self.assertIn("--overlap-days 3", text)
+        self.assertNotIn('args=(--state foliotrace-state/state.json --overlap-days "$OVERLAP_DAYS")',
+                         text)
+        self.assertIn('--overlap-days "$OVERLAP_DAYS"', text)
+
+    def test_first_window_stays_within_three_calendar_months(self):
+        self.assertLessEqual(opendart_secondary.MAX_WINDOW_DAYS, 89)
+        for start in (date(2000, 1, 1), date(2000, 2, 1)):
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "state.json"
+                fresh_state(path)
+                opendart_secondary.scan_opendart_secondary(
+                    path, start, date(2000, 12, 31), max_windows=1, review_limit=0,
+                    fetch_list=lambda _params: no_data(),
+                    read_state=folio.read_json, write_state=folio.write_json)
+                window = folio.read_json(path)["opendart_secondary_backfill"]["coverage"][0]
+                span = (date.fromisoformat(window["to"]) - date.fromisoformat(window["from"])).days
+                self.assertEqual((window["from"], span), (start.isoformat(), 88))
+
+    def test_parser_version_change_reviews_completed_verdicts_once(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        positive_no, negative_no, stable_no = receipt(tag, 1), receipt(tag, 2), receipt(tag, 3)
+        current = secondary.SOURCE_PARSER_VERSION
+
+        def archive(body):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w") as filing:
+                filing.writestr("filing.xml", body)
+            return buffer.getvalue()
+
+        docs = {positive_no: archive("<DOC>국민연금공단 보통주 1000</DOC>"),
+                negative_no: archive("<DOC>일반 주주총회 의사록</DOC>")}
+        calls = []
+
+        def document(no, _key):
+            calls.append(no)
+            return docs[no]
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "queue": {
+                    positive_no: {"receipt_no": positive_no, "rcept_dt": tag,
+                                  "source_status": "source_context_review_pending",
+                                  "parser_version": "stale", "source_attempt_count": 1,
+                                  "last_source_attempt_on": None, "source_sha256": "old"},
+                    negative_no: {"receipt_no": negative_no, "rcept_dt": tag,
+                                  "source_status": "source_mention_unverified",
+                                  "parser_version": "stale", "source_attempt_count": 1,
+                                  "last_source_attempt_on": None, "source_sha256": "old"},
+                    stable_no: {"receipt_no": stable_no, "rcept_dt": tag,
+                                "source_status": "source_mention_unverified",
+                                "parser_version": current, "source_attempt_count": 1,
+                                "last_source_attempt_on": None, "source_sha256": "kept"}},
+                "positives": {}}
+            state["secondary_source_cache"] = {
+                positive_no: {"status": "source_context_review_pending",
+                              "parser_version": "stale", "source_sha256": "old"},
+                negative_no: {"status": "source_mention_unverified",
+                              "parser_version": "stale", "source_sha256": "old"},
+                stable_no: {"status": "source_mention_unverified",
+                            "parser_version": current, "source_sha256": "kept"}}
+            folio.write_json(path, state)
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=3,
+                fetch_list=lambda _params: self.fail("completed range refetched"),
+                fetch_document=document, read_state=folio.read_json,
+                write_state=folio.write_json, key="test-key")
+            # Stale positive and negative are re-examined; the current-version
+            # verdict is not downloaded again.
+            self.assertEqual(calls, [positive_no, negative_no])
+            self.assertEqual(result["source_review_attempts"], 2)
+            saved = folio.read_json(path)
+            ledger = saved["opendart_secondary_backfill"]
+            self.assertEqual(ledger["queue"][positive_no]["parser_version"], current)
+            self.assertEqual(ledger["queue"][negative_no]["parser_version"], current)
+            self.assertEqual(ledger["queue"][stable_no]["parser_version"], current)
+            self.assertEqual(saved["secondary_source_cache"][stable_no]["source_sha256"], "kept")
+            self.assertIn(positive_no, ledger["positives"])
+            self.assertEqual(saved["receipts"], {})
+            self.assertEqual(saved["holdings"], {})
+
+    def test_non_object_json_is_a_shape_error_without_retry_or_secrets(self):
+        for body in (b"[1,2]", b"not json"):
+            with patch.object(opendart_secondary.time, "sleep"), patch.object(
+                    opendart_secondary.urllib.request, "urlopen",
+                    return_value=io.BytesIO(body)) as request:
+                with self.assertRaisesRegex(OpendartListError, "RESPONSE_SHAPE") as failure:
+                    opendart_secondary.fetch_list_page({"bgn_de": "20060208"}, "test-key")
+                self.assertEqual(request.call_count, 1)
+                self.assertNotIn("test-key", str(failure.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -30,7 +30,10 @@ from scripts.foliotrace import secondary
 LEDGER_KEY = "opendart_secondary_backfill"
 METHOD = "opendart-list-v1-lossless-queue"
 EARLIEST_START = date(1999, 4, 1)
-MAX_WINDOW_DAYS = 92  # OpenDART list API accepts at most a 3-month range.
+# Conservative cap for the OpenDART "within 3 months" list range: the shortest
+# 3-calendar-month span (Feb+Mar+Apr in a non-leap year) holds 89 days, while a
+# 92-day window starting on some dates would exceed three calendar months.
+MAX_WINDOW_DAYS = 89
 PAGE_SIZE = 100
 RECEIPT = re.compile(r"^\d{14}$")
 RCEPT_DT = re.compile(r"^\d{8}$")
@@ -117,13 +120,17 @@ def fetch_list_page(params: dict, key: str, *, retries: int = 3) -> dict:
             with urllib.request.urlopen(request, timeout=25) as response:
                 data = json.load(response)
         except (urllib.error.URLError, TimeoutError, ConnectionError,
-                http.client.HTTPException, ValueError) as exc:
-            if isinstance(exc, ValueError):
-                raise OpendartListError("RESPONSE_SHAPE", date.today(), date.today()) from None
+                http.client.HTTPException):
             if attempt + 1 == retries:
                 raise OpendartListError("OPENDART_TRANSPORT", date.today(), date.today()) from None
             time.sleep(attempt + 1)
             continue
+        except ValueError:
+            raise OpendartListError("RESPONSE_SHAPE", date.today(), date.today()) from None
+        if not isinstance(data, dict):
+            # Non-object JSON (or a decoded non-JSON body) is a response-shape
+            # error, never retried, and never logged with key-bearing URLs.
+            raise OpendartListError("RESPONSE_SHAPE", date.today(), date.today()) from None
         status = data.get("status")
         if status in ("000", "013"):
             return data
@@ -143,13 +150,25 @@ def _queue_entry(row: dict, window_from: str, window_to: str) -> dict:
             "rm": rm[:120],
             "first_seen_from": window_from, "first_seen_to": window_to,
             "correction_hold": bool(CORRECTION_HINT.search(report) or CORRECTION_HINT.search(rm)),
-            "source_status": "source_review_pending",
+            "source_status": "source_review_pending", "parser_version": None,
             "source_attempt_count": 0, "last_source_attempt_on": None, "source_sha256": None}
 
 
 def _pending_count(ledger: dict) -> int:
     return sum(1 for item in ledger.get("queue", {}).values()
                if item.get("source_status") in PENDING_STATUSES)
+
+
+def _needs_source_review(item: dict, today: str) -> bool:
+    """Select pending items, plus terminal ones recorded under an older parser.
+
+    Same-version terminal verdicts stay skipped so reruns remain idempotent.
+    """
+    if item.get("last_source_attempt_on") == today:
+        return False
+    if item.get("source_status") in PENDING_STATUSES:
+        return True
+    return item.get("parser_version") != secondary.SOURCE_PARSER_VERSION
 
 
 def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
@@ -299,8 +318,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         pending = sorted(
             (int(item.get("source_attempt_count") or 0), item.get("rcept_dt") or "", no)
             for no, item in ledger["queue"].items()
-            if item.get("source_status") in PENDING_STATUSES
-            and item.get("last_source_attempt_on") != today)
+            if _needs_source_review(item, today))
         for _, _, no in pending:
             if reviewed >= review_limit:
                 break
@@ -319,6 +337,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
             item["source_attempt_count"] = int(item.get("source_attempt_count") or 0) + 1
             item["last_source_attempt_on"] = today
             item["source_status"] = check.get("status") or "source_review_pending"
+            item["parser_version"] = check.get("parser_version")
             item["source_sha256"] = check.get("source_sha256")
             reviewed += 1
             if check.get("status") == "source_context_review_pending":

@@ -70,11 +70,11 @@ jobs:
           OVERLAP_DAYS: ${{ inputs.overlap_days }}
           VALIDATE_ONLY: ${{ inputs.validate_only }}
         run: |
-          args=(--state foliotrace-state/state.json --overlap-days "$OVERLAP_DAYS")
+          args=(--state foliotrace-state/state.json)
           if [ "$EVENT_NAME" = schedule ]; then
-            args+=(--max-listing-pages 100 --max-windows 15 --review-limit 20)
+            args+=(--overlap-days 3 --max-listing-pages 100 --max-windows 15 --review-limit 20)
           else
-            args+=(--max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT")
+            args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT")
           fi
           if [ "$VALIDATE_ONLY" = true ]; then args+=(--validate-only); fi
           python3 scripts/foliotrace/run_opendart_secondary.py "${args[@]}"
