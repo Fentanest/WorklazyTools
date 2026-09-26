@@ -884,7 +884,7 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
 
 def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_document, target_receipt=None):
     """Recover report preparation dates from exact source documents in bounded runs."""
-    method = "report-current-row-v3"
+    method = "report-current-row-v4"
     if limit < 0 or limit > 100:
         raise ValueError("DIRECT_BASIS_LIMIT")
     if target_receipt is not None and not RECEIPT.fullmatch(target_receipt):
