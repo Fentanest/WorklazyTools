@@ -65,7 +65,8 @@ def make_snapshot(state, quotes, now=None):
                     for _, fact in group}) > 1:
                 scoped_conflicts.update(key for key, _ in group)
     for holding in holdings:
-        if holding.get("evidence") == "indirect_observation":
+        if (holding.get("evidence") == "indirect_observation" or
+                holding.get("observation_status") == "same_basis_conflict"):
             continue
         candidates = scoped_by_corp.get(holding.get("corp_code")) or []
         if not candidates:

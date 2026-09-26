@@ -177,6 +177,25 @@ class CommonDistributionSourceTests(unittest.TestCase):
         self.assertEqual(contested['holdings'][0]['directBaseline']['holdingDate'], '2025-02-28')
         self.assertIsNone(contested['holdings'][0]['latestUnresolvedReceiptNo'])
         self.assertEqual(contested['holdings'][0]['valuationExclusionReason'], 'same_basis_observation_conflict')
+        for profile_state in (conflict, legacy_conflict):
+            for issuer_basis in ('2025-09-30', '2026-01-31'):
+                mixed = copy.deepcopy(profile_state)
+                mixed.setdefault('issuer_scope_observations', {})['weaker'] = {
+                    'corp_code': corp, 'stock_code': stock, 'issuer_name': 'BNK금융지주',
+                    'basis_date': issuer_basis, 'quantity': '16000000',
+                    'ownership_percent': '5.16', 'denominator_quantity': '310327033',
+                    'denominator_date': issuer_basis,
+                    'references': [{'receipt_no': '20260320000001',
+                        'filing_date': '2026-03-20', 'document_no': None,
+                        'archive_sha256': 'a' * 64, 'file_sha256': 'b' * 64,
+                        'row_sha256': 'c' * 64, 'parser_version': 'source-holdings-v1'}]}
+                mixed_snapshot = make_snapshot(mixed, {})
+                mixed_row = mixed_snapshot['holdings'][0]
+                self.assertIsNone(mixed_row['companyOwnershipPercent'])
+                self.assertEqual(mixed_row['observationStatus'], 'same_basis_conflict')
+                self.assertEqual(mixed_row['directBaseline']['ownershipPercent'], '4.80')
+                self.assertIsNone(mixed_row['issuerScopeSource'])
+                self.assertEqual(len(mixed_snapshot['issuerScopeObservations']), 1)
         unknown_class_conflict = copy.deepcopy(legacy_conflict)
         unknown_class_conflict['holdings'][corp]['security_kind'] = 'unknown'
         self.assertEqual(make_snapshot(unknown_class_conflict, {})['holdings'][0]['valuationExclusionReason'],
