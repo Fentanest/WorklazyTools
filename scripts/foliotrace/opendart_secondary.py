@@ -717,12 +717,13 @@ def _prune_source_cache(state: dict, ledger: dict) -> int:
     return len(pruned)
 
 
-def _rehydrate_locked(ledger: dict, directory: Path, limit: int) -> list:
+def _rehydrate_locked(ledger: dict, directory: Path, limit: int, cache: dict) -> list:
     """Move stale-parser archived rows out of shards into a return list.
 
     Months without moved rows are left byte-identical. Shard rewrites happen
     before the caller persists the manifest/queue update; superseded files are
-    swept only after that commit.
+    swept only after that commit. The shared month cache is updated in place so
+    a later spill in the same run cannot resurrect a moved row.
     """
     manifest = ledger.get("archive_manifest", {})
     if not isinstance(manifest, dict):
@@ -730,7 +731,6 @@ def _rehydrate_locked(ledger: dict, directory: Path, limit: int) -> list:
     current = secondary.SOURCE_PARSER_VERSION
     moved: list = []
     seen = set(ledger.get("queue", {}))
-    cache: dict = {}
     for month in sorted(manifest):
         if len(moved) >= limit:
             break
@@ -747,6 +747,7 @@ def _rehydrate_locked(ledger: dict, directory: Path, limit: int) -> list:
                 keep[no] = row
         if not month_moved:
             continue
+        cache[month] = keep
         ordered = sorted(keep.values(), key=lambda entry: entry["receipt_no"])
         records = []
         for offset in range(0, len(ordered), ARCHIVE_SHARD_ROWS):
@@ -791,7 +792,7 @@ def rehydrate_archive(state_path: Path, *, limit: int = 100,
     ledger = state.get(LEDGER_KEY)
     if ledger is None:
         raise ValueError("opendart secondary ledger missing")
-    moved = _rehydrate_locked(ledger, directory, limit)
+    moved = _rehydrate_locked(ledger, directory, limit, {})
     if not moved:
         return {"rehydrated": 0, "remaining_archived": _remaining_archived(ledger),
                 "shards": sum(len(months) for months in ledger.get("archive_manifest", {}).values()
@@ -890,7 +891,8 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         room = max_queue_entries - len(ledger["queue"])
         if room > 0:
             moved = _rehydrate_locked(
-                ledger, archive_dir_for(state_path), min(auto_rehydrate_limit, room))
+                ledger, archive_dir_for(state_path), min(auto_rehydrate_limit, room),
+                archive["months"])
             if moved:
                 _apply_rehydrated(ledger, moved)
                 auto_rehydrated = len(moved)

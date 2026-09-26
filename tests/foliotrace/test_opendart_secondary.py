@@ -1171,6 +1171,106 @@ class OpendartListPageTests(unittest.TestCase):
         self.assertIn("LISTING_BUDGET_INSUFFICIENT", run_opendart_secondary.INCOMPLETE_STATUSES)
         self.assertNotIn("SOURCE_REVIEW_COMPLETE", run_opendart_secondary.INCOMPLETE_STATUSES)
 
+    def test_shared_cache_blocks_stale_resurrection_across_phases(self):
+        from datetime import timedelta
+
+        def fetch(params):
+            bgn, end, page = params["bgn_de"], params["end_de"], params["page_no"]
+            first = date(int(bgn[:4]), int(bgn[4:6]), int(bgn[6:8]))
+            last = date(int(end[:4]), int(end[4:6]), int(end[6:8]))
+            days = (last - first).days + 1
+            rows = []
+            for day_offset in range(days):
+                tag = (first + timedelta(days=day_offset)).strftime("%Y%m%d")
+                rows.append(row(f"{tag}000100", tag))
+            total = len(rows)
+            pages = (total + 99) // 100
+            return list_page(rows[(page - 1) * 100:page * 100], total, page, pages)
+
+        def archive_bytes(body):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w") as filing:
+                filing.writestr("filing.xml", body)
+            return buffer.getvalue()
+
+        def archived_row(no, day_tag, parser):
+            return {"receipt_no": no, "corp_code": "00000001", "corp_name": "회사",
+                    "stock_code": "000000", "report_nm": "사업보고서", "rcept_dt": day_tag,
+                    "rm": "", "first_seen_from": day_tag, "first_seen_to": day_tag,
+                    "last_seen_from": day_tag, "last_seen_to": day_tag,
+                    "correction_hold": False, "withdrawal_flag": False,
+                    "source_status": "source_mention_unverified",
+                    "parser_version": parser, "source_attempt_count": 1,
+                    "last_source_attempt_on": None, "source_sha256": f"sha-{no}",
+                    "source_history": []}
+
+        day, tag = date(2006, 2, 8), "20060208"
+        oldA, keepC = "20060207999991", "20060207999992"
+        terminals = [receipt(tag, i) for i in (1, 2, 3)]
+        listed = ["20060208000100", "20060209000100"]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-09", "next_date": "2006-02-08",
+                "max_window_days": 1, "overlap_next_date": None,
+                "coverage": [], "overlap_coverage": [], "positives": {},
+                "queue": {no: {**archived_row(no, tag, "bumped-v1"),
+                               "source_status": "source_mention_unverified"}
+                          for no in terminals}}
+            folio.write_json(path, state)
+            archive_dir = opendart_secondary.archive_dir_for(path)
+            record = opendart_secondary._write_content_shard(
+                archive_dir, "200602",
+                [opendart_secondary._archive_row(archived_row(oldA, "20060207", "v0-stale")),
+                 opendart_secondary._archive_row(archived_row(keepC, "20060207", "v0-stale"))])
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"]["archive_manifest"] = {"200602": [record]}
+            folio.write_json(path, state)
+
+            def single_copy(ids):
+                saved = folio.read_json(path)["opendart_secondary_backfill"]
+                for target in ids:
+                    count = 1 if target in saved["queue"] else 0
+                    for months in saved["archive_manifest"].values():
+                        for entry in months:
+                            rows = json.loads((archive_dir / entry["file"]).read_text(
+                                encoding="utf-8"))["rows"]
+                            count += sum(1 for item in rows if item["receipt_no"] == target)
+                    self.assertEqual(count, 1, target)
+
+            common = dict(max_listing_pages=10, max_windows=5, review_limit=1,
+                          max_queue_entries=2, auto_rehydrate_limit=1,
+                          fetch_list=fetch,
+                          fetch_document=lambda no, _key: archive_bytes("<DOC>일반 기록</DOC>"),
+                          read_state=folio.read_json, write_state=folio.write_json,
+                          key="test-key")
+            with patch.object(secondary, "SOURCE_PARSER_VERSION", "bumped-v1"):
+                first = opendart_secondary.scan_opendart_secondary(
+                    path, day, date(2006, 2, 9), **common)
+                self.assertEqual(first["auto_rehydrated"], 1)
+                saved = folio.read_json(path)["opendart_secondary_backfill"]
+                # The moved row lives only in the queue; the archive keeps just
+                # the genuinely stale remainder instead of resurrecting it.
+                self.assertIn(oldA, saved["queue"])
+                self.assertEqual(saved["queue"][oldA]["parser_version"], "bumped-v1")
+                self.assertEqual(opendart_secondary._archived_stale_count(saved), 1)
+                single_copy([oldA, keepC, *terminals, *listed])
+                # Next run drains the remaining stale row without duplicates.
+                second = opendart_secondary.scan_opendart_secondary(
+                    path, day, date(2006, 2, 9), max_listing_pages=10, max_windows=5,
+                    review_limit=0, max_queue_entries=10, auto_rehydrate_limit=10,
+                    fetch_list=fetch, read_state=folio.read_json,
+                    write_state=folio.write_json, key="test-key")
+                self.assertEqual(second["auto_rehydrated"], 1)
+                done = folio.read_json(path)["opendart_secondary_backfill"]
+                self.assertEqual(opendart_secondary._archived_stale_count(done), 0)
+                self.assertEqual(sum(entry["count"] for months in done["archive_manifest"].values()
+                                     for entry in months), 3)
+                single_copy([oldA, keepC, *terminals, *listed])
+
     def test_spill_first_frees_room_for_bounded_replay(self):
         day = date(2006, 2, 8)
         tag = "20060208"
