@@ -103,7 +103,7 @@ class MigrationTests(unittest.TestCase):
         state["universe"]["00101488"] = {"name": "Test", "stock_code": "009450"}
         row = {"rcept_no": no, "corp_code": "00101488", "rcept_dt": "20200804", "flr_nm": "국민연금공단",
                "report_nm": "주식등의대량보유상황보고서", "corp_name": "Test"}
-        with patch.object(folio, "dart_json", return_value={"status": "000", "total_page": "1", "total_count": "1", "list": [row]}) as dart:
+        with patch.object(folio, "dart_json", return_value={"status": "000", "page_no": "1", "total_page": "1", "total_count": "1", "list": [row]}) as dart:
             first = folio.recover_metadata(state, "test-key")
             second = folio.recover_metadata(state, "test-key")
         self.assertEqual(first["references_matched"], 1)
@@ -217,10 +217,11 @@ class MigrationTests(unittest.TestCase):
             def fake_dart(endpoint, params, key):
                 calls.append(params.copy())
                 if params["page_no"] == 1:
-                    return {"status": "000", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000001", "corp_code": "00104856", "stock_code": "005930", "rcept_dt": "20260909", "flr_nm": "국민연금공단", "corp_name": "Test"}] + [{"flr_nm": "Other"}] * 99}
-                return {"status": "000", "list": [{"flr_nm": "Other"}]}
+                    return {"status": "000", "page_no": "1", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000001", "corp_code": "00104856", "stock_code": "005930", "rcept_dt": "20260909", "flr_nm": "국민연금공단", "corp_name": "Test"}] + [{"rcept_no": f"20260909{i:06d}", "flr_nm": "Other"} for i in range(2, 101)]}
+                return {"status": "000", "page_no": "2", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000101", "flr_nm": "Other"}]}
 
-            with patch.object(folio, "dart_json", side_effect=fake_dart), patch.object(folio, "resolve_unfinished", return_value=0):
+            with patch.object(folio, "dart_json", side_effect=fake_dart), patch.object(folio, "resolve_unfinished", return_value=0), \
+                 patch.object(folio, "holiday_set_for", return_value=frozenset({date(2026, 9, 24), date(2026, 9, 25)})):
                 result = folio.collect(state, date(2026, 9, 26), "test-key")
             self.assertEqual(result["requested_from"], "2026-09-01")
             self.assertEqual(result["new_receipts"], 1)

@@ -33,7 +33,7 @@ def make_snapshot(state, quotes, now=None):
         current_no = holding.get("receipt_no")
         current = state["receipts"].get(current_no, {})
         latest_no = max(holding.get("latest_unresolved_receipt") or "", pending_by_corp.get(holding.get("corp_code"), ""))
-        if latest_no <= (current_no or ""):
+        if latest_no < (current_no or ""):
             latest_no = ""
         if current.get("withdrawn_flag") or current.get("is_correction") or current.get("later_correction_flag"):
             latest_no = max(latest_no or "", current_no or "")

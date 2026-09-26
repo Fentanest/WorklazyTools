@@ -1,5 +1,7 @@
 import importlib.util
+import json
 import unittest
+from datetime import datetime, time, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -27,12 +29,42 @@ def chart(code="000660", close="1862000", day="20260923"):
 
 
 class NaverTests(unittest.TestCase):
+    def test_official_calendar_holiday_and_special_session_close(self):
+        dates = ["2026-01-01", "2026-02-16", "2026-05-01", "2026-09-24", "2026-10-09"]
+        holidays = naver.parse_krx_holidays(json.dumps({"block1": [{"calnd_dd": day} for day in dates]}).encode(), 2026)
+        observed = datetime(2026, 10, 10, 1, tzinfo=timezone.utc)
+        self.assertEqual(naver.expected_session(observed, closures=holidays).isoformat(), "2026-10-08")
+        with self.assertRaisesRegex(naver.QuoteError, "calendar response invalid"):
+            naver.parse_krx_holidays(json.dumps({"block1": [{"calnd_dd": day} for day in dates[:-1]] +
+                                                 [{"calnd_dd": dates[0]}]}).encode(), 2026)
+
+        special = {naver.date(2026, 11, 12): (time(16, 30), time(17, 30))}
+        before = datetime(2026, 11, 12, 8, 0, tzinfo=timezone.utc)
+        after = datetime(2026, 11, 12, 8, 35, tzinfo=timezone.utc)
+        self.assertEqual(naver.expected_session(before, closures=holidays, special_closes=special).isoformat(), "2026-11-11")
+        self.assertEqual(naver.expected_session(after, closures=holidays, special_closes=special).isoformat(), "2026-11-12")
+        basic = {"itemCode": "000660", "stockEndType": "stock", "closePrice": "110",
+                 "marketStatus": "CLOSE", "marketStatusDetailType": "close",
+                 "localTradedAt": "2026-11-12T17:35:00+09:00",
+                 "stockExchangeType": {"code": "KS", "zoneId": "Asia/Seoul", "nationCode": "KOR"}}
+        daily = [{"localTradedAt": "2026-11-12", "closePrice": "110"}]
+        special_chart = (b'<protocol><chartdata symbol="000660" timeframe="minute">'
+                         b'<item data="202611121530|null|null|null|100|1"/>'
+                         b'<item data="202611121630|null|null|null|110|2"/></chartdata></protocol>')
+        result = naver.parse_quote("000660", basic, daily, special_chart, "2026-11-12T08:35:00Z",
+                                   official_close="110", holidays=holidays, special_closes=special)
+        self.assertEqual((result["close"], result["close_basis"]), ("110", "naver_krx_special_close_kind_confirmed"))
+        with self.assertRaisesRegex(naver.QuoteError, "chart/KRX close mismatch"):
+            naver.parse_quote("000660", basic, daily, special_chart, "2026-11-12T08:35:00Z",
+                              official_close="110", holidays=holidays)
+
     def test_missing_chart_row_retries_larger_window_once(self):
         basic, daily = response(close="110")
         client = naver.NaverClient()
         with patch.object(client, "_json", side_effect=[basic, daily]), \
              patch.object(client, "_chart", side_effect=[chart(day="20260922"), chart(close="100")]) as fetch_chart, \
-             patch.object(client, "_kind_close", return_value="100") as official:
+             patch.object(client, "_kind_close", return_value="100") as official, \
+             patch.object(naver, "holiday_set_for", return_value=frozenset({naver.date(2026, 9, 24), naver.date(2026, 9, 25)})):
             result = client.quote("000660", "2026-09-26T00:00:00Z")
         self.assertEqual(result["close"], "100")
         self.assertEqual([call.args[1] for call in fetch_chart.call_args_list], [500, 2000])

@@ -27,7 +27,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from pipeline.foliotrace.naver import NaverClient, QuoteError, expected_session
+from pipeline.foliotrace.naver import NaverClient, QuoteError, expected_session, holiday_set_for, CONFIRMED_SPECIAL_SESSIONS
 from pipeline.foliotrace.publish import make_snapshot, encoded
 
 RECEIPT = re.compile(r"^\d{14}$")
@@ -627,10 +627,13 @@ def apply_listing_row(state, row):
         if old and no > old.get("receipt_no", ""):
             old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
     elif not existing.get("corp_code") or not existing.get("stock_code"):
+        identity_recovered = bool(corp and stock_code and not (existing.get("corp_code") and existing.get("stock_code")))
         existing["corp_code"] = corp
         existing["stock_code"] = stock_code
         existing["receipt_date"] = norm_date(row.get("rcept_dt"))
         existing["metadata_evidence"] = "dart_listing"
+        if identity_recovered:
+            existing["parse_attempt_count"] = 0
         state["unresolved"][no] = "parsed_identity_ready" if existing.get("evidence") in ("dart_document", "dart_structured") and existing.get("quantity") is not None else "needs_filing_parse"
     existing.update(report_name=report_name, remarks=remarks, is_correction=correction,
                     correction_of=None, later_correction_flag=superseded, withdrawn_flag=withdrawn)
@@ -638,13 +641,45 @@ def apply_listing_row(state, row):
         state["unresolved"][no] = "correction_relation_unverified" if correction or superseded else "withdrawal_unverified"
     if listed_code and prior_code and listed_code != prior_code:
         state["unresolved"][no] = "security_identity_conflict"
-    return existing["origin"] == "dart_listing" and existing["evidence"] == "unresolved"
+    return existing.get("origin") == "dart_listing" and existing.get("evidence") == "unresolved"
 
 
-def resolve_unfinished(state, key, limit=30):
+def validate_listing_pages(pages):
+    first = pages[0]
+    if first.get("status") == "013":
+        if len(pages) != 1 or first.get("list"):
+            raise RuntimeError("DART no-data response inconsistent")
+        return 0
+    if first.get("status") != "000":
+        raise RuntimeError("DART listing page failed")
+    try:
+        total = int(first["total_count"])
+        count = int(first["total_page"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError("DART pagination metadata inconsistent") from exc
+    if total < 0 or count < 1 or count != max(1, (total + 99) // 100) or len(pages) != count:
+        raise RuntimeError("DART pagination metadata inconsistent")
+    numbers = []
+    for number, page in enumerate(pages, 1):
+        try:
+            same = (page.get("status") == "000" and int(page["page_no"]) == number
+                    and int(page["total_count"]) == total and int(page["total_page"]) == count)
+        except (KeyError, TypeError, ValueError):
+            same = False
+        rows = page.get("list")
+        if not same or not isinstance(rows, list) or len(rows) != min(100, max(0, total - (number - 1) * 100)):
+            raise RuntimeError("DART listing page identity inconsistent")
+        numbers.extend(str(row.get("rcept_no") or "") for row in rows)
+    if any(not RECEIPT.fullmatch(no) for no in numbers) or len(set(numbers)) != total:
+        raise RuntimeError("DART listing receipt coverage inconsistent")
+    return total
+
+
+def resolve_unfinished(state, key, limit=30, state_path=None):
     processed = 0
     structured_cache = {}
-    for no in sorted(state["unresolved"], reverse=True):
+    for no in sorted(state["unresolved"], key=lambda number: (
+            int(state["receipts"].get(number, {}).get("parse_attempt_count") or 0), -int(number))):
         if processed >= limit:
             break
         receipt = state["receipts"].get(no)
@@ -657,6 +692,7 @@ def resolve_unfinished(state, key, limit=30):
         if state["unresolved"].get(no) == "security_identity_conflict":
             continue
         processed += 1
+        receipt["parse_attempt_count"] = int(receipt.get("parse_attempt_count") or 0) + 1
         try:
             corp = receipt.get("corp_code")
             if state["unresolved"].get(no) in ("security_identity_missing", "parsed_identity_ready") and corp and receipt.get("stock_code") and receipt.get("evidence") in ("dart_document", "dart_structured"):
@@ -702,6 +738,9 @@ def resolve_unfinished(state, key, limit=30):
         else:
             state["unresolved"][no] = "security_identity_missing"
     classify_events(state)
+    if state_path and processed:
+        state["revision"] += 1
+        write_json(state_path, state)
     return processed
 
 
@@ -899,13 +938,11 @@ def recover_metadata(state, key, *, limit_days=100, state_path=None):
         params = {"bgn_de": day.replace("-", ""), "end_de": day.replace("-", ""),
                   "pblntf_detail_ty": "D001", "page_count": 100}
         first = dart_json("list.json", {**params, "page_no": 1}, key)
-        total = int(first.get("total_count") or 0) if first.get("status") == "000" else 0
+        if first.get("status") not in ("000", "013"):
+            raise RuntimeError("DART metadata listing failed")
         count = int(first.get("total_page") or 0) if first.get("status") == "000" else 0
-        if first.get("status") == "000" and (count < 1 or count != max(1, (total + 99) // 100)):
-            raise RuntimeError("DART metadata pagination inconsistent")
         pages = [first] + [dart_json("list.json", {**params, "page_no": page}, key) for page in range(2, count + 1)]
-        if sum(len(page.get("list") or []) for page in pages) != total:
-            raise RuntimeError("DART metadata page count mismatch")
+        validate_listing_pages(pages)
         for page in pages:
             for row in page.get("list") or []:
                 if str(row.get("rcept_no")) in targets and NPS.search(str(row.get("flr_nm") or "")):
@@ -944,8 +981,6 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
         first = dart_json("list.json", {**base, "page_no": 1}, key)
         request_count += 1
         if first.get("status") == "013":
-            if first.get("list"):
-                raise RuntimeError("DART no-data response contains rows")
             pages = [first]
         else:
             total_page = int(first.get("total_page") or 0)
@@ -956,8 +991,7 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
             for number in range(2, total_page + 1):
                 pages.append(dart_json("list.json", {**base, "page_no": number}, key))
                 request_count += 1
-            if sum(len(p.get("list") or []) for p in pages) != total_count:
-                raise RuntimeError("DART listing page count mismatch")
+        validate_listing_pages(pages)
         for page in pages:
             if page.get("status") not in ("000", "013"):
                 raise RuntimeError("DART listing page failed")
@@ -973,8 +1007,10 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
         write_json(state_path, state)
         cursor = end + timedelta(days=1)
     metadata = recover_metadata(state, key, state_path=state_path)
-    parse_attempts = resolve_unfinished(state, key)
-    trade_date = expected_session(datetime.now(timezone.utc)).isoformat()
+    parse_attempts = resolve_unfinished(state, key, state_path=state_path)
+    observed = datetime.now(timezone.utc)
+    trade_date = expected_session(observed, closures=holiday_set_for(observed),
+                                  special_closes=CONFIRMED_SPECIAL_SESSIONS).isoformat()
     mapping_details, mapping_hash = krx_security_details(trade_date) if state["holdings"] else ({}, None)
     mapping_master = {code: item["name"] for code, item in mapping_details.items()}
     mapping = reconcile_security(state, key, state_path=state_path, master=mapping_master, master_hash=mapping_hash)
@@ -998,7 +1034,6 @@ def price_and_value(state_path: Path, output: Path, client=None):
     failed = {}
     cache_hits = 0
     now = datetime.now(timezone.utc)
-    expected = expected_session(now).isoformat()
     cache = state.setdefault("quote_cache", {})
     new_cache = {}
     eligible = {row.get("stock_code") for row in state["holdings"].values()
@@ -1006,12 +1041,18 @@ def price_and_value(state_path: Path, output: Path, client=None):
                 and row.get("stock_code")}
     if not eligible:
         raise RuntimeError("no verified stock-class mappings for valuation")
+    expected = (client.expected_session(now) if hasattr(client, "expected_session") else expected_session(now)).isoformat()
+    special_closes = getattr(client, "special_closes", CONFIRMED_SPECIAL_SESSIONS)
+    is_special = date.fromisoformat(expected) in special_closes
     for code in sorted(eligible):
         strict_key = f"{code}|KRX|regular|{expected}|naver-chart1530-kind-v2"
         delayed_key = f"{code}|KRX|regular|{expected}|naver-delayed-kind-v2"
-        cached_key = strict_key if strict_key in cache else delayed_key
+        special_key = f"{code}|KRX|regular|{expected}|naver-special-kind-v1"
+        cached_key = (special_key if is_special else strict_key if strict_key in cache else delayed_key)
         cached = cache.get(cached_key)
-        expected_basis = "naver_krx_1530_kind_confirmed" if cached_key == strict_key else "naver_krx_delayed_auction_kind_confirmed"
+        expected_basis = ("naver_krx_1530_kind_confirmed" if cached_key == strict_key
+                          else "naver_krx_delayed_auction_kind_confirmed" if cached_key == delayed_key
+                          else "naver_krx_special_close_kind_confirmed")
         if cached and cached.get("verified") is True and cached.get("trade_date") == expected and cached.get("close_basis") == expected_basis:
             quotes[code] = cached
             new_cache[cached_key] = cached
@@ -1020,7 +1061,9 @@ def price_and_value(state_path: Path, output: Path, client=None):
         try:
             quotes[code] = client.quote(code)
             quote = quotes[code]
-            suffix = "naver-delayed-kind-v2" if quote.get("close_basis") == "naver_krx_delayed_auction_kind_confirmed" else "naver-chart1530-kind-v2"
+            suffix = ("naver-delayed-kind-v2" if quote.get("close_basis") == "naver_krx_delayed_auction_kind_confirmed"
+                      else "naver-special-kind-v1" if quote.get("close_basis") == "naver_krx_special_close_kind_confirmed"
+                      else "naver-chart1530-kind-v2")
             new_cache[f"{code}|KRX|regular|{quote['trade_date']}|{suffix}"] = quote
         except QuoteError as exc:
             failed[code] = str(exc)

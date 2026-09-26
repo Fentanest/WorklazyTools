@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 import json
+import http.cookiejar
 from html.parser import HTMLParser
 import re
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, time as clock_time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from zoneinfo import ZoneInfo
 
 
@@ -17,9 +20,14 @@ CODE = re.compile(r"^[0-9A-Z]{6}$")
 BASE = "https://m.stock.naver.com/api/stock"
 CHART_BASE = "https://fchart.stock.naver.com/sise.nhn"
 KIND_BASE = "https://kind.krx.co.kr/common/stockprices.do"
+KRX_CALENDAR_BASE = "https://open.krx.co.kr"
+KRX_CALENDAR_PAGE = "/contents/MKD/01/0110/01100305/MKD01100305.jsp"
+KRX_CALENDAR_BLD = "MKD/01/0110/01100305/mkd01100305_01"
 # Confirmed KRX closures: https://kind.krx.co.kr/external/dst/notice/11637/
 # [한국거래소] 2026년 올빼미공시 안내.pdf (2026 Chuseok, Sep 24-27).
 KNOWN_CLOSURES = {date(2026, 9, 24), date(2026, 9, 25)}
+# KRX dated notice: https://kind.krx.co.kr/external/2025/10/30/000102/20251030000137/99303.htm
+CONFIRMED_SPECIAL_SESSIONS = {date(2025, 11, 13): (clock_time(16, 30), clock_time(17, 30))}
 
 
 class QuoteError(ValueError):
@@ -38,15 +46,78 @@ def _amount(value, *, allow_zero=False):
     return format(n, "f")
 
 
-def expected_session(observed):
+def parse_krx_holidays(payload, year):
+    if not isinstance(payload, bytes) or len(payload) > 100_000:
+        raise QuoteError("KRX calendar response invalid")
+    try:
+        data = json.loads(payload)
+    except (UnicodeError, ValueError) as exc:
+        raise QuoteError("KRX calendar response invalid") from exc
+    rows = data.get("block1") if isinstance(data, dict) else None
+    if not isinstance(rows, list) or not 5 <= len(rows) <= 100:
+        raise QuoteError("KRX calendar response invalid")
+    try:
+        dates = [date.fromisoformat(row["calnd_dd"]) for row in rows]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise QuoteError("KRX calendar response invalid") from exc
+    if any(day.year != year for day in dates) or len(set(dates)) != len(dates):
+        raise QuoteError("KRX calendar response invalid")
+    return frozenset(dates)
+
+
+@lru_cache(maxsize=4)
+def krx_holidays(year):
+    """Read the dated KRX market-closing calendar for one year."""
+    if not isinstance(year, int) or year < 2020 or year > 2100:
+        raise QuoteError("KRX calendar year invalid")
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    headers = {"User-Agent": "Mozilla/5.0 FolioTrace/1.0", "Referer": KRX_CALENDAR_BASE + KRX_CALENDAR_PAGE}
+    try:
+        with opener.open(urllib.request.Request(KRX_CALENDAR_BASE + KRX_CALENDAR_PAGE, headers=headers), timeout=10) as response:
+            page = response.read(300_001)
+        if len(page) > 300_000 or KRX_CALENDAR_BLD.encode() not in page:
+            raise QuoteError("KRX calendar source invalid")
+        query = urllib.parse.urlencode({"name": "form", "bld": KRX_CALENDAR_BLD})
+        with opener.open(urllib.request.Request(KRX_CALENDAR_BASE + "/contents/COM/GenerateOTP.jspx?" + query, headers=headers), timeout=10) as response:
+            code = response.read(501).decode("ascii").strip()
+        if not re.fullmatch(r"[A-Za-z0-9+/=]{20,500}", code):
+            raise QuoteError("KRX calendar token invalid")
+        form = urllib.parse.urlencode({"search_bas_yy": str(year), "gridTp": "KRX", "code": code}).encode()
+        request = urllib.request.Request(KRX_CALENDAR_BASE + "/contents/OPN/99/OPN99000001.jspx", data=form,
+                                         headers={**headers, "Content-Type": "application/x-www-form-urlencoded"})
+        with opener.open(request, timeout=10) as response:
+            payload = response.read(100_001)
+        if len(payload) > 100_000:
+            raise QuoteError("KRX calendar response invalid")
+    except (urllib.error.URLError, TimeoutError, UnicodeError, ValueError) as exc:
+        raise QuoteError("KRX calendar request failed") from exc
+    return parse_krx_holidays(payload, year)
+
+
+def holiday_set_for(observed):
     kst = observed.astimezone(ZoneInfo("Asia/Seoul"))
-    candidate = kst.date() if kst.time() >= clock_time(16, 30) else kst.date() - timedelta(days=1)
-    while candidate.weekday() >= 5 or candidate in KNOWN_CLOSURES:
+    days = set(krx_holidays(kst.year))
+    if kst.month == 1 and kst.day <= 7:
+        days.update(krx_holidays(kst.year - 1))
+    return frozenset(days)
+
+
+def expected_session(observed, *, closures=None, special_closes=None):
+    kst = observed.astimezone(ZoneInfo("Asia/Seoul"))
+    special_closes = CONFIRMED_SPECIAL_SESSIONS if special_closes is None else special_closes
+    schedule = special_closes.get(kst.date())
+    if schedule is not None and (not isinstance(schedule, tuple) or len(schedule) != 2
+                                 or any(not isinstance(item, clock_time) for item in schedule)):
+        raise QuoteError("KRX special session schedule invalid")
+    final_after = schedule[1] if schedule else clock_time(16, 30)
+    candidate = kst.date() if kst.time() >= final_after else kst.date() - timedelta(days=1)
+    holidays = KNOWN_CLOSURES if closures is None else closures
+    while candidate.weekday() >= 5 or candidate in holidays:
         candidate -= timedelta(days=1)
     return candidate
 
 
-def parse_regular_chart(code, payload, traded, *, official_close=None, with_basis=False):
+def parse_regular_chart(code, payload, traded, *, official_close=None, with_basis=False, close_hhmm="1530"):
     """Select a Naver minute only when the dated KRX close confirms its price."""
     if not CODE.fullmatch(code) or not isinstance(payload, bytes) or len(payload) > 2_000_000 or b"<!DOCTYPE" in payload.upper() or b"<!ENTITY" in payload.upper():
         raise QuoteError("regular chart invalid")
@@ -57,14 +128,19 @@ def parse_regular_chart(code, payload, traded, *, official_close=None, with_basi
     chart = root.find("chartdata")
     if chart is None or chart.get("symbol") != code or chart.get("timeframe") != "minute":
         raise QuoteError("regular chart identity mismatch")
-    stamp = traded.replace("-", "") + "1530"
+    if not re.fullmatch(r"\d{4}", close_hhmm):
+        raise QuoteError("KRX close time unverified")
+    stamp = traded.replace("-", "") + close_hhmm
     rows = [item.get("data", "").split("|") for item in chart.findall("item")]
     matched = [row for row in rows if row and row[0] == stamp]
     if len(matched) == 1 and len(matched[0]) == 6 and official_close is not None:
         close = _amount(matched[0][4])
         if close != _amount(official_close):
             raise QuoteError("regular chart/KRX close mismatch")
-        return (close, "naver_krx_1530_kind_confirmed") if with_basis else close
+        basis = "naver_krx_1530_kind_confirmed" if close_hhmm == "1530" else "naver_krx_special_close_kind_confirmed"
+        return (close, basis) if with_basis else close
+    if close_hhmm != "1530":
+        raise QuoteError("regular chart special close unverified")
     if matched or official_close is None:
         raise QuoteError("regular chart 15:30 close unverified")
     prefix = traded.replace("-", "")
@@ -133,8 +209,10 @@ def parse_kind_close(page, traded, code, name):
     return close
 
 
-def parse_quote(code, basic, daily, chart, observed_at, *, today=None, official_close=None):
-    """Cross-check Naver identity/date, then use the 15:30 KRX chart close."""
+def parse_quote(code, basic, daily, chart, observed_at, *, today=None, official_close=None,
+                holidays=None, special_closes=None):
+    """Cross-check Naver identity/date, then use the confirmed session-close minute."""
+    special_closes = CONFIRMED_SPECIAL_SESSIONS if special_closes is None else special_closes
     if not CODE.fullmatch(code) or not isinstance(basic, dict) or not isinstance(daily, list) or not daily:
         raise QuoteError("invalid quote response")
     exchange = basic.get("stockExchangeType")
@@ -150,7 +228,7 @@ def parse_quote(code, basic, daily, chart, observed_at, *, today=None, official_
     if basic_at.tzinfo is None or observed.tzinfo is None:
         raise QuoteError("quote date mismatch")
     today = today or observed.astimezone(ZoneInfo("Asia/Seoul")).date()
-    expected = expected_session(observed)
+    expected = expected_session(observed, closures=holidays, special_closes=special_closes)
     dated = [row for row in daily if isinstance(row, dict) and row.get("localTradedAt") == expected.isoformat()]
     if len(dated) != 1 or expected > today or expected.weekday() >= 5:
         raise QuoteError(f"latest completed KRX session unverified: expected {expected.isoformat()}")
@@ -170,7 +248,10 @@ def parse_quote(code, basic, daily, chart, observed_at, *, today=None, official_
         raise QuoteError("source daily/basic mismatch")
     if official_close is None:
         raise QuoteError("KRX close unverified")
-    close, basis = parse_regular_chart(code, chart, expected.isoformat(), official_close=official_close, with_basis=True)
+    schedule = (special_closes or {}).get(expected)
+    close_time = (schedule[0] if schedule else clock_time(15, 30)).strftime("%H%M")
+    close, basis = parse_regular_chart(code, chart, expected.isoformat(), official_close=official_close,
+                                       with_basis=True, close_hhmm=close_time)
     return {"close": close, "currency": "KRW", "market": "KRX", "session": "regular",
             "trade_date": expected.isoformat(), "adjusted": False, "provider": "naver",
             "observed_at": observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "verified": True,
@@ -179,7 +260,7 @@ def parse_quote(code, basic, daily, chart, observed_at, *, today=None, official_
 
 
 class NaverClient:
-    def __init__(self, *, opener=None, sleep=time.sleep, min_interval=0.25, retries=2):
+    def __init__(self, *, opener=None, sleep=time.sleep, min_interval=0.25, retries=2, special_closes=None):
         self.opener = opener or urllib.request.urlopen
         self.sleep = sleep
         self.min_interval = min_interval
@@ -187,6 +268,10 @@ class NaverClient:
         self.next_request_at = 0.0
         self.cache = {}
         self.requests = 0
+        self.special_closes = CONFIRMED_SPECIAL_SESSIONS if special_closes is None else special_closes
+
+    def expected_session(self, observed):
+        return expected_session(observed, closures=holiday_set_for(observed), special_closes=self.special_closes)
 
     def _json(self, url):
         for attempt in range(self.retries + 1):
@@ -256,14 +341,18 @@ class NaverClient:
         basic = self._json(f"{BASE}/{code}/basic")
         daily = self._json(f"{BASE}/{code}/price?pageSize=5&page=1")
         chart = self._chart(code, 500)
-        traded = expected_session(datetime.fromisoformat(observed_at.replace("Z", "+00:00"))).isoformat()
+        observed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+        holidays = holiday_set_for(observed)
+        traded = expected_session(observed, closures=holidays, special_closes=self.special_closes).isoformat()
         official_close = self._kind_close(code, traded, basic.get("stockName"))
         try:
-            quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close)
+            quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close,
+                                holidays=holidays, special_closes=self.special_closes)
         except QuoteError as exc:
             if not any(reason in str(exc) for reason in ("15:30 close unverified", "delayed close unverified")):
                 raise
             chart = self._chart(code, 2000)
-            quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close)
+            quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close,
+                                holidays=holidays, special_closes=self.special_closes)
         self.cache[code] = quote
         return quote

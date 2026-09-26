@@ -1,7 +1,7 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -42,6 +42,111 @@ def quote():
 
 
 class ReviewFixTests(unittest.TestCase):
+    def test_special_session_rejects_cached_normal_close(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = state_with_holding()
+            state["receipts"][OLD]["receipt_date"] = "2025-11-13"
+            state["holdings"][CORP].update(receipt_date="2025-11-13", corporate_action_trade_date="2025-11-13")
+            state["quote_cache"][f"{CODE}|KRX|regular|2025-11-13|naver-chart1530-kind-v2"] = {
+                **quote(), "trade_date": "2025-11-13", "close_basis": "naver_krx_1530_kind_confirmed"}
+            folio.write_json(path, state)
+            class Client:
+                requests = 0
+                special_closes = {folio.date(2025, 11, 13): (time(16, 30), time(17, 30))}
+                def expected_session(self, observed):
+                    return folio.date(2025, 11, 13)
+                def quote(self, code):
+                    raise folio.QuoteError("special session close missing")
+            with self.assertRaisesRegex(RuntimeError, "all 1 eligible quote codes failed"):
+                folio.price_and_value(path, Path(directory) / "publish.json", Client())
+
+    def test_duplicate_listing_pages_do_not_advance_checkpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = folio.empty_state()
+            state.update(import_ledger=["synthetic"], legacy_resume_hint="2026-09-23")
+            folio.write_json(path, state)
+            rows = [listing(f"20260923{i:06d}") for i in range(100)]
+            def duplicate_page(endpoint, params, key):
+                return {"status": "000", "total_page": "2", "total_count": "200",
+                        "page_no": str(params["page_no"]), "list": rows}
+            with patch.object(folio, "dart_json", side_effect=duplicate_page):
+                with self.assertRaisesRegex(RuntimeError, "receipt coverage inconsistent"):
+                    folio.collect(path, folio.date(2026, 9, 23), "test-key", overlap=0)
+            saved = folio.read_json(path)
+            self.assertIsNone(saved["latest_complete_listing_date"])
+            self.assertEqual(saved["listing_coverage"], [])
+            self.assertEqual(saved["receipts"], {})
+
+    def test_metadata_recovery_rejects_duplicate_pages_without_marking_date_checked(self):
+        state = folio.empty_state()
+        no = "20260923000000"
+        state["receipts"][no] = {"receipt_no": no, "corp_code": None, "stock_code": None,
+                                "evidence": "legacy_reference_only", "origin": "legacy_import"}
+        state["unresolved"][no] = "metadata_missing"
+        rows = [listing(f"20260923{i:06d}") for i in range(100)]
+        def duplicate(endpoint, params, key):
+            return {"status": "000", "page_no": str(params["page_no"]), "total_page": "2",
+                    "total_count": "200", "list": rows}
+        with patch.object(folio, "dart_json", side_effect=duplicate):
+            with self.assertRaisesRegex(RuntimeError, "receipt coverage inconsistent"):
+                folio.recover_metadata(state, "test-key")
+        self.assertEqual(state["metadata_recovery"], {})
+        self.assertIsNone(state["receipts"][no]["corp_code"])
+
+    def test_listing_page_identity_drift_is_rejected(self):
+        first = {"status": "000", "page_no": "1", "total_page": "2", "total_count": "101",
+                 "list": [listing(f"20260923{i:06d}") for i in range(100)]}
+        second = {"status": "000", "page_no": "1", "total_page": "2", "total_count": "101",
+                  "list": [listing("20260923000100")]}
+        with self.assertRaisesRegex(RuntimeError, "page identity inconsistent"):
+            folio.validate_listing_pages([first, second])
+
+    def test_failed_parse_batch_does_not_starve_older_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = folio.empty_state()
+            for i in range(31):
+                folio.apply_listing_row(state, listing(f"20260923{i:06d}"))
+            target = "20260923000000"
+            folio.write_json(path, state)
+            attempted = []
+            def structured(no, *_):
+                attempted.append(no)
+                if no == target:
+                    return {"quantity": "100", "company_ownership_percent": "6", "reason": "", "evidence": "dart_structured"}
+                return None
+            with patch.object(folio, "structured_receipt", side_effect=structured), \
+                 patch.object(folio, "dart_document", side_effect=ValueError("unavailable")):
+                first = folio.resolve_unfinished(state, "test-key", state_path=path)
+                state = folio.read_json(path)
+                second = folio.resolve_unfinished(state, "test-key", state_path=path)
+            self.assertEqual((first, second), (30, 30))
+            self.assertEqual(len(set(attempted)), 31)
+            self.assertNotIn(target, folio.read_json(path)["unresolved"])
+            self.assertEqual(folio.read_json(path)["holdings"][CORP]["quantity"], "100")
+
+    def test_repeated_incomplete_listing_does_not_reset_retry_fairness(self):
+        state = folio.empty_state()
+        row = listing("20260923000010", stock_code="")
+        folio.apply_listing_row(state, row)
+        receipt = state["receipts"][row["rcept_no"]]
+        receipt["parse_attempt_count"] = 7
+        folio.apply_listing_row(state, row)
+        self.assertEqual(receipt["parse_attempt_count"], 7)
+        folio.apply_listing_row(state, {**row, "stock_code": CODE})
+        self.assertEqual(receipt["parse_attempt_count"], 0)
+
+    def test_current_receipt_identity_conflict_excludes_value(self):
+        state = state_with_holding()
+        folio.apply_listing_row(state, listing(OLD, stock_code="000660"))
+        self.assertEqual(state["unresolved"][OLD], "security_identity_conflict")
+        snapshot = make_snapshot(state, {CODE: quote()}, datetime(2026, 9, 23, 8, tzinfo=timezone.utc))
+        self.assertEqual(snapshot["holdings"][0]["latestUnresolvedReceiptNo"], OLD)
+        self.assertEqual(snapshot["holdings"][0]["valuationExclusionReason"], "latest_filing_unresolved")
+        self.assertIsNone(snapshot["estimatedValue"])
+
     def test_newest_failed_filing_survives_older_successful_holding_replacement(self):
         state = state_with_holding()
         earlier, latest = "20260923000001", "20260923000002"
@@ -129,7 +234,7 @@ class ReviewFixTests(unittest.TestCase):
             "quantity": "200", "company_ownership_percent": "6", "evidence": "legacy_json_parser_result",
             "origin": "legacy_import"}
         state["unresolved"][new_no] = "metadata_missing"
-        with patch.object(folio, "dart_json", return_value={"status": "000", "total_page": "1", "total_count": "1",
+        with patch.object(folio, "dart_json", return_value={"status": "000", "page_no": "1", "total_page": "1", "total_count": "1",
                 "list": [listing(new_no, corp_code=new_corp, stock_code=new_code)]}) as api:
             recovery = folio.recover_metadata(state, "test-key")
         self.assertEqual(recovery["references_matched"], 1)
