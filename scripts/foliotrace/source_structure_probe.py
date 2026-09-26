@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.foliotrace.secondary import fetch_source_document
 
 RECEIPTS = ("20060124800040", "20081007000289", "20030909000232",
-            "20090227000244", "20260908000302", "20260623000336")
+            "20090227000244", "20260908000302", "20260623000336",
+            "20260515002914", "20251114002334")
 NPS = re.compile(r"국민연금(?:관리)?공단|National Pension Service", re.I)
 TAG = re.compile(r"<[^>]*>", re.S)
 ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
@@ -55,10 +56,13 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
         date_rows = []
         ownership_context_rows = []
         ownership_adjacent_rows = []
-        if receipt_no in ("20060124800040", "20081007000289"):
+        target_rows = []
+        if receipt_no in ("20060124800040", "20081007000289", "20260515002914", "20251114002334"):
             all_rows = list(ROWS.finditer(decoded))
             anchors = [index for index, match in enumerate(all_rows) if
-                       (NPS.search(match.group(0)) or "발행주식총수" in match.group(0))]
+                       (NPS.search(match.group(0)) or "발행주식총수" in match.group(0) or
+                        receipt_no in ("20260515002914", "20251114002334") and
+                        ("122,062,497" in match.group(0) or "9,954,722" in match.group(0)))]
             nearby = sorted({position for anchor in anchors for position in range(max(0, anchor - 2),
                             min(len(all_rows), anchor + 3))})[:40]
             for position in nearby:
@@ -68,7 +72,7 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                     "cells": [clean(cell, 80) for cell in CELLS.findall(match.group(0))[:16]]})
         for row in ROWS.finditer(decoded):
             source_row = row.group(0)
-            if receipt_no in ("20060124800040", "20081007000289"):
+            if receipt_no in ("20060124800040", "20081007000289", "20260515002914", "20251114002334"):
                 plain_row = clean(source_row, 600)
                 if (re.search(r"발행\s*주식\s*총수|총발행\s*주식|소유\s*주식|보유\s*비율|주식\s*교환|주식\s*이전|기준일|이번보고서제출일|최대주주등", plain_row)
                         and len(ownership_context_rows) < 40):
@@ -80,7 +84,9 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                 r"이번보고서|직전보고서|증\s*감|보고서작성기준일", source_row)
             historical_date_row = receipt_no in ("20060124800040", "20081007000289") and re.search(
                 r"2006년\s*02월\s*01일|2008년\s*9월\s*26일|2008년\s*9월\s*29일", source_row)
-            if NPS.search(source_row) or direct_basis_row or historical_date_row:
+            target_row = receipt_no in ("20260515002914", "20251114002334") and re.search(
+                r"9,954,722|122,062,497|2025년\s*08월\s*22일|2025\.08\.22", source_row)
+            if NPS.search(source_row) or direct_basis_row or historical_date_row or target_row:
                 neighborhood = decoded[max(0, row.start() - 1500):min(len(decoded), row.end() + 300)]
                 item = {"cells": [clean(cell, 80) for cell in CELLS.findall(source_row)[:20]],
                              "acodes": ACODES.findall(source_row)[:20],
@@ -95,6 +101,8 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                     basis_rows.append(item)
                 if historical_date_row and len(date_rows) < 12:
                     date_rows.append(item)
+                if target_row and len(target_rows) < 24:
+                    target_rows.append(item)
             if len(rows) >= 12 and len(basis_rows) >= 12 and len(date_rows) >= 12:
                 break
         if rows or NPS.search(decoded):
@@ -105,6 +113,7 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                                     "date_rows": date_rows,
                                     "ownership_context_rows": ownership_context_rows,
                                     "ownership_adjacent_rows": ownership_adjacent_rows,
+                                    "target_rows": target_rows,
                                     "nps_mentions": len(NPS.findall(decoded)),
                                     "date_tokens": [clean(item, 40) for item in dates]})
     result["archive_status"] = "parsed"
