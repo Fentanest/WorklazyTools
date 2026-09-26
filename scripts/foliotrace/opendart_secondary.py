@@ -712,7 +712,8 @@ def _prune_source_cache(state: dict, ledger: dict) -> int:
         return 0
     keep = set(ledger.get("queue", {})) | set(ledger.get("positives", {}))
     for key in ("secondary_backfill", "secondary_equity_backfill",
-                "secondary_prior_backfill", "secondary_prior_equity_backfill"):
+                "secondary_prior_backfill", "secondary_prior_equity_backfill",
+                "secondary_prior_q1_backfill"):
         other = state.get(key) or {}
         for document_key in (other.get("candidates") or {}):
             keep.add(document_key.split(":", 1)[0])

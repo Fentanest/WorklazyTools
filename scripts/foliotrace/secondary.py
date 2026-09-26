@@ -1009,13 +1009,14 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         raise ValueError("invalid secondary search bounds")
     if review_limit and not key:
         raise ValueError("DART_API_KEY unavailable")
-    if scope not in ("all", "equity", "prior-all", "prior-equity"):
+    if scope not in ("all", "equity", "prior-all", "prior-equity", "prior-q1"):
         raise ValueError("invalid secondary scope")
     if source_receipt is not None and (not source_only or not RECEIPT.fullmatch(source_receipt)):
         raise ValueError("invalid source receipt selection")
     ledger_key = {"all": "secondary_backfill", "equity": "secondary_equity_backfill",
                   "prior-all": "secondary_prior_backfill",
-                  "prior-equity": "secondary_prior_equity_backfill"}[scope]
+                  "prior-equity": "secondary_prior_equity_backfill",
+                  "prior-q1": "secondary_prior_q1_backfill"}[scope]
     method = METHOD + ("-equity" if scope.endswith("equity") else "")
     if fetch is fetch_search_page and scope.endswith("equity"):
         fetch = lambda term, first, last, page: fetch_search_page(term, first, last, page, dsp_type="D")

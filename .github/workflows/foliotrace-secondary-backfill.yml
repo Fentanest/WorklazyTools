@@ -69,6 +69,17 @@ jobs:
             --state foliotrace-state/state.json \
             --max-listing-pages 250 --max-windows 20 --parse-limit 20
 
+      - name: Search DART filings before April 1999
+        id: prior_q1
+        if: ${{ !inputs.review_only }}
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: |
+          python3 scripts/foliotrace/run_secondary_lane.py \
+            --state foliotrace-state/state.json --scope prior-q1 \
+            --max-pages 100 --max-windows 20 --review-limit 20
+
       - name: Search early equity and voting documents
         id: equity
         if: ${{ !inputs.review_only }}
@@ -129,7 +140,7 @@ jobs:
         run: |
           args=()
           if [ -n "$SOURCE_RECEIPT" ]; then args+=(--source-receipt "$SOURCE_RECEIPT"); fi
-          for scope in equity prior-equity prior-all all; do
+          for scope in prior-q1 equity prior-equity prior-all all; do
             python3 scripts/foliotrace/review_sources.py \
               --state foliotrace-state/state.json --scope "$scope" \
               --review-limit 20 "${args[@]}"
@@ -150,5 +161,5 @@ jobs:
           fi
 
       - name: Require successful secondary search batch
-        if: ${{ steps.source_review.outcome != 'success' || (!inputs.review_only && (steps.early_direct.outcome != 'success' || steps.equity.outcome != 'success' || steps.prior_equity.outcome != 'success' || steps.prior_all.outcome != 'success' || steps.search.outcome != 'success')) }}
+        if: ${{ steps.source_review.outcome != 'success' || (!inputs.review_only && (steps.early_direct.outcome != 'success' || steps.prior_q1.outcome != 'success' || steps.equity.outcome != 'success' || steps.prior_equity.outcome != 'success' || steps.prior_all.outcome != 'success' || steps.search.outcome != 'success')) }}
         run: exit 1

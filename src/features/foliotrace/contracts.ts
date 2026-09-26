@@ -128,6 +128,7 @@ export interface Snapshot {
     searchStartDate: IsoDate
     searchTargetDate: IsoDate
     priorContentCheckedThrough: IsoDate | null
+    priorQ1CheckedThrough?: IsoDate | null
     priorEquityCheckedThrough: IsoDate | null
     allContentCheckedThrough: IsoDate | null
     equityContentCheckedThrough: IsoDate | null

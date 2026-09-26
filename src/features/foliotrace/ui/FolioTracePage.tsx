@@ -72,6 +72,7 @@ const STR = {
     secondaryAll: "전체 공시 내용 검색으로 확인한 날짜",
     secondaryEquity: "지분·의결권 공시 내용으로 확인한 날짜",
     secondaryPriorAll: "1999~2005 전체 공시에서 확인한 날짜",
+    secondaryPriorQ1: "1999년 1~3월 공시에서 확인한 날짜",
     secondaryPriorEquity: "1999~2005 지분·의결권 공시에서 확인한 날짜",
     secondaryDirect: "2006~2008 국민연금 제출 공시에서 확인한 날짜",
     secondaryCandidates: "검색에서 찾은 공시",
@@ -236,6 +237,7 @@ const STR = {
     secondaryAll: "All filing contents searched through",
     secondaryEquity: "Ownership and voting filings searched through",
     secondaryPriorAll: "1999–2005 filings searched through",
+    secondaryPriorQ1: "1999 January–March filings searched through",
     secondaryPriorEquity: "1999–2005 ownership and voting filings searched through",
     secondaryDirect: "2006–2008 NPS-submitted filings checked through",
     secondaryCandidates: "Filings found in search",
@@ -622,6 +624,7 @@ function ReadyView({
                 <span>{t.secondaryAll}: {snapshot.secondaryCoverage.allContentCheckedThrough ?? "—"}</span>
                 <span>{t.secondaryEquity}: {snapshot.secondaryCoverage.equityContentCheckedThrough ?? "—"}</span>
                 <span>{t.secondaryPriorAll}: {snapshot.secondaryCoverage.priorContentCheckedThrough ?? "—"}</span>
+                <span>{t.secondaryPriorQ1}: {snapshot.secondaryCoverage.priorQ1CheckedThrough ?? "—"}</span>
                 <span>{t.secondaryPriorEquity}: {snapshot.secondaryCoverage.priorEquityCheckedThrough ?? "—"}</span>
                 <span>{t.secondaryDirect}: {snapshot.secondaryCoverage.earlyDirectCheckedThrough ?? "—"}</span>
                 <span>{t.secondaryCandidates}: {snapshot.secondaryCoverage.candidateDocumentCount}</span>

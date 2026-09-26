@@ -157,11 +157,12 @@ function validSecondaryCoverage(value: unknown): boolean {
   if (!isRecord(value) || !str(value.searchStartDate) || !str(value.searchTargetDate) ||
       !isoDate(value.searchStartDate) || !isoDate(value.searchTargetDate)) return false
   const target = value.searchTargetDate
-  const checked = [value.priorContentCheckedThrough, value.priorEquityCheckedThrough,
+  const checked = [value.priorContentCheckedThrough, value.priorQ1CheckedThrough, value.priorEquityCheckedThrough,
     value.allContentCheckedThrough, value.equityContentCheckedThrough,
     value.earlyDirectCheckedThrough]
   return checked.every((date) => date === null || (str(date) && isoDate(date) && date <= target)) &&
     nullable(value.priorContentCheckedThrough, isoDate) &&
+    (value.priorQ1CheckedThrough === undefined || nullable(value.priorQ1CheckedThrough, isoDate)) &&
     nullable(value.priorEquityCheckedThrough, isoDate) &&
     nullable(value.allContentCheckedThrough, isoDate) &&
     nullable(value.equityContentCheckedThrough, isoDate) &&

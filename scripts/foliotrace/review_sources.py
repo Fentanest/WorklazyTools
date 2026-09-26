@@ -16,14 +16,15 @@ from scripts.foliotrace import folio, secondary
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", type=Path, required=True)
-    parser.add_argument("--scope", choices=("all", "equity", "prior-all", "prior-equity"), required=True)
+    parser.add_argument("--scope", choices=("all", "equity", "prior-all", "prior-equity", "prior-q1"), required=True)
     parser.add_argument("--review-limit", type=int, default=20)
     parser.add_argument("--source-receipt")
     args = parser.parse_args()
     state = folio.read_json(args.state)
     ledger = state.get({"all": "secondary_backfill", "equity": "secondary_equity_backfill",
                         "prior-all": "secondary_prior_backfill",
-                        "prior-equity": "secondary_prior_equity_backfill"}[args.scope])
+                        "prior-equity": "secondary_prior_equity_backfill",
+                        "prior-q1": "secondary_prior_q1_backfill"}[args.scope])
     if ledger is None:
         print(json.dumps({"status": "SOURCE_LEDGER_NOT_INITIALIZED", "scope": args.scope}))
         return 0

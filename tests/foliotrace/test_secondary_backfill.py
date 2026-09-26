@@ -30,6 +30,36 @@ NOISE = ("20060208000286", "1252220", "회사", "투자설명서",
 
 
 class SecondaryBackfillTests(unittest.TestCase):
+    def test_prior_q1_search_preserves_later_cursor_and_reports_partial_coverage(self):
+        day = date(1999, 1, 4)
+        old = ("19990104000001", "10088", "케이티", "사업보고서",
+               "국민연금관리공단 보통주 7.40%", "1999.01.04")
+        answers = {term: result_page([old] if index == 0 else [])
+                   for index, term in enumerate(secondary.TERMS)}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = folio.empty_state()
+            state["secondary_prior_backfill"] = {"method": secondary.METHOD,
+                "start_date": "1999-04-01", "target_date": "2005-12-31",
+                "next_date": "1999-04-02", "coverage": [],
+                "candidates": {}}
+            folio.write_json(path, state)
+            result = secondary.scan_secondary(path, day, day, scope="prior-q1",
+                fetch=lambda term, *_: answers[term], read_state=folio.read_json,
+                write_state=folio.write_json)
+            saved = folio.read_json(path)
+            self.assertEqual(result["status"], "SEARCH_COMPLETE")
+            self.assertEqual(saved["secondary_prior_q1_backfill"]["next_date"], "1999-01-05")
+            self.assertEqual(saved["secondary_prior_backfill"]["next_date"], "1999-04-02")
+            self.assertEqual(len(saved["secondary_prior_q1_backfill"]["candidates"]), 1)
+            coverage = make_snapshot(saved, {})["secondaryCoverage"]
+            self.assertEqual(coverage["priorQ1CheckedThrough"], "1999-01-04")
+            self.assertEqual(coverage["searchStartDate"], "1999-04-01")
+            again = secondary.scan_secondary(path, day, day, scope="prior-q1",
+                fetch=lambda *_: self.fail("completed Q1 window was fetched again"),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(again["search_requests"], 0)
+
     def test_1998_dated_five_percent_register_requires_same_day_all_common_denominator(self):
         def row(*cells):
             return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'

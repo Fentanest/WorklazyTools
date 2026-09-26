@@ -291,12 +291,13 @@ def make_snapshot(state, quotes, now=None):
     secondary = state.get("secondary_backfill") or {}
     equity = state.get("secondary_equity_backfill") or {}
     prior = state.get("secondary_prior_backfill") or {}
+    prior_q1 = state.get("secondary_prior_q1_backfill") or {}
     prior_equity = state.get("secondary_prior_equity_backfill") or {}
     early_direct = state.get("early_direct_backfill") or {}
-    if any(item.get("coverage") for item in (secondary, equity, prior, prior_equity, early_direct)):
+    if any(item.get("coverage") for item in (secondary, equity, prior, prior_q1, prior_equity, early_direct)):
         from scripts.foliotrace.secondary import decode_noncandidate_keys
         candidates = {}
-        for lane in (secondary, equity, prior, prior_equity):
+        for lane in (secondary, equity, prior, prior_q1, prior_equity):
             for key, item in (lane.get("candidates") or {}).items():
                 previous = candidates.get(key)
                 if previous is None or (previous.get("review_status") == "source_review_pending" and
@@ -304,7 +305,7 @@ def make_snapshot(state, quotes, now=None):
                     candidates[key] = item
         noncandidate_ids = set()
         reviews = {}
-        for lane in (secondary, equity, prior, prior_equity):
+        for lane in (secondary, equity, prior, prior_q1, prior_equity):
             for window in lane.get("coverage") or []:
                 noncandidate_ids.update(decode_noncandidate_keys(window))
             for key, item in (lane.get("noncandidate_reviews") or {}).items():
@@ -318,12 +319,14 @@ def make_snapshot(state, quotes, now=None):
         noncandidate_context = sum(reviews.get(key, {}).get("review_status") ==
                                    "source_context_review_pending" for key in noncandidate_ids)
         snapshot["secondaryCoverage"] = {
-            "searchStartDate": prior.get("start_date") or prior_equity.get("start_date") or
+            "searchStartDate": (prior_q1.get("start_date") if prior_q1.get("next_date") == "1999-04-01" else None) or
+                               prior.get("start_date") or prior_equity.get("start_date") or
                                secondary.get("start_date") or equity.get("start_date") or "2006-01-01",
             "searchTargetDate": secondary.get("target_date") or state.get("latest_complete_listing_date") or
                                 early_direct.get("target_date") or equity.get("target_date") or
                                 prior.get("target_date") or prior_equity.get("target_date"),
             "priorContentCheckedThrough": prior["coverage"][-1]["to"] if prior.get("coverage") else None,
+            "priorQ1CheckedThrough": prior_q1["coverage"][-1]["to"] if prior_q1.get("coverage") else None,
             "priorEquityCheckedThrough": prior_equity["coverage"][-1]["to"] if prior_equity.get("coverage") else None,
             "allContentCheckedThrough": secondary["coverage"][-1]["to"] if secondary.get("coverage") else None,
             "equityContentCheckedThrough": equity["coverage"][-1]["to"] if equity.get("coverage") else None,

@@ -208,6 +208,7 @@ def empty_state():
             "historical_backfill": None, "early_direct_backfill": None,
             "secondary_backfill": None, "secondary_equity_backfill": None,
             "secondary_prior_backfill": None, "secondary_prior_equity_backfill": None,
+            "secondary_prior_q1_backfill": None,
             "secondary_source_cache": {},
             "direct_ratio_basis": {}, "indirect_observations": {}, "indirect_invalidations": {},
             "legacy_coverage_status": "unverified", "legacy_resume_hint": None,
@@ -1705,7 +1706,7 @@ def main():
     q.add_argument("--max-pages", type=int, default=300)
     q.add_argument("--max-windows", type=int, default=20)
     q.add_argument("--review-limit", type=int, default=30)
-    q.add_argument("--scope", choices=("all", "equity", "prior-all", "prior-equity"), default="all")
+    q.add_argument("--scope", choices=("all", "equity", "prior-all", "prior-equity", "prior-q1"), default="all")
     q = sub.add_parser("record-reviewed-evidence")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--fact", type=Path, required=True)
@@ -1757,8 +1758,10 @@ def main():
         elif args.command == "scan-secondary":
             from scripts.foliotrace.secondary import scan_secondary
             state = read_json(args.state)
-            start = args.start or (date(1999, 4, 1) if args.scope.startswith("prior-") else date(2006, 1, 1))
-            target = args.end or (date(2005, 12, 31) if args.scope.startswith("prior-") else
+            start = args.start or (date(1999, 1, 1) if args.scope == "prior-q1" else
+                                   date(1999, 4, 1) if args.scope.startswith("prior-") else date(2006, 1, 1))
+            target = args.end or (date(1999, 3, 31) if args.scope == "prior-q1" else
+                                  date(2005, 12, 31) if args.scope.startswith("prior-") else
                                   date(2008, 12, 31) if args.scope == "equity" else
                                   date.fromisoformat(state["latest_complete_listing_date"]))
             if target > kst_today():
