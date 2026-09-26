@@ -120,16 +120,16 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Excluded: below 5% ownership",
   },
   security_mapping_unverified: {
-    ko: "공시의 주식 종류와 종목을 확인하지 못해 평가에서 제외",
-    en: "Excluded: the filing's share class and listed security could not be matched",
+    ko: "공시된 주식이 어떤 상장 종목인지 확인되지 않아 평가에서 제외",
+    en: "Excluded: the reported shares could not be linked to a listed security",
   },
   quantity_unverified: {
     ko: "수량이 확인되지 않아 평가에서 제외",
     en: "Excluded: quantity unverified",
   },
   scope_comparison_unverified: {
-    ko: "다른 공시의 지분율은 확인했지만 직접 공시의 보유 범위·평가 수량과 연결되지 않아 금액은 제외",
-    en: "Value excluded: the separately reported stake cannot yet be matched to the direct filing's holding scope and valued quantity",
+    ko: "다른 공시의 지분율은 확인했지만 평가에 쓸 주식 수와 연결할 수 없어 금액은 제외",
+    en: "Value excluded: ownership was confirmed in another filing, but the share count needed for valuation could not be matched",
   },
   same_basis_observation_conflict: {
     ko: "같은 기준일의 공시 수치가 달라 평가에서 제외",
@@ -144,8 +144,8 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Excluded: no verified closing price",
   },
   quote_date_or_session_mismatch: {
-    ko: "종가 날짜 또는 정규장 가격 여부를 확인하지 못해 평가에서 제외",
-    en: "Excluded: the closing-price date or regular trading price could not be confirmed",
+    ko: "가격 날짜나 정규장 마감 가격인지 확인되지 않아 평가에서 제외",
+    en: "Excluded: the price date or regular-session closing price could not be confirmed",
   },
   quote_basis_unverified: {
     ko: "가격 기준이 확인되지 않아 평가에서 제외",

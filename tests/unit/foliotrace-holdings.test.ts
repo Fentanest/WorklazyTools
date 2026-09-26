@@ -261,11 +261,11 @@ test("every known exclusion reason maps to ko/en text, never the raw code", () =
   assert.equal(exclusionReasonLabel("tracking_exit", "ko"), "5% 미만이라 평가에서 제외");
   assert.equal(
     exclusionReasonLabel("security_mapping_unverified", "ko"),
-    "공시의 주식 종류와 종목을 확인하지 못해 평가에서 제외",
+    "공시된 주식이 어떤 상장 종목인지 확인되지 않아 평가에서 제외",
   );
   assert.equal(
     exclusionReasonLabel("quote_date_or_session_mismatch", "en"),
-    "Excluded: the closing-price date or regular trading price could not be confirmed",
+    "Excluded: the price date or regular-session closing price could not be confirmed",
   );
   assert.equal(
     exclusionReasonLabel("latest_filing_unresolved", "ko"),

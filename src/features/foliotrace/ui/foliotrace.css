@@ -296,10 +296,6 @@
   border-top: 0;
 }
 
-.foliotrace-history small {
-  color: var(--label-secondary, #636369);
-}
-
 /* History values sit outside any scroll container, so they wrap like
  * summary values instead of inheriting the table's nowrap alignment. */
 .foliotrace-history .foliotrace-num {

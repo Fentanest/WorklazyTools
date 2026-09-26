@@ -706,11 +706,19 @@ def _archived_stale_count(ledger: dict) -> int:
 
 
 def _prune_source_cache(state: dict, ledger: dict) -> int:
-    """Drop cache rows for receipts that are neither queued nor positive."""
+    """Drop unreferenced cache rows without evicting other search lanes' work."""
     cache = state.get("secondary_source_cache")
     if not isinstance(cache, dict):
         return 0
     keep = set(ledger.get("queue", {})) | set(ledger.get("positives", {}))
+    for key in ("secondary_backfill", "secondary_equity_backfill",
+                "secondary_prior_backfill", "secondary_prior_equity_backfill"):
+        other = state.get(key) or {}
+        for document_key in (other.get("candidates") or {}):
+            keep.add(document_key.split(":", 1)[0])
+        for document_key in (other.get("noncandidate_reviews") or {}):
+            keep.add(document_key.split(":", 1)[0])
+    keep.update(state.get("target_source_candidates") or {})
     pruned = [key for key in cache if key not in keep]
     for key in pruned:
         del cache[key]

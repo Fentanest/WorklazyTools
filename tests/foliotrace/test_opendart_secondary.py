@@ -1929,6 +1929,38 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(result["cache_pruned"], 2)
             self.assertEqual(sorted(folio.read_json(path)["secondary_source_cache"]), [live_no])
 
+    def test_source_cache_keeps_receipts_owned_by_other_search_lanes(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+        all_no, prior_no, noncandidate_no, target_no, orphan_no = (receipt(tag, n) for n in range(11, 16))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": "2006-02-09",
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [], "queue": {}, "positives": {}}
+            state["secondary_backfill"] = {"candidates": {f"{all_no}:1": {}}}
+            state["secondary_prior_backfill"] = {"candidates": {f"{prior_no}:2": {}}}
+            state["secondary_prior_equity_backfill"] = {
+                "noncandidate_reviews": {f"{noncandidate_no}:3": {}}}
+            state["target_source_candidates"] = {target_no: {}}
+            state["secondary_source_cache"] = {
+                no: {"status": "source_context_review_pending", "parser_version": current}
+                for no in (all_no, prior_no, noncandidate_no, target_no, orphan_no)}
+            folio.write_json(path, state)
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0,
+                fetch_list=lambda _params: self.fail("completed range refetched"),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(result["cache_pruned"], 1)
+            self.assertEqual(set(folio.read_json(path)["secondary_source_cache"]),
+                             {all_no, prior_no, noncandidate_no, target_no})
+
     def test_completion_reflects_overlap_and_archive_backlog(self):
         day = date(2006, 2, 8)
         tag = "20060208"
