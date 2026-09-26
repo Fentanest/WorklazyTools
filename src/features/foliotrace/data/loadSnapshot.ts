@@ -53,7 +53,7 @@ function validHistoricalObservation(value: unknown): boolean {
     decimal(value.quantity) && decimal(value.ownershipPercent) &&
     isoDate(value.basisDate) && isoDate(value.filingDate) &&
     str(value.receiptNo) && RECEIPT.test(value.receiptNo) &&
-    str(value.documentNo) && /^\d+$/.test(value.documentNo) &&
+    nullable(value.documentNo, item => str(item) && /^\d+$/.test(item)) &&
     str(value.sourceRowSha256) && VERSION.test(value.sourceRowSha256) &&
     ((value.ratioDenominator === 'unverified' && value.status === 'historical_only_ratio_basis_unverified') ||
       (value.ratioDenominator === 'issued_shares' && value.status === 'historical_only_denominator_date_unverified')) &&

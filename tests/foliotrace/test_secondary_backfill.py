@@ -8,7 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.foliotrace import folio, secondary
-from pipeline.foliotrace.publish import make_snapshot
+from pipeline.foliotrace.indirect import register_evidence
+from pipeline.foliotrace.publish import encoded, make_snapshot
 
 
 def result_page(rows, total=None, page=1, pages=1):
@@ -29,6 +30,89 @@ NOISE = ("20060208000286", "1252220", "회사", "투자설명서",
 
 
 class SecondaryBackfillTests(unittest.TestCase):
+    def test_complete_parsed_source_claim_enters_current_without_double_history(self):
+        state = folio.empty_state()
+        corp, stock, direct_no = '00126380', '005930', '20260302000001'
+        state['universe'][corp] = {'corp_code': corp, 'stock_code': stock, 'name': '삼성전자'}
+        state['receipts'][direct_no] = {'receipt_no': direct_no, 'receipt_date': '2026-03-02',
+            'corp_code': corp, 'stock_code': stock, 'quantity': '480',
+            'company_ownership_percent': '4.80', 'evidence': 'dart_document'}
+        state['holdings'][corp] = {'corp_code': corp, 'stock_code': stock, 'name': '삼성전자',
+            'receipt_no': direct_no, 'receipt_date': '2026-03-02', 'holding_date': '2026-03-01',
+            'quantity': '480', 'company_ownership_percent': '4.80', 'security_kind': 'common',
+            'tracking': 'below-5-percent', 'evidence': 'dart_document'}
+        register_evidence(state, {'kind': 'direct_ratio_basis', 'direct_receipt_no': direct_no,
+            'source_document_no': None, 'corp_code': corp, 'stock_code': stock,
+            'security_kind': 'common', 'ratio_denominator': 'issued_shares',
+            'holder_scope': 'nps_only', 'basis_date': '2026-03-01',
+            'basis_kind': 'explicit_actual_holding', 'source_document_sha256': 'a' * 64,
+            'source_section_sha256': 'b' * 64, 'verified_at': '2026-09-27T00:00:00Z'})
+        claim = {'status': 'actual_holding_basis_verified', 'row_sha256': 'c' * 64,
+            'row_offset': 100, 'source_file_sha256': 'd' * 64,
+            'basis_date': '2026-06-01', 'basis_evidence': 'explicit_same_row',
+            'quantity': '505', 'ownership_percent': '5.05', 'security_kind': '보통주',
+            'ratio_denominator': 'issued_shares', 'denominator_quantity': '10000',
+            'denominator_date': '2026-06-01', 'denominator_evidence': 'explicit_same_date',
+            'issuer_corp_code': corp, 'stock_code': stock,
+            'issuer_identity_sha256': 'e' * 64, 'holder_scope': 'nps_only',
+            'owner_identity': 'nps_confirmed', 'filer_corp_code': '00126381',
+            'source_status': 'no_known_correction_or_withdrawal'}
+        candidate = {'receipt_no': '20260602000001', 'document_no': None,
+            'filing_date': '2026-06-02', 'filing_company': '삼성전자',
+            'source_archive_sha256': 'f' * 64, 'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_checked_at': '2026-09-27T00:00:00Z', 'source_claims': [claim]}
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 1)
+        self.assertEqual(candidate['current_application_status'], 'comparable_source_registered')
+        snap = make_snapshot(state, {})
+        self.assertEqual((snap['holdings'][0]['companyOwnershipPercent'], snap['holdings'][0]['tracking']),
+                         ('5.05', 'active'))
+        self.assertEqual((snap['holdings'][0]['quantity'], snap['holdings'][0]['estimatedValue']),
+                         ('505', None))
+        self.assertEqual((len(snap['verifiedIndirectObservations']), len(snap['historicalObservations'])), (1, 0))
+        self.assertEqual(snap['events'][0]['kind'], 'tracking-reentry')
+        before = encoded(state)
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 0)
+        self.assertEqual(encoded(state), before)
+        held = {**candidate, 'receipt_no': '20260602000002', 'correction_hold': True}
+        held['source_claims'] = [{**claim, 'row_sha256': '1' * 64}]
+        secondary.retain_verified_historical_claims(state, held)
+        self.assertEqual(held['current_application_status'], 'comparable_source_basis_pending')
+        self.assertEqual(len(state['indirect_observations']), 1)
+
+    def test_stored_opendart_positive_replays_then_withdrawal_holds_observation(self):
+        state = folio.empty_state()
+        corp, stock, no = '00126380', '005930', '20260602000001'
+        state['universe'][corp] = {'corp_code': corp, 'stock_code': stock, 'name': '삼성전자'}
+        claim = {'status': 'actual_holding_basis_verified', 'row_sha256': 'a' * 64,
+            'row_offset': 100, 'source_file_sha256': 'b' * 64,
+            'basis_date': '2026-06-01', 'basis_evidence': 'explicit_same_row',
+            'quantity': '505', 'ownership_percent': '5.05', 'security_kind': '보통주',
+            'ratio_denominator': 'issued_shares', 'denominator_quantity': '10000',
+            'denominator_date': '2026-06-01', 'denominator_evidence': 'explicit_same_date',
+            'issuer_corp_code': corp, 'stock_code': stock,
+            'issuer_identity_sha256': 'c' * 64, 'holder_scope': 'nps_only',
+            'owner_identity': 'nps_confirmed', 'filer_corp_code': corp,
+            'source_status': 'no_known_correction_or_withdrawal'}
+        positive = {'receipt_no': no, 'corp_code': corp, 'corp_name': '삼성전자',
+            'rcept_dt': '20260602', 'document_no': None,
+            'correction_hold': False, 'withdrawal_flag': False}
+        state['opendart_secondary_backfill'] = {'positives': {no: positive},
+            'queue': {no: {'correction_hold': False, 'withdrawal_flag': False}}}
+        state['secondary_source_cache'][no] = {
+            'status': 'source_context_review_pending', 'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_archive_sha256': 'd' * 64, 'source_claims': [claim]}
+        result = secondary.replay_opendart_positives(state)
+        self.assertEqual((result['checked'], result['comparable_registered']), (1, 1))
+        self.assertEqual(make_snapshot(state, {})['holdings'][0]['companyOwnershipPercent'], '5.05')
+        previous = encoded(state)
+        self.assertEqual(secondary.replay_opendart_positives(state)['comparable_registered'], 0)
+        self.assertEqual(encoded(state), previous)
+        state['opendart_secondary_backfill']['positives'].pop(no)
+        state['opendart_secondary_backfill']['queue'][no].update(correction_hold=True, withdrawal_flag=True)
+        secondary.replay_opendart_positives(state)
+        self.assertEqual(make_snapshot(state, {})['holdings'], [])
+        self.assertEqual(len(state['indirect_observations']), 1)
+
     def test_disconnected_search_retries_and_reports_only_safe_transport_code(self):
         day = date(2006, 2, 8)
         payload = result_page([POSCO])

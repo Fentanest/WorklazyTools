@@ -1710,6 +1710,9 @@ def main():
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--fact", type=Path, required=True)
     q.add_argument("--commit", action="store_true")
+    q = sub.add_parser("replay-positive-sources")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--limit", type=int, default=100)
     q = sub.add_parser("recheck-basis")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--receipt", required=True)
@@ -1766,6 +1769,17 @@ def main():
                                     scope=args.scope)
         elif args.command == "record-reviewed-evidence":
             result = record_reviewed_evidence(args.state, args.fact, args.commit)
+        elif args.command == "replay-positive-sources":
+            from scripts.foliotrace.secondary import replay_opendart_positives
+            if not 1 <= args.limit <= 1000:
+                raise ValueError("POSITIVE_REPLAY_LIMIT")
+            state = read_json(args.state)
+            before = encoded(state)
+            result = replay_opendart_positives(state, limit=args.limit)
+            result["changed"] = encoded(state) != before
+            if result["changed"]:
+                state["revision"] += 1
+                write_json(args.state, state)
         elif args.command == "recheck-basis":
             state = read_json(args.state)
             result = recheck_direct_basis(state, os.environ.get("DART_API_KEY", ""), limit=1,

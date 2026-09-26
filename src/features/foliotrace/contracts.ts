@@ -147,7 +147,7 @@ export interface Snapshot {
     basisDate: IsoDate
     filingDate: IsoDate
     receiptNo: string
-    documentNo: string
+    documentNo: string | null
     sourceRowSha256: string
     ratioDenominator: 'unverified' | 'issued_shares'
     denominatorQuantity?: DecimalString | null

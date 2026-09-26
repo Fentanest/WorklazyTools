@@ -24,6 +24,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html.parser import HTMLParser
 from pathlib import Path
 
+from pipeline.foliotrace.indirect import register_evidence
+
 TERMS = ("국민연금공단", "국민연금관리공단", "National Pension Service")
 PAGE_SIZE = 10  # DART search.ax serves ten rows even when maxResults is larger.
 MAX_SITE_PAGES = 100
@@ -394,8 +396,10 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
             candidate["application_status"] = "issuer_identity_unverified"
             continue
         corp, company = matches[0]
-        key = (f'{candidate["receipt_no"]}:{candidate["document_no"]}:{corp}:'
+        key = (f'{candidate["receipt_no"]}:{candidate["document_no"] or "-"}:{corp}:'
                f'{company["stock_code"]}:{claim["basis_date"]}:{claim["row_sha256"]}')
+        register_comparable_source_claim(state, candidate, claim, corp, company)
+        comparable = candidate.get("current_application_status") == "comparable_source_registered"
         fact = {"source_receipt_no": candidate["receipt_no"],
                 "source_document_no": candidate["document_no"],
                 "source_filing_date": candidate["filing_date"],
@@ -412,8 +416,8 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
                 "denominator_evidence": claim.get("denominator_evidence"),
                 "basis_date": claim["basis_date"], "basis_evidence": claim["basis_evidence"],
                 "quantity": claim["quantity"], "ownership_percent": claim["ownership_percent"],
-                "observation_status": ("historical_only_denominator_date_unverified"
-                    if claim.get("ratio_denominator") == "issued_shares" else
+                "observation_status": ("historical_comparable_registered" if comparable else
+                    "historical_only_denominator_date_unverified" if claim.get("ratio_denominator") == "issued_shares" else
                     "historical_only_ratio_basis_unverified")}
         if facts.get(key) is None:
             facts[key] = fact
@@ -424,8 +428,10 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
                     "source_file_sha256", "source_row_sha256", "corp_code", "stock_code", "security_kind",
                     "holder_scope", "basis_date", "quantity", "ownership_percent")
             if (all(prior.get(field) == fact.get(field) for field in core) and
-                    prior.get("ratio_denominator") == "unverified" and
-                    fact["ratio_denominator"] == "issued_shares"):
+                    ((prior.get("ratio_denominator") == "unverified" and
+                      fact["ratio_denominator"] == "issued_shares") or
+                     (prior.get("ratio_denominator") == fact["ratio_denominator"] and
+                      fact["observation_status"] == "historical_comparable_registered"))):
                 facts[key] = fact
                 candidate["application_status"] = "historical_fact_enriched"
                 created += 1
@@ -437,10 +443,142 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
     return created
 
 
+def register_comparable_source_claim(state: dict, candidate: dict, claim: dict,
+                                     corp: str, company: dict) -> bool:
+    """Promote a parsed row only when its issuer, date, scope and source status are complete."""
+    fields = ("issuer_corp_code", "stock_code", "issuer_identity_sha256", "holder_scope",
+              "owner_identity", "filer_corp_code", "source_status", "denominator_date")
+    if (any(claim.get(field) is None for field in fields) or
+            claim["issuer_corp_code"] != corp or claim["stock_code"] != company["stock_code"] or
+            claim.get("denominator_date") != claim.get("basis_date") or
+            claim.get("ratio_denominator") not in ("shares_etc_total", "issued_shares", "voting_rights") or
+            claim.get("security_kind") not in ("보통주", "우선주") or
+            claim.get("owner_identity") != "nps_confirmed" or
+            (candidate.get("filer_corp_code") is not None and
+             claim.get("filer_corp_code") != candidate["filer_corp_code"]) or
+            claim.get("source_status") != "no_known_correction_or_withdrawal" or
+            candidate.get("correction_hold") or candidate.get("withdrawal_flag") or
+            not candidate.get("source_checked_at")):
+        candidate["current_application_status"] = "comparable_source_basis_pending"
+        return False
+    quantity = _number(str(claim.get("quantity") or ""))
+    denominator = _number(str(claim.get("denominator_quantity") or ""))
+    ratio = _number(str(claim.get("ownership_percent") or ""), maximum=100)
+    if quantity is None or denominator is None or ratio is None or Decimal(denominator) <= 0:
+        candidate["current_application_status"] = "comparable_source_math_pending"
+        return False
+    displayed = Decimal(ratio)
+    scale = Decimal(1).scaleb(displayed.as_tuple().exponent)
+    if Decimal(quantity) / Decimal(denominator) * 100 < 0 or (
+            Decimal(quantity) / Decimal(denominator) * 100).quantize(scale, rounding=ROUND_HALF_UP) != displayed:
+        candidate["current_application_status"] = "comparable_source_math_pending"
+        return False
+    fact = {"kind": "indirect_holding", "source_receipt_no": candidate["receipt_no"],
+            "source_document_no": candidate["document_no"],
+            "source_filing_date": candidate["filing_date"], "basis_date": claim["basis_date"],
+            "corp_code": corp, "filer_corp_code": claim["filer_corp_code"],
+            "stock_code": company["stock_code"],
+            "security_kind": "common" if claim["security_kind"] == "보통주" else "preferred",
+            "ownership_percent": claim["ownership_percent"], "quantity": claim["quantity"],
+            "numeric_kind": "exact", "source_file_sha256": claim["source_file_sha256"],
+            "source_row_sha256": claim["row_sha256"], "source_row_offset": claim["row_offset"],
+            "parser_version": candidate["parser_version"],
+            "ratio_denominator": claim["ratio_denominator"], "holder_scope": claim["holder_scope"],
+            "owner_identity": claim["owner_identity"], "basis_kind": "explicit_actual_holding",
+            "source_status": claim["source_status"],
+            "source_document_sha256": candidate["source_archive_sha256"],
+            "source_section_sha256": claim["row_sha256"],
+            "issuer_identity_sha256": claim["issuer_identity_sha256"],
+            "verified_at": candidate["source_checked_at"]}
+    key = ":".join((fact["source_receipt_no"], fact["source_document_no"] or "-", corp,
+                    company["stock_code"], fact["basis_date"], fact["source_row_sha256"]))
+    prior = state.get("indirect_observations", {}).get(key)
+    if prior:
+        fact["verified_at"] = prior["verified_at"]
+    try:
+        result = register_evidence(state, fact)
+    except ValueError:
+        candidate["current_application_status"] = "comparable_source_conflict"
+        return False
+    candidate["current_application_status"] = "comparable_source_registered"
+    return result["changed"]
+
+
 def needs_source_provenance(candidate: dict) -> bool:
     return any(claim.get("status") == "actual_holding_basis_verified" and
                (not candidate.get("source_archive_sha256") or not claim.get("source_file_sha256"))
                for claim in candidate.get("source_claims") or [])
+
+
+def replay_opendart_positives(state: dict, *, limit=100) -> dict:
+    """Recheck stored list-API positives through the shared parsed-source path."""
+    ledger = state.get("opendart_secondary_backfill") or {}
+    positives = ledger.get("positives") or {}
+    queue = ledger.get("queue") or {}
+    cache = state.get("secondary_source_cache") or {}
+    holds = state.setdefault("indirect_source_holds", {})
+    for no, item in queue.items():
+        if not RECEIPT.fullmatch(no):
+            continue
+        if item.get("correction_hold") or item.get("withdrawal_flag"):
+            holds[no] = "withdrawn" if item.get("withdrawal_flag") else "correction_relation_unverified"
+        elif no in positives:
+            holds.pop(no, None)
+    checked = pending = historical = registered = 0
+    for no, positive in sorted(positives.items()):
+        if checked >= limit:
+            break
+        if not RECEIPT.fullmatch(no) or positive.get("receipt_no") != no:
+            pending += 1
+            continue
+        check = cache.get(no) or {}
+        if (positive.get("correction_hold") or positive.get("withdrawal_flag") or no in holds or
+                check.get("parser_version") != SOURCE_PARSER_VERSION or
+                check.get("status") != "source_context_review_pending" or
+                not check.get("source_archive_sha256")):
+            positive["application_status"] = "source_or_relation_review_pending"
+            pending += 1
+            continue
+        raw_date = positive.get("rcept_dt") or ""
+        try:
+            filing_date = date(int(raw_date[:4]), int(raw_date[4:6]), int(raw_date[6:8])).isoformat()
+        except (ValueError, TypeError):
+            positive["application_status"] = "filing_date_unverified"
+            pending += 1
+            continue
+        if len(raw_date) != 8 or raw_date != filing_date.replace("-", ""):
+            positive["application_status"] = "filing_date_unverified"
+            pending += 1
+            continue
+        if not positive.get("source_checked_at"):
+            positive["source_checked_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        candidate = {"receipt_no": no, "document_no": None, "filing_date": filing_date,
+                     "filing_company": positive.get("corp_name"),
+                     "filer_corp_code": positive.get("corp_code"),
+                     "source_archive_sha256": check["source_archive_sha256"],
+                     "source_checked_at": positive["source_checked_at"],
+                     "parser_version": SOURCE_PARSER_VERSION,
+                     "correction_hold": positive.get("correction_hold"),
+                     "withdrawal_flag": positive.get("withdrawal_flag"),
+                     "source_claims": check.get("source_claims") or []}
+        # A full-text result may already carry the same verified row with its
+        # document number. Keep that richer provenance instead of duplicating it.
+        recorded = {(item.get("source_receipt_no"), item.get("source_row_sha256"),
+                     item.get("basis_date")) for item in state.get("verified_historical_observations", {}).values()}
+        candidate["source_claims"] = [claim for claim in candidate["source_claims"]
+            if (no, claim.get("row_sha256"), claim.get("basis_date")) not in recorded]
+        if not candidate["source_claims"]:
+            positive.setdefault("application_status", "source_fact_already_recorded")
+            checked += 1
+            continue
+        before = len(state.get("indirect_observations") or {})
+        historical += retain_verified_historical_claims(state, candidate)
+        registered += len(state.get("indirect_observations") or {}) - before
+        positive["application_status"] = (candidate.get("current_application_status") or
+                                          candidate.get("application_status") or "source_context_review_pending")
+        checked += 1
+    return {"checked": checked, "pending": pending, "historical_retained": historical,
+            "comparable_registered": registered}
 
 
 def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, max_windows=20,
@@ -585,6 +723,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
     if review_limit:
         today = datetime.now(timezone.utc).date().isoformat()
         cache = state.setdefault("secondary_source_cache", {})
+        registered_before = len(state.get("indirect_observations") or {})
         for document_key, item in ledger["candidates"].items():
             if source_receipt and not document_key.startswith(source_receipt + ":"):
                 continue
@@ -603,6 +742,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 except (ValueError, RuntimeError, zipfile.BadZipFile):
                     check = {"status": "source_review_pending", "parser_version": SOURCE_PARSER_VERSION}
                 if check["status"] != "source_review_pending":
+                    check["source_checked_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                     cache[receipt_no] = check
             return check
         noncandidate_reviews = ledger.setdefault("noncandidate_reviews", {})
@@ -659,9 +799,12 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             if reviewed % 10 == 0:
                 state["revision"] += 1
                 write_state(state_path, state)
-        if reviewed % 10 or (retained and reviewed == 0):
+        registered = len(state.get("indirect_observations") or {}) - registered_before
+        if reviewed % 10 or ((retained or registered) and reviewed == 0):
             state["revision"] += 1
             write_state(state_path, state)
+    else:
+        registered = 0
     return {"status": "SOURCE_REVIEW_COMPLETE" if source_only else
             "SEARCH_BUDGET_INSUFFICIENT" if required_pages is not None else
             "SEARCH_COMPLETE" if cursor > end else "SEARCH_IN_PROGRESS",
@@ -671,5 +814,6 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             "candidate_count": len(ledger["candidates"]), "required_pages": required_pages,
             "source_review_attempts": reviewed, "source_document_requests": source_requests,
             "historical_facts_retained": retained,
+            "comparable_observations_registered": registered,
             "source_context_candidates": context_candidates,
             "noncandidate_review_attempts": noncandidate_reviewed}

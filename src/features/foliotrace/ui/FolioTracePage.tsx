@@ -187,7 +187,7 @@ const STR = {
     loadErrorDesc: "페이지 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     schemaErrorTitle: "게시된 데이터 형식을 확인할 수 없습니다",
     schemaErrorDesc: "게시된 자료를 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.",
-    formula: "추정 평가금액 = 공시 확인 수량 × 해당 거래일 KRX 정규장 종가 / 추적 범위 내 비중 = 해당 금액 ÷ 같은 통화·범위·거래일의 평가 가능 합계 × 100",
+    formula: "공시에서 확인한 수량에 해당 거래일의 KRX 정규장 종가를 곱해 평가금액을 추정합니다. 비중은 같은 날 평가할 수 있는 종목의 금액 합계에서 차지하는 몫입니다.",
   },
   en: {
     eyebrow: "FolioTrace · Public filing estimate",
@@ -337,7 +337,7 @@ const STR = {
     loadErrorDesc: "The page data could not be loaded. Please try again shortly.",
     schemaErrorTitle: "Published data format could not be verified",
     schemaErrorDesc: "The published data could not be read. Please try again shortly.",
-    formula: "Estimated value = filed quantity × KRX regular-session close on that trade date / In-scope weight = value ÷ priced total in same currency, scope, and trade date × 100",
+    formula: "We estimate value by multiplying the filed quantity by the KRX regular-session close for that date. Weight is its share of the total value we can price on the same day.",
   },
 } satisfies Record<Lang, Record<string, string>>;
 

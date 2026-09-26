@@ -209,9 +209,10 @@ def observation_timeline(state):
                         "receipt_no": no, "ownership_percent": normalized_ratio, "numeric_kind": "exact",
                         "quantity": receipt.get("quantity")})
     invalidated = state.get("indirect_invalidations") or {}
+    source_holds = state.get("indirect_source_holds") or {}
     incomplete = []
     for key, fact in (state.get("indirect_observations") or {}).items():
-        if key in invalidated:
+        if key in invalidated or fact["source_receipt_no"] in source_holds:
             continue
         entry = {"key": f"indirect:{key}", "source": "indirect", "corp_code": fact["corp_code"],
                         "stock_code": fact["stock_code"], "security_kind": fact["security_kind"],
@@ -348,6 +349,7 @@ def reconcile_indirect(state, holdings):
     """Publish one latest comparable observation without guessing missing dates or bases."""
     observations = state.get("indirect_observations") or {}
     invalidated = state.get("indirect_invalidations") or {}
+    source_holds = state.get("indirect_source_holds") or {}
     profiles = state.get("direct_ratio_basis") or {}
     timeline = observation_timeline(state)
     by_key = {item["key"]: item for item in timeline}
@@ -356,8 +358,10 @@ def reconcile_indirect(state, holdings):
         by_unit.setdefault(_unit(item), []).append(item)
     holdings_by_corp = {item.get("corp_code"): item for item in holdings}
     new_corp_units = {}
-    for fact in observations.values():
-        if fact["corp_code"] not in holdings_by_corp and fact["ownership_percent"] is not None and fact["numeric_kind"] != "estimated":
+    for key, fact in observations.items():
+        if (key not in invalidated and fact["source_receipt_no"] not in source_holds and
+                fact["corp_code"] not in holdings_by_corp and
+                fact["ownership_percent"] is not None and fact["numeric_kind"] != "estimated"):
             new_corp_units.setdefault(fact["corp_code"], set()).add(_unit(fact))
     reasons = {}
     chosen = {}
@@ -398,7 +402,7 @@ def reconcile_indirect(state, holdings):
         latest_selected = next((item for item in latest if item["status"] == "verified"), None)
         resolved = by_key.get(f"indirect:{key}")
         reason = None
-        if key in invalidated:
+        if key in invalidated or fact["source_receipt_no"] in source_holds:
             reason = "source_corrected_or_withdrawn"
         elif fact["ownership_percent"] is None:
             reason = "source_ratio_missing"
@@ -495,6 +499,7 @@ def reconcile_indirect(state, holdings):
     for key, fact in sorted(observations.items()):
         resolved = by_key.get(f"indirect:{key}")
         if (not resolved or resolved["status"] != "verified" or key in invalidated or
+                fact["source_receipt_no"] in source_holds or
                 state.get("universe", {}).get(fact["corp_code"], {}).get("stock_code") != fact["stock_code"]):
             continue
         events.append({"observation_key": key, "receipt_no": fact["source_receipt_no"],

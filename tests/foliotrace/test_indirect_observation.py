@@ -414,7 +414,7 @@ class IndirectObservationTests(unittest.TestCase):
         state['universe'][CORP] = {'corp_code': CORP, 'stock_code': STOCK, 'name': '삼성전자'}
         register_evidence(state, indirect(holder_scope='nps_only',
                                           basis_date='2026-06-01', ownership_percent='5.05'))
-        register_evidence(state, indirect(source_receipt_no='20260702000001',
+        other = register_evidence(state, indirect(source_receipt_no='20260702000001',
                                           source_filing_date='2026-07-02', basis_date='2026-01-01',
                                           holder_scope='nps_reporting_group', ownership_percent='8.00'))
         snap = make_snapshot(state, {})
@@ -423,6 +423,13 @@ class IndirectObservationTests(unittest.TestCase):
         self.assertEqual({item['reason'] for item in snap['verifiedIndirectObservations']},
                          {'comparison_scope_unverified'})
         self.assertTrue(all(not item['appliedToHolding'] for item in snap['verifiedIndirectObservations']))
+        register_evidence(state, {'kind': 'invalidate_indirect', 'observation_key': other['key'],
+            'status': 'withdrawn', 'source_receipt_no': '20260702000002',
+            'source_document_no': None, 'source_document_sha256': H,
+            'source_section_sha256': J, 'verified_at': '2026-09-27T00:00:00Z'})
+        corrected = make_snapshot(state, {})
+        self.assertEqual(corrected['holdings'][0]['companyOwnershipPercent'], '5.05')
+        self.assertEqual(sum(item['appliedToHolding'] for item in corrected['verifiedIndirectObservations']), 1)
 
     def test_threshold_straddling_compatible_interval_stays_pending(self):
         state = self.setup_with_basis()
