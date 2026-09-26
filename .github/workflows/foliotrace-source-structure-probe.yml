@@ -45,6 +45,14 @@ jobs:
           state['secondary_source_cache']['20251114002334']['parser_version'] = 'previous-version'
           write_json(target, state)
           PY
+          if ! python3 scripts/foliotrace/target_source.py --state "$RUNNER_TEMP/foliotrace-target-state.json" \
+            --receipt 20060208000020 --corp 00155319 --filing-date 2006-02-08; then
+            echo '{"receipt_no":"20060208000020","target_probe":"failed"}'
+          fi
+          if ! python3 scripts/foliotrace/target_source.py --state "$RUNNER_TEMP/foliotrace-target-state.json" \
+            --receipt 20081007000308 --corp 00386937 --filing-date 2008-10-07; then
+            echo '{"receipt_no":"20081007000308","target_probe":"failed"}'
+          fi
           python3 scripts/foliotrace/target_source.py --state "$RUNNER_TEMP/foliotrace-target-state.json" \
             --receipt 20251114002334 --corp 00244455 --filing-date 2025-11-14
           python3 - <<'PY'
@@ -56,7 +64,11 @@ jobs:
           row = next((row for row in make_snapshot(state, {})['holdings'] if row['corpCode'] == '00244455'), None)
           print(json.dumps({'ktng_row': {key: row.get(key) for key in
               ('companyOwnershipPercent', 'holdingDate', 'evidence', 'quantity', 'estimatedValue')}
-              if row else None, 'issuer_scope_observations': [
+              if row else None, 'ktng_tracking': row.get('tracking') if row else None,
+              'ktng_later_change_date': (row.get('issuerScopeSource') or {}).get('laterChangeDate') if row else None,
+              'issuer_scope_later_changes': [item['basis_date'] for item in
+                   (state.get('issuer_scope_later_changes') or {}).values()],
+              'issuer_scope_observations': [
                 {'basis_date': fact['basis_date'], 'quantity': fact['quantity'],
                  'ownership_percent': fact['ownership_percent'],
                  'references': len(fact['references'])}
