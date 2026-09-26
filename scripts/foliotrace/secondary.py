@@ -156,6 +156,10 @@ def extract_dated_five_percent_shareholder_claims(xml: str) -> list[dict]:
     for index, row in enumerate(rows):
         if compact(cells[index]) != header:
             continue
+        closing = re.search(r"</TABLE\s*>", xml[row.end():], re.I)
+        if closing is None:
+            continue
+        table_end = row.end() + closing.start()
         heading = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", xml[max(0, row.start()-1200):row.start()])).split())
         basis = _dated_register_marker(xml[max(0, row.start()-500):row.start()])
         if "5%이상 주주의 주식소유 현황" not in heading or not basis:
@@ -165,6 +169,8 @@ def extract_dated_five_percent_shareholder_claims(xml: str) -> list[dict]:
             continue
         denominator = next(iter(denominators))
         for j in range(index + 1, min(index + 25, len(rows) - 2)):
+            if rows[j + 2].end() > table_end:
+                break
             owner = compact(cells[j])
             preferred = compact(cells[j + 1])
             subtotal = compact(cells[j + 2])

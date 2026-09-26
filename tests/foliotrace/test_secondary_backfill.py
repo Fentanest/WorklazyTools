@@ -42,9 +42,10 @@ class SecondaryBackfillTests(unittest.TestCase):
                   row('합 계', '287,917,464주', '액면가', ''))
         ownership = ('<P>나. 5%이상 주주의 주식소유 현황</P>' +
                      row('[1998년 12월31일 현재]', '(단위 :주)') +
+                     '<TABLE>' +
                      row('순 위', '성명(명칭)', '종 류', '주식수', '지분율(%)') +
                      row('2', '국민연금관리<BR/>공단', '보통주', '21,298,820', '7.40') +
-                     row('우선주', '-', '-') + row('합 계', '21,298,820', '7.40'))
+                     row('우선주', '-', '-') + row('합 계', '21,298,820', '7.40') + '</TABLE>')
         claims = secondary.extract_source_claims('<DOC>' + issued + ownership + '</DOC>')
         self.assertEqual(len(claims), 1)
         self.assertEqual((claims[0]['basis_date'], claims[0]['quantity'],
@@ -83,6 +84,13 @@ class SecondaryBackfillTests(unittest.TestCase):
             self.assertEqual(secondary.extract_source_claims('<DOC>' + changed + ownership + '</DOC>'), [])
         self.assertEqual(secondary.extract_source_claims('<DOC>' + issued +
             ownership.replace('7.40', '7.41') + '</DOC>'), [])
+        first_table = ('<P>나. 5%이상 주주의 주식소유 현황</P>' +
+            row('[1998년 12월31일 현재]', '(단위 :주)') + '<TABLE>' +
+            row('순 위', '성명(명칭)', '종 류', '주식수', '지분율(%)') +
+            row('1', '다른 주주', '보통주', '21,298,820', '7.40') + '</TABLE>')
+        later_table = ownership.replace('1998년 12월31일', '1999년 01월01일')
+        self.assertEqual(secondary.extract_source_claims('<DOC>' + issued +
+            first_table + later_table + '</DOC>'), [])
 
     def test_issuer_register_source_requotation_updates_scoped_main_without_direct_delta(self):
         def row(*cells):
