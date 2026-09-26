@@ -46,13 +46,29 @@ export interface Holding {
   receiptNo: string
   receiptDate: IsoDate
   holdingDate: IsoDate | null
-  evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest' | 'indirect-observation'
+  evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest' | 'indirect-observation' | 'issuer-scope-observation'
   indirectSource?: {
     documentNo: string | null
     sourceSha256: string
     basisDate: IsoDate
     directReceiptNo: string | null
     ratioDenominator: string
+  } | null
+  issuerScopeSource?: {
+    observationKey: string
+    sourceQuantity: DecimalString
+    denominatorQuantity: DecimalString
+    denominatorDate: IsoDate
+    referenceCount: number
+    receiptNo: string
+    documentNo: string | null
+  } | null
+  directBaseline?: {
+    receiptNo: string
+    receiptDate: IsoDate
+    holdingDate: IsoDate | null
+    ownershipPercent: DecimalString | null
+    quantity: DecimalString | null
   } | null
   latestUnresolvedReceiptNo: string | null
   latestUnresolvedReason: string | null
@@ -154,6 +170,31 @@ export interface Snapshot {
     denominatorDate?: IsoDate | null
     status: 'historical_only_ratio_basis_unverified' | 'historical_only_denominator_date_unverified'
     filingUrl: string
+  }>
+  issuerScopeObservations?: Array<{
+    observationKey: string
+    corpCode: string
+    stockCode: string
+    issuerName: string
+    basisDate: IsoDate
+    ownershipPercent: DecimalString
+    sourceQuantity: DecimalString
+    denominatorQuantity: DecimalString
+    denominatorDate: IsoDate
+    securityKind: 'unclassified'
+    ratioDenominator: 'issued_shares'
+    holderScope: 'nps_only'
+    status: 'comparison_pending'
+    references: Array<{
+      receiptNo: string
+      documentNo: string | null
+      filingDate: IsoDate
+      archiveSha256: string
+      fileSha256: string
+      rowSha256: string
+      parserVersion: string
+      filingUrl: string
+    }>
   }>
   history: Array<{ tradeDate: IsoDate; estimatedValue: DecimalString; datasetVersion: string }>
 }

@@ -78,6 +78,32 @@ def observation_key(fact):
                      fact["stock_code"], fact["basis_date"], fact["source_row_sha256"]))
 
 
+def effective_source_holds(state):
+    """Hold same-report sources when a later correction has no proven target link."""
+    holds = dict(state.get("indirect_source_holds") or {})
+    queued = (state.get("opendart_secondary_backfill") or {}).get("queue") or {}
+    targeted = state.get("target_source_candidates") or {}
+    sources = {}
+    for no, item in queued.items():
+        sources[no] = (item.get("corp_code"), item.get("report_nm"),
+                       item.get("rcept_dt"), bool(item.get("correction_hold") or item.get("withdrawal_flag")))
+    for no, item in targeted.items():
+        sources[no] = (item.get("filer_corp_code"), item.get("report_name"),
+                       (item.get("filing_date") or "").replace("-", ""),
+                       bool(item.get("correction_hold") or item.get("withdrawal_flag")))
+    def title(value):
+        return re.sub(r"\s+", "", re.sub(r"^(?:\[?정정\]?|정정공시)\s*", "", value or ""))
+    for no, (corp, report, day, held) in sources.items():
+        if not held or not corp or not report or not day:
+            continue
+        normalized = title(report)
+        for prior_no, (prior_corp, prior_report, prior_day, _) in sources.items():
+            if (prior_no != no and prior_corp == corp and prior_report and title(prior_report) == normalized
+                    and prior_day and prior_day <= day):
+                holds[prior_no] = "correction_relation_unverified"
+    return holds
+
+
 def register_evidence(state, fact):
     """Store a reviewed fact or later invalidation; never infer one from snippets."""
     if not isinstance(fact, dict):
@@ -209,7 +235,7 @@ def observation_timeline(state):
                         "receipt_no": no, "ownership_percent": normalized_ratio, "numeric_kind": "exact",
                         "quantity": receipt.get("quantity")})
     invalidated = state.get("indirect_invalidations") or {}
-    source_holds = state.get("indirect_source_holds") or {}
+    source_holds = effective_source_holds(state)
     incomplete = []
     for key, fact in (state.get("indirect_observations") or {}).items():
         if key in invalidated or fact["source_receipt_no"] in source_holds:

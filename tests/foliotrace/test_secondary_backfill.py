@@ -30,6 +30,55 @@ NOISE = ("20060208000286", "1252220", "회사", "투자설명서",
 
 
 class SecondaryBackfillTests(unittest.TestCase):
+    def test_issuer_register_source_requotation_updates_scoped_main_without_direct_delta(self):
+        def row(*cells):
+            return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'
+        xml = ('<DOC>다. 최대주주의 변동' +
+            row('변동일', '최대주주명', '소유주식수', '지분율', '비고') +
+            row('2025년 08월 22일', '국민연금공단', '9,954,722', '8.16',
+                '변동일은 2025.08.22 기준일 주주명부 기준') +
+            row('2025년 12월 31일', '중소기업은행', '9,510,485', '8.06', '다른 주주') +
+            '※ 상기 지분율은 각각 변동일 당시 발행주식총수를 기준으로 산정하였으며, '
+            '해당 기준 주식수는 2025년 8월 22일 122,062,497주, '
+            '2025년 12월 31일 117,976,645주임.</DOC>')
+        claims = secondary.extract_source_claims(xml)
+        self.assertEqual(len(claims), 1)
+        self.assertEqual((claims[0]['basis_date'], claims[0]['security_kind'],
+                          claims[0]['denominator_quantity']), ('2025-08-22', None, '122062497'))
+        state = folio.empty_state()
+        corp, stock = '00244455', '033780'
+        state['universe'][corp] = {'name': '케이티앤지', 'stock_code': stock}
+        state['receipts']['20250401003742'] = {'receipt_no': '20250401003742',
+            'receipt_date': '2025-04-01', 'corp_code': corp, 'stock_code': stock}
+        state['holdings'][corp] = {'corp_code': corp, 'stock_code': stock,
+            'name': '케이티앤지', 'receipt_no': '20250401003742',
+            'receipt_date': '2025-04-01', 'holding_date': None,
+            'quantity': '9157340', 'company_ownership_percent': '7.5',
+            'security_kind': 'unknown', 'tracking': 'unknown',
+            'valuation_exclusion_reason': 'security_mapping_unverified', 'evidence': 'legacy_import'}
+        for no, filed in [('20251114002334', '2025-11-14'), ('20260515002914', '2026-05-15')]:
+            candidate = {'receipt_no': no, 'document_no': None, 'filing_date': filed,
+                'filing_company': '케이티앤지', 'filer_corp_code': corp,
+                'source_archive_sha256': 'a' * 64, 'source_checked_at': '2026-09-27T00:00:00Z',
+                'parser_version': secondary.SOURCE_PARSER_VERSION,
+                'source_claims': [{**claims[0], 'source_file_sha256': 'b' * 64}]}
+            self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 1)
+        self.assertEqual(len(state['issuer_scope_observations']), 1)
+        self.assertEqual(len(next(iter(state['issuer_scope_observations'].values()))['references']), 2)
+        snapshot = make_snapshot(state, {})
+        holding = snapshot['holdings'][0]
+        self.assertEqual((holding['companyOwnershipPercent'], holding['holdingDate'],
+                          holding['quantity'], holding['estimatedValue']),
+                         ('8.16', '2025-08-22', None, None))
+        self.assertEqual((holding['evidence'], holding['directBaseline']['ownershipPercent'],
+                          holding['issuerScopeSource']['referenceCount']),
+                         ('issuer-scope-observation', '7.5', 2))
+        self.assertEqual(snapshot['events'], [])
+        state['indirect_source_holds'] = {'20251114002334': 'withdrawn'}
+        self.assertEqual(make_snapshot(state, {})['holdings'][0]['companyOwnershipPercent'], '8.16')
+        state['indirect_source_holds']['20260515002914'] = 'withdrawn'
+        self.assertEqual(make_snapshot(state, {})['holdings'][0]['companyOwnershipPercent'], '7.5')
+
     def test_complete_parsed_source_claim_enters_current_without_double_history(self):
         state = folio.empty_state()
         corp, stock, direct_no = '00126380', '005930', '20260302000001'

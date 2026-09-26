@@ -1,0 +1,71 @@
+name: Verify exact FolioTrace issuer source
+
+on:
+  workflow_dispatch:
+    inputs:
+      receipt:
+        description: Exact 14-digit DART receipt
+        required: true
+        type: string
+      corp:
+        description: Exact 8-digit issuer corp code
+        required: true
+        type: string
+      filing_date:
+        description: Official listing date YYYY-MM-DD
+        required: true
+        type: string
+      validate_only:
+        description: Inspect without changing the data branch
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' || inputs.validate_only
+    permissions:
+      contents: write
+    runs-on: [self-hosted, Linux, X64, '235']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: foliotrace-data
+          path: foliotrace-state
+          fetch-depth: 0
+      - name: Check source revision
+        if: ${{ !inputs.validate_only }}
+        run: test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+      - name: Verify one official listing and source
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          RECEIPT: ${{ inputs.receipt }}
+          CORP: ${{ inputs.corp }}
+          FILING_DATE: ${{ inputs.filing_date }}
+          VALIDATE_ONLY: ${{ inputs.validate_only }}
+        run: |
+          target=foliotrace-state/state.json
+          if [ "$VALIDATE_ONLY" = true ]; then
+            target="$RUNNER_TEMP/foliotrace-target-state.json"
+            cp foliotrace-state/state.json "$target"
+          fi
+          python3 scripts/foliotrace/target_source.py --state "$target" \
+            --receipt "$RECEIPT" --corp "$CORP" --filing-date "$FILING_DATE"
+      - name: Persist verified facts
+        if: ${{ !inputs.validate_only }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          expected_data=$(git -C foliotrace-state rev-parse HEAD)
+          test "$(git ls-remote origin refs/heads/foliotrace-data | cut -f1)" = "$expected_data"
+          git -C foliotrace-state config user.name 'github-actions[bot]'
+          git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C foliotrace-state add state.json source-archives
+          if ! git -C foliotrace-state diff --cached --quiet; then
+            git -C foliotrace-state commit -m 'data: verify exact FolioTrace issuer source'
+            git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
+          fi

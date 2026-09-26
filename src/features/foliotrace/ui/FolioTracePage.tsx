@@ -135,6 +135,10 @@ const STR = {
     rowIndirectSource: "제3자 공시 원문 확인",
     rowDirectSource: "직접 공시 기록",
     directBaseline: "비교한 직접 공시",
+    issuerScopeSource: "다른 회사 공시에서 확인한 지분율 · 주식 종류 확인 중",
+    issuerScopeDetail: "발행주식 기준으로 확인한 수량",
+    issuerScopeComparison: "이전 직접 공시와 지분율 계산 기준을 비교할 수 없어 증감은 표시하지 않습니다.",
+    documentNumber: "문서 번호",
     verifiedObservationTitle: "다른 회사 공시에서 확인한 지분",
     verifiedObservationApplied: "현재 지분율에 반영",
     rowVerifiedValue: "기준일과 지분율 확인",
@@ -178,14 +182,14 @@ const STR = {
     statusExit: "5% 추적 범위 이탈",
     statusUnresolved: "최신 미확인",
     searchNoResults: "검색 결과가 없습니다.",
-    searchNoResultsDesc: "검색어·필터를 바꾸거나 초기화하세요. 없는 종목을 임의로 만들지 않습니다.",
+    searchNoResultsDesc: "검색어나 필터를 바꾸거나 초기화하세요.",
     loading: "게시된 FolioTrace 데이터를 불러오는 중입니다.",
     missingTitle: "공개 데이터를 아직 게시하지 않았습니다",
     missingDesc:
       "아직 표시할 수 있는 실제 공시 자료가 준비되지 않았습니다.",
     loadErrorTitle: "게시된 데이터를 불러오지 못했습니다",
     loadErrorDesc: "페이지 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    schemaErrorTitle: "게시된 데이터 형식을 확인할 수 없습니다",
+    schemaErrorTitle: "자료를 표시할 수 없습니다",
     schemaErrorDesc: "게시된 자료를 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.",
     formula: "공시에서 확인한 수량에 해당 거래일의 KRX 정규장 종가를 곱해 평가금액을 추정합니다. 비중은 같은 날 평가할 수 있는 종목의 금액 합계에서 차지하는 몫입니다.",
   },
@@ -208,7 +212,7 @@ const STR = {
     historicalLegacyRecheck: "Earlier records awaiting source checks",
     indirectTitle: "Older records checked in individual filings",
     indirectSource: "Open DART filing",
-    indirectScope: "These are holding and planned-allotment clues in other filers' documents. A planned allotment is not a confirmed holding. Search-page checks do not verify every source fact. Historical observations with an unverified ratio basis or current date are excluded from current holdings and valuation.",
+    indirectScope: "Other companies' filings can describe NPS holdings or planned allotments. Plans are shown separately from confirmed holdings. Records still under review are left out of current values.",
     historicalObservationTitle: "Historical holdings",
     historicalObservationScope: "The filing confirms a holding date, quantity, and percentage. Some details about the total share count, including its date, still need checking before comparison with today's percentage.",
     historicalDenominatorDatePending: "Date of the total share count still under review",
@@ -285,6 +289,10 @@ const STR = {
     rowIndirectSource: "Third-party filing checked",
     rowDirectSource: "Direct filing record",
     directBaseline: "Compared direct filing",
+    issuerScopeSource: "Ownership confirmed in another company's filing · share class under review",
+    issuerScopeDetail: "Shares confirmed against all issued shares",
+    issuerScopeComparison: "The earlier direct filing uses an unconfirmed percentage basis, so no change is shown.",
+    documentNumber: "Document number",
     verifiedObservationTitle: "Ownership found in another company's filing",
     verifiedObservationApplied: "Applied to current ownership",
     rowVerifiedValue: "Holding date and percentage checked",
@@ -328,14 +336,14 @@ const STR = {
     statusExit: "Exited 5% scope",
     statusUnresolved: "Latest unverified",
     searchNoResults: "No matching securities.",
-    searchNoResultsDesc: "Change the query or filters, or reset them. Missing securities are never invented.",
+    searchNoResultsDesc: "Change the search or filters, or reset them.",
     loading: "Loading the published FolioTrace data…",
     missingTitle: "Public data is not published yet",
     missingDesc:
       "Real filing data is not ready to show yet.",
     loadErrorTitle: "Could not load the published data",
     loadErrorDesc: "The page data could not be loaded. Please try again shortly.",
-    schemaErrorTitle: "Published data format could not be verified",
+    schemaErrorTitle: "Could not display the records",
     schemaErrorDesc: "The published data could not be read. Please try again shortly.",
     formula: "We estimate value by multiplying the filed quantity by the KRX regular-session close for that date. Weight is its share of the total value we can price on the same day.",
   },
@@ -816,7 +824,7 @@ function ReadyView({
                         <th scope="row">
                           {h.name} <code className="foliotrace-code">{h.stockCode}</code>
                           <small className="foliotrace-row-reason">
-                            {t.rowBasis}: {h.holdingDate ?? t.unknownDate} · {h.evidence === "indirect-observation" ? t.rowIndirectSource :
+                            {t.rowBasis}: {h.holdingDate ?? t.unknownDate} · {h.evidence === "issuer-scope-observation" ? t.issuerScopeSource : h.evidence === "indirect-observation" ? t.rowIndirectSource :
                               h.evidence === "legacy-import" ? t.eventLegacySource : t.rowDirectSource}
                           </small>
                           {h.observationStatus && (
@@ -913,11 +921,25 @@ function ReadyView({
                   <dt>{t.rowIndirectSource}</dt>
                   <dd>
                     {t.eventBasis}: {selected.indirectSource.basisDate}
-                    {selected.indirectSource.documentNo && ` · dcmNo ${selected.indirectSource.documentNo}`}
+                    {selected.indirectSource.documentNo && ` · ${t.documentNumber} ${selected.indirectSource.documentNo}`}
                     {selected.indirectSource.directReceiptNo &&
                       <> · {t.directBaseline}: <code className="foliotrace-code">{selected.indirectSource.directReceiptNo}</code></>}
                   </dd>
                 </div>
+              )}
+              {selected.issuerScopeSource && (
+                <>
+                  <div><dt>{t.issuerScopeSource}</dt><dd>
+                    {t.eventBasis}: {selected.holdingDate} · {t.issuerScopeDetail}: {formatQty(selected.issuerScopeSource.sourceQuantity)}
+                    {" / "}{formatQty(selected.issuerScopeSource.denominatorQuantity)} · {selected.issuerScopeSource.denominatorDate}
+                    {selected.issuerScopeSource.referenceCount > 1 && ` · ${selected.issuerScopeSource.referenceCount} ${t.unitCount}`}
+                  </dd></div>
+                  <div><dt>{t.directBaseline}</dt><dd>
+                    {selected.directBaseline?.ownershipPercent == null ? "—" : formatPct(selected.directBaseline.ownershipPercent)}
+                    {selected.directBaseline?.receiptDate && ` · ${selected.directBaseline.receiptDate}`}
+                    <small className="foliotrace-row-reason">{t.issuerScopeComparison}</small>
+                  </dd></div>
+                </>
               )}
               <div>
                 <dt>{t.detailPrice}</dt>

@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 
 from .valuation import decimal, value_holdings
-from .indirect import reconcile_indirect
+from .indirect import reconcile_indirect, effective_source_holds
 
 
 def encoded(value):
@@ -47,11 +47,56 @@ def make_snapshot(state, quotes, now=None):
             holding["latest_unresolved_reason"] = state.get("unresolved", {}).get(latest_no) or "correction_relation_unverified"
         holdings.append(holding)
     holdings, indirect_events, observation_rows = reconcile_indirect(state, holdings)
+    issuer_observations = state.get("issuer_scope_observations") or {}
+    scoped_by_corp = {}
+    source_holds = effective_source_holds(state)
+    for key, fact in issuer_observations.items():
+        references = [ref for ref in fact.get("references", [])
+                      if ref.get("receipt_no") not in source_holds]
+        if references:
+            scoped_by_corp.setdefault(fact["corp_code"], []).append((key, fact, references))
+    for holding in holdings:
+        candidates = scoped_by_corp.get(holding.get("corp_code")) or []
+        if not candidates:
+            continue
+        latest_date = max(fact["basis_date"] for _, fact, _ in candidates)
+        latest = [(key, fact, refs) for key, fact, refs in candidates
+                  if fact["basis_date"] == latest_date]
+        if len({(fact["quantity"], fact["ownership_percent"], fact["denominator_quantity"])
+                for _, fact, _ in latest}) != 1:
+            holding["issuer_scope_status"] = "same_basis_conflict"
+            continue
+        direct_basis = holding.get("holding_date") or holding.get("receipt_date")
+        if direct_basis and latest_date <= direct_basis:
+            continue
+        pending_no = holding.get("latest_unresolved_receipt")
+        pending_receipt = state.get("receipts", {}).get(pending_no) or {}
+        pending_date = pending_receipt.get("listing_receipt_date") or pending_receipt.get("receipt_date")
+        if pending_date and pending_date >= latest_date:
+            holding["issuer_scope_status"] = "newer_direct_filing_unresolved"
+            continue
+        key, fact, refs = sorted(latest, key=lambda entry: entry[0])[0]
+        primary = sorted(refs, key=lambda ref: (ref["filing_date"], ref["receipt_no"]))[0]
+        holding["direct_baseline"] = {"receipt_no": holding.get("receipt_no"),
+                                      "receipt_date": holding.get("receipt_date"),
+                                      "holding_date": holding.get("holding_date"),
+                                      "ownership_percent": holding.get("company_ownership_percent"),
+                                      "quantity": holding.get("quantity")}
+        holding.update(company_ownership_percent=fact["ownership_percent"],
+                       quantity=None, security_kind="unknown", holding_date=latest_date,
+                       receipt_no=primary["receipt_no"], receipt_date=primary["filing_date"],
+                       evidence="issuer_scope_observation", tracking="active",
+                       issuer_scope_source={"key": key, "quantity": fact["quantity"],
+                                            "denominator_quantity": fact["denominator_quantity"],
+                                            "denominator_date": fact["denominator_date"],
+                                            "reference_count": len(refs),
+                                            "receipt_no": primary["receipt_no"],
+                                            "document_no": primary["document_no"]})
     valued = value_holdings(holdings, quotes, trade_date) if trade_date else value_holdings(holdings, {}, "")
     rows = []
     for row in valued["holdings"]:
         code = row.get("stock_code") or ""
-        candidate_quote = quotes.get(code)
+        candidate_quote = None if row.get("evidence") == "issuer_scope_observation" else quotes.get(code)
         close = decimal(candidate_quote.get("close")) if candidate_quote else None
         quote = (candidate_quote if candidate_quote and candidate_quote.get("verified") is True and
                  candidate_quote.get("trade_date") == trade_date and
@@ -68,13 +113,27 @@ def make_snapshot(state, quotes, now=None):
                      "receiptNo": row.get("receipt_no") or "",
                      "receiptDate": (receipt.get("listing_receipt_date") if state["unresolved"].get(row.get("receipt_no")) == "receipt_date_conflict" else row.get("receipt_date")) or "",
                      "holdingDate": row.get("holding_date"),
-                     "evidence": "unresolved-latest" if row.get("latest_unresolved_receipt") else "indirect-observation" if evidence == "indirect_observation" else "legacy-import" if evidence == "legacy_import" else "dart-structured" if evidence == "dart_structured" else "dart-document" if evidence == "dart_document" else "unresolved-latest",
+                     "evidence": "issuer-scope-observation" if evidence == "issuer_scope_observation" else "unresolved-latest" if row.get("latest_unresolved_receipt") else "indirect-observation" if evidence == "indirect_observation" else "legacy-import" if evidence == "legacy_import" else "dart-structured" if evidence == "dart_structured" else "dart-document" if evidence == "dart_document" else "unresolved-latest",
                      "indirectSource": ({"documentNo": row["indirect_source"]["document_no"],
                                          "sourceSha256": row["indirect_source"]["section_sha256"],
                                          "basisDate": row["indirect_source"]["basis_date"],
                                          "directReceiptNo": row["indirect_source"]["direct_receipt_no"],
                                          "ratioDenominator": row["indirect_source"]["ratio_denominator"]}
                                         if row.get("indirect_source") else None),
+                     "issuerScopeSource": ({"observationKey": row["issuer_scope_source"]["key"],
+                       "sourceQuantity": row["issuer_scope_source"]["quantity"],
+                       "denominatorQuantity": row["issuer_scope_source"]["denominator_quantity"],
+                       "denominatorDate": row["issuer_scope_source"]["denominator_date"],
+                       "referenceCount": row["issuer_scope_source"]["reference_count"],
+                       "receiptNo": row["issuer_scope_source"]["receipt_no"],
+                       "documentNo": row["issuer_scope_source"]["document_no"]}
+                       if row.get("issuer_scope_source") else None),
+                     "directBaseline": ({"receiptNo": row["direct_baseline"]["receipt_no"],
+                       "receiptDate": row["direct_baseline"]["receipt_date"],
+                       "holdingDate": row["direct_baseline"]["holding_date"],
+                       "ownershipPercent": row["direct_baseline"]["ownership_percent"],
+                       "quantity": row["direct_baseline"]["quantity"]}
+                       if row.get("direct_baseline") else None),
                      "latestUnresolvedReceiptNo": row.get("latest_unresolved_receipt") or None,
                      "latestUnresolvedReason": row.get("latest_unresolved_reason") or None,
                      "tracking": row.get("tracking") or "unknown",
@@ -134,6 +193,21 @@ def make_snapshot(state, quotes, now=None):
                 "estimatedValue": valued["estimated_value"], "valuationCoverage": valued["valuation_coverage"],
                 "filingCoverage": "partial" if state["unresolved"] else "complete" if coverage else "unverified",
                 "holdings": rows, "events": events, "verifiedIndirectObservations": observation_rows,
+                "issuerScopeObservations": [{"observationKey": key, "corpCode": fact["corp_code"],
+                    "stockCode": fact["stock_code"], "issuerName": fact["issuer_name"],
+                    "basisDate": fact["basis_date"], "ownershipPercent": fact["ownership_percent"],
+                    "sourceQuantity": fact["quantity"], "denominatorQuantity": fact["denominator_quantity"],
+                    "denominatorDate": fact["denominator_date"], "securityKind": "unclassified",
+                    "ratioDenominator": "issued_shares", "holderScope": "nps_only",
+                    "references": [{"receiptNo": ref["receipt_no"], "documentNo": ref["document_no"],
+                        "filingDate": ref["filing_date"], "archiveSha256": ref["archive_sha256"],
+                        "fileSha256": ref["file_sha256"], "rowSha256": ref["row_sha256"],
+                        "parserVersion": ref["parser_version"],
+                        "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={ref['receipt_no']}"}
+                        for ref in fact["references"]],
+                    "status": "comparison_pending"}
+                    for key, fact in sorted(issuer_observations.items(),
+                                            key=lambda item: (item[1]["basis_date"], item[0]), reverse=True)],
                 "historicalObservations": [{"corpCode": item["corp_code"], "stockCode": item["stock_code"],
                     "issuerName": item["issuer_name"], "quantity": item["quantity"],
                     "ownershipPercent": item["ownership_percent"], "basisDate": item["basis_date"],

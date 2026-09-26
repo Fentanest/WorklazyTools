@@ -7,8 +7,8 @@ queues every discovered receipt for bounded source-document review.
 Listing facts, downloaded sources, and numeric holding observations are tracked
 separately: a completed list window never implies its documents were reviewed,
 and a reviewed document never implies its numbers entered holdings. Positive
-source findings stay in this lane's independent queue until Sol wires the
-shared holding-observation path; this module never writes the full-text,
+source findings stay in this lane's independent queue for bounded replay by
+the shared observation path; this module never writes the full-text,
 direct, or early-direct cursors, nor the receipts/holdings/events ledgers.
 
 The active queue is bounded by spilling terminal, current-version, non-held
@@ -60,8 +60,8 @@ ARCHIVE_SHARD_ROWS = 5000
 PENDING_STATUSES = ("source_review_pending", "source_unavailable")
 SOURCE_HISTORY_CAP = 5
 DEFAULT_MAX_QUEUE_ENTRIES = 20000
-# Holding reflection needs Sol's shared observation wiring; never implied here.
-HOLDING_REFLECTION = "pending_sol_integration"
+# Listing and source review remain separate from observation reconciliation.
+HOLDING_REFLECTION = "separate_reconciliation"
 
 
 class OpendartListError(RuntimeError):

@@ -35,6 +35,34 @@ function validIndirectSource(value: unknown): boolean {
     nullable(value.directReceiptNo, item => str(item) && RECEIPT.test(item)) &&
     str(value.ratioDenominator) && ['shares_etc_total', 'issued_shares', 'voting_rights'].includes(value.ratioDenominator)
 }
+function validIssuerScopeSource(value: unknown): boolean {
+  return isRecord(value) && str(value.observationKey) && VERSION.test(value.observationKey) &&
+    decimal(value.sourceQuantity) && decimal(value.denominatorQuantity) &&
+    isoDate(value.denominatorDate) && Number.isSafeInteger(value.referenceCount) &&
+    Number(value.referenceCount) >= 1 && str(value.receiptNo) && RECEIPT.test(value.receiptNo) &&
+    nullable(value.documentNo, item => str(item) && /^\d+$/.test(item))
+}
+function validDirectBaseline(value: unknown): boolean {
+  return isRecord(value) && str(value.receiptNo) && RECEIPT.test(value.receiptNo) &&
+    isoDate(value.receiptDate) && nullable(value.holdingDate, isoDate) &&
+    nullable(value.ownershipPercent, decimal) && nullable(value.quantity, decimal)
+}
+function validIssuerScopeObservation(value: unknown): boolean {
+  return isRecord(value) && str(value.observationKey) && VERSION.test(value.observationKey) &&
+    str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && str(value.stockCode) && STOCK.test(value.stockCode) &&
+    str(value.issuerName) && isoDate(value.basisDate) && decimal(value.ownershipPercent) &&
+    decimal(value.sourceQuantity) && decimal(value.denominatorQuantity) &&
+    value.denominatorDate === value.basisDate && value.securityKind === 'unclassified' &&
+    value.ratioDenominator === 'issued_shares' && value.holderScope === 'nps_only' &&
+    value.status === 'comparison_pending' && Array.isArray(value.references) &&
+    value.references.length >= 1 && value.references.every((ref: unknown) => isRecord(ref) &&
+      str(ref.receiptNo) && RECEIPT.test(ref.receiptNo) &&
+      nullable(ref.documentNo, item => str(item) && /^\d+$/.test(item)) &&
+      isoDate(ref.filingDate) && str(ref.archiveSha256) && VERSION.test(ref.archiveSha256) &&
+      str(ref.fileSha256) && VERSION.test(ref.fileSha256) &&
+      str(ref.rowSha256) && VERSION.test(ref.rowSha256) &&
+      str(ref.parserVersion) && filingUrl(ref.filingUrl))
+}
 function validIndirectObservation(value: unknown): boolean {
   return isRecord(value) && str(value.observationKey) && OBSERVATION_KEY.test(value.observationKey) &&
     str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && str(value.stockCode) && STOCK.test(value.stockCode) &&
@@ -75,8 +103,10 @@ function validHolding(value: unknown): boolean {
       item => item === 'verified' || item === 'same_basis_conflict')) &&
     str(value.receiptNo) && RECEIPT.test(value.receiptNo) && isoDate(value.receiptDate) &&
     nullable(value.holdingDate, isoDate) &&
-    ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest', 'indirect-observation'].includes(String(value.evidence)) &&
+    ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.evidence)) &&
     (value.indirectSource === undefined || nullable(value.indirectSource, validIndirectSource)) &&
+    (value.issuerScopeSource === undefined || nullable(value.issuerScopeSource, validIssuerScopeSource)) &&
+    (value.directBaseline === undefined || nullable(value.directBaseline, validDirectBaseline)) &&
     nullable(value.latestUnresolvedReceiptNo, (item) => str(item) && RECEIPT.test(item)) &&
     nullable(value.latestUnresolvedReason, str) &&
     ['active', 'below-5-percent', 'unknown'].includes(String(value.tracking)) &&
@@ -163,6 +193,8 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
       (!Array.isArray(value.verifiedIndirectObservations) || !value.verifiedIndirectObservations.every(validIndirectObservation))) return false
   if (value.historicalObservations !== undefined &&
       (!Array.isArray(value.historicalObservations) || !value.historicalObservations.every(validHistoricalObservation))) return false
+  if (value.issuerScopeObservations !== undefined &&
+      (!Array.isArray(value.issuerScopeObservations) || !value.issuerScopeObservations.every(validIssuerScopeObservation))) return false
   return value.holdings.every(validHolding) && value.events.every(validEvent) && value.history.every((row: unknown) =>
     isRecord(row) && isoDate(row.tradeDate) && decimal(row.estimatedValue) && str(row.datasetVersion) && VERSION.test(row.datasetVersion))
 }

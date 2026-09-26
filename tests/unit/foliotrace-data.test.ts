@@ -56,3 +56,29 @@ test('receipt-only indirect observation and its event load together', () => {
   assert.equal(validSnapshot({ ...base, events: [{ ...event, observationKey: observationKey.replace(':-:', ':bad:') }],
     verifiedIndirectObservations: [observation] }, version), false)
 })
+
+test('issuer-level dated observation keeps the direct baseline separate', () => {
+  const receiptNo = '20251114002334'
+  const reference = { receiptNo, documentNo: null, filingDate: '2025-11-14',
+    archiveSha256: 'b'.repeat(64), fileSha256: 'c'.repeat(64), rowSha256: 'd'.repeat(64),
+    parserVersion: 'source-issued-shares-v5',
+    filingUrl: `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${receiptNo}` }
+  const scoped = { observationKey: 'e'.repeat(64), corpCode: '00244455', stockCode: '033780',
+    issuerName: '케이티앤지', basisDate: '2025-08-22', ownershipPercent: '8.16',
+    sourceQuantity: '9954722', denominatorQuantity: '122062497', denominatorDate: '2025-08-22',
+    securityKind: 'unclassified', ratioDenominator: 'issued_shares', holderScope: 'nps_only',
+    status: 'comparison_pending', references: [reference] }
+  const holding = { ...base.holdings[0], corpCode: '00244455', stockCode: '033780',
+    securityKind: 'unknown', quantity: null, companyOwnershipPercent: '8.16',
+    receiptNo, receiptDate: '2025-11-14', holdingDate: '2025-08-22',
+    evidence: 'issuer-scope-observation', quote: null, estimatedValue: null,
+    portfolioWeightPercent: null, valuationExclusionReason: 'security_mapping_unverified',
+    issuerScopeSource: { observationKey: scoped.observationKey, sourceQuantity: scoped.sourceQuantity,
+      denominatorQuantity: scoped.denominatorQuantity, denominatorDate: scoped.denominatorDate,
+      referenceCount: 1, receiptNo, documentNo: null },
+    directBaseline: { receiptNo: '20250401003742', receiptDate: '2025-04-01',
+      holdingDate: null, ownershipPercent: '7.5', quantity: '9157340' } }
+  assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [scoped] }, version), true)
+  assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [
+    { ...scoped, references: [{ ...reference, filingUrl: 'javascript:bad()' }] }] }, version), false)
+})

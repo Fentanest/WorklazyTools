@@ -18,7 +18,8 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.foliotrace import folio, opendart_secondary
+from scripts.foliotrace import folio, opendart_secondary, secondary
+from pipeline.foliotrace.publish import encoded
 
 # Stops that leave the lane incomplete must surface as process failure.
 INCOMPLETE_STATUSES = frozenset({"LISTING_BUDGET_INSUFFICIENT", "QUEUE_BACKLOG",
@@ -74,6 +75,14 @@ def main() -> int:
             overlap_days=args.overlap_days,
             read_state=folio.read_json, write_state=folio.write_json,
             key=os.environ.get("DART_API_KEY", ""))
+        normalized = folio.read_json(state_path)
+        before = encoded(normalized)
+        applied = secondary.replay_opendart_positives(normalized, limit=max(1, args.review_limit))
+        after = encoded(normalized)
+        if after != before:
+            normalized["revision"] += 1
+            folio.write_json(state_path, normalized)
+        result["observation_replay"] = applied
     except opendart_secondary.OpendartListError as exc:
         print(json.dumps({"error": exc.code, "window_start": exc.start,
                           "window_end": exc.end, "page_no": exc.page_no}), file=sys.stderr)

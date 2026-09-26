@@ -75,7 +75,7 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(saved["holdings"], {})
             self.assertEqual(saved["events"], {})
             self.assertIsNone(saved["secondary_backfill"])
-            self.assertEqual(result["holding_reflection"], "pending_sol_integration")
+            self.assertEqual(result["holding_reflection"], "separate_reconciliation")
 
     def test_window_split_and_single_day_budget_overflow(self):
         def fetch(params):

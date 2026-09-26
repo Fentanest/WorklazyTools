@@ -35,6 +35,7 @@ DOCUMENT_KEY = re.compile(r"^\d{14}:\d+$")
 STOCK_CONTEXT = re.compile(r"보통주|우선주|주주|보유|소유|지분|주식|주권|의결권|sharehold|stock|equity|voting", re.I)
 REPORT_CONTEXT = re.compile(r"대량보유|의결권대리행사|주주명부|주식등의|sharehold", re.I)
 SOURCE_PARSER_VERSION = "source-issued-shares-v5"
+MAX_SOURCE_CLAIMS = 100
 SOURCE_ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
 SOURCE_CELLS = re.compile(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", re.I | re.S)
 EXACT_NPS = re.compile(r"^(?:국민연금공단|국민연금관리공단|National Pension Service)$", re.I)
@@ -83,9 +84,73 @@ def extract_source_claims(xml: str) -> list[dict]:
                        "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
                        "row_offset": row.start(), "basis_date": None,
                        "status": "source_context_review_pending"})
-        if len(claims) >= 20:
-            break
-    return bind_change_section_basis(xml, claims)
+    return extract_issuer_register_claims(xml) + bind_change_section_basis(xml, claims)
+
+
+def _korean_date(value: str) -> str | None:
+    match = re.fullmatch(r"\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*", value)
+    if not match:
+        return None
+    try:
+        return date(*(int(part) for part in match.groups())).isoformat()
+    except ValueError:
+        return None
+
+
+def extract_issuer_register_claims(xml: str) -> list[dict]:
+    """Read dated NPS rows in an issuer's largest-shareholder register table."""
+    rows = list(SOURCE_ROWS.finditer(xml))
+    claims = []
+    for index, row in enumerate(rows):
+        cells = _row_cells(row.group(0))
+        if len(cells) < 5 or not EXACT_NPS.fullmatch(cells[1]):
+            continue
+        basis = _korean_date(cells[0])
+        quantity, ratio = _number(cells[2]), _number(cells[3], maximum=100)
+        if basis is None or quantity is None or ratio is None:
+            continue
+        # The row's own note must identify the register date. A filing date or
+        # an adjacent shareholder's date cannot stand in for this field.
+        dotted = basis.replace("-", ".")
+        if dotted not in cells[4] or "기준일 주주명부 기준" not in cells[4]:
+            continue
+        preceding = [_row_cells(item.group(0)) for item in rows[max(0, index - 12):index]]
+        if not any({"변동일", "최대주주명", "소유주식수", "지분율"} <= set(item)
+                   for item in preceding):
+            continue
+        heading = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", xml[max(0, row.start() - 8000):row.start()])).split())
+        if "최대주주의 변동" not in heading[-2000:]:
+            continue
+        following = " ".join(html.unescape(re.sub(r"<[^>]+>", " ",
+            xml[row.end():min(len(xml), row.end() + 3000)])).split())
+        if "각각 변동일 당시 발행주식총수를 기준으로 산정" not in following:
+            continue
+        denominator_matches = re.findall(
+            r"(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*([\d,]+)주",
+            following[:1200])
+        denominators = []
+        for year, month, day, amount in denominator_matches:
+            parsed = _korean_date(f"{year}년 {month}월 {day}일")
+            if parsed == basis and _number(amount):
+                denominators.append(_number(amount))
+        if len(set(denominators)) != 1:
+            continue
+        denominator = denominators[0]
+        shown = Decimal(ratio)
+        scale = Decimal(1).scaleb(shown.as_tuple().exponent)
+        if Decimal(denominator) <= 0 or Decimal(quantity) / Decimal(denominator) * 100 < 0:
+            continue
+        if (Decimal(quantity) / Decimal(denominator) * 100).quantize(scale, rounding=ROUND_HALF_UP) != shown:
+            continue
+        claims.append({"structure": "issuer_largest_shareholder_register",
+                       "security_kind": None, "holder_scope": "nps_only",
+                       "ratio_denominator": "issued_shares", "denominator_date": basis,
+                       "denominator_quantity": denominator,
+                       "quantity": quantity, "ownership_percent": ratio,
+                       "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
+                       "row_offset": row.start(), "basis_date": basis,
+                       "status": "issuer_level_actual_basis_verified"})
+    return claims
 
 
 def bind_change_section_basis(xml: str, claims: list[dict]) -> list[dict]:
@@ -355,10 +420,15 @@ def inspect_source_document(payload: bytes):
                 continue
         if decoded is None:
             continue
-        file_claims = extract_source_claims(decoded)[:max(0, 20 - len(claims))]
+        file_claims = extract_source_claims(decoded)
         for claim in file_claims:
             claim["source_file_sha256"] = hashlib.sha256(raw).hexdigest()
         claims.extend(file_claims)
+        if len(claims) > MAX_SOURCE_CLAIMS:
+            return {"status": "source_review_pending", "source_sha256": None,
+                    "source_archive_sha256": archive_sha256,
+                    "parser_version": SOURCE_PARSER_VERSION,
+                    "source_claims": [], "claim_limit_exceeded": True}
         plain = html.unescape(re.sub(r"<[^>]+>", " ", decoded))
         plain = " ".join(plain.split())
         for term in TERMS:
@@ -386,6 +456,9 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
                if company.get("name") == issuer_name and company.get("stock_code")]
     created = 0
     for claim in candidate.get("source_claims") or []:
+        if claim.get("status") == "issuer_level_actual_basis_verified":
+            created += retain_issuer_scope_claim(state, candidate, claim, matches)
+            continue
         if claim.get("status") != "actual_holding_basis_verified":
             candidate["application_status"] = "basis_or_owner_unverified"
             continue
@@ -441,6 +514,86 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
         if candidate.get("application_status") != "historical_fact_enriched":
             candidate["application_status"] = "historical_fact_retained"
     return created
+
+
+def retain_issuer_scope_claim(state: dict, candidate: dict, claim: dict, matches: list) -> int:
+    """Keep a dated issuer-level register fact without assigning a share class."""
+    if (len(matches) != 1 or not candidate.get("source_archive_sha256") or
+            not claim.get("source_file_sha256") or not candidate.get("source_checked_at") or
+            candidate.get("correction_hold") or candidate.get("withdrawal_flag") or
+            candidate.get("filer_corp_code") != matches[0][0]):
+        candidate["application_status"] = "issuer_scope_identity_or_relation_pending"
+        return 0
+    corp, company = matches[0]
+    if (claim.get("holder_scope") != "nps_only" or claim.get("security_kind") is not None or
+            claim.get("ratio_denominator") != "issued_shares" or
+            claim.get("denominator_date") != claim.get("basis_date")):
+        candidate["application_status"] = "issuer_scope_basis_pending"
+        return 0
+    # Re-citations of one register date and value are one observation with
+    # multiple document references, never fresh changes on each filing date.
+    identity = "|".join((corp, claim["basis_date"], claim["quantity"],
+                         claim["ownership_percent"], claim["denominator_quantity"]))
+    key = hashlib.sha256(identity.encode()).hexdigest()
+    ledger = state.setdefault("issuer_scope_observations", {})
+    fact = ledger.get(key)
+    reference = {"receipt_no": candidate["receipt_no"],
+                 "document_no": candidate.get("document_no"),
+                 "filing_date": candidate["filing_date"],
+                 "report_name": candidate.get("report_name"),
+                 "archive_sha256": candidate["source_archive_sha256"],
+                 "file_sha256": claim["source_file_sha256"],
+                 "row_sha256": claim["row_sha256"],
+                 "row_offset": claim["row_offset"],
+                 "parser_version": candidate["parser_version"]}
+    if fact is None:
+        fact = {"corp_code": corp, "stock_code": company["stock_code"],
+                "issuer_name": company["name"], "security_kind": "unclassified",
+                "holder_scope": "nps_only", "ratio_denominator": "issued_shares",
+                "basis_date": claim["basis_date"],
+                "denominator_date": claim["denominator_date"],
+                "denominator_quantity": claim["denominator_quantity"],
+                "quantity": claim["quantity"], "ownership_percent": claim["ownership_percent"],
+                "numeric_kind": "exact", "references": [reference]}
+        ledger[key] = fact
+        candidate["application_status"] = "issuer_scope_observation_retained"
+        return 1
+    expected = {"corp_code": corp, "stock_code": company["stock_code"],
+                "issuer_name": company["name"], "security_kind": "unclassified",
+                "holder_scope": "nps_only", "ratio_denominator": "issued_shares",
+                "basis_date": claim["basis_date"], "denominator_date": claim["denominator_date"],
+                "denominator_quantity": claim["denominator_quantity"],
+                "quantity": claim["quantity"], "ownership_percent": claim["ownership_percent"],
+                "numeric_kind": "exact"}
+    if any(fact.get(field) != value for field, value in expected.items()):
+        candidate["application_status"] = "issuer_scope_fact_conflict"
+        return 0
+    matching = next((item for item in fact["references"]
+                     if item["receipt_no"] == reference["receipt_no"] and
+                        item["document_no"] == reference["document_no"]), None)
+    if matching is not None:
+        if (matching["archive_sha256"] != reference["archive_sha256"] or
+                matching["file_sha256"] != reference["file_sha256"]):
+            candidate["application_status"] = "issuer_scope_source_conflict"
+            return 0
+        rows = matching.setdefault("supporting_rows", [])
+        row = {"sha256": reference["row_sha256"], "offset": reference["row_offset"]}
+        if row not in rows and row != {"sha256": matching["row_sha256"],
+                                      "offset": matching["row_offset"]}:
+            rows.append(row)
+            rows.sort(key=lambda item: (item["offset"], item["sha256"]))
+            candidate["application_status"] = "issuer_scope_same_document_row_linked"
+            return 1
+        candidate["application_status"] = "issuer_scope_already_recorded"
+        return 0
+    if reference not in fact["references"]:
+        fact["references"].append(reference)
+        fact["references"].sort(key=lambda item: (item["filing_date"], item["receipt_no"],
+                                                   item["document_no"] or ""))
+        candidate["application_status"] = "issuer_scope_recitation_linked"
+        return 1
+    candidate["application_status"] = "issuer_scope_already_recorded"
+    return 0
 
 
 def register_comparable_source_claim(state: dict, candidate: dict, claim: dict,
@@ -555,24 +708,27 @@ def replay_opendart_positives(state: dict, *, limit=100) -> dict:
         candidate = {"receipt_no": no, "document_no": None, "filing_date": filing_date,
                      "filing_company": positive.get("corp_name"),
                      "filer_corp_code": positive.get("corp_code"),
+                     "report_name": positive.get("report_nm"),
                      "source_archive_sha256": check["source_archive_sha256"],
                      "source_checked_at": positive["source_checked_at"],
                      "parser_version": SOURCE_PARSER_VERSION,
                      "correction_hold": positive.get("correction_hold"),
                      "withdrawal_flag": positive.get("withdrawal_flag"),
                      "source_claims": check.get("source_claims") or []}
-        # A full-text result may already carry the same verified row with its
-        # document number. Keep that richer provenance instead of duplicating it.
-        recorded = {(item.get("source_receipt_no"), item.get("source_row_sha256"),
-                     item.get("basis_date")) for item in state.get("verified_historical_observations", {}).values()}
-        candidate["source_claims"] = [claim for claim in candidate["source_claims"]
-            if (no, claim.get("row_sha256"), claim.get("basis_date")) not in recorded]
-        if not candidate["source_claims"]:
-            positive.setdefault("application_status", "source_fact_already_recorded")
-            checked += 1
-            continue
         before = len(state.get("indirect_observations") or {})
-        historical += retain_verified_historical_claims(state, candidate)
+        for claim in candidate["source_claims"]:
+            # Reuse the richer full-text document identity for an earlier row,
+            # but always replay it: a newer parser can establish its basis.
+            recorded = next((item for item in state.get("verified_historical_observations", {}).values()
+                if item.get("source_receipt_no") == no and
+                   item.get("source_row_sha256") == claim.get("row_sha256") and
+                   item.get("basis_date") == claim.get("basis_date")), None)
+            per_claim = {**candidate, "document_no": (recorded.get("source_document_no")
+                         if recorded is not None else None), "source_claims": [claim]}
+            historical += retain_verified_historical_claims(state, per_claim)
+            candidate["application_status"] = per_claim.get("application_status")
+            if per_claim.get("current_application_status"):
+                candidate["current_application_status"] = per_claim["current_application_status"]
         registered += len(state.get("indirect_observations") or {}) - before
         positive["application_status"] = (candidate.get("current_application_status") or
                                           candidate.get("application_status") or "source_context_review_pending")
