@@ -370,7 +370,8 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
             candidate["application_status"] = "issuer_identity_unverified"
             continue
         corp, company = matches[0]
-        key = f'{candidate["receipt_no"]}:{candidate["document_no"]}:{claim["row_sha256"]}'
+        key = (f'{candidate["receipt_no"]}:{candidate["document_no"]}:{corp}:'
+               f'{company["stock_code"]}:{claim["basis_date"]}:{claim["row_sha256"]}')
         fact = {"source_receipt_no": candidate["receipt_no"],
                 "source_document_no": candidate["document_no"],
                 "source_filing_date": candidate["filing_date"],
@@ -393,6 +394,12 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
             continue
         candidate["application_status"] = "historical_fact_retained"
     return created
+
+
+def needs_source_provenance(candidate: dict) -> bool:
+    return any(claim.get("status") == "actual_holding_basis_verified" and
+               (not candidate.get("source_archive_sha256") or not claim.get("source_file_sha256"))
+               for claim in candidate.get("source_claims") or [])
 
 
 def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, max_windows=20,
@@ -547,7 +554,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         def check_source(receipt_no):
             nonlocal source_requests
             check = cache.get(receipt_no)
-            if (check is None or check.get("parser_version") != SOURCE_PARSER_VERSION
+            if (check is None or check.get("parser_version") != SOURCE_PARSER_VERSION or needs_source_provenance(check)
                     or check.get("status") in ("source_review_pending", "source_unavailable")):
                 source_requests += 1
                 try:
@@ -566,10 +573,12 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         for document_key, item in ledger["candidates"].items():
             if source_receipt and not document_key.startswith(source_receipt + ":"):
                 continue
+            provenance_upgrade = needs_source_provenance(item)
             if ((item.get("review_status") == "source_review_pending" or
-                 item.get("parser_version") != SOURCE_PARSER_VERSION) and
+                 item.get("parser_version") != SOURCE_PARSER_VERSION or provenance_upgrade) and
                     (item.get("last_source_attempt_on") != today or
-                     item.get("parser_version") != SOURCE_PARSER_VERSION)):
+                     item.get("parser_version") != SOURCE_PARSER_VERSION or
+                     (provenance_upgrade and item.get("provenance_last_attempt_on") != today))):
                 pending.append((int(item.get("source_attempt_count") or 0),
                                 item["filing_date"], 0, document_key, item))
         for document_key in queue_dates.keys() - ledger["candidates"].keys():
@@ -590,9 +599,11 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             if priority == 0:
                 item["source_attempt_count"] = int(item.get("source_attempt_count") or 0) + 1
                 item["last_source_attempt_on"] = today
+                if needs_source_provenance(item):
+                    item["provenance_last_attempt_on"] = today
                 item.update(check)
                 item["review_status"] = check["status"]
-                retain_verified_historical_claims(state, item)
+                retained += retain_verified_historical_claims(state, item)
             else:
                 noncandidate_reviews[document_key] = {
                     "review_status": check["status"],

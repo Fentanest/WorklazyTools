@@ -167,6 +167,49 @@ class SecondaryBackfillTests(unittest.TestCase):
             self.assertEqual(run()['historical_facts_retained'], 0)
             self.assertEqual(path.read_bytes(), before)
 
+    def test_existing_v4_claim_without_archive_provenance_refetches_once(self):
+        day = date(2006, 2, 1)
+        state = folio.empty_state()
+        state['universe']['00155319'] = {'name': 'POSCO홀딩스', 'stock_code': '005490'}
+        key = '20060124800040:1248144'
+        old_claim = {'status': 'actual_holding_basis_verified', 'row_sha256': 'b' * 64,
+            'row_offset': 12006, 'basis_date': '2006-02-01',
+            'basis_evidence': 'matched_report_change_and_owner_total',
+            'quantity': '2407509', 'ownership_percent': '2.76'}
+        state['secondary_backfill'] = {'method': secondary.METHOD, 'start_date': day.isoformat(),
+            'target_date': day.isoformat(), 'next_date': '2006-02-02', 'coverage': [],
+            'candidates': {key: {'receipt_no': '20060124800040', 'document_no': '1248144',
+                'filing_date': '2006-02-01', 'filing_company': 'POSCO홀딩스',
+                'review_status': 'source_context_review_pending',
+                'last_source_attempt_on': '2026-09-26',
+                'parser_version': secondary.SOURCE_PARSER_VERSION, 'source_claims': [old_claim]}}}
+        state['secondary_source_cache']['20060124800040'] = {
+            'status': 'source_context_review_pending', 'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_claims': [old_claim]}
+        inspected = {'status': 'source_context_review_pending',
+            'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_archive_sha256': 'a' * 64,
+            'source_claims': [{**old_claim, 'source_file_sha256': 'c' * 64}]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, state)
+            with patch.object(secondary, 'inspect_source_document', return_value=inspected) as inspect:
+                run = secondary.scan_secondary(path, day, day, read_state=folio.read_json,
+                    write_state=folio.write_json, key='test-key', review_limit=1, source_only=True,
+                    source_receipt='20060124800040', fetch_document=lambda *_: b'archive')
+                self.assertEqual(inspect.call_count, 1)
+            self.assertEqual((run['source_document_requests'], run['historical_facts_retained']), (1, 1))
+            saved = folio.read_json(path)
+            self.assertEqual(len(saved['verified_historical_observations']), 1)
+            self.assertEqual(saved['secondary_backfill']['candidates'][key]['application_status'],
+                             'historical_fact_retained')
+            before = path.read_bytes()
+            repeat = secondary.scan_secondary(path, day, day, read_state=folio.read_json,
+                write_state=folio.write_json, key='test-key', review_limit=1, source_only=True,
+                source_receipt='20060124800040', fetch_document=lambda *_: self.fail('source refetched'))
+            self.assertEqual(repeat['source_document_requests'], 0)
+            self.assertEqual(path.read_bytes(), before)
+
     def test_parser_keeps_official_page_identity_and_receipt_metadata(self):
         day = date(2006, 2, 8)
         page = secondary.parse_search_page(result_page([POSCO]), 1, day, day)
