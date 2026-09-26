@@ -23,8 +23,12 @@ test("FolioTrace UI never fetches external data or fabricates sample finances", 
     assert.doesNotMatch(source, /dart\.fss\.or\.kr/i);
     assert.ok(!source.includes("Math.random"), "must not invent sample values");
   }
-  // No provider-specific conditions or wording anywhere in UI code.
-  assert.doesNotMatch(pageSource + holdingsSource, /naver/i);
+  // Provider display labels are required attribution; what is forbidden
+  // is usage/permission/licensing-condition wording about any provider.
+  assert.doesNotMatch(
+    pageSource + holdingsSource,
+    /permission|licen[sc]e|이용 ?(조건|허가|승인)|사용 ?(조건|허가|승인)|제휴|공식 ?제공/i,
+  );
 });
 
 test("Number conversion exists only inside the visual-only approxNumber", () => {

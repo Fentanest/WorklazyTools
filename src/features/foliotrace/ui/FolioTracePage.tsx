@@ -29,6 +29,7 @@ import {
   formatQty,
   holdingStatus,
   latestUnresolvedReasonLabel,
+  quoteProviderLabel,
   quoteSessionLabel,
   sortHoldings,
   topHoldings,
@@ -115,7 +116,7 @@ const STR = {
     guideTitle: "방법론·출처·주의사항",
     guideFaqTitle: "자주 묻는 질문",
     faqTitle: "자주 묻는 질문",
-    faqDesc: "정적 안내·검색 노출용 설명과 같은 내용입니다.",
+    faqDesc: "추정 범위·계산·출처에 대한 자주 묻는 질문입니다.",
     prevVerifiedReceipt: "이전 확인 접수",
     latestUnresolvedReceipt: "최신 미확인 접수",
     retry: "게시된 데이터 다시 조회",
@@ -213,7 +214,7 @@ const STR = {
     guideTitle: "Method · sources · cautions",
     guideFaqTitle: "FAQ",
     faqTitle: "FAQ",
-    faqDesc: "Same content as the static guide and search fallback.",
+    faqDesc: "Frequently asked questions about scope, estimation, and sources.",
     prevVerifiedReceipt: "Previously confirmed receipt",
     latestUnresolvedReceipt: "Latest unverified receipt",
     retry: "Re-fetch published data",
@@ -653,7 +654,7 @@ function ReadyView({
                 <dt>{t.detailPrice}</dt>
                 <dd>
                   {selected.quote
-                    ? `${formatKrw(selected.quote.close, lang)} · ${selected.quote.tradeDate} · ${quoteSessionLabel(selected.quote.session, lang)}`
+                    ? `${formatKrw(selected.quote.close, lang)} · ${selected.quote.tradeDate} · ${quoteSessionLabel(selected.quote.session, lang)} · ${quoteProviderLabel(selected.quote.provider, lang)}`
                     : "—"}
                 </dd>
               </div>

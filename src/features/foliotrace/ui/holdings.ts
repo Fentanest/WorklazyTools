@@ -178,14 +178,18 @@ export function latestUnresolvedReasonLabel(reason: string | null, lang: Lang): 
 }
 
 /**
- * Quote basis in clear ko/en terms. The contract session value gets a
- * human label; anything else passes through raw (own data,
- * React-escaped) rather than blanking. No provider-specific branching:
- * the quote line names the market session and date only.
+ * Quote basis in clear ko/en terms. The contract session and provider
+ * values get human labels; anything else passes through raw (own data,
+ * React-escaped) rather than blanking.
  */
 export function quoteSessionLabel(session: string, lang: Lang): string {
   if (session === "regular") return lang === "ko" ? "정규장" : "Regular session";
   return session;
+}
+
+export function quoteProviderLabel(provider: string, lang: Lang): string {
+  if (provider === "naver") return lang === "ko" ? "네이버" : "Naver";
+  return provider;
 }
 
 export function filterHoldings(holdings: Holding[], query: string, quality: QualityFilter): Holding[] {

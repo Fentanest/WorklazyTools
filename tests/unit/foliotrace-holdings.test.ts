@@ -12,6 +12,7 @@ import {
   formatQty,
   holdingStatus,
   latestUnresolvedReasonLabel,
+  quoteProviderLabel,
   quoteSessionLabel,
   sortHoldings,
   topHoldings,
@@ -303,11 +304,14 @@ test("unknown exclusion reasons fall back generically without echoing", () => {
   assert.equal(exclusionReasonLabel("some_future_reason", "en"), "Excluded: reason unavailable");
 });
 
-test("quote session renders as clear terms with identity kept", () => {
+test("quote session/provider render as clear terms with identity kept", () => {
   assert.equal(quoteSessionLabel("regular", "ko"), "정규장");
   assert.equal(quoteSessionLabel("regular", "en"), "Regular session");
+  assert.equal(quoteProviderLabel("naver", "ko"), "네이버");
+  assert.equal(quoteProviderLabel("naver", "en"), "Naver");
   // Unknown contract values pass through (own data, React-escaped), never blank.
   assert.equal(quoteSessionLabel("auction", "ko"), "auction");
+  assert.equal(quoteProviderLabel("other-feed", "en"), "other-feed");
 });
 
 test("eventRangeOf reports the real receipt-date span, never fabricated", () => {
