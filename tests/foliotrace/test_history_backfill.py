@@ -42,6 +42,47 @@ def page(rows):
 
 
 class HistoricalBackfillTests(unittest.TestCase):
+    def test_live_prefix_mismatch_stays_unresolved_and_excludes_older_holding(self):
+        initial = folio.empty_state()
+        current = "20200107000002"
+        initial["universe"][CORP] = {"name": "Synthetic", "stock_code": CODE}
+        initial["receipts"][current] = {"receipt_no": current, "receipt_date": "2020-01-06",
+            "listing_receipt_date": "2020-01-06", "corp_code": CORP, "stock_code": CODE,
+            "quantity": "90", "company_ownership_percent": "6", "evidence": "dart_document"}
+        initial["holdings"][CORP] = {"corp_code": CORP, "stock_code": CODE, "name": "Synthetic",
+            "receipt_no": current, "receipt_date": "2020-01-06", "quantity": "90",
+            "company_ownership_percent": "6", "evidence": "dart_document", "security_kind": "common",
+            "corporate_action_status": "verified", "corporate_action_trade_date": "2020-01-07"}
+        folio.apply_listing_row(initial, row(rcept_dt="20200107"))
+        self.assertEqual(initial["unresolved"][OLD], "receipt_chronology_unverified")
+        with patch.object(folio, "structured_receipt", side_effect=AssertionError("live mismatch parsed")):
+            self.assertEqual(folio.resolve_unfinished(initial, "test-key", limit=10), 0)
+        self.assertEqual(initial["holdings"][CORP]["receipt_no"], current)
+        quote = {CODE: {"close": "100", "trade_date": "2020-01-07", "market": "KRX",
+                        "session": "regular", "currency": "KRW", "adjusted": False,
+                        "provider": "naver", "observed_at": "2020-01-07T08:00:00Z", "verified": True}}
+        holding = make_snapshot(initial, quote)["holdings"][0]
+        self.assertEqual(holding["latestUnresolvedReceiptNo"], OLD)
+        self.assertEqual(holding["valuationExclusionReason"], "latest_filing_unresolved")
+        self.assertIsNone(holding["estimatedValue"])
+
+    def test_live_overlap_keeps_historical_mismatch_out_of_recheck_and_public_events(self):
+        initial = state()
+        initial["receipts"][OLD] = {"receipt_no": OLD, "receipt_date": "2020-01-07",
+            "corp_code": CORP, "stock_code": CODE, "quantity": "75",
+            "company_ownership_percent": "5.5", "origin": "legacy_import",
+            "evidence": "legacy_history_fact"}
+        initial["events"][OLD] = {"receipt_no": OLD, "receipt_date": "2020-01-07",
+            "corp_code": CORP, "stock_code": CODE, "kind": "other", "correction_of": None,
+            "quantity": "75", "company_ownership_percent": "5.5", "source": "legacy_history_fact"}
+        folio.apply_listing_row(initial, row(rcept_dt="20200107"), historical=True)
+        folio.apply_listing_row(initial, row(rcept_dt="20200107"))
+        self.assertEqual(initial["unresolved"][OLD], "receipt_chronology_unverified")
+        with patch.object(folio, "structured_receipt", side_effect=AssertionError("mismatch rechecked")):
+            self.assertEqual(folio.recheck_legacy_history(initial, "test-key"), {"checked": 0, "verified": 0})
+        self.assertEqual(initial["unresolved"][OLD], "receipt_chronology_unverified")
+        self.assertNotIn(OLD, {event["receiptNo"] for event in make_snapshot(initial, {})["events"]})
+
     def test_first_window_failure_reports_only_safe_stage_and_status(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"

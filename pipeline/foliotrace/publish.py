@@ -23,20 +23,24 @@ def make_snapshot(state, quotes, now=None):
     trade_date = trade_dates[-1] if trade_dates else None
     holdings = []
     pending_by_corp = {}
+    def receipt_order(no):
+        receipt = state.get("receipts", {}).get(no, {})
+        return (receipt.get("listing_receipt_date") or receipt.get("receipt_date") or "", no or "")
     for no in state.get("unresolved", {}):
         receipt = state.get("receipts", {}).get(no, {})
         corp = receipt.get("corp_code")
-        if corp:
-            pending_by_corp[corp] = max(pending_by_corp.get(corp, ""), no)
+        if corp and receipt_order(no) > receipt_order(pending_by_corp.get(corp, "")):
+            pending_by_corp[corp] = no
     for source in sorted(state["holdings"].values(), key=lambda h: (h.get("stock_code") or "", h.get("corp_code") or "")):
         holding = dict(source)
         current_no = holding.get("receipt_no")
         current = state["receipts"].get(current_no, {})
-        latest_no = max(holding.get("latest_unresolved_receipt") or "", pending_by_corp.get(holding.get("corp_code"), ""))
-        if latest_no < (current_no or ""):
+        latest_no = max((holding.get("latest_unresolved_receipt") or "", pending_by_corp.get(holding.get("corp_code"), "")),
+                        key=receipt_order)
+        if receipt_order(latest_no) < receipt_order(current_no):
             latest_no = ""
         if current.get("withdrawn_flag") or current.get("is_correction") or current.get("later_correction_flag"):
-            latest_no = max(latest_no or "", current_no or "")
+            latest_no = max((latest_no or "", current_no or ""), key=receipt_order)
         if latest_no:
             holding["latest_unresolved_receipt"] = latest_no
             holding["latest_unresolved_reason"] = state.get("unresolved", {}).get(latest_no) or "correction_relation_unverified"
@@ -68,7 +72,7 @@ def make_snapshot(state, quotes, now=None):
     events = []
     for event in sorted(state.get("events", {}).values(), key=lambda e: e.get("receipt_no", ""), reverse=True):
         no = event.get("receipt_no") or ""
-        if state.get("unresolved", {}).get(no) == "receipt_date_conflict":
+        if state.get("unresolved", {}).get(no) in ("receipt_date_conflict", "receipt_chronology_unverified"):
             continue
         events.append({"receiptNo": no, "receiptDate": event.get("receipt_date") or "",
                        "corpCode": event.get("corp_code") or "", "stockCode": event.get("stock_code"),

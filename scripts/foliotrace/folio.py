@@ -708,6 +708,9 @@ def apply_listing_row(state, row, *, historical=False):
         state["unresolved"][no] = "security_identity_conflict"
     if existing.get("receipt_date") != listed_date:
         state["unresolved"][no] = "receipt_date_conflict"
+    elif (not historical and existing.get("receipt_prefix_date_mismatch")
+          and state["unresolved"].get(no) != "security_identity_conflict"):
+        state["unresolved"][no] = "receipt_chronology_unverified"
     return existing.get("origin") == "dart_listing" and existing.get("evidence") == "unresolved"
 
 
@@ -758,7 +761,8 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
                                     and receipt.get("quantity") is not None
                                     and receipt.get("company_ownership_percent") is not None)):
             continue
-        if state["unresolved"].get(no) in ("security_identity_conflict", "receipt_date_conflict"):
+        if state["unresolved"].get(no) in ("security_identity_conflict", "receipt_date_conflict",
+                                           "receipt_chronology_unverified"):
             continue
         if receipt.get("historical_backfill_only") and (
                 int(receipt.get("parse_attempt_count") or 0) >= HISTORICAL_PARSE_ATTEMPTS
@@ -832,7 +836,7 @@ def classify_events(state):
         for receipt in sorted(receipts, key=lambda item: (item.get("listing_receipt_date") or
                                                        item.get("receipt_date") or "", item["receipt_no"])):
             no = receipt["receipt_no"]
-            if state.get("unresolved", {}).get(no) == "receipt_date_conflict":
+            if state.get("unresolved", {}).get(no) in ("receipt_date_conflict", "receipt_chronology_unverified"):
                 continue
             event = state.get("events", {}).get(no)
             flagged = any(receipt.get(field) for field in ("is_correction", "later_correction_flag", "withdrawn_flag"))
@@ -865,7 +869,8 @@ def recheck_legacy_history(state, key, limit=10, state_path=None):
                   and receipt.get("evidence") not in ("dart_structured", "dart_document")
                   and int(receipt.get("source_recheck_attempts") or 0) < HISTORICAL_PARSE_ATTEMPTS
                   and receipt.get("source_recheck_last_on") != today
-                  and state["unresolved"].get(no) not in ("security_identity_conflict", "receipt_date_conflict")
+                  and state["unresolved"].get(no) not in ("security_identity_conflict", "receipt_date_conflict",
+                                                         "receipt_chronology_unverified")
                   and state["universe"].get(receipt["corp_code"], {}).get("stock_code") == receipt["stock_code"]]
     checked = verified = 0
     structured_cache = {}
