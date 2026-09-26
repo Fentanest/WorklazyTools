@@ -204,7 +204,10 @@ def empty_state():
     return {"schema": 1, "revision": 0, "import_ledger": [], "universe": {}, "receipts": {},
             "holdings": {}, "events": {}, "unresolved": {}, "metadata_recovery": {}, "mapping_ledger": {}, "quote_cache": {},
             "listing_coverage": [], "latest_complete_listing_date": None,
-            "historical_backfill": None,
+            "historical_backfill": None, "early_direct_backfill": None,
+            "secondary_backfill": None, "secondary_equity_backfill": None,
+            "secondary_prior_backfill": None, "secondary_prior_equity_backfill": None,
+            "secondary_source_cache": {},
             "legacy_coverage_status": "unverified", "legacy_resume_hint": None,
             "last_published_dataset": None, "published_history": []}
 
@@ -1098,7 +1101,8 @@ def recover_metadata(state, key, *, limit_days=100, state_path=None):
 
 
 def backfill_history(state_path: Path, start: date, end: date, key: str, *,
-                     max_listing_pages=120, max_windows=20, parse_limit=30, recheck_limit=10):
+                     max_listing_pages=120, max_windows=20, parse_limit=30, recheck_limit=10,
+                     ledger_key="historical_backfill"):
     """Scan old D001 listings forward, committing only fully verified windows.
 
     The historical cursor never advances the incremental cursor. Old receipt
@@ -1107,6 +1111,8 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
     """
     if not key:
         raise ValueError("DART_API_KEY unavailable")
+    if ledger_key not in ("historical_backfill", "early_direct_backfill"):
+        raise ValueError("invalid historical ledger")
     if (start > end or end > kst_today() or max_listing_pages < 1 or max_windows < 1
             or not 0 <= parse_limit <= 300 or not 0 <= recheck_limit <= 100):
         raise ValueError("invalid historical backfill bounds")
@@ -1115,11 +1121,11 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
         raise ValueError("incremental collection must be initialized")
     if end > date.fromisoformat(state["latest_complete_listing_date"]):
         raise ValueError("historical end exceeds current complete listing date")
-    ledger = state.get("historical_backfill")
+    ledger = state.get(ledger_key)
     if ledger is None:
         ledger = {"start_date": start.isoformat(), "target_date": end.isoformat(),
                   "next_date": start.isoformat(), "coverage": []}
-        state["historical_backfill"] = ledger
+        state[ledger_key] = ledger
     elif ledger.get("start_date") != start.isoformat() or end < date.fromisoformat(ledger["target_date"]):
         raise ValueError("historical backfill range conflicts with persisted cursor")
     else:
@@ -1236,14 +1242,17 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
             "state_revision": state["revision"]}
 
 
-def resume_history(state_path: Path, key: str, *, max_listing_pages=120, max_windows=20, parse_limit=30, recheck_limit=10):
-    ledger = read_json(state_path).get("historical_backfill")
+def resume_history(state_path: Path, key: str, *, max_listing_pages=120, max_windows=20, parse_limit=30,
+                   recheck_limit=10, ledger_key="historical_backfill"):
+    if ledger_key not in ("historical_backfill", "early_direct_backfill"):
+        raise ValueError("invalid historical ledger")
+    ledger = read_json(state_path).get(ledger_key)
     if ledger is None:
         return {"status": "NOT_INITIALIZED", "windows_this_run": 0, "parse_attempts": 0}
     return backfill_history(state_path, date.fromisoformat(ledger["start_date"]),
                             date.fromisoformat(ledger["target_date"]), key,
                             max_listing_pages=max_listing_pages, max_windows=max_windows,
-                            parse_limit=parse_limit, recheck_limit=recheck_limit)
+                            parse_limit=parse_limit, recheck_limit=recheck_limit, ledger_key=ledger_key)
 
 
 def collect(state_path: Path, cutoff: date, key: str, overlap=7):
@@ -1459,6 +1468,19 @@ def main():
     q.add_argument("--max-windows", type=int, default=20)
     q.add_argument("--parse-limit", type=int, default=30)
     q.add_argument("--recheck-limit", type=int, default=10)
+    q = sub.add_parser("backfill-early-direct")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--max-listing-pages", type=int, default=300)
+    q.add_argument("--max-windows", type=int, default=20)
+    q.add_argument("--parse-limit", type=int, default=20)
+    q = sub.add_parser("scan-secondary")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--start", type=date.fromisoformat)
+    q.add_argument("--end", type=date.fromisoformat)
+    q.add_argument("--max-pages", type=int, default=300)
+    q.add_argument("--max-windows", type=int, default=20)
+    q.add_argument("--review-limit", type=int, default=30)
+    q.add_argument("--scope", choices=("all", "equity", "prior-all", "prior-equity"), default="all")
     q = sub.add_parser("price-and-value")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--output", type=Path, required=True)
@@ -1490,6 +1512,24 @@ def main():
                                           os.environ.get("DART_API_KEY", ""), **options)
             else:
                 raise ValueError("choose either an explicit historical range or --resume")
+        elif args.command == "backfill-early-direct":
+            result = backfill_history(args.state, date(2006, 1, 1), date(2008, 12, 31),
+                os.environ.get("DART_API_KEY", ""), max_listing_pages=args.max_listing_pages,
+                max_windows=args.max_windows, parse_limit=args.parse_limit, recheck_limit=0,
+                ledger_key="early_direct_backfill")
+        elif args.command == "scan-secondary":
+            from scripts.foliotrace.secondary import scan_secondary
+            state = read_json(args.state)
+            start = args.start or (date(2000, 1, 1) if args.scope.startswith("prior-") else date(2006, 1, 1))
+            target = args.end or (date(2005, 12, 31) if args.scope.startswith("prior-") else
+                                  date(2008, 12, 31) if args.scope == "equity" else
+                                  date.fromisoformat(state["latest_complete_listing_date"]))
+            if target > kst_today():
+                raise ValueError("secondary target beyond today")
+            result = scan_secondary(args.state, start, target, max_pages=args.max_pages,
+                                    max_windows=args.max_windows, read_state=read_json, write_state=write_json,
+                                    key=os.environ.get("DART_API_KEY", ""), review_limit=args.review_limit,
+                                    scope=args.scope)
         elif args.command == "price-and-value": result = price_and_value(args.state, args.output)
         elif args.command == "emit-snapshot": result = emit_snapshot(args.snapshot, args.dist)
         elif args.command == "record-published": result = record_published(args.state, version=args.dataset_version,
@@ -1503,16 +1543,23 @@ def main():
             if not result["verified"] or result["state_receipts"] < result["unique_receipts"]:
                 raise ValueError("migration verification failed")
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-        if args.command == "backfill-history" and result.get("status") == "LISTING_BUDGET_INSUFFICIENT":
+        if (args.command in ("backfill-history", "backfill-early-direct")
+                and result.get("status") == "LISTING_BUDGET_INSUFFICIENT"
+                or args.command == "scan-secondary" and result.get("status") == "SEARCH_BUDGET_INSUFFICIENT"):
             return 1
     except Exception as exc:
         error = {"error": type(exc).__name__}
-        if args.command == "backfill-history" and isinstance(exc, HistoricalCollectionError):
+        if args.command in ("backfill-history", "backfill-early-direct") and isinstance(exc, HistoricalCollectionError):
             error.update(code=exc.code, window_start=exc.start, window_end=exc.end)
             if exc.page_no is not None:
                 error["page_no"] = exc.page_no
             if exc.row_index is not None:
                 error["row_index"] = exc.row_index
+        elif args.command == "scan-secondary":
+            from scripts.foliotrace.secondary import SecondarySearchError
+            if isinstance(exc, SecondarySearchError):
+                error.update(code=exc.code, window_start=exc.start, window_end=exc.end,
+                             term_index=exc.term_index, page_no=exc.page)
         elif args.command != "backfill-history":
             error["message"] = str(exc)
         print(json.dumps(error, ensure_ascii=False), file=sys.stderr)

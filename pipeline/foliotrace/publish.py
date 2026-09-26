@@ -126,6 +126,35 @@ def make_snapshot(state, quotes, now=None):
             "listingComplete": completed_through >= historical["target_date"],
             "firstObservedNpsReceiptDate": min(listed) if listed else None,
             "parsingPendingCount": len(pending), "legacySourceRecheckCount": legacy_recheck}
+    secondary = state.get("secondary_backfill") or {}
+    equity = state.get("secondary_equity_backfill") or {}
+    prior = state.get("secondary_prior_backfill") or {}
+    prior_equity = state.get("secondary_prior_equity_backfill") or {}
+    early_direct = state.get("early_direct_backfill") or {}
+    if any(item.get("coverage") for item in (secondary, equity, prior, prior_equity, early_direct)):
+        candidates = {}
+        for lane in (secondary, equity, prior, prior_equity):
+            for key, item in (lane.get("candidates") or {}).items():
+                previous = candidates.get(key)
+                if previous is None or (previous.get("review_status") == "source_review_pending" and
+                                        item.get("review_status") != "source_review_pending"):
+                    candidates[key] = item
+        snapshot["secondaryCoverage"] = {
+            "searchStartDate": prior.get("start_date") or prior_equity.get("start_date") or
+                               secondary.get("start_date") or equity.get("start_date") or "2006-01-01",
+            "searchTargetDate": secondary.get("target_date") or state.get("latest_complete_listing_date") or
+                                early_direct.get("target_date") or equity.get("target_date") or
+                                prior.get("target_date") or prior_equity.get("target_date"),
+            "priorContentCheckedThrough": prior["coverage"][-1]["to"] if prior.get("coverage") else None,
+            "priorEquityCheckedThrough": prior_equity["coverage"][-1]["to"] if prior_equity.get("coverage") else None,
+            "allContentCheckedThrough": secondary["coverage"][-1]["to"] if secondary.get("coverage") else None,
+            "equityContentCheckedThrough": equity["coverage"][-1]["to"] if equity.get("coverage") else None,
+            "earlyDirectCheckedThrough": early_direct["coverage"][-1]["to"] if early_direct.get("coverage") else None,
+            "candidateDocumentCount": len(candidates),
+            "sourceContextReviewCount": sum(item.get("review_status") == "source_context_review_pending"
+                                            for item in candidates.values()),
+            "sourceReviewPendingCount": sum(item.get("review_status") == "source_review_pending"
+                                            for item in candidates.values())}
     snapshot["datasetVersion"] = digest({k: v for k, v in snapshot.items() if k != "datasetVersion"})
     for item in snapshot["history"]:
         if item["datasetVersion"] == "":

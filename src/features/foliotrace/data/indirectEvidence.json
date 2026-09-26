@@ -1,37 +1,221 @@
 {
   "schemaVersion": 1,
-  "scope": "third-party-filing-mentions",
+  "scope": "source-checked-third-party-filing-samples",
   "items": [
     {
-      "receiptNo": "20060208000020",
-      "filingDate": "2006-02-08",
-      "filingCompany": "포스코",
-      "filingCompanyEn": "POSCO",
-      "filer": "주식회사 포스코",
-      "filerEn": "POSCO Co., Ltd.",
-      "mentionedEntity": "국민연금공단",
-      "mentionedEntityEn": "National Pension Service",
+      "receiptNo": "20000420000129",
+      "documentNo": "51683",
+      "filingDate": "2000-04-20",
+      "filer": "KB캐피탈",
+      "relationship": "planned-third-party-allotment-unconfirmed",
+      "facts": [
+        {
+          "issuer": "KB캐피탈",
+          "basisDate": null,
+          "securityKind": "common",
+          "quantity": "1533800",
+          "ownershipPercent": null,
+          "stage": "planned-allotment-not-confirmed-holding"
+        }
+      ],
+      "sourceConflict": null,
+      "descriptionKo": "2000-04-20 KB캐피탈 유상증자 결의는 국민연금관리공단에 보통주 1,533,800주를 제3자 배정할 계획을 적습니다. 청약·납입 또는 실제 보유 완료 근거는 이 결의만으로 확인되지 않습니다.",
+      "descriptionEn": "A KB Capital capital-increase resolution dated 2000-04-20 proposes allotting 1,533,800 new common shares to NPS. The resolution alone does not confirm subscription, payment, or holdings.",
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20000420000129&dcmNo=51683",
+      "sourceSection": "제3자 배정의 경우",
+      "sourceSectionSha256": "6ea79c3d8f89f763caa3c9c45357c051977a4c3a22907b3067aae6cf30d54e26"
+    },
+    {
+      "receiptNo": "20030909000232",
+      "documentNo": "674676",
+      "filingDate": "2003-09-09",
+      "filer": "주식회사 케이티",
+      "relationship": "shareholder-of-filer-with-old-register-basis",
+      "facts": [
+        {
+          "issuer": "케이티",
+          "basisDate": "2002-12",
+          "securityKind": null,
+          "quantity": null,
+          "ownershipPercent": "2.70"
+        }
+      ],
+      "sourceConflict": null,
+      "descriptionKo": "2003-09-09 케이티의 공시는 국민연금관리공단의 케이티 지분율을 2.70%로 적었습니다. 기준은 2002년 12월 말 주주명부이며 공시는 현재 수량이 다를 수 있다고 경고합니다.",
+      "descriptionEn": "A KT filing dated 2003-09-09 states a 2.70% NPS stake in KT based on its December 2002 shareholder register; it warns that current shares may differ.",
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20030909000232&dcmNo=674676",
+      "sourceSection": "2. 보고자에 관한 사항",
+      "sourceSectionSha256": "9bc0ffeb87e2546913ce281a92f54952786f61e9159f4ee7ca0c5a9cfb36196d"
+    },
+    {
+      "receiptNo": "20050131000208",
+      "documentNo": "980717",
+      "filingDate": "2005-01-31",
+      "filer": "SBS",
       "relationship": "proxy-solicitation-target-shareholder",
-      "securityKind": "보통주",
-      "statedOwnershipPercent": null,
-      "quantity": null,
+      "facts": [
+        {
+          "issuer": "SBS",
+          "basisDate": null,
+          "securityKind": "common",
+          "quantity": null,
+          "ownershipPercent": null
+        }
+      ],
+      "sourceConflict": "source-share-count-masked",
+      "descriptionKo": "2005-01-31 SBS 의결권 대리행사 권유 문서의 피권유자 명단에 국민연금관리공단이 보통주 소유자로 나옵니다. 원문 주식수는 *****로 가려져 있어 수량은 확인되지 않습니다.",
+      "descriptionEn": "An SBS proxy solicitation dated 2005-01-31 lists NPS as a common-share holder. The source masks the share count, so the quantity remains unverified.",
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20050131000208&dcmNo=980717",
+      "sourceSection": "피권유자의 성명ㆍ소유주식의 종류 및 수",
+      "sourceSectionSha256": "cc8d8a7da1e4e487338c6bd1d58a97ab878f6b5cd2fc243db9e071281ade11f5"
+    },
+    {
+      "receiptNo": "20060124800040",
+      "documentNo": "1248144",
+      "filingDate": "2006-02-01",
+      "filer": "주식회사 포스코",
+      "relationship": "reported-share-sale",
+      "facts": [
+        {
+          "issuer": "포스코",
+          "basisDate": null,
+          "securityKind": "common",
+          "quantity": "3084186",
+          "ownershipPercent": "3.54",
+          "stage": "previous-report-value"
+        },
+        {
+          "issuer": "포스코",
+          "basisDate": "2006-02-01",
+          "securityKind": "common",
+          "quantity": "2407509",
+          "ownershipPercent": "2.76",
+          "stage": "current-report-value"
+        }
+      ],
+      "sourceConflict": null,
+      "descriptionKo": "2006-02-01 포스코의 최대주주 변동 공시는 국민연금관리공단 보통주가 장내매도로 3,084,186주(3.54%)에서 2,407,509주(2.76%)로 줄었다고 적습니다. 직전 보고서 제출일 2005-01-25는 이 문서의 참조값이며 해당 직전 원문은 별도 확인 전입니다.",
+      "descriptionEn": "A POSCO filing dated 2006-02-01 reports NPS common shares falling after an on-market sale from 3,084,186 (3.54%) to 2,407,509 (2.76%). Its cited prior filing date, 2005-01-25, has not been independently checked.",
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20060124800040&dcmNo=1248144",
+      "sourceSection": "최대주주등소유주식변동신고서(최대주주변경시)",
+      "sourceSectionSha256": "1ec063f0998a40c96f9a420643a9898025a64a042a1572aa5f1c8c199ce86306",
+      "referencedPriorReportDate": "2005-01-25"
+    },
+    {
+      "receiptNo": "20060201000258",
+      "documentNo": "1247987",
+      "filingDate": "2006-02-01",
+      "filer": "삼성전자",
+      "relationship": "proxy-solicitation-target-shareholder",
+      "facts": [
+        {
+          "issuer": "삼성전자",
+          "basisDate": null,
+          "securityKind": "common",
+          "quantity": null,
+          "ownershipPercent": null
+        }
+      ],
+      "sourceConflict": "search-index-quantity-masked-in-viewer",
+      "descriptionKo": "2006-02-01 삼성전자 의결권 대리행사 권유 문서의 피권유자 명단에 국민연금관리공단이 보통주 소유자로 나옵니다. 원문 주식수는 *****로 가려져 있어 검색 색인의 수량을 확인값으로 쓰지 않습니다.",
+      "descriptionEn": "A Samsung Electronics proxy solicitation dated 2006-02-01 lists NPS as a common-share holder. The source viewer masks the share count, so a number in the search index is not treated as verified.",
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20060201000258&dcmNo=1247987",
+      "sourceSection": "4. 피권유자의 성명ㆍ소유주식의 종류 및 수",
+      "sourceSectionSha256": "591344ab07a63e89b0e8c8b68e4db8a9e87639cf49f385b68bbc4453860ed32c"
+    },
+    {
+      "receiptNo": "20060208000020",
+      "documentNo": "1251611",
+      "filingDate": "2006-02-08",
+      "filer": "주식회사 포스코",
+      "relationship": "proxy-solicitation-target-shareholder",
+      "facts": [
+        {
+          "issuer": "포스코",
+          "basisDate": null,
+          "securityKind": "common",
+          "quantity": null,
+          "ownershipPercent": null
+        }
+      ],
+      "sourceConflict": "search-index-quantity-masked-in-viewer",
+      "descriptionKo": "2006-02-08 포스코 의결권 대리행사 권유 문서의 피권유자 명단에 국민연금공단이 보통주 소유자로 나옵니다. 원문 주식수는 *****로 가려져 있습니다.",
+      "descriptionEn": "A POSCO proxy solicitation dated 2006-02-08 lists NPS as a common-share holder. The source viewer masks the share count.",
       "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20060208000020&dcmNo=1251611",
       "sourceSection": "4. 피권유자의 성명ㆍ소유주식의 종류 및 수",
       "sourceSectionSha256": "a1b36c74f0e45dfad024671240bf1731ad8bde0ea9175d8f2625196333eb4f0c"
     },
     {
-      "receiptNo": "20081007000308",
-      "filingDate": "2008-10-07",
-      "filingCompany": "국민은행",
-      "filingCompanyEn": "Kookmin Bank",
-      "filer": "KB금융지주",
-      "filerEn": "KB Financial Group",
-      "mentionedEntity": "국민연금공단",
-      "mentionedEntityEn": "National Pension Service",
+      "receiptNo": "20060407000047",
+      "documentNo": "1336865",
+      "filingDate": "2006-04-07",
+      "filer": "주식회사 케이티",
       "relationship": "largest-shareholder-of-filer",
-      "securityKind": null,
-      "statedOwnershipPercent": "5.03",
-      "quantity": null,
+      "facts": [
+        {
+          "issuer": "케이티",
+          "basisDate": null,
+          "securityKind": null,
+          "quantity": null,
+          "ownershipPercent": "3.4"
+        }
+      ],
+      "sourceConflict": null,
+      "descriptionKo": "2006-04-07 케이티가 제출한 케이티프리텔 관련 공시는 국민연금관리공단을 보고자 케이티의 최대주주(KT 지분 3.4%)로 적습니다. 케이티프리텔 보유 지분을 뜻하지 않습니다.",
+      "descriptionEn": "A KT filing about KTF dated 2006-04-07 names NPS as KT's largest shareholder with a 3.4% KT stake. It does not establish an NPS stake in KTF.",
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20060407000047&dcmNo=1336865",
+      "sourceSection": "2. 보고자에 대한 구체적인 사항",
+      "sourceSectionSha256": "3d25860940934c48ff3d7fda5c77bcedde9be50aee2e3cc734330f055fd09cc7"
+    },
+    {
+      "receiptNo": "20081007000289",
+      "documentNo": "2031973",
+      "filingDate": "2008-10-07",
+      "filer": "KB금융지주",
+      "relationship": "share-exchange-before-after",
+      "facts": [
+        {
+          "issuer": "국민은행",
+          "basisDate": "2008-09-26",
+          "securityKind": "common",
+          "quantity": "17910781",
+          "ownershipPercent": "5.32",
+          "stage": "before-exchange"
+        },
+        {
+          "issuer": "KB금융지주",
+          "basisDate": null,
+          "securityKind": "common",
+          "quantity": "17910781",
+          "ownershipPercent": "5.03",
+          "stage": "after-exchange"
+        }
+      ],
+      "sourceConflict": null,
+      "descriptionKo": "2008-10-07 KB금융 주식교환 종료보고서는 교환 전 국민은행 보통주 17,910,781주(5.32%, 2008-09-26 기준)와 교환 후 KB금융 보통주 17,910,781주(5.03%)를 국민연금공단 명의로 각각 적습니다. 서로 다른 회사·단계입니다.",
+      "descriptionEn": "A KB Financial share-exchange completion report dated 2008-10-07 lists NPS with 17,910,781 Kookmin Bank common shares (5.32%, as of 2008-09-26) before the exchange and 17,910,781 KB Financial common shares (5.03%) afterward. These are different issuers and stages.",
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20081007000289&dcmNo=2031973",
+      "sourceSection": "3. 주식교환ㆍ이전으로 인한 최대주주등 및 주요주주 지분변동 상황",
+      "sourceSectionSha256": "d8ed336da5d21eb9321ffc80b69140367891e6f504b1b503a5ee7ebc87f9985c"
+    },
+    {
+      "receiptNo": "20081007000308",
+      "documentNo": "2032024",
+      "filingDate": "2008-10-07",
+      "filer": "KB금융지주",
+      "relationship": "largest-shareholder-of-filer",
+      "facts": [
+        {
+          "issuer": "KB금융지주",
+          "basisDate": null,
+          "securityKind": null,
+          "quantity": null,
+          "ownershipPercent": "5.03"
+        }
+      ],
+      "sourceConflict": null,
+      "descriptionKo": "2008-10-07 국민은행 관련 대량보유 공시에서 보고자 KB금융지주는 국민연금공단을 자사의 최대주주(5.03%)로 적습니다. 국민은행 보유 수량 신고는 아닙니다.",
+      "descriptionEn": "A 2008-10-07 large-shareholding filing about Kookmin Bank names NPS as the filer KB Financial Group's largest shareholder (5.03%). It does not report NPS's Bank share count.",
       "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20081007000308&dcmNo=2032024",
       "sourceSection": "2. 대량보유자에 관한 사항",
       "sourceSectionSha256": "228e9155a30c48d5b1f6bcebaa129b58acf662c4db311aafbe581b9f70f84458"

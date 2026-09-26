@@ -56,9 +56,18 @@ const STR = {
     historicalFirstTentative: "(조회 진행 중 잠정값)",
     historicalParsePending: "신규 접수 원문 파싱 미완료",
     historicalLegacyRecheck: "이관 수치 원문 재확인 미완료",
-    indirectTitle: "다른 회사 공시의 과거 단서",
+    indirectTitle: "원문 확인된 과거 단서 (표본)",
     indirectSource: "DART 원문 보기",
-    indirectScope: "두 문서 모두 국민연금 제출 대량보유 공시가 아닙니다. 비공개 수량이나 현재 보유·평가액을 추정하지 않습니다.",
+    indirectScope: "다른 제출인의 문서에서 확인한 보유·계획 단서입니다. 배정 계획은 실제 보유가 아닙니다. 검색 페이지를 검사했어도 모든 보유 사실의 원문 검증이 끝난 것은 아닙니다. 현재 보유·평가액에는 합치지 않습니다.",
+    secondaryAll: "전체 본문검색 결과 페이지 검사 완료일",
+    secondaryEquity: "지분·의결권 검색 결과 페이지 검사 완료일",
+    secondaryPriorAll: "2000~2005 전체 검색 결과 페이지 검사 완료일",
+    secondaryPriorEquity: "2000~2005 지분·의결권 검색 결과 페이지 검사 완료일",
+    secondaryDirect: "2006~2008 직접 제출 목록 검사 완료일",
+    secondaryCandidates: "원문 검토 후보 문서",
+    secondarySourcePending: "원문 조회 대기",
+    secondaryContextPending: "주식 문맥 해석 대기",
+    secondaryNoScan: "체계적 본문검색은 아직 시작되지 않았습니다. 아래는 개별 원문 확인 표본입니다.",
     priceBasis: "KRX 정규장 종가 기준",
     checkedAt: "공시 확인",
     generatedAt: "데이터 생성",
@@ -176,9 +185,18 @@ const STR = {
     historicalFirstTentative: "(provisional while searching)",
     historicalParsePending: "New receipts without parsed source facts",
     historicalLegacyRecheck: "Migrated values without source recheck",
-    indirectTitle: "Historical clues in other companies' filings",
+    indirectTitle: "Source-checked historical clues (samples)",
     indirectSource: "Open DART filing",
-    indirectScope: "Neither document is a large-shareholding filing submitted by NPS. Withheld quantities and current holdings or values are not inferred.",
+    indirectScope: "These are holding and planned-allotment clues checked in other filers' documents. A planned allotment is not a confirmed holding. Checked search-result pages do not mean every source fact has been verified. These clues are excluded from current holdings and valuations.",
+    secondaryAll: "All-content search pages checked through",
+    secondaryEquity: "Equity and voting search pages checked through",
+    secondaryPriorAll: "2000–2005 all-content search pages checked through",
+    secondaryPriorEquity: "2000–2005 equity and voting search pages checked through",
+    secondaryDirect: "2006–2008 direct-filing list checked through",
+    secondaryCandidates: "Documents queued for source review",
+    secondarySourcePending: "Awaiting source retrieval",
+    secondaryContextPending: "Equity context awaiting interpretation",
+    secondaryNoScan: "Systematic full-text search has not started. The items below are individually checked samples.",
     priceBasis: "KRX regular-session close basis",
     checkedAt: "Filings checked",
     generatedAt: "Generated",
@@ -474,15 +492,21 @@ function ReadyView({
 
       <aside className="foliotrace-indirect-clue" aria-label={t.indirectTitle}>
         <strong>{t.indirectTitle}</strong>
+        {snapshot.secondaryCoverage ? (
+          <small>
+            {t.secondaryAll}: {snapshot.secondaryCoverage.allContentCheckedThrough ?? "—"}
+            {" · "}{t.secondaryEquity}: {snapshot.secondaryCoverage.equityContentCheckedThrough ?? "—"}
+            {" · "}{t.secondaryPriorAll}: {snapshot.secondaryCoverage.priorContentCheckedThrough ?? "—"}
+            {" · "}{t.secondaryPriorEquity}: {snapshot.secondaryCoverage.priorEquityCheckedThrough ?? "—"}
+            {" · "}{t.secondaryDirect}: {snapshot.secondaryCoverage.earlyDirectCheckedThrough ?? "—"}
+            {" · "}{t.secondaryCandidates}: {snapshot.secondaryCoverage.candidateDocumentCount}
+            {" · "}{t.secondarySourcePending}: {snapshot.secondaryCoverage.sourceReviewPendingCount}
+            {" · "}{t.secondaryContextPending}: {snapshot.secondaryCoverage.sourceContextReviewCount}
+          </small>
+        ) : <small>{t.secondaryNoScan}</small>}
         {indirectEvidence.items.map((clue) => (
           <p key={clue.receiptNo}>
-            {clue.relationship === "proxy-solicitation-target-shareholder"
-              ? lang === "ko"
-                ? `${clue.filingDate} ${clue.filer}의 의결권 대리행사 권유 문서는 피권유자 명단에 ${clue.mentionedEntity}을 ${clue.filingCompany} ${clue.securityKind} 소유자로 적었지만, 주식 수는 비공개(*****)입니다.`
-                : `The ${clue.filingDate} proxy solicitation by ${clue.filerEn} lists ${clue.mentionedEntityEn} among solicited ${clue.filingCompanyEn} common-share holders; the share count is withheld (*****).`
-              : lang === "ko"
-                ? `${clue.filingDate} 접수된 ${clue.filer}의 ${clue.filingCompany} 관련 공시는 ${clue.mentionedEntity}을 ${clue.filer}의 최대주주(지분율 ${clue.statedOwnershipPercent}%)로 적었습니다.`
-                : `A ${clue.filingDate} filing by ${clue.filerEn} about ${clue.filingCompanyEn} names ${clue.mentionedEntityEn} as the filer's largest shareholder (${clue.statedOwnershipPercent}%).`}
+            {lang === "ko" ? clue.descriptionKo : clue.descriptionEn}
             {" "}<a href={clue.sourceUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
           </p>
         ))}

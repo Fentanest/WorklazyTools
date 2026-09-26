@@ -87,11 +87,25 @@ export interface Snapshot {
   historicalCoverage?: {
     searchStartDate: IsoDate
     searchTargetDate: IsoDate
+    priorContentCheckedThrough: IsoDate | null
+    priorEquityCheckedThrough: IsoDate | null
     listingCompleteThrough: IsoDate
     listingComplete: boolean
     firstObservedNpsReceiptDate: IsoDate | null
     parsingPendingCount: number
     legacySourceRecheckCount: number
+  }
+  secondaryCoverage?: {
+    searchStartDate: IsoDate
+    searchTargetDate: IsoDate
+    priorContentCheckedThrough: IsoDate | null
+    priorEquityCheckedThrough: IsoDate | null
+    allContentCheckedThrough: IsoDate | null
+    equityContentCheckedThrough: IsoDate | null
+    earlyDirectCheckedThrough: IsoDate | null
+    candidateDocumentCount: number
+    sourceContextReviewCount: number
+    sourceReviewPendingCount: number
   }
   holdings: Holding[]
   events: FilingEvent[]

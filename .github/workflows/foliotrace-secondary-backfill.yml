@@ -1,0 +1,124 @@
+name: Scan FolioTrace secondary DART mentions
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 04:00 Asia/Seoul, after the direct filing backfill.
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: Maximum full-text search pages per run
+        required: true
+        default: '300'
+        type: string
+      max_windows:
+        description: Maximum complete date windows per run
+        required: true
+        default: '20'
+        type: string
+      validate_only:
+        description: Exercise search without writing the data branch
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  search:
+    if: github.ref == 'refs/heads/main' || inputs.validate_only
+    permissions:
+      contents: write
+    runs-on: [self-hosted, Linux, X64, '235']
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Checkout normalized FolioTrace state
+        uses: actions/checkout@v4
+        with:
+          ref: foliotrace-data
+          path: foliotrace-state
+          fetch-depth: 0
+
+      - name: Verify source revision and source state
+        if: ${{ !inputs.validate_only }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          test -f foliotrace-state/state.json
+
+      - name: Check early direct D001 listings separately
+        id: early_direct
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: |
+          python3 scripts/foliotrace/folio.py backfill-early-direct \
+            --state foliotrace-state/state.json \
+            --max-listing-pages 250 --max-windows 20 --parse-limit 20
+
+      - name: Search early equity and voting documents
+        id: equity
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: |
+          python3 scripts/foliotrace/folio.py scan-secondary \
+            --state foliotrace-state/state.json --scope equity \
+            --max-pages 100 --max-windows 40 --review-limit 30
+
+      - name: Search pre-2006 equity and voting documents
+        id: prior_equity
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: |
+          python3 scripts/foliotrace/folio.py scan-secondary \
+            --state foliotrace-state/state.json --scope prior-equity \
+            --max-pages 100 --max-windows 40 --review-limit 20
+
+      - name: Search pre-2006 all-content mentions
+        id: prior_all
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: |
+          python3 scripts/foliotrace/folio.py scan-secondary \
+            --state foliotrace-state/state.json --scope prior-all \
+            --max-pages 150 --max-windows 30 --review-limit 20
+
+      - name: Search bounded DART full-text windows
+        id: search
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          EVENT_NAME: ${{ github.event_name }}
+          MAX_PAGES: ${{ inputs.max_pages }}
+          MAX_WINDOWS: ${{ inputs.max_windows }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ]; then
+            python3 scripts/foliotrace/folio.py scan-secondary \
+              --state foliotrace-state/state.json --max-pages 500 --max-windows 40 --review-limit 30
+          else
+            python3 scripts/foliotrace/folio.py scan-secondary \
+              --state foliotrace-state/state.json --max-pages "$MAX_PAGES" --max-windows "$MAX_WINDOWS" --review-limit 30
+          fi
+
+      - name: Preserve completed secondary windows
+        if: ${{ always() && !inputs.validate_only && steps.search.outcome != 'skipped' }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          expected_data=$(git -C foliotrace-state rev-parse HEAD)
+          test "$(git ls-remote origin refs/heads/foliotrace-data | cut -f1)" = "$expected_data"
+          git -C foliotrace-state config user.name 'github-actions[bot]'
+          git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C foliotrace-state add state.json
+          if ! git -C foliotrace-state diff --cached --quiet; then
+            git -C foliotrace-state commit -m 'data: advance FolioTrace secondary search cursor'
+            git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
+          fi
+
+      - name: Require successful secondary search batch
+        if: ${{ steps.early_direct.outcome != 'success' || steps.equity.outcome != 'success' || steps.prior_equity.outcome != 'success' || steps.prior_all.outcome != 'success' || steps.search.outcome != 'success' }}
+        run: exit 1

@@ -70,6 +70,25 @@ function validHistoricalCoverage(value: unknown): boolean {
     value.listingComplete === (value.listingCompleteThrough === value.searchTargetDate)
 }
 
+function validSecondaryCoverage(value: unknown): boolean {
+  if (!isRecord(value) || !str(value.searchStartDate) || !str(value.searchTargetDate) ||
+      !isoDate(value.searchStartDate) || !isoDate(value.searchTargetDate)) return false
+  const target = value.searchTargetDate
+  const checked = [value.priorContentCheckedThrough, value.priorEquityCheckedThrough,
+    value.allContentCheckedThrough, value.equityContentCheckedThrough,
+    value.earlyDirectCheckedThrough]
+  return checked.every((date) => date === null || (str(date) && isoDate(date) && date <= target)) &&
+    nullable(value.priorContentCheckedThrough, isoDate) &&
+    nullable(value.priorEquityCheckedThrough, isoDate) &&
+    nullable(value.allContentCheckedThrough, isoDate) &&
+    nullable(value.equityContentCheckedThrough, isoDate) &&
+    nullable(value.earlyDirectCheckedThrough, isoDate) &&
+    Number.isSafeInteger(value.candidateDocumentCount) && Number(value.candidateDocumentCount) >= 0 &&
+    Number.isSafeInteger(value.sourceContextReviewCount) && Number(value.sourceContextReviewCount) >= 0 &&
+    Number.isSafeInteger(value.sourceReviewPendingCount) && Number(value.sourceReviewPendingCount) >= 0 &&
+    value.searchStartDate <= value.searchTargetDate
+}
+
 function validManifest(value: unknown): value is Manifest {
   return isRecord(value) && value.schemaVersion === 1 &&
     typeof value.datasetVersion === 'string' && VERSION.test(value.datasetVersion) &&
@@ -94,6 +113,7 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
   if (!['complete', 'partial', 'unavailable'].includes(String(value.valuationCoverage))) return false
   if (!['complete', 'partial', 'unverified'].includes(String(value.filingCoverage))) return false
   if (value.historicalCoverage !== undefined && !validHistoricalCoverage(value.historicalCoverage)) return false
+  if (value.secondaryCoverage !== undefined && !validSecondaryCoverage(value.secondaryCoverage)) return false
   return value.holdings.every(validHolding) && value.events.every(validEvent) && value.history.every((row: unknown) =>
     isRecord(row) && isoDate(row.tradeDate) && decimal(row.estimatedValue) && str(row.datasetVersion) && VERSION.test(row.datasetVersion))
 }
