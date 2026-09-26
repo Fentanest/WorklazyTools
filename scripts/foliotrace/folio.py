@@ -36,6 +36,7 @@ STOCK = re.compile(r"^[0-9A-Z]{6}$")
 NPS = re.compile(r"국민연금|National Pension Service", re.I)
 ALLOWED = ("universe.json", "report-cache.json", "holdings-latest.json", "state.json")
 SOURCE_NOTE = "MyTradingDesk context-service NPS public DART cache"
+MAPPING_METHOD = "dart-voting-krx-kind-v1"
 
 
 def kst_today(now=None):
@@ -623,12 +624,12 @@ def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None,
         no = holding.get("receipt_no") or ""
         if holding.get("security_kind") != "unknown" or not RECEIPT.fullmatch(no):
             continue
-        if ledger.get(no, {}).get("status") in ("verified", "unverified"):
+        if ledger.get(no, {}).get("method") == MAPPING_METHOD and ledger[no].get("status") in ("verified", "unverified"):
             continue
         corp = holding.get("corp_code")
         universe = state["universe"].get(corp, {})
         if universe.get("stock_code") != holding.get("stock_code"):
-            ledger[no] = {"status": "unverified", "reason": "stock_identity_mismatch"}
+            ledger[no] = {"status": "unverified", "method": MAPPING_METHOD, "reason": "stock_identity_mismatch"}
             checked += 1
             if state_path and checked % 20 == 0:
                 state["revision"] += 1
@@ -640,13 +641,13 @@ def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None,
         normalized_name = comparable_company_name(holding.get("name"))
         normalized_listed = comparable_company_name(listed_name)
         if not listed_name or normalized_name != normalized_listed:
-            ledger[no] = {"status": "unverified", "reason": "krx_stock_class_or_name_unverified"}
+            ledger[no] = {"status": "unverified", "method": MAPPING_METHOD, "reason": "krx_stock_class_or_name_unverified"}
             checked += 1
             continue
         try:
             parsed = dart_document(no, key)
         except (RuntimeError, ValueError, zipfile.BadZipFile):
-            ledger[no] = {"status": "retry", "reason": "document_unavailable"}
+            ledger[no] = {"status": "retry", "method": MAPPING_METHOD, "reason": "document_unavailable"}
             checked += 1
             pause(0.2)
             if state_path and checked % 20 == 0:
@@ -662,10 +663,11 @@ def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None,
             holding["security_mapping_xml_sha256"] = parsed["xml_sha256"]
             holding["security_mapping_krx_sha256"] = master_hash
             holding["valuation_exclusion_reason"] = None
-            ledger[no] = {"status": "verified", "xml_sha256": parsed["xml_sha256"], "krx_sha256": master_hash}
+            ledger[no] = {"status": "verified", "method": MAPPING_METHOD,
+                          "xml_sha256": parsed["xml_sha256"], "krx_sha256": master_hash}
             mapped += 1
         else:
-            ledger[no] = {"status": "unverified", "reason": "share_class_or_quantity_unverified",
+            ledger[no] = {"status": "unverified", "method": MAPPING_METHOD, "reason": "share_class_or_quantity_unverified",
                           "xml_sha256": parsed.get("xml_sha256")}
         checked += 1
         pause(0.2)

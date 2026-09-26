@@ -81,6 +81,7 @@ class MigrationTests(unittest.TestCase):
         state["universe"]["00101488"] = {"name": "Test", "stock_code": "009450"}
         state["holdings"]["00101488"] = {"corp_code": "00101488", "stock_code": "009450", "name": "Test", "receipt_no": no,
                                           "quantity": "1033888", "security_kind": "unknown", "valuation_exclusion_reason": "security_mapping_unverified"}
+        state["mapping_ledger"][no] = {"status": "unverified", "method": "earlier-parser", "reason": "old"}
         parsed = {"quantity": "1033888", "verified_voting_share_quantity": "1033888", "verified_common_stock_code": "009450", "xml_sha256": "a" * 64}
         with patch.object(folio, "dart_document", return_value=parsed) as document:
             self.assertEqual(folio.reconcile_security(state, "test-key", pause=lambda _: None,
@@ -88,6 +89,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(folio.reconcile_security(state, "test-key", pause=lambda _: None,
                                                       master={"009450": "Test"})["checked"], 0)
         document.assert_called_once_with(no, "test-key")
+        self.assertEqual(state["mapping_ledger"][no]["method"], folio.MAPPING_METHOD)
         self.assertEqual(state["holdings"]["00101488"]["security_kind"], "common")
         self.assertEqual(state["holdings"]["00101488"]["quantity"], "1033888")
         self.assertEqual(folio.parse_krx_security_master('<table><tr><td>주권</td><td>Test</td><td>KR7009450008</td><td>2020</td><td>1</td></tr><tr><td>주권</td><td>Test우</td><td>KR7009451006</td><td>2020</td><td>1</td></tr></table>'), {"009450": "Test"})
