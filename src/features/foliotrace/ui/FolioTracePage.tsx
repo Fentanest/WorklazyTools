@@ -62,7 +62,7 @@ const STR = {
     summaryValue: "공개 보유분 추정 평가금액",
     summaryTracked: "추적 종목 수",
     summaryPriced: "평가 가능 종목",
-    summaryEvents: "최근 공시 변화",
+    summaryEvents: "추적 기간 전체 공시",
     unavailable: "평가 불가",
     unavailableReasonComplete: "유효한 종가가 없어 평가할 수 없습니다.",
     unavailableReasonPartial: "수량·증권 대응·종가를 확인하지 못한 종목은 제외한 부분합입니다.",
@@ -75,6 +75,7 @@ const STR = {
     historySingle: "검증된 이력이 1개뿐이라 추이를 표시하지 않습니다. 종목 표를 먼저 확인하세요.",
     tableTitle: "종목 표",
     tableDesc: "수량·지분율·종가·추정 금액·비중·접수일을 구분해 표시합니다.",
+    tableUnavailable: "—는 확인된 평가 금액이 없다는 뜻입니다. 종목명 아래에서 제외 사유를 확인하세요.",
     searchLabel: "종목명·종목코드 검색",
     searchPlaceholder: "예: 삼성전자 또는 005930",
     qualityLabel: "데이터 상태 필터",
@@ -110,9 +111,14 @@ const STR = {
     openFiling: "DART 원문 열기",
     noFilingUrl: "원문 링크 없음",
     unknownDate: "미상(기준일 모름)",
-    eventsTitle: "공시 변화",
-    eventsDesc: "수집 날짜가 아니라 실제 접수일 기준으로 표시합니다.",
+    eventsTitle: "최근 공시 변화",
+    eventsDesc: "실제 접수일 기준 최근 {shown}건 / 추적 기간 전체 {total}건입니다. 회사명은 현재 추적 종목명입니다.",
     eventsEmpty: "해당 기간의 공시 변화가 없습니다.",
+    eventQuantity: "공시 수량",
+    eventOwnership: "공시 지분율",
+    eventUnknown: "미확인",
+    eventStockCode: "종목코드",
+    eventCorpCode: "회사코드",
     lastChange: "마지막 변화",
     guideTitle: "방법론·출처·주의사항",
     guideFaqTitle: "자주 묻는 질문",
@@ -161,7 +167,7 @@ const STR = {
     summaryValue: "Estimated disclosed value",
     summaryTracked: "Tracked securities",
     summaryPriced: "Priced securities",
-    summaryEvents: "Recent filing changes",
+    summaryEvents: "Filings across tracked period",
     unavailable: "Valuation unavailable",
     unavailableReasonComplete: "No valid closing prices, so nothing could be valued.",
     unavailableReasonPartial: "This is a partial sum; holdings without verified quantity, security mapping, or close are excluded.",
@@ -174,6 +180,7 @@ const STR = {
     historySingle: "Only one verified snapshot exists, so no trend is shown. See the holdings table first.",
     tableTitle: "Holdings table",
     tableDesc: "Quantity, company ownership, close, estimated value, weight, and receipt date are shown separately.",
+    tableUnavailable: "— means no verified valuation is available. See the exclusion reason under the security name.",
     searchLabel: "Search name / stock code",
     searchPlaceholder: "e.g. Samsung or 005930",
     qualityLabel: "Data-status filter",
@@ -209,9 +216,14 @@ const STR = {
     openFiling: "Open DART source",
     noFilingUrl: "No source link",
     unknownDate: "Unknown (no holding date)",
-    eventsTitle: "Filing changes",
-    eventsDesc: "Shown by actual receipt date, not collection date.",
+    eventsTitle: "Recent filing changes",
+    eventsDesc: "Latest {shown} by actual receipt date / {total} across the tracked period. Company names are current tracked names.",
     eventsEmpty: "No filing changes in this period.",
+    eventQuantity: "Filed quantity",
+    eventOwnership: "Filed ownership",
+    eventUnknown: "Unverified",
+    eventStockCode: "Stock code",
+    eventCorpCode: "Company code",
     lastChange: "Last change",
     guideTitle: "Method · sources · cautions",
     guideFaqTitle: "FAQ",
@@ -346,6 +358,19 @@ function ReadyView({
   const maxWeight = Math.max(0, ...topWeights.map((h) => approxNumber(h.portfolioWeightPercent)));
 
   const eventRange = useMemo(() => eventRangeOf(snapshot.events), [snapshot.events]);
+  const recentEvents = useMemo(
+    () => [...snapshot.events]
+      .sort((a, b) => b.receiptDate.localeCompare(a.receiptDate) || b.receiptNo.localeCompare(a.receiptNo))
+      .slice(0, 30),
+    [snapshot.events],
+  );
+  const currentNameByCorpCode = useMemo(
+    () => new Map(snapshot.holdings.map((holding) => [holding.corpCode, holding.name])),
+    [snapshot.holdings],
+  );
+  const eventsDescription = t.eventsDesc
+    .replace("{shown}", String(recentEvents.length))
+    .replace("{total}", String(snapshot.events.length));
 
   const selected: Holding | null =
     selectedCode === null ? null : (snapshot.holdings.find((h) => h.stockCode === selectedCode) ?? null);
@@ -468,6 +493,46 @@ function ReadyView({
         )}
       </SectionCard>
 
+      <SectionCard title={t.eventsTitle} description={eventsDescription}>
+        {recentEvents.length === 0 ? (
+          <p className="foliotrace-state-text" role="status">
+            {t.eventsEmpty} {t.lastChange}: {snapshot.latestReceiptDate ?? "—"}
+          </p>
+        ) : (
+          <ul className="foliotrace-events">
+            {recentEvents.map((event) => {
+              const currentName = currentNameByCorpCode.get(event.corpCode);
+              const label = currentName ?? (event.stockCode
+                ? `${t.eventStockCode} ${event.stockCode}`
+                : `${t.eventCorpCode} ${event.corpCode}`);
+              return (
+                <li key={event.receiptNo}>
+                  <div className="foliotrace-event-heading">
+                    <strong>{label}</strong>
+                    {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
+                    <span>{event.receiptDate}</span>
+                    <span>{EVENT_KIND[lang][event.kind]}</span>
+                  </div>
+                  <div className="foliotrace-event-values">
+                    <span>{t.eventQuantity}: <span className="foliotrace-num">{event.quantity === null ? t.eventUnknown : formatQty(event.quantity)}</span></span>
+                    <span>{t.eventOwnership}: <span className="foliotrace-num">{event.companyOwnershipPercent === null ? t.eventUnknown : formatPct(event.companyOwnershipPercent)}</span></span>
+                  </div>
+                  <div className="foliotrace-event-source">
+                    <code className="foliotrace-code">{event.receiptNo}</code>
+                    {event.correctionOf && <small> ← {event.correctionOf}</small>}
+                    {event.filingUrl && (
+                      <a href={event.filingUrl} target="_blank" rel="noreferrer">
+                        {t.openFiling}
+                      </a>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </SectionCard>
+
       <SectionCard title={t.tableTitle} description={t.tableDesc}>
         {snapshot.holdings.length === 0 ? (
           <>
@@ -478,6 +543,7 @@ function ReadyView({
           </>
         ) : (
           <>
+            <p className="foliotrace-state-text foliotrace-table-note">{t.tableUnavailable}</p>
             <div className="foliotrace-controls">
               <label className="foliotrace-field">
                 <span>{t.searchLabel}</span>
@@ -547,6 +613,11 @@ function ReadyView({
                       <tr key={h.stockCode}>
                         <th scope="row">
                           {h.name} <code className="foliotrace-code">{h.stockCode}</code>
+                          {h.estimatedValue === null && (
+                            <small className="foliotrace-row-reason">
+                              {exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded}
+                            </small>
+                          )}
                         </th>
                         <td className="foliotrace-num">{formatQty(h.quantity)}</td>
                         <td className="foliotrace-num">{formatPct(h.companyOwnershipPercent)}</td>
@@ -569,32 +640,6 @@ function ReadyView({
               </div>
             )}
           </>
-        )}
-      </SectionCard>
-
-      <SectionCard title={t.eventsTitle} description={t.eventsDesc}>
-        {snapshot.events.length === 0 ? (
-          <p className="foliotrace-state-text" role="status">
-            {t.eventsEmpty} {t.lastChange}: {snapshot.latestReceiptDate ?? "—"}
-          </p>
-        ) : (
-          <ul className="foliotrace-events">
-            {[...snapshot.events]
-              .sort((a, b) => b.receiptDate.localeCompare(a.receiptDate))
-              .slice(0, 30)
-              .map((e) => (
-                <li key={e.receiptNo}>
-                  <strong>{EVENT_KIND[lang][e.kind]}</strong> <span>{e.receiptDate}</span>{" "}
-                  <code className="foliotrace-code">{e.receiptNo}</code>
-                  {e.correctionOf && <small> ← {e.correctionOf}</small>}
-                  {e.filingUrl && (
-                    <a href={e.filingUrl} target="_blank" rel="noreferrer">
-                      {t.openFiling}
-                    </a>
-                  )}
-                </li>
-              ))}
-          </ul>
         )}
       </SectionCard>
 

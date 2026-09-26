@@ -298,6 +298,10 @@
   white-space: nowrap;
 }
 
+.foliotrace-table th:first-child {
+  min-width: 12rem;
+}
+
 .foliotrace-num {
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -310,6 +314,19 @@ th.foliotrace-num {
 
 .foliotrace-table td.foliotrace-num {
   text-align: right;
+}
+
+.foliotrace-table-note {
+  margin-top: 0;
+}
+
+.foliotrace-row-reason {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--label-secondary, #636369);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.4;
 }
 
 .foliotrace-code {
@@ -340,6 +357,26 @@ th.foliotrace-num {
 .foliotrace-events li:first-child {
   border-top: 0;
   padding-top: 0;
+}
+
+.foliotrace-event-heading,
+.foliotrace-event-values,
+.foliotrace-event-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.75rem;
+}
+
+.foliotrace-event-heading {
+  font-weight: 500;
+}
+
+.foliotrace-event-values,
+.foliotrace-event-source {
+  margin-top: 0.25rem;
+  color: var(--label-secondary, #636369);
+  font-size: 0.82rem;
 }
 
 .foliotrace-events a,
