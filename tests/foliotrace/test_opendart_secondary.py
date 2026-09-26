@@ -1171,6 +1171,227 @@ class OpendartListPageTests(unittest.TestCase):
         self.assertIn("LISTING_BUDGET_INSUFFICIENT", run_opendart_secondary.INCOMPLETE_STATUSES)
         self.assertNotIn("SOURCE_REVIEW_COMPLETE", run_opendart_secondary.INCOMPLETE_STATUSES)
 
+    def test_spill_first_frees_room_for_bounded_replay(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+
+        def terminal(no):
+            return {"receipt_no": no, "rcept_dt": tag,
+                    "source_status": "source_mention_unverified",
+                    "parser_version": current, "source_attempt_count": 1,
+                    "last_source_attempt_on": None, "source_sha256": f"sha-{no}",
+                    "correction_hold": False, "withdrawal_flag": False,
+                    "source_history": []}
+
+        def archive_bytes(body):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w") as filing:
+                filing.writestr("filing.xml", body)
+            return buffer.getvalue()
+
+        stale_no = receipt("20060102", 7)
+        positive_no = receipt(tag, 50)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            queue = {receipt(tag, 1): terminal(receipt(tag, 1)),
+                     receipt(tag, 2): terminal(receipt(tag, 2)),
+                     positive_no: {**terminal(positive_no),
+                                   "source_status": "source_context_review_pending"}}
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": "2006-02-09",
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [], "queue": queue,
+                "positives": {positive_no: {"receipt_no": positive_no}}}
+            folio.write_json(path, state)
+            archive_dir = opendart_secondary.archive_dir_for(path)
+            stale_row = {"receipt_no": stale_no, "corp_code": None, "corp_name": None,
+                         "stock_code": None, "report_nm": "", "rcept_dt": "20060102",
+                         "rm": "", "first_seen_from": "archive", "first_seen_to": "archive",
+                         "last_seen_from": "archive", "last_seen_to": "archive",
+                         "correction_hold": False, "withdrawal_flag": False,
+                         "source_status": "source_mention_unverified",
+                         "parser_version": "stale-old", "source_attempt_count": 0,
+                         "last_source_attempt_on": None, "source_sha256": "sha-stale",
+                         "source_history": []}
+            record = opendart_secondary._write_content_shard(
+                archive_dir, "200601", [opendart_secondary._archive_row(stale_row)])
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"]["archive_manifest"] = {"200601": [record]}
+            folio.write_json(path, state)
+            # Full queue (2 terminals at cap 2) plus one stale archived row:
+            # the run must spill archivables first, then replay boundedly.
+            first = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=1, max_queue_entries=2,
+                auto_rehydrate_limit=1,
+                fetch_list=lambda _params: self.fail("completed range refetched"),
+                fetch_document=lambda no, _key: archive_bytes("<DOC>일반 주주총회 의사록</DOC>"),
+                read_state=folio.read_json, write_state=folio.write_json, key="test-key")
+            self.assertEqual(first["auto_rehydrated"], 1)
+            self.assertEqual(first["source_review_attempts"], 1)
+            saved = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(opendart_secondary._archived_stale_count(saved), 0)
+            self.assertLessEqual(len(saved["queue"]), 2)
+            # Nothing dropped: every ID lives in the queue or the archive.
+            live = set(saved["queue"])
+            stored: set = set()
+            for months in saved["archive_manifest"].values():
+                for entry in months:
+                    stored.update(row["receipt_no"] for row in json.loads(
+                        (archive_dir / entry["file"]).read_text(encoding="utf-8"))["rows"])
+            for no in (receipt(tag, 1), receipt(tag, 2), positive_no, stale_no):
+                self.assertIn(no, live | stored)
+            # Positive and review evidence survive the spill intact.
+            self.assertIn(positive_no, saved["positives"])
+            self.assertIn(positive_no, saved["queue"])
+            self.assertEqual(first["status"], "SOURCE_REVIEW_COMPLETE")
+            # Later runs stay put: no churn, no phantom backlog.
+            for _ in range(2):
+                again = opendart_secondary.scan_opendart_secondary(
+                    path, day, day, review_limit=1, max_queue_entries=2,
+                    auto_rehydrate_limit=1,
+                    fetch_list=lambda _params: self.fail("completed range refetched"),
+                    fetch_document=lambda no, _key: archive_bytes("<DOC>일반 주주총회 의사록</DOC>"),
+                    read_state=folio.read_json, write_state=folio.write_json, key="test-key")
+                self.assertEqual(again["auto_rehydrated"], 0)
+                self.assertEqual(again["status"], "SOURCE_REVIEW_COMPLETE")
+
+    def test_full_unarchivable_queue_reports_honestly(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+        positive_no, pending_no = receipt(tag, 50), receipt(tag, 51)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": "2006-02-09",
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [],
+                "queue": {
+                    positive_no: {"receipt_no": positive_no, "rcept_dt": tag,
+                                  "source_status": "source_context_review_pending",
+                                  "parser_version": current, "source_attempt_count": 1,
+                                  "last_source_attempt_on": None,
+                                  "source_sha256": "sha-pos",
+                                  "correction_hold": False, "withdrawal_flag": False,
+                                  "source_history": []},
+                    pending_no: {"receipt_no": pending_no, "rcept_dt": tag,
+                                 "source_status": "source_review_pending",
+                                 "parser_version": None, "source_attempt_count": 0,
+                                 "last_source_attempt_on": None, "source_sha256": None,
+                                 "correction_hold": False, "withdrawal_flag": False,
+                                 "source_history": []}},
+                "positives": {positive_no: {"receipt_no": positive_no}}}
+            folio.write_json(path, state)
+            archive_dir = opendart_secondary.archive_dir_for(path)
+            stale_no = receipt("20060102", 7)
+            record = opendart_secondary._write_content_shard(
+                archive_dir, "200601", [opendart_secondary._archive_row({
+                    "receipt_no": stale_no, "rcept_dt": "20060102",
+                    "source_status": "source_mention_unverified",
+                    "parser_version": "stale-old", "source_sha256": "sha-stale"})])
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"]["archive_manifest"] = {"200601": [record]}
+            folio.write_json(path, state)
+            # Cap is full of unarchivable rows: no room can be made, so the run
+            # must say so instead of dropping or pretending.
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=2,
+                auto_rehydrate_limit=1,
+                fetch_list=lambda _params: self.fail("completed range refetched"),
+                read_state=folio.read_json, write_state=folio.write_json, key="test-key")
+            self.assertEqual(result["auto_rehydrated"], 0)
+            self.assertEqual(result["archived_stale"], 1)
+            self.assertEqual(result["status"], "LISTING_COMPLETE_SOURCE_PENDING")
+            saved = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(set(saved["queue"]), {positive_no, pending_no})
+            self.assertIn(positive_no, saved["positives"])
+
+    def test_pinned_cycle_not_clamped_to_moving_base(self):
+        from datetime import timedelta
+
+        def fetch(params):
+            bgn, end, page = params["bgn_de"], params["end_de"], params["page_no"]
+            first = date(int(bgn[:4]), int(bgn[4:6]), int(bgn[6:8]))
+            last = date(int(end[:4]), int(end[4:6]), int(end[6:8]))
+            days = (last - first).days + 1
+            rows = []
+            for day_offset in range(days):
+                tag = (first + timedelta(days=day_offset)).strftime("%Y%m%d")
+                rows.append(row(f"{tag}000000", tag))
+            total = len(rows)
+            pages = (total + 99) // 100
+            return list_page(rows[(page - 1) * 100:page * 100], total, page, pages)
+
+        def archive_bytes(body):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w") as filing:
+                filing.writestr("filing.xml", body)
+            return buffer.getvalue()
+
+        pending_no = receipt("20060101", 9)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-01-01",
+                "target_date": "2006-01-10", "next_date": "2006-01-08",
+                "max_window_days": 1, "overlap_max_window_days": 1,
+                "overlap_next_date": "2006-01-03",
+                "overlap_cycle_from": "2006-01-02", "overlap_cycle_to": "2006-01-04",
+                "last_phase": "forward",
+                "coverage": [{"from": f"2006010{d}", "to": f"2006010{d}", "complete": True}
+                             for d in range(1, 8)],
+                "overlap_coverage": [
+                    {"from": "2006-01-02", "to": "2006-01-02", "complete": True,
+                     "overlap": True}],
+                "queue": {pending_no: {"receipt_no": pending_no, "rcept_dt": "20060101",
+                                       "source_status": "source_review_pending",
+                                       "parser_version": None, "source_attempt_count": 0,
+                                       "last_source_attempt_on": None, "source_sha256": None,
+                                       "correction_hold": False, "withdrawal_flag": False,
+                                       "source_history": []}},
+                "positives": {}}
+            folio.write_json(path, state)
+            common = dict(max_listing_pages=2, max_windows=1, review_limit=1,
+                          overlap_days=3, fetch_list=fetch,
+                          fetch_document=lambda no, _key: archive_bytes("<DOC>일반 기록</DOC>"),
+                          read_state=folio.read_json, write_state=folio.write_json,
+                          key="test-key")
+            first = opendart_secondary.scan_opendart_secondary(
+                path, date(2006, 1, 1), date(2006, 1, 10), **common)
+            # Jan3 is scanned even though forward already reached Jan8, and the
+            # stored frontier stays Jan4 instead of jumping to the moving base.
+            self.assertEqual(first["overlap_windows"], 1)
+            saved = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertIn("2006-01-03",
+                          [window["from"] for window in saved["overlap_coverage"]])
+            self.assertEqual(saved["overlap_next_date"], "2006-01-04")
+            self.assertEqual((saved["overlap_cycle_from"], saved["overlap_cycle_to"]),
+                             ("2006-01-02", "2006-01-04"))
+            self.assertEqual(first["source_review_attempts"], 1)
+            opendart_secondary.scan_opendart_secondary(
+                path, date(2006, 1, 1), date(2006, 1, 10), **common)
+            third = opendart_secondary.scan_opendart_secondary(
+                path, date(2006, 1, 1), date(2006, 1, 10), **common)
+            # The rerun sweeps Jan4 instead of skipping to a fresh cycle.
+            self.assertIn("2006-01-04",
+                          [window["from"] for window in
+                           folio.read_json(path)["opendart_secondary_backfill"]["overlap_coverage"]])
+            self.assertEqual(
+                folio.read_json(path)["opendart_secondary_backfill"]["overlap_next_date"],
+                "2006-01-05")
+            self.assertFalse(third["overlap_cycle_reset"])
+
     def test_auto_rehydrate_drains_stale_across_runs_while_listing_advances(self):
         from datetime import timedelta
 

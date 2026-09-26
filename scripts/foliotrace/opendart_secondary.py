@@ -652,15 +652,17 @@ def _is_archivable(item: dict) -> bool:
 
 
 def _archive_terminal_rows(ledger: dict, archive_dir: Path, *, max_queue_entries: int,
-                           cache: dict) -> int:
+                           cache: dict, to_level: int | None = None) -> int:
     """Spill archivable rows into new immutable shards; queue rows drop only after.
 
     Only terminal, current-version, non-held negatives move. Pending, stale,
     positive, and held rows are never archived. Old shard files stay referenced
     until the manifest update below is persisted; the caller sweeps them after
-    that commit. Returns the archived count.
+    that commit. ``to_level`` spills below the bound to free room for a bounded
+    replay. Returns the archived count.
     """
-    overflow = len(ledger["queue"]) - max_queue_entries
+    level = max_queue_entries if to_level is None else min(to_level, max_queue_entries)
+    overflow = len(ledger["queue"]) - level
     if overflow <= 0:
         return 0
     candidates = sorted(
@@ -856,8 +858,35 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     ledger.setdefault("queue", {})
     ledger.setdefault("positives", {})
     ledger.setdefault("archive_manifest", {})
+    archive = {"dir": archive_dir_for(state_path), "months": {},
+               "hits": 0, "archived": 0, "swept": 0}
+    if len(ledger["queue"]) > max_queue_entries:
+        # Spill archivable terminals first so a later auto-rehydrate has free
+        # room; pending, stale, positive, and held rows are never spilled.
+        # Shards land before the manifest/queue update below is persisted.
+        archive["archived"] += _archive_terminal_rows(
+            ledger, archive["dir"], max_queue_entries=max_queue_entries,
+            cache=archive["months"])
+        if archive["archived"]:
+            state["revision"] += 1
+            write_state(state_path, state)
+            archive["swept"] += _sweep_unreferenced(
+                archive["dir"], ledger.get("archive_manifest", {}))
     auto_rehydrated = 0
-    if auto_rehydrate_limit:
+    if auto_rehydrate_limit and _archived_stale_count(ledger):
+        # Free room for the bounded replay even when the queue sits exactly at
+        # the bound; unarchivable rows are never touched for this.
+        room_target = max(0, max_queue_entries - min(
+            auto_rehydrate_limit, _archived_stale_count(ledger)))
+        if len(ledger["queue"]) > room_target:
+            archive["archived"] += _archive_terminal_rows(
+                ledger, archive["dir"], max_queue_entries=max_queue_entries,
+                to_level=room_target, cache=archive["months"])
+            if archive["archived"]:
+                state["revision"] += 1
+                write_state(state_path, state)
+                archive["swept"] += _sweep_unreferenced(
+                    archive["dir"], ledger.get("archive_manifest", {}))
         room = max_queue_entries - len(ledger["queue"])
         if room > 0:
             moved = _rehydrate_locked(
@@ -882,21 +911,23 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     overlap_base = max(start, forward - timedelta(days=overlap_days)) if overlap_days else forward
     overlap_cap = min(forward, end + timedelta(days=1))
     overlap_cycle_reset = False
+    pinned_from = pinned_to = None
     try:
-        pinned_from = date.fromisoformat(ledger["overlap_cycle_from"])
-        pinned_to = date.fromisoformat(ledger["overlap_cycle_to"])
-        pinned_valid = pinned_from <= pinned_to
+        candidate_from = date.fromisoformat(ledger["overlap_cycle_from"])
+        candidate_to = date.fromisoformat(ledger["overlap_cycle_to"])
+        if candidate_from <= candidate_to:
+            pinned_from, pinned_to = candidate_from, candidate_to
     except (KeyError, TypeError, ValueError):
-        pinned_valid = False
+        pass
     try:
         overlap_saved = (date.fromisoformat(ledger["overlap_next_date"])
                          if ledger.get("overlap_next_date") else None)
     except ValueError:
         overlap_saved = None
     if overlap_days and overlap_base <= overlap_cap - timedelta(days=1):
-        restart = (pinned_valid and overlap_saved is not None
+        restart = (pinned_to is not None and overlap_saved is not None
                    and overlap_saved > pinned_to)
-        if not pinned_valid or restart:
+        if pinned_to is None or restart:
             pinned_from, pinned_to = overlap_base, overlap_cap - timedelta(days=1)
             overlap_cycle_reset = restart
             ledger["overlap_cycle_from"] = pinned_from.isoformat()
@@ -909,8 +940,13 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                 max(overlap_saved, pinned_from), pinned_to + timedelta(days=1))
     else:
         overlap_cursor = overlap_cap
+    # The overlap phase never scans past the pinned cycle end, and the stored
+    # frontier is never clamped up to the moving base: an unfinished cycle
+    # keeps its dates even as forward advances past them.
+    overlap_tail_end = (min(overlap_cap - timedelta(days=1), pinned_to)
+                        if pinned_to is not None else overlap_cap - timedelta(days=1))
     forward_work = forward <= end
-    overlap_work = overlap_days > 0 and overlap_cursor <= overlap_cap - timedelta(days=1)
+    overlap_work = overlap_days > 0 and overlap_cursor <= overlap_tail_end
     if forward_work and overlap_work:
         first_overlap = ledger.get("last_phase") == "forward"
     else:
@@ -921,23 +957,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     requests = windows = new_receipts = overlap_windows = requeued = 0
     required_pages = None
     backlog = False
-    bound_exceeded = False
-    archive = {"dir": archive_dir_for(state_path), "months": {},
-               "hits": 0, "archived": 0, "swept": 0}
-    if len(ledger["queue"]) > max_queue_entries:
-        # Spill before any listing so an over-bound queue never blocks the run
-        # from starting; shard files land before the manifest/queue update is
-        # persisted, and superseded files are swept only after that commit.
-        archive["archived"] += _archive_terminal_rows(
-            ledger, archive["dir"], max_queue_entries=max_queue_entries,
-            cache=archive["months"])
-        if archive["archived"]:
-            state["revision"] += 1
-            write_state(state_path, state)
-            archive["swept"] += _sweep_unreferenced(
-                archive["dir"], ledger.get("archive_manifest", {}))
-        if len(ledger["queue"]) > max_queue_entries:
-            bound_exceeded = True
+    bound_exceeded = len(ledger["queue"]) > max_queue_entries
 
     def window_limit(frontier: date, cap: date, size: int) -> date:
         return min(frontier + timedelta(days=size - 1), cap)
@@ -992,12 +1012,15 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         return frontier
 
     if first_overlap:
-        overlap_cursor = scan_phase(overlap_cursor, overlap_cap - timedelta(days=1), overlap=True)
+        overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, overlap=True)
         forward = scan_phase(forward, end, overlap=False)
     else:
         forward = scan_phase(forward, end, overlap=False)
-        overlap_cursor = scan_phase(overlap_cursor, overlap_cap - timedelta(days=1), overlap=True)
-    ledger["overlap_next_date"] = max(overlap_cursor, overlap_base).isoformat()
+        overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, overlap=True)
+    if pinned_to is not None:
+        ledger["overlap_next_date"] = max(overlap_cursor, pinned_from).isoformat()
+    else:
+        ledger["overlap_next_date"] = max(overlap_cursor, overlap_base).isoformat()
 
     reviewed = source_requests = positive_count = 0
     if review_limit:
