@@ -160,7 +160,7 @@ function validSecondaryCoverage(value: unknown): boolean {
   const checked = [value.priorContentCheckedThrough, value.priorQ1CheckedThrough, value.priorEquityCheckedThrough,
     value.allContentCheckedThrough, value.equityContentCheckedThrough,
     value.earlyDirectCheckedThrough]
-  return checked.every((date) => date === null || (str(date) && isoDate(date) && date <= target)) &&
+  return checked.every((date) => date === undefined || date === null || (str(date) && isoDate(date) && date <= target)) &&
     nullable(value.priorContentCheckedThrough, isoDate) &&
     (value.priorQ1CheckedThrough === undefined || nullable(value.priorQ1CheckedThrough, isoDate)) &&
     nullable(value.priorEquityCheckedThrough, isoDate) &&

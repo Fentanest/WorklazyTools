@@ -82,7 +82,7 @@ jobs:
 
       - name: Search early equity and voting documents
         id: equity
-        if: ${{ !inputs.review_only }}
+        if: ${{ !inputs.review_only && steps.prior_q1.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -93,7 +93,7 @@ jobs:
 
       - name: Search pre-2006 equity and voting documents
         id: prior_equity
-        if: ${{ !inputs.review_only && steps.equity.outputs.site_transport != 'true' }}
+        if: ${{ !inputs.review_only && steps.prior_q1.outputs.site_transport != 'true' && steps.equity.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -104,7 +104,7 @@ jobs:
 
       - name: Search pre-2006 all-content mentions
         id: prior_all
-        if: ${{ !inputs.review_only && steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' }}
+        if: ${{ !inputs.review_only && steps.prior_q1.outputs.site_transport != 'true' && steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -115,7 +115,7 @@ jobs:
 
       - name: Search bounded DART full-text windows
         id: search
-        if: ${{ !inputs.review_only && steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' && steps.prior_all.outputs.site_transport != 'true' }}
+        if: ${{ !inputs.review_only && steps.prior_q1.outputs.site_transport != 'true' && steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' && steps.prior_all.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}

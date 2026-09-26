@@ -36,6 +36,20 @@ test('FolioTrace validates nested quote, event, history, and filing links', () =
   assert.equal(validSnapshot({ ...base, history: [{ ...base.history[0], estimatedValue: null }] }, version), false)
 })
 
+test('secondary coverage loads before and after the optional early 1999 lane', () => {
+  const coverage = { searchStartDate: '1999-04-01', searchTargetDate: '2026-09-26',
+    priorContentCheckedThrough: '2000-03-30', priorEquityCheckedThrough: null,
+    allContentCheckedThrough: '2006-03-31', equityContentCheckedThrough: null,
+    earlyDirectCheckedThrough: null, candidateDocumentCount: 1,
+    noncandidateUnreviewedCount: 0, sourceContextReviewCount: 0,
+    sourceReviewPendingCount: 1 }
+  assert.equal(validSnapshot({ ...base, secondaryCoverage: coverage }, version), true)
+  assert.equal(validSnapshot({ ...base, secondaryCoverage: {
+    ...coverage, priorQ1CheckedThrough: '1999-01-04' } }, version), true)
+  assert.equal(validSnapshot({ ...base, secondaryCoverage: {
+    ...coverage, priorQ1CheckedThrough: 'bad-date' } }, version), false)
+})
+
 test('receipt-only indirect observation and its event load together', () => {
   const receiptNo = '20260602000001'
   const observationKey = `${receiptNo}:-:00101488:009450:2026-06-01:${'c'.repeat(64)}`
