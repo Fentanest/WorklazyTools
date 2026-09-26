@@ -13,7 +13,7 @@
       "valuation": { "q": "How is the estimated value calculated?", "a": "The checked share quantity from the filing is multiplied by the KRX regular-session close on the same trading day. The values of holdings with a calculated value are added up, and each holding's share of that total is shown as a percentage." },
       "dates": { "q": "How do the price date and the filings check differ?", "a": "The price date is the actual trading day whose close is final. The filing receipt date, the time the data was prepared, and the publication time are shown separately." },
       "exclusion": { "q": "Why are some holdings left out of the value calculation?", "a": "Holdings without a checked close or with an unchecked latest filing get no calculated value. They stay on the list with their reason, and a missing value is shown as unavailable rather than zero." },
-      "threshold": { "q": "Does below 5% ownership mean everything was sold?", "a": "No. A record below 5% only means it leaves the tracked list; it does not mean all shares were sold." },
+      "threshold": { "q": "Does below 5% ownership mean everything was sold?", "a": "No. Holdings below 5% stay on the list and remain subject to follow-up searches and rechecks. It does not mean all shares were sold or that the value is zero." },
       "refresh": { "q": "What does refresh do?", "a": "It only reloads the already published data; it does not pull in new DART filings right away." }
     }
   },

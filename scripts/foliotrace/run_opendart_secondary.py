@@ -50,6 +50,12 @@ def main() -> int:
         cleanup = tempfile.mkdtemp(prefix="opendart-secondary-validate-")
         state_path = Path(cleanup) / "state.json"
         shutil.copyfile(args.state, state_path)
+        # Manifests reference the archive directory, so a validation run must
+        # see the same shards in isolation; the originals stay untouched and
+        # the whole copy is discarded afterwards.
+        origin_archive = opendart_secondary.archive_dir_for(args.state)
+        if origin_archive.is_dir():
+            shutil.copytree(origin_archive, opendart_secondary.archive_dir_for(state_path))
     try:
         if args.rehydrate_limit:
             replay = opendart_secondary.rehydrate_archive(

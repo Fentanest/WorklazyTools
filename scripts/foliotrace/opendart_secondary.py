@@ -347,6 +347,10 @@ def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
                         ledger["queue"][no] = _restore_archived(
                             stored, row, cursor.isoformat(), last.isoformat())
                         requeued += 1
+                        # The restored ID must leave the archive in the same
+                        # persisted commit, or a later parser upgrade would
+                        # rehydrate a permanent duplicate stale row.
+                        _drop_archived_ids(ledger, archive["dir"], {no}, archive["months"])
             else:
                 eligibility_changed = _refresh_entry(
                     existing, row, cursor.isoformat(), last.isoformat())
@@ -379,6 +383,42 @@ def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
     archive["swept"] = archive.get("swept", 0) + _sweep_unreferenced(
         archive["dir"], ledger.get("archive_manifest", {}))
     return new_receipts, total, archived_hits, requeued
+
+
+def _drop_archived_ids(ledger: dict, archive_dir: Path, ids: set,
+                       cache: dict) -> int:
+    """Remove restored IDs from archive shards so they cannot linger as stale.
+
+    Replacement shards are written before the manifest update; the caller
+    sweeps superseded files only after persisting that manifest change.
+    Returns the dropped count.
+    """
+    if not ids:
+        return 0
+    manifest = ledger.get("archive_manifest", {})
+    if not isinstance(manifest, dict):
+        raise ArchiveIntegrityError("UNKNOWN_MANIFEST")
+    months = {month for month, records in manifest.items() if isinstance(records, list)}
+    dropped = 0
+    for month in sorted(months):
+        stored = _load_archive_month(ledger, archive_dir, month, cache)
+        victims = [no for no in stored if no in ids]
+        if not victims:
+            continue
+        for no in victims:
+            del stored[no]
+            dropped += 1
+        ordered = sorted(stored.values(), key=lambda row: row["receipt_no"])
+        records = []
+        for offset in range(0, len(ordered), ARCHIVE_SHARD_ROWS):
+            records.append(_write_content_shard(
+                archive_dir, month, ordered[offset:offset + ARCHIVE_SHARD_ROWS]))
+        manifest[month] = records
+        if not records:
+            del manifest[month]
+        # Force later reads in this run onto the rewritten files.
+        cache.pop(month, None)
+    return dropped
 
 
 def _archived_listing_changed(stored: dict, row: dict) -> bool:
@@ -787,21 +827,41 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         raise ValueError("opendart secondary cursor inconsistent")
     # Scan priority alternates across runs while both frontiers have work, so
     # a tiny page budget cannot starve either side forever: the prioritized
-    # phase runs first and the other spends the remainder. A completed overlap
-    # pass starts a new bounded cycle (at most one pass per run) so late or
-    # corrected rows keep being seen instead of the lane going silent.
+    # phase runs first and the other spends the remainder. An unfinished
+    # overlap cycle keeps its pinned [from, to] window even as the forward
+    # cursor advances past it; only a completed cycle starts a new rolling one
+    # (at most one pass per run), so budget-short runs never silently skip
+    # unscanned tail days.
     overlap_base = max(start, forward - timedelta(days=overlap_days)) if overlap_days else forward
     overlap_cap = min(forward, end + timedelta(days=1))
+    overlap_cycle_reset = False
+    try:
+        pinned_from = date.fromisoformat(ledger["overlap_cycle_from"])
+        pinned_to = date.fromisoformat(ledger["overlap_cycle_to"])
+        pinned_valid = pinned_from <= pinned_to
+    except (KeyError, TypeError, ValueError):
+        pinned_valid = False
     try:
         overlap_saved = (date.fromisoformat(ledger["overlap_next_date"])
-                         if ledger.get("overlap_next_date") else overlap_base)
+                         if ledger.get("overlap_next_date") else None)
     except ValueError:
-        overlap_saved = overlap_base
-    if overlap_saved >= overlap_cap and overlap_cap > overlap_base:
-        overlap_cursor, overlap_cycle_reset = overlap_base, True
+        overlap_saved = None
+    if overlap_days and overlap_base <= overlap_cap - timedelta(days=1):
+        restart = (pinned_valid and overlap_saved is not None
+                   and overlap_saved > pinned_to)
+        if not pinned_valid or restart:
+            pinned_from, pinned_to = overlap_base, overlap_cap - timedelta(days=1)
+            overlap_cycle_reset = restart
+            ledger["overlap_cycle_from"] = pinned_from.isoformat()
+            ledger["overlap_cycle_to"] = pinned_to.isoformat()
+            state["revision"] += 1
+            write_state(state_path, state)
+            overlap_cursor = pinned_from
+        else:
+            overlap_cursor = pinned_from if overlap_saved is None else min(
+                max(overlap_saved, pinned_from), pinned_to + timedelta(days=1))
     else:
-        overlap_cursor = min(max(overlap_saved, overlap_base), forward)
-        overlap_cycle_reset = False
+        overlap_cursor = overlap_cap
     forward_work = forward <= end
     overlap_work = overlap_days > 0 and overlap_cursor <= overlap_cap - timedelta(days=1)
     if forward_work and overlap_work:
@@ -953,19 +1013,22 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         write_state(state_path, state)
 
     # Completion distinguishes three scopes: the forward full-range scan
-    # (2006 exhaustive coverage), the rolling tail pass in progress, and stale
-    # archived rows awaiting parser-upgrade rehydration. A same-receipt rm
-    # change older than the rolling tail is only ever seen again as a new
-    # correction filing in the forward scan, so a completed forward range plus
-    # a fresh tail pass is the honest bar, not silence.
+    # (2006 exhaustive coverage), the pinned tail cycle in progress, and stale
+    # archived rows awaiting parser-upgrade rehydration. Residual risk: a
+    # same-receipt rm change older than the pinned tail may only surface as a
+    # new correction filing in the forward scan, and such a filing is not
+    # guaranteed to exist; the tail is a bounded re-verification window, not a
+    # promise to catch every retroactive edit.
     forward_complete = ledger["next_date"] > end.isoformat()
-    tail_cap = min(date.fromisoformat(ledger["next_date"]), end + timedelta(days=1))
     overlap_pending_days = 0
     if overlap_days:
-        tail_end = tail_cap - timedelta(days=1)
-        frontier = date.fromisoformat(ledger["overlap_next_date"] or tail_cap.isoformat())
-        if frontier <= tail_end:
-            overlap_pending_days = (tail_end - frontier).days + 1
+        try:
+            cycle_to = date.fromisoformat(ledger["overlap_cycle_to"])
+            frontier = date.fromisoformat(ledger["overlap_next_date"])
+            if frontier <= cycle_to:
+                overlap_pending_days = (cycle_to - frontier).days + 1
+        except (KeyError, TypeError, ValueError):
+            pass
     pending_sources = _outstanding_count(ledger)
     archived_stale = _archived_stale_count(ledger)
     if required_pages is not None:
