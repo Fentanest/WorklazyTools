@@ -64,32 +64,35 @@ jobs:
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
         run: |
-          python3 scripts/foliotrace/folio.py scan-secondary \
+          python3 scripts/foliotrace/run_secondary_lane.py \
             --state foliotrace-state/state.json --scope equity \
-            --max-pages 100 --max-windows 40 --review-limit 30
+            --max-pages 50 --max-windows 15 --review-limit 20
 
       - name: Search pre-2006 equity and voting documents
         id: prior_equity
+        if: ${{ steps.equity.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
         run: |
-          python3 scripts/foliotrace/folio.py scan-secondary \
+          python3 scripts/foliotrace/run_secondary_lane.py \
             --state foliotrace-state/state.json --scope prior-equity \
-            --max-pages 100 --max-windows 40 --review-limit 20
+            --max-pages 50 --max-windows 15 --review-limit 20
 
       - name: Search pre-2006 all-content mentions
         id: prior_all
+        if: ${{ steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
         run: |
-          python3 scripts/foliotrace/folio.py scan-secondary \
+          python3 scripts/foliotrace/run_secondary_lane.py \
             --state foliotrace-state/state.json --scope prior-all \
-            --max-pages 150 --max-windows 30 --review-limit 20
+            --max-pages 75 --max-windows 15 --review-limit 20
 
       - name: Search bounded DART full-text windows
         id: search
+        if: ${{ steps.equity.outputs.site_transport != 'true' && steps.prior_equity.outputs.site_transport != 'true' && steps.prior_all.outputs.site_transport != 'true' }}
         continue-on-error: true
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -98,15 +101,15 @@ jobs:
           MAX_WINDOWS: ${{ inputs.max_windows }}
         run: |
           if [ "$EVENT_NAME" = schedule ]; then
-            python3 scripts/foliotrace/folio.py scan-secondary \
-              --state foliotrace-state/state.json --max-pages 500 --max-windows 40 --review-limit 30
+            python3 scripts/foliotrace/run_secondary_lane.py \
+              --state foliotrace-state/state.json --max-pages 100 --max-windows 15 --review-limit 20
           else
-            python3 scripts/foliotrace/folio.py scan-secondary \
-              --state foliotrace-state/state.json --max-pages "$MAX_PAGES" --max-windows "$MAX_WINDOWS" --review-limit 30
+            python3 scripts/foliotrace/run_secondary_lane.py \
+              --state foliotrace-state/state.json --max-pages "$MAX_PAGES" --max-windows "$MAX_WINDOWS" --review-limit 20
           fi
 
       - name: Preserve completed secondary windows
-        if: ${{ always() && !inputs.validate_only && steps.search.outcome != 'skipped' }}
+        if: ${{ always() && !inputs.validate_only }}
         run: |
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
           expected_data=$(git -C foliotrace-state rev-parse HEAD)

@@ -179,7 +179,7 @@ def fetch_search_page(term: str, start: date, end: date, page: int, *, dsp_type=
         headers={"User-Agent": "FolioTrace/1.0", "Referer": "https://dart.fss.or.kr/dsab007/main.do?option=contents"})
     for attempt in range(retries):
         try:
-            time.sleep(0.15)
+            time.sleep(2)
             with urllib.request.urlopen(request, timeout=30) as response:
                 payload = response.read(2_000_001)
             if len(payload) > 2_000_000:
