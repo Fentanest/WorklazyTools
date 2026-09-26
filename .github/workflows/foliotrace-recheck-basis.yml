@@ -12,6 +12,11 @@ on:
         required: true
         default: true
         type: boolean
+      diagnose_only:
+        description: Read-only safe field diagnostics from the exact source
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: pages
@@ -36,12 +41,19 @@ jobs:
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
           test -f foliotrace-state/state.json
       - name: Recheck exact direct basis from OpenDART
+        if: ${{ !inputs.diagnose_only }}
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           RECEIPT: ${{ inputs.receipt }}
         run: python3 scripts/foliotrace/folio.py recheck-basis --state foliotrace-state/state.json --receipt "$RECEIPT"
+      - name: Diagnose exact direct source fields
+        if: ${{ inputs.diagnose_only }}
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          RECEIPT: ${{ inputs.receipt }}
+        run: python3 scripts/foliotrace/folio.py diagnose-basis --receipt "$RECEIPT"
       - name: Persist verified basis state
-        if: ${{ !inputs.validate_only }}
+        if: ${{ !inputs.validate_only && !inputs.diagnose_only }}
         run: |
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
           expected_data=$(git -C foliotrace-state rev-parse HEAD)

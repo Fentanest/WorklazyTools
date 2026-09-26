@@ -608,6 +608,14 @@ def parse_filing_document(payload: bytes):
     row_date = parsed_date(row_parts.groups()) if row_parts else None
     row_quantity = dec(cell("ACODE", "THS_STK_CNT"))
     row_ratio = dec(cell("ACODE", "THS_STK_RT"))
+    basis_diagnostic = {"cover_dates": len(cover_dates), "row_date_valid": row_date is not None,
+                        "row_quantity_present": row_quantity is not None,
+                        "row_ratio_present": row_ratio is not None,
+                        "quantity_matches_summary": (row_quantity is not None and
+                            Decimal(row_quantity) == Decimal(quantity)),
+                        "ratio_matches_summary": (row_ratio is not None and
+                            Decimal(row_ratio) == Decimal(ownership)),
+                        "cover_matches_row": (cover_date is None or cover_date == row_date)}
     row_verified = bool(row_date and row_quantity is not None and row_ratio is not None and
                         Decimal(row_quantity) == Decimal(quantity) and Decimal(row_ratio) == Decimal(ownership) and
                         (cover_date is None or cover_date == row_date))
@@ -626,6 +634,7 @@ def parse_filing_document(payload: bytes):
             "holding_date": holding_date,
             "basis_date_evidence": "dart_current_report_row" if holding_date else None,
             "basis_row_sha256": row_sha256,
+            "basis_diagnostic": basis_diagnostic,
             "source_ratio_columns": ({"shares_etc_quantity": str(row_quantity),
                                       "shares_etc_percent": str(row_ratio),
                                       "stock_quantity": str(dec(cell("ACODE", "THS_CMT_CNT"))) if cell("ACODE", "THS_CMT_CNT") else None,
@@ -1605,6 +1614,8 @@ def main():
     q = sub.add_parser("recheck-basis")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--receipt", required=True)
+    q = sub.add_parser("diagnose-basis")
+    q.add_argument("--receipt", required=True)
     q = sub.add_parser("price-and-value")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--output", type=Path, required=True)
@@ -1659,6 +1670,12 @@ def main():
             result = recheck_direct_basis(state, os.environ.get("DART_API_KEY", ""), limit=1,
                                           state_path=args.state, target_receipt=args.receipt)
             result["receipt_no"] = args.receipt
+        elif args.command == "diagnose-basis":
+            if not RECEIPT.fullmatch(args.receipt):
+                raise ValueError("DIRECT_BASIS_TARGET")
+            parsed = dart_document(args.receipt, os.environ.get("DART_API_KEY", ""))
+            result = {"receipt_no": args.receipt, "basis_verified": parsed.get("holding_date") is not None,
+                      "basis_diagnostic": parsed["basis_diagnostic"]}
         elif args.command == "price-and-value": result = price_and_value(args.state, args.output)
         elif args.command == "emit-snapshot": result = emit_snapshot(args.snapshot, args.dist)
         elif args.command == "record-published": result = record_published(args.state, version=args.dataset_version,

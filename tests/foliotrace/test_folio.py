@@ -81,6 +81,8 @@ class MigrationTests(unittest.TestCase):
         parsed = folio.parse_filing_document(output.getvalue())
         self.assertEqual(parsed['holding_date'], '2026-09-07')
         self.assertEqual(parsed['basis_date_evidence'], 'dart_current_report_row')
+        self.assertTrue(all(value is True for key, value in parsed['basis_diagnostic'].items()
+                            if key != 'cover_dates'))
         self.assertEqual(parsed['source_ratio_columns']['issued_voting_shares'], '1980')
         self.assertRegex(parsed['basis_row_sha256'], r'^[a-f0-9]{64}$')
         scaled = io.BytesIO()
@@ -92,7 +94,9 @@ class MigrationTests(unittest.TestCase):
         unknown = io.BytesIO()
         with zipfile.ZipFile(unknown, 'w') as archive:
             archive.writestr('report.xml', xml.replace('2026년 09월 07일</TE>', '2026년 09월 08일</TE>').encode())
-        self.assertIsNone(folio.parse_filing_document(unknown.getvalue())['holding_date'])
+        mismatched = folio.parse_filing_document(unknown.getvalue())
+        self.assertIsNone(mismatched['holding_date'])
+        self.assertFalse(mismatched['basis_diagnostic']['cover_matches_row'])
 
     def test_basis_recheck_prioritizes_current_and_quarantines_value_mismatch(self):
         state = folio.empty_state()
