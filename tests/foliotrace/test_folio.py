@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+from pipeline.foliotrace.publish import digest
 from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -134,6 +135,10 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(second["cache_hits"], 1)
             self.assertEqual(folio.read_json(output)["estimatedValue"], "11258999068426241.25")
             snap = folio.read_json(output)
+            projection = {key: value for key, value in snap.items() if key != "datasetVersion"}
+            projection["history"] = [{**item, "datasetVersion": ""} if item["datasetVersion"] == snap["datasetVersion"] else item
+                                     for item in snap["history"]]
+            self.assertEqual(digest(projection), snap["datasetVersion"])
             recorded = folio.record_published(state_path, version=snap["datasetVersion"],
                                                trade_date=snap["valuationTradeDate"], estimated_value=snap["estimatedValue"])
             self.assertEqual(recorded["history_count"], 1)
