@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.foliotrace.secondary import fetch_source_document
 
 RECEIPTS = ("20060124800040", "20081007000289", "20030909000232",
-            "20090227000244", "20260908000302")
+            "20090227000244", "20260908000302", "20260623000336")
 NPS = re.compile(r"국민연금(?:관리)?공단|National Pension Service", re.I)
 TAG = re.compile(r"<[^>]*>", re.S)
 ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
@@ -55,7 +55,7 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
         date_rows = []
         for row in ROWS.finditer(decoded):
             source_row = row.group(0)
-            direct_basis_row = receipt_no in ("20090227000244", "20260908000302") and re.search(
+            direct_basis_row = receipt_no in ("20090227000244", "20260908000302", "20260623000336") and re.search(
                 r"이번보고서|직전보고서|증\s*감|보고서작성기준일", source_row)
             historical_date_row = receipt_no in ("20060124800040", "20081007000289") and re.search(
                 r"2006년\s*02월\s*01일|2008년\s*9월\s*26일|2008년\s*9월\s*29일", source_row)
