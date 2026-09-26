@@ -128,8 +128,12 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Excluded: quantity unverified",
   },
   scope_comparison_unverified: {
-    ko: "다른 공시에서 확인한 지분율의 주식 종류와 평가 기준을 연결하지 못해 금액은 제외",
-    en: "Value excluded: the independently reported stake cannot yet be matched to a priced share class",
+    ko: "다른 공시의 지분율은 확인했지만 직접 공시의 보유 범위·평가 수량과 연결되지 않아 금액은 제외",
+    en: "Value excluded: the separately reported stake cannot yet be matched to the direct filing's holding scope and valued quantity",
+  },
+  same_basis_observation_conflict: {
+    ko: "같은 기준일의 공시 수치가 달라 평가에서 제외",
+    en: "Excluded: filings for the same holding date disagree",
   },
   zero_quantity: {
     ko: "수량이 0이라 평가에서 제외",

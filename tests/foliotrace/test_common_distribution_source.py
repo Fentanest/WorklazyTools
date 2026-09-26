@@ -167,6 +167,32 @@ class CommonDistributionSourceTests(unittest.TestCase):
         self.assertIsNone(contested['holdings'][0]['companyOwnershipPercent'])
         self.assertEqual(contested['holdings'][0]['observationStatus'], 'same_basis_conflict')
 
+        legacy_conflict = copy.deepcopy(conflict)
+        legacy_conflict['direct_ratio_basis'] = {}
+        contested = make_snapshot(legacy_conflict, {})
+        self.assertIsNone(contested['holdings'][0]['companyOwnershipPercent'])
+        self.assertIsNone(contested['holdings'][0]['estimatedValue'])
+        self.assertEqual(contested['holdings'][0]['observationStatus'], 'same_basis_conflict')
+        self.assertEqual(contested['holdings'][0]['directBaseline']['ownershipPercent'], '4.80')
+        self.assertEqual(contested['holdings'][0]['directBaseline']['holdingDate'], '2025-02-28')
+        self.assertIsNone(contested['holdings'][0]['latestUnresolvedReceiptNo'])
+        self.assertEqual(contested['holdings'][0]['valuationExclusionReason'], 'same_basis_observation_conflict')
+        unknown_class_conflict = copy.deepcopy(legacy_conflict)
+        unknown_class_conflict['holdings'][corp]['security_kind'] = 'unknown'
+        self.assertEqual(make_snapshot(unknown_class_conflict, {})['holdings'][0]['valuationExclusionReason'],
+                         'same_basis_observation_conflict')
+
+        older_conflict = copy.deepcopy(legacy_conflict)
+        older_conflict['holdings'][corp]['holding_date'] = '2026-01-01'
+        older_conflict['holdings'][corp]['receipt_date'] = '2026-01-02'
+        older_conflict['receipts'][direct]['holding_date'] = '2026-01-01'
+        older_conflict['receipts'][direct]['receipt_date'] = '2026-01-02'
+        current = make_snapshot(older_conflict, {})
+        self.assertEqual(current['holdings'][0]['companyOwnershipPercent'], '4.80')
+        self.assertIsNone(current['holdings'][0]['observationStatus'])
+        self.assertTrue(all(item['reason'] == 'same_basis_conflict'
+                            for item in current['verifiedIndirectObservations']))
+
     def test_source_rows_and_official_listing_register_comparable_historical_fact(self):
         state = folio.empty_state()
         corp, stock, no = '00858364', '138930', '20260318001147'
@@ -225,7 +251,7 @@ class CommonDistributionSourceTests(unittest.TestCase):
         for changed in ({'preferred': '1'}, {'issued_date': '2025년 11월 30일'},
                         {'register_date': '2025년 12월 30일'},
                         {'note_denominator': '310,327,034'},
-                        {'ratio': '8.63'}):
+                        {'ratio': '8.63'}, {'quantity': '-'}):
             with self.subTest(changed=changed):
                 self.assertFalse(any(
                     claim['structure'] == 'dated_share_distribution_all_common'

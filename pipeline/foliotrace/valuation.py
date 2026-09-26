@@ -28,6 +28,8 @@ def value_holdings(holdings, quotes, trade_date):
             reason = "latest_filing_unresolved"
         elif holding.get("receipt_date") and trade_date and holding["receipt_date"] > trade_date:
             reason = "filing_after_quote_date"
+        elif holding.get("observation_status") == "same_basis_conflict":
+            reason = "same_basis_observation_conflict"
         elif holding.get("security_kind") not in ("common", "preferred"):
             reason = "security_mapping_unverified"
         elif holding.get("observation_status") == "verified_scoped":

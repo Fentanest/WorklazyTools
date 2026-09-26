@@ -141,7 +141,7 @@ def extract_dated_share_distribution_claims(xml: str) -> list[dict]:
         denominators = [_number(match.group(1)) for note in notes
                         for match in note_pattern.finditer(note)]
         same_day_issued = [amount for issued_date, amount in issued if issued_date == basis]
-        if (ratio is None or (quantity is None and cells[1] not in ("*****", "-")) or
+        if (ratio is None or (quantity is None and cells[1] != "*****") or
                 len(set(denominators)) != 1 or
                 len(same_day_issued) != 1 or denominators[0] != same_day_issued[0] or
                 Decimal(same_day_issued[0]) <= 0):

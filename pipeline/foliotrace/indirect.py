@@ -459,7 +459,8 @@ def reconcile_indirect(state, holdings):
             reason = "security_kind_unverified"
         elif scoped_only and not strong_scoped:
             reason = "ratio_basis_unverified"
-        elif scoped_only and fact["basis_date"] <= current_anchor:
+        elif (scoped_only and fact["basis_date"] <= current_anchor and
+              not (latest and any(item["status"] == "same_basis_conflict" for item in latest))):
             reason = "basis_not_newer_than_direct"
         elif any(receipt.get("corp_code") == corp and no not in profiles and
                  no != (current.get("receipt_no") if current else None) and
@@ -475,7 +476,7 @@ def reconcile_indirect(state, holdings):
             reason = "newer_direct_basis_unverified"
         elif latest and any(item["status"] == "same_basis_conflict" for item in latest):
             reason = "same_basis_conflict" if fact["basis_date"] == latest_date else "newer_conflict_pending"
-            if current and current_profile and fact["basis_date"] == latest_date:
+            if current and fact["basis_date"] == latest_date and fact["basis_date"] >= current_anchor:
                 conflicted.add(corp)
         elif not resolved or resolved["status"] != "verified":
             reason = resolved["status"] if resolved else "source_fact_unverified"
@@ -527,9 +528,11 @@ def reconcile_indirect(state, holdings):
         row = dict(source)
         corp = row.get("corp_code")
         if corp in conflicted:
+            row["direct_baseline"] = {"receipt_no": row.get("receipt_no"),
+                "receipt_date": row.get("receipt_date"), "holding_date": row.get("holding_date"),
+                "ownership_percent": row.get("company_ownership_percent"),
+                "quantity": row.get("quantity")}
             row.update(company_ownership_percent=None, quantity=None, tracking="unknown",
-                       latest_unresolved_receipt=row.get("receipt_no"),
-                       latest_unresolved_reason="same_basis_observation_conflict",
                        observation_status="same_basis_conflict")
         elif corp in chosen:
             fact, key, resolved, scoped_only = chosen[corp]

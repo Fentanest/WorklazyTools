@@ -139,7 +139,7 @@ const STR = {
     rowBasis: "보유 기준일",
     rowIndirectSource: "제3자 공시 원문 확인",
     rowDirectSource: "직접 공시 기록",
-    directBaseline: "비교한 직접 공시",
+    directBaseline: "기존 직접 공시",
     issuerScopeSource: "다른 회사 공시에서 확인한 지분율 · 주식 종류 확인 중",
     issuerScopeDetail: "발행주식 기준으로 확인한 수량",
     issuerScopeComparison: "이전 직접 공시와 지분율 계산 기준이 같다고 확인되지 않아 증감은 표시하지 않습니다.",
@@ -302,7 +302,7 @@ const STR = {
     rowBasis: "Holding basis date",
     rowIndirectSource: "Third-party filing checked",
     rowDirectSource: "Direct filing record",
-    directBaseline: "Compared direct filing",
+    directBaseline: "Earlier direct filing",
     issuerScopeSource: "Ownership confirmed in another company's filing · share class under review",
     issuerScopeDetail: "Shares confirmed against all issued shares",
     issuerScopeComparison: "The earlier direct filing has no confirmed matching percentage basis, so no change is shown.",
@@ -1000,11 +1000,12 @@ function ReadyView({
                   </dd>
                 </div>
               )}
-              {selected.observationStatus === "verified_scoped" && selected.directBaseline && (
+              {(selected.observationStatus === "verified_scoped" || selected.observationStatus === "same_basis_conflict") && selected.directBaseline && (
                 <div><dt>{t.directBaseline}</dt><dd>
                   {selected.directBaseline.ownershipPercent === null ? "—" : formatPct(selected.directBaseline.ownershipPercent)}
-                  {selected.directBaseline.receiptDate && ` · ${selected.directBaseline.receiptDate}`}
-                  <small className="foliotrace-row-reason">{t.issuerScopeComparison}</small>
+                  {` · ${t.detailHoldingDate}: ${selected.directBaseline.holdingDate ?? t.unknownDate}`}
+                  {selected.directBaseline.receiptDate && ` · ${t.eventReceipt}: ${selected.directBaseline.receiptDate}`}
+                  <small className="foliotrace-row-reason">{selected.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict : t.issuerScopeComparison}</small>
                 </dd></div>
               )}
               {selected.issuerScopeSource && (
@@ -1020,7 +1021,8 @@ function ReadyView({
                   </dd></div>
                   <div><dt>{t.directBaseline}</dt><dd>
                     {selected.directBaseline?.ownershipPercent == null ? "—" : formatPct(selected.directBaseline.ownershipPercent)}
-                    {selected.directBaseline?.receiptDate && ` · ${selected.directBaseline.receiptDate}`}
+                    {` · ${t.detailHoldingDate}: ${selected.directBaseline?.holdingDate ?? t.unknownDate}`}
+                    {selected.directBaseline?.receiptDate && ` · ${t.eventReceipt}: ${selected.directBaseline.receiptDate}`}
                     <small className="foliotrace-row-reason">{t.issuerScopeComparison}</small>
                   </dd></div>
                 </>
