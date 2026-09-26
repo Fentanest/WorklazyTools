@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 
 export type ToolAccent = "green" | "blue" | "violet" | "orange" | "pink" | "sky" | "coral";
-export type ToolCategoryId = "spreadsheets" | "documents" | "media" | "text-data" | "work" | "security-share";
+export type ToolCategoryId = "spreadsheets" | "documents" | "media" | "text-data" | "work" | "security-share" | "investment-research";
 
 export interface ToolCategoryDefinition {
   id: ToolCategoryId;
@@ -67,9 +67,11 @@ export const toolCategories: ToolCategoryDefinition[] = [
   { id: "text-data", label: "텍스트·코드", shortLabel: "텍스트·코드", description: "텍스트와 코드 데이터를 읽기 좋은 형태로 정리합니다.", accent: "violet", icon: Braces },
   { id: "work", label: "날짜·계산", shortLabel: "날짜·계산", description: "업무 일정과 근무일, 시차와 급여를 간편하게 계산합니다.", accent: "orange", icon: CalendarDays },
   { id: "security-share", label: "보안·공유", shortLabel: "보안·공유", description: "개인정보를 보호하고 안전한 비밀번호와 공유용 QR을 만듭니다.", accent: "coral", icon: LockKeyhole },
+  { id: "investment-research", label: "투자·공시", shortLabel: "투자·공시", description: "공개된 공시 자료의 범위와 변화를 살펴봅니다.", accent: "blue", icon: WalletCards },
 ];
 
 export const tools: ToolDefinition[] = [
+  { id: "foliotrace", category: "investment-research", path: "/tools/foliotrace", title: "FolioTrace", shortTitle: "FolioTrace", description: "공개 공시로 추적하는 포트폴리오 추정 자료를 살펴봅니다.", eyebrow: "공개 공시 탐색", accent: "blue", icon: WalletCards, highlights: [{ icon: FileSearch2, label: "DART 공시 근거" }, { icon: Table2, label: "추적 종목" }, { icon: CalendarDays, label: "접수일 구분" }], status: "available" },
   { id: "document-redactor", category: "security-share", path: "/tools/document-redactor", title: "개인정보 가리기", shortTitle: "개인정보 가리기", description: "PDF와 이미지에서 직접 선택한 영역을 검정으로 가리고 새 사본으로 저장합니다.", eyebrow: "문서 개인정보", accent: "violet", icon: LockKeyhole, highlights: [{icon: Scissors, label: "직접 영역 선택"}, {icon: Files, label: "모든 PDF 페이지 재생성"}, {icon: Images, label: "이미지 PNG 저장"}, {icon: FileSearch2, label: "결과 다시 확인"}], status: "available" },
   {
     id: "excel-merger",

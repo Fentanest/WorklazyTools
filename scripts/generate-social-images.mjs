@@ -5,6 +5,7 @@ import puppeteer from "puppeteer-core";
 const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
+  tool("foliotrace", "#0879d9", "투자·공시", "FolioTrace", "국민연금 공개 공시 추적", "Investment research", "FolioTrace", "NPS public filing research"),
   tool("document-redactor", "#7554d8", "문서 개인정보", "개인정보 마스킹", "직접 영역 선택 · PDF · 이미지", "Document privacy", "Document Redaction", "Manual masks · PDF · images"),
   tool("excel-merger", "#22a65a", "문서·스프레드시트", "Excel 병합기", "여러 파일 · 시트별 · 세로 · 가로 병합", "Documents & spreadsheets", "Excel Merger", "Combine files · sheets · rows · columns"),
   tool("excel-compare", "#22a65a", "스프레드시트 비교", "Excel 파일 비교", "위치 · 키 · 회계 대사 · 쌍별 보고서", "Spreadsheet comparison", "Excel Compare", "Position · keys · reconciliation · reports"),

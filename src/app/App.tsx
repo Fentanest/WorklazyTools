@@ -47,6 +47,7 @@ const QrStudioPage = lazy(() => import("../features/qr-studio/QrStudioPage").the
 const DataConverterPage = lazy(() => import("../features/data-converter/DataConverterPage").then((module) => ({ default: module.DataConverterPage })));
 const OfficeEditorPage = lazy(() => import("../features/office-editor/OfficeEditorPage").then((module) => ({ default: module.OfficeEditorPage })));
 const OfficeEditorAppPage = lazy(() => import("../features/office-editor/OfficeEditorAppPage").then((module) => ({ default: module.OfficeEditorAppPage })));
+const FolioTraceRoute = lazy(() => import("../features/foliotrace/FolioTraceRoute").then((module) => ({ default: module.FolioTraceRoute })));
 
 export function App() {
   return (
@@ -57,6 +58,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="tools" element={<ToolsPage />} />
+          <Route path="tools/foliotrace" element={<LazyToolRoute label="FolioTrace"><FolioTraceRoute /></LazyToolRoute>} />
           <Route path="tools/excel-merger" element={<ToolReady><ExcelMergerPage /></ToolReady>} />
           <Route path="tools/excel-merger/xls-preserve" element={<ToolReady><ExcelMergerPage /></ToolReady>} />
           <Route path="tools/excel-compare" element={<LazyToolRoute label="Excel compare"><ExcelComparePage /></LazyToolRoute>} />

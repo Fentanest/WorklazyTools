@@ -69,6 +69,7 @@ export function getGuideData(language: AppLanguage, slug: string): ToolGuideDefi
 
 
 export const toolToGuideKey: Record<string, string> = {
+  "foliotrace": "foliotrace",
   "excel-merger": "excel",
   "excel-compare": "excelCompare",
   "excel-cleaner": "excelCleaner",

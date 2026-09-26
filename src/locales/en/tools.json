@@ -11,6 +11,11 @@
     "emptyDescription": "Try another search term or category."
   },
   "categories": {
+    "investment-research": {
+      "label": "Investment research",
+      "shortLabel": "Investment research",
+      "description": "Explore the scope and changes in public filings."
+    },
     "spreadsheets": {
       "label": "Excel & Spreadsheets",
       "shortLabel": "Spreadsheets",
@@ -43,6 +48,13 @@
     }
   },
   "items": {
+    "foliotrace": {
+      "title": "FolioTrace",
+      "shortTitle": "FolioTrace",
+      "description": "Explore an estimate of NPS Korean equity holdings based on public filings.",
+      "eyebrow": "Public filings",
+      "highlights": ["DART filing evidence", "Tracked securities", "Receipt dates"]
+    },
     "document-redactor": {
       "title": "Redact Personal Info from PDF and Images",
       "shortTitle": "Redact Document",

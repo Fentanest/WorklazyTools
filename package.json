@@ -38,6 +38,7 @@
     "test:qr-font-render": "node --experimental-strip-types tests/qr-font-render-regression.mjs",
     "test:pdf-font-embed": "node --experimental-strip-types tests/pdf-font-embed-regression.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
+    "test:foliotrace": "python3 -m unittest discover -s tests/foliotrace -p 'test_*.py' -v",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",

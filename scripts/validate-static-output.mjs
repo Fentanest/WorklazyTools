@@ -54,7 +54,7 @@ if (!rhwpCoreVersion || rhwpCoreVersion !== rhwpEditorVersion) throw new Error("
 const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/stickers.manifest.json", "utf8"));
 
 const routes = [
-  "", "tools", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare",
+  "", "tools", "tools/foliotrace", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
@@ -67,7 +67,7 @@ const routes = [
   "about", "privacy", "terms", "contact", "licenses",
 ];
 const socialSlugByRoute = {
-  "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-generator": "document-generator", "tools/document-compare": "document-compare", "tools/pdf-compare": "pdf-compare", "tools/pdf-editor": "pdf-tools",
+  "tools/foliotrace": "foliotrace", "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-generator": "document-generator", "tools/document-compare": "document-compare", "tools/pdf-compare": "pdf-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
   "tools/pdf-editor/finish": "pdf-finish", "tools/pdf-editor/page-numbers": "pdf-page-numbers", "tools/pdf-editor/header-footer": "pdf-header-footer", "tools/pdf-editor/watermark": "pdf-watermark", "tools/pdf-editor/stamp": "pdf-stamp",
   "tools/hwp-editor": "hwp-editor", "tools/office-editor": "office-editor", "tools/video-studio": "video-studio",

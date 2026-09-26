@@ -45,6 +45,7 @@ export const socialImages = {
 } as const;
 
 const socialImageSlugByPath: Record<string, string> = {
+  "/tools/foliotrace": "foliotrace",
   "/tools/document-redactor": "document-redactor",
   "/tools/excel-merger": "excel-merger",
   "/tools/excel-compare": "excel-compare",
@@ -92,6 +93,7 @@ const socialImageSlugByPath: Record<string, string> = {
 };
 
 export const seoByPath: Record<string, SeoDefinition> = {
+  "/tools/foliotrace": { title: "FolioTrace | 국민연금 공개 공시 추적", description: "국민연금의 국내주식 DART 대량보유 공시를 근거로 공개 추적 범위를 살펴봅니다. 실제 계좌 잔고나 전체 자산을 뜻하지 않습니다." },
   "/tools/document-redactor": {title: "PDF·이미지 개인정보 가리기 - 직접 영역 선택 | Worklazy Tools", description: "PDF와 이미지 파일에서 민감한 개인정보 영역을 검정색으로 가리고 안전하게 사본을 저장하세요.", application: {name: "개인정보 가리기", featureList: ["직접 영역 선택", "검정 픽셀 마스킹", "모든 PDF 페이지 재생성", "PNG 이미지 저장", "결과 확인"]}},
   "/": {
     title: "무료 문서·PDF·비디오·이미지 업무 도구 | Worklazy Tools",
@@ -354,6 +356,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
 };
 
 const englishToolTitles: Record<keyof typeof enTools.items, string> = {
+  "foliotrace": "FolioTrace | NPS Disclosed Holdings",
   "document-redactor": "Redact PDF & Images - Blackout Private Info | Worklazy Tools",
   "excel-merger": "Excel Merger - Combine Files & Merge Sheets | Worklazy Tools",
   "excel-compare": "Compare Excel Files - Find Differences in Values & Formulas | Worklazy Tools",
@@ -380,6 +383,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
 };
 
 const englishPageSeo: Record<string, SeoDefinition> = {
+  "/tools/foliotrace": { title: "FolioTrace | NPS Disclosed Holdings", description: "Explore an estimate based on Korea National Pension Service DART large-shareholding filings. It does not represent actual account balances or total assets." },
   "/tools/document-redactor": {title: "Document Redaction | Mask PDF and Image Areas", description: "Cover selected PDF, JPG, PNG and WebP areas with black masks and save a new copy. Original files remain unchanged; every PDF page is rasterized.", application: {name: "Document Redaction", featureList: ["Manual area selection", "Solid black pixel masks", "Rasterize every PDF page", "PNG image output", "Review results"]}},
   "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
@@ -417,6 +421,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
 };
 
 export const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
+  "/tools/foliotrace": "foliotrace",
   "/tools/excel-merger": "excel-merger", "/tools/excel-compare": "excel-compare", "/tools/excel-cleaner": "excel-cleaner", "/tools/document-compare": "document-compare", "/tools/pdf-compare": "pdf-compare", "/tools/pdf-editor": "pdf-editor",
   "/tools/hwp-editor": "hwp-editor", "/tools/office-editor": "office-editor", "/tools/video-studio": "video-studio",
   "/tools/audio-studio": "audio-studio", "/tools/image-studio": "image-studio", "/tools/text-tools": "text-tools",

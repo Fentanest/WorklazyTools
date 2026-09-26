@@ -1,4 +1,18 @@
 {
+  "foliotrace": {
+    "title": "Using FolioTrace",
+    "description": "Explore the scope tracked from NPS Korean equity large-shareholding filings. This is neither an actual account balance nor all NPS assets.",
+    "blocks": [
+      { "title": "Data scope", "paragraphs": ["Filing receipt dates and disclosed holding dates are shown separately. Check the coverage status of imported history before interpreting gaps."] },
+      { "title": "Valuation and limits", "paragraphs": ["A holding is valued only when its security mapping and a verified KRX regular-session close for the same trade date are available. Weights use the total value of all eligible tracked holdings as the denominator. Unclear prices or security types remain excluded."] },
+      { "title": "Dates and refresh", "paragraphs": ["Filing receipt date, quote trade date, collection check time, and publication time have different meanings. Refresh only reloads published static data; it does not collect new filings immediately."] }
+    ],
+    "faq": {
+      "actual_balance": { "q": "Is this the NPS actual account balance?", "a": "No. It estimates a scope from public Korean equity large-shareholding filings, not actual account balances or all NPS assets." },
+      "missing_price": { "q": "Why are holdings without a value retained?", "a": "Filing evidence stays visible, while securities without a confirmed price, security type, or trade date are excluded from valuation." },
+      "refresh": { "q": "Does Refresh collect new filings?", "a": "No. The browser reloads static data already published on this site." }
+    }
+  },
   "documentCompare": {
     "title": "Document Compare Usage Guide",
     "description": "Compare Word and Hangul (HWP) documents before and after revisions to check for changes in text, tables, and formatting.",

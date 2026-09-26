@@ -1,4 +1,5 @@
 {
+  "/tools/foliotrace": { "slug": "foliotrace", "ko": "실제 국민연금 보유잔고인가요?", "en": "Is this the NPS actual account balance?" },
   "/tools/excel-merger": { "slug": "excel-merger", "ko": "XLSX 수식과 서식을 따로 보존할 수 있나요?", "en": "Can XLSX formulas and formatting be preserved independently?" },
   "/tools/excel-compare": { "slug": "excel-compare", "ko": "어떤 Excel 형식을 비교할 수 있나요?", "en": "Which Excel formats can I compare?" },
   "/tools/excel-cleaner": { "slug": "excel-cleaner", "ko": "수식이 있는 Excel 파일도 정리할 수 있나요?", "en": "Can I clean an Excel file that contains formulas?" },

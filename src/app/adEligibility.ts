@@ -1,4 +1,4 @@
-type EligibilitySource = "routeError" | "routePending";
+type EligibilitySource = "routeError" | "routePending" | "folioTraceUnpublished";
 
 const eligibilityFlags = new Set<EligibilitySource>();
 

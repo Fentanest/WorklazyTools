@@ -11,6 +11,11 @@
     "emptyDescription": "다른 검색어나 카테고리를 선택해 보세요."
   },
   "categories": {
+    "investment-research": {
+      "label": "투자·공시",
+      "shortLabel": "투자·공시",
+      "description": "공개 공시 자료의 범위와 변화를 살펴봅니다."
+    },
     "spreadsheets": {
       "label": "엑셀·표",
       "shortLabel": "엑셀·표",
@@ -43,6 +48,13 @@
     }
   },
   "items": {
+    "foliotrace": {
+      "title": "FolioTrace",
+      "shortTitle": "FolioTrace",
+      "description": "공개 공시로 추적하는 국민연금 국내주식 포트폴리오 추정 자료를 살펴봅니다.",
+      "eyebrow": "공개 공시 탐색",
+      "highlights": ["DART 공시 근거", "추적 종목", "접수일 구분"]
+    },
     "document-redactor": {
       "title": "PDF·이미지 개인정보 가리기",
       "shortTitle": "개인정보 가리기",
