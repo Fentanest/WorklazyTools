@@ -38,7 +38,14 @@ PAGE_SIZE = 100
 RECEIPT = re.compile(r"^\d{14}$")
 RCEPT_DT = re.compile(r"^\d{8}$")
 CORRECTION_HINT = re.compile(r"정정|철회|취소|변경등록")
+# Official list-API `rm` remarks also use single-character short codes.
+RM_TOKENS = re.compile(r"[\s,;/|·()\[\]{}]+")
+RM_CORRECTION_TOKENS = frozenset({"정", "정정"})
+RM_WITHDRAWAL_TOKENS = frozenset({"철", "철회"})
+RM_CANCEL_TOKENS = frozenset({"취", "취소"})
 PENDING_STATUSES = ("source_review_pending", "source_unavailable")
+SOURCE_HISTORY_CAP = 5
+DEFAULT_MAX_QUEUE_ENTRIES = 20000
 # Holding reflection needs Sol's shared observation wiring; never implied here.
 HOLDING_REFLECTION = "pending_sol_integration"
 
@@ -138,9 +145,21 @@ def fetch_list_page(params: dict, key: str, *, retries: int = 3) -> dict:
     raise OpendartListError("OPENDART_TRANSPORT", date.today(), date.today())  # pragma: no cover
 
 
+def _correction_flags(report_nm: str, rm: str) -> tuple[bool, bool]:
+    """Signal correction/withdrawal holds from long and short remark forms."""
+    if CORRECTION_HINT.search(report_nm) or CORRECTION_HINT.search(rm):
+        withdrawal = bool(re.search(r"철회|철", report_nm) or re.search(r"철회|철", rm))
+        return True, withdrawal
+    tokens = set(RM_TOKENS.split(rm)) - {""}
+    if tokens & (RM_CORRECTION_TOKENS | RM_WITHDRAWAL_TOKENS | RM_CANCEL_TOKENS):
+        return True, bool(tokens & RM_WITHDRAWAL_TOKENS)
+    return False, False
+
+
 def _queue_entry(row: dict, window_from: str, window_to: str) -> dict:
     report = str(row.get("report_nm") or "")
     rm = str(row.get("rm") or "")
+    correction_hold, withdrawal_flag = _correction_flags(report, rm)
     return {"receipt_no": str(row.get("rcept_no") or ""),
             "corp_code": str(row.get("corp_code") or "") or None,
             "corp_name": str(row.get("corp_name") or "")[:120] or None,
@@ -149,14 +168,35 @@ def _queue_entry(row: dict, window_from: str, window_to: str) -> dict:
             "rcept_dt": str(row.get("rcept_dt") or ""),
             "rm": rm[:120],
             "first_seen_from": window_from, "first_seen_to": window_to,
-            "correction_hold": bool(CORRECTION_HINT.search(report) or CORRECTION_HINT.search(rm)),
+            "last_seen_from": window_from, "last_seen_to": window_to,
+            "correction_hold": correction_hold, "withdrawal_flag": withdrawal_flag,
             "source_status": "source_review_pending", "parser_version": None,
-            "source_attempt_count": 0, "last_source_attempt_on": None, "source_sha256": None}
+            "source_attempt_count": 0, "last_source_attempt_on": None, "source_sha256": None,
+            "source_history": []}
 
 
-def _pending_count(ledger: dict) -> int:
-    return sum(1 for item in ledger.get("queue", {}).values()
-               if item.get("source_status") in PENDING_STATUSES)
+def _refresh_entry(item: dict, row: dict, window_from: str, window_to: str) -> None:
+    """Refresh listing metadata on recrawl; source-review evidence is untouched."""
+    report = str(row.get("report_nm") or "")
+    rm = str(row.get("rm") or "")
+    correction_hold, withdrawal_flag = _correction_flags(report, rm)
+    item.update(corp_code=str(row.get("corp_code") or "") or None,
+                corp_name=str(row.get("corp_name") or "")[:120] or None,
+                stock_code=str(row.get("stock_code") or "") or None,
+                report_nm=report[:180], rcept_dt=str(row.get("rcept_dt") or ""), rm=rm[:120],
+                last_seen_from=window_from, last_seen_to=window_to,
+                correction_hold=correction_hold, withdrawal_flag=withdrawal_flag)
+
+
+def _is_outstanding(item: dict) -> bool:
+    """Pending items plus terminal verdicts recorded under an older parser."""
+    if item.get("source_status") in PENDING_STATUSES:
+        return True
+    return item.get("parser_version") != secondary.SOURCE_PARSER_VERSION
+
+
+def _outstanding_count(ledger: dict) -> int:
+    return sum(1 for item in ledger.get("queue", {}).values() if _is_outstanding(item))
 
 
 def _needs_source_review(item: dict, today: str) -> bool:
@@ -171,10 +211,147 @@ def _needs_source_review(item: dict, today: str) -> bool:
     return item.get("parser_version") != secondary.SOURCE_PARSER_VERSION
 
 
+def _call_list(fetch_list, key: str, params: dict, cursor: date, last: date,
+               page_no: int) -> dict:
+    try:
+        if fetch_list is fetch_list_page:
+            return fetch_list(params, key)
+        return fetch_list(params)
+    except OpendartListError as exc:
+        raise OpendartListError(exc.code, cursor, last, page_no) from None
+    except (ValueError, RuntimeError) as exc:
+        code = (str(exc) if str(exc) in ("OPENDART_TRANSPORT", "DART_API_KEY unavailable")
+                else "LIST_UNEXPECTED")
+        raise OpendartListError(code, cursor, last, page_no) from None
+
+
+def _collect_window(fetch_list, key: str, cursor: date, last: date, *, ledger: dict,
+                    state: dict, state_path: Path, write_state,
+                    max_listing_pages: int,
+                    spent: int) -> tuple[list[dict] | None, date, int, int | None]:
+    """Fetch every page of one window, halving oversized ranges safely.
+
+    Returns ``(pages, last, spent, required_pages)``; ``pages`` is None when
+    the window cannot be completed on this run, and ``required_pages`` is set
+    only when even a single-day window overflows the page budget.
+    """
+    while True:
+        params = {"bgn_de": cursor.strftime("%Y%m%d"), "end_de": last.strftime("%Y%m%d"),
+                  "page_no": 1, "page_count": PAGE_SIZE,
+                  "last_reprt_at": "N", "sort": "date", "sort_mth": "asc"}
+        first = _call_list(fetch_list, key, params, cursor, last, 1)
+        spent += 1
+        if first.get("status") == "013":
+            return [first], last, spent, None
+        try:
+            page_count = int(first["total_page"])
+            total_count = int(first["total_count"])
+        except (KeyError, TypeError, ValueError):
+            raise OpendartListError("PAGINATION_METADATA", cursor, last, 1) from None
+        if page_count < 1 or page_count > 10_000 or total_count < 0:
+            raise OpendartListError("PAGINATION_METADATA", cursor, last, 1)
+        if page_count > max_listing_pages:
+            if last == cursor:
+                return None, last, spent, page_count
+            last = cursor + timedelta(days=(last - cursor).days // 2)
+            ledger["max_window_days"] = (last - cursor).days + 1
+            state["revision"] += 1
+            write_state(state_path, state)
+            if spent >= max_listing_pages:
+                return None, last, spent, None
+            continue
+        if spent + page_count - 1 > max_listing_pages:
+            return None, last, spent, None  # Fits a fresh run; never commit truncated pages.
+        pages = [first]
+        for number in range(2, page_count + 1):
+            pages.append(_call_list(fetch_list, key, {**params, "page_no": number},
+                                    cursor, last, number))
+            spent += 1
+        return pages, last, spent, None
+
+
+def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
+                   cursor: date, last: date,
+                   pages: list[dict], *, overlap: bool, max_queue_entries: int) -> tuple[int, int]:
+    """Validate pages, queue every receipt, and advance only this phase's cursor."""
+    try:
+        total = validate_list_pages(pages, cursor, last)
+    except ValueError as exc:
+        code = str(exc) if str(exc) in ("NO_DATA_SHAPE", "PAGE_STATUS", "PAGINATION_METADATA",
+                                        "PAGE_COUNT", "PAGE_IDENTITY", "ROW_SHAPE",
+                                        "RECEIPT_IDENTITY", "ROW_DATE", "ROW_DATE_RANGE",
+                                        "RECEIPT_COVERAGE") else "PAGE_VALIDATION"
+        raise OpendartListError(code, cursor, last) from None
+    new_receipts = queued_this_window = 0
+    for page in pages:
+        for row in page.get("list") or []:
+            no = str(row.get("rcept_no") or "")
+            existing = ledger["queue"].get(no)
+            if existing is None:
+                ledger["queue"][no] = _queue_entry(row, cursor.isoformat(), last.isoformat())
+                new_receipts += 1
+            else:
+                _refresh_entry(existing, row, cursor.isoformat(), last.isoformat())
+            queued_this_window += 1
+    digests = [hashlib.sha256(json.dumps(
+        page, ensure_ascii=False, sort_keys=True).encode()).hexdigest() for page in pages]
+    record = {"from": cursor.isoformat(), "to": last.isoformat(),
+              "checked_at": datetime.now(timezone.utc).isoformat(), "method": METHOD,
+              "pages": len(pages), "total_receipts": total,
+              "queued_receipts": queued_this_window, "complete": True,
+              "page_digest": hashlib.sha256("".join(digests).encode()).hexdigest()}
+    if overlap:
+        record["overlap"] = True
+        ledger["overlap_coverage"].append(record)
+        ledger["overlap_next_date"] = (last + timedelta(days=1)).isoformat()
+    else:
+        ledger["coverage"].append(record)
+        ledger["next_date"] = (last + timedelta(days=1)).isoformat()
+    history = ledger["overlap_coverage"] if overlap else ledger["coverage"]
+    if not overlap:
+        # Only forward commits grow the window: overlap rescans must stay
+        # small, otherwise the next run burns its page budget re-halving
+        # instead of advancing either frontier.
+        ledger["max_window_days"] = min(
+            MAX_WINDOW_DAYS, max(1, (last - date.fromisoformat(history[-1]["from"])).days * 2 + 2))
+    _enforce_queue_bound(ledger, max_queue_entries)
+    state["revision"] += 1
+    write_state(state_path, state)
+    return new_receipts, total
+
+
+def _enforce_queue_bound(ledger: dict, max_queue_entries: int) -> int:
+    """Evict only terminal, current-version, non-held negatives with explicit accounting.
+
+    Pending, stale-version, positive, and correction/withdrawal-held rows are
+    never evicted; evicted rows stay re-derivable from the per-window coverage
+    records (from/to/total/page_digest) instead of vanishing silently.
+    """
+    evicted = 0
+    while len(ledger["queue"]) > max_queue_entries:
+        candidates = sorted(
+            (item.get("rcept_dt") or "", no)
+            for no, item in ledger["queue"].items()
+            if item.get("source_status") not in PENDING_STATUSES
+            and item.get("source_status") != "source_context_review_pending"
+            and item.get("parser_version") == secondary.SOURCE_PARSER_VERSION
+            and not item.get("correction_hold") and not item.get("withdrawal_flag"))
+        if not candidates:
+            break
+        _, oldest = candidates[0]
+        del ledger["queue"][oldest]
+        evicted += 1
+        ledger["evicted_count"] = int(ledger.get("evicted_count") or 0) + 1
+        ledger["evicted_digest"] = hashlib.sha256(
+            f'{ledger.get("evicted_digest") or ""}\n{oldest}'.encode()).hexdigest()
+    return evicted
+
+
 def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                             max_listing_pages: int = 300, max_windows: int = 20,
                             review_limit: int = 20, max_pending: int = 5000,
                             overlap_days: int = 0,
+                            max_queue_entries: int = DEFAULT_MAX_QUEUE_ENTRIES,
                             fetch_list=fetch_list_page,
                             fetch_document=secondary.fetch_source_document,
                             read_state=None, write_state=None, key: str = "") -> dict:
@@ -189,14 +366,17 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     if review_limit and not key:
         raise ValueError("DART_API_KEY unavailable")
     if (start > end or start < EARLIEST_START or max_listing_pages < 1 or max_windows < 1
-            or not 0 <= review_limit <= 300 or max_pending < 1 or not 0 <= overlap_days <= 31):
+            or not 0 <= review_limit <= 300 or max_pending < 1 or not 0 <= overlap_days <= 31
+            or max_queue_entries < 1):
         raise ValueError("invalid opendart secondary bounds")
     state = read_state(state_path)
     ledger = state.get(LEDGER_KEY)
     if ledger is None:
         ledger = {"method": METHOD, "start_date": start.isoformat(),
                   "target_date": end.isoformat(), "next_date": start.isoformat(),
-                  "coverage": [], "queue": {}, "positives": {}}
+                  "overlap_next_date": None, "coverage": [], "overlap_coverage": [],
+                  "queue": {}, "positives": {},
+                  "evicted_count": 0, "evicted_digest": ""}
         state[LEDGER_KEY] = ledger
         # Persist the configured range before any network call so a failed
         # first window still leaves range/cursor facts instead of silence.
@@ -208,108 +388,69 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     else:
         ledger["target_date"] = end.isoformat()
     ledger.setdefault("coverage", [])
+    ledger.setdefault("overlap_coverage", [])
     ledger.setdefault("queue", {})
     ledger.setdefault("positives", {})
-    cursor = date.fromisoformat(ledger["next_date"])
-    if not start <= cursor <= end + timedelta(days=1):
+    ledger.setdefault("evicted_count", 0)
+    ledger.setdefault("evicted_digest", "")
+    forward = date.fromisoformat(ledger["next_date"])
+    if not start <= forward <= end + timedelta(days=1):
         raise ValueError("opendart secondary cursor inconsistent")
-    if overlap_days and cursor > start:
-        cursor = max(start, cursor - timedelta(days=overlap_days))
-    prior_cursor = date.fromisoformat(ledger["next_date"])
+    # Overlap rescans already-listed days for late filings and metadata changes,
+    # but track their progress separately: without a persisted overlap frontier
+    # every run would restart at ``forward - overlap_days`` and burn its whole
+    # page budget before the forward cursor ever advances.
+    overlap_base = max(start, forward - timedelta(days=overlap_days)) if overlap_days else forward
+    try:
+        overlap_saved = (date.fromisoformat(ledger["overlap_next_date"])
+                         if ledger.get("overlap_next_date") else overlap_base)
+    except ValueError:
+        overlap_saved = overlap_base
+    overlap_cursor = min(max(overlap_saved, overlap_base), forward)
+    overlap_cap = min(forward, end + timedelta(days=1))
 
-    requests = windows = new_receipts = 0
+    requests = windows = new_receipts = overlap_windows = 0
     required_pages = None
     backlog = False
-    while cursor <= end and windows < max_windows and requests < max_listing_pages:
-        if _pending_count(ledger) >= max_pending:
-            backlog = True
-            break
-        last = min(cursor + timedelta(days=int(ledger.get("max_window_days") or MAX_WINDOW_DAYS) - 1), end)
-        pages = None
-        while True:
-            params = {"bgn_de": cursor.strftime("%Y%m%d"), "end_de": last.strftime("%Y%m%d"),
-                      "page_no": 1, "page_count": PAGE_SIZE,
-                      "last_reprt_at": "N", "sort": "date", "sort_mth": "asc"}
-            try:
-                first = fetch_list(params, key) if fetch_list is fetch_list_page else fetch_list(params)
-            except OpendartListError as exc:
-                raise OpendartListError(exc.code, cursor, last, 1) from None
-            except (ValueError, RuntimeError) as exc:
-                code = str(exc) if str(exc) in ("OPENDART_TRANSPORT", "DART_API_KEY unavailable") else "LIST_UNEXPECTED"
-                raise OpendartListError(code, cursor, last, 1) from None
-            requests += 1
-            if first.get("status") == "013":
-                pages = [first]
+
+    def window_limit(frontier: date, cap: date) -> date:
+        return min(frontier + timedelta(days=int(ledger.get("max_window_days")
+                                                or MAX_WINDOW_DAYS) - 1), cap)
+
+    def scan_phase(frontier: date, cap: date, *, overlap: bool) -> date:
+        """Commit complete windows until the cap or a budget/backlog stop."""
+        nonlocal requests, windows, new_receipts, overlap_windows, required_pages, backlog
+        while (frontier <= cap and windows < max_windows
+               and requests < max_listing_pages and required_pages is None and not backlog):
+            if _outstanding_count(ledger) >= max_pending:
+                backlog = True
                 break
-            try:
-                page_count = int(first["total_page"])
-                total_count = int(first["total_count"])
-            except (KeyError, TypeError, ValueError):
-                raise OpendartListError("PAGINATION_METADATA", cursor, last, 1) from None
-            if page_count < 1 or page_count > 10_000 or total_count < 0:
-                raise OpendartListError("PAGINATION_METADATA", cursor, last, 1)
-            if page_count > max_listing_pages:
-                if last == cursor:
-                    required_pages = page_count
-                    break
-                last = cursor + timedelta(days=(last - cursor).days // 2)
-                ledger["max_window_days"] = (last - cursor).days + 1
-                state["revision"] += 1
-                write_state(state_path, state)
-                if requests >= max_listing_pages:
-                    break
-                continue
-            if requests + page_count - 1 > max_listing_pages:
-                break  # Window fits a fresh run; never commit a truncated page set.
-            pages = [first]
-            for number in range(2, page_count + 1):
-                window_params = {**params, "page_no": number}
-                try:
-                    page = (fetch_list(window_params, key) if fetch_list is fetch_list_page
-                            else fetch_list(window_params))
-                except OpendartListError as exc:
-                    raise OpendartListError(exc.code, cursor, last, number) from None
-                except (ValueError, RuntimeError) as exc:
-                    code = (str(exc) if str(exc) in ("OPENDART_TRANSPORT", "DART_API_KEY unavailable")
-                            else "LIST_UNEXPECTED")
-                    raise OpendartListError(code, cursor, last, number) from None
-                requests += 1
-                pages.append(page)
-            break
-        if pages is None:
-            break
-        try:
-            total = validate_list_pages(pages, cursor, last)
-        except ValueError as exc:
-            code = str(exc) if str(exc) in ("NO_DATA_SHAPE", "PAGE_STATUS", "PAGINATION_METADATA",
-                                            "PAGE_COUNT", "PAGE_IDENTITY", "ROW_SHAPE",
-                                            "RECEIPT_IDENTITY", "ROW_DATE", "ROW_DATE_RANGE",
-                                            "RECEIPT_COVERAGE") else "PAGE_VALIDATION"
-            raise OpendartListError(code, cursor, last) from None
-        queued_this_window = 0
-        for page in pages:
-            for row in page.get("list") or []:
-                no = str(row.get("rcept_no") or "")
-                if no not in ledger["queue"]:
-                    ledger["queue"][no] = _queue_entry(row, cursor.isoformat(), last.isoformat())
-                    new_receipts += 1
-                queued_this_window += 1
-        digests = [hashlib.sha256(json.dumps(
-            page, ensure_ascii=False, sort_keys=True).encode()).hexdigest() for page in pages]
-        ledger["coverage"].append(
-            {"from": cursor.isoformat(), "to": last.isoformat(),
-             "checked_at": datetime.now(timezone.utc).isoformat(), "method": METHOD,
-             "pages": len(pages), "total_receipts": total,
-             "queued_receipts": queued_this_window, "complete": True,
-             "page_digest": hashlib.sha256("".join(digests).encode()).hexdigest()})
-        cursor = last + timedelta(days=1)
-        ledger["next_date"] = max(prior_cursor, cursor).isoformat()
-        ledger["max_window_days"] = min(
-            MAX_WINDOW_DAYS, max(1, (last - date.fromisoformat(
-                ledger["coverage"][-1]["from"])).days * 2 + 2))
-        state["revision"] += 1
-        write_state(state_path, state)
-        windows += 1
+            last = window_limit(frontier, cap)
+            pages, last, requests, needed = _collect_window(
+                fetch_list, key, frontier, last, ledger=ledger, state=state,
+                state_path=state_path, write_state=write_state,
+                max_listing_pages=max_listing_pages, spent=requests)
+            if needed is not None:
+                required_pages = needed
+                break
+            if pages is None:
+                break
+            gained, _ = _commit_window(ledger, state, state_path, write_state,
+                                       frontier, last, pages,
+                                       overlap=overlap, max_queue_entries=max_queue_entries)
+            new_receipts += gained
+            frontier = last + timedelta(days=1)
+            windows += 1
+            if overlap:
+                overlap_windows += 1
+        return frontier
+
+    # Phase 1: re-verify the overlap tail with its own persisted frontier so a
+    # tight page budget still leaves room for phase 2 to advance forward.
+    overlap_cursor = scan_phase(overlap_cursor, overlap_cap - timedelta(days=1), overlap=True)
+    ledger["overlap_next_date"] = max(overlap_cursor, overlap_base).isoformat()
+    # Phase 2: advance the forward cursor over not-yet-listed days.
+    forward = scan_phase(forward, end, overlap=False)
 
     reviewed = source_requests = positive_count = 0
     if review_limit:
@@ -339,9 +480,17 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
             item["source_status"] = check.get("status") or "source_review_pending"
             item["parser_version"] = check.get("parser_version")
             item["source_sha256"] = check.get("source_sha256")
+            history = item.setdefault("source_history", [])
+            history.append({"checked_at": datetime.now(timezone.utc).isoformat(),
+                            "status": item["source_status"],
+                            "parser_version": item["parser_version"],
+                            "source_sha256": item["source_sha256"]})
+            del history[:-SOURCE_HISTORY_CAP]
             reviewed += 1
             if check.get("status") == "source_context_review_pending":
                 positive_count += 1
+                # Replace any earlier verdict for this receipt atomically in the
+                # same persisted write so claims never mix parser generations.
                 ledger["positives"][no] = {
                     "receipt_no": no, "corp_code": item.get("corp_code"),
                     "corp_name": item.get("corp_name"), "report_nm": item.get("report_nm"),
@@ -352,15 +501,20 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                     "parser_version": check.get("parser_version"),
                     "source_claims": check.get("source_claims") or [],
                     "correction_hold": item.get("correction_hold", False),
+                    "withdrawal_flag": item.get("withdrawal_flag", False),
                     "relation": ("correction_relation_unverified" if item.get("correction_hold")
                                  else "holding_observation_pending"),
                     "integration_required": "sol_holding_observation"}
+            else:
+                # A reprocessed receipt that no longer shows an NPS equity
+                # context must not keep its earlier positive claims.
+                ledger["positives"].pop(no, None)
         if reviewed:
             state["revision"] += 1
             write_state(state_path, state)
 
     list_complete = ledger["next_date"] > end.isoformat()
-    pending_sources = _pending_count(ledger)
+    pending_sources = _outstanding_count(ledger)
     if required_pages is not None:
         status = "LISTING_BUDGET_INSUFFICIENT"
     elif backlog:
@@ -374,8 +528,12 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     return {"status": status, "next_date": ledger["next_date"],
             "target_date": ledger["target_date"],
             "completed_windows": len(ledger["coverage"]), "windows_this_run": windows,
+            "overlap_windows": overlap_windows, "overlap_next_date": ledger["overlap_next_date"],
             "listing_requests": requests, "new_receipts": new_receipts,
             "queued_receipts": len(ledger["queue"]), "pending_sources": pending_sources,
             "source_review_attempts": reviewed, "source_document_requests": source_requests,
-            "positive_count": positive_count, "required_pages": required_pages,
+            "positive_count": positive_count,
+            "positive_pending_total": len(ledger["positives"]),
+            "evicted_count": int(ledger.get("evicted_count") or 0),
+            "required_pages": required_pages,
             "holding_reflection": HOLDING_REFLECTION}

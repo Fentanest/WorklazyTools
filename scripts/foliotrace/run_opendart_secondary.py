@@ -30,6 +30,7 @@ def main() -> int:
     parser.add_argument("--max-windows", type=int, default=20)
     parser.add_argument("--review-limit", type=int, default=20)
     parser.add_argument("--max-pending", type=int, default=5000)
+    parser.add_argument("--max-queue-entries", type=int, default=20000)
     parser.add_argument("--overlap-days", type=int, default=0)
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
@@ -49,6 +50,7 @@ def main() -> int:
             state_path, args.start, target,
             max_listing_pages=args.max_listing_pages, max_windows=args.max_windows,
             review_limit=args.review_limit, max_pending=args.max_pending,
+            max_queue_entries=args.max_queue_entries,
             overlap_days=args.overlap_days,
             read_state=folio.read_json, write_state=folio.write_json,
             key=os.environ.get("DART_API_KEY", ""))

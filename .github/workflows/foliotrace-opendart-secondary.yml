@@ -25,6 +25,11 @@ on:
         required: true
         default: '3'
         type: string
+      max_queue_entries:
+        description: Maximum queued receipt rows kept in state
+        required: true
+        default: '20000'
+        type: string
       validate_only:
         description: Exercise the lane without writing the data branch
         required: true
@@ -68,13 +73,14 @@ jobs:
           MAX_WINDOWS: ${{ inputs.max_windows }}
           REVIEW_LIMIT: ${{ inputs.review_limit }}
           OVERLAP_DAYS: ${{ inputs.overlap_days }}
+          MAX_QUEUE_ENTRIES: ${{ inputs.max_queue_entries }}
           VALIDATE_ONLY: ${{ inputs.validate_only }}
         run: |
           args=(--state foliotrace-state/state.json)
           if [ "$EVENT_NAME" = schedule ]; then
-            args+=(--overlap-days 3 --max-listing-pages 100 --max-windows 15 --review-limit 20)
+            args+=(--overlap-days 3 --max-listing-pages 100 --max-windows 15 --review-limit 20 --max-queue-entries 20000)
           else
-            args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT")
+            args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT" --max-queue-entries "$MAX_QUEUE_ENTRIES")
           fi
           if [ "$VALIDATE_ONLY" = true ]; then args+=(--validate-only); fi
           python3 scripts/foliotrace/run_opendart_secondary.py "${args[@]}"
