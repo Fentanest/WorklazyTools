@@ -97,6 +97,37 @@
   color: var(--label-secondary, #636369);
 }
 
+.foliotrace-indirect-clue {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border: 1px dashed var(--separator, rgba(60, 60, 67, 0.13));
+  border-radius: var(--wl-radius-md, 12px);
+  background: var(--bg-solid, #ffffff);
+  color: var(--label, #18181b);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-indirect-clue p {
+  margin: 0;
+}
+
+.foliotrace-indirect-clue small {
+  color: var(--label-secondary, #636369);
+}
+
+.foliotrace-indirect-clue a {
+  color: var(--brand, #b7351f);
+}
+
+.foliotrace-indirect-clue a:focus-visible {
+  outline: 2px solid var(--brand, #b7351f);
+  outline-offset: 2px;
+}
+
 .foliotrace-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

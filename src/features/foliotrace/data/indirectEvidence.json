@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "scope": "third-party-filing-mentions",
+  "items": [
+    {
+      "receiptNo": "20060208000020",
+      "filingDate": "2006-02-08",
+      "filingCompany": "포스코",
+      "filingCompanyEn": "POSCO",
+      "filer": "주식회사 포스코",
+      "filerEn": "POSCO Co., Ltd.",
+      "mentionedEntity": "국민연금공단",
+      "mentionedEntityEn": "National Pension Service",
+      "relationship": "proxy-solicitation-target-shareholder",
+      "securityKind": "보통주",
+      "statedOwnershipPercent": null,
+      "quantity": null,
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20060208000020&dcmNo=1251611",
+      "sourceSection": "4. 피권유자의 성명ㆍ소유주식의 종류 및 수",
+      "sourceSectionSha256": "a1b36c74f0e45dfad024671240bf1731ad8bde0ea9175d8f2625196333eb4f0c"
+    },
+    {
+      "receiptNo": "20081007000308",
+      "filingDate": "2008-10-07",
+      "filingCompany": "국민은행",
+      "filingCompanyEn": "Kookmin Bank",
+      "filer": "KB금융지주",
+      "filerEn": "KB Financial Group",
+      "mentionedEntity": "국민연금공단",
+      "mentionedEntityEn": "National Pension Service",
+      "relationship": "largest-shareholder-of-filer",
+      "securityKind": null,
+      "statedOwnershipPercent": "5.03",
+      "quantity": null,
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20081007000308&dcmNo=2032024",
+      "sourceSection": "2. 대량보유자에 관한 사항",
+      "sourceSectionSha256": "228e9155a30c48d5b1f6bcebaa129b58acf662c4db311aafbe581b9f70f84458"
+    }
+  ]
+}

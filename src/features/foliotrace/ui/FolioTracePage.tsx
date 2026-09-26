@@ -36,6 +36,7 @@ import {
 } from "./holdings";
 import type { Lang, QualityFilter, SortKey } from "./holdings";
 import { getFaqsForPath } from "./faq";
+import indirectEvidence from "../data/indirectEvidence.json";
 
 const STR = {
   ko: {
@@ -50,11 +51,14 @@ const STR = {
     historicalCoverageTarget: "조회 목표일",
     historicalCoverageComplete: "목록 페이지 검사 완료",
     historicalCoveragePending: "목록 페이지 검사 진행 중",
-    historicalCoverageScope: "목록 검사는 공시 수량·지분율의 원문 검증 완료를 뜻하지 않습니다.",
-    historicalFirstObserved: "목록에서 확인한 가장 이른 국민연금 접수",
+    historicalCoverageScope: "국민연금 기관이 제출한 공시만 집계합니다. 목록 검사는 공시 수량·지분율의 원문 검증 완료를 뜻하지 않습니다.",
+    historicalFirstObserved: "국민연금 기관이 제출한 첫 대량보유 공시 접수",
     historicalFirstTentative: "(조회 진행 중 잠정값)",
     historicalParsePending: "신규 접수 원문 파싱 미완료",
     historicalLegacyRecheck: "이관 수치 원문 재확인 미완료",
+    indirectTitle: "다른 회사 공시의 과거 단서",
+    indirectSource: "DART 원문 보기",
+    indirectScope: "두 문서 모두 국민연금 제출 대량보유 공시가 아닙니다. 비공개 수량이나 현재 보유·평가액을 추정하지 않습니다.",
     priceBasis: "KRX 정규장 종가 기준",
     checkedAt: "공시 확인",
     generatedAt: "데이터 생성",
@@ -167,11 +171,14 @@ const STR = {
     historicalCoverageTarget: "Target end date",
     historicalCoverageComplete: "Listing pages checked",
     historicalCoveragePending: "Listing-page checks in progress",
-    historicalCoverageScope: "A complete listing search does not mean every filed quantity or ownership value has been verified.",
-    historicalFirstObserved: "Earliest NPS receipt observed in checked listings",
+    historicalCoverageScope: "Only filings submitted by the NPS institution are counted. A complete listing search does not verify every reported quantity or percentage.",
+    historicalFirstObserved: "Earliest large-shareholding filing submitted by NPS",
     historicalFirstTentative: "(provisional while searching)",
     historicalParsePending: "New receipts without parsed source facts",
     historicalLegacyRecheck: "Migrated values without source recheck",
+    indirectTitle: "Historical clues in other companies' filings",
+    indirectSource: "Open DART filing",
+    indirectScope: "Neither document is a large-shareholding filing submitted by NPS. Withheld quantities and current holdings or values are not inferred.",
     priceBasis: "KRX regular-session close basis",
     checkedAt: "Filings checked",
     generatedAt: "Generated",
@@ -464,6 +471,23 @@ function ReadyView({
           <small>{t.historicalCoverageScope}</small>
         </div>
       )}
+
+      <aside className="foliotrace-indirect-clue" aria-label={t.indirectTitle}>
+        <strong>{t.indirectTitle}</strong>
+        {indirectEvidence.items.map((clue) => (
+          <p key={clue.receiptNo}>
+            {clue.relationship === "proxy-solicitation-target-shareholder"
+              ? lang === "ko"
+                ? `${clue.filingDate} ${clue.filer}의 의결권 대리행사 권유 문서는 피권유자 명단에 ${clue.mentionedEntity}을 ${clue.filingCompany} ${clue.securityKind} 소유자로 적었지만, 주식 수는 비공개(*****)입니다.`
+                : `The ${clue.filingDate} proxy solicitation by ${clue.filerEn} lists ${clue.mentionedEntityEn} among solicited ${clue.filingCompanyEn} common-share holders; the share count is withheld (*****).`
+              : lang === "ko"
+                ? `${clue.filingDate} 접수된 ${clue.filer}의 ${clue.filingCompany} 관련 공시는 ${clue.mentionedEntity}을 ${clue.filer}의 최대주주(지분율 ${clue.statedOwnershipPercent}%)로 적었습니다.`
+                : `A ${clue.filingDate} filing by ${clue.filerEn} about ${clue.filingCompanyEn} names ${clue.mentionedEntityEn} as the filer's largest shareholder (${clue.statedOwnershipPercent}%).`}
+            {" "}<a href={clue.sourceUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
+          </p>
+        ))}
+        <small>{t.indirectScope}</small>
+      </aside>
 
       <div className="foliotrace-summary-grid">
         <Card className="foliotrace-summary-card">

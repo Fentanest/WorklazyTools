@@ -82,7 +82,7 @@ jobs:
           if [ "$EVENT_NAME" = schedule ]; then
             python3 scripts/foliotrace/folio.py backfill-history \
               --state foliotrace-state/state.json --resume \
-              --max-listing-pages 250 --max-windows 40 --parse-limit 60 --recheck-limit 10
+              --max-listing-pages 500 --max-windows 40 --parse-limit 300 --recheck-limit 10
           else
             python3 scripts/foliotrace/folio.py backfill-history \
               --state foliotrace-state/state.json \
