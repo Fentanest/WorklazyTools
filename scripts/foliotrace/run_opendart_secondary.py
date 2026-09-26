@@ -20,6 +20,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.foliotrace import folio, opendart_secondary
 
+# Stops that leave the lane incomplete must surface as process failure.
+INCOMPLETE_STATUSES = frozenset({"LISTING_BUDGET_INSUFFICIENT", "QUEUE_BACKLOG",
+                                 "QUEUE_BOUND_EXCEEDED"})
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -32,6 +36,7 @@ def main() -> int:
     parser.add_argument("--max-pending", type=int, default=5000)
     parser.add_argument("--max-queue-entries", type=int, default=20000)
     parser.add_argument("--overlap-days", type=int, default=0)
+    parser.add_argument("--rehydrate-limit", type=int, default=0)
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
     target = args.end
@@ -46,6 +51,12 @@ def main() -> int:
         state_path = Path(cleanup) / "state.json"
         shutil.copyfile(args.state, state_path)
     try:
+        if args.rehydrate_limit:
+            replay = opendart_secondary.rehydrate_archive(
+                state_path, limit=args.rehydrate_limit,
+                read_state=folio.read_json, write_state=folio.write_json)
+            print(json.dumps({"validate_only": args.validate_only, **replay}, sort_keys=True))
+            return 0
         result = opendart_secondary.scan_opendart_secondary(
             state_path, args.start, target,
             max_listing_pages=args.max_listing_pages, max_windows=args.max_windows,
@@ -65,7 +76,7 @@ def main() -> int:
         if cleanup:
             shutil.rmtree(cleanup, ignore_errors=True)
     print(json.dumps({"validate_only": args.validate_only, **result}, sort_keys=True))
-    if result["status"] in ("LISTING_BUDGET_INSUFFICIENT", "QUEUE_BACKLOG"):
+    if result["status"] in INCOMPLETE_STATUSES:
         return 1
     return 0
 

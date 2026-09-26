@@ -10,13 +10,21 @@ and a reviewed document never implies its numbers entered holdings. Positive
 source findings stay in this lane's independent queue until Sol wires the
 shared holding-observation path; this module never writes the full-text,
 direct, or early-direct cursors, nor the receipts/holdings/events ledgers.
+
+The active queue is bounded by spilling terminal, current-version, non-held
+negative verdicts into monthly archive shards next to the state file: each
+shard is written durably before its rows leave the queue, a manifest with
+digests lives in the ledger, and parser upgrades rehydrate stale rows back
+into the queue. Nothing is ever deleted without a recoverable copy.
 """
 from __future__ import annotations
 
 import hashlib
 import http.client
 import json
+import os
 import re
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -43,8 +51,12 @@ RM_TOKENS = re.compile(r"[\s,;/|·()\[\]{}]+")
 RM_CORRECTION_TOKENS = frozenset({"정", "정정"})
 RM_WITHDRAWAL_TOKENS = frozenset({"철", "철회"})
 RM_CANCEL_TOKENS = frozenset({"취", "취소"})
-# Single letters that may compose official remark codes (e.g. 유정, 유철).
-RM_CODE_LETTERS = frozenset({"유", "정", "철", "취"})
+# Single letters that may compose official remark codes
+# (e.g. 유정, 유철, 코정, 코철, 유연정).
+RM_CODE_LETTERS = frozenset({"유", "정", "철", "취", "코", "연"})
+ARCHIVE_FORMAT = 1
+# Archived rows per monthly shard file; keeps each static data-branch file small.
+ARCHIVE_SHARD_ROWS = 5000
 PENDING_STATUSES = ("source_review_pending", "source_unavailable")
 SOURCE_HISTORY_CAP = 5
 DEFAULT_MAX_QUEUE_ENTRIES = 20000
@@ -249,7 +261,7 @@ def _call_list(fetch_list, key: str, params: dict, cursor: date, last: date,
 
 def _collect_window(fetch_list, key: str, cursor: date, last: date, *, ledger: dict,
                     state: dict, state_path: Path, write_state,
-                    max_listing_pages: int,
+                    max_listing_pages: int, size_key: str,
                     spent: int) -> tuple[list[dict] | None, date, int, int | None]:
     """Fetch every page of one window, halving oversized ranges safely.
 
@@ -276,7 +288,7 @@ def _collect_window(fetch_list, key: str, cursor: date, last: date, *, ledger: d
             if last == cursor:
                 return None, last, spent, page_count
             last = cursor + timedelta(days=(last - cursor).days // 2)
-            ledger["max_window_days"] = (last - cursor).days + 1
+            ledger[size_key] = (last - cursor).days + 1
             state["revision"] += 1
             write_state(state_path, state)
             if spent >= max_listing_pages:
@@ -294,8 +306,16 @@ def _collect_window(fetch_list, key: str, cursor: date, last: date, *, ledger: d
 
 def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
                    cursor: date, last: date,
-                   pages: list[dict], *, overlap: bool) -> tuple[int, int]:
-    """Validate pages, queue every receipt, and advance only this phase's cursor."""
+                   pages: list[dict], *, overlap: bool, archive: dict,
+                   max_listing_pages: int) -> tuple[int, int, int]:
+    """Validate pages, queue every receipt, and advance only this phase's cursor.
+
+    Receipts already recoverable from the archive are not re-queued; returns
+    ``(new_receipts, total, archived_hits)``. Each phase grows only its own
+    window size, and only when doubling the fetched pages still fits the run
+    budget, so tiny budgets settle on stable single-day windows instead of
+    oscillating between growth and re-halving probes.
+    """
     try:
         total = validate_list_pages(pages, cursor, last)
     except ValueError as exc:
@@ -304,14 +324,21 @@ def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
                                         "RECEIPT_IDENTITY", "ROW_DATE", "ROW_DATE_RANGE",
                                         "RECEIPT_COVERAGE") else "PAGE_VALIDATION"
         raise OpendartListError(code, cursor, last) from None
-    new_receipts = queued_this_window = 0
+    new_receipts = queued_this_window = archived_hits = 0
+    window_months = {cursor.strftime("%Y%m"), last.strftime("%Y%m")}
+    archived_lookup: dict = {}
+    for month in window_months:
+        archived_lookup.update(_load_archive_month(ledger, archive["dir"], month, archive["months"]))
     for page in pages:
         for row in page.get("list") or []:
             no = str(row.get("rcept_no") or "")
             existing = ledger["queue"].get(no)
             if existing is None:
-                ledger["queue"][no] = _queue_entry(row, cursor.isoformat(), last.isoformat())
-                new_receipts += 1
+                if no in archived_lookup:
+                    archived_hits += 1
+                else:
+                    ledger["queue"][no] = _queue_entry(row, cursor.isoformat(), last.isoformat())
+                    new_receipts += 1
             else:
                 eligibility_changed = _refresh_entry(
                     existing, row, cursor.isoformat(), last.isoformat())
@@ -333,15 +360,15 @@ def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
         ledger["coverage"].append(record)
         ledger["next_date"] = (last + timedelta(days=1)).isoformat()
     history = ledger["overlap_coverage"] if overlap else ledger["coverage"]
-    if not overlap:
-        # Only forward commits grow the window: overlap rescans must stay
-        # small, otherwise the next run burns its page budget re-halving
-        # instead of advancing either frontier.
-        ledger["max_window_days"] = min(
+    size_key = "overlap_max_window_days" if overlap else "max_window_days"
+    if len(pages) * 2 + 1 <= max_listing_pages:
+        ledger[size_key] = min(
             MAX_WINDOW_DAYS, max(1, (last - date.fromisoformat(history[-1]["from"])).days * 2 + 2))
+    else:
+        ledger[size_key] = max(1, (last - date.fromisoformat(history[-1]["from"])).days + 1)
     state["revision"] += 1
     write_state(state_path, state)
-    return new_receipts, total
+    return new_receipts, total, archived_hits
 
 
 def _record_history(item: dict, note: str) -> None:
@@ -375,6 +402,218 @@ def _sync_positive_eligibility(ledger: dict, item: dict, no: str) -> None:
                 relation=("correction_relation_unverified" if item.get("correction_hold")
                           else "holding_observation_pending"))
     _record_history(item, "positive_eligibility_synchronized")
+
+
+def archive_dir_for(state_path: Path) -> Path:
+    return Path(state_path).parent / "opendart-secondary-archive"
+
+
+def _atomic_write_json(path: Path, obj: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(obj, ensure_ascii=False, sort_keys=True,
+                         separators=(",", ":")).encode() + b"\n"
+    descriptor, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".archive-")
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _shard_path(archive_dir: Path, month: str, index: int) -> Path:
+    return archive_dir / f"shard-{month}-{index:04d}.json"
+
+
+def _read_shard_rows(archive_dir: Path, month: str, index: int) -> list:
+    try:
+        shard = json.loads(_shard_path(archive_dir, month, index).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if (not isinstance(shard, dict) or shard.get("archive_format") != ARCHIVE_FORMAT
+            or shard.get("shard_month") != month or not isinstance(shard.get("rows"), list)):
+        return []
+    return [row for row in shard["rows"]
+            if isinstance(row, list) and len(row) == 6 and isinstance(row[0], str)]
+
+
+def _write_shard_rows(archive_dir: Path, month: str, index: int, rows: list) -> dict:
+    """Write one shard durably; returns its manifest record (never trusts callers)."""
+    ordered = sorted(rows, key=lambda row: row[0])
+    digest = hashlib.sha256("\n".join(row[0] for row in ordered).encode()).hexdigest()
+    _atomic_write_json(_shard_path(archive_dir, month, index), {
+        "method": METHOD, "archive_format": ARCHIVE_FORMAT, "shard_month": month,
+        "archived_at": datetime.now(timezone.utc).isoformat(),
+        "parser_version": secondary.SOURCE_PARSER_VERSION,
+        "rows": ordered, "count": len(ordered), "id_digest": digest})
+    return {"count": len(ordered), "id_digest": digest,
+            "parser_version": secondary.SOURCE_PARSER_VERSION,
+            "updated_at": datetime.now(timezone.utc).isoformat()}
+
+
+def _manifest_shards(ledger: dict, month: str) -> list[int]:
+    return sorted(int(index) for index in ledger.get("archive_manifest", {}).get(month, {}))
+
+
+def _load_archive_month(ledger: dict, archive_dir: Path, month: str,
+                        cache: dict) -> dict:
+    """Load every shard of one month into {receipt_no: row}; missing files read as empty."""
+    if month not in cache:
+        merged: dict = {}
+        indexes = set(_manifest_shards(ledger, month))
+        try:
+            files = sorted(archive_dir.glob(f"shard-{month}-*.json"))
+        except OSError:
+            files = []
+        for path in files:
+            match = re.fullmatch(r"shard-\d{6}-(\d{4})\.json", path.name)
+            if match:
+                indexes.add(int(match.group(1)))
+        for index in sorted(indexes):
+            for row in _read_shard_rows(archive_dir, month, index):
+                merged.setdefault(row[0], row)
+        cache[month] = merged
+    return cache[month]
+
+
+def _is_archivable(item: dict) -> bool:
+    return (item.get("source_status") not in PENDING_STATUSES
+            and item.get("source_status") != "source_context_review_pending"
+            and item.get("parser_version") == secondary.SOURCE_PARSER_VERSION
+            and not item.get("correction_hold") and not item.get("withdrawal_flag"))
+
+
+def _archive_terminal_rows(ledger: dict, archive_dir: Path, *, max_queue_entries: int,
+                           cache: dict) -> int:
+    """Spill archivable rows into monthly shards; shard files land before queue rows go.
+
+    Only terminal, current-version, non-held negatives move. Pending, stale,
+    positive, and held rows are never archived. Returns the archived count.
+    """
+    overflow = len(ledger["queue"]) - max_queue_entries
+    if overflow <= 0:
+        return 0
+    candidates = sorted(
+        (item.get("rcept_dt") or "", no)
+        for no, item in ledger["queue"].items() if _is_archivable(item))
+    moving = [no for _, no in candidates[:overflow]]
+    if not moving:
+        return 0
+    by_month: dict = {}
+    for no in moving:
+        month = (ledger["queue"][no].get("rcept_dt") or "")[:6]
+        if not re.fullmatch(r"\d{6}", month):
+            continue
+        item = ledger["queue"][no]
+        by_month.setdefault(month, []).append(
+            [no, item.get("source_status"), item.get("parser_version"),
+             item.get("source_sha256"), bool(item.get("correction_hold")),
+             bool(item.get("withdrawal_flag"))])
+    archived = 0
+    manifest = ledger.setdefault("archive_manifest", {})
+    stored_ids: set = set()
+    for month in sorted(by_month):
+        stored = _load_archive_month(ledger, archive_dir, month, cache)
+        for row in by_month[month]:
+            stored.setdefault(row[0], row)
+            stored_ids.add(row[0])
+    for month in sorted(by_month):
+        stored = _load_archive_month(ledger, archive_dir, month, cache)
+        for row in by_month[month]:
+            stored.setdefault(row[0], row)
+        months = manifest.setdefault(month, {})
+        index = 0
+        ordered = sorted(stored.values(), key=lambda row: row[0])
+        for offset in range(0, len(ordered), ARCHIVE_SHARD_ROWS):
+            months[str(index)] = _write_shard_rows(
+                archive_dir, month, index, ordered[offset:offset + ARCHIVE_SHARD_ROWS])
+            index += 1
+        for stale in [key for key in months if int(key) >= index]:
+            try:
+                _shard_path(archive_dir, month, int(stale)).unlink()
+            except OSError:
+                pass
+            del months[stale]
+    for no in moving:
+        if no in stored_ids and no in ledger["queue"]:
+            del ledger["queue"][no]
+            archived += 1
+    return archived
+
+
+def rehydrate_archive(state_path: Path, *, limit: int = 100,
+                      read_state=None, write_state=None,
+                      archive_dir: Path | None = None) -> dict:
+    """Move stale-parser archived rows back into the active queue, bounded by limit.
+
+    Shard files are rewritten (emptied ones removed) and the manifest updated
+    in the same persisted write that re-queues the rows, so a crash either
+    keeps rows archived or re-queued, never lost or duplicated.
+    """
+    if read_state is None or write_state is None:
+        raise ValueError("state IO required")
+    if not 1 <= limit <= 20000:
+        raise ValueError("invalid rehydrate limit")
+    directory = Path(archive_dir) if archive_dir is not None else archive_dir_for(state_path)
+    state = read_state(state_path)
+    ledger = state.get(LEDGER_KEY)
+    if ledger is None:
+        raise ValueError("opendart secondary ledger missing")
+    current = secondary.SOURCE_PARSER_VERSION
+    manifest = ledger.get("archive_manifest", {})
+    moved: list = []
+    seen = set(ledger.get("queue", {}))
+    for month in sorted(manifest):
+        if len(moved) >= limit:
+            break
+        months = manifest[month]
+        stored: dict = {}
+        for index in sorted(int(key) for key in months):
+            for row in _read_shard_rows(directory, month, index):
+                stored.setdefault(row[0], row)
+        keep: dict = {}
+        for no in sorted(stored):
+            row = stored[no]
+            if len(moved) < limit and row[2] != current and no not in seen:
+                seen.add(no)
+                moved.append(row)
+            else:
+                keep[no] = row
+        ordered = sorted(keep.values(), key=lambda entry: entry[0])
+        index = 0
+        for offset in range(0, len(ordered), ARCHIVE_SHARD_ROWS):
+            months[str(index)] = _write_shard_rows(
+                directory, month, index, ordered[offset:offset + ARCHIVE_SHARD_ROWS])
+            index += 1
+        for stale in [key for key in months if int(key) >= index]:
+            try:
+                _shard_path(directory, month, int(stale)).unlink()
+            except OSError:
+                pass
+            del months[stale]
+        if not months:
+            del manifest[month]
+    for no, status, parser, sha, held, withdrawn in moved:
+        ledger["queue"][no] = {
+            "receipt_no": no, "corp_code": None, "corp_name": None, "stock_code": None,
+            "report_nm": "", "rcept_dt": no[:8], "rm": "",
+            "first_seen_from": "archive", "first_seen_to": "archive",
+            "last_seen_from": "archive", "last_seen_to": "archive",
+            "correction_hold": bool(held), "withdrawal_flag": bool(withdrawn),
+            "source_status": status, "parser_version": parser,
+            "source_attempt_count": 0, "last_source_attempt_on": None,
+            "source_sha256": sha, "source_history": []}
+    remaining = sum(entry.get("count", 0) for months in manifest.values() for entry in months.values())
+    state["revision"] += 1
+    write_state(state_path, state)
+    return {"rehydrated": len(moved), "remaining_archived": remaining,
+            "shards": sum(len(months) for months in manifest.values())}
 
 
 def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
@@ -420,14 +659,15 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     ledger.setdefault("overlap_coverage", [])
     ledger.setdefault("queue", {})
     ledger.setdefault("positives", {})
+    ledger.setdefault("archive_manifest", {})
     forward = date.fromisoformat(ledger["next_date"])
     if not start <= forward <= end + timedelta(days=1):
         raise ValueError("opendart secondary cursor inconsistent")
-    # The forward scan runs first so a tight page budget always leaves the
-    # forward cursor able to advance; the rolling overlap tail then uses only
-    # the remaining budget. A completed overlap pass starts a new bounded
-    # cycle (at most one pass per run) so late or corrected rows keep being
-    # seen instead of the lane going silent with zero listing calls.
+    # Scan priority alternates across runs while both frontiers have work, so
+    # a tiny page budget cannot starve either side forever: the prioritized
+    # phase runs first and the other spends the remainder. A completed overlap
+    # pass starts a new bounded cycle (at most one pass per run) so late or
+    # corrected rows keep being seen instead of the lane going silent.
     overlap_base = max(start, forward - timedelta(days=overlap_days)) if overlap_days else forward
     overlap_cap = min(forward, end + timedelta(days=1))
     try:
@@ -440,24 +680,48 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     else:
         overlap_cursor = min(max(overlap_saved, overlap_base), forward)
         overlap_cycle_reset = False
+    forward_work = forward <= end
+    overlap_work = overlap_days > 0 and overlap_cursor <= overlap_cap - timedelta(days=1)
+    if forward_work and overlap_work:
+        first_overlap = ledger.get("last_phase") == "forward"
+    else:
+        first_overlap = overlap_work and not forward_work
+    ledger["last_phase"] = "overlap" if first_overlap else "forward"
+    ledger.setdefault("overlap_max_window_days", 1)
 
     requests = windows = new_receipts = overlap_windows = 0
     required_pages = None
     backlog = False
     bound_exceeded = False
+    archive = {"dir": archive_dir_for(state_path), "months": {},
+               "hits": 0, "archived": 0}
+    if len(ledger["queue"]) > max_queue_entries:
+        # Spill before any listing so an over-bound queue never blocks the run
+        # from starting; deletions persist immediately, shards already landed.
+        archive["archived"] += _archive_terminal_rows(
+            ledger, archive["dir"], max_queue_entries=max_queue_entries,
+            cache=archive["months"])
+        if archive["archived"]:
+            state["revision"] += 1
+            write_state(state_path, state)
+        if len(ledger["queue"]) > max_queue_entries:
+            bound_exceeded = True
 
-    def window_limit(frontier: date, cap: date) -> date:
-        return min(frontier + timedelta(days=int(ledger.get("max_window_days")
-                                                or MAX_WINDOW_DAYS) - 1), cap)
+    def window_limit(frontier: date, cap: date, size: int) -> date:
+        return min(frontier + timedelta(days=size - 1), cap)
 
     def scan_phase(frontier: date, cap: date, *, overlap: bool) -> date:
         """Commit complete windows until the cap or a budget/backlog/bound stop.
 
-        Queue rows are never dropped: when the configured queue bound is
-        exceeded the run stops listing and reports it explicitly instead of
-        evicting pending or positive rows.
+        Terminal verdicts spill into the durable archive to respect the queue
+        bound; when nothing archivable remains the run stops and reports the
+        bound explicitly instead of dropping pending or positive rows. Each
+        phase grows only its own window size, so forward growth can never
+        force the overlap tail into wasteful re-halving probes.
         """
         nonlocal requests, windows, new_receipts, overlap_windows, required_pages, backlog, bound_exceeded
+        size_key = "overlap_max_window_days" if overlap else "max_window_days"
+        default_size = 1 if overlap else MAX_WINDOW_DAYS
         while (frontier <= cap and windows < max_windows
                and requests < max_listing_pages and required_pages is None
                and not backlog and not bound_exceeded):
@@ -465,31 +729,41 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                 backlog = True
                 break
             if len(ledger["queue"]) > max_queue_entries:
-                bound_exceeded = True
-                break
-            last = window_limit(frontier, cap)
+                archive["archived"] += _archive_terminal_rows(
+                    ledger, archive["dir"], max_queue_entries=max_queue_entries,
+                    cache=archive["months"])
+                if len(ledger["queue"]) > max_queue_entries:
+                    bound_exceeded = True
+                    break
+            last = window_limit(frontier, cap, int(ledger.get(size_key) or default_size))
             pages, last, requests, needed = _collect_window(
                 fetch_list, key, frontier, last, ledger=ledger, state=state,
                 state_path=state_path, write_state=write_state,
-                max_listing_pages=max_listing_pages, spent=requests)
+                max_listing_pages=max_listing_pages, spent=requests,
+                size_key=size_key)
             if needed is not None:
                 required_pages = needed
                 break
             if pages is None:
                 break
-            gained, _ = _commit_window(ledger, state, state_path, write_state,
-                                       frontier, last, pages, overlap=overlap)
+            gained, _, hits = _commit_window(ledger, state, state_path, write_state,
+                                             frontier, last, pages,
+                                             overlap=overlap, archive=archive,
+                                             max_listing_pages=max_listing_pages)
             new_receipts += gained
+            archive["hits"] += hits
             frontier = last + timedelta(days=1)
             windows += 1
             if overlap:
                 overlap_windows += 1
         return frontier
 
-    # Phase 1: advance the forward cursor over not-yet-listed days first.
-    forward = scan_phase(forward, end, overlap=False)
-    # Phase 2: spend the remaining budget on one bounded rolling-overlap pass.
-    overlap_cursor = scan_phase(overlap_cursor, overlap_cap - timedelta(days=1), overlap=True)
+    if first_overlap:
+        overlap_cursor = scan_phase(overlap_cursor, overlap_cap - timedelta(days=1), overlap=True)
+        forward = scan_phase(forward, end, overlap=False)
+    else:
+        forward = scan_phase(forward, end, overlap=False)
+        overlap_cursor = scan_phase(overlap_cursor, overlap_cap - timedelta(days=1), overlap=True)
     ledger["overlap_next_date"] = max(overlap_cursor, overlap_base).isoformat()
 
     reviewed = source_requests = positive_count = 0
@@ -562,13 +836,19 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         status = "LISTING_COMPLETE_SOURCE_PENDING"
     else:
         status = "SOURCE_REVIEW_COMPLETE"
+    archived_total = sum(entry.get("count", 0)
+                         for months in ledger.get("archive_manifest", {}).values()
+                         for entry in months.values())
     return {"status": status, "next_date": ledger["next_date"],
             "target_date": ledger["target_date"],
             "completed_windows": len(ledger["coverage"]), "windows_this_run": windows,
             "overlap_windows": overlap_windows, "overlap_next_date": ledger["overlap_next_date"],
             "overlap_cycle_reset": overlap_cycle_reset,
+            "last_phase": ledger.get("last_phase"),
             "listing_requests": requests, "new_receipts": new_receipts,
             "queued_receipts": len(ledger["queue"]), "pending_sources": pending_sources,
+            "archived_this_run": archive["archived"], "archived_total": archived_total,
+            "archived_hits": archive["hits"],
             "source_review_attempts": reviewed, "source_document_requests": source_requests,
             "positive_count": positive_count,
             "positive_pending_total": len(ledger["positives"]),

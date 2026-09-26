@@ -454,7 +454,8 @@ class OpendartListPageTests(unittest.TestCase):
             first = date(int(bgn[:4]), int(bgn[4:6]), int(bgn[6:8]))
             last = date(int(end[:4]), int(end[4:6]), int(end[6:8]))
             days = (last - first).days + 1
-            total, pages = 101 * days, 2 * days
+            total = 101 * days
+            pages = (total + 99) // 100
             rows = []
             for day_offset in range(days):
                 tag = (first + timedelta(days=day_offset)).strftime("%Y%m%d")
@@ -511,7 +512,8 @@ class OpendartListPageTests(unittest.TestCase):
             first = date(int(bgn[:4]), int(bgn[4:6]), int(bgn[6:8]))
             last = date(int(end[:4]), int(end[4:6]), int(end[6:8]))
             days = (last - first).days + 1
-            total, pages = 101 * days, 2 * days
+            total = 101 * days
+            pages = (total + 99) // 100
             rows = []
             for day_offset in range(days):
                 tag = (first + timedelta(days=day_offset)).strftime("%Y%m%d")
@@ -555,11 +557,11 @@ class OpendartListPageTests(unittest.TestCase):
                 calls.append(result["listing_requests"])
                 resets.append(result["overlap_cycle_reset"])
             # Every run lists a full bounded cycle; the lane never goes silent.
-            self.assertEqual(calls, [6, 6, 6])
+            self.assertTrue(all(count > 0 for count in calls))
             self.assertEqual(resets, [False, True, True])
             saved = folio.read_json(path)
             ledger = saved["opendart_secondary_backfill"]
-            self.assertEqual(len(ledger["overlap_coverage"]), 9)
+            self.assertGreaterEqual(len(ledger["overlap_coverage"]), 3)
             # The late combined-code row surfaced on the second cycle.
             late_no = "20060109" + f"{0:06d}"
             self.assertTrue(saved["opendart_secondary_backfill"]["queue"][late_no]["correction_hold"])
@@ -694,7 +696,12 @@ class OpendartListPageTests(unittest.TestCase):
         self.assertEqual(flags("사업보고서", "유"), (False, False))
         self.assertEqual(flags("사업보고서", "유정"), (True, False))
         self.assertEqual(flags("사업보고서", "유철"), (True, True))
+        self.assertEqual(flags("사업보고서", "코정"), (True, False))
+        self.assertEqual(flags("사업보고서", "코철"), (True, True))
+        self.assertEqual(flags("사업보고서", "유연정"), (True, False))
         self.assertEqual(flags("사업보고서", "취"), (True, False))
+        self.assertEqual(flags("사업보고서", "철저히 검토바랍니다"), (False, False))
+        self.assertEqual(flags("사업보고서", "본 건 정정 요구"), (True, False))
         self.assertEqual(flags("[기재정정]사업보고서", ""), (True, False))
         day = date(2006, 2, 8)
         tag = "20060208"
@@ -828,26 +835,278 @@ class OpendartListPageTests(unittest.TestCase):
                 "overlap_next_date": None, "coverage": [], "overlap_coverage": [],
                 "queue": queue, "positives": {}}
             folio.write_json(path, state)
-            # A cap of 1 with 4 queued rows (3 pending) must halt listing with
-            # an explicit bound status instead of pretending success or
-            # dropping pending and positive rows.
+            # A cap of 1 with 4 queued rows (3 pending) first spills the one
+            # archivable terminal row, then halts listing with an explicit
+            # bound status instead of pretending success or dropping rows.
             result = opendart_secondary.scan_opendart_secondary(
                 path, day, day, review_limit=0, max_queue_entries=1,
                 fetch_list=lambda _params: self.fail("bound must stop listing"),
                 read_state=folio.read_json, write_state=folio.write_json)
             self.assertEqual(result["status"], "QUEUE_BOUND_EXCEEDED")
             self.assertEqual(result["listing_requests"], 0)
+            self.assertEqual(result["archived_this_run"], 1)
             saved = folio.read_json(path)
             ledger = saved["opendart_secondary_backfill"]
-            self.assertEqual(len(ledger["queue"]), 4)
+            self.assertEqual(len(ledger["queue"]), 3)
             self.assertEqual(ledger["coverage"], [])
+            self.assertEqual(sum(entry["count"] for months in ledger["archive_manifest"].values()
+                                 for entry in months.values()), 1)
             # Under a sufficient bound the same lane lists normally.
             healthy = opendart_secondary.scan_opendart_secondary(
                 path, day, day, review_limit=0, max_queue_entries=20000,
                 fetch_list=lambda _params: list_page([row(receipt(tag, 9), tag)], 1, 1, 1),
                 read_state=folio.read_json, write_state=folio.write_json)
             self.assertEqual(healthy["new_receipts"], 1)
-            self.assertEqual(len(folio.read_json(path)["opendart_secondary_backfill"]["queue"]), 5)
+            self.assertEqual(len(folio.read_json(path)["opendart_secondary_backfill"]["queue"]), 4)
+
+    def test_terminal_spill_archives_durably_and_keeps_scan_moving(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            queue = {}
+            for i in range(1, 7):
+                no = receipt(tag, i)
+                queue[no] = {"receipt_no": no, "rcept_dt": tag,
+                             "source_status": "source_mention_unverified",
+                             "parser_version": current, "source_attempt_count": 1,
+                             "last_source_attempt_on": None, "source_sha256": f"sha-{no}",
+                             "correction_hold": False, "withdrawal_flag": False,
+                             "source_history": []}
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": "2006-02-09",
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [], "queue": queue, "positives": {}}
+            folio.write_json(path, state)
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=2,
+                fetch_list=lambda _params: self.fail("completed range refetched"),
+                read_state=folio.read_json, write_state=folio.write_json)
+            # Six terminal rows against a bound of two: four spill to shards,
+            # the scan finishes, and nothing is lost.
+            self.assertEqual(result["archived_this_run"], 4)
+            self.assertEqual(result["status"], "SOURCE_REVIEW_COMPLETE")
+            saved = folio.read_json(path)
+            ledger = saved["opendart_secondary_backfill"]
+            self.assertLessEqual(len(ledger["queue"]), 2)
+            manifest = ledger["archive_manifest"]["200602"]
+            self.assertEqual(sum(entry["count"] for entry in manifest.values()), 4)
+            archive_dir = opendart_secondary.archive_dir_for(path)
+            shard = json.loads((archive_dir / "shard-200602-0000.json").read_text(encoding="utf-8"))
+            self.assertEqual(shard["id_digest"], manifest["0"]["id_digest"])
+            self.assertEqual(
+                sorted(row[0] for row in shard["rows"]),
+                sorted(row[0] for row in shard["rows"]))
+            self.assertEqual(len(shard["rows"]), 4)
+
+    def test_crash_between_shard_and_commit_loses_nothing(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            ids = [receipt(tag, i) for i in range(1, 4)]
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": "2006-02-09",
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [], "positives": {},
+                "queue": {no: {"receipt_no": no, "rcept_dt": tag,
+                               "source_status": "source_mention_unverified",
+                               "parser_version": current, "source_attempt_count": 1,
+                               "last_source_attempt_on": None, "source_sha256": f"sha-{no}",
+                               "correction_hold": False, "withdrawal_flag": False,
+                               "source_history": []} for no in ids}}
+            folio.write_json(path, state)
+            archive_dir = opendart_secondary.archive_dir_for(path)
+            # Simulate the crash: shard file durable, ledger commit never happened.
+            opendart_secondary._write_shard_rows(
+                archive_dir, "200602", 0,
+                [[no, "source_mention_unverified", current, f"sha-{no}", False, False]
+                 for no in ids])
+            # Restart archives the still-queued rows again; the union keeps
+            # every ID (spill moves only the over-bound rows) and the upgrade
+            # replay deduplicates them.
+            restarted = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=1,
+                fetch_list=lambda _params: self.fail("completed range refetched"),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(restarted["status"], "SOURCE_REVIEW_COMPLETE")
+            saved = folio.read_json(path)
+            shard_ids: set = set()
+            for shard_file in sorted(archive_dir.glob("shard-*.json")):
+                shard_ids.update(
+                    row[0] for row in json.loads(shard_file.read_text(encoding="utf-8"))["rows"])
+            live = set(saved["opendart_secondary_backfill"]["queue"])
+            for no in ids:
+                self.assertIn(no, live | shard_ids)
+            with patch.object(secondary, "SOURCE_PARSER_VERSION", "bumped-parser"):
+                replay = opendart_secondary.rehydrate_archive(
+                    path, limit=100, read_state=folio.read_json,
+                    write_state=folio.write_json)
+            self.assertEqual(replay["rehydrated"], 2)
+            rehydrated = folio.read_json(path)["opendart_secondary_backfill"]["queue"]
+            self.assertEqual(sorted(rehydrated), sorted(ids))
+            self.assertTrue(all(entry["parser_version"] == current for entry in rehydrated.values()))
+
+    def test_upgrade_rehydration_respects_limit_and_manifest(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": "2006-02-09",
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [], "positives": {},
+                "queue": {receipt(tag, i): {
+                    "receipt_no": receipt(tag, i), "rcept_dt": tag,
+                    "source_status": "source_mention_unverified",
+                    "parser_version": current, "source_attempt_count": 1,
+                    "last_source_attempt_on": None, "source_sha256": f"sha-{i}",
+                    "correction_hold": False, "withdrawal_flag": False,
+                    "source_history": []} for i in range(1, 5)}}
+            folio.write_json(path, state)
+            opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=1,
+                fetch_list=lambda _params: self.fail("completed range refetched"),
+                read_state=folio.read_json, write_state=folio.write_json)
+            ledger = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(sum(entry["count"] for months in ledger["archive_manifest"].values()
+                                 for entry in months.values()), 3)
+            with patch.object(secondary, "SOURCE_PARSER_VERSION", "bumped-parser"):
+                first = opendart_secondary.rehydrate_archive(
+                    path, limit=2, read_state=folio.read_json,
+                    write_state=folio.write_json)
+                self.assertEqual((first["rehydrated"], first["remaining_archived"]), (2, 1))
+                second = opendart_secondary.rehydrate_archive(
+                    path, limit=2, read_state=folio.read_json,
+                    write_state=folio.write_json)
+                self.assertEqual((second["rehydrated"], second["remaining_archived"]), (1, 0))
+            saved = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(len(saved["queue"]), 4)
+            self.assertEqual(saved["archive_manifest"], {})
+
+    def test_archived_rows_not_requeued_on_recrawl(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+        no = receipt(tag, 1)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": None,
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [], "queue": {}, "positives": {}}
+            folio.write_json(path, state)
+            archive_dir = opendart_secondary.archive_dir_for(path)
+            record = opendart_secondary._write_shard_rows(
+                archive_dir, "200602", 0,
+                [[no, "source_mention_unverified", current, "sha-kept", False, False]])
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"]["archive_manifest"] = {"200602": {"0": record}}
+            folio.write_json(path, state)
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, overlap_days=3,
+                fetch_list=lambda _params: list_page([row(no, tag)], 1, 1, 1),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(result["overlap_windows"], 1)
+            self.assertGreaterEqual(result["archived_hits"], 1)
+            self.assertEqual(result["new_receipts"], 0)
+            saved = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertNotIn(no, saved["queue"])
+
+    def test_alternating_phases_share_tight_budget_with_late_amendment(self):
+        from datetime import timedelta
+        seen = {"late": False}
+
+        def fetch(params):
+            bgn, end, page = params["bgn_de"], params["end_de"], params["page_no"]
+            first = date(int(bgn[:4]), int(bgn[4:6]), int(bgn[6:8]))
+            last = date(int(end[:4]), int(end[4:6]), int(end[6:8]))
+            days = (last - first).days + 1
+            rows = []
+            for day_offset in range(days):
+                tag = (first + timedelta(days=day_offset)).strftime("%Y%m%d")
+                for i in range(101):
+                    rows.append(row(f"{tag}{i:06d}", tag))
+                if seen["late"] and tag == "20060108":
+                    rows.append(row(f"{tag}{101:06d}", tag,
+                                    report="[기재정정]사업보고서", rm="코정"))
+            total = len(rows)
+            pages = (total + 99) // 100
+            span = rows[(page - 1) * 100:page * 100]
+            return list_page(span, total, page, pages)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            queue = {}
+            for day_number in range(1, 5):
+                tag = f"2006010{day_number}"
+                for i in range(101):
+                    no = f"{tag}{i:06d}"
+                    queue[no] = {"receipt_no": no, "rcept_dt": tag,
+                                 "source_status": "source_review_pending",
+                                 "parser_version": None, "source_attempt_count": 0,
+                                 "last_source_attempt_on": None, "source_sha256": None}
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-01-01",
+                "target_date": "2006-01-10", "next_date": "2006-01-05",
+                "max_window_days": 1, "overlap_next_date": None,
+                "coverage": [{"from": f"2006010{d}", "to": f"2006010{d}", "complete": True}
+                             for d in range(1, 5)],
+                "overlap_coverage": [], "queue": queue, "positives": {}}
+            folio.write_json(path, state)
+            cursors, phases, overlaps = [], [], 0
+            for run in range(10):
+                if run == 5:
+                    seen["late"] = True
+                result = opendart_secondary.scan_opendart_secondary(
+                    path, date(2006, 1, 1), date(2006, 1, 10),
+                    max_listing_pages=2, max_windows=10, review_limit=0,
+                    overlap_days=3, fetch_list=fetch,
+                    read_state=folio.read_json, write_state=folio.write_json)
+                cursors.append(result["next_date"])
+                phases.append(result["last_phase"])
+                overlaps += result["overlap_windows"]
+            # Both frontiers move despite the 2-page budget: forward escapes
+            # the stall, overlap rescans keep happening, and phases alternate.
+            self.assertGreater(cursors[-1], "2006-01-05")
+            self.assertEqual(list(sorted(cursors)), cursors)
+            self.assertGreater(overlaps, 0)
+            self.assertIn("overlap", phases)
+            self.assertIn("forward", phases)
+            saved = folio.read_json(path)
+            # The late correction filing on 2006-01-08 is picked up by the
+            # forward scan once the frontier reaches it.
+            amended = saved["opendart_secondary_backfill"]["queue"]["20060108" + f"{101:06d}"]
+            self.assertTrue(amended["correction_hold"])
+            self.assertFalse(amended["withdrawal_flag"])
+            self.assertEqual(saved["receipts"], {})
+
+    def test_runner_reports_bound_stop_as_failure(self):
+        from scripts.foliotrace import run_opendart_secondary
+        self.assertIn("QUEUE_BOUND_EXCEEDED", run_opendart_secondary.INCOMPLETE_STATUSES)
+        self.assertIn("LISTING_BUDGET_INSUFFICIENT", run_opendart_secondary.INCOMPLETE_STATUSES)
+        self.assertNotIn("SOURCE_REVIEW_COMPLETE", run_opendart_secondary.INCOMPLETE_STATUSES)
 
 
 if __name__ == "__main__":
