@@ -57,6 +57,13 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
         ownership_context_rows = []
         ownership_adjacent_rows = []
         target_rows = []
+        denominator_contexts = []
+        if receipt_no in ("20260515002914", "20251114002334"):
+            for match in list(re.finditer(r"122,062,497", decoded))[:12]:
+                context = decoded[max(0, match.start() - 600):match.end() + 600]
+                denominator_contexts.append({"offset": match.start(),
+                    "context_sha256": hashlib.sha256(context.encode()).hexdigest(),
+                    "context": clean(context, 850)})
         if receipt_no in ("20060124800040", "20081007000289", "20260515002914", "20251114002334"):
             all_rows = list(ROWS.finditer(decoded))
             anchors = [index for index, match in enumerate(all_rows) if
@@ -114,6 +121,7 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                                     "ownership_context_rows": ownership_context_rows,
                                     "ownership_adjacent_rows": ownership_adjacent_rows,
                                     "target_rows": target_rows,
+                                    "denominator_contexts": denominator_contexts,
                                     "nps_mentions": len(NPS.findall(decoded)),
                                     "date_tokens": [clean(item, 40) for item in dates]})
     result["archive_status"] = "parsed"
