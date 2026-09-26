@@ -138,6 +138,9 @@ const STR = {
     issuerScopeSource: "다른 회사 공시에서 확인한 지분율 · 주식 종류 확인 중",
     issuerScopeDetail: "발행주식 기준으로 확인한 수량",
     issuerScopeComparison: "이전 직접 공시와 지분율 계산 기준을 비교할 수 없어 증감은 표시하지 않습니다.",
+    issuerScopeHistory: "주주명부에서 확인한 지분 기록",
+    issuerScopeHistoryNote: "각 날짜의 발행주식수를 기준으로 확인했습니다. 주식 종류와 직접 공시의 비교 기준은 확인 중입니다.",
+    issuerScopeCitedAgain: "같은 날짜 기록을 나중 공시에서 다시 확인",
     documentNumber: "문서 번호",
     verifiedObservationTitle: "다른 회사 공시에서 확인한 지분",
     verifiedObservationApplied: "현재 지분율에 반영",
@@ -292,6 +295,9 @@ const STR = {
     issuerScopeSource: "Ownership confirmed in another company's filing · share class under review",
     issuerScopeDetail: "Shares confirmed against all issued shares",
     issuerScopeComparison: "The earlier direct filing uses an unconfirmed percentage basis, so no change is shown.",
+    issuerScopeHistory: "Ownership recorded in shareholder registers",
+    issuerScopeHistoryNote: "Each percentage uses the issued-share count for its own date. Share class and comparison with direct filings remain under review.",
+    issuerScopeCitedAgain: "The same dated record was cited again in a later filing",
     documentNumber: "Document number",
     verifiedObservationTitle: "Ownership found in another company's filing",
     verifiedObservationApplied: "Applied to current ownership",
@@ -612,6 +618,21 @@ function ReadyView({
                 {" · "}{observation.reason === "same_basis_conflict" ? t.verifiedObservationConflict :
                   observation.appliedToHolding ? t.verifiedObservationApplied : t.verifiedObservationPending}
                 {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
+              </p>
+            ))}
+          </div>
+        )}
+        {(snapshot.issuerScopeObservations?.length ?? 0) > 0 && (
+          <div className="foliotrace-source-observations">
+            <strong>{t.issuerScopeHistory}</strong>
+            <small>{t.issuerScopeHistoryNote}</small>
+            {snapshot.issuerScopeObservations?.slice(0, 20).map((observation) => (
+              <p key={observation.observationKey}>
+                <strong>{observation.issuerName}</strong> · {observation.basisDate} ·
+                {" "}{formatQty(observation.sourceQuantity)} / {formatQty(observation.denominatorQuantity)} ·
+                {" "}{formatPct(observation.ownershipPercent)}
+                {observation.references.length > 1 && ` · ${t.issuerScopeCitedAgain}`}
+                {" "}<a href={observation.references[0].filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
               </p>
             ))}
           </div>
