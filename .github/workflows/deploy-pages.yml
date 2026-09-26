@@ -57,6 +57,12 @@ jobs:
               raise SystemExit('IMPORT_PENDING_SOURCE: normalized FolioTrace seed missing')
           PY
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
       - name: Test FolioTrace migration and valuation invariants
         run: npm run test:foliotrace
 
@@ -120,12 +126,6 @@ jobs:
           for output, key in [('dataset_version', 'datasetVersion'), ('trade_date', 'valuationTradeDate'), ('estimated_value', 'estimatedValue')]:
               print(f'{output}={data.get(key) or ""}')
           PY
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
 
       - name: Install dependencies
         run: npm ci
