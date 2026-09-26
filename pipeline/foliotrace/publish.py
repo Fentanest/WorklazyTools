@@ -51,7 +51,8 @@ def make_snapshot(state, quotes, now=None):
         rows.append({"corpCode": row.get("corp_code") or "", "stockCode": code, "name": row.get("name") or "",
                      "securityKind": row.get("security_kind") or "unknown", "quantity": row.get("quantity"),
                      "companyOwnershipPercent": row.get("company_ownership_percent"),
-                     "receiptNo": row.get("receipt_no") or "", "receiptDate": row.get("receipt_date") or "",
+                     "receiptNo": row.get("receipt_no") or "",
+                     "receiptDate": (receipt.get("listing_receipt_date") if state["unresolved"].get(row.get("receipt_no")) == "receipt_date_conflict" else row.get("receipt_date")) or "",
                      "holdingDate": row.get("holding_date"),
                      "evidence": "unresolved-latest" if row.get("latest_unresolved_receipt") else "legacy-import" if evidence == "legacy_import" else "dart-structured" if evidence == "dart_structured" else "dart-document" if evidence == "dart_document" else "unresolved-latest",
                      "latestUnresolvedReceiptNo": row.get("latest_unresolved_receipt") or None,
@@ -67,6 +68,8 @@ def make_snapshot(state, quotes, now=None):
     events = []
     for event in sorted(state.get("events", {}).values(), key=lambda e: e.get("receipt_no", ""), reverse=True):
         no = event.get("receipt_no") or ""
+        if state.get("unresolved", {}).get(no) == "receipt_date_conflict":
+            continue
         events.append({"receiptNo": no, "receiptDate": event.get("receipt_date") or "",
                        "corpCode": event.get("corp_code") or "", "stockCode": event.get("stock_code"),
                        "kind": event.get("kind") or "other", "correctionOf": event.get("correction_of"),

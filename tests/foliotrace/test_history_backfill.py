@@ -42,6 +42,54 @@ def page(rows):
 
 
 class HistoricalBackfillTests(unittest.TestCase):
+    def test_conflicting_imported_date_is_not_parsed_or_published_as_dart_fact(self):
+        initial = state()
+        initial["receipts"][OLD] = {"receipt_no": OLD, "receipt_date": "2019-12-31",
+            "corp_code": CORP, "stock_code": CODE, "quantity": "75",
+            "company_ownership_percent": "5.5", "origin": "legacy_import",
+            "evidence": "legacy_json_parser_result"}
+        initial["events"][OLD] = {"receipt_no": OLD, "receipt_date": "2019-12-31",
+            "corp_code": CORP, "stock_code": CODE, "kind": "other",
+            "correction_of": None, "quantity": "75", "company_ownership_percent": "5.5",
+            "source": "legacy_json_parser_result"}
+        folio.apply_listing_row(initial, row(), historical=True)
+        self.assertEqual(initial["unresolved"][OLD], "receipt_date_conflict")
+        self.assertEqual(initial["receipts"][OLD]["listing_receipt_date"], "2020-01-06")
+        self.assertEqual(initial["receipts"][OLD]["legacy_receipt_date"], "2019-12-31")
+        with patch.object(folio, "structured_receipt", side_effect=AssertionError("date conflict parsed")), \
+             patch.object(folio, "dart_document", side_effect=AssertionError("date conflict parsed")):
+            self.assertEqual(folio.resolve_unfinished(initial, "test-key", limit=10), 0)
+        self.assertEqual(initial["unresolved"][OLD], "receipt_date_conflict")
+        self.assertEqual(initial["events"][OLD]["source"], "legacy_json_parser_result")
+        self.assertNotIn(OLD, {event["receiptNo"] for event in make_snapshot(initial, {})["events"]})
+        initial["holdings"][CORP].update(receipt_no=OLD, receipt_date="2019-12-31",
+            quantity="75", company_ownership_percent="5.5", security_kind="common",
+            corporate_action_status="verified", corporate_action_trade_date="2026-09-23")
+        quote = {CODE: {"close": "100", "trade_date": "2026-09-23", "market": "KRX",
+                        "session": "regular", "currency": "KRW", "adjusted": False,
+                        "provider": "naver", "observed_at": "2026-09-26T00:00:00Z", "verified": True}}
+        holding = make_snapshot(initial, quote)["holdings"][0]
+        self.assertEqual(holding["receiptDate"], "2020-01-06")
+        self.assertEqual(holding["evidence"], "unresolved-latest")
+        self.assertEqual(holding["valuationExclusionReason"], "latest_filing_unresolved")
+        self.assertIsNone(holding["estimatedValue"])
+
+    def test_daily_resolver_respects_historical_receipt_retry_cap(self):
+        initial = state()
+        folio.apply_listing_row(initial, row(), historical=True)
+        receipt = initial["receipts"][OLD]
+        receipt["parse_attempt_count"] = folio.HISTORICAL_PARSE_ATTEMPTS - 1
+        receipt["last_parse_attempt_on"] = folio.kst_today().isoformat()
+        with patch.object(folio, "structured_receipt", side_effect=AssertionError("same-day retry")):
+            self.assertEqual(folio.resolve_unfinished(initial, "test-key"), 0)
+        receipt["last_parse_attempt_on"] = "2020-01-01"
+        with patch.object(folio, "structured_receipt", side_effect=RuntimeError("temporary")), \
+             patch.object(folio, "dart_document", side_effect=RuntimeError("temporary")):
+            self.assertEqual(folio.resolve_unfinished(initial, "test-key"), 1)
+        self.assertEqual(receipt["parse_attempt_count"], folio.HISTORICAL_PARSE_ATTEMPTS)
+        with patch.object(folio, "structured_receipt", side_effect=AssertionError("cap bypassed")):
+            self.assertEqual(folio.resolve_unfinished(initial, "test-key"), 0)
+
     def test_only_the_nps_institution_large_holding_listing_is_accepted(self):
         self.assertTrue(folio.nps_large_holding_listing(row(flr_nm="국민연금관리공단")))
         self.assertTrue(folio.nps_large_holding_listing(row(flr_nm="National Pension Service")))
@@ -258,6 +306,40 @@ class HistoricalBackfillTests(unittest.TestCase):
                                                 "test-key", max_listing_pages=1, parse_limit=0)
             self.assertEqual(request.call_count, 1)
             self.assertEqual(result["windows_this_run"], 0)
+            self.assertEqual(result["next_date"], "2020-01-01")
+            saved = folio.read_json(path)["historical_backfill"]
+            self.assertEqual(saved["coverage"], [])
+            self.assertLess(saved["max_window_days"], 31)
+
+    def test_oversize_window_shrinks_without_skipping_dates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            folio.write_json(path, state())
+            oversized = {"status": "000", "page_no": "1", "total_page": "3",
+                         "total_count": "300", "list": [row(f"20200101{i:06d}") for i in range(100)]}
+            def listing(endpoint, params, key):
+                return oversized if params["end_de"] == "20200131" else {"status": "013", "list": []}
+            with patch.object(folio, "dart_json", side_effect=listing):
+                result = folio.backfill_history(path, date(2020, 1, 1), date(2020, 1, 31),
+                    "test-key", max_listing_pages=2, max_windows=1, parse_limit=0, recheck_limit=0)
+            self.assertEqual(result["listing_requests"], 2)
+            self.assertEqual(result["windows_this_run"], 1)
+            coverage = folio.read_json(path)["historical_backfill"]["coverage"][0]
+            self.assertEqual((coverage["from"], coverage["to"], coverage["pages"], coverage["complete"]),
+                             ("2020-01-01", "2020-01-16", 1, True))
+            self.assertEqual(result["next_date"], "2020-01-17")
+
+    def test_single_day_over_budget_reports_required_pages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            folio.write_json(path, state())
+            oversized = {"status": "000", "page_no": "1", "total_page": "3",
+                         "total_count": "300", "list": [row(f"20200101{i:06d}") for i in range(100)]}
+            with patch.object(folio, "dart_json", return_value=oversized):
+                result = folio.backfill_history(path, date(2020, 1, 1), date(2020, 1, 1),
+                    "test-key", max_listing_pages=2, parse_limit=0, recheck_limit=0)
+            self.assertEqual(result["status"], "LISTING_BUDGET_INSUFFICIENT")
+            self.assertEqual(result["required_pages"], 3)
             self.assertEqual(result["next_date"], "2020-01-01")
             self.assertIsNone(folio.read_json(path)["historical_backfill"])
 

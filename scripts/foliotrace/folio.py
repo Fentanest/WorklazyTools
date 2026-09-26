@@ -621,6 +621,7 @@ def apply_listing_row(state, row, *, historical=False):
     if existing and existing.get("corp_code") and existing["corp_code"] != corp:
         raise RuntimeError("DART receipt corp conflict")
     if existing and existing.get("receipt_date") and existing["receipt_date"] != listed_date:
+        existing.setdefault("legacy_receipt_date", existing["receipt_date"])
         state["unresolved"][no] = "receipt_date_conflict"
     report_name = safe_str(row.get("report_nm"))
     remarks = safe_str(row.get("rm"), limit=30)
@@ -725,7 +726,11 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
                                     and receipt.get("quantity") is not None
                                     and receipt.get("company_ownership_percent") is not None)):
             continue
-        if state["unresolved"].get(no) == "security_identity_conflict":
+        if state["unresolved"].get(no) in ("security_identity_conflict", "receipt_date_conflict"):
+            continue
+        if receipt.get("historical_backfill_only") and (
+                int(receipt.get("parse_attempt_count") or 0) >= HISTORICAL_PARSE_ATTEMPTS
+                or receipt.get("last_parse_attempt_on") == kst_today().isoformat()):
             continue
         processed += 1
         receipt["parse_attempt_count"] = int(receipt.get("parse_attempt_count") or 0) + 1
@@ -794,6 +799,8 @@ def classify_events(state):
         previous = None
         for receipt in sorted(receipts, key=lambda item: item["receipt_no"]):
             no = receipt["receipt_no"]
+            if state.get("unresolved", {}).get(no) == "receipt_date_conflict":
+                continue
             event = state.get("events", {}).get(no)
             flagged = any(receipt.get(field) for field in ("is_correction", "later_correction_flag", "withdrawn_flag"))
             quantity = dec(receipt.get("quantity"))
@@ -1084,28 +1091,45 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
         raise ValueError("historical backfill cursor inconsistent")
 
     requests = windows = new_receipts = listed_nps = 0
+    required_pages = None
     while cursor <= end and windows < max_windows and requests < max_listing_pages:
-        last = min(cursor + timedelta(days=79), end)
-        params = {"bgn_de": cursor.strftime("%Y%m%d"), "end_de": last.strftime("%Y%m%d"),
-                  "pblntf_ty": "D", "pblntf_detail_ty": "D001", "last_reprt_at": "N",
-                  "page_count": 100}
-        first = dart_json("list.json", {**params, "page_no": 1}, key)
-        requests += 1
-        if first.get("status") == "013":
-            pages = [first]
-        else:
+        last = min(cursor + timedelta(days=int(ledger.get("max_window_days") or 80) - 1), end)
+        pages = None
+        while True:
+            params = {"bgn_de": cursor.strftime("%Y%m%d"), "end_de": last.strftime("%Y%m%d"),
+                      "pblntf_ty": "D", "pblntf_detail_ty": "D001", "last_reprt_at": "N",
+                      "page_count": 100}
+            first = dart_json("list.json", {**params, "page_no": 1}, key)
+            requests += 1
+            if first.get("status") == "013":
+                pages = [first]
+                break
             try:
                 page_count = int(first["total_page"])
             except (KeyError, TypeError, ValueError) as exc:
                 raise RuntimeError("DART historical pagination metadata inconsistent") from exc
             if page_count < 1 or page_count > 10_000:
                 raise RuntimeError("DART historical pagination metadata inconsistent")
+            if page_count > max_listing_pages:
+                if last == cursor:
+                    required_pages = page_count
+                    break
+                last = cursor + timedelta(days=(last - cursor).days // 2)
+                ledger["max_window_days"] = (last - cursor).days + 1
+                state["revision"] += 1
+                write_json(state_path, state)
+                if requests >= max_listing_pages:
+                    break
+                continue
             if requests + page_count - 1 > max_listing_pages:
-                break  # The next invocation retries this uncommitted window.
+                break  # This window fits a fresh run; do not commit a partial one.
             pages = [first]
             for number in range(2, page_count + 1):
                 pages.append(dart_json("list.json", {**params, "page_no": number}, key))
                 requests += 1
+            break
+        if pages is None:
+            break
         validate_listing_pages(pages)
         window_nps = 0
         for page in pages:
@@ -1118,11 +1142,13 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
                 apply_listing_row(state, row, historical=True)
                 window_nps += 1
         listed_nps += window_nps
+        completed_days = (last - cursor).days + 1
         ledger["coverage"].append({"from": cursor.isoformat(), "to": last.isoformat(),
                                    "checked_at": datetime.now(timezone.utc).isoformat(),
                                    "pages": len(pages), "nps_receipts": window_nps, "complete": True})
         cursor = last + timedelta(days=1)
         ledger["next_date"] = cursor.isoformat()
+        ledger["max_window_days"] = min(80, completed_days * 2)
         state["revision"] += 1
         write_json(state_path, state)
         windows += 1
@@ -1144,12 +1170,14 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
     exhausted = sum(no in state["unresolved"] and int(state["receipts"][no].get("parse_attempt_count") or 0)
                     >= HISTORICAL_PARSE_ATTEMPTS for no in historical_pending)
     complete = cursor > end
-    return {"status": "LISTING_COMPLETE_PARSING_PENDING" if complete and pending else
+    return {"status": "LISTING_BUDGET_INSUFFICIENT" if required_pages is not None else
+            "LISTING_COMPLETE_PARSING_PENDING" if complete and pending else
             "LISTING_COMPLETE_WITH_UNVERIFIED" if complete and exhausted else
             "LISTING_COMPLETE" if complete else "LISTING_IN_PROGRESS",
             "start_date": start.isoformat(), "target_date": end.isoformat(),
             "next_date": ledger["next_date"], "completed_windows": len(ledger["coverage"]),
             "windows_this_run": windows, "listing_requests": requests,
+            "required_pages": required_pages,
             "nps_rows_this_run": listed_nps, "new_receipts_this_run": new_receipts,
             "parse_attempts": parsed, "new_receipts_pending": pending,
             "parse_attempts_exhausted": exhausted,
@@ -1424,6 +1452,8 @@ def main():
             if not result["verified"] or result["state_receipts"] < result["unique_receipts"]:
                 raise ValueError("migration verification failed")
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        if args.command == "backfill-history" and result.get("status") == "LISTING_BUDGET_INSUFFICIENT":
+            return 1
     except Exception as exc:
         error = {"error": type(exc).__name__}
         if args.command != "backfill-history":
