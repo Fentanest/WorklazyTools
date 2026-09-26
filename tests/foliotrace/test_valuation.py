@@ -12,8 +12,8 @@ SPEC.loader.exec_module(valuation)
 class ValuationTests(unittest.TestCase):
     def test_exact_decimal_and_global_denominator(self):
         holdings = [
-            {"stock_code": "005930", "quantity": "9007199254740993", "security_kind": "common", "tracking": "active"},
-            {"stock_code": "0126Z0", "quantity": "2", "security_kind": "preferred", "tracking": "active"},
+            {"stock_code": "005930", "quantity": "9007199254740993", "security_kind": "common", "tracking": "active", "corporate_action_status": "verified", "corporate_action_trade_date": "2026-09-25"},
+            {"stock_code": "0126Z0", "quantity": "2", "security_kind": "preferred", "tracking": "active", "corporate_action_status": "verified", "corporate_action_trade_date": "2026-09-25"},
             {"stock_code": "000001", "quantity": "2", "security_kind": "unknown", "tracking": "active"},
         ]
         quotes = {
@@ -30,7 +30,7 @@ class ValuationTests(unittest.TestCase):
 
     def test_old_day_and_total_failure_are_not_zero_value(self):
         result = valuation.value_holdings(
-            [{"stock_code": "005930", "quantity": "100", "security_kind": "common", "tracking": "active"}],
+            [{"stock_code": "005930", "quantity": "100", "security_kind": "common", "tracking": "active", "corporate_action_status": "verified", "corporate_action_trade_date": "2026-09-25"}],
             {"005930": {"close": "10", "verified": True, "trade_date": "2026-09-24", "market": "KRX", "session": "regular", "currency": "KRW", "adjusted": False}},
             "2026-09-25",
         )
@@ -40,8 +40,8 @@ class ValuationTests(unittest.TestCase):
 
     def test_zero_quantity_and_wrong_quote_basis_excluded(self):
         holdings = [
-            {"stock_code": "005930", "quantity": "0", "security_kind": "common", "tracking": "active"},
-            {"stock_code": "000660", "quantity": "1", "security_kind": "common", "tracking": "active"},
+            {"stock_code": "005930", "quantity": "0", "security_kind": "common", "tracking": "active", "corporate_action_status": "verified", "corporate_action_trade_date": "2026-09-25"},
+            {"stock_code": "000660", "quantity": "1", "security_kind": "common", "tracking": "active", "corporate_action_status": "verified", "corporate_action_trade_date": "2026-09-25"},
         ]
         quote = {"close": "100", "verified": True, "trade_date": "2026-09-25", "market": "KRX", "session": "regular", "currency": "KRW", "adjusted": False}
         result = valuation.value_holdings(holdings, {"005930": quote, "000660": {**quote, "adjusted": True}}, "2026-09-25")

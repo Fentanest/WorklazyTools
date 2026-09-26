@@ -39,6 +39,23 @@ class NaverTests(unittest.TestCase):
         with self.assertRaises(naver.QuoteError):
             naver.parse_quote("0126Z0", basic, daily, "2026-10-02T00:00:00Z")
 
+    def test_intraday_cache_miss_uses_independently_cross_checked_prior_close(self):
+        basic, daily = response(close="110")
+        basic.update(marketStatus="OPEN", marketStatusDetailType="open",
+                     localTradedAt="2026-09-28T10:00:00+09:00",
+                     compareToPreviousClosePrice="10",
+                     compareToPreviousPrice={"name": "RISING"})
+        daily = [{"localTradedAt": "2026-09-28", "closePrice": "110"},
+                 {"localTradedAt": "2026-09-23", "closePrice": "100"}]
+        quote = naver.parse_quote("000660", basic, daily, "2026-09-28T01:00:00Z")
+        self.assertEqual((quote["trade_date"], quote["close"]), ("2026-09-23", "100"))
+        basic["compareToPreviousClosePrice"] = "9"
+        with self.assertRaisesRegex(naver.QuoteError, "regular close mismatch"):
+            naver.parse_quote("000660", basic, daily, "2026-09-28T01:00:00Z")
+        basic["compareToPreviousClosePrice"] = "10"
+        with self.assertRaisesRegex(naver.QuoteError, "latest completed KRX session unverified"):
+            naver.parse_quote("000660", basic, daily[:1], "2026-09-28T01:00:00Z")
+
 
 if __name__ == "__main__":
     unittest.main()

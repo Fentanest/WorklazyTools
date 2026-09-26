@@ -66,6 +66,19 @@ jobs:
       - name: Test FolioTrace migration and valuation invariants
         run: npm run test:foliotrace
 
+      - name: Wait for regular close confirmation on the scheduled run
+        if: github.event_name == 'schedule'
+        run: |
+          python3 - <<'PY'
+          from datetime import datetime, time
+          from zoneinfo import ZoneInfo
+          import time as clock
+          now = datetime.now(ZoneInfo('Asia/Seoul'))
+          target = now.replace(hour=16, minute=35, second=0, microsecond=0)
+          if now.weekday() < 5 and time(16, 0) <= now.time() < target.time():
+              clock.sleep(min((target - now).total_seconds(), 35 * 60))
+          PY
+
       - name: Collect incremental DART filings
         id: collect
         continue-on-error: true # Persist completed chunks before failing this deployment.
@@ -89,19 +102,6 @@ jobs:
       - name: Require complete DART listing
         if: steps.collect.outcome != 'success'
         run: exit 1
-
-      - name: Wait for regular close confirmation on the scheduled run
-        if: github.event_name == 'schedule'
-        run: |
-          python3 - <<'PY'
-          from datetime import datetime, time, timedelta
-          from zoneinfo import ZoneInfo
-          import time as clock
-          now = datetime.now(ZoneInfo('Asia/Seoul'))
-          target = now.replace(hour=16, minute=35, second=0, microsecond=0)
-          if now.weekday() < 5 and time(16, 0) <= now.time() < target.time():
-              clock.sleep(min((target - now).total_seconds(), 35 * 60))
-          PY
 
       - name: Verify regular close and value portfolio
         run: python3 scripts/foliotrace/folio.py price-and-value --state foliotrace-state/state.json --output foliotrace-state/publish.json

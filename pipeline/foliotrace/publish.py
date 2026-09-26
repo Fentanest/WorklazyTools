@@ -21,7 +21,18 @@ def make_snapshot(state, quotes, now=None):
     stamp = now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     trade_dates = sorted({q["trade_date"] for q in quotes.values() if q.get("verified") and q.get("trade_date")})
     trade_date = trade_dates[-1] if trade_dates else None
-    holdings = sorted(state["holdings"].values(), key=lambda h: (h.get("stock_code") or "", h.get("corp_code") or ""))
+    holdings = []
+    for source in sorted(state["holdings"].values(), key=lambda h: (h.get("stock_code") or "", h.get("corp_code") or "")):
+        holding = dict(source)
+        current_no = holding.get("receipt_no")
+        current = state["receipts"].get(current_no, {})
+        latest_no = holding.get("latest_unresolved_receipt")
+        if current.get("withdrawn_flag") or current.get("is_correction") or current.get("later_correction_flag"):
+            latest_no = max(latest_no or "", current_no or "")
+        if latest_no:
+            holding["latest_unresolved_receipt"] = latest_no
+            holding["latest_unresolved_reason"] = state.get("unresolved", {}).get(latest_no) or "correction_relation_unverified"
+        holdings.append(holding)
     valued = value_holdings(holdings, quotes, trade_date) if trade_date else value_holdings(holdings, {}, "")
     rows = []
     for row in valued["holdings"]:
@@ -34,7 +45,9 @@ def make_snapshot(state, quotes, now=None):
                      "companyOwnershipPercent": row.get("company_ownership_percent"),
                      "receiptNo": row.get("receipt_no") or "", "receiptDate": row.get("receipt_date") or "",
                      "holdingDate": row.get("holding_date"),
-                     "evidence": "legacy-import" if evidence == "legacy_import" else "dart-structured" if evidence == "dart_structured" else "dart-document" if evidence == "dart_document" else "unresolved-latest",
+                     "evidence": "unresolved-latest" if row.get("latest_unresolved_receipt") else "legacy-import" if evidence == "legacy_import" else "dart-structured" if evidence == "dart_structured" else "dart-document" if evidence == "dart_document" else "unresolved-latest",
+                     "latestUnresolvedReceiptNo": row.get("latest_unresolved_receipt") or None,
+                     "latestUnresolvedReason": row.get("latest_unresolved_reason") or None,
                      "tracking": row.get("tracking") or "unknown",
                      "quote": ({"close": quote["close"], "currency": "KRW", "market": "KRX", "session": "regular",
                                 "tradeDate": quote["trade_date"], "adjusted": quote["adjusted"], "provider": "naver",
@@ -56,7 +69,8 @@ def make_snapshot(state, quotes, now=None):
     coverage = state.get("listing_coverage") or []
     history = [item for item in state.get("published_history", []) if item.get("methodology_version") == "1"
                and item.get("estimated_value") is not None and item.get("trade_date")]
-    if valued["estimated_value"] is not None and trade_date:
+    has_future_filing = any(h.get("receipt_date") and trade_date and h["receipt_date"] > trade_date for h in holdings)
+    if valued["estimated_value"] is not None and trade_date and not has_future_filing:
         history = [item for item in history if item["trade_date"] != trade_date]
         history.append({"trade_date": trade_date, "estimated_value": valued["estimated_value"],
                         "dataset_version": "", "methodology_version": "1"})

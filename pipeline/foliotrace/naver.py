@@ -22,14 +22,14 @@ class QuoteError(ValueError):
     pass
 
 
-def _amount(value):
+def _amount(value, *, allow_zero=False):
     if not isinstance(value, str) or not re.fullmatch(r"[0-9][0-9,]*(?:\.[0-9]+)?", value):
         raise QuoteError("invalid close price")
     try:
         n = Decimal(value.replace(",", ""))
     except InvalidOperation as exc:
         raise QuoteError("invalid close price") from exc
-    if not n.is_finite() or n <= 0:
+    if not n.is_finite() or n < 0 or (n == 0 and not allow_zero):
         raise QuoteError("invalid close price")
     return format(n, "f")
 
@@ -43,7 +43,7 @@ def expected_session(observed):
 
 
 def parse_quote(code, basic, daily, observed_at, *, today=None):
-    """Require current regular close and independently matching dated daily row."""
+    """Select the last completed regular session and cross-check the basic quote."""
     if not CODE.fullmatch(code) or not isinstance(basic, dict) or not isinstance(daily, list) or not daily:
         raise QuoteError("invalid quote response")
     exchange = basic.get("stockExchangeType")
@@ -51,28 +51,42 @@ def parse_quote(code, basic, daily, observed_at, *, today=None):
         raise QuoteError("security identity mismatch")
     if not isinstance(exchange, dict) or exchange.get("code") not in ("KS", "KQ") or exchange.get("zoneId") != "Asia/Seoul" or exchange.get("nationCode") != "KOR":
         raise QuoteError("market unverified")
-    if basic.get("marketStatus") != "CLOSE" or basic.get("marketStatusDetailType") != "close":
-        raise QuoteError("regular close not final")
-    latest = daily[0]
-    if not isinstance(latest, dict):
-        raise QuoteError("invalid daily row")
     try:
-        traded = date.fromisoformat(latest["localTradedAt"])
         basic_at = datetime.fromisoformat(basic["localTradedAt"])
         observed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
     except (KeyError, TypeError, ValueError) as exc:
         raise QuoteError("quote date unverified") from exc
-    if basic_at.tzinfo is None or observed.tzinfo is None or basic_at.astimezone(ZoneInfo("Asia/Seoul")).date() != traded:
+    if basic_at.tzinfo is None or observed.tzinfo is None:
         raise QuoteError("quote date mismatch")
     today = today or observed.astimezone(ZoneInfo("Asia/Seoul")).date()
     expected = expected_session(observed)
-    if traded != expected or traded > today or traded.weekday() >= 5:
-        raise QuoteError(f"latest completed KRX session unverified: expected {expected.isoformat()}, received {traded.isoformat()}")
-    close = _amount(latest.get("closePrice"))
-    if close != _amount(basic.get("closePrice")):
+    dated = [row for row in daily if isinstance(row, dict) and row.get("localTradedAt") == expected.isoformat()]
+    if len(dated) != 1 or expected > today or expected.weekday() >= 5:
+        raise QuoteError(f"latest completed KRX session unverified: expected {expected.isoformat()}")
+    close = _amount(dated[0].get("closePrice"))
+    basic_date = basic_at.astimezone(ZoneInfo("Asia/Seoul")).date()
+    if basic_date == expected:
+        if basic.get("marketStatus") != "CLOSE" or basic.get("marketStatusDetailType") != "close":
+            raise QuoteError("regular close not final")
+        corroborated = _amount(basic.get("closePrice"))
+    elif basic_date == today and basic_date > expected:
+        direction = (basic.get("compareToPreviousPrice") or {}).get("name")
+        change = Decimal(_amount(basic.get("compareToPreviousClosePrice"), allow_zero=True))
+        current = Decimal(_amount(basic.get("closePrice")))
+        if direction == "RISING":
+            corroborated = format(current - change, "f")
+        elif direction == "FALLING":
+            corroborated = format(current + change, "f")
+        elif direction == "UNCHANGED" and change == 0:
+            corroborated = format(current, "f")
+        else:
+            raise QuoteError("previous close unverified")
+    else:
+        raise QuoteError("quote date mismatch")
+    if close != corroborated:
         raise QuoteError("regular close mismatch")
     return {"close": close, "currency": "KRW", "market": "KRX", "session": "regular",
-            "trade_date": traded.isoformat(), "adjusted": False, "provider": "naver",
+            "trade_date": expected.isoformat(), "adjusted": False, "provider": "naver",
             "observed_at": observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "verified": True}
 
 
@@ -112,7 +126,7 @@ class NaverClient:
             return self.cache[code]
         observed_at = observed_at or datetime.now(timezone.utc).isoformat()
         basic = self._json(f"{BASE}/{code}/basic")
-        daily = self._json(f"{BASE}/{code}/price?pageSize=1&page=1")
+        daily = self._json(f"{BASE}/{code}/price?pageSize=5&page=1")
         quote = parse_quote(code, basic, daily, observed_at)
         self.cache[code] = quote
         return quote

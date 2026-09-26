@@ -12,7 +12,7 @@ const base = {
   estimatedValue: '123.45', valuationCoverage: 'complete', filingCoverage: 'complete',
   holdings: [{ corpCode: '00101488', stockCode: '009450', name: '종목', securityKind: 'common', quantity: '1',
     companyOwnershipPercent: '5.0', receiptNo: '20260923000001', receiptDate: '2026-09-23', holdingDate: null,
-    evidence: 'dart-document', tracking: 'active', quote: { close: '123.45', currency: 'KRW', market: 'KRX',
+    evidence: 'dart-document', latestUnresolvedReceiptNo: null, latestUnresolvedReason: null, tracking: 'active', quote: { close: '123.45', currency: 'KRW', market: 'KRX',
       session: 'regular', tradeDate: '2026-09-23', adjusted: false, provider: 'naver', observedAt: '2026-09-26T00:00:00Z', verified: true },
     estimatedValue: '123.45', portfolioWeightPercent: '100', valuationExclusionReason: null,
     filingUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260923000001' }],

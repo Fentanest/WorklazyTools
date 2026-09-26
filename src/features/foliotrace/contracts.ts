@@ -45,6 +45,8 @@ export interface Holding {
   receiptDate: IsoDate
   holdingDate: IsoDate | null
   evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest'
+  latestUnresolvedReceiptNo: string | null
+  latestUnresolvedReason: string | null
   tracking: 'active' | 'below-5-percent' | 'unknown'
   quote: Quote | null
   estimatedValue: DecimalString | null

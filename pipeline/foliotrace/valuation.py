@@ -24,12 +24,18 @@ def value_holdings(holdings, quotes, trade_date):
         reason = None
         if holding.get("tracking") == "below-5-percent":
             reason = "tracking_exit"
+        elif holding.get("latest_unresolved_receipt"):
+            reason = "latest_filing_unresolved"
+        elif holding.get("receipt_date") and trade_date and holding["receipt_date"] > trade_date:
+            reason = "filing_after_quote_date"
         elif holding.get("security_kind") not in ("common", "preferred"):
             reason = "security_mapping_unverified"
         elif quantity is None or quantity < 0:
             reason = "quantity_unverified"
         elif quantity == 0:
             reason = "zero_quantity"
+        elif holding.get("corporate_action_status") != "verified" or holding.get("corporate_action_trade_date") != trade_date:
+            reason = "corporate_action_unverified"
         elif not quote or quote.get("verified") is not True:
             reason = "quote_unverified"
         elif quote.get("trade_date") != trade_date or quote.get("market") != "KRX" or quote.get("session") != "regular":

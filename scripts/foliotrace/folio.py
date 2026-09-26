@@ -37,6 +37,9 @@ NPS = re.compile(r"국민연금|National Pension Service", re.I)
 ALLOWED = ("universe.json", "report-cache.json", "holdings-latest.json", "state.json")
 SOURCE_NOTE = "MyTradingDesk context-service NPS public DART cache"
 MAPPING_METHOD = "dart-voting-krx-kind-v1"
+ACTION_METHOD = "krx-listed-share-ratio-v1"
+CORRECTION_PREFIXES = ("[기재정정]", "[첨부정정]", "[첨부추가]", "[정정]",
+                       "[정정명령부과]", "[정정제출요구]", "[변경등록]", "정정")
 
 
 def kst_today(now=None):
@@ -182,6 +185,7 @@ def normalize_seed(root: Path):
     receipts = {}
     duplicates = 0
     conflicts = []
+    value_conflicts = []
 
     def add_meta(obj, origin):
         nonlocal duplicates
@@ -193,14 +197,27 @@ def normalize_seed(root: Path):
         entry = {"corp_code": corp if CORP.fullmatch(corp) else None,
                  "stock_code": code if STOCK.fullmatch(code) else None,
                  "name": safe_str(obj.get("name")),
-                 "receipt_date": norm_date(obj.get("report_date") or obj.get("date") or obj.get("last_report_date"))}
+                 "receipt_date": norm_date(obj.get("report_date") or obj.get("date") or obj.get("last_report_date")),
+                 "quantity": dec(obj.get("stkqy")), "company_ownership_percent": dec(obj.get("stkrt")),
+                 "reason": safe_str(obj.get("report_reason") or obj.get("reason")),
+                 "sources": [origin]}
         old = metadata.get(no)
         if old:
             duplicates += 1
+            conflicted_fields = set()
             for key in ("corp_code", "stock_code", "receipt_date"):
                 if old.get(key) and entry.get(key) and old[key] != entry[key]:
                     conflicts.append({"receipt_no": no, "field": key})
-            metadata[no] = {key: old.get(key) or entry.get(key) for key in entry}
+            for key in ("quantity", "company_ownership_percent"):
+                if old.get(key) is not None and entry.get(key) is not None and old[key] != entry[key]:
+                    value_conflicts.append({"receipt_no": no, "field": key})
+                    conflicted_fields.add(key)
+            merged = {key: old.get(key) or entry.get(key) for key in entry if key != "sources"}
+            conflicted_fields.update(item["field"] for item in value_conflicts if item["receipt_no"] == no)
+            for key in conflicted_fields:
+                merged[key] = None
+            merged["sources"] = sorted(set(old.get("sources", [])) | {origin})
+            metadata[no] = merged
         else:
             metadata[no] = entry
 
@@ -230,13 +247,17 @@ def normalize_seed(root: Path):
                         "quantity": dec(raw.get("stkqy")), "company_ownership_percent": dec(raw.get("stkrt")),
                         "reason": safe_str(raw.get("report_resn")), "origin": "legacy_import",
                         "evidence": "legacy_json_parser_result", "security_kind": "unknown",
+                        "legacy_sources": sorted(set(meta.get("sources", [])) | {"report-cache"}),
                         "source_json_sha256": manifest["source_hash"]}
     for no, meta in metadata.items():
         if no not in receipts:
             receipts[no] = {"receipt_no": no, "receipt_date": meta.get("receipt_date"),
                             "corp_code": meta.get("corp_code"), "stock_code": meta.get("stock_code"),
-                            "name": meta.get("name"), "quantity": None, "company_ownership_percent": None,
-                            "reason": "", "origin": "legacy_import", "evidence": "legacy_reference_only",
+                            "name": meta.get("name"), "quantity": meta.get("quantity"),
+                            "company_ownership_percent": meta.get("company_ownership_percent"),
+                            "reason": meta.get("reason"), "origin": "legacy_import",
+                            "evidence": "legacy_history_fact" if meta.get("quantity") is not None else "legacy_reference_only",
+                            "legacy_sources": meta.get("sources", []),
                             "security_kind": "unknown", "source_json_sha256": manifest["source_hash"]}
     holdings = {}
     for h in holdings_raw["holdings"]:
@@ -251,6 +272,17 @@ def normalize_seed(root: Path):
                           "holding_date": None, "security_kind": "unknown", "tracking": "unknown",
                           "evidence": "legacy_import", "valuation_exclusion_reason": "security_mapping_unverified"}
     unresolved = {no: "metadata_missing" for no, r in receipts.items() if not r.get("corp_code") or not r.get("stock_code")}
+    for conflict in value_conflicts:
+        unresolved[conflict["receipt_no"]] = "legacy_value_conflict"
+    events = {}
+    for no, receipt in receipts.items():
+        if receipt.get("corp_code") and receipt.get("stock_code") and receipt.get("receipt_date") and receipt.get("quantity") is not None:
+            events[no] = {"receipt_no": no, "receipt_date": receipt["receipt_date"],
+                          "corp_code": receipt["corp_code"], "stock_code": receipt["stock_code"],
+                          "kind": "other", "correction_of": None, "quantity": receipt["quantity"],
+                          "company_ownership_percent": receipt.get("company_ownership_percent"),
+                          "source": "legacy_import"}
+    classify_events({"receipts": receipts, "events": events})
     observed = sorted(r["receipt_date"] for r in receipts.values() if r.get("receipt_date"))
     # A generation/target date is not evidence that intervening filings were listed.
     hint = observed[-1] if observed else None
@@ -258,18 +290,19 @@ def normalize_seed(root: Path):
               "input_records": len(universe_raw) + len(cache_raw) + len(holdings_raw["holdings"]) + brief_count,
               "unique_receipts": len(receipts), "duplicates_merged": duplicates,
               "conflicts_quarantined": len(conflicts), "universe_count": len(universe),
+              "value_conflicts_quarantined": len(value_conflicts), "events_preserved": len(events),
               "holdings_with_evidence": len(holdings), "unresolved_metadata": len(unresolved),
               "min_observed_receipt_date": observed[0] if observed else None,
               "max_observed_receipt_date": observed[-1] if observed else None,
               "legacy_coverage_status": "unverified", "resume_anchor": hint,
               "resume_anchor_basis": "legacy_unverified_hint", "source_hash": manifest["source_hash"],
               "import_batch_id": sha(canonical({"source_hash": manifest["source_hash"], "schema": 1}))[:24],
-              "conflicts": conflicts}
-    return universe, receipts, holdings, unresolved, report
+              "conflicts": conflicts, "value_conflicts": value_conflicts}
+    return universe, receipts, holdings, unresolved, events, report
 
 
 def import_seed(root: Path, state_path: Path, commit: bool):
-    universe, receipts, holdings, unresolved, report = normalize_seed(root)
+    universe, receipts, holdings, unresolved, events, report = normalize_seed(root)
     state = read_json(state_path) if state_path.exists() else empty_state()
     batch = report["import_batch_id"]
     if batch in state["import_ledger"]:
@@ -281,13 +314,52 @@ def import_seed(root: Path, state_path: Path, commit: bool):
         raise ValueError("cannot import seed into advanced state")
     if report["conflicts_quarantined"]:
         raise ValueError("receipt metadata conflicts require review")
-    state.update(universe=universe, receipts=receipts, holdings=holdings, unresolved=unresolved,
+    state.update(universe=universe, receipts=receipts, holdings=holdings, unresolved=unresolved, events=events,
                  legacy_resume_hint=report["resume_anchor"])
     state["import_ledger"].append(batch)
     state["revision"] += 1
     report.update(target_state_revision=state["revision"], migration_state="IMPORTED" if commit else "IMPORT_VALIDATED")
     if commit:
         write_json(state_path, state)
+    return report
+
+
+def backfill_legacy(root: Path, state_path: Path, commit: bool):
+    """Add omitted public filing facts to an already imported state, preserving live facts."""
+    _, receipts, _, unresolved, events, report = normalize_seed(root)
+    state = read_json(state_path)
+    if report["import_batch_id"] not in state.get("import_ledger", []):
+        raise ValueError("legacy export does not match imported batch")
+    changed_receipts = added_events = 0
+    for no, source in receipts.items():
+        target = state["receipts"].get(no)
+        if target is None:
+            state["receipts"][no] = source
+            changed_receipts += 1
+        else:
+            before = dict(target)
+            for field in ("corp_code", "stock_code", "name", "receipt_date", "quantity",
+                          "company_ownership_percent", "reason", "legacy_sources"):
+                if target.get(field) in (None, "", []):
+                    target[field] = source.get(field)
+            if target != before:
+                changed_receipts += 1
+        if no in unresolved:
+            state["unresolved"].setdefault(no, unresolved[no])
+    for no, event in events.items():
+        if no not in state["events"]:
+            state["events"][no] = event
+            added_events += 1
+    before_events = canonical(state["events"])
+    classify_events(state)
+    reclassified = before_events != canonical(state["events"])
+    report.update(changed_receipts=changed_receipts, added_events=added_events,
+                  reclassified_events=reclassified,
+                  migration_state="BACKFILLED" if commit else "BACKFILL_VALIDATED")
+    if changed_receipts or added_events or reclassified:
+        state["revision"] += 1
+        if commit:
+            write_json(state_path, state)
     return report
 
 
@@ -402,6 +474,10 @@ def verified_common_stock_code(xml: str, expected_quantity):
 
 
 def parse_krx_security_master(html_text):
+    return {code: item["name"] for code, item in parse_krx_security_details(html_text).items()}
+
+
+def parse_krx_security_details(html_text):
     parser = FilingTableParser()
     parser.feed(html_text)
     result = {}
@@ -416,11 +492,13 @@ def parse_krx_security_master(html_text):
             if not STOCK.fullmatch(code):
                 continue
             # KRX-listed ordinary identity has the issuer code and 00 series.
-            if isin[9:11] == "00" and not re.search(r"(?:우|우B|우C|우선주)$", name):
-                if code in result and result[code] != name:
+            shares = dec(row[4])
+            if isin[9:11] == "00" and shares is not None and Decimal(shares) > 0 and not re.search(r"(?:우|우B|우C|우선주)$", name):
+                item = {"name": name, "isin": isin, "listed_shares_thousands": shares}
+                if code in result and result[code] != item:
                     result.pop(code)
                 else:
-                    result[code] = name
+                    result[code] = item
     return result
 
 
@@ -429,7 +507,7 @@ def comparable_company_name(value):
     return compact.removesuffix("주식회사")
 
 
-def krx_security_master(trade_date):
+def krx_security_details(trade_date):
     url = "https://kind.krx.co.kr/corpgeneral/listedissuestatusdetail.do"
     merged = {}
     hashes = []
@@ -443,12 +521,17 @@ def krx_security_master(trade_date):
             payload = response.read(3_000_001)
         if len(payload) > 3_000_000:
             raise RuntimeError("KRX security master too large")
-        rows = parse_krx_security_master(payload.decode("utf-8"))
+        rows = parse_krx_security_details(payload.decode("utf-8"))
         if len(rows) < 100:
             raise RuntimeError("KRX security master incomplete")
         merged.update(rows)
         hashes.append(sha(payload))
     return merged, sha(canonical(hashes))
+
+
+def krx_security_master(trade_date):
+    details, digest = krx_security_details(trade_date)
+    return {code: row["name"] for code, row in details.items()}, digest
 
 
 def parse_filing_document(payload: bytes):
@@ -520,12 +603,20 @@ def apply_listing_row(state, row):
         raise RuntimeError("DART receipt corp conflict")
     report_name = safe_str(row.get("report_nm"))
     remarks = safe_str(row.get("rm"), limit=30)
-    correction = report_name.startswith(("[정정]", "정정"))
+    correction = report_name.startswith(CORRECTION_PREFIXES)
     superseded = "정" in remarks
     withdrawn = "철" in remarks
+    listed_code = str(row.get("stock_code") or "")
+    listed_code = listed_code if STOCK.fullmatch(listed_code) else None
+    prior_code = state["universe"].get(corp, {}).get("stock_code")
+    if listed_code and prior_code and listed_code != prior_code:
+        state["unresolved"][no] = "security_identity_conflict"
+    elif listed_code and not prior_code:
+        state["universe"][corp] = {"name": safe_str(row.get("corp_name")), "stock_code": listed_code}
+    stock_code = listed_code or prior_code
     if not existing:
         existing = {"receipt_no": no, "receipt_date": norm_date(row.get("rcept_dt")),
-                    "corp_code": corp, "stock_code": state["universe"].get(corp, {}).get("stock_code"),
+                    "corp_code": corp, "stock_code": stock_code,
                     "name": safe_str(row.get("corp_name")), "quantity": None, "company_ownership_percent": None,
                     "origin": "dart_listing", "evidence": "unresolved", "security_kind": "unknown", "reason": ""}
         state["receipts"][no] = existing
@@ -533,16 +624,18 @@ def apply_listing_row(state, row):
         old = state["holdings"].get(corp)
         if old and no > old.get("receipt_no", ""):
             old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
-    elif existing.get("evidence") == "legacy_reference_only":
+    elif existing.get("evidence") in ("legacy_reference_only", "legacy_json_parser_result") and (not existing.get("corp_code") or not existing.get("stock_code")):
         existing["corp_code"] = corp
-        existing["stock_code"] = state["universe"].get(corp, {}).get("stock_code")
+        existing["stock_code"] = stock_code
         existing["receipt_date"] = norm_date(row.get("rcept_dt"))
-        existing["evidence"] = "unresolved"
+        existing["metadata_evidence"] = "dart_listing"
         state["unresolved"][no] = "needs_filing_parse"
     existing.update(report_name=report_name, remarks=remarks, is_correction=correction,
                     correction_of=None, later_correction_flag=superseded, withdrawn_flag=withdrawn)
     if correction or superseded or withdrawn:
         state["unresolved"][no] = "correction_relation_unverified" if correction or superseded else "withdrawal_unverified"
+    if listed_code and prior_code and listed_code != prior_code:
+        state["unresolved"][no] = "security_identity_conflict"
     return existing["origin"] == "dart_listing" and existing["evidence"] == "unresolved"
 
 
@@ -553,7 +646,9 @@ def resolve_unfinished(state, key, limit=30):
         if processed >= limit:
             break
         receipt = state["receipts"].get(no)
-        if not receipt or receipt.get("evidence") != "unresolved":
+        if not receipt or receipt.get("evidence") not in ("unresolved", "legacy_json_parser_result", "legacy_reference_only"):
+            continue
+        if state["unresolved"].get(no) == "security_identity_conflict":
             continue
         processed += 1
         try:
@@ -573,23 +668,10 @@ def resolve_unfinished(state, key, limit=30):
         stock = receipt.get("stock_code")
         if corp and stock:
             old = state["holdings"].get(corp)
-            old_quantity = dec(old.get("quantity")) if old and old.get("receipt_no", "") < no else None
             new_quantity = dec(parsed["quantity"])
             ownership = Decimal(parsed["company_ownership_percent"])
-            if ownership < 5:
-                event_kind = "tracking-exit"
-            elif "목적" in parsed.get("reason", ""):
-                event_kind = "purpose-change"
-            elif old_quantity is None or new_quantity is None:
-                event_kind = "new-report" if old is None else "other"
-            elif Decimal(new_quantity) > Decimal(old_quantity):
-                event_kind = "increase"
-            elif Decimal(new_quantity) < Decimal(old_quantity):
-                event_kind = "decrease"
-            else:
-                event_kind = "other"
             state.setdefault("events", {})[no] = {"receipt_no": no, "receipt_date": receipt["receipt_date"],
-                "corp_code": corp, "stock_code": stock, "kind": event_kind,
+                "corp_code": corp, "stock_code": stock, "kind": "other",
                 "correction_of": receipt.get("correction_of"), "quantity": parsed["quantity"],
                 "company_ownership_percent": parsed["company_ownership_percent"],
                 "source": parsed["evidence"]}
@@ -610,7 +692,41 @@ def resolve_unfinished(state, key, limit=30):
                 del state["unresolved"][no]
         else:
             state["unresolved"][no] = "security_identity_missing"
+    classify_events(state)
     return processed
+
+
+def classify_events(state):
+    """Use the preceding verified receipt for each issuer, independent of parse order."""
+    by_corp = {}
+    for receipt in state["receipts"].values():
+        corp = receipt.get("corp_code")
+        no = receipt.get("receipt_no")
+        if corp and RECEIPT.fullmatch(str(no or "")):
+            by_corp.setdefault(corp, []).append(receipt)
+    for corp, receipts in by_corp.items():
+        previous = None
+        for receipt in sorted(receipts, key=lambda item: item["receipt_no"]):
+            no = receipt["receipt_no"]
+            event = state.get("events", {}).get(no)
+            flagged = any(receipt.get(field) for field in ("is_correction", "later_correction_flag", "withdrawn_flag"))
+            quantity = dec(receipt.get("quantity"))
+            ownership = dec(receipt.get("company_ownership_percent"))
+            if event:
+                kind = "other"
+                if not flagged and quantity is not None and ownership is not None:
+                    if Decimal(ownership) < 5:
+                        kind = "tracking-exit"
+                    elif "목적" in (receipt.get("reason") or ""):
+                        kind = "purpose-change"
+                    elif previous is None:
+                        kind = "new-report"
+                    elif previous.get("stock_code") == receipt.get("stock_code") and dec(previous.get("quantity")) is not None:
+                        before, after = Decimal(dec(previous["quantity"])), Decimal(quantity)
+                        kind = "increase" if after > before else "decrease" if after < before else "other"
+                event["kind"] = kind
+            if not flagged and quantity is not None and ownership is not None:
+                previous = receipt
 
 
 def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None, master=None, master_hash=None):
@@ -681,6 +797,70 @@ def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None,
             "remaining": sum(h.get("security_kind") == "unknown" for h in state["holdings"].values())}
 
 
+def reconcile_corporate_actions(state, trade_date, current_master, *, fetch=krx_security_details,
+                                state_path=None, limit_dates=50):
+    """Bound large split/merger-like share changes using dated KRX security facts."""
+    rows = [h for h in state["holdings"].values() if h.get("security_kind") in ("common", "preferred")]
+    pending = {}
+    for holding in rows:
+        day = holding.get("receipt_date")
+        baseline = holding.get("corporate_action_baseline") or {}
+        if day and day <= trade_date and (baseline.get("method") != ACTION_METHOD or baseline.get("receipt_date") != day
+                                        or baseline.get("stock_code") != holding.get("stock_code")):
+            pending.setdefault(day, []).append(holding)
+    checked_dates = 0
+    for day, holdings in sorted(pending.items(), reverse=True)[:limit_dates]:
+        historical, source_hash = fetch(day)
+        for holding in holdings:
+            code = holding.get("stock_code")
+            item = historical.get(code)
+            holding["corporate_action_baseline"] = {"method": ACTION_METHOD, "receipt_date": day,
+                "stock_code": code, "isin": item.get("isin") if item else None,
+                "name": item.get("name") if item else None,
+                "listed_shares_thousands": item.get("listed_shares_thousands") if item else None,
+                "source_sha256": source_hash}
+        checked_dates += 1
+        if state_path and checked_dates % 5 == 0:
+            state["revision"] += 1
+            write_json(state_path, state)
+    if state_path and checked_dates % 5:
+        state["revision"] += 1
+        write_json(state_path, state)
+    verified = unverified = 0
+    for holding in rows:
+        day = holding.get("receipt_date")
+        code = holding.get("stock_code")
+        baseline = holding.get("corporate_action_baseline") or {}
+        current = current_master.get(code)
+        reason = None
+        if not day or day > trade_date:
+            reason = "filing_after_quote_date" if day else "receipt_date_missing"
+        elif baseline.get("method") != ACTION_METHOD or baseline.get("receipt_date") != day or not baseline.get("isin"):
+            reason = "historical_security_unverified"
+        elif not current or baseline["isin"] != current.get("isin") or comparable_company_name(baseline.get("name")) != comparable_company_name(current.get("name")):
+            reason = "security_identity_changed"
+        else:
+            before = dec(baseline.get("listed_shares_thousands"))
+            after = dec(current.get("listed_shares_thousands"))
+            if before is None or after is None or Decimal(before) <= 0 or Decimal(after) <= 0:
+                reason = "listed_share_count_unverified"
+            else:
+                ratio = Decimal(after) / Decimal(before)
+                if ratio >= Decimal("1.5") or ratio <= Decimal(2) / Decimal(3):
+                    reason = "material_share_count_change"
+        holding["corporate_action_status"] = "unverified" if reason else "verified"
+        holding["corporate_action_reason"] = reason
+        holding["corporate_action_trade_date"] = trade_date
+        if reason:
+            unverified += 1
+        else:
+            verified += 1
+    if state_path:
+        state["revision"] += 1
+        write_json(state_path, state)
+    return {"checked_dates": checked_dates, "verified": verified, "unverified": unverified}
+
+
 def recover_metadata(state, key, *, limit_days=100, state_path=None):
     """Re-query only the receipt dates of imported references missing identity."""
     pending = {}
@@ -688,7 +868,7 @@ def recover_metadata(state, key, *, limit_days=100, state_path=None):
     today = kst_today()
     for no in state["unresolved"]:
         receipt = state["receipts"].get(no, {})
-        if receipt.get("evidence") != "legacy_reference_only" or not RECEIPT.fullmatch(no):
+        if (receipt.get("corp_code") and receipt.get("stock_code")) or not RECEIPT.fullmatch(no):
             continue
         day = norm_date(no[:8])
         if not day:
@@ -715,7 +895,8 @@ def recover_metadata(state, key, *, limit_days=100, state_path=None):
                     apply_listing_row(state, row)
                     found += 1
         ledger[day] = {"checked_on": today.isoformat(), "target_count": len(targets),
-                       "found_count": sum(state["receipts"].get(no, {}).get("evidence") != "legacy_reference_only" for no in targets)}
+                       "found_count": sum(bool(state["receipts"].get(no, {}).get("corp_code") and
+                                                state["receipts"].get(no, {}).get("stock_code")) for no in targets)}
         checked += 1
         if state_path and checked % 10 == 0:
             state["revision"] += 1
@@ -776,18 +957,18 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
         cursor = end + timedelta(days=1)
     metadata = recover_metadata(state, key, state_path=state_path)
     parse_attempts = resolve_unfinished(state, key)
-    mapping_master = None
-    mapping_hash = None
-    if any(h.get("security_kind") == "unknown" for h in state["holdings"].values()):
-        mapping_master, mapping_hash = krx_security_master(expected_session(datetime.now(timezone.utc)).isoformat())
+    trade_date = expected_session(datetime.now(timezone.utc)).isoformat()
+    mapping_details, mapping_hash = krx_security_details(trade_date) if state["holdings"] else ({}, None)
+    mapping_master = {code: item["name"] for code, item in mapping_details.items()}
     mapping = reconcile_security(state, key, state_path=state_path, master=mapping_master, master_hash=mapping_hash)
+    actions = reconcile_corporate_actions(state, trade_date, mapping_details, state_path=state_path)
     if parse_attempts and not mapping["checked"]:
         state["revision"] += 1
         write_json(state_path, state)
     return {"status": "LISTING_COMPLETE_PARSING_PENDING" if state["unresolved"] else "LISTING_COMPLETE",
             "requested_from": start.isoformat(), "requested_to": cutoff.isoformat(),
             "requests": request_count, "new_receipts": new_receipts,
-            "parse_attempts": parse_attempts, "metadata": metadata, "mapping": mapping,
+            "parse_attempts": parse_attempts, "metadata": metadata, "mapping": mapping, "corporate_actions": actions,
             "unresolved": len(state["unresolved"]), "state_revision": state["revision"]}
 
 
@@ -879,7 +1060,9 @@ def record_published(state_path: Path, *, version: str, trade_date: str | None, 
     if state.get("last_published_dataset") == version:
         return {"published_dataset": version, "history_count": len(state.get("published_history", [])),
                 "state_revision": state["revision"], "idempotent_noop": True}
-    if trade_date and estimated_value is not None:
+    future_filing = any(h.get("receipt_date") and h["receipt_date"] > trade_date
+                        for h in state["holdings"].values()) if trade_date else False
+    if trade_date and estimated_value is not None and not future_filing:
         if not norm_date(trade_date) or dec(estimated_value) is None:
             raise ValueError("invalid published valuation")
         history = [entry for entry in state.get("published_history", []) if entry["trade_date"] != trade_date]
@@ -901,6 +1084,10 @@ def main():
         q.add_argument("--source", type=Path, required=True)
         if name == "export-source": q.add_argument("--output", type=Path, required=True)
     q = sub.add_parser("import-seed")
+    q.add_argument("--export", type=Path, required=True)
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--commit", action="store_true")
+    q = sub.add_parser("backfill-legacy")
     q.add_argument("--export", type=Path, required=True)
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--commit", action="store_true")
@@ -926,13 +1113,14 @@ def main():
         if args.command == "inspect-source": result = inspect_source(args.source)
         elif args.command == "export-source": result = export_source(args.source, args.output)
         elif args.command == "import-seed": result = import_seed(args.export, args.state, args.commit)
+        elif args.command == "backfill-legacy": result = backfill_legacy(args.export, args.state, args.commit)
         elif args.command == "collect": result = collect(args.state, args.cutoff, os.environ.get("DART_API_KEY", ""))
         elif args.command == "price-and-value": result = price_and_value(args.state, args.output)
         elif args.command == "emit-snapshot": result = emit_snapshot(args.snapshot, args.dist)
         elif args.command == "record-published": result = record_published(args.state, version=args.dataset_version,
             trade_date=args.trade_date, estimated_value=args.estimated_value)
         else:
-            _, _, _, _, expected = normalize_seed(args.export)
+            _, _, _, _, _, expected = normalize_seed(args.export)
             state = read_json(args.state)
             result = {"verified": expected["import_batch_id"] in state["import_ledger"],
                       "source_hash": expected["source_hash"], "unique_receipts": expected["unique_receipts"],

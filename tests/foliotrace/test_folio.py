@@ -121,7 +121,8 @@ class MigrationTests(unittest.TestCase):
             state["receipts"][no] = {"receipt_date": "2026-09-23"}
             state["holdings"]["00101488"] = {"corp_code": "00101488", "stock_code": "009450", "name": "Test",
                 "receipt_no": no, "receipt_date": "2026-09-23", "quantity": "9007199254740993",
-                "company_ownership_percent": "5", "security_kind": "common", "tracking": "active", "evidence": "dart_document"}
+                "company_ownership_percent": "5", "security_kind": "common", "tracking": "active", "evidence": "dart_document",
+                "corporate_action_status": "verified", "corporate_action_trade_date": "2026-09-23"}
             folio.write_json(state_path, state)
             quote = {"close": "1.25", "currency": "KRW", "market": "KRX", "session": "regular",
                      "trade_date": "2026-09-23", "adjusted": False, "provider": "naver", "observed_at": "2026-09-26T00:00:00Z", "verified": True}
@@ -212,7 +213,7 @@ class MigrationTests(unittest.TestCase):
             def fake_dart(endpoint, params, key):
                 calls.append(params.copy())
                 if params["page_no"] == 1:
-                    return {"status": "000", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000001", "corp_code": "00104856", "rcept_dt": "20260909", "flr_nm": "국민연금공단", "corp_name": "Test"}] + [{"flr_nm": "Other"}] * 99}
+                    return {"status": "000", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000001", "corp_code": "00104856", "stock_code": "005930", "rcept_dt": "20260909", "flr_nm": "국민연금공단", "corp_name": "Test"}] + [{"flr_nm": "Other"}] * 99}
                 return {"status": "000", "list": [{"flr_nm": "Other"}]}
 
             with patch.object(folio, "dart_json", side_effect=fake_dart), patch.object(folio, "resolve_unfinished", return_value=0):

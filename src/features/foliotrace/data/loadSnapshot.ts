@@ -38,6 +38,8 @@ function validHolding(value: unknown): boolean {
     str(value.receiptNo) && RECEIPT.test(value.receiptNo) && isoDate(value.receiptDate) &&
     nullable(value.holdingDate, isoDate) &&
     ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest'].includes(String(value.evidence)) &&
+    nullable(value.latestUnresolvedReceiptNo, (item) => str(item) && RECEIPT.test(item)) &&
+    nullable(value.latestUnresolvedReason, str) &&
     ['active', 'below-5-percent', 'unknown'].includes(String(value.tracking)) &&
     nullable(value.quote, validQuote) && nullable(value.estimatedValue, decimal) &&
     nullable(value.portfolioWeightPercent, decimal) && nullable(value.valuationExclusionReason, str) &&
