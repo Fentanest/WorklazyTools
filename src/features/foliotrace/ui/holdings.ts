@@ -105,8 +105,8 @@ export function holdingStatus(h: Holding): HoldingStatus {
  */
 const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
   tracking_exit: {
-    ko: "5% 추적 범위 이탈로 평가에서 제외",
-    en: "Excluded: exited the 5% tracking scope",
+    ko: "5% 미만이라 평가에서 제외",
+    en: "Excluded: below 5% ownership",
   },
   security_mapping_unverified: {
     ko: "공시의 주식 종류와 종목을 확인하지 못해 평가에서 제외",

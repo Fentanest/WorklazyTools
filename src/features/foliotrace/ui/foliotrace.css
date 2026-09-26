@@ -97,6 +97,35 @@
   color: var(--label-secondary, #636369);
 }
 
+/* Coverage cards: one concise summary line stays visible; the full
+ * per-lane dates and counts live in a clearly labeled <details> block. */
+.foliotrace-history-coverage details,
+.foliotrace-indirect-clue details {
+  margin-top: 0.15rem;
+}
+
+.foliotrace-history-coverage summary,
+.foliotrace-indirect-clue summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-history-coverage summary:focus-visible,
+.foliotrace-indirect-clue summary:focus-visible {
+  outline: 2px solid var(--brand, #b7351f);
+  outline-offset: 2px;
+}
+
+.foliotrace-coverage-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
 .foliotrace-indirect-clue {
   display: flex;
   flex-direction: column;

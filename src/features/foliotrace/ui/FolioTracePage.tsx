@@ -49,16 +49,20 @@ const STR = {
     historicalCoverageTitle: "과거 공시 확인 범위",
     historicalCoverageRange: "확인한 접수일",
     historicalCoverageTarget: "조회 목표일",
-    historicalCoverageComplete: "해당 기간의 공시 목록 확인 완료",
-    historicalCoveragePending: "공시 목록 확인 중",
+    historicalCoverageComplete: "공시 목록 {from}–{to} 확인 완료",
+    historicalCoveragePending: "공시 목록 {from}–{to} 확인 중",
+    historicalCoverageDetails: "확인 범위 자세히 보기",
     historicalCoverageScope: "국민연금 기관이 제출한 공시를 찾은 기간입니다. 각 공시의 수량·지분율 확인은 별도로 진행합니다.",
     historicalFirstObserved: "국민연금 기관이 제출한 첫 대량보유 공시 접수",
+    historicalFirstFound: "확인된 첫 국민연금 제출 공시",
     historicalFirstTentative: "(조회 진행 중 잠정값)",
     historicalParsePending: "새 공시 내용 확인 중",
     historicalLegacyRecheck: "이전 기록 중 공시 확인이 필요한 건수",
     indirectTitle: "개별 공시에서 확인한 과거 기록",
     indirectSource: "DART 원문 보기",
     indirectScope: "다른 회사의 공시에서 찾은 보유 기록과 배정 계획입니다. 배정 계획은 실제 보유를 뜻하지 않습니다. 아직 확인 중인 기록은 현재 보유액에 넣지 않습니다.",
+    indirectSummary: "검토할 공시 {candidates}건 · 주식 관련 내용 추가 확인 중 {reviewed}건",
+    indirectDetails: "검색 범위 자세히 보기",
     historicalObservationTitle: "과거 보유 내역",
     historicalObservationScope: "공시의 보유 날짜·수량·비율을 확인했습니다. 지분율 계산에 쓰인 전체 주식 수의 날짜 등이 불분명한 기록은 현재 지분율과 바로 비교하지 않습니다.",
     historicalDenominatorDatePending: "전체 주식 수의 기준일 확인 중",
@@ -111,7 +115,7 @@ const STR = {
     qualityAll: "전체",
     qualityPriced: "평가 포함",
     qualityUnpriced: "평가 제외",
-    qualityBelow5: "5% 추적 범위 이탈",
+    qualityBelow5: "5% 미만",
     sortLabel: "정렬",
     sortValue: "추정 금액순",
     sortWeight: "비중순",
@@ -156,7 +160,7 @@ const STR = {
     detailHistory: "해당 종목 공시 이력",
     openFiling: "DART 원문 열기",
     noFilingUrl: "원문 링크 없음",
-    unknownDate: "미상(기준일 모름)",
+    unknownDate: "기준일 모름",
     eventsTitle: "최근 공시 변화",
     eventsDesc: "확인된 보유 기준일 우선 최근 {shown}건 / 전체 {total}건입니다. 기준일이 없으면 접수일을 사용합니다. 수량·지분율은 표시한 출처의 기록값입니다.",
     eventsEmpty: "해당 기간의 공시 변화가 없습니다.",
@@ -176,9 +180,9 @@ const STR = {
     guideFaqTitle: "자주 묻는 질문",
     faqTitle: "자주 묻는 질문",
     faqDesc: "추정 범위·계산·출처에 대한 자주 묻는 질문입니다.",
-    prevVerifiedReceipt: "이전 확인 접수",
-    latestUnresolvedReceipt: "최신 미확인 접수",
-    retry: "게시된 데이터 다시 조회",
+    prevVerifiedReceipt: "이전에 확인한 접수",
+    latestUnresolvedReceipt: "아직 확인하지 못한 최신 접수",
+    retry: "게시된 자료 다시 불러오기",
     statusIncluded: "평가 포함",
     statusExcluded: "평가 제외",
     statusActiveRecord: "공시 지분율 5% 이상",
@@ -207,16 +211,20 @@ const STR = {
     historicalCoverageTitle: "Historical filings checked",
     historicalCoverageRange: "Receipt dates checked",
     historicalCoverageTarget: "Target end date",
-    historicalCoverageComplete: "Filings listed for the whole period",
-    historicalCoveragePending: "Still checking filings",
+    historicalCoverageComplete: "Filing list checked {from}–{to}",
+    historicalCoveragePending: "Filing list check in progress {from}–{to}",
+    historicalCoverageDetails: "See detailed search coverage",
     historicalCoverageScope: "These dates cover filings submitted by NPS. Reported quantities and percentages are checked separately.",
     historicalFirstObserved: "Earliest large-shareholding filing submitted by NPS",
+    historicalFirstFound: "Earliest NPS-submitted filing found",
     historicalFirstTentative: "(provisional while searching)",
     historicalParsePending: "New filings under review",
     historicalLegacyRecheck: "Earlier records awaiting source checks",
     indirectTitle: "Older records checked in individual filings",
     indirectSource: "Open DART filing",
     indirectScope: "Other companies' filings can describe NPS holdings or planned allotments. Plans are shown separately from confirmed holdings. Records still under review are left out of current values.",
+    indirectSummary: "{candidates} filings need review · {reviewed} awaiting a closer content check",
+    indirectDetails: "See detailed search coverage",
     historicalObservationTitle: "Historical holdings",
     historicalObservationScope: "The filing confirms a holding date, quantity, and percentage. Some details about the total share count, including its date, still need checking before comparison with today's percentage.",
     historicalDenominatorDatePending: "Date of the total share count still under review",
@@ -269,7 +277,7 @@ const STR = {
     qualityAll: "All",
     qualityPriced: "Included in valuation",
     qualityUnpriced: "Excluded from valuation",
-    qualityBelow5: "Exited 5% tracking scope",
+    qualityBelow5: "Below 5%",
     sortLabel: "Sort",
     sortValue: "By estimated value",
     sortWeight: "By weight",
@@ -334,9 +342,9 @@ const STR = {
     guideFaqTitle: "FAQ",
     faqTitle: "FAQ",
     faqDesc: "Frequently asked questions about scope, estimation, and sources.",
-    prevVerifiedReceipt: "Previously confirmed receipt",
-    latestUnresolvedReceipt: "Latest unverified receipt",
-    retry: "Re-fetch published data",
+    prevVerifiedReceipt: "Previously checked receipt",
+    latestUnresolvedReceipt: "Latest unchecked receipt",
+    retry: "Reload published data",
     statusIncluded: "Included",
     statusExcluded: "Excluded",
     statusActiveRecord: "Filed ownership at or above 5%",
@@ -359,8 +367,8 @@ const STR = {
 
 const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
   ko: {
-    increase: "기록 수량 비교상 증가",
-    decrease: "기록 수량 비교상 감소",
+    increase: "이전 기록 대비 증가",
+    decrease: "이전 기록 대비 감소",
     "new-report": "첫 기록 공시",
     "purpose-change": "목적 변경",
     "tracking-exit": "5% 추적 범위 이탈",
@@ -566,34 +574,57 @@ function ReadyView({
         <div className="foliotrace-history-coverage" role="status">
           <strong>{t.historicalCoverageTitle}</strong>
           <span>
-            {t.historicalCoverageRange}: {snapshot.historicalCoverage.searchStartDate} ~ {snapshot.historicalCoverage.listingCompleteThrough}
-            {" · "}{t.historicalCoverageTarget}: {snapshot.historicalCoverage.searchTargetDate}
-            {" · "}{snapshot.historicalCoverage.listingComplete ? t.historicalCoverageComplete : t.historicalCoveragePending}
+            {(snapshot.historicalCoverage.listingComplete
+              ? t.historicalCoverageComplete
+              : t.historicalCoveragePending
+            )
+              .replace("{from}", snapshot.historicalCoverage.searchStartDate)
+              .replace("{to}", snapshot.historicalCoverage.listingCompleteThrough)}
+            {" · "}
+            {t.historicalFirstFound}: {snapshot.historicalCoverage.firstObservedNpsReceiptDate ?? "—"}
+            {!snapshot.historicalCoverage.listingComplete &&
+              snapshot.historicalCoverage.firstObservedNpsReceiptDate && ` ${t.historicalFirstTentative}`}
           </span>
-          <span>
-            {t.historicalFirstObserved}: {snapshot.historicalCoverage.firstObservedNpsReceiptDate ?? "—"}
-            {!snapshot.historicalCoverage.listingComplete && snapshot.historicalCoverage.firstObservedNpsReceiptDate && ` ${t.historicalFirstTentative}`}
-            {" · "}{t.historicalParsePending}: {snapshot.historicalCoverage.parsingPendingCount}
-            {" · "}{t.historicalLegacyRecheck}: {snapshot.historicalCoverage.legacySourceRecheckCount}
-          </span>
-          <small>{t.historicalCoverageScope}</small>
+          <details>
+            <summary>{t.historicalCoverageDetails}</summary>
+            <div className="foliotrace-coverage-details">
+              <span>
+                {t.historicalCoverageTarget}: {snapshot.historicalCoverage.searchTargetDate}
+              </span>
+              <span>
+                {t.historicalParsePending}: {snapshot.historicalCoverage.parsingPendingCount}
+              </span>
+              <span>
+                {t.historicalLegacyRecheck}: {snapshot.historicalCoverage.legacySourceRecheckCount}
+              </span>
+              <small>{t.historicalCoverageScope}</small>
+            </div>
+          </details>
         </div>
       )}
 
       <aside className="foliotrace-indirect-clue" aria-label={t.indirectTitle}>
         <strong>{t.indirectTitle}</strong>
         {snapshot.secondaryCoverage ? (
-          <small>
-            {t.secondaryAll}: {snapshot.secondaryCoverage.allContentCheckedThrough ?? "—"}
-            {" · "}{t.secondaryEquity}: {snapshot.secondaryCoverage.equityContentCheckedThrough ?? "—"}
-            {" · "}{t.secondaryPriorAll}: {snapshot.secondaryCoverage.priorContentCheckedThrough ?? "—"}
-            {" · "}{t.secondaryPriorEquity}: {snapshot.secondaryCoverage.priorEquityCheckedThrough ?? "—"}
-            {" · "}{t.secondaryDirect}: {snapshot.secondaryCoverage.earlyDirectCheckedThrough ?? "—"}
-            {" · "}{t.secondaryCandidates}: {snapshot.secondaryCoverage.candidateDocumentCount}
-            {" · "}{t.secondaryOtherUnreviewed}: {snapshot.secondaryCoverage.noncandidateUnreviewedCount}
-            {" · "}{t.secondarySourcePending}: {snapshot.secondaryCoverage.sourceReviewPendingCount}
-            {" · "}{t.secondaryContextPending}: {snapshot.secondaryCoverage.sourceContextReviewCount}
-          </small>
+          <>
+            <small>{t.indirectSummary
+              .replace("{candidates}", String(snapshot.secondaryCoverage.candidateDocumentCount))
+              .replace("{reviewed}", String(snapshot.secondaryCoverage.sourceContextReviewCount))}</small>
+            <details>
+              <summary>{t.indirectDetails}</summary>
+              <div className="foliotrace-coverage-details">
+                <span>{t.secondaryAll}: {snapshot.secondaryCoverage.allContentCheckedThrough ?? "—"}</span>
+                <span>{t.secondaryEquity}: {snapshot.secondaryCoverage.equityContentCheckedThrough ?? "—"}</span>
+                <span>{t.secondaryPriorAll}: {snapshot.secondaryCoverage.priorContentCheckedThrough ?? "—"}</span>
+                <span>{t.secondaryPriorEquity}: {snapshot.secondaryCoverage.priorEquityCheckedThrough ?? "—"}</span>
+                <span>{t.secondaryDirect}: {snapshot.secondaryCoverage.earlyDirectCheckedThrough ?? "—"}</span>
+                <span>{t.secondaryCandidates}: {snapshot.secondaryCoverage.candidateDocumentCount}</span>
+                <span>{t.secondaryOtherUnreviewed}: {snapshot.secondaryCoverage.noncandidateUnreviewedCount}</span>
+                <span>{t.secondarySourcePending}: {snapshot.secondaryCoverage.sourceReviewPendingCount}</span>
+                <span>{t.secondaryContextPending}: {snapshot.secondaryCoverage.sourceContextReviewCount}</span>
+              </div>
+            </details>
+          </>
         ) : <small>{t.secondaryNoScan}</small>}
         {(snapshot.historicalObservations?.length ?? 0) > 0 && (
           <div className="foliotrace-source-observations">

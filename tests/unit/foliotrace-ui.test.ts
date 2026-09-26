@@ -66,6 +66,25 @@ test("React page renders the shared FAQ entries visibly (FT-10)", () => {
   assert.match(cssSource, /\.foliotrace-faq/);
 });
 
+test("coverage cards show one concise summary with labeled expandable details", () => {
+  assert.match(pageSource, /historicalCoverageDetails/);
+  assert.match(pageSource, /indirectDetails/);
+  assert.match(pageSource, /indirectSummary/);
+  assert.match(pageSource, /foliotrace-coverage-details/);
+  assert.match(cssSource, /\.foliotrace-coverage-details/);
+  assert.match(cssSource, /\.foliotrace-history-coverage summary/);
+  assert.match(cssSource, /\.foliotrace-indirect-clue summary/);
+});
+
+test("user-facing copy avoids raw pipeline jargon", () => {
+  for (const banned of ["정적 JSON", "static JSON", "DART 배치",
+    "DART batch", "미구현", "Unimplemented", "파싱 미완료", "security mapping",
+    "이관(import", "data import is not complete"]) {
+    assert.ok(!pageSource.includes(banned), `pipeline jargon on screen: ${banned}`);
+    assert.ok(!holdingsSource.includes(banned), `pipeline jargon in labels: ${banned}`);
+  }
+});
+
 test("long exact amounts wrap in cards/history; table keeps nowrap in its scroll container", () => {
   assert.match(
     cssSource,

@@ -249,7 +249,7 @@ test("every known exclusion reason maps to ko/en text, never the raw code", () =
       assert.ok(!label!.includes("_"), `${reason}/${lang} looks unmapped: ${label}`);
     }
   }
-  assert.equal(exclusionReasonLabel("tracking_exit", "ko"), "5% 추적 범위 이탈로 평가에서 제외");
+  assert.equal(exclusionReasonLabel("tracking_exit", "ko"), "5% 미만이라 평가에서 제외");
   assert.equal(
     exclusionReasonLabel("security_mapping_unverified", "ko"),
     "공시의 주식 종류와 종목을 확인하지 못해 평가에서 제외",
