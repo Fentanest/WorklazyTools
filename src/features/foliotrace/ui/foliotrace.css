@@ -308,6 +308,10 @@ th.foliotrace-num {
   text-align: right;
 }
 
+.foliotrace-table td.foliotrace-num {
+  text-align: right;
+}
+
 .foliotrace-code {
   font-family: ui-monospace, monospace;
   font-size: 0.82em;
