@@ -69,13 +69,37 @@ class HistoricalBackfillTests(unittest.TestCase):
                     folio.backfill_history(path, date(2020, 1, 1), date(2020, 1, 31),
                                            "private-test-key", parse_limit=0, recheck_limit=0)
             self.assertEqual(failure.exception.code, "PAGE_IDENTITY")
-            with patch.object(folio, "dart_json", return_value=page([row(rcept_dt="20200107")])):
+            with patch.object(folio, "dart_json", return_value=page([row(rcept_dt="20201340")])):
                 with self.assertRaises(folio.HistoricalCollectionError) as failure:
                     folio.backfill_history(path, date(2020, 1, 1), date(2020, 1, 31),
                                            "private-test-key", parse_limit=0, recheck_limit=0)
             self.assertEqual((failure.exception.code, failure.exception.page_no, failure.exception.row_index),
                              ("NPS_DATE", 1, 1))
             self.assertIsNone(folio.read_json(path)["historical_backfill"])
+
+    def test_official_listing_date_can_differ_from_receipt_number_prefix(self):
+        initial = state()
+        self.assertTrue(folio.apply_listing_row(initial, row(rcept_dt="20200107"), historical=True))
+        receipt = initial["receipts"][OLD]
+        self.assertEqual(receipt["receipt_date"], "2020-01-07")
+        self.assertEqual(receipt["listing_receipt_date"], "2020-01-07")
+        self.assertTrue(receipt["receipt_prefix_date_mismatch"])
+        self.assertEqual(initial["unresolved"][OLD], "needs_filing_parse")
+
+        initial["receipts"]["20200107000002"] = {"receipt_no": "20200107000002",
+            "receipt_date": "2020-01-06", "corp_code": CORP, "stock_code": CODE,
+            "quantity": "90", "company_ownership_percent": "6", "evidence": "dart_document"}
+        initial["receipts"][OLD].update(quantity="80", company_ownership_percent="5.7",
+                                         evidence="dart_document")
+        for no in (OLD, "20200107000002"):
+            receipt = initial["receipts"][no]
+            initial["events"][no] = {"receipt_no": no, "receipt_date": receipt["receipt_date"],
+                "corp_code": CORP, "stock_code": CODE, "kind": "other", "correction_of": None,
+                "quantity": receipt["quantity"], "company_ownership_percent": receipt["company_ownership_percent"],
+                "source": "dart_document"}
+        folio.classify_events(initial)
+        self.assertEqual(initial["events"]["20200107000002"]["kind"], "new-report")
+        self.assertEqual(initial["events"][OLD]["kind"], "decrease")
 
     def test_conflicting_imported_date_is_not_parsed_or_published_as_dart_fact(self):
         initial = state()

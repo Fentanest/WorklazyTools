@@ -644,7 +644,7 @@ def apply_listing_row(state, row, *, historical=False):
     if not RECEIPT.fullmatch(no) or not CORP.fullmatch(corp):
         raise RuntimeError("DART NPS row lacks identity")
     listed_date = norm_date(row.get("rcept_dt"))
-    if listed_date is None or listed_date != norm_date(no[:8]):
+    if listed_date is None:
         raise RuntimeError("DART NPS listing date inconsistent")
     existing = state["receipts"].get(no)
     newly_discovered = existing is None
@@ -688,6 +688,8 @@ def apply_listing_row(state, row, *, historical=False):
     existing.update(report_name=report_name, remarks=remarks, is_correction=correction,
                     correction_of=None, later_correction_flag=superseded, withdrawn_flag=withdrawn,
                     listing_receipt_date=listed_date)
+    if listed_date != norm_date(no[:8]):
+        existing["receipt_prefix_date_mismatch"] = True
     if not existing.get("receipt_date"):
         existing["receipt_date"] = listed_date
     if historical:
@@ -818,7 +820,7 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
 
 
 def classify_events(state):
-    """Use the preceding verified receipt for each issuer, independent of parse order."""
+    """Compare with the preceding recorded issuer filing in date and receipt order."""
     by_corp = {}
     for receipt in state["receipts"].values():
         corp = receipt.get("corp_code")
@@ -827,7 +829,8 @@ def classify_events(state):
             by_corp.setdefault(corp, []).append(receipt)
     for corp, receipts in by_corp.items():
         previous = None
-        for receipt in sorted(receipts, key=lambda item: item["receipt_no"]):
+        for receipt in sorted(receipts, key=lambda item: (item.get("listing_receipt_date") or
+                                                       item.get("receipt_date") or "", item["receipt_no"])):
             no = receipt["receipt_no"]
             if state.get("unresolved", {}).get(no) == "receipt_date_conflict":
                 continue
