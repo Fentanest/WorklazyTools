@@ -610,7 +610,10 @@ def parse_filing_document(payload: bytes):
     def row_cell(code):
         found = re.search(rf'ACODE="{re.escape(code)}"[^>]*>(.*?)</T[EUD]>', current_row, re.I | re.S)
         return html.unescape(re.sub(r"<[^>]+>", " ", found.group(1))).strip() if found else None
-    row_date_text = row_cell("THS_IFR")
+    row_cells = [html.unescape(re.sub(r"<[^>]+>", " ", match.group(1))).strip()
+                 for match in re.finditer(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", current_row, re.I | re.S)]
+    row_date_text = (row_cells[1] if len(row_cells) >= 3 and row_cells[0] == "이번보고서"
+                     and nps_filer(row_cell("THS_IFR")) else None)
     row_parts = re.fullmatch(r"\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*", row_date_text or "")
     row_date = parsed_date(row_parts.groups()) if row_parts else None
     row_quantity = dec(row_cell("THS_STK_CNT"))

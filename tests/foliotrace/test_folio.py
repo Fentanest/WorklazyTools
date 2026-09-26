@@ -71,8 +71,8 @@ class MigrationTests(unittest.TestCase):
                '보고서작성기준일 : 2026년 09월 07일</COVER>'
                '<TE ACODE="RPT_RSP_NM">국민연금공단</TE>'
                '<TE ACODE="SUM_TMT_CNT">100</TE><TE ACODE="SUM_TMT_RT">5.05</TE>'
-               '<TR><TH>다른표</TH><TE ACODE="THS_IFR">-</TE></TR>'
-               '<TR><TH>이번보고서</TH><TE ACODE="THS_IFR">2026년 09월 07일</TE>'
+               '<TR><TH>다른표</TH><TE>2009년 02월 04일</TE><TE ACODE="THS_IFR">국민연금공단</TE></TR>'
+               '<TR><TH>이번보고서</TH><TE>2026년 09월 07일</TE><TE ACODE="THS_IFR">국민연금공단</TE>'
                '<TE ACODE="THS_STK_CNT">100</TE><TE ACODE="THS_STK_RT">5.05</TE>'
                '<TE ACODE="THS_CMT_CNT">100</TE><TE ACODE="THS_CMT_RT">5.05</TE>'
                '<TE ACODE="THS_STK_CT">1980</TE></TR></ROOT>')
@@ -82,8 +82,11 @@ class MigrationTests(unittest.TestCase):
         parsed = folio.parse_filing_document(output.getvalue())
         self.assertEqual(parsed['holding_date'], '2026-09-07')
         self.assertEqual(parsed['basis_date_evidence'], 'dart_current_report_row')
-        self.assertTrue(all(value is True for key, value in parsed['basis_diagnostic'].items()
-                            if key != 'cover_dates'))
+        self.assertTrue(all(parsed['basis_diagnostic'][key] for key in (
+            'row_date_valid', 'row_quantity_present', 'row_ratio_present',
+            'quantity_matches_summary', 'ratio_matches_summary', 'cover_matches_row')))
+        self.assertEqual(parsed['basis_diagnostic']['current_row_count'], 1)
+        self.assertEqual(parsed['basis_diagnostic']['row_date_text'], '2026년 09월 07일')
         self.assertEqual(parsed['source_ratio_columns']['issued_voting_shares'], '1980')
         self.assertRegex(parsed['basis_row_sha256'], r'^[a-f0-9]{64}$')
         scaled = io.BytesIO()
@@ -94,7 +97,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(folio.parse_filing_document(scaled.getvalue())['holding_date'], '2026-09-07')
         unknown = io.BytesIO()
         with zipfile.ZipFile(unknown, 'w') as archive:
-            archive.writestr('report.xml', xml.replace('2026년 09월 07일</TE>', '2026년 09월 08일</TE>').encode())
+            archive.writestr('report.xml', xml.replace('<TE>2026년 09월 07일</TE>', '<TE>2026년 09월 08일</TE>').encode())
         mismatched = folio.parse_filing_document(unknown.getvalue())
         self.assertIsNone(mismatched['holding_date'])
         self.assertFalse(mismatched['basis_diagnostic']['cover_matches_row'])
