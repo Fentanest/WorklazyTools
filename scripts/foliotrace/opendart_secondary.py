@@ -715,6 +715,62 @@ def _prune_source_cache(state: dict, ledger: dict) -> int:
     return len(pruned)
 
 
+def _rehydrate_locked(ledger: dict, directory: Path, limit: int) -> list:
+    """Move stale-parser archived rows out of shards into a return list.
+
+    Months without moved rows are left byte-identical. Shard rewrites happen
+    before the caller persists the manifest/queue update; superseded files are
+    swept only after that commit.
+    """
+    manifest = ledger.get("archive_manifest", {})
+    if not isinstance(manifest, dict):
+        raise ArchiveIntegrityError("UNKNOWN_MANIFEST")
+    current = secondary.SOURCE_PARSER_VERSION
+    moved: list = []
+    seen = set(ledger.get("queue", {}))
+    cache: dict = {}
+    for month in sorted(manifest):
+        if len(moved) >= limit:
+            break
+        stored = _load_archive_month(ledger, directory, month, cache)
+        keep: dict = {}
+        month_moved = 0
+        for no in sorted(stored):
+            row = stored[no]
+            if len(moved) < limit and row.get("parser_version") != current and no not in seen:
+                seen.add(no)
+                moved.append(row)
+                month_moved += 1
+            else:
+                keep[no] = row
+        if not month_moved:
+            continue
+        ordered = sorted(keep.values(), key=lambda entry: entry["receipt_no"])
+        records = []
+        for offset in range(0, len(ordered), ARCHIVE_SHARD_ROWS):
+            records.append(_write_content_shard(
+                directory, month, ordered[offset:offset + ARCHIVE_SHARD_ROWS]))
+        manifest[month] = records
+        if not records:
+            del manifest[month]
+    return moved
+
+
+def _apply_rehydrated(ledger: dict, moved: list) -> None:
+    for row in moved:
+        entry = dict(row)
+        entry["source_attempt_count"] = 0
+        entry["last_source_attempt_on"] = None
+        ledger["queue"][row["receipt_no"]] = entry
+        _record_history(entry, "rehydrated_for_parser_upgrade")
+
+
+def _remaining_archived(ledger: dict) -> int:
+    return sum(entry.get("count", 0) for months in ledger.get("archive_manifest", {}).values()
+               if isinstance(months, list) for entry in months
+               if isinstance(entry, dict))
+
+
 def rehydrate_archive(state_path: Path, *, limit: int = 100,
                       read_state=None, write_state=None,
                       archive_dir: Path | None = None) -> dict:
@@ -733,46 +789,18 @@ def rehydrate_archive(state_path: Path, *, limit: int = 100,
     ledger = state.get(LEDGER_KEY)
     if ledger is None:
         raise ValueError("opendart secondary ledger missing")
-    current = secondary.SOURCE_PARSER_VERSION
-    manifest = ledger.get("archive_manifest", {})
-    if not isinstance(manifest, dict):
-        raise ArchiveIntegrityError("UNKNOWN_MANIFEST")
-    moved: list = []
-    seen = set(ledger.get("queue", {}))
-    cache: dict = {}
-    for month in sorted(manifest):
-        if len(moved) >= limit:
-            break
-        stored = _load_archive_month(ledger, directory, month, cache)
-        keep: dict = {}
-        for no in sorted(stored):
-            row = stored[no]
-            if len(moved) < limit and row.get("parser_version") != current and no not in seen:
-                seen.add(no)
-                moved.append(row)
-            else:
-                keep[no] = row
-        ordered = sorted(keep.values(), key=lambda entry: entry["receipt_no"])
-        records = []
-        for offset in range(0, len(ordered), ARCHIVE_SHARD_ROWS):
-            records.append(_write_content_shard(
-                directory, month, ordered[offset:offset + ARCHIVE_SHARD_ROWS]))
-        manifest[month] = records
-        if not records:
-            del manifest[month]
-    for row in moved:
-        entry = dict(row)
-        entry["source_attempt_count"] = 0
-        entry["last_source_attempt_on"] = None
-        ledger["queue"][row["receipt_no"]] = entry
-        _record_history(entry, "rehydrated_for_parser_upgrade")
-    remaining = sum(entry.get("count", 0) for months in manifest.values()
-                    if isinstance(months, list) for entry in months)
+    moved = _rehydrate_locked(ledger, directory, limit)
+    if not moved:
+        return {"rehydrated": 0, "remaining_archived": _remaining_archived(ledger),
+                "shards": sum(len(months) for months in ledger.get("archive_manifest", {}).values()
+                              if isinstance(months, list)),
+                "swept_unreferenced": 0}
+    _apply_rehydrated(ledger, moved)
     state["revision"] += 1
     write_state(state_path, state)
-    swept = _sweep_unreferenced(directory, manifest)
-    return {"rehydrated": len(moved), "remaining_archived": remaining,
-            "shards": sum(len(months) for months in manifest.values()
+    swept = _sweep_unreferenced(directory, ledger.get("archive_manifest", {}))
+    return {"rehydrated": len(moved), "remaining_archived": _remaining_archived(ledger),
+            "shards": sum(len(months) for months in ledger.get("archive_manifest", {}).values()
                           if isinstance(months, list)),
             "swept_unreferenced": swept}
 
@@ -782,6 +810,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                             review_limit: int = 20, max_pending: int = 5000,
                             overlap_days: int = 0,
                             max_queue_entries: int = DEFAULT_MAX_QUEUE_ENTRIES,
+                            auto_rehydrate_limit: int = 0,
                             fetch_list=fetch_list_page,
                             fetch_document=secondary.fetch_source_document,
                             read_state=None, write_state=None, key: str = "") -> dict:
@@ -791,6 +820,11 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     ``secondary_source_cache``, and the ``opendart-secondary-archive/`` shard
     directory next to the state file are touched; full-text/direct/early
     cursors and the receipts/holdings/events ledgers are never modified here.
+
+    ``auto_rehydrate_limit`` pulls that many stale archived rows back into the
+    active queue first, limited further by free queue capacity, so scheduled
+    runs drain parser-upgrade backlog while the same run keeps listing and
+    reviewing. With a current parser version nothing moves.
     """
     if read_state is None or write_state is None:
         raise ValueError("state IO required")
@@ -798,7 +832,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         raise ValueError("DART_API_KEY unavailable")
     if (start > end or start < EARLIEST_START or max_listing_pages < 1 or max_windows < 1
             or not 0 <= review_limit <= 300 or max_pending < 1 or not 0 <= overlap_days <= 31
-            or max_queue_entries < 1):
+            or max_queue_entries < 1 or not 0 <= auto_rehydrate_limit <= 20000):
         raise ValueError("invalid opendart secondary bounds")
     state = read_state(state_path)
     ledger = state.get(LEDGER_KEY)
@@ -822,6 +856,19 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     ledger.setdefault("queue", {})
     ledger.setdefault("positives", {})
     ledger.setdefault("archive_manifest", {})
+    auto_rehydrated = 0
+    if auto_rehydrate_limit:
+        room = max_queue_entries - len(ledger["queue"])
+        if room > 0:
+            moved = _rehydrate_locked(
+                ledger, archive_dir_for(state_path), min(auto_rehydrate_limit, room))
+            if moved:
+                _apply_rehydrated(ledger, moved)
+                auto_rehydrated = len(moved)
+                state["revision"] += 1
+                write_state(state_path, state)
+                _sweep_unreferenced(archive_dir_for(state_path),
+                                    ledger.get("archive_manifest", {}))
     forward = date.fromisoformat(ledger["next_date"])
     if not start <= forward <= end + timedelta(days=1):
         raise ValueError("opendart secondary cursor inconsistent")
@@ -1062,6 +1109,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
             "archived_this_run": archive["archived"], "archived_total": archived_total,
             "archived_hits": archive["hits"], "archived_requeued": requeued,
             "archived_stale": archived_stale,
+            "auto_rehydrated": auto_rehydrated,
             "archive_orphans": _count_orphan_shards(ledger, archive["dir"]),
             "swept_unreferenced": archive["swept"],
             "cache_pruned": cache_pruned,

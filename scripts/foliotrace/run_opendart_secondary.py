@@ -37,6 +37,7 @@ def main() -> int:
     parser.add_argument("--max-queue-entries", type=int, default=20000)
     parser.add_argument("--overlap-days", type=int, default=0)
     parser.add_argument("--rehydrate-limit", type=int, default=0)
+    parser.add_argument("--auto-rehydrate-limit", type=int, default=0)
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
     target = args.end
@@ -57,17 +58,19 @@ def main() -> int:
         if origin_archive.is_dir():
             shutil.copytree(origin_archive, opendart_secondary.archive_dir_for(state_path))
     try:
+        replay = None
         if args.rehydrate_limit:
             replay = opendart_secondary.rehydrate_archive(
                 state_path, limit=args.rehydrate_limit,
                 read_state=folio.read_json, write_state=folio.write_json)
-            print(json.dumps({"validate_only": args.validate_only, **replay}, sort_keys=True))
-            return 0
+            print(json.dumps({"validate_only": args.validate_only, "replay": replay},
+                             sort_keys=True))
         result = opendart_secondary.scan_opendart_secondary(
             state_path, args.start, target,
             max_listing_pages=args.max_listing_pages, max_windows=args.max_windows,
             review_limit=args.review_limit, max_pending=args.max_pending,
             max_queue_entries=args.max_queue_entries,
+            auto_rehydrate_limit=args.auto_rehydrate_limit,
             overlap_days=args.overlap_days,
             read_state=folio.read_json, write_state=folio.write_json,
             key=os.environ.get("DART_API_KEY", ""))

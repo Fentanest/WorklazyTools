@@ -35,6 +35,11 @@ on:
         required: true
         default: '0'
         type: string
+      auto_rehydrate_limit:
+        description: Stale archived rows rehydrated automatically each run (0 disables)
+        required: true
+        default: '50'
+        type: string
       validate_only:
         description: Exercise the lane without writing the data branch
         required: true
@@ -80,13 +85,14 @@ jobs:
           OVERLAP_DAYS: ${{ inputs.overlap_days }}
           MAX_QUEUE_ENTRIES: ${{ inputs.max_queue_entries }}
           REHYDRATE_LIMIT: ${{ inputs.rehydrate_limit }}
+          AUTO_REHYDRATE_LIMIT: ${{ inputs.auto_rehydrate_limit }}
           VALIDATE_ONLY: ${{ inputs.validate_only }}
         run: |
           args=(--state foliotrace-state/state.json)
           if [ "$EVENT_NAME" = schedule ]; then
-            args+=(--overlap-days 3 --max-listing-pages 100 --max-windows 15 --review-limit 20 --max-queue-entries 20000)
+            args+=(--overlap-days 3 --max-listing-pages 100 --max-windows 15 --review-limit 20 --max-queue-entries 20000 --auto-rehydrate-limit 50)
           else
-            args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT" --max-queue-entries "$MAX_QUEUE_ENTRIES")
+            args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT" --max-queue-entries "$MAX_QUEUE_ENTRIES" --auto-rehydrate-limit "$AUTO_REHYDRATE_LIMIT")
           fi
           if [ -n "$REHYDRATE_LIMIT" ] && [ "$REHYDRATE_LIMIT" != 0 ]; then args+=(--rehydrate-limit "$REHYDRATE_LIMIT"); fi
           if [ "$VALIDATE_ONLY" = true ]; then args+=(--validate-only); fi
