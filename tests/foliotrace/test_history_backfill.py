@@ -42,6 +42,41 @@ def page(rows):
 
 
 class HistoricalBackfillTests(unittest.TestCase):
+    def test_first_window_failure_reports_only_safe_stage_and_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            folio.write_json(path, state())
+            with patch.object(folio, "dart_json", side_effect=RuntimeError("DART status 021")) as request:
+                with self.assertRaises(folio.HistoricalCollectionError) as failure:
+                    folio.backfill_history(path, date(2009, 1, 1), date(2009, 3, 21),
+                                           "private-test-key", parse_limit=0, recheck_limit=0)
+            self.assertEqual(failure.exception.code, "DART_STATUS_021")
+            self.assertEqual((failure.exception.start, failure.exception.end, failure.exception.page_no),
+                             ("2009-01-01", "2009-03-21", 1))
+            self.assertEqual((request.call_args.args[1]["sort"], request.call_args.args[1]["sort_mth"]),
+                             ("date", "asc"))
+            self.assertNotIn("private-test-key", str(failure.exception))
+            self.assertIsNone(folio.read_json(path)["historical_backfill"])
+
+    def test_listing_page_and_nps_row_failures_have_distinct_safe_codes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            folio.write_json(path, state())
+            malformed = {"status": "000", "page_no": "2", "total_page": "1",
+                         "total_count": "1", "list": [row()]}
+            with patch.object(folio, "dart_json", return_value=malformed):
+                with self.assertRaises(folio.HistoricalCollectionError) as failure:
+                    folio.backfill_history(path, date(2020, 1, 1), date(2020, 1, 31),
+                                           "private-test-key", parse_limit=0, recheck_limit=0)
+            self.assertEqual(failure.exception.code, "PAGE_IDENTITY")
+            with patch.object(folio, "dart_json", return_value=page([row(rcept_dt="20200107")])):
+                with self.assertRaises(folio.HistoricalCollectionError) as failure:
+                    folio.backfill_history(path, date(2020, 1, 1), date(2020, 1, 31),
+                                           "private-test-key", parse_limit=0, recheck_limit=0)
+            self.assertEqual((failure.exception.code, failure.exception.page_no, failure.exception.row_index),
+                             ("NPS_DATE", 1, 1))
+            self.assertIsNone(folio.read_json(path)["historical_backfill"])
+
     def test_conflicting_imported_date_is_not_parsed_or_published_as_dart_fact(self):
         initial = state()
         initial["receipts"][OLD] = {"receipt_no": OLD, "receipt_date": "2019-12-31",

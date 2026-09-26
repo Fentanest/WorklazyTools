@@ -44,6 +44,36 @@ CORRECTION_PREFIXES = ("[기재정정]", "[첨부정정]", "[첨부추가]", "[�
                        "[정정명령부과]", "[정정제출요구]", "[변경등록]", "정정")
 
 
+class HistoricalCollectionError(RuntimeError):
+    def __init__(self, code, start, end, page_no=None, row_index=None):
+        super().__init__(code)
+        self.code = code
+        self.start = start.isoformat()
+        self.end = end.isoformat()
+        self.page_no = page_no
+        self.row_index = row_index
+
+
+def historical_error_code(exc, stage):
+    message = str(exc)
+    status = re.fullmatch(r"DART status ([0-9]{3})", message)
+    if status:
+        return f"DART_STATUS_{status.group(1)}"
+    known = {
+        "DART historical pagination metadata inconsistent": "PAGINATION_METADATA",
+        "DART pagination metadata inconsistent": "PAGINATION_METADATA",
+        "DART listing page identity inconsistent": "PAGE_IDENTITY",
+        "DART listing receipt coverage inconsistent": "RECEIPT_COVERAGE",
+        "DART no-data response inconsistent": "NO_DATA_SHAPE",
+        "DART listing page failed": "PAGE_STATUS",
+        "DART NPS listing date inconsistent": "NPS_DATE",
+        "DART NPS row lacks identity": "NPS_IDENTITY",
+        "DART receipt corp conflict": "NPS_CORP_CONFLICT",
+        "DART transport failure": "DART_TRANSPORT",
+    }
+    return known.get(message, f"{stage}_UNEXPECTED")
+
+
 def nps_filer(value):
     return bool(NPS_FILER.match(str(value or "").strip()))
 
@@ -1098,18 +1128,21 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
         while True:
             params = {"bgn_de": cursor.strftime("%Y%m%d"), "end_de": last.strftime("%Y%m%d"),
                       "pblntf_ty": "D", "pblntf_detail_ty": "D001", "last_reprt_at": "N",
-                      "page_count": 100}
-            first = dart_json("list.json", {**params, "page_no": 1}, key)
+                      "sort": "date", "sort_mth": "asc", "page_count": 100}
+            try:
+                first = dart_json("list.json", {**params, "page_no": 1}, key)
+            except Exception as exc:
+                raise HistoricalCollectionError(historical_error_code(exc, "FIRST_PAGE"), cursor, last, 1) from None
             requests += 1
             if first.get("status") == "013":
                 pages = [first]
                 break
             try:
                 page_count = int(first["total_page"])
-            except (KeyError, TypeError, ValueError) as exc:
-                raise RuntimeError("DART historical pagination metadata inconsistent") from exc
+            except (KeyError, TypeError, ValueError):
+                raise HistoricalCollectionError("PAGINATION_METADATA", cursor, last, 1) from None
             if page_count < 1 or page_count > 10_000:
-                raise RuntimeError("DART historical pagination metadata inconsistent")
+                raise HistoricalCollectionError("PAGINATION_METADATA", cursor, last, 1)
             if page_count > max_listing_pages:
                 if last == cursor:
                     required_pages = page_count
@@ -1125,21 +1158,31 @@ def backfill_history(state_path: Path, start: date, end: date, key: str, *,
                 break  # This window fits a fresh run; do not commit a partial one.
             pages = [first]
             for number in range(2, page_count + 1):
-                pages.append(dart_json("list.json", {**params, "page_no": number}, key))
+                try:
+                    pages.append(dart_json("list.json", {**params, "page_no": number}, key))
+                except Exception as exc:
+                    raise HistoricalCollectionError(historical_error_code(exc, "LATER_PAGE"), cursor, last, number) from None
                 requests += 1
             break
         if pages is None:
             break
-        validate_listing_pages(pages)
+        try:
+            validate_listing_pages(pages)
+        except Exception as exc:
+            raise HistoricalCollectionError(historical_error_code(exc, "PAGE_VALIDATION"), cursor, last) from None
         window_nps = 0
-        for page in pages:
-            for row in page.get("list") or []:
+        for page_number, page in enumerate(pages, 1):
+            for row_index, row in enumerate(page.get("list") or [], 1):
                 if not nps_large_holding_listing(row):
                     continue
                 no = str(row.get("rcept_no") or "")
                 if no not in state["receipts"]:
                     new_receipts += 1
-                apply_listing_row(state, row, historical=True)
+                try:
+                    apply_listing_row(state, row, historical=True)
+                except Exception as exc:
+                    raise HistoricalCollectionError(historical_error_code(exc, "NPS_ROW"), cursor, last,
+                                                    page_number, row_index) from None
                 window_nps += 1
         listed_nps += window_nps
         completed_days = (last - cursor).days + 1
@@ -1456,7 +1499,13 @@ def main():
             return 1
     except Exception as exc:
         error = {"error": type(exc).__name__}
-        if args.command != "backfill-history":
+        if args.command == "backfill-history" and isinstance(exc, HistoricalCollectionError):
+            error.update(code=exc.code, window_start=exc.start, window_end=exc.end)
+            if exc.page_no is not None:
+                error["page_no"] = exc.page_no
+            if exc.row_index is not None:
+                error["row_index"] = exc.row_index
+        elif args.command != "backfill-history":
             error["message"] = str(exc)
         print(json.dumps(error, ensure_ascii=False), file=sys.stderr)
         return 1
