@@ -147,6 +147,31 @@ class SecondaryBackfillTests(unittest.TestCase):
                 fetch_document=document)
             self.assertEqual(called, [NOISE[0], other[0]])
 
+    def test_failing_candidate_does_not_starve_noncandidate_at_limit_one(self):
+        day = date(2006, 2, 8)
+        answers = {secondary.TERMS[0]: result_page([POSCO, NOISE]),
+                   secondary.TERMS[1]: result_page([]), secondary.TERMS[2]: result_page([])}
+        called = []
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, folio.empty_state())
+            def document(no, _key):
+                called.append(no)
+                return b'<result>020</result>'
+            secondary.scan_secondary(path, day, day, fetch=lambda term, *_: answers[term],
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=1,
+                fetch_document=document)
+            saved = folio.read_json(path)
+            self.assertEqual(called, [POSCO[0]])
+            saved['secondary_backfill']['candidates'][f'{POSCO[0]}:{POSCO[1]}']['last_source_attempt_on'] = '2006-02-08'
+            folio.write_json(path, saved)
+            second = secondary.scan_secondary(path, day, day, fetch=lambda *_: self.fail('range refetched'),
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=1,
+                fetch_document=document)
+            self.assertEqual(called, [POSCO[0], NOISE[0]])
+            self.assertEqual(second['noncandidate_review_attempts'], 1)
+            self.assertEqual(make_snapshot(folio.read_json(path), {})['secondaryCoverage']['noncandidateUnreviewedCount'], 1)
+
     def test_source_review_is_bounded_and_never_promotes_holdings(self):
         day = date(2006, 2, 8)
         buffer = io.BytesIO()

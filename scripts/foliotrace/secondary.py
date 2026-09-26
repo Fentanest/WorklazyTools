@@ -399,48 +399,42 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 if check["status"] != "source_review_pending":
                     cache[receipt_no] = check
             return check
-        pending = sorted(ledger["candidates"].values(),
-            key=lambda item: (item.get("source_attempt_count", 0), item["filing_date"], item["receipt_no"]))
-        for item in pending:
-            if reviewed >= review_limit:
-                break
-            if (item.get("review_status") != "source_review_pending"
-                    or item.get("last_source_attempt_on") == today):
-                continue
-            reviewed += 1
-            item["source_attempt_count"] = int(item.get("source_attempt_count") or 0) + 1
-            item["last_source_attempt_on"] = today
-            check = check_source(item["receipt_no"])
-            item.update(check)
-            item["review_status"] = check["status"]
-            context_candidates += int(check["status"] == "source_context_review_pending")
-            if reviewed % 10 == 0:
-                state["revision"] += 1
-                write_state(state_path, state)
         noncandidate_reviews = ledger.setdefault("noncandidate_reviews", {})
-        queue_keys = set()
+        queue_dates = {}
         for window in ledger["coverage"]:
-            queue_keys.update(decode_noncandidate_keys(window))
-        for document_key in sorted(queue_keys, key=lambda item:
-                                   (int(noncandidate_reviews.get(item, {}).get("source_attempt_count") or 0), item)):
+            for document_key in decode_noncandidate_keys(window):
+                queue_dates.setdefault(document_key, window["from"])
+        pending = []
+        for document_key, item in ledger["candidates"].items():
+            if (item.get("review_status") == "source_review_pending" and
+                    item.get("last_source_attempt_on") != today):
+                pending.append((int(item.get("source_attempt_count") or 0),
+                                item["filing_date"], 0, document_key, item))
+        for document_key in queue_dates.keys() - ledger["candidates"].keys():
+            previous = noncandidate_reviews.get(document_key, {})
+            if (previous.get("review_status") in (None, "source_review_pending") and
+                    previous.get("last_source_attempt_on") != today):
+                pending.append((int(previous.get("source_attempt_count") or 0),
+                                queue_dates[document_key], 1, document_key, previous))
+        for _, _, priority, document_key, item in sorted(pending):
             if reviewed >= review_limit:
                 break
-            if document_key in ledger["candidates"]:
-                continue
-            previous = noncandidate_reviews.get(document_key, {})
-            if (previous.get("review_status") not in (None, "source_review_pending") or
-                    previous.get("last_source_attempt_on") == today):
-                continue
             receipt_no = document_key.split(":", 1)[0]
             check = check_source(receipt_no)
-            noncandidate_reviews[document_key] = {
-                "review_status": check["status"],
-                "last_source_attempt_on": today,
-                "source_attempt_count": int(previous.get("source_attempt_count") or 0) + 1,
-                "source_sha256": check.get("source_sha256"),
-            }
+            if priority == 0:
+                item["source_attempt_count"] = int(item.get("source_attempt_count") or 0) + 1
+                item["last_source_attempt_on"] = today
+                item.update(check)
+                item["review_status"] = check["status"]
+            else:
+                noncandidate_reviews[document_key] = {
+                    "review_status": check["status"],
+                    "last_source_attempt_on": today,
+                    "source_attempt_count": int(item.get("source_attempt_count") or 0) + 1,
+                    "source_sha256": check.get("source_sha256"),
+                }
+                noncandidate_reviewed += 1
             reviewed += 1
-            noncandidate_reviewed += 1
             context_candidates += int(check["status"] == "source_context_review_pending")
             if reviewed % 10 == 0:
                 state["revision"] += 1
