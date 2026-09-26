@@ -448,7 +448,7 @@ class OpendartListPageTests(unittest.TestCase):
                 self.assertEqual(request.call_count, 1)
                 self.assertNotIn("test-key", str(failure.exception))
 
-    def test_overlap_budget_leaves_forward_cursor_advancing(self):
+    def test_forward_first_advances_under_tight_budget(self):
         def fetch(params):
             bgn, end, page = params["bgn_de"], params["end_de"], params["page_no"]
             first = date(int(bgn[:4]), int(bgn[4:6]), int(bgn[6:8]))
@@ -483,8 +483,7 @@ class OpendartListPageTests(unittest.TestCase):
                 "max_window_days": 1, "overlap_next_date": None,
                 "coverage": [{"from": f"2006010{d}", "to": f"2006010{d}", "complete": True}
                              for d in range(1, 5)],
-                "overlap_coverage": [], "queue": queue, "positives": {},
-                "evicted_count": 0, "evicted_digest": ""}
+                "overlap_coverage": [], "queue": queue, "positives": {}}
             folio.write_json(path, state)
             cursors = []
             for _ in range(5):
@@ -494,14 +493,77 @@ class OpendartListPageTests(unittest.TestCase):
                     overlap_days=3, fetch_list=fetch,
                     read_state=folio.read_json, write_state=folio.write_json)
                 cursors.append(result["next_date"])
-            # The forward cursor must escape the 2006-01-05 stall within 5 runs.
+            # Forward runs first, so the cursor escapes 2006-01-05 even though
+            # one day already costs the whole 2-page budget.
             self.assertGreater(cursors[-1], "2006-01-05")
             self.assertEqual(list(sorted(cursors)), cursors)
             saved = folio.read_json(path)
             ledger = saved["opendart_secondary_backfill"]
-            self.assertGreaterEqual(len(ledger["overlap_coverage"]), 3)
             self.assertGreater(len(ledger["coverage"]), 4)
-            self.assertIsNotNone(ledger["overlap_next_date"])
+            self.assertEqual(saved["receipts"], {})
+
+    def test_completed_overlap_starts_new_cycle_and_sees_late_rows(self):
+        from datetime import timedelta
+        seen = {"late": False}
+
+        def fetch(params):
+            bgn, end, page = params["bgn_de"], params["end_de"], params["page_no"]
+            first = date(int(bgn[:4]), int(bgn[4:6]), int(bgn[6:8]))
+            last = date(int(end[:4]), int(end[4:6]), int(end[6:8]))
+            days = (last - first).days + 1
+            total, pages = 101 * days, 2 * days
+            rows = []
+            for day_offset in range(days):
+                tag = (first + timedelta(days=day_offset)).strftime("%Y%m%d")
+                for i in range(101):
+                    receipt_no = f"{tag}{i:06d}"
+                    rm = "유철" if (seen["late"] and tag == "20060109" and i == 0) else ""
+                    rows.append(row(receipt_no, tag, rm=rm))
+            span = rows[(page - 1) * 100:page * 100]
+            return list_page(span, total, page, pages)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            queue = {}
+            for day_number in range(1, 11):
+                tag = f"200601{day_number:02d}"
+                for i in range(101):
+                    no = f"{tag}{i:06d}"
+                    queue[no] = {"receipt_no": no, "rcept_dt": tag,
+                                 "source_status": "source_review_pending",
+                                 "parser_version": None, "source_attempt_count": 0,
+                                 "last_source_attempt_on": None, "source_sha256": None}
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-01-01",
+                "target_date": "2006-01-10", "next_date": "2006-01-11",
+                "max_window_days": 1, "overlap_next_date": None,
+                "coverage": [{"from": f"200601{d:02d}", "to": f"200601{d:02d}", "complete": True}
+                             for d in range(1, 11)],
+                "overlap_coverage": [], "queue": queue, "positives": {}}
+            folio.write_json(path, state)
+            calls, resets = [], []
+            for run in range(3):
+                if run == 1:
+                    seen["late"] = True
+                result = opendart_secondary.scan_opendart_secondary(
+                    path, date(2006, 1, 1), date(2006, 1, 10),
+                    max_listing_pages=10, max_windows=10, review_limit=0,
+                    overlap_days=3, fetch_list=fetch,
+                    read_state=folio.read_json, write_state=folio.write_json)
+                calls.append(result["listing_requests"])
+                resets.append(result["overlap_cycle_reset"])
+            # Every run lists a full bounded cycle; the lane never goes silent.
+            self.assertEqual(calls, [6, 6, 6])
+            self.assertEqual(resets, [False, True, True])
+            saved = folio.read_json(path)
+            ledger = saved["opendart_secondary_backfill"]
+            self.assertEqual(len(ledger["overlap_coverage"]), 9)
+            # The late combined-code row surfaced on the second cycle.
+            late_no = "20060109" + f"{0:06d}"
+            self.assertTrue(saved["opendart_secondary_backfill"]["queue"][late_no]["correction_hold"])
+            self.assertTrue(saved["opendart_secondary_backfill"]["queue"][late_no]["withdrawal_flag"])
             self.assertEqual(saved["receipts"], {})
 
     def test_stale_pair_with_limit_one_stays_source_pending(self):
@@ -526,7 +588,6 @@ class OpendartListPageTests(unittest.TestCase):
                 "overlap_next_date": "2006-02-09",
                 "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
                 "overlap_coverage": [], "positives": {},
-                "evicted_count": 0, "evicted_digest": "",
                 "queue": {
                     no: {"receipt_no": no, "rcept_dt": tag,
                          "source_status": "source_mention_unverified",
@@ -598,8 +659,7 @@ class OpendartListPageTests(unittest.TestCase):
                                  "integration_required": "sol_holding_observation"},
                     steady_no: {"receipt_no": steady_no, "source_claims": [{"quantity": "1"}],
                                 "parser_version": "stale",
-                                "integration_required": "sol_holding_observation"}},
-                "evicted_count": 0, "evicted_digest": ""}
+                                "integration_required": "sol_holding_observation"}}}
             state["secondary_source_cache"] = {
                 no: {"status": "source_context_review_pending",
                      "parser_version": "stale", "source_sha256": "old"}
@@ -632,6 +692,9 @@ class OpendartListPageTests(unittest.TestCase):
         self.assertEqual(flags("사업보고서", "정"), (True, False))
         self.assertEqual(flags("사업보고서", "철"), (True, True))
         self.assertEqual(flags("사업보고서", "유"), (False, False))
+        self.assertEqual(flags("사업보고서", "유정"), (True, False))
+        self.assertEqual(flags("사업보고서", "유철"), (True, True))
+        self.assertEqual(flags("사업보고서", "취"), (True, False))
         self.assertEqual(flags("[기재정정]사업보고서", ""), (True, False))
         day = date(2006, 2, 8)
         tag = "20060208"
@@ -657,7 +720,7 @@ class OpendartListPageTests(unittest.TestCase):
                                "source_attempt_count": 1,
                                "last_source_attempt_on": None,
                                "source_sha256": "kept-sha", "source_history": []}},
-                "positives": {}, "evicted_count": 0, "evicted_digest": ""}
+                "positives": {}}
             folio.write_json(path, state)
             result = opendart_secondary.scan_opendart_secondary(
                 path, day, day, review_limit=0, overlap_days=3,
@@ -674,60 +737,117 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(item["source_sha256"], "kept-sha")
             self.assertEqual(item["parser_version"], secondary.SOURCE_PARSER_VERSION)
 
-    def test_queue_bound_evicts_oldest_terminal_negatives_only(self):
+    def test_listing_refresh_synchronizes_or_retracts_positives(self):
         day = date(2006, 2, 8)
         tag = "20060208"
         current = secondary.SOURCE_PARSER_VERSION
+        withdrawn_no, corrected_no = receipt(tag, 1), receipt(tag, 2)
 
-        def terminal(no, day_tag, held=False):
-            return {"receipt_no": no, "rcept_dt": day_tag,
-                    "source_status": "source_mention_unverified",
+        def positive_row(no, held=False):
+            return {"receipt_no": no, "corp_code": "00000001", "corp_name": "회사",
+                    "stock_code": "000000", "report_nm": "사업보고서", "rcept_dt": tag,
+                    "rm": "", "first_seen_from": tag, "first_seen_to": tag,
+                    "correction_hold": held, "withdrawal_flag": False,
+                    "source_status": "source_context_review_pending",
                     "parser_version": current, "source_attempt_count": 1,
                     "last_source_attempt_on": None, "source_sha256": f"sha-{no}",
-                    "correction_hold": held, "withdrawal_flag": False,
                     "source_history": []}
 
-        old = [receipt("20060207", i) for i in range(1, 4)]
-        held_no = receipt("20060207", 9)
-        positive_no, pending_no = receipt(tag, 50), receipt(tag, 51)
-        fresh = [receipt(tag, 60), receipt(tag, 61)]
-        payload = list_page([row(no, tag) for no in fresh], 2, 1, 1)
+        payload = list_page(
+            [row(withdrawn_no, tag, rm="유철"), row(corrected_no, tag, rm="유정")], 2, 1, 1)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             fresh_state(path)
             state = folio.read_json(path)
-            queue = {no: terminal(no, "20060207") for no in old}
-            queue[held_no] = terminal(held_no, "20060207", held=True)
-            queue[positive_no] = {**terminal(positive_no, tag),
-                                  "source_status": "source_context_review_pending"}
-            queue[pending_no] = {**terminal(pending_no, tag),
-                                 "source_status": "source_review_pending",
-                                 "parser_version": None, "source_sha256": None}
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
+                "target_date": "2006-02-08", "next_date": "2006-02-09",
+                "overlap_next_date": None,
+                "coverage": [{"from": "2006-02-08", "to": "2006-02-08", "complete": True}],
+                "overlap_coverage": [],
+                "queue": {withdrawn_no: positive_row(withdrawn_no),
+                          corrected_no: positive_row(corrected_no)},
+                "positives": {
+                    withdrawn_no: {"receipt_no": withdrawn_no, "correction_hold": False,
+                                   "withdrawal_flag": False, "relation": "holding_observation_pending",
+                                   "source_claims": [{"quantity": "7"}]},
+                    corrected_no: {"receipt_no": corrected_no, "correction_hold": False,
+                                   "withdrawal_flag": False, "relation": "holding_observation_pending",
+                                   "source_claims": [{"quantity": "8"}]}}}
+            folio.write_json(path, state)
+            # No source review on this run: the sync must come from listing alone.
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, overlap_days=3,
+                fetch_list=lambda _params: payload,
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(result["overlap_windows"], 1)
+            saved = folio.read_json(path)
+            ledger = saved["opendart_secondary_backfill"]
+            queue = ledger["queue"]
+            # Withdrawn filings lose their applied positive; the audit stays.
+            self.assertNotIn(withdrawn_no, ledger["positives"])
+            self.assertTrue(queue[withdrawn_no]["withdrawal_flag"])
+            self.assertTrue(any(entry.get("note") == "positive_retracted_withdrawal"
+                                for entry in queue[withdrawn_no]["source_history"]))
+            # New correction holds synchronize flags without dropping the record.
+            corrected = ledger["positives"][corrected_no]
+            self.assertTrue(corrected["correction_hold"])
+            self.assertFalse(corrected["withdrawal_flag"])
+            self.assertEqual(corrected["relation"], "correction_relation_unverified")
+            self.assertEqual(corrected["source_claims"], [{"quantity": "8"}])
+            self.assertTrue(any(entry.get("note") == "positive_eligibility_synchronized"
+                                for entry in queue[corrected_no]["source_history"]))
+            self.assertEqual(saved["receipts"], {})
+            self.assertEqual(saved["holdings"], {})
+
+    def test_queue_bound_reports_instead_of_dropping(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        current = secondary.SOURCE_PARSER_VERSION
+
+        def terminal(no, day_tag):
+            return {"receipt_no": no, "rcept_dt": day_tag,
+                    "source_status": "source_mention_unverified",
+                    "parser_version": current, "source_attempt_count": 1,
+                    "last_source_attempt_on": None, "source_sha256": f"sha-{no}",
+                    "correction_hold": False, "withdrawal_flag": False,
+                    "source_history": []}
+
+        pending = [receipt(tag, i) for i in range(1, 4)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            queue = {no: terminal(no, "20060207") for no in [receipt("20060207", 1)]}
+            for no in pending:
+                queue[no] = {**terminal(no, tag), "source_status": "source_review_pending",
+                             "parser_version": None, "source_sha256": None}
             state["opendart_secondary_backfill"] = {
                 "method": opendart_secondary.METHOD, "start_date": "2006-02-08",
                 "target_date": "2006-02-08", "next_date": "2006-02-08",
                 "overlap_next_date": None, "coverage": [], "overlap_coverage": [],
-                "queue": queue,
-                "positives": {positive_no: {"receipt_no": positive_no}},
-                "evicted_count": 0, "evicted_digest": ""}
+                "queue": queue, "positives": {}}
             folio.write_json(path, state)
+            # A cap of 1 with 4 queued rows (3 pending) must halt listing with
+            # an explicit bound status instead of pretending success or
+            # dropping pending and positive rows.
             result = opendart_secondary.scan_opendart_secondary(
-                path, day, day, review_limit=0, max_queue_entries=5,
-                fetch_list=lambda _params: payload,
+                path, day, day, review_limit=0, max_queue_entries=1,
+                fetch_list=lambda _params: self.fail("bound must stop listing"),
                 read_state=folio.read_json, write_state=folio.write_json)
-            # 6 retained + 2 new = 8 rows against a bound of 5: only the three
-            # oldest terminal negatives go, with explicit accounting.
-            self.assertEqual(result["evicted_count"], 3)
+            self.assertEqual(result["status"], "QUEUE_BOUND_EXCEEDED")
+            self.assertEqual(result["listing_requests"], 0)
             saved = folio.read_json(path)
             ledger = saved["opendart_secondary_backfill"]
-            self.assertEqual(ledger["evicted_count"], 3)
-            self.assertEqual(len(ledger["evicted_digest"]), 64)
-            remaining = set(ledger["queue"])
-            for no in old:
-                self.assertNotIn(no, remaining)
-            for no in (held_no, positive_no, pending_no, *fresh):
-                self.assertIn(no, remaining)
-            self.assertIn(positive_no, ledger["positives"])
+            self.assertEqual(len(ledger["queue"]), 4)
+            self.assertEqual(ledger["coverage"], [])
+            # Under a sufficient bound the same lane lists normally.
+            healthy = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=20000,
+                fetch_list=lambda _params: list_page([row(receipt(tag, 9), tag)], 1, 1, 1),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(healthy["new_receipts"], 1)
+            self.assertEqual(len(folio.read_json(path)["opendart_secondary_backfill"]["queue"]), 5)
 
 
 if __name__ == "__main__":
