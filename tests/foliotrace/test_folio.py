@@ -66,6 +66,62 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             folio.parse_filing_document(document("다른기관"))
 
+    def test_document_basis_uses_report_preparation_date_not_obligation_date(self):
+        xml = ('<ROOT><COVER>보고의무발생일 : 2026년 09월 06일 '
+               '보고서작성기준일 : 2026년 09월 07일</COVER>'
+               '<TE ACODE="RPT_RSP_NM">국민연금공단</TE>'
+               '<TE ACODE="SUM_TMT_CNT">100</TE><TE ACODE="SUM_TMT_RT">5.05</TE>'
+               '<TR><TH>이번보고서</TH><TE ACODE="THS_IFR">2026년 09월 07일</TE>'
+               '<TE ACODE="THS_STK_CNT">100</TE><TE ACODE="THS_STK_RT">5.05</TE>'
+               '<TE ACODE="THS_CMT_CNT">100</TE><TE ACODE="THS_CMT_RT">5.05</TE>'
+               '<TE ACODE="THS_STK_CT">1980</TE></TR></ROOT>')
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, 'w') as archive:
+            archive.writestr('report.xml', xml.encode())
+        parsed = folio.parse_filing_document(output.getvalue())
+        self.assertEqual(parsed['holding_date'], '2026-09-07')
+        self.assertEqual(parsed['basis_date_evidence'], 'dart_current_report_row')
+        self.assertEqual(parsed['source_ratio_columns']['issued_voting_shares'], '1980')
+        self.assertRegex(parsed['basis_row_sha256'], r'^[a-f0-9]{64}$')
+        unknown = io.BytesIO()
+        with zipfile.ZipFile(unknown, 'w') as archive:
+            archive.writestr('report.xml', xml.replace('2026년 09월 07일</TE>', '2026년 09월 08일</TE>').encode())
+        self.assertIsNone(folio.parse_filing_document(unknown.getvalue())['holding_date'])
+
+    def test_basis_recheck_prioritizes_current_and_quarantines_value_mismatch(self):
+        state = folio.empty_state()
+        corp = '00104856'
+        current, older = '20260908000302', '20090227000244'
+        for no, day, quantity in ((current, '2026-09-08', '100.0'), (older, '2009-02-27', '90')):
+            state['receipts'][no] = {'receipt_no': no, 'receipt_date': day, 'corp_code': corp,
+                'stock_code': '329180', 'quantity': quantity, 'company_ownership_percent': '5.05',
+                'evidence': 'legacy_history_fact' if no == current else 'dart_structured',
+                'listing_verified_at': '2026-09-26T00:00:00Z'}
+        state['holdings'][corp] = {'corp_code': corp, 'stock_code': '329180',
+            'receipt_no': current, 'receipt_date': '2026-09-08', 'holding_date': None,
+            'quantity': '100.0', 'company_ownership_percent': '5.05', 'evidence': 'legacy_import'}
+        called = []
+        def source(no, _key):
+            called.append(no)
+            return {'quantity': '100' if no == current else '95',
+                'company_ownership_percent': '5.05', 'holding_date': '2026-09-07' if no == current else '2009-02-04',
+                'xml_sha256': 'a' * 64, 'basis_row_sha256': 'b' * 64,
+                'source_ratio_columns': {'shares_etc_percent': '5.05'}}
+        result = folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=source)
+        self.assertEqual(called, [current, older])
+        self.assertEqual((result['verified'], result['value_conflicts']), (1, 1))
+        self.assertEqual(state['holdings'][corp]['holding_date'], '2026-09-07')
+        self.assertEqual(state['holdings'][corp]['evidence'], 'dart_document')
+        self.assertEqual(state['receipts'][current]['evidence'], 'dart_document')
+        self.assertEqual(state['receipts'][older]['basis_review_status'], 'source_value_conflict')
+        self.assertIsNone(state['receipts'][older].get('holding_date'))
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / 'state.json'
+            folio.write_json(state_path, state)
+            self.assertEqual(folio.read_json(state_path)['receipts'][current]['source_ratio_columns'],
+                             {'shares_etc_percent': '5.05'})
+        self.assertEqual(folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=lambda *_: self.fail('refetched'))['checked'], 0)
+
     def test_exact_voting_only_mapping_and_ambiguous_class(self):
         def table(extra="-"):
             cells = ["국민연금기금", "219-82-01593", "식별", "1,033,888", extra, "-", "-", "-", "-", "-", "-", "-", "1,033,888", "7.10"]

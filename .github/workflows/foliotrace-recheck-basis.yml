@@ -1,0 +1,55 @@
+name: Recheck FolioTrace direct report basis
+
+on:
+  workflow_dispatch:
+    inputs:
+      receipt:
+        description: Exact 14-digit public DART receipt
+        required: true
+        type: string
+      validate_only:
+        description: Inspect without writing normalized state
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  recheck:
+    if: github.ref == 'refs/heads/main' || inputs.validate_only
+    permissions:
+      contents: write
+    runs-on: [self-hosted, Linux, X64, '235']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: foliotrace-data
+          path: foliotrace-state
+          fetch-depth: 0
+      - name: Check source and data revisions
+        if: ${{ !inputs.validate_only }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          test -f foliotrace-state/state.json
+      - name: Recheck exact direct basis from OpenDART
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          RECEIPT: ${{ inputs.receipt }}
+        run: python3 scripts/foliotrace/folio.py recheck-basis --state foliotrace-state/state.json --receipt "$RECEIPT"
+      - name: Persist verified basis state
+        if: ${{ !inputs.validate_only }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          expected_data=$(git -C foliotrace-state rev-parse HEAD)
+          test "$(git ls-remote origin refs/heads/foliotrace-data | cut -f1)" = "$expected_data"
+          git -C foliotrace-state config user.name 'github-actions[bot]'
+          git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C foliotrace-state add state.json
+          if ! git -C foliotrace-state diff --cached --quiet; then
+            git -C foliotrace-state commit -m 'data: verify FolioTrace direct holding date'
+            git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
+          fi

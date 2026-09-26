@@ -595,9 +595,42 @@ def parse_filing_document(payload: bytes):
     ownership = dec((cell("ACODE", "SUM_TMT_RT") or "").replace("%", ""))
     if quantity is None or ownership is None:
         raise ValueError("DART XML lacks holding quantity or ratio")
+    cover = html.unescape(re.sub(r"<[^>]+>", " ", xml[:8000]))
+    cover_dates = re.findall(r"보고서\s*작성\s*기준일\s*:\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일", cover)
+    def parsed_date(parts):
+        try:
+            return date(*(int(part) for part in parts)).isoformat()
+        except (TypeError, ValueError):
+            return None
+    cover_date = parsed_date(cover_dates[0]) if len(cover_dates) == 1 else None
+    row_date_text = cell("ACODE", "THS_IFR")
+    row_parts = re.fullmatch(r"\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*", row_date_text or "")
+    row_date = parsed_date(row_parts.groups()) if row_parts else None
+    row_quantity = dec(cell("ACODE", "THS_STK_CNT"))
+    row_ratio = dec(cell("ACODE", "THS_STK_RT"))
+    row_verified = bool(row_date and row_quantity == quantity and row_ratio == ownership and
+                        (cover_date is None or cover_date == row_date))
+    holding_date = row_date if row_verified else None
+    row_sha256 = None
+    if row_verified:
+        marker = re.search(r'ACODE="THS_IFR"', xml)
+        if marker:
+            beginning = xml.rfind("<TR", 0, marker.start())
+            ending = xml.find("</TR>", marker.end())
+            if beginning >= 0 and ending > marker.end():
+                row_sha256 = sha(xml[beginning:ending + 5].encode("utf-8"))
     voting = verified_voting_share_quantity(xml, quantity)
     return {"quantity": quantity, "company_ownership_percent": ownership,
             "reason": safe_str(cell("ACODE", "SUM_CHN_RWN")), "xml_sha256": sha(xml_bytes),
+            "holding_date": holding_date,
+            "basis_date_evidence": "dart_current_report_row" if holding_date else None,
+            "basis_row_sha256": row_sha256,
+            "source_ratio_columns": ({"shares_etc_quantity": str(row_quantity),
+                                      "shares_etc_percent": str(row_ratio),
+                                      "stock_quantity": str(dec(cell("ACODE", "THS_CMT_CNT"))) if cell("ACODE", "THS_CMT_CNT") else None,
+                                      "stock_percent": str(dec(cell("ACODE", "THS_CMT_RT"))) if cell("ACODE", "THS_CMT_RT") else None,
+                                      "issued_voting_shares": str(dec(cell("ACODE", "THS_STK_CT"))) if cell("ACODE", "THS_STK_CT") else None}
+                                     if row_verified else None),
             "verified_voting_share_quantity": voting,
             "verified_common_stock_code": verified_common_stock_code(xml, quantity)}
 
@@ -789,6 +822,10 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
         except (RuntimeError, ValueError, zipfile.BadZipFile) as exc:
             state["unresolved"][no] = type(exc).__name__
             continue
+        basis = parsed.get("holding_date")
+        if basis and basis > (receipt.get("listing_receipt_date") or receipt.get("receipt_date") or ""):
+            parsed["holding_date"] = None
+            parsed["basis_date_evidence"] = None
         receipt.update(parsed)
         corp = receipt.get("corp_code")
         stock = receipt.get("stock_code")
@@ -810,7 +847,7 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
                     "name": receipt.get("name") or state["universe"].get(corp, {}).get("name") or "",
                     "receipt_no": no, "receipt_date": receipt["receipt_date"],
                     "quantity": parsed["quantity"], "company_ownership_percent": parsed["company_ownership_percent"],
-                    "holding_date": None, "security_kind": "unknown",
+                    "holding_date": parsed.get("holding_date"), "security_kind": "unknown",
                     "tracking": "below-5-percent" if ownership < 5 else "active",
                     "evidence": parsed["evidence"], "valuation_exclusion_reason": "security_mapping_unverified"}
             if flagged_relation:
@@ -824,6 +861,81 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
         state["revision"] += 1
         write_json(state_path, state)
     return processed
+
+
+def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_document, target_receipt=None):
+    """Recover report preparation dates from exact source documents in bounded runs."""
+    if limit < 0 or limit > 100:
+        raise ValueError("DIRECT_BASIS_LIMIT")
+    if target_receipt is not None and not RECEIPT.fullmatch(target_receipt):
+        raise ValueError("DIRECT_BASIS_TARGET")
+    if limit and not key:
+        raise ValueError("DART_API_KEY unavailable")
+    today = kst_today().isoformat()
+    current = {holding.get("receipt_no") for holding in state.get("holdings", {}).values()}
+    eligible = []
+    for no, receipt in state.get("receipts", {}).items():
+        if target_receipt and no != target_receipt:
+            continue
+        source_kind = receipt.get("evidence")
+        verified_legacy = source_kind in ("legacy_history_fact", "legacy_json_parser_result") and bool(receipt.get("listing_verified_at"))
+        if (not RECEIPT.fullmatch(str(no)) or
+                (source_kind not in ("dart_document", "dart_structured") and not verified_legacy)
+                or not receipt.get("corp_code") or not receipt.get("stock_code")
+                or receipt.get("quantity") is None or receipt.get("company_ownership_percent") is None
+                or receipt.get("withdrawn_flag") or receipt.get("is_correction") or receipt.get("later_correction_flag")
+                or state.get("unresolved", {}).get(no) in ("receipt_date_conflict", "receipt_chronology_unverified")
+                or receipt.get("basis_method") == "report-cover-v1"
+                or receipt.get("basis_last_attempt_on") == today
+                or int(receipt.get("basis_attempt_count") or 0) >= 3):
+            continue
+        eligible.append((no not in current, -int(no), no, receipt))
+    checked = verified = pending = conflicts = 0
+    for _, _, no, receipt in sorted(eligible)[:limit]:
+        checked += 1
+        receipt["basis_last_attempt_on"] = today
+        receipt["basis_attempt_count"] = int(receipt.get("basis_attempt_count") or 0) + 1
+        try:
+            parsed = fetch(no, key)
+        except (RuntimeError, ValueError, zipfile.BadZipFile):
+            receipt["basis_review_status"] = "source_retry_pending"
+            pending += 1
+            continue
+        basis = parsed.get("holding_date")
+        source_date = receipt.get("listing_receipt_date") or receipt.get("receipt_date")
+        if (not basis or not source_date or basis > source_date):
+            receipt["basis_review_status"] = "basis_unverified"
+            receipt["basis_method"] = "report-cover-v1"
+            pending += 1
+            continue
+        source_quantity, parsed_quantity = dec(receipt.get("quantity")), dec(parsed.get("quantity"))
+        source_ratio, parsed_ratio = dec(receipt.get("company_ownership_percent")), dec(parsed.get("company_ownership_percent"))
+        if (None in (source_quantity, parsed_quantity, source_ratio, parsed_ratio) or
+                Decimal(source_quantity) != Decimal(parsed_quantity) or Decimal(source_ratio) != Decimal(parsed_ratio)):
+            receipt["basis_review_status"] = "source_value_conflict"
+            receipt["basis_method"] = "report-cover-v1"
+            conflicts += 1
+            continue
+        receipt["holding_date"] = basis
+        receipt["basis_date_evidence"] = "dart_current_report_row"
+        receipt["basis_document_sha256"] = parsed.get("xml_sha256")
+        receipt["basis_row_sha256"] = parsed.get("basis_row_sha256")
+        receipt["source_ratio_columns"] = parsed.get("source_ratio_columns")
+        if receipt.get("evidence") in ("legacy_history_fact", "legacy_json_parser_result"):
+            receipt["evidence"] = "dart_document"
+            receipt["xml_sha256"] = parsed.get("xml_sha256")
+        receipt["basis_review_status"] = "verified"
+        receipt["basis_method"] = "report-cover-v1"
+        current_holding = state.get("holdings", {}).get(receipt["corp_code"])
+        if current_holding and current_holding.get("receipt_no") == no:
+            current_holding["holding_date"] = basis
+            if current_holding.get("evidence") == "legacy_import":
+                current_holding["evidence"] = "dart_document"
+        verified += 1
+    if checked and state_path:
+        state["revision"] += 1
+        write_json(state_path, state)
+    return {"checked": checked, "verified": verified, "pending": pending, "value_conflicts": conflicts}
 
 
 def classify_events(state):
@@ -1302,6 +1414,7 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
         cursor = end + timedelta(days=1)
     metadata = recover_metadata(state, key, state_path=state_path)
     parse_attempts = resolve_unfinished(state, key, state_path=state_path)
+    basis = recheck_direct_basis(state, key, limit=20, state_path=state_path)
     observed = datetime.now(timezone.utc)
     trade_date = expected_session(observed, closures=holiday_set_for(observed),
                                   special_closes=CONFIRMED_SPECIAL_SESSIONS).isoformat()
@@ -1315,7 +1428,8 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
     return {"status": "LISTING_COMPLETE_PARSING_PENDING" if state["unresolved"] else "LISTING_COMPLETE",
             "requested_from": start.isoformat(), "requested_to": cutoff.isoformat(),
             "requests": request_count, "new_receipts": new_receipts,
-            "parse_attempts": parse_attempts, "metadata": metadata, "mapping": mapping, "corporate_actions": actions,
+            "parse_attempts": parse_attempts, "basis_rechecked": basis,
+            "metadata": metadata, "mapping": mapping, "corporate_actions": actions,
             "unresolved": len(state["unresolved"]), "state_revision": state["revision"]}
 
 
@@ -1481,6 +1595,9 @@ def main():
     q.add_argument("--max-windows", type=int, default=20)
     q.add_argument("--review-limit", type=int, default=30)
     q.add_argument("--scope", choices=("all", "equity", "prior-all", "prior-equity"), default="all")
+    q = sub.add_parser("recheck-basis")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--receipt", required=True)
     q = sub.add_parser("price-and-value")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--output", type=Path, required=True)
@@ -1530,6 +1647,11 @@ def main():
                                     max_windows=args.max_windows, read_state=read_json, write_state=write_json,
                                     key=os.environ.get("DART_API_KEY", ""), review_limit=args.review_limit,
                                     scope=args.scope)
+        elif args.command == "recheck-basis":
+            state = read_json(args.state)
+            result = recheck_direct_basis(state, os.environ.get("DART_API_KEY", ""), limit=1,
+                                          state_path=args.state, target_receipt=args.receipt)
+            result["receipt_no"] = args.receipt
         elif args.command == "price-and-value": result = price_and_value(args.state, args.output)
         elif args.command == "emit-snapshot": result = emit_snapshot(args.snapshot, args.dist)
         elif args.command == "record-published": result = record_published(args.state, version=args.dataset_version,

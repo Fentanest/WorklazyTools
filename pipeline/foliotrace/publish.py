@@ -104,6 +104,18 @@ def make_snapshot(state, quotes, now=None):
                 "estimatedValue": valued["estimated_value"], "valuationCoverage": valued["valuation_coverage"],
                 "filingCoverage": "partial" if state["unresolved"] else "complete" if coverage else "unverified",
                 "holdings": rows, "events": events,
+                "historicalObservations": [{"corpCode": item["corp_code"], "stockCode": item["stock_code"],
+                    "issuerName": item["issuer_name"], "quantity": item["quantity"],
+                    "ownershipPercent": item["ownership_percent"], "basisDate": item["basis_date"],
+                    "filingDate": item["source_filing_date"], "receiptNo": item["source_receipt_no"],
+                    "documentNo": item["source_document_no"],
+                    "sourceRowSha256": item["source_row_sha256"],
+                    "ratioDenominator": item["ratio_denominator"],
+                    "status": item["observation_status"],
+                    "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={item['source_receipt_no']}"}
+                    for item in sorted(state.get("verified_historical_observations", {}).values(),
+                                       key=lambda entry: (entry["basis_date"], entry["source_receipt_no"]),
+                                       reverse=True)],
                 "history": [{"tradeDate": item["trade_date"], "estimatedValue": item["estimated_value"],
                              "datasetVersion": item["dataset_version"]} for item in history]}
     historical = state.get("historical_backfill")

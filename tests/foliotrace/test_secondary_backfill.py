@@ -102,6 +102,35 @@ class SecondaryBackfillTests(unittest.TestCase):
         mismatched = first.replace('2,407,509</TD></TR><P>5.', '2,407,508</TD></TR><P>5.')
         self.assertIsNone(secondary.extract_source_claims('<DOC>' + mismatched + other + '</DOC>')[0]['basis_date'])
 
+    def test_source_checked_history_fact_keeps_unknown_denominator_and_current_holding(self):
+        state = folio.empty_state()
+        state['universe']['00155319'] = {'name': 'POSCO홀딩스', 'stock_code': '005490'}
+        state['holdings']['00155319'] = {'corp_code': '00155319', 'stock_code': '005490',
+            'quantity': '6576661', 'company_ownership_percent': '8.3',
+            'receipt_no': '20260623000336', 'holding_date': None}
+        candidate = {'receipt_no': '20060124800040', 'document_no': '1248144',
+            'filing_date': '2006-02-01', 'filing_company': 'POSCO홀딩스',
+            'source_archive_sha256': 'a' * 64, 'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_claims': [{'status': 'actual_holding_basis_verified', 'row_sha256': 'b' * 64,
+                'source_file_sha256': 'c' * 64, 'row_offset': 12006, 'basis_date': '2006-02-01',
+                'basis_evidence': 'matched_report_change_and_owner_total',
+                'quantity': '2407509', 'ownership_percent': '2.76'}]}
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 1)
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 0)
+        fact = next(iter(state['verified_historical_observations'].values()))
+        self.assertEqual((fact['corp_code'], fact['stock_code'], fact['basis_date']),
+                         ('00155319', '005490', '2006-02-01'))
+        self.assertEqual(fact['ratio_denominator'], 'unverified')
+        self.assertEqual(state['holdings']['00155319']['company_ownership_percent'], '8.3')
+        self.assertIsNone(state['holdings']['00155319']['holding_date'])
+        public = make_snapshot(state, {})
+        self.assertEqual(public['historicalObservations'][0]['ownershipPercent'], '2.76')
+        self.assertEqual(public['historicalObservations'][0]['basisDate'], '2006-02-01')
+        self.assertEqual(public['holdings'][0]['companyOwnershipPercent'], '8.3')
+        candidate['filing_company'] = '다른회사'
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 0)
+        self.assertEqual(candidate['application_status'], 'issuer_identity_unverified')
+
     def test_parser_keeps_official_page_identity_and_receipt_metadata(self):
         day = date(2006, 2, 8)
         page = secondary.parse_search_page(result_page([POSCO]), 1, day, day)

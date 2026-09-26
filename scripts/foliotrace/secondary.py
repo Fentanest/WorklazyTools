@@ -316,6 +316,7 @@ def inspect_source_document(payload: bytes):
     mentions = 0
     digests = []
     claims = []
+    archive_sha256 = hashlib.sha256(payload).hexdigest()
     for name in archive.namelist():
         if (not name.lower().endswith(".xml") or name.startswith("/") or ".." in Path(name).parts
                 or archive.getinfo(name).file_size > 20_000_000):
@@ -331,7 +332,10 @@ def inspect_source_document(payload: bytes):
                 continue
         if decoded is None:
             continue
-        claims.extend(extract_source_claims(decoded)[:max(0, 20 - len(claims))])
+        file_claims = extract_source_claims(decoded)[:max(0, 20 - len(claims))]
+        for claim in file_claims:
+            claim["source_file_sha256"] = hashlib.sha256(raw).hexdigest()
+        claims.extend(file_claims)
         plain = html.unescape(re.sub(r"<[^>]+>", " ", decoded))
         plain = " ".join(plain.split())
         for term in TERMS:
@@ -345,9 +349,50 @@ def inspect_source_document(payload: bytes):
     return {"status": "source_context_review_pending" if contexts else
             "source_mention_no_equity_context" if mentions else "source_mention_unverified",
             "source_sha256": hashlib.sha256("".join(digests).encode()).hexdigest(),
+            "source_archive_sha256": archive_sha256,
             "parser_version": SOURCE_PARSER_VERSION,
             "source_claims": claims,
             "source_mention_count": mentions, "equity_context_count": contexts}
+
+
+def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
+    """Retain source-proven dated facts separately from current portfolio holdings."""
+    facts = state.setdefault("verified_historical_observations", {})
+    issuer_name = candidate.get("filing_company")
+    matches = [(corp, company) for corp, company in state.get("universe", {}).items()
+               if company.get("name") == issuer_name and company.get("stock_code")]
+    created = 0
+    for claim in candidate.get("source_claims") or []:
+        if claim.get("status") != "actual_holding_basis_verified":
+            candidate["application_status"] = "basis_or_owner_unverified"
+            continue
+        if len(matches) != 1:
+            candidate["application_status"] = "issuer_identity_unverified"
+            continue
+        corp, company = matches[0]
+        key = f'{candidate["receipt_no"]}:{candidate["document_no"]}:{claim["row_sha256"]}'
+        fact = {"source_receipt_no": candidate["receipt_no"],
+                "source_document_no": candidate["document_no"],
+                "source_filing_date": candidate["filing_date"],
+                "source_archive_sha256": candidate["source_archive_sha256"],
+                "source_file_sha256": claim["source_file_sha256"],
+                "source_row_sha256": claim["row_sha256"],
+                "source_row_offset": claim["row_offset"],
+                "parser_version": candidate["parser_version"],
+                "corp_code": corp, "stock_code": company["stock_code"],
+                "issuer_name": issuer_name, "security_kind": "common",
+                "holder_scope": "nps_only", "ratio_denominator": "unverified",
+                "basis_date": claim["basis_date"], "basis_evidence": claim["basis_evidence"],
+                "quantity": claim["quantity"], "ownership_percent": claim["ownership_percent"],
+                "observation_status": "historical_only_ratio_basis_unverified"}
+        if facts.get(key) is None:
+            facts[key] = fact
+            created += 1
+        elif facts[key] != fact:
+            candidate["application_status"] = "historical_fact_conflict"
+            continue
+        candidate["application_status"] = "historical_fact_retained"
+    return created
 
 
 def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, max_windows=20,
@@ -540,6 +585,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 item["last_source_attempt_on"] = today
                 item.update(check)
                 item["review_status"] = check["status"]
+                retain_verified_historical_claims(state, item)
             else:
                 noncandidate_reviews[document_key] = {
                     "review_status": check["status"],
