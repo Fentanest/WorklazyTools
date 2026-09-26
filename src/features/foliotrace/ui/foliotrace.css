@@ -79,6 +79,10 @@
   gap: 0.75rem;
 }
 
+.foliotrace-summary-grid > * {
+  min-width: 0;
+}
+
 @media (max-width: 768px) {
   .foliotrace-summary-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -102,6 +106,16 @@
   font-size: 1.4rem;
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
+}
+
+/* Exact financial strings can exceed the card width (e.g. long KRW
+ * amounts). .foliotrace-num sets white-space:nowrap for column alignment;
+ * summary values must wrap instead of clipping inside the card, while
+ * keeping tabular figures. Higher specificity wins over .foliotrace-num. */
+.foliotrace-summary-card .foliotrace-summary-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .foliotrace-summary-card small {
@@ -200,6 +214,13 @@
 
 .foliotrace-history small {
   color: var(--wl-muted, var(--wl-text));
+}
+
+/* History values sit outside any scroll container, so they wrap like
+ * summary values instead of inheriting the table's nowrap alignment. */
+.foliotrace-history .foliotrace-num {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .foliotrace-controls {

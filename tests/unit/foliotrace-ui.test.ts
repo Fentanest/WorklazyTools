@@ -42,7 +42,25 @@ test("Number conversion exists only inside the visual-only approxNumber", () => 
 });
 
 test("FolioTrace styles stay inside the owned scope", () => {
-  const selectors = cssSource.match(/\.[a-z][a-z0-9-]*/g) ?? [];
+  const selectors = (cssSource.match(/^\s*\.[a-z][a-z0-9-]*/gm) ?? []).map((s) => s.trim());
   const foreign = selectors.filter((s) => !s.startsWith(".foliotrace-"));
   assert.deepEqual(foreign, [], `CSS scope leak: ${foreign.join(",")}`);
+});
+
+test("long exact amounts wrap in cards/history; table keeps nowrap in its scroll container", () => {
+  // Regression guard for the 1280x800 summary-clip defect: the table's
+  // nowrap alignment must not leak into card/history values, which have
+  // no horizontal scroll container of their own.
+  assert.match(
+    cssSource,
+    /\.foliotrace-summary-card \.foliotrace-summary-value\s*\{[^}]*white-space:\s*normal/,
+  );
+  assert.match(
+    cssSource,
+    /\.foliotrace-history \.foliotrace-num\s*\{[^}]*white-space:\s*normal/,
+  );
+  assert.match(cssSource, /\.foliotrace-num\s*\{[^}]*tabular-nums/);
+  assert.match(cssSource, /\.foliotrace-table-wrap\s*\{[^}]*overflow-x:\s*auto/);
+  // Long values prefer wrapping at group boundaries (<wbr/> adds no text).
+  assert.match(pageSource, /<wbr key/);
 });

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import { PageHeader, SectionCard } from "../../../components/ui";
 import { Card } from "../../../components/ui/card";
@@ -243,6 +244,21 @@ const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
   },
 };
 
+/**
+ * Renders an exact formatted financial string with break opportunities
+ * after each thousands separator. The commas stay in the text (so
+ * textContent, copy, and AT read the exact formatted string) and each
+ * is followed by a <wbr/>, letting long amounts wrap at group boundaries
+ * instead of stranding a lone digit on the next line.
+ */
+function breakableValue(text: string): ReactNode {
+  const parts = text.split(",");
+  if (parts.length === 1) return text;
+  return parts.flatMap((part, index): ReactNode[] =>
+    index === 0 ? [part] : [",", <wbr key={index} />, part],
+  );
+}
+
 export function FolioTracePage({ lang, view, onRefresh }: FolioTracePageProps) {
   const t = STR[lang];
   if (view.status !== "ready") {
@@ -373,7 +389,7 @@ function ReadyView({
         <Card className="foliotrace-summary-card">
           <span className="foliotrace-summary-label">{t.summaryValue}</span>
           <strong className="foliotrace-summary-value foliotrace-num">
-            {snapshot.estimatedValue === null ? t.unavailable : formatKrw(snapshot.estimatedValue, lang)}
+            {snapshot.estimatedValue === null ? t.unavailable : breakableValue(formatKrw(snapshot.estimatedValue, lang))}
           </strong>
           <small>
             {snapshot.valuationCoverage === "unavailable"
@@ -429,7 +445,7 @@ function ReadyView({
             {snapshot.history.map((h) => (
               <li key={`${h.tradeDate}-${h.datasetVersion}`}>
                 <span>{h.tradeDate}</span>
-                <span className="foliotrace-num">{formatKrw(h.estimatedValue, lang)}</span>
+                <span className="foliotrace-num">{breakableValue(formatKrw(h.estimatedValue, lang))}</span>
                 <small>{h.datasetVersion}</small>
               </li>
             ))}
