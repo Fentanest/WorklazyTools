@@ -82,14 +82,20 @@ def make_snapshot(state, quotes, now=None):
                                       "holding_date": holding.get("holding_date"),
                                       "ownership_percent": holding.get("company_ownership_percent"),
                                       "quantity": holding.get("quantity")}
+        later_changes = [change for change in (state.get("issuer_scope_later_changes") or {}).values()
+                         if change.get("corp_code") == holding.get("corp_code") and
+                         change.get("basis_date", "") > fact["basis_date"] and
+                         any(ref.get("receipt_no") not in source_holds for ref in change.get("references", []))]
+        later_date = max((change["basis_date"] for change in later_changes), default=None)
         holding.update(company_ownership_percent=fact["ownership_percent"],
                        quantity=None, security_kind="unknown", holding_date=latest_date,
                        receipt_no=primary["receipt_no"], receipt_date=primary["filing_date"],
-                       evidence="issuer_scope_observation", tracking="active",
+                       evidence="issuer_scope_observation", tracking="unknown",
                        issuer_scope_source={"key": key, "quantity": fact["quantity"],
                                             "denominator_quantity": fact["denominator_quantity"],
                                             "denominator_date": fact["denominator_date"],
                                             "reference_count": len(refs),
+                                            "later_change_date": later_date,
                                             "receipt_no": primary["receipt_no"],
                                             "document_no": primary["document_no"]})
     valued = value_holdings(holdings, quotes, trade_date) if trade_date else value_holdings(holdings, {}, "")
@@ -125,6 +131,7 @@ def make_snapshot(state, quotes, now=None):
                        "denominatorQuantity": row["issuer_scope_source"]["denominator_quantity"],
                        "denominatorDate": row["issuer_scope_source"]["denominator_date"],
                        "referenceCount": row["issuer_scope_source"]["reference_count"],
+                       "laterChangeDate": row["issuer_scope_source"]["later_change_date"],
                        "receiptNo": row["issuer_scope_source"]["receipt_no"],
                        "documentNo": row["issuer_scope_source"]["document_no"]}
                        if row.get("issuer_scope_source") else None),
@@ -208,6 +215,15 @@ def make_snapshot(state, quotes, now=None):
                     "status": "comparison_pending"}
                     for key, fact in sorted(issuer_observations.items(),
                                             key=lambda item: (item[1]["basis_date"], item[0]), reverse=True)],
+                "issuerScopeLaterChanges": [{"corpCode": fact["corp_code"],
+                    "basisDate": fact["basis_date"], "kind": fact["kind"],
+                    "references": [{"receiptNo": ref["receipt_no"],
+                                    "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={ref['receipt_no']}"}
+                                   for ref in fact["references"] if ref["receipt_no"] not in source_holds]}
+                    for fact in sorted((item for item in (state.get("issuer_scope_later_changes") or {}).values()
+                                        if any(ref.get("receipt_no") not in source_holds
+                                               for ref in item.get("references", []))),
+                                       key=lambda item: (item["basis_date"], item["corp_code"]), reverse=True)],
                 "historicalObservations": [{"corpCode": item["corp_code"], "stockCode": item["stock_code"],
                     "issuerName": item["issuer_name"], "quantity": item["quantity"],
                     "ownershipPercent": item["ownership_percent"], "basisDate": item["basis_date"],

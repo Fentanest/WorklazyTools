@@ -75,10 +75,15 @@ test('issuer-level dated observation keeps the direct baseline separate', () => 
     portfolioWeightPercent: null, valuationExclusionReason: 'security_mapping_unverified',
     issuerScopeSource: { observationKey: scoped.observationKey, sourceQuantity: scoped.sourceQuantity,
       denominatorQuantity: scoped.denominatorQuantity, denominatorDate: scoped.denominatorDate,
-      referenceCount: 1, receiptNo, documentNo: null },
+      referenceCount: 1, laterChangeDate: '2025-12-31', receiptNo, documentNo: null },
     directBaseline: { receiptNo: '20250401003742', receiptDate: '2025-04-01',
       holdingDate: null, ownershipPercent: '7.5', quantity: '9157340' } }
-  assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [scoped] }, version), true)
+  const later = { corpCode: '00244455', basisDate: '2025-12-31',
+    kind: 'nps_share_decrease_amount_unreported',
+    references: [{ receiptNo: '20260515002914',
+      filingUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260515002914' }] }
+  assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [scoped],
+    issuerScopeLaterChanges: [later] }, version), true)
   assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [
     { ...scoped, references: [{ ...reference, filingUrl: 'javascript:bad()' }] }] }, version), false)
 })

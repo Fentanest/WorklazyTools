@@ -39,7 +39,8 @@ function validIssuerScopeSource(value: unknown): boolean {
   return isRecord(value) && str(value.observationKey) && VERSION.test(value.observationKey) &&
     decimal(value.sourceQuantity) && decimal(value.denominatorQuantity) &&
     isoDate(value.denominatorDate) && Number.isSafeInteger(value.referenceCount) &&
-    Number(value.referenceCount) >= 1 && str(value.receiptNo) && RECEIPT.test(value.receiptNo) &&
+    Number(value.referenceCount) >= 1 && nullable(value.laterChangeDate, isoDate) &&
+    str(value.receiptNo) && RECEIPT.test(value.receiptNo) &&
     nullable(value.documentNo, item => str(item) && /^\d+$/.test(item))
 }
 function validDirectBaseline(value: unknown): boolean {
@@ -62,6 +63,13 @@ function validIssuerScopeObservation(value: unknown): boolean {
       str(ref.fileSha256) && VERSION.test(ref.fileSha256) &&
       str(ref.rowSha256) && VERSION.test(ref.rowSha256) &&
       str(ref.parserVersion) && filingUrl(ref.filingUrl))
+}
+function validIssuerScopeLaterChange(value: unknown): boolean {
+  return isRecord(value) && str(value.corpCode) && /^\d{8}$/.test(value.corpCode) &&
+    isoDate(value.basisDate) && value.kind === 'nps_share_decrease_amount_unreported' &&
+    Array.isArray(value.references) && value.references.length >= 1 &&
+    value.references.every((ref: unknown) => isRecord(ref) && str(ref.receiptNo) &&
+      RECEIPT.test(ref.receiptNo) && filingUrl(ref.filingUrl))
 }
 function validIndirectObservation(value: unknown): boolean {
   return isRecord(value) && str(value.observationKey) && OBSERVATION_KEY.test(value.observationKey) &&
@@ -195,6 +203,8 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
       (!Array.isArray(value.historicalObservations) || !value.historicalObservations.every(validHistoricalObservation))) return false
   if (value.issuerScopeObservations !== undefined &&
       (!Array.isArray(value.issuerScopeObservations) || !value.issuerScopeObservations.every(validIssuerScopeObservation))) return false
+  if (value.issuerScopeLaterChanges !== undefined &&
+      (!Array.isArray(value.issuerScopeLaterChanges) || !value.issuerScopeLaterChanges.every(validIssuerScopeLaterChange))) return false
   return value.holdings.every(validHolding) && value.events.every(validEvent) && value.history.every((row: unknown) =>
     isRecord(row) && isoDate(row.tradeDate) && decimal(row.estimatedValue) && str(row.datasetVersion) && VERSION.test(row.datasetVersion))
 }

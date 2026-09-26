@@ -103,16 +103,10 @@ def extract_issuer_register_claims(xml: str) -> list[dict]:
     claims = []
     for index, row in enumerate(rows):
         cells = _row_cells(row.group(0))
-        if len(cells) < 5 or not EXACT_NPS.fullmatch(cells[1]):
+        if len(cells) < 5:
             continue
         basis = _korean_date(cells[0])
-        quantity, ratio = _number(cells[2]), _number(cells[3], maximum=100)
-        if basis is None or quantity is None or ratio is None:
-            continue
-        # The row's own note must identify the register date. A filing date or
-        # an adjacent shareholder's date cannot stand in for this field.
-        dotted = basis.replace("-", ".")
-        if dotted not in cells[4] or "기준일 주주명부 기준" not in cells[4]:
+        if basis is None:
             continue
         preceding = [_row_cells(item.group(0)) for item in rows[max(0, index - 12):index]]
         if not any({"변동일", "최대주주명", "소유주식수", "지분율"} <= set(item)
@@ -121,6 +115,27 @@ def extract_issuer_register_claims(xml: str) -> list[dict]:
         heading = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", xml[max(0, row.start() - 8000):row.start()])).split())
         if "최대주주의 변동" not in heading[-2000:]:
             continue
+        dotted = basis.replace("-", ".")
+        note = " ".join(cells[4:])
+        if dotted not in note or "기준일 주주명부 기준" not in note:
+            continue
+        if (not EXACT_NPS.fullmatch(cells[1]) and
+                "국민연금공단의 소유주식수 감소" in note):
+            claims.append({"structure": "issuer_register_later_nps_change",
+                           "security_kind": None, "holder_scope": "nps_only",
+                           "basis_date": basis, "quantity": None,
+                           "ownership_percent": None,
+                           "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
+                           "row_offset": row.start(),
+                           "status": "issuer_level_later_change_unquantified"})
+            continue
+        if not EXACT_NPS.fullmatch(cells[1]):
+            continue
+        quantity, ratio = _number(cells[2]), _number(cells[3], maximum=100)
+        if quantity is None or ratio is None:
+            continue
+        # The row's own note must identify the register date. A filing date or
+        # an adjacent shareholder's date cannot stand in for this field.
         following = " ".join(html.unescape(re.sub(r"<[^>]+>", " ",
             xml[row.end():min(len(xml), row.end() + 3000)])).split())
         if "각각 변동일 당시 발행주식총수를 기준으로 산정" not in following:
@@ -456,6 +471,9 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
                if company.get("name") == issuer_name and company.get("stock_code")]
     created = 0
     for claim in candidate.get("source_claims") or []:
+        if claim.get("status") == "issuer_level_later_change_unquantified":
+            created += retain_issuer_later_change(state, candidate, claim, matches)
+            continue
         if claim.get("status") == "issuer_level_actual_basis_verified":
             created += retain_issuer_scope_claim(state, candidate, claim, matches)
             continue
@@ -514,6 +532,38 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
         if candidate.get("application_status") != "historical_fact_enriched":
             candidate["application_status"] = "historical_fact_retained"
     return created
+
+
+def retain_issuer_later_change(state: dict, candidate: dict, claim: dict, matches: list) -> int:
+    """Preserve a dated decrease clue without fabricating its new amount."""
+    if (len(matches) != 1 or not candidate.get("source_archive_sha256") or
+            not candidate.get("source_checked_at") or
+            not claim.get("source_file_sha256") or candidate.get("correction_hold") or
+            candidate.get("withdrawal_flag") or candidate.get("filer_corp_code") != matches[0][0]):
+        candidate["application_status"] = "later_change_source_pending"
+        return 0
+    corp, company = matches[0]
+    key = hashlib.sha256(f"{corp}|{claim['basis_date']}|nps_decrease_unquantified".encode()).hexdigest()
+    ledger = state.setdefault("issuer_scope_later_changes", {})
+    reference = {"receipt_no": candidate["receipt_no"],
+                 "document_no": candidate.get("document_no"),
+                 "filing_date": candidate["filing_date"],
+                 "archive_sha256": candidate["source_archive_sha256"],
+                 "file_sha256": claim["source_file_sha256"],
+                 "row_sha256": claim["row_sha256"],
+                 "parser_version": candidate["parser_version"]}
+    fact = ledger.setdefault(key, {"corp_code": corp, "stock_code": company["stock_code"],
+                                   "basis_date": claim["basis_date"],
+                                   "kind": "nps_share_decrease_amount_unreported",
+                                   "references": []})
+    if not any(item["receipt_no"] == reference["receipt_no"] and
+               item["document_no"] == reference["document_no"] for item in fact["references"]):
+        fact["references"].append(reference)
+        fact["references"].sort(key=lambda item: (item["filing_date"], item["receipt_no"]))
+        candidate["application_status"] = "later_change_unquantified_retained"
+        return 1
+    candidate["application_status"] = "later_change_already_recorded"
+    return 0
 
 
 def retain_issuer_scope_claim(state: dict, candidate: dict, claim: dict, matches: list) -> int:

@@ -141,6 +141,7 @@ const STR = {
     issuerScopeHistory: "주주명부에서 확인한 지분 기록",
     issuerScopeHistoryNote: "각 날짜의 발행주식수를 기준으로 확인했습니다. 주식 종류와 직접 공시의 비교 기준은 확인 중입니다.",
     issuerScopeCitedAgain: "같은 날짜 기록을 나중 공시에서 다시 확인",
+    issuerScopeLaterChange: "이후 국민연금 보유주식 감소가 기록됐지만 새 수량·지분율은 확인되지 않았습니다",
     documentNumber: "문서 번호",
     verifiedObservationTitle: "다른 회사 공시에서 확인한 지분",
     verifiedObservationApplied: "현재 지분율에 반영",
@@ -298,6 +299,7 @@ const STR = {
     issuerScopeHistory: "Ownership recorded in shareholder registers",
     issuerScopeHistoryNote: "Each percentage uses the issued-share count for its own date. Share class and comparison with direct filings remain under review.",
     issuerScopeCitedAgain: "The same dated record was cited again in a later filing",
+    issuerScopeLaterChange: "A later filing reports fewer NPS shares, but gives no new NPS quantity or percentage",
     documentNumber: "Document number",
     verifiedObservationTitle: "Ownership found in another company's filing",
     verifiedObservationApplied: "Applied to current ownership",
@@ -632,6 +634,8 @@ function ReadyView({
                 {" "}{formatQty(observation.sourceQuantity)} / {formatQty(observation.denominatorQuantity)} ·
                 {" "}{formatPct(observation.ownershipPercent)}
                 {observation.references.length > 1 && ` · ${t.issuerScopeCitedAgain}`}
+                {snapshot.issuerScopeLaterChanges?.some((change) => change.corpCode === observation.corpCode &&
+                  change.basisDate > observation.basisDate) && ` · ${t.issuerScopeLaterChange}`}
                 {" "}<a href={observation.references[0].filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
               </p>
             ))}
@@ -853,6 +857,11 @@ function ReadyView({
                               {h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict : t.rowVerifiedValue}
                             </small>
                           )}
+                          {h.issuerScopeSource?.laterChangeDate && (
+                            <small className="foliotrace-row-reason">
+                              {h.issuerScopeSource.laterChangeDate}: {t.issuerScopeLaterChange}
+                            </small>
+                          )}
                           {h.estimatedValue === null && (
                             <small className="foliotrace-row-reason">
                               {exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded}
@@ -954,6 +963,10 @@ function ReadyView({
                     {t.eventBasis}: {selected.holdingDate} · {t.issuerScopeDetail}: {formatQty(selected.issuerScopeSource.sourceQuantity)}
                     {" / "}{formatQty(selected.issuerScopeSource.denominatorQuantity)} · {selected.issuerScopeSource.denominatorDate}
                     {selected.issuerScopeSource.referenceCount > 1 && ` · ${selected.issuerScopeSource.referenceCount} ${t.unitCount}`}
+                    {selected.issuerScopeSource.laterChangeDate &&
+                      <small className="foliotrace-row-reason">
+                        {selected.issuerScopeSource.laterChangeDate}: {t.issuerScopeLaterChange}
+                      </small>}
                   </dd></div>
                   <div><dt>{t.directBaseline}</dt><dd>
                     {selected.directBaseline?.ownershipPercent == null ? "—" : formatPct(selected.directBaseline.ownershipPercent)}

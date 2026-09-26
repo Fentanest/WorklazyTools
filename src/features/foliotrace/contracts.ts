@@ -60,6 +60,7 @@ export interface Holding {
     denominatorQuantity: DecimalString
     denominatorDate: IsoDate
     referenceCount: number
+    laterChangeDate: IsoDate | null
     receiptNo: string
     documentNo: string | null
   } | null
@@ -195,6 +196,12 @@ export interface Snapshot {
       parserVersion: string
       filingUrl: string
     }>
+  }>
+  issuerScopeLaterChanges?: Array<{
+    corpCode: string
+    basisDate: IsoDate
+    kind: 'nps_share_decrease_amount_unreported'
+    references: Array<{ receiptNo: string; filingUrl: string }>
   }>
   history: Array<{ tradeDate: IsoDate; estimatedValue: DecimalString; datasetVersion: string }>
 }
