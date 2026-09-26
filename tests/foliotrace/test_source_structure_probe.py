@@ -14,6 +14,7 @@ class SourceStructureProbeTests(unittest.TestCase):
         self.assertEqual(result['archive_status'], 'parsed')
         self.assertEqual(result['files'][0]['nps_rows'][0]['cells'], ['국민연금관리공단', '보통주', '5.05%'])
         self.assertIn('2026-06-01', result['files'][0]['date_tokens'])
+        self.assertIn('2026-06-01', result['files'][0]['nps_rows'][0]['near_date_tokens'])
         self.assertNotIn('filing.xml', str(result))
 
     def test_status_xml_is_reported_without_raw_response(self):

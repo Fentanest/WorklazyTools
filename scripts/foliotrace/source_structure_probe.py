@@ -51,8 +51,11 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
         rows = []
         for row in ROWS.finditer(decoded):
             if NPS.search(row.group(0)):
+                neighborhood = decoded[max(0, row.start() - 1500):min(len(decoded), row.end() + 300)]
                 rows.append({"cells": [clean(cell, 80) for cell in CELLS.findall(row.group(0))[:12]],
-                             "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest()})
+                             "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
+                             "near_date_tokens": list(dict.fromkeys(DATES.findall(neighborhood)))[:12],
+                             "row_offset": row.start()})
             if len(rows) >= 12:
                 break
         if rows or NPS.search(decoded):
