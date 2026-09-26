@@ -136,7 +136,7 @@ class MigrationTests(unittest.TestCase):
             'quantity': '6576661.0', 'company_ownership_percent': '8.3',
             'evidence': 'legacy_history_fact', 'listing_verified_at': '2026-09-26T00:00:00Z',
             'basis_method': 'report-cover-v1', 'basis_last_attempt_on': folio.kst_today().isoformat(),
-            'basis_attempt_count': 1}
+            'basis_attempt_count': 3}
         state['holdings'][corp] = {'corp_code': corp, 'stock_code': '005490',
             'receipt_no': no, 'quantity': '6576661.0', 'company_ownership_percent': '8.3',
             'tracking': 'unknown', 'evidence': 'legacy_import'}
@@ -148,6 +148,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual((state['holdings'][corp]['holding_date'], state['holdings'][corp]['tracking']),
                          ('2026-06-18', 'active'))
         self.assertEqual(state['receipts'][no]['basis_method'], 'report-row-decimal-v2')
+        self.assertEqual(state['receipts'][no]['basis_attempt_count'], 1)
 
     def test_exact_voting_only_mapping_and_ambiguous_class(self):
         def table(extra="-"):

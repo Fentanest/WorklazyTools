@@ -890,15 +890,17 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
                 or receipt.get("basis_method") == method
                 or (receipt.get("basis_last_attempt_on") == today and
                     receipt.get("basis_last_attempt_method") == method)
-                or int(receipt.get("basis_attempt_count") or 0) >= 3):
+                or (receipt.get("basis_last_attempt_method") == method and
+                    int(receipt.get("basis_attempt_count") or 0) >= 3)):
             continue
         eligible.append((no not in current, -int(no), no, receipt))
     checked = verified = pending = conflicts = 0
     for _, _, no, receipt in sorted(eligible)[:limit]:
         checked += 1
+        previous_attempts = int(receipt.get("basis_attempt_count") or 0) if receipt.get("basis_last_attempt_method") == method else 0
         receipt["basis_last_attempt_on"] = today
         receipt["basis_last_attempt_method"] = method
-        receipt["basis_attempt_count"] = int(receipt.get("basis_attempt_count") or 0) + 1
+        receipt["basis_attempt_count"] = previous_attempts + 1
         try:
             parsed = fetch(no, key)
         except (RuntimeError, ValueError, zipfile.BadZipFile):
