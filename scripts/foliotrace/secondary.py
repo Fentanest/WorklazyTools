@@ -31,6 +31,7 @@ from pipeline.foliotrace.indirect import register_evidence
 TERMS = ("국민연금공단", "국민연금관리공단", "National Pension Service")
 PAGE_SIZE = 10  # DART search.ax serves ten rows even when maxResults is larger.
 MAX_SITE_PAGES = 100
+DART_CATEGORIES = tuple("ABCDEFGHIJ")
 METHOD = "dart-fulltext-v2-lossless-queue"
 RECEIPT = re.compile(r"^\d{14}$")
 DOCUMENT_KEY = re.compile(r"^\d{14}:\d+$")
@@ -539,7 +540,7 @@ def fetch_search_page(term: str, start: date, end: date, page: int, *, dsp_type=
               "endDate": end.strftime("%Y%m%d"), "currentPage": page,
               "maxResults": PAGE_SIZE, "maxLinks": 10, "selDate": 0, "autoSearch": "N"}
     if dsp_type:
-        if dsp_type != "D":
+        if dsp_type not in DART_CATEGORIES:
             raise ValueError("SEARCH_SCOPE")
         fields["dspType"] = dsp_type
     request = urllib.request.Request("https://dart.fss.or.kr/dsab007/search.ax",
@@ -1050,9 +1051,25 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                     code = str(exc) if str(exc) in ("SEARCH_TRANSPORT", "RESPONSE_SIZE", "ENCODING", "COUNT_MISSING", "COUNT_INVALID", "EMPTY_PAGE", "PAGE_IDENTITY", "PAGE_COUNT", "ROW_COUNT", "REPORT_LINK", "REPORT_IDENTITY", "ROW_DATE", "ROW_DATE_RANGE", "COMPANY_IDENTITY", "SNIPPET_SHAPE") else "SEARCH_UNEXPECTED"
                     raise SecondarySearchError(code, cursor, last, term_index, 1) from None
                 pages_used += 1
-                parsed_terms.append((term, first))
-                projected_pages += max(1, first["page_count"])
-                if first["page_count"] > MAX_SITE_PAGES or projected_pages > max_pages:
+                parts = [(None, first)]
+                if first["page_count"] > MAX_SITE_PAGES and last == cursor and not scope.endswith("equity"):
+                    parts = []
+                    for category in DART_CATEGORIES:
+                        try:
+                            part = parse_search_page(fetch(term, cursor, last, 1, dsp_type=category),
+                                                     1, cursor, last)
+                        except (ValueError, RuntimeError) as exc:
+                            code = str(exc) if str(exc) in ("SEARCH_TRANSPORT", "RESPONSE_SIZE", "ENCODING", "COUNT_MISSING", "COUNT_INVALID", "EMPTY_PAGE", "PAGE_IDENTITY", "PAGE_COUNT", "ROW_COUNT", "REPORT_LINK", "REPORT_IDENTITY", "ROW_DATE", "ROW_DATE_RANGE", "COMPANY_IDENTITY", "SNIPPET_SHAPE") else "SEARCH_UNEXPECTED"
+                            raise SecondarySearchError(code, cursor, last, term_index, 1) from None
+                        pages_used += 1
+                        if part["page_count"] > MAX_SITE_PAGES:
+                            raise SecondarySearchError("PARTITION_TOO_LARGE", cursor, last, term_index, 1)
+                        parts.append((category, part))
+                    if sum(part["total"] for _, part in parts) != first["total"]:
+                        raise SecondarySearchError("PARTITION_COUNT", cursor, last, term_index, 1)
+                parsed_terms.append((term, first, parts))
+                projected_pages += sum(max(1, part["page_count"]) for _, part in parts)
+                if (first["page_count"] > MAX_SITE_PAGES and parts[0][0] is None) or projected_pages > max_pages:
                     too_large = True
                     break
             if too_large:
@@ -1067,7 +1084,8 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                     parsed_terms = []
                     break
                 continue
-            if pages_used + projected_pages - len(parsed_terms) > max_pages:
+            fetched_first_pages = sum(len(parts) for _, _, parts in parsed_terms)
+            if pages_used + projected_pages - fetched_first_pages > max_pages:
                 parsed_terms = []
                 break
             break
@@ -1076,28 +1094,36 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         all_rows = []
         page_digests = []
         term_counts = {}
-        for term_index, (term, first) in enumerate(parsed_terms):
+        partition_counts = {}
+        for term_index, (term, first, parts) in enumerate(parsed_terms):
             term_counts[term] = first["total"]
-            all_rows.extend((term, row) for row in first["rows"])
-            page_digests.append(first["sha256"])
-            seen_page_ids = {(row["receipt_no"], row["document_no"]) for row in first["rows"]}
-            if len(seen_page_ids) != len(first["rows"]):
-                raise SecondarySearchError("PAGINATION_REPEAT", cursor, last, term_index, 1)
-            for page_number in range(2, first["page_count"] + 1):
-                try:
-                    page = parse_search_page(fetch(term, cursor, last, page_number), page_number, cursor, last)
-                except (ValueError, RuntimeError) as exc:
-                    code = str(exc) if str(exc) in ("SEARCH_TRANSPORT", "RESPONSE_SIZE", "ENCODING", "COUNT_MISSING", "COUNT_INVALID", "EMPTY_PAGE", "PAGE_IDENTITY", "PAGE_COUNT", "ROW_COUNT", "REPORT_LINK", "REPORT_IDENTITY", "ROW_DATE", "ROW_DATE_RANGE", "COMPANY_IDENTITY", "SNIPPET_SHAPE") else "SEARCH_UNEXPECTED"
-                    raise SecondarySearchError(code, cursor, last, term_index, page_number) from None
-                pages_used += 1
-                if page["total"] != first["total"] or page["page_count"] != first["page_count"]:
-                    raise SecondarySearchError("PAGINATION_CHANGED", cursor, last, term_index, page_number)
-                page_ids = {(row["receipt_no"], row["document_no"]) for row in page["rows"]}
-                if len(page_ids) != len(page["rows"]) or page_ids & seen_page_ids:
-                    raise SecondarySearchError("PAGINATION_REPEAT", cursor, last, term_index, page_number)
-                seen_page_ids.update(page_ids)
-                all_rows.extend((term, row) for row in page["rows"])
-                page_digests.append(page["sha256"])
+            seen_page_ids = set()
+            if parts[0][0] is not None:
+                partition_counts[term] = {category: part["total"] for category, part in parts}
+                page_digests.append(first["sha256"])
+            for category, part_first in parts:
+                if part_first["page_count"] == 0:
+                    page_digests.append(part_first["sha256"])
+                for page_number in range(1, part_first["page_count"] + 1):
+                    if page_number == 1:
+                        page = part_first
+                    else:
+                        try:
+                            kwargs = {"dsp_type": category} if category else {}
+                            page = parse_search_page(fetch(term, cursor, last, page_number, **kwargs),
+                                                     page_number, cursor, last)
+                        except (ValueError, RuntimeError) as exc:
+                            code = str(exc) if str(exc) in ("SEARCH_TRANSPORT", "RESPONSE_SIZE", "ENCODING", "COUNT_MISSING", "COUNT_INVALID", "EMPTY_PAGE", "PAGE_IDENTITY", "PAGE_COUNT", "ROW_COUNT", "REPORT_LINK", "REPORT_IDENTITY", "ROW_DATE", "ROW_DATE_RANGE", "COMPANY_IDENTITY", "SNIPPET_SHAPE") else "SEARCH_UNEXPECTED"
+                            raise SecondarySearchError(code, cursor, last, term_index, page_number) from None
+                        pages_used += int(page_number > 1)
+                    if page["total"] != part_first["total"] or page["page_count"] != part_first["page_count"]:
+                        raise SecondarySearchError("PAGINATION_CHANGED", cursor, last, term_index, page_number)
+                    page_ids = {(row["receipt_no"], row["document_no"]) for row in page["rows"]}
+                    if len(page_ids) != len(page["rows"]) or page_ids & seen_page_ids:
+                        raise SecondarySearchError("PAGINATION_REPEAT", cursor, last, term_index, page_number)
+                    seen_page_ids.update(page_ids)
+                    all_rows.extend((term, row) for row in page["rows"])
+                    page_digests.append(page["sha256"])
         candidates = ledger["candidates"]
         discovered_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         unique_hits = {}
@@ -1127,6 +1153,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         ledger["coverage"].append({"from": cursor.isoformat(), "to": last.isoformat(),
             "checked_at": datetime.now(timezone.utc).isoformat(), "method": method,
             "pages": len(page_digests), "term_hits": term_counts,
+            "category_partitions": partition_counts,
             "unique_documents": len(unique_hits), "candidate_documents": sum(key in candidates for key in unique_hits),
             "term_candidate_hits": term_candidate_counts,
             "noncandidate_documents": len(noncandidate_keys),

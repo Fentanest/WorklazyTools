@@ -814,6 +814,87 @@ class SecondaryBackfillTests(unittest.TestCase):
             self.assertEqual(folio.read_json(path)["secondary_backfill"]["coverage"][0]["to"], "2006-02-08")
             self.assertTrue(any(first == last == start for _, first, last, _ in calls))
 
+    def test_single_day_overflow_requires_complete_disjoint_category_partition(self):
+        day = date(2006, 3, 31)
+        rows = [(f'20060331{i:06d}', str(1000000 + i), '회사', '사업보고서',
+                 '국민연금관리공단 주주', '2006.03.31') for i in range(11)]
+        def fetch(term, first, last, page, *, dsp_type=None, altered=None):
+            if term != secondary.TERMS[0]:
+                return result_page([])
+            if dsp_type is None:
+                return result_page(rows[:10], total=11, pages=2)
+            subset = rows[:6] if dsp_type == 'A' else rows[6:] if dsp_type == 'B' else []
+            if altered == 'count' and dsp_type == 'B':
+                subset = subset[:-1]
+            if altered == 'repeat' and dsp_type == 'B':
+                subset = [rows[0], *subset[1:]]
+            return result_page(subset)
+        with patch.object(secondary, 'MAX_SITE_PAGES', 1):
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'state.json'
+                folio.write_json(path, folio.empty_state())
+                result = secondary.scan_secondary(path, day, day, max_pages=30,
+                    fetch=fetch, read_state=folio.read_json, write_state=folio.write_json)
+                saved = folio.read_json(path)['secondary_backfill']
+                self.assertEqual((result['status'], result['new_candidates']), ('SEARCH_COMPLETE', 11))
+                self.assertEqual(saved['next_date'], '2006-04-01')
+                self.assertEqual(saved['coverage'][0]['category_partitions'][secondary.TERMS[0]]['A'], 6)
+                self.assertEqual(saved['coverage'][0]['category_partitions'][secondary.TERMS[0]]['B'], 5)
+                again = secondary.scan_secondary(path, day, day, max_pages=30,
+                    fetch=lambda *_: self.fail('completed partition repeated'),
+                    read_state=folio.read_json, write_state=folio.write_json)
+                self.assertEqual(again['search_requests'], 0)
+            for altered, code in [('count', 'PARTITION_COUNT'), ('repeat', 'PAGINATION_REPEAT')]:
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / 'state.json'
+                    folio.write_json(path, folio.empty_state())
+                    def bad_fetch(*args, **kwargs):
+                        return fetch(*args, altered=altered, **kwargs)
+                    with self.assertRaises(secondary.SecondarySearchError) as raised:
+                        secondary.scan_secondary(path, day, day, max_pages=30,
+                            fetch=bad_fetch, read_state=folio.read_json, write_state=folio.write_json)
+                    self.assertEqual(raised.exception.code, code)
+                    self.assertFalse((folio.read_json(path).get('secondary_backfill') or {}).get('coverage'))
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'state.json'
+                folio.write_json(path, folio.empty_state())
+                limited = secondary.scan_secondary(path, day, day, max_pages=10,
+                    fetch=fetch, read_state=folio.read_json, write_state=folio.write_json)
+                self.assertEqual(limited['status'], 'SEARCH_BUDGET_INSUFFICIENT')
+                self.assertEqual(limited['next_date'], '2006-03-31')
+                self.assertFalse((folio.read_json(path).get('secondary_backfill') or {}).get('coverage'))
+
+    def test_partition_checks_later_page_identity_before_advancing(self):
+        day = date(2006, 3, 31)
+        rows = [(f'20060331{i:06d}', str(1000000 + i), '회사', '사업보고서',
+                 '국민연금관리공단 주주', '2006.03.31') for i in range(21)]
+        def fetch(term, first, last, page, *, dsp_type=None):
+            if term != secondary.TERMS[0]:
+                return result_page([])
+            if dsp_type is None:
+                return result_page(rows[:10], total=21, pages=3)
+            subset = rows[:11] if dsp_type == 'A' else rows[11:] if dsp_type == 'B' else []
+            pages = 2 if len(subset) == 11 else 1
+            return result_page(subset[(page-1)*10:page*10], total=len(subset), page=page, pages=pages)
+        with patch.object(secondary, 'MAX_SITE_PAGES', 2):
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'state.json'
+                folio.write_json(path, folio.empty_state())
+                result = secondary.scan_secondary(path, day, day, max_pages=30,
+                    fetch=fetch, read_state=folio.read_json, write_state=folio.write_json)
+                self.assertEqual((result['status'], result['new_candidates']), ('SEARCH_COMPLETE', 21))
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'state.json'
+                folio.write_json(path, folio.empty_state())
+                def bad_fetch(term, first, last, page, *, dsp_type=None):
+                    return fetch(term, first, last, 1 if dsp_type == 'A' and page == 2 else page,
+                                 dsp_type=dsp_type)
+                with self.assertRaises(secondary.SecondarySearchError) as raised:
+                    secondary.scan_secondary(path, day, day, max_pages=30,
+                        fetch=bad_fetch, read_state=folio.read_json, write_state=folio.write_json)
+                self.assertEqual(raised.exception.code, 'PAGE_IDENTITY')
+                self.assertFalse((folio.read_json(path).get('secondary_backfill') or {}).get('coverage'))
+
     def test_budget_exhausted_while_shrinking_does_not_mix_window_pages(self):
         start, end = date(2006, 2, 8), date(2006, 2, 9)
         eleven = [(f'20060208{i:06d}', str(1251611 + i), '포스코', '주식등의대량보유상황보고서',
