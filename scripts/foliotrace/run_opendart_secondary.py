@@ -22,7 +22,7 @@ from scripts.foliotrace import folio, opendart_secondary
 
 # Stops that leave the lane incomplete must surface as process failure.
 INCOMPLETE_STATUSES = frozenset({"LISTING_BUDGET_INSUFFICIENT", "QUEUE_BACKLOG",
-                                 "QUEUE_BOUND_EXCEEDED"})
+                                 "QUEUE_BOUND_EXCEEDED", "REPROCESS_PENDING"})
 
 
 def main() -> int:
