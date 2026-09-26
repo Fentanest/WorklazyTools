@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from html.parser import HTMLParser
 import re
 import time
 import urllib.error
@@ -15,6 +16,7 @@ from zoneinfo import ZoneInfo
 CODE = re.compile(r"^[0-9A-Z]{6}$")
 BASE = "https://m.stock.naver.com/api/stock"
 CHART_BASE = "https://fchart.stock.naver.com/sise.nhn"
+KIND_BASE = "https://kind.krx.co.kr/common/stockprices.do"
 # Confirmed KRX closures: https://kind.krx.co.kr/external/dst/notice/11637/
 # [한국거래소] 2026년 올빼미공시 안내.pdf (2026 Chuseok, Sep 24-27).
 KNOWN_CLOSURES = {date(2026, 9, 24), date(2026, 9, 25)}
@@ -44,7 +46,7 @@ def expected_session(observed):
     return candidate
 
 
-def parse_regular_chart(code, payload, traded):
+def parse_regular_chart(code, payload, traded, *, official_close=None):
     """Select the exact 15:30 KRX minute from Naver's dated minute chart."""
     if not CODE.fullmatch(code) or not isinstance(payload, bytes) or len(payload) > 2_000_000 or b"<!DOCTYPE" in payload.upper() or b"<!ENTITY" in payload.upper():
         raise QuoteError("regular chart invalid")
@@ -58,12 +60,70 @@ def parse_regular_chart(code, payload, traded):
     stamp = traded.replace("-", "") + "1530"
     rows = [item.get("data", "").split("|") for item in chart.findall("item")]
     matched = [row for row in rows if row and row[0] == stamp]
-    if len(matched) != 1 or len(matched[0]) != 6:
+    if len(matched) == 1 and len(matched[0]) == 6:
+        return _amount(matched[0][4])
+    if matched or official_close is None:
         raise QuoteError("regular chart 15:30 close unverified")
-    return _amount(matched[0][4])
+    prefix = traded.replace("-", "")
+    delayed = [row for row in rows if len(row) == 6 and row[0].startswith(prefix)
+               and re.fullmatch(r"15(?:3[1-9])", row[0][8:])]
+    if not delayed or delayed[0][0][8:] > "1535":
+        raise QuoteError("regular chart delayed close unverified")
+    prices = {_amount(row[4]) for row in delayed}
+    if prices != {_amount(official_close)}:
+        raise QuoteError("regular chart/KRX close mismatch")
+    return _amount(official_close)
 
 
-def parse_quote(code, basic, daily, chart, observed_at, *, today=None):
+class _KindRows(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.rows = []
+        self.row = None
+        self.cell = None
+        self.inputs = {}
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "input":
+            fields = dict(attrs)
+            if fields.get("id") in ("repIsuSrtCd", "comAbbrv"):
+                self.inputs[fields["id"]] = fields.get("value")
+        if tag == "tr":
+            self.row = []
+        elif self.row is not None and tag in ("th", "td"):
+            self.cell = []
+
+    def handle_data(self, data):
+        if self.cell is not None:
+            self.cell.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in ("th", "td") and self.cell is not None and self.row is not None:
+            self.row.append("".join(self.cell).strip())
+            self.cell = None
+        elif tag == "tr" and self.row is not None:
+            self.rows.append(self.row)
+            self.row = None
+
+
+def parse_kind_close(page, traded, code, name):
+    if not isinstance(page, str) or len(page) > 1_000_000 or f"* {traded} 종가 기준" not in page:
+        raise QuoteError("KRX close response invalid")
+    parser = _KindRows()
+    parser.feed(page)
+    if parser.inputs.get("repIsuSrtCd") != f"A{code}" or parser.inputs.get("comAbbrv") != name:
+        raise QuoteError("KRX security identity mismatch")
+    rows = [row for row in parser.rows if len(row) >= 2 and row[0] == f"{traded} 종가"]
+    current = [row for row in parser.rows if len(row) >= 2 and row[0] == "현재가"]
+    if len(rows) != 1 or len(current) != 1:
+        raise QuoteError("KRX close date unverified")
+    close = _amount(rows[0][1])
+    if close != _amount(current[0][1]):
+        raise QuoteError("KRX close response mismatch")
+    return close
+
+
+def parse_quote(code, basic, daily, chart, observed_at, *, today=None, official_close=None):
     """Cross-check Naver identity/date, then use the 15:30 KRX chart close."""
     if not CODE.fullmatch(code) or not isinstance(basic, dict) or not isinstance(daily, list) or not daily:
         raise QuoteError("invalid quote response")
@@ -98,11 +158,12 @@ def parse_quote(code, basic, daily, chart, observed_at, *, today=None):
         raise QuoteError("quote date mismatch")
     if daily_close != corroborated:
         raise QuoteError("source daily/basic mismatch")
-    close = parse_regular_chart(code, chart, expected.isoformat())
+    close = parse_regular_chart(code, chart, expected.isoformat(), official_close=official_close)
     return {"close": close, "currency": "KRW", "market": "KRX", "session": "regular",
             "trade_date": expected.isoformat(), "adjusted": False, "provider": "naver",
             "observed_at": observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "verified": True,
-            "daily_reference_close": daily_close, "close_basis": "naver_krx_1530_minute"}
+            "daily_reference_close": daily_close,
+            "close_basis": "naver_krx_delayed_auction_kind_confirmed" if official_close is not None else "naver_krx_1530_minute"}
 
 
 class NaverClient:
@@ -154,6 +215,26 @@ class NaverClient:
                 self.sleep(min(2 ** attempt, 4))
         raise QuoteError("regular chart request failed")
 
+    def _kind_close(self, code, trade_date, name):
+        url = f"{KIND_BASE}?isurCd={code[:5]}&method=searchStockPricesMain"
+        for attempt in range(self.retries + 1):
+            delay = self.next_request_at - time.monotonic()
+            if delay > 0:
+                self.sleep(delay)
+            self.next_request_at = time.monotonic() + self.min_interval
+            request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 FolioTrace/1.0", "Accept": "text/html"})
+            try:
+                self.requests += 1
+                with self.opener(request, timeout=10) as response:
+                    if not response.headers.get("Content-Type", "").lower().startswith("text/html"):
+                        raise QuoteError("unexpected KRX content type")
+                    return parse_kind_close(response.read(1_000_001).decode("utf-8"), trade_date, code, name)
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, UnicodeError) as exc:
+                if attempt == self.retries or isinstance(exc, urllib.error.HTTPError) and exc.code not in (429, 500, 502, 503, 504):
+                    raise QuoteError("KRX close request failed") from exc
+                self.sleep(min(2 ** attempt, 4))
+        raise QuoteError("KRX close request failed")
+
     def quote(self, code, observed_at=None):
         if not CODE.fullmatch(code):
             raise QuoteError("invalid stock code")
@@ -168,6 +249,14 @@ class NaverClient:
         except QuoteError as exc:
             if "15:30 close unverified" not in str(exc):
                 raise
-            quote = parse_quote(code, basic, daily, self._chart(code, 2000), observed_at)
+            chart = self._chart(code, 2000)
+            try:
+                quote = parse_quote(code, basic, daily, chart, observed_at)
+            except QuoteError as second:
+                if "15:30 close unverified" not in str(second):
+                    raise
+                traded = expected_session(datetime.fromisoformat(observed_at.replace("Z", "+00:00"))).isoformat()
+                quote = parse_quote(code, basic, daily, chart, observed_at,
+                                    official_close=self._kind_close(code, traded, basic.get("stockName")))
         self.cache[code] = quote
         return quote

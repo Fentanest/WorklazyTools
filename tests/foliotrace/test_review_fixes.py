@@ -160,6 +160,26 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(result["unverified"], 1)
         self.assertEqual(state["holdings"][CORP]["corporate_action_reason"], "material_share_count_change")
 
+    def test_officially_confirmed_delayed_chart_close_is_cached_separately(self):
+        state = state_with_holding()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            output = Path(directory) / "publish.json"
+            folio.write_json(path, state)
+            delayed = {**quote(), "close_basis": "naver_krx_delayed_auction_kind_confirmed"}
+            class Client:
+                requests = 0
+                def quote(self, code):
+                    self.requests += 1
+                    return delayed
+            client = Client()
+            with patch.object(folio, "expected_session", return_value=folio.date(2026, 9, 23)):
+                first = folio.price_and_value(path, output, client)
+                second = folio.price_and_value(path, output, client)
+            self.assertEqual((first["cache_hits"], second["cache_hits"], client.requests), (0, 1, 1))
+            keys = list(folio.read_json(path)["quote_cache"])
+            self.assertEqual(keys, [f"{CODE}|KRX|regular|2026-09-23|naver-chart1530-kind-v1"])
+
 
 if __name__ == "__main__":
     unittest.main()

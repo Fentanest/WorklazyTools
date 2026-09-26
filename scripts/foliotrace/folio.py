@@ -1001,17 +1001,21 @@ def price_and_value(state_path: Path, output: Path, client=None):
     if not eligible:
         raise RuntimeError("no verified stock-class mappings for valuation")
     for code in sorted(eligible):
-        key = f"{code}|KRX|regular|{expected}|naver-chart1530-v1"
-        cached = cache.get(key)
-        if cached and cached.get("verified") is True and cached.get("trade_date") == expected and cached.get("close_basis") == "naver_krx_1530_minute":
+        strict_key = f"{code}|KRX|regular|{expected}|naver-chart1530-v1"
+        delayed_key = f"{code}|KRX|regular|{expected}|naver-chart1530-kind-v1"
+        cached_key = strict_key if strict_key in cache else delayed_key
+        cached = cache.get(cached_key)
+        expected_basis = "naver_krx_1530_minute" if cached_key == strict_key else "naver_krx_delayed_auction_kind_confirmed"
+        if cached and cached.get("verified") is True and cached.get("trade_date") == expected and cached.get("close_basis") == expected_basis:
             quotes[code] = cached
-            new_cache[key] = cached
+            new_cache[cached_key] = cached
             cache_hits += 1
             continue
         try:
             quotes[code] = client.quote(code)
             quote = quotes[code]
-            new_cache[f"{code}|KRX|regular|{quote['trade_date']}|naver-chart1530-v1"] = quote
+            suffix = "naver-chart1530-kind-v1" if quote.get("close_basis") == "naver_krx_delayed_auction_kind_confirmed" else "naver-chart1530-v1"
+            new_cache[f"{code}|KRX|regular|{quote['trade_date']}|{suffix}"] = quote
         except QuoteError as exc:
             failed[code] = str(exc)
     if eligible and not quotes:

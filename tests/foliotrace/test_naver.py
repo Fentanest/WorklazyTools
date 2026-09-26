@@ -55,6 +55,28 @@ class NaverTests(unittest.TestCase):
         with self.assertRaisesRegex(naver.QuoteError, "regular chart invalid"):
             naver.parse_regular_chart("000660", b"<!DOCTYPE protocol>" + chart(), "2026-09-23")
 
+    def test_delayed_close_requires_exact_official_identity_date_and_price(self):
+        late = chart("402340", "1190000").replace(b"202609231530", b"202609231532")
+        with self.assertRaisesRegex(naver.QuoteError, "15:30 close unverified"):
+            naver.parse_regular_chart("402340", late, "2026-09-23")
+        self.assertEqual(naver.parse_regular_chart("402340", late, "2026-09-23", official_close="1190000"), "1190000")
+        with self.assertRaisesRegex(naver.QuoteError, "chart/KRX close mismatch"):
+            naver.parse_regular_chart("402340", late, "2026-09-23", official_close="1191000")
+        too_late = late.replace(b"202609231532", b"202609231540")
+        with self.assertRaisesRegex(naver.QuoteError, "delayed close unverified"):
+            naver.parse_regular_chart("402340", too_late, "2026-09-23", official_close="1190000")
+        conflict = late.replace(b"</chartdata>", b'<item data="202609231536|null|null|null|1191000|101" /></chartdata>')
+        with self.assertRaisesRegex(naver.QuoteError, "chart/KRX close mismatch"):
+            naver.parse_regular_chart("402340", conflict, "2026-09-23", official_close="1190000")
+        page = ('<input id="repIsuSrtCd" value="A402340"><input id="comAbbrv" value="SK스퀘어">'
+                '* 2026-09-23 종가 기준<table><tr><th>현재가</th><td>1190000</td></tr>'
+                '<tr><th>2026-09-23 종가</th><td>1190000</td></tr></table>')
+        self.assertEqual(naver.parse_kind_close(page, "2026-09-23", "402340", "SK스퀘어"), "1190000")
+        with self.assertRaisesRegex(naver.QuoteError, "security identity mismatch"):
+            naver.parse_kind_close(page, "2026-09-23", "402340", "다른회사")
+        with self.assertRaisesRegex(naver.QuoteError, "close response invalid"):
+            naver.parse_kind_close(page, "2026-09-22", "402340", "SK스퀘어")
+
     def test_intraday_cache_miss_uses_independently_cross_checked_prior_close(self):
         basic, daily = response(close="110")
         basic.update(marketStatus="OPEN", marketStatusDetailType="open",
