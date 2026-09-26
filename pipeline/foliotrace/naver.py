@@ -119,7 +119,8 @@ def parse_kind_close(page, traded, code, name):
     parser = _KindRows()
     parser.feed(page)
     official_name = parser.inputs.get("comAbbrv")
-    same_name = isinstance(name, str) and (official_name == name or official_name == name + "공사")
+    same_name = isinstance(name, str) and (official_name == name or official_name == name + "공사"
+                                           or name.startswith("SK") and official_name == "에스케이" + name[2:])
     if parser.inputs.get("repIsuSrtCd") != f"A{code}" or not same_name:
         raise QuoteError("KRX security identity mismatch")
     rows = [row for row in parser.rows if len(row) >= 2 and row[0] == f"{traded} 종가"]
@@ -260,15 +261,9 @@ class NaverClient:
         try:
             quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close)
         except QuoteError as exc:
-            if "15:30 close unverified" not in str(exc):
+            if not any(reason in str(exc) for reason in ("15:30 close unverified", "delayed close unverified")):
                 raise
             chart = self._chart(code, 2000)
-            try:
-                quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close)
-            except QuoteError as second:
-                if "15:30 close unverified" not in str(second):
-                    raise
-                quote = parse_quote(code, basic, daily, chart, observed_at,
-                                    official_close=official_close)
+            quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close)
         self.cache[code] = quote
         return quote

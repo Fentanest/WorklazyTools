@@ -1,6 +1,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 PATH = Path(__file__).resolve().parents[2] / "pipeline/foliotrace/naver.py"
@@ -26,6 +27,17 @@ def chart(code="000660", close="1862000", day="20260923"):
 
 
 class NaverTests(unittest.TestCase):
+    def test_missing_chart_row_retries_larger_window_once(self):
+        basic, daily = response(close="110")
+        client = naver.NaverClient()
+        with patch.object(client, "_json", side_effect=[basic, daily]), \
+             patch.object(client, "_chart", side_effect=[chart(day="20260922"), chart(close="100")]) as fetch_chart, \
+             patch.object(client, "_kind_close", return_value="100") as official:
+            result = client.quote("000660", "2026-09-26T00:00:00Z")
+        self.assertEqual(result["close"], "100")
+        self.assertEqual([call.args[1] for call in fetch_chart.call_args_list], [500, 2000])
+        official.assert_called_once()
+
     def test_special_session_intraday_minute_must_match_official_close(self):
         basic, daily = response(close="110")
         minute = chart(close="100")
@@ -50,6 +62,14 @@ class NaverTests(unittest.TestCase):
         self.assertEqual(naver.parse_kind_close(page, "2026-09-23", "015760", "한국전력"), "23750")
         with self.assertRaisesRegex(naver.QuoteError, "security identity mismatch"):
             naver.parse_kind_close(page.replace("A015760", "A015761"), "2026-09-23", "015760", "한국전력")
+
+    def test_exact_security_code_allows_sk_company_spelling(self):
+        page = ('<input id="repIsuSrtCd" value="A326030"><input id="comAbbrv" value="에스케이바이오팜">'
+                '* 2026-09-23 종가 기준<table><tr><th>현재가</th><td>100</td></tr>'
+                '<tr><th>2026-09-23 종가</th><td>100</td></tr></table>')
+        self.assertEqual(naver.parse_kind_close(page, "2026-09-23", "326030", "SK바이오팜"), "100")
+        with self.assertRaisesRegex(naver.QuoteError, "security identity mismatch"):
+            naver.parse_kind_close(page.replace("A326030", "A326031"), "2026-09-23", "326030", "SK바이오팜")
 
     def test_regular_close_ignores_different_after_market_price(self):
         basic, daily = response()
