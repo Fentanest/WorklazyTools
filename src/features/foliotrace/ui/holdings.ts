@@ -3,6 +3,7 @@ import type { FilingEvent, Holding } from "../contracts";
 export type SortKey = "value" | "weight" | "ownership" | "receipt";
 export type QualityFilter = "all" | "priced" | "unpriced" | "below-5";
 export type HoldingStatus = "included" | "excluded" | "exit" | "unresolved";
+export type Lang = "ko" | "en";
 
 /**
  * Exact decimal-string handling for all financial labels.
@@ -93,6 +94,67 @@ export function holdingStatus(h: Holding): HoldingStatus {
   if (h.evidence === "unresolved-latest") return "unresolved";
   if (h.quote === null || h.estimatedValue === null) return "excluded";
   return "included";
+}
+
+/**
+ * User-facing labels for pipeline valuation exclusion reasons.
+ * Raw reason codes (e.g. "security_mapping_unverified") are internal
+ * identifiers and must never reach the screen: known codes map to
+ * accurate ko/en text, anything else falls back to a generic message
+ * that does not echo the unknown string.
+ */
+const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
+  tracking_exit: {
+    ko: "5% 추적 범위 이탈로 평가에서 제외",
+    en: "Excluded: exited the 5% tracking scope",
+  },
+  security_mapping_unverified: {
+    ko: "증권 대응이 확인되지 않아 평가에서 제외",
+    en: "Excluded: security mapping unverified",
+  },
+  quantity_unverified: {
+    ko: "수량이 확인되지 않아 평가에서 제외",
+    en: "Excluded: quantity unverified",
+  },
+  zero_quantity: {
+    ko: "수량이 0이라 평가에서 제외",
+    en: "Excluded: zero quantity",
+  },
+  quote_unverified: {
+    ko: "검증된 종가가 없어 평가에서 제외",
+    en: "Excluded: no verified closing price",
+  },
+  quote_date_or_session_mismatch: {
+    ko: "종가 기준일 또는 세션이 맞지 않아 평가에서 제외",
+    en: "Excluded: closing-price date or session mismatch",
+  },
+  quote_basis_unverified: {
+    ko: "가격 기준이 확인되지 않아 평가에서 제외",
+    en: "Excluded: price basis unverified",
+  },
+};
+
+export function exclusionReasonLabel(reason: string | null, lang: Lang): string | null {
+  if (reason === null) return null;
+  return (
+    EXCLUSION_REASON_LABELS[reason]?.[lang] ??
+    (lang === "ko" ? "확인되지 않은 사유로 평가에서 제외" : "Excluded: reason unavailable")
+  );
+}
+
+/**
+ * Quote basis in clear ko/en terms. Known contract values get human
+ * labels that retain source identity (KRX/네이버/Naver); anything else
+ * passes through raw (own data, React-escaped) rather than blanking.
+ */
+export function quoteSessionLabel(session: string, lang: Lang): string {
+  if (session === "regular") return lang === "ko" ? "정규장" : "Regular session";
+  return session;
+}
+
+export function quoteProviderLabel(provider: string, lang: Lang): string {
+  if (provider === "naver") return lang === "ko" ? "네이버" : "Naver";
+  return provider;
 }
 
 export function filterHoldings(holdings: Holding[], query: string, quality: QualityFilter): Holding[] {

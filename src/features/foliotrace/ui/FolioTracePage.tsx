@@ -22,17 +22,18 @@ import "./foliotrace.css";
 import {
   approxNumber,
   eventRangeOf,
+  exclusionReasonLabel,
   filterHoldings,
   formatKrw,
   formatPct,
   formatQty,
   holdingStatus,
+  quoteProviderLabel,
+  quoteSessionLabel,
   sortHoldings,
   topHoldings,
 } from "./holdings";
-import type { QualityFilter, SortKey } from "./holdings";
-
-type Lang = "ko" | "en";
+import type { Lang, QualityFilter, SortKey } from "./holdings";
 
 const STR = {
   ko: {
@@ -632,7 +633,7 @@ function ReadyView({
                 <dt>{t.detailPrice}</dt>
                 <dd>
                   {selected.quote
-                    ? `${formatKrw(selected.quote.close, lang)} · ${selected.quote.tradeDate} · ${selected.quote.session} · ${selected.quote.provider}`
+                    ? `${formatKrw(selected.quote.close, lang)} · ${selected.quote.tradeDate} · ${quoteSessionLabel(selected.quote.session, lang)} · ${quoteProviderLabel(selected.quote.provider, lang)}`
                     : "—"}
                 </dd>
               </div>
@@ -640,7 +641,10 @@ function ReadyView({
                 <dt>{t.detailInclusion}</dt>
                 <dd>
                   {statusLabel(holdingStatus(selected))}
-                  {selected.valuationExclusionReason ? ` — ${selected.valuationExclusionReason}` : ""}
+                  {(() => {
+                    const reason = exclusionReasonLabel(selected.valuationExclusionReason, lang);
+                    return reason ? ` — ${reason}` : "";
+                  })()}
                 </dd>
               </div>
               <div>

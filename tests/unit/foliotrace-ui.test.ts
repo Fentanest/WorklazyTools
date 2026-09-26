@@ -19,10 +19,12 @@ test("FolioTrace UI reuses Sol's contract instead of inventing a competing one",
 
 test("FolioTrace UI never fetches external data or fabricates sample finances", () => {
   for (const source of [pageSource, holdingsSource]) {
-    assert.doesNotMatch(source, /fetch\(|XMLHttpRequest|DART_API_KEY/i);
-    assert.doesNotMatch(source, /naver|dart\.fss\.or\.kr/i);
+    assert.doesNotMatch(source, /fetch\(|XMLHttpRequest|https?:\/\/|DART_API_KEY/i);
+    assert.doesNotMatch(source, /dart\.fss\.or\.kr/i);
     assert.ok(!source.includes("Math.random"), "must not invent sample values");
   }
+  // "naver" may only appear as a quote-provider display label, never a request.
+  assert.doesNotMatch(pageSource + holdingsSource, /naver\.(com|net|co\.|api)|openapi|query.*naver|naver.*query/i);
 });
 
 test("Number conversion exists only inside the visual-only approxNumber", () => {
@@ -45,6 +47,16 @@ test("FolioTrace styles stay inside the owned scope", () => {
   const selectors = (cssSource.match(/^\s*\.[a-z][a-z0-9-]*/gm) ?? []).map((s) => s.trim());
   const foreign = selectors.filter((s) => !s.startsWith(".foliotrace-"));
   assert.deepEqual(foreign, [], `CSS scope leak: ${foreign.join(",")}`);
+});
+
+test("scoped CSS uses only production tokens or valid fallbacks", () => {
+  // Production loads worklazy-theme.css, not theme.css: every --wl-*
+  // reference must carry a literal fallback (only radius tokens remain).
+  const bare = cssSource.match(/var\(--wl-(?!radius)[a-z-]*\)/g) ?? [];
+  assert.deepEqual(bare, [], `unresolvable production tokens: ${bare.join(", ")}`);
+  for (const token of ["--brand", "--bg-solid", "--label", "--label-secondary", "--separator"]) {
+    assert.ok(cssSource.includes(token), `expected production token ${token}`);
+  }
 });
 
 test("long exact amounts wrap in cards/history; table keeps nowrap in its scroll container", () => {

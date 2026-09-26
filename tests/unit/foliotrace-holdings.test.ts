@@ -5,11 +5,14 @@ import type { FilingEvent, Holding } from "../../src/features/foliotrace/contrac
 import {
   approxNumber,
   eventRangeOf,
+  exclusionReasonLabel,
   filterHoldings,
   formatKrw,
   formatPct,
   formatQty,
   holdingStatus,
+  quoteProviderLabel,
+  quoteSessionLabel,
   sortHoldings,
   topHoldings,
 } from "../../src/features/foliotrace/ui/holdings.ts";
@@ -219,6 +222,59 @@ test("topHoldings takes the top 8 priced weights in exact desc order", () => {
     top.map((h) => h.stockCode),
     ["code-9", "code-8", "code-7", "code-6", "code-5", "code-4", "code-3", "code-2"],
   );
+});
+
+test("every known exclusion reason maps to ko/en text, never the raw code", () => {
+  const known = [
+    "tracking_exit",
+    "security_mapping_unverified",
+    "quantity_unverified",
+    "zero_quantity",
+    "quote_unverified",
+    "quote_date_or_session_mismatch",
+    "quote_basis_unverified",
+  ];
+  for (const reason of known) {
+    for (const lang of ["ko", "en"] as const) {
+      const label = exclusionReasonLabel(reason, lang);
+      assert.ok(label, `${reason}/${lang} must map`);
+      assert.ok(!label!.includes(reason), `${reason}/${lang} leaks raw code: ${label}`);
+      assert.ok(!label!.includes("_"), `${reason}/${lang} looks unmapped: ${label}`);
+    }
+  }
+  assert.equal(exclusionReasonLabel("tracking_exit", "ko"), "5% 추적 범위 이탈로 평가에서 제외");
+  assert.equal(
+    exclusionReasonLabel("security_mapping_unverified", "ko"),
+    "증권 대응이 확인되지 않아 평가에서 제외",
+  );
+  assert.equal(
+    exclusionReasonLabel("quote_date_or_session_mismatch", "en"),
+    "Excluded: closing-price date or session mismatch",
+  );
+});
+
+test("unknown exclusion reasons fall back generically without echoing", () => {
+  assert.equal(exclusionReasonLabel(null, "ko"), null);
+  assert.equal(exclusionReasonLabel(null, "en"), null);
+  for (const unknown of ["some_future_reason", "SECURITY_MAPPING_UNVERIFIED", "tracking_exit ", ""]) {
+    for (const lang of ["ko", "en"] as const) {
+      const label = exclusionReasonLabel(unknown, lang);
+      assert.ok(label, `unknown reason must still explain: ${JSON.stringify(unknown)}`);
+      assert.ok(!label!.includes(unknown) || unknown === "", `echoes unknown code: ${label}`);
+    }
+  }
+  assert.equal(exclusionReasonLabel("some_future_reason", "ko"), "확인되지 않은 사유로 평가에서 제외");
+  assert.equal(exclusionReasonLabel("some_future_reason", "en"), "Excluded: reason unavailable");
+});
+
+test("quote session/provider render as clear terms with identity kept", () => {
+  assert.equal(quoteSessionLabel("regular", "ko"), "정규장");
+  assert.equal(quoteSessionLabel("regular", "en"), "Regular session");
+  assert.equal(quoteProviderLabel("naver", "ko"), "네이버");
+  assert.equal(quoteProviderLabel("naver", "en"), "Naver");
+  // Unknown contract values pass through (own data, React-escaped), never blank.
+  assert.equal(quoteSessionLabel("auction", "ko"), "auction");
+  assert.equal(quoteProviderLabel("other-feed", "en"), "other-feed");
 });
 
 test("eventRangeOf reports the real receipt-date span, never fabricated", () => {

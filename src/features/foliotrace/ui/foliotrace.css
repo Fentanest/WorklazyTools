@@ -1,4 +1,10 @@
-/* FolioTrace scoped styles. Only .foliotrace-* selectors. Semantic tokens only. */
+/* FolioTrace scoped styles. Only .foliotrace-* selectors.
+ * Colors come from the real four-theme tokens in
+ * src/styles/worklazy-theme.css (the stylesheet production main.tsx
+ * loads): --brand/--brand-border/--brand-on-bg, --bg-solid/--bg-elevated/
+ * --bg-muted, --label/--label-secondary, --separator, --green-soft/
+ * --orange-soft. Every var() keeps a literal fallback so a missing token
+ * degrades to a readable light value instead of transparent/inherit. */
 .foliotrace-page {
   display: flex;
   flex-direction: column;
@@ -10,10 +16,10 @@
 
 .foliotrace-retry {
   align-self: flex-start;
-  border: 1px solid var(--wl-border);
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   border-radius: var(--wl-radius-md, 12px);
-  background: var(--wl-surface);
-  color: var(--wl-text);
+  background: var(--bg-solid, #ffffff);
+  color: var(--label, #18181b);
   font-size: 0.85rem;
   font-weight: 700;
   padding: 0.55rem 0.9rem;
@@ -22,12 +28,12 @@
 }
 
 .foliotrace-retry:hover {
-  border-color: var(--wl-primary);
-  color: var(--wl-primary);
+  border-color: var(--brand, #e8502f);
+  color: var(--brand, #e8502f);
 }
 
 .foliotrace-retry:focus-visible {
-  outline: 2px solid var(--wl-focus, var(--wl-primary));
+  outline: 2px solid var(--brand-border, var(--brand, #e8502f));
   outline-offset: 2px;
 }
 
@@ -35,10 +41,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 0.9rem;
-  border: 1px solid var(--wl-border);
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   border-radius: var(--wl-radius-md, 12px);
-  background: var(--wl-surface);
-  color: var(--wl-text);
+  background: var(--bg-solid, #ffffff);
+  color: var(--label, #18181b);
   font-size: 0.85rem;
   line-height: 1.5;
   padding: 0.75rem 1rem;
@@ -56,18 +62,18 @@
 }
 
 .foliotrace-badge-warn {
-  background: var(--wl-warning);
-  color: var(--wl-on);
+  background: var(--orange-soft, rgba(245, 139, 0, 0.12));
+  color: var(--label, #18181b);
 }
 
 .foliotrace-badge-ok {
-  background: var(--wl-success);
-  color: var(--wl-on);
+  background: var(--green-soft, rgba(32, 177, 90, 0.12));
+  color: var(--label, #18181b);
 }
 
 .foliotrace-scope-note {
   margin: 0;
-  color: var(--wl-muted, var(--wl-text));
+  color: var(--label-secondary, #636369);
   font-size: 0.9rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -91,15 +97,15 @@
 
 .foliotrace-summary-card {
   padding: 1rem 1.1rem;
-  background: var(--wl-card-bg, var(--wl-surface));
-  border-color: var(--wl-border);
+  background: var(--bg-elevated, var(--bg-solid, #ffffff));
+  border-color: var(--separator, rgba(60, 60, 67, 0.13));
 }
 
 .foliotrace-summary-label {
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.04em;
-  color: var(--wl-muted, var(--wl-text));
+  color: var(--label-secondary, #636369);
 }
 
 .foliotrace-summary-value {
@@ -119,12 +125,12 @@
 }
 
 .foliotrace-summary-card small {
-  color: var(--wl-muted, var(--wl-text));
+  color: var(--label-secondary, #636369);
   font-size: 0.8rem;
 }
 
 .foliotrace-state-text {
-  color: var(--wl-text);
+  color: var(--label, #18181b);
   font-size: 0.92rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -175,14 +181,14 @@
   display: block;
   height: 0.65rem;
   border-radius: 999px;
-  background: var(--wl-soft, var(--wl-surface-muted));
+  background: var(--bg-muted, rgba(118, 118, 128, 0.08));
   overflow: hidden;
 }
 
 .foliotrace-bar-fill {
   display: block;
   height: 100%;
-  background: var(--wl-primary);
+  background: var(--brand, #e8502f);
   border-radius: 999px;
 }
 
@@ -203,7 +209,7 @@
   display: flex;
   gap: 0.8rem;
   align-items: baseline;
-  border-top: 1px solid var(--wl-border);
+  border-top: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   padding: 0.5rem 0.1rem;
   font-size: 0.9rem;
 }
@@ -213,7 +219,7 @@
 }
 
 .foliotrace-history small {
-  color: var(--wl-muted, var(--wl-text));
+  color: var(--label-secondary, #636369);
 }
 
 /* History values sit outside any scroll container, so they wrap like
@@ -243,10 +249,10 @@
 
 .foliotrace-field input,
 .foliotrace-field select {
-  border: 1px solid var(--wl-border);
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   border-radius: var(--wl-radius-sm, 10px);
-  background: var(--wl-surface);
-  color: var(--wl-text);
+  background: var(--bg-solid, #ffffff);
+  color: var(--label, #18181b);
   font-size: 0.92rem;
   font-weight: 400;
   min-height: 2.6rem;
@@ -256,14 +262,14 @@
 
 .foliotrace-field input:focus-visible,
 .foliotrace-field select:focus-visible {
-  outline: 2px solid var(--wl-focus, var(--wl-primary));
+  outline: 2px solid var(--brand-border, var(--brand, #e8502f));
   outline-offset: 1px;
 }
 
 .foliotrace-table-wrap {
   overflow-x: auto;
   max-width: 100%;
-  border: 1px solid var(--wl-border);
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   border-radius: var(--wl-radius-md, 12px);
 }
 
@@ -272,13 +278,13 @@
   width: 100%;
   min-width: 880px;
   font-size: 0.87rem;
-  background: var(--wl-surface);
-  color: var(--wl-text);
+  background: var(--bg-solid, #ffffff);
+  color: var(--label, #18181b);
 }
 
 .foliotrace-table th,
 .foliotrace-table td {
-  border-top: 1px solid var(--wl-border);
+  border-top: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   padding: 0.55rem 0.7rem;
   text-align: left;
   vertical-align: top;
@@ -287,7 +293,7 @@
 
 .foliotrace-table thead th {
   border-top: 0;
-  background: var(--wl-surface-muted, var(--wl-soft));
+  background: var(--bg-muted, rgba(118, 118, 128, 0.08));
   font-size: 0.78rem;
   white-space: nowrap;
 }
@@ -305,7 +311,7 @@ th.foliotrace-num {
 .foliotrace-code {
   font-family: ui-monospace, monospace;
   font-size: 0.82em;
-  background: var(--wl-soft, var(--wl-surface-muted));
+  background: var(--bg-muted, rgba(118, 118, 128, 0.08));
   border-radius: 6px;
   padding: 0.05rem 0.35rem;
   white-space: nowrap;
@@ -322,7 +328,7 @@ th.foliotrace-num {
 }
 
 .foliotrace-events li {
-  border-top: 1px solid var(--wl-border);
+  border-top: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   padding-top: 0.5rem;
   overflow-wrap: anywhere;
 }
@@ -334,7 +340,7 @@ th.foliotrace-num {
 
 .foliotrace-events a,
 .foliotrace-detail-list a {
-  color: var(--wl-primary);
+  color: var(--brand-on-bg, var(--brand, #e8502f));
 }
 
 .foliotrace-guide {
@@ -358,7 +364,7 @@ th.foliotrace-num {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  border-top: 1px solid var(--wl-border);
+  border-top: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   padding: 0.55rem 0;
   font-size: 0.9rem;
 }
@@ -368,7 +374,7 @@ th.foliotrace-num {
 }
 
 .foliotrace-detail-list dt {
-  color: var(--wl-muted, var(--wl-text));
+  color: var(--label-secondary, #636369);
   flex-shrink: 0;
 }
 
