@@ -366,6 +366,9 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
         if claim.get("status") != "actual_holding_basis_verified":
             candidate["application_status"] = "basis_or_owner_unverified"
             continue
+        if not candidate.get("source_archive_sha256") or not claim.get("source_file_sha256"):
+            candidate["application_status"] = "source_provenance_pending"
+            continue
         if len(matches) != 1:
             candidate["application_status"] = "issuer_identity_unverified"
             continue

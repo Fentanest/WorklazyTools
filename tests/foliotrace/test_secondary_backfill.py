@@ -210,6 +210,36 @@ class SecondaryBackfillTests(unittest.TestCase):
             self.assertEqual(repeat['source_document_requests'], 0)
             self.assertEqual(path.read_bytes(), before)
 
+    def test_provenance_upgrade_transport_failure_persists_retry_state(self):
+        day = date(2006, 2, 1)
+        state = folio.empty_state()
+        state['universe']['00155319'] = {'name': 'POSCO홀딩스', 'stock_code': '005490'}
+        key = '20060124800040:1248144'
+        state['secondary_backfill'] = {'method': secondary.METHOD, 'start_date': day.isoformat(),
+            'target_date': day.isoformat(), 'next_date': '2006-02-02', 'coverage': [],
+            'candidates': {key: {'receipt_no': '20060124800040', 'document_no': '1248144',
+                'filing_date': '2006-02-01', 'filing_company': 'POSCO홀딩스',
+                'review_status': 'source_context_review_pending',
+                'parser_version': secondary.SOURCE_PARSER_VERSION,
+                'source_archive_sha256': 'a' * 64,
+                'source_claims': [{'status': 'actual_holding_basis_verified',
+                    'row_sha256': 'b' * 64, 'basis_date': '2006-02-01',
+                    'quantity': '2407509', 'ownership_percent': '2.76'}]}}}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, state)
+            result = secondary.scan_secondary(path, day, day, read_state=folio.read_json,
+                write_state=folio.write_json, key='test-key', review_limit=1, source_only=True,
+                source_receipt='20060124800040',
+                fetch_document=lambda *_: (_ for _ in ()).throw(RuntimeError('DOCUMENT_TRANSPORT')))
+            self.assertEqual((result['source_review_attempts'], result['historical_facts_retained']), (1, 0))
+            saved = folio.read_json(path)
+            candidate = saved['secondary_backfill']['candidates'][key]
+            self.assertEqual(candidate['review_status'], 'source_review_pending')
+            self.assertEqual(candidate['application_status'], 'source_provenance_pending')
+            self.assertEqual(candidate['source_attempt_count'], 1)
+            self.assertEqual(saved.get('verified_historical_observations', {}), {})
+
     def test_parser_keeps_official_page_identity_and_receipt_metadata(self):
         day = date(2006, 2, 8)
         page = secondary.parse_search_page(result_page([POSCO]), 1, day, day)
