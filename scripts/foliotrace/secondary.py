@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import http.client
 import io
 import math
 import base64
@@ -184,7 +185,7 @@ def fetch_search_page(term: str, start: date, end: date, page: int, *, dsp_type=
             if len(payload) > 2_000_000:
                 raise ValueError("RESPONSE_SIZE")
             return payload
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException):
             if attempt + 1 == retries:
                 raise RuntimeError("SEARCH_TRANSPORT") from None
             time.sleep(attempt + 1)
@@ -202,7 +203,7 @@ def fetch_source_document(receipt_no: str, key: str, *, retries=3):
             if len(payload) > 20_000_000:
                 raise ValueError("DOCUMENT_SIZE")
             return payload
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException):
             if attempt + 1 == retries:
                 raise RuntimeError("DOCUMENT_TRANSPORT") from None
             time.sleep(attempt + 1)

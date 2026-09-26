@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 import io
+import http.client
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -28,6 +29,33 @@ NOISE = ("20060208000286", "1252220", "회사", "투자설명서",
 
 
 class SecondaryBackfillTests(unittest.TestCase):
+    def test_disconnected_search_retries_and_reports_only_safe_transport_code(self):
+        day = date(2006, 2, 8)
+        payload = result_page([POSCO])
+        with patch.object(secondary.time, 'sleep'), patch.object(secondary.urllib.request, 'urlopen',
+                side_effect=[http.client.RemoteDisconnected('connection closed'), io.BytesIO(payload)]) as request:
+            self.assertEqual(secondary.fetch_search_page('국민연금공단', day, day, 1), payload)
+            self.assertEqual(request.call_count, 2)
+        with patch.object(secondary.time, 'sleep'), patch.object(secondary.urllib.request, 'urlopen',
+                side_effect=http.client.RemoteDisconnected('secret-bearing transport detail')) as request:
+            with self.assertRaisesRegex(RuntimeError, '^SEARCH_TRANSPORT$') as failure:
+                secondary.fetch_search_page('국민연금공단', day, day, 1, retries=3)
+            self.assertEqual(request.call_count, 3)
+            self.assertNotIn('secret-bearing', str(failure.exception))
+
+    def test_disconnected_document_retries_and_preserves_retryable_failure(self):
+        payload = b'example archive bytes'
+        with patch.object(secondary.time, 'sleep'), patch.object(secondary.urllib.request, 'urlopen',
+                side_effect=[http.client.RemoteDisconnected('connection closed'), io.BytesIO(payload)]) as request:
+            self.assertEqual(secondary.fetch_source_document(POSCO[0], 'test-key'), payload)
+            self.assertEqual(request.call_count, 2)
+        with patch.object(secondary.time, 'sleep'), patch.object(secondary.urllib.request, 'urlopen',
+                side_effect=http.client.RemoteDisconnected('test-key transport detail')) as request:
+            with self.assertRaisesRegex(RuntimeError, '^DOCUMENT_TRANSPORT$') as failure:
+                secondary.fetch_source_document(POSCO[0], 'test-key', retries=3)
+            self.assertEqual(request.call_count, 3)
+            self.assertNotIn('test-key', str(failure.exception))
+
     def test_source_archive_marks_context_for_review_without_extracting_quantity(self):
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as archive:
