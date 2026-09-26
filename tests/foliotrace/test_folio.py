@@ -65,6 +65,112 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             folio.parse_filing_document(document("다른기관"))
 
+    def test_exact_voting_only_mapping_and_ambiguous_class(self):
+        def table(extra="-"):
+            cells = ["국민연금기금", "219-82-01593", "식별", "1,033,888", extra, "-", "-", "-", "-", "-", "-", "-", "1,033,888", "7.10"]
+            return "<TABLE><TR><TH>보유주식등의 내역</TH><TH>의결권 있는 주식</TH><TH>주수</TH></TR><TR>" + "".join(f"<TD>{v}</TD>" for v in cells) + "</TR></TABLE>"
+        self.assertEqual(folio.verified_voting_share_quantity(table(), "1033888"), "1033888")
+        self.assertIsNone(folio.verified_voting_share_quantity(table("1"), "1033888"))
+        self.assertIsNone(folio.verified_voting_share_quantity(table(), "1033889"))
+        class_row = "<TABLE><TR><TD>보통주</TD><TD>009450</TD><TD>1,033,888</TD></TR></TABLE>"
+        self.assertEqual(folio.verified_common_stock_code(class_row, "1033888"), "009450")
+        self.assertIsNone(folio.verified_common_stock_code(class_row.replace("009450", "009451"), "1033889"))
+        state = folio.empty_state()
+        no = "20260401003327"
+        state["universe"]["00101488"] = {"name": "Test", "stock_code": "009450"}
+        state["holdings"]["00101488"] = {"corp_code": "00101488", "stock_code": "009450", "name": "Test", "receipt_no": no,
+                                          "quantity": "1033888", "security_kind": "unknown", "valuation_exclusion_reason": "security_mapping_unverified"}
+        parsed = {"quantity": "1033888", "verified_voting_share_quantity": "1033888", "verified_common_stock_code": "009450", "xml_sha256": "a" * 64}
+        with patch.object(folio, "dart_document", return_value=parsed) as document:
+            self.assertEqual(folio.reconcile_security(state, "test-key", pause=lambda _: None,
+                                                      master={"009450": "Test"}, master_hash="b" * 64)["mapped"], 1)
+            self.assertEqual(folio.reconcile_security(state, "test-key", pause=lambda _: None,
+                                                      master={"009450": "Test"})["checked"], 0)
+        document.assert_called_once_with(no, "test-key")
+        self.assertEqual(state["holdings"]["00101488"]["security_kind"], "common")
+        self.assertEqual(state["holdings"]["00101488"]["quantity"], "1033888")
+        self.assertEqual(folio.parse_krx_security_master('<table><tr><td>주권</td><td>Test</td><td>KR7009450008</td><td>2020</td><td>1</td></tr><tr><td>주권</td><td>Test우</td><td>KR7009451006</td><td>2020</td><td>1</td></tr></table>'), {"009450": "Test"})
+
+    def test_targeted_legacy_reference_metadata_recovery(self):
+        state = folio.empty_state()
+        no = "20200804001234"
+        state["receipts"][no] = {"receipt_no": no, "evidence": "legacy_reference_only", "corp_code": None, "stock_code": None,
+                                  "quantity": None, "origin": "legacy_import"}
+        state["unresolved"][no] = "metadata_missing"
+        state["universe"]["00101488"] = {"name": "Test", "stock_code": "009450"}
+        row = {"rcept_no": no, "corp_code": "00101488", "rcept_dt": "20200804", "flr_nm": "국민연금공단",
+               "report_nm": "주식등의대량보유상황보고서", "corp_name": "Test"}
+        with patch.object(folio, "dart_json", return_value={"status": "000", "total_page": "1", "total_count": "1", "list": [row]}) as dart:
+            first = folio.recover_metadata(state, "test-key")
+            second = folio.recover_metadata(state, "test-key")
+        self.assertEqual(first["references_matched"], 1)
+        self.assertEqual(second["dates_checked"], 0)
+        self.assertEqual(dart.call_args.args[1]["bgn_de"], "20200804")
+        self.assertEqual(state["receipts"][no]["stock_code"], "009450")
+
+    def test_quote_cache_snapshot_and_published_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path, output = root / "state.json", root / "publish.json"
+            state = folio.empty_state()
+            state["import_ledger"] = ["seed"]
+            no = "20260923000001"
+            state["receipts"][no] = {"receipt_date": "2026-09-23"}
+            state["holdings"]["00101488"] = {"corp_code": "00101488", "stock_code": "009450", "name": "Test",
+                "receipt_no": no, "receipt_date": "2026-09-23", "quantity": "9007199254740993",
+                "company_ownership_percent": "5", "security_kind": "common", "tracking": "active", "evidence": "dart_document"}
+            folio.write_json(state_path, state)
+            quote = {"close": "1.25", "currency": "KRW", "market": "KRX", "session": "regular",
+                     "trade_date": "2026-09-23", "adjusted": False, "provider": "naver", "observed_at": "2026-09-26T00:00:00Z", "verified": True}
+            class Client:
+                requests = 2
+                def quote(self, code):
+                    self.requests += 2
+                    return quote
+            with patch.object(folio, "expected_session", return_value=date(2026, 9, 23)):
+                first = folio.price_and_value(state_path, output, Client())
+                second = folio.price_and_value(state_path, output, Client())
+            self.assertEqual(first["priced"], 1)
+            self.assertEqual(second["cache_hits"], 1)
+            self.assertEqual(folio.read_json(output)["estimatedValue"], "11258999068426241.25")
+            snap = folio.read_json(output)
+            recorded = folio.record_published(state_path, version=snap["datasetVersion"],
+                                               trade_date=snap["valuationTradeDate"], estimated_value=snap["estimatedValue"])
+            self.assertEqual(recorded["history_count"], 1)
+            self.assertTrue(folio.record_published(state_path, version=snap["datasetVersion"],
+                trade_date=snap["valuationTradeDate"], estimated_value=snap["estimatedValue"])["idempotent_noop"])
+            dist = root / "dist"
+            for lang in ("ko", "en"):
+                page = dist / lang / "tools/foliotrace/index.html"
+                page.parent.mkdir(parents=True)
+                page.write_text('<div class="seo-static-fallback"><main></main></div>')
+            (dist / "index.html").write_text("built")
+            emitted = folio.emit_snapshot(output, dist)
+            self.assertEqual(emitted["snapshot_sha256"], folio.sha((dist / "data/foliotrace/v1/snapshots" / f'{snap["datasetVersion"]}.json').read_bytes()))
+            self.assertIn("11258999068426241.25", (dist / "en/tools/foliotrace/index.html").read_text())
+
+    def test_production_valuation_rejects_zero_mappings_and_total_quote_outage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            output = Path(directory) / "publish.json"
+            state = folio.empty_state()
+            state["import_ledger"] = ["seed"]
+            state["holdings"]["00101488"] = {"stock_code": "009450", "quantity": "10", "security_kind": "unknown"}
+            folio.write_json(state_path, state)
+            with self.assertRaisesRegex(RuntimeError, "no verified stock-class mappings"):
+                folio.price_and_value(state_path, output)
+            self.assertFalse(output.exists())
+            state["holdings"]["00101488"]["security_kind"] = "common"
+            folio.write_json(state_path, state)
+            class FailedClient:
+                requests = 1
+                def quote(self, code):
+                    raise folio.QuoteError("quote request failed")
+            with patch.object(folio, "expected_session", return_value=date(2026, 9, 23)):
+                with self.assertRaisesRegex(RuntimeError, "all 1 eligible quote codes failed"):
+                    folio.price_and_value(state_path, output, FailedClient())
+            self.assertFalse(output.exists())
+
     def test_export_import_preserves_stock_code_and_does_not_import_price(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

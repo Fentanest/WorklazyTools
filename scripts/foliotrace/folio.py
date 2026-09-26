@@ -20,10 +20,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from html.parser import HTMLParser
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from pipeline.foliotrace.naver import NaverClient, QuoteError, expected_session
+from pipeline.foliotrace.publish import make_snapshot, encoded
 
 RECEIPT = re.compile(r"^\d{14}$")
 CORP = re.compile(r"^\d{8}$")
@@ -152,9 +157,10 @@ def safe_str(value, limit=200):
 
 def empty_state():
     return {"schema": 1, "revision": 0, "import_ledger": [], "universe": {}, "receipts": {},
-            "holdings": {}, "events": {}, "unresolved": {}, "listing_coverage": [], "latest_complete_listing_date": None,
+            "holdings": {}, "events": {}, "unresolved": {}, "metadata_recovery": {}, "mapping_ledger": {}, "quote_cache": {},
+            "listing_coverage": [], "latest_complete_listing_date": None,
             "legacy_coverage_status": "unverified", "legacy_resume_hint": None,
-            "last_published_dataset": None}
+            "last_published_dataset": None, "published_history": []}
 
 
 def normalize_seed(root: Path):
@@ -300,7 +306,7 @@ def dart_json(endpoint, params, key, retries=3):
             time.sleep(attempt + 1)
 
 
-def parse_filing_document(payload: bytes):
+def document_xml(payload: bytes):
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = [name for name in archive.namelist() if name.lower().endswith(".xml") and not name.startswith("/") and ".." not in Path(name).parts]
         if not names:
@@ -315,12 +321,141 @@ def parse_filing_document(payload: bytes):
     else:
         raise ValueError("DART XML encoding unsupported")
 
+    return xml, xml_bytes
+
+
+class FilingTableParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tables = []
+        self.table = None
+        self.row = None
+        self.cell = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "table": self.table = []
+        elif self.table is not None and tag == "tr": self.row = []
+        elif self.row is not None and tag in ("td", "th", "te", "tu"): self.cell = []
+
+    def handle_data(self, data):
+        if self.cell is not None: self.cell.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in ("td", "th", "te", "tu") and self.cell is not None and self.row is not None:
+            self.row.append(re.sub(r"\s+", "", html.unescape("".join(self.cell))))
+            self.cell = None
+        elif tag == "tr" and self.row is not None and self.table is not None:
+            self.table.append(self.row)
+            self.row = None
+        elif tag == "table" and self.table is not None:
+            self.tables.append(self.table)
+            self.table = None
+
+
+def verified_voting_share_quantity(xml: str, expected):
+    """Accept a single NPS table only when voting shares equal all reported securities."""
+    parser = FilingTableParser()
+    parser.feed(xml)
+    matches = []
+    for table in parser.tables:
+        headers = "".join("".join(row) for row in table[:3])
+        if "보유주식등의내역" not in headers or "의결권있는주식" not in headers or "주수" not in headers:
+            continue
+        nps_rows = [row for row in table if len(row) >= 14 and any(NPS.search(cell) for cell in row[:3])]
+        if not nps_rows:
+            continue
+        voting = Decimal(0)
+        total = Decimal(0)
+        for row in nps_rows:
+            # The public DART class table has relation, filer, ID, A, a1, a2, B..G, total, ratio.
+            cells = row[-11:]
+            if len(cells) != 11:
+                return None
+            try:
+                amounts = [Decimal(0) if value in ("", "-") else Decimal(value.replace(",", "")) for value in cells[:-1]]
+            except InvalidOperation:
+                return None
+            if any(value != 0 for value in amounts[1:-1]):
+                return None
+            voting += amounts[0]
+            total += amounts[-1]
+        if voting > 0 and voting == total == Decimal(expected):
+            matches.append(format(voting, "f"))
+    return matches[0] if len(matches) == 1 else None
+
+
+def verified_common_stock_code(xml: str, expected_quantity):
+    """Require an explicit ordinary-share code and amount in one source row."""
+    parser = FilingTableParser()
+    parser.feed(xml)
+    matches = set()
+    for table in parser.tables:
+        for row in table:
+            if not any("보통주" in cell for cell in row):
+                continue
+            codes = [cell for cell in row if STOCK.fullmatch(cell)]
+            amounts = [dec(cell) for cell in row if dec(cell) is not None]
+            if len(codes) == 1 and expected_quantity in amounts:
+                matches.add(codes[0])
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
+def parse_krx_security_master(html_text):
+    parser = FilingTableParser()
+    parser.feed(html_text)
+    result = {}
+    for table in parser.tables:
+        for row in table:
+            if len(row) < 5 or row[0] != "주권":
+                continue
+            name, isin = row[1:3]
+            if not re.fullmatch(r"KR7[0-9A-Z]{9}", isin):
+                continue
+            code = isin[3:9]
+            if not STOCK.fullmatch(code):
+                continue
+            # KRX-listed ordinary identity has the issuer code and 00 series.
+            if isin[9:11] == "00" and not re.search(r"(?:우|우B|우C|우선주)$", name):
+                if code in result and result[code] != name:
+                    result.pop(code)
+                else:
+                    result[code] = name
+    return result
+
+
+def comparable_company_name(value):
+    compact = re.sub(r"\s+", "", value or "").replace("㈜", "").replace("(주)", "")
+    return compact.removesuffix("주식회사")
+
+
+def krx_security_master(trade_date):
+    url = "https://kind.krx.co.kr/corpgeneral/listedissuestatusdetail.do"
+    merged = {}
+    hashes = []
+    for market in ("STK", "KSQ"):
+        params = {"method": "searchListedIssueStatDetailSub", "forward": "listedissuestatdetail_sub",
+                  "currentPageSize": "3000", "pageIndex": "1", "selDate": trade_date.replace("-", ""),
+                  "mktId": market, "secugrpId": "ST", "detailType": "2"}
+        request = urllib.request.Request(url, data=urllib.parse.urlencode(params).encode(),
+            headers={"User-Agent": "FolioTrace/1.0", "Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(request, timeout=25) as response:
+            payload = response.read(3_000_001)
+        if len(payload) > 3_000_000:
+            raise RuntimeError("KRX security master too large")
+        rows = parse_krx_security_master(payload.decode("utf-8"))
+        if len(rows) < 100:
+            raise RuntimeError("KRX security master incomplete")
+        merged.update(rows)
+        hashes.append(sha(payload))
+    return merged, sha(canonical(hashes))
+
+
+def parse_filing_document(payload: bytes):
+    xml, xml_bytes = document_xml(payload)
     def cell(attribute, code):
         found = re.search(rf'{attribute}="{re.escape(code)}"[^>]*>(.*?)</T[EUD]>', xml, re.S)
-        if not found:
-            return None
+        if not found: return None
         return html.unescape(re.sub(r"<[^>]+>", " ", found.group(1))).strip()
-
     filer = cell("ACODE", "RPT_RSP_NM")
     if not filer or not NPS.search(filer):
         raise ValueError("DART filer mismatch")
@@ -328,8 +463,11 @@ def parse_filing_document(payload: bytes):
     ownership = dec((cell("ACODE", "SUM_TMT_RT") or "").replace("%", ""))
     if quantity is None or ownership is None:
         raise ValueError("DART XML lacks holding quantity or ratio")
+    voting = verified_voting_share_quantity(xml, quantity)
     return {"quantity": quantity, "company_ownership_percent": ownership,
-            "reason": safe_str(cell("ACODE", "SUM_CHN_RWN")), "xml_sha256": sha(xml_bytes)}
+            "reason": safe_str(cell("ACODE", "SUM_CHN_RWN")), "xml_sha256": sha(xml_bytes),
+            "verified_voting_share_quantity": voting,
+            "verified_common_stock_code": verified_common_stock_code(xml, quantity)}
 
 
 def dart_document(no, key, retries=3):
@@ -396,6 +534,7 @@ def apply_listing_row(state, row):
             old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
     elif existing.get("evidence") == "legacy_reference_only":
         existing["corp_code"] = corp
+        existing["stock_code"] = state["universe"].get(corp, {}).get("stock_code")
         existing["receipt_date"] = norm_date(row.get("rcept_dt"))
         existing["evidence"] = "unresolved"
         state["unresolved"][no] = "needs_filing_parse"
@@ -473,6 +612,118 @@ def resolve_unfinished(state, key, limit=30):
     return processed
 
 
+def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None, master=None, master_hash=None):
+    """Check only current imported holdings against their exact DART receipt."""
+    ledger = state.setdefault("mapping_ledger", {})
+    checked = 0
+    mapped = 0
+    for holding in sorted(state["holdings"].values(), key=lambda h: h.get("receipt_no", ""), reverse=True):
+        if checked >= limit:
+            break
+        no = holding.get("receipt_no") or ""
+        if holding.get("security_kind") != "unknown" or not RECEIPT.fullmatch(no):
+            continue
+        if ledger.get(no, {}).get("status") in ("verified", "unverified"):
+            continue
+        corp = holding.get("corp_code")
+        universe = state["universe"].get(corp, {})
+        if universe.get("stock_code") != holding.get("stock_code"):
+            ledger[no] = {"status": "unverified", "reason": "stock_identity_mismatch"}
+            checked += 1
+            if state_path and checked % 20 == 0:
+                state["revision"] += 1
+                write_json(state_path, state)
+            continue
+        if master is None:
+            continue
+        listed_name = master.get(holding.get("stock_code"))
+        normalized_name = comparable_company_name(holding.get("name"))
+        normalized_listed = comparable_company_name(listed_name)
+        if not listed_name or normalized_name != normalized_listed:
+            ledger[no] = {"status": "unverified", "reason": "krx_stock_class_or_name_unverified"}
+            checked += 1
+            continue
+        try:
+            parsed = dart_document(no, key)
+        except (RuntimeError, ValueError, zipfile.BadZipFile):
+            ledger[no] = {"status": "retry", "reason": "document_unavailable"}
+            checked += 1
+            pause(0.2)
+            if state_path and checked % 20 == 0:
+                state["revision"] += 1
+                write_json(state_path, state)
+            continue
+        exact = parsed.get("verified_voting_share_quantity")
+        quantity = dec(holding.get("quantity"))
+        class_code = parsed.get("verified_common_stock_code")
+        if exact is not None and (class_code is None or class_code == holding.get("stock_code")) and quantity is not None and Decimal(exact) == Decimal(parsed["quantity"]) == Decimal(quantity):
+            holding["security_kind"] = "common"
+            holding["security_mapping_evidence"] = "dart_voting_only_and_krx_listed_class"
+            holding["security_mapping_xml_sha256"] = parsed["xml_sha256"]
+            holding["security_mapping_krx_sha256"] = master_hash
+            holding["valuation_exclusion_reason"] = None
+            ledger[no] = {"status": "verified", "xml_sha256": parsed["xml_sha256"], "krx_sha256": master_hash}
+            mapped += 1
+        else:
+            ledger[no] = {"status": "unverified", "reason": "share_class_or_quantity_unverified",
+                          "xml_sha256": parsed.get("xml_sha256")}
+        checked += 1
+        pause(0.2)
+        if state_path and checked % 20 == 0:
+            state["revision"] += 1
+            write_json(state_path, state)
+    if state_path and checked % 20:
+        state["revision"] += 1
+        write_json(state_path, state)
+    return {"checked": checked, "mapped": mapped,
+            "remaining": sum(h.get("security_kind") == "unknown" for h in state["holdings"].values())}
+
+
+def recover_metadata(state, key, *, limit_days=100, state_path=None):
+    """Re-query only the receipt dates of imported references missing identity."""
+    pending = {}
+    ledger = state.setdefault("metadata_recovery", {})
+    today = kst_today()
+    for no in state["unresolved"]:
+        receipt = state["receipts"].get(no, {})
+        if receipt.get("evidence") != "legacy_reference_only" or not RECEIPT.fullmatch(no):
+            continue
+        day = norm_date(no[:8])
+        if not day:
+            continue
+        last = ledger.get(day, {}).get("checked_on")
+        if last and (today - date.fromisoformat(last)).days < 7:
+            continue
+        pending.setdefault(day, set()).add(no)
+    checked = found = 0
+    for day, targets in sorted(pending.items(), reverse=True)[:limit_days]:
+        params = {"bgn_de": day.replace("-", ""), "end_de": day.replace("-", ""),
+                  "pblntf_detail_ty": "D001", "page_count": 100}
+        first = dart_json("list.json", {**params, "page_no": 1}, key)
+        total = int(first.get("total_count") or 0) if first.get("status") == "000" else 0
+        count = int(first.get("total_page") or 0) if first.get("status") == "000" else 0
+        if first.get("status") == "000" and (count < 1 or count != max(1, (total + 99) // 100)):
+            raise RuntimeError("DART metadata pagination inconsistent")
+        pages = [first] + [dart_json("list.json", {**params, "page_no": page}, key) for page in range(2, count + 1)]
+        if sum(len(page.get("list") or []) for page in pages) != total:
+            raise RuntimeError("DART metadata page count mismatch")
+        for page in pages:
+            for row in page.get("list") or []:
+                if str(row.get("rcept_no")) in targets and NPS.search(str(row.get("flr_nm") or "")):
+                    apply_listing_row(state, row)
+                    found += 1
+        ledger[day] = {"checked_on": today.isoformat(), "target_count": len(targets),
+                       "found_count": sum(state["receipts"].get(no, {}).get("evidence") != "legacy_reference_only" for no in targets)}
+        checked += 1
+        if state_path and checked % 10 == 0:
+            state["revision"] += 1
+            write_json(state_path, state)
+    if state_path and checked % 10:
+        state["revision"] += 1
+        write_json(state_path, state)
+    return {"dates_checked": checked, "references_matched": found}
+
+
 def collect(state_path: Path, cutoff: date, key: str, overlap=7):
     if not key:
         raise ValueError("DART_API_KEY unavailable")
@@ -521,14 +772,123 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
         state["revision"] += 1
         write_json(state_path, state)
         cursor = end + timedelta(days=1)
+    metadata = recover_metadata(state, key, state_path=state_path)
     parse_attempts = resolve_unfinished(state, key)
-    if parse_attempts:
+    mapping_master = None
+    mapping_hash = None
+    if any(h.get("security_kind") == "unknown" for h in state["holdings"].values()):
+        mapping_master, mapping_hash = krx_security_master(expected_session(datetime.now(timezone.utc)).isoformat())
+    mapping = reconcile_security(state, key, state_path=state_path, master=mapping_master, master_hash=mapping_hash)
+    if parse_attempts and not mapping["checked"]:
         state["revision"] += 1
         write_json(state_path, state)
     return {"status": "LISTING_COMPLETE_PARSING_PENDING" if state["unresolved"] else "LISTING_COMPLETE",
             "requested_from": start.isoformat(), "requested_to": cutoff.isoformat(),
             "requests": request_count, "new_receipts": new_receipts,
-            "parse_attempts": parse_attempts, "unresolved": len(state["unresolved"]), "state_revision": state["revision"]}
+            "parse_attempts": parse_attempts, "metadata": metadata, "mapping": mapping,
+            "unresolved": len(state["unresolved"]), "state_revision": state["revision"]}
+
+
+def price_and_value(state_path: Path, output: Path, client=None):
+    state = read_json(state_path)
+    if not state.get("import_ledger"):
+        raise ValueError("IMPORT_PENDING_SOURCE")
+    client = client or NaverClient()
+    quotes = {}
+    failed = {}
+    cache_hits = 0
+    now = datetime.now(timezone.utc)
+    expected = expected_session(now).isoformat()
+    cache = state.setdefault("quote_cache", {})
+    new_cache = {}
+    eligible = {row.get("stock_code") for row in state["holdings"].values()
+                if row.get("security_kind") in ("common", "preferred") and row.get("tracking") != "below-5-percent"
+                and row.get("stock_code")}
+    if not eligible:
+        raise RuntimeError("no verified stock-class mappings for valuation")
+    for code in sorted(eligible):
+        key = f"{code}|KRX|regular|{expected}|raw"
+        cached = cache.get(key)
+        if cached and cached.get("verified") is True and cached.get("trade_date") == expected:
+            quotes[code] = cached
+            new_cache[key] = cached
+            cache_hits += 1
+            continue
+        try:
+            quotes[code] = client.quote(code)
+            quote = quotes[code]
+            new_cache[f"{code}|KRX|regular|{quote['trade_date']}|raw"] = quote
+        except QuoteError as exc:
+            failed[code] = str(exc)
+    if eligible and not quotes:
+        raise RuntimeError(f"all {len(eligible)} eligible quote codes failed on {expected}")
+    if new_cache != cache:
+        state["quote_cache"] = new_cache
+        state["revision"] += 1
+        write_json(state_path, state)
+    snapshot = make_snapshot(state, quotes)
+    write_json(output, snapshot)
+    return {"dataset_version": snapshot["datasetVersion"], "tracked": snapshot["trackedCount"],
+            "eligible_codes": len(eligible), "priced": snapshot["pricedCount"],
+            "valuation_coverage": snapshot["valuationCoverage"], "failed_quotes": failed,
+            "requests": client.requests, "cache_hits": cache_hits,
+            "output_sha256": sha(encoded(snapshot))}
+
+
+def emit_snapshot(snapshot_path: Path, dist: Path):
+    if dist.name != "dist" or not (dist / "index.html").is_file():
+        raise ValueError("output must be a built dist directory")
+    snapshot = read_json(snapshot_path)
+    version = snapshot.get("datasetVersion")
+    if not isinstance(version, str) or not re.fullmatch(r"[a-f0-9]{64}", version):
+        raise ValueError("invalid snapshot version")
+    root = dist / "data/foliotrace/v1"
+    target = root / "snapshots" / f"{version}.json"
+    write_json(target, snapshot)
+    manifest = {"schemaVersion": 1, "datasetVersion": version,
+                "snapshotPath": f"snapshots/{version}.json", "snapshotSha256": sha(target.read_bytes())}
+    write_json(root / "manifest.json", manifest)
+    for lang in ("ko", "en"):
+        page = dist / lang / "tools/foliotrace/index.html"
+        source = page.read_text(encoding="utf-8")
+        if 'class="seo-static-fallback"' not in source:
+            raise ValueError("FolioTrace static fallback missing")
+        is_ko = lang == "ko"
+        label = "평가 기준 거래일" if is_ko else "Valuation trade date"
+        value_label = "추정 평가금액" if is_ko else "Estimated value"
+        unavailable = "검증된 평가금액 없음" if is_ko else "No verified estimate available"
+        top_label = "상위 보유종목" if is_ko else "Top holdings"
+        rows = sorted((h for h in snapshot["holdings"] if h["estimatedValue"] is not None),
+                      key=lambda h: Decimal(h["estimatedValue"]), reverse=True)[:10]
+        table = ""
+        if rows:
+            body = "".join(f"<tr><th scope='row'>{html.escape(h['name'])}</th><td>{html.escape(h['stockCode'])}</td><td>{html.escape(h['estimatedValue'])}</td></tr>" for h in rows)
+            table = f"<h2>{top_label}</h2><table><thead><tr><th>{'종목' if is_ko else 'Security'}</th><th>{'코드' if is_ko else 'Code'}</th><th>KRW</th></tr></thead><tbody>{body}</tbody></table>"
+        summary = f"<section data-foliotrace-dataset='{version}'><h2>{value_label}</h2><p>{html.escape(snapshot['estimatedValue'] or unavailable)}</p><p>{label}: {html.escape(snapshot['valuationTradeDate'] or unavailable)}</p>{table}</section>"
+        page.write_text(source.replace("</main>", summary + "</main>", 1), encoding="utf-8")
+    return {"dataset_version": version, "snapshot_sha256": manifest["snapshotSha256"],
+            "manifest_sha256": sha((root / "manifest.json").read_bytes())}
+
+
+def record_published(state_path: Path, *, version: str, trade_date: str | None, estimated_value: str | None):
+    if not re.fullmatch(r"[a-f0-9]{64}", version):
+        raise ValueError("invalid published dataset")
+    state = read_json(state_path)
+    if state.get("last_published_dataset") == version:
+        return {"published_dataset": version, "history_count": len(state.get("published_history", [])),
+                "state_revision": state["revision"], "idempotent_noop": True}
+    if trade_date and estimated_value is not None:
+        if not norm_date(trade_date) or dec(estimated_value) is None:
+            raise ValueError("invalid published valuation")
+        history = [entry for entry in state.get("published_history", []) if entry["trade_date"] != trade_date]
+        history.append({"trade_date": trade_date, "estimated_value": dec(estimated_value),
+                        "dataset_version": version, "methodology_version": "1"})
+        state["published_history"] = sorted(history, key=lambda entry: entry["trade_date"])[-90:]
+    state["last_published_dataset"] = version
+    state["revision"] += 1
+    write_json(state_path, state)
+    return {"published_dataset": version, "history_count": len(state.get("published_history", [])),
+            "state_revision": state["revision"]}
 
 
 def main():
@@ -545,7 +905,17 @@ def main():
     q = sub.add_parser("collect")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--cutoff", type=date.fromisoformat, default=kst_today())
-    sub.add_parser("price-and-value")
+    q = sub.add_parser("price-and-value")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--output", type=Path, required=True)
+    q = sub.add_parser("emit-snapshot")
+    q.add_argument("--snapshot", type=Path, required=True)
+    q.add_argument("--dist", type=Path, required=True)
+    q = sub.add_parser("record-published")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--dataset-version", required=True)
+    q.add_argument("--trade-date")
+    q.add_argument("--estimated-value")
     q = sub.add_parser("verify-migration")
     q.add_argument("--export", type=Path, required=True)
     q.add_argument("--state", type=Path, required=True)
@@ -555,8 +925,10 @@ def main():
         elif args.command == "export-source": result = export_source(args.source, args.output)
         elif args.command == "import-seed": result = import_seed(args.export, args.state, args.commit)
         elif args.command == "collect": result = collect(args.state, args.cutoff, os.environ.get("DART_API_KEY", ""))
-        elif args.command == "price-and-value":
-            raise RuntimeError("NAVER_QUOTE_RIGHTS_UNVERIFIED: official Npay FAQ forbids reuse in a web page")
+        elif args.command == "price-and-value": result = price_and_value(args.state, args.output)
+        elif args.command == "emit-snapshot": result = emit_snapshot(args.snapshot, args.dist)
+        elif args.command == "record-published": result = record_published(args.state, version=args.dataset_version,
+            trade_date=args.trade_date, estimated_value=args.estimated_value)
         else:
             _, _, _, _, expected = normalize_seed(args.export)
             state = read_json(args.state)

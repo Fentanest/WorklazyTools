@@ -26,7 +26,10 @@ jobs:
       contents: write # Commit only the normalized FolioTrace state on its dedicated branch.
     runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","235"]') }}
     outputs:
-      data_sha: ${{ steps.persist-data.outputs.sha }}
+      data_sha: ${{ steps.persist-price.outputs.sha }}
+      dataset_version: ${{ steps.snapshot-meta.outputs.dataset_version }}
+      trade_date: ${{ steps.snapshot-meta.outputs.trade_date }}
+      estimated_value: ${{ steps.snapshot-meta.outputs.estimated_value }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,8 +79,42 @@ jobs:
         if: steps.collect.outcome != 'success'
         run: exit 1
 
-      - name: Verify quote rights and value portfolio
-        run: python3 scripts/foliotrace/folio.py price-and-value
+      - name: Wait for regular close confirmation on the scheduled run
+        if: github.event_name == 'schedule'
+        run: |
+          python3 - <<'PY'
+          from datetime import datetime, time, timedelta
+          from zoneinfo import ZoneInfo
+          import time as clock
+          now = datetime.now(ZoneInfo('Asia/Seoul'))
+          target = now.replace(hour=16, minute=35, second=0, microsecond=0)
+          if now.weekday() < 5 and time(16, 0) <= now.time() < target.time():
+              clock.sleep(min((target - now).total_seconds(), 35 * 60))
+          PY
+
+      - name: Verify regular close and value portfolio
+        run: python3 scripts/foliotrace/folio.py price-and-value --state foliotrace-state/state.json --output foliotrace-state/publish.json
+
+      - name: Persist verified quote cache
+        id: persist-price
+        run: |
+          git -C foliotrace-state add state.json
+          if ! git -C foliotrace-state diff --cached --quiet; then
+            git -C foliotrace-state commit -m 'data: cache verified FolioTrace closes'
+            git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
+          fi
+          echo "sha=$(git -C foliotrace-state rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Pin snapshot metadata
+        id: snapshot-meta
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          data = json.loads(Path('foliotrace-state/publish.json').read_text())
+          for output, key in [('dataset_version', 'datasetVersion'), ('trade_date', 'valuationTradeDate'), ('estimated_value', 'estimatedValue')]:
+              print(f'{output}={data.get(key) or ""}')
+          PY
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -99,6 +136,12 @@ jobs:
         env:
           VITE_BASE_PATH: /
           VITE_SITE_URL: https://worklazy.net/
+
+      - name: Emit versioned FolioTrace snapshot and matching HTML
+        run: python3 scripts/foliotrace/folio.py emit-snapshot --snapshot foliotrace-state/publish.json --dist dist
+
+      - name: Validate deployed FolioTrace contract and HTML
+        run: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs dist
 
       - name: Run unit tests
         run: npm run test:unit
@@ -127,7 +170,7 @@ jobs:
 
   deploy:
     permissions:
-      contents: read
+      contents: write # Record only the successfully deployed FolioTrace valuation history.
       pages: write
       id-token: write
     environment:
@@ -150,3 +193,33 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Checkout pinned FolioTrace data for published history
+        uses: actions/checkout@v4
+        with:
+          ref: foliotrace-data
+          path: foliotrace-state
+          fetch-depth: 0
+      - name: Record successfully published dataset
+        env:
+          EXPECTED_DATA: ${{ needs.build.outputs.data_sha }}
+          DATASET_VERSION: ${{ needs.build.outputs.dataset_version }}
+          TRADE_DATE: ${{ needs.build.outputs.trade_date }}
+          ESTIMATED_VALUE: ${{ needs.build.outputs.estimated_value }}
+        run: |
+          test "$(git -C foliotrace-state rev-parse HEAD)" = "$EXPECTED_DATA"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.foliotrace.folio import record_published
+          result = record_published(Path('foliotrace-state/state.json'), version=os.environ['DATASET_VERSION'],
+                                    trade_date=os.environ['TRADE_DATE'] or None,
+                                    estimated_value=os.environ['ESTIMATED_VALUE'] or None)
+          print(result)
+          PY
+          git -C foliotrace-state config user.name 'github-actions[bot]'
+          git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C foliotrace-state add state.json
+          if ! git -C foliotrace-state diff --cached --quiet; then
+            git -C foliotrace-state commit -m 'data: record published FolioTrace dataset'
+            git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
+          fi

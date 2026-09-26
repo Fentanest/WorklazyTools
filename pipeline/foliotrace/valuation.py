@@ -1,7 +1,4 @@
-"""Exact valuation of already verified, same-session quotes.
-
-No network access lives here. Npay quote reuse is blocked separately.
-"""
+"""Exact valuation of verified quotes from one regular KRX session."""
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
