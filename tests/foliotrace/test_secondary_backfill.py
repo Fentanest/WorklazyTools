@@ -102,6 +102,99 @@ class SecondaryBackfillTests(unittest.TestCase):
         mismatched = first.replace('2,407,509</TD></TR><P>5.', '2,407,508</TD></TR><P>5.')
         self.assertIsNone(secondary.extract_source_claims('<DOC>' + mismatched + other + '</DOC>')[0]['basis_date'])
 
+    def test_issued_share_total_checks_actual_posco_ratio_without_inventing_denominator_date(self):
+        def row(*cells):
+            return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'
+        xml = ('<DOC><P>2. 발행주식수정보</P>' +
+            row('보통주식총수(1)', '우선주식총수(2)', '발행주식총수(1+2)') +
+            row('87,186,835', '0', '87,186,835') +
+            row('이번보고서제출일', '2006년 02월 01일', '보통주', '2,407,509', '2.76') +
+            '<P>4. 개인별세부변동사항</P>' + row('성명', '국민연금관리공단') +
+            row('2006년 02월 01일', '장내매도(-)', '보통주', '3,084,186', '-676,677', '2,407,509') +
+            '<P>5. 최대주주등 주식소유현황(총괄현황)</P>' +
+            row('국민연금관리공단', '사업자등록', '219-82-01593', '본인', '2,407,509', '2.76') + '</DOC>')
+        claim = secondary.extract_source_claims(xml)[0]
+        self.assertEqual((claim['ratio_denominator'], claim['denominator_quantity'],
+                          claim['denominator_date']), ('issued_shares', '87186835', None))
+        wrong = xml.replace('87,186,835', '80,000,000')
+        self.assertNotIn('ratio_denominator', secondary.extract_source_claims(wrong)[0])
+
+        state = folio.empty_state()
+        state['universe']['00155319'] = {'name': 'POSCO홀딩스', 'stock_code': '005490'}
+        candidate = {'receipt_no': '20060124800040', 'document_no': '1248144',
+            'filing_date': '2006-02-01', 'filing_company': 'POSCO홀딩스',
+            'source_archive_sha256': 'a' * 64, 'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_claims': [{**claim, 'source_file_sha256': 'c' * 64}]}
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 1)
+        fact = next(iter(state['verified_historical_observations'].values()))
+        self.assertEqual((fact['ratio_denominator'], fact['denominator_date'],
+            fact['observation_status']), ('issued_shares', None, 'historical_only_denominator_date_unverified'))
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 0)
+        self.assertEqual(len(state['verified_historical_observations']), 1)
+        key = next(iter(state['verified_historical_observations']))
+        prior = dict(fact, ratio_denominator='unverified', denominator_quantity=None,
+            denominator_date=None, denominator_evidence=None,
+            observation_status='historical_only_ratio_basis_unverified',
+            parser_version='source-change-sections-v4')
+        state['verified_historical_observations'][key] = prior
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 1)
+        self.assertEqual(candidate['application_status'], 'historical_fact_enriched')
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 0)
+        self.assertEqual(len(state['verified_historical_observations']), 1)
+
+    def test_stored_candidate_rechecks_source_and_reaches_public_history(self):
+        def row(*cells):
+            return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'
+        xml = ('<DOC><P>2. 발행주식수정보</P>' +
+            row('보통주식총수(1)', '우선주식총수(2)', '발행주식총수(1+2)') +
+            row('87,186,835', '0', '87,186,835') +
+            row('이번보고서제출일', '2006년 02월 01일', '보통주', '2,407,509', '2.76') +
+            '<P>4. 개인별세부변동사항</P>' + row('성명', '국민연금관리공단') +
+            row('2006년 02월 01일', '장내매도(-)', '보통주', '3,084,186', '-676,677', '2,407,509') +
+            '<P>5. 최대주주등 주식소유현황(총괄현황)</P>' +
+            row('국민연금관리공단', '사업자등록', '219-82-01593', '본인', '2,407,509', '2.76') + '</DOC>')
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, 'w') as zf:
+            zf.writestr('report.xml', xml)
+        state = folio.empty_state()
+        corp, stock, receipt, document = '00155319', '005490', '20060124800040', '1248144'
+        state['universe'][corp] = {'name': 'POSCO홀딩스', 'stock_code': stock}
+        state['holdings'][corp] = {'corp_code': corp, 'stock_code': stock, 'name': 'POSCO홀딩스',
+            'receipt_no': '20260623000336', 'receipt_date': '2026-06-23',
+            'holding_date': '2026-06-18', 'quantity': '6576661',
+            'company_ownership_percent': '8.3', 'security_kind': 'common',
+            'tracking': 'active', 'evidence': 'dart_document'}
+        candidate = {'receipt_no': receipt, 'document_no': document,
+            'filing_date': '2006-02-01', 'filing_company': 'POSCO홀딩스',
+            'review_status': 'source_context_review_pending',
+            'parser_version': 'source-change-sections-v4'}
+        state['secondary_backfill'] = {'method': secondary.METHOD,
+            'start_date': '2006-02-01', 'target_date': '2006-02-01',
+            'next_date': '2006-02-02', 'coverage': [], 'candidates': {f'{receipt}:{document}': candidate}}
+        state['secondary_source_cache'][receipt] = {'parser_version': 'source-change-sections-v4',
+            'status': 'source_context_review_pending'}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, state)
+            first = secondary.scan_secondary(path, date(2006, 2, 1), date(2006, 2, 1),
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key',
+                source_only=True, source_receipt=receipt, review_limit=1,
+                fetch_document=lambda *_: archive.getvalue())
+            self.assertEqual((first['source_document_requests'], first['historical_facts_retained']), (1, 1))
+            saved = folio.read_json(path)
+            fact = next(iter(saved['verified_historical_observations'].values()))
+            self.assertEqual((fact['basis_date'], fact['quantity'], fact['ownership_percent'],
+                fact['ratio_denominator'], fact['denominator_date']),
+                ('2006-02-01', '2407509', '2.76', 'issued_shares', None))
+            public = make_snapshot(saved, {})
+            self.assertEqual(public['historicalObservations'][0]['status'],
+                             'historical_only_denominator_date_unverified')
+            self.assertEqual(public['holdings'][0]['companyOwnershipPercent'], '8.3')
+            second = secondary.scan_secondary(path, date(2006, 2, 1), date(2006, 2, 1),
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key',
+                source_only=True, source_receipt=receipt, review_limit=1,
+                fetch_document=lambda *_: self.fail('unexpected source re-fetch'))
+            self.assertEqual((second['source_document_requests'], second['historical_facts_retained']), (0, 0))
     def test_source_checked_history_fact_keeps_unknown_denominator_and_current_holding(self):
         state = folio.empty_state()
         state['universe']['00155319'] = {'name': 'POSCO홀딩스', 'stock_code': '005490'}

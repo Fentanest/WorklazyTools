@@ -252,11 +252,11 @@ test("every known exclusion reason maps to ko/en text, never the raw code", () =
   assert.equal(exclusionReasonLabel("tracking_exit", "ko"), "5% 추적 범위 이탈로 평가에서 제외");
   assert.equal(
     exclusionReasonLabel("security_mapping_unverified", "ko"),
-    "증권 대응이 확인되지 않아 평가에서 제외",
+    "공시의 주식 종류와 종목을 확인하지 못해 평가에서 제외",
   );
   assert.equal(
     exclusionReasonLabel("quote_date_or_session_mismatch", "en"),
-    "Excluded: closing-price date or session mismatch",
+    "Excluded: the closing-price date or regular trading price could not be confirmed",
   );
   assert.equal(
     exclusionReasonLabel("latest_filing_unresolved", "ko"),
@@ -269,10 +269,10 @@ test("every known exclusion reason maps to ko/en text, never the raw code", () =
 
 test("latest-unresolved sub-reasons map, unknowns fall back without echo", () => {
   assert.equal(latestUnresolvedReasonLabel(null, "ko"), null);
-  assert.equal(latestUnresolvedReasonLabel("needs_filing_parse", "ko"), "공시문 분석 필요");
+  assert.equal(latestUnresolvedReasonLabel("needs_filing_parse", "ko"), "공시 내용 확인 중");
   assert.equal(latestUnresolvedReasonLabel("correction_relation_unverified", "en"), "Correction relation unverified");
   assert.equal(latestUnresolvedReasonLabel("withdrawal_unverified", "ko"), "철회 여부 미확인");
-  assert.equal(latestUnresolvedReasonLabel("security_identity_missing", "en"), "Security identity missing");
+  assert.equal(latestUnresolvedReasonLabel("security_identity_missing", "en"), "Not enough information to identify the share class and security");
   assert.equal(latestUnresolvedReasonLabel("future_code", "ko"), "미확인 사유");
   assert.equal(latestUnresolvedReasonLabel("future_code", "en"), "Unverified reason");
 });

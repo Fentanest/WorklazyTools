@@ -5,7 +5,8 @@ import hashlib
 import json
 from datetime import datetime, timezone
 
-from .valuation import value_holdings
+from .valuation import decimal, value_holdings
+from .indirect import reconcile_indirect
 
 
 def encoded(value):
@@ -45,20 +46,35 @@ def make_snapshot(state, quotes, now=None):
             holding["latest_unresolved_receipt"] = latest_no
             holding["latest_unresolved_reason"] = state.get("unresolved", {}).get(latest_no) or "correction_relation_unverified"
         holdings.append(holding)
+    holdings, indirect_events, observation_rows = reconcile_indirect(state, holdings)
     valued = value_holdings(holdings, quotes, trade_date) if trade_date else value_holdings(holdings, {}, "")
     rows = []
     for row in valued["holdings"]:
         code = row.get("stock_code") or ""
-        quote = quotes.get(code) if row["estimated_value"] is not None else None
+        candidate_quote = quotes.get(code)
+        close = decimal(candidate_quote.get("close")) if candidate_quote else None
+        quote = (candidate_quote if candidate_quote and candidate_quote.get("verified") is True and
+                 candidate_quote.get("trade_date") == trade_date and
+                 candidate_quote.get("market") == "KRX" and candidate_quote.get("session") == "regular" and
+                 candidate_quote.get("currency") == "KRW" and candidate_quote.get("adjusted") is False and
+                 close is not None and close > 0 else None)
         receipt = state["receipts"].get(row.get("receipt_no"), {})
         evidence = row.get("evidence") or ""
         rows.append({"corpCode": row.get("corp_code") or "", "stockCode": code, "name": row.get("name") or "",
                      "securityKind": row.get("security_kind") or "unknown", "quantity": row.get("quantity"),
                      "companyOwnershipPercent": row.get("company_ownership_percent"),
+                     "ownershipNumericKind": row.get("ownership_numeric_kind"),
+                     "observationStatus": row.get("observation_status"),
                      "receiptNo": row.get("receipt_no") or "",
                      "receiptDate": (receipt.get("listing_receipt_date") if state["unresolved"].get(row.get("receipt_no")) == "receipt_date_conflict" else row.get("receipt_date")) or "",
                      "holdingDate": row.get("holding_date"),
-                     "evidence": "unresolved-latest" if row.get("latest_unresolved_receipt") else "legacy-import" if evidence == "legacy_import" else "dart-structured" if evidence == "dart_structured" else "dart-document" if evidence == "dart_document" else "unresolved-latest",
+                     "evidence": "unresolved-latest" if row.get("latest_unresolved_receipt") else "indirect-observation" if evidence == "indirect_observation" else "legacy-import" if evidence == "legacy_import" else "dart-structured" if evidence == "dart_structured" else "dart-document" if evidence == "dart_document" else "unresolved-latest",
+                     "indirectSource": ({"documentNo": row["indirect_source"]["document_no"],
+                                         "sourceSha256": row["indirect_source"]["section_sha256"],
+                                         "basisDate": row["indirect_source"]["basis_date"],
+                                         "directReceiptNo": row["indirect_source"]["direct_receipt_no"],
+                                         "ratioDenominator": row["indirect_source"]["ratio_denominator"]}
+                                        if row.get("indirect_source") else None),
                      "latestUnresolvedReceiptNo": row.get("latest_unresolved_receipt") or None,
                      "latestUnresolvedReason": row.get("latest_unresolved_reason") or None,
                      "tracking": row.get("tracking") or "unknown",
@@ -75,11 +91,25 @@ def make_snapshot(state, quotes, now=None):
         if state.get("unresolved", {}).get(no) in ("receipt_date_conflict", "receipt_chronology_unverified"):
             continue
         events.append({"receiptNo": no, "receiptDate": event.get("receipt_date") or "",
+                       "basisDate": state.get("receipts", {}).get(no, {}).get("holding_date"),
                        "corpCode": event.get("corp_code") or "", "stockCode": event.get("stock_code"),
                        "kind": event.get("kind") or "other", "correctionOf": event.get("correction_of"),
                        "quantity": event.get("quantity"), "companyOwnershipPercent": event.get("company_ownership_percent"),
                        "source": "dart-structured" if event.get("source") == "dart_structured" else "dart-document" if event.get("source") == "dart_document" else "legacy-import",
                        "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={no}" if no else None})
+    for event in indirect_events:
+        no = event["receipt_no"]
+        events.append({"receiptNo": no, "receiptDate": event["receipt_date"],
+                       "basisDate": event["basis_date"],
+                       "observationKey": event["observation_key"],
+                       "corpCode": event["corp_code"], "stockCode": event["stock_code"],
+                       "kind": event.get("kind") or "other", "correctionOf": None,
+                       "quantity": event["quantity"], "companyOwnershipPercent": event["company_ownership_percent"],
+                       "numericKind": event["numeric_kind"],
+                       "percentagePointChange": event.get("percentage_point_change"),
+                       "source": "indirect-observation",
+                       "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={no}"})
+    events.sort(key=lambda event: (event.get("basisDate") or event["receiptDate"], event["receiptNo"]), reverse=True)
     receipts = [r.get("receipt_date") for r in state["receipts"].values() if r.get("receipt_date")]
     coverage = state.get("listing_coverage") or []
     history = [item for item in state.get("published_history", []) if item.get("methodology_version") == "1"
@@ -103,7 +133,7 @@ def make_snapshot(state, quotes, now=None):
                 "trackedCount": len(rows), "pricedCount": valued["priced_count"], "unresolvedCount": len(state["unresolved"]),
                 "estimatedValue": valued["estimated_value"], "valuationCoverage": valued["valuation_coverage"],
                 "filingCoverage": "partial" if state["unresolved"] else "complete" if coverage else "unverified",
-                "holdings": rows, "events": events,
+                "holdings": rows, "events": events, "verifiedIndirectObservations": observation_rows,
                 "historicalObservations": [{"corpCode": item["corp_code"], "stockCode": item["stock_code"],
                     "issuerName": item["issuer_name"], "quantity": item["quantity"],
                     "ownershipPercent": item["ownership_percent"], "basisDate": item["basis_date"],
@@ -111,6 +141,8 @@ def make_snapshot(state, quotes, now=None):
                     "documentNo": item["source_document_no"],
                     "sourceRowSha256": item["source_row_sha256"],
                     "ratioDenominator": item["ratio_denominator"],
+                    "denominatorQuantity": item.get("denominator_quantity"),
+                    "denominatorDate": item.get("denominator_date"),
                     "status": item["observation_status"],
                     "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={item['source_receipt_no']}"}
                     for item in sorted(state.get("verified_historical_observations", {}).values(),

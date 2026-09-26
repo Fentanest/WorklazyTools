@@ -20,7 +20,7 @@ import urllib.request
 import zipfile
 import zlib
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -32,7 +32,7 @@ RECEIPT = re.compile(r"^\d{14}$")
 DOCUMENT_KEY = re.compile(r"^\d{14}:\d+$")
 STOCK_CONTEXT = re.compile(r"보통주|우선주|주주|보유|소유|지분|주식|주권|의결권|sharehold|stock|equity|voting", re.I)
 REPORT_CONTEXT = re.compile(r"대량보유|의결권대리행사|주주명부|주식등의|sharehold", re.I)
-SOURCE_PARSER_VERSION = "source-change-sections-v4"
+SOURCE_PARSER_VERSION = "source-issued-shares-v5"
 SOURCE_ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
 SOURCE_CELLS = re.compile(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", re.I | re.S)
 EXACT_NPS = re.compile(r"^(?:국민연금공단|국민연금관리공단|National Pension Service)$", re.I)
@@ -104,6 +104,16 @@ def bind_change_section_basis(xml: str, claims: list[dict]) -> list[dict]:
             parsed = korean_date(cells[1])
             if parsed:
                 reports.append((index, start, parsed, _number(cells[3]), _number(cells[4], maximum=100)))
+    issued_candidates = []
+    for index, (start, _, cells) in enumerate(rows[:-1]):
+        if cells == ["보통주식총수(1)", "우선주식총수(2)", "발행주식총수(1+2)"]:
+            following = rows[index + 1][2]
+            if len(following) >= 3:
+                amounts = [_number(value) for value in following[:3]]
+                if all(amount is not None for amount in amounts):
+                    common, preferred, total = map(Decimal, amounts)
+                    if common + preferred == total and total > 0:
+                        issued_candidates.append((start, common, preferred, total))
     for position, (row_index, start, basis, quantity, ratio) in enumerate(reports):
         next_start = reports[position + 1][1] if position + 1 < len(reports) else len(xml)
         section = xml[start:next_start]
@@ -126,6 +136,17 @@ def bind_change_section_basis(xml: str, claims: list[dict]) -> list[dict]:
                 claim.update(basis_date=basis, security_kind="보통주",
                              status="actual_holding_basis_verified",
                              basis_evidence="matched_report_change_and_owner_total")
+                preceding_issued = [entry for entry in issued_candidates if entry[0] < start]
+                if len(preceding_issued) == 1:
+                    _, common, preferred, total = preceding_issued[0]
+                    displayed = Decimal(ratio)
+                    scale = Decimal(1).scaleb(displayed.as_tuple().exponent)
+                    if (preferred == 0 and Decimal(quantity) <= common and
+                            (Decimal(quantity) / total * 100).quantize(scale, rounding=ROUND_HALF_UP) == displayed):
+                        claim.update(ratio_denominator="issued_shares",
+                                     denominator_quantity=format(total, "f"),
+                                     denominator_date=None,
+                                     denominator_evidence="same_document_issued_share_header_and_arithmetic")
     return claims
 
 
@@ -385,17 +406,34 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
                 "parser_version": candidate["parser_version"],
                 "corp_code": corp, "stock_code": company["stock_code"],
                 "issuer_name": issuer_name, "security_kind": "common",
-                "holder_scope": "nps_only", "ratio_denominator": "unverified",
+                "holder_scope": "nps_only", "ratio_denominator": claim.get("ratio_denominator") or "unverified",
+                "denominator_quantity": claim.get("denominator_quantity"),
+                "denominator_date": claim.get("denominator_date"),
+                "denominator_evidence": claim.get("denominator_evidence"),
                 "basis_date": claim["basis_date"], "basis_evidence": claim["basis_evidence"],
                 "quantity": claim["quantity"], "ownership_percent": claim["ownership_percent"],
-                "observation_status": "historical_only_ratio_basis_unverified"}
+                "observation_status": ("historical_only_denominator_date_unverified"
+                    if claim.get("ratio_denominator") == "issued_shares" else
+                    "historical_only_ratio_basis_unverified")}
         if facts.get(key) is None:
             facts[key] = fact
             created += 1
         elif facts[key] != fact:
-            candidate["application_status"] = "historical_fact_conflict"
-            continue
-        candidate["application_status"] = "historical_fact_retained"
+            prior = facts[key]
+            core = ("source_receipt_no", "source_document_no", "source_filing_date", "source_archive_sha256",
+                    "source_file_sha256", "source_row_sha256", "corp_code", "stock_code", "security_kind",
+                    "holder_scope", "basis_date", "quantity", "ownership_percent")
+            if (all(prior.get(field) == fact.get(field) for field in core) and
+                    prior.get("ratio_denominator") == "unverified" and
+                    fact["ratio_denominator"] == "issued_shares"):
+                facts[key] = fact
+                candidate["application_status"] = "historical_fact_enriched"
+                created += 1
+            else:
+                candidate["application_status"] = "historical_fact_conflict"
+                continue
+        if candidate.get("application_status") != "historical_fact_enriched":
+            candidate["application_status"] = "historical_fact_retained"
     return created
 
 

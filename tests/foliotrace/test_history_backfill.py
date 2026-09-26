@@ -140,7 +140,9 @@ class HistoricalBackfillTests(unittest.TestCase):
                 "source": "dart_document"}
         folio.classify_events(initial)
         self.assertEqual(initial["events"]["20200107000002"]["kind"], "new-report")
-        self.assertEqual(initial["events"][OLD]["kind"], "decrease")
+        self.assertEqual(initial["events"][OLD]["kind"], "other")
+        self.assertEqual(initial["events"][OLD]["quantity"], "80")
+        self.assertEqual(initial["events"][OLD]["receipt_date"], "2020-01-07")
 
     def test_conflicting_imported_date_is_not_parsed_or_published_as_dart_fact(self):
         initial = state()

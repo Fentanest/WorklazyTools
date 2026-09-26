@@ -109,8 +109,8 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Excluded: exited the 5% tracking scope",
   },
   security_mapping_unverified: {
-    ko: "증권 대응이 확인되지 않아 평가에서 제외",
-    en: "Excluded: security mapping unverified",
+    ko: "공시의 주식 종류와 종목을 확인하지 못해 평가에서 제외",
+    en: "Excluded: the filing's share class and listed security could not be matched",
   },
   quantity_unverified: {
     ko: "수량이 확인되지 않아 평가에서 제외",
@@ -125,8 +125,8 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Excluded: no verified closing price",
   },
   quote_date_or_session_mismatch: {
-    ko: "종가 기준일 또는 세션이 맞지 않아 평가에서 제외",
-    en: "Excluded: closing-price date or session mismatch",
+    ko: "종가 날짜 또는 정규장 가격 여부를 확인하지 못해 평가에서 제외",
+    en: "Excluded: the closing-price date or regular trading price could not be confirmed",
   },
   quote_basis_unverified: {
     ko: "가격 기준이 확인되지 않아 평가에서 제외",
@@ -168,12 +168,12 @@ const LATEST_UNRESOLVED_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Withdrawal unverified",
   },
   needs_filing_parse: {
-    ko: "공시문 분석 필요",
-    en: "Filing parse required",
+    ko: "공시 내용 확인 중",
+    en: "Filing details under review",
   },
   security_identity_missing: {
-    ko: "증권 식별정보 부족",
-    en: "Security identity missing",
+    ko: "주식 종류와 종목을 확인할 정보 부족",
+    en: "Not enough information to identify the share class and security",
   },
 };
 

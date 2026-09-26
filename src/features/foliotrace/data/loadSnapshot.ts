@@ -25,6 +25,40 @@ function decimal(value: unknown): boolean { return str(value) && DECIMAL.test(va
 function isoDate(value: unknown): boolean { return str(value) && ISO_DATE.test(value) }
 function timestamp(value: unknown): boolean { return str(value) && Number.isFinite(Date.parse(value)) }
 function filingUrl(value: unknown): boolean { return str(value) && FILING_URL.test(value) }
+function numericKind(value: unknown): boolean {
+  return value === 'exact' || value === 'lower_bound' || value === 'upper_bound' || value === 'estimated'
+}
+function validIndirectSource(value: unknown): boolean {
+  return isRecord(value) && nullable(value.documentNo, item => str(item) && /^\d+$/.test(item)) &&
+    str(value.sourceSha256) && VERSION.test(value.sourceSha256) && isoDate(value.basisDate) &&
+    nullable(value.directReceiptNo, item => str(item) && RECEIPT.test(item)) &&
+    str(value.ratioDenominator) && ['shares_etc_total', 'issued_shares', 'voting_rights'].includes(value.ratioDenominator)
+}
+function validIndirectObservation(value: unknown): boolean {
+  return isRecord(value) && str(value.observationKey) && /^\d{14}:(?:\d+|-):\d{8}:[0-9A-Z]{6}:\d{4}-\d{2}-\d{2}:[a-f0-9]{64}$/.test(value.observationKey) &&
+    str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && str(value.stockCode) && STOCK.test(value.stockCode) &&
+    nullable(value.ownershipPercent, decimal) && isoDate(value.basisDate) && isoDate(value.filingDate) &&
+    numericKind(value.numericKind) &&
+    str(value.receiptNo) && RECEIPT.test(value.receiptNo) && nullable(value.documentNo, item => str(item) && /^\d+$/.test(item)) &&
+    str(value.sourceSha256) && VERSION.test(value.sourceSha256) && filingUrl(value.filingUrl) &&
+    typeof value.appliedToHolding === 'boolean' && nullable(value.reason, str) &&
+    (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&
+    (value.trackingChange === undefined || nullable(value.trackingChange,
+      item => item === 'tracking-exit' || item === 'tracking-reentry'))
+}
+function validHistoricalObservation(value: unknown): boolean {
+  return isRecord(value) && str(value.corpCode) && /^\d{8}$/.test(value.corpCode) &&
+    str(value.stockCode) && STOCK.test(value.stockCode) && str(value.issuerName) &&
+    decimal(value.quantity) && decimal(value.ownershipPercent) &&
+    isoDate(value.basisDate) && isoDate(value.filingDate) &&
+    str(value.receiptNo) && RECEIPT.test(value.receiptNo) &&
+    str(value.documentNo) && /^\d+$/.test(value.documentNo) &&
+    str(value.sourceRowSha256) && VERSION.test(value.sourceRowSha256) &&
+    ((value.ratioDenominator === 'unverified' && value.status === 'historical_only_ratio_basis_unverified') ||
+      (value.ratioDenominator === 'issued_shares' && value.status === 'historical_only_denominator_date_unverified')) &&
+    (value.denominatorQuantity === undefined || nullable(value.denominatorQuantity, decimal)) &&
+    (value.denominatorDate === undefined || nullable(value.denominatorDate, isoDate)) && filingUrl(value.filingUrl)
+}
 function validQuote(value: unknown): boolean {
   return isRecord(value) && decimal(value.close) && value.currency === 'KRW' && value.market === 'KRX' &&
     value.session === 'regular' && isoDate(value.tradeDate) && value.adjusted === false &&
@@ -35,9 +69,13 @@ function validHolding(value: unknown): boolean {
     str(value.stockCode) && STOCK.test(value.stockCode) && str(value.name) &&
     ['common', 'preferred', 'other', 'unknown'].includes(String(value.securityKind)) &&
     nullable(value.quantity, decimal) && nullable(value.companyOwnershipPercent, decimal) &&
+    (value.ownershipNumericKind === undefined || nullable(value.ownershipNumericKind, numericKind)) &&
+    (value.observationStatus === undefined || nullable(value.observationStatus,
+      item => item === 'verified' || item === 'same_basis_conflict')) &&
     str(value.receiptNo) && RECEIPT.test(value.receiptNo) && isoDate(value.receiptDate) &&
     nullable(value.holdingDate, isoDate) &&
-    ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest'].includes(String(value.evidence)) &&
+    ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest', 'indirect-observation'].includes(String(value.evidence)) &&
+    (value.indirectSource === undefined || nullable(value.indirectSource, validIndirectSource)) &&
     nullable(value.latestUnresolvedReceiptNo, (item) => str(item) && RECEIPT.test(item)) &&
     nullable(value.latestUnresolvedReason, str) &&
     ['active', 'below-5-percent', 'unknown'].includes(String(value.tracking)) &&
@@ -47,10 +85,15 @@ function validHolding(value: unknown): boolean {
 }
 function validEvent(value: unknown): boolean {
   return isRecord(value) && str(value.receiptNo) && RECEIPT.test(value.receiptNo) && isoDate(value.receiptDate) &&
+    (value.basisDate === undefined || nullable(value.basisDate, isoDate)) &&
+    (value.observationKey === undefined || (str(value.observationKey) &&
+      /^\d{14}:\d+:\d{8}:[0-9A-Z]{6}:\d{4}-\d{2}-\d{2}:[a-f0-9]{64}$/.test(value.observationKey))) &&
     str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && nullable(value.stockCode, x => str(x) && STOCK.test(x)) &&
-    ['increase', 'decrease', 'new-report', 'purpose-change', 'tracking-exit', 'other'].includes(String(value.kind)) &&
+    ['increase', 'decrease', 'new-report', 'purpose-change', 'tracking-exit', 'tracking-reentry', 'other'].includes(String(value.kind)) &&
     nullable(value.correctionOf, x => str(x) && RECEIPT.test(x)) && nullable(value.quantity, decimal) &&
-    nullable(value.companyOwnershipPercent, decimal) && ['legacy-import', 'dart-structured', 'dart-document'].includes(String(value.source)) &&
+    nullable(value.companyOwnershipPercent, decimal) && ['legacy-import', 'dart-structured', 'dart-document', 'indirect-observation'].includes(String(value.source)) &&
+    (value.numericKind === undefined || numericKind(value.numericKind)) &&
+    (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&
     nullable(value.filingUrl, filingUrl)
 }
 
@@ -115,6 +158,10 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
   if (!['complete', 'partial', 'unverified'].includes(String(value.filingCoverage))) return false
   if (value.historicalCoverage !== undefined && !validHistoricalCoverage(value.historicalCoverage)) return false
   if (value.secondaryCoverage !== undefined && !validSecondaryCoverage(value.secondaryCoverage)) return false
+  if (value.verifiedIndirectObservations !== undefined &&
+      (!Array.isArray(value.verifiedIndirectObservations) || !value.verifiedIndirectObservations.every(validIndirectObservation))) return false
+  if (value.historicalObservations !== undefined &&
+      (!Array.isArray(value.historicalObservations) || !value.historicalObservations.every(validHistoricalObservation))) return false
   return value.holdings.every(validHolding) && value.events.every(validEvent) && value.history.every((row: unknown) =>
     isRecord(row) && isoDate(row.tradeDate) && decimal(row.estimatedValue) && str(row.datasetVersion) && VERSION.test(row.datasetVersion))
 }

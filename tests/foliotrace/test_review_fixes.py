@@ -266,8 +266,8 @@ class ReviewFixTests(unittest.TestCase):
         with patch.object(folio, "structured_receipt", side_effect=lambda no, *_: {
                 "quantity": "200" if no == a else "150", "company_ownership_percent": "6", "reason": "", "evidence": "dart_structured"}):
             folio.resolve_unfinished(state, "test-key")
-        self.assertEqual(state["events"][a]["kind"], "increase")
-        self.assertEqual(state["events"][b]["kind"], "decrease")
+        self.assertEqual((state["events"][a]["kind"], state["events"][b]["kind"]), ("other", "other"))
+        self.assertEqual((state["events"][a]["quantity"], state["events"][b]["quantity"]), ("200", "150"))
         self.assertEqual(state["holdings"][CORP]["receipt_no"], b)
 
     def test_future_filing_is_not_backdated_or_history_replaced(self):
@@ -278,6 +278,10 @@ class ReviewFixTests(unittest.TestCase):
         snapshot = make_snapshot(state, {CODE: quote()}, datetime(2026, 9, 28, 1, tzinfo=timezone.utc))
         self.assertIsNone(snapshot["estimatedValue"])
         self.assertEqual(snapshot["holdings"][0]["valuationExclusionReason"], "filing_after_quote_date")
+        self.assertEqual(snapshot["holdings"][0]["quote"]["close"], quote()["close"])
+        self.assertIsNone(snapshot["holdings"][0]["estimatedValue"])
+        unverified_quote = dict(quote(), adjusted=True)
+        self.assertIsNone(make_snapshot(state, {CODE: unverified_quote})["holdings"][0]["quote"])
         self.assertEqual(snapshot["history"][0]["estimatedValue"], "1000")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
@@ -300,7 +304,8 @@ class ReviewFixTests(unittest.TestCase):
             folio.import_seed(export, path, True)
             imported = folio.read_json(path)
             self.assertEqual(imported["receipts"]["20260901000001"]["quantity"], "80")
-            self.assertEqual(imported["events"][OLD]["kind"], "increase")
+            self.assertEqual(imported["events"][OLD]["kind"], "other")
+            self.assertEqual(imported["events"][OLD]["quantity"], "100")
             imported["events"] = {}
             imported["receipts"]["20260901000001"]["quantity"] = None
             imported["receipts"]["20260901000001"]["evidence"] = "legacy_reference_only"

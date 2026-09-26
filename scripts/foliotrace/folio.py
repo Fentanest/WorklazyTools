@@ -22,12 +22,13 @@ import urllib.request
 import zipfile
 from html.parser import HTMLParser
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from pipeline.foliotrace.naver import NaverClient, QuoteError, expected_session, holiday_set_for, CONFIRMED_SPECIAL_SESSIONS
+from pipeline.foliotrace.indirect import observation_timeline, reconcile_indirect, register_evidence
 from pipeline.foliotrace.publish import make_snapshot, encoded
 
 RECEIPT = re.compile(r"^\d{14}$")
@@ -208,6 +209,7 @@ def empty_state():
             "secondary_backfill": None, "secondary_equity_backfill": None,
             "secondary_prior_backfill": None, "secondary_prior_equity_backfill": None,
             "secondary_source_cache": {},
+            "direct_ratio_basis": {}, "indirect_observations": {}, "indirect_invalidations": {},
             "legacy_coverage_status": "unverified", "legacy_resume_hint": None,
             "last_published_dataset": None, "published_history": []}
 
@@ -646,6 +648,7 @@ def parse_filing_document(payload: bytes):
             "basis_diagnostic": basis_diagnostic,
             "source_ratio_columns": ({"shares_etc_quantity": str(row_quantity),
                                       "shares_etc_percent": str(row_ratio),
+                                      "reporting_count": dec(row_cell("THS_RPT_CNT")),
                                       "stock_quantity": dec(row_cell("THS_CMT_CNT")),
                                       "stock_percent": dec(row_cell("THS_CMT_RT")),
                                       "issued_voting_shares": dec(row_cell("THS_STK_CT"))}
@@ -882,9 +885,68 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
     return processed
 
 
+def register_verified_direct_profile(state, receipt, parsed):
+    """Use one exact report row only when its share class and percentage basis agree."""
+    no = receipt["receipt_no"]
+    columns = parsed.get("source_ratio_columns") or {}
+    current_holding = state.get("holdings", {}).get(receipt["corp_code"])
+    current_mapping = (current_holding and current_holding.get("receipt_no") == no and
+        current_holding.get("security_kind") == "common" and
+        state.get("mapping_ledger", {}).get(no, {}).get("status") == "verified" and
+        state["mapping_ledger"][no].get("xml_sha256") == parsed.get("xml_sha256"))
+    historic_mapping = (state.get("mapping_ledger", {}).get(no, {}).get("status") == "verified" and
+        state["mapping_ledger"][no].get("xml_sha256") == parsed.get("xml_sha256"))
+    document_mapping = (parsed.get("verified_common_stock_code") == receipt.get("stock_code") and
+        dec(parsed.get("verified_voting_share_quantity")) is not None and
+        Decimal(dec(parsed["verified_voting_share_quantity"])) == Decimal(dec(receipt["quantity"])) and
+        state.get("universe", {}).get(receipt["corp_code"], {}).get("stock_code") == receipt.get("stock_code"))
+    try:
+        shares_quantity = Decimal(str(columns["shares_etc_quantity"]))
+        stock_quantity = Decimal(str(columns["stock_quantity"]))
+        shares_percent = Decimal(str(columns["shares_etc_percent"]))
+        stock_percent = Decimal(str(columns["stock_percent"]))
+        denominator = Decimal(str(columns["issued_voting_shares"]))
+        reporting_count = Decimal(str(columns["reporting_count"]))
+        source_quantity = Decimal(dec(receipt["quantity"]))
+        source_percent = Decimal(dec(receipt["company_ownership_percent"]))
+        scale = Decimal(1).scaleb(stock_percent.as_tuple().exponent)
+        arithmetic_matches = (denominator > 0 and
+            (stock_quantity / denominator * 100).quantize(scale, rounding=ROUND_HALF_UP) == stock_percent)
+        comparable = (reporting_count == 1 and arithmetic_matches and
+            shares_quantity == stock_quantity == source_quantity and
+            shares_percent == stock_percent == source_percent and
+            (current_mapping or historic_mapping or document_mapping))
+    except (KeyError, InvalidOperation, TypeError, ValueError, ZeroDivisionError):
+        comparable = False
+    if not comparable:
+        receipt["ratio_basis_review_status"] = "ratio_basis_unverified"
+        return False
+    profile = {"kind": "direct_ratio_basis", "direct_receipt_no": no,
+        "source_document_no": None, "corp_code": receipt["corp_code"],
+        "stock_code": receipt["stock_code"], "security_kind": "common",
+        "ratio_denominator": "voting_rights", "holder_scope": "nps_reporting_group",
+        "basis_date": receipt["holding_date"], "basis_kind": "explicit_actual_holding",
+        "denominator_quantity": format(denominator, "f"), "denominator_date": receipt["holding_date"],
+        "source_document_sha256": parsed["xml_sha256"],
+        "source_section_sha256": parsed["basis_row_sha256"],
+        "verified_at": datetime.now(timezone.utc).isoformat()}
+    prior = state.get("direct_ratio_basis", {}).get(no)
+    if prior is not None:
+        profile["verified_at"] = prior["verified_at"]
+    try:
+        register_evidence(state, profile)
+    except ValueError as exc:
+        if str(exc) != "EVIDENCE_CONFLICT":
+            raise
+        receipt["ratio_basis_review_status"] = "profile_conflict"
+        return False
+    receipt["ratio_basis_review_status"] = "verified_voting_rights_group"
+    return True
+
+
 def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_document, target_receipt=None):
     """Recover report preparation dates from exact source documents in bounded runs."""
-    method = "report-current-row-v4"
+    method = "report-current-row-v5"
     if limit < 0 or limit > 100:
         raise ValueError("DIRECT_BASIS_LIMIT")
     if target_receipt is not None and not RECEIPT.fullmatch(target_receipt):
@@ -956,6 +1018,7 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
             current_holding["tracking"] = "below-5-percent" if Decimal(source_ratio) < 5 else "active"
             if current_holding.get("evidence") == "legacy_import":
                 current_holding["evidence"] = "dart_document"
+        register_verified_direct_profile(state, receipt, parsed)
         verified += 1
     if checked and state_path:
         state["revision"] += 1
@@ -964,7 +1027,10 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
 
 
 def classify_events(state):
-    """Compare with the preceding recorded issuer filing in date and receipt order."""
+    """Compare only source-compatible filing facts in verified basis-date order."""
+    profiles = state.get("direct_ratio_basis", {})
+    direct_timeline = {item["receipt_no"]: item for item in observation_timeline(state)
+                       if item["source"] == "direct" and item["status"] == "verified"}
     by_corp = {}
     for receipt in state["receipts"].values():
         corp = receipt.get("corp_code")
@@ -973,7 +1039,8 @@ def classify_events(state):
             by_corp.setdefault(corp, []).append(receipt)
     for corp, receipts in by_corp.items():
         previous = None
-        for receipt in sorted(receipts, key=lambda item: (item.get("listing_receipt_date") or
+        for receipt in sorted(receipts, key=lambda item: (profiles.get(item["receipt_no"], {}).get("basis_date") or
+                                                       item.get("listing_receipt_date") or
                                                        item.get("receipt_date") or "", item["receipt_no"])):
             no = receipt["receipt_no"]
             if state.get("unresolved", {}).get(no) in ("receipt_date_conflict", "receipt_chronology_unverified"):
@@ -985,13 +1052,18 @@ def classify_events(state):
             if event:
                 kind = "other"
                 if not flagged and quantity is not None and ownership is not None:
-                    if Decimal(ownership) < 5:
-                        kind = "tracking-exit"
+                    if direct_timeline.get(no, {}).get("tracking_change"):
+                        kind = direct_timeline[no]["tracking_change"]
                     elif "목적" in (receipt.get("reason") or ""):
                         kind = "purpose-change"
                     elif previous is None:
                         kind = "new-report"
-                    elif previous.get("stock_code") == receipt.get("stock_code") and dec(previous.get("quantity")) is not None:
+                    elif (previous.get("stock_code") == receipt.get("stock_code") and
+                          dec(previous.get("quantity")) is not None and
+                          profiles.get(previous["receipt_no"]) and profiles.get(no) and
+                          all(profiles[previous["receipt_no"]][field] == profiles[no][field]
+                              for field in ("ratio_denominator", "holder_scope")) and
+                          profiles[previous["receipt_no"]]["basis_date"] < profiles[no]["basis_date"]):
                         before, after = Decimal(dec(previous["quantity"])), Decimal(quantity)
                         kind = "increase" if after > before else "decrease" if after < before else "other"
                 event["kind"] = kind
@@ -1458,6 +1530,19 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
             "unresolved": len(state["unresolved"]), "state_revision": state["revision"]}
 
 
+def record_reviewed_evidence(state_path: Path, fact_path: Path, commit=False):
+    from pipeline.foliotrace.indirect import register_evidence
+    state = read_json(state_path)
+    fact = read_json(fact_path)
+    result = register_evidence(state, fact)
+    if result["changed"] and commit:
+        if result["kind"] == "direct_ratio_basis":
+            classify_events(state)
+        state["revision"] += 1
+        write_json(state_path, state)
+    return {**result, "committed": bool(result["changed"] and commit), "state_revision": state["revision"]}
+
+
 def price_and_value(state_path: Path, output: Path, client=None):
     state = read_json(state_path)
     if not state.get("import_ledger"):
@@ -1469,9 +1554,10 @@ def price_and_value(state_path: Path, output: Path, client=None):
     now = datetime.now(timezone.utc)
     cache = state.setdefault("quote_cache", {})
     new_cache = {}
-    eligible = {row.get("stock_code") for row in state["holdings"].values()
+    current_rows, _, _ = reconcile_indirect(state, list(state["holdings"].values()))
+    eligible = {row.get("stock_code") for row in current_rows
                 if row.get("security_kind") in ("common", "preferred") and row.get("tracking") != "below-5-percent"
-                and row.get("stock_code")}
+                and row.get("stock_code") and row.get("quantity") is not None}
     if not eligible:
         raise RuntimeError("no verified stock-class mappings for valuation")
     expected = (client.expected_session(now) if hasattr(client, "expected_session") else expected_session(now)).isoformat()
@@ -1620,6 +1706,10 @@ def main():
     q.add_argument("--max-windows", type=int, default=20)
     q.add_argument("--review-limit", type=int, default=30)
     q.add_argument("--scope", choices=("all", "equity", "prior-all", "prior-equity"), default="all")
+    q = sub.add_parser("record-reviewed-evidence")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--fact", type=Path, required=True)
+    q.add_argument("--commit", action="store_true")
     q = sub.add_parser("recheck-basis")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--receipt", required=True)
@@ -1674,6 +1764,8 @@ def main():
                                     max_windows=args.max_windows, read_state=read_json, write_state=write_json,
                                     key=os.environ.get("DART_API_KEY", ""), review_limit=args.review_limit,
                                     scope=args.scope)
+        elif args.command == "record-reviewed-evidence":
+            result = record_reviewed_evidence(args.state, args.fact, args.commit)
         elif args.command == "recheck-basis":
             state = read_json(args.state)
             result = recheck_direct_basis(state, os.environ.get("DART_API_KEY", ""), limit=1,

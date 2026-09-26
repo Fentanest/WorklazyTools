@@ -41,10 +41,19 @@ export interface Holding {
   securityKind: 'common' | 'preferred' | 'other' | 'unknown'
   quantity: DecimalString | null
   companyOwnershipPercent: DecimalString | null
+  ownershipNumericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated' | null
+  observationStatus?: 'verified' | 'same_basis_conflict' | null
   receiptNo: string
   receiptDate: IsoDate
   holdingDate: IsoDate | null
-  evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest'
+  evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest' | 'indirect-observation'
+  indirectSource?: {
+    documentNo: string | null
+    sourceSha256: string
+    basisDate: IsoDate
+    directReceiptNo: string | null
+    ratioDenominator: string
+  } | null
   latestUnresolvedReceiptNo: string | null
   latestUnresolvedReason: string | null
   tracking: 'active' | 'below-5-percent' | 'unknown'
@@ -56,15 +65,19 @@ export interface Holding {
 }
 
 export interface FilingEvent {
+  observationKey?: string
   receiptNo: string
   receiptDate: IsoDate
+  basisDate?: IsoDate | null
   corpCode: string
   stockCode: string | null
-  kind: 'increase' | 'decrease' | 'new-report' | 'purpose-change' | 'tracking-exit' | 'other'
+  kind: 'increase' | 'decrease' | 'new-report' | 'purpose-change' | 'tracking-exit' | 'tracking-reentry' | 'other'
   correctionOf: string | null
   quantity: DecimalString | null
   companyOwnershipPercent: DecimalString | null
-  source: 'legacy-import' | 'dart-structured' | 'dart-document'
+  numericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated'
+  percentagePointChange?: DecimalString | null
+  source: 'legacy-import' | 'dart-structured' | 'dart-document' | 'indirect-observation'
   filingUrl: string | null
 }
 
@@ -87,8 +100,6 @@ export interface Snapshot {
   historicalCoverage?: {
     searchStartDate: IsoDate
     searchTargetDate: IsoDate
-    priorContentCheckedThrough: IsoDate | null
-    priorEquityCheckedThrough: IsoDate | null
     listingCompleteThrough: IsoDate
     listingComplete: boolean
     firstObservedNpsReceiptDate: IsoDate | null
@@ -110,6 +121,40 @@ export interface Snapshot {
   }
   holdings: Holding[]
   events: FilingEvent[]
+  verifiedIndirectObservations?: Array<{
+    observationKey: string
+    corpCode: string
+    stockCode: string
+    ownershipPercent: DecimalString | null
+    numericKind: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated'
+    basisDate: IsoDate
+    filingDate: IsoDate
+    receiptNo: string
+    documentNo: string | null
+    sourceSha256: string
+    filingUrl: string
+    appliedToHolding: boolean
+    reason: string | null
+    percentagePointChange?: DecimalString | null
+    trackingChange?: 'tracking-exit' | 'tracking-reentry' | null
+  }>
+  historicalObservations?: Array<{
+    corpCode: string
+    stockCode: string
+    issuerName: string
+    quantity: DecimalString
+    ownershipPercent: DecimalString
+    basisDate: IsoDate
+    filingDate: IsoDate
+    receiptNo: string
+    documentNo: string
+    sourceRowSha256: string
+    ratioDenominator: 'unverified' | 'issued_shares'
+    denominatorQuantity?: DecimalString | null
+    denominatorDate?: IsoDate | null
+    status: 'historical_only_ratio_basis_unverified' | 'historical_only_denominator_date_unverified'
+    filingUrl: string
+  }>
   history: Array<{ tradeDate: IsoDate; estimatedValue: DecimalString; datasetVersion: string }>
 }
 

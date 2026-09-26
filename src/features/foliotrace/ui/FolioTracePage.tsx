@@ -45,43 +45,48 @@ const STR = {
     description:
       "DART 대량보유 공시로 추적하는 국민연금 국내주식 공개 포트폴리오 추정치입니다. 국민연금 전체 자산·실제 계좌 잔고·실제 운용 수익률이 아닙니다.",
     scopeNote:
-      "현재 범위는 국민연금 국내주식 DART 대량보유 공시 기반 1개 포트폴리오입니다. 미구현 해외·타 기관·인물 포트폴리오는 제공하지 않습니다.",
-    historicalCoverageTitle: "과거 공시 목록 조회",
-    historicalCoverageRange: "검사 완료 접수일 구간",
+      "국민연금의 국내주식 대량보유 공시를 바탕으로 한 추정 내역입니다.",
+    historicalCoverageTitle: "과거 공시 확인 범위",
+    historicalCoverageRange: "확인한 접수일",
     historicalCoverageTarget: "조회 목표일",
-    historicalCoverageComplete: "목록 페이지 검사 완료",
-    historicalCoveragePending: "목록 페이지 검사 진행 중",
-    historicalCoverageScope: "국민연금 기관이 제출한 공시만 집계합니다. 목록 검사는 공시 수량·지분율의 원문 검증 완료를 뜻하지 않습니다.",
+    historicalCoverageComplete: "해당 기간의 공시 목록 확인 완료",
+    historicalCoveragePending: "공시 목록 확인 중",
+    historicalCoverageScope: "국민연금 기관이 제출한 공시를 찾은 기간입니다. 각 공시의 수량·지분율 확인은 별도로 진행합니다.",
     historicalFirstObserved: "국민연금 기관이 제출한 첫 대량보유 공시 접수",
     historicalFirstTentative: "(조회 진행 중 잠정값)",
-    historicalParsePending: "신규 접수 원문 파싱 미완료",
-    historicalLegacyRecheck: "이관 수치 원문 재확인 미완료",
-    indirectTitle: "원문 확인된 과거 단서 (표본)",
+    historicalParsePending: "새 공시 내용 확인 중",
+    historicalLegacyRecheck: "이전 기록 중 공시 확인이 필요한 건수",
+    indirectTitle: "개별 공시에서 확인한 과거 기록",
     indirectSource: "DART 원문 보기",
-    indirectScope: "다른 제출인의 문서에서 확인한 보유·계획 단서입니다. 배정 계획은 실제 보유가 아닙니다. 검색 페이지를 검사했어도 모든 보유 사실의 원문 검증이 끝난 것은 아닙니다. 현재 보유·평가액에는 합치지 않습니다.",
-    secondaryAll: "전체 본문검색 결과 페이지 검사 완료일",
-    secondaryEquity: "지분·의결권 검색 결과 페이지 검사 완료일",
-    secondaryPriorAll: "1999~2005 전체 검색 결과 페이지 검사 완료일",
-    secondaryPriorEquity: "1999~2005 지분·의결권 검색 결과 페이지 검사 완료일",
-    secondaryDirect: "2006~2008 직접 제출 목록 검사 완료일",
-    secondaryCandidates: "원문 검토 후보 문서",
-    secondaryOtherUnreviewed: "검색 적중 중 원문 미검토 문서",
-    secondarySourcePending: "원문 조회 대기",
-    secondaryContextPending: "주식 문맥 해석 대기",
-    secondaryNoScan: "체계적 본문검색은 아직 시작되지 않았습니다. 아래는 개별 원문 확인 표본입니다.",
+    indirectScope: "다른 회사의 공시에서 찾은 보유 기록과 배정 계획입니다. 배정 계획은 실제 보유를 뜻하지 않습니다. 아직 확인 중인 기록은 현재 보유액에 넣지 않습니다.",
+    historicalObservationTitle: "과거 보유 내역",
+    historicalObservationScope: "공시의 보유 날짜·수량·비율을 확인했습니다. 지분율 계산에 쓰인 전체 주식 수의 날짜 등이 불분명한 기록은 현재 지분율과 바로 비교하지 않습니다.",
+    historicalDenominatorDatePending: "전체 주식 수의 기준일 확인 중",
+    historicalRatioBasisPending: "지분율 계산 기준 확인 중",
+    historicalObservationMore: "더 많은 과거 기록",
+    secondaryAll: "전체 공시 내용 검색으로 확인한 날짜",
+    secondaryEquity: "지분·의결권 공시 내용으로 확인한 날짜",
+    secondaryPriorAll: "1999~2005 전체 공시에서 확인한 날짜",
+    secondaryPriorEquity: "1999~2005 지분·의결권 공시에서 확인한 날짜",
+    secondaryDirect: "2006~2008 국민연금 제출 공시에서 확인한 날짜",
+    secondaryCandidates: "내용을 확인할 공시",
+    secondaryOtherUnreviewed: "검색에서 찾았지만 아직 읽지 않은 공시",
+    secondarySourcePending: "공시 내용 확인 대기",
+    secondaryContextPending: "주식 관련 내용 확인 중",
+    secondaryNoScan: "기간별 공시 검색이 시작되기 전입니다. 아래는 개별적으로 확인한 기록입니다.",
     priceBasis: "KRX 정규장 종가 기준",
     checkedAt: "공시 확인",
-    generatedAt: "데이터 생성",
+    generatedAt: "자료 정리",
     publishedAt: "게시",
     publishTimeUnknown: "게시 시각 미기록",
-    staleBadge: "데이터 생성 후 3일 초과 — 공시·종가를 다시 확인하세요",
-    freshBadge: "생성 데이터 표시",
-    legacyVerified: "이관 자료 범위: 검증됨",
-    legacyPartial: "이관 자료 범위: 일부만 검증됨 — 과거 수치는 참고용입니다",
-    legacyUnverified: "이관 자료 범위: 미검증 — 과거 수치는 참고용입니다",
-    filingComplete: "공시 커버리지: 완전",
-    filingPartial: "공시 커버리지: 부분적 — 일부 접수·정정이 미반영일 수 있음",
-    filingUnverified: "공시 커버리지: 미검증",
+    staleBadge: "자료를 확인한 지 3일 이상 지났습니다 — 공시와 종가를 다시 확인하세요",
+    freshBadge: "현재 공개된 자료",
+    legacyVerified: "이전 기록: 확인됨",
+    legacyPartial: "이전 기록: 일부만 확인됨 — 과거 수치는 참고용입니다",
+    legacyUnverified: "이전 기록: 아직 확인되지 않음 — 과거 수치는 참고용입니다",
+    filingComplete: "확인한 공시 범위: 완료",
+    filingPartial: "확인한 공시 범위: 일부 접수·정정 확인 중",
+    filingUnverified: "확인한 공시 범위: 확인 중",
     methodLink: "계산 방법·출처는 하단 안내를 확인하세요",
     summaryValue: "공개 보유분 추정 평가금액",
     summaryTracked: "추적 종목 수",
@@ -89,13 +94,13 @@ const STR = {
     summaryEvents: "추적 기간 전체 공시",
     unavailable: "평가 불가",
     unavailableReasonComplete: "유효한 종가가 없어 평가할 수 없습니다.",
-    unavailableReasonPartial: "수량·증권 대응·종가를 확인하지 못한 종목은 제외한 부분합입니다.",
+    unavailableReasonPartial: "수량·종목과 주식 종류·종가를 확인하지 못한 종목을 제외한 금액입니다.",
     noHoldings: "추적 중인 종목이 없습니다.",
-    noHoldingsDesc: "공시 확인 시각 이후 추적 종목이 비어 있습니다. 게시된 정적 데이터를 다시 조회해 보세요.",
+    noHoldingsDesc: "현재 표시할 종목이 없습니다. 잠시 후 다시 조회해 보세요.",
     topWeights: "상위 보유 종목 비중",
-    topWeightsDesc: "추적 범위 내 비중입니다. 분모는 평가 가능한 전체 집합이며, 표 필터로 분모를 다시 100%로 만들지 않습니다.",
+    topWeightsDesc: "평가할 수 있는 종목의 전체 금액을 기준으로 계산한 비중입니다. 검색·필터를 바꿔도 이 기준은 같습니다.",
     historyTitle: "추정 평가금액 추이",
-    historyDesc: "같은 방법론의 실제 스냅샷이 2개 이상일 때만 표시합니다.",
+    historyDesc: "같은 계산 기준의 실제 기록이 두 번 이상 쌓이면 표시합니다.",
     historySingle: "검증된 이력이 1개뿐이라 추이를 표시하지 않습니다. 종목 표를 먼저 확인하세요.",
     tableTitle: "종목 표",
     tableDesc: "수량·지분율·종가·추정 금액·비중·접수일을 구분해 표시합니다.",
@@ -126,6 +131,15 @@ const STR = {
     colDetail: "상세",
     detailButton: "상세 보기",
     detailHoldingDate: "보유 기준일",
+    rowBasis: "보유 기준일",
+    rowIndirectSource: "제3자 공시 원문 확인",
+    rowDirectSource: "직접 공시 기록",
+    directBaseline: "비교한 직접 공시",
+    verifiedObservationTitle: "다른 회사 공시에서 확인한 지분",
+    verifiedObservationApplied: "현재 지분율에 반영",
+    rowVerifiedValue: "기준일과 지분율 확인",
+    verifiedObservationPending: "현재 지분율과 비교할 정보가 부족합니다",
+    verifiedObservationConflict: "같은 날짜의 공시 수치가 달라 현재값에 넣지 않았습니다",
     detailReceipt: "접수일·접수번호",
     detailReport: "보고 기준",
     detailPrice: "가격 기준",
@@ -136,7 +150,7 @@ const STR = {
     noFilingUrl: "원문 링크 없음",
     unknownDate: "미상(기준일 모름)",
     eventsTitle: "최근 공시 변화",
-    eventsDesc: "접수일 기준 최근 {shown}건 / 전체 {total}건입니다. 수량·지분율은 표시한 출처의 기록값이며 증감은 직전 기록된 공시 수량과 비교한 분류입니다.",
+    eventsDesc: "확인된 보유 기준일 우선 최근 {shown}건 / 전체 {total}건입니다. 기준일이 없으면 접수일을 사용합니다. 수량·지분율은 표시한 출처의 기록값입니다.",
     eventsEmpty: "해당 기간의 공시 변화가 없습니다.",
     eventQuantity: "공시 수량",
     eventOwnership: "공시 지분율",
@@ -144,9 +158,13 @@ const STR = {
     eventStockCode: "종목코드",
     eventCorpCode: "회사코드",
     eventDartSource: "DART 확인값",
-    eventLegacySource: "이관 기록 · 원문 수치 재확인 전",
+    eventIndirectSource: "제3자 공시 원문 확인값",
+    eventIndirectReentry: "제3자 공시로 5% 이상 보유 재확인",
+    eventBasis: "보유 기준일",
+    eventReceipt: "접수일",
+    eventLegacySource: "과거 기록 · 공시 수치 재확인 전",
     lastChange: "마지막 변화",
-    guideTitle: "방법론·출처·주의사항",
+    guideTitle: "계산 방법·출처·알아둘 점",
     guideFaqTitle: "자주 묻는 질문",
     faqTitle: "자주 묻는 질문",
     faqDesc: "추정 범위·계산·출처에 대한 자주 묻는 질문입니다.",
@@ -155,6 +173,8 @@ const STR = {
     retry: "게시된 데이터 다시 조회",
     statusIncluded: "평가 포함",
     statusExcluded: "평가 제외",
+    statusActiveRecord: "공시 지분율 5% 이상",
+    statusUnknownTracking: "추적 상태 확인 중",
     statusExit: "5% 추적 범위 이탈",
     statusUnresolved: "최신 미확인",
     searchNoResults: "검색 결과가 없습니다.",
@@ -162,11 +182,11 @@ const STR = {
     loading: "게시된 FolioTrace 데이터를 불러오는 중입니다.",
     missingTitle: "공개 데이터를 아직 게시하지 않았습니다",
     missingDesc:
-      "실제 데이터 이관(import)이 완료되지 않아 표시할 수 없습니다. 샘플 금융 데이터로 대체하지 않습니다.",
+      "아직 표시할 수 있는 실제 공시 자료가 준비되지 않았습니다.",
     loadErrorTitle: "게시된 데이터를 불러오지 못했습니다",
-    loadErrorDesc: "같은 사이트의 정적 JSON을 다시 조회해 보세요. DART 배치를 실행하지 않습니다.",
+    loadErrorDesc: "페이지 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     schemaErrorTitle: "게시된 데이터 형식을 확인할 수 없습니다",
-    schemaErrorDesc: "게시 파일의 버전·형식이 계약과 다릅니다. 관리자가 게시물을 고칠 때까지 기다려 주세요.",
+    schemaErrorDesc: "게시된 자료를 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.",
     formula: "추정 평가금액 = 공시 확인 수량 × 해당 거래일 KRX 정규장 종가 / 추적 범위 내 비중 = 해당 금액 ÷ 같은 통화·범위·거래일의 평가 가능 합계 × 100",
   },
   en: {
@@ -175,43 +195,48 @@ const STR = {
     description:
       "An estimated public portfolio of NPS domestic equities tracked from DART major-shareholding filings. Not total NPS assets, real account balances, or actual returns.",
     scopeNote:
-      "Current scope is one NPS domestic-equity portfolio from DART filings. Unimplemented foreign, other-institution, or person portfolios are not offered.",
-    historicalCoverageTitle: "Historical filing-list search",
-    historicalCoverageRange: "Receipt dates with complete page checks",
+      "This estimate follows NPS domestic equities reported in DART filings.",
+    historicalCoverageTitle: "Historical filings checked",
+    historicalCoverageRange: "Receipt dates checked",
     historicalCoverageTarget: "Target end date",
-    historicalCoverageComplete: "Listing pages checked",
-    historicalCoveragePending: "Listing-page checks in progress",
-    historicalCoverageScope: "Only filings submitted by the NPS institution are counted. A complete listing search does not verify every reported quantity or percentage.",
+    historicalCoverageComplete: "Filings listed for the whole period",
+    historicalCoveragePending: "Still checking filings",
+    historicalCoverageScope: "These dates cover filings submitted by NPS. Reported quantities and percentages are checked separately.",
     historicalFirstObserved: "Earliest large-shareholding filing submitted by NPS",
     historicalFirstTentative: "(provisional while searching)",
-    historicalParsePending: "New receipts without parsed source facts",
-    historicalLegacyRecheck: "Migrated values without source recheck",
-    indirectTitle: "Source-checked historical clues (samples)",
+    historicalParsePending: "New filings under review",
+    historicalLegacyRecheck: "Earlier records awaiting source checks",
+    indirectTitle: "Older records checked in individual filings",
     indirectSource: "Open DART filing",
-    indirectScope: "These are holding and planned-allotment clues checked in other filers' documents. A planned allotment is not a confirmed holding. Checked search-result pages do not mean every source fact has been verified. These clues are excluded from current holdings and valuations.",
-    secondaryAll: "All-content search pages checked through",
-    secondaryEquity: "Equity and voting search pages checked through",
-    secondaryPriorAll: "1999–2005 all-content search pages checked through",
-    secondaryPriorEquity: "1999–2005 equity and voting search pages checked through",
-    secondaryDirect: "2006–2008 direct-filing list checked through",
-    secondaryCandidates: "Documents queued for source review",
-    secondaryOtherUnreviewed: "Search hits awaiting source review",
-    secondarySourcePending: "Awaiting source retrieval",
-    secondaryContextPending: "Equity context awaiting interpretation",
-    secondaryNoScan: "Systematic full-text search has not started. The items below are individually checked samples.",
+    indirectScope: "These are holding and planned-allotment clues in other filers' documents. A planned allotment is not a confirmed holding. Search-page checks do not verify every source fact. Historical observations with an unverified ratio basis or current date are excluded from current holdings and valuation.",
+    historicalObservationTitle: "Historical holdings",
+    historicalObservationScope: "The filing confirms a holding date, quantity, and percentage. Some details about the total share count, including its date, still need checking before comparison with today's percentage.",
+    historicalDenominatorDatePending: "Date of the total share count still under review",
+    historicalRatioBasisPending: "How the percentage was calculated is still under review",
+    historicalObservationMore: "More historical records",
+    secondaryAll: "All filing contents searched through",
+    secondaryEquity: "Ownership and voting filings searched through",
+    secondaryPriorAll: "1999–2005 filings searched through",
+    secondaryPriorEquity: "1999–2005 ownership and voting filings searched through",
+    secondaryDirect: "2006–2008 NPS-submitted filings checked through",
+    secondaryCandidates: "Filings needing a closer look",
+    secondaryOtherUnreviewed: "Found in search but not yet read",
+    secondarySourcePending: "Waiting to read filing contents",
+    secondaryContextPending: "Stock-related details under review",
+    secondaryNoScan: "The period-by-period search has not started. The records below were checked individually.",
     priceBasis: "KRX regular-session close basis",
     checkedAt: "Filings checked",
-    generatedAt: "Generated",
+    generatedAt: "Records prepared",
     publishedAt: "Published",
     publishTimeUnknown: "Publish time not recorded",
-    staleBadge: "Generated over 3 days ago — re-check filings and closes",
-    freshBadge: "Generated data shown",
-    legacyVerified: "Migrated coverage: verified",
-    legacyPartial: "Migrated coverage: partially verified — treat history as reference",
-    legacyUnverified: "Migrated coverage: unverified — treat history as reference",
-    filingComplete: "Filing coverage: complete",
-    filingPartial: "Filing coverage: partial — some receipts/corrections may be missing",
-    filingUnverified: "Filing coverage: unverified",
+    staleBadge: "These records were checked more than 3 days ago — please check filings and closing prices again",
+    freshBadge: "Currently published records",
+    legacyVerified: "Earlier records: verified",
+    legacyPartial: "Earlier records: partly verified — use older figures as a guide",
+    legacyUnverified: "Earlier records: unverified — use older figures as a guide",
+    filingComplete: "Filings checked: complete",
+    filingPartial: "Filings checked: some receipts and corrections remain under review",
+    filingUnverified: "Filings checked: in progress",
     methodLink: "See the notes below for method and sources",
     summaryValue: "Estimated disclosed value",
     summaryTracked: "Tracked securities",
@@ -219,14 +244,14 @@ const STR = {
     summaryEvents: "Filings across tracked period",
     unavailable: "Valuation unavailable",
     unavailableReasonComplete: "No valid closing prices, so nothing could be valued.",
-    unavailableReasonPartial: "This is a partial sum; holdings without verified quantity, security mapping, or close are excluded.",
+    unavailableReasonPartial: "This total excludes securities whose quantity, share class, listed identity, or closing price could not be confirmed.",
     noHoldings: "No tracked securities.",
-    noHoldingsDesc: "The tracked list is empty after the last filings check. Re-fetch the published static data.",
+    noHoldingsDesc: "There are no holdings to show right now. Please try again later.",
     topWeights: "Top holdings by weight",
-    topWeightsDesc: "Weights within the tracked scope. The denominator is the full priced set; table filters never renormalize it to 100%.",
+    topWeightsDesc: "Shares of the total value we can estimate. Search and filters do not change the total.",
     historyTitle: "Estimated value history",
-    historyDesc: "Shown only with 2+ real snapshots under the same methodology.",
-    historySingle: "Only one verified snapshot exists, so no trend is shown. See the holdings table first.",
+    historyDesc: "Shown after at least two real records use the same calculation method.",
+    historySingle: "Only one confirmed record is available, so there is no trend yet. See the holdings table first.",
     tableTitle: "Holdings table",
     tableDesc: "Quantity, company ownership, close, estimated value, weight, and receipt date are shown separately.",
     tableUnavailable: "— means no verified valuation is available. See the exclusion reason under the security name.",
@@ -256,6 +281,15 @@ const STR = {
     colDetail: "Detail",
     detailButton: "View detail",
     detailHoldingDate: "Holding date",
+    rowBasis: "Holding basis date",
+    rowIndirectSource: "Third-party filing checked",
+    rowDirectSource: "Direct filing record",
+    directBaseline: "Compared direct filing",
+    verifiedObservationTitle: "Ownership found in another company's filing",
+    verifiedObservationApplied: "Applied to current ownership",
+    rowVerifiedValue: "Holding date and percentage checked",
+    verifiedObservationPending: "Not enough information to compare with the current percentage",
+    verifiedObservationConflict: "Filings for the same date disagree, so this was not used for the current value",
     detailReceipt: "Receipt date · no.",
     detailReport: "Report basis",
     detailPrice: "Price basis",
@@ -266,7 +300,7 @@ const STR = {
     noFilingUrl: "No source link",
     unknownDate: "Unknown (no holding date)",
     eventsTitle: "Recent filing changes",
-    eventsDesc: "Latest {shown} by receipt date / {total} overall. Quantities and ownership are recorded source values; change labels compare a previously recorded filing quantity.",
+    eventsDesc: "Latest {shown} by verified holding date, or receipt date when unavailable / {total} overall. Quantities and ownership are recorded source values.",
     eventsEmpty: "No filing changes in this period.",
     eventQuantity: "Filed quantity",
     eventOwnership: "Filed ownership",
@@ -274,9 +308,13 @@ const STR = {
     eventStockCode: "Stock code",
     eventCorpCode: "Company code",
     eventDartSource: "DART-verified values",
-    eventLegacySource: "Migrated record · source values pending recheck",
+    eventIndirectSource: "Source-checked third-party filing",
+    eventIndirectReentry: "At least 5% holding reconfirmed in another filer's source",
+    eventBasis: "Holding basis date",
+    eventReceipt: "Receipt date",
+    eventLegacySource: "Older record · reported values still being checked",
     lastChange: "Last change",
-    guideTitle: "Method · sources · cautions",
+    guideTitle: "Calculation, sources, and things to know",
     guideFaqTitle: "FAQ",
     faqTitle: "FAQ",
     faqDesc: "Frequently asked questions about scope, estimation, and sources.",
@@ -285,6 +323,8 @@ const STR = {
     retry: "Re-fetch published data",
     statusIncluded: "Included",
     statusExcluded: "Excluded",
+    statusActiveRecord: "Filed ownership at or above 5%",
+    statusUnknownTracking: "Tracking status under review",
     statusExit: "Exited 5% scope",
     statusUnresolved: "Latest unverified",
     searchNoResults: "No matching securities.",
@@ -292,11 +332,11 @@ const STR = {
     loading: "Loading the published FolioTrace data…",
     missingTitle: "Public data is not published yet",
     missingDesc:
-      "The real data import is not complete, so nothing can be shown. No sample financial data is substituted.",
+      "Real filing data is not ready to show yet.",
     loadErrorTitle: "Could not load the published data",
-    loadErrorDesc: "Re-fetch this site's static JSON. This never runs a DART batch.",
+    loadErrorDesc: "The page data could not be loaded. Please try again shortly.",
     schemaErrorTitle: "Published data format could not be verified",
-    schemaErrorDesc: "The published file version/format differs from the contract. Please wait for a fixed publish.",
+    schemaErrorDesc: "The published data could not be read. Please try again shortly.",
     formula: "Estimated value = filed quantity × KRX regular-session close on that trade date / In-scope weight = value ÷ priced total in same currency, scope, and trade date × 100",
   },
 } satisfies Record<Lang, Record<string, string>>;
@@ -308,6 +348,7 @@ const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
     "new-report": "첫 기록 공시",
     "purpose-change": "목적 변경",
     "tracking-exit": "5% 추적 범위 이탈",
+    "tracking-reentry": "5% 추적 범위 재진입",
     other: "기타",
   },
   en: {
@@ -316,9 +357,19 @@ const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
     "new-report": "First recorded filing",
     "purpose-change": "Purpose change",
     "tracking-exit": "Exited 5% tracking scope",
+    "tracking-reentry": "Re-entered 5% tracking scope",
     other: "Other",
   },
 };
+
+function observedPercent(value: string | null, kind?: Holding["ownershipNumericKind"]): string {
+  if (value === null) return "—";
+  const rendered = formatPct(value);
+  if (kind === "lower_bound") return `≥${rendered}`;
+  if (kind === "upper_bound") return `≤${rendered}`;
+  if (kind === "estimated") return `≈${rendered}`;
+  return rendered;
+}
 
 /**
  * Renders an exact formatted financial string with break opportunities
@@ -411,8 +462,14 @@ function ReadyView({
   const eventRange = useMemo(() => eventRangeOf(snapshot.events), [snapshot.events]);
   const recentEvents = useMemo(
     () => [...snapshot.events]
-      .sort((a, b) => b.receiptDate.localeCompare(a.receiptDate) || b.receiptNo.localeCompare(a.receiptNo))
+      .sort((a, b) => (b.basisDate ?? b.receiptDate).localeCompare(a.basisDate ?? a.receiptDate) ||
+        b.receiptNo.localeCompare(a.receiptNo))
       .slice(0, 30),
+    [snapshot.events],
+  );
+  const indirectReentries = useMemo(
+    () => new Set(snapshot.events.filter((event) => event.source === "indirect-observation" &&
+      event.kind === "tracking-reentry").map((event) => `${event.corpCode}:${event.receiptNo}`)),
     [snapshot.events],
   );
   const currentNameByCorpCode = useMemo(
@@ -426,12 +483,25 @@ function ReadyView({
   const selected: Holding | null =
     selectedCode === null ? null : (snapshot.holdings.find((h) => h.stockCode === selectedCode) ?? null);
   const selectedEvents = useMemo(
-    () => (selected ? snapshot.events.filter((e) => e.corpCode === selected.corpCode) : []),
+    () => (selected ? snapshot.events.filter((e) => e.corpCode === selected.corpCode)
+      .sort((a, b) => (b.basisDate ?? b.receiptDate).localeCompare(a.basisDate ?? a.receiptDate) ||
+        b.receiptNo.localeCompare(a.receiptNo)) : []),
     [selected, snapshot.events],
   );
+  const recentObservations = useMemo(
+    () => [...(snapshot.verifiedIndirectObservations ?? [])]
+      .sort((a, b) => b.basisDate.localeCompare(a.basisDate) || b.filingDate.localeCompare(a.filingDate)),
+    [snapshot.verifiedIndirectObservations],
+  );
+  const selectedObservations = selected
+    ? recentObservations.filter((observation) => observation.corpCode === selected.corpCode) : [];
 
   const entityName = lang === "ko" ? snapshot.entity.nameKo : snapshot.entity.nameEn;
   const scope = lang === "ko" ? snapshot.portfolio.scopeKo : snapshot.portfolio.scopeEn;
+  const trackingStatusLabel = (holding: Holding) =>
+    indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ? t.eventIndirectReentry :
+      holding.tracking === "active" ? t.statusActiveRecord :
+        holding.tracking === "below-5-percent" ? t.statusExit : t.statusUnknownTracking;
   const statusLabel = (s: ReturnType<typeof holdingStatus>) =>
     s === "included" ? t.statusIncluded : s === "excluded" ? t.statusExcluded : s === "exit" ? t.statusExit : t.statusUnresolved;
 
@@ -507,7 +577,42 @@ function ReadyView({
             {" · "}{t.secondaryContextPending}: {snapshot.secondaryCoverage.sourceContextReviewCount}
           </small>
         ) : <small>{t.secondaryNoScan}</small>}
-        {indirectEvidence.items.map((clue) => (
+        {(snapshot.historicalObservations?.length ?? 0) > 0 && (
+          <div className="foliotrace-source-observations">
+            <strong>{t.historicalObservationTitle}</strong>
+            <small>{t.historicalObservationScope}</small>
+            {snapshot.historicalObservations?.slice(0, 20).map((observation) => (
+              <p key={`${observation.receiptNo}:${observation.documentNo}:${observation.sourceRowSha256}`}>
+                <strong>{observation.issuerName}</strong> · {observation.basisDate} · {formatQty(observation.quantity)} · {formatPct(observation.ownershipPercent)}
+                {" · "}{observation.status === "historical_only_denominator_date_unverified" ?
+                  t.historicalDenominatorDatePending : t.historicalRatioBasisPending}
+                {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
+              </p>
+            ))}
+            {(snapshot.historicalObservations?.length ?? 0) > 20 && (
+              <small>{t.historicalObservationMore}: {(snapshot.historicalObservations?.length ?? 0) - 20}</small>
+            )}
+          </div>
+        )}
+        {(snapshot.verifiedIndirectObservations?.length ?? 0) > 0 && (
+          <div className="foliotrace-source-observations">
+            <strong>{t.verifiedObservationTitle}</strong>
+            {recentObservations.slice(0, 20).map((observation) => (
+              <p key={observation.observationKey}>
+                <strong>{currentNameByCorpCode.get(observation.corpCode) ?? observation.stockCode}</strong>
+                {" · "}{observation.basisDate} · {observedPercent(observation.ownershipPercent, observation.numericKind)}
+                {" · "}{observation.reason === "same_basis_conflict" ? t.verifiedObservationConflict :
+                  observation.appliedToHolding ? t.verifiedObservationApplied : t.verifiedObservationPending}
+                {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
+              </p>
+            ))}
+          </div>
+        )}
+        {indirectEvidence.items.filter((clue) => !(clue.facts.length === 1 && snapshot.historicalObservations?.some(
+          (observation) => observation.receiptNo === clue.receiptNo &&
+            observation.quantity === clue.facts[0].quantity &&
+            observation.ownershipPercent === clue.facts[0].ownershipPercent &&
+            observation.basisDate === clue.facts[0].basisDate))).map((clue) => (
           <p key={clue.receiptNo}>
             {lang === "ko" ? clue.descriptionKo : clue.descriptionEn}
             {" "}<a href={clue.sourceUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
@@ -570,7 +675,7 @@ function ReadyView({
         )}
       </SectionCard>
 
-      <SectionCard title={t.historyTitle} description={`${t.historyDesc} (v${snapshot.portfolio.methodologyVersion})`}>
+      <SectionCard title={t.historyTitle} description={t.historyDesc}>
         {snapshot.history.length >= 2 ? (
           <ul className="foliotrace-history">
             {snapshot.history.map((h) => (
@@ -599,19 +704,22 @@ function ReadyView({
                 ? `${t.eventStockCode} ${event.stockCode}`
                 : `${t.eventCorpCode} ${event.corpCode}`);
               return (
-                <li key={event.receiptNo}>
+                <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}`}>
                   <div className="foliotrace-event-heading">
                     <strong>{label}</strong>
                     {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
-                    <span>{event.receiptDate}</span>
-                    <span>{EVENT_KIND[lang][event.kind]}</span>
+                    <span>{event.basisDate ? `${t.eventBasis}: ${event.basisDate}` : `${t.eventReceipt}: ${event.receiptDate}`}</span>
+                    <span>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
+                      t.eventIndirectReentry : EVENT_KIND[lang][event.kind]}</span>
                   </div>
                   <div className="foliotrace-event-values">
                     <span>{t.eventQuantity}: <span className="foliotrace-num">{event.quantity === null ? t.eventUnknown : formatQty(event.quantity)}</span></span>
-                    <span>{t.eventOwnership}: <span className="foliotrace-num">{event.companyOwnershipPercent === null ? t.eventUnknown : formatPct(event.companyOwnershipPercent)}</span></span>
+                    <span>{t.eventOwnership}: <span className="foliotrace-num">{event.companyOwnershipPercent === null ? t.eventUnknown : observedPercent(event.companyOwnershipPercent, event.numericKind)}</span></span>
+                    {event.percentagePointChange != null && <span>Δ <span className="foliotrace-num">{event.percentagePointChange}pp</span></span>}
                   </div>
                   <div className="foliotrace-event-source">
-                    <span>{event.source === "legacy-import" ? t.eventLegacySource : t.eventDartSource}</span>
+                    <span>{event.source === "legacy-import" ? t.eventLegacySource :
+                      event.source === "indirect-observation" ? t.eventIndirectSource : t.eventDartSource}</span>
                     <code className="foliotrace-code">{event.receiptNo}</code>
                     {event.correctionOf && <small> ← {event.correctionOf}</small>}
                     {event.filingUrl && (
@@ -707,6 +815,15 @@ function ReadyView({
                       <tr key={h.stockCode}>
                         <th scope="row">
                           {h.name} <code className="foliotrace-code">{h.stockCode}</code>
+                          <small className="foliotrace-row-reason">
+                            {t.rowBasis}: {h.holdingDate ?? t.unknownDate} · {h.evidence === "indirect-observation" ? t.rowIndirectSource :
+                              h.evidence === "legacy-import" ? t.eventLegacySource : t.rowDirectSource}
+                          </small>
+                          {h.observationStatus && (
+                            <small className="foliotrace-row-reason">
+                              {h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict : t.rowVerifiedValue}
+                            </small>
+                          )}
                           {h.estimatedValue === null && (
                             <small className="foliotrace-row-reason">
                               {exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded}
@@ -714,14 +831,14 @@ function ReadyView({
                           )}
                         </th>
                         <td className="foliotrace-num">{formatQty(h.quantity)}</td>
-                        <td className="foliotrace-num">{formatPct(h.companyOwnershipPercent)}</td>
+                        <td className="foliotrace-num">{observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}</td>
                         <td className="foliotrace-num">
                           {h.quote ? `${formatKrw(h.quote.close, lang)} · ${h.quote.tradeDate}` : "—"}
                         </td>
                         <td className="foliotrace-num">{h.estimatedValue === null ? "—" : formatKrw(h.estimatedValue, lang)}</td>
                         <td className="foliotrace-num">{formatPct(h.portfolioWeightPercent)}</td>
                         <td>{h.receiptDate}</td>
-                        <td>{statusLabel(holdingStatus(h))}</td>
+                        <td>{trackingStatusLabel(h)}<small className="foliotrace-row-reason">{statusLabel(holdingStatus(h))}</small></td>
                         <td>
                           <button type="button" className="foliotrace-retry" onClick={() => setSelectedCode(h.stockCode)}>
                             {t.detailButton}
@@ -779,7 +896,7 @@ function ReadyView({
               </div>
               <div>
                 <dt>{t.colOwnership}</dt>
-                <dd className="foliotrace-num">{formatPct(selected.companyOwnershipPercent)}</dd>
+                <dd className="foliotrace-num">{observedPercent(selected.companyOwnershipPercent, selected.ownershipNumericKind)}</dd>
               </div>
               <div>
                 <dt>{t.detailHoldingDate}</dt>
@@ -791,6 +908,17 @@ function ReadyView({
                   {selected.receiptDate} · <code className="foliotrace-code">{selected.receiptNo}</code>
                 </dd>
               </div>
+              {selected.indirectSource && (
+                <div>
+                  <dt>{t.rowIndirectSource}</dt>
+                  <dd>
+                    {t.eventBasis}: {selected.indirectSource.basisDate}
+                    {selected.indirectSource.documentNo && ` · dcmNo ${selected.indirectSource.documentNo}`}
+                    {selected.indirectSource.directReceiptNo &&
+                      <> · {t.directBaseline}: <code className="foliotrace-code">{selected.indirectSource.directReceiptNo}</code></>}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt>{t.detailPrice}</dt>
                 <dd>
@@ -802,7 +930,7 @@ function ReadyView({
               <div>
                 <dt>{t.detailInclusion}</dt>
                 <dd>
-                  {statusLabel(holdingStatus(selected))}
+                  {trackingStatusLabel(selected)} · {statusLabel(holdingStatus(selected))}
                   {(() => {
                     const reason = exclusionReasonLabel(selected.valuationExclusionReason, lang);
                     return reason ? ` — ${reason}` : "";
@@ -842,14 +970,29 @@ function ReadyView({
                 </dd>
               </div>
             </dl>
+            {selectedObservations.length > 0 && (
+              <section className="foliotrace-source-observations" aria-label={t.verifiedObservationTitle}>
+                <h3 className="foliotrace-detail-h3">{t.verifiedObservationTitle}</h3>
+                {selectedObservations.map((observation) => (
+                  <p key={observation.observationKey}>
+                    {observation.basisDate} · {observedPercent(observation.ownershipPercent, observation.numericKind)}
+                    {" · "}{observation.reason === "same_basis_conflict" ? t.verifiedObservationConflict :
+                      observation.appliedToHolding ? t.verifiedObservationApplied : t.verifiedObservationPending}
+                    {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
+                  </p>
+                ))}
+              </section>
+            )}
             <h3 className="foliotrace-detail-h3">{t.detailHistory}</h3>
             {selectedEvents.length === 0 ? (
               <p className="foliotrace-state-text">{t.eventsEmpty}</p>
             ) : (
               <ul className="foliotrace-events">
                 {selectedEvents.map((e) => (
-                  <li key={e.receiptNo}>
-                    <strong>{EVENT_KIND[lang][e.kind]}</strong> <span>{e.receiptDate}</span>{" "}
+                  <li key={e.observationKey ?? `${e.receiptNo}:${e.corpCode}:${e.stockCode ?? ""}`}>
+                    <strong>{e.kind === "tracking-reentry" && e.source === "indirect-observation" ?
+                      t.eventIndirectReentry : EVENT_KIND[lang][e.kind]}</strong>
+                    <span>{e.basisDate ? `${t.eventBasis}: ${e.basisDate}` : `${t.eventReceipt}: ${e.receiptDate}`}</span>{" "}
                     <code className="foliotrace-code">{e.receiptNo}</code>
                   </li>
                 ))}
