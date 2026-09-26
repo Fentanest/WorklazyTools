@@ -54,6 +54,18 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
         basis_rows = []
         date_rows = []
         ownership_context_rows = []
+        ownership_adjacent_rows = []
+        if receipt_no in ("20060124800040", "20081007000289"):
+            all_rows = list(ROWS.finditer(decoded))
+            anchors = [index for index, match in enumerate(all_rows) if
+                       (NPS.search(match.group(0)) or "발행주식총수" in match.group(0))]
+            nearby = sorted({position for anchor in anchors for position in range(max(0, anchor - 2),
+                            min(len(all_rows), anchor + 3))})[:40]
+            for position in nearby:
+                match = all_rows[position]
+                ownership_adjacent_rows.append({
+                    "row_offset": match.start(), "row_sha256": hashlib.sha256(match.group(0).encode()).hexdigest(),
+                    "cells": [clean(cell, 80) for cell in CELLS.findall(match.group(0))[:16]]})
         for row in ROWS.finditer(decoded):
             source_row = row.group(0)
             if receipt_no in ("20060124800040", "20081007000289"):
@@ -92,6 +104,7 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                                     "basis_rows": basis_rows,
                                     "date_rows": date_rows,
                                     "ownership_context_rows": ownership_context_rows,
+                                    "ownership_adjacent_rows": ownership_adjacent_rows,
                                     "nps_mentions": len(NPS.findall(decoded)),
                                     "date_tokens": [clean(item, 40) for item in dates]})
     result["archive_status"] = "parsed"
