@@ -1,0 +1,47 @@
+name: Audit DART historical NPS filings
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_year:
+        description: First receipt year to scan
+        required: true
+        default: '1999'
+        type: string
+      end_year:
+        description: Last receipt year to scan
+        required: true
+        default: '2020'
+        type: string
+      max_requests:
+        description: Maximum DART requests for this run
+        required: true
+        default: '2500'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan historical DART filings
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          START_YEAR: ${{ inputs.start_year }}
+          END_YEAR: ${{ inputs.end_year }}
+          MAX_REQUESTS: ${{ inputs.max_requests }}
+        run: |
+          python3 scripts/foliotrace/history_probe.py \
+            --start-year "$START_YEAR" --end-year "$END_YEAR" \
+            --max-requests "$MAX_REQUESTS" --output history-probe.json
+      - name: Save sanitized result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-history-probe
+          path: history-probe.json
+          if-no-files-found: ignore
