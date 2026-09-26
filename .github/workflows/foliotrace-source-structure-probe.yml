@@ -1,0 +1,23 @@
+name: Probe FolioTrace source document structure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, Linux, X64, '235']
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect three fixed public filing archives
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: python3 scripts/foliotrace/source_structure_probe.py source-structure-probe.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: foliotrace-source-structure
+          path: source-structure-probe.json
+          retention-days: 7
