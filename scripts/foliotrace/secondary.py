@@ -32,7 +32,7 @@ RECEIPT = re.compile(r"^\d{14}$")
 DOCUMENT_KEY = re.compile(r"^\d{14}:\d+$")
 STOCK_CONTEXT = re.compile(r"보통주|우선주|주주|보유|소유|지분|주식|주권|의결권|sharehold|stock|equity|voting", re.I)
 REPORT_CONTEXT = re.compile(r"대량보유|의결권대리행사|주주명부|주식등의|sharehold", re.I)
-SOURCE_PARSER_VERSION = "source-rows-v3"
+SOURCE_PARSER_VERSION = "source-change-sections-v4"
 SOURCE_ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
 SOURCE_CELLS = re.compile(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", re.I | re.S)
 EXACT_NPS = re.compile(r"^(?:국민연금공단|국민연금관리공단|National Pension Service)$", re.I)
@@ -83,6 +83,49 @@ def extract_source_claims(xml: str) -> list[dict]:
                        "status": "source_context_review_pending"})
         if len(claims) >= 20:
             break
+    return bind_change_section_basis(xml, claims)
+
+
+def bind_change_section_basis(xml: str, claims: list[dict]) -> list[dict]:
+    """Bind an NPS own-share row only when report, transaction, and total rows agree."""
+    rows = [(match.start(), match.end(), _row_cells(match.group(0))) for match in SOURCE_ROWS.finditer(xml)]
+    def korean_date(value):
+        match = re.fullmatch(r"\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*", value)
+        if not match:
+            return None
+        try:
+            return date(*(int(part) for part in match.groups())).isoformat()
+        except ValueError:
+            return None
+    reports = []
+    for index, (start, _, cells) in enumerate(rows):
+        if (len(cells) >= 5 and cells[0] == "이번보고서제출일" and cells[2] == "보통주" and
+                _number(cells[3]) is not None and _number(cells[4], maximum=100) is not None):
+            parsed = korean_date(cells[1])
+            if parsed:
+                reports.append((index, start, parsed, _number(cells[3]), _number(cells[4], maximum=100)))
+    for position, (row_index, start, basis, quantity, ratio) in enumerate(reports):
+        next_start = reports[position + 1][1] if position + 1 < len(reports) else len(xml)
+        section = xml[start:next_start]
+        if "개인별세부변동사항" not in section or "최대주주등 주식소유현황" not in section:
+            continue
+        section_rows = rows[row_index + 1:reports[position + 1][0] if position + 1 < len(reports) else len(rows)]
+        owner_rows = [cells for _, _, cells in section_rows if len(cells) >= 6 and EXACT_NPS.fullmatch(cells[0])
+                      and cells[3] == "본인" and _number(cells[4]) == quantity
+                      and _number(cells[5], maximum=100) == ratio]
+        identity_rows = [cells for _, _, cells in section_rows if any(EXACT_NPS.fullmatch(cell) for cell in cells)
+                         and "성명" in cells]
+        changes = [cells for _, _, cells in section_rows if len(cells) >= 6 and
+                   korean_date(cells[0]) == basis and cells[2] == "보통주" and
+                   _number(cells[5]) == quantity]
+        if len(owner_rows) != 1 or len(identity_rows) != 1 or len(changes) != 1:
+            continue
+        for claim in claims:
+            if (claim["structure"] == "owner_total_row" and start < claim["row_offset"] < next_start and
+                    claim["quantity"] == quantity and claim["ownership_percent"] == ratio):
+                claim.update(basis_date=basis, security_kind="보통주",
+                             status="actual_holding_basis_verified",
+                             basis_evidence="matched_report_change_and_owner_total")
     return claims
 
 

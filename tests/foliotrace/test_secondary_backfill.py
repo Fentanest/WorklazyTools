@@ -82,6 +82,26 @@ class SecondaryBackfillTests(unittest.TestCase):
         self.assertTrue(all(claim['status'] == 'source_context_review_pending' for claim in claims))
         self.assertEqual(claims[0]['security_kind'], None)
 
+    def test_report_change_owner_total_must_agree_within_one_section(self):
+        def row(*cells):
+            return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'
+        first = (row('이번보고서제출일', '2006년 02월 01일', '보통주', '2,407,509', '2.76') +
+                 '<P>4. 개인별세부변동사항</P>' + row('성명', '국민연금관리공단') +
+                 row('2006년 02월 01일', '장내매도(-)', '보통주', '3,084,186', '-676,677', '2,407,509') +
+                 '<P>5. 최대주주등 주식소유현황(총괄현황)</P>' +
+                 row('국민연금관리공단', '사업자등록', '219-82-01593', '본인', '2,407,509', '2.76'))
+        other = (row('이번보고서제출일', '2006년 02월 01일', '보통주', '2,481,311', '2.85') +
+                 '<P>4. 개인별세부변동사항</P>' + row('성명', '다른 주주') +
+                 row('2006년 02월 01일', '해당사항없슴', '보통주', '2,481,310', '0', '2,481,310') +
+                 '<P>5. 최대주주등 주식소유현황(총괄현황)</P>' +
+                 row('다른 주주', '사업자등록', '0', '본인', '2,481,311', '2.85'))
+        claims = secondary.extract_source_claims('<DOC>' + first + other + '</DOC>')
+        self.assertEqual(len(claims), 1)
+        self.assertEqual((claims[0]['basis_date'], claims[0]['status'], claims[0]['security_kind']),
+                         ('2006-02-01', 'actual_holding_basis_verified', '보통주'))
+        mismatched = first.replace('2,407,509</TD></TR><P>5.', '2,407,508</TD></TR><P>5.')
+        self.assertIsNone(secondary.extract_source_claims('<DOC>' + mismatched + other + '</DOC>')[0]['basis_date'])
+
     def test_parser_keeps_official_page_identity_and_receipt_metadata(self):
         day = date(2006, 2, 8)
         page = secondary.parse_search_page(result_page([POSCO]), 1, day, day)
