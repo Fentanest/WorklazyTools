@@ -533,10 +533,17 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         state["revision"] += 1
         write_state(state_path, state)
         windows += 1
-    reviewed = context_candidates = source_requests = noncandidate_reviewed = 0
+    reviewed = context_candidates = source_requests = noncandidate_reviewed = retained = 0
     if review_limit:
         today = datetime.now(timezone.utc).date().isoformat()
         cache = state.setdefault("secondary_source_cache", {})
+        for document_key, item in ledger["candidates"].items():
+            if source_receipt and not document_key.startswith(source_receipt + ":"):
+                continue
+            if (item.get("parser_version") == SOURCE_PARSER_VERSION and
+                    item.get("source_archive_sha256") and
+                    any(claim.get("status") == "actual_holding_basis_verified" for claim in item.get("source_claims") or [])):
+                retained += retain_verified_historical_claims(state, item)
         def check_source(receipt_no):
             nonlocal source_requests
             check = cache.get(receipt_no)
@@ -600,7 +607,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             if reviewed % 10 == 0:
                 state["revision"] += 1
                 write_state(state_path, state)
-        if reviewed % 10:
+        if reviewed % 10 or (retained and reviewed == 0):
             state["revision"] += 1
             write_state(state_path, state)
     return {"status": "SOURCE_REVIEW_COMPLETE" if source_only else
@@ -611,5 +618,6 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             "search_requests": pages_used, "new_candidates": new_candidates,
             "candidate_count": len(ledger["candidates"]), "required_pages": required_pages,
             "source_review_attempts": reviewed, "source_document_requests": source_requests,
+            "historical_facts_retained": retained,
             "source_context_candidates": context_candidates,
             "noncandidate_review_attempts": noncandidate_reviewed}
