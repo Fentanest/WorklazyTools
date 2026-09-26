@@ -603,11 +603,18 @@ def parse_filing_document(payload: bytes):
         except (TypeError, ValueError):
             return None
     cover_date = parsed_date(cover_dates[0]) if len(cover_dates) == 1 else None
-    row_date_text = cell("ACODE", "THS_IFR")
+    current_rows = [match.group(0) for match in re.finditer(r"<TR\b[^>]*>.*?</TR>", xml, re.I | re.S)
+                    if 'ACODE="THS_IFR"' in match.group(0) and
+                    "이번보고서" in html.unescape(re.sub(r"<[^>]+>", " ", match.group(0)))]
+    current_row = current_rows[0] if len(current_rows) == 1 else ""
+    def row_cell(code):
+        found = re.search(rf'ACODE="{re.escape(code)}"[^>]*>(.*?)</T[EUD]>', current_row, re.I | re.S)
+        return html.unescape(re.sub(r"<[^>]+>", " ", found.group(1))).strip() if found else None
+    row_date_text = row_cell("THS_IFR")
     row_parts = re.fullmatch(r"\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*", row_date_text or "")
     row_date = parsed_date(row_parts.groups()) if row_parts else None
-    row_quantity = dec(cell("ACODE", "THS_STK_CNT"))
-    row_ratio = dec(cell("ACODE", "THS_STK_RT"))
+    row_quantity = dec(row_cell("THS_STK_CNT"))
+    row_ratio = dec(row_cell("THS_STK_RT"))
     basis_diagnostic = {"cover_dates": len(cover_dates), "row_date_valid": row_date is not None,
                         "row_quantity_present": row_quantity is not None,
                         "row_ratio_present": row_ratio is not None,
@@ -620,14 +627,7 @@ def parse_filing_document(payload: bytes):
                         Decimal(row_quantity) == Decimal(quantity) and Decimal(row_ratio) == Decimal(ownership) and
                         (cover_date is None or cover_date == row_date))
     holding_date = row_date if row_verified else None
-    row_sha256 = None
-    if row_verified:
-        marker = re.search(r'ACODE="THS_IFR"', xml)
-        if marker:
-            beginning = xml.rfind("<TR", 0, marker.start())
-            ending = xml.find("</TR>", marker.end())
-            if beginning >= 0 and ending > marker.end():
-                row_sha256 = sha(xml[beginning:ending + 5].encode("utf-8"))
+    row_sha256 = sha(current_row.encode("utf-8")) if row_verified else None
     voting = verified_voting_share_quantity(xml, quantity)
     return {"quantity": quantity, "company_ownership_percent": ownership,
             "reason": safe_str(cell("ACODE", "SUM_CHN_RWN")), "xml_sha256": sha(xml_bytes),
@@ -637,9 +637,9 @@ def parse_filing_document(payload: bytes):
             "basis_diagnostic": basis_diagnostic,
             "source_ratio_columns": ({"shares_etc_quantity": str(row_quantity),
                                       "shares_etc_percent": str(row_ratio),
-                                      "stock_quantity": str(dec(cell("ACODE", "THS_CMT_CNT"))) if cell("ACODE", "THS_CMT_CNT") else None,
-                                      "stock_percent": str(dec(cell("ACODE", "THS_CMT_RT"))) if cell("ACODE", "THS_CMT_RT") else None,
-                                      "issued_voting_shares": str(dec(cell("ACODE", "THS_STK_CT"))) if cell("ACODE", "THS_STK_CT") else None}
+                                      "stock_quantity": dec(row_cell("THS_CMT_CNT")),
+                                      "stock_percent": dec(row_cell("THS_CMT_RT")),
+                                      "issued_voting_shares": dec(row_cell("THS_STK_CT"))}
                                      if row_verified else None),
             "verified_voting_share_quantity": voting,
             "verified_common_stock_code": verified_common_stock_code(xml, quantity)}
@@ -875,7 +875,7 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
 
 def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_document, target_receipt=None):
     """Recover report preparation dates from exact source documents in bounded runs."""
-    method = "report-row-decimal-v2"
+    method = "report-current-row-v3"
     if limit < 0 or limit > 100:
         raise ValueError("DIRECT_BASIS_LIMIT")
     if target_receipt is not None and not RECEIPT.fullmatch(target_receipt):

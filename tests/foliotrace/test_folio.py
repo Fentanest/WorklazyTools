@@ -71,6 +71,7 @@ class MigrationTests(unittest.TestCase):
                '보고서작성기준일 : 2026년 09월 07일</COVER>'
                '<TE ACODE="RPT_RSP_NM">국민연금공단</TE>'
                '<TE ACODE="SUM_TMT_CNT">100</TE><TE ACODE="SUM_TMT_RT">5.05</TE>'
+               '<TR><TH>다른표</TH><TE ACODE="THS_IFR">-</TE></TR>'
                '<TR><TH>이번보고서</TH><TE ACODE="THS_IFR">2026년 09월 07일</TE>'
                '<TE ACODE="THS_STK_CNT">100</TE><TE ACODE="THS_STK_RT">5.05</TE>'
                '<TE ACODE="THS_CMT_CNT">100</TE><TE ACODE="THS_CMT_RT">5.05</TE>'
@@ -132,14 +133,15 @@ class MigrationTests(unittest.TestCase):
                              {'shares_etc_percent': '5.05'})
         self.assertEqual(folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=lambda *_: self.fail('refetched'))['checked'], 0)
 
-    def test_old_basis_parser_attempt_is_rechecked_with_decimal_v2(self):
+    def test_old_basis_parser_attempt_is_rechecked_with_current_row_v3(self):
         state = folio.empty_state()
         no, corp = '20260623000336', '00155319'
         state['receipts'][no] = {'receipt_no': no, 'receipt_date': '2026-06-23',
             'listing_receipt_date': '2026-06-23', 'corp_code': corp, 'stock_code': '005490',
             'quantity': '6576661.0', 'company_ownership_percent': '8.3',
             'evidence': 'legacy_history_fact', 'listing_verified_at': '2026-09-26T00:00:00Z',
-            'basis_method': 'report-cover-v1', 'basis_last_attempt_on': folio.kst_today().isoformat(),
+            'basis_method': 'report-row-decimal-v2', 'basis_last_attempt_on': folio.kst_today().isoformat(),
+            'basis_last_attempt_method': 'report-row-decimal-v2',
             'basis_attempt_count': 3}
         state['holdings'][corp] = {'corp_code': corp, 'stock_code': '005490',
             'receipt_no': no, 'quantity': '6576661.0', 'company_ownership_percent': '8.3',
@@ -151,7 +153,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual((result['checked'], result['verified']), (1, 1))
         self.assertEqual((state['holdings'][corp]['holding_date'], state['holdings'][corp]['tracking']),
                          ('2026-06-18', 'active'))
-        self.assertEqual(state['receipts'][no]['basis_method'], 'report-row-decimal-v2')
+        self.assertEqual(state['receipts'][no]['basis_method'], 'report-current-row-v3')
         self.assertEqual(state['receipts'][no]['basis_attempt_count'], 1)
 
     def test_exact_voting_only_mapping_and_ambiguous_class(self):
