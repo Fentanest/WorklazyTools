@@ -83,6 +83,12 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(parsed['basis_date_evidence'], 'dart_current_report_row')
         self.assertEqual(parsed['source_ratio_columns']['issued_voting_shares'], '1980')
         self.assertRegex(parsed['basis_row_sha256'], r'^[a-f0-9]{64}$')
+        scaled = io.BytesIO()
+        with zipfile.ZipFile(scaled, 'w') as archive:
+            archive.writestr('report.xml', xml.replace('ACODE="SUM_TMT_RT">5.05',
+                'ACODE="SUM_TMT_RT">5.050').replace('ACODE="THS_STK_CNT">100',
+                'ACODE="THS_STK_CNT">100.0').encode())
+        self.assertEqual(folio.parse_filing_document(scaled.getvalue())['holding_date'], '2026-09-07')
         unknown = io.BytesIO()
         with zipfile.ZipFile(unknown, 'w') as archive:
             archive.writestr('report.xml', xml.replace('2026년 09월 07일</TE>', '2026년 09월 08일</TE>').encode())
@@ -121,6 +127,27 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(folio.read_json(state_path)['receipts'][current]['source_ratio_columns'],
                              {'shares_etc_percent': '5.05'})
         self.assertEqual(folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=lambda *_: self.fail('refetched'))['checked'], 0)
+
+    def test_old_basis_parser_attempt_is_rechecked_with_decimal_v2(self):
+        state = folio.empty_state()
+        no, corp = '20260623000336', '00155319'
+        state['receipts'][no] = {'receipt_no': no, 'receipt_date': '2026-06-23',
+            'listing_receipt_date': '2026-06-23', 'corp_code': corp, 'stock_code': '005490',
+            'quantity': '6576661.0', 'company_ownership_percent': '8.3',
+            'evidence': 'legacy_history_fact', 'listing_verified_at': '2026-09-26T00:00:00Z',
+            'basis_method': 'report-cover-v1', 'basis_last_attempt_on': folio.kst_today().isoformat(),
+            'basis_attempt_count': 1}
+        state['holdings'][corp] = {'corp_code': corp, 'stock_code': '005490',
+            'receipt_no': no, 'quantity': '6576661.0', 'company_ownership_percent': '8.3',
+            'tracking': 'unknown', 'evidence': 'legacy_import'}
+        result = folio.recheck_direct_basis(state, 'test-key', limit=1, target_receipt=no,
+            fetch=lambda *_: {'quantity': '6576661', 'company_ownership_percent': '8.30',
+                'holding_date': '2026-06-18', 'xml_sha256': 'a' * 64,
+                'basis_row_sha256': 'b' * 64, 'source_ratio_columns': {'shares_etc_percent': '8.30'}})
+        self.assertEqual((result['checked'], result['verified']), (1, 1))
+        self.assertEqual((state['holdings'][corp]['holding_date'], state['holdings'][corp]['tracking']),
+                         ('2026-06-18', 'active'))
+        self.assertEqual(state['receipts'][no]['basis_method'], 'report-row-decimal-v2')
 
     def test_exact_voting_only_mapping_and_ambiguous_class(self):
         def table(extra="-"):

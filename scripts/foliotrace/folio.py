@@ -608,7 +608,8 @@ def parse_filing_document(payload: bytes):
     row_date = parsed_date(row_parts.groups()) if row_parts else None
     row_quantity = dec(cell("ACODE", "THS_STK_CNT"))
     row_ratio = dec(cell("ACODE", "THS_STK_RT"))
-    row_verified = bool(row_date and row_quantity == quantity and row_ratio == ownership and
+    row_verified = bool(row_date and row_quantity is not None and row_ratio is not None and
+                        Decimal(row_quantity) == Decimal(quantity) and Decimal(row_ratio) == Decimal(ownership) and
                         (cover_date is None or cover_date == row_date))
     holding_date = row_date if row_verified else None
     row_sha256 = None
@@ -865,6 +866,7 @@ def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, p
 
 def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_document, target_receipt=None):
     """Recover report preparation dates from exact source documents in bounded runs."""
+    method = "report-row-decimal-v2"
     if limit < 0 or limit > 100:
         raise ValueError("DIRECT_BASIS_LIMIT")
     if target_receipt is not None and not RECEIPT.fullmatch(target_receipt):
@@ -885,8 +887,9 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
                 or receipt.get("quantity") is None or receipt.get("company_ownership_percent") is None
                 or receipt.get("withdrawn_flag") or receipt.get("is_correction") or receipt.get("later_correction_flag")
                 or state.get("unresolved", {}).get(no) in ("receipt_date_conflict", "receipt_chronology_unverified")
-                or receipt.get("basis_method") == "report-cover-v1"
-                or receipt.get("basis_last_attempt_on") == today
+                or receipt.get("basis_method") == method
+                or (receipt.get("basis_last_attempt_on") == today and
+                    receipt.get("basis_last_attempt_method") == method)
                 or int(receipt.get("basis_attempt_count") or 0) >= 3):
             continue
         eligible.append((no not in current, -int(no), no, receipt))
@@ -894,6 +897,7 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
     for _, _, no, receipt in sorted(eligible)[:limit]:
         checked += 1
         receipt["basis_last_attempt_on"] = today
+        receipt["basis_last_attempt_method"] = method
         receipt["basis_attempt_count"] = int(receipt.get("basis_attempt_count") or 0) + 1
         try:
             parsed = fetch(no, key)
@@ -905,7 +909,7 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
         source_date = receipt.get("listing_receipt_date") or receipt.get("receipt_date")
         if (not basis or not source_date or basis > source_date):
             receipt["basis_review_status"] = "basis_unverified"
-            receipt["basis_method"] = "report-cover-v1"
+            receipt["basis_method"] = method
             pending += 1
             continue
         source_quantity, parsed_quantity = dec(receipt.get("quantity")), dec(parsed.get("quantity"))
@@ -913,7 +917,7 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
         if (None in (source_quantity, parsed_quantity, source_ratio, parsed_ratio) or
                 Decimal(source_quantity) != Decimal(parsed_quantity) or Decimal(source_ratio) != Decimal(parsed_ratio)):
             receipt["basis_review_status"] = "source_value_conflict"
-            receipt["basis_method"] = "report-cover-v1"
+            receipt["basis_method"] = method
             conflicts += 1
             continue
         receipt["holding_date"] = basis
@@ -925,10 +929,11 @@ def recheck_direct_basis(state, key, limit=20, state_path=None, fetch=dart_docum
             receipt["evidence"] = "dart_document"
             receipt["xml_sha256"] = parsed.get("xml_sha256")
         receipt["basis_review_status"] = "verified"
-        receipt["basis_method"] = "report-cover-v1"
+        receipt["basis_method"] = method
         current_holding = state.get("holdings", {}).get(receipt["corp_code"])
         if current_holding and current_holding.get("receipt_no") == no:
             current_holding["holding_date"] = basis
+            current_holding["tracking"] = "below-5-percent" if Decimal(source_ratio) < 5 else "active"
             if current_holding.get("evidence") == "legacy_import":
                 current_holding["evidence"] = "dart_document"
         verified += 1
