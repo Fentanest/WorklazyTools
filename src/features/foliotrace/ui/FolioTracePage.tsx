@@ -28,12 +28,13 @@ import {
   formatPct,
   formatQty,
   holdingStatus,
-  quoteProviderLabel,
+  latestUnresolvedReasonLabel,
   quoteSessionLabel,
   sortHoldings,
   topHoldings,
 } from "./holdings";
 import type { Lang, QualityFilter, SortKey } from "./holdings";
+import { FOLIO_TRACE_FAQ } from "./faq";
 
 const STR = {
   ko: {
@@ -113,6 +114,10 @@ const STR = {
     lastChange: "마지막 변화",
     guideTitle: "방법론·출처·주의사항",
     guideFaqTitle: "자주 묻는 질문",
+    faqTitle: "자주 묻는 질문",
+    faqDesc: "정적 안내·검색 노출용 설명과 같은 내용입니다.",
+    prevVerifiedReceipt: "이전 확인 접수",
+    latestUnresolvedReceipt: "최신 미확인 접수",
     retry: "게시된 데이터 다시 조회",
     statusIncluded: "평가 포함",
     statusExcluded: "평가 제외",
@@ -207,6 +212,10 @@ const STR = {
     lastChange: "Last change",
     guideTitle: "Method · sources · cautions",
     guideFaqTitle: "FAQ",
+    faqTitle: "FAQ",
+    faqDesc: "Same content as the static guide and search fallback.",
+    prevVerifiedReceipt: "Previously confirmed receipt",
+    latestUnresolvedReceipt: "Latest unverified receipt",
     retry: "Re-fetch published data",
     statusIncluded: "Included",
     statusExcluded: "Excluded",
@@ -601,6 +610,17 @@ function ReadyView({
         </ul>
       </SectionCard>
 
+      <SectionCard title={t.faqTitle} description={t.faqDesc}>
+        <div className="foliotrace-faq">
+          {FOLIO_TRACE_FAQ.map((entry) => (
+            <details key={entry.q[lang]}>
+              <summary>{entry.q[lang]}</summary>
+              <p>{entry.a[lang]}</p>
+            </details>
+          ))}
+        </div>
+      </SectionCard>
+
       <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) setSelectedCode(null); }}>
         {selected && (
           <SheetContent side="right" aria-label={`${selected.name} ${t.colDetail}`}>
@@ -633,7 +653,7 @@ function ReadyView({
                 <dt>{t.detailPrice}</dt>
                 <dd>
                   {selected.quote
-                    ? `${formatKrw(selected.quote.close, lang)} · ${selected.quote.tradeDate} · ${quoteSessionLabel(selected.quote.session, lang)} · ${quoteProviderLabel(selected.quote.provider, lang)}`
+                    ? `${formatKrw(selected.quote.close, lang)} · ${selected.quote.tradeDate} · ${quoteSessionLabel(selected.quote.session, lang)}`
                     : "—"}
                 </dd>
               </div>
@@ -647,6 +667,26 @@ function ReadyView({
                   })()}
                 </dd>
               </div>
+              {selected.evidence === "unresolved-latest" && selected.latestUnresolvedReceiptNo && (
+                <>
+                  <div>
+                    <dt>{t.prevVerifiedReceipt}</dt>
+                    <dd>
+                      {selected.receiptDate} · <code className="foliotrace-code">{selected.receiptNo}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t.latestUnresolvedReceipt}</dt>
+                    <dd>
+                      <code className="foliotrace-code">{selected.latestUnresolvedReceiptNo}</code>
+                      {(() => {
+                        const sub = latestUnresolvedReasonLabel(selected.latestUnresolvedReason, lang);
+                        return sub ? ` — ${sub}` : "";
+                      })()}
+                    </dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt>{t.detailSource}</dt>
                 <dd>

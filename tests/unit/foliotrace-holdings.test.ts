@@ -11,11 +11,12 @@ import {
   formatPct,
   formatQty,
   holdingStatus,
-  quoteProviderLabel,
+  latestUnresolvedReasonLabel,
   quoteSessionLabel,
   sortHoldings,
   topHoldings,
 } from "../../src/features/foliotrace/ui/holdings.ts";
+import { FOLIO_TRACE_FAQ } from "../../src/features/foliotrace/ui/faq.ts";
 
 function holding(overrides: Partial<Holding> & { stockCode: string }): Holding {
   return {
@@ -44,6 +45,8 @@ function holding(overrides: Partial<Holding> & { stockCode: string }): Holding {
     portfolioWeightPercent: "10.00",
     valuationExclusionReason: null,
     filingUrl: "https://dart.fss.or.kr/example",
+    latestUnresolvedReceiptNo: null,
+    latestUnresolvedReason: null,
     ...overrides,
   };
 }
@@ -233,6 +236,7 @@ test("every known exclusion reason maps to ko/en text, never the raw code", () =
     "quote_unverified",
     "quote_date_or_session_mismatch",
     "quote_basis_unverified",
+    "latest_filing_unresolved",
   ];
   for (const reason of known) {
     for (const lang of ["ko", "en"] as const) {
@@ -251,6 +255,38 @@ test("every known exclusion reason maps to ko/en text, never the raw code", () =
     exclusionReasonLabel("quote_date_or_session_mismatch", "en"),
     "Excluded: closing-price date or session mismatch",
   );
+  assert.equal(
+    exclusionReasonLabel("latest_filing_unresolved", "ko"),
+    "최신 공시가 확인되지 않아 평가에서 제외 — 이전 확인 수량은 유지",
+  );
+  assert.ok(
+    (exclusionReasonLabel("latest_filing_unresolved", "en") ?? "").includes("retained"),
+  );
+});
+
+test("latest-unresolved sub-reasons map, unknowns fall back without echo", () => {
+  assert.equal(latestUnresolvedReasonLabel(null, "ko"), null);
+  assert.equal(latestUnresolvedReasonLabel("needs_filing_parse", "ko"), "공시문 분석 필요");
+  assert.equal(latestUnresolvedReasonLabel("correction_relation_unverified", "en"), "Correction relation unverified");
+  assert.equal(latestUnresolvedReasonLabel("withdrawal_unverified", "ko"), "철회 여부 미확인");
+  assert.equal(latestUnresolvedReasonLabel("security_identity_missing", "en"), "Security identity missing");
+  assert.equal(latestUnresolvedReasonLabel("future_code", "ko"), "미확인 사유");
+  assert.equal(latestUnresolvedReasonLabel("future_code", "en"), "Unverified reason");
+});
+
+test("visible FAQ carries approved ko/en questions and answers", () => {
+  // FT-10 regression: the React page rendered no FAQ at all.
+  assert.ok(FOLIO_TRACE_FAQ.length >= 5, "FAQ must cover the approved guide topics");
+  const questions = new Set<string>();
+  for (const entry of FOLIO_TRACE_FAQ) {
+    assert.ok(entry.q.ko.trim() && entry.q.en.trim(), "each FAQ needs both questions");
+    assert.ok(entry.a.ko.trim() && entry.a.en.trim(), "each FAQ needs both answers");
+    questions.add(entry.q.ko);
+  }
+  assert.equal(questions.size, FOLIO_TRACE_FAQ.length, "FAQ questions must be distinct");
+  const allKo = FOLIO_TRACE_FAQ.map((e) => `${e.q.ko} ${e.a.ko}`).join("\n");
+  assert.ok(allKo.includes("전체 자산"), "FAQ must state the not-total-assets scope");
+  assert.ok(allKo.includes("정규장 종가"), "FAQ must state the price basis");
 });
 
 test("unknown exclusion reasons fall back generically without echoing", () => {
@@ -267,14 +303,11 @@ test("unknown exclusion reasons fall back generically without echoing", () => {
   assert.equal(exclusionReasonLabel("some_future_reason", "en"), "Excluded: reason unavailable");
 });
 
-test("quote session/provider render as clear terms with identity kept", () => {
+test("quote session renders as clear terms with identity kept", () => {
   assert.equal(quoteSessionLabel("regular", "ko"), "정규장");
   assert.equal(quoteSessionLabel("regular", "en"), "Regular session");
-  assert.equal(quoteProviderLabel("naver", "ko"), "네이버");
-  assert.equal(quoteProviderLabel("naver", "en"), "Naver");
   // Unknown contract values pass through (own data, React-escaped), never blank.
   assert.equal(quoteSessionLabel("auction", "ko"), "auction");
-  assert.equal(quoteProviderLabel("other-feed", "en"), "other-feed");
 });
 
 test("eventRangeOf reports the real receipt-date span, never fabricated", () => {

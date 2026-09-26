@@ -23,8 +23,8 @@ test("FolioTrace UI never fetches external data or fabricates sample finances", 
     assert.doesNotMatch(source, /dart\.fss\.or\.kr/i);
     assert.ok(!source.includes("Math.random"), "must not invent sample values");
   }
-  // "naver" may only appear as a quote-provider display label, never a request.
-  assert.doesNotMatch(pageSource + holdingsSource, /naver\.(com|net|co\.|api)|openapi|query.*naver|naver.*query/i);
+  // No provider-specific conditions or wording anywhere in UI code.
+  assert.doesNotMatch(pageSource + holdingsSource, /naver/i);
 });
 
 test("Number conversion exists only inside the visual-only approxNumber", () => {
@@ -59,10 +59,16 @@ test("scoped CSS uses only production tokens or valid fallbacks", () => {
   }
 });
 
+test("React page renders the shared FAQ entries visibly (FT-10)", () => {
+  // The former failure: guide paragraphs existed but no FAQ was rendered
+  // after React mount replaced the static fallback.
+  assert.match(pageSource, /FOLIO_TRACE_FAQ/);
+  assert.match(pageSource, /<details key/);
+  assert.match(pageSource, /<summary>\{entry\.q\[lang\]\}<\/summary>/);
+  assert.match(cssSource, /\.foliotrace-faq/);
+});
+
 test("long exact amounts wrap in cards/history; table keeps nowrap in its scroll container", () => {
-  // Regression guard for the 1280x800 summary-clip defect: the table's
-  // nowrap alignment must not leak into card/history values, which have
-  // no horizontal scroll container of their own.
   assert.match(
     cssSource,
     /\.foliotrace-summary-card \.foliotrace-summary-value\s*\{[^}]*white-space:\s*normal/,

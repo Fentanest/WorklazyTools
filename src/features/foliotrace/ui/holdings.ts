@@ -132,6 +132,10 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     ko: "가격 기준이 확인되지 않아 평가에서 제외",
     en: "Excluded: price basis unverified",
   },
+  latest_filing_unresolved: {
+    ko: "최신 공시가 확인되지 않아 평가에서 제외 — 이전 확인 수량은 유지",
+    en: "Excluded: latest filing unverified — previously confirmed quantity retained",
+  },
 };
 
 export function exclusionReasonLabel(reason: string | null, lang: Lang): string | null {
@@ -143,18 +147,45 @@ export function exclusionReasonLabel(reason: string | null, lang: Lang): string 
 }
 
 /**
- * Quote basis in clear ko/en terms. Known contract values get human
- * labels that retain source identity (KRX/네이버/Naver); anything else
- * passes through raw (own data, React-escaped) rather than blanking.
+ * User-facing labels for the latest-unresolved-filing sub-reasons
+ * (FT-02). Unknown strings fall back generically without echoing.
+ */
+const LATEST_UNRESOLVED_REASON_LABELS: Record<string, Record<Lang, string>> = {
+  correction_relation_unverified: {
+    ko: "정정 관계 미확인",
+    en: "Correction relation unverified",
+  },
+  withdrawal_unverified: {
+    ko: "철회 여부 미확인",
+    en: "Withdrawal unverified",
+  },
+  needs_filing_parse: {
+    ko: "공시문 분석 필요",
+    en: "Filing parse required",
+  },
+  security_identity_missing: {
+    ko: "증권 식별정보 부족",
+    en: "Security identity missing",
+  },
+};
+
+export function latestUnresolvedReasonLabel(reason: string | null, lang: Lang): string | null {
+  if (reason === null) return null;
+  return (
+    LATEST_UNRESOLVED_REASON_LABELS[reason]?.[lang] ??
+    (lang === "ko" ? "미확인 사유" : "Unverified reason")
+  );
+}
+
+/**
+ * Quote basis in clear ko/en terms. The contract session value gets a
+ * human label; anything else passes through raw (own data,
+ * React-escaped) rather than blanking. No provider-specific branching:
+ * the quote line names the market session and date only.
  */
 export function quoteSessionLabel(session: string, lang: Lang): string {
   if (session === "regular") return lang === "ko" ? "정규장" : "Regular session";
   return session;
-}
-
-export function quoteProviderLabel(provider: string, lang: Lang): string {
-  if (provider === "naver") return lang === "ko" ? "네이버" : "Naver";
-  return provider;
 }
 
 export function filterHoldings(holdings: Holding[], query: string, quality: QualityFilter): Holding[] {
