@@ -828,6 +828,10 @@ class SecondaryBackfillTests(unittest.TestCase):
                 subset = subset[:-1]
             if altered == 'repeat' and dsp_type == 'B':
                 subset = [rows[0], *subset[1:]]
+            if altered == 'omission' and dsp_type == 'A':
+                replacement = ('20060331000099', '1000099', '회사', '사업보고서',
+                               '국민연금관리공단 주주', '2006.03.31')
+                subset = [replacement, *subset[1:]]
             return result_page(subset)
         with patch.object(secondary, 'MAX_SITE_PAGES', 1):
             with tempfile.TemporaryDirectory() as directory:
@@ -844,7 +848,8 @@ class SecondaryBackfillTests(unittest.TestCase):
                     fetch=lambda *_: self.fail('completed partition repeated'),
                     read_state=folio.read_json, write_state=folio.write_json)
                 self.assertEqual(again['search_requests'], 0)
-            for altered, code in [('count', 'PARTITION_COUNT'), ('repeat', 'PAGINATION_REPEAT')]:
+            for altered, code in [('count', 'PARTITION_COUNT'), ('repeat', 'PAGINATION_REPEAT'),
+                                  ('omission', 'PARTITION_IDENTITY')]:
                 with tempfile.TemporaryDirectory() as directory:
                     path = Path(directory) / 'state.json'
                     folio.write_json(path, folio.empty_state())
@@ -858,9 +863,14 @@ class SecondaryBackfillTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / 'state.json'
                 folio.write_json(path, folio.empty_state())
-                limited = secondary.scan_secondary(path, day, day, max_pages=10,
-                    fetch=fetch, read_state=folio.read_json, write_state=folio.write_json)
+                calls = []
+                def limited_fetch(*args, **kwargs):
+                    calls.append((args, kwargs))
+                    return fetch(*args, **kwargs)
+                limited = secondary.scan_secondary(path, day, day, max_pages=1,
+                    fetch=limited_fetch, read_state=folio.read_json, write_state=folio.write_json)
                 self.assertEqual(limited['status'], 'SEARCH_BUDGET_INSUFFICIENT')
+                self.assertEqual(len(calls), 1)
                 self.assertEqual(limited['next_date'], '2006-03-31')
                 self.assertFalse((folio.read_json(path).get('secondary_backfill') or {}).get('coverage'))
 

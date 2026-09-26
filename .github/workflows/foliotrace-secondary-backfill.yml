@@ -125,7 +125,7 @@ jobs:
         run: |
           if [ "$EVENT_NAME" = schedule ]; then
             python3 scripts/foliotrace/run_secondary_lane.py \
-              --state foliotrace-state/state.json --max-pages 100 --max-windows 15 --review-limit 20
+              --state foliotrace-state/state.json --max-pages 300 --max-windows 15 --review-limit 20
           else
             python3 scripts/foliotrace/run_secondary_lane.py \
               --state foliotrace-state/state.json --max-pages "$MAX_PAGES" --max-windows "$MAX_WINDOWS" --review-limit 20

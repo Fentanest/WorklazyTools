@@ -1053,6 +1053,10 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 pages_used += 1
                 parts = [(None, first)]
                 if first["page_count"] > MAX_SITE_PAGES and last == cursor and not scope.endswith("equity"):
+                    if pages_used + len(DART_CATEGORIES) > max_pages:
+                        required_pages = pages_used + len(DART_CATEGORIES)
+                        too_large = True
+                        break
                     parts = []
                     for category in DART_CATEGORIES:
                         try:
@@ -1074,7 +1078,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                     break
             if too_large:
                 if last == cursor:
-                    required_pages = projected_pages
+                    required_pages = max(required_pages or 0, projected_pages)
                     break
                 last = cursor + timedelta(days=(last - cursor).days // 2)
                 ledger["max_window_days"] = (last - cursor).days + 1
@@ -1098,6 +1102,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         for term_index, (term, first, parts) in enumerate(parsed_terms):
             term_counts[term] = first["total"]
             seen_page_ids = set()
+            partition_rows = {}
             if parts[0][0] is not None:
                 partition_counts[term] = {category: part["total"] for category, part in parts}
                 page_digests.append(first["sha256"])
@@ -1122,8 +1127,18 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                     if len(page_ids) != len(page["rows"]) or page_ids & seen_page_ids:
                         raise SecondarySearchError("PAGINATION_REPEAT", cursor, last, term_index, page_number)
                     seen_page_ids.update(page_ids)
+                    partition_rows.update({(row["receipt_no"], row["document_no"]): row
+                                           for row in page["rows"]})
                     all_rows.extend((term, row) for row in page["rows"])
                     page_digests.append(page["sha256"])
+            if parts[0][0] is not None:
+                first_ids = {(row["receipt_no"], row["document_no"]) for row in first["rows"]}
+                if len(first_ids) != len(first["rows"]) or not first_ids <= seen_page_ids:
+                    raise SecondarySearchError("PARTITION_IDENTITY", cursor, last, term_index, 1)
+                if any(any(partition_rows[(row["receipt_no"], row["document_no"])][field] != row[field]
+                           for field in ("filing_date", "filing_company", "report_name"))
+                       for row in first["rows"]):
+                    raise SecondarySearchError("PARTITION_IDENTITY", cursor, last, term_index, 1)
         candidates = ledger["candidates"]
         discovered_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         unique_hits = {}
