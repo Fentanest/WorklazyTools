@@ -615,7 +615,9 @@ def parse_filing_document(payload: bytes):
     row_date = parsed_date(row_parts.groups()) if row_parts else None
     row_quantity = dec(row_cell("THS_STK_CNT"))
     row_ratio = dec(row_cell("THS_STK_RT"))
-    basis_diagnostic = {"cover_dates": len(cover_dates), "row_date_valid": row_date is not None,
+    safe_row_date_text = row_date_text if row_date_text and re.fullmatch(r"[0-9년월일 .-]{1,40}", row_date_text) else None
+    basis_diagnostic = {"cover_dates": len(cover_dates), "current_row_count": len(current_rows),
+                        "row_date_text": safe_row_date_text, "row_date_valid": row_date is not None,
                         "row_quantity_present": row_quantity is not None,
                         "row_ratio_present": row_ratio is not None,
                         "quantity_matches_summary": (row_quantity is not None and
