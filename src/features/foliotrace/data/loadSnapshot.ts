@@ -84,6 +84,7 @@ function validSecondaryCoverage(value: unknown): boolean {
     nullable(value.equityContentCheckedThrough, isoDate) &&
     nullable(value.earlyDirectCheckedThrough, isoDate) &&
     Number.isSafeInteger(value.candidateDocumentCount) && Number(value.candidateDocumentCount) >= 0 &&
+    Number.isSafeInteger(value.noncandidateUnreviewedCount) && Number(value.noncandidateUnreviewedCount) >= 0 &&
     Number.isSafeInteger(value.sourceContextReviewCount) && Number(value.sourceContextReviewCount) >= 0 &&
     Number.isSafeInteger(value.sourceReviewPendingCount) && Number(value.sourceReviewPendingCount) >= 0 &&
     value.searchStartDate <= value.searchTargetDate

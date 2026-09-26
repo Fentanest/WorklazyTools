@@ -132,6 +132,7 @@ def make_snapshot(state, quotes, now=None):
     prior_equity = state.get("secondary_prior_equity_backfill") or {}
     early_direct = state.get("early_direct_backfill") or {}
     if any(item.get("coverage") for item in (secondary, equity, prior, prior_equity, early_direct)):
+        from scripts.foliotrace.secondary import decode_noncandidate_keys
         candidates = {}
         for lane in (secondary, equity, prior, prior_equity):
             for key, item in (lane.get("candidates") or {}).items():
@@ -139,6 +140,21 @@ def make_snapshot(state, quotes, now=None):
                 if previous is None or (previous.get("review_status") == "source_review_pending" and
                                         item.get("review_status") != "source_review_pending"):
                     candidates[key] = item
+        noncandidate_ids = set()
+        reviews = {}
+        for lane in (secondary, equity, prior, prior_equity):
+            for window in lane.get("coverage") or []:
+                noncandidate_ids.update(decode_noncandidate_keys(window))
+            for key, item in (lane.get("noncandidate_reviews") or {}).items():
+                previous = reviews.get(key)
+                if previous is None or (previous.get("review_status") == "source_review_pending" and
+                                        item.get("review_status") != "source_review_pending"):
+                    reviews[key] = item
+        noncandidate_ids.difference_update(candidates)
+        noncandidate_unreviewed = sum(reviews.get(key, {}).get("review_status") in
+                                     (None, "source_review_pending") for key in noncandidate_ids)
+        noncandidate_context = sum(reviews.get(key, {}).get("review_status") ==
+                                   "source_context_review_pending" for key in noncandidate_ids)
         snapshot["secondaryCoverage"] = {
             "searchStartDate": prior.get("start_date") or prior_equity.get("start_date") or
                                secondary.get("start_date") or equity.get("start_date") or "2006-01-01",
@@ -151,8 +167,9 @@ def make_snapshot(state, quotes, now=None):
             "equityContentCheckedThrough": equity["coverage"][-1]["to"] if equity.get("coverage") else None,
             "earlyDirectCheckedThrough": early_direct["coverage"][-1]["to"] if early_direct.get("coverage") else None,
             "candidateDocumentCount": len(candidates),
+            "noncandidateUnreviewedCount": noncandidate_unreviewed,
             "sourceContextReviewCount": sum(item.get("review_status") == "source_context_review_pending"
-                                            for item in candidates.values()),
+                                            for item in candidates.values()) + noncandidate_context,
             "sourceReviewPendingCount": sum(item.get("review_status") == "source_review_pending"
                                             for item in candidates.values())}
     snapshot["datasetVersion"] = digest({k: v for k, v in snapshot.items() if k != "datasetVersion"})

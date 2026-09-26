@@ -61,10 +61,11 @@ const STR = {
     indirectScope: "다른 제출인의 문서에서 확인한 보유·계획 단서입니다. 배정 계획은 실제 보유가 아닙니다. 검색 페이지를 검사했어도 모든 보유 사실의 원문 검증이 끝난 것은 아닙니다. 현재 보유·평가액에는 합치지 않습니다.",
     secondaryAll: "전체 본문검색 결과 페이지 검사 완료일",
     secondaryEquity: "지분·의결권 검색 결과 페이지 검사 완료일",
-    secondaryPriorAll: "2000~2005 전체 검색 결과 페이지 검사 완료일",
-    secondaryPriorEquity: "2000~2005 지분·의결권 검색 결과 페이지 검사 완료일",
+    secondaryPriorAll: "1999~2005 전체 검색 결과 페이지 검사 완료일",
+    secondaryPriorEquity: "1999~2005 지분·의결권 검색 결과 페이지 검사 완료일",
     secondaryDirect: "2006~2008 직접 제출 목록 검사 완료일",
     secondaryCandidates: "원문 검토 후보 문서",
+    secondaryOtherUnreviewed: "검색 적중 중 원문 미검토 문서",
     secondarySourcePending: "원문 조회 대기",
     secondaryContextPending: "주식 문맥 해석 대기",
     secondaryNoScan: "체계적 본문검색은 아직 시작되지 않았습니다. 아래는 개별 원문 확인 표본입니다.",
@@ -190,10 +191,11 @@ const STR = {
     indirectScope: "These are holding and planned-allotment clues checked in other filers' documents. A planned allotment is not a confirmed holding. Checked search-result pages do not mean every source fact has been verified. These clues are excluded from current holdings and valuations.",
     secondaryAll: "All-content search pages checked through",
     secondaryEquity: "Equity and voting search pages checked through",
-    secondaryPriorAll: "2000–2005 all-content search pages checked through",
-    secondaryPriorEquity: "2000–2005 equity and voting search pages checked through",
+    secondaryPriorAll: "1999–2005 all-content search pages checked through",
+    secondaryPriorEquity: "1999–2005 equity and voting search pages checked through",
     secondaryDirect: "2006–2008 direct-filing list checked through",
     secondaryCandidates: "Documents queued for source review",
+    secondaryOtherUnreviewed: "Search hits awaiting source review",
     secondarySourcePending: "Awaiting source retrieval",
     secondaryContextPending: "Equity context awaiting interpretation",
     secondaryNoScan: "Systematic full-text search has not started. The items below are individually checked samples.",
@@ -500,6 +502,7 @@ function ReadyView({
             {" · "}{t.secondaryPriorEquity}: {snapshot.secondaryCoverage.priorEquityCheckedThrough ?? "—"}
             {" · "}{t.secondaryDirect}: {snapshot.secondaryCoverage.earlyDirectCheckedThrough ?? "—"}
             {" · "}{t.secondaryCandidates}: {snapshot.secondaryCoverage.candidateDocumentCount}
+            {" · "}{t.secondaryOtherUnreviewed}: {snapshot.secondaryCoverage.noncandidateUnreviewedCount}
             {" · "}{t.secondarySourcePending}: {snapshot.secondaryCoverage.sourceReviewPendingCount}
             {" · "}{t.secondaryContextPending}: {snapshot.secondaryCoverage.sourceContextReviewCount}
           </small>

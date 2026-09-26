@@ -36,6 +36,8 @@ class SecondaryBackfillTests(unittest.TestCase):
         self.assertEqual(result["status"], "source_context_review_pending")
         self.assertGreater(result["equity_context_count"], 0)
         self.assertNotIn("quantity", result)
+        self.assertEqual(secondary.inspect_source_document(b'<result><status>020</status></result>')["status"],
+                         "source_review_pending")
 
     def test_parser_keeps_official_page_identity_and_receipt_metadata(self):
         day = date(2006, 2, 8)
@@ -69,6 +71,8 @@ class SecondaryBackfillTests(unittest.TestCase):
             self.assertEqual((result["search_requests"], result["new_candidates"]), (3, 1))
             self.assertEqual(ledger["next_date"], "2006-02-09")
             self.assertEqual(ledger["coverage"][0]["unique_documents"], 2)
+            self.assertEqual(secondary.decode_noncandidate_keys(ledger["coverage"][0]),
+                             [f'{NOISE[0]}:{NOISE[1]}'])
             self.assertEqual(ledger["coverage"][0]["term_hits"][secondary.TERMS[1]], 2)
             self.assertEqual(set(ledger["candidates"]), {f'{POSCO[0]}:{POSCO[1]}'})
             self.assertEqual(saved["receipts"], {})
@@ -76,9 +80,72 @@ class SecondaryBackfillTests(unittest.TestCase):
             snapshot = make_snapshot(saved, {})
             self.assertEqual(snapshot["secondaryCoverage"]["allContentCheckedThrough"], "2006-02-08")
             self.assertEqual(snapshot["secondaryCoverage"]["candidateDocumentCount"], 1)
+            self.assertEqual(snapshot["secondaryCoverage"]["noncandidateUnreviewedCount"], 1)
             again = secondary.scan_secondary(path, day, day, fetch=lambda *_: self.fail("complete range refetched"),
                 read_state=folio.read_json, write_state=folio.write_json)
             self.assertEqual(again["search_requests"], 0)
+
+    def test_noncandidate_queue_reviews_after_candidates_and_retries_bad_zip(self):
+        day = date(2006, 2, 8)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("filing.xml", "<DOC>국민연금관리공단 보통주</DOC>")
+        answers = {secondary.TERMS[0]: result_page([POSCO, NOISE]),
+                   secondary.TERMS[1]: result_page([]), secondary.TERMS[2]: result_page([])}
+        requests = []
+        def document(no, _key):
+            requests.append(no)
+            return buffer.getvalue() if no == POSCO[0] or requests.count(NOISE[0]) > 1 else b'<result>020</result>'
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, folio.empty_state())
+            result = secondary.scan_secondary(path, day, day, fetch=lambda term, *_: answers[term],
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=2,
+                fetch_document=document)
+            self.assertEqual((result['source_review_attempts'], result['noncandidate_review_attempts']), (2, 1))
+            saved = folio.read_json(path)
+            key = f'{NOISE[0]}:{NOISE[1]}'
+            self.assertEqual(saved['secondary_backfill']['noncandidate_reviews'][key]['review_status'],
+                             'source_review_pending')
+            self.assertNotIn(NOISE[0], saved['secondary_source_cache'])
+            self.assertEqual(make_snapshot(saved, {})['secondaryCoverage']['noncandidateUnreviewedCount'], 1)
+            saved['secondary_backfill']['noncandidate_reviews'][key]['last_source_attempt_on'] = '2006-02-08'
+            folio.write_json(path, saved)
+            retry = secondary.scan_secondary(path, day, day, fetch=lambda *_: self.fail('range refetched'),
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=2,
+                fetch_document=document)
+            saved = folio.read_json(path)
+            self.assertEqual((retry['search_requests'], retry['noncandidate_review_attempts']), (0, 1))
+            self.assertEqual(saved['secondary_backfill']['noncandidate_reviews'][key]['review_status'],
+                             'source_context_review_pending')
+            self.assertEqual(make_snapshot(saved, {})['secondaryCoverage']['noncandidateUnreviewedCount'], 0)
+            self.assertEqual(make_snapshot(saved, {})['secondaryCoverage']['sourceContextReviewCount'], 2)
+            self.assertEqual(saved['holdings'], {})
+
+    def test_retryable_noise_does_not_starve_unseen_documents(self):
+        day = date(2006, 2, 8)
+        other = ('20060208000287', '1252221', '회사', '투자설명서',
+                 '국민연금관리공단 빌딩 5층', '2006.02.08')
+        answers = {secondary.TERMS[0]: result_page([NOISE, other]),
+                   secondary.TERMS[1]: result_page([]), secondary.TERMS[2]: result_page([])}
+        called = []
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, folio.empty_state())
+            def document(no, _key):
+                called.append(no)
+                return b'<result>020</result>'
+            secondary.scan_secondary(path, day, day, fetch=lambda term, *_: answers[term],
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=1,
+                fetch_document=document)
+            saved = folio.read_json(path)
+            self.assertEqual(called, [NOISE[0]])
+            saved['secondary_backfill']['noncandidate_reviews'][f'{NOISE[0]}:{NOISE[1]}']['last_source_attempt_on'] = '2006-02-08'
+            folio.write_json(path, saved)
+            secondary.scan_secondary(path, day, day, fetch=lambda *_: self.fail('range refetched'),
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key', review_limit=1,
+                fetch_document=document)
+            self.assertEqual(called, [NOISE[0], other[0]])
 
     def test_source_review_is_bounded_and_never_promotes_holdings(self):
         day = date(2006, 2, 8)
@@ -154,6 +221,25 @@ class SecondaryBackfillTests(unittest.TestCase):
             self.assertEqual(result["next_date"], "2006-02-09")
             self.assertEqual(folio.read_json(path)["secondary_backfill"]["coverage"][0]["to"], "2006-02-08")
             self.assertTrue(any(first == last == start for _, first, last, _ in calls))
+
+    def test_budget_exhausted_while_shrinking_does_not_mix_window_pages(self):
+        start, end = date(2006, 2, 8), date(2006, 2, 9)
+        eleven = [(f'20060208{i:06d}', str(1251611 + i), '포스코', '주식등의대량보유상황보고서',
+                   '국민연금공단 보통주', '2006.02.08') for i in range(11)]
+        def fetch(term, first, last, page):
+            if term != secondary.TERMS[2]:
+                return result_page([])
+            return result_page(eleven[(page-1)*10:page*10], total=11, page=page, pages=2)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, folio.empty_state())
+            first = secondary.scan_secondary(path, start, end, max_pages=3, fetch=fetch,
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual((first['next_date'], first['windows_this_run']), ('2006-02-08', 0))
+            self.assertEqual(folio.read_json(path)['secondary_backfill']['coverage'], [])
+            resumed = secondary.scan_secondary(path, start, end, max_pages=4, max_windows=1, fetch=fetch,
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual((resumed['next_date'], resumed['windows_this_run']), ('2006-02-09', 1))
 
     def test_early_direct_uses_separate_cursor_and_preserves_current_holdings(self):
         initial = folio.empty_state()

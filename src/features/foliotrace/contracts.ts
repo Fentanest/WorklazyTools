@@ -104,6 +104,7 @@ export interface Snapshot {
     equityContentCheckedThrough: IsoDate | null
     earlyDirectCheckedThrough: IsoDate | null
     candidateDocumentCount: number
+    noncandidateUnreviewedCount: number
     sourceContextReviewCount: number
     sourceReviewPendingCount: number
   }

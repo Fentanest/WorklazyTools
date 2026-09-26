@@ -1520,7 +1520,7 @@ def main():
         elif args.command == "scan-secondary":
             from scripts.foliotrace.secondary import scan_secondary
             state = read_json(args.state)
-            start = args.start or (date(2000, 1, 1) if args.scope.startswith("prior-") else date(2006, 1, 1))
+            start = args.start or (date(1999, 4, 1) if args.scope.startswith("prior-") else date(2006, 1, 1))
             target = args.end or (date(2005, 12, 31) if args.scope.startswith("prior-") else
                                   date(2008, 12, 31) if args.scope == "equity" else
                                   date.fromisoformat(state["latest_complete_listing_date"]))

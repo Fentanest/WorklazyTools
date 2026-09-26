@@ -9,12 +9,15 @@ import hashlib
 import html
 import io
 import math
+import base64
+import binascii
 import re
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+import zlib
 from datetime import date, datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -22,8 +25,9 @@ from pathlib import Path
 TERMS = ("국민연금공단", "국민연금관리공단", "National Pension Service")
 PAGE_SIZE = 10  # DART search.ax serves ten rows even when maxResults is larger.
 MAX_SITE_PAGES = 100
-METHOD = "dart-fulltext-v1"
+METHOD = "dart-fulltext-v2-lossless-queue"
 RECEIPT = re.compile(r"^\d{14}$")
+DOCUMENT_KEY = re.compile(r"^\d{14}:\d+$")
 STOCK_CONTEXT = re.compile(r"보통주|우선주|주주|보유|소유|지분|주식|주권|의결권|sharehold|stock|equity|voting", re.I)
 REPORT_CONTEXT = re.compile(r"대량보유|의결권대리행사|주주명부|주식등의|sharehold", re.I)
 
@@ -34,6 +38,32 @@ class SecondarySearchError(RuntimeError):
         super().__init__(code)
         self.code, self.start, self.end = code, start.isoformat(), end.isoformat()
         self.term_index, self.page, self.required_pages = term_index, page, required_pages
+
+
+def encode_noncandidate_keys(keys: list[str]) -> str:
+    if keys != sorted(set(keys)) or any(not DOCUMENT_KEY.fullmatch(key) for key in keys):
+        raise ValueError("NONCANDIDATE_KEYS")
+    return base64.b64encode(zlib.compress("\n".join(keys).encode(), level=9)).decode("ascii")
+
+
+def decode_noncandidate_keys(coverage: dict) -> list[str]:
+    encoded = coverage.get("noncandidate_queue_zlib_b64")
+    if not isinstance(encoded, str):
+        raise ValueError("NONCANDIDATE_QUEUE_MISSING")
+    try:
+        packed = base64.b64decode(encoded, validate=True)
+        inflater = zlib.decompressobj()
+        raw = inflater.decompress(packed, 100_001)
+        if not inflater.eof or inflater.unconsumed_tail or inflater.unused_data or len(raw) > 100_000:
+            raise ValueError("NONCANDIDATE_QUEUE_SIZE")
+        keys = raw.decode("ascii").splitlines() if raw else []
+    except (ValueError, binascii.Error, zlib.error, UnicodeError) as exc:
+        raise ValueError("NONCANDIDATE_QUEUE_INVALID") from exc
+    if (keys != sorted(set(keys)) or any(not DOCUMENT_KEY.fullmatch(key) for key in keys)
+            or len(keys) != coverage.get("noncandidate_documents")
+            or hashlib.sha256("\n".join(keys).encode()).hexdigest() != coverage.get("noncandidate_key_digest")):
+        raise ValueError("NONCANDIDATE_QUEUE_IDENTITY")
+    return keys
 
 
 class SearchRows(HTMLParser):
@@ -183,7 +213,7 @@ def inspect_source_document(payload: bytes):
     try:
         archive = zipfile.ZipFile(io.BytesIO(payload))
     except zipfile.BadZipFile:
-        return {"status": "source_unavailable", "source_sha256": None}
+        return {"status": "source_review_pending", "source_sha256": None}
     contexts = 0
     mentions = 0
     digests = []
@@ -210,7 +240,7 @@ def inspect_source_document(payload: bytes):
                 if STOCK_CONTEXT.search(plain[max(0, match.start() - 240):match.end() + 240]):
                     contexts += 1
     if not digests:
-        return {"status": "source_unavailable", "source_sha256": None}
+        return {"status": "source_review_pending", "source_sha256": None}
     return {"status": "source_context_review_pending" if contexts else
             "source_mention_no_equity_context" if mentions else "source_mention_unverified",
             "source_sha256": hashlib.sha256("".join(digests).encode()).hexdigest(),
@@ -279,6 +309,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 state["revision"] += 1
                 write_state(state_path, state)
                 if pages_used >= max_pages:
+                    parsed_terms = []
                     break
                 continue
             if pages_used + projected_pages - len(parsed_terms) > max_pages:
@@ -344,6 +375,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             "noncandidate_documents": len(noncandidate_keys),
             "noncandidate_sample": noncandidate_keys[:10],
             "noncandidate_key_digest": hashlib.sha256("\n".join(noncandidate_keys).encode()).hexdigest(),
+            "noncandidate_queue_zlib_b64": encode_noncandidate_keys(noncandidate_keys),
             "page_digest": hashlib.sha256("".join(page_digests).encode()).hexdigest(), "complete": True})
         cursor = last + timedelta(days=1)
         ledger["next_date"] = cursor.isoformat()
@@ -351,33 +383,64 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         state["revision"] += 1
         write_state(state_path, state)
         windows += 1
-    reviewed = context_candidates = source_requests = 0
+    reviewed = context_candidates = source_requests = noncandidate_reviewed = 0
     if review_limit:
         today = datetime.now(timezone.utc).date().isoformat()
+        cache = state.setdefault("secondary_source_cache", {})
+        def check_source(receipt_no):
+            nonlocal source_requests
+            check = cache.get(receipt_no)
+            if check is None or check.get("status") in ("source_review_pending", "source_unavailable"):
+                source_requests += 1
+                try:
+                    check = inspect_source_document(fetch_document(receipt_no, key))
+                except (ValueError, RuntimeError, zipfile.BadZipFile):
+                    check = {"status": "source_review_pending"}
+                if check["status"] != "source_review_pending":
+                    cache[receipt_no] = check
+            return check
         pending = sorted(ledger["candidates"].values(),
             key=lambda item: (item.get("source_attempt_count", 0), item["filing_date"], item["receipt_no"]))
         for item in pending:
             if reviewed >= review_limit:
                 break
             if (item.get("review_status") != "source_review_pending"
-                    or item.get("last_source_attempt_on") == today
-                    or int(item.get("source_attempt_count") or 0) >= 3):
+                    or item.get("last_source_attempt_on") == today):
                 continue
             reviewed += 1
             item["source_attempt_count"] = int(item.get("source_attempt_count") or 0) + 1
             item["last_source_attempt_on"] = today
-            cache = state.setdefault("secondary_source_cache", {})
-            check = cache.get(item["receipt_no"])
-            if check is None:
-                source_requests += 1
-                try:
-                    check = inspect_source_document(fetch_document(item["receipt_no"], key))
-                except (ValueError, RuntimeError, zipfile.BadZipFile):
-                    check = {"status": "source_review_pending"}
-                if check["status"] != "source_review_pending":
-                    cache[item["receipt_no"]] = check
+            check = check_source(item["receipt_no"])
             item.update(check)
             item["review_status"] = check["status"]
+            context_candidates += int(check["status"] == "source_context_review_pending")
+            if reviewed % 10 == 0:
+                state["revision"] += 1
+                write_state(state_path, state)
+        noncandidate_reviews = ledger.setdefault("noncandidate_reviews", {})
+        queue_keys = set()
+        for window in ledger["coverage"]:
+            queue_keys.update(decode_noncandidate_keys(window))
+        for document_key in sorted(queue_keys, key=lambda item:
+                                   (int(noncandidate_reviews.get(item, {}).get("source_attempt_count") or 0), item)):
+            if reviewed >= review_limit:
+                break
+            if document_key in ledger["candidates"]:
+                continue
+            previous = noncandidate_reviews.get(document_key, {})
+            if (previous.get("review_status") not in (None, "source_review_pending") or
+                    previous.get("last_source_attempt_on") == today):
+                continue
+            receipt_no = document_key.split(":", 1)[0]
+            check = check_source(receipt_no)
+            noncandidate_reviews[document_key] = {
+                "review_status": check["status"],
+                "last_source_attempt_on": today,
+                "source_attempt_count": int(previous.get("source_attempt_count") or 0) + 1,
+                "source_sha256": check.get("source_sha256"),
+            }
+            reviewed += 1
+            noncandidate_reviewed += 1
             context_candidates += int(check["status"] == "source_context_review_pending")
             if reviewed % 10 == 0:
                 state["revision"] += 1
@@ -392,4 +455,5 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             "search_requests": pages_used, "new_candidates": new_candidates,
             "candidate_count": len(ledger["candidates"]), "required_pages": required_pages,
             "source_review_attempts": reviewed, "source_document_requests": source_requests,
-            "source_context_candidates": context_candidates}
+            "source_context_candidates": context_candidates,
+            "noncandidate_review_attempts": noncandidate_reviewed}
