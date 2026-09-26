@@ -36,7 +36,7 @@ RECEIPT = re.compile(r"^\d{14}$")
 DOCUMENT_KEY = re.compile(r"^\d{14}:\d+$")
 STOCK_CONTEXT = re.compile(r"보통주|우선주|주주|보유|소유|지분|주식|주권|의결권|sharehold|stock|equity|voting", re.I)
 REPORT_CONTEXT = re.compile(r"대량보유|의결권대리행사|주주명부|주식등의|sharehold", re.I)
-SOURCE_PARSER_VERSION = "source-issued-shares-v6"
+SOURCE_PARSER_VERSION = "source-issued-shares-v7"
 MAX_SOURCE_CLAIMS = 100
 SOURCE_ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
 SOURCE_CELLS = re.compile(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", re.I | re.S)
@@ -86,9 +86,12 @@ def extract_source_claims(xml: str) -> list[dict]:
                        "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
                        "row_offset": row.start(), "basis_date": None,
                        "status": "source_context_review_pending"})
+    dated = extract_dated_five_percent_shareholder_claims(xml)
+    dated_rows = {claim["row_sha256"] for claim in dated}
     return (extract_issuer_register_claims(xml) +
-            extract_dated_share_distribution_claims(xml) +
-            bind_change_section_basis(xml, claims))
+            extract_dated_share_distribution_claims(xml) + dated +
+            [claim for claim in bind_change_section_basis(xml, claims)
+             if claim["row_sha256"] not in dated_rows])
 
 
 def _korean_date(value: str) -> str | None:
@@ -99,6 +102,98 @@ def _korean_date(value: str) -> str | None:
         return date(*(int(part) for part in match.groups())).isoformat()
     except ValueError:
         return None
+
+
+def _dated_register_marker(raw: str) -> str | None:
+    plain = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", raw)).split())
+    found = []
+    for match in re.finditer(r"(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*현재|"
+                             r"(\d{4})\.(\d{1,2})\.(\d{1,2})\.?\s*현재", plain):
+        parts = match.group(1, 2, 3) if match.group(1) else match.group(4, 5, 6)
+        try:
+            found.append(date(*(int(part) for part in parts)).isoformat())
+        except ValueError:
+            return None
+    return next(iter(set(found))) if len(set(found)) == 1 else None
+
+
+def extract_dated_five_percent_shareholder_claims(xml: str) -> list[dict]:
+    """Read a dated 5% shareholder row only with matching all-common issued shares."""
+    rows = list(SOURCE_ROWS.finditer(xml))
+    cells = [_row_cells(row.group(0)) for row in rows]
+    compact = lambda values: [re.sub(r"\s+", "", value) for value in values]
+    issued = []
+    for index, row in enumerate(rows):
+        if compact(cells[index]) != ["발행할주식의총수", "발행한주식의총수", "미발행주식의총수"]:
+            continue
+        heading = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", xml[max(0, row.start()-1200):row.start()])).split())
+        basis = _dated_register_marker(xml[max(0, row.start()-500):row.start()])
+        if "주식의 총수" not in heading or not basis or index + 1 >= len(rows):
+            continue
+        total_row = compact(cells[index + 1])
+        if len(total_row) != 3:
+            continue
+        total = _number(total_row[1].removesuffix("주"))
+        if total is None or Decimal(total) <= 0:
+            continue
+        common_headers = [j for j in range(index + 1, min(index + 16, len(rows)))
+                          if compact(cells[j]) == ["구분", "종류", "발행주식수", "액면가액총액", "비고"]]
+        if len(common_headers) != 1:
+            continue
+        j = common_headers[0]
+        common_date = _dated_register_marker(xml[max(0, rows[j].start()-500):rows[j].start()])
+        common_row = compact(cells[j + 1]) if j + 1 < len(rows) else []
+        sum_row = compact(cells[j + 2]) if j + 2 < len(rows) else []
+        if (common_date == basis and len(common_row) == 5 and len(sum_row) == 4 and
+                common_row[:2] == ["기명식", "보통주"] and sum_row[0] == "합계" and
+                _number(common_row[2].removesuffix("주")) == total and
+                _number(sum_row[1].removesuffix("주")) == total):
+            issued.append((basis, total))
+    if not issued:
+        return []
+    claims = []
+    header = ["순위", "성명(명칭)", "종류", "주식수", "지분율(%)"]
+    for index, row in enumerate(rows):
+        if compact(cells[index]) != header:
+            continue
+        heading = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", xml[max(0, row.start()-1200):row.start()])).split())
+        basis = _dated_register_marker(xml[max(0, row.start()-500):row.start()])
+        if "5%이상 주주의 주식소유 현황" not in heading or not basis:
+            continue
+        denominators = {amount for issued_date, amount in issued if issued_date == basis}
+        if len(denominators) != 1:
+            continue
+        denominator = next(iter(denominators))
+        for j in range(index + 1, min(index + 25, len(rows) - 2)):
+            owner = compact(cells[j])
+            preferred = compact(cells[j + 1])
+            subtotal = compact(cells[j + 2])
+            if (len(owner) != 5 or not EXACT_NPS.fullmatch(owner[1]) or
+                    owner[2] != "보통주" or len(preferred) != 3 or
+                    preferred != ["우선주", "-", "-"] or len(subtotal) != 3 or
+                    subtotal[0] not in ("합계", "소계")):
+                continue
+            quantity = _number(owner[3])
+            ratio = _number(owner[4], maximum=100)
+            if (quantity is None or ratio is None or _number(subtotal[1]) != quantity or
+                    _number(subtotal[2], maximum=100) != ratio):
+                continue
+            displayed = Decimal(ratio)
+            scale = Decimal(1).scaleb(displayed.as_tuple().exponent)
+            if (Decimal(quantity) / Decimal(denominator) * 100).quantize(
+                    scale, rounding=ROUND_HALF_UP) != displayed:
+                continue
+            claims.append({"structure": "dated_five_percent_shareholder_all_common",
+                           "security_kind": "보통주", "holder_scope": "nps_only",
+                           "owner_identity": "nps_confirmed", "ratio_denominator": "issued_shares",
+                           "denominator_date": basis, "denominator_quantity": denominator,
+                           "denominator_evidence": "same_day_issued_total_and_only_common_class",
+                           "quantity": quantity, "ownership_percent": ratio,
+                           "row_sha256": hashlib.sha256(rows[j].group(0).encode()).hexdigest(),
+                           "row_offset": rows[j].start(), "basis_date": basis,
+                           "basis_evidence": "dated_five_percent_shareholder_table",
+                           "status": "actual_holding_basis_verified"})
+    return claims if len(claims) == 1 else []
 
 
 def extract_dated_share_distribution_claims(xml: str) -> list[dict]:
@@ -553,10 +648,22 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
         if claim.get("status") != "actual_holding_basis_verified":
             candidate["application_status"] = "basis_or_owner_unverified"
             continue
-        if (claim.get("structure") == "dated_share_distribution_all_common" and
-                len(matches) == 1 and candidate.get("filer_corp_code") == matches[0][0] and
+        claim_matches = matches
+        if claim.get("structure") == "dated_five_percent_shareholder_all_common":
+            if candidate.get("correction_hold") or candidate.get("withdrawal_flag"):
+                candidate["application_status"] = "correction_relation_unverified"
+                continue
+            if "사업보고서" not in (candidate.get("report_name") or ""):
+                candidate["application_status"] = "issuer_report_type_unverified"
+                continue
+            filer = candidate.get("filer_corp_code")
+            company = state.get("universe", {}).get(filer) or {}
+            claim_matches = [(filer, company)] if company.get("stock_code") else []
+        if (claim.get("structure") in ("dated_share_distribution_all_common",
+                                         "dated_five_percent_shareholder_all_common") and
+                len(claim_matches) == 1 and candidate.get("filer_corp_code") == claim_matches[0][0] and
                 not candidate.get("correction_hold") and not candidate.get("withdrawal_flag")):
-            corp, company = matches[0]
+            corp, company = claim_matches[0]
             identity = "|".join((corp, company["stock_code"], company["name"],
                                  candidate["receipt_no"]))
             claim.update(issuer_corp_code=corp, stock_code=company["stock_code"],
@@ -566,10 +673,10 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
         if not candidate.get("source_archive_sha256") or not claim.get("source_file_sha256"):
             candidate["application_status"] = "source_provenance_pending"
             continue
-        if len(matches) != 1:
+        if len(claim_matches) != 1:
             candidate["application_status"] = "issuer_identity_unverified"
             continue
-        corp, company = matches[0]
+        corp, company = claim_matches[0]
         key = (f'{candidate["receipt_no"]}:{candidate["document_no"] or "-"}:{corp}:'
                f'{company["stock_code"]}:{claim["basis_date"]}:{claim["row_sha256"]}')
         register_comparable_source_claim(state, candidate, claim, corp, company)

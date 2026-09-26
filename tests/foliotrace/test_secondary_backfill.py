@@ -30,6 +30,60 @@ NOISE = ("20060208000286", "1252220", "회사", "투자설명서",
 
 
 class SecondaryBackfillTests(unittest.TestCase):
+    def test_1998_dated_five_percent_register_requires_same_day_all_common_denominator(self):
+        def row(*cells):
+            return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'
+        issued = ('<P>4. 주식의 총수 등</P>' + row('(1998.12.31. 현재)') +
+                  row('발행할 주식의 총수', '발행한 주식의 총수', '미발행 주식의 총수') +
+                  row('1,000,000,000주', '287,917,464주', '712,082,536주') +
+                  '<P>나. 발행한 주식의 내용</P>' + row('(1998.12.31 현재)') +
+                  row('구 분', '종 류', '발행주식수', '액면가액총액', '비 고') +
+                  row('기명식', '보통주', '287,917,464주', '액면가', '') +
+                  row('합 계', '287,917,464주', '액면가', ''))
+        ownership = ('<P>나. 5%이상 주주의 주식소유 현황</P>' +
+                     row('[1998년 12월31일 현재]', '(단위 :주)') +
+                     row('순 위', '성명(명칭)', '종 류', '주식수', '지분율(%)') +
+                     row('2', '국민연금관리<BR/>공단', '보통주', '21,298,820', '7.40') +
+                     row('우선주', '-', '-') + row('합 계', '21,298,820', '7.40'))
+        claims = secondary.extract_source_claims('<DOC>' + issued + ownership + '</DOC>')
+        self.assertEqual(len(claims), 1)
+        self.assertEqual((claims[0]['basis_date'], claims[0]['quantity'],
+                          claims[0]['ownership_percent'], claims[0]['denominator_quantity']),
+                         ('1998-12-31', '21298820', '7.40', '287917464'))
+        self.assertEqual(claims[0]['status'], 'actual_holding_basis_verified')
+        self.assertEqual(len(secondary.extract_source_claims('<DOC>' + issued +
+            ownership.replace('관리<BR/>공단', '관리공단') + '</DOC>')), 1)
+        state = folio.empty_state()
+        state['universe']['00190321'] = {'name': '케이티', 'stock_code': '030200'}
+        candidate = {'receipt_no': '19990330000205', 'document_no': None,
+            'filing_date': '1999-03-30', 'filing_company': '옛 회사명',
+            'filer_corp_code': '00190321', 'report_name': '사업보고서 (1998.12)',
+            'source_archive_sha256': 'a' * 64, 'source_checked_at': '2026-09-27T00:00:00Z',
+            'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_claims': [{**claims[0], 'source_file_sha256': 'b' * 64}]}
+        self.assertEqual(secondary.retain_verified_historical_claims(state, candidate), 1)
+        fact = next(iter(state['verified_historical_observations'].values()))
+        self.assertEqual((fact['corp_code'], fact['basis_date'], fact['denominator_date']),
+                         ('00190321', '1998-12-31', '1998-12-31'))
+        state['holdings']['00190321'] = {'corp_code': '00190321', 'stock_code': '030200',
+            'name': '케이티', 'receipt_no': '20260901000001', 'receipt_date': '2026-09-01',
+            'holding_date': None, 'quantity': '10000000', 'company_ownership_percent': '8.0',
+            'security_kind': 'common', 'tracking': 'active', 'evidence': 'legacy_import'}
+        snapshot = make_snapshot(state, {})
+        current = next(item for item in snapshot['holdings'] if item['corpCode'] == '00190321')
+        self.assertEqual((current['companyOwnershipPercent'], current['quantity']), ('8.0', '10000000'))
+        correction = {**candidate, 'receipt_no': '19990611000003',
+                      'filing_date': '1999-06-11', 'correction_hold': True}
+        self.assertEqual(secondary.retain_verified_historical_claims(state, correction), 0)
+        self.assertEqual(correction['application_status'], 'correction_relation_unverified')
+        self.assertEqual(len(state['verified_historical_observations']), 1)
+        for changed in (issued.replace('287,917,464주', '287,917,465주', 1),
+                        issued.replace('보통주', '우선주', 1),
+                        issued.replace('1998.12.31 현재', '1999.01.01 현재')):
+            self.assertEqual(secondary.extract_source_claims('<DOC>' + changed + ownership + '</DOC>'), [])
+        self.assertEqual(secondary.extract_source_claims('<DOC>' + issued +
+            ownership.replace('7.40', '7.41') + '</DOC>'), [])
+
     def test_issuer_register_source_requotation_updates_scoped_main_without_direct_delta(self):
         def row(*cells):
             return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'
