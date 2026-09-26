@@ -6,7 +6,7 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
-from scripts.foliotrace import folio, target_source
+from scripts.foliotrace import folio, secondary, target_source
 from pipeline.foliotrace.publish import make_snapshot
 
 
@@ -96,6 +96,15 @@ class TargetSourceTests(unittest.TestCase):
         self.assertIn('same_basis_conflict', {item['status']
             for item in conflict_snapshot['issuerScopeObservations']})
         del state['issuer_scope_observations']['f' * 64]
+        future_candidate = copy.deepcopy(state['target_source_candidates']['20251114002334'])
+        future_candidate['receipt_no'] = '20251115000001'
+        future_candidate['source_claims'] = [{**future_candidate['source_claims'][0],
+            'basis_date': '2027-08-22', 'denominator_date': '2027-08-22',
+            'row_sha256': 'f' * 64}]
+        before_facts = len(state['issuer_scope_observations'])
+        self.assertEqual(secondary.retain_verified_historical_claims(state, future_candidate), 0)
+        self.assertEqual(future_candidate['application_status'], 'source_basis_after_filing')
+        self.assertEqual(len(state['issuer_scope_observations']), before_facts)
         # A separately filed correction with no explicit target link holds
         # only the matching report period, not the earlier Q3 citation.
         correction = {'status': '000', 'page_no': '1', 'page_count': '100',
@@ -107,12 +116,14 @@ class TargetSourceTests(unittest.TestCase):
             date(2026, 5, 16), '', fetch_list=lambda _: correction,
             fetch_document=fetch_document)
         self.assertEqual(make_snapshot(state, {})['holdings'][0]['issuerScopeSource']['referenceCount'], 1)
+        self.assertEqual(len(make_snapshot(state, {})['issuerScopeObservations'][0]['references']), 1)
         target_source.ingest_target(state, '20251114002334', '00244455',
             date(2025, 11, 14), '',
             fetch_list=lambda _: listed('20251114002334', '2025-11-14', '철'),
             fetch_document=fetch_document)
         self.assertEqual(len(calls), 3)
         self.assertEqual(make_snapshot(state, {})['holdings'][0]['companyOwnershipPercent'], '7.5')
+        self.assertEqual(make_snapshot(state, {})['issuerScopeObservations'], [])
         target_source.ingest_target(state, '20260515002914', '00244455',
             date(2026, 5, 15), '',
             fetch_list=lambda _: listed('20260515002914', '2026-05-15', '철'),

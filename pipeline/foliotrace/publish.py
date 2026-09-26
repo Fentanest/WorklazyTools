@@ -234,10 +234,11 @@ def make_snapshot(state, quotes, now=None):
                         "fileSha256": ref["file_sha256"], "rowSha256": ref["row_sha256"],
                         "parserVersion": ref["parser_version"],
                         "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={ref['receipt_no']}"}
-                        for ref in fact["references"]],
+                        for ref in fact["references"] if ref["receipt_no"] not in source_holds],
                     "status": "same_basis_conflict" if key in scoped_conflicts else "comparison_pending"}
                     for key, fact in sorted(issuer_observations.items(),
-                                            key=lambda item: (item[1]["basis_date"], item[0]), reverse=True)],
+                                            key=lambda item: (item[1]["basis_date"], item[0]), reverse=True)
+                    if any(ref["receipt_no"] not in source_holds for ref in fact["references"])],
                 "issuerScopeLaterChanges": [{"corpCode": fact["corp_code"],
                     "basisDate": fact["basis_date"], "kind": fact["kind"],
                     "references": [{"receiptNo": ref["receipt_no"],

@@ -150,17 +150,30 @@ class SecondaryBackfillTests(unittest.TestCase):
         state['secondary_source_cache'][no] = {
             'status': 'source_context_review_pending', 'parser_version': secondary.SOURCE_PARSER_VERSION,
             'source_archive_sha256': 'd' * 64, 'source_claims': [claim]}
-        result = secondary.replay_opendart_positives(state)
+        later_no = '20260604000001'
+        later_claim = {**claim, 'row_sha256': 'e' * 64, 'basis_date': '2026-06-03',
+            'denominator_date': '2026-06-03', 'quantity': '600', 'ownership_percent': '6.0'}
+        state['opendart_secondary_backfill']['positives'][later_no] = {
+            **positive, 'receipt_no': later_no, 'rcept_dt': '20260604'}
+        state['opendart_secondary_backfill']['queue'][later_no] = {
+            'correction_hold': False, 'withdrawal_flag': False}
+        state['secondary_source_cache'][later_no] = {
+            **state['secondary_source_cache'][no], 'source_archive_sha256': 'f' * 64,
+            'source_claims': [later_claim]}
+        result = secondary.replay_opendart_positives(state, limit=1)
         self.assertEqual((result['checked'], result['comparable_registered']), (1, 1))
         self.assertEqual(make_snapshot(state, {})['holdings'][0]['companyOwnershipPercent'], '5.05')
+        later_result = secondary.replay_opendart_positives(state, limit=1)
+        self.assertEqual((later_result['checked'], later_result['comparable_registered']), (1, 1))
+        self.assertEqual(make_snapshot(state, {})['holdings'][0]['companyOwnershipPercent'], '6.0')
         previous = encoded(state)
-        self.assertEqual(secondary.replay_opendart_positives(state)['comparable_registered'], 0)
+        self.assertEqual(secondary.replay_opendart_positives(state, limit=1)['checked'], 0)
         self.assertEqual(encoded(state), previous)
         state['opendart_secondary_backfill']['positives'].pop(no)
         state['opendart_secondary_backfill']['queue'][no].update(correction_hold=True, withdrawal_flag=True)
         secondary.replay_opendart_positives(state)
-        self.assertEqual(make_snapshot(state, {})['holdings'], [])
-        self.assertEqual(len(state['indirect_observations']), 1)
+        self.assertEqual(make_snapshot(state, {})['holdings'][0]['companyOwnershipPercent'], '6.0')
+        self.assertEqual(len(state['indirect_observations']), 2)
 
     def test_disconnected_search_retries_and_reports_only_safe_transport_code(self):
         day = date(2006, 2, 8)

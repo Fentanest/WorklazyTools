@@ -9,6 +9,7 @@ import hashlib
 import html
 import http.client
 import io
+import json
 import math
 import base64
 import binascii
@@ -471,6 +472,10 @@ def retain_verified_historical_claims(state: dict, candidate: dict) -> int:
                if company.get("name") == issuer_name and company.get("stock_code")]
     created = 0
     for claim in candidate.get("source_claims") or []:
+        if (claim.get("basis_date") and candidate.get("filing_date") and
+                claim["basis_date"] > candidate["filing_date"]):
+            candidate["application_status"] = "source_basis_after_filing"
+            continue
         if claim.get("status") == "issuer_level_later_change_unquantified":
             created += retain_issuer_later_change(state, candidate, claim, matches)
             continue
@@ -742,6 +747,19 @@ def replay_opendart_positives(state: dict, *, limit=100) -> dict:
             positive["application_status"] = "source_or_relation_review_pending"
             pending += 1
             continue
+        replay_input = {
+            "receipt_no": no, "corp_code": positive.get("corp_code"),
+            "corp_name": positive.get("corp_name"), "report_nm": positive.get("report_nm"),
+            "rcept_dt": positive.get("rcept_dt"), "hold": holds.get(no),
+            "parser_version": check["parser_version"],
+            "source_archive_sha256": check["source_archive_sha256"],
+            "source_claims": check.get("source_claims") or [],
+            "universe": (state.get("universe") or {}).get(positive.get("corp_code")),
+        }
+        replay_sha = hashlib.sha256(json.dumps(replay_input, sort_keys=True, ensure_ascii=False,
+                                                separators=(",", ":")).encode()).hexdigest()
+        if positive.get("replay_input_sha256") == replay_sha:
+            continue
         raw_date = positive.get("rcept_dt") or ""
         try:
             filing_date = date(int(raw_date[:4]), int(raw_date[4:6]), int(raw_date[6:8])).isoformat()
@@ -782,6 +800,7 @@ def replay_opendart_positives(state: dict, *, limit=100) -> dict:
         registered += len(state.get("indirect_observations") or {}) - before
         positive["application_status"] = (candidate.get("current_application_status") or
                                           candidate.get("application_status") or "source_context_review_pending")
+        positive["replay_input_sha256"] = replay_sha
         checked += 1
     return {"checked": checked, "pending": pending, "historical_retained": historical,
             "comparable_registered": registered}
