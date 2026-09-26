@@ -18,10 +18,20 @@ import type { FolioTracePageProps } from "../contracts";
 export type { FolioTracePageProps } from "../contracts";
 
 import "./foliotrace.css";
+import {
+  eventRangeOf,
+  filterHoldings,
+  formatKrw,
+  formatPct,
+  formatQty,
+  holdingStatus,
+  sortHoldings,
+  toNumberOrNull,
+  topHoldings,
+} from "./holdings";
+import type { QualityFilter, SortKey } from "./holdings";
 
 type Lang = "ko" | "en";
-type SortKey = "value" | "weight" | "ownership" | "receipt";
-type QualityFilter = "all" | "priced" | "unpriced" | "below-5";
 
 const STR = {
   ko: {
@@ -233,41 +243,6 @@ const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
   },
 };
 
-function toNumberOrNull(value: string | null): number | null {
-  if (value === null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-function formatKrw(value: string | null, lang: Lang): string {
-  const n = toNumberOrNull(value);
-  if (n === null) return "—";
-  return new Intl.NumberFormat(lang === "ko" ? "ko-KR" : "en-US", {
-    style: "currency",
-    currency: "KRW",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
-function formatPct(value: string | null): string {
-  const n = toNumberOrNull(value);
-  if (n === null) return "—";
-  return `${n.toFixed(2)}%`;
-}
-
-function formatQty(value: string | null): string {
-  const n = toNumberOrNull(value);
-  if (n === null) return "—";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n);
-}
-
-function holdingStatus(h: Holding): "included" | "excluded" | "exit" | "unresolved" {
-  if (h.tracking === "below-5-percent") return "exit";
-  if (h.evidence === "unresolved-latest") return "unresolved";
-  if (h.quote === null || h.estimatedValue === null) return "excluded";
-  return "included";
-}
-
 export function FolioTracePage({ lang, view, onRefresh }: FolioTracePageProps) {
   const t = STR[lang];
   if (view.status !== "ready") {
@@ -331,48 +306,16 @@ function ReadyView({
   const [sortKey, setSortKey] = useState<SortKey>("value");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let rows = snapshot.holdings.filter((h) => {
-      if (q && !(h.name.toLowerCase().includes(q) || h.stockCode.toLowerCase().includes(q))) return false;
-      const s = holdingStatus(h);
-      if (quality === "priced" && s !== "included") return false;
-      if (quality === "unpriced" && s === "included") return false;
-      if (quality === "below-5" && s !== "exit") return false;
-      return true;
-    });
-    const num = (h: Holding): number | null => {
-      if (sortKey === "value") return toNumberOrNull(h.estimatedValue);
-      if (sortKey === "weight") return toNumberOrNull(h.portfolioWeightPercent);
-      if (sortKey === "ownership") return toNumberOrNull(h.companyOwnershipPercent);
-      return null;
-    };
-    rows = [...rows].sort((a, b) => {
-      if (sortKey === "receipt") return b.receiptDate.localeCompare(a.receiptDate);
-      const na = num(a);
-      const nb = num(b);
-      if (na === null && nb === null) return 0;
-      if (na === null) return 1;
-      if (nb === null) return -1;
-      return nb - na;
-    });
-    return rows;
-  }, [snapshot.holdings, query, quality, sortKey]);
+  const filtered = useMemo(
+    () => sortHoldings(filterHoldings(snapshot.holdings, query, quality), sortKey),
+    [snapshot.holdings, query, quality, sortKey],
+  );
 
-  const topWeights = useMemo(() => {
-    const priced = snapshot.holdings.filter((h) => toNumberOrNull(h.portfolioWeightPercent) !== null);
-    return [...priced]
-      .sort((a, b) => (toNumberOrNull(b.portfolioWeightPercent) ?? 0) - (toNumberOrNull(a.portfolioWeightPercent) ?? 0))
-      .slice(0, 8);
-  }, [snapshot.holdings]);
+  const topWeights = useMemo(() => topHoldings(snapshot.holdings), [snapshot.holdings]);
 
   const maxWeight = Math.max(0, ...topWeights.map((h) => toNumberOrNull(h.portfolioWeightPercent) ?? 0));
 
-  const eventRange = useMemo(() => {
-    if (!snapshot.events.length) return null;
-    const dates = snapshot.events.map((e) => e.receiptDate).sort();
-    return { from: dates[0], to: dates[dates.length - 1], count: snapshot.events.length };
-  }, [snapshot.events]);
+  const eventRange = useMemo(() => eventRangeOf(snapshot.events), [snapshot.events]);
 
   const selected: Holding | null =
     selectedCode === null ? null : (snapshot.holdings.find((h) => h.stockCode === selectedCode) ?? null);
