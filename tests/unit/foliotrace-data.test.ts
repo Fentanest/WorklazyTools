@@ -35,3 +35,24 @@ test('FolioTrace validates nested quote, event, history, and filing links', () =
   assert.equal(validSnapshot({ ...base, events: [{ ...base.events[0], receiptDate: null }] }, version), false)
   assert.equal(validSnapshot({ ...base, history: [{ ...base.history[0], estimatedValue: null }] }, version), false)
 })
+
+test('receipt-only indirect observation and its event load together', () => {
+  const receiptNo = '20260602000001'
+  const observationKey = `${receiptNo}:-:00101488:009450:2026-06-01:${'c'.repeat(64)}`
+  const filingUrl = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${receiptNo}`
+  const observation = {
+    observationKey, corpCode: '00101488', stockCode: '009450', ownershipPercent: '5.05',
+    numericKind: 'exact', basisDate: '2026-06-01', filingDate: '2026-06-02', receiptNo,
+    documentNo: null, sourceSha256: 'd'.repeat(64), filingUrl, appliedToHolding: true,
+    reason: null, percentagePointChange: '0.25', trackingChange: 'tracking-reentry',
+  }
+  const event = {
+    receiptNo, receiptDate: '2026-06-02', basisDate: '2026-06-01', observationKey,
+    corpCode: '00101488', stockCode: '009450', kind: 'tracking-reentry', correctionOf: null,
+    quantity: null, companyOwnershipPercent: '5.05', numericKind: 'exact',
+    percentagePointChange: '0.25', source: 'indirect-observation', filingUrl,
+  }
+  assert.equal(validSnapshot({ ...base, events: [event], verifiedIndirectObservations: [observation] }, version), true)
+  assert.equal(validSnapshot({ ...base, events: [{ ...event, observationKey: observationKey.replace(':-:', ':bad:') }],
+    verifiedIndirectObservations: [observation] }, version), false)
+})

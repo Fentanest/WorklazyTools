@@ -19,6 +19,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 const RECEIPT = /^\d{14}$/
 const STOCK = /^[0-9A-Z]{6}$/
 const FILING_URL = /^https:\/\/dart\.fss\.or\.kr\/dsaf001\/main\.do\?rcpNo=\d{14}$/
+const OBSERVATION_KEY = /^\d{14}:(?:\d+|-):\d{8}:[0-9A-Z]{6}:\d{4}-\d{2}-\d{2}:[a-f0-9]{64}$/
 function str(value: unknown): value is string { return typeof value === 'string' }
 function nullable(value: unknown, check: (value: unknown) => boolean): boolean { return value === null || check(value) }
 function decimal(value: unknown): boolean { return str(value) && DECIMAL.test(value) }
@@ -35,7 +36,7 @@ function validIndirectSource(value: unknown): boolean {
     str(value.ratioDenominator) && ['shares_etc_total', 'issued_shares', 'voting_rights'].includes(value.ratioDenominator)
 }
 function validIndirectObservation(value: unknown): boolean {
-  return isRecord(value) && str(value.observationKey) && /^\d{14}:(?:\d+|-):\d{8}:[0-9A-Z]{6}:\d{4}-\d{2}-\d{2}:[a-f0-9]{64}$/.test(value.observationKey) &&
+  return isRecord(value) && str(value.observationKey) && OBSERVATION_KEY.test(value.observationKey) &&
     str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && str(value.stockCode) && STOCK.test(value.stockCode) &&
     nullable(value.ownershipPercent, decimal) && isoDate(value.basisDate) && isoDate(value.filingDate) &&
     numericKind(value.numericKind) &&
@@ -87,7 +88,7 @@ function validEvent(value: unknown): boolean {
   return isRecord(value) && str(value.receiptNo) && RECEIPT.test(value.receiptNo) && isoDate(value.receiptDate) &&
     (value.basisDate === undefined || nullable(value.basisDate, isoDate)) &&
     (value.observationKey === undefined || (str(value.observationKey) &&
-      /^\d{14}:\d+:\d{8}:[0-9A-Z]{6}:\d{4}-\d{2}-\d{2}:[a-f0-9]{64}$/.test(value.observationKey))) &&
+      OBSERVATION_KEY.test(value.observationKey))) &&
     str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && nullable(value.stockCode, x => str(x) && STOCK.test(x)) &&
     ['increase', 'decrease', 'new-report', 'purpose-change', 'tracking-exit', 'tracking-reentry', 'other'].includes(String(value.kind)) &&
     nullable(value.correctionOf, x => str(x) && RECEIPT.test(x)) && nullable(value.quantity, decimal) &&
