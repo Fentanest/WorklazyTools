@@ -6,6 +6,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import date, datetime, time as clock_time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
@@ -13,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 CODE = re.compile(r"^[0-9A-Z]{6}$")
 BASE = "https://m.stock.naver.com/api/stock"
+CHART_BASE = "https://fchart.stock.naver.com/sise.nhn"
 # Confirmed KRX closures: https://kind.krx.co.kr/external/dst/notice/11637/
 # [한국거래소] 2026년 올빼미공시 안내.pdf (2026 Chuseok, Sep 24-27).
 KNOWN_CLOSURES = {date(2026, 9, 24), date(2026, 9, 25)}
@@ -42,8 +44,27 @@ def expected_session(observed):
     return candidate
 
 
-def parse_quote(code, basic, daily, observed_at, *, today=None):
-    """Select the last completed regular session and cross-check the basic quote."""
+def parse_regular_chart(code, payload, traded):
+    """Select the exact 15:30 KRX minute from Naver's dated minute chart."""
+    if not CODE.fullmatch(code) or not isinstance(payload, bytes) or len(payload) > 2_000_000 or b"<!DOCTYPE" in payload.upper() or b"<!ENTITY" in payload.upper():
+        raise QuoteError("regular chart invalid")
+    try:
+        root = ET.fromstring(payload.decode("euc-kr"))
+    except (ET.ParseError, UnicodeError, LookupError, ValueError) as exc:
+        raise QuoteError("regular chart invalid") from exc
+    chart = root.find("chartdata")
+    if chart is None or chart.get("symbol") != code or chart.get("timeframe") != "minute":
+        raise QuoteError("regular chart identity mismatch")
+    stamp = traded.replace("-", "") + "1530"
+    rows = [item.get("data", "").split("|") for item in chart.findall("item")]
+    matched = [row for row in rows if row and row[0] == stamp]
+    if len(matched) != 1 or len(matched[0]) != 6:
+        raise QuoteError("regular chart 15:30 close unverified")
+    return _amount(matched[0][4])
+
+
+def parse_quote(code, basic, daily, chart, observed_at, *, today=None):
+    """Cross-check Naver identity/date, then use the 15:30 KRX chart close."""
     if not CODE.fullmatch(code) or not isinstance(basic, dict) or not isinstance(daily, list) or not daily:
         raise QuoteError("invalid quote response")
     exchange = basic.get("stockExchangeType")
@@ -63,31 +84,25 @@ def parse_quote(code, basic, daily, observed_at, *, today=None):
     dated = [row for row in daily if isinstance(row, dict) and row.get("localTradedAt") == expected.isoformat()]
     if len(dated) != 1 or expected > today or expected.weekday() >= 5:
         raise QuoteError(f"latest completed KRX session unverified: expected {expected.isoformat()}")
-    close = _amount(dated[0].get("closePrice"))
+    daily_close = _amount(dated[0].get("closePrice"))
     basic_date = basic_at.astimezone(ZoneInfo("Asia/Seoul")).date()
     if basic_date == expected:
         if basic.get("marketStatus") != "CLOSE" or basic.get("marketStatusDetailType") != "close":
             raise QuoteError("regular close not final")
         corroborated = _amount(basic.get("closePrice"))
     elif basic_date == today and basic_date > expected:
-        direction = (basic.get("compareToPreviousPrice") or {}).get("name")
-        change = Decimal(_amount(basic.get("compareToPreviousClosePrice"), allow_zero=True))
-        current = Decimal(_amount(basic.get("closePrice")))
-        if direction == "RISING":
-            corroborated = format(current - change, "f")
-        elif direction == "FALLING":
-            corroborated = format(current + change, "f")
-        elif direction == "UNCHANGED" and change == 0:
-            corroborated = format(current, "f")
-        else:
-            raise QuoteError("previous close unverified")
+        # During the next session, the basic comparison may use a different
+        # prior session close; the dated 15:30 chart is the price evidence.
+        corroborated = daily_close
     else:
         raise QuoteError("quote date mismatch")
-    if close != corroborated:
-        raise QuoteError("regular close mismatch")
+    if daily_close != corroborated:
+        raise QuoteError("source daily/basic mismatch")
+    close = parse_regular_chart(code, chart, expected.isoformat())
     return {"close": close, "currency": "KRW", "market": "KRX", "session": "regular",
             "trade_date": expected.isoformat(), "adjusted": False, "provider": "naver",
-            "observed_at": observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "verified": True}
+            "observed_at": observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "verified": True,
+            "daily_reference_close": daily_close, "close_basis": "naver_krx_1530_minute"}
 
 
 class NaverClient:
@@ -119,6 +134,26 @@ class NaverClient:
                 self.sleep(min(2 ** attempt, 4))
         raise QuoteError("quote request failed")
 
+    def _chart(self, code, count):
+        url = f"{CHART_BASE}?symbol={code}&timeframe=minute&count={count}&requestType=0"
+        for attempt in range(self.retries + 1):
+            delay = self.next_request_at - time.monotonic()
+            if delay > 0:
+                self.sleep(delay)
+            self.next_request_at = time.monotonic() + self.min_interval
+            request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 FolioTrace/1.0", "Accept": "application/xml,text/xml"})
+            try:
+                self.requests += 1
+                with self.opener(request, timeout=10) as response:
+                    if "xml" not in response.headers.get("Content-Type", "").lower():
+                        raise QuoteError("unexpected regular chart content type")
+                    return response.read(2_000_001)
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+                if attempt == self.retries or isinstance(exc, urllib.error.HTTPError) and exc.code not in (429, 500, 502, 503, 504):
+                    raise QuoteError("regular chart request failed") from exc
+                self.sleep(min(2 ** attempt, 4))
+        raise QuoteError("regular chart request failed")
+
     def quote(self, code, observed_at=None):
         if not CODE.fullmatch(code):
             raise QuoteError("invalid stock code")
@@ -127,6 +162,12 @@ class NaverClient:
         observed_at = observed_at or datetime.now(timezone.utc).isoformat()
         basic = self._json(f"{BASE}/{code}/basic")
         daily = self._json(f"{BASE}/{code}/price?pageSize=5&page=1")
-        quote = parse_quote(code, basic, daily, observed_at)
+        chart = self._chart(code, 500)
+        try:
+            quote = parse_quote(code, basic, daily, chart, observed_at)
+        except QuoteError as exc:
+            if "15:30 close unverified" not in str(exc):
+                raise
+            quote = parse_quote(code, basic, daily, self._chart(code, 2000), observed_at)
         self.cache[code] = quote
         return quote

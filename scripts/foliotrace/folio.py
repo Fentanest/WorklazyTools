@@ -342,6 +342,8 @@ def backfill_legacy(root: Path, state_path: Path, commit: bool):
                           "company_ownership_percent", "reason", "legacy_sources"):
                 if target.get(field) in (None, "", []):
                     target[field] = source.get(field)
+            if target.get("evidence") == "legacy_reference_only" and target.get("quantity") is not None:
+                target["evidence"] = "legacy_history_fact"
             if target != before:
                 changed_receipts += 1
         if no in unresolved:
@@ -740,10 +742,19 @@ def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None,
         no = holding.get("receipt_no") or ""
         if holding.get("security_kind") != "unknown" or not RECEIPT.fullmatch(no):
             continue
-        if ledger.get(no, {}).get("method") == MAPPING_METHOD and ledger[no].get("status") in ("verified", "unverified"):
-            continue
         corp = holding.get("corp_code")
         universe = state["universe"].get(corp, {})
+        prior = ledger.get(no, {})
+        if prior.get("method") == MAPPING_METHOD:
+            if prior.get("status") == "verified":
+                continue
+            if prior.get("status") == "unverified":
+                # A new issuer may appear in KRX after the first attempt, and
+                # a later DART listing may repair the universe code.
+                changed_identity = universe.get("stock_code") == holding.get("stock_code") and prior.get("reason") == "stock_identity_mismatch"
+                changed_master = prior.get("reason") == "krx_stock_class_or_name_unverified" and prior.get("krx_sha256") != master_hash
+                if not (changed_identity or changed_master):
+                    continue
         if universe.get("stock_code") != holding.get("stock_code"):
             ledger[no] = {"status": "unverified", "method": MAPPING_METHOD, "reason": "stock_identity_mismatch"}
             checked += 1
@@ -757,7 +768,7 @@ def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None,
         normalized_name = comparable_company_name(holding.get("name"))
         normalized_listed = comparable_company_name(listed_name)
         if not listed_name or normalized_name != normalized_listed:
-            ledger[no] = {"status": "unverified", "method": MAPPING_METHOD, "reason": "krx_stock_class_or_name_unverified"}
+            ledger[no] = {"status": "unverified", "method": MAPPING_METHOD, "reason": "krx_stock_class_or_name_unverified", "krx_sha256": master_hash}
             checked += 1
             continue
         try:
@@ -990,9 +1001,9 @@ def price_and_value(state_path: Path, output: Path, client=None):
     if not eligible:
         raise RuntimeError("no verified stock-class mappings for valuation")
     for code in sorted(eligible):
-        key = f"{code}|KRX|regular|{expected}|raw"
+        key = f"{code}|KRX|regular|{expected}|naver-chart1530-v1"
         cached = cache.get(key)
-        if cached and cached.get("verified") is True and cached.get("trade_date") == expected:
+        if cached and cached.get("verified") is True and cached.get("trade_date") == expected and cached.get("close_basis") == "naver_krx_1530_minute":
             quotes[code] = cached
             new_cache[key] = cached
             cache_hits += 1
@@ -1000,7 +1011,7 @@ def price_and_value(state_path: Path, output: Path, client=None):
         try:
             quotes[code] = client.quote(code)
             quote = quotes[code]
-            new_cache[f"{code}|KRX|regular|{quote['trade_date']}|raw"] = quote
+            new_cache[f"{code}|KRX|regular|{quote['trade_date']}|naver-chart1530-v1"] = quote
         except QuoteError as exc:
             failed[code] = str(exc)
     if eligible and not quotes:

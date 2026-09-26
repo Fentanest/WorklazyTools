@@ -81,6 +81,19 @@ class ReviewFixTests(unittest.TestCase):
             self.assertEqual(folio.resolve_unfinished(state, "test-key"), 1)
         self.assertEqual(state["holdings"][new_corp]["stock_code"], new_code)
 
+    def test_new_issuer_mapping_retries_when_krx_master_gains_code(self):
+        state = state_with_holding()
+        target = state["holdings"][CORP]
+        target["security_kind"] = "unknown"
+        self.assertEqual(folio.reconcile_security(state, "test-key", master={}, master_hash="a" * 64)["mapped"], 0)
+        self.assertEqual(state["mapping_ledger"][OLD]["reason"], "krx_stock_class_or_name_unverified")
+        document = {"verified_voting_share_quantity": "100", "quantity": "100", "xml_sha256": "c" * 64,
+                    "verified_common_stock_code": CODE}
+        with patch.object(folio, "dart_document", return_value=document):
+            result = folio.reconcile_security(state, "test-key", master={CODE: "Synthetic"}, master_hash="b" * 64)
+        self.assertEqual(result["mapped"], 1)
+        self.assertEqual(target["security_kind"], "common")
+
     def test_same_day_event_uses_prior_receipt_not_latest_holding(self):
         state = state_with_holding()
         a, b = "20260923000001", "20260923000002"
@@ -126,11 +139,13 @@ class ReviewFixTests(unittest.TestCase):
             self.assertEqual(imported["events"][OLD]["kind"], "increase")
             imported["events"] = {}
             imported["receipts"]["20260901000001"]["quantity"] = None
+            imported["receipts"]["20260901000001"]["evidence"] = "legacy_reference_only"
             folio.write_json(path, imported)
             first = folio.backfill_legacy(export, path, True)
             second = folio.backfill_legacy(export, path, True)
             self.assertEqual((first["added_events"], second["added_events"]), (2, 0))
             self.assertEqual(folio.read_json(path)["receipts"]["20260901000001"]["quantity"], "80")
+            self.assertEqual(folio.read_json(path)["receipts"]["20260901000001"]["evidence"], "legacy_history_fact")
 
     def test_dated_security_share_jump_excluded_small_drift_retained(self):
         state = state_with_holding()

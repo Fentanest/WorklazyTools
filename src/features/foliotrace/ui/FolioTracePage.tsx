@@ -35,7 +35,7 @@ import {
   topHoldings,
 } from "./holdings";
 import type { Lang, QualityFilter, SortKey } from "./holdings";
-import { FOLIO_TRACE_FAQ } from "./faq";
+import { getFaqsForPath } from "./faq";
 
 const STR = {
   ko: {
@@ -49,8 +49,9 @@ const STR = {
     checkedAt: "공시 확인",
     generatedAt: "데이터 생성",
     publishedAt: "게시",
-    staleBadge: "지연된 데이터(stale) — 최신 공시·종가를 다시 확인하세요",
-    freshBadge: "최신 게시 반영",
+    publishTimeUnknown: "게시 시각 미기록",
+    staleBadge: "데이터 생성 후 3일 초과 — 공시·종가를 다시 확인하세요",
+    freshBadge: "생성 데이터 표시",
     legacyVerified: "이관 자료 범위: 검증됨",
     legacyPartial: "이관 자료 범위: 일부만 검증됨 — 과거 수치는 참고용입니다",
     legacyUnverified: "이관 자료 범위: 미검증 — 과거 수치는 참고용입니다",
@@ -147,8 +148,9 @@ const STR = {
     checkedAt: "Filings checked",
     generatedAt: "Generated",
     publishedAt: "Published",
-    staleBadge: "Stale data — please re-check the latest filings and closes",
-    freshBadge: "Latest publish applied",
+    publishTimeUnknown: "Publish time not recorded",
+    staleBadge: "Generated over 3 days ago — re-check filings and closes",
+    freshBadge: "Generated data shown",
     legacyVerified: "Migrated coverage: verified",
     legacyPartial: "Migrated coverage: partially verified — treat history as reference",
     legacyUnverified: "Migrated coverage: unverified — treat history as reference",
@@ -375,7 +377,7 @@ function ReadyView({
         </span>
         <span>
           {t.checkedAt}: {snapshot.filingsCheckedAt ?? "—"} · {t.generatedAt}: {snapshot.generatedAt} · {t.publishedAt}:{" "}
-          {snapshot.publishedAt ?? "—"}
+          {snapshot.publishedAt ?? t.publishTimeUnknown}
         </span>
         <span className={stale ? "foliotrace-badge-warn" : "foliotrace-badge-ok"}>{stale ? t.staleBadge : t.freshBadge}</span>
         <span>
@@ -606,17 +608,17 @@ function ReadyView({
           </li>
           <li>
             {t.checkedAt}: {snapshot.filingsCheckedAt ?? "—"} · {t.generatedAt}: {snapshot.generatedAt} · {t.publishedAt}:{" "}
-            {snapshot.publishedAt ?? "—"}
+            {snapshot.publishedAt ?? t.publishTimeUnknown}
           </li>
         </ul>
       </SectionCard>
 
       <SectionCard title={t.faqTitle} description={t.faqDesc}>
         <div className="foliotrace-faq">
-          {FOLIO_TRACE_FAQ.map((entry) => (
-            <details key={entry.q[lang]}>
-              <summary>{entry.q[lang]}</summary>
-              <p>{entry.a[lang]}</p>
+          {getFaqsForPath(lang, "foliotrace", "/tools/foliotrace").map((entry) => (
+            <details key={entry.question}>
+              <summary>{entry.question}</summary>
+              <p>{entry.answer}</p>
             </details>
           ))}
         </div>

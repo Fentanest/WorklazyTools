@@ -60,9 +60,9 @@ test("scoped CSS uses only production tokens or valid fallbacks", () => {
 test("React page renders the shared FAQ entries visibly (FT-10)", () => {
   // The former failure: guide paragraphs existed but no FAQ was rendered
   // after React mount replaced the static fallback.
-  assert.match(pageSource, /FOLIO_TRACE_FAQ/);
+  assert.match(pageSource, /getFaqsForPath/);
   assert.match(pageSource, /<details key/);
-  assert.match(pageSource, /<summary>\{entry\.q\[lang\]\}<\/summary>/);
+  assert.match(pageSource, /<summary>\{entry\.question\}<\/summary>/);
   assert.match(cssSource, /\.foliotrace-faq/);
 });
 

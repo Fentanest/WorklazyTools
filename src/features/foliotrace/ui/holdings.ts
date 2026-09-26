@@ -136,6 +136,14 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     ko: "최신 공시가 확인되지 않아 평가에서 제외 — 이전 확인 수량은 유지",
     en: "Excluded: latest filing unverified — previously confirmed quantity retained",
   },
+  filing_after_quote_date: {
+    ko: "공시 접수일이 종가 기준일보다 늦어 평가에서 제외",
+    en: "Excluded: filing arrived after the closing-price date",
+  },
+  corporate_action_unverified: {
+    ko: "공시 후 주식 변동 여부가 확인되지 않아 평가에서 제외",
+    en: "Excluded: share changes since the filing are unverified",
+  },
 };
 
 export function exclusionReasonLabel(reason: string | null, lang: Lang): string | null {

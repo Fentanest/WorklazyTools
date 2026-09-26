@@ -17,7 +17,7 @@ import {
   sortHoldings,
   topHoldings,
 } from "../../src/features/foliotrace/ui/holdings.ts";
-import { FOLIO_TRACE_FAQ } from "../../src/features/foliotrace/ui/faq.ts";
+import { getFaqsForPath } from "../../src/i18n/guideData.ts";
 
 function holding(overrides: Partial<Holding> & { stockCode: string }): Holding {
   return {
@@ -238,6 +238,8 @@ test("every known exclusion reason maps to ko/en text, never the raw code", () =
     "quote_date_or_session_mismatch",
     "quote_basis_unverified",
     "latest_filing_unresolved",
+    "filing_after_quote_date",
+    "corporate_action_unverified",
   ];
   for (const reason of known) {
     for (const lang of ["ko", "en"] as const) {
@@ -277,15 +279,18 @@ test("latest-unresolved sub-reasons map, unknowns fall back without echo", () =>
 
 test("visible FAQ carries approved ko/en questions and answers", () => {
   // FT-10 regression: the React page rendered no FAQ at all.
-  assert.ok(FOLIO_TRACE_FAQ.length >= 5, "FAQ must cover the approved guide topics");
+  const korean = getFaqsForPath("ko", "foliotrace", "/tools/foliotrace");
+  const english = getFaqsForPath("en", "foliotrace", "/tools/foliotrace");
+  assert.equal(korean.length, 6);
+  assert.equal(english.length, korean.length);
   const questions = new Set<string>();
-  for (const entry of FOLIO_TRACE_FAQ) {
-    assert.ok(entry.q.ko.trim() && entry.q.en.trim(), "each FAQ needs both questions");
-    assert.ok(entry.a.ko.trim() && entry.a.en.trim(), "each FAQ needs both answers");
-    questions.add(entry.q.ko);
+  for (let i = 0; i < korean.length; i++) {
+    assert.ok(korean[i].question.trim() && english[i].question.trim(), "each FAQ needs both questions");
+    assert.ok(korean[i].answer.trim() && english[i].answer.trim(), "each FAQ needs both answers");
+    questions.add(korean[i].question);
   }
-  assert.equal(questions.size, FOLIO_TRACE_FAQ.length, "FAQ questions must be distinct");
-  const allKo = FOLIO_TRACE_FAQ.map((e) => `${e.q.ko} ${e.a.ko}`).join("\n");
+  assert.equal(questions.size, korean.length, "FAQ questions must be distinct");
+  const allKo = korean.map((e) => `${e.question} ${e.answer}`).join("\n");
   assert.ok(allKo.includes("전체 자산"), "FAQ must state the not-total-assets scope");
   assert.ok(allKo.includes("정규장 종가"), "FAQ must state the price basis");
 });

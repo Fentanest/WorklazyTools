@@ -125,7 +125,10 @@ class MigrationTests(unittest.TestCase):
                 "corporate_action_status": "verified", "corporate_action_trade_date": "2026-09-23"}
             folio.write_json(state_path, state)
             quote = {"close": "1.25", "currency": "KRW", "market": "KRX", "session": "regular",
-                     "trade_date": "2026-09-23", "adjusted": False, "provider": "naver", "observed_at": "2026-09-26T00:00:00Z", "verified": True}
+                     "trade_date": "2026-09-23", "adjusted": False, "provider": "naver", "observed_at": "2026-09-26T00:00:00Z", "verified": True,
+                     "close_basis": "naver_krx_1530_minute"}
+            state["quote_cache"]["009450|KRX|regular|2026-09-23|raw"] = {**quote, "close": "99", "close_basis": "basic_daily_v1"}
+            folio.write_json(state_path, state)
             class Client:
                 requests = 2
                 def quote(self, code):
@@ -135,6 +138,7 @@ class MigrationTests(unittest.TestCase):
                 first = folio.price_and_value(state_path, output, Client())
                 second = folio.price_and_value(state_path, output, Client())
             self.assertEqual(first["priced"], 1)
+            self.assertEqual(first["cache_hits"], 0)
             self.assertEqual(second["cache_hits"], 1)
             self.assertEqual(folio.read_json(output)["estimatedValue"], "11258999068426241.25")
             snap = folio.read_json(output)
