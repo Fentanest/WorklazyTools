@@ -53,8 +53,17 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
         rows = []
         basis_rows = []
         date_rows = []
+        ownership_context_rows = []
         for row in ROWS.finditer(decoded):
             source_row = row.group(0)
+            if receipt_no in ("20060124800040", "20081007000289"):
+                plain_row = clean(source_row, 600)
+                if (re.search(r"발행\s*주식\s*총수|총발행\s*주식|소유\s*주식|보유\s*비율|주식\s*교환|주식\s*이전|기준일|이번보고서제출일|최대주주등", plain_row)
+                        and len(ownership_context_rows) < 40):
+                    ownership_context_rows.append({
+                        "row_offset": row.start(), "row_sha256": hashlib.sha256(source_row.encode()).hexdigest(),
+                        "cells": [clean(cell, 80) for cell in CELLS.findall(source_row)[:16]],
+                        "preceding_heading": clean(decoded[max(0, row.start() - 350):row.start()], 180)})
             direct_basis_row = receipt_no in ("20090227000244", "20260908000302", "20260623000336") and re.search(
                 r"이번보고서|직전보고서|증\s*감|보고서작성기준일", source_row)
             historical_date_row = receipt_no in ("20060124800040", "20081007000289") and re.search(
@@ -82,6 +91,7 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                                     "xml_bytes": len(raw), "nps_rows": rows,
                                     "basis_rows": basis_rows,
                                     "date_rows": date_rows,
+                                    "ownership_context_rows": ownership_context_rows,
                                     "nps_mentions": len(NPS.findall(decoded)),
                                     "date_tokens": [clean(item, 40) for item in dates]})
     result["archive_status"] = "parsed"
