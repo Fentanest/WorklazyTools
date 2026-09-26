@@ -42,7 +42,7 @@ export interface Holding {
   quantity: DecimalString | null
   companyOwnershipPercent: DecimalString | null
   ownershipNumericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated' | null
-  observationStatus?: 'verified' | 'same_basis_conflict' | null
+  observationStatus?: 'verified' | 'verified_scoped' | 'same_basis_conflict' | null
   receiptNo: string
   receiptDate: IsoDate
   holdingDate: IsoDate | null

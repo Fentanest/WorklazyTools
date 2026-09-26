@@ -5,6 +5,17 @@ export type QualityFilter = "all" | "priced" | "unpriced" | "below-5";
 export type HoldingStatus = "included" | "excluded" | "exit" | "unresolved";
 export type Lang = "ko" | "en";
 
+export function formatKstTimestamp(value: string | null, lang: Lang): string | null {
+  if (value === null) return null;
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return null;
+  const formatted = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(instant);
+  return `${formatted} KST`;
+}
+
 /**
  * Exact decimal-string handling for all financial labels.
  *
@@ -115,6 +126,10 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
   quantity_unverified: {
     ko: "수량이 확인되지 않아 평가에서 제외",
     en: "Excluded: quantity unverified",
+  },
+  scope_comparison_unverified: {
+    ko: "다른 공시에서 확인한 지분율의 주식 종류와 평가 기준을 연결하지 못해 금액은 제외",
+    en: "Value excluded: the independently reported stake cannot yet be matched to a priced share class",
   },
   zero_quantity: {
     ko: "수량이 0이라 평가에서 제외",

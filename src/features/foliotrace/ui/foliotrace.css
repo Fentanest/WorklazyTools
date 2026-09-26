@@ -394,6 +394,11 @@ th.foliotrace-num {
   text-align: right;
 }
 
+.foliotrace-table td.foliotrace-receipt-date {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 .foliotrace-table-note {
   margin-top: 0;
 }

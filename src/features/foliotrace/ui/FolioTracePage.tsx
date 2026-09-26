@@ -24,6 +24,7 @@ import {
   eventRangeOf,
   exclusionReasonLabel,
   filterHoldings,
+  formatKstTimestamp,
   formatKrw,
   formatPct,
   formatQty,
@@ -141,7 +142,7 @@ const STR = {
     directBaseline: "비교한 직접 공시",
     issuerScopeSource: "다른 회사 공시에서 확인한 지분율 · 주식 종류 확인 중",
     issuerScopeDetail: "발행주식 기준으로 확인한 수량",
-    issuerScopeComparison: "이전 직접 공시와 지분율 계산 기준을 비교할 수 없어 증감은 표시하지 않습니다.",
+    issuerScopeComparison: "이전 직접 공시와 지분율 계산 기준이 같다고 확인되지 않아 증감은 표시하지 않습니다.",
     issuerScopeHistory: "주주명부에서 확인한 지분 기록",
     issuerScopeHistoryNote: "각 날짜의 발행주식수를 기준으로 확인했습니다. 주식 종류와 직접 공시의 비교 기준은 확인 중입니다.",
     issuerScopeCitedAgain: "같은 날짜 기록을 나중 공시에서 다시 확인",
@@ -150,6 +151,7 @@ const STR = {
     verifiedObservationTitle: "다른 회사 공시에서 확인한 지분",
     verifiedObservationApplied: "현재 지분율에 반영",
     rowVerifiedValue: "기준일과 지분율 확인",
+    rowScopedValue: "국민연금 본인·발행주식수 기준 · 직접 공시와 증감 비교 보류",
     verifiedObservationPending: "현재 지분율과 비교할 정보가 부족합니다",
     verifiedObservationConflict: "같은 날짜의 공시 수치가 달라 현재값에 넣지 않았습니다",
     detailReceipt: "접수일·접수번호",
@@ -303,7 +305,7 @@ const STR = {
     directBaseline: "Compared direct filing",
     issuerScopeSource: "Ownership confirmed in another company's filing · share class under review",
     issuerScopeDetail: "Shares confirmed against all issued shares",
-    issuerScopeComparison: "The earlier direct filing uses an unconfirmed percentage basis, so no change is shown.",
+    issuerScopeComparison: "The earlier direct filing has no confirmed matching percentage basis, so no change is shown.",
     issuerScopeHistory: "Ownership recorded in shareholder registers",
     issuerScopeHistoryNote: "Each percentage uses the issued-share count for its own date. Share class and comparison with direct filings remain under review.",
     issuerScopeCitedAgain: "The same dated record was cited again in a later filing",
@@ -312,6 +314,7 @@ const STR = {
     verifiedObservationTitle: "Ownership found in another company's filing",
     verifiedObservationApplied: "Applied to current ownership",
     rowVerifiedValue: "Holding date and percentage checked",
+    rowScopedValue: "NPS-held shares / all issued shares · change from direct filing unverified",
     verifiedObservationPending: "Not enough information to compare with the current percentage",
     verifiedObservationConflict: "Filings for the same date disagree, so this was not used for the current value",
     detailReceipt: "Receipt date · no.",
@@ -525,7 +528,8 @@ function ReadyView({
   const entityName = lang === "ko" ? snapshot.entity.nameKo : snapshot.entity.nameEn;
   const scope = lang === "ko" ? snapshot.portfolio.scopeKo : snapshot.portfolio.scopeEn;
   const trackingStatusLabel = (holding: Holding) =>
-    indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ? t.eventIndirectReentry :
+    (indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ||
+      (holding.observationStatus === "verified_scoped" && holding.tracking === "active")) ? t.eventIndirectReentry :
       holding.tracking === "active" ? t.statusActiveRecord :
         holding.tracking === "below-5-percent" ? t.statusExit : t.statusUnknownTracking;
   const statusLabel = (s: ReturnType<typeof holdingStatus>) =>
@@ -548,8 +552,8 @@ function ReadyView({
           {snapshot.valuationTradeDate ? ` · ${snapshot.valuationTradeDate}` : ""}
         </span>
         <span>
-          {t.checkedAt}: {snapshot.filingsCheckedAt ?? "—"} · {t.generatedAt}: {snapshot.generatedAt} · {t.publishedAt}:{" "}
-          {snapshot.publishedAt ?? t.publishTimeUnknown}
+          {t.checkedAt}: {formatKstTimestamp(snapshot.filingsCheckedAt, lang) ?? "—"} · {t.generatedAt}: {formatKstTimestamp(snapshot.generatedAt, lang)} · {t.publishedAt}:{" "}
+          {formatKstTimestamp(snapshot.publishedAt, lang) ?? t.publishTimeUnknown}
         </span>
         <span className={stale ? "foliotrace-badge-warn" : "foliotrace-badge-ok"}>{stale ? t.staleBadge : t.freshBadge}</span>
         <span>
@@ -889,7 +893,8 @@ function ReadyView({
                           </small>
                           {h.observationStatus && (
                             <small className="foliotrace-row-reason">
-                              {h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict : t.rowVerifiedValue}
+                              {h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict :
+                                h.observationStatus === "verified_scoped" ? t.rowScopedValue : t.rowVerifiedValue}
                             </small>
                           )}
                           {h.issuerScopeConflict && (
@@ -913,7 +918,7 @@ function ReadyView({
                         </td>
                         <td className="foliotrace-num">{h.estimatedValue === null ? "—" : formatKrw(h.estimatedValue, lang)}</td>
                         <td className="foliotrace-num">{formatPct(h.portfolioWeightPercent)}</td>
-                        <td>{h.receiptDate}</td>
+                        <td className="foliotrace-receipt-date">{h.receiptDate}</td>
                         <td>{trackingStatusLabel(h)}<small className="foliotrace-row-reason">{statusLabel(holdingStatus(h))}</small></td>
                         <td>
                           <button type="button" className="foliotrace-retry" onClick={() => setSelectedCode(h.stockCode)}>
@@ -939,8 +944,8 @@ function ReadyView({
             {snapshot.valuationTradeDate ? ` · ${snapshot.valuationTradeDate}` : ""} · {t.retry}
           </li>
           <li>
-            {t.checkedAt}: {snapshot.filingsCheckedAt ?? "—"} · {t.generatedAt}: {snapshot.generatedAt} · {t.publishedAt}:{" "}
-            {snapshot.publishedAt ?? t.publishTimeUnknown}
+            {t.checkedAt}: {formatKstTimestamp(snapshot.filingsCheckedAt, lang) ?? "—"} · {t.generatedAt}: {formatKstTimestamp(snapshot.generatedAt, lang)} · {t.publishedAt}:{" "}
+            {formatKstTimestamp(snapshot.publishedAt, lang) ?? t.publishTimeUnknown}
           </li>
         </ul>
       </SectionCard>
@@ -994,6 +999,13 @@ function ReadyView({
                       <> · {t.directBaseline}: <code className="foliotrace-code">{selected.indirectSource.directReceiptNo}</code></>}
                   </dd>
                 </div>
+              )}
+              {selected.observationStatus === "verified_scoped" && selected.directBaseline && (
+                <div><dt>{t.directBaseline}</dt><dd>
+                  {selected.directBaseline.ownershipPercent === null ? "—" : formatPct(selected.directBaseline.ownershipPercent)}
+                  {selected.directBaseline.receiptDate && ` · ${selected.directBaseline.receiptDate}`}
+                  <small className="foliotrace-row-reason">{t.issuerScopeComparison}</small>
+                </dd></div>
               )}
               {selected.issuerScopeSource && (
                 <>

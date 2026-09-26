@@ -8,6 +8,7 @@ import {
   exclusionReasonLabel,
   filterHoldings,
   formatKrw,
+  formatKstTimestamp,
   formatPct,
   formatQty,
   holdingStatus,
@@ -18,6 +19,14 @@ import {
   topHoldings,
 } from "../../src/features/foliotrace/ui/holdings.ts";
 import { getFaqsForPath } from "../../src/i18n/guideData.ts";
+
+test("publication timestamps use the same Seoul instant in both languages", () => {
+  const instant = "2026-09-26T15:30:00Z";
+  assert.match(formatKstTimestamp(instant, "ko") ?? "", /2026.*9.*27.*00:30.*KST/);
+  assert.match(formatKstTimestamp(instant, "en") ?? "", /Sep.*27.*2026.*00:30.*KST/);
+  assert.equal(formatKstTimestamp(null, "ko"), null);
+  assert.equal(formatKstTimestamp("invalid", "en"), null);
+});
 
 function holding(overrides: Partial<Holding> & { stockCode: string }): Holding {
   return {

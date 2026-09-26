@@ -108,7 +108,7 @@ function validHolding(value: unknown): boolean {
     nullable(value.quantity, decimal) && nullable(value.companyOwnershipPercent, decimal) &&
     (value.ownershipNumericKind === undefined || nullable(value.ownershipNumericKind, numericKind)) &&
     (value.observationStatus === undefined || nullable(value.observationStatus,
-      item => item === 'verified' || item === 'same_basis_conflict')) &&
+      item => item === 'verified' || item === 'verified_scoped' || item === 'same_basis_conflict')) &&
     str(value.receiptNo) && RECEIPT.test(value.receiptNo) && isoDate(value.receiptDate) &&
     nullable(value.holdingDate, isoDate) &&
     ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.evidence)) &&

@@ -141,13 +141,14 @@ def extract_dated_share_distribution_claims(xml: str) -> list[dict]:
         denominators = [_number(match.group(1)) for note in notes
                         for match in note_pattern.finditer(note)]
         same_day_issued = [amount for issued_date, amount in issued if issued_date == basis]
-        if (quantity is None or ratio is None or len(set(denominators)) != 1 or
+        if (ratio is None or (quantity is None and cells[1] not in ("*****", "-")) or
+                len(set(denominators)) != 1 or
                 len(same_day_issued) != 1 or denominators[0] != same_day_issued[0] or
                 Decimal(same_day_issued[0]) <= 0):
             continue
         shown = Decimal(ratio)
         scale = Decimal(1).scaleb(shown.as_tuple().exponent)
-        if ((Decimal(quantity) / Decimal(same_day_issued[0]) * 100)
+        if (quantity is not None and (Decimal(quantity) / Decimal(same_day_issued[0]) * 100)
                 .quantize(scale, rounding=ROUND_HALF_UP) != shown):
             continue
         claims.append({"structure": "dated_share_distribution_all_common",
@@ -749,13 +750,13 @@ def register_comparable_source_claim(state: dict, candidate: dict, claim: dict,
     quantity = _number(str(claim.get("quantity") or ""))
     denominator = _number(str(claim.get("denominator_quantity") or ""))
     ratio = _number(str(claim.get("ownership_percent") or ""), maximum=100)
-    if quantity is None or denominator is None or ratio is None or Decimal(denominator) <= 0:
+    if denominator is None or ratio is None or Decimal(denominator) <= 0:
         candidate["current_application_status"] = "comparable_source_math_pending"
         return False
     displayed = Decimal(ratio)
     scale = Decimal(1).scaleb(displayed.as_tuple().exponent)
-    if Decimal(quantity) / Decimal(denominator) * 100 < 0 or (
-            Decimal(quantity) / Decimal(denominator) * 100).quantize(scale, rounding=ROUND_HALF_UP) != displayed:
+    if (quantity is not None and
+            (Decimal(quantity) / Decimal(denominator) * 100).quantize(scale, rounding=ROUND_HALF_UP) != displayed):
         candidate["current_application_status"] = "comparable_source_math_pending"
         return False
     fact = {"kind": "indirect_holding", "source_receipt_no": candidate["receipt_no"],
@@ -774,6 +775,8 @@ def register_comparable_source_claim(state: dict, candidate: dict, claim: dict,
             "source_document_sha256": candidate["source_archive_sha256"],
             "source_section_sha256": claim["row_sha256"],
             "issuer_identity_sha256": claim["issuer_identity_sha256"],
+            "denominator_quantity": denominator,
+            "denominator_date": claim["denominator_date"],
             "verified_at": candidate["source_checked_at"]}
     key = ":".join((fact["source_receipt_no"], fact["source_document_no"] or "-", corp,
                     company["stock_code"], fact["basis_date"], fact["source_row_sha256"]))

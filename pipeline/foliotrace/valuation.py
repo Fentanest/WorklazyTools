@@ -30,6 +30,8 @@ def value_holdings(holdings, quotes, trade_date):
             reason = "filing_after_quote_date"
         elif holding.get("security_kind") not in ("common", "preferred"):
             reason = "security_mapping_unverified"
+        elif holding.get("observation_status") == "verified_scoped":
+            reason = "scope_comparison_unverified"
         elif quantity is None or quantity < 0:
             reason = "quantity_unverified"
         elif quantity == 0:

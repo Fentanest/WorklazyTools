@@ -142,7 +142,8 @@ def register_evidence(state, fact):
                    "numeric_kind", "source_file_sha256", "source_row_sha256", "source_row_offset", "parser_version",
                    "ratio_denominator", "holder_scope", "owner_identity", "basis_kind", "source_status",
                    "source_document_sha256", "source_section_sha256", "issuer_identity_sha256", "verified_at"}
-        if set(fact) != allowed:
+        optional = {"denominator_quantity", "denominator_date"}
+        if not allowed <= set(fact) or not set(fact) <= allowed | optional:
             raise ValueError("EVIDENCE_SHAPE")
         corp, stock = _identity(fact)
         if not CORP.fullmatch(str(fact.get("filer_corp_code") or "")):
@@ -160,6 +161,11 @@ def register_evidence(state, fact):
             raise ValueError("EVIDENCE_NUMERIC_KIND")
         if fact["ownership_percent"] is not None:
             _decimal(fact["ownership_percent"], maximum=100)
+        if ("denominator_quantity" in fact) != ("denominator_date" in fact):
+            raise ValueError("EVIDENCE_RATIO_BASIS")
+        if "denominator_quantity" in fact:
+            if Decimal(_decimal(fact["denominator_quantity"])) <= 0 or _date(fact["denominator_date"]) != basis:
+                raise ValueError("EVIDENCE_RATIO_BASIS")
         if fact["quantity"] is not None:
             if fact["numeric_kind"] != "exact":
                 raise ValueError("EVIDENCE_QUANTITY_BASIS")
@@ -372,10 +378,10 @@ def observation_timeline(state):
 
 
 def reconcile_indirect(state, holdings):
-    """Publish one latest comparable observation without guessing missing dates or bases."""
+    """Publish a dated source value; compare changes only within proven matching units."""
     observations = state.get("indirect_observations") or {}
     invalidated = state.get("indirect_invalidations") or {}
-    source_holds = state.get("indirect_source_holds") or {}
+    source_holds = effective_source_holds(state)
     profiles = state.get("direct_ratio_basis") or {}
     timeline = observation_timeline(state)
     by_key = {item["key"]: item for item in timeline}
@@ -391,6 +397,7 @@ def reconcile_indirect(state, holdings):
             new_corp_units.setdefault(fact["corp_code"], set()).add(_unit(fact))
     reasons = {}
     chosen = {}
+    eligible_by_corp = {}
     chosen_direct = {}
     conflicted = set()
     for corp, current in holdings_by_corp.items():
@@ -428,6 +435,14 @@ def reconcile_indirect(state, holdings):
         latest_selected = next((item for item in latest if item["status"] == "verified"), None)
         resolved = by_key.get(f"indirect:{key}")
         reason = None
+        scoped_only = bool(current and (not current_profile or
+            current_profile["ratio_denominator"] != fact["ratio_denominator"] or
+            current_profile["holder_scope"] != fact["holder_scope"]))
+        strong_scoped = (scoped_only and fact["security_kind"] == "common" and
+            fact["holder_scope"] == "nps_only" and fact["ratio_denominator"] == "issued_shares" and
+            fact["numeric_kind"] == "exact" and fact.get("denominator_quantity") is not None and
+            fact.get("denominator_date") == fact["basis_date"])
+        current_anchor = (current.get("holding_date") or current.get("receipt_date") or "") if current else ""
         if key in invalidated or fact["source_receipt_no"] in source_holds:
             reason = "source_corrected_or_withdrawn"
         elif fact["ownership_percent"] is None:
@@ -440,16 +455,21 @@ def reconcile_indirect(state, holdings):
             reason = "comparison_scope_unverified"
         elif current and current.get("latest_unresolved_receipt"):
             reason = "newer_direct_unresolved"
-        elif current and not current_profile:
-            reason = "ratio_basis_unverified"
-        elif current and (current_profile["ratio_denominator"] != fact["ratio_denominator"] or
-                          current_profile["holder_scope"] != fact["holder_scope"]):
-            reason = "ratio_basis_unverified"
-        elif current and current.get("security_kind") != fact["security_kind"]:
+        elif current and current.get("security_kind") not in (fact["security_kind"], "unknown"):
             reason = "security_kind_unverified"
+        elif scoped_only and not strong_scoped:
+            reason = "ratio_basis_unverified"
+        elif scoped_only and fact["basis_date"] <= current_anchor:
+            reason = "basis_not_newer_than_direct"
         elif any(receipt.get("corp_code") == corp and no not in profiles and
                  no != (current.get("receipt_no") if current else None) and
                  (_direct_date(receipt, {}) or "9999-12-31") >= fact["basis_date"]
+                 for no, receipt in state.get("receipts", {}).items()
+                 if receipt.get("evidence") in ("dart_document", "dart_structured", "legacy_history_fact")):
+            reason = "newer_direct_basis_unverified"
+        elif scoped_only and any(receipt.get("corp_code") == corp and
+                 no != current.get("receipt_no") and
+                 ((profiles.get(no) or {}).get("basis_date") or _direct_date(receipt, {}) or "") >= fact["basis_date"]
                  for no, receipt in state.get("receipts", {}).items()
                  if receipt.get("evidence") in ("dart_document", "dart_structured", "legacy_history_fact")):
             reason = "newer_direct_basis_unverified"
@@ -464,11 +484,26 @@ def reconcile_indirect(state, holdings):
         elif latest_selected is None or latest_selected["key"] != f"indirect:{key}":
             reason = "same_basis_duplicate"
         if reason is None:
-            chosen[corp] = (fact, key, resolved)
+            eligible_by_corp.setdefault(corp, []).append((fact, key, resolved, scoped_only))
         reasons[key] = reason
+    for corp, candidates in eligible_by_corp.items():
+        latest_date = max(fact["basis_date"] for fact, _, _, _ in candidates)
+        latest = [item for item in candidates if item[0]["basis_date"] == latest_date]
+        for fact, key, _, _ in candidates:
+            if fact["basis_date"] < latest_date:
+                reasons[key] = "superseded_by_newer_observation"
+        if len({_unit(fact) for fact, _, _, _ in latest}) > 1:
+            for _, key, _, _ in latest:
+                reasons[key] = "comparison_scope_unverified"
+            continue
+        chosen[corp] = min(latest, key=lambda item: item[1])
+        for _, key, _, _ in latest:
+            if key != chosen[corp][1]:
+                reasons[key] = "same_basis_duplicate"
     for corp in conflicted:
         chosen.pop(corp, None)
-    selected_keys = {key for _, key, _ in chosen.values()}
+    selected_keys = {key for _, key, _, _ in chosen.values()}
+    scoped_keys = {key for _, key, _, scoped in chosen.values() if scoped}
     published = []
     for key, fact in sorted(observations.items()):
         resolved = by_key.get(f"indirect:{key}")
@@ -480,15 +515,15 @@ def reconcile_indirect(state, holdings):
             "documentNo": fact["source_document_no"], "sourceSha256": fact["source_section_sha256"],
             "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={fact['source_receipt_no']}",
             "appliedToHolding": key in selected_keys, "reason": reason,
-            "percentagePointChange": resolved["percentage_point_change"] if resolved else None,
-            "trackingChange": resolved["tracking_change"] if resolved else None})
+            "percentagePointChange": resolved["percentage_point_change"] if resolved and key not in scoped_keys else None,
+            "trackingChange": resolved["tracking_change"] if resolved and key not in scoped_keys else None})
     result = []
     for source in [*holdings, *({"corp_code": corp, "stock_code": fact["stock_code"],
                                 "name": state["universe"][corp].get("name") or "",
                                 "security_kind": fact["security_kind"], "quantity": None,
                                 "receipt_no": fact["source_receipt_no"],
                                 "receipt_date": fact["source_filing_date"]}
-                               for corp, (fact, _, _) in chosen.items() if corp not in holdings_by_corp)]:
+                               for corp, (fact, _, _, _) in chosen.items() if corp not in holdings_by_corp)]:
         row = dict(source)
         corp = row.get("corp_code")
         if corp in conflicted:
@@ -497,14 +532,20 @@ def reconcile_indirect(state, holdings):
                        latest_unresolved_reason="same_basis_observation_conflict",
                        observation_status="same_basis_conflict")
         elif corp in chosen:
-            fact, key, resolved = chosen[corp]
+            fact, key, resolved, scoped_only = chosen[corp]
             old_no = row.get("receipt_no") if corp in holdings_by_corp else None
+            if scoped_only:
+                row["direct_baseline"] = {"receipt_no": old_no, "receipt_date": row.get("receipt_date"),
+                    "holding_date": row.get("holding_date"),
+                    "ownership_percent": row.get("company_ownership_percent"),
+                    "quantity": row.get("quantity")}
             row.update(receipt_no=fact["source_receipt_no"], receipt_date=fact["source_filing_date"],
-                       holding_date=fact["basis_date"], quantity=fact["quantity"],
+                       holding_date=fact["basis_date"], quantity=None if scoped_only else fact["quantity"],
                        company_ownership_percent=fact["ownership_percent"],
                        tracking=_tracking(fact["ownership_percent"], fact["numeric_kind"]),
                        evidence="indirect_observation", corporate_action_status="unverified",
-                       observation_status="verified", ownership_numeric_kind=fact["numeric_kind"],
+                       observation_status="verified_scoped" if scoped_only else "verified",
+                       ownership_numeric_kind=fact["numeric_kind"],
                        indirect_source={"document_no": fact["source_document_no"],
                                         "section_sha256": fact["source_section_sha256"],
                                         "basis_date": fact["basis_date"], "direct_receipt_no": old_no,
@@ -531,9 +572,9 @@ def reconcile_indirect(state, holdings):
         events.append({"observation_key": key, "receipt_no": fact["source_receipt_no"],
                        "receipt_date": fact["source_filing_date"], "basis_date": fact["basis_date"],
                        "corp_code": fact["corp_code"],
-                       "stock_code": fact["stock_code"], "kind": resolved["tracking_change"] or "other",
+                       "stock_code": fact["stock_code"], "kind": (None if key in scoped_keys else resolved["tracking_change"]) or "other",
                        "correction_of": None, "quantity": fact["quantity"],
                        "company_ownership_percent": fact["ownership_percent"],
                        "numeric_kind": fact["numeric_kind"], "source": "indirect_observation",
-                       "percentage_point_change": resolved["percentage_point_change"]})
+                       "percentage_point_change": None if key in scoped_keys else resolved["percentage_point_change"]})
     return result, events, published
