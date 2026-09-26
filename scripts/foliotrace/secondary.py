@@ -1044,7 +1044,13 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
             parsed_terms = []
             projected_pages = 0
             too_large = False
+            budget_exhausted = False
             for term_index, term in enumerate(TERMS):
+                if pages_used >= max_pages:
+                    required_pages = max_pages + 1 if last == cursor else None
+                    parsed_terms = []
+                    budget_exhausted = True
+                    break
                 try:
                     first = parse_search_page(fetch(term, cursor, last, 1), 1, cursor, last)
                 except (ValueError, RuntimeError) as exc:
@@ -1076,6 +1082,8 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 if (first["page_count"] > MAX_SITE_PAGES and parts[0][0] is None) or projected_pages > max_pages:
                     too_large = True
                     break
+            if budget_exhausted:
+                break
             if too_large:
                 if last == cursor:
                     required_pages = max(required_pages or 0, projected_pages)

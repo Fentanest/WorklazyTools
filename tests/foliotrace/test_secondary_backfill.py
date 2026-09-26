@@ -873,6 +873,18 @@ class SecondaryBackfillTests(unittest.TestCase):
                 self.assertEqual(len(calls), 1)
                 self.assertEqual(limited['next_date'], '2006-03-31')
                 self.assertFalse((folio.read_json(path).get('secondary_backfill') or {}).get('coverage'))
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'state.json'
+                folio.write_json(path, folio.empty_state())
+                calls = []
+                def second_term_overflow(term, first, last, page, *, dsp_type=None):
+                    calls.append((term, dsp_type))
+                    return result_page(rows[:10], total=11, pages=2) if term == secondary.TERMS[1] else result_page([])
+                limited = secondary.scan_secondary(path, day, day, max_pages=1,
+                    fetch=second_term_overflow, read_state=folio.read_json,
+                    write_state=folio.write_json)
+                self.assertEqual((limited['status'], len(calls)), ('SEARCH_BUDGET_INSUFFICIENT', 1))
+                self.assertFalse((folio.read_json(path).get('secondary_backfill') or {}).get('coverage'))
 
     def test_partition_checks_later_page_identity_before_advancing(self):
         day = date(2006, 3, 31)
