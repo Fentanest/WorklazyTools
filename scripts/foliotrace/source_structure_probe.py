@@ -20,7 +20,8 @@ RECEIPTS = ("20060124800040", "20081007000289", "20030909000232",
 NPS = re.compile(r"국민연금(?:관리)?공단|National Pension Service", re.I)
 TAG = re.compile(r"<[^>]*>", re.S)
 ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
-CELLS = re.compile(r"<T[DH]\b[^>]*>(.*?)</T[DH]>", re.I | re.S)
+CELLS = re.compile(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", re.I | re.S)
+ACODES = re.compile(r"<T[DEUH]\b[^>]*\bACODE=\"([^\"]+)\"", re.I | re.S)
 DATES = re.compile(r"(?:19|20)\d{2}[.\-/년 ]+\d{1,2}(?:[.\-/월 ]+\d{1,2})?")
 SENSITIVE = re.compile(r"https?://|crtfc_key|token|password|secret|@", re.I)
 
@@ -50,21 +51,31 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
         if decoded is None:
             continue
         rows = []
+        basis_rows = []
         for row in ROWS.finditer(decoded):
-            if NPS.search(row.group(0)):
+            source_row = row.group(0)
+            direct_basis_row = receipt_no in ("20090227000244", "20260908000302") and re.search(
+                r"이번보고서|직전보고서|증\s*감|보고서작성기준일", source_row)
+            if NPS.search(source_row) or direct_basis_row:
                 neighborhood = decoded[max(0, row.start() - 1500):min(len(decoded), row.end() + 300)]
-                rows.append({"cells": [clean(cell, 80) for cell in CELLS.findall(row.group(0))[:12]],
-                             "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
+                item = {"cells": [clean(cell, 80) for cell in CELLS.findall(source_row)[:20]],
+                             "acodes": ACODES.findall(source_row)[:20],
+                             "row_sha256": hashlib.sha256(source_row.encode()).hexdigest(),
                              "near_date_tokens": list(dict.fromkeys(DATES.findall(neighborhood)))[:12],
                              "preceding_context": clean(decoded[max(0, row.start() - 1800):row.start()], 650),
                              "following_context": clean(decoded[row.end():min(len(decoded), row.end() + 300)], 200),
-                             "row_offset": row.start()})
-            if len(rows) >= 12:
+                             "row_offset": row.start()}
+                if NPS.search(source_row) and len(rows) < 12:
+                    rows.append(item)
+                if direct_basis_row and len(basis_rows) < 12:
+                    basis_rows.append(item)
+            if len(rows) >= 12 and len(basis_rows) >= 12:
                 break
         if rows or NPS.search(decoded):
             dates = list(dict.fromkeys(DATES.findall(decoded)))[:20]
             result["files"].append({"xml_sha256": hashlib.sha256(raw).hexdigest(),
                                     "xml_bytes": len(raw), "nps_rows": rows,
+                                    "basis_rows": basis_rows,
                                     "nps_mentions": len(NPS.findall(decoded)),
                                     "date_tokens": [clean(item, 40) for item in dates]})
     result["archive_status"] = "parsed"
