@@ -23,6 +23,7 @@ import zipfile
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 RECEIPT = re.compile(r"^\d{14}$")
 CORP = re.compile(r"^\d{8}$")
@@ -30,6 +31,10 @@ STOCK = re.compile(r"^[0-9A-Z]{6}$")
 NPS = re.compile(r"국민연금|National Pension Service", re.I)
 ALLOWED = ("universe.json", "report-cache.json", "holdings-latest.json", "state.json")
 SOURCE_NOTE = "MyTradingDesk context-service NPS public DART cache"
+
+
+def kst_today(now=None):
+    return (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Seoul")).date()
 
 
 def canonical(obj):
@@ -465,7 +470,7 @@ def main():
     q.add_argument("--commit", action="store_true")
     q = sub.add_parser("collect")
     q.add_argument("--state", type=Path, required=True)
-    q.add_argument("--cutoff", type=date.fromisoformat, default=date.today())
+    q.add_argument("--cutoff", type=date.fromisoformat, default=kst_today())
     sub.add_parser("price-and-value")
     q = sub.add_parser("verify-migration")
     q.add_argument("--export", type=Path, required=True)

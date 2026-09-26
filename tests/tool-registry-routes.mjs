@@ -48,6 +48,7 @@ export const availableToolRoutes = Object.freeze(toolsDeclaration.initializer.el
 // Deliberately independent of the product registry: adding a tool requires an
 // explicit review of this expected list as well as the registry itself.
 export const expectedToolIds = Object.freeze([
+  "foliotrace",
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "pdf-editor", "document-compare", "pdf-compare",
   "hwp-editor", "office-editor", "video-studio", "audio-studio", "image-studio",
   "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator",

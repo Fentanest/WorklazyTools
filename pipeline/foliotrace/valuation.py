@@ -31,10 +31,14 @@ def value_holdings(holdings, quotes, trade_date):
             reason = "security_mapping_unverified"
         elif quantity is None or quantity < 0:
             reason = "quantity_unverified"
+        elif quantity == 0:
+            reason = "zero_quantity"
         elif not quote or quote.get("verified") is not True:
             reason = "quote_unverified"
         elif quote.get("trade_date") != trade_date or quote.get("market") != "KRX" or quote.get("session") != "regular":
             reason = "quote_date_or_session_mismatch"
+        elif quote.get("currency") != "KRW" or quote.get("adjusted") is not False:
+            reason = "quote_basis_unverified"
         else:
             close = decimal(quote.get("close"))
             if close is None or close <= 0:

@@ -4,7 +4,7 @@ import json
 import tempfile
 import unittest
 import zipfile
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,6 +16,9 @@ SPEC.loader.exec_module(folio)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_kst_cutoff_uses_korean_calendar_date_on_utc_runner(self):
+        self.assertEqual(folio.kst_today(datetime(2026, 9, 25, 15, 1, tzinfo=timezone.utc)), date(2026, 9, 26))
+
     def test_document_parser_requires_nps_and_preserves_decimal(self):
         def document(filer):
             xml = f'<ROOT><TE ACODE="RPT_RSP_NM">{filer}</TE><TE ACODE="SUM_TMT_CNT">9,007,199,254,740,993</TE><TE ACODE="SUM_TMT_RT">5.25</TE></ROOT>'

@@ -85,6 +85,7 @@ const DEFAULT_BOTTOM_TARGET_SELECTOR = ".tool-page > :last-child";
 // landing attribute would wait on a DOM that is already gone.
 const OFFICE_EDITOR_SELECTOR = "[data-tool-page='office-editor-app']";
 const readySelectorFor = (route, contentSelector) => contentSelector
+  ?? (route.toolId === "foliotrace" ? ".foliotrace-page" : null)
   ?? (route.toolId === "office-editor" ? OFFICE_EDITOR_SELECTOR : null)
   ?? (migratedToolIds.has(route.toolId) ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR);
 const HWP_ENGLISH_NA_REASON = "The HWP editor is intentionally Korean-only; its English URL redirects to /en/tools and is recorded as a separate redirect scenario.";
@@ -189,6 +190,8 @@ const bottomScenarioFor = (route) => {
     assertSelector: readySelectorFor(route, contentSelector),
     bottomTargetSelector: route.toolId === "office-editor"
       ? `${OFFICE_EDITOR_SELECTOR} > :last-child`
+      : route.toolId === "foliotrace"
+        ? ".foliotrace-page > :last-child"
       : (migrated ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR),
     localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
     ...(redactor ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
@@ -860,6 +863,7 @@ export const visualRegressionScenarios = Object.freeze([
 export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDefinitions).sort());
 
 export const interactionNotApplicableReasons = Object.freeze({
+  "foliotrace": "Its published-data search, sorting, and detail states require a synthetic static dataset; they are reviewed in the isolated FolioTrace preview rather than the generic empty-route visual harness.",
   "document-generator": "Its multi-file DOCX/XLSX generation states use the dedicated synthetic U7 UI harness because the generic visual fixture DSL cannot express the paired template and data inputs.",
   "pdf-compare": "Its paired PDF run, mapping, preview, cancellation, rerun, replacement, and report states use the dedicated synthetic U8 UI harness because the generic visual fixture DSL cannot express two related file inputs and output reopening.",
 });

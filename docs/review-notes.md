@@ -2,6 +2,12 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-26 — FolioTrace 구현 중 판정
+
+- MyTradingDesk의 실제 `data/context-service/nps`를 서비스 변경 없이 읽었다. 허용 파일 129개를 두 번 대조한 source hash는 `6048f7bfdd2a7d677f914ceadd0ce19318a584fa03746e3b00587f29ac22479d`; 정규화 import는 접수번호 1,489개, 중복 참조 401개 병합, metadata 미해결 596개, universe 561개, 보유 근거 285개다. 접수일 관측 범위는 2020-01-06~2026-09-08. `state.last_run_at`과 holdings `as_of_date`는 목록 완전성 증거가 아니므로 과거 coverage는 `unverified`, 재개 기준은 실제 관측 접수일 2026-09-08의 힌트로 둔다. 로컬 전용 `foliotrace-data` seed commit `413c021`은 원격 미반영이다. — Codx
+- Npay 증권 [공식 도움말](https://help.pay.naver.com/faq/content.help?faqId=17106)은 시세 정보가 유료 콘텐츠 계약으로 제공되고 화면 직접 열람 외 재가공·웹페이지 사용 및 제3자 재배포가 금지된다고 명시한다. 따라서 비공식 endpoint의 HTTP 성공 여부로 사용권을 추정하지 않고 네이버 종가 생산 평가·게시를 차단한다. 합성 화면 fixture와 Decimal 계산 검사는 실데이터 가격 실증이 아니다. — Codx
+- DART 증분은 80일 목록 chunk와 기본 7일 겹침을 사용하고 페이지 수·전체 건수를 확인한 chunk만 checkpoint로 저장한다. 이전 chunk가 저장된 뒤 다음 chunk가 실패해도 workflow가 부분 진행 state를 보존하고 배포는 실패한다. 원문·metadata 미해결은 별도 큐에 남기며 최신 보유를 조용히 삭제하지 않는다. DART live key가 로컬에 없어 실수집·정정 관계 검증은 미실행이다. — Codx
+
 ## 2026-09-21
 
 ### 화면 결함·기술 부채 묶음 정리 (Claude 판정)
