@@ -55,6 +55,8 @@ def inspect(receipt_no: str, payload: bytes) -> dict:
                 rows.append({"cells": [clean(cell, 80) for cell in CELLS.findall(row.group(0))[:12]],
                              "row_sha256": hashlib.sha256(row.group(0).encode()).hexdigest(),
                              "near_date_tokens": list(dict.fromkeys(DATES.findall(neighborhood)))[:12],
+                             "preceding_context": clean(decoded[max(0, row.start() - 1800):row.start()], 650),
+                             "following_context": clean(decoded[row.end():min(len(decoded), row.end() + 300)], 200),
                              "row_offset": row.start()})
             if len(rows) >= 12:
                 break
