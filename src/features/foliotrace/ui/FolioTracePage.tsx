@@ -45,6 +45,16 @@ const STR = {
       "DART 대량보유 공시로 추적하는 국민연금 국내주식 공개 포트폴리오 추정치입니다. 국민연금 전체 자산·실제 계좌 잔고·실제 운용 수익률이 아닙니다.",
     scopeNote:
       "현재 범위는 국민연금 국내주식 DART 대량보유 공시 기반 1개 포트폴리오입니다. 미구현 해외·타 기관·인물 포트폴리오는 제공하지 않습니다.",
+    historicalCoverageTitle: "과거 공시 목록 조회",
+    historicalCoverageRange: "검사 완료 접수일 구간",
+    historicalCoverageTarget: "조회 목표일",
+    historicalCoverageComplete: "목록 페이지 검사 완료",
+    historicalCoveragePending: "목록 페이지 검사 진행 중",
+    historicalCoverageScope: "목록 검사는 공시 수량·지분율의 원문 검증 완료를 뜻하지 않습니다.",
+    historicalFirstObserved: "목록에서 확인한 가장 이른 국민연금 접수",
+    historicalFirstTentative: "(조회 진행 중 잠정값)",
+    historicalParsePending: "신규 접수 원문 파싱 미완료",
+    historicalLegacyRecheck: "이관 수치 원문 재확인 미완료",
     priceBasis: "KRX 정규장 종가 기준",
     checkedAt: "공시 확인",
     generatedAt: "데이터 생성",
@@ -112,13 +122,15 @@ const STR = {
     noFilingUrl: "원문 링크 없음",
     unknownDate: "미상(기준일 모름)",
     eventsTitle: "최근 공시 변화",
-    eventsDesc: "실제 접수일 기준 최근 {shown}건 / 추적 기간 전체 {total}건입니다. 회사명은 현재 추적 종목명입니다.",
+    eventsDesc: "접수일 기준 최근 {shown}건 / 전체 {total}건입니다. 수량·지분율은 표시한 출처의 기록값이며 증감은 직전 기록된 공시 수량과 비교한 분류입니다.",
     eventsEmpty: "해당 기간의 공시 변화가 없습니다.",
     eventQuantity: "공시 수량",
     eventOwnership: "공시 지분율",
     eventUnknown: "미확인",
     eventStockCode: "종목코드",
     eventCorpCode: "회사코드",
+    eventDartSource: "DART 확인값",
+    eventLegacySource: "이관 기록 · 원문 수치 재확인 전",
     lastChange: "마지막 변화",
     guideTitle: "방법론·출처·주의사항",
     guideFaqTitle: "자주 묻는 질문",
@@ -150,6 +162,16 @@ const STR = {
       "An estimated public portfolio of NPS domestic equities tracked from DART major-shareholding filings. Not total NPS assets, real account balances, or actual returns.",
     scopeNote:
       "Current scope is one NPS domestic-equity portfolio from DART filings. Unimplemented foreign, other-institution, or person portfolios are not offered.",
+    historicalCoverageTitle: "Historical filing-list search",
+    historicalCoverageRange: "Receipt dates with complete page checks",
+    historicalCoverageTarget: "Target end date",
+    historicalCoverageComplete: "Listing pages checked",
+    historicalCoveragePending: "Listing-page checks in progress",
+    historicalCoverageScope: "A complete listing search does not mean every filed quantity or ownership value has been verified.",
+    historicalFirstObserved: "Earliest NPS receipt observed in checked listings",
+    historicalFirstTentative: "(provisional while searching)",
+    historicalParsePending: "New receipts without parsed source facts",
+    historicalLegacyRecheck: "Migrated values without source recheck",
     priceBasis: "KRX regular-session close basis",
     checkedAt: "Filings checked",
     generatedAt: "Generated",
@@ -217,13 +239,15 @@ const STR = {
     noFilingUrl: "No source link",
     unknownDate: "Unknown (no holding date)",
     eventsTitle: "Recent filing changes",
-    eventsDesc: "Latest {shown} by actual receipt date / {total} across the tracked period. Company names are current tracked names.",
+    eventsDesc: "Latest {shown} by receipt date / {total} overall. Quantities and ownership are recorded source values; change labels compare a previously recorded filing quantity.",
     eventsEmpty: "No filing changes in this period.",
     eventQuantity: "Filed quantity",
     eventOwnership: "Filed ownership",
     eventUnknown: "Unverified",
     eventStockCode: "Stock code",
     eventCorpCode: "Company code",
+    eventDartSource: "DART-verified values",
+    eventLegacySource: "Migrated record · source values pending recheck",
     lastChange: "Last change",
     guideTitle: "Method · sources · cautions",
     guideFaqTitle: "FAQ",
@@ -252,17 +276,17 @@ const STR = {
 
 const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
   ko: {
-    increase: "공시상 보유 증가",
-    decrease: "공시상 보유 감소",
-    "new-report": "신규 보고",
+    increase: "기록 수량 비교상 증가",
+    decrease: "기록 수량 비교상 감소",
+    "new-report": "첫 기록 공시",
     "purpose-change": "목적 변경",
     "tracking-exit": "5% 추적 범위 이탈",
     other: "기타",
   },
   en: {
-    increase: "Filed increase",
-    decrease: "Filed decrease",
-    "new-report": "New report",
+    increase: "Increase vs prior recorded filing",
+    decrease: "Decrease vs prior recorded filing",
+    "new-report": "First recorded filing",
     "purpose-change": "Purpose change",
     "tracking-exit": "Exited 5% tracking scope",
     other: "Other",
@@ -423,6 +447,24 @@ function ReadyView({
 
       <p className="foliotrace-scope-note">{t.scopeNote}</p>
 
+      {snapshot.historicalCoverage && (
+        <div className="foliotrace-history-coverage" role="status">
+          <strong>{t.historicalCoverageTitle}</strong>
+          <span>
+            {t.historicalCoverageRange}: {snapshot.historicalCoverage.searchStartDate} ~ {snapshot.historicalCoverage.listingCompleteThrough}
+            {" · "}{t.historicalCoverageTarget}: {snapshot.historicalCoverage.searchTargetDate}
+            {" · "}{snapshot.historicalCoverage.listingComplete ? t.historicalCoverageComplete : t.historicalCoveragePending}
+          </span>
+          <span>
+            {t.historicalFirstObserved}: {snapshot.historicalCoverage.firstObservedNpsReceiptDate ?? "—"}
+            {!snapshot.historicalCoverage.listingComplete && snapshot.historicalCoverage.firstObservedNpsReceiptDate && ` ${t.historicalFirstTentative}`}
+            {" · "}{t.historicalParsePending}: {snapshot.historicalCoverage.parsingPendingCount}
+            {" · "}{t.historicalLegacyRecheck}: {snapshot.historicalCoverage.legacySourceRecheckCount}
+          </span>
+          <small>{t.historicalCoverageScope}</small>
+        </div>
+      )}
+
       <div className="foliotrace-summary-grid">
         <Card className="foliotrace-summary-card">
           <span className="foliotrace-summary-label">{t.summaryValue}</span>
@@ -518,6 +560,7 @@ function ReadyView({
                     <span>{t.eventOwnership}: <span className="foliotrace-num">{event.companyOwnershipPercent === null ? t.eventUnknown : formatPct(event.companyOwnershipPercent)}</span></span>
                   </div>
                   <div className="foliotrace-event-source">
+                    <span>{event.source === "legacy-import" ? t.eventLegacySource : t.eventDartSource}</span>
                     <code className="foliotrace-code">{event.receiptNo}</code>
                     {event.correctionOf && <small> ← {event.correctionOf}</small>}
                     {event.filingUrl && (

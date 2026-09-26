@@ -23,6 +23,13 @@ const base = {
 
 test('FolioTrace validates nested quote, event, history, and filing links', () => {
   assert.equal(validSnapshot(base, version), true)
+  const historicalCoverage = { searchStartDate: '1999-01-01', searchTargetDate: '2026-09-08',
+    listingCompleteThrough: '2000-01-01', listingComplete: false,
+    firstObservedNpsReceiptDate: '1999-10-01', parsingPendingCount: 2, legacySourceRecheckCount: 3 }
+  assert.equal(validSnapshot({ ...base, historicalCoverage }, version), true)
+  assert.equal(validSnapshot({ ...base, historicalCoverage: { ...historicalCoverage, parsingPendingCount: -1 } }, version), false)
+  assert.equal(validSnapshot({ ...base, historicalCoverage: { ...historicalCoverage, listingComplete: true } }, version), false)
+  assert.equal(validSnapshot({ ...base, historicalCoverage: { ...historicalCoverage, firstObservedNpsReceiptDate: '2026-09-23' } }, version), false)
   assert.equal(validSnapshot({ ...base, holdings: [{ ...base.holdings[0], quote: { ...base.holdings[0].quote, close: {} } }] }, version), false)
   assert.equal(validSnapshot({ ...base, holdings: [{ ...base.holdings[0], filingUrl: 'javascript:alert(1)' }] }, version), false)
   assert.equal(validSnapshot({ ...base, events: [{ ...base.events[0], receiptDate: null }] }, version), false)

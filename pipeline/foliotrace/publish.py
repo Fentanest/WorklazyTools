@@ -71,7 +71,7 @@ def make_snapshot(state, quotes, now=None):
                        "corpCode": event.get("corp_code") or "", "stockCode": event.get("stock_code"),
                        "kind": event.get("kind") or "other", "correctionOf": event.get("correction_of"),
                        "quantity": event.get("quantity"), "companyOwnershipPercent": event.get("company_ownership_percent"),
-                       "source": "legacy-import" if event.get("source") == "legacy_import" else "dart-structured" if event.get("source") == "dart_structured" else "dart-document",
+                       "source": "dart-structured" if event.get("source") == "dart_structured" else "dart-document" if event.get("source") == "dart_document" else "legacy-import",
                        "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={no}" if no else None})
     receipts = [r.get("receipt_date") for r in state["receipts"].values() if r.get("receipt_date")]
     coverage = state.get("listing_coverage") or []
@@ -99,6 +99,26 @@ def make_snapshot(state, quotes, now=None):
                 "holdings": rows, "events": events,
                 "history": [{"tradeDate": item["trade_date"], "estimatedValue": item["estimated_value"],
                              "datasetVersion": item["dataset_version"]} for item in history]}
+    historical = state.get("historical_backfill")
+    if historical and historical.get("coverage"):
+        completed_through = historical["coverage"][-1]["to"]
+        listed = [receipt.get("listing_receipt_date") for receipt in state["receipts"].values()
+                  if receipt.get("listing_verified_at") and receipt.get("listing_receipt_date")
+                  and historical["start_date"] <= receipt["listing_receipt_date"] <= completed_through]
+        pending = [receipt for no, receipt in state["receipts"].items()
+                   if receipt.get("historical_backfill_only") and no in state["unresolved"]
+                   and receipt.get("evidence") in ("unresolved", "legacy_json_parser_result", "legacy_reference_only")]
+        current_nos = {holding.get("receipt_no") for holding in state["holdings"].values()}
+        legacy_recheck = sum(receipt.get("origin") == "legacy_import" and no not in current_nos and
+                             bool(receipt.get("listing_verified_at")) and
+                             receipt.get("evidence") not in ("dart_structured", "dart_document")
+                             for no, receipt in state["receipts"].items())
+        snapshot["historicalCoverage"] = {
+            "searchStartDate": historical["start_date"], "searchTargetDate": historical["target_date"],
+            "listingCompleteThrough": completed_through,
+            "listingComplete": completed_through >= historical["target_date"],
+            "firstObservedNpsReceiptDate": min(listed) if listed else None,
+            "parsingPendingCount": len(pending), "legacySourceRecheckCount": legacy_recheck}
     snapshot["datasetVersion"] = digest({k: v for k, v in snapshot.items() if k != "datasetVersion"})
     for item in snapshot["history"]:
         if item["datasetVersion"] == "":

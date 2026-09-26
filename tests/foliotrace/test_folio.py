@@ -217,7 +217,7 @@ class MigrationTests(unittest.TestCase):
             def fake_dart(endpoint, params, key):
                 calls.append(params.copy())
                 if params["page_no"] == 1:
-                    return {"status": "000", "page_no": "1", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000001", "corp_code": "00104856", "stock_code": "005930", "rcept_dt": "20260909", "flr_nm": "국민연금공단", "corp_name": "Test"}] + [{"rcept_no": f"20260909{i:06d}", "flr_nm": "Other"} for i in range(2, 101)]}
+                    return {"status": "000", "page_no": "1", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000001", "corp_code": "00104856", "stock_code": "005930", "rcept_dt": "20260909", "flr_nm": "국민연금공단", "report_nm": "주식등의대량보유상황보고서", "corp_name": "Test"}] + [{"rcept_no": f"20260909{i:06d}", "flr_nm": "Other"} for i in range(2, 101)]}
                 return {"status": "000", "page_no": "2", "total_page": "2", "total_count": "101", "list": [{"rcept_no": "20260909000101", "flr_nm": "Other"}]}
 
             with patch.object(folio, "dart_json", side_effect=fake_dart), patch.object(folio, "resolve_unfinished", return_value=0), \

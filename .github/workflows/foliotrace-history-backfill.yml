@@ -1,0 +1,110 @@
+name: Backfill FolioTrace filing history
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # 03:00 Asia/Seoul; resumes only a previously initialized range.
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: Earliest verified DART D001 search date (YYYY-MM-DD)
+        required: true
+        type: string
+      end_date:
+        description: Last historical search date, at or before the incremental checkpoint
+        required: true
+        type: string
+      max_listing_pages:
+        description: Maximum DART listing pages per run
+        required: true
+        default: '120'
+        type: string
+      max_windows:
+        description: Maximum complete 80-day windows per run
+        required: true
+        default: '20'
+        type: string
+      parse_limit:
+        description: Maximum newly found receipts to parse per run
+        required: true
+        default: '30'
+        type: string
+      recheck_limit:
+        description: Maximum listed migrated historical receipts to verify per run
+        required: true
+        default: '10'
+        type: string
+      validate_only:
+        description: Exercise the collector without writing the data branch
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    if: github.ref == 'refs/heads/main' || inputs.validate_only
+    permissions:
+      contents: write
+    runs-on: [self-hosted, Linux, X64, '235']
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Checkout normalized FolioTrace state
+        uses: actions/checkout@v4
+        with:
+          ref: foliotrace-data
+          path: foliotrace-state
+          fetch-depth: 0
+
+      - name: Verify source revision and source state
+        if: ${{ !inputs.validate_only }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          test -f foliotrace-state/state.json
+
+      - name: Backfill bounded DART listing and receipts
+        id: collect
+        continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          MAX_LISTING_PAGES: ${{ inputs.max_listing_pages }}
+          MAX_WINDOWS: ${{ inputs.max_windows }}
+          PARSE_LIMIT: ${{ inputs.parse_limit }}
+          RECHECK_LIMIT: ${{ inputs.recheck_limit }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ]; then
+            python3 scripts/foliotrace/folio.py backfill-history \
+              --state foliotrace-state/state.json --resume \
+              --max-listing-pages 250 --max-windows 40 --parse-limit 60 --recheck-limit 10
+          else
+            python3 scripts/foliotrace/folio.py backfill-history \
+              --state foliotrace-state/state.json \
+              --start "$START_DATE" --end "$END_DATE" \
+              --max-listing-pages "$MAX_LISTING_PAGES" \
+              --max-windows "$MAX_WINDOWS" --parse-limit "$PARSE_LIMIT" --recheck-limit "$RECHECK_LIMIT"
+          fi
+
+      - name: Preserve completed historical windows
+        if: ${{ always() && !inputs.validate_only && steps.collect.outcome != 'skipped' }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          expected_data=$(git -C foliotrace-state rev-parse HEAD)
+          test "$(git ls-remote origin refs/heads/foliotrace-data | cut -f1)" = "$expected_data"
+          git -C foliotrace-state config user.name 'github-actions[bot]'
+          git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C foliotrace-state add state.json
+          if ! git -C foliotrace-state diff --cached --quiet; then
+            git -C foliotrace-state commit -m 'data: advance FolioTrace historical listing cursor'
+            git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
+          fi
+
+      - name: Require successful historical request batch
+        if: ${{ steps.collect.outcome != 'success' }}
+        run: exit 1

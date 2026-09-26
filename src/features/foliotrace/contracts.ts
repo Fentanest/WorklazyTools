@@ -84,6 +84,15 @@ export interface Snapshot {
   estimatedValue: DecimalString | null
   valuationCoverage: 'complete' | 'partial' | 'unavailable'
   filingCoverage: 'complete' | 'partial' | 'unverified'
+  historicalCoverage?: {
+    searchStartDate: IsoDate
+    searchTargetDate: IsoDate
+    listingCompleteThrough: IsoDate
+    listingComplete: boolean
+    firstObservedNpsReceiptDate: IsoDate | null
+    parsingPendingCount: number
+    legacySourceRecheckCount: number
+  }
   holdings: Holding[]
   events: FilingEvent[]
   history: Array<{ tradeDate: IsoDate; estimatedValue: DecimalString; datasetVersion: string }>

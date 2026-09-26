@@ -33,13 +33,24 @@ from pipeline.foliotrace.publish import make_snapshot, encoded
 RECEIPT = re.compile(r"^\d{14}$")
 CORP = re.compile(r"^\d{8}$")
 STOCK = re.compile(r"^[0-9A-Z]{6}$")
-NPS = re.compile(r"국민연금|National Pension Service", re.I)
+NPS_FILER = re.compile(r"^(?:국민연금공단|국민연금관리공단|National Pension Service)(?=$|[\s(（])", re.I)
+NPS_TABLE = re.compile(r"국민연금|National Pension Service", re.I)
 ALLOWED = ("universe.json", "report-cache.json", "holdings-latest.json", "state.json")
 SOURCE_NOTE = "MyTradingDesk context-service NPS public DART cache"
 MAPPING_METHOD = "dart-voting-krx-kind-v1"
 ACTION_METHOD = "krx-listed-share-exact-v2"
+HISTORICAL_PARSE_ATTEMPTS = 5
 CORRECTION_PREFIXES = ("[기재정정]", "[첨부정정]", "[첨부추가]", "[정정]",
                        "[정정명령부과]", "[정정제출요구]", "[변경등록]", "정정")
+
+
+def nps_filer(value):
+    return bool(NPS_FILER.match(str(value or "").strip()))
+
+
+def nps_large_holding_listing(row):
+    report = re.sub(r"\s+", "", str(row.get("report_nm") or ""))
+    return nps_filer(row.get("flr_nm")) and "주식등의대량보유" in report
 
 
 def kst_today(now=None):
@@ -163,6 +174,7 @@ def empty_state():
     return {"schema": 1, "revision": 0, "import_ledger": [], "universe": {}, "receipts": {},
             "holdings": {}, "events": {}, "unresolved": {}, "metadata_recovery": {}, "mapping_ledger": {}, "quote_cache": {},
             "listing_coverage": [], "latest_complete_listing_date": None,
+            "historical_backfill": None,
             "legacy_coverage_status": "unverified", "legacy_resume_hint": None,
             "last_published_dataset": None, "published_history": []}
 
@@ -238,7 +250,7 @@ def normalize_seed(root: Path):
     for no, raw in cache_raw.items():
         if not RECEIPT.fullmatch(no) or not isinstance(raw, dict):
             continue
-        if not NPS.search(str(raw.get("filer") or "")):
+        if not nps_filer(raw.get("filer")):
             continue
         meta = metadata.get(no, {})
         receipts[no] = {"receipt_no": no, "receipt_date": meta.get("receipt_date"),
@@ -436,7 +448,8 @@ def verified_voting_share_quantity(xml: str, expected):
         headers = "".join("".join(row) for row in table[:3])
         if "보유주식등의내역" not in headers or "의결권있는주식" not in headers or "주수" not in headers:
             continue
-        nps_rows = [row for row in table if len(row) >= 14 and any(NPS.search(cell) for cell in row[:3])]
+        nps_rows = [row for row in table if len(row) >= 14 and
+                    any(NPS_TABLE.search(cell) for cell in row[:3])]
         if not nps_rows:
             continue
         voting = Decimal(0)
@@ -543,7 +556,7 @@ def parse_filing_document(payload: bytes):
         if not found: return None
         return html.unescape(re.sub(r"<[^>]+>", " ", found.group(1))).strip()
     filer = cell("ACODE", "RPT_RSP_NM")
-    if not filer or not NPS.search(filer):
+    if not nps_filer(filer):
         raise ValueError("DART filer mismatch")
     quantity = dec(cell("ACODE", "SUM_TMT_CNT"))
     ownership = dec((cell("ACODE", "SUM_TMT_RT") or "").replace("%", ""))
@@ -578,7 +591,7 @@ def structured_receipt(no, corp, key, cache):
         cache[corp] = dart_json("majorstock.json", {"corp_code": corp}, key)
     rows = cache[corp].get("list") or []
     for row in rows:
-        if str(row.get("rcept_no") or "") != no or not NPS.search(str(row.get("repror") or "")):
+        if str(row.get("rcept_no") or "") != no or not nps_filer(row.get("repror")):
             continue
         quantity = dec(row.get("stkqy"))
         ownership = dec(row.get("stkrt"))
@@ -589,20 +602,26 @@ def structured_receipt(no, corp, key, cache):
     return None
 
 
-def apply_listing_row(state, row):
+def apply_listing_row(state, row, *, historical=False):
     """Retain correction/withdrawal flags without inventing a predecessor link.
 
     OpenDART list guide documents rm=정 (later correction exists) and rm=철
     (withdrawn): https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001
     """
-    if not NPS.search(str(row.get("flr_nm") or "")):
+    if not nps_large_holding_listing(row):
         return False
     no, corp = str(row.get("rcept_no") or ""), str(row.get("corp_code") or "")
     if not RECEIPT.fullmatch(no) or not CORP.fullmatch(corp):
         raise RuntimeError("DART NPS row lacks identity")
+    listed_date = norm_date(row.get("rcept_dt"))
+    if listed_date is None or listed_date != norm_date(no[:8]):
+        raise RuntimeError("DART NPS listing date inconsistent")
     existing = state["receipts"].get(no)
+    newly_discovered = existing is None
     if existing and existing.get("corp_code") and existing["corp_code"] != corp:
         raise RuntimeError("DART receipt corp conflict")
+    if existing and existing.get("receipt_date") and existing["receipt_date"] != listed_date:
+        state["unresolved"][no] = "receipt_date_conflict"
     report_name = safe_str(row.get("report_nm"))
     remarks = safe_str(row.get("rm"), limit=30)
     correction = report_name.startswith(CORRECTION_PREFIXES)
@@ -617,30 +636,45 @@ def apply_listing_row(state, row):
         state["universe"][corp] = {"name": safe_str(row.get("corp_name")), "stock_code": listed_code}
     stock_code = listed_code or prior_code
     if not existing:
-        existing = {"receipt_no": no, "receipt_date": norm_date(row.get("rcept_dt")),
+        existing = {"receipt_no": no, "receipt_date": listed_date,
                     "corp_code": corp, "stock_code": stock_code,
                     "name": safe_str(row.get("corp_name")), "quantity": None, "company_ownership_percent": None,
                     "origin": "dart_listing", "evidence": "unresolved", "security_kind": "unknown", "reason": ""}
         state["receipts"][no] = existing
         state["unresolved"][no] = "parsed_identity_ready" if existing.get("evidence") in ("dart_document", "dart_structured") and existing.get("quantity") is not None else "needs_filing_parse"
         old = state["holdings"].get(corp)
-        if old and no > old.get("receipt_no", ""):
+        if not historical and old and no > old.get("receipt_no", ""):
             old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
     elif not existing.get("corp_code") or not existing.get("stock_code"):
         identity_recovered = bool(corp and stock_code and not (existing.get("corp_code") and existing.get("stock_code")))
         existing["corp_code"] = corp
         existing["stock_code"] = stock_code
-        existing["receipt_date"] = norm_date(row.get("rcept_dt"))
+        existing["receipt_date"] = listed_date
         existing["metadata_evidence"] = "dart_listing"
         if identity_recovered:
             existing["parse_attempt_count"] = 0
         state["unresolved"][no] = "parsed_identity_ready" if existing.get("evidence") in ("dart_document", "dart_structured") and existing.get("quantity") is not None else "needs_filing_parse"
     existing.update(report_name=report_name, remarks=remarks, is_correction=correction,
-                    correction_of=None, later_correction_flag=superseded, withdrawn_flag=withdrawn)
+                    correction_of=None, later_correction_flag=superseded, withdrawn_flag=withdrawn,
+                    listing_receipt_date=listed_date)
+    if not existing.get("receipt_date"):
+        existing["receipt_date"] = listed_date
+    if historical:
+        # Listing identity is verified separately from the filing's quantities.
+        existing.setdefault("listing_verified_at", datetime.now(timezone.utc).isoformat())
+        if newly_discovered:
+            existing["historical_backfill_only"] = True
+    elif existing.pop("historical_backfill_only", False):
+        # A receipt seen again in the live overlap is eligible for current-state
+        # reconciliation; its earlier historical scan alone was not enough.
+        if existing.get("evidence") in ("dart_document", "dart_structured") and existing.get("quantity") is not None:
+            state["unresolved"][no] = "parsed_identity_ready"
     if correction or superseded or withdrawn:
         state["unresolved"][no] = "correction_relation_unverified" if correction or superseded else "withdrawal_unverified"
     if listed_code and prior_code and listed_code != prior_code:
         state["unresolved"][no] = "security_identity_conflict"
+    if existing.get("receipt_date") != listed_date:
+        state["unresolved"][no] = "receipt_date_conflict"
     return existing.get("origin") == "dart_listing" and existing.get("evidence") == "unresolved"
 
 
@@ -675,13 +709,15 @@ def validate_listing_pages(pages):
     return total
 
 
-def resolve_unfinished(state, key, limit=30, state_path=None):
+def resolve_unfinished(state, key, limit=30, state_path=None, candidates=None, promote_holdings=True):
     processed = 0
     structured_cache = {}
     for no in sorted(state["unresolved"], key=lambda number: (
             int(state["receipts"].get(number, {}).get("parse_attempt_count") or 0), -int(number))):
         if processed >= limit:
             break
+        if candidates is not None and no not in candidates:
+            continue
         receipt = state["receipts"].get(no)
         if not receipt or (receipt.get("evidence") not in ("unresolved", "legacy_json_parser_result", "legacy_reference_only")
                            and not (state["unresolved"].get(no) in ("security_identity_missing", "parsed_identity_ready")
@@ -693,6 +729,7 @@ def resolve_unfinished(state, key, limit=30, state_path=None):
             continue
         processed += 1
         receipt["parse_attempt_count"] = int(receipt.get("parse_attempt_count") or 0) + 1
+        receipt["last_parse_attempt_on"] = kst_today().isoformat()
         try:
             corp = receipt.get("corp_code")
             if state["unresolved"].get(no) in ("security_identity_missing", "parsed_identity_ready") and corp and receipt.get("stock_code") and receipt.get("evidence") in ("dart_document", "dart_structured"):
@@ -721,9 +758,10 @@ def resolve_unfinished(state, key, limit=30, state_path=None):
                 "company_ownership_percent": parsed["company_ownership_percent"],
                 "source": parsed["evidence"]}
             flagged_relation = receipt.get("is_correction") or receipt.get("later_correction_flag") or receipt.get("withdrawn_flag")
-            if old and flagged_relation and no > old.get("receipt_no", ""):
+            if promote_holdings and old and flagged_relation and no > old.get("receipt_no", ""):
                 old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
-            if not flagged_relation and (not old or no >= old.get("receipt_no", "")):
+            if (promote_holdings and not receipt.get("historical_backfill_only") and not flagged_relation
+                    and (not old or no >= old.get("receipt_no", ""))):
                 state["holdings"][corp] = {"corp_code": corp, "stock_code": stock,
                     "name": receipt.get("name") or state["universe"].get(corp, {}).get("name") or "",
                     "receipt_no": no, "receipt_date": receipt["receipt_date"],
@@ -775,6 +813,59 @@ def classify_events(state):
                 event["kind"] = kind
             if not flagged and quantity is not None and ownership is not None:
                 previous = receipt
+
+
+def recheck_legacy_history(state, key, limit=10, state_path=None):
+    """Gradually verify listed historical receipts while retaining imported facts."""
+    current_nos = {holding.get("receipt_no") for holding in state["holdings"].values()}
+    today = kst_today().isoformat()
+    candidates = [receipt for no, receipt in sorted(state["receipts"].items())
+                  if receipt.get("origin") == "legacy_import" and receipt.get("listing_verified_at")
+                  and receipt.get("corp_code") and receipt.get("stock_code") and no not in current_nos
+                  and receipt.get("evidence") not in ("dart_structured", "dart_document")
+                  and int(receipt.get("source_recheck_attempts") or 0) < HISTORICAL_PARSE_ATTEMPTS
+                  and receipt.get("source_recheck_last_on") != today
+                  and state["unresolved"].get(no) not in ("security_identity_conflict", "receipt_date_conflict")
+                  and state["universe"].get(receipt["corp_code"], {}).get("stock_code") == receipt["stock_code"]]
+    checked = verified = 0
+    structured_cache = {}
+    for receipt in candidates[:limit]:
+        no = receipt["receipt_no"]
+        receipt["source_recheck_attempts"] = int(receipt.get("source_recheck_attempts") or 0) + 1
+        receipt["source_recheck_last_on"] = today
+        checked += 1
+        try:
+            try:
+                parsed = structured_receipt(no, receipt["corp_code"], key, structured_cache)
+            except RuntimeError:
+                parsed = None
+            if parsed is None:
+                parsed = dart_document(no, key)
+                parsed["evidence"] = "dart_document"
+        except (RuntimeError, ValueError, zipfile.BadZipFile) as exc:
+            receipt["source_recheck_error"] = type(exc).__name__
+            continue
+        receipt.setdefault("legacy_fact", {"quantity": receipt.get("quantity"),
+                                           "company_ownership_percent": receipt.get("company_ownership_percent"),
+                                           "evidence": receipt.get("evidence")})
+        receipt.update(parsed)
+        receipt.pop("source_recheck_error", None)
+        state["events"][no] = {"receipt_no": no, "receipt_date": receipt.get("receipt_date"),
+            "corp_code": receipt["corp_code"], "stock_code": receipt["stock_code"], "kind": "other",
+            "correction_of": receipt.get("correction_of"), "quantity": parsed["quantity"],
+            "company_ownership_percent": parsed["company_ownership_percent"], "source": parsed["evidence"]}
+        flagged = any(receipt.get(field) for field in ("is_correction", "later_correction_flag", "withdrawn_flag"))
+        if flagged:
+            state["unresolved"][no] = "withdrawal_unverified" if receipt.get("withdrawn_flag") else "correction_relation_unverified"
+        else:
+            state["unresolved"].pop(no, None)
+        verified += 1
+    if checked:
+        classify_events(state)
+        if state_path:
+            state["revision"] += 1
+            write_json(state_path, state)
+    return {"checked": checked, "verified": verified}
 
 
 def reconcile_security(state, key, limit=300, pause=time.sleep, state_path=None, master=None, master_hash=None):
@@ -936,7 +1027,7 @@ def recover_metadata(state, key, *, limit_days=100, state_path=None):
     checked = found = 0
     for day, targets in sorted(pending.items(), reverse=True)[:limit_days]:
         params = {"bgn_de": day.replace("-", ""), "end_de": day.replace("-", ""),
-                  "pblntf_detail_ty": "D001", "page_count": 100}
+                  "pblntf_ty": "D", "pblntf_detail_ty": "D001", "page_count": 100}
         first = dart_json("list.json", {**params, "page_no": 1}, key)
         if first.get("status") not in ("000", "013"):
             raise RuntimeError("DART metadata listing failed")
@@ -945,7 +1036,7 @@ def recover_metadata(state, key, *, limit_days=100, state_path=None):
         validate_listing_pages(pages)
         for page in pages:
             for row in page.get("list") or []:
-                if str(row.get("rcept_no")) in targets and NPS.search(str(row.get("flr_nm") or "")):
+                if str(row.get("rcept_no")) in targets and nps_large_holding_listing(row):
                     apply_listing_row(state, row)
                     found += 1
         ledger[day] = {"checked_on": today.isoformat(), "target_count": len(targets),
@@ -959,6 +1050,121 @@ def recover_metadata(state, key, *, limit_days=100, state_path=None):
         state["revision"] += 1
         write_json(state_path, state)
     return {"dates_checked": checked, "references_matched": found}
+
+
+def backfill_history(state_path: Path, start: date, end: date, key: str, *,
+                     max_listing_pages=120, max_windows=20, parse_limit=30, recheck_limit=10):
+    """Scan old D001 listings forward, committing only fully verified windows.
+
+    The historical cursor never advances the incremental cursor. Old receipt
+    facts can enrich events but cannot promote a partial archive into today's
+    holdings. The caller persists each completed window even if a later one fails.
+    """
+    if not key:
+        raise ValueError("DART_API_KEY unavailable")
+    if (start > end or end > kst_today() or max_listing_pages < 1 or max_windows < 1
+            or not 0 <= parse_limit <= 300 or not 0 <= recheck_limit <= 100):
+        raise ValueError("invalid historical backfill bounds")
+    state = read_json(state_path)
+    if not state.get("import_ledger") or not state.get("latest_complete_listing_date"):
+        raise ValueError("incremental collection must be initialized")
+    if end > date.fromisoformat(state["latest_complete_listing_date"]):
+        raise ValueError("historical end exceeds current complete listing date")
+    ledger = state.get("historical_backfill")
+    if ledger is None:
+        ledger = {"start_date": start.isoformat(), "target_date": end.isoformat(),
+                  "next_date": start.isoformat(), "coverage": []}
+        state["historical_backfill"] = ledger
+    elif ledger.get("start_date") != start.isoformat() or end < date.fromisoformat(ledger["target_date"]):
+        raise ValueError("historical backfill range conflicts with persisted cursor")
+    else:
+        ledger["target_date"] = end.isoformat()
+    cursor = date.fromisoformat(ledger["next_date"])
+    if cursor < start or cursor > end + timedelta(days=1):
+        raise ValueError("historical backfill cursor inconsistent")
+
+    requests = windows = new_receipts = listed_nps = 0
+    while cursor <= end and windows < max_windows and requests < max_listing_pages:
+        last = min(cursor + timedelta(days=79), end)
+        params = {"bgn_de": cursor.strftime("%Y%m%d"), "end_de": last.strftime("%Y%m%d"),
+                  "pblntf_ty": "D", "pblntf_detail_ty": "D001", "last_reprt_at": "N",
+                  "page_count": 100}
+        first = dart_json("list.json", {**params, "page_no": 1}, key)
+        requests += 1
+        if first.get("status") == "013":
+            pages = [first]
+        else:
+            try:
+                page_count = int(first["total_page"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise RuntimeError("DART historical pagination metadata inconsistent") from exc
+            if page_count < 1 or page_count > 10_000:
+                raise RuntimeError("DART historical pagination metadata inconsistent")
+            if requests + page_count - 1 > max_listing_pages:
+                break  # The next invocation retries this uncommitted window.
+            pages = [first]
+            for number in range(2, page_count + 1):
+                pages.append(dart_json("list.json", {**params, "page_no": number}, key))
+                requests += 1
+        validate_listing_pages(pages)
+        window_nps = 0
+        for page in pages:
+            for row in page.get("list") or []:
+                if not nps_large_holding_listing(row):
+                    continue
+                no = str(row.get("rcept_no") or "")
+                if no not in state["receipts"]:
+                    new_receipts += 1
+                apply_listing_row(state, row, historical=True)
+                window_nps += 1
+        listed_nps += window_nps
+        ledger["coverage"].append({"from": cursor.isoformat(), "to": last.isoformat(),
+                                   "checked_at": datetime.now(timezone.utc).isoformat(),
+                                   "pages": len(pages), "nps_receipts": window_nps, "complete": True})
+        cursor = last + timedelta(days=1)
+        ledger["next_date"] = cursor.isoformat()
+        state["revision"] += 1
+        write_json(state_path, state)
+        windows += 1
+
+    historical_pending = {no for no in state["unresolved"]
+                          if state["receipts"].get(no, {}).get("historical_backfill_only")
+                          and state["receipts"][no].get("origin") == "dart_listing"
+                          and state["receipts"][no].get("evidence") in
+                          ("unresolved", "legacy_json_parser_result", "legacy_reference_only")}
+    parse_candidates = {no for no in historical_pending
+                        if int(state["receipts"][no].get("parse_attempt_count") or 0) < HISTORICAL_PARSE_ATTEMPTS
+                        and state["receipts"][no].get("last_parse_attempt_on") != kst_today().isoformat()}
+    parsed = (resolve_unfinished(state, key, limit=parse_limit, state_path=state_path,
+                                 candidates=parse_candidates, promote_holdings=False)
+              if parse_limit else 0)
+    rechecked = recheck_legacy_history(state, key, limit=recheck_limit, state_path=state_path) if recheck_limit else {"checked": 0, "verified": 0}
+    pending = sum(no in state["unresolved"] and int(state["receipts"][no].get("parse_attempt_count") or 0)
+                  < HISTORICAL_PARSE_ATTEMPTS for no in historical_pending)
+    exhausted = sum(no in state["unresolved"] and int(state["receipts"][no].get("parse_attempt_count") or 0)
+                    >= HISTORICAL_PARSE_ATTEMPTS for no in historical_pending)
+    complete = cursor > end
+    return {"status": "LISTING_COMPLETE_PARSING_PENDING" if complete and pending else
+            "LISTING_COMPLETE_WITH_UNVERIFIED" if complete and exhausted else
+            "LISTING_COMPLETE" if complete else "LISTING_IN_PROGRESS",
+            "start_date": start.isoformat(), "target_date": end.isoformat(),
+            "next_date": ledger["next_date"], "completed_windows": len(ledger["coverage"]),
+            "windows_this_run": windows, "listing_requests": requests,
+            "nps_rows_this_run": listed_nps, "new_receipts_this_run": new_receipts,
+            "parse_attempts": parsed, "new_receipts_pending": pending,
+            "parse_attempts_exhausted": exhausted,
+            "legacy_rechecked": rechecked["checked"], "legacy_verified": rechecked["verified"],
+            "state_revision": state["revision"]}
+
+
+def resume_history(state_path: Path, key: str, *, max_listing_pages=120, max_windows=20, parse_limit=30, recheck_limit=10):
+    ledger = read_json(state_path).get("historical_backfill")
+    if ledger is None:
+        return {"status": "NOT_INITIALIZED", "windows_this_run": 0, "parse_attempts": 0}
+    return backfill_history(state_path, date.fromisoformat(ledger["start_date"]),
+                            date.fromisoformat(ledger["target_date"]), key,
+                            max_listing_pages=max_listing_pages, max_windows=max_windows,
+                            parse_limit=parse_limit, recheck_limit=recheck_limit)
 
 
 def collect(state_path: Path, cutoff: date, key: str, overlap=7):
@@ -977,7 +1183,7 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
     while cursor <= cutoff:
         end = min(cursor + timedelta(days=79), cutoff)
         base = {"bgn_de": cursor.strftime("%Y%m%d"), "end_de": end.strftime("%Y%m%d"),
-                "pblntf_detail_ty": "D001", "page_count": 100}
+                "pblntf_ty": "D", "pblntf_detail_ty": "D001", "page_count": 100}
         first = dart_json("list.json", {**base, "page_no": 1}, key)
         request_count += 1
         if first.get("status") == "013":
@@ -997,7 +1203,7 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
                 raise RuntimeError("DART listing page failed")
             for row in page.get("list") or []:
                 no = str(row.get("rcept_no") or "")
-                if no not in state["receipts"] and NPS.search(str(row.get("flr_nm") or "")):
+                if no not in state["receipts"] and nps_large_holding_listing(row):
                     new_receipts += 1
                 apply_listing_row(state, row)
         state["listing_coverage"].append({"from": cursor.isoformat(), "to": end.isoformat(),
@@ -1165,6 +1371,15 @@ def main():
     q = sub.add_parser("collect")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--cutoff", type=date.fromisoformat, default=kst_today())
+    q = sub.add_parser("backfill-history")
+    q.add_argument("--state", type=Path, required=True)
+    q.add_argument("--start", type=date.fromisoformat)
+    q.add_argument("--end", type=date.fromisoformat)
+    q.add_argument("--resume", action="store_true")
+    q.add_argument("--max-listing-pages", type=int, default=120)
+    q.add_argument("--max-windows", type=int, default=20)
+    q.add_argument("--parse-limit", type=int, default=30)
+    q.add_argument("--recheck-limit", type=int, default=10)
     q = sub.add_parser("price-and-value")
     q.add_argument("--state", type=Path, required=True)
     q.add_argument("--output", type=Path, required=True)
@@ -1186,6 +1401,16 @@ def main():
         elif args.command == "import-seed": result = import_seed(args.export, args.state, args.commit)
         elif args.command == "backfill-legacy": result = backfill_legacy(args.export, args.state, args.commit)
         elif args.command == "collect": result = collect(args.state, args.cutoff, os.environ.get("DART_API_KEY", ""))
+        elif args.command == "backfill-history":
+            options = {"max_listing_pages": args.max_listing_pages, "max_windows": args.max_windows,
+                       "parse_limit": args.parse_limit, "recheck_limit": args.recheck_limit}
+            if args.resume and args.start is None and args.end is None:
+                result = resume_history(args.state, os.environ.get("DART_API_KEY", ""), **options)
+            elif not args.resume and args.start is not None and args.end is not None:
+                result = backfill_history(args.state, args.start, args.end,
+                                          os.environ.get("DART_API_KEY", ""), **options)
+            else:
+                raise ValueError("choose either an explicit historical range or --resume")
         elif args.command == "price-and-value": result = price_and_value(args.state, args.output)
         elif args.command == "emit-snapshot": result = emit_snapshot(args.snapshot, args.dist)
         elif args.command == "record-published": result = record_published(args.state, version=args.dataset_version,
@@ -1200,7 +1425,10 @@ def main():
                 raise ValueError("migration verification failed")
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     except Exception as exc:
-        print(json.dumps({"error": type(exc).__name__, "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        error = {"error": type(exc).__name__}
+        if args.command != "backfill-history":
+            error["message"] = str(exc)
+        print(json.dumps(error, ensure_ascii=False), file=sys.stderr)
         return 1
     return 0
 

@@ -54,6 +54,22 @@ function validEvent(value: unknown): boolean {
     nullable(value.filingUrl, filingUrl)
 }
 
+function validHistoricalCoverage(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.searchStartDate !== 'string' ||
+    typeof value.searchTargetDate !== 'string' || typeof value.listingCompleteThrough !== 'string' ||
+    (value.firstObservedNpsReceiptDate !== null && typeof value.firstObservedNpsReceiptDate !== 'string')) return false
+  return isoDate(value.searchStartDate) && isoDate(value.searchTargetDate) &&
+    isoDate(value.listingCompleteThrough) && typeof value.listingComplete === 'boolean' &&
+    nullable(value.firstObservedNpsReceiptDate, isoDate) &&
+    Number.isSafeInteger(value.parsingPendingCount) && Number(value.parsingPendingCount) >= 0 &&
+    Number.isSafeInteger(value.legacySourceRecheckCount) && Number(value.legacySourceRecheckCount) >= 0 &&
+    value.searchStartDate <= value.listingCompleteThrough &&
+    value.listingCompleteThrough <= value.searchTargetDate &&
+    (value.firstObservedNpsReceiptDate === null ||
+      (value.searchStartDate <= value.firstObservedNpsReceiptDate && value.firstObservedNpsReceiptDate <= value.listingCompleteThrough)) &&
+    value.listingComplete === (value.listingCompleteThrough === value.searchTargetDate)
+}
+
 function validManifest(value: unknown): value is Manifest {
   return isRecord(value) && value.schemaVersion === 1 &&
     typeof value.datasetVersion === 'string' && VERSION.test(value.datasetVersion) &&
@@ -77,6 +93,7 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
   if (!Number.isSafeInteger(value.trackedCount) || !Number.isSafeInteger(value.pricedCount) || !Number.isSafeInteger(value.unresolvedCount)) return false
   if (!['complete', 'partial', 'unavailable'].includes(String(value.valuationCoverage))) return false
   if (!['complete', 'partial', 'unverified'].includes(String(value.filingCoverage))) return false
+  if (value.historicalCoverage !== undefined && !validHistoricalCoverage(value.historicalCoverage)) return false
   return value.holdings.every(validHolding) && value.events.every(validEvent) && value.history.every((row: unknown) =>
     isRecord(row) && isoDate(row.tradeDate) && decimal(row.estimatedValue) && str(row.datasetVersion) && VERSION.test(row.datasetVersion))
 }
