@@ -19,6 +19,38 @@ class MigrationTests(unittest.TestCase):
     def test_kst_cutoff_uses_korean_calendar_date_on_utc_runner(self):
         self.assertEqual(folio.kst_today(datetime(2026, 9, 25, 15, 1, tzinfo=timezone.utc)), date(2026, 9, 26))
 
+    def test_same_day_correction_and_withdrawal_keep_prior_holding_until_link_verified(self):
+        state = folio.empty_state()
+        state["universe"]["00104856"] = {"name": "Test", "stock_code": "005930"}
+        state["holdings"]["00104856"] = {"corp_code": "00104856", "stock_code": "005930", "receipt_no": "20260924000001", "quantity": "10", "tracking": "active"}
+        rows = [
+            {"rcept_no": "20260925000001", "corp_code": "00104856", "rcept_dt": "20260925", "flr_nm": "국민연금공단", "report_nm": "주식등의대량보유상황보고서", "rm": "정"},
+            {"rcept_no": "20260925000002", "corp_code": "00104856", "rcept_dt": "20260925", "flr_nm": "국민연금공단", "report_nm": "[정정]주식등의대량보유상황보고서", "rm": ""},
+            {"rcept_no": "20260925000003", "corp_code": "00104856", "rcept_dt": "20260925", "flr_nm": "국민연금공단", "report_nm": "주식등의대량보유상황보고서", "rm": "철"},
+        ]
+        for row in rows:
+            folio.apply_listing_row(state, row)
+        for row in rows:
+            folio.apply_listing_row(state, row)  # overlap rerun
+        self.assertEqual(len(state["receipts"]), 3)
+        with patch.object(folio, "structured_receipt", return_value={"quantity": "20", "company_ownership_percent": "6", "reason": "", "evidence": "dart_structured"}):
+            self.assertEqual(folio.resolve_unfinished(state, "test-key"), 3)
+        self.assertEqual(state["holdings"]["00104856"]["receipt_no"], "20260924000001")
+        self.assertEqual(state["holdings"]["00104856"]["latest_unresolved_receipt"], "20260925000003")
+        self.assertTrue(all(state["receipts"][row["rcept_no"]]["correction_of"] is None for row in rows))
+        self.assertEqual(len(state["events"]), 3)
+        self.assertEqual(len(state["unresolved"]), 3)
+
+    def test_delayed_structured_row_uses_exact_document_fallback(self):
+        state = folio.empty_state()
+        state["universe"]["00104856"] = {"name": "Test", "stock_code": "005930"}
+        folio.apply_listing_row(state, {"rcept_no": "20260925000001", "corp_code": "00104856", "rcept_dt": "20260925", "flr_nm": "국민연금공단", "report_nm": "주식등의대량보유상황보고서"})
+        with patch.object(folio, "structured_receipt", return_value=None), patch.object(folio, "dart_document", return_value={"quantity": "12", "company_ownership_percent": "5.2", "reason": "", "xml_sha256": "abc"}) as document:
+            self.assertEqual(folio.resolve_unfinished(state, "test-key"), 1)
+        document.assert_called_once_with("20260925000001", "test-key")
+        self.assertEqual(state["holdings"]["00104856"]["quantity"], "12")
+        self.assertEqual(state["events"]["20260925000001"]["source"], "dart_document")
+
     def test_document_parser_requires_nps_and_preserves_decimal(self):
         def document(filer):
             xml = f'<ROOT><TE ACODE="RPT_RSP_NM">{filer}</TE><TE ACODE="SUM_TMT_CNT">9,007,199,254,740,993</TE><TE ACODE="SUM_TMT_RT">5.25</TE></ROOT>'

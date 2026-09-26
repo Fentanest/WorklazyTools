@@ -152,7 +152,7 @@ def safe_str(value, limit=200):
 
 def empty_state():
     return {"schema": 1, "revision": 0, "import_ledger": [], "universe": {}, "receipts": {},
-            "holdings": {}, "unresolved": {}, "listing_coverage": [], "latest_complete_listing_date": None,
+            "holdings": {}, "events": {}, "unresolved": {}, "listing_coverage": [], "latest_complete_listing_date": None,
             "legacy_coverage_status": "unverified", "legacy_resume_hint": None,
             "last_published_dataset": None}
 
@@ -348,8 +348,67 @@ def dart_document(no, key, retries=3):
             time.sleep(attempt + 1)
 
 
+def structured_receipt(no, corp, key, cache):
+    """Use only the exact NPS receipt; a missing/delayed row requires XML fallback."""
+    if corp not in cache:
+        cache[corp] = dart_json("majorstock.json", {"corp_code": corp}, key)
+    rows = cache[corp].get("list") or []
+    for row in rows:
+        if str(row.get("rcept_no") or "") != no or not NPS.search(str(row.get("repror") or "")):
+            continue
+        quantity = dec(row.get("stkqy"))
+        ownership = dec(row.get("stkrt"))
+        if quantity is None or ownership is None:
+            break
+        return {"quantity": quantity, "company_ownership_percent": ownership,
+                "reason": safe_str(row.get("report_resn")), "evidence": "dart_structured"}
+    return None
+
+
+def apply_listing_row(state, row):
+    """Retain correction/withdrawal flags without inventing a predecessor link.
+
+    OpenDART list guide documents rm=정 (later correction exists) and rm=철
+    (withdrawn): https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001
+    """
+    if not NPS.search(str(row.get("flr_nm") or "")):
+        return False
+    no, corp = str(row.get("rcept_no") or ""), str(row.get("corp_code") or "")
+    if not RECEIPT.fullmatch(no) or not CORP.fullmatch(corp):
+        raise RuntimeError("DART NPS row lacks identity")
+    existing = state["receipts"].get(no)
+    if existing and existing.get("corp_code") and existing["corp_code"] != corp:
+        raise RuntimeError("DART receipt corp conflict")
+    report_name = safe_str(row.get("report_nm"))
+    remarks = safe_str(row.get("rm"), limit=30)
+    correction = report_name.startswith(("[정정]", "정정"))
+    superseded = "정" in remarks
+    withdrawn = "철" in remarks
+    if not existing:
+        existing = {"receipt_no": no, "receipt_date": norm_date(row.get("rcept_dt")),
+                    "corp_code": corp, "stock_code": state["universe"].get(corp, {}).get("stock_code"),
+                    "name": safe_str(row.get("corp_name")), "quantity": None, "company_ownership_percent": None,
+                    "origin": "dart_listing", "evidence": "unresolved", "security_kind": "unknown", "reason": ""}
+        state["receipts"][no] = existing
+        state["unresolved"][no] = "needs_filing_parse"
+        old = state["holdings"].get(corp)
+        if old and no > old.get("receipt_no", ""):
+            old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
+    elif existing.get("evidence") == "legacy_reference_only":
+        existing["corp_code"] = corp
+        existing["receipt_date"] = norm_date(row.get("rcept_dt"))
+        existing["evidence"] = "unresolved"
+        state["unresolved"][no] = "needs_filing_parse"
+    existing.update(report_name=report_name, remarks=remarks, is_correction=correction,
+                    correction_of=None, later_correction_flag=superseded, withdrawn_flag=withdrawn)
+    if correction or superseded or withdrawn:
+        state["unresolved"][no] = "correction_relation_unverified" if correction or superseded else "withdrawal_unverified"
+    return existing["origin"] == "dart_listing" and existing["evidence"] == "unresolved"
+
+
 def resolve_unfinished(state, key, limit=30):
     processed = 0
+    structured_cache = {}
     for no in sorted(state["unresolved"], reverse=True):
         if processed >= limit:
             break
@@ -358,26 +417,57 @@ def resolve_unfinished(state, key, limit=30):
             continue
         processed += 1
         try:
-            parsed = dart_document(no, key)
+            corp = receipt.get("corp_code")
+            try:
+                parsed = structured_receipt(no, corp, key, structured_cache) if corp else None
+            except RuntimeError:
+                parsed = None  # An unavailable or delayed structured row can use the document.
+            if parsed is None:
+                parsed = dart_document(no, key)
+                parsed["evidence"] = "dart_document"
         except (RuntimeError, ValueError, zipfile.BadZipFile) as exc:
             state["unresolved"][no] = type(exc).__name__
             continue
         receipt.update(parsed)
-        receipt["evidence"] = "dart_document"
         corp = receipt.get("corp_code")
         stock = receipt.get("stock_code")
         if corp and stock:
             old = state["holdings"].get(corp)
-            if not old or no >= old.get("receipt_no", ""):
-                ownership = Decimal(parsed["company_ownership_percent"])
+            old_quantity = dec(old.get("quantity")) if old and old.get("receipt_no", "") < no else None
+            new_quantity = dec(parsed["quantity"])
+            ownership = Decimal(parsed["company_ownership_percent"])
+            if ownership < 5:
+                event_kind = "tracking-exit"
+            elif "목적" in parsed.get("reason", ""):
+                event_kind = "purpose-change"
+            elif old_quantity is None or new_quantity is None:
+                event_kind = "new-report" if old is None else "other"
+            elif Decimal(new_quantity) > Decimal(old_quantity):
+                event_kind = "increase"
+            elif Decimal(new_quantity) < Decimal(old_quantity):
+                event_kind = "decrease"
+            else:
+                event_kind = "other"
+            state.setdefault("events", {})[no] = {"receipt_no": no, "receipt_date": receipt["receipt_date"],
+                "corp_code": corp, "stock_code": stock, "kind": event_kind,
+                "correction_of": receipt.get("correction_of"), "quantity": parsed["quantity"],
+                "company_ownership_percent": parsed["company_ownership_percent"],
+                "source": parsed["evidence"]}
+            flagged_relation = receipt.get("is_correction") or receipt.get("later_correction_flag") or receipt.get("withdrawn_flag")
+            if old and flagged_relation and no > old.get("receipt_no", ""):
+                old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
+            if not flagged_relation and (not old or no >= old.get("receipt_no", "")):
                 state["holdings"][corp] = {"corp_code": corp, "stock_code": stock,
                     "name": receipt.get("name") or state["universe"].get(corp, {}).get("name") or "",
                     "receipt_no": no, "receipt_date": receipt["receipt_date"],
                     "quantity": parsed["quantity"], "company_ownership_percent": parsed["company_ownership_percent"],
                     "holding_date": None, "security_kind": "unknown",
                     "tracking": "below-5-percent" if ownership < 5 else "active",
-                    "evidence": "dart_document", "valuation_exclusion_reason": "security_mapping_unverified"}
-            del state["unresolved"][no]
+                    "evidence": parsed["evidence"], "valuation_exclusion_reason": "security_mapping_unverified"}
+            if flagged_relation:
+                state["unresolved"][no] = "correction_relation_unverified" if not receipt.get("withdrawn_flag") else "withdrawal_unverified"
+            else:
+                del state["unresolved"][no]
         else:
             state["unresolved"][no] = "security_identity_missing"
     return processed
@@ -421,26 +511,10 @@ def collect(state_path: Path, cutoff: date, key: str, overlap=7):
             if page.get("status") not in ("000", "013"):
                 raise RuntimeError("DART listing page failed")
             for row in page.get("list") or []:
-                if not NPS.search(str(row.get("flr_nm") or "")):
-                    continue
-                no, corp = str(row.get("rcept_no") or ""), str(row.get("corp_code") or "")
-                if not RECEIPT.fullmatch(no) or not CORP.fullmatch(corp):
-                    raise RuntimeError("DART NPS row lacks identity")
-                existing = state["receipts"].get(no)
-                if existing and existing.get("corp_code") and existing["corp_code"] != corp:
-                    raise RuntimeError("DART receipt corp conflict")
-                if not existing:
-                    state["receipts"][no] = {"receipt_no": no, "receipt_date": norm_date(row.get("rcept_dt")),
-                        "corp_code": corp, "stock_code": state["universe"].get(corp, {}).get("stock_code"),
-                        "name": safe_str(row.get("corp_name")), "quantity": None, "company_ownership_percent": None,
-                        "origin": "dart_listing", "evidence": "unresolved", "security_kind": "unknown",
-                        "reason": ""}
-                    state["unresolved"][no] = "needs_filing_parse"
+                no = str(row.get("rcept_no") or "")
+                if no not in state["receipts"] and NPS.search(str(row.get("flr_nm") or "")):
                     new_receipts += 1
-                elif existing.get("evidence") == "legacy_reference_only":
-                    existing["corp_code"] = corp
-                    existing["receipt_date"] = norm_date(row.get("rcept_dt"))
-                    state["unresolved"][no] = "needs_filing_parse"
+                apply_listing_row(state, row)
         state["listing_coverage"].append({"from": cursor.isoformat(), "to": end.isoformat(),
             "checked_at": datetime.now(timezone.utc).isoformat(), "pages": len(pages), "complete": True})
         state["latest_complete_listing_date"] = end.isoformat()
