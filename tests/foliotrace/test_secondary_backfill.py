@@ -315,6 +315,8 @@ class SecondaryBackfillTests(unittest.TestCase):
                 fetch_document=lambda *_: archive.getvalue())
             self.assertEqual((first['source_document_requests'], first['historical_facts_retained']), (1, 1))
             saved = folio.read_json(path)
+            self.assertIsNone(saved['secondary_backfill']['candidates'][f'{receipt}:{document}']
+                              ['first_discovered_at'])
             fact = next(iter(saved['verified_historical_observations'].values()))
             self.assertEqual((fact['basis_date'], fact['quantity'], fact['ownership_percent'],
                 fact['ratio_denominator'], fact['denominator_date']),
@@ -502,6 +504,8 @@ class SecondaryBackfillTests(unittest.TestCase):
                              [f'{NOISE[0]}:{NOISE[1]}'])
             self.assertEqual(ledger["coverage"][0]["term_hits"][secondary.TERMS[1]], 2)
             self.assertEqual(set(ledger["candidates"]), {f'{POSCO[0]}:{POSCO[1]}'})
+            self.assertRegex(ledger["candidates"][f'{POSCO[0]}:{POSCO[1]}']["first_discovered_at"],
+                             r'^\d{4}-\d{2}-\d{2}T')
             self.assertEqual(saved["receipts"], {})
             self.assertEqual(saved["holdings"], {})
             snapshot = make_snapshot(saved, {})

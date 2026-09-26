@@ -365,6 +365,7 @@ const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
     "purpose-change": "목적 변경",
     "tracking-exit": "5% 추적 범위 이탈",
     "tracking-reentry": "5% 추적 범위 재진입",
+    "unquantified-change": "지분 변동 확인 · 수치는 미기재",
     other: "기타",
   },
   en: {
@@ -374,6 +375,7 @@ const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
     "purpose-change": "Purpose change",
     "tracking-exit": "Exited 5% tracking scope",
     "tracking-reentry": "Re-entered 5% tracking scope",
+    "unquantified-change": "Ownership change noted · amount unstated",
     other: "Other",
   },
 };
@@ -634,6 +636,7 @@ function ReadyView({
                 {" "}{formatQty(observation.sourceQuantity)} / {formatQty(observation.denominatorQuantity)} ·
                 {" "}{formatPct(observation.ownershipPercent)}
                 {observation.references.length > 1 && ` · ${t.issuerScopeCitedAgain}`}
+                {observation.status === "same_basis_conflict" && ` · ${t.verifiedObservationConflict}`}
                 {snapshot.issuerScopeLaterChanges?.some((change) => change.corpCode === observation.corpCode &&
                   change.basisDate > observation.basisDate) && ` · ${t.issuerScopeLaterChange}`}
                 {" "}<a href={observation.references[0].filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
@@ -737,7 +740,7 @@ function ReadyView({
                 ? `${t.eventStockCode} ${event.stockCode}`
                 : `${t.eventCorpCode} ${event.corpCode}`);
               return (
-                <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}`}>
+                <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}:${event.kind}:${event.basisDate ?? ""}`}>
                   <div className="foliotrace-event-heading">
                     <strong>{label}</strong>
                     {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
@@ -752,7 +755,8 @@ function ReadyView({
                   </div>
                   <div className="foliotrace-event-source">
                     <span>{event.source === "legacy-import" ? t.eventLegacySource :
-                      event.source === "indirect-observation" ? t.eventIndirectSource : t.eventDartSource}</span>
+                      event.source === "indirect-observation" ? t.eventIndirectSource :
+                      event.source === "issuer-scope-observation" ? t.issuerScopeSource : t.eventDartSource}</span>
                     <code className="foliotrace-code">{event.receiptNo}</code>
                     {event.correctionOf && <small> ← {event.correctionOf}</small>}
                     {event.filingUrl && (
@@ -856,6 +860,9 @@ function ReadyView({
                             <small className="foliotrace-row-reason">
                               {h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict : t.rowVerifiedValue}
                             </small>
+                          )}
+                          {h.issuerScopeConflict && (
+                            <small className="foliotrace-row-reason">{t.verifiedObservationConflict}</small>
                           )}
                           {h.issuerScopeSource?.laterChangeDate && (
                             <small className="foliotrace-row-reason">
@@ -1045,7 +1052,7 @@ function ReadyView({
             ) : (
               <ul className="foliotrace-events">
                 {selectedEvents.map((e) => (
-                  <li key={e.observationKey ?? `${e.receiptNo}:${e.corpCode}:${e.stockCode ?? ""}`}>
+                  <li key={e.observationKey ?? `${e.receiptNo}:${e.corpCode}:${e.stockCode ?? ""}:${e.kind}:${e.basisDate ?? ""}`}>
                     <strong>{e.kind === "tracking-reentry" && e.source === "indirect-observation" ?
                       t.eventIndirectReentry : EVENT_KIND[lang][e.kind]}</strong>
                     <span>{e.basisDate ? `${t.eventBasis}: ${e.basisDate}` : `${t.eventReceipt}: ${e.receiptDate}`}</span>{" "}

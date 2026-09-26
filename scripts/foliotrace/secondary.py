@@ -886,6 +886,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                 all_rows.extend((term, row) for row in page["rows"])
                 page_digests.append(page["sha256"])
         candidates = ledger["candidates"]
+        discovered_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         unique_hits = {}
         term_candidate_counts = {term: 0 for term in TERMS}
         for term, row in all_rows:
@@ -903,6 +904,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
                             "filing_date": row["filing_date"], "filing_company": row["filing_company"],
                             "report_name": row["report_name"], "search_terms": [],
                             "review_status": "source_review_pending",
+                            "first_discovered_at": discovered_at,
                             "search_context_sha256": hashlib.sha256(row["snippet"].encode()).hexdigest()}
                     candidates[document_key] = item
                     new_candidates += 1
@@ -931,6 +933,7 @@ def scan_secondary(state_path: Path, start: date, end: date, *, max_pages=300, m
         cache = state.setdefault("secondary_source_cache", {})
         registered_before = len(state.get("indirect_observations") or {})
         for document_key, item in ledger["candidates"].items():
+            item.setdefault("first_discovered_at", None)
             if source_receipt and not document_key.startswith(source_receipt + ":"):
                 continue
             if (item.get("parser_version") == SOURCE_PARSER_VERSION and

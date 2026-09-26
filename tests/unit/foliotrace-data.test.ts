@@ -82,8 +82,13 @@ test('issuer-level dated observation keeps the direct baseline separate', () => 
     kind: 'nps_share_decrease_amount_unreported',
     references: [{ receiptNo: '20260515002914',
       filingUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260515002914' }] }
+  const laterEvent = { receiptNo: '20260515002914', receiptDate: '2026-05-15',
+    basisDate: '2025-12-31', corpCode: '00244455', stockCode: null,
+    kind: 'unquantified-change', correctionOf: null, quantity: null,
+    companyOwnershipPercent: null, source: 'issuer-scope-observation',
+    filingUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260515002914' }
   assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [scoped],
-    issuerScopeLaterChanges: [later] }, version), true)
+    issuerScopeLaterChanges: [later], events: [laterEvent] }, version), true)
   assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [
     { ...scoped, references: [{ ...reference, filingUrl: 'javascript:bad()' }] }] }, version), false)
 })

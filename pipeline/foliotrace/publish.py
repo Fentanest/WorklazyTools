@@ -55,6 +55,15 @@ def make_snapshot(state, quotes, now=None):
                       if ref.get("receipt_no") not in source_holds]
         if references:
             scoped_by_corp.setdefault(fact["corp_code"], []).append((key, fact, references))
+    scoped_conflicts = set()
+    for candidates in scoped_by_corp.values():
+        by_date = {}
+        for key, fact, _ in candidates:
+            by_date.setdefault(fact["basis_date"], []).append((key, fact))
+        for group in by_date.values():
+            if len({(fact["quantity"], fact["ownership_percent"], fact["denominator_quantity"])
+                    for _, fact in group}) > 1:
+                scoped_conflicts.update(key for key, _ in group)
     for holding in holdings:
         candidates = scoped_by_corp.get(holding.get("corp_code")) or []
         if not candidates:
@@ -141,6 +150,7 @@ def make_snapshot(state, quotes, now=None):
                        "ownershipPercent": row["direct_baseline"]["ownership_percent"],
                        "quantity": row["direct_baseline"]["quantity"]}
                        if row.get("direct_baseline") else None),
+                     "issuerScopeConflict": row.get("issuer_scope_status") == "same_basis_conflict",
                      "latestUnresolvedReceiptNo": row.get("latest_unresolved_receipt") or None,
                      "latestUnresolvedReason": row.get("latest_unresolved_reason") or None,
                      "tracking": row.get("tracking") or "unknown",
@@ -174,6 +184,19 @@ def make_snapshot(state, quotes, now=None):
                        "numericKind": event["numeric_kind"],
                        "percentagePointChange": event.get("percentage_point_change"),
                        "source": "indirect-observation",
+                       "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={no}"})
+    for fact in (state.get("issuer_scope_later_changes") or {}).values():
+        refs = [ref for ref in fact.get("references", []) if ref.get("receipt_no") not in source_holds]
+        if not refs:
+            continue
+        ref = min(refs, key=lambda item: (item["filing_date"], item["receipt_no"]))
+        no = ref["receipt_no"]
+        events.append({"receiptNo": no, "receiptDate": ref["filing_date"],
+                       "basisDate": fact["basis_date"], "corpCode": fact["corp_code"],
+                       "stockCode": None, "kind": "unquantified-change",
+                       "correctionOf": None, "quantity": None,
+                       "companyOwnershipPercent": None,
+                       "source": "issuer-scope-observation",
                        "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={no}"})
     events.sort(key=lambda event: (event.get("basisDate") or event["receiptDate"], event["receiptNo"]), reverse=True)
     receipts = [r.get("receipt_date") for r in state["receipts"].values() if r.get("receipt_date")]
@@ -212,7 +235,7 @@ def make_snapshot(state, quotes, now=None):
                         "parserVersion": ref["parser_version"],
                         "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={ref['receipt_no']}"}
                         for ref in fact["references"]],
-                    "status": "comparison_pending"}
+                    "status": "same_basis_conflict" if key in scoped_conflicts else "comparison_pending"}
                     for key, fact in sorted(issuer_observations.items(),
                                             key=lambda item: (item[1]["basis_date"], item[0]), reverse=True)],
                 "issuerScopeLaterChanges": [{"corpCode": fact["corp_code"],

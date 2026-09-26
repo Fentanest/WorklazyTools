@@ -1,4 +1,5 @@
 import io
+import copy
 import tempfile
 import unittest
 import zipfile
@@ -79,7 +80,22 @@ class TargetSourceTests(unittest.TestCase):
         self.assertEqual(snapshot['holdings'][0]['issuerScopeSource']['laterChangeDate'], '2025-12-31')
         self.assertEqual(snapshot['holdings'][0]['tracking'], 'unknown')
         self.assertEqual(len(snapshot['issuerScopeLaterChanges']), 1)
-        self.assertEqual(snapshot['events'], [])
+        self.assertEqual([event['basisDate'] for event in snapshot['events']
+                          if event['kind'] == 'unquantified-change'],
+                         ['2025-12-31'])
+        self.assertTrue(all(event['quantity'] is None and event['companyOwnershipPercent'] is None
+                            for event in snapshot['events'] if event['kind'] == 'unquantified-change'))
+        conflicting = copy.deepcopy(next(fact for fact in state['issuer_scope_observations'].values()
+                                         if fact['basis_date'] == '2025-08-22'))
+        conflicting['quantity'] = '9954723'
+        conflicting['ownership_percent'] = '8.17'
+        state['issuer_scope_observations']['f' * 64] = conflicting
+        conflict_snapshot = make_snapshot(state, {})
+        self.assertEqual(conflict_snapshot['holdings'][0]['companyOwnershipPercent'], '7.5')
+        self.assertTrue(conflict_snapshot['holdings'][0]['issuerScopeConflict'])
+        self.assertIn('same_basis_conflict', {item['status']
+            for item in conflict_snapshot['issuerScopeObservations']})
+        del state['issuer_scope_observations']['f' * 64]
         # A separately filed correction with no explicit target link holds
         # only the matching report period, not the earlier Q3 citation.
         correction = {'status': '000', 'page_no': '1', 'page_count': '100',

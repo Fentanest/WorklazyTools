@@ -71,6 +71,7 @@ export interface Holding {
     ownershipPercent: DecimalString | null
     quantity: DecimalString | null
   } | null
+  issuerScopeConflict?: boolean
   latestUnresolvedReceiptNo: string | null
   latestUnresolvedReason: string | null
   tracking: 'active' | 'below-5-percent' | 'unknown'
@@ -88,13 +89,13 @@ export interface FilingEvent {
   basisDate?: IsoDate | null
   corpCode: string
   stockCode: string | null
-  kind: 'increase' | 'decrease' | 'new-report' | 'purpose-change' | 'tracking-exit' | 'tracking-reentry' | 'other'
+  kind: 'increase' | 'decrease' | 'new-report' | 'purpose-change' | 'tracking-exit' | 'tracking-reentry' | 'unquantified-change' | 'other'
   correctionOf: string | null
   quantity: DecimalString | null
   companyOwnershipPercent: DecimalString | null
   numericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated'
   percentagePointChange?: DecimalString | null
-  source: 'legacy-import' | 'dart-structured' | 'dart-document' | 'indirect-observation'
+  source: 'legacy-import' | 'dart-structured' | 'dart-document' | 'indirect-observation' | 'issuer-scope-observation'
   filingUrl: string | null
 }
 
@@ -185,7 +186,7 @@ export interface Snapshot {
     securityKind: 'unclassified'
     ratioDenominator: 'issued_shares'
     holderScope: 'nps_only'
-    status: 'comparison_pending'
+    status: 'comparison_pending' | 'same_basis_conflict'
     references: Array<{
       receiptNo: string
       documentNo: string | null

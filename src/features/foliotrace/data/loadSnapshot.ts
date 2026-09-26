@@ -55,7 +55,7 @@ function validIssuerScopeObservation(value: unknown): boolean {
     decimal(value.sourceQuantity) && decimal(value.denominatorQuantity) &&
     value.denominatorDate === value.basisDate && value.securityKind === 'unclassified' &&
     value.ratioDenominator === 'issued_shares' && value.holderScope === 'nps_only' &&
-    value.status === 'comparison_pending' && Array.isArray(value.references) &&
+    ['comparison_pending', 'same_basis_conflict'].includes(String(value.status)) && Array.isArray(value.references) &&
     value.references.length >= 1 && value.references.every((ref: unknown) => isRecord(ref) &&
       str(ref.receiptNo) && RECEIPT.test(ref.receiptNo) &&
       nullable(ref.documentNo, item => str(item) && /^\d+$/.test(item)) &&
@@ -115,6 +115,7 @@ function validHolding(value: unknown): boolean {
     (value.indirectSource === undefined || nullable(value.indirectSource, validIndirectSource)) &&
     (value.issuerScopeSource === undefined || nullable(value.issuerScopeSource, validIssuerScopeSource)) &&
     (value.directBaseline === undefined || nullable(value.directBaseline, validDirectBaseline)) &&
+    (value.issuerScopeConflict === undefined || typeof value.issuerScopeConflict === 'boolean') &&
     nullable(value.latestUnresolvedReceiptNo, (item) => str(item) && RECEIPT.test(item)) &&
     nullable(value.latestUnresolvedReason, str) &&
     ['active', 'below-5-percent', 'unknown'].includes(String(value.tracking)) &&
@@ -128,9 +129,9 @@ function validEvent(value: unknown): boolean {
     (value.observationKey === undefined || (str(value.observationKey) &&
       OBSERVATION_KEY.test(value.observationKey))) &&
     str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && nullable(value.stockCode, x => str(x) && STOCK.test(x)) &&
-    ['increase', 'decrease', 'new-report', 'purpose-change', 'tracking-exit', 'tracking-reentry', 'other'].includes(String(value.kind)) &&
+    ['increase', 'decrease', 'new-report', 'purpose-change', 'tracking-exit', 'tracking-reentry', 'unquantified-change', 'other'].includes(String(value.kind)) &&
     nullable(value.correctionOf, x => str(x) && RECEIPT.test(x)) && nullable(value.quantity, decimal) &&
-    nullable(value.companyOwnershipPercent, decimal) && ['legacy-import', 'dart-structured', 'dart-document', 'indirect-observation'].includes(String(value.source)) &&
+    nullable(value.companyOwnershipPercent, decimal) && ['legacy-import', 'dart-structured', 'dart-document', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.source)) &&
     (value.numericKind === undefined || numericKind(value.numericKind)) &&
     (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&
     nullable(value.filingUrl, filingUrl)
