@@ -26,9 +26,34 @@ def chart(code="000660", close="1862000", day="20260923"):
 
 
 class NaverTests(unittest.TestCase):
+    def test_special_session_intraday_minute_must_match_official_close(self):
+        basic, daily = response(close="110")
+        minute = chart(close="100")
+        with self.assertRaisesRegex(naver.QuoteError, "chart/KRX close mismatch"):
+            naver.parse_quote("000660", basic, daily, minute, "2026-09-26T00:00:00Z", official_close="110")
+        with self.assertRaisesRegex(naver.QuoteError, "KRX close unverified"):
+            naver.parse_quote("000660", basic, daily, minute, "2026-09-26T00:00:00Z")
+
+    def test_official_prior_close_row_is_usable_during_newer_session(self):
+        page = ('<input id="repIsuSrtCd" value="A402340"><input id="comAbbrv" value="SK스퀘어">'
+                '* 2026-09-28 종가 기준<table><tr><th>현재가</th><td>1200000</td></tr>'
+                '<tr><th>2026-09-23 종가</th><td>1190000</td></tr></table>')
+        self.assertEqual(naver.parse_kind_close(page, "2026-09-23", "402340", "SK스퀘어"), "1190000")
+        with self.assertRaisesRegex(naver.QuoteError, "close date unverified"):
+            naver.parse_kind_close(page.replace("2026-09-28 종가 기준", "2026-09-22 종가 기준"),
+                                   "2026-09-23", "402340", "SK스퀘어")
+
+    def test_exact_security_code_allows_official_company_suffix(self):
+        page = ('<input id="repIsuSrtCd" value="A015760"><input id="comAbbrv" value="한국전력공사">'
+                '* 2026-09-23 종가 기준<table><tr><th>현재가</th><td>23750</td></tr>'
+                '<tr><th>2026-09-23 종가</th><td>23750</td></tr></table>')
+        self.assertEqual(naver.parse_kind_close(page, "2026-09-23", "015760", "한국전력"), "23750")
+        with self.assertRaisesRegex(naver.QuoteError, "security identity mismatch"):
+            naver.parse_kind_close(page.replace("A015760", "A015761"), "2026-09-23", "015760", "한국전력")
+
     def test_regular_close_ignores_different_after_market_price(self):
         basic, daily = response()
-        quote = naver.parse_quote("000660", basic, daily, chart(), "2026-09-26T00:00:00Z")
+        quote = naver.parse_quote("000660", basic, daily, chart(), "2026-09-26T00:00:00Z", official_close="1862000")
         self.assertEqual(quote["close"], "1862000")
         self.assertEqual(quote["daily_reference_close"], "1863000")
         self.assertEqual(quote["trade_date"], "2026-09-23")
@@ -37,14 +62,14 @@ class NaverTests(unittest.TestCase):
 
     def test_alphanumeric_code_and_rejections(self):
         basic, daily = response("0126Z0", "331,000")
-        self.assertEqual(naver.parse_quote("0126Z0", basic, daily, chart("0126Z0", "330000"), "2026-09-26T00:00:00Z")["close"], "330000")
+        self.assertEqual(naver.parse_quote("0126Z0", basic, daily, chart("0126Z0", "330000"), "2026-09-26T00:00:00Z", official_close="330000")["close"], "330000")
         for changed in ({"marketStatus": "OPEN"}, {"itemCode": "005930"}, {"closePrice": "1,864,000"}):
             with self.subTest(changed=changed), self.assertRaises(naver.QuoteError):
-                naver.parse_quote("0126Z0", {**basic, **changed}, daily, chart("0126Z0", "330000"), "2026-09-26T00:00:00Z")
+                naver.parse_quote("0126Z0", {**basic, **changed}, daily, chart("0126Z0", "330000"), "2026-09-26T00:00:00Z", official_close="330000")
         with self.assertRaises(naver.QuoteError):
-            naver.parse_quote("0126Z0", basic, [{"localTradedAt": "2026-09-22", "closePrice": "331,000"}], chart("0126Z0", "330000"), "2026-09-26T00:00:00Z")
+            naver.parse_quote("0126Z0", basic, [{"localTradedAt": "2026-09-22", "closePrice": "331,000"}], chart("0126Z0", "330000"), "2026-09-26T00:00:00Z", official_close="330000")
         with self.assertRaises(naver.QuoteError):
-            naver.parse_quote("0126Z0", basic, daily, chart("0126Z0", "330000"), "2026-10-02T00:00:00Z")
+            naver.parse_quote("0126Z0", basic, daily, chart("0126Z0", "330000"), "2026-10-02T00:00:00Z", official_close="330000")
 
     def test_chart_rejects_missing_or_duplicate_regular_close(self):
         with self.assertRaisesRegex(naver.QuoteError, "15:30 close unverified"):
@@ -74,7 +99,7 @@ class NaverTests(unittest.TestCase):
         self.assertEqual(naver.parse_kind_close(page, "2026-09-23", "402340", "SK스퀘어"), "1190000")
         with self.assertRaisesRegex(naver.QuoteError, "security identity mismatch"):
             naver.parse_kind_close(page, "2026-09-23", "402340", "다른회사")
-        with self.assertRaisesRegex(naver.QuoteError, "close response invalid"):
+        with self.assertRaisesRegex(naver.QuoteError, "close date unverified"):
             naver.parse_kind_close(page, "2026-09-22", "402340", "SK스퀘어")
 
     def test_intraday_cache_miss_uses_independently_cross_checked_prior_close(self):
@@ -85,12 +110,12 @@ class NaverTests(unittest.TestCase):
                      compareToPreviousPrice={"name": "RISING"})
         daily = [{"localTradedAt": "2026-09-28", "closePrice": "110"},
                  {"localTradedAt": "2026-09-23", "closePrice": "100"}]
-        quote = naver.parse_quote("000660", basic, daily, chart(close="99"), "2026-09-28T01:00:00Z")
+        quote = naver.parse_quote("000660", basic, daily, chart(close="99"), "2026-09-28T01:00:00Z", official_close="99")
         self.assertEqual((quote["trade_date"], quote["close"]), ("2026-09-23", "99"))
         basic["compareToPreviousClosePrice"] = "9"
-        self.assertEqual(naver.parse_quote("000660", basic, daily, chart(close="99"), "2026-09-28T01:00:00Z")["close"], "99")
+        self.assertEqual(naver.parse_quote("000660", basic, daily, chart(close="99"), "2026-09-28T01:00:00Z", official_close="99")["close"], "99")
         with self.assertRaisesRegex(naver.QuoteError, "latest completed KRX session unverified"):
-            naver.parse_quote("000660", basic, daily[:1], chart(close="99"), "2026-09-28T01:00:00Z")
+            naver.parse_quote("000660", basic, daily[:1], chart(close="99"), "2026-09-28T01:00:00Z", official_close="99")
 
 
 if __name__ == "__main__":

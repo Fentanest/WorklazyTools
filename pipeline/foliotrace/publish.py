@@ -22,11 +22,19 @@ def make_snapshot(state, quotes, now=None):
     trade_dates = sorted({q["trade_date"] for q in quotes.values() if q.get("verified") and q.get("trade_date")})
     trade_date = trade_dates[-1] if trade_dates else None
     holdings = []
+    pending_by_corp = {}
+    for no in state.get("unresolved", {}):
+        receipt = state.get("receipts", {}).get(no, {})
+        corp = receipt.get("corp_code")
+        if corp:
+            pending_by_corp[corp] = max(pending_by_corp.get(corp, ""), no)
     for source in sorted(state["holdings"].values(), key=lambda h: (h.get("stock_code") or "", h.get("corp_code") or "")):
         holding = dict(source)
         current_no = holding.get("receipt_no")
         current = state["receipts"].get(current_no, {})
-        latest_no = holding.get("latest_unresolved_receipt")
+        latest_no = max(holding.get("latest_unresolved_receipt") or "", pending_by_corp.get(holding.get("corp_code"), ""))
+        if latest_no <= (current_no or ""):
+            latest_no = ""
         if current.get("withdrawn_flag") or current.get("is_correction") or current.get("later_correction_flag"):
             latest_no = max(latest_no or "", current_no or "")
         if latest_no:

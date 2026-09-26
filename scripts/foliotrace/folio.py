@@ -37,7 +37,7 @@ NPS = re.compile(r"국민연금|National Pension Service", re.I)
 ALLOWED = ("universe.json", "report-cache.json", "holdings-latest.json", "state.json")
 SOURCE_NOTE = "MyTradingDesk context-service NPS public DART cache"
 MAPPING_METHOD = "dart-voting-krx-kind-v1"
-ACTION_METHOD = "krx-listed-share-ratio-v1"
+ACTION_METHOD = "krx-listed-share-exact-v2"
 CORRECTION_PREFIXES = ("[기재정정]", "[첨부정정]", "[첨부추가]", "[정정]",
                        "[정정명령부과]", "[정정제출요구]", "[변경등록]", "정정")
 
@@ -622,16 +622,16 @@ def apply_listing_row(state, row):
                     "name": safe_str(row.get("corp_name")), "quantity": None, "company_ownership_percent": None,
                     "origin": "dart_listing", "evidence": "unresolved", "security_kind": "unknown", "reason": ""}
         state["receipts"][no] = existing
-        state["unresolved"][no] = "needs_filing_parse"
+        state["unresolved"][no] = "parsed_identity_ready" if existing.get("evidence") in ("dart_document", "dart_structured") and existing.get("quantity") is not None else "needs_filing_parse"
         old = state["holdings"].get(corp)
         if old and no > old.get("receipt_no", ""):
             old["latest_unresolved_receipt"] = max(old.get("latest_unresolved_receipt", ""), no)
-    elif existing.get("evidence") in ("legacy_reference_only", "legacy_json_parser_result") and (not existing.get("corp_code") or not existing.get("stock_code")):
+    elif not existing.get("corp_code") or not existing.get("stock_code"):
         existing["corp_code"] = corp
         existing["stock_code"] = stock_code
         existing["receipt_date"] = norm_date(row.get("rcept_dt"))
         existing["metadata_evidence"] = "dart_listing"
-        state["unresolved"][no] = "needs_filing_parse"
+        state["unresolved"][no] = "parsed_identity_ready" if existing.get("evidence") in ("dart_document", "dart_structured") and existing.get("quantity") is not None else "needs_filing_parse"
     existing.update(report_name=report_name, remarks=remarks, is_correction=correction,
                     correction_of=None, later_correction_flag=superseded, withdrawn_flag=withdrawn)
     if correction or superseded or withdrawn:
@@ -648,20 +648,27 @@ def resolve_unfinished(state, key, limit=30):
         if processed >= limit:
             break
         receipt = state["receipts"].get(no)
-        if not receipt or receipt.get("evidence") not in ("unresolved", "legacy_json_parser_result", "legacy_reference_only"):
+        if not receipt or (receipt.get("evidence") not in ("unresolved", "legacy_json_parser_result", "legacy_reference_only")
+                           and not (state["unresolved"].get(no) in ("security_identity_missing", "parsed_identity_ready")
+                                    and receipt.get("corp_code") and receipt.get("stock_code")
+                                    and receipt.get("quantity") is not None
+                                    and receipt.get("company_ownership_percent") is not None)):
             continue
         if state["unresolved"].get(no) == "security_identity_conflict":
             continue
         processed += 1
         try:
             corp = receipt.get("corp_code")
-            try:
-                parsed = structured_receipt(no, corp, key, structured_cache) if corp else None
-            except RuntimeError:
-                parsed = None  # An unavailable or delayed structured row can use the document.
-            if parsed is None:
-                parsed = dart_document(no, key)
-                parsed["evidence"] = "dart_document"
+            if state["unresolved"].get(no) in ("security_identity_missing", "parsed_identity_ready") and corp and receipt.get("stock_code") and receipt.get("evidence") in ("dart_document", "dart_structured"):
+                parsed = {field: receipt[field] for field in ("quantity", "company_ownership_percent", "evidence")}
+            else:
+                try:
+                    parsed = structured_receipt(no, corp, key, structured_cache) if corp else None
+                except RuntimeError:
+                    parsed = None  # An unavailable or delayed structured row can use the document.
+                if parsed is None:
+                    parsed = dart_document(no, key)
+                    parsed["evidence"] = "dart_document"
         except (RuntimeError, ValueError, zipfile.BadZipFile) as exc:
             state["unresolved"][no] = type(exc).__name__
             continue
@@ -856,9 +863,8 @@ def reconcile_corporate_actions(state, trade_date, current_master, *, fetch=krx_
             if before is None or after is None or Decimal(before) <= 0 or Decimal(after) <= 0:
                 reason = "listed_share_count_unverified"
             else:
-                ratio = Decimal(after) / Decimal(before)
-                if ratio >= Decimal("1.5") or ratio <= Decimal(2) / Decimal(3):
-                    reason = "material_share_count_change"
+                if Decimal(after) != Decimal(before):
+                    reason = "listed_share_count_changed_without_action_evidence"
         holding["corporate_action_status"] = "unverified" if reason else "verified"
         holding["corporate_action_reason"] = reason
         holding["corporate_action_trade_date"] = trade_date
@@ -1001,11 +1007,11 @@ def price_and_value(state_path: Path, output: Path, client=None):
     if not eligible:
         raise RuntimeError("no verified stock-class mappings for valuation")
     for code in sorted(eligible):
-        strict_key = f"{code}|KRX|regular|{expected}|naver-chart1530-v1"
-        delayed_key = f"{code}|KRX|regular|{expected}|naver-chart1530-kind-v1"
+        strict_key = f"{code}|KRX|regular|{expected}|naver-chart1530-kind-v2"
+        delayed_key = f"{code}|KRX|regular|{expected}|naver-delayed-kind-v2"
         cached_key = strict_key if strict_key in cache else delayed_key
         cached = cache.get(cached_key)
-        expected_basis = "naver_krx_1530_minute" if cached_key == strict_key else "naver_krx_delayed_auction_kind_confirmed"
+        expected_basis = "naver_krx_1530_kind_confirmed" if cached_key == strict_key else "naver_krx_delayed_auction_kind_confirmed"
         if cached and cached.get("verified") is True and cached.get("trade_date") == expected and cached.get("close_basis") == expected_basis:
             quotes[code] = cached
             new_cache[cached_key] = cached
@@ -1014,7 +1020,7 @@ def price_and_value(state_path: Path, output: Path, client=None):
         try:
             quotes[code] = client.quote(code)
             quote = quotes[code]
-            suffix = "naver-chart1530-kind-v1" if quote.get("close_basis") == "naver_krx_delayed_auction_kind_confirmed" else "naver-chart1530-v1"
+            suffix = "naver-delayed-kind-v2" if quote.get("close_basis") == "naver_krx_delayed_auction_kind_confirmed" else "naver-chart1530-kind-v2"
             new_cache[f"{code}|KRX|regular|{quote['trade_date']}|{suffix}"] = quote
         except QuoteError as exc:
             failed[code] = str(exc)
@@ -1025,6 +1031,9 @@ def price_and_value(state_path: Path, output: Path, client=None):
         state["revision"] += 1
         write_json(state_path, state)
     snapshot = make_snapshot(state, quotes)
+    if snapshot["trackedCount"] and (snapshot["pricedCount"] == 0 or snapshot["estimatedValue"] is None
+                                     or snapshot["valuationCoverage"] == "unavailable"):
+        raise RuntimeError("all tracked holdings are unpriced; production snapshot withheld")
     write_json(output, snapshot)
     return {"dataset_version": snapshot["datasetVersion"], "tracked": snapshot["trackedCount"],
             "eligible_codes": len(eligible), "priced": snapshot["pricedCount"],
@@ -1037,6 +1046,10 @@ def emit_snapshot(snapshot_path: Path, dist: Path):
     if dist.name != "dist" or not (dist / "index.html").is_file():
         raise ValueError("output must be a built dist directory")
     snapshot = read_json(snapshot_path)
+    if snapshot.get("trackedCount", 0) > 0 and (snapshot.get("pricedCount") == 0
+                                                 or snapshot.get("estimatedValue") is None
+                                                 or snapshot.get("valuationCoverage") == "unavailable"):
+        raise ValueError("all tracked holdings are unpriced; production snapshot withheld")
     version = snapshot.get("datasetVersion")
     if not isinstance(version, str) or not re.fullmatch(r"[a-f0-9]{64}", version):
         raise ValueError("invalid snapshot version")

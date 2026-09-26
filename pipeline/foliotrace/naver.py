@@ -46,8 +46,8 @@ def expected_session(observed):
     return candidate
 
 
-def parse_regular_chart(code, payload, traded, *, official_close=None):
-    """Select the exact 15:30 KRX minute from Naver's dated minute chart."""
+def parse_regular_chart(code, payload, traded, *, official_close=None, with_basis=False):
+    """Select a Naver minute only when the dated KRX close confirms its price."""
     if not CODE.fullmatch(code) or not isinstance(payload, bytes) or len(payload) > 2_000_000 or b"<!DOCTYPE" in payload.upper() or b"<!ENTITY" in payload.upper():
         raise QuoteError("regular chart invalid")
     try:
@@ -60,19 +60,23 @@ def parse_regular_chart(code, payload, traded, *, official_close=None):
     stamp = traded.replace("-", "") + "1530"
     rows = [item.get("data", "").split("|") for item in chart.findall("item")]
     matched = [row for row in rows if row and row[0] == stamp]
-    if len(matched) == 1 and len(matched[0]) == 6:
-        return _amount(matched[0][4])
+    if len(matched) == 1 and len(matched[0]) == 6 and official_close is not None:
+        close = _amount(matched[0][4])
+        if close != _amount(official_close):
+            raise QuoteError("regular chart/KRX close mismatch")
+        return (close, "naver_krx_1530_kind_confirmed") if with_basis else close
     if matched or official_close is None:
         raise QuoteError("regular chart 15:30 close unverified")
     prefix = traded.replace("-", "")
     delayed = [row for row in rows if len(row) == 6 and row[0].startswith(prefix)
                and re.fullmatch(r"15(?:3[1-9])", row[0][8:])]
-    if not delayed or delayed[0][0][8:] > "1535":
+    if not delayed or min(row[0][8:] for row in delayed) > "1535":
         raise QuoteError("regular chart delayed close unverified")
     prices = {_amount(row[4]) for row in delayed}
     if prices != {_amount(official_close)}:
         raise QuoteError("regular chart/KRX close mismatch")
-    return _amount(official_close)
+    close = _amount(official_close)
+    return (close, "naver_krx_delayed_auction_kind_confirmed") if with_basis else close
 
 
 class _KindRows(HTMLParser):
@@ -107,18 +111,23 @@ class _KindRows(HTMLParser):
 
 
 def parse_kind_close(page, traded, code, name):
-    if not isinstance(page, str) or len(page) > 1_000_000 or f"* {traded} 종가 기준" not in page:
+    if not isinstance(page, str) or len(page) > 1_000_000:
         raise QuoteError("KRX close response invalid")
+    referenced = re.findall(r"\*\s*(\d{4}-\d{2}-\d{2})\s*종가 기준", page)
+    if len(referenced) != 1 or referenced[0] < traded:
+        raise QuoteError("KRX close date unverified")
     parser = _KindRows()
     parser.feed(page)
-    if parser.inputs.get("repIsuSrtCd") != f"A{code}" or parser.inputs.get("comAbbrv") != name:
+    official_name = parser.inputs.get("comAbbrv")
+    same_name = isinstance(name, str) and (official_name == name or official_name == name + "공사")
+    if parser.inputs.get("repIsuSrtCd") != f"A{code}" or not same_name:
         raise QuoteError("KRX security identity mismatch")
     rows = [row for row in parser.rows if len(row) >= 2 and row[0] == f"{traded} 종가"]
     current = [row for row in parser.rows if len(row) >= 2 and row[0] == "현재가"]
     if len(rows) != 1 or len(current) != 1:
         raise QuoteError("KRX close date unverified")
     close = _amount(rows[0][1])
-    if close != _amount(current[0][1]):
+    if referenced[0] == traded and close != _amount(current[0][1]):
         raise QuoteError("KRX close response mismatch")
     return close
 
@@ -158,12 +167,14 @@ def parse_quote(code, basic, daily, chart, observed_at, *, today=None, official_
         raise QuoteError("quote date mismatch")
     if daily_close != corroborated:
         raise QuoteError("source daily/basic mismatch")
-    close = parse_regular_chart(code, chart, expected.isoformat(), official_close=official_close)
+    if official_close is None:
+        raise QuoteError("KRX close unverified")
+    close, basis = parse_regular_chart(code, chart, expected.isoformat(), official_close=official_close, with_basis=True)
     return {"close": close, "currency": "KRW", "market": "KRX", "session": "regular",
             "trade_date": expected.isoformat(), "adjusted": False, "provider": "naver",
             "observed_at": observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "verified": True,
             "daily_reference_close": daily_close,
-            "close_basis": "naver_krx_delayed_auction_kind_confirmed" if official_close is not None else "naver_krx_1530_minute"}
+            "close_basis": basis}
 
 
 class NaverClient:
@@ -244,19 +255,20 @@ class NaverClient:
         basic = self._json(f"{BASE}/{code}/basic")
         daily = self._json(f"{BASE}/{code}/price?pageSize=5&page=1")
         chart = self._chart(code, 500)
+        traded = expected_session(datetime.fromisoformat(observed_at.replace("Z", "+00:00"))).isoformat()
+        official_close = self._kind_close(code, traded, basic.get("stockName"))
         try:
-            quote = parse_quote(code, basic, daily, chart, observed_at)
+            quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close)
         except QuoteError as exc:
             if "15:30 close unverified" not in str(exc):
                 raise
             chart = self._chart(code, 2000)
             try:
-                quote = parse_quote(code, basic, daily, chart, observed_at)
+                quote = parse_quote(code, basic, daily, chart, observed_at, official_close=official_close)
             except QuoteError as second:
                 if "15:30 close unverified" not in str(second):
                     raise
-                traded = expected_session(datetime.fromisoformat(observed_at.replace("Z", "+00:00"))).isoformat()
                 quote = parse_quote(code, basic, daily, chart, observed_at,
-                                    official_close=self._kind_close(code, traded, basic.get("stockName")))
+                                    official_close=official_close)
         self.cache[code] = quote
         return quote

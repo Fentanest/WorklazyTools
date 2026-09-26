@@ -15,6 +15,8 @@ const snapshot = JSON.parse(bytes.toString('utf8'))
 assert.equal(validSnapshot(snapshot, manifest.datasetVersion), true, 'FolioTrace snapshot schema invalid')
 assert.equal(snapshot.holdings.length, snapshot.trackedCount)
 assert.equal(snapshot.holdings.filter(row => row.estimatedValue !== null).length, snapshot.pricedCount)
+assert.ok(snapshot.trackedCount > 0 && snapshot.pricedCount > 0 && snapshot.estimatedValue !== null &&
+  snapshot.valuationCoverage !== 'unavailable', 'All tracked holdings are unpriced; production snapshot withheld')
 for (const lang of ['ko', 'en']) {
   const html = await fs.readFile(path.join(directory, lang, 'tools/foliotrace/index.html'), 'utf8')
   assert.ok(html.includes(`data-foliotrace-dataset='${manifest.datasetVersion}'`))

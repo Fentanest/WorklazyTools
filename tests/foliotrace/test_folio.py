@@ -126,7 +126,7 @@ class MigrationTests(unittest.TestCase):
             folio.write_json(state_path, state)
             quote = {"close": "1.25", "currency": "KRW", "market": "KRX", "session": "regular",
                      "trade_date": "2026-09-23", "adjusted": False, "provider": "naver", "observed_at": "2026-09-26T00:00:00Z", "verified": True,
-                     "close_basis": "naver_krx_1530_minute"}
+                     "close_basis": "naver_krx_1530_kind_confirmed"}
             state["quote_cache"]["009450|KRX|regular|2026-09-23|raw"] = {**quote, "close": "99", "close_basis": "basic_daily_v1"}
             folio.write_json(state_path, state)
             class Client:

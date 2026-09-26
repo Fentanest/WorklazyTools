@@ -42,6 +42,65 @@ def quote():
 
 
 class ReviewFixTests(unittest.TestCase):
+    def test_newest_failed_filing_survives_older_successful_holding_replacement(self):
+        state = state_with_holding()
+        earlier, latest = "20260923000001", "20260923000002"
+        folio.apply_listing_row(state, listing(earlier))
+        folio.apply_listing_row(state, listing(latest))
+        def structured(no, *_):
+            if no == latest:
+                return None
+            return {"quantity": "200", "company_ownership_percent": "6", "reason": "", "evidence": "dart_structured"}
+        with patch.object(folio, "structured_receipt", side_effect=structured), patch.object(folio, "dart_document", side_effect=ValueError("bad document")):
+            self.assertEqual(folio.resolve_unfinished(state, "test-key"), 2)
+        self.assertEqual(state["holdings"][CORP]["receipt_no"], earlier)
+        self.assertIn(latest, state["unresolved"])
+        state["holdings"][CORP].update(security_kind="common", corporate_action_status="verified")
+        snapshot = make_snapshot(state, {CODE: quote()}, datetime(2026, 9, 23, 8, tzinfo=timezone.utc))
+        self.assertEqual(snapshot["holdings"][0]["latestUnresolvedReceiptNo"], latest)
+        self.assertEqual(snapshot["holdings"][0]["valuationExclusionReason"], "latest_filing_unresolved")
+        self.assertIsNone(snapshot["estimatedValue"])
+
+    def test_document_fact_is_applied_after_exact_metadata_recovery_without_redownload(self):
+        state = folio.empty_state()
+        no = "20260923000003"
+        state["receipts"][no] = {"receipt_no": no, "corp_code": None, "stock_code": None,
+            "receipt_date": None, "evidence": "legacy_reference_only", "origin": "legacy_import"}
+        state["unresolved"][no] = "metadata_missing"
+        parsed = {"quantity": "200", "company_ownership_percent": "6", "reason": "", "evidence": "dart_document"}
+        with patch.object(folio, "dart_document", return_value=parsed):
+            self.assertEqual(folio.resolve_unfinished(state, "test-key"), 1)
+        self.assertEqual(state["unresolved"][no], "security_identity_missing")
+        folio.apply_listing_row(state, listing(no))
+        self.assertEqual(state["unresolved"][no], "parsed_identity_ready")
+        with patch.object(folio, "dart_document", side_effect=AssertionError("document refetched")), patch.object(folio, "structured_receipt", side_effect=AssertionError("structured refetched")):
+            self.assertEqual(folio.resolve_unfinished(state, "test-key"), 1)
+        self.assertNotIn(no, state["unresolved"])
+        self.assertEqual(state["holdings"][CORP]["quantity"], "200")
+
+    def test_all_unpriced_production_candidate_is_withheld(self):
+        state = state_with_holding()
+        state["holdings"][CORP]["corporate_action_status"] = "unverified"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path, output = root / "state.json", root / "publish.json"
+            folio.write_json(state_path, state)
+            class Client:
+                requests = 1
+                def quote(self, code):
+                    return {**quote(), "close_basis": "naver_krx_1530_kind_confirmed"}
+            with patch.object(folio, "expected_session", return_value=folio.date(2026, 9, 23)):
+                with self.assertRaisesRegex(RuntimeError, "all tracked holdings are unpriced"):
+                    folio.price_and_value(state_path, output, Client())
+            self.assertFalse(output.exists())
+            unavailable = make_snapshot(state, {CODE: quote()})
+            folio.write_json(output, unavailable)
+            dist = root / "dist"
+            dist.mkdir()
+            (dist / "index.html").write_text("<html></html>")
+            with self.assertRaisesRegex(ValueError, "all tracked holdings are unpriced"):
+                folio.emit_snapshot(output, dist)
+
     def test_official_correction_and_withdrawal_exclude_old_quantity(self):
         state = state_with_holding()
         first = "20260923000001"
@@ -147,18 +206,18 @@ class ReviewFixTests(unittest.TestCase):
             self.assertEqual(folio.read_json(path)["receipts"]["20260901000001"]["quantity"], "80")
             self.assertEqual(folio.read_json(path)["receipts"]["20260901000001"]["evidence"], "legacy_history_fact")
 
-    def test_dated_security_share_jump_excluded_small_drift_retained(self):
+    def test_dated_security_share_change_requires_action_evidence(self):
         state = state_with_holding()
         state["holdings"][CORP]["receipt_date"] = "2026-09-08"
         historic = {CODE: {"name": "Synthetic", "isin": "KR7005930003", "listed_shares_thousands": "100"}}
-        current = {CODE: {"name": "Synthetic", "isin": "KR7005930003", "listed_shares_thousands": "102"}}
+        current = {CODE: {"name": "Synthetic", "isin": "KR7005930003", "listed_shares_thousands": "100"}}
         fetch = lambda day: (historic, "a" * 64)
         result = folio.reconcile_corporate_actions(state, "2026-09-23", current, fetch=fetch)
         self.assertEqual(result["verified"], 1)
-        current[CODE]["listed_shares_thousands"] = "500"
+        current[CODE]["listed_shares_thousands"] = "125"
         result = folio.reconcile_corporate_actions(state, "2026-09-23", current, fetch=fetch)
         self.assertEqual(result["unverified"], 1)
-        self.assertEqual(state["holdings"][CORP]["corporate_action_reason"], "material_share_count_change")
+        self.assertEqual(state["holdings"][CORP]["corporate_action_reason"], "listed_share_count_changed_without_action_evidence")
 
     def test_officially_confirmed_delayed_chart_close_is_cached_separately(self):
         state = state_with_holding()
@@ -178,7 +237,7 @@ class ReviewFixTests(unittest.TestCase):
                 second = folio.price_and_value(path, output, client)
             self.assertEqual((first["cache_hits"], second["cache_hits"], client.requests), (0, 1, 1))
             keys = list(folio.read_json(path)["quote_cache"])
-            self.assertEqual(keys, [f"{CODE}|KRX|regular|2026-09-23|naver-chart1530-kind-v1"])
+            self.assertEqual(keys, [f"{CODE}|KRX|regular|2026-09-23|naver-delayed-kind-v2"])
 
 
 if __name__ == "__main__":
