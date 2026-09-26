@@ -263,7 +263,8 @@ def make_snapshot(state, quotes, now=None):
                     "status": item["observation_status"],
                     "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={item['source_receipt_no']}"}
                     for item in sorted((fact for fact in state.get("verified_historical_observations", {}).values()
-                                        if fact.get("observation_status") != "historical_comparable_registered"),
+                                        if fact.get("observation_status") != "historical_comparable_registered" and
+                                        fact.get("source_receipt_no") not in source_holds),
                                        key=lambda entry: (entry["basis_date"], entry["source_receipt_no"]),
                                        reverse=True)],
                 "history": [{"tradeDate": item["trade_date"], "estimatedValue": item["estimated_value"],

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import re
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -16,12 +19,64 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.foliotrace import folio, opendart_secondary, secondary
 
 
+def fetch_filing_family(receipt_no: str) -> bytes:
+    if not re.fullmatch(r"\d{14}", receipt_no):
+        raise ValueError("FAMILY_IDENTITY")
+    request = urllib.request.Request(
+        f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={receipt_no}",
+        headers={"User-Agent": "FolioTrace/1.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = response.read(2_000_001)
+    except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException):
+        raise RuntimeError("FAMILY_TRANSPORT") from None
+    if len(payload) > 2_000_000:
+        raise ValueError("FAMILY_SIZE")
+    return payload
+
+
+def correction_original(payload: bytes, corrected_no: str) -> str | None:
+    try:
+        source = payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    linked = set(re.findall(
+        rf'alertInvestNotice\(\s*"{corrected_no}"\s*,\s*"\d+"\s*,\s*"(\d{{14}})"',
+        source))
+    if len(linked) != 1:
+        return None
+    original = next(iter(linked))
+    if original == corrected_no or not re.search(
+            rf'<option\b[^>]*\bvalue="rcpNo={original}"', source):
+        return None
+    return original
+
+
+def _report_identity(name: str) -> str:
+    return re.sub(r"\s+", "", re.sub(r"^(?:\[(?:기재)?정정\]|정정)\s*", "", name or ""))
+
+
+def _same_dated_shareholder_facts(original: dict, correction: dict) -> bool:
+    fields = ("structure", "basis_date", "security_kind", "quantity",
+              "ownership_percent", "denominator_quantity", "denominator_date")
+    def facts(item):
+        return {tuple(claim.get(field) for field in fields)
+                for claim in item.get("source_claims") or []
+                if claim.get("structure") == "dated_five_percent_shareholder_all_common" and
+                claim.get("status") == "actual_holding_basis_verified" and
+                claim.get("source_file_sha256") and claim.get("row_sha256")}
+    left, right = facts(original), facts(correction)
+    return bool(left) and left == right
+
+
 def ingest_target(state: dict, receipt_no: str, corp_code: str, filing_day: date, key: str,
-                  *, fetch_list=None, fetch_document=None, archive_dir: Path | None = None) -> dict:
+                  *, fetch_list=None, fetch_document=None, fetch_family=None,
+                  archive_dir: Path | None = None) -> dict:
     if not re.fullmatch(r"\d{14}", receipt_no) or not re.fullmatch(r"\d{8}", corp_code):
         raise ValueError("TARGET_IDENTITY")
     fetch_list = fetch_list or (lambda params: opendart_secondary.fetch_list_page(params, key))
     fetch_document = fetch_document or (lambda no: secondary.fetch_source_document(no, key))
+    fetch_family = fetch_family or fetch_filing_family
     params = {"corp_code": corp_code, "bgn_de": filing_day.strftime("%Y%m%d"),
               "end_de": filing_day.strftime("%Y%m%d"), "page_no": 1,
               "page_count": opendart_secondary.PAGE_SIZE,
@@ -110,7 +165,37 @@ def ingest_target(state: dict, receipt_no: str, corp_code: str, filing_day: date
                  "source_archive_sha256": check["source_archive_sha256"],
                  "parser_version": secondary.SOURCE_PARSER_VERSION,
                  "source_claims": check.get("source_claims") or []}
-    if queue["correction_hold"] or queue["withdrawal_flag"]:
+    family_requests = 0
+    possible_original = any(
+        item.get("filer_corp_code") == corp_code and
+        item.get("filing_date", "") < filing_day.isoformat() and
+        _report_identity(item.get("report_name")) == _report_identity(queue["report_nm"])
+        for item in (state.get("target_source_candidates") or {}).values())
+    if (queue["correction_hold"] and not queue["withdrawal_flag"] and
+            _report_identity(queue["report_nm"]) != re.sub(r"\s+", "", queue["report_nm"]) and
+            mapping_verified and possible_original):
+        family_requests = 1
+        try:
+            family = fetch_family(receipt_no)
+            original_no = correction_original(family, receipt_no)
+        except (ValueError, RuntimeError):
+            original_no = None
+        original = (state.get("target_source_candidates") or {}).get(original_no) if original_no else None
+        if (original and original.get("filer_corp_code") == corp_code and
+                original.get("filing_date", "") < filing_day.isoformat() and
+                original.get("parser_version") == secondary.SOURCE_PARSER_VERSION and
+                original.get("source_archive_sha256") and
+                original.get("source_checked_at") and
+                _report_identity(original.get("report_name")) == _report_identity(queue["report_nm"]) and
+                _same_dated_shareholder_facts(original, candidate)):
+            candidate["listing_correction_flag"] = True
+            candidate["correction_hold"] = False
+            candidate["correction_relation_verified"] = {
+                "original_receipt_no": original_no,
+                "original_archive_sha256": original["source_archive_sha256"],
+                "family_page_sha256": hashlib.sha256(family).hexdigest()}
+            state.setdefault("indirect_source_holds", {})[original_no] = "superseded_by_correction"
+    if candidate["correction_hold"] or queue["withdrawal_flag"]:
         state.setdefault("indirect_source_holds", {})[receipt_no] = (
             "withdrawn" if queue["withdrawal_flag"] else "correction_relation_unverified")
     else:
@@ -125,6 +210,7 @@ def ingest_target(state: dict, receipt_no: str, corp_code: str, filing_day: date
     if changed:
         state["revision"] += 1
     return {"receipt_no": receipt_no, "listing_pages": pages, "source_requests": requests,
+            "family_requests": family_requests,
             "raw_archive_cache_hits": raw_cache_hits,
             "source_claims": len(candidate["source_claims"]), "state_changed": changed,
             "facts_changed": count, "mapping_verified": mapping_verified,

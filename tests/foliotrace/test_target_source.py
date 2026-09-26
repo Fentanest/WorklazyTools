@@ -31,6 +31,80 @@ def source_archive(later=False):
 
 
 class TargetSourceTests(unittest.TestCase):
+    def test_verified_report_family_retains_corrected_1998_fact_only(self):
+        original_no, corrected_no = '19990330000205', '19990611000003'
+        state = folio.empty_state()
+        state['universe']['00190321'] = {'name': '케이티', 'stock_code': '030200'}
+        state['receipts']['20260901000001'] = {'receipt_no': '20260901000001',
+            'receipt_date': '2026-09-01', 'corp_code': '00190321', 'stock_code': '030200'}
+        state['holdings']['00190321'] = {'corp_code': '00190321', 'stock_code': '030200',
+            'name': '케이티', 'receipt_no': '20260901000001', 'receipt_date': '2026-09-01',
+            'holding_date': None, 'quantity': '10000000', 'company_ownership_percent': '8.0',
+            'security_kind': 'common', 'tracking': 'active', 'evidence': 'legacy_import'}
+        def row(*cells):
+            return '<TR>' + ''.join(f'<TD>{cell}</TD>' for cell in cells) + '</TR>'
+        xml = ('<DOC><P>4. 주식의 총수 등</P>' + row('(1998.12.31. 현재)') +
+            row('발행할 주식의 총수', '발행한 주식의 총수', '미발행 주식의 총수') +
+            row('1,000,000,000주', '287,917,464주', '712,082,536주') +
+            '<P>나. 발행한 주식의 내용</P>' + row('(1998.12.31 현재)') +
+            row('구 분', '종 류', '발행주식수', '액면가액총액', '비 고') +
+            row('기명식', '보통주', '287,917,464주', '액면가', '') +
+            row('합 계', '287,917,464주', '액면가', '') +
+            '<P>나. 5%이상 주주의 주식소유 현황</P>' + row('[1998년 12월31일 현재]', '(단위 :주)') +
+            '<TABLE>' + row('순 위', '성명(명칭)', '종 류', '주식수', '지분율(%)') +
+            row('2', '국민연금관리공단', '보통주', '21,298,820', '7.40') +
+            row('우선주', '-', '-') + row('합 계', '21,298,820', '7.40') + '</TABLE></DOC>')
+        def archive(text):
+            output = io.BytesIO()
+            with zipfile.ZipFile(output, 'w') as zipped:
+                zipped.writestr('filing.xml', text)
+            return output.getvalue()
+        payload = archive(xml)
+        def listed(no, day, report):
+            return {'status': '000', 'page_no': '1', 'page_count': '100',
+                'total_count': '1', 'total_page': '1', 'list': [{
+                    'rcept_no': no, 'rcept_dt': day, 'corp_code': '00190321',
+                    'corp_name': '케이티', 'stock_code': '030200',
+                    'report_nm': report, 'rm': '정'}]}
+        original_list = listed(original_no, '19990330', '사업보고서 (1998.12)')
+        corrected_list = listed(corrected_no, '19990611', '[기재정정]사업보고서 (1998.12)')
+        family = (f'<script>alertInvestNotice("{corrected_no}", "13413", "{original_no}", "1");'
+                  f'</script><select><option value="rcpNo={original_no}" title="사업보고서">원공시</option></select>').encode()
+        with tempfile.TemporaryDirectory() as directory:
+            archive_dir = Path(directory)
+            original = target_source.ingest_target(state, original_no, '00190321',
+                date(1999, 3, 30), '', archive_dir=archive_dir,
+                fetch_list=lambda _: original_list, fetch_document=lambda _: payload,
+                fetch_family=lambda _: self.fail('original must not query correction family'))
+            self.assertEqual((original['source_claims'], original['facts_changed']), (1, 0))
+            self.assertEqual(len(state['verified_historical_observations']), 0)
+            pending = target_source.ingest_target(state, corrected_no, '00190321',
+                date(1999, 6, 11), '', archive_dir=archive_dir,
+                fetch_list=lambda _: corrected_list, fetch_document=lambda _: payload,
+                fetch_family=lambda _: b'<select></select>')
+            self.assertEqual((pending['facts_changed'], pending['application_status']),
+                             (0, 'correction_relation_unverified'))
+            corrected = target_source.ingest_target(state, corrected_no, '00190321',
+                date(1999, 6, 11), '', archive_dir=archive_dir,
+                fetch_list=lambda _: corrected_list, fetch_document=lambda _: payload,
+                fetch_family=lambda _: family)
+            self.assertEqual((corrected['source_claims'], corrected['facts_changed'],
+                              corrected['family_requests']), (1, 1, 1))
+            fact = next(iter(state['verified_historical_observations'].values()))
+            self.assertEqual((fact['source_receipt_no'], fact['basis_date'], fact['quantity']),
+                             (corrected_no, '1998-12-31', '21298820'))
+            self.assertEqual(state['indirect_source_holds'][original_no], 'superseded_by_correction')
+            snapshot = make_snapshot(state, {})
+            self.assertEqual(len(snapshot['verifiedIndirectObservations']), 1)
+            self.assertEqual(snapshot['verifiedIndirectObservations'][0]['receiptNo'], corrected_no)
+            self.assertEqual(snapshot['holdings'][0]['companyOwnershipPercent'], '8.0')
+            replay = target_source.ingest_target(state, corrected_no, '00190321',
+                date(1999, 6, 11), '', archive_dir=archive_dir,
+                fetch_list=lambda _: corrected_list,
+                fetch_document=lambda _: self.fail('raw cache was not reused'),
+                fetch_family=lambda _: family)
+            self.assertEqual((replay['facts_changed'], replay['raw_archive_cache_hits']), (0, 0))
+
     def test_official_listing_to_document_to_scoped_main_and_withdrawal(self):
         state = folio.empty_state()
         state['universe']['00244455'] = {'name': '케이티앤지', 'stock_code': '033780'}
@@ -114,7 +188,7 @@ class TargetSourceTests(unittest.TestCase):
                 'report_nm': '정정 분기보고서 (2026.03)', 'rm': '정'}]}
         target_source.ingest_target(state, '20260516000001', '00244455',
             date(2026, 5, 16), '', fetch_list=lambda _: correction,
-            fetch_document=fetch_document)
+            fetch_document=fetch_document, fetch_family=lambda _: b'<select></select>')
         self.assertEqual(make_snapshot(state, {})['holdings'][0]['issuerScopeSource']['referenceCount'], 1)
         self.assertEqual(len(make_snapshot(state, {})['issuerScopeObservations'][0]['references']), 1)
         target_source.ingest_target(state, '20251114002334', '00244455',

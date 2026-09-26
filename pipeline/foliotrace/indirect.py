@@ -92,7 +92,7 @@ def effective_source_holds(state):
                        (item.get("filing_date") or "").replace("-", ""),
                        bool(item.get("correction_hold") or item.get("withdrawal_flag")))
     def title(value):
-        return re.sub(r"\s+", "", re.sub(r"^(?:\[?정정\]?|정정공시)\s*", "", value or ""))
+        return re.sub(r"\s+", "", re.sub(r"^(?:\[(?:기재)?정정\]|\(정정\)|정정공시|정정)\s*", "", value or ""))
     for no, (corp, report, day, held) in sources.items():
         if not held or not corp or not report or not day:
             continue
