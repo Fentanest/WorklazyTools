@@ -1,0 +1,363 @@
+/* FolioTrace scoped styles. Only .foliotrace-* selectors. Semantic tokens only. */
+.foliotrace-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.foliotrace-retry {
+  align-self: flex-start;
+  border: 1px solid var(--wl-border);
+  border-radius: var(--wl-radius-md, 12px);
+  background: var(--wl-surface);
+  color: var(--wl-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.foliotrace-retry:hover {
+  border-color: var(--wl-primary);
+  color: var(--wl-primary);
+}
+
+.foliotrace-retry:focus-visible {
+  outline: 2px solid var(--wl-focus, var(--wl-primary));
+  outline-offset: 2px;
+}
+
+.foliotrace-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  border: 1px solid var(--wl-border);
+  border-radius: var(--wl-radius-md, 12px);
+  background: var(--wl-surface);
+  color: var(--wl-text);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding: 0.75rem 1rem;
+}
+
+.foliotrace-scope {
+  font-weight: 800;
+}
+
+.foliotrace-badge-warn,
+.foliotrace-badge-ok {
+  border-radius: 999px;
+  font-weight: 800;
+  padding: 0.1rem 0.65rem;
+}
+
+.foliotrace-badge-warn {
+  background: var(--wl-warning);
+  color: var(--wl-on);
+}
+
+.foliotrace-badge-ok {
+  background: var(--wl-success);
+  color: var(--wl-on);
+}
+
+.foliotrace-scope-note {
+  margin: 0;
+  color: var(--wl-muted, var(--wl-text));
+  font-size: 0.9rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .foliotrace-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.foliotrace-summary-card {
+  padding: 1rem 1.1rem;
+  background: var(--wl-card-bg, var(--wl-surface));
+  border-color: var(--wl-border);
+}
+
+.foliotrace-summary-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--wl-muted, var(--wl-text));
+}
+
+.foliotrace-summary-value {
+  font-size: 1.4rem;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-summary-card small {
+  color: var(--wl-muted, var(--wl-text));
+  font-size: 0.8rem;
+}
+
+.foliotrace-state-text {
+  color: var(--wl-text);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-state-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.foliotrace-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.foliotrace-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+@media (max-width: 620px) {
+  .foliotrace-bar-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .foliotrace-bar-track {
+    grid-column: 1 / -1;
+    order: 2;
+  }
+}
+
+.foliotrace-bar-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.foliotrace-bar-track {
+  display: block;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--wl-soft, var(--wl-surface-muted));
+  overflow: hidden;
+}
+
+.foliotrace-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--wl-primary);
+  border-radius: 999px;
+}
+
+.foliotrace-bar-value {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.foliotrace-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.foliotrace-history li {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  border-top: 1px solid var(--wl-border);
+  padding: 0.5rem 0.1rem;
+  font-size: 0.9rem;
+}
+
+.foliotrace-history li:first-child {
+  border-top: 0;
+}
+
+.foliotrace-history small {
+  color: var(--wl-muted, var(--wl-text));
+}
+
+.foliotrace-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: end;
+  margin-bottom: 0.6rem;
+}
+
+.foliotrace-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-width: min(220px, 100%);
+  flex: 1 1 180px;
+}
+
+.foliotrace-field input,
+.foliotrace-field select {
+  border: 1px solid var(--wl-border);
+  border-radius: var(--wl-radius-sm, 10px);
+  background: var(--wl-surface);
+  color: var(--wl-text);
+  font-size: 0.92rem;
+  font-weight: 400;
+  min-height: 2.6rem;
+  padding: 0.5rem 0.7rem;
+  max-width: 100%;
+}
+
+.foliotrace-field input:focus-visible,
+.foliotrace-field select:focus-visible {
+  outline: 2px solid var(--wl-focus, var(--wl-primary));
+  outline-offset: 1px;
+}
+
+.foliotrace-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--wl-border);
+  border-radius: var(--wl-radius-md, 12px);
+}
+
+.foliotrace-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 880px;
+  font-size: 0.87rem;
+  background: var(--wl-surface);
+  color: var(--wl-text);
+}
+
+.foliotrace-table th,
+.foliotrace-table td {
+  border-top: 1px solid var(--wl-border);
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-table thead th {
+  border-top: 0;
+  background: var(--wl-surface-muted, var(--wl-soft));
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.foliotrace-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+th.foliotrace-num {
+  text-align: right;
+}
+
+.foliotrace-code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82em;
+  background: var(--wl-soft, var(--wl-surface-muted));
+  border-radius: 6px;
+  padding: 0.05rem 0.35rem;
+  white-space: nowrap;
+}
+
+.foliotrace-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.foliotrace-events li {
+  border-top: 1px solid var(--wl-border);
+  padding-top: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-events li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.foliotrace-events a,
+.foliotrace-detail-list a {
+  color: var(--wl-primary);
+}
+
+.foliotrace-guide {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-detail-list {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.foliotrace-detail-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--wl-border);
+  padding: 0.55rem 0;
+  font-size: 0.9rem;
+}
+
+.foliotrace-detail-list > div:first-child {
+  border-top: 0;
+}
+
+.foliotrace-detail-list dt {
+  color: var(--wl-muted, var(--wl-text));
+  flex-shrink: 0;
+}
+
+.foliotrace-detail-list dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-detail-h3 {
+  font-size: 0.95rem;
+  margin: 0.6rem 0 0.4rem;
+}
