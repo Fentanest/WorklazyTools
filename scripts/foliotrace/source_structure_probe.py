@@ -15,7 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.foliotrace.secondary import fetch_source_document
 
-RECEIPTS = ("20060124800040", "20081007000289", "20030909000232")
+RECEIPTS = ("20060124800040", "20081007000289", "20030909000232",
+            "20090227000244", "20260908000302")
 NPS = re.compile(r"국민연금(?:관리)?공단|National Pension Service", re.I)
 TAG = re.compile(r"<[^>]*>", re.S)
 ROWS = re.compile(r"<TR\b[^>]*>.*?</TR>", re.I | re.S)
