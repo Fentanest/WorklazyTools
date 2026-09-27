@@ -6,6 +6,7 @@ import {
   approxNumber,
   eventRangeOf,
   exclusionReasonLabel,
+  filingChangesForHoldings,
   filterHoldings,
   formatKrw,
   formatKstTimestamp,
@@ -110,6 +111,55 @@ test("financial display renders null and non-decimal input as em-dash, never NaN
   const ko = formatKrw("70000000", "ko");
   assert.ok(ko.includes("70,000,000"), `unexpected ko value: ${ko}`);
   assert.ok(!ko.includes("NaN"), `NaN leaked: ${ko}`);
+});
+
+test("table filing colors compare quantity and ownership independently with exact decimals", () => {
+  const currentHolding = holding({ stockCode: "005930", receiptNo: "20260103000001",
+    quantity: "9007199254740993", companyOwnershipPercent: "6.10" });
+  const previous = event({ receiptNo: "20260102000001", receiptDate: "2026-01-02",
+    quantity: "9007199254740992", companyOwnershipPercent: "6.20" });
+  const current = event({ receiptNo: currentHolding.receiptNo, receiptDate: "2026-01-03", kind: "other",
+    quantity: currentHolding.quantity, companyOwnershipPercent: currentHolding.companyOwnershipPercent,
+    source: "legacy-import" });
+  assert.deepEqual(filingChangesForHoldings([currentHolding], [current, previous]).get(currentHolding),
+    { quantity: "up", ownership: "down" });
+
+  const sameQuantity = holding({ ...currentHolding, quantity: "1000.0", companyOwnershipPercent: "6.30" });
+  assert.deepEqual(filingChangesForHoldings([sameQuantity], [
+    { ...current, quantity: "1000", companyOwnershipPercent: "6.30" },
+    { ...previous, quantity: "1000.00", companyOwnershipPercent: "6.20" },
+  ]).get(sameQuantity), { quantity: null, ownership: "up" });
+});
+
+test("first reports, corrections, and indirect holdings keep their normal text color", () => {
+  const currentHolding = holding({ stockCode: "005930", receiptNo: "20260103000001" });
+  const previous = event({ receiptNo: "20260102000001", receiptDate: "2026-01-02",
+    quantity: "900", companyOwnershipPercent: "5.10" });
+  const current = event({ receiptNo: currentHolding.receiptNo, receiptDate: "2026-01-03" });
+  assert.equal(filingChangesForHoldings([currentHolding], [current]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [{ ...current, kind: "new-report" }, previous]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [{ ...current, kind: "tracking-reentry" }, previous]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [{ ...current, correctionOf: previous.receiptNo }, previous]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [current, { ...previous, correctionOf: "20260101000001" }]).has(currentHolding), false);
+  const indirect = holding({ ...currentHolding, evidence: "issuer-scope-observation" });
+  assert.equal(filingChangesForHoldings([indirect], [current, previous]).has(indirect), false);
+  const lowerBound = holding({ ...currentHolding, ownershipNumericKind: "lower_bound" });
+  assert.deepEqual(filingChangesForHoldings([lowerBound], [current, previous]).get(lowerBound),
+    { quantity: "up", ownership: null });
+});
+
+test("a missing value in the immediately preceding filing stays neutral for that field", () => {
+  const currentHolding = holding({ stockCode: "005930", receiptNo: "20260103000001",
+    quantity: "1000", companyOwnershipPercent: "6.10" });
+  const older = event({ receiptNo: "20260101000001", receiptDate: "2026-01-01",
+    quantity: "500", companyOwnershipPercent: "5.00" });
+  const previous = event({ receiptNo: "20260102000001", receiptDate: "2026-01-02",
+    quantity: null, companyOwnershipPercent: "6.20" });
+  const current = event({ receiptNo: currentHolding.receiptNo, receiptDate: "2026-01-03" });
+  assert.deepEqual(filingChangesForHoldings([currentHolding], [older, current, previous]).get(currentHolding),
+    { quantity: null, ownership: "down" });
+  const otherSecurity = { ...older, stockCode: "000660" };
+  assert.equal(filingChangesForHoldings([currentHolding], [current, otherSecurity]).has(currentHolding), false);
 });
 
 test("approxNumber exists only for bar sizing and never throws", () => {

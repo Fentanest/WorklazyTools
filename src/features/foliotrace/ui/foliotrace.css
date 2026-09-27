@@ -382,6 +382,24 @@
   white-space: nowrap;
 }
 
+.foliotrace-change-up {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.foliotrace-change-down {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+:root[data-theme^="dark-"] .foliotrace-change-up {
+  color: #ff958e;
+}
+
+:root[data-theme^="dark-"] .foliotrace-change-down {
+  color: #93c5fd;
+}
+
 th.foliotrace-num {
   text-align: right;
 }

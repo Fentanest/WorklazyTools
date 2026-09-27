@@ -104,6 +104,76 @@ function compareParsed(a: ParsedDecimal, b: ParsedDecimal): number {
   return 0;
 }
 
+export type FilingChangeDirection = "up" | "down" | null;
+export interface FilingValueChanges {
+  quantity: FilingChangeDirection;
+  ownership: FilingChangeDirection;
+}
+
+const DIRECT_EVENT_SOURCES = new Set<FilingEvent["source"]>([
+  "legacy-import", "dart-structured", "dart-document",
+]);
+const DIRECT_HOLDING_EVIDENCE = new Set<Holding["evidence"]>([
+  "legacy-import", "dart-structured", "dart-document",
+]);
+
+function reportedDirection(current: string | null, previous: string | null): FilingChangeDirection {
+  const currentValue = parseDecimal(current);
+  const previousValue = parseDecimal(previous);
+  if (currentValue === null || previousValue === null) return null;
+  const order = compareParsed(currentValue, previousValue);
+  return order > 0 ? "up" : order < 0 ? "down" : null;
+}
+
+function sameReportedValue(left: string | null, right: string | null): boolean {
+  const leftValue = parseDecimal(left);
+  const rightValue = parseDecimal(right);
+  return leftValue !== null && rightValue !== null && compareParsed(leftValue, rightValue) === 0;
+}
+
+/**
+ * Compare the table's two reported numbers with the immediately preceding
+ * filing for the same security. This describes the reported numbers only;
+ * it does not infer trades or compare third-party ownership observations.
+ */
+export function filingChangesForHoldings(
+  holdings: Holding[], events: FilingEvent[],
+): Map<Holding, FilingValueChanges> {
+  const bySecurity = new Map<string, FilingEvent[]>();
+  for (const event of events) {
+    if (!event.stockCode || !DIRECT_EVENT_SOURCES.has(event.source)) continue;
+    const key = `${event.corpCode}:${event.stockCode}`;
+    const filings = bySecurity.get(key) ?? [];
+    filings.push(event);
+    bySecurity.set(key, filings);
+  }
+  for (const filings of bySecurity.values()) filings.sort((a, b) => a.receiptNo.localeCompare(b.receiptNo));
+
+  const changes = new Map<Holding, FilingValueChanges>();
+  for (const holding of holdings) {
+    if (!DIRECT_HOLDING_EVIDENCE.has(holding.evidence)) continue;
+    const filings = bySecurity.get(`${holding.corpCode}:${holding.stockCode}`);
+    if (!filings || filings.length < 2) continue;
+    const currentIndex = filings.findIndex((event) => event.receiptNo === holding.receiptNo);
+    if (currentIndex < 1 || currentIndex !== filings.length - 1) continue;
+    const current = filings[currentIndex];
+    const previous = filings[currentIndex - 1];
+    // A first/re-entry report establishes a position; corrections and
+    // uncertain latest holdings must not be presented as a numeric change.
+    if (current.correctionOf || previous.correctionOf ||
+        current.kind === "new-report" || current.kind === "tracking-reentry") continue;
+    const quantity = sameReportedValue(holding.quantity, current.quantity)
+      ? reportedDirection(holding.quantity, previous.quantity) : null;
+    const exactOwnership = (holding.ownershipNumericKind == null || holding.ownershipNumericKind === "exact") &&
+      (current.numericKind == null || current.numericKind === "exact") &&
+      (previous.numericKind == null || previous.numericKind === "exact");
+    const ownership = exactOwnership && sameReportedValue(holding.companyOwnershipPercent, current.companyOwnershipPercent)
+      ? reportedDirection(holding.companyOwnershipPercent, previous.companyOwnershipPercent) : null;
+    if (quantity || ownership) changes.set(holding, { quantity, ownership });
+  }
+  return changes;
+}
+
 export function holdingStatus(h: Holding): HoldingStatus {
   if (h.tracking === "below-5-percent") return "exit";
   if (h.evidence === "unresolved-latest") return "unresolved";

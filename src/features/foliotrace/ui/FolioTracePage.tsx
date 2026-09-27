@@ -24,6 +24,7 @@ import {
   approxNumber,
   eventRangeOf,
   exclusionReasonLabel,
+  filingChangesForHoldings,
   filterHoldings,
   formatKstTimestamp,
   formatKrw,
@@ -36,7 +37,7 @@ import {
   sortHoldings,
   topHoldings,
 } from "./holdings";
-import type { Lang, QualityFilter, SortKey } from "./holdings";
+import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./holdings";
 import { XIcon } from "lucide-react";
 import { getFaqsForPath } from "./faq";
 import indirectEvidence from "../data/indirectEvidence.json";
@@ -112,6 +113,9 @@ const STR = {
     tableTitle: "종목 표",
     tableDesc: "수량·지분율·종가·추정 금액·비중·접수일을 구분해 표시합니다.",
     tableUnavailable: "—는 확인된 평가 금액이 없다는 뜻입니다. 종목명 아래에서 제외 사유를 확인하세요.",
+    tableChangeNote: "같은 종목의 직전 공시 숫자보다 크면 빨강, 작으면 파랑으로 표시합니다. 첫 확인·비교 불가 값은 기본색이며, 색이 실제 매매를 뜻하지는 않습니다.",
+    changeUp: "직전 공시 수치보다 증가",
+    changeDown: "직전 공시 수치보다 감소",
     searchLabel: "종목명·종목코드 검색",
     searchPlaceholder: "예: 삼성전자 또는 005930",
     qualityLabel: "평가 여부",
@@ -278,6 +282,9 @@ const STR = {
     tableTitle: "Holdings table",
     tableDesc: "Quantity, company ownership, close, estimated value, weight, and receipt date are shown separately.",
     tableUnavailable: "— means no verified valuation is available. See the exclusion reason under the security name.",
+    tableChangeNote: "Reported numbers appear red when above the previous filing for the same security and blue when below it. First reports and incomparable values keep the usual color; colors do not establish a trade.",
+    changeUp: "Higher than the previous filing",
+    changeDown: "Lower than the previous filing",
     searchLabel: "Search name / stock code",
     searchPlaceholder: "e.g. Samsung or 005930",
     qualityLabel: "Valuation status",
@@ -423,6 +430,22 @@ function breakableValue(text: string): ReactNode {
   );
 }
 
+function FilingChangeValue({ value, direction, upLabel, downLabel }: {
+  value: string;
+  direction: FilingChangeDirection;
+  upLabel: string;
+  downLabel: string;
+}) {
+  if (direction === null) return value;
+  const label = direction === "up" ? upLabel : downLabel;
+  return (
+    <span className={`foliotrace-change-${direction}`} title={label}>
+      <span aria-hidden="true">{direction === "up" ? "↑ " : "↓ "}</span>
+      {value}<span className="sr-only"> · {label}</span>
+    </span>
+  );
+}
+
 export function FolioTracePage({ lang, view, onRefresh }: FolioTracePageProps) {
   const t = STR[lang];
   if (view.status !== "ready") {
@@ -489,6 +512,10 @@ function ReadyView({
   const filtered = useMemo(
     () => sortHoldings(filterHoldings(snapshot.holdings, query, quality), sortKey),
     [snapshot.holdings, query, quality, sortKey],
+  );
+  const filingChanges = useMemo(
+    () => filingChangesForHoldings(snapshot.holdings, snapshot.events),
+    [snapshot.holdings, snapshot.events],
   );
 
   const topWeights = useMemo(() => topHoldings(snapshot.holdings), [snapshot.holdings]);
@@ -740,6 +767,7 @@ function ReadyView({
         ) : (
           <>
             <p className="foliotrace-state-text foliotrace-table-note">{t.tableUnavailable}</p>
+            <p className="foliotrace-state-text foliotrace-table-note">{t.tableChangeNote}</p>
             <div className="foliotrace-controls">
               <label className="foliotrace-field">
                 <span>{t.searchLabel}</span>
@@ -833,8 +861,14 @@ function ReadyView({
                             </small>
                           )}
                         </th>
-                        <td className="foliotrace-num">{formatQty(h.quantity)}</td>
-                        <td className="foliotrace-num">{observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}</td>
+                        <td className="foliotrace-num">
+                          <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
+                            upLabel={t.changeUp} downLabel={t.changeDown} />
+                        </td>
+                        <td className="foliotrace-num">
+                          <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}
+                            direction={filingChanges.get(h)?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
+                        </td>
                         <td className="foliotrace-num">
                           {h.quote ? `${formatKrw(h.quote.close, lang)} · ${h.quote.tradeDate}` : "—"}
                         </td>
