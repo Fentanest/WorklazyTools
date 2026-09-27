@@ -973,7 +973,7 @@ function ReadyView({
 
       <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) setSelectedCode(null); }}>
         {selected && (
-          <SheetContent side="center" className="foliotrace-detail-panel" showCloseButton={false} aria-label={`${selected.name} ${t.colDetail}`}>
+          <SheetContent side="center" className="foliotrace-detail-panel" showCloseButton={false} style={{ maxHeight: "100dvh" }} aria-label={`${selected.name} ${t.colDetail}`}>
             <SheetClose className="foliotrace-detail-close" aria-label={t.closeDetail}>
               <XIcon aria-hidden="true" size={18} />
             </SheetClose>
