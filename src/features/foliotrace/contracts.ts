@@ -91,6 +91,8 @@ export interface FilingEvent {
   stockCode: string | null
   kind: 'increase' | 'decrease' | 'new-report' | 'purpose-change' | 'tracking-exit' | 'tracking-reentry' | 'unquantified-change' | 'other'
   correctionOf: string | null
+  /** Absent in older snapshots; null when the receipt flags cannot be verified. */
+  isCorrectionOrWithdrawal?: boolean | null
   quantity: DecimalString | null
   companyOwnershipPercent: DecimalString | null
   numericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated'

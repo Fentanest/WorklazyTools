@@ -130,7 +130,9 @@ function validEvent(value: unknown): boolean {
       OBSERVATION_KEY.test(value.observationKey))) &&
     str(value.corpCode) && /^\d{8}$/.test(value.corpCode) && nullable(value.stockCode, x => str(x) && STOCK.test(x)) &&
     ['increase', 'decrease', 'new-report', 'purpose-change', 'tracking-exit', 'tracking-reentry', 'unquantified-change', 'other'].includes(String(value.kind)) &&
-    nullable(value.correctionOf, x => str(x) && RECEIPT.test(x)) && nullable(value.quantity, decimal) &&
+    nullable(value.correctionOf, x => str(x) && RECEIPT.test(x)) &&
+    (value.isCorrectionOrWithdrawal === undefined || nullable(value.isCorrectionOrWithdrawal, x => typeof x === 'boolean')) &&
+    nullable(value.quantity, decimal) &&
     nullable(value.companyOwnershipPercent, decimal) && ['legacy-import', 'dart-structured', 'dart-document', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.source)) &&
     (value.numericKind === undefined || numericKind(value.numericKind)) &&
     (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&

@@ -158,9 +158,10 @@ export function filingChangesForHoldings(
     if (currentIndex < 1 || currentIndex !== filings.length - 1) continue;
     const current = filings[currentIndex];
     const previous = filings[currentIndex - 1];
-    // A first/re-entry report establishes a position; corrections and
-    // uncertain latest holdings must not be presented as a numeric change.
-    if (current.correctionOf || previous.correctionOf ||
+    // A first/re-entry report establishes a position. Missing receipt flags
+    // and corrections must stay neutral, including in older snapshots.
+    if (current.isCorrectionOrWithdrawal !== false || previous.isCorrectionOrWithdrawal !== false ||
+        current.correctionOf || previous.correctionOf ||
         current.kind === "new-report" || current.kind === "tracking-reentry") continue;
     const quantity = sameReportedValue(holding.quantity, current.quantity)
       ? reportedDirection(holding.quantity, previous.quantity) : null;

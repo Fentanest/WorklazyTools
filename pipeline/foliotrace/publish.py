@@ -175,10 +175,15 @@ def make_snapshot(state, quotes, now=None):
         no = event.get("receipt_no") or ""
         if state.get("unresolved", {}).get(no) in ("receipt_date_conflict", "receipt_chronology_unverified"):
             continue
+        receipt = state.get("receipts", {}).get(no, {})
+        flags = ("is_correction", "later_correction_flag", "withdrawn_flag")
+        correction_or_withdrawal = (any(receipt[flag] for flag in flags)
+                                    if all(isinstance(receipt.get(flag), bool) for flag in flags) else None)
         events.append({"receiptNo": no, "receiptDate": event.get("receipt_date") or "",
                        "basisDate": state.get("receipts", {}).get(no, {}).get("holding_date"),
                        "corpCode": event.get("corp_code") or "", "stockCode": event.get("stock_code"),
                        "kind": event.get("kind") or "other", "correctionOf": event.get("correction_of"),
+                       "isCorrectionOrWithdrawal": correction_or_withdrawal,
                        "quantity": event.get("quantity"), "companyOwnershipPercent": event.get("company_ownership_percent"),
                        "source": "dart-structured" if event.get("source") == "dart_structured" else "dart-document" if event.get("source") == "dart_document" else "legacy-import",
                        "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={no}" if no else None})

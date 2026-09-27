@@ -42,6 +42,28 @@ def quote():
 
 
 class ReviewFixTests(unittest.TestCase):
+    def test_published_event_marks_correction_and_unknown_receipt_flags(self):
+        state = state_with_holding()
+        ordinary, correction, unknown = OLD, "20260923000002", "20260923000003"
+        for no, flags in ((ordinary, (False, False, False)),
+                          (correction, (True, False, False)),
+                          (unknown, None)):
+            state["receipts"][no] = {
+                **state["receipts"].get(no, {}), "receipt_no": no,
+                "receipt_date": "2026-09-23", "corp_code": CORP, "stock_code": CODE,
+                **(dict(zip(("is_correction", "later_correction_flag", "withdrawn_flag"), flags))
+                   if flags is not None else {}),
+            }
+            state["events"][no] = {
+                "receipt_no": no, "receipt_date": "2026-09-23", "corp_code": CORP,
+                "stock_code": CODE, "kind": "other", "correction_of": None,
+                "quantity": "100", "company_ownership_percent": "6", "source": "dart_document",
+            }
+        events = {event["receiptNo"]: event for event in make_snapshot(state, {})["events"]}
+        self.assertIs(events[ordinary]["isCorrectionOrWithdrawal"], False)
+        self.assertIs(events[correction]["isCorrectionOrWithdrawal"], True)
+        self.assertIsNone(events[unknown]["isCorrectionOrWithdrawal"])
+
     def test_special_session_rejects_cached_normal_close(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"

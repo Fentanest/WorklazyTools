@@ -68,6 +68,7 @@ function event(overrides: Partial<FilingEvent> & { receiptNo: string; receiptDat
     stockCode: "005930",
     kind: "increase",
     correctionOf: null,
+    isCorrectionOrWithdrawal: false,
     quantity: "1000",
     companyOwnershipPercent: "6.10",
     source: "dart-structured",
@@ -141,6 +142,10 @@ test("first reports, corrections, and indirect holdings keep their normal text c
   assert.equal(filingChangesForHoldings([currentHolding], [{ ...current, kind: "tracking-reentry" }, previous]).has(currentHolding), false);
   assert.equal(filingChangesForHoldings([currentHolding], [{ ...current, correctionOf: previous.receiptNo }, previous]).has(currentHolding), false);
   assert.equal(filingChangesForHoldings([currentHolding], [current, { ...previous, correctionOf: "20260101000001" }]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [{ ...current, isCorrectionOrWithdrawal: true }, previous]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [current, { ...previous, kind: "other", correctionOf: null, isCorrectionOrWithdrawal: true }]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [current, { ...previous, isCorrectionOrWithdrawal: null }]).has(currentHolding), false);
+  assert.equal(filingChangesForHoldings([currentHolding], [{ ...current, isCorrectionOrWithdrawal: undefined }, previous]).has(currentHolding), false);
   const indirect = holding({ ...currentHolding, evidence: "issuer-scope-observation" });
   assert.equal(filingChangesForHoldings([indirect], [current, previous]).has(indirect), false);
   const lowerBound = holding({ ...currentHolding, ownershipNumericKind: "lower_bound" });
