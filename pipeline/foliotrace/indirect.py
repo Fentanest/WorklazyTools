@@ -197,6 +197,23 @@ def _direct_date(receipt, holding):
     return receipt.get("listing_receipt_date") or receipt.get("receipt_date") or holding.get("receipt_date")
 
 
+def verified_receipt_upper_bound(state, receipt_no):
+    """A verified filing date bounds its report basis; it is not the basis date."""
+    if state.get("unresolved", {}).get(receipt_no) in ("receipt_date_conflict", "receipt_chronology_unverified"):
+        return None
+    receipt = state.get("receipts", {}).get(receipt_no) or {}
+    if not receipt.get("listing_verified_at"):
+        return None
+    listed = receipt.get("listing_receipt_date")
+    if not isinstance(listed, str):
+        return None
+    try:
+        _date(listed)
+    except ValueError:
+        return None
+    return listed
+
+
 def _tracking(percent: str, numeric_kind: str) -> str:
     value = Decimal(percent)
     if numeric_kind == "exact":
@@ -442,7 +459,10 @@ def reconcile_indirect(state, holdings):
             fact["holder_scope"] == "nps_only" and fact["ratio_denominator"] == "issued_shares" and
             fact["numeric_kind"] == "exact" and fact.get("denominator_quantity") is not None and
             fact.get("denominator_date") == fact["basis_date"])
-        current_anchor = (current.get("holding_date") or current.get("receipt_date") or "") if current else ""
+        current_basis = (current.get("holding_date") or (current_profile or {}).get("basis_date")) if current else None
+        receipt_upper = verified_receipt_upper_bound(state, current.get("receipt_no")) if current else None
+        newer_than_current = (fact["basis_date"] >= current_basis if current_basis else
+                              bool(receipt_upper and fact["basis_date"] > receipt_upper))
         if key in invalidated or fact["source_receipt_no"] in source_holds:
             reason = "source_corrected_or_withdrawn"
         elif fact["ownership_percent"] is None:
@@ -459,24 +479,28 @@ def reconcile_indirect(state, holdings):
             reason = "security_kind_unverified"
         elif scoped_only and not strong_scoped:
             reason = "ratio_basis_unverified"
-        elif (scoped_only and fact["basis_date"] <= current_anchor and
+        elif (scoped_only and current_basis and fact["basis_date"] <= current_basis and
               not (latest and any(item["status"] == "same_basis_conflict" for item in latest))):
             reason = "basis_not_newer_than_direct"
+        elif scoped_only and not current_basis and not newer_than_current:
+            reason = "direct_basis_unverified"
         elif any(receipt.get("corp_code") == corp and no not in profiles and
                  no != (current.get("receipt_no") if current else None) and
-                 (_direct_date(receipt, {}) or "9999-12-31") >= fact["basis_date"]
+                 (verified_receipt_upper_bound(state, no) is None or
+                  verified_receipt_upper_bound(state, no) >= fact["basis_date"])
                  for no, receipt in state.get("receipts", {}).items()
                  if receipt.get("evidence") in ("dart_document", "dart_structured", "legacy_history_fact")):
             reason = "newer_direct_basis_unverified"
         elif scoped_only and any(receipt.get("corp_code") == corp and
                  no != current.get("receipt_no") and
-                 ((profiles.get(no) or {}).get("basis_date") or _direct_date(receipt, {}) or "") >= fact["basis_date"]
+                 ((profiles.get(no) or {}).get("basis_date") or
+                  verified_receipt_upper_bound(state, no) or "9999-12-31") >= fact["basis_date"]
                  for no, receipt in state.get("receipts", {}).items()
                  if receipt.get("evidence") in ("dart_document", "dart_structured", "legacy_history_fact")):
             reason = "newer_direct_basis_unverified"
         elif latest and any(item["status"] == "same_basis_conflict" for item in latest):
             reason = "same_basis_conflict" if fact["basis_date"] == latest_date else "newer_conflict_pending"
-            if current and fact["basis_date"] == latest_date and fact["basis_date"] >= current_anchor:
+            if current and fact["basis_date"] == latest_date and newer_than_current:
                 conflicted.add(corp)
         elif not resolved or resolved["status"] != "verified":
             reason = resolved["status"] if resolved else "source_fact_unverified"

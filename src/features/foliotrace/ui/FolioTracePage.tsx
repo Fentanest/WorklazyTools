@@ -154,6 +154,7 @@ const STR = {
     rowVerifiedValue: "기준일과 지분율 확인",
     rowScopedValue: "국민연금 본인·발행주식수 기준 · 직접 공시와 증감 비교 보류",
     verifiedObservationPending: "현재 지분율과 비교할 정보가 부족합니다",
+    directBasisPending: "직접 공시의 보유 기준일을 확인 중입니다",
     verifiedObservationConflict: "같은 날짜의 공시 수치가 달라 현재값에 넣지 않았습니다",
     detailReceipt: "접수일·접수번호",
     detailReport: "보고 기준",
@@ -319,6 +320,7 @@ const STR = {
     rowVerifiedValue: "Holding date and percentage checked",
     rowScopedValue: "NPS-held shares / all issued shares · change from direct filing unverified",
     verifiedObservationPending: "Not enough information to compare with the current percentage",
+    directBasisPending: "Checking the holding date in the direct filing",
     verifiedObservationConflict: "Filings for the same date disagree, so this was not used for the current value",
     detailReceipt: "Receipt date · no.",
     detailReport: "Report basis",
@@ -660,6 +662,7 @@ function ReadyView({
                 <strong>{currentNameByCorpCode.get(observation.corpCode) ?? observation.stockCode}</strong>
                 {" · "}{observation.basisDate} · {observedPercent(observation.ownershipPercent, observation.numericKind)}
                 {" · "}{observation.reason === "same_basis_conflict" ? t.verifiedObservationConflict :
+                  observation.reason === "direct_basis_unverified" ? t.directBasisPending :
                   observation.appliedToHolding ? t.verifiedObservationApplied : t.verifiedObservationPending}
                 {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
               </p>
@@ -677,6 +680,7 @@ function ReadyView({
                 {" "}{formatPct(observation.ownershipPercent)}
                 {observation.references.length > 1 && ` · ${t.issuerScopeCitedAgain}`}
                 {observation.status === "same_basis_conflict" && ` · ${t.verifiedObservationConflict}`}
+                {observation.status === "direct_basis_unverified" && ` · ${t.directBasisPending}`}
                 {snapshot.issuerScopeLaterChanges?.some((change) => change.corpCode === observation.corpCode &&
                   change.basisDate > observation.basisDate) && ` · ${t.issuerScopeLaterChange}`}
                 {" "}<a href={observation.references[0].filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
@@ -1089,6 +1093,7 @@ function ReadyView({
                   <p key={observation.observationKey}>
                     {observation.basisDate} · {observedPercent(observation.ownershipPercent, observation.numericKind)}
                     {" · "}{observation.reason === "same_basis_conflict" ? t.verifiedObservationConflict :
+                      observation.reason === "direct_basis_unverified" ? t.directBasisPending :
                       observation.appliedToHolding ? t.verifiedObservationApplied : t.verifiedObservationPending}
                     {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
                   </p>

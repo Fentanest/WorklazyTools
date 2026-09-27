@@ -55,7 +55,7 @@ function validIssuerScopeObservation(value: unknown): boolean {
     decimal(value.sourceQuantity) && decimal(value.denominatorQuantity) &&
     value.denominatorDate === value.basisDate && value.securityKind === 'unclassified' &&
     value.ratioDenominator === 'issued_shares' && value.holderScope === 'nps_only' &&
-    ['comparison_pending', 'same_basis_conflict'].includes(String(value.status)) && Array.isArray(value.references) &&
+    ['comparison_pending', 'same_basis_conflict', 'direct_basis_unverified'].includes(String(value.status)) && Array.isArray(value.references) &&
     value.references.length >= 1 && value.references.every((ref: unknown) => isRecord(ref) &&
       str(ref.receiptNo) && RECEIPT.test(ref.receiptNo) &&
       nullable(ref.documentNo, item => str(item) && /^\d+$/.test(item)) &&

@@ -31,12 +31,48 @@ def source_archive(later=False):
 
 
 class TargetSourceTests(unittest.TestCase):
+    def test_issuer_value_waits_for_unknown_direct_basis_unless_later_than_verified_filing(self):
+        corp, stock, direct = '00244455', '033780', '20250401003742'
+        template = folio.empty_state()
+        template['universe'][corp] = {'name': '케이티앤지', 'stock_code': stock}
+        template['receipts'][direct] = {'receipt_no': direct, 'corp_code': corp,
+            'stock_code': stock, 'receipt_date': '2025-04-01'}
+        template['holdings'][corp] = {'corp_code': corp, 'stock_code': stock, 'name': '케이티앤지',
+            'receipt_no': direct, 'receipt_date': '2025-04-01', 'holding_date': None,
+            'quantity': '9157340', 'company_ownership_percent': '7.5',
+            'security_kind': 'unknown', 'tracking': 'unknown', 'evidence': 'legacy_import'}
+        template.setdefault('issuer_scope_observations', {})['a' * 64] = {'corp_code': corp, 'stock_code': stock,
+            'issuer_name': '케이티앤지', 'basis_date': '2025-08-22', 'quantity': '9954722',
+            'ownership_percent': '8.16', 'denominator_quantity': '122062497',
+            'denominator_date': '2025-08-22', 'references': [{'receipt_no': '20251114002334',
+                'filing_date': '2025-11-14', 'document_no': None, 'archive_sha256': 'a' * 64,
+                'file_sha256': 'b' * 64, 'row_sha256': 'c' * 64,
+                'parser_version': 'source-holdings-v1'}]}
+        for receipt_day, verified, expected_ratio, expected_status in (
+                ('2025-04-01', True, '8.16', 'comparison_pending'),
+                ('2025-08-22', True, '7.5', 'direct_basis_unverified'),
+                ('2025-09-01', True, '7.5', 'direct_basis_unverified'),
+                ('2025-04-01', False, '7.5', 'direct_basis_unverified')):
+            with self.subTest(receipt_day=receipt_day, verified=verified):
+                state = copy.deepcopy(template)
+                state['receipts'][direct]['receipt_date'] = receipt_day
+                state['holdings'][corp]['receipt_date'] = receipt_day
+                if verified:
+                    state['receipts'][direct].update(listing_receipt_date=receipt_day,
+                        listing_verified_at='2026-09-27T00:00:00Z')
+                snapshot = make_snapshot(state, {})
+                self.assertEqual(snapshot['holdings'][0]['companyOwnershipPercent'], expected_ratio)
+                self.assertEqual(snapshot['issuerScopeObservations'][0]['status'], expected_status)
+                self.assertIsNone(snapshot['holdings'][0]['estimatedValue'])
+
     def test_verified_report_family_retains_corrected_1998_fact_only(self):
         original_no, corrected_no = '19990330000205', '19990611000003'
         state = folio.empty_state()
         state['universe']['00190321'] = {'name': '케이티', 'stock_code': '030200'}
         state['receipts']['20260901000001'] = {'receipt_no': '20260901000001',
-            'receipt_date': '2026-09-01', 'corp_code': '00190321', 'stock_code': '030200'}
+            'receipt_date': '2026-09-01', 'listing_receipt_date': '2026-09-01',
+            'listing_verified_at': '2026-09-27T00:00:00Z',
+            'corp_code': '00190321', 'stock_code': '030200'}
         state['holdings']['00190321'] = {'corp_code': '00190321', 'stock_code': '030200',
             'name': '케이티', 'receipt_no': '20260901000001', 'receipt_date': '2026-09-01',
             'holding_date': None, 'quantity': '10000000', 'company_ownership_percent': '8.0',
@@ -98,6 +134,8 @@ class TargetSourceTests(unittest.TestCase):
             self.assertEqual(len(snapshot['verifiedIndirectObservations']), 1)
             self.assertEqual(snapshot['verifiedIndirectObservations'][0]['receiptNo'], corrected_no)
             self.assertEqual(snapshot['holdings'][0]['companyOwnershipPercent'], '8.0')
+            self.assertEqual(snapshot['verifiedIndirectObservations'][0]['reason'],
+                             'direct_basis_unverified')
             replay = target_source.ingest_target(state, corrected_no, '00190321',
                 date(1999, 6, 11), '', archive_dir=archive_dir,
                 fetch_list=lambda _: corrected_list,
@@ -109,7 +147,9 @@ class TargetSourceTests(unittest.TestCase):
         state = folio.empty_state()
         state['universe']['00244455'] = {'name': '케이티앤지', 'stock_code': '033780'}
         state['receipts']['20250401003742'] = {'receipt_no': '20250401003742',
-            'receipt_date': '2025-04-01', 'corp_code': '00244455', 'stock_code': '033780'}
+            'receipt_date': '2025-04-01', 'listing_receipt_date': '2025-04-01',
+            'listing_verified_at': '2026-09-26T16:51:43Z',
+            'corp_code': '00244455', 'stock_code': '033780'}
         state['holdings']['00244455'] = {'corp_code': '00244455', 'stock_code': '033780',
             'name': '케이티앤지', 'receipt_no': '20250401003742',
             'receipt_date': '2025-04-01', 'holding_date': None, 'quantity': '9157340',

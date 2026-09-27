@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 
 from .valuation import decimal, value_holdings
-from .indirect import reconcile_indirect, effective_source_holds
+from .indirect import reconcile_indirect, effective_source_holds, verified_receipt_upper_bound
 
 
 def encoded(value):
@@ -78,9 +78,14 @@ def make_snapshot(state, quotes, now=None):
                 for _, fact, _ in latest}) != 1:
             holding["issuer_scope_status"] = "same_basis_conflict"
             continue
-        direct_basis = holding.get("holding_date") or holding.get("receipt_date")
+        direct_basis = holding.get("holding_date")
         if direct_basis and latest_date <= direct_basis:
             continue
+        if not direct_basis:
+            receipt_upper = verified_receipt_upper_bound(state, holding.get("receipt_no"))
+            if not receipt_upper or latest_date <= receipt_upper:
+                holding["issuer_scope_status"] = "direct_basis_unverified"
+                continue
         pending_no = holding.get("latest_unresolved_receipt")
         pending_receipt = state.get("receipts", {}).get(pending_no) or {}
         pending_date = pending_receipt.get("listing_receipt_date") or pending_receipt.get("receipt_date")
@@ -110,6 +115,7 @@ def make_snapshot(state, quotes, now=None):
                                             "later_change_date": later_date,
                                             "receipt_no": primary["receipt_no"],
                                             "document_no": primary["document_no"]})
+    issuer_status_by_corp = {row.get("corp_code"): row.get("issuer_scope_status") for row in holdings}
     valued = value_holdings(holdings, quotes, trade_date) if trade_date else value_holdings(holdings, {}, "")
     rows = []
     for row in valued["holdings"]:
@@ -238,7 +244,9 @@ def make_snapshot(state, quotes, now=None):
                         "parserVersion": ref["parser_version"],
                         "filingUrl": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={ref['receipt_no']}"}
                         for ref in fact["references"] if ref["receipt_no"] not in source_holds],
-                    "status": "same_basis_conflict" if key in scoped_conflicts else "comparison_pending"}
+                    "status": "same_basis_conflict" if key in scoped_conflicts else
+                              "direct_basis_unverified" if issuer_status_by_corp.get(fact["corp_code"]) == "direct_basis_unverified" else
+                              "comparison_pending"}
                     for key, fact in sorted(issuer_observations.items(),
                                             key=lambda item: (item[1]["basis_date"], item[0]), reverse=True)
                     if any(ref["receipt_no"] not in source_holds for ref in fact["references"])],

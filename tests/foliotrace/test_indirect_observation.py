@@ -199,6 +199,34 @@ class IndirectObservationTests(unittest.TestCase):
         self.assertEqual(snap['holdings'][0]['companyOwnershipPercent'], '4.80')
         self.assertEqual(snap['verifiedIndirectObservations'][0]['reason'], 'ratio_basis_unverified')
 
+    def test_unknown_direct_basis_uses_only_verified_filing_upper_bound(self):
+        template = base_state()
+        template['holdings'][CORP]['holding_date'] = None
+        fact = indirect(basis_date='2025-12-31', source_filing_date='2026-01-05',
+            holder_scope='nps_only', ratio_denominator='issued_shares',
+            denominator_quantity='1000', denominator_date='2025-12-31')
+        register_evidence(template, fact)
+        for filing_date, verified, unresolved, expected_ratio, expected_reason in (
+                ('2025-03-01', True, None, '5.05', None),
+                ('2026-02-02', True, None, '4.80', 'direct_basis_unverified'),
+                ('2025-03-01', False, None, '4.80', 'direct_basis_unverified'),
+                ('2025-03-01', True, 'receipt_date_conflict', '4.80', 'newer_direct_unresolved'),
+                ('2025-03-01', True, 'receipt_chronology_unverified', '4.80', 'newer_direct_unresolved')):
+            with self.subTest(filing_date=filing_date, verified=verified, unresolved=unresolved):
+                state = copy.deepcopy(template)
+                state['holdings'][CORP]['receipt_date'] = filing_date
+                state['receipts'][DIRECT]['receipt_date'] = filing_date
+                state['receipts'][DIRECT]['listing_receipt_date'] = filing_date
+                if verified:
+                    state['receipts'][DIRECT]['listing_verified_at'] = '2026-09-27T00:00:00Z'
+                if unresolved:
+                    state['unresolved'][DIRECT] = unresolved
+                snap = make_snapshot(state, {})
+                self.assertEqual(snap['holdings'][0]['companyOwnershipPercent'], expected_ratio)
+                self.assertEqual(snap['verifiedIndirectObservations'][0]['reason'], expected_reason)
+                self.assertIsNone(snap['verifiedIndirectObservations'][0]['percentagePointChange'])
+                self.assertIsNone(snap['verifiedIndirectObservations'][0]['trackingChange'])
+
     def test_other_company_observation_cannot_update_current_holding(self):
         state = self.setup_with_basis()
         register_evidence(state, indirect(corp_code='00126381', stock_code='000660'))

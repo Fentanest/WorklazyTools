@@ -141,7 +141,9 @@ class SecondaryBackfillTests(unittest.TestCase):
         corp, stock = '00244455', '033780'
         state['universe'][corp] = {'name': '케이티앤지', 'stock_code': stock}
         state['receipts']['20250401003742'] = {'receipt_no': '20250401003742',
-            'receipt_date': '2025-04-01', 'corp_code': corp, 'stock_code': stock}
+            'receipt_date': '2025-04-01', 'listing_receipt_date': '2025-04-01',
+            'listing_verified_at': '2026-09-27T00:00:00Z',
+            'corp_code': corp, 'stock_code': stock}
         state['holdings'][corp] = {'corp_code': corp, 'stock_code': stock,
             'name': '케이티앤지', 'receipt_no': '20250401003742',
             'receipt_date': '2025-04-01', 'holding_date': None,

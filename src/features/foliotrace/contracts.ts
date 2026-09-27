@@ -187,7 +187,7 @@ export interface Snapshot {
     securityKind: 'unclassified'
     ratioDenominator: 'issued_shares'
     holderScope: 'nps_only'
-    status: 'comparison_pending' | 'same_basis_conflict'
+    status: 'comparison_pending' | 'same_basis_conflict' | 'direct_basis_unverified'
     references: Array<{
       receiptNo: string
       documentNo: string | null

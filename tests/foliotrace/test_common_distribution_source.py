@@ -66,7 +66,8 @@ class CommonDistributionSourceTests(unittest.TestCase):
                 ('20250207000001', '2025-02-07', '2025-02-06', '78', '7.80')):
             state['receipts'][prior_no] = {**state['receipts'][direct], 'receipt_no': prior_no,
                 'receipt_date': filed, 'holding_date': basis, 'quantity': quantity,
-                'company_ownership_percent': ratio}
+                'company_ownership_percent': ratio, 'listing_receipt_date': filed,
+                'listing_verified_at': '2026-09-27T00:00:00Z'}
             state['mapping_ledger'][prior_no] = {'status': 'verified', 'xml_sha256': 'a' * 64}
             prior_parsed = copy.deepcopy(parsed)
             prior_parsed['source_ratio_columns']['shares_etc_quantity'] = quantity
