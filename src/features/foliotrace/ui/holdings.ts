@@ -69,10 +69,14 @@ function renderExact(parsed: ParsedDecimal): string {
   return `${parsed.neg ? "-" : ""}${groupInt(parsed.int)}${parsed.frac ? `.${parsed.frac}` : ""}`;
 }
 
+function renderAmount(parsed: ParsedDecimal): string {
+  return renderExact(parsed.frac && /^0+$/.test(parsed.frac) ? { ...parsed, frac: "" } : parsed);
+}
+
 export function formatKrw(value: string | null, _lang: "ko" | "en"): string {
   const parsed = parseDecimal(value);
   if (parsed === null) return "—";
-  return `₩${renderExact(parsed)}`;
+  return `₩${renderAmount(parsed)}`;
 }
 
 export function formatPct(value: string | null): string {
@@ -84,7 +88,7 @@ export function formatPct(value: string | null): string {
 export function formatQty(value: string | null): string {
   const parsed = parseDecimal(value);
   if (parsed === null) return "—";
-  return renderExact(parsed);
+  return renderAmount(parsed);
 }
 
 /** Exact comparison of two parsed decimals: -1 | 0 | 1. */

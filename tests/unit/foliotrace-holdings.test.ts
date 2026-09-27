@@ -90,6 +90,14 @@ test("financial display preserves fractional digits without rounding", () => {
   assert.equal(formatPct("6.10"), "6.10%");
 });
 
+test("quantity and won labels omit only all-zero fractional digits", () => {
+  assert.equal(formatQty("2120278.0"), "2,120,278");
+  assert.equal(formatKrw("114196460716685.0", "ko"), "₩114,196,460,716,685");
+  assert.equal(formatKrw("114196460716685.000", "en"), "₩114,196,460,716,685");
+  assert.equal(formatQty("2120278.010"), "2,120,278.010");
+  assert.equal(formatPct("5.0"), "5.0%");
+});
+
 test("financial display renders null and non-decimal input as em-dash, never NaN", () => {
   assert.equal(formatKrw(null, "ko"), "—");
   assert.equal(formatPct(null), "—");
