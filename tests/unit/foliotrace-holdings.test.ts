@@ -190,6 +190,7 @@ test("filterHoldings searches names and string codes, preserves leading zeros", 
   const rows = [
     holding({ stockCode: "005930", name: "삼성전자" }),
     holding({ stockCode: "000660", name: "SK하이닉스" }),
+    holding({ stockCode: "033780", name: "케이티앤지" }),
   ];
   assert.deepEqual(
     filterHoldings(rows, "0059", "all").map((h) => h.stockCode),
@@ -200,7 +201,10 @@ test("filterHoldings searches names and string codes, preserves leading zeros", 
     ["005930"],
   );
   assert.equal(filterHoldings(rows, "삼성", "all").length, 1);
-  assert.equal(filterHoldings(rows, "  ", "all").length, 2);
+  assert.deepEqual(filterHoldings(rows, "KT&G", "all").map((h) => h.stockCode), ["033780"]);
+  assert.deepEqual(filterHoldings(rows, "k-t&g", "all").map((h) => h.stockCode), ["033780"]);
+  assert.deepEqual(filterHoldings(rows, "케이티앤지", "all").map((h) => h.stockCode), ["033780"]);
+  assert.equal(filterHoldings(rows, "  ", "all").length, 3);
   assert.equal(filterHoldings(rows, "no-such-security", "all").length, 0);
 });
 

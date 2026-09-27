@@ -219,10 +219,31 @@ export function quoteProviderLabel(provider: string, lang: Lang): string {
   return provider;
 }
 
+const LETTER_NAMES: Record<string, string> = {
+  a: "에이", b: "비", c: "씨", d: "디", e: "이", f: "에프", g: "지",
+  h: "에이치", i: "아이", j: "제이", k: "케이", l: "엘", m: "엠", n: "엔",
+  o: "오", p: "피", q: "큐", r: "알", s: "에스", t: "티", u: "유",
+  v: "브이", w: "더블유", x: "엑스", y: "와이", z: "지",
+};
+
+function searchText(value: string): string {
+  return value.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
+}
+
+function spokenInitialism(value: string): string | null {
+  const compact = value.toLowerCase().replace(/[\s.\-]/g, "");
+  if (!/^[a-z&]+$/.test(compact) || (compact.match(/[a-z]/g)?.length ?? 0) < 2) return null;
+  return [...compact].map((character) => character === "&" ? "앤" : LETTER_NAMES[character]).join("");
+}
+
 export function filterHoldings(holdings: Holding[], query: string, quality: QualityFilter): Holding[] {
   const q = query.trim().toLowerCase();
+  const compactQuery = searchText(q);
+  const spokenQuery = spokenInitialism(q);
   return holdings.filter((h) => {
-    if (q && !(h.name.toLowerCase().includes(q) || h.stockCode.toLowerCase().includes(q))) return false;
+    if (q && !(h.name.toLowerCase().includes(q) || h.stockCode.toLowerCase().includes(q) ||
+      (compactQuery && searchText(h.name).includes(compactQuery)) ||
+      (spokenQuery && searchText(h.name).includes(spokenQuery)))) return false;
     const s = holdingStatus(h);
     if (quality === "priced" && s !== "included") return false;
     if (quality === "unpriced" && s === "included") return false;
