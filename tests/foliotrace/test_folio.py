@@ -136,6 +136,33 @@ class MigrationTests(unittest.TestCase):
                              {'shares_etc_percent': '5.05'})
         self.assertEqual(folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=lambda *_: self.fail('refetched'))['checked'], 0)
 
+    def test_bounded_basis_runs_advance_current_receipts_before_history(self):
+        state = folio.empty_state()
+        current_numbers = ('20260903000001', '20260902000001', '20260901000001')
+        historical = '20200101000001'
+        for index, no in enumerate((*current_numbers, historical)):
+            corp = f'{index + 1:08d}' if no != historical else '00000001'
+            state['receipts'][no] = {'receipt_no': no, 'receipt_date': no[:4] + '-' + no[4:6] + '-' + no[6:8],
+                'listing_verified_at': '2026-09-27T00:00:00Z', 'corp_code': corp,
+                'stock_code': '005930', 'quantity': '100', 'company_ownership_percent': '5.00',
+                'evidence': 'legacy_history_fact'}
+            if no != historical:
+                state['holdings'][corp] = {'corp_code': corp, 'stock_code': '005930',
+                    'receipt_no': no, 'receipt_date': state['receipts'][no]['receipt_date'],
+                    'quantity': '100', 'company_ownership_percent': '5.00', 'evidence': 'legacy_import'}
+        seen = []
+        def source(no, _key):
+            seen.append(no)
+            return {'quantity': '100', 'company_ownership_percent': '5.00',
+                'holding_date': '2019-12-31' if no == historical else '2026-08-31',
+                'xml_sha256': 'a' * 64, 'basis_row_sha256': 'b' * 64,
+                'source_ratio_columns': {'shares_etc_percent': '5.00'}}
+        self.assertEqual(folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=source)['checked'], 2)
+        self.assertEqual(seen, list(current_numbers[:2]))
+        self.assertEqual(folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=source)['checked'], 2)
+        self.assertEqual(seen, [*current_numbers, historical])
+        self.assertEqual(folio.recheck_direct_basis(state, 'test-key', limit=2, fetch=source)['checked'], 0)
+
     def test_old_basis_parser_attempt_is_rechecked_with_current_row_v5(self):
         state = folio.empty_state()
         no, corp = '20260623000336', '00155319'

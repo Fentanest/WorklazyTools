@@ -1716,7 +1716,8 @@ def main():
     q.add_argument("--limit", type=int, default=100)
     q = sub.add_parser("recheck-basis")
     q.add_argument("--state", type=Path, required=True)
-    q.add_argument("--receipt", required=True)
+    q.add_argument("--receipt")
+    q.add_argument("--limit", type=int, default=100)
     q = sub.add_parser("diagnose-basis")
     q.add_argument("--receipt", required=True)
     q = sub.add_parser("price-and-value")
@@ -1784,10 +1785,13 @@ def main():
                 state["revision"] += 1
                 write_json(args.state, state)
         elif args.command == "recheck-basis":
+            if not 1 <= args.limit <= 100:
+                raise ValueError("DIRECT_BASIS_LIMIT")
             state = read_json(args.state)
-            result = recheck_direct_basis(state, os.environ.get("DART_API_KEY", ""), limit=1,
+            result = recheck_direct_basis(state, os.environ.get("DART_API_KEY", ""), limit=args.limit,
                                           state_path=args.state, target_receipt=args.receipt)
-            result["receipt_no"] = args.receipt
+            if args.receipt:
+                result["receipt_no"] = args.receipt
         elif args.command == "diagnose-basis":
             if not RECEIPT.fullmatch(args.receipt):
                 raise ValueError("DIRECT_BASIS_TARGET")

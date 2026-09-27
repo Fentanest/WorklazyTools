@@ -5,7 +5,12 @@ on:
     inputs:
       receipt:
         description: Exact 14-digit public DART receipt
+        required: false
+        type: string
+      limit:
+        description: Maximum source documents to check in this run (1–100)
         required: true
+        default: '100'
         type: string
       validate_only:
         description: Inspect without writing normalized state
@@ -45,13 +50,21 @@ jobs:
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           RECEIPT: ${{ inputs.receipt }}
-        run: python3 scripts/foliotrace/folio.py recheck-basis --state foliotrace-state/state.json --receipt "$RECEIPT"
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          if [ -n "$RECEIPT" ]; then
+            python3 scripts/foliotrace/folio.py recheck-basis --state foliotrace-state/state.json --receipt "$RECEIPT" --limit 1
+          else
+            python3 scripts/foliotrace/folio.py recheck-basis --state foliotrace-state/state.json --limit "$LIMIT"
+          fi
       - name: Diagnose exact direct source fields
         if: ${{ inputs.diagnose_only }}
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           RECEIPT: ${{ inputs.receipt }}
-        run: python3 scripts/foliotrace/folio.py diagnose-basis --receipt "$RECEIPT"
+        run: |
+          test -n "$RECEIPT"
+          python3 scripts/foliotrace/folio.py diagnose-basis --receipt "$RECEIPT"
       - name: Persist verified basis state
         if: ${{ !inputs.validate_only && !inputs.diagnose_only }}
         run: |
