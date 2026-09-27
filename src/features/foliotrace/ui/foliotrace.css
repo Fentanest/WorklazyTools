@@ -515,6 +515,51 @@ th.foliotrace-num {
   flex-direction: column;
 }
 
+.foliotrace-detail-panel {
+  width: min(44rem, 100%);
+  max-height: calc(100dvh - 2rem);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
+  border-radius: var(--wl-radius-lg, 16px);
+  padding: 1.5rem;
+}
+
+.foliotrace-detail-close {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  align-self: flex-end;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: -2.25rem;
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
+  border-radius: 50%;
+  background: var(--bg-solid, #ffffff);
+  color: var(--label, #18181b);
+  cursor: pointer;
+}
+
+.foliotrace-detail-close:focus-visible {
+  outline: 2px solid var(--brand-border, var(--brand, #e8502f));
+  outline-offset: 2px;
+}
+
+.foliotrace-detail-panel [data-slot="sheet-title"],
+.foliotrace-detail-panel [data-slot="sheet-description"] {
+  padding-right: 3rem;
+}
+
+@media (max-width: 620px) {
+  .foliotrace-detail-panel {
+    padding: 1rem;
+  }
+}
+
 .foliotrace-detail-list > div {
   display: flex;
   justify-content: space-between;

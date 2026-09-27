@@ -6,15 +6,15 @@
       { "title": "Filing date and holding date are different", "paragraphs": ["Each filing shows the date it was received and the holding date it refers to. These are different dates, so always check them together. Records for the same company with different holding dates describe different points in time."] },
       { "title": "Values use checked quantities and same-day closes", "paragraphs": ["A value is calculated only when the filing gives a checked share quantity and a checked KRX regular-session close exists for the same trading day. Each holding's share is shown as a percentage of the combined value of all holdings with a calculated value. Holdings without a checked close are left out of the value calculation."] },
       { "title": "A percentage alone does not give a value", "paragraphs": ["Records that show only a percentage, without a checked share quantity, stay on the list but get no calculated value. A percentage on its own does not settle the amount."] },
-      { "title": "Dates and refresh", "paragraphs": ["The filing receipt date, the price date, and the publication time each mean different things. Refresh reloads the already published data; it does not pull in new filings right away."] }
+      { "title": "Dates and reloading data", "paragraphs": ["The filing receipt date, price date, and time the data was prepared are different. Publication time appears when available. ‘Reload published data’ shows the latest posted records; it does not fetch new DART filings right away."] }
     ],
     "faq": {
       "scope": { "q": "Is this the NPS actual account balance?", "a": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. It is not total NPS assets, actual account balances, or actual returns." },
       "valuation": { "q": "How is the estimated value calculated?", "a": "The checked share quantity from the filing is multiplied by the KRX regular-session close on the same trading day. The values of holdings with a calculated value are added up, and each holding's share of that total is shown as a percentage." },
-      "dates": { "q": "How do the price date and the filings check differ?", "a": "The price date is the actual trading day whose close is final. The filing receipt date, the time the data was prepared, and the publication time are shown separately." },
+      "dates": { "q": "How do the price date and the filings check differ?", "a": "The price date is the trading day whose closing price is final. The filing receipt date and time the data was prepared are shown separately; publication time appears when available." },
       "exclusion": { "q": "Why are some holdings left out of the value calculation?", "a": "Holdings without a checked close or with an unchecked latest filing get no calculated value. They stay on the list with their reason, and a missing value is shown as unavailable rather than zero." },
       "threshold": { "q": "Does below 5% ownership mean everything was sold?", "a": "No. Holdings below 5% stay on the list and remain subject to follow-up searches and rechecks. It does not mean all shares were sold or that the value is zero." },
-      "refresh": { "q": "What does refresh do?", "a": "It only reloads the already published data; it does not pull in new DART filings right away." }
+      "refresh": { "q": "What does ‘Reload published data’ do?", "a": "It reloads the currently published records. It does not fetch new DART filings right away." }
     }
   },
   "documentCompare": {
