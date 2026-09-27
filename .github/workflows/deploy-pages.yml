@@ -1,4 +1,5 @@
 name: Deploy GitHub Pages
+run-name: ${{ github.event_name == 'push' && 'Deploy code with published FolioTrace' || github.event_name == 'schedule' && 'Daily FolioTrace collection and deploy' || 'Manual FolioTrace collection/build' }}
 
 on:
   push:
@@ -31,7 +32,7 @@ jobs:
       contents: write # Commit only the normalized FolioTrace state on its dedicated branch.
     runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","235"]') }}
     outputs:
-      data_sha: ${{ steps.persist-price.outputs.sha }}
+      data_sha: ${{ steps.pin-data.outputs.sha }}
       dataset_version: ${{ steps.snapshot-meta.outputs.dataset_version }}
       trade_date: ${{ steps.snapshot-meta.outputs.trade_date }}
       estimated_value: ${{ steps.snapshot-meta.outputs.estimated_value }}
@@ -81,6 +82,7 @@ jobs:
 
       - name: Collect incremental DART filings
         id: collect
+        if: github.event_name != 'push'
         continue-on-error: true # Persist completed chunks before failing this deployment.
         run: python3 scripts/foliotrace/folio.py collect --state foliotrace-state/state.json
         env:
@@ -88,7 +90,7 @@ jobs:
 
       - name: Persist normalized collection state
         id: persist-data
-        if: always() && steps.restore.outcome == 'success'
+        if: always() && github.event_name != 'push' && steps.restore.outcome == 'success'
         run: |
           git -C foliotrace-state config user.name 'github-actions[bot]'
           git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -100,14 +102,16 @@ jobs:
           echo "sha=$(git -C foliotrace-state rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Require complete DART listing
-        if: steps.collect.outcome != 'success'
+        if: github.event_name != 'push' && steps.collect.outcome != 'success'
         run: exit 1
 
       - name: Verify regular close and value portfolio
+        if: github.event_name != 'push'
         run: python3 scripts/foliotrace/folio.py price-and-value --state foliotrace-state/state.json --output foliotrace-state/publish.json
 
       - name: Persist verified quote cache
         id: persist-price
+        if: github.event_name != 'push'
         run: |
           git -C foliotrace-state add state.json
           if ! git -C foliotrace-state diff --cached --quiet; then
@@ -115,6 +119,14 @@ jobs:
             git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
           fi
           echo "sha=$(git -C foliotrace-state rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Reuse the last published FolioTrace snapshot on main push
+        if: github.event_name == 'push'
+        run: python3 scripts/foliotrace/reuse_published_snapshot.py --state foliotrace-state/state.json --output foliotrace-state/publish.json
+
+      - name: Pin FolioTrace data revision
+        id: pin-data
+        run: echo "sha=$(git -C foliotrace-state rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Pin snapshot metadata
         id: snapshot-meta
@@ -200,12 +212,14 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Checkout pinned FolioTrace data for published history
+        if: github.event_name != 'push'
         uses: actions/checkout@v4
         with:
           ref: foliotrace-data
           path: foliotrace-state
           fetch-depth: 0
       - name: Record successfully published dataset
+        if: github.event_name != 'push'
         env:
           EXPECTED_DATA: ${{ needs.build.outputs.data_sha }}
           DATASET_VERSION: ${{ needs.build.outputs.dataset_version }}

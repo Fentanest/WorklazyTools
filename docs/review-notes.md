@@ -2,6 +2,12 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-09-27 — FolioTrace 코드 push와 일일 수집 분리
+
+- 사용자의 최신 명시 지시로 기존 FolioTrace 정본의 ‘main push도 새 수집’ 조건을 이 변경 범위에서 대체했다. `main` push는 즉시 사이트를 배포하되 마지막 **게시 완료** 스냅샷을 그대로 사용한다. 03:00·04:00·04:30 KST 백필은 `foliotrace-data`의 원장만 갱신하고, 16:10 KST 예약 실행과 기존 수동 전체 실행은 새 수집·가격 검증·스냅샷 배포를 유지한다. — Codx
+- `foliotrace-data`의 `state.json`은 당시 11,088,807바이트, 보유 381개·이벤트 3,716개·가격 캐시 262개이며 ZIP 7개는 지정 접수번호의 원문 검증 보관분이다. 원장의 `last_published_dataset`과 실사이트 manifest의 버전이 모두 `f7dc85bd532abd7dfdc2c4fc5569bca35c0e3bb98cb3d4fe6d89e5a668ead054`로 일치했다. push에서 원장으로 새 snapshot을 계산하면 아직 게시되지 않은 밤샘 자료가 섞일 수 있으므로 기각했다. 공개 manifest의 버전·경로·snapshot 해시를 검사하고 원장의 마지막 게시 버전과 다르면 배포를 멈춘다. — Codx
+- GitHub의 [workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)는 `steps.if`에서 `github.event_name` 조건과 `${{ }}` 생략을 허용한다(2026-09-27 확인). push 경로는 수집·가격조회·원장 쓰기·게시 이력 갱신을 건너뛰고, 예약·수동 경로의 기존 검증은 보존한다. 공개 사이트에서 이전 snapshot을 읽지 못하면 push 배포가 실패하며, 이를 새 수집이나 조용한 미확인 자료로 대체하지 않는다. — Codx
+
 ## 2026-09-27 — FolioTrace 상세 창·안내 문구 국소 확인
 
 - 실페이지 `https://worklazy.net/ko/tools/foliotrace/`를 Chrome 1920×1080에서 열어 종목 표의 상세 보기를 누르면 창이 왼쪽 끝의 약 400px 폭으로 나타났다. 공용 Sheet의 `side="right"` 호출을 이 화면에서만 `center`로 바꾸고, 최대 44rem 폭·화면 안쪽 높이·내부 스크롤을 지정했다. Astra의 첫 후보 검수에서 브라우저 기본 `<dialog>` 최대 높이 때문에 모바일 상단 3px 잘림을 발견해 이 호출에만 `maxHeight: 100dvh`를 더했다. 다시 측정한 패널 좌표는 1920×1080에서 x=608, y≈65, 폭=704, 높이≈950px, 390×844에서 x=16, y=16, 폭=358, 높이=812px로 각각 화면 중앙이다. 공용 Sheet 자체를 바꾸는 안은 다른 도구의 서랍 동작에 영향을 주므로 채택하지 않았다. — Codx
