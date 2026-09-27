@@ -483,7 +483,9 @@ def reconcile_indirect(state, holdings):
               not (latest and any(item["status"] == "same_basis_conflict" for item in latest))):
             reason = "basis_not_newer_than_direct"
         elif scoped_only and not current_basis and not newer_than_current:
-            reason = "direct_basis_unverified"
+            reason = ("same_basis_conflict" if fact["basis_date"] == latest_date and
+                      any(item["status"] == "same_basis_conflict" for item in latest)
+                      else "direct_basis_unverified")
         elif any(receipt.get("corp_code") == corp and no not in profiles and
                  no != (current.get("receipt_no") if current else None) and
                  (verified_receipt_upper_bound(state, no) is None or

@@ -227,6 +227,29 @@ class IndirectObservationTests(unittest.TestCase):
                 self.assertIsNone(snap['verifiedIndirectObservations'][0]['percentagePointChange'])
                 self.assertIsNone(snap['verifiedIndirectObservations'][0]['trackingChange'])
 
+    def test_unknown_direct_basis_does_not_hide_conflicting_source_values(self):
+        template = base_state()
+        template['holdings'][CORP]['holding_date'] = None
+        for no, ratio in ((INDIRECT, '5.05'), ('20260602000002', '5.16')):
+            register_evidence(template, indirect(source_receipt_no=no,
+                source_filing_date='2026-06-02', basis_date='2025-12-31',
+                holder_scope='nps_only', ratio_denominator='issued_shares',
+                denominator_quantity='1000', denominator_date='2025-12-31',
+                ownership_percent=ratio))
+        for verified in (False, True):
+            state = copy.deepcopy(template)
+            state['holdings'][CORP]['receipt_date'] = '2026-02-02'
+            state['receipts'][DIRECT]['receipt_date'] = '2026-02-02'
+            if verified:
+                state['receipts'][DIRECT].update(listing_receipt_date='2026-02-02',
+                    listing_verified_at='2026-09-27T00:00:00Z')
+            snap = make_snapshot(state, {})
+            self.assertEqual(snap['holdings'][0]['companyOwnershipPercent'], '4.80')
+            self.assertIsNone(snap['holdings'][0]['observationStatus'])
+            self.assertEqual([item['reason'] for item in snap['verifiedIndirectObservations']],
+                             ['same_basis_conflict', 'same_basis_conflict'])
+            self.assertFalse(any(item['appliedToHolding'] for item in snap['verifiedIndirectObservations']))
+
     def test_other_company_observation_cannot_update_current_holding(self):
         state = self.setup_with_basis()
         register_evidence(state, indirect(corp_code='00126381', stock_code='000660'))
