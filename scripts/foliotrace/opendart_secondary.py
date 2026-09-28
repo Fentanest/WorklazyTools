@@ -368,7 +368,11 @@ def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
     if phase == "incremental":
         record["incremental"] = True
         ledger["incremental_coverage"].append(record)
-        ledger["incremental_next_date"] = (last + timedelta(days=1)).isoformat()
+        # Persist the final day's replay cursor in the same write as its
+        # coverage. A crash between writes cannot skip the last checked day.
+        ledger["incremental_next_date"] = (
+            last if last.isoformat() == ledger["target_date"]
+            else last + timedelta(days=1)).isoformat()
     elif phase == "overlap":
         record["overlap"] = True
         ledger["overlap_coverage"].append(record)
@@ -1055,12 +1059,6 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
 
     if incremental_only:
         incremental_forward = scan_phase(incremental_forward, end, phase="incremental")
-        if incremental_forward > end and windows:
-            # Keep the last checked day inclusive until the wrapper records a
-            # successful completion time. A replay failure cannot skip it.
-            ledger["incremental_next_date"] = end.isoformat()
-            state["revision"] += 1
-            write_state(state_path, state)
     elif first_overlap:
         overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, phase="overlap")
         forward = scan_phase(forward, end, phase="forward")

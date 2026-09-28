@@ -442,6 +442,31 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(len(ledger["queue"]), 1)
             self.assertEqual(len(ledger["incremental_coverage"]), 2)
 
+    def test_final_day_cursor_is_durable_with_its_coverage(self):
+        day = date(2026, 9, 27)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = day.isoformat()
+            folio.write_json(path, state)
+
+            def save_then_interrupt(target, value):
+                folio.write_json(target, value)
+                ledger = value["opendart_secondary_backfill"]
+                if ledger.get("incremental_coverage"):
+                    raise RuntimeError("synthetic interruption after durable window")
+
+            with self.assertRaisesRegex(RuntimeError, "synthetic interruption"):
+                opendart_secondary.scan_opendart_secondary(
+                    path, date(1999, 4, 1), day, incremental_only=True,
+                    review_limit=0, fetch_list=lambda _params: no_data(),
+                    read_state=folio.read_json, write_state=save_then_interrupt)
+            ledger = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(ledger["incremental_coverage"][-1]["to"], "2026-09-27")
+            self.assertEqual(ledger["incremental_next_date"], "2026-09-27")
+            self.assertNotIn("incremental_listing_completed_at", ledger)
+
     def test_incomplete_daily_scan_resumes_without_advancing_completion(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
