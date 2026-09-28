@@ -556,6 +556,13 @@ def _shard_filename(month: str, row_digest: str) -> str:
     return f"shard-{month}-{row_digest[:16]}.json"
 
 
+def _held_sources(rows: list) -> list:
+    """Keep correction relationships available without loading archive shards."""
+    return [{"receipt_no": row["receipt_no"], "corp_code": row.get("corp_code"),
+             "report_nm": row.get("report_nm"), "rcept_dt": row.get("rcept_dt")}
+            for row in rows if row.get("correction_hold") or row.get("withdrawal_flag")]
+
+
 def _write_content_shard(archive_dir: Path, month: str, rows: list) -> dict:
     """Write one immutable content-addressed shard; returns its manifest record."""
     ordered = sorted(rows, key=lambda row: row["receipt_no"])
@@ -569,6 +576,7 @@ def _write_content_shard(archive_dir: Path, month: str, rows: list) -> dict:
         versions[row.get("parser_version")] = versions.get(row.get("parser_version"), 0) + 1
     return {"file": _shard_filename(month, digest), "count": len(ordered),
             "row_digest": digest, "parser_versions": versions,
+            "held_sources": _held_sources(ordered),
             "updated_at": datetime.now(timezone.utc).isoformat()}
 
 
@@ -600,6 +608,10 @@ def _read_manifest_shard(archive_dir: Path, month: str, record: dict) -> list:
     if (shard.get("count") != len(rows) or shard.get("row_digest") != digest
             or record.get("count") != len(rows) or record.get("row_digest") != digest):
         raise ArchiveIntegrityError("ROW_DIGEST_MISMATCH", month, filename)
+    # Legacy shards predate held-row archival, so a missing summary is valid
+    # only if the shard contains no held rows.
+    if record.get("held_sources", []) != _held_sources(rows):
+        raise ArchiveIntegrityError("HELD_SOURCES_MISMATCH", month, filename)
     return rows
 
 

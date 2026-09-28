@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 from scripts.foliotrace import folio, opendart_secondary, secondary
 from scripts.foliotrace.opendart_secondary import OpendartListError
+from pipeline.foliotrace.indirect import effective_source_holds
+from pipeline.foliotrace.publish import make_snapshot
 
 
 def row(no, day, report="사업보고서", corp="00000001", name="회사", stock="000000", rm=""):
@@ -1343,6 +1345,103 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(set(saved['queue']), {no, pending_no})
             self.assertIn(no, saved['positives'])
             self.assertEqual(saved.get('archive_manifest', {}), {})
+
+    def test_archived_correction_keeps_prior_verified_holding_on_hold(self):
+        original_no, correction_no = '20260602000001', '20260603000001'
+        corp = '00126380'
+        state = folio.empty_state()
+        state['universe'][corp] = {'corp_code': corp, 'stock_code': '005930', 'name': '삼성전자'}
+        original = opendart_secondary._queue_entry(
+            row(original_no, '20260602', corp=corp, name='삼성전자', stock='005930'),
+            '2026-06-02', '2026-06-03')
+        original.update(source_status='source_context_review_pending',
+                        parser_version=secondary.SOURCE_PARSER_VERSION)
+        state['opendart_secondary_backfill'] = {
+            'method': opendart_secondary.METHOD, 'start_date': '2026-06-02',
+            'target_date': '2026-06-03', 'next_date': '2026-06-04', 'coverage': [],
+            'queue': {original_no: original}, 'positives': {original_no: copy.deepcopy(original)}}
+        state['secondary_source_cache'][original_no] = {
+            'status': 'source_context_review_pending',
+            'parser_version': secondary.SOURCE_PARSER_VERSION,
+            'source_archive_sha256': 'd' * 64,
+            'source_claims': [{
+                'status': 'actual_holding_basis_verified', 'row_sha256': 'a' * 64,
+                'row_offset': 100, 'source_file_sha256': 'b' * 64,
+                'basis_date': '2026-06-01', 'basis_evidence': 'explicit_same_row',
+                'quantity': '505', 'ownership_percent': '5.05', 'security_kind': '보통주',
+                'ratio_denominator': 'issued_shares', 'denominator_quantity': '10000',
+                'denominator_date': '2026-06-01', 'denominator_evidence': 'explicit_same_date',
+                'issuer_corp_code': corp, 'stock_code': '005930',
+                'issuer_identity_sha256': 'c' * 64, 'holder_scope': 'nps_only',
+                'owner_identity': 'nps_confirmed', 'filer_corp_code': corp,
+                'source_status': 'no_known_correction_or_withdrawal'}]}
+        secondary.replay_opendart_positives(state)
+        self.assertEqual(len(make_snapshot(state, {})['holdings']), 1)
+        correction = opendart_secondary._queue_entry(
+            row(correction_no, '20260603', '[기재정정]사업보고서',
+                corp=corp, name='삼성전자', stock='005930', rm='정'),
+            '2026-06-02', '2026-06-03')
+        correction.update(source_status='source_mention_unverified',
+                          parser_version=secondary.SOURCE_PARSER_VERSION,
+                          source_sha256='e' * 64)
+        state['opendart_secondary_backfill']['queue'][correction_no] = correction
+        self.assertEqual(make_snapshot(state, {})['holdings'], [])
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            folio.write_json(path, state)
+            result = opendart_secondary.scan_opendart_secondary(
+                path, date(2026, 6, 2), date(2026, 6, 3), review_limit=0,
+                max_queue_entries=1, read_state=folio.read_json, write_state=folio.write_json,
+                fetch_list=lambda *_: self.fail('completed listing must not refetch'))
+            self.assertEqual(result['archived_this_run'], 1)
+            saved = folio.read_json(path)
+            ledger = saved['opendart_secondary_backfill']
+            record = ledger['archive_manifest']['202606'][0]
+            self.assertEqual([item['receipt_no'] for item in record['held_sources']],
+                             [correction_no])
+            secondary.replay_opendart_positives(saved)
+            self.assertIn(original_no, effective_source_holds(saved))
+            self.assertEqual(make_snapshot(saved, {})['holdings'], [])
+            self.assertIn(original_no, ledger['positives'])
+            saved.setdefault('target_source_candidates', {})[correction_no] = {
+                'filer_corp_code': corp, 'report_name': '사업보고서',
+                'filing_date': '2026-06-03', 'correction_hold': False}
+            self.assertIn(original_no, effective_source_holds(saved))
+            self.assertEqual(make_snapshot(saved, {})['holdings'], [])
+
+            bad = dict(record, held_sources=[])
+            with self.assertRaisesRegex(opendart_secondary.ArchiveIntegrityError,
+                                        'HELD_SOURCES_MISMATCH'):
+                opendart_secondary._read_manifest_shard(
+                    opendart_secondary.archive_dir_for(path), '202606', bad)
+
+            with patch.object(secondary, 'SOURCE_PARSER_VERSION', 'new-parser'):
+                opendart_secondary.rehydrate_archive(
+                    path, limit=1, read_state=folio.read_json, write_state=folio.write_json)
+            restored = folio.read_json(path)
+            self.assertEqual(restored['opendart_secondary_backfill']['archive_manifest'], {})
+            self.assertIn(original_no, effective_source_holds(restored))
+            self.assertEqual(make_snapshot(restored, {})['holdings'], [])
+
+    def test_effective_holds_keep_same_day_relation_without_self_hold(self):
+        state = folio.empty_state()
+        state['opendart_secondary_backfill'] = {'queue': {
+            'a': {'corp_code': '1', 'report_nm': '사업보고서',
+                  'rcept_dt': '20260602'},
+            'b': {'corp_code': '1', 'report_nm': '[기재정정]사업보고서',
+                  'rcept_dt': '20260602', 'correction_hold': True},
+            'c': {'corp_code': '2', 'report_nm': '사업보고서',
+                  'rcept_dt': '20260601'}}}
+        self.assertEqual(effective_source_holds(state),
+                         {'a': 'correction_relation_unverified'})
+        state['opendart_secondary_backfill']['queue']['d'] = {
+            'corp_code': '1', 'report_nm': '[기재정정]사업보고서',
+            'rcept_dt': '20260602', 'correction_hold': True}
+        self.assertEqual(effective_source_holds(state), {
+            'a': 'correction_relation_unverified',
+            'b': 'correction_relation_unverified',
+            'd': 'correction_relation_unverified'})
 
     def test_crash_between_shard_and_commit_loses_nothing(self):
         day = date(2006, 2, 8)

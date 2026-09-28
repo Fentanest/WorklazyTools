@@ -82,25 +82,40 @@ def effective_source_holds(state):
     """Hold same-report sources when a later correction has no proven target link."""
     holds = dict(state.get("indirect_source_holds") or {})
     queued = (state.get("opendart_secondary_backfill") or {}).get("queue") or {}
+    manifest = (state.get("opendart_secondary_backfill") or {}).get("archive_manifest") or {}
     targeted = state.get("target_source_candidates") or {}
     sources = {}
+    for records in manifest.values():
+        for record in records:
+            for item in record.get("held_sources", []):
+                no = item["receipt_no"]
+                sources[no] = (item.get("corp_code"), item.get("report_nm"),
+                               item.get("rcept_dt"), True)
     for no, item in queued.items():
         sources[no] = (item.get("corp_code"), item.get("report_nm"),
                        item.get("rcept_dt"), bool(item.get("correction_hold") or item.get("withdrawal_flag")))
     for no, item in targeted.items():
-        sources[no] = (item.get("filer_corp_code"), item.get("report_name"),
-                       (item.get("filing_date") or "").replace("-", ""),
-                       bool(item.get("correction_hold") or item.get("withdrawal_flag")))
+        # A second search lane may hold the same receipt with incomplete flags.
+        # It must not clear a correction already established by the list API.
+        if no not in sources or not sources[no][3]:
+            sources[no] = (item.get("filer_corp_code"), item.get("report_name"),
+                           (item.get("filing_date") or "").replace("-", ""),
+                           bool(item.get("correction_hold") or item.get("withdrawal_flag")))
     def title(value):
         return re.sub(r"\s+", "", re.sub(r"^(?:\[(?:기재)?정정\]|\(정정\)|정정공시|정정)\s*", "", value or ""))
+    grouped = {}
     for no, (corp, report, day, held) in sources.items():
-        if not held or not corp or not report or not day:
+        if corp and report and day:
+            grouped.setdefault((corp, title(report)), []).append((no, day, held))
+    for members in grouped.values():
+        held_days = [day for _, day, held in members if held]
+        if not held_days:
             continue
-        normalized = title(report)
-        for prior_no, (prior_corp, prior_report, prior_day, _) in sources.items():
-            if (prior_no != no and prior_corp == corp and prior_report and title(prior_report) == normalized
-                    and prior_day and prior_day <= day):
-                holds[prior_no] = "correction_relation_unverified"
+        latest = max(held_days)
+        latest_count = held_days.count(latest)
+        for no, day, held in members:
+            if day < latest or (day == latest and (not held or latest_count > 1)):
+                holds[no] = "correction_relation_unverified"
     return holds
 
 
