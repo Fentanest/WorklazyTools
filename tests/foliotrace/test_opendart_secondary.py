@@ -451,7 +451,9 @@ class OpendartListPageTests(unittest.TestCase):
             state["opendart_secondary_backfill"] = {
                 "method": opendart_secondary.METHOD, "start_date": "1999-04-01",
                 "target_date": "2026-09-29", "next_date": "2000-05-07",
-                "coverage": [], "queue": {}, "positives": {}}
+                "coverage": [], "queue": {}, "positives": {},
+                "incremental_listing_completed_at": "2026-09-27T04:31:00+09:00",
+                "incremental_listing_completed_date": "2026-09-27"}
             folio.write_json(path, state)
             queried = []
             force_split = [True]
@@ -470,7 +472,8 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(first["status"], "INCREMENTAL_IN_PROGRESS")
             saved = folio.read_json(path)["opendart_secondary_backfill"]
             self.assertEqual(saved["incremental_next_date"], "2026-09-28")
-            self.assertNotIn("incremental_listing_completed_at", saved)
+            self.assertEqual(saved["incremental_listing_completed_at"],
+                             "2026-09-27T04:31:00+09:00")
             queried.clear()
             force_split[0] = False
             second = opendart_secondary.scan_opendart_secondary(
