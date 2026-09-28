@@ -369,27 +369,22 @@ class OpendartListPageTests(unittest.TestCase):
         document = io.BytesIO()
         with zipfile.ZipFile(document, 'w') as archive:
             archive.writestr('filing.xml', '<DOC>일반 공시</DOC>')
-        calls = []
-
-        def quota_after_first(no, _key):
-            calls.append(no)
-            if no == second_no:
-                raise secondary.DartQuotaExceeded('OPENDART_STATUS_020')
-            return document.getvalue()
-
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'state.json'
             fresh_state(path)
-            result = opendart_secondary.scan_opendart_secondary(
-                path, day, day, review_limit=2,
-                fetch_list=lambda _params: payload, fetch_document=quota_after_first,
-                read_state=folio.read_json, write_state=folio.write_json, key='test-key')
+            quota = b'\xef\xbb\xbf<result><status>020</status></result>'
+            with patch.object(secondary.urllib.request, 'urlopen', side_effect=[
+                    io.BytesIO(document.getvalue()), io.BytesIO(quota)]) as requests:
+                result = opendart_secondary.scan_opendart_secondary(
+                    path, day, day, review_limit=2,
+                    fetch_list=lambda _params: payload,
+                    read_state=folio.read_json, write_state=folio.write_json, key='test-key')
+                self.assertEqual(requests.call_count, 2)
             self.assertEqual(result['status'], 'SOURCE_QUOTA_EXCEEDED')
             self.assertEqual((result['source_review_attempts'], result['source_document_requests']), (1, 2))
             saved = folio.read_json(path)['opendart_secondary_backfill']
             self.assertEqual(saved['queue'][first_no]['source_status'], 'source_mention_unverified')
             self.assertEqual(saved['queue'][second_no]['source_attempt_count'], 0)
-            self.assertEqual(calls, [first_no, second_no])
             resume = opendart_secondary.scan_opendart_secondary(
                 path, day, day, review_limit=2,
                 fetch_list=lambda _params: self.fail('completed list must not be fetched'),

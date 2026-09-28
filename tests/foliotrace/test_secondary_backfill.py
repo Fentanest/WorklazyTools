@@ -298,10 +298,13 @@ class SecondaryBackfillTests(unittest.TestCase):
 
     def test_document_quota_response_stops_without_exposing_key(self):
         response = b'<result><status>020</status><message>limit</message></result>'
-        with patch.object(secondary.urllib.request, 'urlopen', return_value=io.BytesIO(response)):
-            with self.assertRaisesRegex(secondary.DartQuotaExceeded, '^OPENDART_STATUS_020$') as failure:
-                secondary.fetch_source_document(POSCO[0], 'test-key')
-        self.assertNotIn('test-key', str(failure.exception))
+        for payload in (response, b'\xef\xbb\xbf' + response):
+            with self.subTest(payload=payload[:3]), patch.object(
+                    secondary.urllib.request, 'urlopen', return_value=io.BytesIO(payload)) as request:
+                with self.assertRaisesRegex(secondary.DartQuotaExceeded, '^OPENDART_STATUS_020$') as failure:
+                    secondary.fetch_source_document(POSCO[0], 'test-key')
+                self.assertEqual(request.call_count, 1)
+                self.assertNotIn('test-key', str(failure.exception))
 
     def test_source_archive_marks_context_for_review_without_extracting_quantity(self):
         buffer = io.BytesIO()
