@@ -40,6 +40,38 @@ def fresh_state(path):
     folio.write_json(path, folio.empty_state())
 
 
+def verified_indirect_state():
+    original_no, corp = '20260602000001', '00126380'
+    state = folio.empty_state()
+    state['universe'][corp] = {'corp_code': corp, 'stock_code': '005930', 'name': '삼성전자'}
+    original = opendart_secondary._queue_entry(
+        row(original_no, '20260602', corp=corp, name='삼성전자', stock='005930'),
+        '2026-06-02', '2026-06-03')
+    original.update(source_status='source_context_review_pending',
+                    parser_version=secondary.SOURCE_PARSER_VERSION)
+    state['opendart_secondary_backfill'] = {
+        'method': opendart_secondary.METHOD, 'start_date': '2026-06-02',
+        'target_date': '2026-06-03', 'next_date': '2026-06-04', 'coverage': [],
+        'queue': {original_no: original}, 'positives': {original_no: copy.deepcopy(original)}}
+    state['secondary_source_cache'][original_no] = {
+        'status': 'source_context_review_pending',
+        'parser_version': secondary.SOURCE_PARSER_VERSION,
+        'source_archive_sha256': 'd' * 64,
+        'source_claims': [{
+            'status': 'actual_holding_basis_verified', 'row_sha256': 'a' * 64,
+            'row_offset': 100, 'source_file_sha256': 'b' * 64,
+            'basis_date': '2026-06-01', 'basis_evidence': 'explicit_same_row',
+            'quantity': '505', 'ownership_percent': '5.05', 'security_kind': '보통주',
+            'ratio_denominator': 'issued_shares', 'denominator_quantity': '10000',
+            'denominator_date': '2026-06-01', 'denominator_evidence': 'explicit_same_date',
+            'issuer_corp_code': corp, 'stock_code': '005930',
+            'issuer_identity_sha256': 'c' * 64, 'holder_scope': 'nps_only',
+            'owner_identity': 'nps_confirmed', 'filer_corp_code': corp,
+            'source_status': 'no_known_correction_or_withdrawal'}]}
+    secondary.replay_opendart_positives(state)
+    return state, original_no, corp
+
+
 class OpendartListPageTests(unittest.TestCase):
     def test_multi_page_window_queues_every_receipt_without_type_filter(self):
         day = date(2006, 2, 8)
@@ -1347,35 +1379,8 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(saved.get('archive_manifest', {}), {})
 
     def test_archived_correction_keeps_prior_verified_holding_on_hold(self):
-        original_no, correction_no = '20260602000001', '20260603000001'
-        corp = '00126380'
-        state = folio.empty_state()
-        state['universe'][corp] = {'corp_code': corp, 'stock_code': '005930', 'name': '삼성전자'}
-        original = opendart_secondary._queue_entry(
-            row(original_no, '20260602', corp=corp, name='삼성전자', stock='005930'),
-            '2026-06-02', '2026-06-03')
-        original.update(source_status='source_context_review_pending',
-                        parser_version=secondary.SOURCE_PARSER_VERSION)
-        state['opendart_secondary_backfill'] = {
-            'method': opendart_secondary.METHOD, 'start_date': '2026-06-02',
-            'target_date': '2026-06-03', 'next_date': '2026-06-04', 'coverage': [],
-            'queue': {original_no: original}, 'positives': {original_no: copy.deepcopy(original)}}
-        state['secondary_source_cache'][original_no] = {
-            'status': 'source_context_review_pending',
-            'parser_version': secondary.SOURCE_PARSER_VERSION,
-            'source_archive_sha256': 'd' * 64,
-            'source_claims': [{
-                'status': 'actual_holding_basis_verified', 'row_sha256': 'a' * 64,
-                'row_offset': 100, 'source_file_sha256': 'b' * 64,
-                'basis_date': '2026-06-01', 'basis_evidence': 'explicit_same_row',
-                'quantity': '505', 'ownership_percent': '5.05', 'security_kind': '보통주',
-                'ratio_denominator': 'issued_shares', 'denominator_quantity': '10000',
-                'denominator_date': '2026-06-01', 'denominator_evidence': 'explicit_same_date',
-                'issuer_corp_code': corp, 'stock_code': '005930',
-                'issuer_identity_sha256': 'c' * 64, 'holder_scope': 'nps_only',
-                'owner_identity': 'nps_confirmed', 'filer_corp_code': corp,
-                'source_status': 'no_known_correction_or_withdrawal'}]}
-        secondary.replay_opendart_positives(state)
+        state, original_no, corp = verified_indirect_state()
+        correction_no = '20260603000001'
         self.assertEqual(len(make_snapshot(state, {})['holdings']), 1)
         correction = opendart_secondary._queue_entry(
             row(correction_no, '20260603', '[기재정정]사업보고서',
@@ -1424,7 +1429,7 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertIn(original_no, effective_source_holds(restored))
             self.assertEqual(make_snapshot(restored, {})['holdings'], [])
 
-    def test_effective_holds_keep_same_day_relation_without_self_hold(self):
+    def test_effective_holds_keep_same_day_relation_and_own_hold(self):
         state = folio.empty_state()
         state['opendart_secondary_backfill'] = {'queue': {
             'a': {'corp_code': '1', 'report_nm': '사업보고서',
@@ -1434,7 +1439,8 @@ class OpendartListPageTests(unittest.TestCase):
             'c': {'corp_code': '2', 'report_nm': '사업보고서',
                   'rcept_dt': '20260601'}}}
         self.assertEqual(effective_source_holds(state),
-                         {'a': 'correction_relation_unverified'})
+                         {'a': 'correction_relation_unverified',
+                          'b': 'correction_relation_unverified'})
         state['opendart_secondary_backfill']['queue']['d'] = {
             'corp_code': '1', 'report_nm': '[기재정정]사업보고서',
             'rcept_dt': '20260602', 'correction_hold': True}
@@ -1442,6 +1448,56 @@ class OpendartListPageTests(unittest.TestCase):
             'a': 'correction_relation_unverified',
             'b': 'correction_relation_unverified',
             'd': 'correction_relation_unverified'})
+
+    def test_restart_after_negative_review_archives_own_hold_safely(self):
+        for withdrawn in (False, True):
+            with self.subTest(withdrawn=withdrawn), tempfile.TemporaryDirectory() as directory:
+                state, original_no, _ = verified_indirect_state()
+                ledger = state['opendart_secondary_backfill']
+                self.assertEqual(len(make_snapshot(state, {})['holdings']), 1)
+                ledger['queue'][original_no].update(
+                    correction_hold=True, withdrawal_flag=withdrawn,
+                    rm='철' if withdrawn else '정', parser_version='previous-parser')
+                ledger['positives'][original_no].update(
+                    correction_hold=True, withdrawal_flag=withdrawn,
+                    parser_version='previous-parser')
+                state['secondary_source_cache'][original_no]['parser_version'] = 'previous-parser'
+                state['indirect_source_holds'] = {}
+                for no in ('20260603000001', '20260603000002'):
+                    ledger['queue'][no] = {'receipt_no': no, 'rcept_dt': '20260603',
+                                           'source_status': 'source_review_pending'}
+                path = Path(directory) / 'state.json'
+                folio.write_json(path, state)
+                with patch.object(secondary, 'inspect_source_document', return_value={
+                        'status': 'source_mention_unverified',
+                        'parser_version': secondary.SOURCE_PARSER_VERSION,
+                        'source_sha256': 'e' * 64}):
+                    opendart_secondary.scan_opendart_secondary(
+                        path, date(2026, 6, 2), date(2026, 6, 3),
+                        review_limit=1, max_queue_entries=2,
+                        read_state=folio.read_json, write_state=folio.write_json,
+                        key='synthetic-offline', fetch_document=lambda *_: b'offline fixture',
+                        fetch_list=lambda *_: self.fail('completed listing must not refetch'))
+                checkpoint = folio.read_json(path)
+                self.assertEqual(checkpoint['opendart_secondary_backfill']['queue']
+                                 [original_no]['source_status'], 'source_mention_unverified')
+                self.assertNotIn(original_no, checkpoint['opendart_secondary_backfill']['positives'])
+                self.assertNotIn(original_no, checkpoint['indirect_source_holds'])
+
+                # Model process interruption before the wrapper's positive replay.
+                result = opendart_secondary.scan_opendart_secondary(
+                    path, date(2026, 6, 2), date(2026, 6, 3),
+                    review_limit=0, max_queue_entries=2,
+                    read_state=folio.read_json, write_state=folio.write_json,
+                    fetch_list=lambda *_: self.fail('completed listing must not refetch'))
+                self.assertEqual(result['archived_this_run'], 1)
+                saved = folio.read_json(path)
+                secondary.replay_opendart_positives(saved)
+                self.assertEqual(effective_source_holds(saved)[original_no],
+                                 'withdrawn' if withdrawn else 'correction_relation_unverified')
+                self.assertEqual(make_snapshot(saved, {})['holdings'], [])
+                self.assertEqual(saved['opendart_secondary_backfill']['archive_manifest']
+                                 ['202606'][0]['held_sources'][0]['withdrawal_flag'], withdrawn)
 
     def test_crash_between_shard_and_commit_loses_nothing(self):
         day = date(2006, 2, 8)

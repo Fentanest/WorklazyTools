@@ -91,9 +91,14 @@ def effective_source_holds(state):
                 no = item["receipt_no"]
                 sources[no] = (item.get("corp_code"), item.get("report_nm"),
                                item.get("rcept_dt"), True)
+                holds.setdefault(no, "withdrawn" if item.get("withdrawal_flag")
+                                 else "correction_relation_unverified")
     for no, item in queued.items():
         sources[no] = (item.get("corp_code"), item.get("report_nm"),
                        item.get("rcept_dt"), bool(item.get("correction_hold") or item.get("withdrawal_flag")))
+        if item.get("correction_hold") or item.get("withdrawal_flag"):
+            holds.setdefault(no, "withdrawn" if item.get("withdrawal_flag")
+                             else "correction_relation_unverified")
     for no, item in targeted.items():
         # A second search lane may hold the same receipt with incomplete flags.
         # It must not clear a correction already established by the list API.
@@ -101,6 +106,9 @@ def effective_source_holds(state):
             sources[no] = (item.get("filer_corp_code"), item.get("report_name"),
                            (item.get("filing_date") or "").replace("-", ""),
                            bool(item.get("correction_hold") or item.get("withdrawal_flag")))
+        if item.get("correction_hold") or item.get("withdrawal_flag"):
+            holds.setdefault(no, "withdrawn" if item.get("withdrawal_flag")
+                             else "correction_relation_unverified")
     def title(value):
         return re.sub(r"\s+", "", re.sub(r"^(?:\[(?:기재)?정정\]|\(정정\)|정정공시|정정)\s*", "", value or ""))
     grouped = {}

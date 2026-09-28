@@ -559,7 +559,8 @@ def _shard_filename(month: str, row_digest: str) -> str:
 def _held_sources(rows: list) -> list:
     """Keep correction relationships available without loading archive shards."""
     return [{"receipt_no": row["receipt_no"], "corp_code": row.get("corp_code"),
-             "report_nm": row.get("report_nm"), "rcept_dt": row.get("rcept_dt")}
+             "report_nm": row.get("report_nm"), "rcept_dt": row.get("rcept_dt"),
+             "withdrawal_flag": bool(row.get("withdrawal_flag"))}
             for row in rows if row.get("correction_hold") or row.get("withdrawal_flag")]
 
 
