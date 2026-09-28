@@ -1072,6 +1072,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
             ledger["overlap_next_date"] = max(overlap_cursor, overlap_base).isoformat()
 
     reviewed = source_requests = positive_count = 0
+    source_quota_exceeded = False
     if review_limit:
         today = datetime.now(timezone.utc).date().isoformat()
         cache = state.setdefault("secondary_source_cache", {})
@@ -1089,6 +1090,9 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                 source_requests += 1
                 try:
                     check = secondary.inspect_source_document(fetch_document(no, key))
+                except secondary.DartQuotaExceeded:
+                    source_quota_exceeded = True
+                    break
                 except (ValueError, RuntimeError, zipfile.BadZipFile):
                     check = {"status": "source_review_pending",
                              "parser_version": secondary.SOURCE_PARSER_VERSION}
@@ -1151,7 +1155,9 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
             pass
     pending_sources = _outstanding_count(ledger)
     archived_stale = _archived_stale_count(ledger)
-    if required_pages is not None:
+    if source_quota_exceeded:
+        status = "SOURCE_QUOTA_EXCEEDED"
+    elif required_pages is not None:
         status = "LISTING_BUDGET_INSUFFICIENT"
     elif bound_exceeded:
         status = "QUEUE_BOUND_EXCEEDED"
@@ -1193,6 +1199,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
             "archive_orphans": _count_orphan_shards(ledger, archive["dir"]),
             "swept_unreferenced": archive["swept"],
             "cache_pruned": cache_pruned,
+            "source_quota_exceeded": source_quota_exceeded,
             "source_review_attempts": reviewed, "source_document_requests": source_requests,
             "positive_count": positive_count,
             "positive_pending_total": len(ledger["positives"]),

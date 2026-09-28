@@ -44,6 +44,10 @@ SOURCE_CELLS = re.compile(r"<T[DEUH]\b[^>]*>(.*?)</T[DEUH]>", re.I | re.S)
 EXACT_NPS = re.compile(r"^(?:국민연금공단|국민연금관리공단|National Pension Service)$", re.I)
 
 
+class DartQuotaExceeded(RuntimeError):
+    """The document API returned its daily request-limit status."""
+
+
 def _row_cells(raw: str) -> list[str]:
     return [" ".join(html.unescape(re.sub(r"<[^>]+>", " ", cell)).split())
             for cell in SOURCE_CELLS.findall(raw)]
@@ -571,6 +575,9 @@ def fetch_source_document(receipt_no: str, key: str, *, retries=3):
                 payload = response.read(20_000_001)
             if len(payload) > 20_000_000:
                 raise ValueError("DOCUMENT_SIZE")
+            if (payload.lstrip().startswith(b"<") and
+                    re.search(rb"<status>\s*020\s*</status>", payload[:4096])):
+                raise DartQuotaExceeded("OPENDART_STATUS_020")
             return payload
         except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException):
             if attempt + 1 == retries:

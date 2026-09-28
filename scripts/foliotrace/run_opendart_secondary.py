@@ -25,7 +25,7 @@ from pipeline.foliotrace.publish import encoded
 # Stops that leave the lane incomplete must surface as process failure.
 INCOMPLETE_STATUSES = frozenset({"LISTING_BUDGET_INSUFFICIENT", "QUEUE_BACKLOG",
                                  "QUEUE_BOUND_EXCEEDED", "REPROCESS_PENDING",
-                                 "INCREMENTAL_IN_PROGRESS"})
+                                 "INCREMENTAL_IN_PROGRESS", "SOURCE_QUOTA_EXCEEDED"})
 
 
 def main() -> int:
