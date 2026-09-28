@@ -1499,6 +1499,39 @@ class OpendartListPageTests(unittest.TestCase):
                 self.assertEqual(saved['opendart_secondary_backfill']['archive_manifest']
                                  ['202606'][0]['held_sources'][0]['withdrawal_flag'], withdrawn)
 
+    def test_verified_target_relation_overrides_listing_correction_but_not_withdrawal(self):
+        for withdrawn in (False, True):
+            with self.subTest(withdrawn=withdrawn), tempfile.TemporaryDirectory() as directory:
+                state, no, corp = verified_indirect_state()
+                ledger = state['opendart_secondary_backfill']
+                ledger['positives'].pop(no)
+                ledger['queue'][no].update(
+                    correction_hold=True, withdrawal_flag=withdrawn,
+                    source_status='source_mention_unverified',
+                    parser_version=secondary.SOURCE_PARSER_VERSION)
+                ledger['queue']['20260603000002'] = {
+                    'receipt_no': '20260603000002', 'rcept_dt': '20260603',
+                    'source_status': 'source_review_pending'}
+                state.setdefault('target_source_candidates', {})[no] = {
+                    'filer_corp_code': corp, 'report_name': '[기재정정]사업보고서',
+                    'filing_date': '2026-06-02', 'correction_hold': False,
+                    'withdrawal_flag': False,
+                    'correction_relation_verified': {'original_receipt_no': '20260601000001'}}
+                state['indirect_source_holds'] = {}
+                expected = 0 if withdrawn else 1
+                self.assertEqual(len(make_snapshot(state, {})['holdings']), expected)
+                path = Path(directory) / 'state.json'
+                folio.write_json(path, state)
+                result = opendart_secondary.scan_opendart_secondary(
+                    path, date(2026, 6, 2), date(2026, 6, 3),
+                    review_limit=0, max_queue_entries=1,
+                    read_state=folio.read_json, write_state=folio.write_json,
+                    fetch_list=lambda *_: self.fail('completed listing must not refetch'))
+                self.assertEqual(result['archived_this_run'], 1)
+                saved = folio.read_json(path)
+                self.assertEqual(len(make_snapshot(saved, {})['holdings']), expected)
+                self.assertEqual(no in effective_source_holds(saved), withdrawn)
+
     def test_crash_between_shard_and_commit_loses_nothing(self):
         day = date(2006, 2, 8)
         tag = "20060208"

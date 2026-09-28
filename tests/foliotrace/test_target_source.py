@@ -6,7 +6,7 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
-from scripts.foliotrace import folio, secondary, target_source
+from scripts.foliotrace import folio, opendart_secondary, secondary, target_source
 from pipeline.foliotrace.publish import make_snapshot
 
 
@@ -142,6 +142,31 @@ class TargetSourceTests(unittest.TestCase):
                 fetch_document=lambda _: self.fail('raw cache was not reused'),
                 fetch_family=lambda _: family)
             self.assertEqual((replay['facts_changed'], replay['raw_archive_cache_hits']), (0, 0))
+
+            # The all-type list lane can encounter this receipt later. Its
+            # raw correction flag must not override the verified family link.
+            state_path = archive_dir / 'state.json'
+            folio.write_json(state_path, state)
+            opendart_secondary.scan_opendart_secondary(
+                state_path, date(1999, 6, 11), date(1999, 6, 11),
+                review_limit=0, max_windows=1,
+                read_state=folio.read_json, write_state=folio.write_json,
+                fetch_list=lambda _: corrected_list)
+            listed_state = folio.read_json(state_path)
+            target_source.ingest_target(listed_state, corrected_no, '00190321',
+                date(1999, 6, 11), '', archive_dir=archive_dir,
+                fetch_list=lambda _: corrected_list,
+                fetch_document=lambda _: self.fail('raw cache was not reused'),
+                fetch_family=lambda _: family)
+            self.assertNotIn(corrected_no, listed_state['indirect_source_holds'])
+            self.assertTrue(listed_state['target_source_candidates'][corrected_no]
+                            ['correction_relation_verified'])
+            without_direct = copy.deepcopy(listed_state)
+            without_direct['holdings'] = {}
+            without_direct['receipts'] = {}
+            published = make_snapshot(without_direct, {})
+            self.assertEqual(len(published['holdings']), 1)
+            self.assertEqual(published['holdings'][0]['receiptNo'], corrected_no)
 
     def test_official_listing_to_document_to_scoped_main_and_withdrawal(self):
         state = folio.empty_state()
