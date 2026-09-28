@@ -223,6 +223,29 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(result["listing_requests"], 0)
             self.assertEqual(result["pending_sources"], 2)
 
+    def test_default_pending_limit_allows_listing_past_5000(self):
+        day = date(2006, 2, 8)
+        tag = "20060208"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": day.isoformat(),
+                "target_date": day.isoformat(), "next_date": day.isoformat(),
+                "coverage": [], "queue": {
+                    receipt(tag, i): {"receipt_no": receipt(tag, i),
+                                      "source_status": "source_review_pending"}
+                    for i in range(5001)},
+                "positives": {}}
+            folio.write_json(path, state)
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, fetch_list=lambda _params: no_data(),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(result["listing_requests"], 1)
+            self.assertEqual(result["pending_sources"], 5001)
+            self.assertEqual(result["status"], "LISTING_COMPLETE_SOURCE_PENDING")
+
     def test_completed_range_rerun_is_idempotent(self):
         day = date(2006, 2, 8)
         tag = "20060208"

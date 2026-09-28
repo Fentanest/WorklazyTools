@@ -60,6 +60,7 @@ ARCHIVE_SHARD_ROWS = 5000
 PENDING_STATUSES = ("source_review_pending", "source_unavailable")
 SOURCE_HISTORY_CAP = 5
 DEFAULT_MAX_QUEUE_ENTRIES = 20000
+DEFAULT_MAX_PENDING = 20000
 # Listing and source review remain separate from observation reconciliation.
 HOLDING_REFLECTION = "separate_reconciliation"
 
@@ -819,7 +820,7 @@ def rehydrate_archive(state_path: Path, *, limit: int = 100,
 
 def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                             max_listing_pages: int = 300, max_windows: int = 20,
-                            review_limit: int = 20, max_pending: int = 5000,
+                            review_limit: int = 20, max_pending: int = DEFAULT_MAX_PENDING,
                             overlap_days: int = 0,
                             max_queue_entries: int = DEFAULT_MAX_QUEUE_ENTRIES,
                             auto_rehydrate_limit: int = 0,

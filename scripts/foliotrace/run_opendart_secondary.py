@@ -34,7 +34,7 @@ def main() -> int:
     parser.add_argument("--max-listing-pages", type=int, default=300)
     parser.add_argument("--max-windows", type=int, default=20)
     parser.add_argument("--review-limit", type=int, default=20)
-    parser.add_argument("--max-pending", type=int, default=5000)
+    parser.add_argument("--max-pending", type=int, default=opendart_secondary.DEFAULT_MAX_PENDING)
     parser.add_argument("--max-queue-entries", type=int, default=20000)
     parser.add_argument("--overlap-days", type=int, default=0)
     parser.add_argument("--rehydrate-limit", type=int, default=0)
