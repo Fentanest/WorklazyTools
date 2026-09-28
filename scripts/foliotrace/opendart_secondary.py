@@ -58,6 +58,7 @@ ARCHIVE_FORMAT = 2
 # Archived rows per monthly shard file; keeps each static data-branch file small.
 ARCHIVE_SHARD_ROWS = 5000
 PENDING_STATUSES = ("source_review_pending", "source_unavailable")
+TERMINAL_NEGATIVE_STATUSES = ("source_mention_unverified", "source_mention_no_equity_context")
 SOURCE_HISTORY_CAP = 5
 DEFAULT_MAX_QUEUE_ENTRIES = 20000
 DEFAULT_MAX_PENDING = 20000
@@ -658,20 +659,22 @@ def _sweep_unreferenced(archive_dir: Path, manifest: dict) -> int:
 
 
 def _is_archivable(item: dict) -> bool:
-    return (item.get("source_status") not in PENDING_STATUSES
-            and item.get("source_status") != "source_context_review_pending"
-            and item.get("parser_version") == secondary.SOURCE_PARSER_VERSION
-            and not item.get("correction_hold") and not item.get("withdrawal_flag"))
+    # A negative verdict cannot back a holding. Its correction/withdrawal
+    # metadata remains in the hashed archive row and is checked on relisting.
+    return (item.get("source_status") in TERMINAL_NEGATIVE_STATUSES
+            and item.get("parser_version") == secondary.SOURCE_PARSER_VERSION)
 
 
 def _archive_terminal_rows(ledger: dict, archive_dir: Path, *, max_queue_entries: int,
                            cache: dict, to_level: int | None = None) -> int:
     """Spill archivable rows into new immutable shards; queue rows drop only after.
 
-    Only terminal, current-version, non-held negatives move. Pending, stale,
-    positive, and held rows are never archived. Old shard files stay referenced
-    until the manifest update below is persisted; the caller sweeps them after
-    that commit. ``to_level`` spills below the bound to free room for a bounded
+    Only current-version negatives without a positive record move. A negative
+    correction/withdrawal still has its full listing flags and audit history
+    in the shard, and a changed listing requeues it. Pending, stale, and
+    positive rows stay active. Old shard files stay referenced until the
+    manifest update below is persisted; the caller sweeps them after that
+    commit. ``to_level`` spills below the bound to free room for a bounded
     replay. Returns the archived count.
     """
     level = max_queue_entries if to_level is None else min(to_level, max_queue_entries)
@@ -680,7 +683,8 @@ def _archive_terminal_rows(ledger: dict, archive_dir: Path, *, max_queue_entries
         return 0
     candidates = sorted(
         (item.get("rcept_dt") or "", no)
-        for no, item in ledger["queue"].items() if _is_archivable(item))
+        for no, item in ledger["queue"].items()
+        if no not in ledger.get("positives", {}) and _is_archivable(item))
     moving = [no for _, no in candidates[:overflow]]
     if not moving:
         return 0

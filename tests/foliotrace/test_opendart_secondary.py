@@ -1251,6 +1251,99 @@ class OpendartListPageTests(unittest.TestCase):
                              (tag, "source_mention_unverified", current, f"sha-{receipt(tag, 1)}"))
             self.assertIn("source_history", sample)
 
+    def test_held_negative_spill_keeps_flags_and_requeues_on_changed_listing(self):
+        day = date(2006, 2, 8)
+        tag = '20060208'
+        held_no, withdrawn_no, positive_no, pending_no = [receipt(tag, i) for i in range(1, 5)]
+        version = secondary.SOURCE_PARSER_VERSION
+
+        def entry(no, status, *, rm='', hold=False, withdrawn=False):
+            return {'receipt_no': no, 'rcept_dt': tag, 'corp_code': '00000001',
+                    'corp_name': '회사', 'stock_code': '000000', 'report_nm': '사업보고서',
+                    'rm': rm, 'correction_hold': hold, 'withdrawal_flag': withdrawn,
+                    'source_status': status, 'parser_version': version,
+                    'source_sha256': f'sha-{no}', 'source_history': [{'note': 'source_reviewed'}]}
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            state = folio.empty_state()
+            state['opendart_secondary_backfill'] = {
+                'method': opendart_secondary.METHOD, 'start_date': day.isoformat(),
+                'target_date': day.isoformat(), 'next_date': '2006-02-09',
+                'coverage': [], 'queue': {
+                    held_no: entry(held_no, 'source_mention_unverified', rm='유정', hold=True),
+                    withdrawn_no: entry(withdrawn_no, 'source_mention_no_equity_context',
+                                        rm='유철', hold=True, withdrawn=True),
+                    positive_no: entry(positive_no, 'source_context_review_pending',
+                                       rm='유정', hold=True),
+                    pending_no: entry(pending_no, 'source_review_pending')},
+                'positives': {positive_no: {'receipt_no': positive_no}}}
+            folio.write_json(path, state)
+            first = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=2,
+                fetch_list=lambda _params: self.fail('completed listing must not refetch'),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(first['archived_this_run'], 2)
+            saved = folio.read_json(path)['opendart_secondary_backfill']
+            self.assertEqual(set(saved['queue']), {positive_no, pending_no})
+            archive_dir = opendart_secondary.archive_dir_for(path)
+            archived = {item['receipt_no']: item for record in saved['archive_manifest']['200602']
+                        for item in opendart_secondary._read_manifest_shard(
+                            archive_dir, '200602', record)}
+            self.assertEqual(set(archived), {held_no, withdrawn_no})
+            self.assertTrue(archived[held_no]['correction_hold'])
+            self.assertTrue(archived[withdrawn_no]['withdrawal_flag'])
+            self.assertEqual(archived[held_no]['source_sha256'], f'sha-{held_no}')
+            self.assertEqual(archived[held_no]['source_history'], [{'note': 'source_reviewed'}])
+
+            refreshed = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=2,
+                overlap_days=1, max_windows=1,
+                fetch_list=lambda _params: list_page([row(held_no, tag)], 1, 1, 1),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual((refreshed['archived_hits'], refreshed['archived_requeued']), (1, 1))
+            after = folio.read_json(path)['opendart_secondary_backfill']
+            restored = after['queue'][held_no]
+            self.assertFalse(restored['correction_hold'])
+            self.assertFalse(restored['withdrawal_flag'])
+            self.assertEqual(restored['source_status'], 'source_mention_unverified')
+            self.assertTrue(any(x['note'] == 'requeued_listing_metadata_changed'
+                                for x in restored['source_history']))
+            self.assertIn(positive_no, after['positives'])
+            self.assertNotIn(held_no, {
+                item['receipt_no'] for record in after['archive_manifest']['200602']
+                for item in opendart_secondary._read_manifest_shard(
+                    archive_dir, '200602', record)})
+
+    def test_negative_row_with_positive_record_stays_active_under_queue_pressure(self):
+        day = date(2006, 2, 8)
+        tag = '20060208'
+        no, pending_no = receipt(tag, 10), receipt(tag, 11)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            state = folio.empty_state()
+            state['opendart_secondary_backfill'] = {
+                'method': opendart_secondary.METHOD, 'start_date': day.isoformat(),
+                'target_date': day.isoformat(), 'next_date': '2006-02-09',
+                'coverage': [], 'queue': {
+                    no: {'receipt_no': no, 'rcept_dt': tag,
+                         'source_status': 'source_mention_unverified',
+                         'parser_version': secondary.SOURCE_PARSER_VERSION,
+                         'correction_hold': True, 'withdrawal_flag': False},
+                    pending_no: {'receipt_no': pending_no, 'rcept_dt': tag,
+                                 'source_status': 'source_review_pending'}},
+                'positives': {no: {'receipt_no': no}}}
+            folio.write_json(path, state)
+            result = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=0, max_queue_entries=1,
+                fetch_list=lambda _params: self.fail('completed listing must not refetch'),
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(result['status'], 'QUEUE_BOUND_EXCEEDED')
+            saved = folio.read_json(path)['opendart_secondary_backfill']
+            self.assertEqual(set(saved['queue']), {no, pending_no})
+            self.assertIn(no, saved['positives'])
+            self.assertEqual(saved.get('archive_manifest', {}), {})
+
     def test_crash_between_shard_and_commit_loses_nothing(self):
         day = date(2006, 2, 8)
         tag = "20060208"
