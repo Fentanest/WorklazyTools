@@ -469,7 +469,7 @@ class OpendartListPageTests(unittest.TestCase):
                 read_state=folio.read_json, write_state=folio.write_json)
             self.assertEqual(first["status"], "INCREMENTAL_IN_PROGRESS")
             saved = folio.read_json(path)["opendart_secondary_backfill"]
-            self.assertEqual(saved["incremental_next_date"], "2026-09-27")
+            self.assertEqual(saved["incremental_next_date"], "2026-09-28")
             self.assertNotIn("incremental_listing_completed_at", saved)
             queried.clear()
             force_split[0] = False
@@ -479,9 +479,41 @@ class OpendartListPageTests(unittest.TestCase):
                 review_limit=0, fetch_list=fetch,
                 read_state=folio.read_json, write_state=folio.write_json)
             self.assertTrue(second["incremental_complete"])
-            self.assertEqual(queried[0][0], "20260927")
+            self.assertEqual(queried[0][0], "20260928")
             self.assertEqual(folio.read_json(path)["opendart_secondary_backfill"]["next_date"],
                              "2000-05-07")
+
+    def test_daily_budget_resumes_at_next_unchecked_day(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = "2026-09-27"
+            folio.write_json(path, state)
+            rows = {day: [row(receipt(day, i), day) for i in range(151)]
+                    for day in ("20260927", "20260928")}
+
+            def fetch(params):
+                selected = [filing for day, filings in rows.items()
+                            if params["bgn_de"] <= day <= params["end_de"]
+                            for filing in filings]
+                page = params["page_no"]
+                return list_page(selected[(page - 1) * 100:page * 100],
+                                 len(selected), page, (len(selected) + 99) // 100)
+
+            results = []
+            for _ in range(2):
+                results.append(opendart_secondary.scan_opendart_secondary(
+                    path, date(1999, 4, 1), date(2026, 9, 28),
+                    incremental_only=True, max_listing_pages=3,
+                    review_limit=0, fetch_list=fetch,
+                    read_state=folio.read_json, write_state=folio.write_json))
+            ledger = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(results[0]["status"], "INCREMENTAL_IN_PROGRESS")
+            self.assertTrue(results[1]["incremental_complete"])
+            self.assertEqual([window["from"] for window in ledger["incremental_coverage"]],
+                             ["2026-09-27", "2026-09-28"])
+            self.assertEqual(len(ledger["queue"]), 302)
 
     def test_daily_completion_time_sets_next_inclusive_kst_date(self):
         from contextlib import redirect_stdout
@@ -530,6 +562,30 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(stale["incremental_listing_completed_at"],
                              "2026-10-01T04:31:00+09:00")
             self.assertEqual(stale["incremental_next_date"], "2026-09-28")
+
+    def test_replay_failure_rechecks_last_listed_day(self):
+        from contextlib import redirect_stdout
+        from scripts.foliotrace import run_opendart_secondary
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = "2026-09-27"
+            folio.write_json(path, state)
+            argv = ["run_opendart_secondary.py", "--state", str(path),
+                    "--end", "2026-09-27", "--daily-incremental",
+                    "--review-limit", "0"]
+            payload = json.dumps(no_data()).encode()
+            with patch.object(sys, "argv", argv), redirect_stdout(io.StringIO()), patch.dict(
+                    os.environ, {"DART_API_KEY": "test-key"}), patch.object(
+                    opendart_secondary.urllib.request, "urlopen",
+                    side_effect=lambda *_args, **_kwargs: io.BytesIO(payload)), patch.object(
+                    secondary, "replay_opendart_positives", side_effect=ValueError("synthetic")):
+                self.assertEqual(run_opendart_secondary.main(), 1)
+            ledger = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(ledger["incremental_next_date"], "2026-09-27")
+            self.assertNotIn("incremental_listing_completed_at", ledger)
 
     def test_first_window_stays_within_three_calendar_months(self):
         self.assertLessEqual(opendart_secondary.MAX_WINDOW_DAYS, 89)

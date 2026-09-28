@@ -368,7 +368,7 @@ def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
     if phase == "incremental":
         record["incremental"] = True
         ledger["incremental_coverage"].append(record)
-        ledger["incremental_next_date"] = last.isoformat()
+        ledger["incremental_next_date"] = (last + timedelta(days=1)).isoformat()
     elif phase == "overlap":
         record["overlap"] = True
         ledger["overlap_coverage"].append(record)
@@ -838,8 +838,9 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     """List every filing in range, then review queued source documents boundedly.
 
     ``incremental_only`` scans recent dates with a separate cursor and keeps
-    the historical 1999+ cursor intact. The last scanned date remains
-    inclusive across interrupted runs.
+    the historical 1999+ cursor intact. Incomplete runs resume at the first
+    unchecked date; completed runs replay their final date until the wrapper
+    records the KST completion date.
 
     Only ``opendart_secondary_backfill``, the shared
     ``secondary_source_cache``, and the ``opendart-secondary-archive/`` shard
@@ -1054,6 +1055,12 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
 
     if incremental_only:
         incremental_forward = scan_phase(incremental_forward, end, phase="incremental")
+        if incremental_forward > end and windows:
+            # Keep the last checked day inclusive until the wrapper records a
+            # successful completion time. A replay failure cannot skip it.
+            ledger["incremental_next_date"] = end.isoformat()
+            state["revision"] += 1
+            write_state(state_path, state)
     elif first_overlap:
         overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, phase="overlap")
         forward = scan_phase(forward, end, phase="forward")
