@@ -21,10 +21,15 @@ on:
         default: '20'
         type: string
       overlap_days:
-        description: Incremental overlap days rescanned on each run
+        description: Historical cursor overlap days (historical mode only)
         required: true
         default: '3'
         type: string
+      historical_backfill:
+        description: Continue the saved 1999+ all-type scan instead of the daily incremental scan
+        required: true
+        default: false
+        type: boolean
       max_queue_entries:
         description: Maximum queued receipt rows kept in state
         required: true
@@ -83,6 +88,7 @@ jobs:
           MAX_WINDOWS: ${{ inputs.max_windows }}
           REVIEW_LIMIT: ${{ inputs.review_limit }}
           OVERLAP_DAYS: ${{ inputs.overlap_days }}
+          HISTORICAL_BACKFILL: ${{ inputs.historical_backfill }}
           MAX_QUEUE_ENTRIES: ${{ inputs.max_queue_entries }}
           REHYDRATE_LIMIT: ${{ inputs.rehydrate_limit }}
           AUTO_REHYDRATE_LIMIT: ${{ inputs.auto_rehydrate_limit }}
@@ -90,9 +96,10 @@ jobs:
         run: |
           args=(--state foliotrace-state/state.json)
           if [ "$EVENT_NAME" = schedule ]; then
-            args+=(--overlap-days 3 --max-listing-pages 100 --max-windows 15 --review-limit 20 --max-queue-entries 20000 --auto-rehydrate-limit 50)
+            args+=(--daily-incremental --max-listing-pages 100 --max-windows 15 --review-limit 20 --max-queue-entries 20000 --auto-rehydrate-limit 50)
           else
             args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT" --max-queue-entries "$MAX_QUEUE_ENTRIES" --auto-rehydrate-limit "$AUTO_REHYDRATE_LIMIT")
+            if [ "$HISTORICAL_BACKFILL" != true ]; then args+=(--daily-incremental); fi
           fi
           if [ -n "$REHYDRATE_LIMIT" ] && [ "$REHYDRATE_LIMIT" != 0 ]; then args+=(--rehydrate-limit "$REHYDRATE_LIMIT"); fi
           if [ "$VALIDATE_ONLY" = true ]; then args+=(--validate-only); fi

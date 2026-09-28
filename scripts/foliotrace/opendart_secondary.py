@@ -307,7 +307,7 @@ def _collect_window(fetch_list, key: str, cursor: date, last: date, *, ledger: d
 
 def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
                    cursor: date, last: date,
-                   pages: list[dict], *, overlap: bool, archive: dict,
+                   pages: list[dict], *, phase: str, archive: dict,
                    max_listing_pages: int) -> tuple[int, int, int]:
     """Validate pages, queue every receipt, and advance only this phase's cursor.
 
@@ -365,15 +365,22 @@ def _commit_window(ledger: dict, state: dict, state_path: Path, write_state,
               "pages": len(pages), "total_receipts": total,
               "queued_receipts": queued_this_window, "complete": True,
               "page_digest": hashlib.sha256("".join(digests).encode()).hexdigest()}
-    if overlap:
+    if phase == "incremental":
+        record["incremental"] = True
+        ledger["incremental_coverage"].append(record)
+        ledger["incremental_next_date"] = last.isoformat()
+    elif phase == "overlap":
         record["overlap"] = True
         ledger["overlap_coverage"].append(record)
         ledger["overlap_next_date"] = (last + timedelta(days=1)).isoformat()
     else:
         ledger["coverage"].append(record)
         ledger["next_date"] = (last + timedelta(days=1)).isoformat()
-    history = ledger["overlap_coverage"] if overlap else ledger["coverage"]
-    size_key = "overlap_max_window_days" if overlap else "max_window_days"
+    history_key = {"incremental": "incremental_coverage",
+                   "overlap": "overlap_coverage", "forward": "coverage"}[phase]
+    size_key = {"incremental": "incremental_max_window_days",
+                "overlap": "overlap_max_window_days", "forward": "max_window_days"}[phase]
+    history = ledger[history_key]
     if len(pages) * 2 + 1 <= max_listing_pages:
         ledger[size_key] = min(
             MAX_WINDOW_DAYS, max(1, (last - date.fromisoformat(history[-1]["from"])).days * 2 + 2))
@@ -822,12 +829,17 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                             max_listing_pages: int = 300, max_windows: int = 20,
                             review_limit: int = 20, max_pending: int = DEFAULT_MAX_PENDING,
                             overlap_days: int = 0,
+                            incremental_only: bool = False,
                             max_queue_entries: int = DEFAULT_MAX_QUEUE_ENTRIES,
                             auto_rehydrate_limit: int = 0,
                             fetch_list=fetch_list_page,
                             fetch_document=secondary.fetch_source_document,
                             read_state=None, write_state=None, key: str = "") -> dict:
     """List every filing in range, then review queued source documents boundedly.
+
+    ``incremental_only`` scans recent dates with a separate cursor and keeps
+    the historical 1999+ cursor intact. The last scanned date remains
+    inclusive across interrupted runs.
 
     Only ``opendart_secondary_backfill``, the shared
     ``secondary_source_cache``, and the ``opendart-secondary-archive/`` shard
@@ -869,6 +881,21 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     ledger.setdefault("queue", {})
     ledger.setdefault("positives", {})
     ledger.setdefault("archive_manifest", {})
+    if incremental_only:
+        # First daily run starts at the already collected direct-list date.
+        # The historical all-type cursor is retained for explicit catch-up runs.
+        if "incremental_next_date" not in ledger:
+            latest = state.get("latest_complete_listing_date")
+            seed = date.fromisoformat(latest) if latest else end
+            ledger["incremental_next_date"] = max(start, min(seed, end)).isoformat()
+            ledger["incremental_coverage"] = []
+            state["revision"] += 1
+            write_state(state_path, state)
+        ledger.setdefault("incremental_coverage", [])
+        incremental_forward = date.fromisoformat(ledger["incremental_next_date"])
+        if not start <= incremental_forward <= end + timedelta(days=1):
+            raise ValueError("opendart incremental cursor inconsistent")
+        overlap_days = 0
     archive = {"dir": archive_dir_for(state_path), "months": {},
                "hits": 0, "archived": 0, "swept": 0}
     if len(ledger["queue"]) > max_queue_entries:
@@ -963,7 +990,8 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         first_overlap = ledger.get("last_phase") == "forward"
     else:
         first_overlap = overlap_work and not forward_work
-    ledger["last_phase"] = "overlap" if first_overlap else "forward"
+    if not incremental_only:
+        ledger["last_phase"] = "overlap" if first_overlap else "forward"
     ledger.setdefault("overlap_max_window_days", 1)
 
     requests = windows = new_receipts = overlap_windows = requeued = 0
@@ -974,7 +1002,7 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     def window_limit(frontier: date, cap: date, size: int) -> date:
         return min(frontier + timedelta(days=size - 1), cap)
 
-    def scan_phase(frontier: date, cap: date, *, overlap: bool) -> date:
+    def scan_phase(frontier: date, cap: date, *, phase: str) -> date:
         """Commit complete windows until the cap or a budget/backlog/bound stop.
 
         Terminal verdicts spill into the durable archive to respect the queue
@@ -984,8 +1012,9 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         force the overlap tail into wasteful re-halving probes.
         """
         nonlocal requests, windows, new_receipts, overlap_windows, requeued, required_pages, backlog, bound_exceeded
-        size_key = "overlap_max_window_days" if overlap else "max_window_days"
-        default_size = 1 if overlap else MAX_WINDOW_DAYS
+        size_key = {"incremental": "incremental_max_window_days",
+                    "overlap": "overlap_max_window_days", "forward": "max_window_days"}[phase]
+        default_size = 1 if phase == "overlap" else MAX_WINDOW_DAYS
         while (frontier <= cap and windows < max_windows
                and requests < max_listing_pages and required_pages is None
                and not backlog and not bound_exceeded):
@@ -1012,27 +1041,30 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                 break
             gained, _, hits, restored = _commit_window(ledger, state, state_path, write_state,
                                              frontier, last, pages,
-                                             overlap=overlap, archive=archive,
+                                             phase=phase, archive=archive,
                                              max_listing_pages=max_listing_pages)
             new_receipts += gained
             archive["hits"] += hits
             requeued += restored
             frontier = last + timedelta(days=1)
             windows += 1
-            if overlap:
+            if phase == "overlap":
                 overlap_windows += 1
         return frontier
 
-    if first_overlap:
-        overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, overlap=True)
-        forward = scan_phase(forward, end, overlap=False)
+    if incremental_only:
+        incremental_forward = scan_phase(incremental_forward, end, phase="incremental")
+    elif first_overlap:
+        overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, phase="overlap")
+        forward = scan_phase(forward, end, phase="forward")
     else:
-        forward = scan_phase(forward, end, overlap=False)
-        overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, overlap=True)
-    if pinned_to is not None:
-        ledger["overlap_next_date"] = max(overlap_cursor, pinned_from).isoformat()
-    else:
-        ledger["overlap_next_date"] = max(overlap_cursor, overlap_base).isoformat()
+        forward = scan_phase(forward, end, phase="forward")
+        overlap_cursor = scan_phase(overlap_cursor, overlap_tail_end, phase="overlap")
+    if not incremental_only:
+        if pinned_to is not None:
+            ledger["overlap_next_date"] = max(overlap_cursor, pinned_from).isoformat()
+        else:
+            ledger["overlap_next_date"] = max(overlap_cursor, overlap_base).isoformat()
 
     reviewed = source_requests = positive_count = 0
     if review_limit:
@@ -1094,14 +1126,15 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         state["revision"] += 1
         write_state(state_path, state)
 
-    # Completion distinguishes three scopes: the forward full-range scan
-    # (2006 exhaustive coverage), the pinned tail cycle in progress, and stale
+    # Completion distinguishes the forward full-range scan, the independent
+    # recent scan, the pinned tail cycle in progress, and stale
     # archived rows awaiting parser-upgrade rehydration. Residual risk: a
     # same-receipt rm change older than the pinned tail may only surface as a
     # new correction filing in the forward scan, and such a filing is not
     # guaranteed to exist; the tail is a bounded re-verification window, not a
     # promise to catch every retroactive edit.
     forward_complete = ledger["next_date"] > end.isoformat()
+    incremental_complete = incremental_only and incremental_forward > end
     overlap_pending_days = 0
     if overlap_days:
         try:
@@ -1119,7 +1152,9 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
         status = "QUEUE_BOUND_EXCEEDED"
     elif backlog:
         status = "QUEUE_BACKLOG"
-    elif not forward_complete:
+    elif incremental_only and not incremental_complete:
+        status = "INCREMENTAL_IN_PROGRESS"
+    elif not incremental_only and not forward_complete:
         status = "LISTING_IN_PROGRESS"
     elif pending_sources:
         status = "LISTING_COMPLETE_SOURCE_PENDING"
@@ -1132,9 +1167,14 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
                          if isinstance(months, list) for entry in months
                          if isinstance(entry, dict))
     return {"status": status, "next_date": ledger["next_date"],
+            "incremental_only": incremental_only,
+            "incremental_complete": incremental_complete,
+            "incremental_next_date": ledger.get("incremental_next_date"),
+            "incremental_listing_completed_at": ledger.get("incremental_listing_completed_at"),
+            "incremental_windows": len(ledger.get("incremental_coverage", [])),
             "target_date": ledger["target_date"],
             "completed_windows": len(ledger["coverage"]), "windows_this_run": windows,
-            "overlap_windows": overlap_windows, "overlap_next_date": ledger["overlap_next_date"],
+            "overlap_windows": overlap_windows, "overlap_next_date": ledger.get("overlap_next_date"),
             "overlap_cycle_reset": overlap_cycle_reset,
             "overlap_pending_days": overlap_pending_days,
             "forward_complete": forward_complete,

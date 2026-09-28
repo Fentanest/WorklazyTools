@@ -14,8 +14,9 @@ import os
 import shutil
 import sys
 import tempfile
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.foliotrace import folio, opendart_secondary, secondary
@@ -23,7 +24,8 @@ from pipeline.foliotrace.publish import encoded
 
 # Stops that leave the lane incomplete must surface as process failure.
 INCOMPLETE_STATUSES = frozenset({"LISTING_BUDGET_INSUFFICIENT", "QUEUE_BACKLOG",
-                                 "QUEUE_BOUND_EXCEEDED", "REPROCESS_PENDING"})
+                                 "QUEUE_BOUND_EXCEEDED", "REPROCESS_PENDING",
+                                 "INCREMENTAL_IN_PROGRESS"})
 
 
 def main() -> int:
@@ -37,6 +39,7 @@ def main() -> int:
     parser.add_argument("--max-pending", type=int, default=opendart_secondary.DEFAULT_MAX_PENDING)
     parser.add_argument("--max-queue-entries", type=int, default=20000)
     parser.add_argument("--overlap-days", type=int, default=0)
+    parser.add_argument("--daily-incremental", action="store_true")
     parser.add_argument("--rehydrate-limit", type=int, default=0)
     parser.add_argument("--auto-rehydrate-limit", type=int, default=0)
     parser.add_argument("--validate-only", action="store_true")
@@ -73,6 +76,7 @@ def main() -> int:
             max_queue_entries=args.max_queue_entries,
             auto_rehydrate_limit=args.auto_rehydrate_limit,
             overlap_days=args.overlap_days,
+            incremental_only=args.daily_incremental,
             read_state=folio.read_json, write_state=folio.write_json,
             key=os.environ.get("DART_API_KEY", ""))
         normalized = folio.read_json(state_path)
@@ -83,6 +87,20 @@ def main() -> int:
             normalized["revision"] += 1
             folio.write_json(state_path, normalized)
         result["observation_replay"] = applied
+        if (args.daily_incremental and result["incremental_complete"]
+                and result["windows_this_run"] and result["status"] not in INCOMPLETE_STATUSES):
+            completed = datetime.now(ZoneInfo("Asia/Seoul"))
+            ledger = normalized[opendart_secondary.LEDGER_KEY]
+            ledger["incremental_listing_completed_at"] = completed.isoformat()
+            ledger["incremental_listing_completed_date"] = completed.date().isoformat()
+            # Never move past the first date that the completed listing did
+            # not cover, even if a manually supplied target is old.
+            ledger["incremental_next_date"] = min(
+                completed.date(), target + timedelta(days=1)).isoformat()
+            normalized["revision"] += 1
+            folio.write_json(state_path, normalized)
+            result["incremental_listing_completed_at"] = ledger["incremental_listing_completed_at"]
+            result["incremental_next_date"] = ledger["incremental_next_date"]
     except opendart_secondary.OpendartListError as exc:
         print(json.dumps({"error": exc.code, "window_start": exc.start,
                           "window_end": exc.end, "page_no": exc.page_no}), file=sys.stderr)

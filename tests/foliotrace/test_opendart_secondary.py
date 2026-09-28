@@ -7,7 +7,7 @@ import tempfile
 import unittest
 import urllib.error
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -371,14 +371,165 @@ class OpendartListPageTests(unittest.TestCase):
                     fetch_list=lambda _params: no_data(),
                     read_state=folio.read_json, write_state=folio.write_json)
 
-    def test_schedule_workflow_uses_literal_overlap_while_dispatch_uses_input(self):
+    def test_schedule_uses_daily_incremental_and_dispatch_can_resume_history(self):
         workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / \
             "foliotrace-opendart-secondary.yml"
         text = workflow.read_text(encoding="utf-8")
-        self.assertIn("--overlap-days 3", text)
+        self.assertIn("args+=(--daily-incremental --max-listing-pages 100", text)
+        self.assertIn('if [ "$HISTORICAL_BACKFILL" != true ]; then args+=(--daily-incremental); fi',
+                      text)
         self.assertNotIn('args=(--state foliotrace-state/state.json --overlap-days "$OVERLAP_DAYS")',
                          text)
         self.assertIn('--overlap-days "$OVERLAP_DAYS"', text)
+
+    def test_daily_incremental_starts_at_recent_date_and_preserves_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = "2026-09-27"
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "1999-04-01",
+                "target_date": "2026-09-27", "next_date": "2000-05-07",
+                "overlap_next_date": "2000-03-22", "coverage": [],
+                "overlap_coverage": [], "queue": {}, "positives": {}}
+            folio.write_json(path, state)
+            queried = []
+
+            def fetch(params):
+                queried.append((params["bgn_de"], params["end_de"]))
+                return no_data()
+
+            result = opendart_secondary.scan_opendart_secondary(
+                path, date(1999, 4, 1), date(2026, 9, 27),
+                incremental_only=True, overlap_days=3, review_limit=0,
+                fetch_list=fetch, read_state=folio.read_json, write_state=folio.write_json)
+            saved = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(queried, [("20260927", "20260927")])
+            self.assertTrue(result["incremental_complete"])
+            self.assertEqual(saved["incremental_next_date"], "2026-09-27")
+            self.assertEqual(saved["incremental_coverage"][0]["from"], "2026-09-27")
+            self.assertEqual(saved["next_date"], "2000-05-07")
+            self.assertEqual(saved["overlap_next_date"], "2000-03-22")
+            self.assertEqual(saved["coverage"], [])
+            opendart_secondary.scan_opendart_secondary(
+                path, date(1999, 4, 1), date(2026, 9, 27),
+                max_windows=1, review_limit=0, fetch_list=fetch,
+                read_state=folio.read_json, write_state=folio.write_json)
+            resumed = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(resumed["coverage"][0]["from"], "2000-05-07")
+            self.assertEqual(resumed["incremental_next_date"], "2026-09-27")
+
+    def test_rechecking_completion_day_does_not_duplicate_receipt(self):
+        day = date(2026, 9, 27)
+        filing = row(receipt("20260927", 1), "20260927")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = day.isoformat()
+            folio.write_json(path, state)
+            counts = []
+            for _ in range(2):
+                result = opendart_secondary.scan_opendart_secondary(
+                    path, date(1999, 4, 1), day, incremental_only=True,
+                    review_limit=0,
+                    fetch_list=lambda _params: list_page([filing], 1, 1, 1),
+                    read_state=folio.read_json, write_state=folio.write_json)
+                counts.append(result["new_receipts"])
+            ledger = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(counts, [1, 0])
+            self.assertEqual(len(ledger["queue"]), 1)
+            self.assertEqual(len(ledger["incremental_coverage"]), 2)
+
+    def test_incomplete_daily_scan_resumes_without_advancing_completion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = "2026-09-27"
+            state["opendart_secondary_backfill"] = {
+                "method": opendart_secondary.METHOD, "start_date": "1999-04-01",
+                "target_date": "2026-09-29", "next_date": "2000-05-07",
+                "coverage": [], "queue": {}, "positives": {}}
+            folio.write_json(path, state)
+            queried = []
+            force_split = [True]
+
+            def fetch(params):
+                queried.append((params["bgn_de"], params["end_de"]))
+                if force_split[0] and params["bgn_de"] != params["end_de"]:
+                    return list_page([], 0, 1, 4)
+                return no_data()
+
+            first = opendart_secondary.scan_opendart_secondary(
+                path, date(1999, 4, 1), date(2026, 9, 29),
+                incremental_only=True, max_listing_pages=3, max_windows=1,
+                review_limit=0, fetch_list=fetch,
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertEqual(first["status"], "INCREMENTAL_IN_PROGRESS")
+            saved = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(saved["incremental_next_date"], "2026-09-27")
+            self.assertNotIn("incremental_listing_completed_at", saved)
+            queried.clear()
+            force_split[0] = False
+            second = opendart_secondary.scan_opendart_secondary(
+                path, date(1999, 4, 1), date(2026, 9, 29),
+                incremental_only=True, max_listing_pages=3, max_windows=3,
+                review_limit=0, fetch_list=fetch,
+                read_state=folio.read_json, write_state=folio.write_json)
+            self.assertTrue(second["incremental_complete"])
+            self.assertEqual(queried[0][0], "20260927")
+            self.assertEqual(folio.read_json(path)["opendart_secondary_backfill"]["next_date"],
+                             "2000-05-07")
+
+    def test_daily_completion_time_sets_next_inclusive_kst_date(self):
+        from contextlib import redirect_stdout
+        from scripts.foliotrace import run_opendart_secondary
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = "2026-09-27"
+            folio.write_json(path, state)
+
+            def run(end, completed):
+                argv = ["run_opendart_secondary.py", "--state", str(path),
+                        "--end", end, "--daily-incremental", "--review-limit", "0"]
+                output = io.StringIO()
+                payload = json.dumps(no_data()).encode()
+                with patch.object(sys, "argv", argv), redirect_stdout(output), patch.dict(
+                        os.environ, {"DART_API_KEY": "test-key"}), patch.object(
+                        opendart_secondary.urllib.request, "urlopen",
+                        side_effect=lambda *_args, **_kwargs: io.BytesIO(payload)), patch.object(
+                        run_opendart_secondary, "datetime") as clock:
+                    clock.now.return_value = datetime.fromisoformat(completed)
+                    self.assertEqual(run_opendart_secondary.main(), 0)
+                return json.loads(output.getvalue().strip().splitlines()[-1])
+
+            first = run("2026-09-27", "2026-09-28T04:31:00+09:00")
+            ledger = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(first["incremental_listing_completed_at"],
+                             "2026-09-28T04:31:00+09:00")
+            self.assertEqual(ledger["incremental_listing_completed_date"], "2026-09-28")
+            self.assertEqual(ledger["incremental_next_date"], "2026-09-28")
+            self.assertEqual(ledger["next_date"], "1999-04-01")
+            second = run("2026-09-28", "2026-09-29T04:31:00+09:00")
+            ledger = folio.read_json(path)["opendart_secondary_backfill"]
+            self.assertEqual(ledger["incremental_coverage"][-1]["from"], "2026-09-28")
+            self.assertEqual(second["incremental_next_date"], "2026-09-29")
+            self.assertEqual(ledger["incremental_listing_completed_date"], "2026-09-29")
+            # A stale upstream target must not jump several unscanned days
+            # just because the runner finishes much later.
+            fresh_state(path)
+            state = folio.read_json(path)
+            state["latest_complete_listing_date"] = "2026-09-27"
+            folio.write_json(path, state)
+            stale = run("2026-09-27", "2026-10-01T04:31:00+09:00")
+            self.assertEqual(stale["incremental_listing_completed_at"],
+                             "2026-10-01T04:31:00+09:00")
+            self.assertEqual(stale["incremental_next_date"], "2026-09-28")
 
     def test_first_window_stays_within_three_calendar_months(self):
         self.assertLessEqual(opendart_secondary.MAX_WINDOW_DAYS, 89)
