@@ -403,11 +403,54 @@ class OpendartListPageTests(unittest.TestCase):
                     fetch_list=lambda _params: no_data(),
                     read_state=folio.read_json, write_state=folio.write_json)
 
+    def test_daily_source_capacity_can_drain_more_than_300_queued_receipts(self):
+        day = date(2006, 2, 8)
+        tag = '20060208'
+        document = io.BytesIO()
+        with zipfile.ZipFile(document, 'w') as archive:
+            archive.writestr('filing.xml', '<DOC>일반 공시</DOC>')
+        calls = []
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            state = folio.empty_state()
+            state['opendart_secondary_backfill'] = {
+                'method': opendart_secondary.METHOD,
+                'start_date': day.isoformat(), 'target_date': day.isoformat(),
+                'next_date': '2006-02-09', 'coverage': [], 'queue': {
+                    receipt(tag, index): {
+                        'receipt_no': receipt(tag, index), 'rcept_dt': tag,
+                        'source_status': 'source_review_pending', 'source_attempt_count': 0,
+                        'last_source_attempt_on': None}
+                    for index in range(1201)},
+                'positives': {}}
+            folio.write_json(path, state)
+
+            def fetch_document(no, _key):
+                calls.append(no)
+                return document.getvalue()
+
+            first = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=1200,
+                fetch_list=lambda _params: self.fail('completed listing must not refetch'),
+                fetch_document=fetch_document,
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key')
+            self.assertEqual((first['source_review_attempts'], first['pending_sources']), (1200, 1))
+            self.assertEqual(first['status'], 'LISTING_COMPLETE_SOURCE_PENDING')
+            second = opendart_secondary.scan_opendart_secondary(
+                path, day, day, review_limit=1200,
+                fetch_list=lambda _params: self.fail('completed listing must not refetch'),
+                fetch_document=fetch_document,
+                read_state=folio.read_json, write_state=folio.write_json, key='test-key')
+            self.assertEqual((second['source_review_attempts'], second['pending_sources']), (1, 0))
+            self.assertEqual(second['status'], 'SOURCE_REVIEW_COMPLETE')
+            self.assertEqual(len(calls), 1201)
+
     def test_schedule_uses_daily_incremental_and_dispatch_can_resume_history(self):
         workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / \
             "foliotrace-opendart-secondary.yml"
         text = workflow.read_text(encoding="utf-8")
         self.assertIn("args+=(--daily-incremental --max-listing-pages 100", text)
+        self.assertIn("--review-limit 1200 --max-queue-entries 20000", text)
         self.assertIn('if [ "$HISTORICAL_BACKFILL" != true ]; then args+=(--daily-incremental); fi',
                       text)
         self.assertNotIn('args=(--state foliotrace-state/state.json --overlap-days "$OVERLAP_DAYS")',

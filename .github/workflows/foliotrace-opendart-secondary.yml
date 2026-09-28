@@ -96,7 +96,7 @@ jobs:
         run: |
           args=(--state foliotrace-state/state.json)
           if [ "$EVENT_NAME" = schedule ]; then
-            args+=(--daily-incremental --max-listing-pages 100 --max-windows 15 --review-limit 20 --max-queue-entries 20000 --auto-rehydrate-limit 50)
+            args+=(--daily-incremental --max-listing-pages 100 --max-windows 15 --review-limit 1200 --max-queue-entries 20000 --auto-rehydrate-limit 50)
           else
             args+=(--overlap-days "$OVERLAP_DAYS" --max-listing-pages "$MAX_LISTING_PAGES" --max-windows "$MAX_WINDOWS" --review-limit "$REVIEW_LIMIT" --max-queue-entries "$MAX_QUEUE_ENTRIES" --auto-rehydrate-limit "$AUTO_REHYDRATE_LIMIT")
             if [ "$HISTORICAL_BACKFILL" != true ]; then args+=(--daily-incremental); fi

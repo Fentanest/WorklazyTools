@@ -61,6 +61,7 @@ PENDING_STATUSES = ("source_review_pending", "source_unavailable")
 SOURCE_HISTORY_CAP = 5
 DEFAULT_MAX_QUEUE_ENTRIES = 20000
 DEFAULT_MAX_PENDING = 20000
+MAX_SOURCE_REVIEWS_PER_RUN = 1200
 # Listing and source review remain separate from observation reconciliation.
 HOLDING_REFLECTION = "separate_reconciliation"
 
@@ -861,7 +862,8 @@ def scan_opendart_secondary(state_path: Path, start: date, end: date, *,
     if review_limit and not key:
         raise ValueError("DART_API_KEY unavailable")
     if (start > end or start < EARLIEST_START or max_listing_pages < 1 or max_windows < 1
-            or not 0 <= review_limit <= 300 or max_pending < 1 or not 0 <= overlap_days <= 31
+            or not 0 <= review_limit <= MAX_SOURCE_REVIEWS_PER_RUN
+            or max_pending < 1 or not 0 <= overlap_days <= 31
             or max_queue_entries < 1 or not 0 <= auto_rehydrate_limit <= 20000):
         raise ValueError("invalid opendart secondary bounds")
     state = read_state(state_path)
