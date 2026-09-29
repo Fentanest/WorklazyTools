@@ -79,7 +79,7 @@
   },
   "consent": {
     "title": "방문 분석과 광고 사용 설정",
-    "description": "동의하면 Google·Naver 방문 분석과 광고 스크립트를 불러옵니다. 작업 파일과 도구 입력값은 분석 서비스로 보내지 않습니다.",
+    "description": "동의하면 Google·Naver 방문 분석, Google AdSense와 쿠팡 파트너스 광고를 불러옵니다. 작업 파일과 도구 입력값은 분석·광고 서비스로 보내지 않습니다.",
     "reject": "필수 기능만 사용",
     "accept": "동의하고 계속"
   },

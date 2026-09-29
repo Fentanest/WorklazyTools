@@ -17,6 +17,7 @@ for(const language of ['ko','en']) {
   'missing policy':html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/,''),
   'missing marker':html.replace('worklazy-redactor-isolation','removed-marker'),
   'external connect':html.replace("connect-src 'self'","connect-src 'self' https:"),
+  'external frame':html.replace("frame-src https://ads-partners.coupang.com","frame-src https:"),
   'JS eval permission':html.replace("'wasm-unsafe-eval'","'wasm-unsafe-eval' 'unsafe-eval'"),
   'changed executable bootstrap':html.replace(/(<script(?![^>]*src=)(?![^>]*application\/ld\+json)[^>]*>)/,'$1/* changed hash */'),
   'ads bootstrap':html.replace('</head>','<meta name="google-adsense-account" content="test"></head>'),

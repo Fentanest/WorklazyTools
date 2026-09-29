@@ -79,7 +79,7 @@
   },
   "consent": {
     "title": "Analytics and advertising preferences",
-    "description": "With your consent, Google and Naver analytics and advertising scripts are loaded. Work files and tool inputs are never sent to analytics services.",
+    "description": "With your consent, Google and Naver analytics, Google AdSense, and Coupang Partners ads are loaded. Work files and tool inputs are never sent to analytics or ad services.",
     "reject": "Use essential features only",
     "accept": "Accept and continue"
   },

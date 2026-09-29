@@ -291,6 +291,6 @@ function renderRedactorPage(template, page, canonical) {
   const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
     .map(([, text]) => "'sha256-" + createHash('sha256').update(text).digest('base64') + "'");
   const policy = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' " + hashes.join(' ') +
-    "; style-src 'self' " + styles.join(' ') + "; style-src-attr 'none'; connect-src 'self'; img-src 'self' blob: data:; font-src 'self' blob:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'";
+    "; style-src 'self' " + styles.join(' ') + "; style-src-attr 'none'; connect-src 'self'; img-src 'self' blob: data:; font-src 'self' blob:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; frame-src https://ads-partners.coupang.com; form-action 'none'; base-uri 'self'";
   return html.replace(/<head>/, '<head>\n<meta http-equiv="Content-Security-Policy" content="' + policy + '" />\n<meta name="worklazy-redactor-isolation" content="document-scope" />');
 }

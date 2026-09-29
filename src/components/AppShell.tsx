@@ -28,6 +28,7 @@ import { useToolCatalog } from "../i18n/useToolCatalog";
 import { useWorklazyTheme } from "../hooks/useWorklazyTheme";
 import { cn } from "../lib/utils";
 import { AdSenseLoader } from "./AdSenseLoader";
+import { CoupangBanner } from "./CoupangBanner";
 import { setAdIneligible } from "../app/adEligibility";
 
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
@@ -433,6 +434,7 @@ export function AppShell() {
           {redactorActive && !redactorDocument && <DocumentRedactorFallback />}
         </RouteErrorBoundary>
         {import.meta.env.PROD && videoStudioActive && !videoControllerReady && <div className="tool-route-loading min-h-[420px]" role="status">{videoIsolationFailed ? (language === "ko" ? "비디오 도구를 준비하지 못했습니다. 페이지를 새로고침해 다시 시도하세요." : "The video tool could not start. Refresh the page to try again.") : t("status.loadingTool", { tool: "Video Studio" })}</div>}
+        {normalizedPath.startsWith("/tools/") && focusMode !== "editor" && <CoupangBanner routeKey={normalizedPath} />}
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
           <nav aria-label={t("footer.policyLabel")}>

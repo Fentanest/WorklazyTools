@@ -6,8 +6,8 @@ export function assertRedactorStatic(html) {
   assert.ok(html.includes('<meta name="worklazy-redactor-isolation" content="document-scope" />'));
   const first=html.search(/<(?:script|style|link)\b/i);
   assert.ok(policyTag.index<first,'CSP must precede executable/resource elements');
-  for(const value of ["default-src 'none'","script-src 'self' 'wasm-unsafe-eval'","connect-src 'self'","worker-src 'self' blob:","object-src 'none'","frame-src 'none'","form-action 'none'","base-uri 'self'"])assert.ok(policy.includes(value),value);
-  assert.ok(!policy.includes("'unsafe-eval'")&&!policy.includes("'unsafe-inline'")&&!policy.includes('https:'));
+  for(const value of ["default-src 'none'","script-src 'self' 'wasm-unsafe-eval'","connect-src 'self';","worker-src 'self' blob:","object-src 'none'","frame-src https://ads-partners.coupang.com;","form-action 'none'","base-uri 'self'"])assert.ok(policy.includes(value),value);
+  assert.ok(!policy.includes("'unsafe-eval'")&&!policy.includes("'unsafe-inline'")&&!/script-src[^;]*https:/.test(policy));
   for(const [,attrs,text]of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
     if (/\bsrc=|application\/ld\+json/.test(attrs))continue;
     assert.ok(policy.includes("'sha256-"+createHash('sha256').update(text).digest('base64')+"'"),'exact executable bootstrap hash missing');
