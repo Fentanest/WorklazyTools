@@ -81,7 +81,9 @@ function isSafeNaverReferrer(referrer: string) {
     const url = new URL(referrer);
     if (url.search || url.hash) return false;
     if (url.origin !== window.location.origin) return url.pathname === "/";
-    return Boolean(safeAnalyticsPage(url.pathname));
+    // The language landing is a safe same-site referrer even though it has
+    // no locale-specific analytics page of its own.
+    return url.pathname === "/" || Boolean(safeAnalyticsPage(url.pathname));
   } catch { return false; }
 }
 

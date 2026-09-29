@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { PDFDocument } from 'pdf-lib';
 import { PNG } from 'pngjs';
+import { VIDEO_STUDIO_PUBLIC } from '../src/app/publicServiceConfig.mjs';
 const base=process.env.TEST_BASE_URL || 'http://127.0.0.1:4199';
 const out=process.env.DIRECT_ENTRY_OUTPUT || '/tmp/worklazy-u9-core/browser';
 await fs.mkdir(out,{recursive:true});
@@ -15,10 +16,10 @@ const png=new PNG({width:80,height:60});for(let i=0;i<png.data.length;i+=4){png.
 execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=440:duration=3','-c:a','pcm_s16le',path.join(out,'input.wav')]);
 execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','color=c=blue:s=160x120:r=15:d=3','-f','lavfi','-i','sine=frequency=440:duration=3','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-shortest',path.join(out,'input.mp4')]);
 const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
-const selected=new Set((process.env.DIRECT_ENTRY_FEATURES || 'pdf,image,audio,video').split(','));
+const selected=new Set((process.env.DIRECT_ENTRY_FEATURES || 'pdf,image,audio,video-unavailable').split(','));
 const report={direct:[],checks:[],errors:[],external:[]};
 const context=await browser.newContext({viewport:{width:1365,height:900},acceptDownloads:true});
-await context.addInitScript(()=>{window.__folderWrites=0;window.__folderAborts=0;window.__folderCloses=0;window.showDirectoryPicker=async()=>({getFileHandle:async()=>({createWritable:async()=>({write:async()=>{window.__folderWrites++;await new Promise(resolve=>window.__folderRelease=resolve);},close:async()=>{window.__folderCloses++;},abort:async()=>{window.__folderAborts++;window.__folderRelease?.();}})})});localStorage.setItem('worklazy_privacy_consent_v2','granted');window.__revoked=[];const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{window.__revoked.push(url);revoke(url);};});
+await context.addInitScript(()=>{window.__folderWrites=0;window.__folderAborts=0;window.__folderCloses=0;window.showDirectoryPicker=async()=>({getFileHandle:async()=>({createWritable:async()=>({write:async()=>{window.__folderWrites++;await new Promise(resolve=>window.__folderRelease=resolve);},close:async()=>{window.__folderCloses++;},abort:async()=>{window.__folderAborts++;window.__folderRelease?.();}})})});localStorage.setItem('worklazy_privacy_consent_v2','denied');window.__revoked=[];const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{window.__revoked.push(url);revoke(url);};});
 const page=await context.newPage();page.setDefaultTimeout(30000);
 page.on('pageerror',e=>report.errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()) && !r.url().startsWith(base))report.external.push(r.url());});
 const navigate=async route=>{await page.evaluate(route=>{history.pushState({},'',route);dispatchEvent(new PopStateEvent('popstate'));},route);};
@@ -26,7 +27,7 @@ const purpose=async value=>{await page.locator(`[data-direct-purpose="${value}"]
 const confirm=async choice=>{await page.locator('[data-testid="direct-entry-confirm"][open]').waitFor();await page.locator(`[data-testid="direct-entry-${choice}"]`).click();await page.locator('[data-testid="direct-entry-confirm"][open]').waitFor({state:'hidden'});};
 const check=name=>{report.checks.push(name);console.log('PASS',name);};
 try{
- if (process.env.DIRECT_ENTRY_SKIP_MATRIX !== '1') for(const lang of ['ko','en']) for(const row of rows){
+ if (process.env.DIRECT_ENTRY_SKIP_MATRIX !== '1') for(const lang of ['ko','en']) for(const row of rows.filter(row=>VIDEO_STUDIO_PUBLIC || row.owner!=='video-studio')){
   await page.goto(`${base}/${lang}${row.path}/`);
   await page.locator(row.readySelector).waitFor();
   if(row.owner==='pdf-organize') { const expected=row.purpose==='split'?1:0;assert.equal(await page.locator('.pdf-output-mode-list [role=radio]').nth(expected).getAttribute('aria-checked'),'true'); }
@@ -34,7 +35,14 @@ try{
   if(row.owner==='pdf-convert') assert.equal(await page.locator('.pdf-format-grid [role=radio]').nth(row.purpose==='ocr'?3:0).getAttribute('aria-checked'),'true');
   report.direct.push(`${lang}:${row.path}`);
  }
- if (report.direct.length) { assert.equal(report.direct.length,28); check('28 native direct entries render'); }
+ if (report.direct.length) { assert.equal(report.direct.length,VIDEO_STUDIO_PUBLIC?28:22); check(`${report.direct.length} public native direct entries render`); }
+ if(selected.has('video-unavailable')) for(const lang of ['ko','en']) for(const suffix of ['', 'trim/', 'merge/', 'extract-audio/', 'unknown/child/']) {
+  await page.goto(`${base}/${lang}/tools/video-studio/${suffix}`);
+  assert.equal(await page.locator('.video-studio-page').count(),0);
+  assert.equal(await page.locator('[role=status] h1').count(),1);
+  assert.equal(await page.locator('script[data-worklazy-adsense]').count(),0);
+ }
+ if(selected.has('video-unavailable')) check('video direct and subpaths show unavailable page without ads');
  if(selected.has('pdf')) {
  await page.goto(`${base}/en/tools/pdf-editor/merge/?old=1#before`);await purpose('merge');
  await page.locator('input[type=file]').first().setInputFiles(path.join(out,'input.pdf'));

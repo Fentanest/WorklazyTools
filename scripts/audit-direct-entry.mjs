@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 
 const root = path.resolve(process.env.DIRECT_ENTRY_SOURCE_ROOT || ".");
 const failures = [];
@@ -192,6 +193,15 @@ for (const [route, files] of foundRoutes) {
 // Deployment graph cross-check: every manifest static slug must exist in dist for both locales.
 for (const row of manifest) {
   if (!row.static) continue;
+  if (row.owner === "video-studio" && !VIDEO_STUDIO_PUBLIC) {
+    for (const language of row.locales) {
+      const file = path.join(root, "dist", language, row.path.slice(1), "index.html");
+      if (fs.existsSync(file)) fail(`Unpublished video static document remains: ${language}/${row.path.slice(1)}/`);
+    }
+    const unprefixed = path.join(root, "dist", row.path.slice(1), "index.html");
+    if (fs.existsSync(unprefixed)) fail(`Unpublished video redirect remains: ${row.path.slice(1)}/`);
+    continue;
+  }
   for (const language of row.locales) {
     const file = path.join(root, "dist", language, row.path.slice(1), "index.html");
     if (!fs.existsSync(file)) fail(`Missing deployed static document: ${language}/${row.path.slice(1)}/`);

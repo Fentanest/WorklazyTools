@@ -8,7 +8,7 @@ import { startRecoveryServer } from "./recovery-server.mjs";
 const server = await startRecoveryServer({ root: "dist", port: Number(process.env.ANALYTICS_TEST_PORT || 4186) });
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 
-async function contextWithConsent(consent = "granted", delayed = false, serviceWorkers = "block") {
+async function contextWithConsent(consent = "granted", delayed = false, serviceWorkers = "block", coupang = "mock") {
   const context = await browser.newContext({ serviceWorkers });
   await context.addInitScript((value) => {
     if (value !== "unset") localStorage.setItem("worklazy_privacy_consent_v2", value);
@@ -32,6 +32,10 @@ async function contextWithConsent(consent = "granted", delayed = false, serviceW
     }
     if (url.startsWith("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) {
       return route.fulfill({ status: 200, contentType: "text/javascript", headers: supplierHeaders, body: "window.adsbygoogle={loaded:true}" });
+    }
+    if (url === "https://ads-partners.coupang.com/g.js") {
+      if (coupang === "block") return route.abort();
+      return route.fulfill({ status: 200, contentType: "text/javascript", headers: supplierHeaders, body: "window.PartnersCoupang={G:function(){}}" });
     }
     return route.abort();
   });
@@ -79,6 +83,25 @@ try {
       assert.equal(external.filter((url) => url.includes("googletagmanager.com/gtag/js")).length, 1);
       assert.equal(external.filter((url) => url.includes("wcs.pstatic.net/wcslog.js")).length, 1);
       console.log("PASS analytics initial, SPA, back, revoke, regrant: GA/Naver 4 views and one script each");
+    } finally { await context.close(); }
+  }
+
+  {
+    const { context, page } = await contextWithConsent();
+    try {
+      await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.__naverViews?.length === 1);
+      await page.locator('.sidebar a[href="/ko/tools/pdf-editor"]').click();
+      await page.waitForFunction(() => window.__naverViews?.length === 2);
+      await page.goBack();
+      await page.waitForFunction(() => window.__naverViews?.length === 3);
+      await page.goForward();
+      await page.waitForFunction(() => window.__naverViews?.length === 4);
+      assert.equal((await counts(page)).google, 4);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.__naverViews?.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
+      assert.deepEqual([(await counts(page)).google, (await counts(page)).naver], [1, 1]);
+      console.log("PASS history forward and user refresh: normal visits are not permanently suppressed");
     } finally { await context.close(); }
   }
 
@@ -196,6 +219,17 @@ try {
     } finally { await context.close(); }
   }
 
+  {
+    const { context, page } = await contextWithConsent();
+    try {
+      await page.goto(`${server.url}/ko/error/`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.__naverViews?.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
+      const result = await counts(page);
+      assert.deepEqual([result.google, result.naver, result.adScripts], [1, 1, 0]);
+      console.log("PASS error document: safe analytics view without advertising");
+    } finally { await context.close(); }
+  }
+
   const hwpBytes = Buffer.from((await fs.readFile("tests/fixtures/rhwp-roundtrip-empty.hwp.b64", "utf8")).trim(), "base64");
   for (const [width, height, theme] of [[1365, 900, "light-coral"], [390, 844, "dark-coral"]]) {
     const { context, page } = await contextWithConsent();
@@ -211,12 +245,25 @@ try {
         const editor = document.querySelector('[data-tool-page="hwp-editor"]')?.getBoundingClientRect();
         const footer = document.querySelector(".global-footer")?.getBoundingClientRect();
         const frame = document.querySelector(".coupang-banner-frame");
-        return { bannerTop: banner?.top, bannerBottom: banner?.bottom, editorBottom: editor?.bottom, footerTop: footer?.top, frameWidth: frame?.getAttribute("width"), disclosure: document.querySelector(".coupang-banner-disclosure")?.textContent };
+        return { bannerTop: banner?.top, bannerBottom: banner?.bottom, editorBottom: editor?.bottom, footerTop: footer?.top, frameWidth: frame?.getAttribute("width"), disclosure: document.querySelector(".coupang-banner-disclosure")?.textContent, theme: document.documentElement.dataset.theme, mobileNavigation: getComputedStyle(document.querySelector(".bottom-tabs")).display };
       });
       assert.ok(layout.bannerTop >= layout.editorBottom - 1 && layout.footerTop >= layout.bannerBottom - 1, JSON.stringify(layout));
       assert.equal(layout.frameWidth, width < 1076 ? "280" : "740");
       assert.equal(layout.disclosure, "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.");
+      assert.equal(layout.theme, theme);
+      if (width < 821) assert.equal(layout.mobileNavigation, "none");
       console.log(`PASS HWP focus ${theme} ${width}px: footer banner outside editor and exact disclosure`);
+    } finally { await context.close(); }
+  }
+
+  {
+    const { context, page } = await contextWithConsent("granted", false, "block", "block");
+    try {
+      const attempted = page.waitForRequest((request) => request.url() === "https://ads-partners.coupang.com/g.js");
+      await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
+      await attempted;
+      await page.waitForFunction(() => document.querySelector('[data-tool-page="text-merger"]') && !document.querySelector(".coupang-banner"));
+      console.log("PASS blocked Coupang script: empty footer slot collapses and tool remains usable");
     } finally { await context.close(); }
   }
 } finally {

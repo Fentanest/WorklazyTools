@@ -33,7 +33,7 @@ if (selectedTargetIds.length && (new Set(selectedTargetIds).size !== selectedTar
 
 // Self-contained so the browser runs exactly the observer exercised by unit tests.
 export function installRenderingObservers() {
-  localStorage.setItem("worklazy_privacy_consent_v2", "granted");
+  localStorage.setItem("worklazy_privacy_consent_v2", "denied");
   localStorage.setItem("worklazy_lang", "ko");
   localStorage.setItem("worklazy-theme", "light-coral");
   const metrics = globalThis.__worklazyRenderingMetrics = { cls: 0, lcp: 0, longTasks: [], layoutShifts: [] };
@@ -179,7 +179,7 @@ export async function runRenderingBaseline() {
       schemaVersion: 2,
       measuredAt: new Date().toISOString(),
       conditions: {
-        build: "VITE_LOCAL_QA=1 production build served by vite preview",
+        build: "production build served by vite preview; analytics/ad consent denied",
         browser: browserVersion,
         viewport: { width: 1280, height: 800, deviceScaleFactor: 1 },
         colorScheme: "light",

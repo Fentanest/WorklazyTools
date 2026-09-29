@@ -37,10 +37,14 @@ try {
     localStorage.setItem("worklazy_privacy_consent_v2", "granted");
     localStorage.setItem("worklazy_lang", "ko");
   });
+  await page.setRequestInterception(true);
   page.on("request", (request) => {
     const requestUrl = new URL(request.url());
     if (requestUrl.origin !== new URL(baseUrl).origin && !["data:", "blob:"].includes(requestUrl.protocol)) {
       externalRequests.push(request.url());
+      void request.abort("blockedbyclient");
+    } else {
+      void request.continue();
     }
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));

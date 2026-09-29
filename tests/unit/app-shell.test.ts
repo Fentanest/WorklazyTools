@@ -58,6 +58,7 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "src/components/AppShell.tsx", // Owner: the sole route-level render gate.
     "tests/ad-eligibility-smoke.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
     "tests/analytics-policy-smoke.mjs", // Owner: mocked provider lifecycle and consent assertions; never sends live events.
+    "tests/direct-entry-core-smoke.mjs", // Owner: unpublished video direct-entry and ad absence assertions.
     "tests/excel-cleaner-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/excel-compare-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/helpers/ad-stub.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.

@@ -64,7 +64,7 @@ export interface ToolDefinition {
 export const toolCategories: ToolCategoryDefinition[] = [
   { id: "spreadsheets", label: "엑셀·표", shortLabel: "엑셀·표", description: "엑셀과 표 데이터를 정리·비교·병합합니다.", accent: "green", icon: FileSpreadsheet },
   { id: "documents", label: "문서·PDF", shortLabel: "문서·PDF", description: "문서를 편집·비교·생성하고 필요한 형식으로 변환합니다.", accent: "blue", icon: FileText },
-  { id: "media", label: "이미지·영상·오디오", shortLabel: "이미지·영상", description: "이미지와 영상, 오디오를 브라우저에서 직접 편집합니다.", accent: "pink", icon: Images },
+  { id: "media", label: "이미지·오디오", shortLabel: "이미지·오디오", description: "이미지와 오디오를 브라우저에서 직접 편집합니다.", accent: "pink", icon: Images },
   { id: "text-data", label: "텍스트·코드", shortLabel: "텍스트·코드", description: "텍스트와 코드 데이터를 읽기 좋은 형태로 정리합니다.", accent: "violet", icon: Braces },
   { id: "work", label: "날짜·계산", shortLabel: "날짜·계산", description: "업무 일정과 근무일, 시차와 급여를 간편하게 계산합니다.", accent: "orange", icon: CalendarDays },
   { id: "security-share", label: "보안·공유", shortLabel: "보안·공유", description: "개인정보를 보호하고 안전한 비밀번호와 공유용 QR을 만듭니다.", accent: "coral", icon: LockKeyhole },

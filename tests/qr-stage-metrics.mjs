@@ -88,7 +88,7 @@ try {
   browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", `--log-net-log=${path.resolve(outputDirectory, "netlog.json")}`, "--net-log-capture-mode=Default"] });
   const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, locale: "ko-KR", timezoneId: "Asia/Seoul", colorScheme: "light", serviceWorkers: "block", acceptDownloads: true });
   await context.addInitScript(() => {
-    localStorage.setItem("worklazy_privacy_consent_v2", "granted");
+    localStorage.setItem("worklazy_privacy_consent_v2", "denied");
     localStorage.setItem("worklazy_lang", "ko");
   });
   const responseTasks = [];
@@ -215,7 +215,7 @@ try {
   assertQrFontRequests(requests, scenario);
   assert.equal(fontServer.injected.length, scenario === "corrupt" ? 1 : 0);
   const report = { scenario, pdfResult, fontInjection: fontServer.injected, measuredAt: new Date().toISOString(), conditions: {
-    build: "VITE_LOCAL_QA=1 production", browser: browserVersion, viewport: { width: 1365, height: 900 },
+    build: "production build; analytics/ad consent denied", browser: browserVersion, viewport: { width: 1365, height: 900 },
     context: "fresh", serviceWorkers: "blocked", cache: "CDP disabled for page and each paused worker; no page.route interception",
     throttling: "none; local preview through test HTTP proxy; only corrupt subset response body changes", transferBytes: "NetLog encoded response body + HTTP headers for all requests; excludes HTTP chunk framing; CDP values retained separately (initial worker CDP can contain only headers)",
     jsGzipBytes: "gzipSync of served dist JS bytes, per request; separate from actual HTTP transfer",

@@ -62,8 +62,8 @@ export function ToolsPage() {
       <PageHeader eyebrow={t("tools:index.eyebrow")} title={t("tools:index.title")} description={t("tools:index.description")} />
       <div className="tool-search">
         <Search size={19} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("tools:index.searchPlaceholder")} aria-label={t("tools:index.searchLabel")} />
-        {normalizedQuery && <span className="tool-search-count">{t("common:format.tools", { count: visibleToolCount })}</span>}
+        <input data-testid="tools-search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("tools:index.searchPlaceholder")} aria-label={t("tools:index.searchLabel")} />
+        {normalizedQuery && <span className="tool-search-count" data-testid="tools-search-status" role="status" aria-atomic="true">{t("common:format.tools", { count: visibleToolCount })}</span>}
       </div>
 
       <div className="tool-category-filter" aria-label={t("tools:index.categoryLabel")}>
@@ -90,7 +90,7 @@ export function ToolsPage() {
 
       <PrivacyBanner compact />
 
-      <div className="tool-category-groups" aria-live="polite">
+      <div className="tool-category-groups">
         {groupedTools.map(({ category, tools: categoryTools }) => {
           const Icon = category.icon;
           return (

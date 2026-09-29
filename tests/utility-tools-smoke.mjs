@@ -14,6 +14,10 @@ try {
     const parsed = new URL(url);
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin === localOrigin) { void request.continue(); return; }
     interceptedExternalRequests.push(url);
+    if (url.startsWith("https://www.googletagmanager.com/gtag/js")) { void request.respond({ status: 200, contentType: "text/javascript", body: "window.__mockGoogleLoaded=true" }); return; }
+    if (url === "https://wcs.pstatic.net/wcslog.js") { void request.respond({ status: 200, contentType: "text/javascript", headers: { "access-control-allow-origin": "*", "cross-origin-resource-policy": "cross-origin" }, body: "window.wcs={event:()=>{}};window.wcs_do=()=>{}" }); return; }
+    if (url.startsWith("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) { void request.respond({ status: 200, contentType: "text/javascript", headers: { "access-control-allow-origin": "*", "cross-origin-resource-policy": "cross-origin" }, body: "window.adsbygoogle={loaded:true}" }); return; }
+    if (url === "https://ads-partners.coupang.com/g.js") { void request.respond({ status: 200, contentType: "text/javascript", body: "window.PartnersCoupang={G:function(){}}" }); return; }
     void request.abort("blockedbyclient");
   });
   await page.setViewport({ width: 1440, height: 1000 });
@@ -37,15 +41,24 @@ try {
   await page.waitForSelector(".privacy-consent");
   await page.click("[data-testid=privacy-consent-accept]");
   await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent_v2") === "granted");
-  await page.waitForFunction(() => (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"));
+  await page.waitForFunction(() => document.querySelector("script[data-worklazy-google-analytics]") && document.querySelector("script[data-worklazy-naver-analytics]"));
   const analyticsBootstrap = await page.evaluate(() => ({
     google: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
     naver: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
     malformedCommands: (window.dataLayer || []).filter((item) => Array.isArray(item) && typeof item[0] === "string").length,
+    queuedViews: (window.dataLayer || []).filter((item) => item[0] === "event" && item[1] === "page_view").length,
   }));
-  if (!analyticsBootstrap.google || !analyticsBootstrap.naver || analyticsBootstrap.malformedCommands) {
+  if (!analyticsBootstrap.google || !analyticsBootstrap.naver || analyticsBootstrap.malformedCommands || analyticsBootstrap.queuedViews !== 1) {
     throw new Error(`Analytics bootstrap is incomplete or uses malformed gtag commands: ${JSON.stringify(analyticsBootstrap)}`);
   }
+  // The remaining suite tests keyboard/layout behavior, not supplier focus.
+  // Withdraw consent after bootstrap so a late affiliate iframe cannot steal
+  // focus between focusing the native language selector and pressing ArrowUp.
+  await page.evaluate(() => {
+    localStorage.setItem("worklazy_privacy_consent_v2", "denied");
+    window.dispatchEvent(new CustomEvent("worklazy-consent-change", { detail: "denied" }));
+  });
+  await page.waitForFunction(() => !document.querySelector(".coupang-banner"));
   const languageSwitcher = await page.$eval("select[data-ui-component='language-switcher']", (select) => ({
     tagName: select.tagName,
     name: select.getAttribute("name"),
@@ -70,8 +83,9 @@ try {
   }
   const storedLanguage = await page.evaluate(() => localStorage.getItem("worklazy_lang"));
   if (storedLanguage !== "en") throw new Error(`Language storage was not updated: ${storedLanguage}`);
+  await page.waitForSelector(".all-tools-grid");
   // Native select keyboard: focus, ArrowDown to Korean, Enter commits.
-  await page.$eval("select[data-ui-component='language-switcher']", (select) => select.focus());
+  await page.$eval(".wl-topbar select[data-ui-component='language-switcher']", (select) => select.focus());
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => location.pathname.startsWith("/ko") && document.documentElement.lang === "ko"
@@ -80,9 +94,10 @@ try {
     throw new Error("Language select did not keep focus after keyboard change.");
   }
   await page.goto(`${koBaseUrl}`, { waitUntil: "networkidle0" });
-  const homeKicker = await page.$eval(".hero-kicker", (element) => element.textContent);
+  await page.waitForSelector(".wl-hero-badge");
+  const homeKicker = await page.$eval(".wl-hero-badge", (element) => element.textContent);
   if (!homeKicker?.includes("작지만 유용한 업무 도구")) throw new Error(`Home kicker is outdated: ${homeKicker}`);
-  const homeFeedback = await page.$eval(".hero-feedback", (element) => ({
+  const homeFeedback = await page.$eval(".wl-hero-note", (element) => ({
     text: element.textContent || "",
     href: element.querySelector("a")?.href || "",
     target: element.querySelector("a")?.target || "",
@@ -101,21 +116,21 @@ try {
     headings: Array.from(document.querySelectorAll(".tool-category-heading h2"), (element) => element.textContent),
     repeatedLocalBadges: document.querySelectorAll(".local-badge").length,
   }));
-  if (categoryOverview.filters !== 6 || categoryOverview.sections !== 5 || categoryOverview.repeatedLocalBadges !== 0 || !categoryOverview.headings.includes("이미지·영상·오디오")) {
+  if (categoryOverview.filters !== 8 || categoryOverview.sections !== 7 || categoryOverview.repeatedLocalBadges !== 0 || !categoryOverview.headings.includes("이미지·오디오") || !categoryOverview.headings.includes("투자·공시")) {
     throw new Error(`Tool categories are incomplete: ${JSON.stringify(categoryOverview)}`);
   }
   const toolCards = await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.map((card) => ({
     tagName: card.tagName,
     slot: card.getAttribute("data-slot"),
     accent: Array.from(card.classList).find((name) => name.startsWith("ui-accent-")),
-    iconAccent: card.querySelector("[data-accent]")?.getAttribute("data-accent"),
+    iconTone: card.querySelector("[data-icon-tone]")?.getAttribute("data-icon-tone"),
     href: card.getAttribute("href"),
   })));
-  if (toolCards.length !== 23 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || card.accent !== `ui-accent-${card.iconAccent}`)) {
+  if (toolCards.length !== 23 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || !card.accent || !card.iconTone)) {
     throw new Error(`Tool card link or accent contract failed: ${JSON.stringify(toolCards)}`);
   }
   // Manual theme drives color; OS brightness must not (covered by ui-theme-surfaces).
-  await page.locator(".app-topbar .theme-cycle").click();
+  await page.locator(".wl-topbar .wl-theme-button").click();
   await page.waitForFunction(() => document.documentElement.getAttribute("data-theme") === "dark-coral");
   const darkSelectedContrast = await page.$eval('.tool-category-filter button[aria-pressed="true"]', (element) => {
     const toRgb = (color) => {
@@ -139,8 +154,8 @@ try {
     return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
   });
   if (darkSelectedContrast < 4.5) throw new Error(`Selected tool category contrast is below 4.5:1 in dark mode: ${darkSelectedContrast}`);
-  await page.click('.tool-category-filter button[aria-label^="이미지·영상·오디오"]');
-  await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 3);
+  await page.click('.tool-category-filter button[aria-label^="이미지·오디오"]');
+  await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 2);
   await page.click(".tool-category-filter button:first-child");
   await page.type("[data-testid='tools-search-input']", "비밀번호");
   await page.waitForFunction(() => document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 1 && document.querySelector(".tool-category-heading h2")?.textContent === "보안·공유");
@@ -408,42 +423,18 @@ try {
   await page.mouse.move(bounds.x + 80, bounds.y + 80); await page.mouse.down(); await page.mouse.move(bounds.x + 220, bounds.y + 150, { steps: 8 }); await page.mouse.up();
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-undo"]')?.disabled);
 
-  await page.evaluate(() => {
-    const originalGtag = window.gtag;
-    window.gtag = (...args) => {
-      if (args[0] === "event" && args[1] === "tool_open" && args[2]?.tool_id === "video-studio") {
-        sessionStorage.setItem("worklazy-test-google-video-open", "1");
-      }
-      originalGtag?.(...args);
-    };
-  });
-  await page.$eval('a[href^="/ko/tools/video-studio"]', (link) => link.click());
-  await page.waitForFunction(() => location.pathname === "/ko/tools/video-studio/"
-    && window.crossOriginIsolated === true
-    && Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')), { timeout: 60_000 });
-  await page.waitForFunction(() => sessionStorage.getItem("worklazy-test-google-video-open") === "1");
-  await page.waitForSelector("[data-testid=video-runtime-status]");
-  const videoIsolation = await page.evaluate(() => ({
-    origin: location.origin,
-    path: location.pathname,
-    marker: Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')),
+  if (await page.$('a[href^="/ko/tools/video-studio"]')) throw new Error("Unpublished video editor remains in navigation.");
+  await page.goto(`${koBaseUrl}/tools/video-studio/`, { waitUntil: "networkidle0" });
+  const unpublishedVideo = await page.evaluate(() => ({
+    editor: Boolean(document.querySelector(".video-studio-page")),
     ads: Boolean(document.querySelector("script[data-worklazy-adsense]")),
-    googleAnalytics: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
-    naverAnalytics: Boolean(document.querySelector("script[data-worklazy-naver-analytics]")),
-    controller: navigator.serviceWorker.controller?.scriptURL || "",
-    engine: document.querySelector("[data-testid=video-runtime-status]")?.textContent || "",
+    unavailable: document.querySelector("[role='status'] h1")?.textContent?.includes("현재 제공하지 않는 도구") || false,
   }));
-  const validVideoController = videoIsolation.controller.endsWith("/service-worker.js") || videoIsolation.controller.endsWith("/ko/tools/video-studio/coi-serviceworker.js");
-  if (videoIsolation.origin !== new URL(baseUrl).origin || videoIsolation.path !== "/ko/tools/video-studio/" || !videoIsolation.marker || videoIsolation.ads
-    || !videoIsolation.googleAnalytics || !videoIsolation.naverAnalytics || !validVideoController || !videoIsolation.engine.includes("멀티스레드")) {
-    throw new Error(`Video document isolation is incomplete: ${JSON.stringify(videoIsolation)}`);
+  if (unpublishedVideo.editor || unpublishedVideo.ads || !unpublishedVideo.unavailable) {
+    throw new Error(`Unpublished video route is still available: ${JSON.stringify(unpublishedVideo)}`);
   }
-  const videoCompatibility = await page.$$eval(".video-studio-page [data-slot=notice]", (elements) => elements.find((element) => element.textContent?.includes("MKV"))?.textContent || "");
-  if (!videoCompatibility.includes("MKV") || !videoCompatibility.includes("AVI") || !videoCompatibility.includes("재생 시간") || videoCompatibility.includes("FFmpeg")) throw new Error("Video compatibility fallback notice is incomplete or exposes implementation details.");
-
-  await page.$eval('a[href^="/ko/tools/pdf-editor"]', (link) => link.click());
-  await page.waitForFunction(() => location.pathname === "/ko/tools/pdf-editor" && !document.querySelector('meta[name="worklazy-video-isolation"]'));
-  await page.waitForSelector("script[data-worklazy-adsense]");
+  await page.goto(`${koBaseUrl}/tools/pdf-editor/`, { waitUntil: "networkidle0" });
+  if (await page.$("script[data-worklazy-adsense]")) throw new Error("AdSense loaded after consent withdrawal.");
   await page.goto(`${koBaseUrl}/tools/pdf-editor/convert`, { waitUntil: "networkidle0" });
   await page.waitForSelector('input[placeholder*="1-5, 8"]');
 
@@ -463,12 +454,12 @@ try {
   }
   await page.goto(`${baseUrl}/en/tools/`, { waitUntil: "networkidle0" });
   const englishToolCount = await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.length);
-  if (englishToolCount !== 22) throw new Error(`English tool catalog should hide HWP editor: ${englishToolCount}`);
+  if (englishToolCount !== 21) throw new Error(`English tool catalog should hide HWP and video editors: ${englishToolCount}`);
   await page.goto(`${baseUrl}/en/tools/hwp-editor`, { waitUntil: "networkidle0" });
   if (new URL(page.url()).pathname !== "/en/tools") throw new Error(`English HWP editor was not hidden: ${page.url()}`);
 
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
-  console.log(`Utility tool smoke tests passed: Korean and English routes, hreflang, categorized tools, paired editors, world map, utility tools, video compatibility and PDF page range. External HTTP(S) requests observed and blocked before execution: ${interceptedExternalRequests.length}.`);
+  console.log(`Utility tool smoke tests passed: Korean and English routes, hreflang, categorized tools, paired editors, world map, utility tools, video unpublication and PDF page range. External HTTP(S) requests intercepted before the network: ${interceptedExternalRequests.length}.`);
 } catch (error) {
   console.error(`Utility smoke failed at ${page?.url() || "unknown URL"}.`);
   throw error;
