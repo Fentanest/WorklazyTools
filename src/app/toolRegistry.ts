@@ -1,3 +1,4 @@
+import { isToolPublished } from "./publicService";
 import {
   AlignLeft,
   AudioWaveform,
@@ -470,4 +471,4 @@ export const tools: ToolDefinition[] = [
     ],
     status: "available",
   },
-];
+].filter((tool) => isToolPublished(tool.id));
