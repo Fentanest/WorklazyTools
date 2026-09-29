@@ -44,7 +44,7 @@
     "principle": "Documents, file passwords and generated results are not uploaded to or stored on a Worklazy Tools server.",
     "date": "Effective September 30, 2026",
     "providerLinksTitle": "Provider information and your choice",
-    "providerLinksDescription": "The providers' official pages explain their practices. You can change this site's analytics and advertising choice through Analytics & ad settings in the footer.",
+    "providerLinksDescription": "The providers' official pages explain their data practices and available choices. You can also use browser cookie and content-blocking settings.",
     "googlePolicyLink": "Google Privacy Policy",
     "naverPolicyLink": "Naver Analytics official information",
     "coupangPolicyLink": "Coupang Partners official information",
@@ -88,15 +88,15 @@
         "paragraphs": [
           "Google Analytics 4 and Naver Analytics can process page paths, referrals, visit and click times, and browser or device categories. Tool-menu events contain only the tool identifier and menu location.",
           "File names, contents and sizes, entered text, payroll and passwords, QR results, generated output and detailed errors are not included in analytics events. Google Signals and ad personalization are disabled in Google Analytics.",
-          "Google AdSense and advertising partners may use cookies, web beacons, IP addresses and identifiers for ad delivery, measurement and abuse prevention. Available pages are not excluded by tool type; ads and analytics start only after the screen is ready and consent is confirmed. Ads are not requested on redirect, preparation or empty error screens.",
-          "Coupang Partners banners appear above the footer on tool pages when you consent, including the expanded HWP editing view without overlapping the work area. They are not shown while a tool is loading or has failed. Banner code runs in an iframe separate from the work area; selected files and tool inputs are not passed to it. Coupang may receive ordinary connection data and use identifiers for ad delivery and measurement. The operator may earn a commission from purchases through the banner."
+          "Google AdSense and advertising partners may use cookies, web beacons, IP addresses and identifiers for ad delivery, measurement and abuse prevention. Available pages are not excluded by tool type; ad and analytics requests may start once a normal screen is ready. Ads are not requested on redirect, preparation or empty error screens.",
+          "Coupang Partners banners appear above the footer on tool pages, including the expanded HWP editing view without overlapping the work area. They are not shown while a tool is loading or has failed. Banner code runs in an iframe separate from the work area; selected files and tool inputs are not passed to it. Coupang may receive ordinary connection data and use identifiers for ad delivery and measurement. The operator may earn a commission from purchases through the banner."
         ]
       },
       {
-        "title": "6. Consent and third parties",
+        "title": "6. Third-party services and your choices",
         "paragraphs": [
-          "Google and Naver analytics, Google AdSense and Coupang Partners scripts are not loaded before consent, and Google Consent Mode defaults analytics and advertising storage to denied. You can reopen the choice from Analytics & ad settings in the footer. Requirements for a Google-certified CMP in the EEA, United Kingdom and Switzerland must be verified and applied separately before serving ads there.",
-          "Browser settings and content blockers can limit analytics or advertising without disabling local file processing. Worklazy Tools does not sell selected files or passwords or provide them to analytics or advertising companies. Third-party processing of ordinary connection data follows their policies and your consent settings."
+          "This site does not show its own advertising or analytics consent dialog. Once a normal screen is ready, Google Analytics, Naver Analytics, Google AdSense and Coupang Partners on tool pages may load automatically. Where separate consent is required, deployment-level consent management and each provider's policies additionally apply.",
+          "Browser settings and content blockers can limit analytics or advertising without disabling local file processing. Worklazy Tools does not sell selected files or passwords or provide them to analytics or advertising companies. Third-party processing of ordinary connection data follows their policies."
         ]
       },
       {

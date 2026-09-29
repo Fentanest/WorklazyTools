@@ -35,8 +35,6 @@ import { setAdIneligible } from "../app/adEligibility";
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { AppInstallControl } from "./AppInstallControl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
-import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { getUnsavedWorkKind, hasUnsavedWork, isGuardedTarget, subscribeUnsavedWork } from "../app/toolState";
@@ -401,11 +399,9 @@ export function AppShell() {
             <NavLink to={localizedPath(language, "/terms")}>{t("footer.terms")}</NavLink>
             <NavLink to={localizedPath(language, "/licenses")}>{t("footer.licenses")}</NavLink>
             <NavLink to={localizedPath(language, "/contact")}>{t("footer.contact")}</NavLink>
-            <button type="button" className="footer-link-button" onClick={resetPrivacyConsent}>{t("footer.consentSettings")}</button>
           </nav>
         </footer>
       </main>
-      <PrivacyConsentBanner />
       <UnsavedWorkDialog
         open={guardOpen}
         kind={getUnsavedWorkKind()}

@@ -43,6 +43,7 @@ try {
   });
   try {
     const page = await browser.newPage();
+    await page.evaluateOnNewDocument(() => { window.__WORKLAZY_MOCK_PROVIDERS__ = true; });
     page.setDefaultTimeout(480_000);
     // Keep this functional smoke out of production analytics/ad inventory.
     // Provider entry scripts are local stubs; all other third-party traffic is blocked.

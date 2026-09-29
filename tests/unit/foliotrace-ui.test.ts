@@ -17,6 +17,11 @@ test("FolioTrace UI reuses Sol's contract instead of inventing a competing one",
   assert.doesNotMatch(pageSource, /interface FolioTracePageProps|type FolioTracePageProps =/);
 });
 
+test("portfolio price details do not expose the internal quote provider label", () => {
+  assert.match(pageSource, /\? quotePriceDetail\(selected\.quote, lang\)/);
+  assert.doesNotMatch(pageSource + holdingsSource, /quoteProviderLabel|"네이버"|"Naver"/);
+});
+
 test("FolioTrace UI never fetches external data or fabricates sample finances", () => {
   for (const source of [pageSource, holdingsSource]) {
     assert.doesNotMatch(source, /fetch\(|XMLHttpRequest|https?:\/\/|DART_API_KEY/i);

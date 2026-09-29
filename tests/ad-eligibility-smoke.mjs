@@ -68,6 +68,7 @@ async function newTrackedContext(browser, server, {
   });
   await installAdFirewall(context, server.url, counters, { stub });
   await context.addInitScript((preset) => {
+    window.__WORKLAZY_MOCK_PROVIDERS__ = true;
     window.__wlNav = { push: 0, replace: 0 };
     window.__wlSmokeDocumentToken = crypto.randomUUID();
     try {
@@ -262,7 +263,7 @@ async function runCase(name, fn) {
 }
 
 async function scenarioS1(browser, server) {
-  // No/unset or denied consent on an allowed path: no script, no stub.
+  // Legacy stored preferences no longer gate scripts on an eligible page.
   const cases = [];
   for (const consent of ["unset", "denied"]) {
     cases.push(await runCase(`S1-${consent}`, async () => {
@@ -272,13 +273,14 @@ async function scenarioS1(browser, server) {
       try {
         await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
         await waitReady(tracked.page);
+        await tracked.page.waitForFunction(() => window.__wlAdStub?.loads === 1);
         const obs = await observe(tracked.page);
-        assert.equal(obs.scripts, 0, `S1-${consent}: ad script must be absent`);
-        assert.equal(obs.loads, 0, `S1-${consent}: stub must not load`);
-        assert.equal(tracked.counters.attempt, 0, `S1-${consent}: no ad request attempt`);
+        assert.equal(obs.scripts, 1, `S1-${consent}: one ad script`);
+        assert.equal(obs.loads, 1, `S1-${consent}: stub loads once`);
+        assert.equal(tracked.counters.attempt, 1, `S1-${consent}: one ad request attempt`);
         assertNoRealNetwork(tracked.counters, `S1-${consent}`);
         const shot = await screenshot(tracked.page, `S1-${consent}`);
-        return { lang: "ko", url: obs.url, status: "pass", note: "script 0, stub 0", scripts: obs.scripts, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
+        return { lang: "ko", url: obs.url, status: "pass", note: "legacy preference ignored; script 1, stub 1", scripts: obs.scripts, counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits, serverRequests: summarizeServerRequests(server.state.requests.slice(mark)), evidence: shot };
       } finally {
         await tracked.context.close();
       }
@@ -758,17 +760,17 @@ async function scenarioS9(browser, server) {
     }
   }));
 
-  results.push(await runCase("S9-T5-no-consent", async () => {
+  results.push(await runCase("S9-T5-legacy-denial", async () => {
     const tracked = await newTrackedContext(browser, server, { consent: "unset" });
     try {
-      const before = await setupS9Source(tracked, server, { ads: false });
+      const before = await setupS9Source(tracked, server);
       await openS9Guard(tracked);
       await tracked.page.locator('[data-testid="unsaved-leave"]').click();
       await waitForS9Destination(tracked, "/ko/tools/pdf-editor", before.commitCount);
       const after = await readS9State(tracked);
-      assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T5: confirmation is independent of consent");
-      assert.equal(tracked.docCommits.length - before.commitCount, 0, "T5: navigation does not reload without consent");
-      assert.equal(after.scripts, 0, "T5: destination has no ad script");
+      assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T5: confirmation is independent of legacy storage");
+      assert.equal(tracked.docCommits.length - before.commitCount, 0, "T5: navigation does not reload");
+      assert.equal(after.scripts, 1, "T5: destination retains one ad script");
       assert.equal(tracked.unexpectedDialogs.length, 0, "T5: no unexpected native dialog");
       assertNoRealNetwork(tracked.counters, "S9-T5");
       return { status: "pass", confirmations: 1, newCommits: tracked.docCommits.slice(before.commitCount), scripts: after.scripts };

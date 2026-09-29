@@ -1,4 +1,4 @@
-import type { FilingEvent, Holding } from "../contracts";
+import type { FilingEvent, Holding, Quote } from "../contracts";
 
 export type SortKey = "value" | "weight" | "ownership" | "receipt";
 export type QualityFilter = "all" | "priced" | "unpriced" | "below-5";
@@ -279,19 +279,14 @@ export function latestUnresolvedReasonLabel(reason: string | null, lang: Lang): 
   );
 }
 
-/**
- * Quote basis in clear ko/en terms. The contract session and provider
- * values get human labels; anything else passes through raw (own data,
- * React-escaped) rather than blanking.
- */
+/** Quote session in clear ko/en terms; unknown values retain their label. */
 export function quoteSessionLabel(session: string, lang: Lang): string {
   if (session === "regular") return lang === "ko" ? "정규장" : "Regular session";
   return session;
 }
 
-export function quoteProviderLabel(provider: string, lang: Lang): string {
-  if (provider === "naver") return lang === "ko" ? "네이버" : "Naver";
-  return provider;
+export function quotePriceDetail(quote: Pick<Quote, "close" | "tradeDate" | "session">, lang: Lang): string {
+  return `${formatKrw(quote.close, lang)} · ${quote.tradeDate} · ${quoteSessionLabel(quote.session, lang)}`;
 }
 
 const LETTER_NAMES: Record<string, string> = {

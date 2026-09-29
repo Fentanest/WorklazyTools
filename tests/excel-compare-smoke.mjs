@@ -68,7 +68,7 @@ try {
     await page.setViewport({ width: 1360, height: 940, deviceScaleFactor: 1 });
     page.setDefaultTimeout(180_000);
     await page.evaluateOnNewDocument(() => {
-      localStorage.setItem("worklazy_privacy_consent_v2", "granted");
+      window.__WORKLAZY_MOCK_PROVIDERS__ = true;
       globalThis.__excelCompareRevokedUrls = [];
       const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
       URL.revokeObjectURL = (url) => {
@@ -369,7 +369,6 @@ async function assertHeaderSelectionFlow(browser, files) {
     else void request.continue();
   });
   await page.evaluateOnNewDocument(() => {
-    localStorage.setItem("worklazy_privacy_consent_v2", "granted");
     globalThis.__excelInspectMessages = [];
     globalThis.__excelWorkerTerminations = 0;
     const NativeWorker = globalThis.Worker;
@@ -617,7 +616,6 @@ async function assertIntegrityFailure(browser, leftPath, rightPath, mode) {
   const page = await browser.newPage();
   try {
     page.setDefaultTimeout(180_000);
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     await page.evaluate((injectionMode) => {
@@ -653,7 +651,6 @@ async function assertSwapDirection(browser, leftPath, rightPath) {
   const page = await browser.newPage();
   try {
     page.setDefaultTimeout(180_000);
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
@@ -688,7 +685,6 @@ async function assertOptionalReconciliation(browser, leftPath, rightPath, root) 
   const page = await browser.newPage();
   try {
     page.setDefaultTimeout(180_000);
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const client = await page.createCDPSession();
@@ -737,7 +733,6 @@ async function assertGroupedDuplicateDownloads(browser, files, root) {
   const page = await browser.newPage();
   try {
     page.setDefaultTimeout(180_000);
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const client = await page.createCDPSession();
@@ -780,7 +775,6 @@ async function assertGroupedDuplicateUi(browser, files) {
   try {
     page.setDefaultTimeout(180_000);
     await page.setViewport({ width: 1360, height: 940, deviceScaleFactor: 1 });
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
@@ -1059,7 +1053,6 @@ async function openDuplicateFocusPage(browser, files, language, viewport) {
   const page = await browser.newPage();
   page.setDefaultTimeout(180_000);
   await page.setViewport({ deviceScaleFactor: 1, ...viewport });
-  await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   await page.goto(`${baseUrl}/${language}/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector('[data-testid="excel-compare-page"]');
   const input = await page.$('[data-testid="excel-compare-page"] input[type="file"]');
@@ -1160,7 +1153,6 @@ async function assertStandardKeyDisplay(browser, files, root) {
   const page = await browser.newPage();
   try {
     page.setDefaultTimeout(180_000);
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.goto(`${baseUrl}/ko/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const client = await page.createCDPSession();
@@ -1326,7 +1318,6 @@ async function assertDuplicateKeyTooLongIsolation(browser, files, root, language
   const page = await browser.newPage();
   try {
     page.setDefaultTimeout(180_000);
-    await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.goto(`${baseUrl}/${language}/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('[data-testid="excel-compare-page"]');
     const client = await page.createCDPSession();

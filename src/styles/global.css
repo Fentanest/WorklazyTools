@@ -1020,34 +1020,6 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
   .fabric-stage { padding: 7px; overflow: hidden; touch-action: manipulation; }
 }
 
-.privacy-consent {
-  position: fixed;
-  z-index: 120;
-  right: 22px;
-  bottom: 22px;
-  left: max(22px, calc(var(--sidebar-width, 0px) + 22px));
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  max-width: 880px;
-  margin-inline: auto;
-  padding: 16px 18px;
-  border: 1px solid var(--glass-border);
-  border-radius: 22px;
-  box-shadow: 0 18px 55px rgba(0,0,0,.18);
-}
-.privacy-consent strong { display: block; margin-bottom: 3px; }
-.privacy-consent p { margin: 0; color: var(--label-secondary); font-size: 14px; line-height: 1.45; }
-.privacy-consent-actions { display: flex; gap: 8px; }
-.privacy-consent-actions button { white-space: nowrap; }
-.footer-link-button { appearance: none; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; cursor: pointer; }
-.footer-link-button:hover { color: var(--color-blue-700); }
-@media (max-width: 720px) {
-  .privacy-consent { right: 12px; bottom: 78px; left: 12px; grid-template-columns: auto 1fr; padding: 14px; }
-  .privacy-consent-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
-  .privacy-consent-actions button { width: 100%; justify-content: center; }
-}
 
 /* Manual-theme ownership: the old OS-media dark tokens moved to data-theme
    tokens; only the direct surface rules are kept, re-scoped to manual dark
@@ -1081,17 +1053,6 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 }
 }
 
-/* Consent banner reservation: while the fixed banner is visible it must not
-   cover cards or the footer. The height variable is measured live by
-   PrivacyConsentBanner because wrapping differs per viewport and language. */
-body[data-consent-banner="visible"] .main-content {
-  padding-bottom: var(--consent-banner-height, 140px);
-}
-@media (max-width: 820px) {
-  body[data-consent-banner="visible"] .main-content {
-    padding-bottom: calc(var(--wl-bottom-nav-height) + 8px + env(safe-area-inset-bottom) + var(--consent-banner-height, 140px));
-  }
-}
 
 
 .app-shell.editor-mode .main-content {

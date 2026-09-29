@@ -37,10 +37,9 @@ try {
     throw new Error(`Language landing copy is not split into bilingual lines: ${JSON.stringify(landingLines)}`);
   }
 
+  await page.evaluateOnNewDocument(() => { window.__WORKLAZY_MOCK_PROVIDERS__ = true; });
   await page.goto(koBaseUrl, { waitUntil: "networkidle0" });
-  await page.waitForSelector(".privacy-consent");
-  await page.click("[data-testid=privacy-consent-accept]");
-  await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent_v2") === "granted");
+  if (await page.$(".privacy-consent")) throw new Error("Removed first-party consent banner is still visible.");
   await page.waitForFunction(() => document.querySelector("script[data-worklazy-google-analytics]") && document.querySelector("script[data-worklazy-naver-analytics]"));
   const analyticsBootstrap = await page.evaluate(() => ({
     google: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),
@@ -51,14 +50,7 @@ try {
   if (!analyticsBootstrap.google || !analyticsBootstrap.naver || analyticsBootstrap.malformedCommands || analyticsBootstrap.queuedViews !== 1) {
     throw new Error(`Analytics bootstrap is incomplete or uses malformed gtag commands: ${JSON.stringify(analyticsBootstrap)}`);
   }
-  // The remaining suite tests keyboard/layout behavior, not supplier focus.
-  // Withdraw consent after bootstrap so a late affiliate iframe cannot steal
-  // focus between focusing the native language selector and pressing ArrowUp.
-  await page.evaluate(() => {
-    localStorage.setItem("worklazy_privacy_consent_v2", "denied");
-    window.dispatchEvent(new CustomEvent("worklazy-consent-change", { detail: "denied" }));
-  });
-  await page.waitForFunction(() => !document.querySelector(".coupang-banner"));
+  // Supplier endpoints remain mocked throughout the keyboard/layout suite.
   const languageSwitcher = await page.$eval("select[data-ui-component='language-switcher']", (select) => ({
     tagName: select.tagName,
     name: select.getAttribute("name"),
@@ -442,7 +434,7 @@ try {
     throw new Error(`Unpublished video route is still available: ${JSON.stringify(unpublishedVideo)}`);
   }
   await page.goto(`${koBaseUrl}/tools/pdf-editor/`, { waitUntil: "networkidle0" });
-  if (await page.$("script[data-worklazy-adsense]")) throw new Error("AdSense loaded after consent withdrawal.");
+  if (!(await page.$("script[data-worklazy-adsense]"))) throw new Error("AdSense did not load on the ready PDF page.");
   await page.goto(`${koBaseUrl}/tools/pdf-editor/convert`, { waitUntil: "networkidle0" });
   await page.waitForSelector('input[placeholder*="1-5, 8"]');
 

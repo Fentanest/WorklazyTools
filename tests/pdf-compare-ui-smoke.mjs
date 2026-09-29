@@ -22,10 +22,21 @@ const server = await preview({ root, build: { outDir: process.env.PDF_COMPARE_UI
 const baseUrl = server.resolvedUrls.local[0].replace(/\/$/, "");
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1365, height: 900 }, deviceScaleFactor: 1 });
-const external = []; const pageErrors = [];
-const dismissConsent = async language => { const button = page.getByRole("button", { name: language === "ko" ? "필수 기능만 사용" : "Use essential features only" }); if (await button.count()) await button.click(); assert.equal(await page.locator(".privacy-consent").count(), 0); };
+const external = []; const providerRequests = []; const pageErrors = [];
+const assertNoConsentBanner = async () => { assert.equal(await page.locator(".privacy-consent").count(), 0); };
 page.on("pageerror", error => pageErrors.push(error.message));
-await page.route("**/*", route => { const url = new URL(route.request().url()); if (url.protocol.startsWith("http") && !["127.0.0.1", "localhost"].includes(url.hostname)) { external.push(url.href); return route.abort("blockedbyclient"); } return route.continue(); });
+await page.route("**/*", route => {
+  const url = new URL(route.request().url());
+  if (!["http:", "https:"].includes(url.protocol) || ["127.0.0.1", "localhost"].includes(url.hostname)) return route.continue();
+  const script = (body) => route.fulfill({ status: 200, contentType: "text/javascript", headers: { "access-control-allow-origin": "*", "cross-origin-resource-policy": "cross-origin" }, body });
+  if (url.origin === "https://www.googletagmanager.com" && url.pathname === "/gtag/js") { providerRequests.push(url.href); return script(""); }
+  if (url.href === "https://wcs.pstatic.net/wcslog.js") { providerRequests.push(url.href); return script("window.wcs={};window.wcs_do=()=>{}"); }
+  if (url.origin === "https://pagead2.googlesyndication.com" && url.pathname === "/pagead/js/adsbygoogle.js") { providerRequests.push(url.href); return script(""); }
+  if (url.href === "https://ads-partners.coupang.com/g.js") { providerRequests.push(url.href); return script("window.PartnersCoupang={G:function(){}}"); }
+  if (url.origin === "https://ads-partners.coupang.com" && url.pathname === "/widgets.html") { providerRequests.push(url.href); return route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>Mock affiliate widget</title>" }); }
+  external.push(url.href);
+  return route.abort("blockedbyclient");
+});
 try {
   if (process.env.PDF_COMPARE_UI_SCOPE === "lifecycle") {
     const { runPdfCompareUiLifecycle } = await import("./helpers/pdf-compare-ui-lifecycle.mjs");
@@ -82,7 +93,7 @@ try {
   ];
   for (const [language, theme, width, fileName] of initialProfiles) {
     await page.setViewportSize({ width, height: 844 }); await page.emulateMedia({ colorScheme: theme }); await page.goto(`${baseUrl}/${language}/tools/pdf-compare/`, { waitUntil: "networkidle" });
-    await dismissConsent(language);
+    await assertNoConsentBanner();
     await page.waitForSelector('[data-tool-page="pdf-compare"] input[type="file"]');
     const metrics = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, text: document.body.innerText, dark: matchMedia("(prefers-color-scheme: dark)").matches, background: getComputedStyle(document.body).backgroundColor })); assert.ok(metrics.overflow <= 1); assert.equal(metrics.dark, theme === "dark"); assert.ok(metrics.background);
     if (language === "ko") { assert.match(metrics.text, /PDF 파일 비교/); assert.match(metrics.text, /화면 배율, 기기와 글꼴 환경/); } else assert.match(metrics.text, /Pixel differences can vary/);
@@ -92,7 +103,7 @@ try {
   const mobileShots = [];
   for (const profile of [{ language: "ko", theme: "light", width: 320 }, { language: "en", theme: "dark", width: 390 }]) {
     await page.setViewportSize({ width: profile.width, height: 844 }); await page.emulateMedia({ colorScheme: profile.theme }); await page.goto(`${baseUrl}/${profile.language}/tools/pdf-compare/`, { waitUntil: "networkidle" });
-    await dismissConsent(profile.language);
+    await assertNoConsentBanner();
     const mobileInputs = await page.locator('[data-tool-page="pdf-compare"] input[type="file"]').all(); await mobileInputs[0].setInputFiles(path.join(corpus, "fixtures/normal-ascii.pdf")); await mobileInputs[1].setInputFiles(path.join(corpus, "fixtures/changed-word.pdf"));
     const runButton = page.getByRole("button", { name: profile.language === "ko" ? "비교 시작" : "Start comparison" }); await runButton.focus(); await page.keyboard.press("Enter");
     await page.getByRole("heading", { name: profile.language === "ko" ? "비교 결과" : "Comparison results" }).waitFor({ timeout: 120_000 });
@@ -112,7 +123,7 @@ try {
   const manifestItems = []; for (const file of screenshots) { const bytes = await fs.readFile(path.join(out, file)); manifestItems.push({ file, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }); }
   const sizeSHA = createHash("sha256").update(JSON.stringify(manifestItems.map(({ file, bytes }) => [file, bytes]))).digest("hex");
   const manifest = { sourceBuildSHA: sourceHash.digest("hex"), sizeSHA, items: manifestItems }; await fs.writeFile(path.join(out, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  await fs.writeFile(path.join(out, "result.json"), `${JSON.stringify({ baseUrl, external, pageErrors, screenshots, sourceBuildSHA: manifest.sourceBuildSHA, sizeSHA }, null, 2)}\n`);
+  await fs.writeFile(path.join(out, "result.json"), `${JSON.stringify({ baseUrl, external, providerRequests, pageErrors, screenshots, sourceBuildSHA: manifest.sourceBuildSHA, sizeSHA }, null, 2)}\n`);
   console.log(`PDF compare UI smoke passed; evidence=${out}`);
   }
 } finally { await browser.close(); await server.close(); }

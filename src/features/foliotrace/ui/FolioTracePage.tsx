@@ -32,8 +32,7 @@ import {
   formatQty,
   holdingStatus,
   latestUnresolvedReasonLabel,
-  quoteProviderLabel,
-  quoteSessionLabel,
+  quotePriceDetail,
   sortHoldings,
   topHoldings,
 } from "./holdings";
@@ -1078,7 +1077,7 @@ function ReadyView({
                 <dt>{t.detailPrice}</dt>
                 <dd>
                   {selected.quote
-                    ? `${formatKrw(selected.quote.close, lang)} · ${selected.quote.tradeDate} · ${quoteSessionLabel(selected.quote.session, lang)} · ${quoteProviderLabel(selected.quote.provider, lang)}`
+                    ? quotePriceDetail(selected.quote, lang)
                     : "—"}
                 </dd>
               </div>

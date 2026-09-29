@@ -14,7 +14,7 @@ import {
   formatQty,
   holdingStatus,
   latestUnresolvedReasonLabel,
-  quoteProviderLabel,
+  quotePriceDetail,
   quoteSessionLabel,
   sortHoldings,
   topHoldings,
@@ -385,14 +385,13 @@ test("unknown exclusion reasons fall back generically without echoing", () => {
   assert.equal(exclusionReasonLabel("some_future_reason", "en"), "Excluded: reason unavailable");
 });
 
-test("quote session/provider render as clear terms with identity kept", () => {
+test("quote price detail shows session without an internal provider name", () => {
   assert.equal(quoteSessionLabel("regular", "ko"), "정규장");
   assert.equal(quoteSessionLabel("regular", "en"), "Regular session");
-  assert.equal(quoteProviderLabel("naver", "ko"), "네이버");
-  assert.equal(quoteProviderLabel("naver", "en"), "Naver");
-  // Unknown contract values pass through (own data, React-escaped), never blank.
   assert.equal(quoteSessionLabel("auction", "ko"), "auction");
-  assert.equal(quoteProviderLabel("other-feed", "en"), "other-feed");
+  const quote = { close: "12345", tradeDate: "2026-09-23", session: "regular" as const, provider: "naver" };
+  assert.equal(quotePriceDetail(quote, "ko"), "₩12,345 · 2026-09-23 · 정규장");
+  assert.equal(quotePriceDetail(quote, "en"), "₩12,345 · 2026-09-23 · Regular session");
 });
 
 test("eventRangeOf reports the real receipt-date span, never fabricated", () => {

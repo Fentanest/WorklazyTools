@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { isAdIneligible } from "../app/adEligibility";
-import { CONSENT_EVENT, getPrivacyConsent, type PrivacyConsent } from "./privacyConsent";
-import { isLocalQaBuild } from "./localQa";
+import { isThirdPartyBlockedForQa } from "./localQa";
 
 // With the desktop sidebar and page padding, a 740px banner needs at least
 // 1076px of viewport width. Use the smaller variant below that threshold.
@@ -29,7 +28,6 @@ function bannerSource(size: "mobile" | "desktop", direct: boolean) {
 }
 
 export function CoupangBanner({ routeKey }: { routeKey: string }) {
-  const [consent, setConsent] = useState<PrivacyConsent>(() => getPrivacyConsent());
   const [ineligible, setIneligible] = useState(() => isAdIneligible());
   const [mobile, setMobile] = useState(() => window.matchMedia(MOBILE_BANNER_QUERY).matches);
   const [failedKey, setFailedKey] = useState<string | null>(null);
@@ -46,13 +44,6 @@ export function CoupangBanner({ routeKey }: { routeKey: string }) {
   }, [frameKey]);
 
   useEffect(() => {
-    const onConsent = (event: Event) => setConsent((event as CustomEvent<PrivacyConsent>).detail);
-    window.addEventListener(CONSENT_EVENT, onConsent);
-    setConsent(getPrivacyConsent());
-    return () => window.removeEventListener(CONSENT_EVENT, onConsent);
-  }, []);
-
-  useEffect(() => {
     const update = () => setIneligible(isAdIneligible());
     update();
     window.addEventListener("wl-ad-eligibility-changed", update);
@@ -66,7 +57,7 @@ export function CoupangBanner({ routeKey }: { routeKey: string }) {
     return () => media.removeEventListener("change", update);
   }, []);
 
-  if (!import.meta.env.PROD || isLocalQaBuild || consent !== "granted" || ineligible || isAdIneligible() || failedKey === frameKey) return null;
+  if (!import.meta.env.PROD || isThirdPartyBlockedForQa() || ineligible || isAdIneligible() || failedKey === frameKey) return null;
 
   const direct = /\/tools\/(?:document-redactor|office-editor\/app|excel-merger\/xls-preserve)\/?$/.test(routeKey);
   const english = /^\/en(?:\/|$)/.test(window.location.pathname);

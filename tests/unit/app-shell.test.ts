@@ -14,6 +14,7 @@ test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect owne
   assert.match(appShellSource, /documentReadiness\(location\.pathname/);
   assert.match(appShellSource, /readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe/);
   assert.doesNotMatch(appShellSource, /isAdFreePath|adFree/);
+  assert.doesNotMatch(appShellSource, /PrivacyConsentBanner|resetPrivacyConsent|consentSettings/);
   assert.match(appShellSource, /isVideoDirectPath\(location\.pathname/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/office-editor\/app"/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/excel-merger\/xls-preserve"/);
@@ -49,7 +50,7 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     ["pagead2.googlesyndication.com", "/pagead/js/adsbygoogle"].join(""),
   ];
   const matches = trackedAndNew
-    .filter((relativePath) => executableExtensions.has(path.extname(relativePath)) && !relativePath.startsWith(vendorPrefix))
+    .filter((relativePath) => executableExtensions.has(path.extname(relativePath)) && !relativePath.startsWith(vendorPrefix) && fs.existsSync(path.join(repositoryRoot, relativePath)))
     .filter((relativePath) => needles.some((needle) => read(relativePath).includes(needle)))
     .sort();
   const allowlist = [
@@ -57,7 +58,7 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "src/components/AdSenseLoader.tsx", // Owner: the sole script creator.
     "src/components/AppShell.tsx", // Owner: the sole route-level render gate.
     "tests/ad-eligibility-smoke.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
-    "tests/analytics-policy-smoke.mjs", // Owner: mocked provider lifecycle and consent assertions; never sends live events.
+    "tests/analytics-policy-smoke.mjs", // Owner: mocked provider lifecycle and page-view assertions; never sends live events.
     "tests/direct-entry-core-smoke.mjs", // Owner: unpublished video direct-entry and ad absence assertions.
     "tests/excel-cleaner-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/excel-compare-smoke.mjs", // Owner: standard-route presence assertion.

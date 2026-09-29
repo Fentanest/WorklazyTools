@@ -5,8 +5,8 @@ import { AnalyticsLoader } from "../components/AnalyticsLoader";
 
 /**
  * Dedicated error page for S5 (render error recovery).
- * Displayed outside AppShell without ad requests. A consenting visitor may
- * still generate one safe, fixed-title error-page view.
+ * Displayed outside AppShell without ad requests. A visitor may still
+ * generate one safe, fixed-title error-page view.
  */
 export function RouteErrorPage() {
   const { t } = useTranslation("common");

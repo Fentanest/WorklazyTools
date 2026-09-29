@@ -87,8 +87,7 @@ try {
 async function testPdfTools(page, fixtures, tempDir) {
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
   await navigateTo(page, `${koBaseUrl}/tools/pdf-editor/`);
-  const privacyChoice = await page.$(".privacy-consent-actions .secondary-button");
-  if (privacyChoice) await privacyChoice.click();
+  if (await page.$(".privacy-consent")) throw new Error("Removed first-party consent banner is still visible.");
   const input = await page.$('input[type="file"]');
   await input.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);

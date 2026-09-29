@@ -8,12 +8,12 @@ import { startRecoveryServer } from "./recovery-server.mjs";
 const server = await startRecoveryServer({ root: "dist", port: Number(process.env.ANALYTICS_TEST_PORT || 4186) });
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 
-async function contextWithConsent(consent = "granted", delayed = false, serviceWorkers = "block", coupang = "mock") {
+async function trackedContext(delayed = false, serviceWorkers = "block", coupang = "mock") {
   const context = await browser.newContext({ serviceWorkers });
-  await context.addInitScript((value) => {
-    if (value !== "unset") localStorage.setItem("worklazy_privacy_consent_v2", value);
+  await context.addInitScript(() => {
+    window.__WORKLAZY_MOCK_PROVIDERS__ = true;
     window.__naverViews = [];
-  }, consent);
+  });
   let release;
   const held = delayed ? new Promise((resolve) => { release = resolve; }) : null;
   const external = [];
@@ -57,7 +57,26 @@ async function counts(page) {
 
 try {
   {
-    const { context, page, external } = await contextWithConsent();
+    const context = await browser.newContext();
+    const external = [];
+    await context.route("**/*", (route) => {
+      const url = route.request().url();
+      if (new URL(url).origin === new URL(server.url).origin) return route.continue();
+      external.push(url);
+      return route.abort();
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
+      await page.waitForSelector('[data-tool-page="text-merger"]');
+      assert.deepEqual(external, []);
+      assert.equal(await page.locator("script[data-worklazy-google-analytics],script[data-worklazy-naver-analytics],script[data-worklazy-adsense],.privacy-consent").count(), 0);
+      console.log("PASS loopback QA default: no live supplier request or first-party consent banner");
+    } finally { await context.close(); }
+  }
+
+  {
+    const { context, page, external } = await trackedContext();
     try {
       await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.__naverViews.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
@@ -68,26 +87,17 @@ try {
       await page.goBack();
       await page.waitForFunction(() => window.__naverViews.length === 3);
       assert.equal((await counts(page)).google, 3);
-      await page.getByRole("button", { name: "분석·광고 설정" }).click();
-      await page.getByRole("button", { name: "필수 기능만 사용" }).click();
-      await page.locator('.sidebar a[href="/ko/tools/pdf-editor"]').click();
-      await page.waitForURL(/\/ko\/tools\/pdf-editor\/?$/);
       assert.equal((await counts(page)).google, 3);
-      assert.equal((await counts(page)).naver, 3);
-      await page.getByRole("button", { name: "분석·광고 설정" }).click();
-      await page.getByTestId("privacy-consent-accept").click();
-      await page.waitForFunction(() => window.__naverViews.length === 4);
-      assert.equal((await counts(page)).google, 4);
       const views = (await counts(page)).views;
       assert.ok(views.every((view) => !JSON.stringify(view).includes("secret")));
       assert.equal(external.filter((url) => url.includes("googletagmanager.com/gtag/js")).length, 1);
       assert.equal(external.filter((url) => url.includes("wcs.pstatic.net/wcslog.js")).length, 1);
-      console.log("PASS analytics initial, SPA, back, revoke, regrant: GA/Naver 4 views and one script each");
+      console.log("PASS analytics initial, SPA and back: GA/Naver 3 views and one script each");
     } finally { await context.close(); }
   }
 
   {
-    const { context, page } = await contextWithConsent();
+    const { context, page } = await trackedContext();
     try {
       await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.__naverViews?.length === 1);
@@ -106,7 +116,7 @@ try {
   }
 
   {
-    const { context, page, external } = await contextWithConsent();
+    const { context, page, external } = await trackedContext();
     try {
       const sentinel = "secret-file-and-password-123";
       await page.goto(`${server.url}/ko/tools/pdf-editor/?file=${sentinel}`, { waitUntil: "domcontentloaded" });
@@ -120,47 +130,35 @@ try {
   }
 
   {
-    const { context, page, release } = await contextWithConsent("granted", true);
+    const { context, page, release } = await trackedContext(true);
     try {
       await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
       await page.waitForSelector("script[data-worklazy-google-analytics]", { state: "attached" });
-      await page.getByRole("button", { name: "분석·광고 설정" }).click();
-      await page.getByRole("button", { name: "필수 기능만 사용" }).click();
+      await page.locator('.sidebar a[href="/ko/tools/pdf-editor"]').click();
+      await page.waitForURL(/\/ko\/tools\/pdf-editor\/?$/);
       release();
       await page.waitForFunction(() => window.__mockGoogleLoaded && window.wcs_do);
-      assert.equal((await counts(page)).google, 0);
-      assert.equal((await counts(page)).naver, 0);
-      assert.equal(await page.evaluate(() => (window.dataLayer || []).filter((entry) => entry[0] === "consent" && entry[1] === "update" && entry[2]?.analytics_storage === "granted").length), 0);
-      assert.equal(await page.evaluate(() => (window.dataLayer || []).filter((entry) => entry[0] === "config").length), 0);
-      console.log("PASS delayed supplier load after consent withdrawal: zero page views");
+      await page.waitForFunction(() => window.__naverViews.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
+      assert.deepEqual([(await counts(page)).google, (await counts(page)).naver], [1, 1]);
+      assert.equal((await counts(page)).views[0].page_path, "/ko/tools/pdf-editor/");
+      console.log("PASS delayed supplier load: only the current route receives one page view");
     } finally { release(); await context.close(); }
   }
 
   {
-    const { context, page } = await contextWithConsent("unset");
+    const { context, page } = await trackedContext();
     try {
-      await page.addInitScript(() => {
-        const read = Storage.prototype.getItem;
-        const write = Storage.prototype.setItem;
-        Storage.prototype.getItem = function (key) {
-          if (String(key).startsWith("worklazy_privacy_consent")) throw new DOMException("Storage denied", "SecurityError");
-          return read.call(this, key);
-        };
-        Storage.prototype.setItem = function (key, value) {
-          if (String(key).startsWith("worklazy_privacy_consent")) throw new DOMException("Storage denied", "SecurityError");
-          return write.call(this, key, value);
-        };
-      });
+      await page.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
       await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
-      await page.getByTestId("privacy-consent-accept").click();
       await page.waitForFunction(() => window.__naverViews?.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
       assert.equal((await counts(page)).google, 1);
-      console.log("PASS restricted storage: volatile consent enables current screen without crashing");
+      assert.equal(await page.locator(".privacy-consent").count(), 0);
+      console.log("PASS legacy consent value does not gate analytics or show the removed banner");
     } finally { await context.close(); }
   }
 
   for (const workspace of ["office-editor/app", "excel-merger/xls-preserve"]) {
-    const { context, page, external } = await contextWithConsent("granted", false, "allow");
+    const { context, page, external } = await trackedContext(false, "allow");
     const documents = [];
     page.on("domcontentloaded", () => { documents.push(page.url()); });
     try {
@@ -192,7 +190,7 @@ try {
   }
 
   {
-    const { context, page } = await contextWithConsent("granted", false, "allow");
+    const { context, page } = await trackedContext(false, "allow");
     try {
       await page.goto(`${server.url}/ko/tools/excel-merger/`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => navigator.serviceWorker.controller?.scriptURL.endsWith("/service-worker.js"));
@@ -208,7 +206,7 @@ try {
   }
 
   {
-    const { context, page } = await contextWithConsent();
+    const { context, page } = await trackedContext();
     try {
       await page.goto(`${server.url}/ko/tools/document-redactor/`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.__naverViews?.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
@@ -220,7 +218,7 @@ try {
   }
 
   {
-    const { context, page } = await contextWithConsent();
+    const { context, page } = await trackedContext();
     try {
       await page.goto(`${server.url}/ko/error/`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.__naverViews?.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
@@ -232,7 +230,7 @@ try {
 
   const hwpBytes = Buffer.from((await fs.readFile("tests/fixtures/rhwp-roundtrip-empty.hwp.b64", "utf8")).trim(), "base64");
   for (const [width, height, theme] of [[1365, 900, "light-coral"], [390, 844, "dark-coral"]]) {
-    const { context, page } = await contextWithConsent();
+    const { context, page } = await trackedContext();
     try {
       await page.setViewportSize({ width, height });
       await page.addInitScript((value) => localStorage.setItem("worklazy-theme", value), theme);
@@ -257,7 +255,7 @@ try {
   }
 
   {
-    const { context, page } = await contextWithConsent("granted", false, "block", "block");
+    const { context, page } = await trackedContext(false, "block", "block");
     try {
       const attempted = page.waitForRequest((request) => request.url() === "https://ads-partners.coupang.com/g.js");
       await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });

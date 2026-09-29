@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
 import { safeAnalyticsPage } from "../app/publicService";
 import { tools } from "../app/toolRegistry";
-import { CONSENT_EVENT, getPrivacyConsent, initializeGoogleConsentMode, updateGoogleConsent, type PrivacyConsent } from "./privacyConsent";
-import { isLocalQaBuild } from "./localQa";
+import { isThirdPartyBlockedForQa } from "./localQa";
 
 const GOOGLE_ANALYTICS_ID = "G-CFSK50SX9R";
 const NAVER_ANALYTICS_ID = "1025dd835558ee0";
@@ -15,6 +14,8 @@ const MENU_SOURCES = new Set(["home_card", "tools_card", "sidebar", "mobile_shee
 
 declare global {
   interface Window {
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
     wcs_add?: Record<string, string>;
     wcs?: { event?: (category: string, action: string) => void };
     wcs_do?: () => void;
@@ -31,20 +32,10 @@ let lastNaverKey = "";
 
 export function AnalyticsLoader({ ready }: { ready: boolean }) {
   const location = useLocation();
-  const [consent, setConsent] = useState<PrivacyConsent>(() => getPrivacyConsent());
-
-  useEffect(() => {
-    initializeGoogleConsentMode();
-    updateGoogleConsent(getPrivacyConsent());
-    const onConsent = (event: Event) => setConsent((event as CustomEvent<PrivacyConsent>).detail);
-    window.addEventListener(CONSENT_EVENT, onConsent);
-    setConsent(getPrivacyConsent());
-    return () => window.removeEventListener(CONSENT_EVENT, onConsent);
-  }, []);
 
   useEffect(() => {
     const safePage = ready ? safeAnalyticsPage(location.pathname, location.search, location.hash) : null;
-    if (!import.meta.env.PROD || isLocalQaBuild || consent !== "granted" || !safePage || getPrivacyConsent() !== "granted") {
+    if (!import.meta.env.PROD || isThirdPartyBlockedForQa() || !safePage) {
       activePage = null;
       lastGoogleKey = "";
       lastNaverKey = "";
@@ -60,14 +51,14 @@ export function AnalyticsLoader({ ready }: { ready: boolean }) {
     if (activePage.naverSafe) initializeNaverAnalytics();
     flushPageViews();
     return () => { activePage = null; };
-  }, [ready, consent, location.key, location.pathname, location.search, location.hash]);
+  }, [ready, location.key, location.pathname, location.search, location.hash]);
 
   return null;
 }
 
 export function trackToolOpen(toolId: string, menuSource: string, contentLanguage: "ko" | "en") {
   const page = currentPage();
-  if (!import.meta.env.PROD || isLocalQaBuild || !page) return;
+  if (!import.meta.env.PROD || isThirdPartyBlockedForQa() || !page) return;
   if (!TOOL_IDS.has(toolId) || !MENU_SOURCES.has(menuSource)) return;
   if (googleLoaded) window.gtag?.("event", "tool_open", {
     tool_id: toolId, menu_source: menuSource, content_language: contentLanguage,
@@ -88,7 +79,7 @@ function isSafeNaverReferrer(referrer: string) {
 }
 
 function currentPage() {
-  if (getPrivacyConsent() !== "granted" || !activePage) return null;
+  if (!activePage) return null;
   if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== activePage.route) return null;
   return activePage;
 }
@@ -103,6 +94,7 @@ function initializeGoogleAnalytics() {
     return;
   }
   if (!currentPage()) return;
+  ensureGoogleTagQueue();
   const script = document.createElement("script");
   script.async = true;
   script.referrerPolicy = "origin";
@@ -121,10 +113,16 @@ function initializeGoogleAnalytics() {
   document.head.appendChild(script);
 }
 
+function ensureGoogleTagQueue() {
+  window.dataLayer ??= [];
+  window.gtag ??= function gtag() { window.dataLayer?.push(arguments); };
+}
+
 function configureGoogleAnalytics() {
   const page = currentPage()?.page;
   if (!googleLoaded || googleConfigured || !page) return;
   googleConfigured = true;
+  ensureGoogleTagQueue();
   window.gtag?.("js", new Date());
   window.gtag?.("config", GOOGLE_ANALYTICS_ID, {
     allow_google_signals: false,
