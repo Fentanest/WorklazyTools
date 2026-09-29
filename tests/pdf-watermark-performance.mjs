@@ -169,7 +169,7 @@ try {
 
 async function installMetrics(context) {
   await context.addInitScript(() => {
-    localStorage.setItem("worklazy_privacy_consent", "denied");
+    localStorage.setItem("worklazy_privacy_consent_v2", "denied");
     window.__pdfWatermarkPerformance = { gaps: [], longTasks: [] };
     let last = performance.now();
     setInterval(() => {
@@ -233,7 +233,7 @@ async function measureCancellation(browserInstance) {
 async function measureWorkerFallback(browserInstance) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, locale: "en-US", serviceWorkers: "block" });
   await context.addInitScript(() => {
-    localStorage.setItem("worklazy_privacy_consent", "denied");
+    localStorage.setItem("worklazy_privacy_consent_v2", "denied");
     Object.defineProperty(globalThis, "Worker", { configurable: true, value: undefined });
   });
   const page = await context.newPage();

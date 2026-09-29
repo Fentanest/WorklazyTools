@@ -10,8 +10,10 @@ const read = (relativePath: string) => fs.readFileSync(path.join(repositoryRoot,
 const appShellSource = read("src/components/AppShell.tsx");
 
 test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect ownership", () => {
-  assert.match(appShellSource, /<RouteSeo \/>[\s\S]*?<VideoIsolationBoundary[\s\S]*?<OfficeIsolationBoundary[\s\S]*?<ExcelPreserveIsolationBoundary[\s\S]*?<AnalyticsLoader[\s\S]*?<AdSenseLoader \/>/);
-  assert.match(appShellSource, /!videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument/);
+  assert.match(appShellSource, /<RouteSeo \/>[\s\S]*?<VideoIsolationBoundary[\s\S]*?<OfficeIsolationBoundary[\s\S]*?<ExcelPreserveIsolationBoundary[\s\S]*?<AnalyticsLoader ready=\{pageReady\} \/>[\s\S]*?<AdSenseLoader ready=\{adReady\} \/>/);
+  assert.match(appShellSource, /documentReadiness\(location\.pathname/);
+  assert.match(appShellSource, /readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe/);
+  assert.doesNotMatch(appShellSource, /isAdFreePath|adFree/);
   assert.match(appShellSource, /isVideoDirectPath\(location\.pathname/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/office-editor\/app"/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/excel-merger\/xls-preserve"/);
@@ -54,8 +56,8 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "scripts/validate-static-output.mjs", // Owner: static isolation-page absence assertions.
     "src/components/AdSenseLoader.tsx", // Owner: the sole script creator.
     "src/components/AppShell.tsx", // Owner: the sole route-level render gate.
-    "src/pages/RouteErrorPage.tsx", // Owner: S5 error recovery — ad-free dedicated error page (no AdSenseLoader).
     "tests/ad-eligibility-smoke.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
+    "tests/analytics-policy-smoke.mjs", // Owner: mocked provider lifecycle and consent assertions; never sends live events.
     "tests/excel-cleaner-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/excel-compare-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/helpers/ad-stub.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.

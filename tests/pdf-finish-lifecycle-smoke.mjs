@@ -41,7 +41,7 @@ try {
       await route.fulfill({ response, body });
     });
     await context.addInitScript(() => {
-      localStorage.setItem("worklazy_privacy_consent", "granted");
+      localStorage.setItem("worklazy_privacy_consent_v2", "granted");
       globalThis.__finishUrlEvents = [];
       globalThis.__finishLifecyclePause = () => new Promise((resolve) => {
         globalThis.__finishBatchPaused = true;

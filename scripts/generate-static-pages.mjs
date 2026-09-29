@@ -1,4 +1,5 @@
 import { VIDEO_DIRECT_PATHS } from "../src/features/video-studio/videoDirectPaths.ts";
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -15,13 +16,13 @@ const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData
 
 const toolRoutes = [
   "foliotrace",
-  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "hwp-editor", "office-editor", "video-studio", "audio-studio",
+  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "document-redactor", "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
 ];
 const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
-const videoChildRoutes = VIDEO_DIRECT_PATHS.slice(1).map(route => route.slice(1));
+const videoChildRoutes = VIDEO_STUDIO_PUBLIC ? VIDEO_DIRECT_PATHS.slice(1).map(route => route.slice(1)) : [];
 const coreDirectRoutes = ["tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr", "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark", "tools/audio-studio/trim"];
 const localizedRoutes = [...coreDirectRoutes, ...videoChildRoutes,"", "tools", ...toolRoutes.map((slug) => `tools/${slug}`), ...pdfRoutes.map((slug) => `tools/${slug}`), ...pageRoutes, "error"];
 const videoRoute = "tools/video-studio";
@@ -80,24 +81,26 @@ for (const route of retiredCompareRoutes) {
   }
 }
 
-const coiSource = path.join(sourceRoot, "node_modules/coi-serviceworker/coi-serviceworker.min.js");
-const coiSourceText = await fs.readFile(coiSource, "utf8");
 const officeCoiSourceText = await fs.readFile(path.join(sourceRoot, "src/features/office-editor/office_coi_serviceworker.js"), "utf8");
-const credentiallessCoiSource = coiSourceText.replace("let coepCredentialless=!1;", "let coepCredentialless=!0;");
-if (credentiallessCoiSource === coiSourceText) throw new Error("Unable to configure the video isolation service worker for credentialless subresources.");
-for (const language of languages) {
-  for (const assetDirectory of ["workers", "runtime"]) {
-    const source = path.join(outputDirectory, videoRoute, assetDirectory);
-    const target = path.join(outputDirectory, language, videoRoute, assetDirectory);
-    await fs.cp(source, target, { recursive: true });
+if (VIDEO_STUDIO_PUBLIC) {
+  const coiSource = path.join(sourceRoot, "node_modules/coi-serviceworker/coi-serviceworker.min.js");
+  const coiSourceText = await fs.readFile(coiSource, "utf8");
+  const credentiallessCoiSource = coiSourceText.replace("let coepCredentialless=!1;", "let coepCredentialless=!0;");
+  if (credentiallessCoiSource === coiSourceText) throw new Error("Unable to configure the video isolation service worker for credentialless subresources.");
+  for (const language of languages) {
+    for (const assetDirectory of ["workers", "runtime"]) {
+      const source = path.join(outputDirectory, videoRoute, assetDirectory);
+      const target = path.join(outputDirectory, language, videoRoute, assetDirectory);
+      await fs.cp(source, target, { recursive: true });
+    }
   }
-}
-for (const language of [...languages, "legacy"]) {
-  const target = language === "legacy"
-    ? path.join(outputDirectory, videoRoute, "coi-serviceworker.js")
-    : path.join(outputDirectory, language, videoRoute, "coi-serviceworker.js");
-  await fs.mkdir(path.dirname(target), { recursive: true });
-  await fs.writeFile(target, credentiallessCoiSource);
+  for (const language of [...languages, "legacy"]) {
+    const target = language === "legacy"
+      ? path.join(outputDirectory, videoRoute, "coi-serviceworker.js")
+      : path.join(outputDirectory, language, videoRoute, "coi-serviceworker.js");
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, credentiallessCoiSource);
+  }
 }
 for (const language of languages) {
   for (const isolatedRoute of [officeAppRoute, excelPreserveRoute]) {
@@ -167,7 +170,7 @@ function renderPage(template, page, canonical) {
     `<meta name="twitter:description" content="${escapeHtml(page.description)}" />`, `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
     `<meta name="twitter:image:alt" content="${escapeHtml(page.socialImage.alt)}" />`,
     `<script id="worklazy-route-jsonld" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
-    ...(VIDEO_DIRECT_PATHS.includes(`/${page.route}`) ? [`<meta name="worklazy-video-isolation" content="document-scope" />`, `<script>globalThis.coi={quiet:true,coepCredentialless:()=>true};</script>`, `<script data-worklazy-video-isolation src="${page.route === videoRoute ? "./" : "../"}coi-serviceworker.js"></script>`] : []),
+    ...(VIDEO_STUDIO_PUBLIC && VIDEO_DIRECT_PATHS.includes(`/${page.route}`) ? [`<meta name="worklazy-video-isolation" content="document-scope" />`, `<script>globalThis.coi={quiet:true,coepCredentialless:()=>true};</script>`, `<script data-worklazy-video-isolation src="${page.route === videoRoute ? "./" : "../"}coi-serviceworker.js"></script>`] : []),
   ].join("\n    ");
   return template.replace(/<html[^>]*>/, `<html lang="${page.language}">`).replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(page.title)}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${escapeHtml(page.description)}" />`).replace("</head>", `    ${head}\n  </head>`).replace('<div id="root"></div>', `<div id="root">${staticBody(page)}</div>`);
 }
@@ -283,14 +286,13 @@ function escapeXml(value) { return escapeHtml(value).replaceAll("'", "&apos;"); 
 
 function renderRedactorPage(template, page, canonical) {
   let html = renderPage(template, page, canonical)
-    .replace(/<meta\s+name="google-adsense-account"[^>]*>/g, '')
     .replace(/<link\s+rel="manifest"[^>]*>/g, '');
   const hashes = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
     .filter(([, attrs]) => !/\bsrc=|application\/ld\+json/.test(attrs))
     .map(([, , text]) => "'sha256-" + createHash('sha256').update(text).digest('base64') + "'");
   const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
     .map(([, text]) => "'sha256-" + createHash('sha256').update(text).digest('base64') + "'");
-  const policy = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' " + hashes.join(' ') +
-    "; style-src 'self' " + styles.join(' ') + "; style-src-attr 'none'; connect-src 'self'; img-src 'self' blob: data:; font-src 'self' blob:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; frame-src https://ads-partners.coupang.com; form-action 'none'; base-uri 'self'";
+  const policy = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://pagead2.googlesyndication.com https://www.googletagmanager.com https://wcs.pstatic.net " + hashes.join(' ') +
+    "; style-src 'self' " + styles.join(' ') + "; style-src-attr 'none'; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://wcs.naver.com; img-src 'self' blob: data: https://www.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://wcs.naver.com; font-src 'self' blob:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; frame-src https://ads-partners.coupang.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; form-action 'none'; base-uri 'self'";
   return html.replace(/<head>/, '<head>\n<meta http-equiv="Content-Security-Policy" content="' + policy + '" />\n<meta name="worklazy-redactor-isolation" content="document-scope" />');
 }

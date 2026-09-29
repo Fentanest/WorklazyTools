@@ -27,9 +27,9 @@
       "description": "Edit, compare, generate, and convert documents."
     },
     "media": {
-      "label": "Image, Video & Audio",
+      "label": "Image & Audio",
       "shortLabel": "Media",
-      "description": "Edit images, videos, and audio directly in your browser."
+      "description": "Edit images and audio directly in your browser."
     },
     "text-data": {
       "label": "Text & Code",

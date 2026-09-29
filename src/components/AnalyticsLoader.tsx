@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
+import { safeAnalyticsPage } from "../app/publicService";
+import { tools } from "../app/toolRegistry";
 import { CONSENT_EVENT, getPrivacyConsent, initializeGoogleConsentMode, updateGoogleConsent, type PrivacyConsent } from "./privacyConsent";
 import { isLocalQaBuild } from "./localQa";
 
@@ -8,173 +10,169 @@ const GOOGLE_ANALYTICS_ID = "G-CFSK50SX9R";
 const NAVER_ANALYTICS_ID = "1025dd835558ee0";
 const GOOGLE_TAG_URL = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`;
 const NAVER_TAG_URL = "https://wcs.pstatic.net/wcslog.js";
-
-type AnalyticsValue = string | number | boolean;
+const TOOL_IDS = new Set([...tools.map((tool) => tool.id), "topbar-search"]);
+const MENU_SOURCES = new Set(["home_card", "tools_card", "sidebar", "mobile_sheet", "topbar"]);
 
 declare global {
   interface Window {
-    dataLayer?: unknown[];
-    gtag?: (...args: unknown[]) => void;
     wcs_add?: Record<string, string>;
     wcs?: { event?: (category: string, action: string) => void };
     wcs_do?: () => void;
   }
 }
 
-let initialized = false;
-let naverReady = false;
-let lastNaverPath = "";
-let lastGooglePath = "";
-let pendingNaverPageView = false;
-const pendingNaverEvents: Array<[string, string]> = [];
+type SafePage = NonNullable<ReturnType<typeof safeAnalyticsPage>>;
+let activePage: { key: string; page: SafePage; naverSafe: boolean; route: string } | null = null;
+let googleLoaded = false;
+let googleConfigured = false;
+let naverLoaded = false;
+let lastGoogleKey = "";
+let lastNaverKey = "";
 
-export function AnalyticsLoader({ disabled = false }: { disabled?: boolean }) {
+export function AnalyticsLoader({ ready }: { ready: boolean }) {
   const location = useLocation();
   const [consent, setConsent] = useState<PrivacyConsent>(() => getPrivacyConsent());
 
   useEffect(() => {
     initializeGoogleConsentMode();
-    updateGoogleConsent(consent);
-    const handleConsent = (event: Event) => setConsent((event as CustomEvent<PrivacyConsent>).detail);
-    window.addEventListener(CONSENT_EVENT, handleConsent);
-    return () => window.removeEventListener(CONSENT_EVENT, handleConsent);
+    updateGoogleConsent(getPrivacyConsent());
+    const onConsent = (event: Event) => setConsent((event as CustomEvent<PrivacyConsent>).detail);
+    window.addEventListener(CONSENT_EVENT, onConsent);
+    setConsent(getPrivacyConsent());
+    return () => window.removeEventListener(CONSENT_EVENT, onConsent);
   }, []);
 
   useEffect(() => {
-    updateGoogleConsent(consent);
-    if (!import.meta.env.PROD || isLocalQaBuild || disabled || consent !== "granted") {
-      resetPageViewState();
+    const safePage = ready ? safeAnalyticsPage(location.pathname, location.search, location.hash) : null;
+    if (!import.meta.env.PROD || isLocalQaBuild || consent !== "granted" || !safePage || getPrivacyConsent() !== "granted") {
+      activePage = null;
+      lastGoogleKey = "";
+      lastNaverKey = "";
       return;
     }
-    initializeAnalytics();
-  }, [consent, disabled]);
-
-  useEffect(() => {
-    if (!import.meta.env.PROD || isLocalQaBuild || disabled || consent !== "granted") return;
-    const path = `${location.pathname}${location.search}`;
-    const timer = window.setTimeout(() => {
-      requestGooglePageView(path);
-      requestNaverPageView(path);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [consent, disabled, location.pathname, location.search]);
+    activePage = {
+      key: `${location.key}:${safePage.path}`,
+      page: safePage,
+      naverSafe: isSafeNaverReferrer(document.referrer),
+      route: `${location.pathname}${location.search}${location.hash}`,
+    };
+    initializeGoogleAnalytics();
+    if (activePage.naverSafe) initializeNaverAnalytics();
+    flushPageViews();
+    return () => { activePage = null; };
+  }, [ready, consent, location.key, location.pathname, location.search, location.hash]);
 
   return null;
 }
 
 export function trackToolOpen(toolId: string, menuSource: string, contentLanguage: "ko" | "en") {
-  if (!import.meta.env.PROD || isLocalQaBuild || !initialized || getPrivacyConsent() !== "granted") return;
-  const safeToolId = sanitizeEventValue(toolId);
-  const safeMenuSource = sanitizeEventValue(menuSource);
-
-  sendGoogleEvent("tool_open", {
-    tool_id: safeToolId,
-    menu_source: safeMenuSource,
-    content_language: contentLanguage,
+  const page = currentPage();
+  if (!import.meta.env.PROD || isLocalQaBuild || !page) return;
+  if (!TOOL_IDS.has(toolId) || !MENU_SOURCES.has(menuSource)) return;
+  if (googleLoaded) window.gtag?.("event", "tool_open", {
+    tool_id: toolId, menu_source: menuSource, content_language: contentLanguage,
   });
-  sendNaverEvent("tool_open", `${contentLanguage}:${safeMenuSource}:${safeToolId}`);
+  if (page.naverSafe && naverLoaded) window.wcs?.event?.("tool_open", `${contentLanguage}:${menuSource}:${toolId}`);
 }
 
-function initializeAnalytics() {
-  if (initialized) return;
-  initialized = true;
-  initializeGoogleAnalytics();
-  initializeNaverAnalytics();
+function isSafeNaverReferrer(referrer: string) {
+  if (!referrer) return true;
+  try {
+    const url = new URL(referrer);
+    if (url.search || url.hash) return false;
+    if (url.origin !== window.location.origin) return url.pathname === "/";
+    return Boolean(safeAnalyticsPage(url.pathname));
+  } catch { return false; }
+}
+
+function currentPage() {
+  if (getPrivacyConsent() !== "granted" || !activePage) return null;
+  if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== activePage.route) return null;
+  return activePage;
 }
 
 function initializeGoogleAnalytics() {
-  window.dataLayer ??= [];
-  window.gtag ??= function gtag() {
-    window.dataLayer?.push(arguments);
-  };
-
-  window.gtag("js", new Date());
-  window.gtag("config", GOOGLE_ANALYTICS_ID, {
-    allow_google_signals: false,
-    allow_ad_personalization_signals: false,
-    send_page_view: false,
-  });
-
-  if (document.querySelector("script[data-worklazy-google-analytics]")) return;
+  const existing = document.querySelector<HTMLScriptElement>("script[data-worklazy-google-analytics]");
+  if (existing) {
+    if (existing.dataset.loaded === "true") {
+      googleLoaded = true;
+      configureGoogleAnalytics();
+    }
+    return;
+  }
+  if (!currentPage()) return;
   const script = document.createElement("script");
   script.async = true;
+  script.referrerPolicy = "origin";
   script.dataset.worklazyGoogleAnalytics = "true";
   script.src = GOOGLE_TAG_URL;
+  script.addEventListener("load", () => {
+    script.dataset.loaded = "true";
+    googleLoaded = true;
+    configureGoogleAnalytics();
+    flushPageViews();
+  }, { once: true });
+  script.addEventListener("error", () => {
+    googleLoaded = false;
+    script.remove();
+  }, { once: true });
   document.head.appendChild(script);
 }
 
-function requestGooglePageView(path: string) {
-  if (path === lastGooglePath || !initialized) return;
-  lastGooglePath = path;
-  window.gtag?.("event", "page_view", {
-    page_location: window.location.href,
-    page_path: path,
-    page_title: document.title,
+function configureGoogleAnalytics() {
+  const page = currentPage()?.page;
+  if (!googleLoaded || googleConfigured || !page) return;
+  googleConfigured = true;
+  window.gtag?.("js", new Date());
+  window.gtag?.("config", GOOGLE_ANALYTICS_ID, {
+    allow_google_signals: false,
+    allow_ad_personalization_signals: false,
+    send_page_view: false,
+    page_location: new URL(page.path, window.location.origin).href,
+    page_title: page.title,
+    page_referrer: "",
   });
 }
 
 function initializeNaverAnalytics() {
   window.wcs_add ??= {};
   window.wcs_add.wa = NAVER_ANALYTICS_ID;
-
-  if (window.wcs && window.wcs_do) {
-    markNaverReady();
-    return;
-  }
-
+  if (window.wcs && window.wcs_do) { naverLoaded = true; return; }
   const existing = document.querySelector<HTMLScriptElement>("script[data-worklazy-naver-analytics]");
-  if (existing) {
-    existing.addEventListener("load", markNaverReady, { once: true });
-    return;
-  }
-
+  if (existing) return;
   const script = document.createElement("script");
   script.async = true;
   script.crossOrigin = "anonymous";
+  script.referrerPolicy = "origin";
   script.dataset.worklazyNaverAnalytics = "true";
   script.src = NAVER_TAG_URL;
-  script.addEventListener("load", markNaverReady, { once: true });
+  script.addEventListener("load", () => {
+    naverLoaded = Boolean(window.wcs && window.wcs_do);
+    flushPageViews();
+  }, { once: true });
+  script.addEventListener("error", () => {
+    naverLoaded = false;
+    script.remove();
+  }, { once: true });
   document.head.appendChild(script);
 }
 
-function requestNaverPageView(path: string) {
-  if (path === lastNaverPath) return;
-  lastNaverPath = path;
-  if (!naverReady || !window.wcs_do) {
-    pendingNaverPageView = true;
-    return;
+function flushPageViews() {
+  const current = currentPage();
+  if (!current) return;
+  configureGoogleAnalytics();
+  const { key, page, naverSafe } = current;
+  if (googleLoaded && key !== lastGoogleKey) {
+    lastGoogleKey = key;
+    window.gtag?.("event", "page_view", {
+      page_location: new URL(page.path, window.location.origin).href,
+      page_path: page.path,
+      page_title: page.title,
+      page_referrer: "",
+    });
   }
-  window.wcs_do();
-}
-
-function markNaverReady() {
-  naverReady = Boolean(window.wcs && window.wcs_do);
-  if (!naverReady) return;
-  if (pendingNaverPageView) {
-    pendingNaverPageView = false;
+  if (naverSafe && naverLoaded && key !== lastNaverKey) {
+    lastNaverKey = key;
     window.wcs_do?.();
   }
-  pendingNaverEvents.splice(0).forEach(([category, action]) => window.wcs?.event?.(category, action));
-}
-
-function sendGoogleEvent(name: string, parameters: Record<string, AnalyticsValue>) {
-  window.gtag?.("event", name, parameters);
-}
-
-function sendNaverEvent(category: string, action: string) {
-  if (naverReady && window.wcs?.event) {
-    window.wcs.event(category, action);
-    return;
-  }
-  if (pendingNaverEvents.length < 20) pendingNaverEvents.push([category, action]);
-}
-
-function sanitizeEventValue(value: string) {
-  return value.replace(/[^a-z0-9_-]/gi, "_").slice(0, 60);
-}
-
-function resetPageViewState() {
-  lastGooglePath = "";
-  lastNaverPath = "";
-  pendingNaverPageView = false;
 }

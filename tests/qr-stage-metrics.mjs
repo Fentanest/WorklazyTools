@@ -88,7 +88,7 @@ try {
   browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", `--log-net-log=${path.resolve(outputDirectory, "netlog.json")}`, "--net-log-capture-mode=Default"] });
   const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, locale: "ko-KR", timezoneId: "Asia/Seoul", colorScheme: "light", serviceWorkers: "block", acceptDownloads: true });
   await context.addInitScript(() => {
-    localStorage.setItem("worklazy_privacy_consent", "granted");
+    localStorage.setItem("worklazy_privacy_consent_v2", "granted");
     localStorage.setItem("worklazy_lang", "ko");
   });
   const responseTasks = [];

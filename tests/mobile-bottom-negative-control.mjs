@@ -22,7 +22,7 @@ try {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
-  await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+  await page.evaluateOnNewDocument(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
   await page.goto(new URL("/ko/tools/excel-compare", baseUrl).href, { waitUntil: "networkidle0" });
   await page.waitForSelector('[data-testid="excel-compare-page"]', { visible: true });
   const injectedStyle = await page.addStyleTag({ content: ".main-content { padding-bottom: 0 !important; }" });

@@ -45,6 +45,7 @@ export function assertStaticFaqHtml(html, { filePath = "static output", expected
 }
 
 async function main() {
+const { VIDEO_STUDIO_PUBLIC } = await import("../src/app/publicServiceConfig.mjs");
 
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
@@ -58,7 +59,7 @@ const routes = [
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
-  "tools/hwp-editor", "tools/office-editor", "tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio", "tools/audio-studio", "tools/audio-studio/trim", "tools/image-studio",
+  "tools/hwp-editor", "tools/office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio"] : []), "tools/audio-studio", "tools/audio-studio/trim", "tools/image-studio",
   "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark",
   "tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr",
   "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
@@ -107,7 +108,7 @@ for (const route of routes) {
     if (!html.includes(marker)) throw new Error(`${filePath} is missing ${marker}`);
   }
   if (route === "tools/document-redactor") {
-    if (html.includes('name="google-adsense-account"')) throw new Error(`${filePath} must not include the AdSense account marker.`);
+    if (!html.includes('name="google-adsense-account"')) throw new Error(`${filePath} is missing the AdSense account marker.`);
     if (html.includes('rel="manifest"')) throw new Error(`${filePath} must not include the web app manifest.`);
   } else if (!html.includes('name="google-adsense-account"')) {
     throw new Error(`${filePath} is missing name="google-adsense-account"`);
@@ -266,17 +267,18 @@ const [cname, worklazyLicense, thirdPartyLicenses, favicon, logo, manifestText, 
   fs.readFile("dist/social/worklazy-tools-share.png"),
   fs.readFile("dist/social/worklazy-tools-share-ko.png"),
 ]);
-const [pyodideModule, pyodideWasm, ocrWorker, ocrEnglish, ocrKorean, videoIsolationWorker, videoSingleCore, videoMultiCore, videoMultiWorker] = await Promise.all([
+const [pyodideModule, pyodideWasm, ocrWorker, ocrEnglish, ocrKorean] = await Promise.all([
   fs.stat(`dist/vendor/pyodide/${pyodideVersion}/pyodide.mjs`),
   fs.stat(`dist/vendor/pyodide/${pyodideVersion}/pyodide.asm.wasm`),
   fs.stat("dist/vendor/tesseract/7.0.0/worker.min.js"),
   fs.stat("dist/vendor/tesseract/7.0.0/lang/eng.traineddata.gz"),
   fs.stat("dist/vendor/tesseract/7.0.0/lang/kor.traineddata.gz"),
-  fs.stat("dist/tools/video-studio/coi-serviceworker.js"),
-  fs.stat("dist/tools/video-studio/runtime/single/ffmpeg-core.wasm"),
-  fs.stat("dist/tools/video-studio/runtime/multi/ffmpeg-core.wasm"),
-  fs.stat("dist/tools/video-studio/runtime/multi/ffmpeg-core.worker.js"),
 ]);
+const [audioCore, audioWorker] = await Promise.all([
+  fs.stat("dist/vendor/ffmpeg-audio/single/ffmpeg-core.wasm"),
+  fs.stat("dist/vendor/ffmpeg-audio/ffmpeg-worker.js"),
+]);
+if (audioCore.size < 30_000_000 || audioWorker.size < 1_000) throw new Error("Shared Audio Studio FFmpeg runtime is incomplete.");
 const officeAssets = [
   ["soffice.js", 858124, "5143e5354f470b87f86ba272bcfef857bd13e6f07b59666e48a7ccb89643cd77"],
   ["soffice.wasm", 161667499, "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4"],
@@ -336,6 +338,13 @@ for (const language of ["ko", "en"]) {
     }
   }
 }
+if (VIDEO_STUDIO_PUBLIC) {
+const [videoIsolationWorker, videoSingleCore, videoMultiCore, videoMultiWorker] = await Promise.all([
+  fs.stat("dist/tools/video-studio/coi-serviceworker.js"),
+  fs.stat("dist/tools/video-studio/runtime/single/ffmpeg-core.wasm"),
+  fs.stat("dist/tools/video-studio/runtime/multi/ffmpeg-core.wasm"),
+  fs.stat("dist/tools/video-studio/runtime/multi/ffmpeg-core.worker.js"),
+]);
 const videoWorkerFiles = await fs.readdir("dist/tools/video-studio/workers");
 for (const language of ["ko", "en"]) {
   const localizedVideoRoot = path.join("dist", language, "tools", "video-studio");
@@ -358,6 +367,13 @@ for (const language of ["ko", "en"]) {
     throw new Error(`${language} video workers were emitted outside their localized document scope.`);
   }
 }
+if (videoIsolationWorker.size < 1_000 || videoSingleCore.size < 30_000_000 || videoMultiCore.size < 30_000_000 || videoMultiWorker.size < 1_000) throw new Error("Video runtime is incomplete.");
+if (!videoWorkerFiles.some((name) => name.startsWith("video.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-probe.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-zip.worker-"))) throw new Error("Video workers were emitted outside their isolated document scope.");
+} else {
+  for (const root of ["dist/tools/video-studio", "dist/ko/tools/video-studio", "dist/en/tools/video-studio"]) {
+    if (await fs.stat(root).then(() => true, () => false)) throw new Error(`Unpublished video output remains: ${root}`);
+  }
+}
 const assetFiles = await fs.readdir("dist/assets");
 const applicationJavaScript = (await Promise.all(
   assetFiles.filter((name) => name.endsWith(".js")).map((name) => fs.readFile(path.join("dist/assets", name), "utf8")),
@@ -377,7 +393,7 @@ if (manifest.display !== "standalone" || manifest.scope !== "./" || manifest.sta
   || !manifest.icons?.some((icon) => icon.sizes === "192x192") || !manifest.icons?.some((icon) => icon.sizes === "512x512")) {
   throw new Error("The installable web app manifest is incomplete.");
 }
-if (!serviceWorker.includes('addEventListener("install"') || !serviceWorker.includes('addEventListener("fetch"') || !serviceWorker.includes('"credentialless"')
+if (!serviceWorker.includes('addEventListener("install"') || !serviceWorker.includes('addEventListener("fetch"')
   || !serviceWorker.includes('Cross-Origin-Embedder-Policy') || !serviceWorker.includes('Cross-Origin-Opener-Policy')
   || !serviceWorker.includes('Cross-Origin-Resource-Policy') || !serviceWorker.includes('vendor\\/zetaoffice')
   || !serviceWorker.includes('event.request.destination === "worker"') || !serviceWorker.includes('event.request.destination === "sharedworker"')
@@ -387,10 +403,6 @@ if (!serviceWorker.includes('addEventListener("install"') || !serviceWorker.incl
 if (socialImage.length < 10_000 || koreanSocialImage.length < 10_000) throw new Error("A localized social preview image is missing or unexpectedly small.");
 if (pyodideModule.size < 10_000 || pyodideWasm.size < 5_000_000) throw new Error("Self-hosted Pyodide runtime is incomplete.");
 if (ocrWorker.size < 50_000 || ocrEnglish.size < 1_000_000 || ocrKorean.size < 1_000_000) throw new Error("Self-hosted Tesseract runtime or language data is incomplete.");
-if (videoIsolationWorker.size < 1_000) throw new Error("Video isolation service worker is missing or unexpectedly small.");
-if (!(await fs.readFile("dist/tools/video-studio/coi-serviceworker.js", "utf8")).includes("let coepCredentialless=!0;")) throw new Error("Video isolation service worker does not allow credentialless analytics requests.");
-if (videoSingleCore.size < 30_000_000 || videoMultiCore.size < 30_000_000 || videoMultiWorker.size < 1_000) throw new Error("Document-scoped FFmpeg runtime is incomplete.");
-if (!videoWorkerFiles.some((name) => name.startsWith("video.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-probe.worker-")) || !videoWorkerFiles.some((name) => name.startsWith("video-zip.worker-"))) throw new Error("Video workers were emitted outside their isolated document scope.");
 if (!assetFiles.some((name) => name.startsWith("audioProcessor.worker-"))) throw new Error("Audio processor worker is missing from the static build.");
 if (!applicationJavaScript.includes("G-CFSK50SX9R") || !applicationJavaScript.includes("1025dd835558ee0") || !applicationJavaScript.includes("wcs.pstatic.net/wcslog.js")) throw new Error("Google or Naver Analytics configuration is missing from the application bundle.");
 if (!robots.includes("Sitemap:")) throw new Error("robots.txt does not point to the sitemap.");
@@ -398,6 +410,7 @@ if (!notFound.includes('name="robots" content="noindex, nofollow"') || !notFound
 if (!robots.includes("https://worklazy.net/sitemap.xml")) throw new Error("robots.txt does not use the custom root domain.");
 if (sitemap.includes("/worklazytools/")) throw new Error("sitemap.xml still contains the repository subpath.");
 if (sitemap.includes("/tools/office-editor/app/") || sitemap.includes("/tools/excel-merger/xls-preserve/") || sitemap.includes("/tools/word-compare/") || sitemap.includes("/tools/hwp-compare/")) throw new Error("sitemap.xml contains a workspace or retired comparison route.");
+if (!VIDEO_STUDIO_PUBLIC && sitemap.includes("/tools/video-studio/")) throw new Error("sitemap.xml contains unpublished Video Studio routes.");
 for (const route of routes) {
   if (route && !sitemap.includes(`/ko/${route}/`)) throw new Error(`sitemap.xml is missing ko/${route}.`);
   if (route && route !== "tools/hwp-editor" && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
@@ -421,11 +434,11 @@ const [koreanPages, englishPages] = await Promise.all([
   fs.readFile("src/locales/ko/pages.json", "utf8"),
   fs.readFile("src/locales/en/pages.json", "utf8"),
 ]);
-if (!koreanPages.includes("비디오 스튜디오, 오피스 편집 작업 화면과 XLS 수식·서식 보존 화면은 AdSense 스크립트를 불러오지 않으며")
-  || !koreanPages.includes("오피스 편집 작업 화면과 XLS 수식·서식 보존 화면은 방문 분석도 불러오지 않습니다")
-  || !englishPages.includes("Video Studio, the office editing workspace and the XLS formula-and-formatting preservation screen do not load AdSense")
-  || !englishPages.includes("office editing workspace and XLS preservation screen also do not load visit analytics")) {
-  throw new Error("The privacy policy does not describe the isolated workspace analytics and ad exclusions accurately.");
+if (!koreanPages.includes("정상 공개 페이지는 도구 종류만으로 제외하지 않으며")
+  || !englishPages.includes("Available pages are not excluded by tool type")
+  || koreanPages.includes("방문 분석도 불러오지 않습니다")
+  || englishPages.includes("do not load visit analytics")) {
+  throw new Error("The privacy policy does not describe the current advertising and analytics policy accurately.");
 }
 
 // Recurse through every output directory, with an explicit minimum exception

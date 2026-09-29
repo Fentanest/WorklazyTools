@@ -27,9 +27,9 @@
       "description": "문서를 편집·비교·생성하고 필요한 형식으로 변환합니다."
     },
     "media": {
-      "label": "이미지·영상·오디오",
-      "shortLabel": "이미지·영상",
-      "description": "이미지와 영상, 오디오를 브라우저에서 직접 편집합니다."
+      "label": "이미지·오디오",
+      "shortLabel": "이미지·오디오",
+      "description": "이미지와 오디오를 브라우저에서 직접 편집합니다."
     },
     "text-data": {
       "label": "텍스트·코드",

@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import { getCanonicalUrl, getSeoDefinition, getSocialImageDefinition, getSocialImageUrl, normalizeSeoPath } from "../app/seo";
 import { languageFromPath, stripLanguagePrefix } from "../i18n/languages";
+import { isVideoUnavailablePath } from "../app/publicService";
 
 const MANAGED_JSON_LD_ID = "worklazy-route-jsonld";
 
@@ -16,15 +17,20 @@ export function RouteSeo() {
     const isTemporaryResult = routePath.startsWith("/tools/document-compare/results/");
     const isOfficeWorkspace = routePath === "/tools/office-editor/app";
     const isExcelPreserveWorkspace = routePath === "/tools/excel-merger/xls-preserve";
+    const isUnavailableVideo = isVideoUnavailablePath(routePath);
     const baseResultPath = "/tools/document-compare";
-    const seo = isTemporaryResult
+    const seo = isUnavailableVideo
+      ? { title: language === "en" ? "Tool Unavailable | Worklazy Tools" : "도구 일시 중단 | Worklazy Tools", description: language === "en" ? "This tool is temporarily unavailable." : "이 도구는 현재 제공하지 않습니다.", noIndex: true }
+      : isTemporaryResult
       ? { ...getSeoDefinition(language, baseResultPath), title: language === "en" ? "Document Comparison Result | Worklazy Tools" : "문서 비교 결과 | Worklazy Tools", noIndex: true }
       : isOfficeWorkspace
         ? { ...getSeoDefinition(language, "/tools/office-editor"), noIndex: true }
         : isExcelPreserveWorkspace
           ? { ...getSeoDefinition(language, "/tools/excel-merger"), noIndex: true }
       : getSeoDefinition(language, routePath);
-    const canonicalPath = isTemporaryResult
+    const canonicalPath = isUnavailableVideo
+      ? "/tools"
+      : isTemporaryResult
       ? baseResultPath
       : isOfficeWorkspace
         ? "/tools/office-editor"

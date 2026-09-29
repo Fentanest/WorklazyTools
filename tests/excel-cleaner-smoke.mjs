@@ -59,7 +59,7 @@ try {
       } else void request.continue();
     });
     await page.evaluateOnNewDocument(() => {
-      localStorage.setItem("worklazy_privacy_consent", "granted");
+      localStorage.setItem("worklazy_privacy_consent_v2", "granted");
       globalThis.__excelCleanerRevokedUrls = [];
       const revoke = URL.revokeObjectURL.bind(URL);
       URL.revokeObjectURL = (url) => { globalThis.__excelCleanerRevokedUrls.push(url); revoke(url); };

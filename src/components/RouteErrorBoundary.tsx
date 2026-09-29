@@ -26,9 +26,9 @@ export function RouteErrorBoundary({ children }: { children: ReactNode }) {
   // Reset only failure state; remounting the healthy subtree would discard
   // document-comparison sessions when navigating from input to results.
   const handleError = () => {
-    // S5: Navigate to dedicated ad-free error page on first error.
-    // Must use window.location.assign() to force FULL DOCUMENT reload (not same-document SPA nav).
-    // This clears: HTML head (ad script tags), adsbygoogle global, all React state.
+    // An unrecoverable route failure moves to a separate error document.
+    // Auto Ads can outlive a React unmount, so a full document transition is
+    // needed to keep that empty failure screen free of ad activity.
     // D4: Loop guard - prevent re-navigation if already on error page.
     const pathSegments = location.pathname.split("/").filter(Boolean);
     const lang = pathSegments[0] || "en";

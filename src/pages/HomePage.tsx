@@ -21,7 +21,6 @@ const HOME_TOOL_IDS_KO = [
   "hwp-editor",
   "text-tools",
   "qr-studio",
-  "video-studio",
 ] as const;
 
 const HOME_TOOL_IDS_EN = [
@@ -35,7 +34,6 @@ const HOME_TOOL_IDS_EN = [
   "office-editor",
   "text-tools",
   "qr-studio",
-  "video-studio",
 ] as const;
 
 export function HomePage() {

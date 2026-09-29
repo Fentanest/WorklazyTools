@@ -15,6 +15,15 @@ export function PrivacyPage() {
       <article className="prose-card">
         <p className="policy-date">{t("privacy.date")}</p>
         {sections.map((section) => <section key={section.title}><h2>{section.title}</h2>{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}{section.items && <ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}</section>)}
+        <section>
+          <h2>{t("privacy.providerLinksTitle")}</h2>
+          <p>{t("privacy.providerLinksDescription")}</p>
+          <ul>
+            <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">{t("privacy.googlePolicyLink")}</a></li>
+            <li><a href="https://analytics.naver.com/" target="_blank" rel="noopener noreferrer">{t("privacy.naverPolicyLink")}</a></li>
+            <li><a href="https://partners.coupang.com/" target="_blank" rel="noopener noreferrer">{t("privacy.coupangPolicyLink")}</a></li>
+          </ul>
+        </section>
       </article>
       <div className="content-callouts">
         <div><FileLock2 size={20} /><span><strong>{t("privacy.localTitle")}</strong><small>{t("privacy.localText")}</small></span></div>

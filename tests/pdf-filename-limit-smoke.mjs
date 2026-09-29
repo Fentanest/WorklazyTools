@@ -38,7 +38,7 @@ try {
   });
   for (const language of ["ko", "en"]) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     page.setDefaultTimeout(60_000);
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/header-footer/`, { waitUntil: "networkidle" });

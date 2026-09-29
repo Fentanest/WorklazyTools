@@ -1,12 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 
 const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const publicVendorRoot = path.join(projectRoot, "public", "vendor");
 
 await copyPyodide();
 await copyTesseract();
-await copyVideoRuntime();
+await copySharedAudioRuntime();
+if (VIDEO_STUDIO_PUBLIC) await copyVideoRuntime();
+else await fs.rm(path.join(projectRoot, "public", "tools", "video-studio"), { recursive: true, force: true });
 await vendorZetaOffice();
 
 async function copyPyodide() {
@@ -66,6 +69,17 @@ async function copyVideoRuntime() {
     [path.join(multiCoreSource, "ffmpeg-core.wasm"), path.join(destination, "multi", "ffmpeg-core.wasm")],
     [path.join(multiCoreSource, "ffmpeg-core.worker.js"), path.join(destination, "multi", "ffmpeg-core.worker.js")],
   ].map(([source, target]) => fs.copyFile(source, target)));
+}
+
+async function copySharedAudioRuntime() {
+  const destination = path.join(publicVendorRoot, "ffmpeg-audio");
+  const workerSource = path.join(projectRoot, "node_modules", "@ffmpeg", "ffmpeg", "dist", "esm");
+  const coreSource = path.join(projectRoot, "node_modules", "@ffmpeg", "core", "dist", "esm");
+  await fs.mkdir(path.join(destination, "single"), { recursive: true });
+  await Promise.all([
+    ["worker.js", "ffmpeg-worker.js"], ["const.js", "const.js"], ["errors.js", "errors.js"],
+  ].map(([source, target]) => fs.copyFile(path.join(workerSource, source), path.join(destination, target))));
+  await Promise.all(["ffmpeg-core.js", "ffmpeg-core.wasm"].map((name) => fs.copyFile(path.join(coreSource, name), path.join(destination, "single", name))));
 }
 
 async function vendorZetaOffice() {

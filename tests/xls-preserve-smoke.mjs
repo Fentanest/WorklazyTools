@@ -44,6 +44,19 @@ try {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(480_000);
+    // Keep this functional smoke out of production analytics/ad inventory.
+    // Provider entry scripts are local stubs; all other third-party traffic is blocked.
+    await page.setRequestInterception(true);
+    page.on("request", async (request) => {
+      const url = request.url();
+      if (!/^https?:\/\//.test(url) || new URL(url).hostname === "127.0.0.1") return request.continue();
+      const headers = { "access-control-allow-origin": "*", "cross-origin-resource-policy": "cross-origin" };
+      if (url.startsWith("https://www.googletagmanager.com/gtag/js")) return request.respond({ status: 200, contentType: "text/javascript", headers, body: "" });
+      if (url === "https://wcs.pstatic.net/wcslog.js") return request.respond({ status: 200, contentType: "text/javascript", headers, body: "window.wcs={event:function(){}};window.wcs_do=function(){}" });
+      if (url.startsWith("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js")) return request.respond({ status: 200, contentType: "text/javascript", headers, body: "window.adsbygoogle=[]" });
+      if (url === "https://ads-partners.coupang.com/g.js") return request.respond({ status: 200, contentType: "text/javascript", headers, body: "window.PartnersCoupang={G:function(){}}" });
+      return request.abort();
+    });
     const pageErrors = [];
     const officeRequests = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -52,7 +65,7 @@ try {
     });
 
     await page.goto(`${baseUrl}/ko/tools/excel-merger/`, { waitUntil: "networkidle0" });
-    await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     await page.reload({ waitUntil: "networkidle0" });
     await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLSX 수식 보존"]');
     await page.waitForSelector("script[data-worklazy-adsense]");
@@ -80,6 +93,9 @@ try {
     await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"]');
     await page.waitForFunction(() => location.pathname.endsWith("/tools/excel-merger/xls-preserve/"));
     await page.waitForSelector('[data-ui-part="toggle-switch"][aria-label="XLS 수식 보존"][aria-checked="true"]');
+    await page.waitForSelector("script[data-worklazy-adsense]");
+    await page.waitForSelector("script[data-worklazy-google-analytics]");
+    await page.waitForSelector("script[data-worklazy-naver-analytics]");
     if (!new URL(page.url()).search.endsWith("formula=1&format=0")) throw new Error(`XLS formula-only route is incorrect: ${page.url()}`);
     const boundary = await page.evaluate(() => ({
       isolated: crossOriginIsolated,
@@ -91,7 +107,7 @@ try {
       heading: document.querySelector("h1")?.textContent || "",
     }));
     if (!boundary.isolated || !boundary.marker || boundary.noIndex !== "noindex, nofollow"
-      || boundary.ads || boundary.googleAnalytics || boundary.naverAnalytics || boundary.heading !== "Excel 병합기") {
+      || !boundary.ads || !boundary.googleAnalytics || !boundary.naverAnalytics || boundary.heading !== "엑셀 시트·자료 합치기") {
       throw new Error(`XLS preservation boundary or shared UI is incomplete: ${JSON.stringify(boundary)}`);
     }
 
@@ -106,7 +122,7 @@ try {
     }));
     if (!disguisedXmlBatch.names.includes("전각 ８５８ 한글 공백 SpreadsheetML.xls")
       || !disguisedXmlBatch.sheetNames.includes("XML 혼합 시트")
-      || !officeRequests.length) {
+      || officeRequests.length !== 0) {
       throw new Error(`SpreadsheetML signature routing or original-name display failed: ${JSON.stringify({ disguisedXmlBatch, officeRequests })}`);
     }
     const disguisedXmlMerged = await mergeAndInspect(page);
@@ -181,7 +197,7 @@ try {
       heading: document.querySelector("h1")?.textContent || "",
       fileCount: document.querySelectorAll("[data-testid=excel-file-item]").length,
     }));
-    if (returned.marker || !returned.ads || returned.heading !== "Excel 병합기" || returned.fileCount !== 0) {
+    if (returned.marker || !returned.ads || returned.heading !== "엑셀 시트·자료 합치기" || returned.fileCount !== 0) {
       throw new Error(`Switching back did not restore the standard Excel screen safely: ${JSON.stringify(returned)}`);
     }
     await page.click('[data-ui-part="toggle-switch"][aria-label="XLS 서식 보존"]');

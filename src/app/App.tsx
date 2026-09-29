@@ -18,6 +18,7 @@ import { TermsPage } from "../pages/TermsPage";
 import { ToolsPage } from "../pages/ToolsPage";
 import { LanguageLandingPage } from "../pages/LanguageLandingPage";
 import { RouteErrorPage } from "../pages/RouteErrorPage";
+import { UnavailableToolPage } from "../pages/UnavailableToolPage";
 import type { PdfFinishPreset, PdfToolMode } from "../features/pdf-editor/types";
 import type { QrMode } from "../features/qr-studio/QrStudioPage";
 import { InvalidLanguageRedirect, LocalizedNavigate, useAppLanguage } from "../i18n/routing";
@@ -31,7 +32,6 @@ const PdfComparePage = lazy(() => import("../features/pdf-compare/PdfComparePage
 const ExcelComparePage = lazy(() => import("../features/excel-compare/ExcelComparePage").then((module) => ({ default: module.ExcelComparePage })));
 const ExcelCleanerPage = lazy(() => import("../features/excel-cleaner/ExcelCleanerPage").then((module) => ({ default: module.ExcelCleanerPage })));
 const DocumentGeneratorPage = lazy(() => import("../features/document-generator/DocumentGeneratorPage").then((module) => ({ default: module.DocumentGeneratorPage })));
-const VideoStudioPage = lazy(() => import("../features/video-studio/VideoStudioPage").then((module) => ({ default: module.VideoStudioPage })));
 const AudioStudioPage = lazy(() => import("../features/audio-studio/AudioStudioPage").then((module) => ({ default: module.AudioStudioPage })));
 const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioPage").then((module) => ({ default: module.ImageStudioPage })));
 const TextMergerPage = lazy(() => import("../features/text-merger/TextMergerPage").then((module) => ({ default: module.TextMergerPage })));
@@ -48,6 +48,7 @@ const DataConverterPage = lazy(() => import("../features/data-converter/DataConv
 const OfficeEditorPage = lazy(() => import("../features/office-editor/OfficeEditorPage").then((module) => ({ default: module.OfficeEditorPage })));
 const OfficeEditorAppPage = lazy(() => import("../features/office-editor/OfficeEditorAppPage").then((module) => ({ default: module.OfficeEditorAppPage })));
 const FolioTraceRoute = lazy(() => import("../features/foliotrace/FolioTraceRoute").then((module) => ({ default: module.FolioTraceRoute })));
+const VideoStudioPage = __VIDEO_STUDIO_PUBLIC__ ? lazy(() => import("../features/video-studio/VideoStudioPage").then((module) => ({ default: module.VideoStudioPage }))) : null;
 
 export function App() {
   return (
@@ -88,10 +89,12 @@ export function App() {
           <Route path="tools/hwp-editor" element={<KoreanOnlyRoute><LazyToolRoute label="HWP editor"><HwpEditorPage /></LazyToolRoute></KoreanOnlyRoute>} />
           <Route path="tools/office-editor" element={<LazyToolRoute label="Office editor"><OfficeEditorPage /></LazyToolRoute>} />
           <Route path="tools/office-editor/app" element={<LazyToolRoute label="Office editor workspace"><OfficeEditorAppPage /></LazyToolRoute>} />
-          <Route path="tools/video-studio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage /></LazyToolRoute>} />
-          <Route path="tools/video-studio/trim" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "trim", allGroupsOneFile: false, outputMode: "individual", outputFormat: "mp4", audioMode: "copy" }} /></LazyToolRoute>} />
-          <Route path="tools/video-studio/merge" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "merge", allGroupsOneFile: true, outputMode: "individual", outputFormat: "mp4", audioMode: "copy" }} /></LazyToolRoute>} />
-          <Route path="tools/video-studio/extract-audio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "extract-audio", allGroupsOneFile: false, outputMode: "individual", outputFormat: "mp3", audioMode: "copy" }} /></LazyToolRoute>} />
+          {__VIDEO_STUDIO_PUBLIC__ && VideoStudioPage ? <>
+            <Route path="tools/video-studio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage /></LazyToolRoute>} />
+            <Route path="tools/video-studio/trim" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "trim", allGroupsOneFile: false, outputMode: "individual", outputFormat: "mp4", audioMode: "copy" }} /></LazyToolRoute>} />
+            <Route path="tools/video-studio/merge" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "merge", allGroupsOneFile: true, outputMode: "individual", outputFormat: "mp4", audioMode: "copy" }} /></LazyToolRoute>} />
+            <Route path="tools/video-studio/extract-audio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "extract-audio", allGroupsOneFile: false, outputMode: "individual", outputFormat: "mp3", audioMode: "copy" }} /></LazyToolRoute>} />
+          </> : <Route path="tools/video-studio/*" element={<UnavailableToolPage />} />}
           <Route path="tools/audio-studio" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage /></LazyToolRoute>} />
           <Route path="tools/audio-studio/trim" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage preset={{ purpose: "trim" }} /></LazyToolRoute>} />
           <Route path="tools/image-studio" element={<LazyToolRoute label="Image Studio"><ImageStudioPage /></LazyToolRoute>} />
@@ -111,7 +114,7 @@ export function App() {
           <Route path="tools/qr-studio/bulk" element={<QrRoute mode="bulk" />} />
           <Route path="tools/data-converter" element={<LazyToolRoute label="Table Data Converter"><DataConverterPage /></LazyToolRoute>} />
           <Route path="hwp-editor" element={<LocalizedNavigate to="/tools/hwp-editor" />} />
-          <Route path="video-studio" element={<LocalizedNavigate to="/tools/video-studio/" />} />
+          <Route path="video-studio/*" element={__VIDEO_STUDIO_PUBLIC__ ? <LocalizedNavigate to="/tools/video-studio/" /> : <UnavailableToolPage />} />
           <Route path="audio-studio" element={<LocalizedNavigate to="/tools/audio-studio" />} />
           <Route path="image-studio" element={<LocalizedNavigate to="/tools/image-studio" />} />
           <Route path="text-merger" element={<LocalizedNavigate to="/tools/text-merger" />} />

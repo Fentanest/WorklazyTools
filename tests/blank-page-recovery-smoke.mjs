@@ -30,7 +30,7 @@ async function attempt(name, profile, action, { storageThrows = false } = {}) {
   const record = { name, profile, start: new Date().toISOString(), network: [], storage: [], navigations: [], errors: [], external: [], helpShown: [] };
   await context.exposeBinding("recordRecovery", (_, event) => { (record[event.kind] ||= []).push(event); });
   await context.addInitScript(({ storageThrows }) => {
-    localStorage.setItem("worklazy_privacy_consent", "denied");
+    localStorage.setItem("worklazy_privacy_consent_v2", "denied");
     const originalSet = Storage.prototype.setItem;
     const originalRemove = Storage.prototype.removeItem;
     Storage.prototype.setItem = function (key, value) {

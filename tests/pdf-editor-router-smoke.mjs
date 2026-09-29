@@ -14,7 +14,7 @@ async function checkPage(page, url, expectedMode) {
   if (errorElement) throw new Error(`Found data-route-error on ${url}`);
   
   // Wait for guide or dropzone
-  await page.waitForSelector("[data-testid='tool-guide']", { timeout: 5000 }).catch(() => {
+  await page.waitForSelector("[data-ui-component='tool-guide']", { timeout: 15000 }).catch(() => {
     throw new Error(`Guide not found on ${url}`);
   });
   

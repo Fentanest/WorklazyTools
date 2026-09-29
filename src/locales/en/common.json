@@ -88,7 +88,7 @@
     "compact": "Files and passwords are processed only in this browser.",
     "eyebrow": "PRIVATE BY DESIGN",
     "title": "Your work files are never uploaded to our server.",
-    "description": "Selected files, passwords and results are processed only in your current browser. No account or external upload is required.",
+    "description": "Selected files are processed in your browser, and file contents are not sent for advertising or visit analytics. We use ads and analytics to operate this site; see the Privacy Policy for details and your choices.",
     "local": "Local processing",
     "removed": "Cleared when the tab closes"
   },
@@ -97,7 +97,7 @@
     "titleBefore": "Let the tools handle",
     "titleAccent": "the tedious file work.",
     "titleAfter": "",
-    "description": "From documents and data to images and video, no installation or sign-in is needed. Choose a tool to make complex tasks simpler.",
+    "description": "From documents and data to images and audio, no installation or sign-in is needed. Choose a tool to make complex tasks simpler.",
     "browse": "Explore tools",
     "noUploadTitle": "No file uploads",
     "noUploadBody": "Everything is processed in your browser.",

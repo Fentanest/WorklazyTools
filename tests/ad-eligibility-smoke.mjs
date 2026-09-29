@@ -107,7 +107,7 @@ async function newTrackedContext(browser, server, {
     }
     if (preset !== "unset") {
       try {
-        window.localStorage.setItem("worklazy_privacy_consent", preset);
+        window.localStorage.setItem("worklazy_privacy_consent_v2", preset);
       } catch { /* Storage may be unavailable; consent stays unset. */ }
     }
   }, consent);
@@ -294,6 +294,7 @@ async function checkS2(browser, server, lang) {
   try {
     await tracked.page.goto(`${server.url}/${lang}/tools/text-merger/`, { waitUntil: "domcontentloaded" });
     await waitReady(tracked.page);
+    await tracked.page.waitForFunction(() => window.__wlAdStub?.loads === 1);
     const obs = await observe(tracked.page);
     assert.equal(obs.scripts, 1, `S2-${lang}: exactly one ad script tag`);
     assert.equal(tracked.counters.attempt, 1, `S2-${lang}: exactly one ad request attempt`);
@@ -326,6 +327,7 @@ async function scenarioS3(browser, server) {
       assert.equal(during.scripts, 0, "S3: no ad script while route is pending");
       await waitReady(tracked.page, 40_000);
       const tReady = Date.now();
+      await tracked.page.waitForFunction(() => window.__wlAdStub?.loads === 1, { timeout: 10_000 });
       const obs = await observe(tracked.page);
       assert.equal(obs.scripts, 1, "S3: ad script present after load");
       assert.equal(obs.loads, 1, "S3: stub loaded once after load");
@@ -403,8 +405,8 @@ async function scenarioS4(browser, server) {
   })];
 }
 
-async function moveToExcluded(browser, server, { lang, target, tag }) {
-  // Returns the tracked session left open on the excluded page (caller closes).
+async function moveToPublic(browser, server, { lang, target, tag }) {
+  // Ordinary tool changes stay in one document; the loaded provider script is reused.
   resetServer(server);
   const tracked = await newTrackedContext(browser, server, { consent: "granted" });
   const from = `${server.url}/${lang}/tools/text-merger/`;
@@ -412,33 +414,19 @@ async function moveToExcluded(browser, server, { lang, target, tag }) {
   await waitReady(tracked.page);
   const before = await observe(tracked.page);
   assert.equal(before.scripts, 1, `${tag}: ad script must be present before the move`);
-  const stubBefore = tracked.counters.stub;
   const commitsBefore = tracked.docCommits.length;
   const mark = server.state.requests.length;
   const href = `/${lang}${target}`;
   const link = tracked.page.locator(`.sidebar a[href="${href}"]`).first();
   await link.scrollIntoViewIfNeeded();
   await link.click();
-  // Wait for exactly the new document commit (CDP loaderId change).
-  const deadline = Date.now() + 30_000;
-  while (tracked.docCommits.length < commitsBefore + 1 && Date.now() < deadline) {
-    await sleep(250);
-  }
-  await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
-  await tracked.page.waitForFunction(
-    () => !document.querySelector(".tool-route-loading") || Boolean(document.querySelector("[data-route-error]")),
-    { timeout: 30_000 },
-  ).catch(() => {});
-  await sleep(1000);
+  await tracked.page.waitForURL((url) => url.pathname.replace(/\/$/, "") === href, { timeout: 30_000 });
+  await waitReady(tracked.page);
   const after = await observe(tracked.page);
   const movedDocs = tracked.docCommits.slice(commitsBefore).map((entry) => ({ ...entry }));
-  assert.equal(movedDocs.length, 1, `${tag}: exactly one new document commit (initial entry excluded), got ${JSON.stringify(movedDocs)}`);
-  assert.equal(after.scripts, 0, `${tag}: no ad script in the new document`);
-  assert.equal(tracked.counters.stub - stubBefore, 0, `${tag}: no additional stub load`);
-  const stableDocs = tracked.docCommits.length;
-  await sleep(5000);
-  assert.equal(tracked.docCommits.length, stableDocs, `${tag}: no further document swaps during stabilization`);
-  const stabilized = await observe(tracked.page);
+  assert.equal(movedDocs.length, 0, `${tag}: ordinary tool navigation must not reload for old ad exclusions`);
+  assert.equal(after.scripts, 1, `${tag}: provider script is retained once`);
+  assert.equal(tracked.counters.stub, 1, `${tag}: no duplicate provider initialization`);
   assertNoRealNetwork(tracked.counters, tag);
   const requests = server.state.requests.slice(mark);
   const redirects = requests.filter((entry) => entry.status === 301).map((entry) => entry.pathname);
@@ -446,15 +434,10 @@ async function moveToExcluded(browser, server, { lang, target, tag }) {
     tracked, before, after, movedDocs, redirects,
     detail: {
       lang, from: before.url, to: after.url, status: "pass",
-      scripts: after.scripts, stubAdded: tracked.counters.stub - stubBefore,
+      scripts: after.scripts, stubLoads: tracked.counters.stub,
       docCommits: tracked.docCommits.map((entry) => ({ ...entry })),
-      // SPA history events are snapshotted per stage: the source document's
-      // counters (pre-click), the new document's, and post-stabilization.
-      // The click's own pushState may fall on either side of the document
-      // swap depending on timing, so no single field claims the whole move.
       spaBeforeClick: { ...before.nav },
-      spaNewDoc: { ...after.nav },
-      spaStabilized: { ...stabilized.nav },
+      spaAfterClick: { ...after.nav },
       serverRedirects301: redirects,
       counters: counterSnapshot(tracked.counters), serverRequests: summarizeServerRequests(requests),
     },
@@ -501,7 +484,7 @@ async function scenarioS6S7(browser, server) {
   let s7Session = null;
   for (const move of moves) {
     const outcome = await runCase(move.tag, async () => {
-      const { tracked, detail } = await moveToExcluded(browser, server, move);
+      const { tracked, detail } = await moveToPublic(browser, server, move);
       const shot = await screenshot(tracked.page, move.tag);
       if (move.tag === "S6-ko-hwp") s7Session = tracked;
       else await tracked.context.close();
@@ -513,7 +496,7 @@ async function scenarioS6S7(browser, server) {
       s7Session = null;
     }
   }
-  // S7: back navigation from the excluded document to the allowed path.
+  // S7: back navigation is a normal SPA revisit, not an exclusion reload.
   results.push(await runCase("S7-back", async () => {
     assert.ok(s7Session, "S7 requires the S6-ko-hwp session");
     const { page, counters, docCommits } = s7Session;
@@ -523,7 +506,8 @@ async function scenarioS6S7(browser, server) {
       await page.waitForURL(/\/tools\/text-merger/, { timeout: 30_000 });
       await waitReady(page, 30_000);
       const obs = await observe(page);
-      assert.equal(obs.scripts, 1, "S7: ad script is re-inserted on return (policy)");
+      assert.equal(docCommits.length, docsBefore, "S7: ordinary back navigation stays in the same document");
+      assert.equal(obs.scripts, 1, "S7: ad script remains present on return");
       assert.ok(obs.scripts <= 1, "S7: no duplicate ad script tags");
       assertNoRealNetwork(counters, "S7");
       const shot = await screenshot(page, "S7-back");
@@ -545,12 +529,12 @@ const S8_ENTRIES = [
   { path: "/ko/tools/pdf-editor/ocr/" },
   { path: "/ko/tools/hwp-editor/" },
   { path: "/ko/tools/document-compare/" },
-  { path: "/ko/tools/document-compare/results/1/", expiredMarker: '[data-testid="document-expired-result"]' },
+  { path: "/ko/tools/document-compare/results/1/", expiredMarker: '[data-testid="document-expired-result"]', expectAds: false },
   { path: "/ko/tools/pdf-compare/" },
   { path: "/ko/tools/office-editor/app/" },
   { path: "/ko/tools/excel-merger/xls-preserve/" },
-  { path: "/ko/tools/video-studio/" },
-  { path: "/ko/tools/video-studio/trim/" },
+  { path: "/ko/tools/video-studio/", expectAds: false, unpublished: true },
+  { path: "/ko/tools/video-studio/trim/", expectAds: false, unpublished: true },
   { path: "/ko/tools/document-redactor/" },
   { path: "/en/tools/pdf-editor/merge/" },
   { path: "/en/tools/document-compare/" },
@@ -580,10 +564,11 @@ async function scenarioS8(browser, server) {
         const bodyText = await tracked.page.locator("body").innerText().catch(() => "");
         const is404Title = /^Page not found/i.test(obs.title);
         const expired = entry.expiredMarker ? await tracked.page.locator(entry.expiredMarker).count() : 0;
-        assert.equal(obs.scripts, 0, `${tag}: no ad script`);
-        assert.equal(tracked.counters.attempt, 0, `${tag}: no ad request attempt`);
-        assert.equal(tracked.counters.stub, 0, `${tag}: no stub served`);
-        assert.ok(!is404Title, `${tag}: the app must boot (got 404 document title)`);
+        const expectAds = entry.expectAds !== false;
+        assert.equal(obs.scripts, expectAds ? 1 : 0, `${tag}: ready public pages request one ad script; unavailable/expired pages request none`);
+        assert.equal(tracked.counters.stub, expectAds ? 1 : 0, `${tag}: exact ad stub count`);
+        if (entry.unpublished) assert.ok(bodyText.includes("잠시 공개를 중단"), `${tag}: unavailable notice is required`);
+        else assert.ok(!is404Title, `${tag}: the app must boot (got 404 document title)`);
         if (entry.expiredMarker) {
           assert.ok(expired >= 1, `${tag}: session-expired notice must be shown`);
         } else {
@@ -593,7 +578,7 @@ async function scenarioS8(browser, server) {
         assertNoRealNetwork(tracked.counters, tag);
         const shot = await screenshot(tracked.page, tag);
         return {
-          path: entry.path, finalUrl: obs.url, status: "pass", note: entry.expiredMarker ? "expired notice, script 0" : "script 0, stub 0",
+          path: entry.path, finalUrl: obs.url, status: "pass", note: expectAds ? "ready public page, script 1" : "unavailable/expired, script 0",
           scripts: obs.scripts, expiredMarkerCount: expired, isolation,
           loading: obs.loading, routeError: obs.routeError, bodyChars: bodyText.trim().length,
           counters: counterSnapshot(tracked.counters), docs: tracked.docs, docCommits: tracked.docCommits,
@@ -623,6 +608,7 @@ async function setupS9Source(tracked, server, { work = true, ads = true } = {}) 
   const requestMark = server.state.requests.length;
   await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
   await waitReady(tracked.page);
+  if (ads) await tracked.page.waitForFunction(() => document.querySelectorAll("script[data-worklazy-adsense]").length === 1 && window.__wlAdStub?.loads === 1);
   const initial = await readS9State(tracked);
   assert.equal(initial.scripts, ads ? 1 : 0, "S9 setup: source ad script policy");
   assert.equal(tracked.counters.stub, ads ? 1 : 0, "S9 setup: source stub policy");
@@ -670,13 +656,8 @@ function destinationDocumentRequests(server, requestMark, pathPrefix = "/ko/tool
 
 async function waitForS9Destination(tracked, pathname, priorCommitCount) {
   await tracked.page.waitForURL((url) => url.pathname === pathname || url.pathname === `${pathname}/`, { timeout: 30_000 });
-  const deadline = Date.now() + 30_000;
-  while (tracked.docCommits.length < priorCommitCount + 1 && Date.now() < deadline) {
-    await sleep(100);
-  }
-  assert.ok(tracked.docCommits.length >= priorCommitCount + 1, `S9: destination did not commit a new document for ${pathname}`);
-  await tracked.page.waitForLoadState("load", { timeout: 30_000 }).catch(() => {});
   await waitReady(tracked.page);
+  assert.equal(tracked.docCommits.length, priorCommitCount, `S9: ordinary destination must stay in the same document for ${pathname}`);
 }
 
 async function scenarioS9(browser, server) {
@@ -738,14 +719,14 @@ async function scenarioS9(browser, server) {
       const newCommits = tracked.docCommits.slice(before.commitCount);
       assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T3: confirmation opens exactly once");
       assert.equal(tracked.unexpectedDialogs.length, 0, "T3: approved leave has no native dialog");
-      assert.equal(newCommits.length, 1, "T3: exactly one new main-frame document");
-      assert.notEqual(after.documentToken, before.state.documentToken, "T3: destination has a new document token");
-      assert.equal(tracked.pagehideEvents.length, 1, "T3: source document emitted pagehide");
-      assert.equal(after.scripts, 0, "T3: destination has no ad script");
-      assert.equal(after.stubLoads, 0, "T3: destination document did not execute the source stub");
+      assert.equal(newCommits.length, 0, "T3: ad-policy navigation does not create a new document");
+      assert.equal(after.documentToken, before.state.documentToken, "T3: destination retains the current document");
+      assert.equal(tracked.pagehideEvents.length, 0, "T3: source document did not emit pagehide");
+      assert.equal(after.scripts, 1, "T3: provider script remains initialized once");
+      assert.equal(after.stubLoads, 1, "T3: source stub remains initialized once");
       assert.equal(tracked.counters.stub - before.stubCount, 0, "T3: no destination stub request");
       assert.equal(await tracked.page.locator("[data-route-error], .tool-route-loading").count(), 0, "T3: destination is ready, not error/loading UI");
-      assert.ok(destinationDocumentRequests(server, before.requestMark).length >= 1, "T3: destination document was requested");
+      assert.equal(destinationDocumentRequests(server, before.requestMark).length, 0, "T3: no destination document was requested");
       assertNoRealNetwork(tracked.counters, "S9-T3");
       const shot = await screenshot(tracked.page, "S9-T3-leave");
       return {
@@ -767,8 +748,8 @@ async function scenarioS9(browser, server) {
       await waitForS9Destination(tracked, "/ko/tools/pdf-editor", before.commitCount);
       const after = await readS9State(tracked);
       assert.equal(tracked.guardEvents.length - before.guardCount, 0, "T4: no confirmation without work");
-      assert.equal(tracked.docCommits.length - before.commitCount, 1, "T4: exactly one required new document");
-      assert.equal(after.scripts, 0, "T4: destination has no ad script");
+      assert.equal(tracked.docCommits.length - before.commitCount, 0, "T4: ordinary route stays in one document");
+      assert.equal(after.scripts, 1, "T4: destination retains one ad script");
       assert.equal(tracked.unexpectedDialogs.length, 0, "T4: no unexpected native dialog");
       assertNoRealNetwork(tracked.counters, "S9-T4");
       return { status: "pass", confirmations: 0, newCommits: tracked.docCommits.slice(before.commitCount), scripts: after.scripts };
@@ -786,7 +767,7 @@ async function scenarioS9(browser, server) {
       await waitForS9Destination(tracked, "/ko/tools/pdf-editor", before.commitCount);
       const after = await readS9State(tracked);
       assert.equal(tracked.guardEvents.length - before.guardCount, 1, "T5: confirmation is independent of consent");
-      assert.equal(tracked.docCommits.length - before.commitCount, 1, "T5: excluded path keeps full-document policy");
+      assert.equal(tracked.docCommits.length - before.commitCount, 0, "T5: navigation does not reload without consent");
       assert.equal(after.scripts, 0, "T5: destination has no ad script");
       assert.equal(tracked.unexpectedDialogs.length, 0, "T5: no unexpected native dialog");
       assertNoRealNetwork(tracked.counters, "S9-T5");
@@ -807,7 +788,7 @@ async function scenarioS9(browser, server) {
       await retry.page.locator('[data-testid="unsaved-leave"]').click();
       await waitForS9Destination(retry, "/ko/tools/document-compare", before.commitCount);
       assert.equal(retry.guardEvents.length - before.guardCount, 2, "T6 retry: each intent opens one confirmation");
-      assert.equal(retry.docCommits.length - before.commitCount, 1, "T6 retry: only approved retry navigates");
+      assert.equal(retry.docCommits.length - before.commitCount, 0, "T6 retry: only approved retry navigates in the same document");
       assert.ok(retry.page.url().includes("/tools/document-compare"), "T6 retry: stale PDF target is not used");
       assert.equal(retry.unexpectedDialogs.length, 0, "T6 retry: no unexpected native dialog");
       retryDetail = { target: new URL(retry.page.url()).pathname, newCommits: retry.docCommits.slice(before.commitCount) };
@@ -826,7 +807,7 @@ async function scenarioS9(browser, server) {
       });
       await waitForS9Destination(doubled, "/ko/tools/pdf-editor", before.commitCount);
       await sleep(500);
-      assert.equal(doubled.docCommits.length - before.commitCount, 1, "T6 double click: one document navigation");
+      assert.equal(doubled.docCommits.length - before.commitCount, 0, "T6 double click: no document reload");
       assert.ok(doubled.page.url().includes("/tools/pdf-editor"), "T6 double click: approved target is retained");
       assert.equal(doubled.unexpectedDialogs.length, 0, "T6 double click: no unexpected native dialog");
       assertNoRealNetwork(doubled.counters, "S9-T6-double");

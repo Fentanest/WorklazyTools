@@ -96,7 +96,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   "/tools/foliotrace": { title: "FolioTrace | 국민연금 공개 공시 추적", description: "국민연금의 국내주식 DART 대량보유 공시를 근거로 공개 추적 범위를 살펴봅니다. 실제 계좌 잔고나 전체 자산을 뜻하지 않습니다." },
   "/tools/document-redactor": {title: "PDF·이미지 개인정보 가리기 - 직접 영역 선택 | Worklazy Tools", description: "PDF와 이미지 파일에서 민감한 개인정보 영역을 검정색으로 가리고 안전하게 사본을 저장하세요.", application: {name: "개인정보 가리기", featureList: ["직접 영역 선택", "검정 픽셀 마스킹", "모든 PDF 페이지 재생성", "PNG 이미지 저장", "결과 확인"]}},
   "/": {
-    title: "무료 문서·PDF·비디오·이미지 업무 도구 | Worklazy Tools",
+    title: "무료 문서·PDF·이미지·오디오 업무 도구 | Worklazy Tools",
     description: "설치와 로그인 없이 문서·미디어 편집, 텍스트·데이터 변환, 일정·급여 계산과 보안 도구를 실행하세요. 입력은 브라우저에서 처리합니다.",
   },
   "/tools": {
@@ -335,7 +335,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/about": {
     title: "서비스 소개 | Worklazy Tools",
-    description: "Worklazy Tools가 파일을 서버에 올리지 않고 브라우저에서 문서, PDF, 비디오와 이미지 작업을 처리하는 방법과 지원 범위를 안내합니다.",
+    description: "Worklazy Tools가 파일을 서버에 올리지 않고 브라우저에서 문서, PDF, 이미지와 오디오 작업을 처리하는 방법과 지원 범위를 안내합니다.",
   },
   "/privacy": {
     title: "개인정보처리방침 | Worklazy Tools",

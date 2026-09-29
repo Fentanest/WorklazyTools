@@ -31,7 +31,7 @@ try {
     blocked.push(route.request().url());
     return route.abort();
   });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   await page.goto(`${base}/ko/tools/pdf-editor/finish/`);
   await page.locator("[data-testid='pdf-finish-ready']").waitFor();

@@ -6,7 +6,7 @@ import { workerMessage } from "../../i18n/workerMessages";
 import type { AudioClipboardData, AudioProcessorRequest, AudioProcessorResult, AudioVoiceEffectSettings } from "./types";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
-const runtimeBaseURL = new URL(`${import.meta.env.BASE_URL}tools/video-studio/runtime/`, worker.location.origin);
+const runtimeBaseURL = new URL(`${import.meta.env.BASE_URL}vendor/ffmpeg-audio/`, worker.location.origin);
 const coreURL = new URL("single/ffmpeg-core.js", runtimeBaseURL).href;
 const wasmURL = new URL("single/ffmpeg-core.wasm", runtimeBaseURL).href;
 const classWorkerURL = new URL("ffmpeg-worker.js", runtimeBaseURL).href;

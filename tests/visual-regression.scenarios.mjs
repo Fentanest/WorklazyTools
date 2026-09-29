@@ -860,7 +860,8 @@ export const visualRegressionScenarios = Object.freeze([
   ...pdfFinishScenarios,
 ]);
 
-export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDefinitions).sort());
+export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDefinitions)
+  .filter((id) => availableToolRoutes.some((route) => route.toolId === id)).sort());
 
 export const interactionNotApplicableReasons = Object.freeze({
   "foliotrace": "Its published-data search, sorting, and detail states require a synthetic static dataset; they are reviewed in the isolated FolioTrace preview rather than the generic empty-route visual harness.",

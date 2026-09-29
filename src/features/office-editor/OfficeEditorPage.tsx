@@ -1,7 +1,7 @@
 import { FileEdit, FileSpreadsheet, MonitorUp, Presentation, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -24,14 +24,13 @@ export function OfficeEditorPage() {
 
 
  const appPath = useLocalizedPath("/tools/office-editor/app/");
-  const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     if (searchParams.get("guide") !== "1") {
-      navigate(appPath, { replace: true });
+      window.location.replace(appPath);
     }
-  }, [navigate, appPath, location.search]);
+  }, [appPath, location.search]);
  const downloadSize = formatBytes(OFFICE_DOWNLOAD_BYTES);
  const [handoffBusy, setHandoffBusy] = useState(false);
  const [handoffError, setHandoffError] = useState<string>();

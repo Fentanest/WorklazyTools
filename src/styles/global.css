@@ -1099,3 +1099,9 @@ body[data-consent-banner="visible"] .main-content {
 .app-shell.editor-mode .wl-topbar {
   display: none;
 }
+@media (max-width: 820px) {
+  .app-shell.editor-mode .mobile-header,
+  .app-shell.editor-mode .bottom-tabs {
+    display: none;
+  }
+}

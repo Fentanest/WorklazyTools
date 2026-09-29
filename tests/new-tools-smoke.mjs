@@ -9,6 +9,7 @@ import initRhwp, { HwpDocument } from "@rhwp/core";
 import JSZip from "jszip";
 import puppeteer from "puppeteer-core";
 import { createFile as createMp4BoxFile } from "mp4box";
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
@@ -102,17 +103,26 @@ try {
       await testAudioStudio(page, fixtures.audio);
     }
     if (!onlyHwp && !onlyAudio && !onlyImage) {
-      console.log("[4/4] Video studio");
-      await testVideoStudio(
-        page,
-        fixtures.videos,
-        fixtures.largeVideo,
-        fixtures.largePassThroughVideos,
-        fixtures.largeAudioIncompatibleVideo,
-        fixtures.targetAudioIncompatibleVideo,
-        fixtures.videoIncompatibleVideo,
-        fixtures.dolbyVisionVideo,
-      );
+      if (VIDEO_STUDIO_PUBLIC) {
+        console.log("[4/4] Video studio");
+        await testVideoStudio(
+          page,
+          fixtures.videos,
+          fixtures.largeVideo,
+          fixtures.largePassThroughVideos,
+          fixtures.largeAudioIncompatibleVideo,
+          fixtures.targetAudioIncompatibleVideo,
+          fixtures.videoIncompatibleVideo,
+          fixtures.dolbyVisionVideo,
+        );
+      } else {
+        console.log("[4/4] Video studio publication boundary");
+        for (const route of ["/tools/video-studio/", "/tools/video-studio/trim/", "/video-studio/legacy/"]) {
+          await page.goto(`${koBaseUrl}${route}`, { waitUntil: "domcontentloaded" });
+          await page.waitForFunction(() => document.querySelector('.tool-page[role="status"] h1')?.textContent?.includes("현재 제공하지 않는 도구"));
+          if (await page.$(".video-studio-page")) throw new Error(`Unpublished video editor mounted at ${route}`);
+        }
+      }
     }
 
     if (pageErrors.length) throw new Error(`Browser errors:\n${pageErrors.join("\n")}`);
@@ -122,7 +132,13 @@ try {
   }
   console.log(process.env.TEST_ONLY_HWP === "1"
     ? "HWP editor and unified document comparison smoke tests passed."
-    : "New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, video group timelines and grouped output.");
+    : onlyAudio
+      ? "Audio Studio smoke tests passed: waveform editing and export."
+      : onlyVideo
+        ? VIDEO_STUDIO_PUBLIC ? "Video Studio smoke tests passed." : "Unpublished Video Studio routes smoke tests passed."
+    : VIDEO_STUDIO_PUBLIC
+      ? "New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, video group timelines and grouped output."
+      : "New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, and unpublished Video Studio routes.");
 } finally {
   await fs.rm(tempDirectory, { recursive: true, force: true });
 }
@@ -180,6 +196,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     if (/edwardkim\.github\.io|cdn\.jsdelivr\.net/i.test(request.url())) forbiddenRhwpRequests.push(request.url());
   };
   page.on("request", recordRhwpRequest);
+  page.once("dialog", (dialog) => { if (dialog.type() === "beforeunload") void dialog.accept(); else void dialog.dismiss(); });
   await page.goto(`${koBaseUrl}/tools/hwp-editor`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid='hwp-editor-shell'] iframe");
   await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-success")?.textContent?.includes("편집기를 사용할 수 있습니다"));
@@ -263,7 +280,13 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
 }
 
 async function runHwpComparison(page, url, hwpPaths) {
-  await page.goto(url, { waitUntil: "domcontentloaded" });
+  const acceptConfirmedLeave = (dialog) => {
+    if (dialog.type() === "beforeunload") void dialog.accept();
+    else void dialog.dismiss();
+  };
+  page.on("dialog", acceptConfirmedLeave);
+  try { await page.goto(url, { waitUntil: "domcontentloaded" }); }
+  finally { page.off("dialog", acceptConfirmedLeave); }
   await page.waitForSelector("[data-tool-page='document-compare'] input[type=file]");
   let inputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
   await inputs[0].uploadFile(hwpPaths[0]);
@@ -3274,7 +3297,7 @@ async function testVideoStudio(page, videoPaths, largeVideoPath, largePassThroug
   if (new URL(page.url()).origin !== new URL(baseUrl).origin) {
     await page.goto(`${koBaseUrl}/`, { waitUntil: "domcontentloaded" });
   }
-  await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await page.evaluate(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const videoAdRequests = [];
   const videoZipWorkerRequests = [];
   const videoStreamWorkerRequests = [];

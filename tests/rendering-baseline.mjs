@@ -33,7 +33,7 @@ if (selectedTargetIds.length && (new Set(selectedTargetIds).size !== selectedTar
 
 // Self-contained so the browser runs exactly the observer exercised by unit tests.
 export function installRenderingObservers() {
-  localStorage.setItem("worklazy_privacy_consent", "granted");
+  localStorage.setItem("worklazy_privacy_consent_v2", "granted");
   localStorage.setItem("worklazy_lang", "ko");
   localStorage.setItem("worklazy-theme", "light-coral");
   const metrics = globalThis.__worklazyRenderingMetrics = { cls: 0, lcp: 0, longTasks: [], layoutShifts: [] };

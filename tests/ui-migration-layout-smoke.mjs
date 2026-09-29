@@ -34,7 +34,7 @@ try {
     { name: "prefers-reduced-motion", value: "reduce" },
   ]);
   await page.evaluateOnNewDocument(() => {
-    localStorage.setItem("worklazy_privacy_consent", "granted");
+    localStorage.setItem("worklazy_privacy_consent_v2", "granted");
     localStorage.setItem("worklazy_lang", "ko");
   });
   page.on("request", (request) => {

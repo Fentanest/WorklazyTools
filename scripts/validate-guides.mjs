@@ -7,6 +7,7 @@ import ts from "typescript";
 import { getGuideKeyForPath } from "../src/i18n/guideData.ts";
 import { toolSlugByPath } from "../src/app/seo.ts";
 import faqExpectations from "./static-faq-expectations.json" with { type: "json" };
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 
 export const removedProductionMemoTexts = Object.freeze([
   "카드 순서: 직접 입력 “1. 오전 회의” → 오전.txt → 직접 입력 “2. 오후 회의” → 오후.txt. 구분자 빈 줄을 선택한 결과를 보여준다.",
@@ -121,10 +122,12 @@ function resolvedFaqs(guides, slug, route) {
 
 export function validateGuidesData({ guidesData, appRoutes, expectations = faqExpectations, slugByPath = toolSlugByPath }) {
   const errors = [];
+  const isDormantVideoRoute = (route) => !VIDEO_STUDIO_PUBLIC && /^\/tools\/video-studio(?:\/|$)/.test(route);
   const routeSet = new Set(appRoutes.map(normalizeRoute));
   const addError = (message) => errors.push(message);
   const faqConnectionsByGuide = new Map();
   for (const [route, expectation] of Object.entries(expectations)) {
+    if (isDormantVideoRoute(route)) continue;
     const guideKey = getGuideKeyForPath(expectation.slug, route);
     const connections = faqConnectionsByGuide.get(guideKey) || [];
     connections.push({ route, slug: expectation.slug });
@@ -169,7 +172,7 @@ export function validateGuidesData({ guidesData, appRoutes, expectations = faqEx
       inspectMemoText(guideKey, guide.description, "description");
       inspectBlocks(guideKey, Array.isArray(guide.blocks) ? guide.blocks : [], "blocks");
       for (const [route, blocks] of Object.entries(guide.pathBlocks || {})) {
-        if (!routeSet.has(normalizeRoute(route))) addError(`[${lang}] Guide '${guideKey}' pathBlocks route is not an exact App route: ${route}`);
+        if (!routeSet.has(normalizeRoute(route)) && !isDormantVideoRoute(route)) addError(`[${lang}] Guide '${guideKey}' pathBlocks route is not an exact App route: ${route}`);
         inspectBlocks(guideKey, Array.isArray(blocks) ? blocks : [], `pathBlocks['${route}']`);
       }
       for (const [id, faq] of Object.entries(guide.faq || {})) {
@@ -178,7 +181,7 @@ export function validateGuidesData({ guidesData, appRoutes, expectations = faqEx
         inspectMemoText(guideKey, faq?.a, `faq['${id}'].a`);
       }
       for (const [route, ids] of Object.entries(guide.pathFaqs || {})) {
-        if (!routeSet.has(normalizeRoute(route))) addError(`[${lang}] Guide '${guideKey}' pathFaqs route is not an exact App route: ${route}`);
+        if (!routeSet.has(normalizeRoute(route)) && !isDormantVideoRoute(route)) addError(`[${lang}] Guide '${guideKey}' pathFaqs route is not an exact App route: ${route}`);
         if (!Array.isArray(ids) || ids.length === 0) addError(`[${lang}] Guide '${guideKey}' pathFaqs['${route}'] must not be empty`);
         for (const id of Array.isArray(ids) ? ids : []) if (!guide.faq?.[id]) addError(`[${lang}] Guide '${guideKey}' pathFaqs['${route}'] references missing FAQ ID '${id}'`);
       }
@@ -206,6 +209,7 @@ export function validateGuidesData({ guidesData, appRoutes, expectations = faqEx
     }
 
     for (const [route, expectation] of Object.entries(expectations)) {
+      if (isDormantVideoRoute(route)) continue;
       if (!routeSet.has(route)) addError(`[${lang}] FAQ expectation route is not declared in App.tsx: ${route}`);
       const questions = resolvedFaqs(guides, expectation.slug, route);
       if (!questions.includes(expectation[lang])) addError(`[${lang}] Required FAQ missing for (${expectation.slug}, ${route}): ${expectation[lang]}`);

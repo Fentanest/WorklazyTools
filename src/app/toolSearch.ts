@@ -27,7 +27,6 @@ const TOOL_ALIASES: Record<string, string[]> = {
   "image-studio": ["사진", "이미지", "png", "jpg"],
   "document-generator": ["워드 메일머지", "메일머지", "mail merge", "문서 일괄 생성", "양식 자동 채우기", "DOCX", "Word"],
   "document-redactor": ["개인정보 마스킹", "검정 박스", "PDF 가리기", "문서 가리기"],
-  "video-studio": ["비디오 스튜디오", "video", "영상 자르기"],
   "qr-studio": ["QR 스튜디오", "QR 만들기", "QR 스캔"],
 };
 

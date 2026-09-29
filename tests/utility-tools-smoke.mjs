@@ -36,7 +36,7 @@ try {
   await page.goto(koBaseUrl, { waitUntil: "networkidle0" });
   await page.waitForSelector(".privacy-consent");
   await page.click("[data-testid=privacy-consent-accept]");
-  await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent") === "granted");
+  await page.waitForFunction(() => localStorage.getItem("worklazy_privacy_consent_v2") === "granted");
   await page.waitForFunction(() => (window.dataLayer || []).some((item) => Object.prototype.toString.call(item) === "[object Arguments]" && item[0] === "event" && item[1] === "page_view"));
   const analyticsBootstrap = await page.evaluate(() => ({
     google: Boolean(document.querySelector("script[data-worklazy-google-analytics]")),

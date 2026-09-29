@@ -55,7 +55,7 @@ try {
       for (const viewport of [{ id: "desktop", width: 1365, height: 900 }, { id: "mobile", width: 390, height: 844 }]) {
         const context = await browser.newContext({ viewport, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
         await context.addInitScript(() => {
-          localStorage.setItem("worklazy_privacy_consent", "granted");
+          localStorage.setItem("worklazy_privacy_consent_v2", "granted");
           if (!location.pathname.includes("/tools/pdf-editor/")) return;
           const pathname = location.pathname.replace(/\/+$/, "") || "/";
           const target = `${pathname}${location.search}`;
@@ -112,7 +112,7 @@ try {
 
 async function testChunkRecovery(browserInstance) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   const documentRequests = [];
   let injectedFailures = 0;
@@ -147,7 +147,7 @@ async function testDisplayModuleRecovery(browserInstance, fixture) {
   };
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
     const page = await context.newPage();
     const displayRequests = [];
     let recoveryStarted = false;
@@ -188,7 +188,7 @@ async function testDisplayModuleRecovery(browserInstance, fixture) {
 async function testNavigation(browserInstance) {
   for (const width of [320, 390, 820, 821]) {
     const context = await browserInstance.newContext({ viewport: { width, height: 844 }, locale: "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     await page.goto(`${baseUrl}/en/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
     await page.locator("[data-testid='pdf-finish-ready']").waitFor();
@@ -236,7 +236,7 @@ async function testNavigation(browserInstance) {
   }
 
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   await page.goto(`${baseUrl}/en/tools/pdf-editor/`, { waitUntil: "networkidle" });
   await page.locator(".pdf-tool-navigation [data-pdf-nav-mode='finish']").click();
@@ -258,7 +258,7 @@ async function testUploadErrors(browserInstance) {
   ];
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
     const input = page.locator("[data-testid='pdf-finish-ready'] input[type='file']");
@@ -282,7 +282,7 @@ async function testPreviewGeometry(browserInstance, fixture) {
   for (const language of ["ko", "en"]) {
     for (const colorScheme of ["light", "dark"]) {
       const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: language === "ko" ? "ko-KR" : "en-US", colorScheme, serviceWorkers: "block" });
-      await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+      await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
       const page = await context.newPage();
       await page.goto(`${baseUrl}/${language}/tools/pdf-editor/header-footer/`, { waitUntil: "networkidle" });
       await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles({ name: "preview-geometry.pdf", mimeType: "application/pdf", buffer: fixture });
@@ -333,7 +333,7 @@ async function testPreviewGeometry(browserInstance, fixture) {
 
 async function testPreflightGuidance(browserInstance, fixture, smallFixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   page.setDefaultTimeout(120_000);
   await page.goto(`${baseUrl}/en/tools/pdf-editor/header-footer/`, { waitUntil: "networkidle" });
@@ -403,7 +403,7 @@ async function testPreflightGuidance(browserInstance, fixture, smallFixture) {
 async function testBatchFontWarning(browserInstance, fixture) {
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
     await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles(["가.pdf", "나.pdf", "다.pdf"].map((name) => ({
@@ -425,7 +425,7 @@ async function testPreflightReselection(browserInstance, fixture) {
   let combinations = 0;
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     page.setDefaultTimeout(120_000);
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
@@ -486,7 +486,7 @@ async function testPreflightRawInputAndTabChanges(browserInstance, fixture) {
   let generatedOutputs = 0;
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block", acceptDownloads: false });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     page.setDefaultTimeout(120_000);
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
@@ -587,7 +587,7 @@ async function testOutputNameDownloads(browserInstance, fixture) {
   ];
   for (const { language, source, expected } of cases) {
     const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block", acceptDownloads: false });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     page.setDefaultTimeout(120_000);
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
@@ -638,7 +638,7 @@ async function assertReadyPreflight(page, action, label) {
 
 async function testFinishWorkflow(browserInstance, fixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block", acceptDownloads: false });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   page.setDefaultTimeout(60_000);
   await page.goto(`${baseUrl}/en/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
@@ -743,7 +743,7 @@ async function testFinishWorkflow(browserInstance, fixture) {
 
 async function testCombinedBatchWorkflow(browserInstance, fixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "ko-KR", serviceWorkers: "block", acceptDownloads: false });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   page.setDefaultTimeout(120_000);
   await page.goto(`${baseUrl}/ko/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });
@@ -835,7 +835,7 @@ async function testStructureWorkflow(browserInstance) {
   assert.deepEqual(expectedAppearance, { count: 2_000, box: [100, 180, 199, 199] });
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
     const page = await context.newPage();
     page.setDefaultTimeout(120_000);
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
@@ -921,7 +921,7 @@ async function testStructureWorkflow(browserInstance) {
   }
 
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
   const page = await context.newPage();
   await page.goto(`${baseUrl}/en/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
   const manifest = JSON.parse(await fs.readFile(path.join(repositoryRoot, "tests/fixtures/pdf-finish/manifest.json"), "utf8"));
@@ -940,7 +940,7 @@ async function testStructureWorkflow(browserInstance) {
 
 async function testRasterWorkflow(browserInstance, fixture) {
   const context = await browserInstance.newContext({ viewport: { width: 390, height: 844 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
   const page = await context.newPage();
   page.setDefaultTimeout(120_000);
   await page.goto(`${baseUrl}/en/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
@@ -997,7 +997,7 @@ async function testRasterWorkflow(browserInstance, fixture) {
 
 async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixture, smallFixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   const runtimeRequests = new Set();
   page.on("response", (response) => {
@@ -1111,7 +1111,7 @@ async function testWatermarkWorkflow(browserInstance, fixture, inlineImageFixtur
 
 async function testStampWorkflow(browserInstance, fixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   page.setDefaultTimeout(120_000);
   await page.goto(`${baseUrl}/en/tools/pdf-editor/stamp/`, { waitUntil: "networkidle" });
@@ -1210,7 +1210,7 @@ async function testStampWorkflow(browserInstance, fixture) {
 async function testWhitespaceWatermark(browserInstance, fixture) {
   for (const language of ["ko", "en"]) {
     const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: language === "ko" ? "ko-KR" : "en-US", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+    await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
     const page = await context.newPage();
     await page.goto(`${baseUrl}/${language}/tools/pdf-editor/watermark/`, { waitUntil: "networkidle" });
     await page.locator("[data-testid='pdf-finish-ready'] input[accept*='application/pdf']").setInputFiles({ name: `whitespace-${language}.pdf`, mimeType: "application/pdf", buffer: fixture });
@@ -1235,7 +1235,7 @@ async function assertF2Owned(page, selector, label) {
 
 async function testBoundaryCropRendering(browserInstance, fixture) {
   const context = await browserInstance.newContext({ viewport: { width: 1280, height: 900 }, locale: "en-US", serviceWorkers: "block" });
-  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "granted"));
+  await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "granted"));
   const page = await context.newPage();
   page.setDefaultTimeout(120_000);
   await page.goto(`${baseUrl}/en/tools/pdf-editor/page-numbers/`, { waitUntil: "networkidle" });

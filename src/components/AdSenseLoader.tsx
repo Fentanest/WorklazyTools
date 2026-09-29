@@ -5,7 +5,7 @@ import { isAdIneligible } from "../app/adEligibility";
 
 const ADSENSE_CLIENT = "ca-pub-8940087269746960";
 
-export function AdSenseLoader() {
+export function AdSenseLoader({ ready }: { ready: boolean }) {
   const [consent, setConsent] = useState<PrivacyConsent>(() => getPrivacyConsent());
   const [ineligible, setIneligible] = useState(() => isAdIneligible());
 
@@ -27,14 +27,14 @@ export function AdSenseLoader() {
   }, []);
 
   useEffect(() => {
-    if (!import.meta.env.PROD || isLocalQaBuild || consent !== "granted" || ineligible || isAdIneligible() || document.querySelector("script[data-worklazy-adsense]")) return;
+    if (!import.meta.env.PROD || isLocalQaBuild || !ready || consent !== "granted" || ineligible || isAdIneligible() || document.querySelector("script[data-worklazy-adsense]")) return;
     const script = document.createElement("script");
     script.async = true;
     script.crossOrigin = "anonymous";
     script.dataset.worklazyAdsense = "true";
     script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`;
     document.head.appendChild(script);
-  }, [consent, ineligible]);
+  }, [consent, ineligible, ready]);
 
   return null;
 }

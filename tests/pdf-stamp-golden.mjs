@@ -186,7 +186,7 @@ async function runBrowserPreviewGolden(sourceFixture, imageBytes) {
     for (const dpr of [1, 2]) {
       for (const shrink of [1, 0.5]) {
         const context = await browser.newContext({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: dpr, locale: "en-US", serviceWorkers: "block" });
-        await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent", "denied"));
+        await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
         const page = await context.newPage();
         page.setDefaultTimeout(60_000);
         await page.goto(`${baseUrl}/en/tools/pdf-editor/stamp/`, { waitUntil: "networkidle" });

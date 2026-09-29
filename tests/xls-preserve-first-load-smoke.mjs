@@ -2,18 +2,14 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 
 import ExcelJS from "exceljs";
 import puppeteer from "puppeteer-core";
 
-const run = promisify(execFile);
 const distributionRoot = path.resolve("dist");
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-xls-first-load-"));
 const serverRequests = [];
 const fixturePaths = [];
-const videoFixturePath = path.join(temporaryDirectory, "credentialless-worker-check.mp4");
 
 const server = http.createServer(async (request, response) => {
   try {
@@ -54,13 +50,6 @@ try {
     await createFixture(filePath, index);
     fixturePaths.push(filePath);
   }
-  await run("ffmpeg", [
-    "-hide_banner", "-loglevel", "error", "-y",
-    "-f", "lavfi", "-i", "color=c=0x159bd7:s=160x90:d=1",
-    "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
-    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", videoFixturePath,
-  ]);
-
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolve);
@@ -121,8 +110,7 @@ try {
       if (response.request().isNavigationRequest()
         || responseUrl.pathname.endsWith("service-worker.js")
         || responseUrl.pathname.endsWith("coi-serviceworker.js")
-        || /\/assets\/excel\.worker-[^/]+\.js$/.test(responseUrl.pathname)
-        || /\/tools\/video-studio\/workers\/video-probe\.worker-[^/]+\.js$/.test(responseUrl.pathname)) {
+        || /\/assets\/excel\.worker-[^/]+\.js$/.test(responseUrl.pathname)) {
         const headers = response.headers();
         responseTrace.push({
           url: response.url(),
@@ -170,23 +158,15 @@ try {
       };
     }
 
-    let videoCompatibility = null;
+    let videoUnavailable = null;
     let directEntry = null;
     if (firstAttempt.ready === 4) {
-      await page.goto(`${baseUrl}/ko/tools/video-studio/`, { waitUntil: "domcontentloaded" });
-      await page.waitForFunction(() => window.crossOriginIsolated === true);
-      await page.waitForSelector(".video-studio-page input[type=file]");
-      const probeResponsePromise = page.waitForResponse((response) => response.url().includes("video-probe.worker-"));
-      await (await page.$(".video-studio-page input[type=file]")).uploadFile(videoFixturePath);
-      await probeResponsePromise;
-      await page.waitForFunction(() => document.querySelectorAll(".video-trim-lane").length === 1);
-      const videoDocumentResponse = [...responseTrace].reverse().find((item) => item.resourceType === "document" && item.url.includes("/tools/video-studio/"));
-      const videoWorkerResponse = [...responseTrace].reverse().find((item) => item.url.includes("video-probe.worker-"));
-      videoCompatibility = {
-        isolated: await page.evaluate(() => window.crossOriginIsolated),
-        controller: await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ""),
-        document: videoDocumentResponse,
-        worker: videoWorkerResponse,
+      const videoResponse = await page.goto(`${baseUrl}/ko/tools/video-studio/`, { waitUntil: "domcontentloaded" });
+      await page.waitForSelector('.tool-page[role="status"]');
+      videoUnavailable = {
+        status: videoResponse?.status(),
+        editorPresent: await page.$(".video-studio-page") !== null,
+        message: await page.$eval('.tool-page[role="status"] h1', (element) => element.textContent),
       };
 
       const directContext = await browser.createBrowserContext();
@@ -213,9 +193,9 @@ try {
       firstEntry,
       firstAttempt,
       afterManualReload,
-      videoCompatibility,
+      videoUnavailable,
       directEntry,
-      serverRequests: serverRequests.filter((item) => item.pathname.includes("xls-preserve") || item.pathname.includes("excel.worker") || item.pathname.includes("video-probe.worker")),
+      serverRequests: serverRequests.filter((item) => item.pathname.includes("xls-preserve") || item.pathname.includes("excel.worker") || item.pathname.includes("video-studio")),
       responseTrace,
       requestFailures,
       pageErrors,
@@ -229,11 +209,9 @@ try {
     if (firstAttempt.ready !== 4 || firstAttempt.errors.length || firstAttempt.banner) {
       throw new Error(`XLS files did not pass inspection on the first entry without a manual reload: ${JSON.stringify(evidence)}`);
     }
-    if (!videoCompatibility?.isolated
-      || videoCompatibility.document?.coep !== "credentialless"
-      || videoCompatibility.worker?.coep !== "require-corp"
-      || videoCompatibility.worker?.corp !== "same-origin") {
-      throw new Error(`The credentialless video document could not start its same-origin worker with the hardened response: ${JSON.stringify(videoCompatibility)}`);
+    if (videoUnavailable?.status !== 404 || videoUnavailable.editorPresent
+      || !videoUnavailable.message?.includes("현재 제공하지 않는 도구")) {
+      throw new Error(`The unpublished video route unexpectedly exposed its editor: ${JSON.stringify(videoUnavailable)}`);
     }
     if (!directEntry?.browser.isolated
       || !directEntry.browser.controller.endsWith("/coi-serviceworker.js")

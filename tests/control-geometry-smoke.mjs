@@ -51,7 +51,7 @@ try {
           { name: "prefers-reduced-motion", value: "reduce" },
         ]);
         await page.evaluateOnNewDocument((locale) => {
-          localStorage.setItem("worklazy_privacy_consent", "granted");
+          localStorage.setItem("worklazy_privacy_consent_v2", "granted");
           localStorage.setItem("worklazy_lang", locale);
         }, profile.locale);
         await page.setRequestInterception(true);

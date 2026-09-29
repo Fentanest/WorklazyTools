@@ -356,7 +356,7 @@ export async function runAccessibilityAudit() {
         timezoneId: "Asia/Seoul",
       });
       await context.addInitScript(({ language, colorScheme }) => {
-        localStorage.setItem("worklazy_privacy_consent", "denied");
+        localStorage.setItem("worklazy_privacy_consent_v2", "denied");
         if (language) localStorage.setItem("worklazy_lang", language);
         // W5 shared theme fixture: sparse colorScheme resolves to the default
         // family (dark -> dark-coral, else light-coral). Only the theme key is

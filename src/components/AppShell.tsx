@@ -1,5 +1,6 @@
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
+import { VIDEO_STUDIO_PUBLIC, documentReadiness, safeAnalyticsPage } from "../app/publicService";
 import {
   CircleHelp,
   Github,
@@ -38,20 +39,12 @@ import { PrivacyConsentBanner } from "./PrivacyConsentBanner";
 import { resetPrivacyConsent } from "./privacyConsent";
 import { RouteSeo } from "./RouteSeo";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
-import { getUnsavedWorkGeneration, getUnsavedWorkKind, hasUnsavedWork, isGuardedTarget, subscribeUnsavedWork } from "../app/toolState";
+import { getUnsavedWorkKind, hasUnsavedWork, isGuardedTarget, subscribeUnsavedWork } from "../app/toolState";
 import { UnsavedWorkDialog } from "./UnsavedWorkDialog";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { getToolIconTone } from "./toolAccentStyles";
 import { DocumentRedactorFallback } from "../features/document-redactor/DocumentRedactorFallback";
 
-
-function isAdFreePath(pathname: string) {
-  const p = stripLanguagePrefix(pathname);
-  return p.startsWith("/tools/hwp-editor") || 
-         p.startsWith("/tools/document-compare") || 
-         p.startsWith("/tools/pdf-compare") || 
-         p.startsWith("/tools/pdf-editor");
-}
 
 const GITHUB_REPO_URL = GITHUB_ISSUES_URL.replace(/\/issues\/?$/, "");
 
@@ -83,26 +76,18 @@ export function AppShell() {
   useEffect(() => subscribeUnsavedWork(() => setGuardTick((tick) => tick + 1)), []);
   const unsavedActive = hasUnsavedWork();
   const pendingActionRef = useRef<(() => void) | null>(null);
-  const pendingTargetRef = useRef<string | null>(null);  // S9: store target URL for ad-free check
   const leaveAfterPopRef = useRef<(() => void) | null>(null);
   const [guardOpen, setGuardOpen] = useState(false);
   const guardEntryRef = useRef(false);
   const guardKeyRef = useRef<string | null>(null);
   const skipPopRef = useRef(false);
-  const leaveApprovedRef = useRef<{
-    targetUrl: string;
-    sourceUrl: string;
-    unsavedGeneration: number;
-  } | null>(null);
   // Set while a confirmed "leave" is in flight so the sentinel effect below
   // neither re-pushes a guard entry nor pops one under the navigation.
   // Cleared on stay and whenever the pathname actually changes.
   const leavingRef = useRef(false);
 
   const closeGuardStay = useCallback(() => {
-    leaveApprovedRef.current = null;
     pendingActionRef.current = null;
-    pendingTargetRef.current = null;
     leavingRef.current = false;
     setGuardOpen(false);
     if (hasUnsavedWork() && !guardEntryRef.current) {
@@ -115,42 +100,11 @@ export function AppShell() {
   const confirmGuardLeave = useCallback(() => {
     if (leavingRef.current) return;
     const action = pendingActionRef.current;
-    const targetUrl = pendingTargetRef.current;
     pendingActionRef.current = null;
-    pendingTargetRef.current = null;
     setGuardOpen(false);
     if (!action) return;
     leavingRef.current = true;
 
-    // Check if destination is an ad-free path
-    let targetIsAdFree = false;
-    if (targetUrl) {
-      try {
-        const targetPathname = new URL(targetUrl, window.location.href).pathname;
-        targetIsAdFree = isAdFreePath(targetPathname);
-      } catch {
-        targetIsAdFree = false;
-      }
-    }
-
-    // For ad-free paths: skip history.back() to avoid async document navigation issues
-    if (targetIsAdFree) {
-      guardEntryRef.current = false;
-      guardKeyRef.current = null;
-      if (targetUrl) {
-        leaveApprovedRef.current = {
-          targetUrl,
-          sourceUrl: window.location.href,
-          unsavedGeneration: getUnsavedWorkGeneration(),
-        };
-        window.location.assign(targetUrl);
-        return;
-      }
-      action();
-      return;
-    }
-
-    // For normal paths: use history.back() pathway
     if (guardEntryRef.current) {
       // Remove our same-URL guard entry first so Back from the destination
       // behaves normally, then run the pending navigation once it pops.
@@ -183,8 +137,6 @@ export function AppShell() {
       return;
     }
     pendingActionRef.current = perform;
-    pendingTargetRef.current = target.href;  // S9: store full URL for ad-free path check
-    leaveApprovedRef.current = null;
     setGuardOpen(true);
   }, []);
 
@@ -214,8 +166,6 @@ export function AppShell() {
       event.stopPropagation();
       const destination = `${url.pathname}${url.search}${url.hash}`;
       pendingActionRef.current = () => navigate(destination);
-      pendingTargetRef.current = url.href;
-      leaveApprovedRef.current = null;
       setGuardOpen(true);
     };
     document.addEventListener("click", onClickCapture, true);
@@ -225,27 +175,11 @@ export function AppShell() {
   useEffect(() => {
     if (!unsavedActive) return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      const approved = leaveApprovedRef.current;
-      if (
-        approved
-        && approved.sourceUrl === window.location.href
-        && approved.unsavedGeneration === getUnsavedWorkGeneration()
-      ) {
-        return;
-      }
       event.preventDefault();
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [unsavedActive]);
-
-  useEffect(() => {
-    const onPageShow = () => {
-      leaveApprovedRef.current = null;
-    };
-    window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
-  }, []);
 
   useEffect(() => {
     leavingRef.current = false;
@@ -273,7 +207,6 @@ export function AppShell() {
 
   useEffect(() => {
     const onPopState = () => {
-      leaveApprovedRef.current = null;
       if (skipPopRef.current) {
         skipPopRef.current = false;
         const deferred = leaveAfterPopRef.current;
@@ -288,24 +221,17 @@ export function AppShell() {
         pendingActionRef.current = () => {
           window.history.back();
         };
-        leaveApprovedRef.current = null;
         setGuardOpen(true);
       }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
-  const adFree = isAdFreePath(location.pathname);
-  useEffect(() => {
-    if (adFree && document.querySelector("script[data-worklazy-adsense]")) {
-      window.location.replace(window.location.href);
-    }
-  }, [adFree]);
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
   const redactorActive = isRedactorPath(location.pathname);
   const redactorDocument = isRedactorDocument();
   useEffect(() => { if (import.meta.env.PROD && redactorActive !== redactorDocument) window.location.replace(window.location.href); }, [redactorActive, redactorDocument]);
-  const videoStudioActive = isVideoDirectPath(location.pathname, import.meta.env.BASE_URL);
+  const videoStudioActive = VIDEO_STUDIO_PUBLIC && isVideoDirectPath(location.pathname, import.meta.env.BASE_URL);
   const officeEditorAppActive = normalizedPath === "/tools/office-editor/app";
   const excelPreserveActive = normalizedPath === "/tools/excel-merger/xls-preserve";
   const [videoControllerReady, setVideoControllerReady] = useState(false);
@@ -313,6 +239,38 @@ export function AppShell() {
   const videoIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-video-isolation"]'));
   const officeIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-office-isolation"]'));
   const excelIsolationDocument = Boolean(document.querySelector('meta[name="worklazy-excel-preserve-isolation"]'));
+  const [controllerScriptUrl, setControllerScriptUrl] = useState(() => navigator.serviceWorker?.controller?.scriptURL ?? "");
+  useEffect(() => {
+    const reconcile = () => setControllerScriptUrl(navigator.serviceWorker?.controller?.scriptURL ?? "");
+    navigator.serviceWorker?.addEventListener("controllerchange", reconcile);
+    reconcile();
+    return () => navigator.serviceWorker?.removeEventListener("controllerchange", reconcile);
+  }, []);
+  const routeIdentity = `${location.key}:${location.pathname}`;
+  const [contentReadyIdentity, setContentReadyIdentity] = useState<string | null>(null);
+  const [adReadyIdentity, setAdReadyIdentity] = useState<string | null>(null);
+  useEffect(() => {
+    const main = document.getElementById("main-content");
+    if (!main) return;
+    const reconcile = () => {
+      const next = main.querySelector(".tool-route-loading, [data-route-error]") ? null : routeIdentity;
+      setContentReadyIdentity((current) => current === next ? current : next);
+      const adNext = next && !main.querySelector('[data-testid="document-expired-result"]') ? routeIdentity : null;
+      setAdReadyIdentity((current) => current === adNext ? current : adNext);
+    };
+    reconcile();
+    const observer = new MutationObserver(reconcile);
+    observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [routeIdentity]);
+  const readiness = documentReadiness(location.pathname, {
+    redactor: redactorDocument,
+    office: officeIsolationDocument,
+    excel: excelIsolationDocument,
+  }, window.crossOriginIsolated, location.search, controllerScriptUrl);
+  const routeMetadataSafe = Boolean(safeAnalyticsPage(location.pathname, location.search, location.hash));
+  const pageReady = readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe;
+  const adReady = pageReady && adReadyIdentity === routeIdentity;
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -341,8 +299,8 @@ export function AppShell() {
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} onReady={setVideoControllerReady} onFailed={setVideoIsolationFailed} />
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
       <ExcelPreserveIsolationBoundary active={excelPreserveActive} isolationDocument={excelIsolationDocument} language={language} />
-      {!redactorActive && !redactorDocument && <AnalyticsLoader disabled={(videoStudioActive && !videoIsolationDocument) || officeEditorAppActive || excelPreserveActive} />}
-      {!redactorActive && !redactorDocument && !videoStudioActive && !videoIsolationDocument && !officeEditorAppActive && !officeIsolationDocument && !excelPreserveActive && !excelIsolationDocument && !adFree && <AdSenseLoader />}
+      <AnalyticsLoader ready={pageReady} />
+      <AdSenseLoader ready={adReady} />
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand-card" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
           <svg
@@ -434,7 +392,7 @@ export function AppShell() {
           {redactorActive && !redactorDocument && <DocumentRedactorFallback />}
         </RouteErrorBoundary>
         {import.meta.env.PROD && videoStudioActive && !videoControllerReady && <div className="tool-route-loading min-h-[420px]" role="status">{videoIsolationFailed ? (language === "ko" ? "비디오 도구를 준비하지 못했습니다. 페이지를 새로고침해 다시 시도하세요." : "The video tool could not start. Refresh the page to try again.") : t("status.loadingTool", { tool: "Video Studio" })}</div>}
-        {normalizedPath.startsWith("/tools/") && focusMode !== "editor" && <CoupangBanner routeKey={normalizedPath} />}
+        {adReady && normalizedPath.startsWith("/tools/") && <CoupangBanner routeKey={normalizedPath} />}
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
           <nav aria-label={t("footer.policyLabel")}>

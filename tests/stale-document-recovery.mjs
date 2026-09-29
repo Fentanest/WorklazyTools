@@ -27,7 +27,7 @@ try {
       const record = { tool, language, run, control, storageThrows, persistent, expectedEntry, responses: [], cacheEvents: [], requests: [], storage: [], errors: [] };
       await context.exposeBinding("staleStorage", (_, data) => record.storage.push(data));
       await context.addInitScript(({ storageThrows }) => {
-        localStorage.setItem("worklazy_privacy_consent", "denied");
+        localStorage.setItem("worklazy_privacy_consent_v2", "denied");
         const set = Storage.prototype.setItem, remove = Storage.prototype.removeItem;
         Storage.prototype.setItem = function (key, value) {
           const result = set.call(this, key, value);

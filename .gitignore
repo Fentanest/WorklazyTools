@@ -12,6 +12,7 @@ newui/
 public/vendor/pyodide/
 public/vendor/tesseract/
 public/tools/video-studio/runtime/
+public/vendor/ffmpeg-audio/
 public/vendor/zetaoffice/
 .cache/zetaoffice/
 public/vendor/emoji/

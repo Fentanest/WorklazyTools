@@ -5,7 +5,7 @@
 | 변경 영역 | 우선 확인할 기존 진입점 |
 |---|---|
 | 순수 로직·회귀 | `tests/unit/*.test.ts`, `npm run test:unit` 및 실제 지원하는 개별 테스트 선택 |
-| 정적 페이지·SEO·광고 제외·언어 | `test:static`, `test:guides`, `test:i18n`, `test:ads` 중 관련 항목 |
+| 정적 페이지·SEO·광고/분석 준비 상태·언어 | `test:static`, `test:guides`, `test:i18n`, `test:ads` 중 관련 항목 |
 | 일반 도구 | `test:utilities`, `test:new-tools`, `test:browser` 중 실제 변경된 도구/소비자 |
 | Excel 비교·정리·XLS 보존 | `test:excel-compare`, `test:excel-cleaner`, `test:xls-preserve`, `test:xls-first-load` |
 | 문서 비교·오피스 | `test:document-diff`, `test:office` |

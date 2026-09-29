@@ -13,8 +13,8 @@ test("the opt-in local QA build blocks analytics, events, and AdSense without ch
   const adsense = read("src/components/AdSenseLoader.tsx");
 
   assert.match(gate, /import\.meta\.env\.VITE_LOCAL_QA === "1"/);
-  assert.equal((analytics.match(/isLocalQaBuild/g) || []).length, 4);
+  assert.equal((analytics.match(/isLocalQaBuild/g) || []).length, 3);
   assert.equal((adsense.match(/isLocalQaBuild/g) || []).length, 2);
-  assert.match(analytics, /isLocalQaBuild \|\| !initialized/);
-  assert.match(adsense, /!import\.meta\.env\.PROD \|\| isLocalQaBuild \|\| consent !== "granted"/);
+  assert.match(analytics, /!import\.meta\.env\.PROD \|\| isLocalQaBuild \|\| consent !== "granted"/);
+  assert.match(adsense, /!import\.meta\.env\.PROD \|\| isLocalQaBuild \|\| !ready \|\| consent !== "granted"/);
 });

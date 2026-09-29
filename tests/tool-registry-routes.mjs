@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const registryPath = path.resolve(testDirectory, "../src/app/toolRegistry.ts");
@@ -12,9 +13,11 @@ const sourceFile = ts.createSourceFile(registryPath, registrySource, ts.ScriptTa
 const toolsDeclaration = sourceFile.statements
   .filter(ts.isVariableStatement)
   .flatMap((statement) => statement.declarationList.declarations)
-  .find((declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === "tools");
+  .find((declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === "allTools");
 
-if (!toolsDeclaration || !toolsDeclaration.initializer || !ts.isArrayLiteralExpression(toolsDeclaration.initializer)) {
+const catalogArray = toolsDeclaration?.initializer && ts.isSatisfiesExpression(toolsDeclaration.initializer)
+  ? toolsDeclaration.initializer.expression : toolsDeclaration?.initializer;
+if (!catalogArray || !ts.isArrayLiteralExpression(catalogArray)) {
   throw new Error("Could not derive visual routes from src/app/toolRegistry.ts.");
 }
 
@@ -29,14 +32,14 @@ const propertyText = (entry, name) => {
     : undefined;
 };
 
-export const availableToolRoutes = Object.freeze(toolsDeclaration.initializer.elements
+export const availableToolRoutes = Object.freeze(catalogArray.elements
   .filter(ts.isObjectLiteralExpression)
   .map((entry) => ({
     id: propertyText(entry, "id"),
     path: propertyText(entry, "path"),
     status: propertyText(entry, "status"),
   }))
-  .filter((entry) => entry.id && entry.path && entry.status === "available")
+  .filter((entry) => entry.id && entry.path && entry.status === "available" && (entry.id !== "video-studio" || VIDEO_STUDIO_PUBLIC))
   .map(({ id, path: routePath }) => Object.freeze({
     id: `${id}-empty`,
     toolId: id,
@@ -50,7 +53,7 @@ export const availableToolRoutes = Object.freeze(toolsDeclaration.initializer.el
 export const expectedToolIds = Object.freeze([
   "foliotrace",
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "pdf-editor", "document-compare", "pdf-compare",
-  "hwp-editor", "office-editor", "video-studio", "audio-studio", "image-studio",
+  "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio", "image-studio",
   "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator",
   "document-redactor", "payroll-calculator", "image-privacy", "security-tools", "qr-studio", "data-converter",
 ]);

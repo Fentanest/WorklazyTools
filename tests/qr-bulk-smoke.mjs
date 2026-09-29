@@ -63,7 +63,7 @@ try {
 
   await page.goto(`${baseUrl}/ko/tools/qr-studio/bulk`, { waitUntil: "networkidle0" });
   await page.evaluate(() => {
-    localStorage.setItem("worklazy_privacy_consent", "denied");
+    localStorage.setItem("worklazy_privacy_consent_v2", "denied");
     localStorage.setItem("worklazy_lang", "ko");
   });
   await page.reload({ waitUntil: "networkidle0" });
@@ -92,7 +92,7 @@ try {
   for (const fixture of fixtures) {
     await page.goto(`${baseUrl}/ko/tools/qr-studio/bulk`, { waitUntil: "networkidle0" });
     await page.evaluate(() => {
-      localStorage.setItem("worklazy_privacy_consent", "denied");
+      localStorage.setItem("worklazy_privacy_consent_v2", "denied");
       localStorage.setItem("worklazy_lang", "ko");
     });
     await page.reload({ waitUntil: "networkidle0" });

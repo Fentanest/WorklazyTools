@@ -1,12 +1,12 @@
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import { AnalyticsLoader } from "../components/AnalyticsLoader";
 
 /**
  * Dedicated error page for S5 (render error recovery).
- * Displayed OUTSIDE AppShell, WITHOUT AdSenseLoader.
- * Contract: must have 0 ad scripts when loaded.
+ * Displayed outside AppShell without ad requests. A consenting visitor may
+ * still generate one safe, fixed-title error-page view.
  */
 export function RouteErrorPage() {
   const { t } = useTranslation("common");
@@ -18,6 +18,8 @@ export function RouteErrorPage() {
   };
 
   return (
+    <>
+    <AnalyticsLoader ready />
     <div className="page tool-page grid place-items-center min-h-screen px-4 py-8">
       <div className="max-w-sm text-center space-y-6">
         <div className="space-y-2">
@@ -41,5 +43,6 @@ export function RouteErrorPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

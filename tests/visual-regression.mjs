@@ -318,7 +318,7 @@ async function captureAndCompare(capture, browser) {
       { name: "prefers-reduced-motion", value: config.animation.prefersReducedMotion },
     ]);
     await page.evaluateOnNewDocument((locale, consent, theme) => {
-      localStorage.setItem("worklazy_privacy_consent", consent);
+      localStorage.setItem("worklazy_privacy_consent_v2", consent);
       localStorage.setItem("worklazy_lang", locale);
       // W5 shared theme fixture: the seed stores the resolved theme
       // (sparse light/dark resolve to the coral default, explicit mint

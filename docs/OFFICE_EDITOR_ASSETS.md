@@ -23,7 +23,7 @@
 ## 배포·정책 경계
 
 - 편집 안내 페이지는 일반 색인·광고·동의 정책을 따른다.
-- `/ko/tools/office-editor/app/`와 `/en/tools/office-editor/app/`는 편집 전용 문서이며 `noindex`이고 사이트맵에서 제외한다. 방문 분석과 광고 코드는 이 작업 문서에서 시작하지 않는다.
+- `/ko/tools/office-editor/app/`와 `/en/tools/office-editor/app/`는 편집 전용 문서이며 `noindex`이고 사이트맵에서 제외한다. 초기 격리·재로드 준비 중에는 광고·방문 분석을 요청하지 않는다. 준비된 공개 작업 화면의 공급자 적용은 `PROJECT_RULES.md`의 현재 정책과 실제 호환성 검증을 따른다.
 - 문서는 네트워크 업로드나 Cache Storage에 넣지 않는다. Cache Storage에는 편집 프로그램 정적 자산만 저장한다.
 - 문서를 열 때 매크로 실행과 외부 문서 갱신을 차단한다. 저장 결과는 ZIP 또는 Compound File 컨테이너 서명을 확인한 뒤 다운로드한다.
 - 정확한 글꼴, 페이지 나눔, 수식, 매크로, 고급 Microsoft Office 개체 호환은 보장하지 않는다.
