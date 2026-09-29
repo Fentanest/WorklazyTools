@@ -434,7 +434,7 @@ export function AppShell() {
         side="bottom"
         showCloseButton={false}
         overlayClassName="sheet-backdrop z-[80]"
-        className="mobile-sheet z-[90] max-h-[calc(100dvh-20px)] overflow-hidden data-[side=bottom]:inset-x-[10px] data-[side=bottom]:bottom-[10px] data-[side=bottom]:w-auto data-[side=bottom]:max-w-[520px] data-[side=bottom]:rounded-[28px]"
+        className="mobile-sheet z-[90] max-h-[calc(100dvh-20px)] overflow-hidden data-[side=bottom]:inset-x-[10px] data-[side=bottom]:max-w-[520px] data-[side=bottom]:rounded-[28px]"
         aria-label={t("navigation.shortcuts")}
         aria-modal="true"
       >

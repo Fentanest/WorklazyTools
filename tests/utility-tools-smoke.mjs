@@ -185,6 +185,7 @@ try {
   await page.click('#mobile-navigation-trigger');
   await page.waitForSelector('[data-slot="sheet-content"]', { visible: true });
   await page.waitForFunction(() => document.activeElement instanceof HTMLElement && Boolean(document.activeElement.closest('[data-slot="sheet-content"]')));
+  await page.waitForFunction(() => document.querySelector('[data-slot="sheet-panel"]')?.getAnimations().every((animation) => animation.playState === "finished"));
   await page.waitForFunction(() => {
     const sheet = document.querySelector('[data-slot="sheet-content"]');
     const panel = sheet?.querySelector('[data-slot="sheet-panel"]');
@@ -192,7 +193,7 @@ try {
     if (!(panel instanceof HTMLElement) || !(list instanceof HTMLElement)) return false;
     const rect = panel.getBoundingClientRect();
     return rect.left >= 9 && rect.left <= 11 && rect.top >= 9 && rect.top <= 11
-      && rect.width <= Math.min(360, window.innerWidth - 20) + 1
+      && rect.width <= Math.min(520, window.innerWidth - 20) + 1 && rect.right <= window.innerWidth - 9
       && rect.bottom <= window.innerHeight - 9 && list.scrollHeight > list.clientHeight;
   });
   const mobileNavigationSheet = await page.$eval('[data-slot="sheet-content"]', (sheet) => {
@@ -249,8 +250,7 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector('[data-slot="sheet-content"]'));
   await page.waitForFunction(() => document.activeElement?.id === "mobile-navigation-trigger");
-  await page.click("#mobile-navigation-trigger");
-  await page.waitForSelector("[data-slot='sheet-content'] .sheet-install .app-install-button");
+  await page.waitForSelector(".mobile-header-actions .app-install-button");
   await page.evaluate(() => {
     window.__installPromptCalls = 0;
     window.__installChoiceResolved = false;
@@ -264,10 +264,10 @@ try {
     });
     window.dispatchEvent(event);
   });
-  await page.click("[data-slot='sheet-content'] .sheet-install .app-install-button");
+  await page.click(".mobile-header-actions .app-install-button");
   await page.waitForFunction(() => window.__installPromptCalls === 1 && window.__installChoiceResolved);
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.click("[data-slot='sheet-content'] .sheet-install .app-install-button");
+  await page.click(".mobile-header-actions .app-install-button");
   await page.waitForSelector(".install-sheet");
   const installFallback = await page.$eval(".install-sheet", (element) => element.textContent || "");
   if (!installFallback.includes("홈 화면에 추가") || !installFallback.includes("브라우저 메뉴")) throw new Error(`Mobile install fallback is incomplete: ${installFallback}`);
@@ -314,7 +314,15 @@ try {
   await clickButton(page, "텍스트 병합");
   await page.waitForFunction(() => document.querySelector("[data-testid='text-merger-result']")?.value === "첫 번째\n파일 A 편집\n직접 입력 사이\n파일 B");
 
-  await page.goto(`${koBaseUrl}/tools/text-tools`, { waitUntil: "networkidle0" });
+  let sawUnsavedWorkPrompt = false;
+  const acceptSyntheticWorkExit = (dialog) => {
+    if (dialog.type() === "beforeunload") { sawUnsavedWorkPrompt = true; void dialog.accept(); }
+    else void dialog.dismiss();
+  };
+  page.on("dialog", acceptSyntheticWorkExit);
+  try { await page.goto(`${koBaseUrl}/tools/text-tools`, { waitUntil: "networkidle0" }); }
+  finally { page.off("dialog", acceptSyntheticWorkExit); }
+  if (!sawUnsavedWorkPrompt) throw new Error("Unsaved text merge work did not require leave confirmation.");
   await assertPairedEditors(page, "text-tools");
   await page.type("[data-testid='text-tools-input']", "할수  있습니다\n할수  있습니다");
   await page.click("[data-testid='text-actions'] button:nth-child(2)");

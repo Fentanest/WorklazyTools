@@ -742,7 +742,8 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 
 .sheet-backdrop { position: fixed; z-index: 80; inset: 0; display: none; align-items: flex-end; justify-content: center; padding: 10px; background: rgba(0,0,0,.23); backdrop-filter: blur(4px); animation: fade-in .2s ease both; }
 @keyframes fade-in { from { opacity: 0; } }
-.mobile-sheet { width: min(520px, 100%); padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); border: 1px solid rgba(255,255,255,.7); border-radius: 28px; background: rgba(249,249,251,.93); box-shadow: 0 -20px 60px rgba(20,22,28,.17); animation: sheet-up .32s cubic-bezier(.2,.8,.2,1) both; }
+.mobile-sheet { width: min(520px, calc(100vw - 20px)); padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); border: 1px solid rgba(255,255,255,.7); border-radius: 28px; background: rgba(249,249,251,.93); box-shadow: 0 -20px 60px rgba(20,22,28,.17); animation: sheet-up .32s cubic-bezier(.2,.8,.2,1) both; }
+[data-slot="sheet-panel"].mobile-sheet[data-side="bottom"] { top: 10px; bottom: auto; }
 @keyframes sheet-up { from { transform: translateY(30px); opacity: .7; } }
 .sheet-grabber { width: 36px; height: 5px; margin: 0 auto 16px; border-radius: 4px; background: rgba(120,120,128,.27); }
 .sheet-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
