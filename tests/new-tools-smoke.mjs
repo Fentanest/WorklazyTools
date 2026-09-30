@@ -139,6 +139,7 @@ try {
     : VIDEO_STUDIO_PUBLIC
       ? "New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, video group timelines and grouped output."
       : "New tool smoke tests passed: HWP editor, image clipboard/batch/collage preview, audio waveform editing/export, and unpublished Video Studio routes.");
+  if (onlyHwp || onlyAudio) console.log("1 passed");
 } finally {
   await fs.rm(tempDirectory, { recursive: true, force: true });
 }
