@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { isAdIneligible } from "../app/adEligibility";
+import { stripSiteBasePath } from "../app/siteBasePath";
 import { isThirdPartyBlockedForQa } from "./localQa";
 
 // With the desktop sidebar and page padding, a 740px banner needs at least
@@ -60,7 +61,7 @@ export function CoupangBanner({ routeKey }: { routeKey: string }) {
   if (!import.meta.env.PROD || isThirdPartyBlockedForQa() || ineligible || isAdIneligible() || failedKey === frameKey) return null;
 
   const direct = /\/tools\/(?:document-redactor|office-editor\/app|excel-merger\/xls-preserve)\/?$/.test(routeKey);
-  const english = /^\/en(?:\/|$)/.test(window.location.pathname);
+  const english = /^\/en(?:\/|$)/.test(stripSiteBasePath(window.location.pathname, import.meta.env.BASE_URL) ?? "");
   return (
     <section className="coupang-banner" aria-label={english ? "Coupang Partners advertisement" : "쿠팡 파트너스 광고"}>
       <iframe

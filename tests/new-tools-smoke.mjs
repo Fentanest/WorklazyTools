@@ -31,7 +31,7 @@ let rhwpInitialization;
 const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "worklazy-new-tools-"));
 
 try {
-  const fixtures = onlyHwp ? await createHwpFixtures(tempDirectory) : await createFixtures(tempDirectory);
+  const fixtures = onlyHwp ? await createHwpFixtures(tempDirectory) : onlyAudio ? await createAudioFixtures(tempDirectory) : await createFixtures(tempDirectory);
   const browser = await puppeteer.launch({
     executablePath: "/usr/bin/google-chrome",
     headless: true,
@@ -219,9 +219,19 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     const focus = document.querySelector("[data-tool-page='hwp-editor']")?.getBoundingClientRect();
     const sidebar = document.querySelector(".sidebar")?.getBoundingClientRect();
     const shell = document.querySelector("[data-testid='hwp-editor-shell']")?.getBoundingClientRect();
-    return focus && sidebar && shell ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, hasPageHeader: Boolean(document.querySelector("[data-tool-page='hwp-editor'] .ui-page-header")) } : null;
+    const mainContent = document.querySelector(".main-content");
+    return focus && sidebar && shell && mainContent ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, viewportWidth: innerWidth, mainRightPadding: Number.parseFloat(getComputedStyle(mainContent).paddingRight), hasPageHeader: Boolean(document.querySelector("[data-tool-page='hwp-editor'] .ui-page-header")) } : null;
   });
-  if (!focusLayout || focusLayout.focus.left < focusLayout.sidebar.right || focusLayout.focus.right < 1435 || focusLayout.focus.top > 10 || focusLayout.focus.bottom < 895 || focusLayout.shellHeight < focusLayout.focus.bottom - focusLayout.focus.top - 130 || focusLayout.hasPageHeader) {
+  if (onlyHwp) {
+    const captureDirectory = path.resolve("tests/visual-artifacts/ad-policy-hwp-focus");
+    await fs.mkdir(captureDirectory, { recursive: true });
+    await page.screenshot({ path: path.join(captureDirectory, "desktop.png") });
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+    await page.screenshot({ path: path.join(captureDirectory, "mobile.png") });
+    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+    console.log(`  hwp: desktop/mobile focus captures at ${captureDirectory}`);
+  }
+  if (!focusLayout || focusLayout.focus.left < focusLayout.sidebar.right || focusLayout.focus.right < focusLayout.viewportWidth - focusLayout.mainRightPadding - 1 || focusLayout.focus.top > 10 || focusLayout.focus.bottom < 895 || focusLayout.shellHeight < focusLayout.focus.bottom - focusLayout.focus.top - 130 || focusLayout.hasPageHeader) {
     throw new Error(`HWP focus layout did not fill the area outside the sidebar: ${JSON.stringify(focusLayout)}`);
   }
   await page.waitForFunction(() => {
@@ -4203,13 +4213,7 @@ async function createFixtures(directory) {
     "-f", "lavfi", "-i", "sine=frequency=440:duration=1.5",
     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", video,
   ]);
-  const audio = path.join(directory, "sample-audio.wav");
-  await execFileAsync("ffmpeg", [
-    "-hide_banner", "-loglevel", "error", "-y",
-    "-f", "lavfi", "-i", "sine=frequency=523:duration=2.4:sample_rate=48000",
-    "-filter_complex", "[0:a]asplit=2[left][right];[left][right]amerge=inputs=2[a]",
-    "-map", "[a]", "-c:a", "pcm_s16le", audio,
-  ]);
+  const { audio } = await createAudioFixtures(directory);
   await execFileAsync("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi", "-i", "color=c=0xff375f:s=240x320:r=60:d=1",
@@ -4289,6 +4293,17 @@ async function createFixtures(directory) {
     videoIncompatibleVideo,
     dolbyVisionVideo: dolbyVisionMatrix[0],
   };
+}
+
+async function createAudioFixtures(directory) {
+  const audio = path.join(directory, "sample-audio.wav");
+  await execFileAsync("ffmpeg", [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi", "-i", "sine=frequency=523:duration=2.4:sample_rate=48000",
+    "-filter_complex", "[0:a]asplit=2[left][right];[left][right]amerge=inputs=2[a]",
+    "-map", "[a]", "-c:a", "pcm_s16le", audio,
+  ]);
+  return { audio };
 }
 
 async function createHwpFixtures(directory) {

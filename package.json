@@ -54,10 +54,12 @@
     "test:pdf-finish": "node tests/pdf-finish-smoke.mjs && node tests/pdf-finish-lifecycle-smoke.mjs && node --experimental-strip-types tests/pdf-watermark-golden.mjs && node --experimental-strip-types tests/pdf-stamp-golden.mjs && node --experimental-strip-types tests/pdf-structure-golden.mjs && node --experimental-strip-types tests/pdf-finish-combined-golden.mjs",
     "test:pdf-raster-benchmark": "node tests/pdf-raster-benchmark.mjs",
     "test:pdf-watermark-performance": "node tests/pdf-watermark-performance.mjs",
-    "test:static": "node scripts/validate-static-output.mjs",
+    "test:static": "node scripts/validate-static-output.mjs && node tests/redactor-static.mjs",
     "test:ads": "node tests/ad-eligibility-smoke.mjs",
     "test:analytics": "node tests/analytics-policy-smoke.mjs",
     "test:analytics-base": "node tests/analytics-base-smoke.mjs",
+    "test:coupang-base": "node tests/coupang-base-smoke.mjs",
+    "test:provider-sdk": "node tests/provider-sdk-fenced-smoke.mjs",
     "test:i18n": "node scripts/validate-i18n.mjs",
     "test:guides": "node --experimental-strip-types scripts/validate-guides.mjs"
   },

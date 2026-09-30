@@ -16,6 +16,8 @@
 | 생성물·벤더 | 생성기·입력·vendor snapshot 크기/해시 계약, `docs/OFFICE_EDITOR_ASSETS.md` |
 | 에이전트 운영 코드·문서 | `python3 -m unittest discover -s tests/agent_ops -v`, 문서/경로/정책/복사본 검사 |
 
+실제 공급자 SDK의 제한된 개인정보 표본 점검은 `test:provider-sdk`를 명시적으로 실행한다. 현재 SDK 바이트를 읽되 브라우저의 외부 요청은 모두 차단·기록하고 합성 입력만 사용한다. 이 검사는 운영 이벤트 전송이나 격리 문서의 실제 광고 게재 검증이 아니다.
+
 최종 제품 통합 후보는 build·test:unit·test:static과 영향 범위 스모크/필요한 시각 검수·이월 필수 항목을 확인한다. 이 단계와 중간 보존용 커밋·묶음 검수를 혼동하지 않는다. 기존 유효 결과는 관련 입력이 같을 때 재사용한다. 각 브랜치 결과를 합쳐 최종 후보의 통과로 적지 않는다.
 
 비디오 편집기 비공개 기간의 `test:unit`은 `scripts/run-public-unit-tests.mjs`가 비디오 전용 파일을 제외하고, `VIDEO_STUDIO_PUBLIC` 재활성화 시 다시 포함한다. 일반 공개 경로 경계와 다른 도구의 미디어 검사는 유지한다.

@@ -163,6 +163,9 @@ jobs:
       - name: Check analytics at root and project subpath
         run: npm run test:analytics-base
 
+      - name: Check Coupang disclosure language at root and project subpath
+        run: npm run test:coupang-base
+
       - name: Validate SEO and AdSense files
         run: npm run test:static
 

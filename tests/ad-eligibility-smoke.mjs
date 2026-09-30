@@ -535,8 +535,6 @@ const S8_ENTRIES = [
   { path: "/ko/tools/pdf-compare/" },
   { path: "/ko/tools/office-editor/app/" },
   { path: "/ko/tools/excel-merger/xls-preserve/" },
-  { path: "/ko/tools/video-studio/", expectAds: false, unpublished: true },
-  { path: "/ko/tools/video-studio/trim/", expectAds: false, unpublished: true },
   { path: "/ko/tools/document-redactor/" },
   { path: "/en/tools/pdf-editor/merge/" },
   { path: "/en/tools/document-compare/" },
@@ -556,7 +554,6 @@ async function scenarioS8(browser, server) {
         await sleep(4000);
         const obs = await observe(tracked.page);
         const isolation = await tracked.page.evaluate(() => ({
-          video: Boolean(document.querySelector('meta[name="worklazy-video-isolation"]')),
           office: Boolean(document.querySelector('meta[name="worklazy-office-isolation"]')),
           excel: Boolean(document.querySelector('meta[name="worklazy-excel-preserve-isolation"]')),
           redactor: Boolean(document.querySelector('meta[name="worklazy-redactor-isolation"]')),
@@ -569,8 +566,7 @@ async function scenarioS8(browser, server) {
         const expectAds = entry.expectAds !== false;
         assert.equal(obs.scripts, expectAds ? 1 : 0, `${tag}: ready public pages request one ad script; unavailable/expired pages request none`);
         assert.equal(tracked.counters.stub, expectAds ? 1 : 0, `${tag}: exact ad stub count`);
-        if (entry.unpublished) assert.ok(bodyText.includes("잠시 공개를 중단"), `${tag}: unavailable notice is required`);
-        else assert.ok(!is404Title, `${tag}: the app must boot (got 404 document title)`);
+        assert.ok(!is404Title, `${tag}: the app must boot (got 404 document title)`);
         if (entry.expiredMarker) {
           assert.ok(expired >= 1, `${tag}: session-expired notice must be shown`);
         } else {

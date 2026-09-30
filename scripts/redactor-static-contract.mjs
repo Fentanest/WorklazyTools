@@ -13,7 +13,9 @@ export function assertRedactorStatic(html) {
     assert.ok(policy.includes("'sha256-"+createHash('sha256').update(text).digest('base64')+"'"),'exact executable bootstrap hash missing');
   }
   for(const [,text]of html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g))assert.ok(policy.includes("'sha256-"+createHash('sha256').update(text).digest('base64')+"'"));
-  assert.ok(html.includes('name="google-adsense-account"'));
+  const accountTags = [...html.matchAll(/<meta\s+name="google-adsense-account"(?=\s|\/?>)[^>]*>/g)];
+  assert.equal(accountTags.length, 1, 'exactly one AdSense account meta is required');
+  assert.match(accountTags[0][0], /\bcontent="ca-pub-8940087269746960"/, 'configured AdSense account is required');
   for(const forbidden of ['data-worklazy-video-isolation','coi-serviceworker.js'])assert.ok(!html.includes(forbidden),forbidden);
   assert.ok(/<script[^>]+type="module"[^>]+src=|<script[^>]+src=[^>]+type="module"/.test(html));
   return true;
