@@ -24,6 +24,8 @@
 
 비디오 편집기가 비공개인 동안 Pages 작업에서 비디오 전용 FFmpeg 준비와 `test:video-hybrid`는 실행하지 않는다. 공통 `test:unit`도 비디오 전용 `video-*.test.ts` 파일을 제외한다. `VIDEO_STUDIO_PUBLIC`을 다시 켤 때 단위검사는 자동으로 재포함되며 FFmpeg·하이브리드 단계도 복구하고 비디오 편집기 기능·공개 경로를 검증한다. 다른 도구가 사용하는 미디어 자산과 검사는 유지한다.
 
+도구·안내 화면만 수동 게시할 때는 `deploy-pages.yml`의 `pages_only=true`, `validate_only=false`를 사용한다. 이 경로는 DART 수집·시세 조회·포트폴리오 데이터 브랜치 쓰기·게시 이력 기록을 건너뛰고, 마지막으로 게시된 스냅샷을 검증해 그대로 재사용한다. 현재 공개 스냅샷과 기록된 게시 버전이 다르면 임의로 새 값을 만들지 않고 배포를 실패시킨다.
+
 ## 4. Search Console·공유 정보
 
 최초 공개·주소/SEO 구조 변경 때 소유권·sitemap 제출·대표 도구/정책 URL 검사·canonical·404·모바일·Core Web Vitals를 확인한다. 한·영 도구 Open Graph PNG는 `public/social/tools/`의 1200×630, summary_large_image 사용 여부와 실제 메타데이터를 대조한다.

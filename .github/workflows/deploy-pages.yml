@@ -1,5 +1,5 @@
 name: Deploy GitHub Pages
-run-name: ${{ github.event_name == 'schedule' && 'Daily FolioTrace collection and deploy' || 'Manual FolioTrace collection/build' }}
+run-name: ${{ github.event_name == 'schedule' && 'Daily FolioTrace collection and deploy' || inputs.pages_only && 'Publish site pages without portfolio refresh' || 'Manual FolioTrace collection/build' }}
 
 on:
   workflow_dispatch:
@@ -13,7 +13,12 @@ on:
           - self-hosted
           - github-hosted
       validate_only:
-        description: Run collection, pricing, and build without publishing Pages
+        description: Build and validate without publishing Pages
+        required: true
+        default: false
+        type: boolean
+      pages_only:
+        description: Reuse the published portfolio snapshot; skip collection, pricing, and data updates
         required: true
         default: false
         type: boolean
@@ -63,6 +68,7 @@ jobs:
           cache: npm
 
       - name: Test FolioTrace migration and valuation invariants
+        if: github.event_name != 'workflow_dispatch' || !inputs.pages_only
         run: npm run test:foliotrace
 
       - name: Wait for regular close confirmation on the scheduled run
@@ -80,6 +86,7 @@ jobs:
 
       - name: Collect incremental DART filings
         id: collect
+        if: github.event_name != 'workflow_dispatch' || !inputs.pages_only
         continue-on-error: true # Persist completed chunks before failing this deployment.
         run: python3 scripts/foliotrace/folio.py collect --state foliotrace-state/state.json
         env:
@@ -87,7 +94,7 @@ jobs:
 
       - name: Persist normalized collection state
         id: persist-data
-        if: always() && steps.restore.outcome == 'success'
+        if: always() && (github.event_name != 'workflow_dispatch' || !inputs.pages_only) && steps.restore.outcome == 'success'
         run: |
           git -C foliotrace-state config user.name 'github-actions[bot]'
           git -C foliotrace-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -99,14 +106,16 @@ jobs:
           echo "sha=$(git -C foliotrace-state rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Require complete DART listing
-        if: steps.collect.outcome != 'success'
+        if: (github.event_name != 'workflow_dispatch' || !inputs.pages_only) && steps.collect.outcome != 'success'
         run: exit 1
 
       - name: Verify regular close and value portfolio
+        if: github.event_name != 'workflow_dispatch' || !inputs.pages_only
         run: python3 scripts/foliotrace/folio.py price-and-value --state foliotrace-state/state.json --output foliotrace-state/publish.json
 
       - name: Persist verified quote cache
         id: persist-price
+        if: github.event_name != 'workflow_dispatch' || !inputs.pages_only
         run: |
           git -C foliotrace-state add state.json
           if ! git -C foliotrace-state diff --cached --quiet; then
@@ -114,6 +123,10 @@ jobs:
             git -C foliotrace-state push origin HEAD:refs/heads/foliotrace-data
           fi
           echo "sha=$(git -C foliotrace-state rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Reuse the last published FolioTrace snapshot
+        if: github.event_name == 'workflow_dispatch' && inputs.pages_only
+        run: python3 scripts/foliotrace/reuse_published_snapshot.py --state foliotrace-state/state.json --output foliotrace-state/publish.json
 
       - name: Pin FolioTrace data revision
         id: pin-data
@@ -204,12 +217,14 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Checkout pinned FolioTrace data for published history
+        if: github.event_name != 'workflow_dispatch' || !inputs.pages_only
         uses: actions/checkout@v4
         with:
           ref: foliotrace-data
           path: foliotrace-state
           fetch-depth: 0
       - name: Record successfully published dataset
+        if: github.event_name != 'workflow_dispatch' || !inputs.pages_only
         env:
           EXPECTED_DATA: ${{ needs.build.outputs.data_sha }}
           DATASET_VERSION: ${{ needs.build.outputs.dataset_version }}
