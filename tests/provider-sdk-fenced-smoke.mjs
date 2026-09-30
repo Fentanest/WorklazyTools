@@ -54,6 +54,15 @@ try {
     await search.press("Enter");
     await page.waitForFunction((token) => location.pathname.replace(/\/+$/, "") === "/ko/tools" && !location.search && document.querySelector('[data-testid="tools-search-input"]')?.value === token, sentinel);
     await page.waitForLoadState("networkidle");
+    await search.fill("");
+    await search.press("Enter");
+    await page.waitForFunction(() => !document.querySelector('[data-testid="tools-search-input"]')?.value);
+    await page.locator('.tool-category-filter button[aria-label^="이미지·오디오"]').click();
+    await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1);
+    await search.fill("PDF");
+    await search.press("Enter");
+    await page.waitForFunction(() => !location.search && document.querySelector('[data-testid="tools-search-input"]')?.value === "PDF" && document.querySelector('a.ui-tool-card[href="/ko/tools/pdf-editor"]'));
+    await page.waitForLoadState("networkidle");
     const redactor = await context.newPage();
     await redactor.goto(`${server.url}/ko/tools/document-redactor/`, { waitUntil: "domcontentloaded" });
     await redactor.waitForFunction(() => document.querySelector('script[data-worklazy-google-analytics][data-loaded="true"]') && typeof window.wcs_do === "function");
@@ -92,7 +101,7 @@ try {
     await fs.mkdir(evidenceDirectory, { recursive: true });
     await fs.writeFile(path.join(evidenceDirectory, "result.json"), JSON.stringify({
       sdkIdentity, browser: await browser.version(), networkRule: "only local dist and exact SDK bytes; all other external requests aborted",
-      routes: ["/ko/tools/text-merger/ -> /ko/tools (synthetic query in router state only)", "/ko/tools/?q=<synthetic> -> /ko/tools/ (legacy URL migration)", "/ko/tools/document-redactor/ (direct CSP document)", ...isolatedPages.map((entry) => entry.route)],
+      routes: ["/ko/tools/text-merger/ -> /ko/tools (synthetic query in router state only)", "/ko/tools?category=media -> /ko/tools (new search resets category)", "/ko/tools/?q=<synthetic> -> /ko/tools/ (legacy URL migration)", "/ko/tools/document-redactor/ (direct CSP document)", ...isolatedPages.map((entry) => entry.route)],
       redactorState,
       isolatedPages,
       syntheticToken: sentinel, egress, leakedCount: leaked.length,

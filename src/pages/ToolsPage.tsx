@@ -18,25 +18,20 @@ export function ToolsPage() {
   const { toolCategories, tools } = useToolCatalog();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const stateQuery = typeof location.state?.worklazySearchQuery === "string" ? location.state.worklazySearchQuery : null;
   const [query, setQuery] = useState<string>(() => stateQuery ?? searchParams.get("q") ?? "");
-  const [activeCategory, setActiveCategory] = useState<CategoryFilter>(() => {
-    const requestedCategory = searchParams.get("category");
-    return isToolCategory(requestedCategory) ? requestedCategory : "all";
-  });
+  const requestedCategory = searchParams.get("category");
+  const activeCategory: CategoryFilter = isToolCategory(requestedCategory) ? requestedCategory : "all";
   const normalizedQuery = query.trim().toLowerCase();
 
   // Migrate old ?q= links into route state before this page becomes eligible
   // for third-party SDKs. New searches never put free text in the URL.
   useEffect(() => {
     const legacyQuery = searchParams.get("q");
-    const legacyCategory = searchParams.get("category");
-    if (legacyQuery !== null || legacyCategory !== null) {
+    if (legacyQuery !== null) {
       const next = new URLSearchParams(searchParams);
       next.delete("q");
-      next.delete("category");
-      if (isToolCategory(legacyCategory)) setActiveCategory(legacyCategory);
       navigate({ pathname: location.pathname, search: next.toString() }, { replace: true, state: { ...location.state, worklazySearchQuery: legacyQuery ?? stateQuery ?? "" } });
       return;
     }
@@ -66,7 +61,12 @@ export function ToolsPage() {
     .filter((group) => group.tools.length > 0), [activeCategory, normalizedQuery, toolCategories, tools]);
 
   const visibleToolCount = groupedTools.reduce((count, group) => count + group.tools.length, 0);
-  const selectCategory = setActiveCategory;
+  const selectCategory = (category: CategoryFilter) => {
+    const next = new URLSearchParams(searchParams);
+    if (category === "all") next.delete("category");
+    else next.set("category", category);
+    setSearchParams(next, { replace: true, state: { ...location.state, worklazySearchQuery: query } });
+  };
 
   return (
     <div className="page standard-page page-enter tools-index-page">
