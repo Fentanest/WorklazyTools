@@ -130,6 +130,18 @@ try {
   }
 
   {
+    const { context, page } = await trackedContext();
+    try {
+      await page.goto(`${server.url}/ko/tools/?category=media`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.__naverViews?.length === 1);
+      const result = await counts(page);
+      assert.deepEqual([result.google, result.naver, result.adScripts], [1, 1, 1]);
+      assert.equal(result.views[0].page_path, "/ko/tools/");
+      console.log("PASS fixed category URL: one safe GA/Naver view and ad loader");
+    } finally { await context.close(); }
+  }
+
+  {
     const { context, page, release } = await trackedContext(true);
     try {
       await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });

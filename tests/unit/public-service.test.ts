@@ -42,6 +42,10 @@ test("analytics metadata accepts only known routes and fixed parameters", () => 
     path: "/en/tools/pdf-editor/merge/", title: "Worklazy Tools · tools · pdf-editor · merge",
   });
   assert.equal(safeAnalyticsPage("/ko/tools/pdf-editor/", "?file=secret.pdf"), null);
+  assert.equal(safeAnalyticsPage("/ko/tools/", "?category=media")?.path, "/ko/tools/");
+  assert.equal(safeAnalyticsPage("/en/tools/", "?category=documents")?.path, "/en/tools/");
+  assert.equal(safeAnalyticsPage("/ko/tools/", "?category=media&q=secret.pdf"), null);
+  assert.equal(safeAnalyticsPage("/ko/tools/", "?category=secret.pdf"), null);
   assert.equal(safeAnalyticsPage("/en/tools/hwp-editor/"), null);
   assert.equal(safeAnalyticsPage("/ko/tools/pdf-editor/", "", "#secret"), null);
   assert.equal(safeAnalyticsPage("/ko/tools/office-editor/", "?guide=1")?.path, "/ko/tools/office-editor/");
