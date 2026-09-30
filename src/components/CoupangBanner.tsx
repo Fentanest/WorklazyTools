@@ -4,16 +4,16 @@ import { isAdIneligible } from "../app/adEligibility";
 import { stripSiteBasePath } from "../app/siteBasePath";
 import { isThirdPartyBlockedForQa } from "./localQa";
 
-// With the desktop sidebar and page padding, a 740px banner needs at least
-// 1076px of viewport width. Use the smaller variant below that threshold.
-const MOBILE_BANNER_QUERY = "(max-width: 1075px)";
+// With the desktop sidebar and page padding, a 1030px banner needs at least
+// 1366px of viewport width. Use the smaller variant below that threshold.
+const MOBILE_BANNER_QUERY = "(max-width: 1365px)";
 const DISCLOSURE_KO = "이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
 const DISCLOSURE_EN = "This page includes Coupang Partners affiliate ads. We may earn a commission from purchases made through them.";
 const WIDGET_FAILED_MESSAGE = "worklazy:coupang-widget-failed";
 
 function bannerSource(size: "mobile" | "desktop", direct: boolean) {
-  const width = size === "mobile" ? 280 : 740;
-  const height = size === "mobile" ? 160 : 280;
+  const width = size === "mobile" ? 280 : 1030;
+  const height = size === "mobile" ? 160 : 190;
   const id = size === "mobile" ? 1034218 : 1034406;
   // The redactor's strict CSP and the Office/XLS require-corp documents cannot
   // run the loader. Use its cross-origin widget URL there. Elsewhere, run the
@@ -72,8 +72,8 @@ export function CoupangBanner({ routeKey }: { routeKey: string }) {
         title={english ? "Coupang Partners advertisement" : "쿠팡 파트너스 광고"}
         src={bannerSource(size, direct)}
         className="coupang-banner-frame"
-        width={mobile ? 280 : 740}
-        height={mobile ? 160 : 280}
+        width={mobile ? 280 : 1030}
+        height={mobile ? 160 : 190}
         loading="lazy"
         referrerPolicy="no-referrer"
         sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
