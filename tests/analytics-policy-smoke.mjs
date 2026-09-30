@@ -259,7 +259,7 @@ try {
       });
       assert.ok(layout.bannerTop >= layout.editorBottom - 1 && layout.footerTop >= layout.bannerBottom - 1, JSON.stringify(layout));
       assert.equal(layout.frameWidth, width < 1076 ? "280" : "740");
-      assert.equal(layout.disclosure, "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.");
+      assert.equal(layout.disclosure, "이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.");
       assert.equal(layout.theme, theme);
       if (width < 821) assert.equal(layout.mobileNavigation, "none");
       console.log(`PASS HWP focus ${theme} ${width}px: footer banner outside editor and exact disclosure`);

@@ -402,7 +402,7 @@ export function AppShell() {
           {redactorActive && !redactorDocument && <DocumentRedactorFallback />}
         </RouteErrorBoundary>
         {import.meta.env.PROD && videoStudioActive && !videoControllerReady && <div className="tool-route-loading min-h-[420px]" role="status">{videoIsolationFailed ? (language === "ko" ? "비디오 도구를 준비하지 못했습니다. 페이지를 새로고침해 다시 시도하세요." : "The video tool could not start. Refresh the page to try again.") : t("status.loadingTool", { tool: "Video Studio" })}</div>}
-        {adReady && normalizedPath.startsWith("/tools/") && <CoupangBanner routeKey={normalizedPath} />}
+        {adReady && (normalizedPath === "/" || normalizedPath === "/tools" || normalizedPath.startsWith("/tools/")) && <CoupangBanner routeKey={normalizedPath} />}
         <footer className="global-footer">
           <span>© {new Date().getFullYear()} Worklazy Tools</span>
           <nav aria-label={t("footer.policyLabel")}>
