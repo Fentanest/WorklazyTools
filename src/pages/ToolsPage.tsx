@@ -1,7 +1,7 @@
 import { LayoutGrid, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { type ToolAccent, type ToolCategoryId } from "../app/toolRegistry";
 import { PrivacyBanner } from "../components/PrivacyBanner";
@@ -16,17 +16,33 @@ type CategoryFilter = "all" | ToolCategoryId;
 export function ToolsPage() {
   const { t } = useTranslation(["tools", "common"]);
   const { toolCategories, tools } = useToolCatalog();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const requestedCategory = searchParams.get("category");
-  const activeCategory: CategoryFilter = isToolCategory(requestedCategory) ? requestedCategory : "all";
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const stateQuery = typeof location.state?.worklazySearchQuery === "string" ? location.state.worklazySearchQuery : null;
+  const [query, setQuery] = useState<string>(() => stateQuery ?? searchParams.get("q") ?? "");
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>(() => {
+    const requestedCategory = searchParams.get("category");
+    return isToolCategory(requestedCategory) ? requestedCategory : "all";
+  });
   const normalizedQuery = query.trim().toLowerCase();
 
-  // Keep the top-bar search (?q=) and the in-page search box in sync.
+  // Migrate old ?q= links into route state before this page becomes eligible
+  // for third-party SDKs. New searches never put free text in the URL.
   useEffect(() => {
-    const externalQuery = searchParams.get("q") ?? "";
+    const legacyQuery = searchParams.get("q");
+    const legacyCategory = searchParams.get("category");
+    if (legacyQuery !== null || legacyCategory !== null) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("q");
+      next.delete("category");
+      if (isToolCategory(legacyCategory)) setActiveCategory(legacyCategory);
+      navigate({ pathname: location.pathname, search: next.toString() }, { replace: true, state: { ...location.state, worklazySearchQuery: legacyQuery ?? stateQuery ?? "" } });
+      return;
+    }
+    const externalQuery = stateQuery ?? "";
     setQuery((current) => (current === externalQuery ? current : externalQuery));
-  }, [searchParams]);
+  }, [location.pathname, location.state, navigate, searchParams, stateQuery]);
 
   const groupedTools = useMemo(() => toolCategories
     .filter((category) => activeCategory === "all" || category.id === activeCategory)
@@ -50,12 +66,7 @@ export function ToolsPage() {
     .filter((group) => group.tools.length > 0), [activeCategory, normalizedQuery, toolCategories, tools]);
 
   const visibleToolCount = groupedTools.reduce((count, group) => count + group.tools.length, 0);
-  const selectCategory = (category: CategoryFilter) => {
-    const next = new URLSearchParams(searchParams);
-    if (category === "all") next.delete("category");
-    else next.set("category", category);
-    setSearchParams(next, { replace: true });
-  };
+  const selectCategory = setActiveCategory;
 
   return (
     <div className="page standard-page page-enter tools-index-page">
@@ -134,5 +145,5 @@ const categoryIconClasses = {
 } satisfies Record<ToolAccent, string>;
 
 function isToolCategory(value: string | null): value is ToolCategoryId {
-  return ["documents", "media", "text-data", "work", "security-share"].includes(value ?? "");
+  return ["spreadsheets", "documents", "media", "text-data", "work", "security-share", "investment-research"].includes(value ?? "");
 }

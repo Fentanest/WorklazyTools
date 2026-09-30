@@ -488,8 +488,9 @@ function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed, onGuar
   const { t } = useTranslation("common");
   const language = useAppLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const [query, setQuery] = useState<string>(() => typeof location.state?.worklazySearchQuery === "string" ? location.state.worklazySearchQuery : searchParams.get("q") ?? "");
   const searchRef = useRef<HTMLInputElement>(null);
   const CollapseIcon = sidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
 
@@ -506,12 +507,11 @@ function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed, onGuar
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    const next = new URLSearchParams();
-    if (query.trim()) next.set("q", query.trim());
-    const search = next.toString();
-    const to = `${localizedPath(language, "/tools")}${search ? `?${search}` : ""}`;
+    // Search terms are free text. Keep them out of History URLs because GA's
+    // account-level enhanced measurement can emit its own history page_view.
+    const to = localizedPath(language, "/tools");
     onGuardedNavigate(to, () => {
-      navigate(to);
+      navigate(to, { state: { worklazySearchQuery: query.trim() } });
       trackToolOpen("topbar-search", "topbar", language);
     });
   };

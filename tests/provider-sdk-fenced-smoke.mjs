@@ -18,8 +18,10 @@ for (const [name, url] of Object.entries(sdkUrls)) {
   const response = await fetch(url);
   assert.equal(response.status, 200, `${name} SDK must be retrievable`);
   const body = Buffer.from(await response.arrayBuffer());
-  sdk.set(url, body);
-  sdkIdentity[name] = { url, bytes: body.length, sha256: createHash("sha256").update(body).digest("hex") };
+  const headers = Object.fromEntries(["access-control-allow-origin", "cross-origin-resource-policy"]
+    .map((key) => [key, response.headers.get(key)]).filter(([, value]) => value));
+  sdk.set(url, { body, headers });
+  sdkIdentity[name] = { url, bytes: body.length, sha256: createHash("sha256").update(body).digest("hex"), headers };
   console.log(`${name} SDK: ${body.length} bytes, sha256 ${sdkIdentity[name].sha256}`);
 }
 
@@ -29,18 +31,18 @@ try {
   const context = await browser.newContext({ serviceWorkers: "block" });
   await context.addInitScript(() => { window.__WORKLAZY_MOCK_PROVIDERS__ = true; });
   const egress = [];
-  await context.route("**/*", async (route) => {
+  const captureRoute = async (route) => {
     const request = route.request();
     const url = request.url();
     if (new URL(url).origin === new URL(server.url).origin) return route.continue();
     if (sdk.has(url)) {
-      return route.fulfill({ status: 200, contentType: "text/javascript", headers: {
-        "access-control-allow-origin": "*", "cross-origin-resource-policy": "cross-origin",
-      }, body: sdk.get(url) });
+      const captured = sdk.get(url);
+      return route.fulfill({ status: 200, contentType: "text/javascript", headers: captured.headers, body: captured.body });
     }
     egress.push({ url, method: request.method(), headers: request.headers(), body: request.postData() ?? "" });
     return route.abort();
-  });
+  };
+  await context.route("**/*", captureRoute);
   const page = await context.newPage();
   try {
     await page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
@@ -50,7 +52,7 @@ try {
     const search = page.locator(".wl-topbar .wl-search input");
     await search.fill(sentinel);
     await search.press("Enter");
-    await page.waitForFunction((token) => location.pathname.replace(/\/+$/, "") === "/ko/tools" && new URLSearchParams(location.search).get("q") === token, sentinel);
+    await page.waitForFunction((token) => location.pathname.replace(/\/+$/, "") === "/ko/tools" && !location.search && document.querySelector('[data-testid="tools-search-input"]')?.value === token, sentinel);
     await page.waitForLoadState("networkidle");
     const redactor = await context.newPage();
     await redactor.goto(`${server.url}/ko/tools/document-redactor/`, { waitUntil: "domcontentloaded" });
@@ -63,18 +65,41 @@ try {
     }));
     assert.match(redactorState.csp, /script-src 'self'/);
     assert.equal(redactorState.route, "/ko/tools/document-redactor/");
+    const legacySearch = await context.newPage();
+    await legacySearch.goto(`${server.url}/ko/tools/?q=${encodeURIComponent(sentinel)}`, { waitUntil: "domcontentloaded" });
+    await legacySearch.waitForFunction((token) => !location.search && document.querySelector('[data-testid="tools-search-input"]')?.value === token, sentinel);
+    await legacySearch.waitForLoadState("networkidle");
+    const isolatedPages = [];
+    for (const workspace of ["office-editor/app", "excel-merger/xls-preserve"]) {
+      const isolatedContext = await browser.newContext({ serviceWorkers: "allow" });
+      await isolatedContext.addInitScript(() => { window.__WORKLAZY_MOCK_PROVIDERS__ = true; });
+      await isolatedContext.route("**/*", captureRoute);
+      try {
+        const isolatedPage = await isolatedContext.newPage();
+        await isolatedPage.goto(`${server.url}/ko/tools/${workspace}/`, { waitUntil: "domcontentloaded" });
+        await isolatedPage.waitForFunction(() => crossOriginIsolated && document.querySelector('script[data-worklazy-google-analytics][data-loaded="true"]') && typeof window.wcs_do === "function", null, { timeout: 60_000 });
+        await isolatedPage.waitForLoadState("networkidle");
+        isolatedPages.push(await isolatedPage.evaluate(() => ({
+          route: location.pathname, isolated: crossOriginIsolated,
+          controller: navigator.serviceWorker.controller?.scriptURL ?? "",
+        })));
+      } finally {
+        await isolatedContext.close();
+      }
+    }
     const leaked = egress.filter((entry) => JSON.stringify(entry).includes(sentinel));
     const evidenceDirectory = path.resolve("tests/visual-artifacts/provider-sdk-fenced");
     await fs.mkdir(evidenceDirectory, { recursive: true });
     await fs.writeFile(path.join(evidenceDirectory, "result.json"), JSON.stringify({
       sdkIdentity, browser: await browser.version(), networkRule: "only local dist and exact SDK bytes; all other external requests aborted",
-      routes: ["/ko/tools/text-merger/ -> /ko/tools?q=<synthetic>", "/ko/tools/document-redactor/ (direct CSP document)"],
+      routes: ["/ko/tools/text-merger/ -> /ko/tools (synthetic query in router state only)", "/ko/tools/?q=<synthetic> -> /ko/tools/ (legacy URL migration)", "/ko/tools/document-redactor/ (direct CSP document)", ...isolatedPages.map((entry) => entry.route)],
       redactorState,
+      isolatedPages,
       syntheticToken: sentinel, egress, leakedCount: leaked.length,
     }, null, 2));
     assert.equal(leaked.length, 0, `synthetic user text reached ${leaked.length} blocked supplier requests`);
     const supplierAttempts = egress.filter((entry) => /google|naver|pstatic/.test(new URL(entry.url).hostname));
-    console.log(`PASS real SDK fenced: ${egress.length} external requests aborted, ${supplierAttempts.length} analytics attempts, synthetic text in 0 URLs/bodies/headers; redactor CSP document loaded both SDKs`);
+    console.log(`PASS real SDK fenced: ${egress.length} external requests aborted, ${supplierAttempts.length} analytics attempts, synthetic text in 0 URLs/bodies/headers; redactor CSP and Office/XLS COEP documents loaded both SDKs`);
   } finally {
     await context.close();
   }
