@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { isThirdPartyBlockedForQa } from "./localQa";
 import { isAdIneligible } from "../app/adEligibility";
 
 const ADSENSE_CLIENT = "ca-pub-8940087269746960";
 
-export function AdSenseLoader({ ready }: { ready: boolean }) {
+declare global {
+  interface Window { adsbygoogle?: unknown[] & { pauseAdRequests?: number }; }
+}
+
+export function AdSenseLoader({ ready, terminalIneligible = false }: { ready: boolean; terminalIneligible?: boolean }) {
   const [ineligible, setIneligible] = useState(() => isAdIneligible());
 
   useEffect(() => {
@@ -16,6 +20,16 @@ export function AdSenseLoader({ ready }: { ready: boolean }) {
     window.addEventListener("wl-ad-eligibility-changed", handleEligibility);
     return () => window.removeEventListener("wl-ad-eligibility-changed", handleEligibility);
   }, []);
+
+  useLayoutEffect(() => {
+    const script = document.querySelector("script[data-worklazy-adsense]");
+    if (!script) return;
+    // Google's documented request pause prevents new Auto Ads requests while
+    // a route is still preparing. It does not remove an already-rendered ad.
+    const queue = (window.adsbygoogle ??= []);
+    queue.pauseAdRequests = ready && !ineligible && !isAdIneligible() ? 0 : 1;
+    if (terminalIneligible) window.location.replace(window.location.href);
+  }, [ready, ineligible, terminalIneligible]);
 
   useEffect(() => {
     if (!import.meta.env.PROD || isThirdPartyBlockedForQa() || !ready || ineligible || isAdIneligible() || document.querySelector("script[data-worklazy-adsense]")) return;

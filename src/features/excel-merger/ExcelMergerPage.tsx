@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useLocation } from "react-router-dom";
+import { withSiteBasePath } from "../../app/siteBasePath";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { FileShareButton } from "../../components/FileShareButton";
@@ -306,7 +307,7 @@ export function ExcelMergerPage() {
     if (requiresNavigation) {
       if (entries.length > 0 && !window.confirm(t("excel.xlsPreserve.switchConfirm"))) return;
       if (!next.formulas && !next.formatting) {
-        window.location.assign(standardPath);
+        window.location.assign(withSiteBasePath(standardPath, import.meta.env.BASE_URL));
         return;
       }
       window.location.assign(createPreserveUrl(preservePath, next));
@@ -946,7 +947,7 @@ function getInitialXlsRetention(preserveRoute: boolean, search: string) {
 }
 
 function createPreserveUrl(path: string, retention: { formulas: boolean; formatting: boolean }) {
-  const target = new URL(path, window.location.origin);
+  const target = new URL(withSiteBasePath(path, import.meta.env.BASE_URL), window.location.origin);
   target.searchParams.set("formula", retention.formulas ? "1" : "0");
   target.searchParams.set("format", retention.formatting ? "1" : "0");
   return `${target.pathname}${target.search}`;

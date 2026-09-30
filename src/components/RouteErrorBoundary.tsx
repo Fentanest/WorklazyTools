@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { confirmToolReady } from "../app/chunkRecovery";
 import { Button } from "./ui/button";
 import { setAdIneligible } from "../app/adEligibility";
+import { withSiteBasePath } from "../app/siteBasePath";
 
 
 class RouteBoundary extends Component<{ children: ReactNode; resetKey: string; onError?: () => void }, { failed: boolean; resetKey: string }> {
@@ -37,7 +38,7 @@ export function RouteErrorBoundary({ children }: { children: ReactNode }) {
       // Second error in same session - show error in-place without navigation
       return;
     }
-    window.location.assign(`/${lang}/error/`);
+    window.location.assign(withSiteBasePath(`/${lang}/error/`, import.meta.env.BASE_URL));
   };
   return <RouteBoundary resetKey={`${location.pathname}${location.search}`} onError={handleError}>{children}</RouteBoundary>;
 }
@@ -53,7 +54,7 @@ function RouteFailure() {
   const goHome = () => {
     // D3: Don't reload. Return to home (clear state).
     const lang = document.documentElement.lang || "en";
-    window.location.assign(`/${lang}/`);
+    window.location.assign(withSiteBasePath(`/${lang}/`, import.meta.env.BASE_URL));
   };
   return (
     <div className="page tool-page tool-route-loading outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" role="alert" tabIndex={-1} ref={notice} data-route-error>

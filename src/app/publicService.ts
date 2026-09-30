@@ -1,6 +1,7 @@
 import { seoByPath, toolSlugByPath } from "./seo.ts";
 import { stripLanguagePrefix } from "../i18n/languages.ts";
 import { VIDEO_STUDIO_PUBLIC } from "./publicServiceConfig.mjs";
+import { withSiteBasePath } from "./siteBasePath.ts";
 
 // One publication decision is consumed by the catalog, router, static generator and tracking.
 // The implementation remains in src/features/video-studio for a later reactivation.
@@ -23,6 +24,7 @@ export function documentReadiness(
   isolated: boolean,
   search = "",
   controllerScriptUrl = "",
+  baseUrl = "/",
 ): DocumentReadiness {
   if (isVideoUnavailablePath(pathname)) return "unavailable";
   const path = stripLanguagePrefix(pathname).replace(/\/+$/, "") || "/";
@@ -33,13 +35,13 @@ export function documentReadiness(
   if (path === "/tools/office-editor" && new URLSearchParams(search).get("guide") !== "1") return "navigation";
   if (redactor !== markers.redactor || office !== markers.office || excel !== markers.excel) return "navigation";
   if (office || excel) {
-    const expectedWorkerPath = `${pathname.replace(/\/+$/, "")}/coi-serviceworker.js`;
+    const expectedWorkerPath = `${withSiteBasePath(pathname, baseUrl).replace(/\/+$/, "")}/coi-serviceworker.js`;
     let ownsDocument = false;
     try {
       const controllerPath = new URL(controllerScriptUrl).pathname;
       // A workspace reached from the main SPA may already be isolated by the
       // root worker. Direct entry instead uses the workspace-scoped worker.
-      ownsDocument = controllerPath === expectedWorkerPath || controllerPath === "/service-worker.js";
+      ownsDocument = controllerPath === expectedWorkerPath || controllerPath === withSiteBasePath("/service-worker.js", baseUrl);
     } catch { /* Uncontrolled bootstrap document. */ }
     if (!isolated || !ownsDocument) return "isolation-pending";
   }

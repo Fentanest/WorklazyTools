@@ -1,6 +1,6 @@
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
 export function registerServiceWorker() {
-  if (isRedactorDocument() || isRedactorPath(location.pathname)) return;
+  if (isRedactorDocument() || isRedactorPath(location.pathname, import.meta.env.BASE_URL)) return;
   if (/\/(?:ko|en)\/tools\/(?:office-editor\/app|excel-merger\/xls-preserve)\/?$/.test(location.pathname)) return;
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {

@@ -1,12 +1,16 @@
+import { stripSiteBasePath } from "./siteBasePath";
+
 export const REDACTOR_MARKER = 'meta[name="worklazy-redactor-isolation"][content="document-scope"]';
-export function isRedactorPath(pathname: string) {
-  return /^\/(?:ko\/|en\/)?tools\/document-redactor\/?$/.test(pathname);
+export function isRedactorPath(pathname: string, baseUrl = "/") {
+  const route = stripSiteBasePath(pathname, baseUrl);
+  return route !== null && /^\/(?:ko\/|en\/)?tools\/document-redactor\/?$/.test(route);
 }
 export function isRedactorDocument() {
   return Boolean(document.querySelector(REDACTOR_MARKER));
 }
 function isDedicatedWorkspacePath(pathname: string) {
-  return /^\/(?:ko\/|en\/)?tools\/(?:document-redactor|office-editor\/app|excel-merger\/xls-preserve)\/?$/.test(pathname);
+  const route = stripSiteBasePath(pathname, import.meta.env.BASE_URL);
+  return route !== null && /^\/(?:ko\/|en\/)?tools\/(?:document-redactor|office-editor\/app|excel-merger\/xls-preserve)\/?$/.test(route);
 }
 function isDedicatedWorkspaceDocument() {
   return Boolean(document.querySelector(`${REDACTOR_MARKER}, meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"]`));

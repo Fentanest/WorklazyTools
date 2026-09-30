@@ -6,6 +6,9 @@
 
 ## 2026-09-30 — 자체 광고·분석 동의창 제거 후 확인
 
+- 고정 후보 `21e4c18`의 Astra 정식 검수는 `needs_changes`였다. 새 AdSense 삽입만 막는 코드가 이미 실행된 Auto Ads의 잔여 DOM을 처리하지 못하는 상태 전환, 프로젝트 하위 경로에서 Router/실제 URL 불일치로 GA·네이버 페이지뷰가 0건인 반례 두 가지가 차단 항목이었다. 후속 후보에서는 빈 비교 결과·미제공 상태에 한해 기존 Auto Ads 문서를 끝내고, 준비 중 요청은 Google의 `pauseAdRequests` 예시 설정을 사용한다. 빈 비교 결과→정상 도구→브라우저 뒤로가기는 모의 공급자에서 최종 광고 스크립트/DOM 0건·추가 광고 요청 0건·문서 전환 1회였다. 이것은 실제 AdSense 후속 iframe·송출 검증이 아니다. — Codx
+- 분석 경로는 Vite `BASE_URL`을 Router 경로와 실제 URL의 비교·GA page_location/path·네이버 동일 사이트 referrer에 일관되게 적용했다. jsdom의 실제 React Router+로더 모의 공급자 검사에서 루트와 `/worklazytools/` 각각 직접 진입·SPA 이동·재방문 GA 3건/네이버 3건이었다. Office/XLS 서비스워커 소유 및 강제 문서 이동도 같은 base를 적용했다. 실제 프로젝트 하위 경로 배포의 공급자 네트워크는 미검증이다. — Codx
+- 비디오 기능 검사는 비공개 기간 `test:unit`의 `video-*.test.ts`와 전용 하이브리드 검사에서 제외한다. 기존 공통 단위 명령을 변경 전 한 번 실행해 비디오 소스 단위검사까지 포함한 것은 요청 범위를 놓친 실행이며, 후속 선택 실행은 65개 파일·586건 통과였다. 공개 중단 경계 검사는 기능 검사와 구분해 유지한다. — Codx
 - 비디오 편집기 비공개 상태에서 별도 `test:video-hybrid` 실행을 시작했으나 사용자 지시 직후 중단했다(exit 130). 이를 통과로 간주하지 않는다. Pages의 해당 비디오 전용 검사와 FFmpeg 준비는 재공개 때까지 제외하며, 오디오 등 다른 미디어 도구의 검사는 유지한다. — Codx
 - 저장된 기존 동의값은 새 동작에 승계하지 않으며 앱 로더는 정상 화면 준비·공개 경로 적격성만 확인한다. 로컬 프로덕션 미리보기에서는 실제 공급자 요청을 기본 차단하고, 공급자 모의 검사는 외부 요청을 차단하는 테스트에서만 명시적으로 허용한다. 이 변경은 배포 측 CMP 실동작이나 공급자 계정 승인을 검증한 것이 아니다. — Codx
 - 최종 후보의 `npm run build`, `npm run test:unit`(653/653), `npm run test:static`, `npm run test:ads`, `npm run test:analytics`, `npm run test:xls-preserve`, `npm run test:xls-first-load`, `npm run test:office`, `npm run test:pdf-compare-ui`, `npm run test:excel-cleaner`는 통과했다. `npm run test:utilities`는 변경하지 않은 Image Studio의 영문 화면에 남은 한국어 안내 문구 검사에서, `npm run test:excel-compare`는 변경하지 않은 선택 카드·Swap/Add 시각 대비 검사에서 실패했다. 둘을 통과나 변경 원인으로 단정하지 않고 별도 회귀 확인 대상으로 남긴다. — Codx

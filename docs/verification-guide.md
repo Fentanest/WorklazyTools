@@ -5,7 +5,7 @@
 | 변경 영역 | 우선 확인할 기존 진입점 |
 |---|---|
 | 순수 로직·회귀 | `tests/unit/*.test.ts`, `npm run test:unit` 및 실제 지원하는 개별 테스트 선택 |
-| 정적 페이지·SEO·광고/분석 준비 상태·언어 | `test:static`, `test:guides`, `test:i18n`, `test:ads` 중 관련 항목 |
+| 정적 페이지·SEO·광고/분석 준비 상태·언어 | `test:static`, `test:guides`, `test:i18n`, `test:ads`, `test:analytics`, `test:analytics-base` 중 관련 항목 |
 | 일반 도구 | `test:utilities`, `test:new-tools`, `test:browser` 중 실제 변경된 도구/소비자 |
 | Excel 비교·정리·XLS 보존 | `test:excel-compare`, `test:excel-cleaner`, `test:xls-preserve`, `test:xls-first-load` |
 | 문서 비교·오피스 | `test:document-diff`, `test:office` |
@@ -17,6 +17,8 @@
 | 에이전트 운영 코드·문서 | `python3 -m unittest discover -s tests/agent_ops -v`, 문서/경로/정책/복사본 검사 |
 
 최종 제품 통합 후보는 build·test:unit·test:static과 영향 범위 스모크/필요한 시각 검수·이월 필수 항목을 확인한다. 이 단계와 중간 보존용 커밋·묶음 검수를 혼동하지 않는다. 기존 유효 결과는 관련 입력이 같을 때 재사용한다. 각 브랜치 결과를 합쳐 최종 후보의 통과로 적지 않는다.
+
+비디오 편집기 비공개 기간의 `test:unit`은 `scripts/run-public-unit-tests.mjs`가 비디오 전용 파일을 제외하고, `VIDEO_STUDIO_PUBLIC` 재활성화 시 다시 포함한다. 일반 공개 경로 경계와 다른 도구의 미디어 검사는 유지한다.
 
 `PUBLISHING_CHECKLIST.md`의 전체 목록은 최초 공개·광범위 변경·운영 기반 변경 때 적용한다. 평상시 작은 수정에서 전 도구/전 형식 검사를 반복하는 근거로 쓰지 않는다. CI의 기존 필수 검사는 유지한다.
 

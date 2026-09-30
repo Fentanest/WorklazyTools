@@ -160,6 +160,9 @@ jobs:
       - name: Run ad eligibility smoke tests
         run: npm run test:ads
 
+      - name: Check analytics at root and project subpath
+        run: npm run test:analytics-base
+
       - name: Validate SEO and AdSense files
         run: npm run test:static
 

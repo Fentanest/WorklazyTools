@@ -10,7 +10,7 @@ const read = (relativePath: string) => fs.readFileSync(path.join(repositoryRoot,
 const appShellSource = read("src/components/AppShell.tsx");
 
 test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect ownership", () => {
-  assert.match(appShellSource, /<RouteSeo \/>[\s\S]*?<VideoIsolationBoundary[\s\S]*?<OfficeIsolationBoundary[\s\S]*?<ExcelPreserveIsolationBoundary[\s\S]*?<AnalyticsLoader ready=\{pageReady\} \/>[\s\S]*?<AdSenseLoader ready=\{adReady\} \/>/);
+  assert.match(appShellSource, /<RouteSeo \/>[\s\S]*?<VideoIsolationBoundary[\s\S]*?<OfficeIsolationBoundary[\s\S]*?<ExcelPreserveIsolationBoundary[\s\S]*?<AnalyticsLoader ready=\{pageReady\} \/>[\s\S]*?<AdSenseLoader ready=\{adReady\} terminalIneligible=\{terminalAdState\} \/>/);
   assert.match(appShellSource, /documentReadiness\(location\.pathname/);
   assert.match(appShellSource, /readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe/);
   assert.doesNotMatch(appShellSource, /isAdFreePath|adFree/);
@@ -19,8 +19,8 @@ test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect owne
   assert.match(appShellSource, /normalizedPath === "\/tools\/office-editor\/app"/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/excel-merger\/xls-preserve"/);
   assert.match(appShellSource, /videoParentAssetUrl\(window\.location\.pathname/);
-  assert.match(appShellSource, /target\.pathname = localizedPath\(language, "\/tools\/office-editor\/app\/"\)/);
-  assert.match(appShellSource, /target\.pathname = localizedPath\(language, "\/tools\/excel-merger\/xls-preserve\/"\)/);
+  assert.match(appShellSource, /target\.pathname = withSiteBasePath\(localizedPath\(language, "\/tools\/office-editor\/app\/"\), import\.meta\.env\.BASE_URL\)/);
+  assert.match(appShellSource, /target\.pathname = withSiteBasePath\(localizedPath\(language, "\/tools\/excel-merger\/xls-preserve\/"\), import\.meta\.env\.BASE_URL\)/);
   assert.match(appShellSource, /<aside className="sidebar glass-panel"/);
   assert.match(appShellSource, /<nav className="bottom-tabs glass-bar"/);
 });

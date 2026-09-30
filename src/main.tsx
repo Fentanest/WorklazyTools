@@ -39,4 +39,4 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>,
 );
 
-if (!isRedactorDocument() && !isRedactorPath(location.pathname)) registerServiceWorker();
+if (!isRedactorDocument() && !isRedactorPath(location.pathname, import.meta.env.BASE_URL)) registerServiceWorker();

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { documentReadiness, isKnownPublicPath, isVideoUnavailablePath, safeAnalyticsPage, VIDEO_STUDIO_PUBLIC } from "../../src/app/publicService.ts";
+import { stripSiteBasePath, withSiteBasePath } from "../../src/app/siteBasePath.ts";
 
 const noMarkers = { redactor: false, office: false, excel: false };
 
@@ -22,9 +23,18 @@ test("public tools are eligible by readiness, not an old tool-type ad or analyti
   assert.equal(documentReadiness("/ko/tools/office-editor/app/", { ...noMarkers, office: true }, true, "", "https://worklazy.net/service-worker.js"), "ready");
   assert.equal(documentReadiness("/ko/tools/excel-merger/xls-preserve/", { ...noMarkers, excel: true }, true, "", "https://worklazy.net/ko/tools/excel-merger/xls-preserve/coi-serviceworker.js"), "ready");
   assert.equal(documentReadiness("/ko/tools/excel-merger/xls-preserve/", { ...noMarkers, excel: true }, true, "", "https://worklazy.net/service-worker.js"), "ready");
+  assert.equal(documentReadiness("/ko/tools/office-editor/app/", { ...noMarkers, office: true }, true, "", "https://worklazy.net/worklazytools/ko/tools/office-editor/app/coi-serviceworker.js", "/worklazytools/"), "ready");
+  assert.equal(documentReadiness("/ko/tools/excel-merger/xls-preserve/", { ...noMarkers, excel: true }, true, "", "https://worklazy.net/worklazytools/service-worker.js", "/worklazytools/"), "ready");
   assert.equal(documentReadiness("/ko/tools/office-editor/", noMarkers, false), "navigation");
   assert.equal(documentReadiness("/ko/tools/office-editor/", noMarkers, false, "?guide=1"), "ready");
   assert.equal(documentReadiness("/en/tools/hwp-editor/", noMarkers, false), "navigation");
+});
+
+test("browser URL and router path use the same deployment-base coordinates", () => {
+  assert.equal(withSiteBasePath("/ko/tools/text-merger/", "/"), "/ko/tools/text-merger/");
+  assert.equal(withSiteBasePath("/ko/tools/text-merger/", "/worklazytools/"), "/worklazytools/ko/tools/text-merger/");
+  assert.equal(stripSiteBasePath("/worklazytools/ko/tools/text-merger/", "/worklazytools/"), "/ko/tools/text-merger/");
+  assert.equal(stripSiteBasePath("/ko/tools/text-merger/", "/worklazytools/"), null);
 });
 
 test("analytics metadata accepts only known routes and fixed parameters", () => {

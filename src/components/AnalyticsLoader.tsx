@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
 import { safeAnalyticsPage } from "../app/publicService";
+import { stripSiteBasePath, withSiteBasePath } from "../app/siteBasePath";
 import { tools } from "../app/toolRegistry";
 import { isThirdPartyBlockedForQa } from "./localQa";
 
@@ -11,6 +12,7 @@ const GOOGLE_TAG_URL = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANA
 const NAVER_TAG_URL = "https://wcs.pstatic.net/wcslog.js";
 const TOOL_IDS = new Set([...tools.map((tool) => tool.id), "topbar-search"]);
 const MENU_SOURCES = new Set(["home_card", "tools_card", "sidebar", "mobile_sheet", "topbar"]);
+const SITE_BASE_URL = import.meta.env.BASE_URL;
 
 declare global {
   interface Window {
@@ -74,13 +76,15 @@ function isSafeNaverReferrer(referrer: string) {
     if (url.origin !== window.location.origin) return url.pathname === "/";
     // The language landing is a safe same-site referrer even though it has
     // no locale-specific analytics page of its own.
-    return url.pathname === "/" || Boolean(safeAnalyticsPage(url.pathname));
+    const pathname = stripSiteBasePath(url.pathname, SITE_BASE_URL);
+    return pathname === "/" || Boolean(pathname && safeAnalyticsPage(pathname));
   } catch { return false; }
 }
 
 function currentPage() {
   if (!activePage) return null;
-  if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== activePage.route) return null;
+  const pathname = stripSiteBasePath(window.location.pathname, SITE_BASE_URL);
+  if (!pathname || `${pathname}${window.location.search}${window.location.hash}` !== activePage.route) return null;
   return activePage;
 }
 
@@ -128,7 +132,7 @@ function configureGoogleAnalytics() {
     allow_google_signals: false,
     allow_ad_personalization_signals: false,
     send_page_view: false,
-    page_location: new URL(page.path, window.location.origin).href,
+    page_location: new URL(withSiteBasePath(page.path, SITE_BASE_URL), window.location.origin).href,
     page_title: page.title,
     page_referrer: "",
   });
@@ -165,8 +169,8 @@ function flushPageViews() {
   if (googleLoaded && key !== lastGoogleKey) {
     lastGoogleKey = key;
     window.gtag?.("event", "page_view", {
-      page_location: new URL(page.path, window.location.origin).href,
-      page_path: page.path,
+      page_location: new URL(withSiteBasePath(page.path, SITE_BASE_URL), window.location.origin).href,
+      page_path: withSiteBasePath(page.path, SITE_BASE_URL),
       page_title: page.title,
       page_referrer: "",
     });

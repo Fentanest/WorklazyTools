@@ -1,6 +1,7 @@
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
 import { VIDEO_STUDIO_PUBLIC, documentReadiness, safeAnalyticsPage } from "../app/publicService";
+import { stripSiteBasePath, withSiteBasePath } from "../app/siteBasePath";
 import {
   CircleHelp,
   Github,
@@ -30,7 +31,6 @@ import { useWorklazyTheme } from "../hooks/useWorklazyTheme";
 import { cn } from "../lib/utils";
 import { AdSenseLoader } from "./AdSenseLoader";
 import { CoupangBanner } from "./CoupangBanner";
-import { setAdIneligible } from "../app/adEligibility";
 
 import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { AppInstallControl } from "./AppInstallControl";
@@ -128,8 +128,10 @@ export function AppShell() {
       perform();
       return;
     }
-    const targetStripped = stripLanguagePrefix(target.pathname).replace(/\/+$/, "") || "/";
-    const currentStripped = stripLanguagePrefix(window.location.pathname).replace(/\/+$/, "") || "/";
+    const targetRoute = stripSiteBasePath(target.pathname, import.meta.env.BASE_URL) ?? target.pathname;
+    const currentRoute = stripSiteBasePath(window.location.pathname, import.meta.env.BASE_URL) ?? window.location.pathname;
+    const targetStripped = stripLanguagePrefix(targetRoute).replace(/\/+$/, "") || "/";
+    const currentStripped = stripLanguagePrefix(currentRoute).replace(/\/+$/, "") || "/";
     if (targetStripped === currentStripped || !hasUnsavedWork() || !isGuardedTarget(targetStripped)) {
       perform();
       return;
@@ -156,13 +158,15 @@ export function AppShell() {
         return;
       }
       if (url.origin !== window.location.origin) return;
-      const targetStripped = stripLanguagePrefix(url.pathname).replace(/\/+$/, "") || "/";
-      const currentStripped = stripLanguagePrefix(window.location.pathname).replace(/\/+$/, "") || "/";
+      const targetRoute = stripSiteBasePath(url.pathname, import.meta.env.BASE_URL) ?? url.pathname;
+      const currentRoute = stripSiteBasePath(window.location.pathname, import.meta.env.BASE_URL) ?? window.location.pathname;
+      const targetStripped = stripLanguagePrefix(targetRoute).replace(/\/+$/, "") || "/";
+      const currentStripped = stripLanguagePrefix(currentRoute).replace(/\/+$/, "") || "/";
       if (targetStripped === currentStripped) return;
       if (!hasUnsavedWork() || !isGuardedTarget(targetStripped)) return;
       event.preventDefault();
       event.stopPropagation();
-      const destination = `${url.pathname}${url.search}${url.hash}`;
+      const destination = `${targetRoute}${url.search}${url.hash}`;
       pendingActionRef.current = () => navigate(destination);
       setGuardOpen(true);
     };
@@ -247,13 +251,16 @@ export function AppShell() {
   const routeIdentity = `${location.key}:${location.pathname}`;
   const [contentReadyIdentity, setContentReadyIdentity] = useState<string | null>(null);
   const [adReadyIdentity, setAdReadyIdentity] = useState<string | null>(null);
+  const [expiredResultIdentity, setExpiredResultIdentity] = useState<string | null>(null);
   useEffect(() => {
     const main = document.getElementById("main-content");
     if (!main) return;
     const reconcile = () => {
       const next = main.querySelector(".tool-route-loading, [data-route-error]") ? null : routeIdentity;
       setContentReadyIdentity((current) => current === next ? current : next);
-      const adNext = next && !main.querySelector('[data-testid="document-expired-result"]') ? routeIdentity : null;
+      const expired = Boolean(main.querySelector('[data-testid="document-expired-result"]'));
+      setExpiredResultIdentity((current) => current === (expired ? routeIdentity : null) ? current : (expired ? routeIdentity : null));
+      const adNext = next && !expired ? routeIdentity : null;
       setAdReadyIdentity((current) => current === adNext ? current : adNext);
     };
     reconcile();
@@ -265,9 +272,14 @@ export function AppShell() {
     redactor: redactorDocument,
     office: officeIsolationDocument,
     excel: excelIsolationDocument,
-  }, window.crossOriginIsolated, location.search, controllerScriptUrl);
+  }, window.crossOriginIsolated, location.search, controllerScriptUrl, import.meta.env.BASE_URL);
   const routeMetadataSafe = Boolean(safeAnalyticsPage(location.pathname, location.search, location.hash));
-  const pageReady = readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe;
+  // Auto Ads can survive a React unmount. An unavailable/empty state reached
+  // from an ad-bearing SPA document must become its own document. It then has
+  // no AdSense script, so this transition cannot loop or request another ad.
+  const terminalAdState = readiness === "unavailable" || expiredResultIdentity === routeIdentity;
+  const terminalAdDocumentTransition = terminalAdState && Boolean(document.querySelector("script[data-worklazy-adsense]"));
+  const pageReady = readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe && !terminalAdDocumentTransition;
   const adReady = pageReady && adReadyIdentity === routeIdentity;
 
   useEffect(() => {
@@ -298,7 +310,7 @@ export function AppShell() {
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
       <ExcelPreserveIsolationBoundary active={excelPreserveActive} isolationDocument={excelIsolationDocument} language={language} />
       <AnalyticsLoader ready={pageReady} />
-      <AdSenseLoader ready={adReady} />
+      <AdSenseLoader ready={adReady} terminalIneligible={terminalAdState} />
       <aside className="sidebar glass-panel" aria-label={t("navigation.primaryLabel")}>
         <NavLink className="brand-card" to={localizedPath(language, "/")} aria-label={`Worklazy Tools ${t("navigation.home")}`}>
           <svg
@@ -572,7 +584,7 @@ function OfficeIsolationBoundary({ active, isolationDocument, language }: { acti
     if (!import.meta.env.PROD) return;
     if (active && !isolationDocument) {
       const target = new URL(window.location.href);
-      target.pathname = localizedPath(language, "/tools/office-editor/app/");
+      target.pathname = withSiteBasePath(localizedPath(language, "/tools/office-editor/app/"), import.meta.env.BASE_URL);
       window.location.replace(target.href);
       return;
     }
@@ -587,7 +599,7 @@ function ExcelPreserveIsolationBoundary({ active, isolationDocument, language }:
     if (!import.meta.env.PROD) return;
     if (active && !isolationDocument) {
       const target = new URL(window.location.href);
-      target.pathname = localizedPath(language, "/tools/excel-merger/xls-preserve/");
+      target.pathname = withSiteBasePath(localizedPath(language, "/tools/excel-merger/xls-preserve/"), import.meta.env.BASE_URL);
       window.location.replace(target.href);
       return;
     }

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { localizedPath, storeLanguage, stripLanguagePrefix, type AppLanguage } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
+import { withSiteBasePath } from "../app/siteBasePath";
 
 const LANGUAGE_OPTIONS = ["ko", "en"] as const;
 
@@ -24,7 +25,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
     const destination = nextLanguage === "en" && currentPath === "/tools/hwp-editor"
       ? localizedPath(nextLanguage, "/tools")
       : localizedPath(nextLanguage, currentPath);
-    if (isRedactorDocument() || isRedactorPath(location.pathname)) { window.location.assign(`${destination}${location.search}${location.hash}`); return; }
+    if (isRedactorDocument() || isRedactorPath(location.pathname)) { window.location.assign(`${withSiteBasePath(destination, import.meta.env.BASE_URL)}${location.search}${location.hash}`); return; }
     navigate(`${destination}${location.search}${location.hash}`);
   };
 

@@ -1064,6 +1064,33 @@ async function scenarioS10(browser, server) {
   })];
 }
 
+async function scenarioS11(browser, server) {
+  // Empty result -> normal tool -> browser Back must leave the Auto Ads
+  // document. This exercises a status boundary, not any video editor feature.
+  return [await runCase("S11-expired-result-document-boundary", async () => {
+    resetServer(server);
+    const tracked = await newTrackedContext(browser, server);
+    try {
+      await tracked.page.goto(`${server.url}/ko/tools/document-compare/results/1/`, { waitUntil: "domcontentloaded" });
+      await tracked.page.locator('[data-testid="document-expired-result"]').waitFor();
+      assert.equal((await observe(tracked.page)).scripts, 0, "expired direct entry cannot request AdSense");
+      await tracked.page.locator('[data-testid="document-expired-result"] a[href*="document-compare"]').click();
+      await tracked.page.locator("script[data-worklazy-adsense]").waitFor({ state: "attached" });
+      await tracked.page.waitForFunction(() => window.__wlAdStub?.loads === 1);
+      assert.equal(tracked.docCommits.length, 1, "ordinary ready-tool navigation remains SPA");
+      await tracked.page.goBack({ waitUntil: "domcontentloaded" });
+      await tracked.page.waitForFunction(() => document.querySelector('[data-testid="document-expired-result"]') && !document.querySelector("script[data-worklazy-adsense]"));
+      assert.equal(tracked.docCommits.length, 2, "expired status gets exactly one fresh document");
+      assert.equal(tracked.counters.stub, 1, "the expired document does not request a second ad");
+      assert.equal(await tracked.page.locator(".wl-ad-stub-marker").count(), 0, "the previous Auto Ads DOM does not survive the boundary");
+      assertNoRealNetwork(tracked.counters, "S11");
+      return { status: "pass", docCommits: [...tracked.docCommits], counters: counterSnapshot(tracked.counters) };
+    } finally {
+      await tracked.context.close();
+    }
+  })];
+}
+
 const STUB_EXPECTATION_MESSAGE = "S2-discrimination: stub expected (should fail with stub disabled)";
 
 function isExpectedStubFailure(error) {
@@ -1159,6 +1186,7 @@ async function main() {
       { key: "S5", run: () => scenarioS5(browser, server) },
       { key: "D4", run: () => scenarioD4(browser, server) },
       { key: "S10", run: () => scenarioS10(browser, server) },
+      { key: "S11", run: () => scenarioS11(browser, server) },
     ];
     const scenarios = [];
     for (const job of jobs) {

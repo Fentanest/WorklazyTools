@@ -37,7 +37,7 @@
     "test:qr-bulk": "node tests/qr-bulk-smoke.mjs",
     "test:qr-font-render": "node --experimental-strip-types tests/qr-font-render-regression.mjs",
     "test:pdf-font-embed": "node --experimental-strip-types tests/pdf-font-embed-regression.mjs",
-    "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
+    "test:unit": "node scripts/run-public-unit-tests.mjs",
     "test:foliotrace": "python3 -m unittest discover -s tests/foliotrace -p 'test_*.py' -v",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",
@@ -57,6 +57,7 @@
     "test:static": "node scripts/validate-static-output.mjs",
     "test:ads": "node tests/ad-eligibility-smoke.mjs",
     "test:analytics": "node tests/analytics-policy-smoke.mjs",
+    "test:analytics-base": "node tests/analytics-base-smoke.mjs",
     "test:i18n": "node scripts/validate-i18n.mjs",
     "test:guides": "node --experimental-strip-types scripts/validate-guides.mjs"
   },

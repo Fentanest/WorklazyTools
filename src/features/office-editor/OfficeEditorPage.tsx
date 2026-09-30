@@ -13,6 +13,7 @@ import { UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import { stagePendingOfficeFile } from "./pendingOfficeFile";
 import { OFFICE_DOWNLOAD_BYTES } from "./officeAssets";
+import { withSiteBasePath } from "../../app/siteBasePath";
 
 const OFFICE_ACCEPT = ".docx,.doc,.odt,.xlsx,.xls,.ods,.pptx,.ppt,.odp";
 const OFFICE_EXTENSIONS = new Set(["docx", "doc", "odt", "xlsx", "xls", "ods", "pptx", "ppt", "odp"]);
@@ -24,13 +25,14 @@ export function OfficeEditorPage() {
 
 
  const appPath = useLocalizedPath("/tools/office-editor/app/");
+ const appDocumentPath = withSiteBasePath(appPath, import.meta.env.BASE_URL);
   const location = useLocation();
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     if (searchParams.get("guide") !== "1") {
-      window.location.replace(appPath);
+      window.location.replace(appDocumentPath);
     }
-  }, [appPath, location.search]);
+  }, [appDocumentPath, location.search]);
  const downloadSize = formatBytes(OFFICE_DOWNLOAD_BYTES);
  const [handoffBusy, setHandoffBusy] = useState(false);
  const [handoffError, setHandoffError] = useState<string>();
@@ -45,7 +47,7 @@ export function OfficeEditorPage() {
   setHandoffError(undefined);
   try {
    await stagePendingOfficeFile(file);
-   window.location.assign(appPath);
+   window.location.assign(appDocumentPath);
   } catch {
    setHandoffBusy(false);
    setHandoffError(L("브라우저에 파일을 임시 보관하지 못했습니다. 저장 공간을 허용한 뒤 다시 시도해 주세요.", "The file could not be held temporarily in this browser. Allow site storage and try again."));

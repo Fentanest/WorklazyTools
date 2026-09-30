@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { AnalyticsLoader } from "../components/AnalyticsLoader";
+import { withSiteBasePath } from "../app/siteBasePath";
 
 /**
  * Dedicated error page for S5 (render error recovery).
@@ -14,7 +15,7 @@ export function RouteErrorPage() {
 
   const goHome = () => {
     const lang = document.documentElement.lang || "en";
-    window.location.assign(`/${lang}/`);
+    window.location.assign(withSiteBasePath(`/${lang}/`, import.meta.env.BASE_URL));
   };
 
   return (
@@ -34,7 +35,7 @@ export function RouteErrorPage() {
           </Button>
 
           <Button
-            onClick={() => window.location.assign(location.pathname)}
+            onClick={() => window.location.assign(withSiteBasePath(location.pathname, import.meta.env.BASE_URL))}
             variant="outline"
             className="w-full"
           >
