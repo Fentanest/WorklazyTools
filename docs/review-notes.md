@@ -6,6 +6,7 @@
 
 ## 2026-09-30 — 자체 광고·분석 동의창 제거 후 확인
 
+- 비디오 편집기 비공개 상태에서 별도 `test:video-hybrid` 실행을 시작했으나 사용자 지시 직후 중단했다(exit 130). 이를 통과로 간주하지 않는다. Pages의 해당 비디오 전용 검사와 FFmpeg 준비는 재공개 때까지 제외하며, 오디오 등 다른 미디어 도구의 검사는 유지한다. — Codx
 - 저장된 기존 동의값은 새 동작에 승계하지 않으며 앱 로더는 정상 화면 준비·공개 경로 적격성만 확인한다. 로컬 프로덕션 미리보기에서는 실제 공급자 요청을 기본 차단하고, 공급자 모의 검사는 외부 요청을 차단하는 테스트에서만 명시적으로 허용한다. 이 변경은 배포 측 CMP 실동작이나 공급자 계정 승인을 검증한 것이 아니다. — Codx
 - 최종 후보의 `npm run build`, `npm run test:unit`(653/653), `npm run test:static`, `npm run test:ads`, `npm run test:analytics`, `npm run test:xls-preserve`, `npm run test:xls-first-load`, `npm run test:office`, `npm run test:pdf-compare-ui`, `npm run test:excel-cleaner`는 통과했다. `npm run test:utilities`는 변경하지 않은 Image Studio의 영문 화면에 남은 한국어 안내 문구 검사에서, `npm run test:excel-compare`는 변경하지 않은 선택 카드·Swap/Add 시각 대비 검사에서 실패했다. 둘을 통과나 변경 원인으로 단정하지 않고 별도 회귀 확인 대상으로 남긴다. — Codx
 

@@ -163,13 +163,8 @@ jobs:
       - name: Validate SEO and AdSense files
         run: npm run test:static
 
-      - name: Setup FFmpeg for the hybrid smoke
-        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6 # v3.1
-        with:
-          ffmpeg-version: release
-
-      - name: Verify the small hybrid video route
-        run: npm run test:video-hybrid
+      # Video Studio is unpublished. Restore its FFmpeg setup and hybrid smoke
+      # when VIDEO_STUDIO_PUBLIC is enabled again.
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
