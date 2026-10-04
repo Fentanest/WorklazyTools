@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { moduleAttributionPlugin } from "./scripts/bundle-output-metadata.mjs";
 import { VIDEO_STUDIO_PUBLIC } from "./src/app/publicServiceConfig.mjs";
+import { productBannerRuntimePlugin } from "./scripts/product-banner-runtime.mjs";
 
 const configuredBase = process.env.VITE_BASE_PATH || "/";
 const base = `${configuredBase.startsWith("/") ? "" : "/"}${configuredBase.replace(/\/$/, "")}/`;
@@ -27,6 +28,7 @@ export default defineConfig({
   base,
   define: { __VIDEO_STUDIO_PUBLIC__: JSON.stringify(VIDEO_STUDIO_PUBLIC) },
   plugins: [
+    productBannerRuntimePlugin(),
     react(),
     tailwindcss(),
     browserNodePolyfills(),
