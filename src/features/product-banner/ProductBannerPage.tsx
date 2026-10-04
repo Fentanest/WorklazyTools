@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUnsavedWorkGuard } from "../../app/toolState";
 import { PageHeader, SectionCard } from "../../components/ui";
@@ -33,9 +33,18 @@ export function ProductBannerPage() {
   const [sampleSettings, setSampleSettings] = useState(() => createDefaultSettings(language));
   const editorRef = useRef(state); editorRef.current = state;
   const jsonInput = useRef<HTMLInputElement>(null);
-  useUnsavedWorkGuard("product-banner", hasBannerWork(state) || busy || pending, { kind: "edits", scopePath: "/tools/product-banner" });
+  const jsonRequest = useRef(0);
+  const [jsonReading, setJsonReading] = useState(false);
+  useEffect(() => () => { jsonRequest.current++; }, []);
+  useUnsavedWorkGuard("product-banner", hasBannerWork(state) || busy || pending || jsonReading, { kind: "edits", scopePath: "/tools/product-banner" });
   const dispatch = (action: EditorAction) => {
-    try { const next = reduceEditorState(editorRef.current, action); editorRef.current = next; setState(next); setMessage(""); return true; }
+    try {
+      const next = reduceEditorState(editorRef.current, action);
+      // Project changes expire prior reads, including an edit followed by Undo.
+      // Selection and observed image status do not invalidate a replacement approval.
+      if (next.project !== editorRef.current.project) { jsonRequest.current++; setJsonReading(false); }
+      editorRef.current = next; setState(next); setMessage(""); return true;
+    }
     catch { setMessage(text.limitError); return false; }
   };
   const output = useMemo(() => {
@@ -48,10 +57,17 @@ export function ProductBannerPage() {
   const errorText = (code: InputErrorCode) => inputErrorMessages[language][code];
   async function importJson(file?: File) {
     if (!file || busy) return;
-    if (hasBannerWork(state) && !window.confirm(text.confirm)) return;
+    const request = ++jsonRequest.current;
+    setJsonReading(false);
+    if (hasBannerWork(editorRef.current) && !window.confirm(text.confirm)) return;
     if (file.size > PROJECT_LIMITS.bytes) { setMessage(text.limitError); return; }
-    try { dispatch({ type: "load", project: loadProjectJson(await file.text()), confirmDiscard: true }); }
-    catch { setMessage(text.jsonError); }
+    setJsonReading(true);
+    try {
+      const content = await file.text();
+      if (request !== jsonRequest.current) return;
+      dispatch({ type: "load", project: loadProjectJson(content), confirmDiscard: true });
+    } catch { if (request === jsonRequest.current) setMessage(text.jsonError); }
+    finally { if (request === jsonRequest.current) setJsonReading(false); }
   }
   async function copy(which: "html" | "iframe") {
     setFormat(which);
