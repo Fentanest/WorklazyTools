@@ -42,7 +42,7 @@ export function parsePrice(cell: CellValue | null | undefined, currencyRaw?: str
   const match = /^(?:([A-Za-z]{3})\s+)?((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)$/u.exec(raw.trim());
   const prefix = currencyValue(match?.[1]);
   const amount = match ? Number(match[2].replace(/,/gu, "")) : NaN;
-  return { raw, amount: Number.isFinite(amount) && !(prefix && currency && prefix !== currency) ? amount : null, currency: currency ?? prefix };
+  return { raw, amount: Number.isFinite(amount) && amount <= Number.MAX_SAFE_INTEGER && !(prefix && currency && prefix !== currency) ? amount : null, currency: currency ?? prefix };
 }
 export function parseDiscount(cell: CellValue | null | undefined): BannerInputProduct["discount"] {
   const raw = cell?.text ?? null;

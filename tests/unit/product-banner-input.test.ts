@@ -7,6 +7,16 @@ import { parseInputBytes, sniffInputFormat, classifyInputError } from "../../src
 import { extractInputProducts, mapHeaders, normalizeHeader, parsePrice, parseDiscount, summarizeSheets } from "../../src/features/product-banner/inputMapping.ts";
 import { INPUT_LIMITS, ProductBannerInputError } from "../../src/features/product-banner/inputTypes.ts";
 import { validateProductUrl } from "../../src/features/product-banner/urlPolicy.ts";
+import { createEditorState, reduceEditorState } from "../../src/features/product-banner/state.ts";
+import { loadProjectJson, saveProjectJson } from "../../src/features/product-banner/projectJson.ts";
+test("unrepresentable optional prices preserve raw input and do not block normal product import", () => {
+  const row = syntheticRow(1); row[4] = "USD 9007199254740992";
+  const products = extractInputProducts(parseInputBytes(syntheticBytes("xlsx", [headers, row, syntheticRow(2)])), 0, "synthetic").products;
+  assert.equal(products[0].originPrice.raw, row[4]); assert.equal(products[0].originPrice.amount, null);
+  const state = reduceEditorState(createEditorState("ko"), { type: "append", products, importedAt: "2026-10-05T00:00:00.000Z" });
+  assert.equal(state.project.products.length, 2);
+  assert.deepEqual(loadProjectJson(saveProjectJson(state.project)), state.project);
+});
 const errorCode = (code: string) => (error: unknown) => error instanceof ProductBannerInputError && error.code === code;
 for (const format of ["biff8", "xlsx"] as const) test(`${format}: byte sniffing, 21 columns, strings, prices, discount, video`, () => {
   const bytes = syntheticBytes(format), book = parseInputBytes(bytes), result = extractInputProducts(book, 2, "wrong.csv");
