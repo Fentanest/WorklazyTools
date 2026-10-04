@@ -30,8 +30,9 @@ export function imageStatus(state: BannerEditorState, id: string): ImageStatus {
   const product = state.project.products.find((p) => p.id === id), entry = state.imageStates[id];
   return product && entry?.url === product.imageUrl ? entry.status : "unchecked";
 }
-export function productReviewFields(product: EditProduct): ("name" | "imageUrl" | "promotionUrl")[] {
-  const fields: ("name" | "imageUrl" | "promotionUrl")[] = [];
+export function productReviewFields(product: EditProduct): ("name" | "imageUrl" | "promotionUrl" | "productId")[] {
+  const fields: ("name" | "imageUrl" | "promotionUrl" | "productId")[] = [];
+  if (product.productIdNeedsReview) fields.push("productId");
   if (!product.name.trim()) fields.push("name");
   for (const key of ["imageUrl", "promotionUrl"] as const) if (!validateProductUrl(product[key]).valid) fields.push(key);
   return fields;
@@ -67,6 +68,7 @@ function importProducts(products: readonly BannerInputProduct[], start: number, 
   return products.map((p, i) => ({ id: `pb-${start + i}`, originalOrder: start + i, included: true,
     name: string(p.name), imageUrl: string(p.imageUrl).trim(), promotionUrl: string(p.promotionUrl).trim(),
     originalUrls: { imageUrl: string(p.originalUrls.imageUrl), promotionUrl: string(p.originalUrls.promotionUrl) }, productId: p.productId === null ? null : string(p.productId),
+    productIdNeedsReview: p.needsReview.includes("productId"),
     originPrice: validatePrice(p.originPrice), discountPrice: validatePrice(p.discountPrice), discount: validateDiscount(p.discount),
     source: { fileIndex: integer(p.source.fileIndex), sheetIndex: integer(p.source.sheetIndex), rowNumber: integer(p.source.rowNumber, 1), importedAt } }));
 }

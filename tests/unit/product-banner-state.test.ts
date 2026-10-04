@@ -193,3 +193,20 @@ test("price display omits invalid or inconsistent raw digits without substitutin
     assert.equal(model.products[0].prices, undefined);
   }
 });
+
+test("unsafe ProductId warning survives edits, undo and project JSON without guessing an ID", async () => {
+  const { saveProjectJson, loadProjectJson } = await import("../../src/features/product-banner/projectJson.ts");
+  const product = { ...inputProduct(1), productId: "9007199254740992", needsReview: ["productId"] as ["productId"] };
+  let s = reduce(createEditorState("ko"), { type: "append", products: [product], importedAt });
+  s = reduce(s, { type: "edit", id: "pb-1", changes: { name: "Edited" } });
+  s = reduce(s, { type: "undo" });
+  const p = loadProjectJson(saveProjectJson(s.project)).products[0];
+  assert.equal(p.productId, product.productId);
+  assert.equal(p.productIdNeedsReview, true);
+  assert.deepEqual(productReviewFields(p), ["productId"]);
+  assert.ok(!JSON.stringify(createDisplayModel(s.project)).includes("productIdNeedsReview"));
+  const legacy = JSON.parse(saveProjectJson(s.project)); delete legacy.products[0].productIdNeedsReview;
+  assert.equal(loadProjectJson(JSON.stringify(legacy)).products[0].productIdNeedsReview, false);
+  legacy.products[0].productIdNeedsReview = "true";
+  assert.throws(() => loadProjectJson(JSON.stringify(legacy)), code("INVALID_PROJECT"));
+});

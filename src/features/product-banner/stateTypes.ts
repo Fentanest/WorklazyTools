@@ -21,6 +21,7 @@ export type EditProduct = Readonly<{
   imageUrl: string; promotionUrl: string;
   originalUrls: Readonly<{ imageUrl: string; promotionUrl: string }>;
   productId: string | null;
+  productIdNeedsReview: boolean;
   originPrice: Readonly<PriceValue>; discountPrice: Readonly<PriceValue>;
   discount: Readonly<{ raw: string | null; percent: number | null }>;
   source: Readonly<{ fileIndex: number; sheetIndex: number; rowNumber: number; importedAt: string }>;

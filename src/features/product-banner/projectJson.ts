@@ -42,6 +42,8 @@ function decodeProduct(value: unknown): EditProduct {
   return { id, originalOrder: integer(v.originalOrder, 1), included: boolean(v.included), name: string(v.name),
     imageUrl: string(v.imageUrl).trim(), promotionUrl: string(v.promotionUrl).trim(),
     originalUrls: { imageUrl: string(urls.imageUrl), promotionUrl: string(urls.promotionUrl) }, productId: nullableString(v.productId),
+    // Older v1 projects lack this optional warning; never infer a replacement ID.
+    productIdNeedsReview: v.productIdNeedsReview === undefined ? false : boolean(v.productIdNeedsReview),
     originPrice: validatePrice(v.originPrice), discountPrice: validatePrice(v.discountPrice), discount: validateDiscount(v.discount),
     source: { fileIndex: integer(source.fileIndex), sheetIndex: integer(source.sheetIndex), rowNumber: integer(source.rowNumber, 1), importedAt: validateImportedAt(source.importedAt) } };
 }
