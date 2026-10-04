@@ -20,6 +20,8 @@ export const bannerCss = `
 .wlpb-v1-original{text-decoration:line-through}
 .wlpb-v1-discount{font-weight:700;color:var(--wlpb-color)}
 .wlpb-v1-link[data-wlpb-cta]{height:auto;margin-top:8px;display:block;color:var(--wlpb-color);text-decoration:underline;padding:8px 0;min-height:44px}
+.wlpb-v1-photo-strip .wlpb-v1-item{display:flex;flex-direction:column}
+.wlpb-v1-photo-strip .wlpb-v1-link:not([data-wlpb-cta]){height:auto;flex:1}
 .wlpb-v1-product-card .wlpb-v1-item,.wlpb-v1-grid .wlpb-v1-item{border:1px solid var(--wlpb-line);border-radius:8px;padding:10px;display:flex;flex-direction:column}
 .wlpb-v1-product-card .wlpb-v1-link,.wlpb-v1-grid .wlpb-v1-link{flex:1}
 .wlpb-v1-product-card .wlpb-v1-name,.wlpb-v1-grid .wlpb-v1-name{height:3em}
