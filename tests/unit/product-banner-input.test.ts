@@ -88,6 +88,7 @@ test("unsafe URLs are retained and flagged; whitespace trim is the only rewrite"
   const row = syntheticRow(1); row[1] = " javascript:alert(1) "; row[14] = " https://EXAMPLE.com:443/a/../b?x=1&y=2 "; row[3] = "";
   const p = extractInputProducts(parseInputBytes(syntheticBytes("xlsx", [headers, row])), 0, "a").products[0];
   assert.equal(p.imageUrl, "javascript:alert(1)"); assert.equal(p.promotionUrl, "https://EXAMPLE.com:443/a/../b?x=1&y=2");
+  assert.deepEqual(p.originalUrls, { imageUrl: row[1], promotionUrl: row[14] });
   assert.deepEqual(p.needsReview, ["imageUrl", "name"]);
 });
 test("URL policy rejects schemes, credentials, controls, private IPs and local names", () => {

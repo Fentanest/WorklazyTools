@@ -63,6 +63,7 @@ function productFromRow(row: InputRow, mapping: ColumnMapping, fileIndex: number
   const invalidId = id && (id.unsafeInteger || id.cacheMissing || id.kind === "error" || (id.kind === "number" && !Number.isSafeInteger(Number(id.text))));
   if (invalidId) needsReview.push("productId");
   return { source: { fileIndex, sheetIndex, rowNumber: row.rowNumber }, imageUrl, promotionUrl, name,
+    originalUrls: { imageUrl: value("imageUrl"), promotionUrl: value("promotionUrl") },
     productId: invalidId ? null : id?.text ?? null, videoUrl: value("videoUrl") || null,
     originPrice: parsePrice(cell("originPrice"), value("currency")), discountPrice: parsePrice(cell("discountPrice"), value("currency")),
     discount: parseDiscount(cell("discount")), needsReview,

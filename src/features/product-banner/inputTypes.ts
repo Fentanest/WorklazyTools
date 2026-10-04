@@ -26,6 +26,7 @@ export type PriceValue = { raw: string | null; amount: number | null; currency: 
 export type BannerInputProduct = {
   source: { fileIndex: number; sheetIndex: number; rowNumber: number };
   imageUrl: string; promotionUrl: string; name: string; productId: string | null; videoUrl: string | null;
+  originalUrls: { imageUrl: string; promotionUrl: string };
   originPrice: PriceValue; discountPrice: PriceValue; discount: { raw: string | null; percent: number | null };
   needsReview: ("imageUrl" | "promotionUrl" | "name" | "productId")[];
   sourceHyperlinks: Partial<Record<"imageUrl" | "promotionUrl", string>>;
