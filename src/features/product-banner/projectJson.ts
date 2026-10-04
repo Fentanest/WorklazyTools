@@ -54,7 +54,7 @@ export function validateProject(value: unknown): BannerProject {
   if (v.products.length > PROJECT_LIMITS.products) throw new BannerStateError("PROJECT_LIMIT");
   const products = v.products.map(decodeProduct), ids = new Set<string>(), orders = new Set<number>();
   for (const p of products) {
-    if (ids.has(p.id) || orders.has(p.originalOrder) || Number(p.id.slice(3)) >= nextId) throw new BannerStateError("INVALID_PROJECT");
+    if (ids.has(p.id) || orders.has(p.originalOrder) || p.originalOrder >= nextId || Number(p.id.slice(3)) >= nextId) throw new BannerStateError("INVALID_PROJECT");
     ids.add(p.id); orders.add(p.originalOrder);
   }
   return { schemaVersion: PROJECT_SCHEMA_VERSION, nextId, products, settings: validateSettings(v.settings) };

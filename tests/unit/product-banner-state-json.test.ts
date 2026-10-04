@@ -8,6 +8,18 @@ import { inputProduct, importedAt, stateWith } from "../fixtures/product-banner/
 const code = (expected: string) => (error: unknown) => error instanceof BannerStateError && error.code === expected;
 const editable = () => JSON.parse(saveProjectJson(stateWith().project));
 
+test("originalOrder remains below the allocator: accepted JSON can append and save/load", () => {
+  const value = JSON.parse(saveProjectJson(stateWith(1).project));
+  value.products[0].originalOrder = value.nextId;
+  assert.throws(() => loadProjectJson(JSON.stringify(value)), code("INVALID_PROJECT"));
+  value.nextId = 5; value.products[0].originalOrder = 4;
+  const loaded = loadProjectJson(JSON.stringify(value));
+  const restored = reduce(createEditorState("ko"), { type: "load", project: loaded });
+  const appended = reduce(restored, { type: "append", products: [inputProduct(2)], importedAt });
+  assert.deepEqual(appended.project.products.map((p) => p.originalOrder), [4, 5]);
+  assert.deepEqual(loadProjectJson(saveProjectJson(appended.project)), appended.project);
+});
+
 test("JSON restores ordered IDs, included/excluded lists, edited values, raw/used links, settings and display identically", () => {
   let s = stateWith();
   s = reduce(s, { type: "edit", id: "pb-1", changes: { name: '수정 "<&>😀', promotionUrl: " https://EXAMPLE.com:443/a/../z?b=2&a=%22 " } });
